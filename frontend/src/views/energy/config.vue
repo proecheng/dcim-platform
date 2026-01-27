@@ -144,7 +144,7 @@
         <el-alert type="info" :closable="false" style="margin-bottom: 16px;">
           <template #title>电价说明</template>
           <p>电价配置用于计算用电成本。支持手动配置或上传电费单自动识别(OCR)。</p>
-          <p>时段类型：<el-tag type="danger" size="small">尖峰</el-tag> <el-tag type="warning" size="small">高峰</el-tag> <el-tag size="small">平段</el-tag> <el-tag type="success" size="small">低谷</el-tag></p>
+          <p>时段类型：<el-tag type="danger" size="small">尖峰</el-tag> <el-tag type="warning" size="small">高峰</el-tag> <el-tag size="small">平段</el-tag> <el-tag type="success" size="small">低谷</el-tag> <el-tag type="primary" size="small">深谷</el-tag></p>
         </el-alert>
 
         <el-table :data="pricingList" v-loading="loading.pricing" stripe>
@@ -181,28 +181,34 @@
 
         <!-- 电价汇总卡片 -->
         <el-row :gutter="20" style="margin-top: 20px;">
-          <el-col :span="6">
+          <el-col :span="4" :lg="4" :md="6" :sm="12" :xs="24">
             <el-card shadow="hover" class="summary-card">
               <div class="summary-label">尖峰电价</div>
               <div class="summary-value danger">¥{{ getPriceByType('sharp')?.toFixed(4) || '-' }}</div>
             </el-card>
           </el-col>
-          <el-col :span="6">
+          <el-col :span="4" :lg="4" :md="6" :sm="12" :xs="24">
             <el-card shadow="hover" class="summary-card">
               <div class="summary-label">高峰电价</div>
               <div class="summary-value warning">¥{{ getPriceByType('peak')?.toFixed(4) || '-' }}</div>
             </el-card>
           </el-col>
-          <el-col :span="6">
+          <el-col :span="4" :lg="4" :md="6" :sm="12" :xs="24">
             <el-card shadow="hover" class="summary-card">
               <div class="summary-label">平段电价</div>
               <div class="summary-value">¥{{ getPriceByType('flat')?.toFixed(4) || '-' }}</div>
             </el-card>
           </el-col>
-          <el-col :span="6">
+          <el-col :span="4" :lg="4" :md="6" :sm="12" :xs="24">
             <el-card shadow="hover" class="summary-card">
               <div class="summary-label">低谷电价</div>
               <div class="summary-value success">¥{{ getPriceByType('valley')?.toFixed(4) || '-' }}</div>
+            </el-card>
+          </el-col>
+          <el-col :span="4" :lg="4" :md="6" :sm="12" :xs="24">
+            <el-card shadow="hover" class="summary-card">
+              <div class="summary-label">深谷电价</div>
+              <div class="summary-value primary">¥{{ getPriceByType('deep_valley')?.toFixed(4) || '-' }}</div>
             </el-card>
           </el-col>
         </el-row>
@@ -359,6 +365,7 @@
             <el-option label="高峰" value="peak" />
             <el-option label="平段" value="flat" />
             <el-option label="低谷" value="valley" />
+            <el-option label="深谷" value="deep_valley" />
           </el-select>
         </el-form-item>
         <el-form-item label="开始时间" required>
@@ -453,12 +460,12 @@ const getPanelTypeText = (type: string) => {
 }
 
 const getPeriodTypeText = (type: string) => {
-  const map: Record<string, string> = { sharp: '尖峰', peak: '高峰', flat: '平段', valley: '低谷' }
+  const map: Record<string, string> = { sharp: '尖峰', peak: '高峰', flat: '平段', valley: '低谷', deep_valley: '深谷' }
   return map[type] || type
 }
 
 const getPeriodTagType = (type: string): TagType => {
-  const map: Record<string, TagType> = { sharp: 'danger', peak: 'warning', flat: 'info', valley: 'success' }
+  const map: Record<string, TagType> = { sharp: 'danger', peak: 'warning', flat: 'info', valley: 'success', deep_valley: 'primary' }
   return map[type] || 'info'
 }
 
@@ -684,7 +691,7 @@ const handleBillUpload = (file: any) => {
   // 2. 调用OCR接口识别电费单内容
   // 3. 解析识别结果，提取电价信息
   // 4. 自动填充pricingList
-  console.log('上传文件:', file)
+  void file // suppress unused variable warning
 }
 
 onMounted(() => {
@@ -863,6 +870,10 @@ onMounted(() => {
 
     &.success {
       color: var(--success-color);
+    }
+
+    &.primary {
+      color: var(--primary-color);
     }
   }
 }

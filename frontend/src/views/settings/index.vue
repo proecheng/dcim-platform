@@ -224,9 +224,11 @@
               show-icon
             >
               <ul>
-                <li>峰时电价：用电高峰时段，电价较高 (通常 8:00-22:00)</li>
-                <li>谷时电价：用电低谷时段，电价较低 (通常 23:00-7:00)</li>
-                <li>平时电价：正常时段电价</li>
+                <li>尖峰电价：用电最高峰时段，电价最高（如午高峰、晚高峰核心时段）</li>
+                <li>高峰电价：用电高峰时段，电价较高（如白天工作时段）</li>
+                <li>平段电价：正常用电时段，标准电价</li>
+                <li>低谷电价：用电低谷时段，电价较低（如深夜时段）</li>
+                <li>深谷电价：用电最低谷时段，电价最低（如凌晨时段）</li>
                 <li>时段不能重叠，系统会自动检查时间冲突</li>
               </ul>
             </el-alert>
@@ -343,9 +345,11 @@
         </el-form-item>
         <el-form-item label="时段类型" prop="period_type">
           <el-select v-model="pricingForm.period_type" style="width: 100%;">
-            <el-option label="峰时 (用电高峰)" value="peak" />
-            <el-option label="平时 (正常时段)" value="normal" />
-            <el-option label="谷时 (用电低谷)" value="valley" />
+            <el-option label="尖峰 (最高峰时段)" value="sharp" />
+            <el-option label="高峰 (用电高峰)" value="peak" />
+            <el-option label="平段 (正常时段)" value="flat" />
+            <el-option label="低谷 (用电低谷)" value="valley" />
+            <el-option label="深谷 (最低谷时段)" value="deep_valley" />
           </el-select>
         </el-form-item>
         <el-form-item label="开始时间" prop="start_time">
@@ -608,15 +612,21 @@ const pricingRules = {
 }
 
 const periodTypeText: Record<string, string> = {
-  peak: '峰时',
-  normal: '平时',
-  valley: '谷时'
+  sharp: '尖峰',
+  peak: '高峰',
+  flat: '平段',
+  valley: '低谷',
+  deep_valley: '深谷',
+  normal: '平段' // 兼容旧数据
 }
 
 const periodTypeTag: Record<string, TagType> = {
-  peak: 'danger',
-  normal: 'warning',
-  valley: 'success'
+  sharp: 'danger',
+  peak: 'warning',
+  flat: 'info',
+  valley: 'success',
+  deep_valley: 'primary',
+  normal: 'info' // 兼容旧数据
 }
 
 // ===== 授权信息 =====

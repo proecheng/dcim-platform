@@ -273,7 +273,7 @@ class EnergyComparison(BaseModel):
 class ElectricityPricingBase(BaseModel):
     """电价配置基础模型"""
     pricing_name: str = Field(..., description="电价名称")
-    period_type: str = Field(..., description="时段类型: peak/normal/valley")
+    period_type: str = Field(..., description="时段类型: sharp/peak/flat/valley/deep_valley")
     start_time: str = Field(..., description="开始时间 HH:MM")
     end_time: str = Field(..., description="结束时间 HH:MM")
     price: float = Field(..., description="电价 元/kWh")

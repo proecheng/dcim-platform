@@ -161,7 +161,7 @@ class PowerCurveData(Base):
     demand_rolling = Column(Float, comment="滑动窗口需量 kW")
 
     # 分时标识
-    time_period = Column(String(10), comment="时段: peak/flat/valley/sharp")
+    time_period = Column(String(10), comment="时段: sharp/peak/flat/valley/deep_valley")
 
     created_at = Column(DateTime, default=datetime.now, comment="创建时间")
 
@@ -389,7 +389,7 @@ class ElectricityPricing(Base):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     pricing_name = Column(String(50), nullable=False, comment="电价名称")
-    period_type = Column(String(10), nullable=False, comment="时段类型: sharp/peak/normal/valley/deep_valley")
+    period_type = Column(String(10), nullable=False, comment="时段类型: sharp/peak/flat/valley/deep_valley")
     start_time = Column(String(5), nullable=False, comment="开始时间 HH:MM")
     end_time = Column(String(5), nullable=False, comment="结束时间 HH:MM")
     price = Column(Float, nullable=False, comment="电价 元/kWh")
@@ -631,7 +631,7 @@ class Demand15MinData(Base):
 
     # 分时标识
     is_peak_period = Column(Boolean, default=False, comment="是否峰时")
-    time_period = Column(String(10), comment="时段: peak/flat/valley/sharp")
+    time_period = Column(String(10), comment="时段: sharp/peak/flat/valley/deep_valley")
 
     # 标记
     is_max_of_day = Column(Boolean, default=False, comment="是否当日最大需量")

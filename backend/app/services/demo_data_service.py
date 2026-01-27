@@ -66,12 +66,17 @@ POWER_DEVICES = [
 ]
 
 ELECTRICITY_PRICING = [
-    {"pricing_name": "峰时电价", "period_type": "peak", "start_time": "08:00", "end_time": "11:00", "price": 1.2},
-    {"pricing_name": "峰时电价", "period_type": "peak", "start_time": "18:00", "end_time": "21:00", "price": 1.2},
-    {"pricing_name": "平时电价", "period_type": "normal", "start_time": "07:00", "end_time": "08:00", "price": 0.8},
-    {"pricing_name": "平时电价", "period_type": "normal", "start_time": "11:00", "end_time": "18:00", "price": 0.8},
-    {"pricing_name": "平时电价", "period_type": "normal", "start_time": "21:00", "end_time": "23:00", "price": 0.8},
-    {"pricing_name": "谷时电价", "period_type": "valley", "start_time": "23:00", "end_time": "07:00", "price": 0.4},
+    {"pricing_name": "尖峰电价", "period_type": "sharp", "start_time": "11:00", "end_time": "12:00", "price": 1.5},
+    {"pricing_name": "尖峰电价", "period_type": "sharp", "start_time": "18:00", "end_time": "19:00", "price": 1.5},
+    {"pricing_name": "高峰电价", "period_type": "peak", "start_time": "08:00", "end_time": "11:00", "price": 1.2},
+    {"pricing_name": "高峰电价", "period_type": "peak", "start_time": "12:00", "end_time": "14:00", "price": 1.2},
+    {"pricing_name": "高峰电价", "period_type": "peak", "start_time": "19:00", "end_time": "21:00", "price": 1.2},
+    {"pricing_name": "平段电价", "period_type": "flat", "start_time": "07:00", "end_time": "08:00", "price": 0.8},
+    {"pricing_name": "平段电价", "period_type": "flat", "start_time": "14:00", "end_time": "18:00", "price": 0.8},
+    {"pricing_name": "平段电价", "period_type": "flat", "start_time": "21:00", "end_time": "22:00", "price": 0.8},
+    {"pricing_name": "低谷电价", "period_type": "valley", "start_time": "22:00", "end_time": "00:00", "price": 0.4},
+    {"pricing_name": "低谷电价", "period_type": "valley", "start_time": "06:00", "end_time": "07:00", "price": 0.4},
+    {"pricing_name": "深谷电价", "period_type": "deep_valley", "start_time": "00:00", "end_time": "06:00", "price": 0.25},
 ]
 
 
