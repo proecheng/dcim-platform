@@ -4,6 +4,9 @@
       <div class="title-group">
         <span class="title">24小时负荷分布</span>
         <span class="subtitle" v-if="meterPointName">{{ meterPointName }}</span>
+        <el-tag v-if="isMockData" type="warning" size="small" class="mock-badge">
+          演示数据
+        </el-tag>
       </div>
       <div class="header-info">
         <span class="date">{{ date || '昨日' }}</span>
@@ -37,16 +40,16 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, watch, nextTick, computed } from 'vue'
+import { ref, onMounted, onUnmounted, watch, nextTick, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import * as echarts from 'echarts'
 import type { EChartsOption } from 'echarts'
-import { getLoadPeriodDistribution, type LoadPeriodData } from '@/api/modules/demand'
+import { getLoadPeriodDistribution, type LoadPeriodData, type PeriodSummary } from '@/api/modules/demand'
 
 const props = withDefaults(
   defineProps<{
     meterPointId?: number
-    meterPointName?: string  // 计量点名称（可选传入）
+    meterPointName?: string
     date?: string
     showPricing?: boolean
     highlightPeriods?: string[]
@@ -61,9 +64,11 @@ const router = useRouter()
 const loading = ref(false)
 const data = ref<LoadPeriodData | null>(null)
 const chartRef = ref<HTMLElement>()
-let chartInstance: echarts.ECharts | null = null
+const isMockData = ref(false)
 
-// 计算显示的计量点名称
+let chartInstance: echarts.ECharts | null = null
+let resizeObserver: ResizeObserver | null = null
+
 const meterPointName = computed(() => {
   if (props.meterPointName) return props.meterPointName
   if (!props.meterPointId) return '全站总负荷'
@@ -71,23 +76,58 @@ const meterPointName = computed(() => {
 })
 
 const periodColors: Record<string, string> = {
-  sharp: '#722ed1',       // 尖峰-紫色
-  peak: '#f5222d',        // 峰时-红色
-  flat: '#faad14',        // 平时-橙色
-  valley: '#52c41a',      // 谷时-绿色
-  deep_valley: '#1890ff'  // 深谷-蓝色
+  sharp: '#722ed1',
+  peak: '#f5222d',
+  flat: '#faad14',
+  valley: '#52c41a',
+  deep_valley: '#1890ff'
 }
+
+// 模拟数据基础功率配置 (kW)
+const MOCK_BASE_POWER_KW = {
+  deep_valley: 380,
+  valley: 450,
+  flat: 550,
+  peak: 680,
+  sharp: 750
+} as const
+
+const POWER_RANDOM_VARIANCE_KW = 60
+const SHIFTABLE_LOAD_RATIO = 0.5
 
 onMounted(() => {
   loadData()
+})
+
+onUnmounted(() => {
+  cleanup()
 })
 
 watch(() => [props.meterPointId, props.date], () => {
   loadData()
 })
 
+function cleanup() {
+  if (resizeObserver) {
+    resizeObserver.disconnect()
+    resizeObserver = null
+  }
+  if (chartInstance) {
+    chartInstance.dispose()
+    chartInstance = null
+  }
+}
+
+async function applyMockDataFallback() {
+  isMockData.value = true
+  generateMockData()
+  await nextTick()
+  renderChart()
+}
+
 async function loadData() {
   loading.value = true
+  isMockData.value = false
   try {
     const res = await getLoadPeriodDistribution({
       meterPointId: props.meterPointId,
@@ -98,24 +138,15 @@ async function loadData() {
       await nextTick()
       renderChart()
     } else {
-      // API返回成功但没有数据，使用模拟数据
-      console.warn('[LoadPeriodChart] API returned no data, generating mock data')
-      generateMockData()
-      await nextTick()
-      renderChart()
+      await applyMockDataFallback()
     }
-  } catch (e) {
-    console.error('[LoadPeriodChart] API调用失败, generating mock data:', e)
-    // API调用失败，使用模拟数据作为fallback
-    generateMockData()
-    await nextTick()
-    renderChart()
+  } catch {
+    await applyMockDataFallback()
   } finally {
     loading.value = false
   }
 }
 
-// 生成模拟24小时负荷数据
 function generateMockData() {
   const periodMap: Record<number, 'sharp' | 'peak' | 'flat' | 'valley' | 'deep_valley'> = {
     0: 'deep_valley', 1: 'deep_valley', 2: 'deep_valley', 3: 'deep_valley',
@@ -126,18 +157,10 @@ function generateMockData() {
     20: 'peak', 21: 'flat', 22: 'valley', 23: 'valley'
   }
 
-  const base_powers = {
-    'deep_valley': 380,
-    'valley': 450,
-    'flat': 550,
-    'peak': 680,
-    'sharp': 750
-  }
-
-  const hourly_data = Array.from({ length: 24 }, (_, hour) => {
+  const hourlyData = Array.from({ length: 24 }, (_, hour) => {
     const period = periodMap[hour]
-    const basePower = base_powers[period]
-    const randomVariation = (Math.random() - 0.5) * 60
+    const basePower = MOCK_BASE_POWER_KW[period]
+    const randomVariation = (Math.random() - 0.5) * POWER_RANDOM_VARIANCE_KW
     return {
       hour,
       power: Math.round(basePower + randomVariation),
@@ -145,127 +168,128 @@ function generateMockData() {
     }
   })
 
-  // 计算时段汇总
-  const period_summary: Record<string, any> = {}
-  for (const period of ['sharp', 'peak', 'flat', 'valley', 'deep_valley']) {
-    const periodData = hourly_data.filter(d => d.period === period)
+  const periodSummary: Record<string, PeriodSummary> = {}
+  for (const period of ['sharp', 'peak', 'flat', 'valley', 'deep_valley'] as const) {
+    const periodData = hourlyData.filter(d => d.period === period)
     if (periodData.length > 0) {
-      const total_power = periodData.reduce((sum, d) => sum + d.power, 0)
-      period_summary[period] = {
-        total_kwh: Math.round(total_power),
-        avg_power: Math.round(total_power / periodData.length),
+      const totalPower = periodData.reduce((sum, d) => sum + d.power, 0)
+      periodSummary[period] = {
+        total_kwh: Math.round(totalPower),
+        avg_power: Math.round(totalPower / periodData.length),
         hours: periodData.length
       }
     }
   }
 
+  const peakAvg = MOCK_BASE_POWER_KW.peak
+  const valleyAvg = MOCK_BASE_POWER_KW.valley
+
   data.value = {
     date: props.date || new Date().toISOString().split('T')[0],
-    hourly_data,
-    period_summary,
-    shiftable_power: Math.round((680 - 450) * 0.5)
+    hourly_data: hourlyData,
+    period_summary: periodSummary,
+    shiftable_power: Math.round((peakAvg - valleyAvg) * SHIFTABLE_LOAD_RATIO)
   }
-
-  console.log('[LoadPeriodChart] Generated mock data with', hourly_data.length, 'hours')
 }
 
 function renderChart() {
   if (!chartRef.value || !data.value) return
 
-  if (chartInstance) {
-    chartInstance.dispose()
-  }
+  try {
+    cleanup()
 
-  chartInstance = echarts.init(chartRef.value)
+    chartInstance = echarts.init(chartRef.value)
 
-  const hours = data.value.hourly_data.map(d => d.hour)
-  const powers = data.value.hourly_data.map(d => d.power)
-  const periods = data.value.hourly_data.map(d => d.period)
+    const hours = data.value.hourly_data.map(d => d.hour)
+    const powers = data.value.hourly_data.map(d => d.power)
+    const periods = data.value.hourly_data.map(d => d.period)
 
-  const option: EChartsOption = {
-    grid: {
-      top: 30,
-      right: 20,
-      bottom: 40,
-      left: 50
-    },
-    tooltip: {
-      trigger: 'axis',
-      formatter: (params: any) => {
-        const point = params[0]
-        const period = periods[point.dataIndex]
-        const periodName: Record<string, string> = {
-          sharp: '尖峰',
-          peak: '峰时',
-          flat: '平时',
-          valley: '谷时',
-          deep_valley: '深谷'
-        }
-        return `${point.axisValue}时<br/>负荷: ${point.value} kW<br/>时段: ${periodName[period] || period}`
-      }
-    },
-    xAxis: {
-      type: 'category',
-      data: hours,
-      name: '时刻',
-      nameTextStyle: {
-        color: 'rgba(255, 255, 255, 0.65)'
+    const option: EChartsOption = {
+      grid: {
+        top: 30,
+        right: 20,
+        bottom: 40,
+        left: 50
       },
-      axisLabel: {
-        color: 'rgba(255, 255, 255, 0.65)',
-        fontSize: 11,
-        formatter: '{value}:00'
-      },
-      axisLine: {
-        lineStyle: {
-          color: 'rgba(255, 255, 255, 0.15)'
-        }
-      }
-    },
-    yAxis: {
-      type: 'value',
-      name: 'kW',
-      nameTextStyle: {
-        color: 'rgba(255, 255, 255, 0.65)'
-      },
-      axisLabel: {
-        color: 'rgba(255, 255, 255, 0.65)',
-        fontSize: 11
-      },
-      splitLine: {
-        lineStyle: {
-          color: 'rgba(255, 255, 255, 0.1)'
-        }
-      }
-    },
-    series: [
-      {
-        name: '负荷',
-        type: 'bar',
-        data: powers.map((power, idx) => {
-          const period = periods[idx]
-          const baseColor = periodColors[period] || '#1890ff'
-          const shouldHighlight = props.highlightPeriods.length === 0 || props.highlightPeriods.includes(period)
-          return {
-            value: power,
-            itemStyle: {
-              color: baseColor,
-              opacity: shouldHighlight ? 1 : 0.4
-            }
+      tooltip: {
+        trigger: 'axis',
+        formatter: (params: any) => {
+          const point = params[0]
+          const period = periods[point.dataIndex]
+          const periodName: Record<string, string> = {
+            sharp: '尖峰',
+            peak: '峰时',
+            flat: '平时',
+            valley: '谷时',
+            deep_valley: '深谷'
           }
-        }),
-        barWidth: '60%'
-      }
-    ]
+          return `${point.axisValue}时<br/>负荷: ${point.value} kW<br/>时段: ${periodName[period] || period}`
+        }
+      },
+      xAxis: {
+        type: 'category',
+        data: hours,
+        name: '时刻',
+        nameTextStyle: {
+          color: 'rgba(255, 255, 255, 0.65)'
+        },
+        axisLabel: {
+          color: 'rgba(255, 255, 255, 0.65)',
+          fontSize: 11,
+          formatter: '{value}:00'
+        },
+        axisLine: {
+          lineStyle: {
+            color: 'rgba(255, 255, 255, 0.15)'
+          }
+        }
+      },
+      yAxis: {
+        type: 'value',
+        name: 'kW',
+        nameTextStyle: {
+          color: 'rgba(255, 255, 255, 0.65)'
+        },
+        axisLabel: {
+          color: 'rgba(255, 255, 255, 0.65)',
+          fontSize: 11
+        },
+        splitLine: {
+          lineStyle: {
+            color: 'rgba(255, 255, 255, 0.1)'
+          }
+        }
+      },
+      series: [
+        {
+          name: '负荷',
+          type: 'bar',
+          data: powers.map((power, idx) => {
+            const period = periods[idx]
+            const baseColor = periodColors[period] || '#1890ff'
+            const shouldHighlight = props.highlightPeriods.length === 0 || props.highlightPeriods.includes(period)
+            return {
+              value: power,
+              itemStyle: {
+                color: baseColor,
+                opacity: shouldHighlight ? 1 : 0.4
+              }
+            }
+          }),
+          barWidth: '60%'
+        }
+      ]
+    }
+
+    chartInstance.setOption(option)
+
+    resizeObserver = new ResizeObserver(() => {
+      chartInstance?.resize()
+    })
+    resizeObserver.observe(chartRef.value)
+  } catch {
+    // Chart rendering failed silently
   }
-
-  chartInstance.setOption(option)
-
-  // 响应式
-  const resizeObserver = new ResizeObserver(() => {
-    chartInstance?.resize()
-  })
-  resizeObserver.observe(chartRef.value)
 }
 
 function getSummary(period: string) {
@@ -303,6 +327,11 @@ function goToFullAnalysis() {
       .subtitle {
         font-size: 11px;
         color: var(--text-secondary, rgba(255, 255, 255, 0.65));
+      }
+
+      .mock-badge {
+        align-self: flex-start;
+        margin-top: 4px;
       }
     }
 
