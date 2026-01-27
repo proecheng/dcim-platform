@@ -1,8 +1,15 @@
 """
 应用配置模块
 """
+import secrets
 from pydantic_settings import BaseSettings
+from pydantic import Field
 from functools import lru_cache
+
+
+def generate_secret_key() -> str:
+    """生成安全的随机密钥"""
+    return secrets.token_urlsafe(64)
 
 
 class Settings(BaseSettings):
@@ -10,7 +17,7 @@ class Settings(BaseSettings):
     # 应用信息
     app_name: str = "算力中心智能监控系统"
     app_version: str = "1.0.0"
-    debug: bool = True
+    debug: bool = False  # 生产环境默认关闭调试模式
 
     # 服务器配置
     host: str = "0.0.0.0"
@@ -19,10 +26,14 @@ class Settings(BaseSettings):
     # 数据库
     database_url: str = "sqlite+aiosqlite:///./dcim.db"
 
-    # JWT 配置
-    secret_key: str = "your-secret-key-change-in-production"
+    # JWT 配置 - 必须通过环境变量设置，无默认值更安全
+    secret_key: str = Field(default_factory=generate_secret_key)
     algorithm: str = "HS256"
-    access_token_expire_minutes: int = 480
+    access_token_expire_minutes: int = 30  # 缩短令牌过期时间
+    refresh_token_expire_days: int = 7  # 刷新令牌过期天数
+
+    # CORS 配置
+    cors_origins: str = "http://localhost:5173,http://localhost:3000"  # 允许的前端地址，逗号分隔
 
     # 数据采集配置
     collect_interval: int = 10  # 秒

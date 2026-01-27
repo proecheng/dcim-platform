@@ -24,23 +24,59 @@ const ALARM_COLORS = {
   info: '#00ccff'
 }
 
+// 转义HTML特殊字符，防止XSS攻击
+function escapeHtml(text: string | number | undefined): string {
+  if (text === undefined || text === null) return ''
+  const str = String(text)
+  const map: Record<string, string> = {
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#039;'
+  }
+  return str.replace(/[&<>"']/g, m => map[m])
+}
+
 // 创建告警气泡
 function createBubble(alarm: BigscreenAlarm): CSS2DObject {
   const color = ALARM_COLORS[alarm.level]
 
   const div = document.createElement('div')
   div.className = `alarm-bubble alarm-${alarm.level}`
-  div.innerHTML = `
-    <div class="bubble-icon">⚠</div>
-    <div class="bubble-content">
-      <div class="bubble-title">${alarm.message}</div>
-      <div class="bubble-detail">
-        ${alarm.value !== undefined ? `当前: ${alarm.value}` : ''}
-        ${alarm.threshold !== undefined ? ` / 阈值: ${alarm.threshold}` : ''}
-      </div>
-      ${alarm.duration ? `<div class="bubble-duration">持续: ${alarm.duration}</div>` : ''}
-    </div>
-  `
+
+  // 使用textContent防止XSS，或对动态内容进行转义
+  const iconDiv = document.createElement('div')
+  iconDiv.className = 'bubble-icon'
+  iconDiv.textContent = '⚠'
+
+  const contentDiv = document.createElement('div')
+  contentDiv.className = 'bubble-content'
+
+  const titleDiv = document.createElement('div')
+  titleDiv.className = 'bubble-title'
+  titleDiv.textContent = alarm.message  // 使用textContent防止XSS
+  contentDiv.appendChild(titleDiv)
+
+  if (alarm.value !== undefined || alarm.threshold !== undefined) {
+    const detailDiv = document.createElement('div')
+    detailDiv.className = 'bubble-detail'
+    let detailText = ''
+    if (alarm.value !== undefined) detailText += `当前: ${escapeHtml(alarm.value)}`
+    if (alarm.threshold !== undefined) detailText += ` / 阈值: ${escapeHtml(alarm.threshold)}`
+    detailDiv.textContent = detailText
+    contentDiv.appendChild(detailDiv)
+  }
+
+  if (alarm.duration) {
+    const durationDiv = document.createElement('div')
+    durationDiv.className = 'bubble-duration'
+    durationDiv.textContent = `持续: ${alarm.duration}`
+    contentDiv.appendChild(durationDiv)
+  }
+
+  div.appendChild(iconDiv)
+  div.appendChild(contentDiv)
 
   div.style.cssText = `
     background: rgba(20, 0, 0, 0.9);

@@ -5,9 +5,10 @@ V2.0 架构重构版
 import os
 import asyncio
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Query
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import select
+from jose import jwt, JWTError
 
 from .core.config import get_settings
 from .core.database import init_db, async_session
@@ -18,6 +19,24 @@ from .services.websocket import ws_manager
 from .services.simulator import simulator
 
 settings = get_settings()
+
+
+async def verify_websocket_token(token: str) -> bool:
+    """验证 WebSocket 连接的 JWT 令牌"""
+    if not token:
+        return False
+    try:
+        payload = jwt.decode(token, settings.secret_key, algorithms=[settings.algorithm])
+        username = payload.get("sub")
+        if username is None:
+            return False
+        # 验证用户是否存在且活跃
+        async with async_session() as session:
+            result = await session.execute(select(User).where(User.username == username))
+            user = result.scalar_one_or_none()
+            return user is not None and user.is_active
+    except JWTError:
+        return False
 
 
 async def init_default_data():
@@ -158,13 +177,14 @@ app = FastAPI(
     redoc_url="/redoc"
 )
 
-# CORS 配置
+# CORS 配置 - 只允许配置的前端地址
+cors_origins = [origin.strip() for origin in settings.cors_origins.split(",") if origin.strip()]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=cors_origins,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type", "X-Requested-With"],
 )
 
 # 注册 API v1 路由
@@ -224,10 +244,13 @@ async def get_stats():
         }
 
 
-# WebSocket 路由
+# WebSocket 路由 - 需要 JWT 令牌认证
 @app.websocket("/ws/realtime")
-async def websocket_realtime(websocket: WebSocket):
-    """实时数据 WebSocket"""
+async def websocket_realtime(websocket: WebSocket, token: str = Query(None)):
+    """实时数据 WebSocket（需要认证）"""
+    if not await verify_websocket_token(token):
+        await websocket.close(code=4001, reason="Unauthorized")
+        return
     await ws_manager.connect(websocket, "realtime")
     try:
         while True:
@@ -238,8 +261,11 @@ async def websocket_realtime(websocket: WebSocket):
 
 
 @app.websocket("/ws/alarms")
-async def websocket_alarms(websocket: WebSocket):
-    """告警 WebSocket"""
+async def websocket_alarms(websocket: WebSocket, token: str = Query(None)):
+    """告警 WebSocket（需要认证）"""
+    if not await verify_websocket_token(token):
+        await websocket.close(code=4001, reason="Unauthorized")
+        return
     await ws_manager.connect(websocket, "alarms")
     try:
         while True:
@@ -249,8 +275,11 @@ async def websocket_alarms(websocket: WebSocket):
 
 
 @app.websocket("/ws/system")
-async def websocket_system(websocket: WebSocket):
-    """系统状态 WebSocket"""
+async def websocket_system(websocket: WebSocket, token: str = Query(None)):
+    """系统状态 WebSocket（需要认证）"""
+    if not await verify_websocket_token(token):
+        await websocket.close(code=4001, reason="Unauthorized")
+        return
     await ws_manager.connect(websocket, "system")
     try:
         while True:

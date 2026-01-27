@@ -1,8 +1,10 @@
 """
 认证 API - v1
 """
+import time
 from datetime import datetime, timedelta
 from typing import Optional
+from collections import defaultdict
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -17,6 +19,33 @@ from ...schemas.user import Token, UserInfo, PasswordChange
 
 router = APIRouter()
 settings = get_settings()
+
+# 简单的内存速率限制器
+class RateLimiter:
+    def __init__(self, max_attempts: int = 5, window_seconds: int = 60):
+        self.max_attempts = max_attempts
+        self.window_seconds = window_seconds
+        self.attempts: dict[str, list[float]] = defaultdict(list)
+
+    def is_allowed(self, key: str) -> bool:
+        now = time.time()
+        # 清除过期的尝试记录
+        self.attempts[key] = [t for t in self.attempts[key] if now - t < self.window_seconds]
+        # 检查是否超过限制
+        if len(self.attempts[key]) >= self.max_attempts:
+            return False
+        self.attempts[key].append(now)
+        return True
+
+    def get_remaining_time(self, key: str) -> int:
+        if not self.attempts[key]:
+            return 0
+        oldest = min(self.attempts[key])
+        remaining = self.window_seconds - (time.time() - oldest)
+        return max(0, int(remaining))
+
+# 登录速率限制：每分钟最多5次尝试
+login_limiter = RateLimiter(max_attempts=5, window_seconds=60)
 
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
@@ -36,6 +65,18 @@ async def login(
     """
     用户登录获取访问令牌
     """
+    # 获取客户端IP用于速率限制
+    client_ip = request.client.host if request.client else "unknown"
+
+    # 检查速率限制
+    if not login_limiter.is_allowed(client_ip):
+        remaining = login_limiter.get_remaining_time(client_ip)
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=f"登录尝试过于频繁，请在{remaining}秒后重试",
+            headers={"Retry-After": str(remaining)}
+        )
+
     # 查询用户
     result = await db.execute(select(User).where(User.username == form_data.username))
     user = result.scalar_one_or_none()

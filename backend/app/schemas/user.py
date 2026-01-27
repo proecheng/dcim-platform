@@ -1,9 +1,25 @@
 """
 用户相关 Schema
 """
+import re
 from typing import Optional, List
 from datetime import datetime
-from pydantic import BaseModel, EmailStr, Field, ConfigDict
+from pydantic import BaseModel, EmailStr, Field, ConfigDict, field_validator
+
+
+def validate_password_complexity(password: str) -> str:
+    """验证密码复杂度"""
+    if len(password) < 8:
+        raise ValueError('密码长度至少8个字符')
+    if not re.search(r'[A-Z]', password):
+        raise ValueError('密码必须包含大写字母')
+    if not re.search(r'[a-z]', password):
+        raise ValueError('密码必须包含小写字母')
+    if not re.search(r'\d', password):
+        raise ValueError('密码必须包含数字')
+    if not re.search(r'[!@#$%^&*(),.?":{}|<>]', password):
+        raise ValueError('密码必须包含特殊字符')
+    return password
 
 
 class Token(BaseModel):
@@ -25,19 +41,29 @@ class LoginRequest(BaseModel):
 class PasswordChange(BaseModel):
     """修改密码"""
     old_password: str
-    new_password: str = Field(..., min_length=6)
+    new_password: str = Field(..., min_length=8)
     confirm_password: str
+
+    @field_validator('new_password')
+    @classmethod
+    def validate_new_password(cls, v: str) -> str:
+        return validate_password_complexity(v)
 
 
 class UserCreate(BaseModel):
     """创建用户"""
     username: str = Field(..., min_length=3, max_length=50)
-    password: str = Field(..., min_length=6)
+    password: str = Field(..., min_length=8)
     real_name: Optional[str] = None
     email: Optional[EmailStr] = None
     phone: Optional[str] = None
     role: str = "operator"
     department: Optional[str] = None
+
+    @field_validator('password')
+    @classmethod
+    def validate_password(cls, v: str) -> str:
+        return validate_password_complexity(v)
 
 
 class UserUpdate(BaseModel):

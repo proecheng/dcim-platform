@@ -34,15 +34,26 @@ function createLabel(cabinetId: string, name: string, power: number, position: T
   return label
 }
 
-// 更新标签内容 - 紧凑型设计
+// 更新标签内容 - 紧凑型设计，使用安全的DOM操作防止XSS
 function updateLabelDiv(div: HTMLDivElement, name: string, power: number) {
   // 提取机柜编号（如 A-01 从 "A区1号柜" 中提取）
   const shortName = name.match(/([A-Z])[区]?(\d+)/i)
   const displayName = shortName ? `${shortName[1]}${shortName[2]}` : name.slice(0, 4)
 
-  div.innerHTML = `
-    <div class="compact-power">${power.toFixed(1)}<span class="unit">kW</span></div>
-  `
+  // 清空现有内容
+  div.innerHTML = ''
+
+  // 使用DOM API安全创建内容，防止XSS
+  const powerDiv = document.createElement('div')
+  powerDiv.className = 'compact-power'
+  powerDiv.textContent = power.toFixed(1)
+
+  const unitSpan = document.createElement('span')
+  unitSpan.className = 'unit'
+  unitSpan.textContent = 'kW'
+  powerDiv.appendChild(unitSpan)
+
+  div.appendChild(powerDiv)
   div.style.cssText = `
     background: rgba(0, 20, 40, 0.85);
     border: 1px solid rgba(0, 136, 255, 0.5);

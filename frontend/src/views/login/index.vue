@@ -49,7 +49,7 @@
       </el-form>
 
       <div class="login-footer">
-        <p>默认账户: admin / admin123</p>
+        <p>请使用管理员分配的账户登录</p>
       </div>
     </div>
   </div>

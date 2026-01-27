@@ -200,12 +200,12 @@ async def toggle_user_status(
 @router.put("/{user_id}/reset-password", summary="重置密码")
 async def reset_password(
     user_id: int,
-    new_password: str = "123456",
+    new_password: str = Query(..., min_length=8, description="新密码（必填，至少8位）"),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_admin)
 ):
     """
-    重置用户密码（默认重置为123456）
+    重置用户密码（必须提供新密码）
     """
     result = await db.execute(select(User).where(User.id == user_id))
     user = result.scalar_one_or_none()

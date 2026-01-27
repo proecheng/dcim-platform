@@ -252,10 +252,20 @@ class DemoDataGenerator:
         if self.conn:
             self.conn.close()
 
+    # 允许清除的表白名单
+    ALLOWED_TABLES = frozenset([
+        'energy_suggestions', 'pue_history', 'energy_monthly', 'energy_daily',
+        'energy_hourly', 'demand_15min_data', 'power_curve_data',
+        'regulation_history', 'load_regulation_configs',
+        'device_shift_configs', 'device_load_profiles',
+        'power_devices', 'distribution_circuits', 'distribution_panels',
+        'meter_points', 'transformers', 'electricity_pricing'
+    ])
+
     def clear_demo_data(self):
         """清除旧的演示数据"""
         cursor = self.conn.cursor()
-        # 按依赖顺序删除
+        # 按依赖顺序删除，使用白名单验证防止SQL注入
         tables = [
             'energy_suggestions', 'pue_history', 'energy_monthly', 'energy_daily',
             'energy_hourly', 'demand_15min_data', 'power_curve_data',
@@ -265,8 +275,12 @@ class DemoDataGenerator:
             'meter_points', 'transformers', 'electricity_pricing'
         ]
         for table in tables:
+            # 白名单验证，防止SQL注入
+            if table not in self.ALLOWED_TABLES:
+                print(f"警告: 表名 {table} 不在白名单中，跳过")
+                continue
             try:
-                cursor.execute(f"DELETE FROM {table}")
+                cursor.execute(f"DELETE FROM [{table}]")
             except Exception as e:
                 print(f"清除{table}失败: {e}")
         self.conn.commit()
