@@ -195,7 +195,8 @@ async def get_history_statistics(
             func.count(PointHistory.id).label("count"),
             func.min(PointHistory.value).label("min"),
             func.max(PointHistory.value).label("max"),
-            func.avg(PointHistory.value).label("avg")
+            func.avg(PointHistory.value).label("avg"),
+            func.sum(PointHistory.value).label("sum")
         ).where(
             and_(
                 PointHistory.point_id == point_id,
@@ -207,22 +208,60 @@ async def get_history_statistics(
     row = result.first()
 
     # 计算标准差
-    from sqlalchemy import cast, Float
-    std_result = await db.execute(
-        select(
-            func.avg(
-                (PointHistory.value - row.avg) * (PointHistory.value - row.avg)
+    std_dev = 0
+    if row.avg is not None:
+        std_result = await db.execute(
+            select(
+                func.avg(
+                    (PointHistory.value - row.avg) * (PointHistory.value - row.avg)
+                )
+            ).where(
+                and_(
+                    PointHistory.point_id == point_id,
+                    PointHistory.recorded_at >= start_time,
+                    PointHistory.recorded_at <= end_time
+                )
             )
-        ).where(
+        )
+        variance = std_result.scalar() or 0
+        std_dev = variance ** 0.5 if variance else 0
+
+    # 获取第一条和最后一条记录的值
+    first_value = None
+    last_value = None
+    change_rate = None
+
+    # 获取第一条记录
+    first_result = await db.execute(
+        select(PointHistory.value).where(
             and_(
                 PointHistory.point_id == point_id,
                 PointHistory.recorded_at >= start_time,
                 PointHistory.recorded_at <= end_time
             )
-        )
+        ).order_by(PointHistory.recorded_at.asc()).limit(1)
     )
-    variance = std_result.scalar() or 0
-    std_dev = variance ** 0.5 if variance else 0
+    first_row = first_result.first()
+    if first_row:
+        first_value = first_row[0]
+
+    # 获取最后一条记录
+    last_result = await db.execute(
+        select(PointHistory.value).where(
+            and_(
+                PointHistory.point_id == point_id,
+                PointHistory.recorded_at >= start_time,
+                PointHistory.recorded_at <= end_time
+            )
+        ).order_by(PointHistory.recorded_at.desc()).limit(1)
+    )
+    last_row = last_result.first()
+    if last_row:
+        last_value = last_row[0]
+
+    # 计算变化率
+    if first_value is not None and last_value is not None and first_value != 0:
+        change_rate = (last_value - first_value) / first_value
 
     return HistoryStatistics(
         point_id=point_id,
@@ -234,7 +273,11 @@ async def get_history_statistics(
         min_value=row.min,
         max_value=row.max,
         avg_value=round(row.avg, 2) if row.avg else None,
-        std_dev=round(std_dev, 2)
+        sum_value=round(row.sum, 2) if row.sum else None,
+        std_dev=round(std_dev, 2),
+        first_value=round(first_value, 2) if first_value is not None else None,
+        last_value=round(last_value, 2) if last_value is not None else None,
+        change_rate=round(change_rate, 4) if change_rate is not None else None
     )
 
 

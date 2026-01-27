@@ -40,7 +40,11 @@ class HistoryStatistics(BaseModel):
     min_value: Optional[float] = None
     max_value: Optional[float] = None
     avg_value: Optional[float] = None
+    sum_value: Optional[float] = None
     std_dev: float = 0
+    first_value: Optional[float] = None
+    last_value: Optional[float] = None
+    change_rate: Optional[float] = None
 
 
 class CompareQuery(BaseModel):

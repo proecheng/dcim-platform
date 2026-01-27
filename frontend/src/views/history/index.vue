@@ -169,7 +169,7 @@ const chartType = ref<'line' | 'bar'>('line')
 const filters = reactive({
   point_id: null as number | null,
   dateRange: [] as string[],
-  granularity: 'minute' as 'raw' | 'minute' | 'hour' | 'day'
+  granularity: 'raw' as 'raw' | 'minute' | 'hour' | 'day'
 })
 
 const pagination = reactive({
@@ -344,7 +344,7 @@ async function handleQuery() {
 function handleReset() {
   filters.point_id = null
   filters.dateRange = []
-  filters.granularity = 'minute'
+  filters.granularity = 'raw'
   pagination.page = 1
   historyData.value = []
   trendData.value = []

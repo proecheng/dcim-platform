@@ -23,6 +23,7 @@ export interface TrendData {
 
 export interface HistoryStatistics {
   point_id: number
+  point_code: string
   point_name: string
   start_time: string
   end_time: string
