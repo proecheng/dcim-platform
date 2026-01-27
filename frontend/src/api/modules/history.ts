@@ -28,14 +28,14 @@ export interface HistoryStatistics {
   start_time: string
   end_time: string
   count: number
-  min_value: number
-  max_value: number
-  avg_value: number
-  sum_value: number
+  min_value: number | null
+  max_value: number | null
+  avg_value: number | null
+  sum_value: number | null
   std_dev: number
-  first_value: number
-  last_value: number
-  change_rate: number
+  first_value: number | null
+  last_value: number | null
+  change_rate: number | null
 }
 
 export interface CompareData {

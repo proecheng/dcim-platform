@@ -71,30 +71,32 @@
               {{ statistics.count }} 条
             </el-descriptions-item>
             <el-descriptions-item label="最小值">
-              <span class="stat-value min">{{ statistics.min_value?.toFixed(2) }}</span>
+              <span class="stat-value min">{{ formatValue(statistics.min_value) }}</span>
               {{ currentPoint?.unit }}
             </el-descriptions-item>
             <el-descriptions-item label="最大值">
-              <span class="stat-value max">{{ statistics.max_value?.toFixed(2) }}</span>
+              <span class="stat-value max">{{ formatValue(statistics.max_value) }}</span>
               {{ currentPoint?.unit }}
             </el-descriptions-item>
             <el-descriptions-item label="平均值">
-              <span class="stat-value avg">{{ statistics.avg_value?.toFixed(2) }}</span>
+              <span class="stat-value avg">{{ formatValue(statistics.avg_value) }}</span>
               {{ currentPoint?.unit }}
             </el-descriptions-item>
             <el-descriptions-item label="标准差">
-              {{ statistics.std_dev?.toFixed(4) }}
+              {{ statistics.std_dev.toFixed(4) }}
             </el-descriptions-item>
             <el-descriptions-item label="变化率">
-              <el-tag :type="statistics.change_rate >= 0 ? 'success' : 'danger'">
+              <el-tag v-if="statistics.change_rate !== null && statistics.change_rate !== undefined"
+                      :type="statistics.change_rate >= 0 ? 'success' : 'danger'">
                 {{ statistics.change_rate >= 0 ? '+' : '' }}{{ (statistics.change_rate * 100).toFixed(2) }}%
               </el-tag>
+              <span v-else>-</span>
             </el-descriptions-item>
             <el-descriptions-item label="起始值">
-              {{ statistics.first_value?.toFixed(2) }} {{ currentPoint?.unit }}
+              {{ formatValue(statistics.first_value) }} {{ currentPoint?.unit }}
             </el-descriptions-item>
             <el-descriptions-item label="结束值">
-              {{ statistics.last_value?.toFixed(2) }} {{ currentPoint?.unit }}
+              {{ formatValue(statistics.last_value) }} {{ currentPoint?.unit }}
             </el-descriptions-item>
           </el-descriptions>
           <el-empty v-else description="请先查询数据" :image-size="80" />
@@ -150,7 +152,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted, watch, nextTick } from 'vue'
+import { ref, reactive, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Search, Refresh, Download } from '@element-plus/icons-vue'
 import * as echarts from 'echarts'
@@ -232,9 +234,34 @@ function formatDateTime(dateStr: string | null | undefined): string {
   return dateStr.replace('T', ' ').substring(0, 19)
 }
 
+// 格式化数值
+function formatValue(val: number | null | undefined): string {
+  return val !== null && val !== undefined ? val.toFixed(2) : '-'
+}
+
+// Resize 事件处理器
+let resizeHandler: (() => void) | null = null
+
 onMounted(async () => {
   await loadPoints()
   initChart()
+  // 添加 resize 监听器
+  if (chartInstance) {
+    resizeHandler = () => chartInstance?.resize()
+    window.addEventListener('resize', resizeHandler)
+  }
+})
+
+onUnmounted(() => {
+  // 清理事件监听器和图表实例
+  if (resizeHandler) {
+    window.removeEventListener('resize', resizeHandler)
+    resizeHandler = null
+  }
+  if (chartInstance) {
+    chartInstance.dispose()
+    chartInstance = null
+  }
 })
 
 watch(chartType, () => {
@@ -253,9 +280,6 @@ async function loadPoints() {
 function initChart() {
   if (chartRef.value) {
     chartInstance = echarts.init(chartRef.value)
-    window.addEventListener('resize', () => {
-      chartInstance?.resize()
-    })
   }
 }
 

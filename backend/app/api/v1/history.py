@@ -259,8 +259,9 @@ async def get_history_statistics(
     if last_row:
         last_value = last_row[0]
 
-    # 计算变化率
-    if first_value is not None and last_value is not None and first_value != 0:
+    # 计算变化率（避免除零和浮点精度问题）
+    EPSILON = 1e-10
+    if first_value is not None and last_value is not None and abs(first_value) > EPSILON:
         change_rate = (last_value - first_value) / first_value
 
     return HistoryStatistics(
