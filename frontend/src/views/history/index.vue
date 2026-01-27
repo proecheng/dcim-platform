@@ -112,7 +112,11 @@
       </template>
       <el-table :data="historyData" stripe border v-loading="loading">
         <el-table-column type="index" label="#" width="60" />
-        <el-table-column prop="created_at" label="采集时间" width="180" />
+        <el-table-column prop="created_at" label="采集时间" width="180">
+          <template #default="{ row }">
+            {{ formatDateTime(row.created_at) }}
+          </template>
+        </el-table-column>
         <el-table-column prop="value" label="数值" width="120">
           <template #default="{ row }">
             {{ row.value?.toFixed(2) }} {{ currentPoint?.unit }}
@@ -220,6 +224,13 @@ const dateShortcuts = [
     }
   }
 ]
+
+// 格式化日期时间
+function formatDateTime(dateStr: string | null | undefined): string {
+  if (!dateStr) return '-'
+  // 将 ISO 格式转换为 YYYY-MM-DD HH:mm:ss
+  return dateStr.replace('T', ' ').substring(0, 19)
+}
 
 onMounted(async () => {
   await loadPoints()
