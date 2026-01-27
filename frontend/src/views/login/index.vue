@@ -49,7 +49,8 @@
       </el-form>
 
       <div class="login-footer">
-        <p>请使用管理员分配的账户登录</p>
+        <!-- TODO: 正式发布前移除此默认账户提示 -->
+        <p>开发环境默认账户: admin / admin123</p>
       </div>
     </div>
   </div>

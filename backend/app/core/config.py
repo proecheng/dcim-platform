@@ -17,7 +17,7 @@ class Settings(BaseSettings):
     # 应用信息
     app_name: str = "算力中心智能监控系统"
     app_version: str = "1.0.0"
-    debug: bool = False  # 生产环境默认关闭调试模式
+    debug: bool = True  # 开发阶段默认开启，正式发布前改为 False
 
     # 服务器配置
     host: str = "0.0.0.0"
@@ -29,7 +29,7 @@ class Settings(BaseSettings):
     # JWT 配置 - 必须通过环境变量设置，无默认值更安全
     secret_key: str = Field(default_factory=generate_secret_key)
     algorithm: str = "HS256"
-    access_token_expire_minutes: int = 30  # 缩短令牌过期时间
+    access_token_expire_minutes: int = 480  # 开发阶段8小时，正式发布改为30分钟
     refresh_token_expire_days: int = 7  # 刷新令牌过期天数
 
     # CORS 配置
