@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+html { background: #0a1628; }
+body {
+  width: 720pt; height: 405pt; margin: 0; padding: 0;
+  background: #0a1628; font-family: Arial, sans-serif;
+  display: flex; flex-direction: column;
+}
+.header {
+  background: #112240; padding: 15pt 30pt; border-bottom: 2pt solid #1890ff;
+}
+h1 { color: #00d4ff; font-size: 24pt; margin: 0; }
+.content { padding: 15pt 30pt; }
+h2 { color: #1890ff; font-size: 14pt; margin: 0 0 10pt 0; }
+.arch-container { display: flex; gap: 15pt; }
+.arch-layer {
+  flex: 1; background: rgba(26, 42, 74, 0.6);
+  border-radius: 6pt; padding: 10pt;
+  border-left: 3pt solid #1890ff;
+}
+h3 { color: #00d4ff; font-size: 11pt; margin: 0 0 8pt 0; }
+p { color: rgba(255,255,255,0.85); font-size: 9pt; margin: 0 0 4pt 0; line-height: 1.3; }
+.tech-stack {
+  display: flex; gap: 10pt; margin-top: 12pt;
+}
+.tech-box {
+  flex: 1; background: rgba(24, 144, 255, 0.15);
+  border-radius: 4pt; padding: 8pt; text-align: center;
+  border: 1pt solid rgba(24, 144, 255, 0.3);
+}
+.tech-name { color: #00d4ff; font-size: 11pt; margin: 0 0 3pt 0; font-weight: bold; }
+.tech-desc { color: rgba(255,255,255,0.7); font-size: 8pt; margin: 0; }
+</style>
+</head>
+<body>
+<div class="header">
+  <h1>后端架构设计</h1>
+</div>
+<div class="content">
+  <h2>分层架构</h2>
+  <div class="arch-container">
+    <div class="arch-layer">
+      <h3>API网关层</h3>
+      <p>FastAPI框架</p>
+      <p>认证中间件</p>
+      <p>权限校验</p>
+      <p>请求日志</p>
+      <p>限流/异常/CORS</p>
+    </div>
+    <div class="arch-layer">
+      <h3>业务服务层</h3>
+      <p>认证服务 AuthSvc</p>
+      <p>点位服务 PointSvc</p>
+      <p>采集服务 CollectSvc</p>
+      <p>告警服务 AlarmSvc</p>
+      <p>WebSocket推送</p>
+    </div>
+    <div class="arch-layer">
+      <h3>数据访问层</h3>
+      <p>UserRepo</p>
+      <p>PointRepo</p>
+      <p>AlarmRepo</p>
+      <p>HistoryRepo</p>
+      <p>ConfigRepo</p>
+    </div>
+    <div class="arch-layer">
+      <h3>数据存储层</h3>
+      <p>SQLite/MySQL</p>
+      <p>内存缓存</p>
+      <p>文件存储</p>
+      <p>报表/导出</p>
+    </div>
+  </div>
+  <div class="tech-stack">
+    <div class="tech-box">
+      <p class="tech-name">Vue 3</p>
+      <p class="tech-desc">TypeScript前端</p>
+    </div>
+    <div class="tech-box">
+      <p class="tech-name">FastAPI</p>
+      <p class="tech-desc">Python后端</p>
+    </div>
+    <div class="tech-box">
+      <p class="tech-name">Three.js</p>
+      <p class="tech-desc">3D可视化</p>
+    </div>
+    <div class="tech-box">
+      <p class="tech-name">WebSocket</p>
+      <p class="tech-desc">实时推送</p>
+    </div>
+    <div class="tech-box">
+      <p class="tech-name">ECharts</p>
+      <p class="tech-desc">图表组件</p>
+    </div>
+  </div>
+</div>
+</body>
+</html>

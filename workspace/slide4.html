@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+html { background: #0a1628; }
+body {
+  width: 720pt; height: 405pt; margin: 0; padding: 0;
+  background: #0a1628; font-family: Arial, sans-serif;
+  display: flex; flex-direction: column;
+}
+.header {
+  background: #112240; padding: 15pt 30pt; border-bottom: 2pt solid #1890ff;
+}
+h1 { color: #00d4ff; font-size: 24pt; margin: 0; }
+.content { padding: 20pt 30pt; display: flex; }
+.left { flex: 1; padding-right: 20pt; }
+.right { flex: 1; }
+h2 { color: #1890ff; font-size: 14pt; margin: 0 0 10pt 0; }
+.feature-card {
+  background: rgba(26, 42, 74, 0.7); border-radius: 6pt;
+  padding: 10pt 12pt; margin-bottom: 8pt;
+}
+h3 { color: #00d4ff; font-size: 12pt; margin: 0 0 5pt 0; }
+p { color: rgba(255,255,255,0.85); font-size: 10pt; margin: 0; line-height: 1.4; }
+.flow-box {
+  background: rgba(24, 144, 255, 0.2); border: 1pt solid #1890ff;
+  border-radius: 6pt; padding: 10pt; margin-top: 10pt;
+}
+.flow-title { color: #00d4ff; font-size: 11pt; margin: 0 0 8pt 0; }
+.flow-item { color: rgba(255,255,255,0.8); font-size: 9pt; margin: 0 0 4pt 0; }
+</style>
+</head>
+<body>
+<div class="header">
+  <h1>数字孪生大屏系统</h1>
+</div>
+<div class="content">
+  <div class="left">
+    <h2>功能特性</h2>
+    <div class="feature-card">
+      <h3>真实数据对接</h3>
+      <p>对接实时数据API，环境/能源/告警/设备</p>
+    </div>
+    <div class="feature-card">
+      <h3>3D可视化</h3>
+      <p>Three.js实现，热力图/设备状态/告警气泡</p>
+    </div>
+    <div class="feature-card">
+      <h3>场景模式</h3>
+      <p>支持自动巡航、手动导航、逐级下探</p>
+    </div>
+    <div class="feature-card">
+      <h3>便捷导航</h3>
+      <p>侧边栏入口 + 仪表盘快捷操作</p>
+    </div>
+  </div>
+  <div class="right">
+    <h2>数据流架构</h2>
+    <div class="flow-box">
+      <p class="flow-title">API数据源</p>
+      <p class="flow-item">/api/v1/realtime/summary</p>
+      <p class="flow-item">/api/v1/realtime</p>
+      <p class="flow-item">/api/v1/alarms/active</p>
+      <p class="flow-item">/api/v1/realtime/energy-dashboard</p>
+    </div>
+    <div class="flow-box">
+      <p class="flow-title">场景层级导航</p>
+      <p class="flow-item">园区外观 → 建筑楼层</p>
+      <p class="flow-item">机房内部 → 机柜U位</p>
+      <p class="flow-item">设备详情 → 实时数据</p>
+    </div>
+  </div>
+</div>
+</body>
+</html>

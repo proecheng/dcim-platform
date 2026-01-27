@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+html { background: #0a1628; }
+body {
+  width: 720pt; height: 405pt; margin: 0; padding: 0;
+  background: #0a1628; font-family: Arial, sans-serif;
+  display: flex; flex-direction: column;
+}
+.header {
+  background: #112240; padding: 15pt 30pt; border-bottom: 2pt solid #1890ff;
+}
+h1 { color: #00d4ff; font-size: 24pt; margin: 0; }
+.content { padding: 15pt 30pt; }
+h2 { color: #1890ff; font-size: 14pt; margin: 0 0 10pt 0; }
+.point-grid { display: flex; gap: 12pt; margin-bottom: 12pt; }
+.point-card {
+  flex: 1; background: rgba(26, 42, 74, 0.7);
+  border-radius: 6pt; padding: 10pt; text-align: center;
+}
+.point-type { color: #00d4ff; font-size: 14pt; margin: 0 0 3pt 0; font-weight: bold; }
+.point-name { color: rgba(255,255,255,0.7); font-size: 9pt; margin: 0 0 5pt 0; }
+.point-desc { color: rgba(255,255,255,0.85); font-size: 8pt; margin: 0; }
+.code-box {
+  background: rgba(26, 42, 74, 0.8); border-radius: 6pt;
+  padding: 12pt; margin-bottom: 10pt;
+  border: 1pt solid rgba(24, 144, 255, 0.3);
+}
+.code-title { color: #faad14; font-size: 11pt; margin: 0 0 8pt 0; }
+p { color: rgba(255,255,255,0.85); font-size: 10pt; margin: 0 0 4pt 0; font-family: Courier New, monospace; }
+.example { color: #52c41a; }
+</style>
+</head>
+<body>
+<div class="header">
+  <h1>监控点位设计</h1>
+</div>
+<div class="content">
+  <h2>点位类型定义</h2>
+  <div class="point-grid">
+    <div class="point-card">
+      <p class="point-type">AI</p>
+      <p class="point-name">Analog Input</p>
+      <p class="point-desc">模拟量输入<br/>温度/电压/功率</p>
+    </div>
+    <div class="point-card">
+      <p class="point-type">DI</p>
+      <p class="point-name">Digital Input</p>
+      <p class="point-desc">开关量输入<br/>门禁/报警状态</p>
+    </div>
+    <div class="point-card">
+      <p class="point-type">AO</p>
+      <p class="point-name">Analog Output</p>
+      <p class="point-desc">模拟量输出<br/>设定温度/风速</p>
+    </div>
+    <div class="point-card">
+      <p class="point-type">DO</p>
+      <p class="point-name">Digital Output</p>
+      <p class="point-desc">开关量输出<br/>设备启停控制</p>
+    </div>
+  </div>
+  <div class="code-box">
+    <p class="code-title">点位编码规则</p>
+    <p>{区域代码}_{设备类型}_{点位类型}_{序号}</p>
+    <p class="example">A1_TH_AI_001  → A1区-温湿度-模拟输入-001号</p>
+    <p class="example">A1_UPS_DI_001 → A1区-UPS-开关输入-001号</p>
+  </div>
+</div>
+</body>
+</html>

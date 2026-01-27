@@ -1,0 +1,1688 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>机房动环监测系统 - 用户手册 V2.3.1</title>
+    <style>
+        :root {
+            --primary-color: #409EFF;
+            --success-color: #67C23A;
+            --warning-color: #E6A23C;
+            --danger-color: #F56C6C;
+            --info-color: #909399;
+            --text-primary: #303133;
+            --text-regular: #606266;
+            --text-secondary: #909399;
+            --border-color: #DCDFE6;
+            --bg-color: #F5F7FA;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+            color: var(--text-primary);
+            line-height: 1.6;
+            background: var(--bg-color);
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        /* Header */
+        .header {
+            background: linear-gradient(135deg, #409EFF 0%, #66b1ff 100%);
+            color: white;
+            padding: 60px 20px;
+            text-align: center;
+            margin-bottom: 40px;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+
+        .header .version {
+            font-size: 1.2em;
+            opacity: 0.9;
+        }
+
+        .header .subtitle {
+            margin-top: 15px;
+            font-size: 1.1em;
+            opacity: 0.85;
+        }
+
+        /* Navigation */
+        .nav {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 30px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.1);
+            position: sticky;
+            top: 10px;
+            z-index: 100;
+        }
+
+        .nav h3 {
+            color: var(--primary-color);
+            margin-bottom: 15px;
+            font-size: 1.1em;
+        }
+
+        .nav-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            list-style: none;
+        }
+
+        .nav-list a {
+            display: inline-block;
+            padding: 8px 16px;
+            background: var(--bg-color);
+            color: var(--text-regular);
+            text-decoration: none;
+            border-radius: 4px;
+            font-size: 0.9em;
+            transition: all 0.3s;
+        }
+
+        .nav-list a:hover {
+            background: var(--primary-color);
+            color: white;
+        }
+
+        /* Sections */
+        .section {
+            background: white;
+            border-radius: 8px;
+            padding: 30px;
+            margin-bottom: 30px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.1);
+        }
+
+        .section h2 {
+            color: var(--primary-color);
+            border-bottom: 2px solid var(--primary-color);
+            padding-bottom: 10px;
+            margin-bottom: 25px;
+            font-size: 1.5em;
+        }
+
+        .section h3 {
+            color: var(--text-primary);
+            margin: 25px 0 15px 0;
+            font-size: 1.2em;
+        }
+
+        .section h4 {
+            color: var(--text-regular);
+            margin: 20px 0 10px 0;
+            font-size: 1.05em;
+        }
+
+        .section p {
+            color: var(--text-regular);
+            margin-bottom: 15px;
+        }
+
+        /* Tables */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+
+        th, td {
+            padding: 12px 15px;
+            text-align: left;
+            border: 1px solid var(--border-color);
+        }
+
+        th {
+            background: var(--bg-color);
+            color: var(--text-primary);
+            font-weight: 600;
+        }
+
+        tr:hover {
+            background: #f9f9f9;
+        }
+
+        /* Lists */
+        ul, ol {
+            margin: 15px 0;
+            padding-left: 25px;
+        }
+
+        li {
+            margin: 8px 0;
+            color: var(--text-regular);
+        }
+
+        /* Code blocks */
+        code {
+            background: #f4f4f5;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 0.9em;
+            color: var(--danger-color);
+        }
+
+        pre {
+            background: #2d3748;
+            color: #e2e8f0;
+            padding: 20px;
+            border-radius: 8px;
+            overflow-x: auto;
+            margin: 15px 0;
+        }
+
+        pre code {
+            background: none;
+            color: inherit;
+            padding: 0;
+        }
+
+        /* Alerts */
+        .alert {
+            padding: 15px 20px;
+            border-radius: 4px;
+            margin: 15px 0;
+        }
+
+        .alert-info {
+            background: #ecf5ff;
+            border-left: 4px solid var(--primary-color);
+            color: var(--primary-color);
+        }
+
+        .alert-success {
+            background: #f0f9eb;
+            border-left: 4px solid var(--success-color);
+            color: var(--success-color);
+        }
+
+        .alert-warning {
+            background: #fdf6ec;
+            border-left: 4px solid var(--warning-color);
+            color: var(--warning-color);
+        }
+
+        .alert-danger {
+            background: #fef0f0;
+            border-left: 4px solid var(--danger-color);
+            color: var(--danger-color);
+        }
+
+        /* Cards */
+        .card-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 20px;
+            margin: 20px 0;
+        }
+
+        .card {
+            background: var(--bg-color);
+            border-radius: 8px;
+            padding: 20px;
+            border: 1px solid var(--border-color);
+        }
+
+        .card h4 {
+            color: var(--primary-color);
+            margin-bottom: 10px;
+        }
+
+        .card p {
+            font-size: 0.9em;
+            margin: 0;
+        }
+
+        /* Feature list */
+        .feature-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+
+        .feature-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 15px;
+            background: var(--bg-color);
+            border-radius: 4px;
+        }
+
+        .feature-item .icon {
+            width: 24px;
+            height: 24px;
+            background: var(--primary-color);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 12px;
+        }
+
+        /* Steps */
+        .steps {
+            counter-reset: step;
+            margin: 20px 0;
+        }
+
+        .step {
+            position: relative;
+            padding-left: 50px;
+            padding-bottom: 25px;
+            border-left: 2px solid var(--border-color);
+            margin-left: 15px;
+        }
+
+        .step:last-child {
+            border-left: none;
+            padding-bottom: 0;
+        }
+
+        .step::before {
+            counter-increment: step;
+            content: counter(step);
+            position: absolute;
+            left: -16px;
+            top: 0;
+            width: 30px;
+            height: 30px;
+            background: var(--primary-color);
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+        }
+
+        .step h4 {
+            margin-top: 0;
+            color: var(--text-primary);
+        }
+
+        /* Tags */
+        .tag {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 0.8em;
+            margin-right: 5px;
+        }
+
+        .tag-primary { background: #ecf5ff; color: var(--primary-color); }
+        .tag-success { background: #f0f9eb; color: var(--success-color); }
+        .tag-warning { background: #fdf6ec; color: var(--warning-color); }
+        .tag-danger { background: #fef0f0; color: var(--danger-color); }
+        .tag-info { background: #f4f4f5; color: var(--info-color); }
+
+        /* Screenshots placeholder */
+        .screenshot {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 8px;
+            padding: 60px 20px;
+            text-align: center;
+            color: white;
+            margin: 20px 0;
+        }
+
+        .screenshot span {
+            opacity: 0.8;
+        }
+
+        /* Footer */
+        .footer {
+            text-align: center;
+            padding: 40px 20px;
+            color: var(--text-secondary);
+            font-size: 0.9em;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .header h1 {
+                font-size: 1.8em;
+            }
+
+            .nav-list {
+                flex-direction: column;
+            }
+
+            .section {
+                padding: 20px;
+            }
+        }
+
+        /* Print styles */
+        @media print {
+            .nav {
+                display: none;
+            }
+
+            .section {
+                box-shadow: none;
+                border: 1px solid #ddd;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<header class="header">
+    <h1>机房动环监测系统</h1>
+    <div class="version">用户手册 V2.3.1</div>
+    <div class="subtitle">Data Center Infrastructure Management System</div>
+</header>
+
+<div class="container">
+    <!-- Navigation -->
+    <nav class="nav">
+        <h3>快速导航</h3>
+        <ul class="nav-list">
+            <li><a href="#overview">系统概述</a></li>
+            <li><a href="#login">登录系统</a></li>
+            <li><a href="#dashboard">监控仪表盘</a></li>
+            <li><a href="#points">点位管理</a></li>
+            <li><a href="#alarms">告警管理</a></li>
+            <li><a href="#history">历史数据</a></li>
+            <li><a href="#reports">报表分析</a></li>
+            <li><a href="#energy-monitor">用电监控</a></li>
+            <li><a href="#energy-stats">能耗统计</a></li>
+            <li><a href="#suggestions">节能建议</a></li>
+            <li><a href="#config">配电配置</a></li>
+            <li><a href="#topology">配电拓扑</a></li>
+            <li><a href="#demand">需量分析</a></li>
+            <li><a href="#regulation">负荷调节</a></li>
+            <li><a href="#settings">系统设置</a></li>
+            <li><a href="#faq">常见问题</a></li>
+        </ul>
+    </nav>
+
+    <!-- Section 1: Overview -->
+    <section id="overview" class="section">
+        <h2>1. 系统概述</h2>
+
+        <h3>1.1 系统简介</h3>
+        <p>机房动环监测系统（DCIM - Data Center Infrastructure Management）是一套专为数据中心设计的综合监控管理平台，实现对机房温湿度、电力、安防、设备等的实时监测、告警管理和数据可视化。</p>
+
+        <h3>1.2 系统功能</h3>
+        <div class="card-grid">
+            <div class="card">
+                <h4>实时监控</h4>
+                <p>52个监控点位实时数据采集，支持AI/DI/AO/DO四种点位类型，WebSocket实时推送。</p>
+            </div>
+            <div class="card">
+                <h4>告警管理</h4>
+                <p>四级告警机制（紧急/重要/次要/提示），声音提醒，实时弹窗通知。</p>
+            </div>
+            <div class="card">
+                <h4>用电管理</h4>
+                <p>PUE实时监控，能耗统计分析，峰谷平电费计算，智能节能建议。</p>
+            </div>
+            <div class="card">
+                <h4>配电管理</h4>
+                <p>配电系统拓扑配置，需量分析优化，负荷调节控制。</p>
+            </div>
+            <div class="card">
+                <h4>数据分析</h4>
+                <p>历史数据查询，趋势分析，同环比对比，多格式报表导出。</p>
+            </div>
+            <div class="card">
+                <h4>系统管理</h4>
+                <p>用户权限管理，阈值配置，操作日志，系统配置。</p>
+            </div>
+        </div>
+
+        <h3>1.3 技术架构</h3>
+        <table>
+            <tr>
+                <th>层次</th>
+                <th>技术栈</th>
+                <th>说明</th>
+            </tr>
+            <tr>
+                <td>前端</td>
+                <td>Vue 3 + TypeScript + Element Plus</td>
+                <td>响应式界面，组件化开发</td>
+            </tr>
+            <tr>
+                <td>后端</td>
+                <td>Python FastAPI + SQLAlchemy</td>
+                <td>异步高性能API服务</td>
+            </tr>
+            <tr>
+                <td>数据库</td>
+                <td>SQLite / PostgreSQL</td>
+                <td>轻量部署或企业级部署</td>
+            </tr>
+            <tr>
+                <td>图表</td>
+                <td>ECharts 5</td>
+                <td>丰富的数据可视化</td>
+            </tr>
+            <tr>
+                <td>通信</td>
+                <td>WebSocket + REST API</td>
+                <td>实时推送 + 标准接口</td>
+            </tr>
+        </table>
+
+        <h3>1.4 版本历史</h3>
+        <table>
+            <tr>
+                <th>版本</th>
+                <th>功能</th>
+                <th>说明</th>
+            </tr>
+            <tr>
+                <td><span class="tag tag-info">V2.0</span></td>
+                <td>基础监控</td>
+                <td>实时监控、告警管理、历史查询</td>
+            </tr>
+            <tr>
+                <td><span class="tag tag-info">V2.1</span></td>
+                <td>用电管理</td>
+                <td>PUE监控、能耗统计、节能建议</td>
+            </tr>
+            <tr>
+                <td><span class="tag tag-info">V2.2</span></td>
+                <td>配电配置</td>
+                <td>配电拓扑、需量分析、变压器管理</td>
+            </tr>
+            <tr>
+                <td><span class="tag tag-primary">V2.3</span></td>
+                <td>功能增强</td>
+                <td>负荷调节、15分钟需量、建议模板库</td>
+            </tr>
+            <tr>
+                <td><span class="tag tag-success">V2.3.1</span></td>
+                <td>交互增强</td>
+                <td>仪表盘交互式能源卡片、趋势图</td>
+            </tr>
+        </table>
+    </section>
+
+    <!-- Section 2: Login -->
+    <section id="login" class="section">
+        <h2>2. 登录系统</h2>
+
+        <h3>2.1 访问地址</h3>
+        <p>在浏览器地址栏输入系统地址：</p>
+        <pre><code>http://localhost:3000</code></pre>
+
+        <h3>2.2 默认账号</h3>
+        <table>
+            <tr>
+                <th>角色</th>
+                <th>用户名</th>
+                <th>密码</th>
+                <th>权限说明</th>
+            </tr>
+            <tr>
+                <td><span class="tag tag-danger">管理员</span></td>
+                <td>admin</td>
+                <td>admin123</td>
+                <td>所有功能权限</td>
+            </tr>
+            <tr>
+                <td><span class="tag tag-warning">操作员</span></td>
+                <td>operator</td>
+                <td>operator123</td>
+                <td>监控、告警确认、控制操作</td>
+            </tr>
+            <tr>
+                <td><span class="tag tag-info">查看者</span></td>
+                <td>viewer</td>
+                <td>viewer123</td>
+                <td>仅查看，无操作权限</td>
+            </tr>
+        </table>
+
+        <h3>2.3 登录步骤</h3>
+        <div class="steps">
+            <div class="step">
+                <h4>输入账号密码</h4>
+                <p>在登录页面输入用户名和密码。</p>
+            </div>
+            <div class="step">
+                <h4>点击登录按钮</h4>
+                <p>点击"登录"按钮提交认证请求。</p>
+            </div>
+            <div class="step">
+                <h4>进入系统</h4>
+                <p>认证成功后自动跳转到监控仪表盘。</p>
+            </div>
+        </div>
+
+        <div class="alert alert-warning">
+            <strong>安全提示：</strong>首次登录后请及时修改默认密码，在"系统设置 → 用户管理"中可修改密码。
+        </div>
+    </section>
+
+    <!-- Section 3: Dashboard -->
+    <section id="dashboard" class="section">
+        <h2>3. 监控仪表盘</h2>
+
+        <p>监控仪表盘是系统的核心界面，提供机房运行状态的全局视图。</p>
+
+        <h3>3.1 点位统计卡片</h3>
+        <p>页面顶部显示四个统计卡片：</p>
+        <table>
+            <tr>
+                <th>卡片</th>
+                <th>图标颜色</th>
+                <th>说明</th>
+            </tr>
+            <tr>
+                <td>监控点位</td>
+                <td><span class="tag tag-primary">蓝色</span></td>
+                <td>系统监控的总点位数量</td>
+            </tr>
+            <tr>
+                <td>正常点位</td>
+                <td><span class="tag tag-success">绿色</span></td>
+                <td>运行状态正常的点位数量</td>
+            </tr>
+            <tr>
+                <td>告警点位</td>
+                <td><span class="tag tag-danger">红色</span></td>
+                <td>当前处于告警状态的点位数量</td>
+            </tr>
+            <tr>
+                <td>离线点位</td>
+                <td><span class="tag tag-info">灰色</span></td>
+                <td>通信中断或离线的点位数量</td>
+            </tr>
+        </table>
+
+        <h3>3.2 能源统计卡片 <span class="tag tag-success">V2.3.1 新增</span></h3>
+        <p>第二行显示五个交互式能源卡片，支持点击跳转和趋势展示：</p>
+
+        <h4>3.2.1 实时功率卡片</h4>
+        <ul>
+            <li><strong>主要显示：</strong>数据中心总功率 (kW)</li>
+            <li><strong>迷你趋势图：</strong>近1小时功率变化趋势</li>
+            <li><strong>详情信息：</strong>IT负载功率、制冷系统功率</li>
+            <li><strong>点击操作：</strong>跳转到用电监控页面</li>
+        </ul>
+
+        <h4>3.2.2 PUE效率卡片</h4>
+        <ul>
+            <li><strong>主要显示：</strong>当前PUE值（电源使用效率）</li>
+            <li><strong>可视化仪表条：</strong>显示PUE相对于目标值的位置</li>
+            <li><strong>颜色等级：</strong>
+                <span class="tag tag-success">优秀(≤1.4)</span>
+                <span class="tag tag-primary">良好(≤1.6)</span>
+                <span class="tag tag-warning">一般(≤1.8)</span>
+                <span class="tag tag-danger">警告(>1.8)</span>
+            </li>
+            <li><strong>趋势指示：</strong>与昨日对比的变化趋势</li>
+        </ul>
+
+        <h4>3.2.3 需量状态卡片</h4>
+        <ul>
+            <li><strong>主要显示：</strong>当前需量利用率百分比</li>
+            <li><strong>进度条颜色：</strong>
+                <span class="tag tag-success">绿色(&lt;60%)</span>
+                <span class="tag tag-warning">橙色(60-80%)</span>
+                <span class="tag tag-danger">红色(>80%)</span>
+            </li>
+            <li><strong>风险预警：</strong>利用率超过90%时显示超需量风险警告</li>
+            <li><strong>详情信息：</strong>当前需量 / 申报需量</li>
+        </ul>
+
+        <h4>3.2.4 今日电费卡片</h4>
+        <ul>
+            <li><strong>主要显示：</strong>今日累计电费（元）</li>
+            <li><strong>饼图展示：</strong>峰时/平时/谷时用电比例</li>
+            <li><strong>附加信息：</strong>本月累计电费、平均电价</li>
+        </ul>
+
+        <h4>3.2.5 节能建议卡片</h4>
+        <ul>
+            <li><strong>主要显示：</strong>待处理建议数量</li>
+            <li><strong>高优先级标识：</strong>紧急/高优先级建议数量</li>
+            <li><strong>潜在节省：</strong>执行建议可节省的月费用</li>
+            <li><strong>点击操作：</strong>跳转到节能建议页面</li>
+        </ul>
+
+        <h3>3.3 实时数据表格</h3>
+        <p>左侧区域显示所有监控点位的实时数据：</p>
+        <ul>
+            <li><strong>点位编码：</strong>唯一标识符，格式为 {区域}_{设备类型}_{点位类型}_{序号}</li>
+            <li><strong>点位名称：</strong>人工可读的描述性名称</li>
+            <li><strong>类型：</strong>AI(模拟输入)/DI(开关输入)/AO(模拟输出)/DO(开关输出)</li>
+            <li><strong>当前值：</strong>实时采集的数值，带单位</li>
+            <li><strong>状态：</strong>正常/告警/离线</li>
+            <li><strong>更新时间：</strong>最后一次数据更新的时间</li>
+        </ul>
+        <p>点击"刷新"按钮可手动刷新数据，系统默认每10秒自动刷新。</p>
+
+        <h3>3.4 最新告警列表</h3>
+        <p>右侧区域显示最近的告警信息：</p>
+        <ul>
+            <li>按时间倒序显示最新的10条告警</li>
+            <li>告警级别用颜色标识：
+                <span class="tag tag-danger">紧急</span>
+                <span class="tag tag-warning">重要</span>
+                <span class="tag tag-primary">次要</span>
+                <span class="tag tag-info">提示</span>
+            </li>
+            <li>点击"查看全部"跳转到告警管理页面</li>
+        </ul>
+    </section>
+
+    <!-- Section 4: Points -->
+    <section id="points" class="section">
+        <h2>4. 点位管理</h2>
+
+        <p>点位管理用于配置和管理系统中的所有监控点位。</p>
+
+        <h3>4.1 点位类型</h3>
+        <table>
+            <tr>
+                <th>类型</th>
+                <th>全称</th>
+                <th>说明</th>
+                <th>示例</th>
+            </tr>
+            <tr>
+                <td><span class="tag tag-primary">AI</span></td>
+                <td>模拟量输入</td>
+                <td>连续变化的测量值</td>
+                <td>温度、湿度、电压、电流</td>
+            </tr>
+            <tr>
+                <td><span class="tag tag-success">DI</span></td>
+                <td>开关量输入</td>
+                <td>二元状态值</td>
+                <td>设备运行状态、门禁状态</td>
+            </tr>
+            <tr>
+                <td><span class="tag tag-warning">AO</span></td>
+                <td>模拟量输出</td>
+                <td>可调节的控制输出</td>
+                <td>温度设定、风速调节</td>
+            </tr>
+            <tr>
+                <td><span class="tag tag-danger">DO</span></td>
+                <td>开关量输出</td>
+                <td>二元控制输出</td>
+                <td>设备启停、阀门开关</td>
+            </tr>
+        </table>
+
+        <h3>4.2 点位编码规则</h3>
+        <p>点位编码格式：<code>{区域}_{设备类型}_{点位类型}_{序号}</code></p>
+        <ul>
+            <li><strong>区域：</strong>A1, A2, B1... 表示机房区域</li>
+            <li><strong>设备类型：</strong>TH(温湿度), AC(空调), UPS, PDU, ENV(环境), SEC(安防)</li>
+            <li><strong>点位类型：</strong>AI, DI, AO, DO</li>
+            <li><strong>序号：</strong>001-999 三位数字</li>
+        </ul>
+        <p>示例：<code>A1_TH_AI_001</code> 表示 A1区域温湿度设备的第1个模拟输入点（温度）</p>
+
+        <h3>4.3 点位操作</h3>
+        <ul>
+            <li><strong>新增点位：</strong>点击"新增"按钮，填写点位信息</li>
+            <li><strong>编辑点位：</strong>点击操作列的"编辑"按钮</li>
+            <li><strong>删除点位：</strong>点击操作列的"删除"按钮（需确认）</li>
+            <li><strong>批量导入：</strong>支持Excel文件批量导入点位配置</li>
+            <li><strong>批量导出：</strong>导出当前点位配置为Excel文件</li>
+        </ul>
+
+        <div class="alert alert-info">
+            <strong>提示：</strong>点位的启用/禁用状态会影响数据采集和告警检测，禁用的点位不会采集数据。
+        </div>
+    </section>
+
+    <!-- Section 5: Alarms -->
+    <section id="alarms" class="section">
+        <h2>5. 告警管理</h2>
+
+        <p>告警管理提供告警的查看、确认、处理和统计功能。</p>
+
+        <h3>5.1 告警级别</h3>
+        <table>
+            <tr>
+                <th>级别</th>
+                <th>颜色</th>
+                <th>说明</th>
+                <th>响应要求</th>
+            </tr>
+            <tr>
+                <td><span class="tag tag-danger">紧急 (Critical)</span></td>
+                <td>红色</td>
+                <td>严重故障，可能导致业务中断</td>
+                <td>立即响应，5分钟内处理</td>
+            </tr>
+            <tr>
+                <td><span class="tag tag-warning">重要 (Major)</span></td>
+                <td>橙色</td>
+                <td>重要异常，需尽快处理</td>
+                <td>15分钟内响应</td>
+            </tr>
+            <tr>
+                <td><span class="tag tag-primary">次要 (Minor)</span></td>
+                <td>蓝色</td>
+                <td>一般异常，需关注</td>
+                <td>1小时内处理</td>
+            </tr>
+            <tr>
+                <td><span class="tag tag-info">提示 (Info)</span></td>
+                <td>灰色</td>
+                <td>信息提示，供参考</td>
+                <td>可计划处理</td>
+            </tr>
+        </table>
+
+        <h3>5.2 告警状态</h3>
+        <ul>
+            <li><strong>活动 (Active)：</strong>告警正在发生，尚未处理</li>
+            <li><strong>已确认 (Acknowledged)：</strong>已知晓告警，正在处理中</li>
+            <li><strong>已解决 (Resolved)：</strong>告警原因已消除，问题已解决</li>
+        </ul>
+
+        <h3>5.3 告警处理流程</h3>
+        <div class="steps">
+            <div class="step">
+                <h4>发现告警</h4>
+                <p>系统检测到异常，生成告警记录，页面弹窗提醒并播放告警声音。</p>
+            </div>
+            <div class="step">
+                <h4>确认告警</h4>
+                <p>操作员查看告警详情，点击"确认"按钮表示已知晓。可填写确认备注。</p>
+            </div>
+            <div class="step">
+                <h4>处理问题</h4>
+                <p>根据告警信息排查和解决实际问题。</p>
+            </div>
+            <div class="step">
+                <h4>解决告警</h4>
+                <p>问题解决后，点击"解决"按钮关闭告警。需填写解决措施说明。</p>
+            </div>
+        </div>
+
+        <h3>5.4 告警筛选</h3>
+        <p>支持多维度筛选告警记录：</p>
+        <ul>
+            <li>按告警级别筛选</li>
+            <li>按告警状态筛选</li>
+            <li>按点位类型筛选</li>
+            <li>按时间范围筛选</li>
+            <li>按关键词搜索</li>
+        </ul>
+    </section>
+
+    <!-- Section 6: History -->
+    <section id="history" class="section">
+        <h2>6. 历史数据</h2>
+
+        <p>历史数据页面用于查询和分析点位的历史采集数据。</p>
+
+        <h3>6.1 查询条件</h3>
+        <table>
+            <tr>
+                <th>参数</th>
+                <th>说明</th>
+            </tr>
+            <tr>
+                <td>点位选择</td>
+                <td>选择要查询的监控点位</td>
+            </tr>
+            <tr>
+                <td>时间范围</td>
+                <td>设置查询的起止时间</td>
+            </tr>
+            <tr>
+                <td>数据粒度</td>
+                <td>原始数据 / 分钟均值 / 小时均值 / 日均值</td>
+            </tr>
+        </table>
+
+        <h3>6.2 趋势图表</h3>
+        <p>查询结果以折线图形式展示数据变化趋势：</p>
+        <ul>
+            <li>支持缩放和平移查看详细数据</li>
+            <li>鼠标悬停显示具体数值和时间</li>
+            <li>可切换折线图/柱状图显示</li>
+        </ul>
+
+        <h3>6.3 统计信息</h3>
+        <p>自动计算并显示查询时段内的统计数据：</p>
+        <ul>
+            <li><strong>最大值：</strong>时段内的峰值</li>
+            <li><strong>最小值：</strong>时段内的谷值</li>
+            <li><strong>平均值：</strong>时段内的算术平均</li>
+            <li><strong>标准差：</strong>数据的离散程度</li>
+            <li><strong>变化率：</strong>起止值的变化百分比</li>
+        </ul>
+
+        <h3>6.4 数据导出</h3>
+        <p>支持多种格式导出历史数据：</p>
+        <ul>
+            <li><strong>Excel (.xlsx)：</strong>完整数据表格，适合分析</li>
+            <li><strong>CSV (.csv)：</strong>通用格式，适合导入其他系统</li>
+            <li><strong>JSON (.json)：</strong>结构化数据，适合程序处理</li>
+        </ul>
+    </section>
+
+    <!-- Section 7: Reports -->
+    <section id="reports" class="section">
+        <h2>7. 报表分析</h2>
+
+        <p>报表分析提供日报、周报、月报等多种报表类型。</p>
+
+        <h3>7.1 报表类型</h3>
+        <table>
+            <tr>
+                <th>类型</th>
+                <th>内容</th>
+                <th>用途</th>
+            </tr>
+            <tr>
+                <td>日报</td>
+                <td>当日运行概况、告警统计、关键指标</td>
+                <td>每日运维交班</td>
+            </tr>
+            <tr>
+                <td>周报</td>
+                <td>周度趋势分析、告警变化、能耗对比</td>
+                <td>周度运维总结</td>
+            </tr>
+            <tr>
+                <td>月报</td>
+                <td>月度综合分析、KPI达成、改进建议</td>
+                <td>月度管理汇报</td>
+            </tr>
+            <tr>
+                <td>自定义</td>
+                <td>按需选择时间范围和报表内容</td>
+                <td>专项分析</td>
+            </tr>
+        </table>
+
+        <h3>7.2 报表内容</h3>
+        <ul>
+            <li><strong>运行概况：</strong>点位在线率、数据完整率</li>
+            <li><strong>告警统计：</strong>各级别告警数量、处理情况</li>
+            <li><strong>环境数据：</strong>温湿度均值、峰值、波动</li>
+            <li><strong>能耗数据：</strong>用电量、PUE、电费</li>
+            <li><strong>趋势图表：</strong>关键指标变化曲线</li>
+        </ul>
+
+        <h3>7.3 报表操作</h3>
+        <ul>
+            <li><strong>生成报表：</strong>选择报表类型和日期，点击"生成"</li>
+            <li><strong>查看报表：</strong>在报表列表中点击查看详情</li>
+            <li><strong>下载报表：</strong>支持PDF、Excel格式下载</li>
+            <li><strong>定时生成：</strong>可配置自动生成规则</li>
+        </ul>
+    </section>
+
+    <!-- Section 8: Energy Monitor -->
+    <section id="energy-monitor" class="section">
+        <h2>8. 用电监控</h2>
+
+        <p>用电监控页面提供数据中心电力系统的实时监控视图。</p>
+
+        <h3>8.1 核心指标卡片</h3>
+        <div class="card-grid">
+            <div class="card">
+                <h4>总功率</h4>
+                <p>数据中心实时总功率消耗，单位kW。</p>
+            </div>
+            <div class="card">
+                <h4>IT负载</h4>
+                <p>IT设备（服务器、网络、存储）功率。</p>
+            </div>
+            <div class="card">
+                <h4>制冷功率</h4>
+                <p>空调、冷却系统的功率消耗。</p>
+            </div>
+            <div class="card">
+                <h4>PUE值</h4>
+                <p>电源使用效率 = 总功率 / IT负载功率。</p>
+            </div>
+            <div class="card">
+                <h4>今日用电</h4>
+                <p>当日累计用电量，单位kWh。</p>
+            </div>
+            <div class="card">
+                <h4>今日电费</h4>
+                <p>当日累计电费，单位元。</p>
+            </div>
+        </div>
+
+        <h3>8.2 PUE监控</h3>
+        <p><strong>PUE（Power Usage Effectiveness）</strong>是衡量数据中心能源效率的关键指标：</p>
+        <pre><code>PUE = 数据中心总功率 / IT设备功率</code></pre>
+
+        <table>
+            <tr>
+                <th>PUE范围</th>
+                <th>评级</th>
+                <th>说明</th>
+            </tr>
+            <tr>
+                <td>≤ 1.4</td>
+                <td><span class="tag tag-success">优秀</span></td>
+                <td>能效领先，运营成本低</td>
+            </tr>
+            <tr>
+                <td>1.4 - 1.6</td>
+                <td><span class="tag tag-primary">良好</span></td>
+                <td>能效较好，有优化空间</td>
+            </tr>
+            <tr>
+                <td>1.6 - 1.8</td>
+                <td><span class="tag tag-warning">一般</span></td>
+                <td>能效一般，建议优化</td>
+            </tr>
+            <tr>
+                <td>> 1.8</td>
+                <td><span class="tag tag-danger">警告</span></td>
+                <td>能效较差，需改进</td>
+            </tr>
+        </table>
+
+        <h3>8.3 PUE趋势图</h3>
+        <p>显示PUE值随时间的变化趋势，支持多种时间粒度：</p>
+        <ul>
+            <li><strong>小时：</strong>查看当日每小时PUE变化</li>
+            <li><strong>日：</strong>查看近期每日PUE趋势</li>
+            <li><strong>周：</strong>查看周度PUE平均值</li>
+            <li><strong>月：</strong>查看月度PUE统计</li>
+        </ul>
+
+        <h3>8.4 设备功率表格</h3>
+        <p>显示各用电设备的实时电力参数：</p>
+        <table>
+            <tr>
+                <th>参数</th>
+                <th>单位</th>
+                <th>说明</th>
+            </tr>
+            <tr>
+                <td>电压</td>
+                <td>V</td>
+                <td>设备输入电压</td>
+            </tr>
+            <tr>
+                <td>电流</td>
+                <td>A</td>
+                <td>设备负载电流</td>
+            </tr>
+            <tr>
+                <td>功率</td>
+                <td>kW</td>
+                <td>有功功率消耗</td>
+            </tr>
+            <tr>
+                <td>功率因数</td>
+                <td>-</td>
+                <td>有功功率与视在功率的比值</td>
+            </tr>
+            <tr>
+                <td>负载率</td>
+                <td>%</td>
+                <td>当前负载占额定容量的百分比</td>
+            </tr>
+        </table>
+    </section>
+
+    <!-- Section 9: Energy Statistics -->
+    <section id="energy-stats" class="section">
+        <h2>9. 能耗统计</h2>
+
+        <p>能耗统计页面提供用电量和电费的详细分析。</p>
+
+        <h3>9.1 统计维度</h3>
+        <ul>
+            <li><strong>日统计：</strong>选择日期查看当日能耗详情</li>
+            <li><strong>月统计：</strong>选择月份查看月度能耗汇总</li>
+        </ul>
+
+        <h3>9.2 能耗汇总卡片</h3>
+        <div class="card-grid">
+            <div class="card">
+                <h4>总用电量</h4>
+                <p>统计周期内的累计用电量（kWh）。</p>
+            </div>
+            <div class="card">
+                <h4>总电费</h4>
+                <p>根据峰谷平电价计算的总电费（元）。</p>
+            </div>
+            <div class="card">
+                <h4>平均功率</h4>
+                <p>统计周期内的平均功率消耗（kW）。</p>
+            </div>
+            <div class="card">
+                <h4>平均PUE</h4>
+                <p>统计周期内的PUE平均值。</p>
+            </div>
+        </div>
+
+        <h3>9.3 峰谷平分析</h3>
+        <p>根据电价时段分析用电分布：</p>
+        <table>
+            <tr>
+                <th>时段</th>
+                <th>时间范围</th>
+                <th>电价（参考）</th>
+                <th>优化建议</th>
+            </tr>
+            <tr>
+                <td><span class="tag tag-danger">峰时</span></td>
+                <td>08:00 - 11:00, 18:00 - 21:00</td>
+                <td>1.2 元/kWh</td>
+                <td>减少非必要负载</td>
+            </tr>
+            <tr>
+                <td><span class="tag tag-warning">平时</span></td>
+                <td>07:00 - 08:00, 11:00 - 18:00, 21:00 - 23:00</td>
+                <td>0.8 元/kWh</td>
+                <td>正常运行</td>
+            </tr>
+            <tr>
+                <td><span class="tag tag-success">谷时</span></td>
+                <td>23:00 - 次日07:00</td>
+                <td>0.4 元/kWh</td>
+                <td>安排大负载任务</td>
+            </tr>
+        </table>
+
+        <h3>9.4 能耗趋势图</h3>
+        <p>组合图表展示能耗变化：</p>
+        <ul>
+            <li><strong>柱状图：</strong>显示各时段/日期的用电量</li>
+            <li><strong>折线图：</strong>叠加显示电费变化趋势</li>
+        </ul>
+
+        <h3>9.5 同环比分析</h3>
+        <ul>
+            <li><strong>同比：</strong>与去年同期对比（如本月 vs 去年同月）</li>
+            <li><strong>环比：</strong>与上一周期对比（如本月 vs 上月）</li>
+        </ul>
+        <p>正值表示增长<span class="tag tag-danger">↑</span>，负值表示下降<span class="tag tag-success">↓</span>。</p>
+    </section>
+
+    <!-- Section 10: Suggestions -->
+    <section id="suggestions" class="section">
+        <h2>10. 节能建议</h2>
+
+        <p>节能建议页面展示系统自动分析生成的节能优化建议。</p>
+
+        <h3>10.1 节能潜力卡片</h3>
+        <div class="card-grid">
+            <div class="card">
+                <h4>潜在节能</h4>
+                <p>执行所有建议可节省的月度电量（kWh）。</p>
+            </div>
+            <div class="card">
+                <h4>预计节省</h4>
+                <p>潜在节能对应的月度电费节省（元）。</p>
+            </div>
+            <div class="card">
+                <h4>已完成建议</h4>
+                <p>已执行完成的建议数量。</p>
+            </div>
+            <div class="card">
+                <h4>实际节能</h4>
+                <p>已完成建议实际产生的节能效果。</p>
+            </div>
+        </div>
+
+        <h3>10.2 建议优先级</h3>
+        <table>
+            <tr>
+                <th>优先级</th>
+                <th>标识</th>
+                <th>说明</th>
+            </tr>
+            <tr>
+                <td><span class="tag tag-danger">紧急</span></td>
+                <td>红色</td>
+                <td>存在能源浪费或安全隐患，需立即处理</td>
+            </tr>
+            <tr>
+                <td><span class="tag tag-warning">高</span></td>
+                <td>橙色</td>
+                <td>节能潜力大，建议尽快实施</td>
+            </tr>
+            <tr>
+                <td><span class="tag tag-primary">中</span></td>
+                <td>蓝色</td>
+                <td>有一定节能效果，可计划实施</td>
+            </tr>
+            <tr>
+                <td><span class="tag tag-info">低</span></td>
+                <td>灰色</td>
+                <td>节能效果较小，可选实施</td>
+            </tr>
+        </table>
+
+        <h3>10.3 建议类别 <span class="tag tag-success">V2.3 新增</span></h3>
+        <p>系统内置10+种建议模板，涵盖以下类别：</p>
+        <ul>
+            <li><strong>温度优化：</strong>空调温度设定优化建议</li>
+            <li><strong>照明优化：</strong>照明系统节能建议</li>
+            <li><strong>负载均衡：</strong>IT负载分布优化建议</li>
+            <li><strong>设备更新：</strong>低效设备更换建议</li>
+            <li><strong>运行模式：</strong>设备运行策略优化建议</li>
+            <li><strong>需量管理：</strong>电力需量优化建议</li>
+            <li><strong>PUE优化：</strong>能效提升综合建议</li>
+        </ul>
+
+        <h3>10.4 建议操作</h3>
+        <div class="steps">
+            <div class="step">
+                <h4>查看详情</h4>
+                <p>点击建议卡片展开查看详细说明和实施步骤。</p>
+            </div>
+            <div class="step">
+                <h4>接受建议</h4>
+                <p>确认可行后点击"接受"，建议进入待实施状态。</p>
+            </div>
+            <div class="step">
+                <h4>执行措施</h4>
+                <p>按照建议步骤实施节能措施。</p>
+            </div>
+            <div class="step">
+                <h4>完成确认</h4>
+                <p>措施执行完毕后点击"完成"，填写实际节能效果。</p>
+            </div>
+        </div>
+
+        <h3>10.5 智能分析</h3>
+        <p>点击"智能分析"按钮，系统将基于当前运行数据自动生成新的节能建议。分析维度包括：</p>
+        <ul>
+            <li>温湿度与空调运行状态</li>
+            <li>设备负载率分布</li>
+            <li>峰谷平用电比例</li>
+            <li>PUE变化趋势</li>
+            <li>历史能耗对比</li>
+        </ul>
+    </section>
+
+    <!-- Section 11: Config -->
+    <section id="config" class="section">
+        <h2>11. 配电配置</h2>
+
+        <p>配电配置页面用于管理数据中心的配电系统基础设施。</p>
+
+        <h3>11.1 变压器管理</h3>
+        <p>配置数据中心的变压器设备：</p>
+        <table>
+            <tr>
+                <th>字段</th>
+                <th>说明</th>
+            </tr>
+            <tr>
+                <td>变压器编码</td>
+                <td>唯一标识，如 TR-001</td>
+            </tr>
+            <tr>
+                <td>变压器名称</td>
+                <td>描述性名称，如 "1#主变压器"</td>
+            </tr>
+            <tr>
+                <td>额定容量</td>
+                <td>变压器容量，单位 kVA</td>
+            </tr>
+            <tr>
+                <td>输入电压</td>
+                <td>高压侧电压，如 10kV</td>
+            </tr>
+            <tr>
+                <td>输出电压</td>
+                <td>低压侧电压，如 400V</td>
+            </tr>
+            <tr>
+                <td>安装位置</td>
+                <td>变压器室位置</td>
+            </tr>
+        </table>
+
+        <h3>11.2 计量点管理</h3>
+        <p>配置电力计量点（电表）：</p>
+        <ul>
+            <li><strong>计量点编码：</strong>唯一标识</li>
+            <li><strong>电表号：</strong>实际电表编号</li>
+            <li><strong>所属变压器：</strong>关联的变压器</li>
+            <li><strong>计量类型：</strong>总表/分表</li>
+            <li><strong>申报需量：</strong>向供电局申报的需量值（kW）</li>
+            <li><strong>需量类型：</strong>按需/按容</li>
+        </ul>
+
+        <h3>11.3 配电柜管理</h3>
+        <p>配置各级配电柜：</p>
+        <table>
+            <tr>
+                <th>柜体类型</th>
+                <th>说明</th>
+            </tr>
+            <tr>
+                <td>主配电柜 (MDB)</td>
+                <td>主进线配电柜</td>
+            </tr>
+            <tr>
+                <td>ATS切换柜</td>
+                <td>自动转换开关柜</td>
+            </tr>
+            <tr>
+                <td>UPS输入柜</td>
+                <td>UPS电源输入配电</td>
+            </tr>
+            <tr>
+                <td>UPS输出柜</td>
+                <td>UPS电源输出配电</td>
+            </tr>
+            <tr>
+                <td>列头柜 (RPP)</td>
+                <td>机房列头配电柜</td>
+            </tr>
+            <tr>
+                <td>精密配电柜 (PDU)</td>
+                <td>机柜级配电单元</td>
+            </tr>
+        </table>
+
+        <h3>11.4 配电回路管理</h3>
+        <p>配置配电柜内的各回路：</p>
+        <ul>
+            <li><strong>回路编号：</strong>配电柜内的回路标识</li>
+            <li><strong>负载类型：</strong>IT负载/空调/照明/其他</li>
+            <li><strong>断路器规格：</strong>如 3P 63A</li>
+            <li><strong>可转移标识：</strong>是否支持负荷转移</li>
+        </ul>
+    </section>
+
+    <!-- Section 12: Topology -->
+    <section id="topology" class="section">
+        <h2>12. 配电拓扑</h2>
+
+        <p>配电拓扑页面以树形结构展示配电系统的层级关系。</p>
+
+        <h3>12.1 拓扑结构</h3>
+        <pre><code>变压器 (Transformer)
+  └── 计量点 (Meter Point)
+       └── 配电柜 (Distribution Panel)
+            └── 配电回路 (Circuit)
+                 └── 用电设备 (Power Device)</code></pre>
+
+        <h3>12.2 统计卡片</h3>
+        <ul>
+            <li><strong>总容量：</strong>所有变压器的额定容量总和</li>
+            <li><strong>计量点数：</strong>配置的电表数量</li>
+            <li><strong>设备数：</strong>接入的用电设备总数</li>
+        </ul>
+
+        <h3>12.3 节点信息</h3>
+        <p>点击树形图中的节点可查看详细信息：</p>
+        <ul>
+            <li>设备基本信息</li>
+            <li>实时功率数据</li>
+            <li>运行状态</li>
+            <li>关联的下级设备列表</li>
+        </ul>
+
+        <h3>12.4 状态标识</h3>
+        <table>
+            <tr>
+                <th>状态</th>
+                <th>颜色</th>
+                <th>说明</th>
+            </tr>
+            <tr>
+                <td>正常</td>
+                <td><span class="tag tag-success">绿色</span></td>
+                <td>设备运行正常</td>
+            </tr>
+            <tr>
+                <td>告警</td>
+                <td><span class="tag tag-warning">橙色</span></td>
+                <td>存在告警需关注</td>
+            </tr>
+            <tr>
+                <td>故障</td>
+                <td><span class="tag tag-danger">红色</span></td>
+                <td>设备故障需处理</td>
+            </tr>
+            <tr>
+                <td>离线</td>
+                <td><span class="tag tag-info">灰色</span></td>
+                <td>设备离线或停用</td>
+            </tr>
+        </table>
+    </section>
+
+    <!-- Section 13: Demand -->
+    <section id="demand" class="section">
+        <h2>13. 需量分析</h2>
+
+        <p>需量分析页面提供电力需量的监控和优化分析功能。</p>
+
+        <h3>13.1 什么是需量</h3>
+        <p><strong>电力需量</strong>是指用户在一定时间间隔内的平均功率，通常以15分钟为计算周期。供电局按照申报需量或实际最大需量收取基本电费。</p>
+
+        <div class="alert alert-info">
+            <strong>需量管理的意义：</strong>合理控制需量可以降低基本电费，避免超需量罚款。
+        </div>
+
+        <h3>13.2 15分钟需量曲线 <span class="tag tag-success">V2.3 新增</span></h3>
+        <p>显示近期的15分钟滑动窗口需量数据：</p>
+        <ul>
+            <li>蓝色曲线：实际需量变化</li>
+            <li>红色虚线：申报需量限值</li>
+            <li>橙色区域：超需量预警区间</li>
+        </ul>
+
+        <h3>13.3 需量配置分析</h3>
+        <p>分析各计量点的需量配置合理性：</p>
+        <table>
+            <tr>
+                <th>指标</th>
+                <th>说明</th>
+            </tr>
+            <tr>
+                <td>申报需量</td>
+                <td>向供电局申报的需量值</td>
+            </tr>
+            <tr>
+                <td>12月最大需量</td>
+                <td>近12个月的最大实际需量</td>
+            </tr>
+            <tr>
+                <td>平均需量</td>
+                <td>近期的平均需量值</td>
+            </tr>
+            <tr>
+                <td>利用率</td>
+                <td>实际需量占申报需量的百分比</td>
+            </tr>
+            <tr>
+                <td>建议需量</td>
+                <td>系统计算的建议申报值</td>
+            </tr>
+        </table>
+
+        <h3>13.4 需量优化方案</h3>
+        <p>系统自动生成三种优化方案：</p>
+        <ul>
+            <li><strong>保守方案：</strong>以历史最大值为基准，保留较大安全余量</li>
+            <li><strong>均衡方案：</strong>综合考虑成本和风险的推荐方案</li>
+            <li><strong>激进方案：</strong>以平均值为基准，最大程度降低基本电费</li>
+        </ul>
+
+        <h3>13.5 负荷转移分析</h3>
+        <p>分析可转移负荷以削峰填谷：</p>
+        <ul>
+            <li>识别可转移的设备负荷</li>
+            <li>计算转移后的需量变化</li>
+            <li>评估转移的潜在节省</li>
+            <li>生成负荷转移建议</li>
+        </ul>
+    </section>
+
+    <!-- Section 14: Regulation -->
+    <section id="regulation" class="section">
+        <h2>14. 负荷调节 <span class="tag tag-success">V2.3 新增</span></h2>
+
+        <p>负荷调节页面提供可调设备的功率控制功能。</p>
+
+        <h3>14.1 调节类型</h3>
+        <table>
+            <tr>
+                <th>类型</th>
+                <th>适用设备</th>
+                <th>调节方式</th>
+            </tr>
+            <tr>
+                <td>温度调节</td>
+                <td>精密空调、新风系统</td>
+                <td>调整设定温度影响压缩机功率</td>
+            </tr>
+            <tr>
+                <td>亮度调节</td>
+                <td>照明系统</td>
+                <td>调整照明亮度降低功耗</td>
+            </tr>
+            <tr>
+                <td>运行模式</td>
+                <td>UPS、空调</td>
+                <td>切换节能模式/标准模式</td>
+            </tr>
+            <tr>
+                <td>负载控制</td>
+                <td>非关键负载</td>
+                <td>调整设备负载率</td>
+            </tr>
+        </table>
+
+        <h3>14.2 调节配置列表</h3>
+        <p>显示所有可调节设备的配置：</p>
+        <ul>
+            <li><strong>设备名称：</strong>可调设备标识</li>
+            <li><strong>调节类型：</strong>温度/亮度/模式/负载</li>
+            <li><strong>当前值：</strong>当前设定或运行值</li>
+            <li><strong>调节范围：</strong>允许的调节区间</li>
+            <li><strong>当前功率：</strong>设备当前功率</li>
+            <li><strong>启用状态：</strong>是否允许调节</li>
+        </ul>
+
+        <h3>14.3 调节模拟</h3>
+        <p>在实际调节前，可先进行模拟预测：</p>
+        <div class="steps">
+            <div class="step">
+                <h4>选择设备</h4>
+                <p>选择要调节的设备。</p>
+            </div>
+            <div class="step">
+                <h4>设置目标值</h4>
+                <p>通过滑块或输入框设置目标调节值。</p>
+            </div>
+            <div class="step">
+                <h4>查看模拟结果</h4>
+                <p>系统预测调节后的功率变化和影响。</p>
+            </div>
+            <div class="step">
+                <h4>确认应用</h4>
+                <p>确认无误后点击"应用"执行调节。</p>
+            </div>
+        </div>
+
+        <h3>14.4 调节建议</h3>
+        <p>系统基于当前运行状态自动生成调节建议：</p>
+        <ul>
+            <li>高峰时段削峰建议</li>
+            <li>设备节能运行建议</li>
+            <li>环境参数优化建议</li>
+        </ul>
+        <p>每条建议显示预期节能效果和舒适度影响评估。</p>
+
+        <h3>14.5 调节历史</h3>
+        <p>记录所有调节操作的历史：</p>
+        <ul>
+            <li>调节时间</li>
+            <li>操作人员</li>
+            <li>调节设备和参数</li>
+            <li>调节前后功率变化</li>
+            <li>实际节能效果</li>
+        </ul>
+    </section>
+
+    <!-- Section 15: Settings -->
+    <section id="settings" class="section">
+        <h2>15. 系统设置</h2>
+
+        <p>系统设置页面提供系统配置和管理功能。</p>
+
+        <h3>15.1 阈值配置</h3>
+        <p>配置各点位的告警阈值：</p>
+        <table>
+            <tr>
+                <th>阈值类型</th>
+                <th>说明</th>
+            </tr>
+            <tr>
+                <td>高高限 (HH)</td>
+                <td>超过触发紧急告警</td>
+            </tr>
+            <tr>
+                <td>高限 (H)</td>
+                <td>超过触发重要告警</td>
+            </tr>
+            <tr>
+                <td>低限 (L)</td>
+                <td>低于触发重要告警</td>
+            </tr>
+            <tr>
+                <td>低低限 (LL)</td>
+                <td>低于触发紧急告警</td>
+            </tr>
+        </table>
+
+        <h3>15.2 用户管理</h3>
+        <p>管理员可进行以下操作：</p>
+        <ul>
+            <li><strong>新增用户：</strong>创建新的系统用户</li>
+            <li><strong>编辑用户：</strong>修改用户信息和权限</li>
+            <li><strong>禁用用户：</strong>暂停用户登录权限</li>
+            <li><strong>重置密码：</strong>重置用户登录密码</li>
+            <li><strong>删除用户：</strong>永久删除用户账号</li>
+        </ul>
+
+        <h3>15.3 电价配置</h3>
+        <p>配置分时电价用于电费计算：</p>
+        <ul>
+            <li><strong>电价名称：</strong>如"夏季峰时电价"</li>
+            <li><strong>时段类型：</strong>峰时/平时/谷时</li>
+            <li><strong>时间范围：</strong>适用的时间段</li>
+            <li><strong>单价：</strong>电价（元/kWh）</li>
+            <li><strong>生效日期：</strong>电价开始生效日期</li>
+        </ul>
+
+        <h3>15.4 系统日志</h3>
+        <p>查看系统运行日志：</p>
+        <ul>
+            <li><strong>操作日志：</strong>用户操作记录</li>
+            <li><strong>系统日志：</strong>系统运行事件</li>
+            <li><strong>通讯日志：</strong>设备通讯记录</li>
+        </ul>
+        <p>支持按时间、类型、用户筛选，可导出日志文件。</p>
+
+        <h3>15.5 授权信息</h3>
+        <p>查看系统授权状态：</p>
+        <ul>
+            <li>授权版本</li>
+            <li>授权点位数</li>
+            <li>有效期限</li>
+            <li>授权功能列表</li>
+        </ul>
+    </section>
+
+    <!-- Section 16: FAQ -->
+    <section id="faq" class="section">
+        <h2>16. 常见问题</h2>
+
+        <h3>Q1: 登录失败怎么办？</h3>
+        <p><strong>A:</strong> 请检查以下事项：</p>
+        <ul>
+            <li>确认用户名和密码是否正确（注意大小写）</li>
+            <li>检查账号是否被禁用</li>
+            <li>确认后端服务是否正常运行</li>
+            <li>清除浏览器缓存后重试</li>
+        </ul>
+
+        <h3>Q2: 数据不更新怎么办？</h3>
+        <p><strong>A:</strong> 可能原因和解决方法：</p>
+        <ul>
+            <li>检查网络连接是否正常</li>
+            <li>检查数据模拟器是否运行</li>
+            <li>尝试手动点击"刷新"按钮</li>
+            <li>检查浏览器控制台是否有错误</li>
+        </ul>
+
+        <h3>Q3: 告警声音如何关闭？</h3>
+        <p><strong>A:</strong> 在页面右上角点击声音图标可临时静音。如需永久关闭，在系统设置中配置告警通知方式。</p>
+
+        <h3>Q4: 如何导出报表？</h3>
+        <p><strong>A:</strong> 在报表分析页面，选择报表类型和日期后点击"生成"，生成完成后点击"下载"按钮选择导出格式（PDF/Excel）。</p>
+
+        <h3>Q5: PUE值异常怎么排查？</h3>
+        <p><strong>A:</strong> PUE异常可能原因：</p>
+        <ul>
+            <li>IT负载功率采集点故障</li>
+            <li>制冷系统功率异常增加</li>
+            <li>其他辅助系统能耗增加</li>
+            <li>检查配电计量点数据是否正常</li>
+        </ul>
+
+        <h3>Q6: 如何添加新的监控点位？</h3>
+        <p><strong>A:</strong> 进入"点位管理"页面，点击"新增"按钮，填写点位编码、名称、类型、单位等信息后保存。如需批量添加，可使用Excel导入功能。</p>
+
+        <h3>Q7: 节能建议如何生成？</h3>
+        <p><strong>A:</strong> 系统会根据运行数据自动分析生成建议。也可在节能建议页面点击"智能分析"按钮手动触发分析。建议基于温度、负载、能耗等多维度数据综合评估。</p>
+
+        <h3>Q8: 如何联系技术支持？</h3>
+        <p><strong>A:</strong> 如遇到无法解决的问题，请通过以下方式联系技术支持：</p>
+        <ul>
+            <li>查看项目文档：README.md</li>
+            <li>提交Issue：GitHub项目页面</li>
+        </ul>
+    </section>
+
+    <!-- Appendix -->
+    <section class="section">
+        <h2>附录：快捷键</h2>
+        <table>
+            <tr>
+                <th>快捷键</th>
+                <th>功能</th>
+            </tr>
+            <tr>
+                <td><code>F5</code></td>
+                <td>刷新页面数据</td>
+            </tr>
+            <tr>
+                <td><code>Esc</code></td>
+                <td>关闭弹窗/对话框</td>
+            </tr>
+            <tr>
+                <td><code>Enter</code></td>
+                <td>确认表单提交</td>
+            </tr>
+        </table>
+    </section>
+</div>
+
+<footer class="footer">
+    <p>机房动环监测系统 V2.3.1 用户手册</p>
+    <p>文档生成日期：2026-01-19</p>
+    <p>&copy; 2026 DCIM System. All rights reserved.</p>
+</footer>
+
+</body>
+</html>

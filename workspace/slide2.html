@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+html { background: #0a1628; }
+body {
+  width: 720pt; height: 405pt; margin: 0; padding: 0;
+  background: #0a1628; font-family: Arial, sans-serif;
+  display: flex; flex-direction: column;
+}
+.header {
+  background: #112240; padding: 15pt 30pt; border-bottom: 2pt solid #1890ff;
+}
+h1 { color: #00d4ff; font-size: 24pt; margin: 0; }
+.content {
+  display: flex; flex: 1; padding: 20pt 30pt;
+}
+.left-col { flex: 1; padding-right: 15pt; }
+.right-col { flex: 1; padding-left: 15pt; }
+.module-card {
+  background: rgba(26, 42, 74, 0.8); border-radius: 8pt;
+  padding: 12pt 15pt; margin-bottom: 10pt;
+  border-left: 3pt solid #1890ff;
+}
+h3 { color: #00d4ff; font-size: 14pt; margin: 0 0 5pt 0; }
+p { color: rgba(255,255,255,0.85); font-size: 11pt; margin: 0; line-height: 1.4; }
+.highlight { color: #faad14; }
+</style>
+</head>
+<body>
+<div class="header">
+  <h1>系统核心功能模块</h1>
+</div>
+<div class="content">
+  <div class="left-col">
+    <div class="module-card">
+      <h3>动力监控</h3>
+      <p>UPS/配电/电池/发电机/ATS/列头柜</p>
+    </div>
+    <div class="module-card">
+      <h3>环境监控</h3>
+      <p>温湿度/空调/漏水/新风/消防</p>
+    </div>
+    <div class="module-card">
+      <h3>安防监控</h3>
+      <p>门禁/视频/消防/防盗</p>
+    </div>
+    <div class="module-card">
+      <h3>资产管理</h3>
+      <p>全生命周期管理/盘点/追溯</p>
+    </div>
+  </div>
+  <div class="right-col">
+    <div class="module-card">
+      <h3>容量管理</h3>
+      <p>空间/电力/制冷/承重/网络</p>
+    </div>
+    <div class="module-card">
+      <h3>能效管理</h3>
+      <p>PUE/能耗分项/碳排放/节能</p>
+    </div>
+    <div class="module-card">
+      <h3>运维管理</h3>
+      <p>工单/巡检/维保/变更/值班</p>
+    </div>
+    <div class="module-card">
+      <h3 class="highlight">核心优势</h3>
+      <p>用电管理 + 数字孪生3D可视化</p>
+    </div>
+  </div>
+</div>
+</body>
+</html>

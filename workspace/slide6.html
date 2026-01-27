@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+html { background: #0a1628; }
+body {
+  width: 720pt; height: 405pt; margin: 0; padding: 0;
+  background: #0a1628; font-family: Arial, sans-serif;
+  display: flex; flex-direction: column;
+}
+.header {
+  background: #112240; padding: 15pt 30pt; border-bottom: 2pt solid #1890ff;
+}
+h1 { color: #00d4ff; font-size: 24pt; margin: 0; }
+.content { padding: 15pt 30pt; display: flex; }
+.left { flex: 1; padding-right: 15pt; }
+.right { flex: 1; padding-left: 15pt; }
+h2 { color: #1890ff; font-size: 14pt; margin: 0 0 10pt 0; }
+.module-box {
+  background: rgba(26, 42, 74, 0.7); border-radius: 6pt;
+  padding: 12pt; margin-bottom: 10pt;
+}
+h3 { color: #00d4ff; font-size: 12pt; margin: 0 0 8pt 0; }
+p { color: rgba(255,255,255,0.85); font-size: 10pt; margin: 0 0 5pt 0; line-height: 1.4; }
+.tag {
+  display: inline-block; background: rgba(24, 144, 255, 0.3);
+  color: #00d4ff; font-size: 9pt; padding: 2pt 6pt;
+  border-radius: 3pt; margin-right: 5pt; margin-bottom: 4pt;
+}
+.status-flow {
+  background: rgba(82, 196, 26, 0.15); border: 1pt solid rgba(82, 196, 26, 0.4);
+  border-radius: 4pt; padding: 8pt; margin-top: 8pt;
+}
+.flow-text { color: rgba(255,255,255,0.8); font-size: 9pt; margin: 0; }
+</style>
+</head>
+<body>
+<div class="header">
+  <h1>容量管理与运维管理模块</h1>
+</div>
+<div class="content">
+  <div class="left">
+    <h2>容量管理 (Phase 15)</h2>
+    <div class="module-box">
+      <h3>四维容量监控</h3>
+      <p><span class="tag">空间容量</span><span class="tag">电力容量</span></p>
+      <p><span class="tag">制冷容量</span><span class="tag">承重容量</span></p>
+      <p>使用率 &gt;80% 警告，&gt;95% 严重</p>
+    </div>
+    <div class="module-box">
+      <h3>容量规划功能</h3>
+      <p>新设备上架可行性评估</p>
+      <p>自动检查资源可用性</p>
+      <p>返回feasible状态和issues列表</p>
+    </div>
+  </div>
+  <div class="right">
+    <h2>运维管理 (Phase 16)</h2>
+    <div class="module-box">
+      <h3>工单管理</h3>
+      <p>编号: WO-YYYYMMDD-XXX</p>
+      <p>类型: 故障/维护/变更/其他</p>
+      <div class="status-flow">
+        <p class="flow-text">pending → assigned → processing → completed → closed</p>
+      </div>
+    </div>
+    <div class="module-box">
+      <h3>巡检 + 知识库</h3>
+      <p>巡检计划/任务自动生成</p>
+      <p>知识库分类管理/全文搜索</p>
+    </div>
+  </div>
+</div>
+</body>
+</html>

@@ -1,0 +1,272 @@
+// ============================================
+// 全局样式入口文件 - 深色科技风主题
+// ============================================
+
+// 导入主题变量
+@use './themes/dark-tech.scss' as *;
+
+// 导入 Element Plus 深色主题覆盖
+@import './element-dark.scss';
+
+// ============= 基础重置 =============
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  background: var(--bg-primary);
+  color: var(--text-regular);
+  font-family: 'Microsoft YaHei', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+#app {
+  height: 100%;
+}
+
+// ============= 滚动条样式 (深色主题) =============
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 3px;
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.3);
+  }
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+// ============= 链接样式 =============
+a {
+  color: var(--primary-color);
+  text-decoration: none;
+  transition: color var(--transition-fast);
+
+  &:hover {
+    color: var(--primary-light);
+  }
+}
+
+// ============= 告警级别颜色 =============
+.alarm-critical {
+  color: var(--alarm-critical);
+}
+
+.alarm-major {
+  color: var(--alarm-major);
+}
+
+.alarm-minor {
+  color: var(--alarm-minor);
+}
+
+.alarm-info {
+  color: var(--alarm-info);
+}
+
+// 带背景的告警标签
+.alarm-tag-critical {
+  background: rgba(255, 77, 79, 0.2);
+  color: var(--alarm-critical);
+  border: 1px solid rgba(255, 77, 79, 0.3);
+}
+
+.alarm-tag-major {
+  background: rgba(250, 140, 22, 0.2);
+  color: var(--alarm-major);
+  border: 1px solid rgba(250, 140, 22, 0.3);
+}
+
+.alarm-tag-minor {
+  background: rgba(250, 173, 20, 0.2);
+  color: var(--alarm-minor);
+  border: 1px solid rgba(250, 173, 20, 0.3);
+}
+
+.alarm-tag-info {
+  background: rgba(24, 144, 255, 0.2);
+  color: var(--alarm-info);
+  border: 1px solid rgba(24, 144, 255, 0.3);
+}
+
+// ============= 状态颜色 =============
+.status-normal {
+  color: var(--success-color);
+}
+
+.status-alarm {
+  color: var(--error-color);
+}
+
+.status-offline {
+  color: var(--text-disabled);
+}
+
+.status-warning {
+  color: var(--warning-color);
+}
+
+// ============= 点位类型颜色 =============
+.point-type-ai {
+  color: var(--primary-color);
+}
+
+.point-type-di {
+  color: var(--success-color);
+}
+
+.point-type-ao {
+  color: var(--warning-color);
+}
+
+.point-type-do {
+  color: var(--error-color);
+}
+
+// ============= 通用工具类 =============
+// 文字颜色
+.text-primary {
+  color: var(--text-primary);
+}
+
+.text-regular {
+  color: var(--text-regular);
+}
+
+.text-secondary {
+  color: var(--text-secondary);
+}
+
+.text-placeholder {
+  color: var(--text-placeholder);
+}
+
+.text-disabled {
+  color: var(--text-disabled);
+}
+
+// 主题色文字
+.text-theme-primary {
+  color: var(--primary-color);
+}
+
+.text-theme-accent {
+  color: var(--accent-color);
+}
+
+.text-success {
+  color: var(--success-color);
+}
+
+.text-warning {
+  color: var(--warning-color);
+}
+
+.text-error {
+  color: var(--error-color);
+}
+
+// 背景色
+.bg-primary {
+  background-color: var(--bg-primary);
+}
+
+.bg-secondary {
+  background-color: var(--bg-secondary);
+}
+
+.bg-tertiary {
+  background-color: var(--bg-tertiary);
+}
+
+.bg-card {
+  background: var(--bg-card);
+}
+
+.bg-card-solid {
+  background-color: var(--bg-card-solid);
+}
+
+// ============= 卡片通用样式 =============
+.dark-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+
+  &:hover {
+    border-color: var(--border-active);
+    box-shadow: var(--shadow-glow);
+  }
+}
+
+.dark-card-solid {
+  background: var(--bg-card-solid);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+}
+
+// ============= 发光效果 =============
+.glow-text {
+  text-shadow: 0 0 10px var(--accent-glow);
+}
+
+.glow-border {
+  box-shadow: var(--shadow-glow);
+}
+
+// ============= 过渡动画 =============
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity var(--transition-base);
+}
+
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+}
+
+.slide-fade-enter-active {
+  transition: all var(--transition-base);
+}
+
+.slide-fade-leave-active {
+  transition: all var(--transition-fast);
+}
+
+.slide-fade-enter-from,
+.slide-fade-leave-to {
+  transform: translateX(20px);
+  opacity: 0;
+}
+
+// ============= 数据闪烁动画 (告警) =============
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+.blink {
+  animation: blink 1s ease-in-out infinite;
+}
+
+@keyframes pulse-glow {
+  0%, 100% { box-shadow: 0 0 5px var(--accent-glow); }
+  50% { box-shadow: 0 0 20px var(--accent-glow), 0 0 30px var(--accent-glow); }
+}
+
+.pulse-glow {
+  animation: pulse-glow 2s ease-in-out infinite;
+}

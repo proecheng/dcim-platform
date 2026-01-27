@@ -1,0 +1,51 @@
+version: '3.8'
+
+services:
+  # 后端服务
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: dcim-backend
+    restart: unless-stopped
+    environment:
+      - APP_NAME=算力中心智能监控系统
+      - APP_VERSION=2.0.0
+      - DEBUG=false
+      - DATABASE_URL=sqlite+aiosqlite:///./data/dcim.db
+      - SECRET_KEY=${SECRET_KEY:-your-super-secret-key-change-in-production}
+      - MAX_POINTS=100
+    volumes:
+      - backend-data:/app/data
+    ports:
+      - "8000:8000"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - dcim-network
+
+  # 前端服务
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: dcim-frontend
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    networks:
+      - dcim-network
+
+volumes:
+  backend-data:
+    name: dcim-backend-data
+
+networks:
+  dcim-network:
+    name: dcim-network
+    driver: bridge

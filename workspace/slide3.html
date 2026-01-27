@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+html { background: #0a1628; }
+body {
+  width: 720pt; height: 405pt; margin: 0; padding: 0;
+  background: #0a1628; font-family: Arial, sans-serif;
+  display: flex; flex-direction: column;
+}
+.header {
+  background: #112240; padding: 15pt 30pt; border-bottom: 2pt solid #1890ff;
+}
+h1 { color: #00d4ff; font-size: 24pt; margin: 0; }
+.content { padding: 20pt 30pt; display: flex; }
+.left { flex: 1.2; padding-right: 20pt; }
+.right { flex: 1; }
+h2 { color: #1890ff; font-size: 16pt; margin: 0 0 10pt 0; }
+p { color: rgba(255,255,255,0.9); font-size: 11pt; margin: 0 0 8pt 0; line-height: 1.5; }
+.color-table {
+  background: rgba(26, 42, 74, 0.6); border-radius: 6pt; padding: 12pt;
+}
+.color-row {
+  display: flex; align-items: center; margin-bottom: 8pt;
+}
+.color-box {
+  width: 40pt; height: 20pt; border-radius: 3pt; margin-right: 10pt;
+}
+.bg-primary { background: #0a1628; border: 1pt solid #1890ff; }
+.bg-secondary { background: #0d1b2a; }
+.bg-tertiary { background: #112240; }
+.bg-card { background: #1a2a4a; }
+.text-primary { background: #ffffff; }
+.accent { background: #00d4ff; }
+.label { color: rgba(255,255,255,0.7); font-size: 10pt; }
+.value { color: #00d4ff; font-size: 10pt; margin-left: auto; }
+</style>
+</head>
+<body>
+<div class="header">
+  <h1>深色主题配色方案</h1>
+</div>
+<div class="content">
+  <div class="left">
+    <h2>设计理念</h2>
+    <p>采用深蓝科技风配色，营造专业监控中心氛围。强制覆盖Element Plus默认浅色变量，确保全局深色一致性。</p>
+    <h2>核心改进</h2>
+    <p>1. 强制 color-scheme: dark 暗色模式</p>
+    <p>2. 提高文字亮度确保可读性</p>
+    <p>3. 组件级 !important 覆盖</p>
+    <p>4. ECharts深色主题配置</p>
+  </div>
+  <div class="right">
+    <div class="color-table">
+      <div class="color-row">
+        <div class="color-box bg-primary"></div>
+        <p class="label">主背景</p>
+        <p class="value">#0a1628</p>
+      </div>
+      <div class="color-row">
+        <div class="color-box bg-tertiary"></div>
+        <p class="label">三级背景</p>
+        <p class="value">#112240</p>
+      </div>
+      <div class="color-row">
+        <div class="color-box bg-card"></div>
+        <p class="label">卡片背景</p>
+        <p class="value">#1a2a4a</p>
+      </div>
+      <div class="color-row">
+        <div class="color-box accent"></div>
+        <p class="label">强调色</p>
+        <p class="value">#00d4ff</p>
+      </div>
+      <div class="color-row">
+        <div class="color-box text-primary"></div>
+        <p class="label">主要文字</p>
+        <p class="value">#ffffff</p>
+      </div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

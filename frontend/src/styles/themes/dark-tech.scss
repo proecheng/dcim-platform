@@ -1,0 +1,202 @@
+// ============================================
+// 深色科技风主题变量 - 基于行业DCIM系统UI研究
+// ============================================
+
+// ============= 背景色系 =============
+$bg-primary: #0a1628;           // 主背景色 (最深)
+$bg-secondary: #0d1b2a;         // 次级背景
+$bg-tertiary: #112240;          // 三级背景
+$bg-card: rgba(26, 42, 74, 0.85); // 卡片背景 (半透明)
+$bg-card-solid: #1a2a4a;        // 卡片背景 (实色)
+$bg-hover: rgba(24, 144, 255, 0.1); // 悬停背景
+$bg-active: rgba(24, 144, 255, 0.2); // 激活背景
+
+// ============= 主色系 =============
+$primary-color: #1890ff;        // 主色 (Element Plus蓝)
+$primary-light: #40a9ff;        // 主色浅
+$primary-lighter: #69c0ff;      // 主色更浅
+$primary-dark: #096dd9;         // 主色深
+
+// ============= 强调色 (科技青) =============
+$accent-color: #00d4ff;         // 强调色
+$accent-light: #00f7ff;         // 强调色浅
+$accent-glow: rgba(0, 212, 255, 0.3); // 发光效果
+
+// ============= 状态色 =============
+$success-color: #52c41a;        // 成功/正常
+$success-light: #73d13d;
+$warning-color: #faad14;        // 警告
+$warning-light: #ffc53d;
+$error-color: #f5222d;          // 错误/危险
+$error-light: #ff4d4f;
+$info-color: #1890ff;           // 信息
+
+// ============= 告警等级色 =============
+$alarm-critical: #ff4d4f;       // 紧急 (1级)
+$alarm-major: #fa8c16;          // 重要 (2级)
+$alarm-minor: #faad14;          // 一般 (3级)
+$alarm-info: #1890ff;           // 提示 (4级)
+
+// ============= 文字色 =============
+// 提高文字亮度，增强与深色背景的对比度
+$text-primary: #ffffff;                          // 主要文字 (纯白)
+$text-regular: rgba(255, 255, 255, 0.95);        // 常规文字 (95%白)
+$text-secondary: rgba(255, 255, 255, 0.75);      // 次要文字 (75%白)
+$text-placeholder: rgba(255, 255, 255, 0.50);    // 占位符 (50%白)
+$text-disabled: rgba(255, 255, 255, 0.30);       // 禁用文字 (30%白)
+
+// 表格专用文字色 - 更高对比度
+$table-text-primary: #ffffff;                    // 表头文字
+$table-text-regular: rgba(255, 255, 255, 0.95);  // 表格内容文字
+$table-text-secondary: rgba(255, 255, 255, 0.80); // 表格次要文字
+
+// ============= 边框色 =============
+$border-color: rgba(255, 255, 255, 0.1);      // 默认边框
+$border-light: rgba(255, 255, 255, 0.06);     // 浅色边框
+$border-lighter: rgba(255, 255, 255, 0.03);   // 更浅边框
+$border-active: rgba(0, 212, 255, 0.5);       // 激活边框
+$border-glow: rgba(0, 212, 255, 0.3);         // 发光边框
+
+// ============= 阴影 =============
+$shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.3);
+$shadow-base: 0 4px 12px rgba(0, 0, 0, 0.4);
+$shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.5);
+$shadow-glow: 0 0 20px rgba(0, 212, 255, 0.2);
+
+// ============= 尺寸 =============
+$header-height: 60px;
+$sidebar-width: 220px;
+$sidebar-collapsed-width: 64px;
+
+// ============= 圆角 =============
+$radius-sm: 2px;
+$radius-base: 4px;
+$radius-lg: 8px;
+$radius-xl: 12px;
+
+// ============= 过渡 =============
+$transition-fast: 0.15s ease;
+$transition-base: 0.25s ease;
+$transition-slow: 0.35s ease;
+
+// ============= 图表配色 =============
+$chart-colors: (
+  #5470c6,  // 蓝
+  #91cc75,  // 绿
+  #fac858,  // 黄
+  #ee6666,  // 红
+  #73c0de,  // 青
+  #3ba272,  // 深绿
+  #fc8452,  // 橙
+  #9a60b4,  // 紫
+  #ea7ccc,  // 粉
+  #48b8d0   // 湖蓝
+);
+
+// ============= CSS Variables 导出 =============
+:root {
+  // 强制覆盖 Element Plus 浅色主题
+  color-scheme: dark;
+
+  // Element Plus 核心背景变量覆盖（修复白色背景问题）
+  --el-bg-color: #{$bg-card-solid};
+  --el-bg-color-page: #{$bg-primary};
+  --el-bg-color-overlay: #{$bg-card-solid};
+
+  // Element Plus 填充色覆盖
+  --el-fill-color: #{$bg-tertiary};
+  --el-fill-color-light: #{$bg-tertiary};
+  --el-fill-color-lighter: #{$bg-secondary};
+  --el-fill-color-extra-light: #{$bg-secondary};
+  --el-fill-color-dark: #{$bg-tertiary};
+  --el-fill-color-darker: #{$bg-tertiary};
+  --el-fill-color-blank: #{$bg-card-solid};
+
+  // Element Plus 文字色覆盖 - 提高亮度增强可读性
+  --el-text-color-primary: #{$text-primary};
+  --el-text-color-regular: #{$text-regular};
+  --el-text-color-secondary: #{$text-secondary};
+  --el-text-color-placeholder: #{$text-placeholder};
+  --el-text-color-disabled: #{$text-disabled};
+
+  // 颜色对比度增强 - 用于深色背景上的文字
+  --el-color-white: #ffffff;
+
+  // Element Plus 边框色覆盖
+  --el-border-color: #{$border-color};
+  --el-border-color-light: #{$border-light};
+  --el-border-color-lighter: #{$border-lighter};
+  --el-border-color-extra-light: #{$border-lighter};
+  --el-border-color-dark: #{$border-color};
+  --el-border-color-darker: #{$border-color};
+
+  // 背景
+  --bg-primary: #{$bg-primary};
+  --bg-secondary: #{$bg-secondary};
+  --bg-tertiary: #{$bg-tertiary};
+  --bg-card: #{$bg-card};
+  --bg-card-solid: #{$bg-card-solid};
+  --bg-hover: #{$bg-hover};
+  --bg-active: #{$bg-active};
+
+  // 主色
+  --primary-color: #{$primary-color};
+  --primary-light: #{$primary-light};
+  --primary-lighter: #{$primary-lighter};
+  --primary-dark: #{$primary-dark};
+
+  // 强调色
+  --accent-color: #{$accent-color};
+  --accent-light: #{$accent-light};
+  --accent-glow: #{$accent-glow};
+
+  // 状态色
+  --success-color: #{$success-color};
+  --warning-color: #{$warning-color};
+  --error-color: #{$error-color};
+  --info-color: #{$info-color};
+
+  // 告警色
+  --alarm-critical: #{$alarm-critical};
+  --alarm-major: #{$alarm-major};
+  --alarm-minor: #{$alarm-minor};
+  --alarm-info: #{$alarm-info};
+
+  // 文字
+  --text-primary: #{$text-primary};
+  --text-regular: #{$text-regular};
+  --text-secondary: #{$text-secondary};
+  --text-placeholder: #{$text-placeholder};
+  --text-disabled: #{$text-disabled};
+
+  // 表格专用文字色
+  --table-text-primary: #{$table-text-primary};
+  --table-text-regular: #{$table-text-regular};
+  --table-text-secondary: #{$table-text-secondary};
+
+  // 边框
+  --border-color: #{$border-color};
+  --border-light: #{$border-light};
+  --border-active: #{$border-active};
+  --border-glow: #{$border-glow};
+
+  // 阴影
+  --shadow-sm: #{$shadow-sm};
+  --shadow-base: #{$shadow-base};
+  --shadow-lg: #{$shadow-lg};
+  --shadow-glow: #{$shadow-glow};
+
+  // 尺寸
+  --header-height: #{$header-height};
+  --sidebar-width: #{$sidebar-width};
+  --sidebar-collapsed-width: #{$sidebar-collapsed-width};
+
+  // 圆角
+  --radius-sm: #{$radius-sm};
+  --radius-base: #{$radius-base};
+  --radius-lg: #{$radius-lg};
+
+  // 过渡
+  --transition-fast: #{$transition-fast};
+  --transition-base: #{$transition-base};
+}

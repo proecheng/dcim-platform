@@ -1,0 +1,6 @@
+export { default as FloorLayoutBase } from './FloorLayoutBase.vue'
+export { default as FloorB1Layout } from './FloorB1Layout.vue'
+export { default as FloorF1Layout } from './FloorF1Layout.vue'
+export { default as FloorF2Layout } from './FloorF2Layout.vue'
+export { default as FloorF3Layout } from './FloorF3Layout.vue'
+export { default as FloorLayoutSelector } from './FloorLayoutSelector.vue'
