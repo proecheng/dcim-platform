@@ -10,6 +10,7 @@ from .security import (
     get_current_user,
     get_current_admin_user
 )
+from .logging import setup_logging, get_logger
 
 __all__ = [
     "get_settings",
@@ -22,5 +23,7 @@ __all__ = [
     "get_password_hash",
     "create_access_token",
     "get_current_user",
-    "get_current_admin_user"
+    "get_current_admin_user",
+    "setup_logging",
+    "get_logger"
 ]

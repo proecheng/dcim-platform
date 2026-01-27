@@ -4,6 +4,7 @@ Execution Service
 
 提供执行计划管理、任务执行、效果追踪等功能
 """
+import logging
 from typing import Dict, List, Optional, Any
 from datetime import datetime, date, timedelta
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -16,6 +17,8 @@ from ..models.energy import (
     PowerDevice, PUEHistory, EnergyDaily
 )
 from .device_control_service import DeviceControlService, ControlResult
+
+logger = logging.getLogger(__name__)
 
 
 class ExecutionService:
@@ -656,8 +659,8 @@ class ExecutionService:
             config = result.scalar_one_or_none()
             if config and config.period_prices:
                 return config.period_prices
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning(f"Failed to get period prices: {e}")
         return None
 
     async def _get_average_price(self) -> float:

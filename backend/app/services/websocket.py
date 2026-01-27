@@ -1,9 +1,12 @@
 """
 WebSocket 服务
 """
+import logging
 from typing import List, Dict
 from fastapi import WebSocket
 import json
+
+logger = logging.getLogger(__name__)
 
 
 class ConnectionManager:
@@ -39,8 +42,8 @@ class ConnectionManager:
             for connection in self.active_connections[channel]:
                 try:
                     await connection.send_json(message)
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.warning(f"Failed to send message to WebSocket client: {e}")
 
     async def broadcast_realtime(self, point_data: dict):
         """广播实时数据"""

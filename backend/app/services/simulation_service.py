@@ -5,6 +5,7 @@ Simulation Service
 提供What-if模拟计算功能，支持参数调整实时计算收益
 用于节能建议详情页的交互式模拟器
 """
+import logging
 from typing import Dict, List, Optional, Any, Tuple
 from datetime import datetime, date, timedelta
 from dataclasses import dataclass, field
@@ -17,6 +18,8 @@ from ..models.energy import (
     PowerDevice, DeviceShiftConfig, LoadRegulationConfig,
     PUEHistory, EnergyDaily
 )
+
+logger = logging.getLogger(__name__)
 
 
 class SimulationType(str, Enum):
@@ -499,7 +502,8 @@ class SimulationService:
             )
             powers = [row[0] for row in result.all() if row[0]]
             return powers if powers else []
-        except Exception:
+        except Exception as e:
+            logger.warning(f"Failed to get power history: {e}")
             return []
 
     def _calculate_demand_cost(
@@ -568,7 +572,8 @@ class SimulationService:
                     "allowed_hours": config.allowed_shift_hours or []
                 })
             return devices
-        except Exception:
+        except Exception as e:
+            logger.warning(f"Failed to get shiftable devices: {e}")
             return []
 
     def _select_devices_for_shift(

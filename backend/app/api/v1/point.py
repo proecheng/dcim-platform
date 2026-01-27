@@ -193,7 +193,7 @@ async def batch_import_points(
     content = await file.read()
     try:
         content = content.decode("utf-8-sig")
-    except:
+    except UnicodeDecodeError:
         content = content.decode("gbk")
 
     reader = csv.DictReader(io.StringIO(content))

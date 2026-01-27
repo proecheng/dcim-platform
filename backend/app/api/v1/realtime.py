@@ -1,6 +1,7 @@
 """
 实时数据 API - v1
 """
+import logging
 from datetime import datetime
 from typing import Optional, List
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -12,6 +13,7 @@ from ...models.user import User
 from ...models.point import Point, PointRealtime
 from ...schemas.realtime import RealtimeData, RealtimeSummary, ControlCommand
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
@@ -559,8 +561,8 @@ async def get_energy_dashboard(
         )
         power_trend_rows = power_trend_result.all()
         trends["power_1h"] = [row[0] or 0 for row in power_trend_rows]
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning(f"Failed to get power trend: {e}")
 
     # 获取近24小时PUE趋势 (简化版本，不使用date_trunc)
     one_day_ago = datetime.now() - timedelta(hours=24)
@@ -574,8 +576,8 @@ async def get_energy_dashboard(
         # 取最后24个点作为趋势
         pue_values = [round(row[0], 2) if row[0] else 0 for row in pue_trend_rows]
         trends["pue_24h"] = pue_values[-24:] if len(pue_values) > 24 else pue_values
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning(f"Failed to get PUE trend: {e}")
 
     # 获取近24小时需量趋势 (使用功率数据)
     trends["demand_24h"] = trends["power_1h"][-24:] if len(trends["power_1h"]) >= 24 else trends["power_1h"]

@@ -5,6 +5,7 @@ Opportunity Analysis Engine
 整合现有分析插件，提供统一的机会发现和分析接口
 根据能源中心重新设计方案，将6种模板整合为4大类别
 """
+import logging
 from typing import Dict, List, Optional, Any
 from datetime import datetime, date
 from enum import Enum
@@ -28,6 +29,12 @@ from ..models.energy import (
     PowerDevice, EnergySuggestion, ElectricityPricing,
     EnergyDaily, PUEHistory
 )
+
+logger = logging.getLogger(__name__)
+
+# 默认值常量
+DEFAULT_MAX_DEMAND_KW = 500  # 默认最大需量 (kW)
+DEFAULT_AVG_DEMAND_KW = 350  # 默认平均需量 (kW)
 
 
 class OpportunityCategory(str, Enum):
@@ -423,8 +430,9 @@ class OpportunityEngine:
             )
             max_power = result.scalar()
             return max_power or 0
-        except Exception:
-            return 500  # 默认值
+        except Exception as e:
+            logger.warning(f"Failed to get max demand from history: {e}")
+            return DEFAULT_MAX_DEMAND_KW
 
     async def _get_avg_demand_from_history(self, days: int = 30) -> float:
         """从历史数据获取平均需量"""
@@ -435,8 +443,9 @@ class OpportunityEngine:
             )
             avg_power = result.scalar()
             return avg_power or 0
-        except Exception:
-            return 350  # 默认值
+        except Exception as e:
+            logger.warning(f"Failed to get avg demand from history: {e}")
+            return DEFAULT_AVG_DEMAND_KW
 
     async def _get_shiftable_devices(self) -> List[Dict]:
         """获取可转移负荷设备"""
