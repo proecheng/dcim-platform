@@ -30,6 +30,7 @@ from .execution import router as execution_router
 from .demand import router as demand_router
 from .dispatch import router as dispatch_router
 from .monitoring import router as monitoring_router
+from .topology import router as topology_router
 # TODO: Enable after installing numpy
 # from .optimization import router as optimization_router
 
@@ -62,5 +63,6 @@ api_router.include_router(execution_router, prefix="/execution", tags=["执行�
 api_router.include_router(demand_router, tags=["需量嵌入式API"])
 api_router.include_router(dispatch_router, prefix="/dispatch", tags=["可调度资源配置"])
 api_router.include_router(monitoring_router, prefix="/monitoring", tags=["电费监控"])
+api_router.include_router(topology_router, prefix="/topology", tags=["拓扑编辑"])
 # TODO: Enable after installing numpy
 # api_router.include_router(optimization_router, prefix="/optimization", tags=["日前调度优化"])

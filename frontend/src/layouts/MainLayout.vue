@@ -170,7 +170,6 @@ import {
 } from '@element-plus/icons-vue'
 import { useUserStore, useAlarmStore } from '@/stores'
 import { getAlarmCount } from '@/api/alarm'
-import { ElLoading } from 'element-plus'
 
 const router = useRouter()
 const route = useRoute()
@@ -181,23 +180,14 @@ const isCollapse = ref(false)
 // 当前激活的菜单项
 const activeMenu = computed(() => route.path)
 
-// 处理菜单选择 - 手动路由跳转并显示加载状态
+// 处理菜单选择 - 优化后的轻量级路由跳转
 async function handleMenuSelect(index: string) {
   if (index === route.path) return // 已经在当前页面
 
-  const loading = ElLoading.service({
-    lock: true,
-    text: '加载中...',
-    background: 'rgba(0, 0, 0, 0.5)'
-  })
-
   try {
     await router.push(index)
-  } finally {
-    // 延迟关闭loading，确保页面已渲染
-    setTimeout(() => {
-      loading.close()
-    }, 100)
+  } catch (e) {
+    console.error('路由跳转失败', e)
   }
 }
 

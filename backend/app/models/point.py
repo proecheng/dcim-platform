@@ -14,12 +14,12 @@ class Point(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     point_code = Column(String(50), unique=True, nullable=False, comment="点位编码")
     point_name = Column(String(100), nullable=False, comment="点位名称")
-    point_type = Column(String(2), nullable=False, comment="点位类型: AI/DI/AO/DO")
-    device_id = Column(Integer, ForeignKey("devices.id"), comment="关联设备ID")
-    device_type = Column(String(20), nullable=False, comment="设备类型: TH/UPS/PDU/AC/DOOR/SMOKE/WATER/IR/FAN/LIGHT")
-    area_code = Column(String(10), nullable=False, comment="区域代码: A1/A2/B1/B2")
+    point_type = Column(String(20), nullable=False, comment="点位类型: AI/DI/AO/DO/measurement/control/status/alarm")
+    device_id = Column(Integer, ForeignKey("devices.id"), comment="关联采集设备ID")
+    device_type = Column(String(20), comment="设备类型: TH/UPS/PDU/AC/DOOR/SMOKE/WATER/IR/FAN/LIGHT")
+    area_code = Column(String(10), comment="区域代码: A1/A2/B1/B2")
     unit = Column(String(20), comment="单位")
-    data_type = Column(String(10), default="float", comment="数据类型: float/boolean")
+    data_type = Column(String(10), default="float", comment="数据类型: float/int/bool/string")
     min_range = Column(Float, comment="量程最小值")
     max_range = Column(Float, comment="量程最大值")
     precision = Column(Integer, default=2, comment="小数位数")
@@ -30,6 +30,16 @@ class Point(Base):
     calc_formula = Column(Text, comment="计算公式(虚拟点)")
     description = Column(Text, comment="描述")
     sort_order = Column(Integer, default=0, comment="排序")
+
+    # 用能设备关联 (与 PowerDevice 关联)
+    energy_device_id = Column(Integer, comment="关联用能设备ID")
+
+    # 通信采集配置
+    register_address = Column(String(50), comment="寄存器地址")
+    function_code = Column(Integer, comment="Modbus功能码")
+    scale_factor = Column(Float, default=1.0, comment="比例因子")
+    offset = Column(Float, default=0.0, comment="偏移量")
+
     created_at = Column(DateTime, default=datetime.now, comment="创建时间")
     updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now, comment="更新时间")
 

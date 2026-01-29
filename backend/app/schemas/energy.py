@@ -1,6 +1,7 @@
 """
 用电管理数据模型
 """
+from enum import Enum
 from typing import Optional, List, Dict
 from pydantic import BaseModel, Field
 from datetime import datetime, date
@@ -488,6 +489,9 @@ class TransformerBase(BaseModel):
     load_loss: Optional[float] = Field(None, description="负载损耗 kW")
     location: Optional[str] = Field(None, description="安装位置")
     status: str = Field("running", description="状态")
+    declared_demand: Optional[float] = Field(None, description="申报需量 kW")
+    demand_type: str = Field("kW", description="需量单位: kW/kVA")
+    demand_warning_ratio: float = Field(0.9, description="需量预警比例 0-1")
 
 
 class TransformerCreate(TransformerBase):
@@ -507,6 +511,9 @@ class TransformerUpdate(BaseModel):
     location: Optional[str] = None
     status: Optional[str] = None
     is_enabled: Optional[bool] = None
+    declared_demand: Optional[float] = None
+    demand_type: Optional[str] = None
+    demand_warning_ratio: Optional[float] = None
 
 
 class TransformerResponse(TransformerBase):
@@ -1542,4 +1549,260 @@ class CreateLoadShiftPlanResponse(BaseModel):
     plan_name: str = Field(..., description="计划名称")
     expected_saving: float = Field(..., description="预期年节省(元)")
     task_count: int = Field(..., description="任务数量")
+
+
+# ========== V2.7 拓扑编辑功能 ==========
+
+class TopologyNodeType(str, Enum):
+    """拓扑节点类型"""
+    TRANSFORMER = "transformer"
+    METER_POINT = "meter_point"
+    PANEL = "panel"
+    CIRCUIT = "circuit"
+    DEVICE = "device"
+    POINT = "point"
+
+
+class TopologyNodePosition(BaseModel):
+    """拓扑节点位置"""
+    x: float = Field(..., description="X坐标")
+    y: float = Field(..., description="Y坐标")
+
+
+class TopologyNodeCreate(BaseModel):
+    """创建拓扑节点"""
+    node_type: TopologyNodeType = Field(..., description="节点类型")
+    parent_id: Optional[int] = Field(None, description="父节点ID")
+    parent_type: Optional[TopologyNodeType] = Field(None, description="父节点类型")
+    position: Optional[TopologyNodePosition] = Field(None, description="节点位置")
+
+    # 变压器字段
+    transformer_code: Optional[str] = Field(None, max_length=50)
+    transformer_name: Optional[str] = Field(None, max_length=100)
+    rated_capacity: Optional[float] = Field(None, ge=0)
+    voltage_high: Optional[float] = Field(None, ge=0)
+    voltage_low: Optional[float] = Field(None, ge=0)
+
+    # 计量点字段
+    meter_code: Optional[str] = Field(None, max_length=50)
+    meter_name: Optional[str] = Field(None, max_length=100)
+    ct_ratio: Optional[float] = Field(None)
+    pt_ratio: Optional[float] = Field(None)
+
+    # 配电柜字段
+    panel_code: Optional[str] = Field(None, max_length=50)
+    panel_name: Optional[str] = Field(None, max_length=100)
+    panel_type: Optional[str] = Field(None)
+
+    # 回路字段
+    circuit_code: Optional[str] = Field(None, max_length=50)
+    circuit_name: Optional[str] = Field(None, max_length=100)
+    circuit_type: Optional[str] = Field(None)
+    rated_current: Optional[float] = Field(None, ge=0)
+
+    # 设备字段
+    device_code: Optional[str] = Field(None, max_length=50)
+    device_name: Optional[str] = Field(None, max_length=100)
+    device_type: Optional[str] = Field(None)
+    rated_power: Optional[float] = Field(None)
+
+    # 采集点位字段
+    point_code: Optional[str] = Field(None, max_length=50)
+    point_name: Optional[str] = Field(None, max_length=100)
+    point_type: Optional[str] = Field(None)
+    measurement_type: Optional[str] = Field(None)
+    register_address: Optional[str] = Field(None, max_length=50)
+    data_type: Optional[str] = Field(None)
+    scale_factor: Optional[float] = Field(None)
+
+
+class TopologyNodeUpdate(BaseModel):
+    """更新拓扑节点"""
+    node_id: int = Field(..., description="节点ID")
+    node_type: TopologyNodeType = Field(..., description="节点类型")
+    position: Optional[TopologyNodePosition] = Field(None, description="节点位置")
+
+    # 通用字段
+    name: Optional[str] = Field(None, max_length=100, description="名称")
+    code: Optional[str] = Field(None, max_length=50, description="编码")
+    status: Optional[str] = Field(None, description="状态")
+    is_enabled: Optional[bool] = Field(None, description="是否启用")
+    location: Optional[str] = Field(None, description="位置")
+    remark: Optional[str] = Field(None, description="备注")
+
+    # 特定字段 - 根据node_type使用
+    rated_capacity: Optional[float] = Field(None, description="额定容量")
+    rated_power: Optional[float] = Field(None, description="额定功率")
+    rated_current: Optional[float] = Field(None, description="额定电流")
+    voltage_high: Optional[float] = Field(None, description="高压侧电压")
+    voltage_low: Optional[float] = Field(None, description="低压侧电压")
+    ct_ratio: Optional[float] = Field(None, description="CT变比")
+    pt_ratio: Optional[float] = Field(None, description="PT变比")
+    declared_demand: Optional[float] = Field(None, description="申报需量")
+
+
+class TopologyNodeDelete(BaseModel):
+    """删除拓扑节点"""
+    node_id: int = Field(..., description="节点ID")
+    node_type: TopologyNodeType = Field(..., description="节点类型")
+    cascade: bool = Field(False, description="是否级联删除子节点")
+
+
+class TopologyConnectionCreate(BaseModel):
+    """创建拓扑连接"""
+    source_id: int = Field(..., description="源节点ID")
+    source_type: TopologyNodeType = Field(..., description="源节点类型")
+    target_id: int = Field(..., description="目标节点ID")
+    target_type: TopologyNodeType = Field(..., description="目标节点类型")
+
+
+class TopologyConnectionDelete(BaseModel):
+    """删除拓扑连接"""
+    source_id: int = Field(..., description="源节点ID")
+    source_type: TopologyNodeType = Field(..., description="源节点类型")
+    target_id: int = Field(..., description="目标节点ID")
+    target_type: TopologyNodeType = Field(..., description="目标节点类型")
+
+
+class TopologyBatchOperation(BaseModel):
+    """批量拓扑操作"""
+    creates: List[TopologyNodeCreate] = Field(default_factory=list, description="创建操作列表")
+    updates: List[TopologyNodeUpdate] = Field(default_factory=list, description="更新操作列表")
+    deletes: List[TopologyNodeDelete] = Field(default_factory=list, description="删除操作列表")
+    connections_add: List[TopologyConnectionCreate] = Field(default_factory=list, description="添加连接列表")
+    connections_remove: List[TopologyConnectionDelete] = Field(default_factory=list, description="删除连接列表")
+
+
+class TopologyBatchResult(BaseModel):
+    """批量操作结果"""
+    success: bool = Field(..., description="是否全部成功")
+    created_count: int = Field(0, description="创建数量")
+    updated_count: int = Field(0, description="更新数量")
+    deleted_count: int = Field(0, description="删除数量")
+    connections_added: int = Field(0, description="添加连接数量")
+    connections_removed: int = Field(0, description="删除连接数量")
+    errors: List[str] = Field(default_factory=list, description="错误信息列表")
+    created_ids: Dict[str, int] = Field(default_factory=dict, description="创建的节点ID映射")
+
+
+class TopologyExport(BaseModel):
+    """拓扑导出数据"""
+    version: str = Field("1.0", description="导出版本")
+    export_time: datetime = Field(..., description="导出时间")
+    transformers: List[Dict] = Field(default_factory=list)
+    meter_points: List[Dict] = Field(default_factory=list)
+    panels: List[Dict] = Field(default_factory=list)
+    circuits: List[Dict] = Field(default_factory=list)
+    devices: List[Dict] = Field(default_factory=list)
+    connections: List[Dict] = Field(default_factory=list)
+
+
+class TopologyImport(BaseModel):
+    """拓扑导入数据"""
+    version: str = Field(..., description="导入版本")
+    clear_existing: bool = Field(False, description="是否清除现有数据")
+    transformers: List[Dict] = Field(default_factory=list)
+    meter_points: List[Dict] = Field(default_factory=list)
+    panels: List[Dict] = Field(default_factory=list)
+    circuits: List[Dict] = Field(default_factory=list)
+    devices: List[Dict] = Field(default_factory=list)
+    connections: List[Dict] = Field(default_factory=list)
+
+
+# ========== V2.7 设备测点配置 ==========
+
+class DevicePointType(str, Enum):
+    """设备测点类型"""
+    MEASUREMENT = "measurement"  # 测量点
+    CONTROL = "control"  # 控制点
+    STATUS = "status"  # 状态点
+    ALARM = "alarm"  # 告警点
+
+
+class DevicePointConfig(BaseModel):
+    """设备测点配置"""
+    point_code: str = Field(..., max_length=50, description="点位编码")
+    point_name: str = Field(..., max_length=100, description="点位名称")
+    point_type: DevicePointType = Field(..., description="点位类型")
+    data_type: str = Field("float", description="数据类型: float/int/bool/string")
+    unit: Optional[str] = Field(None, description="单位")
+    description: Optional[str] = Field(None, description="描述")
+
+    # 采集配置
+    device_id: Optional[int] = Field(None, description="关联采集设备ID")
+    register_address: Optional[str] = Field(None, description="寄存器地址")
+    function_code: Optional[int] = Field(None, description="功能码")
+    scale_factor: float = Field(1.0, description="比例因子")
+    offset: float = Field(0.0, description="偏移量")
+
+    # 告警配置
+    alarm_enabled: bool = Field(False, description="是否启用告警")
+    alarm_high: Optional[float] = Field(None, description="上限告警值")
+    alarm_low: Optional[float] = Field(None, description="下限告警值")
+
+
+class DevicePointConfigCreate(BaseModel):
+    """创建设备测点"""
+    energy_device_id: int = Field(..., description="用能设备ID")
+    points: List[DevicePointConfig] = Field(..., description="测点列表")
+
+
+class DevicePointConfigUpdate(BaseModel):
+    """更新设备测点"""
+    point_id: int = Field(..., description="测点ID")
+    point_name: Optional[str] = Field(None, max_length=100)
+    unit: Optional[str] = Field(None)
+    description: Optional[str] = Field(None)
+    device_id: Optional[int] = Field(None)
+    register_address: Optional[str] = Field(None)
+    function_code: Optional[int] = Field(None)
+    scale_factor: Optional[float] = Field(None)
+    offset: Optional[float] = Field(None)
+    alarm_enabled: Optional[bool] = Field(None)
+    alarm_high: Optional[float] = Field(None)
+    alarm_low: Optional[float] = Field(None)
+
+
+class DevicePointConfigResponse(BaseModel):
+    """设备测点响应"""
+    id: int
+    energy_device_id: int
+    point_code: str
+    point_name: str
+    point_type: str
+    data_type: str
+    unit: Optional[str]
+    description: Optional[str]
+    device_id: Optional[int]
+    register_address: Optional[str]
+    function_code: Optional[int]
+    scale_factor: float
+    offset: float
+    alarm_enabled: bool
+    alarm_high: Optional[float]
+    alarm_low: Optional[float]
+    current_value: Optional[float] = None
+    last_update_time: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+
+class TopologyNodeResponse(BaseModel):
+    """拓扑节点响应"""
+    id: int
+    node_type: str
+    code: str
+    name: str
+    status: Optional[str] = None
+    is_enabled: bool = True
+    parent_id: Optional[int] = None
+    parent_type: Optional[str] = None
+    children_count: int = 0
+    position: Optional[TopologyNodePosition] = None
+    attributes: Dict = Field(default_factory=dict, description="节点特定属性")
+    points: List[DevicePointConfigResponse] = Field(default_factory=list, description="关联测点")
+
+    class Config:
+        from_attributes = True
 

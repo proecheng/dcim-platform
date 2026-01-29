@@ -1901,6 +1901,9 @@ async def create_transformer(
     if existing.scalar_one_or_none():
         raise HTTPException(status_code=400, detail="变压器编码已存在")
 
+    if transformer.declared_demand is not None and transformer.declared_demand > transformer.rated_capacity:
+        raise HTTPException(status_code=400, detail=f"申报需量不能超过额定容量 ({transformer.rated_capacity} kVA)")
+
     new_transformer = Transformer(**transformer.model_dump())
     db.add(new_transformer)
     await db.commit()
@@ -1931,10 +1934,18 @@ async def update_transformer(
 ):
     """更新变压器"""
     result = await db.execute(select(Transformer).where(Transformer.id == transformer_id))
-    if not result.scalar_one_or_none():
+    transformer = result.scalar_one_or_none()
+    if not transformer:
         raise HTTPException(status_code=404, detail="变压器不存在")
 
     update_data = data.model_dump(exclude_unset=True)
+
+    # 需量验证: 不能超过额定容量
+    check_capacity = update_data.get("rated_capacity", transformer.rated_capacity)
+    check_demand = update_data.get("declared_demand", transformer.declared_demand)
+    if check_demand is not None and check_demand > check_capacity:
+        raise HTTPException(status_code=400, detail=f"申报需量不能超过额定容量 ({check_capacity} kVA)")
+
     update_data["updated_at"] = datetime.now()
     await db.execute(update(Transformer).where(Transformer.id == transformer_id).values(**update_data))
     await db.commit()

@@ -616,6 +616,10 @@ export interface Transformer {
   location?: string
   status: 'normal' | 'warning' | 'fault' | 'offline'
   is_enabled: boolean
+  // 需量配置字段
+  declared_demand?: number
+  demand_type: 'kW' | 'kVA'
+  demand_warning_ratio: number
   created_at: string
   updated_at: string
 }
@@ -627,6 +631,9 @@ export interface TransformerCreate {
   voltage_high?: number
   voltage_low?: number
   location?: string
+  declared_demand?: number
+  demand_type?: 'kW' | 'kVA'
+  demand_warning_ratio?: number
 }
 
 export interface TransformerUpdate {
@@ -637,6 +644,9 @@ export interface TransformerUpdate {
   location?: string
   status?: string
   is_enabled?: boolean
+  declared_demand?: number
+  demand_type?: 'kW' | 'kVA'
+  demand_warning_ratio?: number
 }
 
 /** 计量点 */
@@ -1774,4 +1784,235 @@ export interface CreateLoadShiftPlanResponse {
 /** 从负荷转移配置创建执行计划 */
 export function createLoadShiftPlan(data: CreateLoadShiftPlanRequest) {
   return request.post<ResponseModel<CreateLoadShiftPlanResponse>>('/v1/execution/plans/from-shift', data)
+}
+
+// ==================== V2.7 拓扑编辑 ====================
+
+/** 拓扑节点类型 */
+export type TopologyNodeTypeEnum = 'transformer' | 'meter_point' | 'panel' | 'circuit' | 'device' | 'point'
+
+/** 拓扑节点位置 */
+export interface TopologyNodePosition {
+  x: number
+  y: number
+}
+
+/** 创建拓扑节点请求 */
+export interface TopologyNodeCreateRequest {
+  node_type: TopologyNodeTypeEnum
+  parent_id?: number
+  parent_type?: TopologyNodeTypeEnum
+  position?: TopologyNodePosition
+  // 变压器
+  transformer_code?: string
+  transformer_name?: string
+  rated_capacity?: number
+  voltage_high?: number
+  voltage_low?: number
+  // 计量点
+  meter_code?: string
+  meter_name?: string
+  meter_type?: string
+  ct_ratio?: number
+  pt_ratio?: number
+  measurement_types?: string[]
+  // 配电柜
+  panel_code?: string
+  panel_name?: string
+  panel_type?: string
+  // 回路
+  circuit_code?: string
+  circuit_name?: string
+  circuit_type?: string
+  rated_current?: number
+  // 设备
+  device_code?: string
+  device_name?: string
+  device_type?: string
+  rated_power?: number
+  // 采集点位
+  point_code?: string
+  point_name?: string
+  point_type?: string
+  measurement_type?: string
+  register_address?: string
+  data_type?: string
+  scale_factor?: number
+}
+
+/** 更新拓扑节点请求 */
+export interface TopologyNodeUpdateRequest {
+  node_id: number
+  node_type: TopologyNodeTypeEnum
+  position?: TopologyNodePosition
+  name?: string
+  code?: string
+  status?: string
+  is_enabled?: boolean
+  location?: string
+  remark?: string
+  rated_capacity?: number
+  rated_power?: number
+  rated_current?: number
+  voltage_high?: number
+  voltage_low?: number
+  ct_ratio?: number
+  pt_ratio?: number
+  declared_demand?: number
+  meter_type?: string
+  measurement_types?: string[]
+  // 采集点位
+  point_type?: string
+  measurement_type?: string
+  register_address?: string
+  data_type?: string
+  scale_factor?: number
+}
+
+/** 删除拓扑节点请求 */
+export interface TopologyNodeDeleteRequest {
+  node_id: number
+  node_type: TopologyNodeTypeEnum
+  cascade: boolean
+}
+
+/** 批量操作请求 */
+export interface TopologyBatchOperationRequest {
+  creates: TopologyNodeCreateRequest[]
+  updates: TopologyNodeUpdateRequest[]
+  deletes: TopologyNodeDeleteRequest[]
+  connections_add: Array<{
+    source_id: number
+    source_type: TopologyNodeTypeEnum
+    target_id: number
+    target_type: TopologyNodeTypeEnum
+  }>
+  connections_remove: Array<{
+    source_id: number
+    source_type: TopologyNodeTypeEnum
+    target_id: number
+    target_type: TopologyNodeTypeEnum
+  }>
+}
+
+/** 批量操作结果 */
+export interface TopologyBatchResult {
+  success: boolean
+  created_count: number
+  updated_count: number
+  deleted_count: number
+  connections_added: number
+  connections_removed: number
+  errors: string[]
+  created_ids: Record<string, number>
+}
+
+/** 设备测点配置 */
+export interface DevicePointConfig {
+  point_code: string
+  point_name: string
+  point_type: 'measurement' | 'control' | 'status' | 'alarm'
+  data_type: string
+  unit?: string
+  description?: string
+  device_id?: number
+  register_address?: string
+  function_code?: number
+  scale_factor: number
+  offset: number
+  alarm_enabled: boolean
+  alarm_high?: number
+  alarm_low?: number
+}
+
+/** 设备测点响应 */
+export interface DevicePointConfigResponse {
+  id: number
+  energy_device_id: number
+  point_code: string
+  point_name: string
+  point_type: string
+  data_type: string
+  unit?: string
+  description?: string
+  device_id?: number
+  register_address?: string
+  function_code?: number
+  scale_factor: number
+  offset: number
+  alarm_enabled: boolean
+  alarm_high?: number
+  alarm_low?: number
+  current_value?: number
+  last_update_time?: string
+}
+
+// --- 拓扑编辑 API ---
+
+/** 创建拓扑节点 */
+export function createTopologyNode(data: TopologyNodeCreateRequest) {
+  return request.post<ResponseModel<{ success: boolean; node_id: number; node_type: string }>>('/v1/topology/nodes', data)
+}
+
+/** 更新拓扑节点 */
+export function updateTopologyNode(data: TopologyNodeUpdateRequest) {
+  return request.put<ResponseModel<{ success: boolean }>>('/v1/topology/nodes', data)
+}
+
+/** 删除拓扑节点 */
+export function deleteTopologyNode(data: TopologyNodeDeleteRequest) {
+  return request.delete<ResponseModel<{ success: boolean; deleted: Record<string, number> }>>('/v1/topology/nodes', { data })
+}
+
+/** 批量拓扑操作 */
+export function batchTopologyOperation(data: TopologyBatchOperationRequest) {
+  return request.post<ResponseModel<TopologyBatchResult>>('/v1/topology/batch', data)
+}
+
+/** 导出拓扑数据 */
+export function exportTopology() {
+  return request.get<ResponseModel<any>>('/v1/topology/export')
+}
+
+/** 导入拓扑数据 */
+export function importTopology(data: any) {
+  return request.post<ResponseModel<TopologyBatchResult>>('/v1/topology/import', data)
+}
+
+/** 创建拓扑连接 */
+export function createTopologyConnection(data: {
+  source_id: number
+  source_type: TopologyNodeTypeEnum
+  target_id: number
+  target_type: TopologyNodeTypeEnum
+}) {
+  return request.post<ResponseModel<{ success: boolean }>>('/v1/topology/connections', data)
+}
+
+/** 删除拓扑连接 */
+export function deleteTopologyConnection(data: {
+  target_id: number
+  target_type: TopologyNodeTypeEnum
+}) {
+  return request.delete<ResponseModel<{ success: boolean }>>('/v1/topology/connections', { data })
+}
+
+/** 创建设备测点 */
+export function createDevicePoints(data: { energy_device_id: number; points: DevicePointConfig[] }) {
+  return request.post<ResponseModel<{ success: boolean; point_ids: number[] }>>('/v1/topology/device-points', data)
+}
+
+/** 获取设备测点 */
+export function getDevicePoints(deviceId: number) {
+  return request.get<ResponseModel<{ device_id: number; points: DevicePointConfigResponse[] }>>(`/v1/topology/device-points/${deviceId}`)
+}
+
+/** 更新设备测点 */
+export function updateDevicePoint(pointId: number, data: Partial<DevicePointConfig>) {
+  return request.put<ResponseModel<{ success: boolean }>>(`/v1/topology/device-points/${pointId}`, data)
+}
+
+/** 删除设备所有测点 */
+export function deleteDevicePoints(deviceId: number) {
+  return request.delete<ResponseModel<{ success: boolean; deleted_count: number }>>(`/v1/topology/device-points/${deviceId}`)
 }

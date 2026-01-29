@@ -102,8 +102,19 @@ $chart-colors: (
   --el-bg-color: #{$bg-card-solid};
   --el-bg-color-page: #{$bg-primary};
   --el-bg-color-overlay: #{$bg-card-solid};
+}
 
-  // Element Plus 填充色覆盖
+// ============= Element Plus 暗色主题变量覆盖 =============
+// 在 html.dark 选择器下覆盖 Element Plus 的 CSS 变量
+// 这是 Element Plus 官方暗色主题的工作方式
+html.dark,
+.dark {
+  // 核心背景色 - 修复对话框等组件的白色背景问题
+  --el-bg-color: #{$bg-card-solid};
+  --el-bg-color-page: #{$bg-primary};
+  --el-bg-color-overlay: #{$bg-card-solid};
+
+  // 填充色
   --el-fill-color: #{$bg-tertiary};
   --el-fill-color-light: #{$bg-tertiary};
   --el-fill-color-lighter: #{$bg-secondary};
@@ -111,6 +122,41 @@ $chart-colors: (
   --el-fill-color-dark: #{$bg-tertiary};
   --el-fill-color-darker: #{$bg-tertiary};
   --el-fill-color-blank: #{$bg-card-solid};
+
+  // 文字色
+  --el-text-color-primary: #{$text-primary};
+  --el-text-color-regular: #{$text-regular};
+  --el-text-color-secondary: #{$text-secondary};
+  --el-text-color-placeholder: #{$text-placeholder};
+  --el-text-color-disabled: #{$text-disabled};
+
+  // 边框色
+  --el-border-color: #{$border-color};
+  --el-border-color-light: #{$border-light};
+  --el-border-color-lighter: #{$border-lighter};
+  --el-border-color-extra-light: #{$border-lighter};
+  --el-border-color-dark: #{$border-color};
+  --el-border-color-darker: #{$border-color};
+
+  // 对话框专用
+  --el-dialog-bg-color: #{$bg-card-solid};
+
+  // 卡片
+  --el-card-bg-color: #{$bg-card-solid};
+
+  // 遮罩
+  --el-mask-color: rgba(0, 0, 0, 0.6);
+  --el-mask-color-extra-light: rgba(0, 0, 0, 0.3);
+
+  // 颜色
+  --el-color-white: #ffffff;
+  --el-color-black: #000000;
+
+  color-scheme: dark;
+}
+
+// 继续 :root 变量定义 - 自定义 CSS 变量
+:root {
 
   // Element Plus 文字色覆盖 - 提高亮度增强可读性
   --el-text-color-primary: #{$text-primary};

@@ -93,100 +93,241 @@
   }
 }
 
-// 表格 - 确保所有单元格使用深色背景和清晰的文字
+// ============================================
+// 表格样式 - 工业控制台高对比度主题 V6
+// 特点：超亮边框、醒目表头、最大化视觉分离
+// ============================================
 .el-table {
-  --el-table-bg-color: var(--bg-card-solid);
-  --el-table-tr-bg-color: var(--bg-card-solid);
-  --el-table-header-bg-color: var(--bg-tertiary);
-  --el-table-header-text-color: var(--table-text-primary, #ffffff);
-  --el-table-text-color: var(--table-text-regular, rgba(255, 255, 255, 0.95));
-  --el-table-border-color: var(--border-color);
-  --el-table-row-hover-bg-color: var(--bg-hover);
-  --el-table-current-row-bg-color: var(--bg-active);
+  // CSS 变量定义
+  --el-table-bg-color: #0d1520;
+  --el-table-tr-bg-color: #0d1520;
+  --el-table-header-bg-color: #1e4a6f;
+  --el-table-header-text-color: #ffffff;
+  --el-table-text-color: rgba(255, 255, 255, 0.95);
+  --el-table-border-color: #7db8e8;
+  --el-table-row-hover-bg-color: #1a3554;
+  --el-table-current-row-bg-color: #1a3554;
 
-  background-color: var(--bg-card-solid) !important;
-  color: var(--table-text-regular, rgba(255, 255, 255, 0.95)) !important;
+  // 表格外框 - 超亮边框，最大对比度
+  background-color: #0d1520 !important;
+  color: rgba(255, 255, 255, 0.95) !important;
+  border: 2px solid #7db8e8 !important;
+  border-radius: 8px !important;
+  overflow: hidden;
+  box-shadow:
+    0 0 0 1px rgba(125, 184, 232, 0.4),
+    0 0 15px rgba(125, 184, 232, 0.15),
+    0 4px 24px rgba(0, 0, 0, 0.5) !important;
 
-  // 表头单元格 - 使用纯白色文字
+  // 移除 Element Plus 默认的 ::before 底部边框
+  &::before {
+    display: none !important;
+  }
+
+  // 表头单元格 - 更醒目的渐变 + 亮蓝边框
   th.el-table__cell {
-    background-color: var(--bg-tertiary) !important;
-    color: var(--table-text-primary, #ffffff) !important;
-    font-weight: 600;
+    background: linear-gradient(180deg, #2d6090 0%, #1e4a70 100%) !important;
+    color: #ffffff !important;
+    font-weight: 700;
+    font-size: 13px;
+    letter-spacing: 0.5px;
+    border-bottom: 3px solid #7db8e8 !important;
+    border-right: 1px solid #5a8ab0 !important;
+    padding: 16px 14px !important;
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
 
     .cell {
-      color: var(--table-text-primary, #ffffff) !important;
+      color: #ffffff !important;
+    }
+
+    &:last-child {
+      border-right: none !important;
     }
   }
 
-  // 表格内容单元格 - 使用高亮度文字
+  // 表格内容单元格 - 更清晰的分隔线
   td.el-table__cell {
-    background-color: var(--bg-card-solid) !important;
-    color: var(--table-text-regular, rgba(255, 255, 255, 0.95)) !important;
+    background-color: transparent !important;
+    color: rgba(255, 255, 255, 0.95) !important;
+    border-bottom: 1px solid #2d4a66 !important;
+    border-right: 1px solid #223a50 !important;
+    padding: 14px !important;
+    transition: all 0.2s ease;
 
     .cell {
-      color: var(--table-text-regular, rgba(255, 255, 255, 0.95)) !important;
+      color: rgba(255, 255, 255, 0.95) !important;
+    }
+
+    &:last-child {
+      border-right: none !important;
     }
   }
 
+  // 行样式 - 更深的底色以增加与边框的对比
   tr {
-    background-color: var(--bg-card-solid) !important;
+    background-color: #0d1520 !important;
+    transition: all 0.2s ease;
 
+    // 偶数行
+    &:nth-child(even) {
+      background-color: #111d2c !important;
+
+      td.el-table__cell {
+        background-color: #111d2c !important;
+      }
+    }
+
+    // 奇数行
+    &:nth-child(odd) {
+      background-color: #0d1520 !important;
+
+      td.el-table__cell {
+        background-color: #0d1520 !important;
+      }
+    }
+
+    // 悬停效果 - 蓝色高亮
     &:hover > td.el-table__cell {
-      background-color: var(--bg-hover) !important;
+      background-color: #1a3554 !important;
+      border-bottom-color: #5a90b8 !important;
     }
   }
 
-  // 斑马纹
+  // 斑马纹模式
   &--striped .el-table__body tr.el-table__row--striped td.el-table__cell {
-    background-color: rgba(255, 255, 255, 0.03) !important;
+    background-color: #111d2c !important;
   }
 
-  // 空数据
+  // 带边框模式 - 更醒目的网格
+  &--border {
+    border: 2px solid #7db8e8 !important;
+
+    th.el-table__cell,
+    td.el-table__cell {
+      border-right: 1px solid #5a8ab0 !important;
+    }
+  }
+
+  // 空数据状态
   .el-table__empty-block {
-    background-color: var(--bg-card-solid);
+    background-color: #0d1520;
 
     .el-table__empty-text {
-      color: var(--text-secondary);
+      color: rgba(255, 255, 255, 0.5);
     }
   }
 
   // 表格内层容器
   .el-table__inner-wrapper {
-    background-color: var(--bg-card-solid);
+    background-color: transparent;
+
+    &::before {
+      display: none !important;
+    }
   }
 
   .el-table__body-wrapper {
-    background-color: var(--bg-card-solid);
+    background-color: transparent;
   }
 
   .el-table__header-wrapper {
-    background-color: var(--bg-tertiary);
+    background: linear-gradient(180deg, #2d6090 0%, #1e4a70 100%);
   }
 
   // 排序图标
   .sort-caret {
-    border-bottom-color: var(--text-secondary);
-    border-top-color: var(--text-secondary);
+    border-bottom-color: rgba(255, 255, 255, 0.6);
+    border-top-color: rgba(255, 255, 255, 0.6);
 
     &.ascending {
-      border-bottom-color: var(--primary-color);
+      border-bottom-color: #7db8e8;
     }
 
     &.descending {
-      border-top-color: var(--primary-color);
+      border-top-color: #7db8e8;
     }
   }
 
-  // 固定列阴影
+  // 固定列
   .el-table-fixed-column--left,
   .el-table-fixed-column--right {
-    background-color: var(--bg-card-solid) !important;
+    background-color: #0d1520 !important;
   }
 
   // 展开行
   .el-table__expanded-cell {
-    background-color: var(--bg-tertiary) !important;
-    color: var(--table-text-regular, rgba(255, 255, 255, 0.95)) !important;
+    background-color: #111d2c !important;
+    color: rgba(255, 255, 255, 0.95) !important;
+    border-bottom: 1px solid #2d4a66 !important;
+  }
+
+  // 表格选中行
+  .current-row > td.el-table__cell {
+    background-color: #1a3554 !important;
+  }
+
+  // 表格单元格内的链接按钮
+  .el-button--text,
+  .el-button--link {
+    &.el-button--primary {
+      color: #7db8e8 !important;
+
+      &:hover {
+        color: #a0d0f5 !important;
+      }
+    }
+
+    &.el-button--danger {
+      color: #f56c6c !important;
+
+      &:hover {
+        color: #f89898 !important;
+      }
+    }
+  }
+
+  // 表格内的 Tag 标签样式 - 更鲜艳
+  .el-tag {
+    font-weight: 600;
+    border-radius: 4px;
+
+    &--primary {
+      background: rgba(125, 184, 232, 0.2) !important;
+      border: 1px solid #7db8e8 !important;
+      color: #7db8e8 !important;
+    }
+
+    &--success {
+      background: rgba(103, 194, 58, 0.2) !important;
+      border: 1px solid #67c23a !important;
+      color: #67c23a !important;
+    }
+
+    &--warning {
+      background: rgba(230, 162, 60, 0.2) !important;
+      border: 1px solid #e6a23c !important;
+      color: #e6a23c !important;
+    }
+
+    &--danger {
+      background: rgba(245, 108, 108, 0.2) !important;
+      border: 1px solid #f56c6c !important;
+      color: #f56c6c !important;
+    }
+
+    &--info {
+      background: rgba(144, 147, 153, 0.2) !important;
+      border: 1px solid #909399 !important;
+      color: #b0b3b8 !important;
+    }
+  }
+
+  // 表格内的开关
+  .el-switch {
+    &.is-checked .el-switch__core {
+      background-color: #409eff !important;
+      border-color: #409eff !important;
+    }
   }
 }
 
@@ -316,16 +457,16 @@
   }
 }
 
-// 弹窗
+// 弹窗 - 强制深色背景覆盖 Element Plus 默认白色
+// 使用 !important 确保优先级高于 Element Plus 内置样式
 .el-dialog {
-  --el-dialog-bg-color: var(--bg-card-solid);
-  --el-dialog-title-font-size: 18px;
-
-  background: var(--bg-card-solid);
-  border: 1px solid var(--border-color);
-  box-shadow: var(--shadow-lg);
+  --el-dialog-bg-color: #1a2a4a !important;
+  background-color: #1a2a4a !important;
+  border: 1px solid var(--border-color) !important;
+  box-shadow: var(--shadow-lg) !important;
 
   .el-dialog__header {
+    background-color: #1a2a4a !important;
     border-bottom: 1px solid var(--border-color);
     padding: 16px 20px;
   }
@@ -343,12 +484,27 @@
   }
 
   .el-dialog__body {
+    background-color: #1a2a4a !important;
     color: var(--text-regular);
   }
 
   .el-dialog__footer {
+    background-color: #1a2a4a !important;
     border-top: 1px solid var(--border-color);
     padding: 12px 20px;
+  }
+}
+
+// 额外的高优先级选择器确保覆盖
+.el-overlay .el-dialog,
+.el-overlay-dialog .el-dialog,
+body .el-dialog {
+  background-color: #1a2a4a !important;
+
+  .el-dialog__header,
+  .el-dialog__body,
+  .el-dialog__footer {
+    background-color: #1a2a4a !important;
   }
 }
 
@@ -1469,10 +1625,17 @@
 // 表单文字增强
 .el-form-item__label {
   color: var(--text-regular) !important;
+  background-color: transparent !important;
 }
 
 .el-form-item__content {
   color: var(--text-regular);
+  background-color: transparent !important;
+}
+
+// 表单项整体背景透明
+.el-form-item {
+  background-color: transparent !important;
 }
 
 // 树形控件文字增强

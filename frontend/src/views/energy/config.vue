@@ -213,6 +213,84 @@
           </el-col>
         </el-row>
       </el-tab-pane>
+
+      <!-- 需量配置 -->
+      <el-tab-pane label="需量配置" name="demand">
+        <div class="tab-header">
+          <el-button type="primary" @click="showDemandDialog()">
+            <el-icon><Edit /></el-icon>配置需量
+          </el-button>
+        </div>
+
+        <el-alert type="info" :closable="false" style="margin-bottom: 16px;">
+          <template #title>需量说明</template>
+          <p>申报需量是向电力公司申报的最大用电功率,超出申报需量将产生超需量罚款。</p>
+          <p>建议:申报需量应设置在实际最大需量的110%-120%之间,且不能超过变压器容量。</p>
+        </el-alert>
+
+        <!-- 变压器需量列表 -->
+        <el-table :data="transformers" v-loading="loading.transformer" stripe>
+          <el-table-column prop="transformer_code" label="变压器编码" width="120" />
+          <el-table-column prop="transformer_name" label="变压器名称" min-width="150" />
+          <el-table-column prop="rated_capacity" label="额定容量(kVA)" width="130" />
+          <el-table-column prop="declared_demand" label="申报需量" width="130">
+            <template #default="{ row }">
+              <span v-if="row.declared_demand" class="demand-value">
+                {{ row.declared_demand }} {{ row.demand_type || 'kW' }}
+              </span>
+              <span v-else class="not-configured">未配置</span>
+            </template>
+          </el-table-column>
+          <el-table-column prop="demand_warning_ratio" label="预警阈值" width="100">
+            <template #default="{ row }">
+              {{ ((row.demand_warning_ratio || 0.9) * 100).toFixed(0) }}%
+            </template>
+          </el-table-column>
+          <el-table-column label="使用率" width="150">
+            <template #default="{ row }">
+              <el-progress
+                v-if="row.declared_demand"
+                :percentage="getDemandUtilization(row)"
+                :status="getDemandStatus(row)"
+              />
+              <span v-else>-</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="操作" width="100" fixed="right">
+            <template #default="{ row }">
+              <el-button link type="primary" @click="showDemandDialog(row)">配置</el-button>
+            </template>
+          </el-table-column>
+        </el-table>
+
+        <!-- 汇总卡片 -->
+        <el-row :gutter="20" style="margin-top: 20px;">
+          <el-col :span="6">
+            <el-card shadow="hover" class="summary-card">
+              <div class="summary-label">变压器总数</div>
+              <div class="summary-value">{{ transformers.length }} 台</div>
+            </el-card>
+          </el-col>
+          <el-col :span="6">
+            <el-card shadow="hover" class="summary-card">
+              <div class="summary-label">总额定容量</div>
+              <div class="summary-value">{{ totalCapacity }} kVA</div>
+            </el-card>
+          </el-col>
+          <el-col :span="6">
+            <el-card shadow="hover" class="summary-card">
+              <div class="summary-label">总申报需量</div>
+              <div class="summary-value primary">{{ totalDeclaredDemand }} kW</div>
+            </el-card>
+          </el-col>
+          <el-col :span="6">
+            <el-card shadow="hover" class="summary-card">
+              <div class="summary-label">已配置</div>
+              <div class="summary-value success">{{ configuredCount }} / {{ transformers.length }}</div>
+            </el-card>
+          </el-col>
+        </el-row>
+      </el-tab-pane>
     </el-tabs>
 
     <!-- 变压器对话框 -->
@@ -389,13 +467,49 @@
         <el-button type="primary" @click="handleSavePricing" :loading="saving">保存</el-button>
       </template>
     </el-dialog>
+
+    <!-- 需量配置对话框 -->
+    <el-dialog v-model="dialogs.demand" title="配置申报需量" width="500px">
+      <el-form :model="demandForm" label-width="120px">
+        <el-form-item label="变压器">
+          <el-input :value="demandForm.transformer_name" disabled />
+        </el-form-item>
+        <el-form-item label="额定容量">
+          <el-input :value="`${demandForm.rated_capacity} kVA`" disabled />
+        </el-form-item>
+        <el-form-item label="申报需量" required>
+          <el-input-number
+            v-model="demandForm.declared_demand"
+            :min="0"
+            :max="demandForm.rated_capacity"
+            style="width: 180px"
+          />
+          <el-select v-model="demandForm.demand_type" style="width: 80px; margin-left: 8px;">
+            <el-option label="kW" value="kW" />
+            <el-option label="kVA" value="kVA" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="预警阈值">
+          <el-slider
+            v-model="demandForm.demand_warning_ratio"
+            :min="0.5" :max="1" :step="0.05"
+            :format-tooltip="(val: number) => `${(val * 100).toFixed(0)}%`"
+          />
+          <span class="tip-text">当需量达到申报值的 {{ (demandForm.demand_warning_ratio * 100).toFixed(0) }}% 时触发预警</span>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="dialogs.demand = false">取消</el-button>
+        <el-button type="primary" @click="handleSaveDemand" :loading="saving">保存</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Plus, Upload } from '@element-plus/icons-vue'
+import { Plus, Upload, Edit } from '@element-plus/icons-vue'
 import {
   getTransformers, createTransformer, updateTransformer, deleteTransformer,
   getMeterPoints, createMeterPoint, updateMeterPoint, deleteMeterPoint,
@@ -422,7 +536,8 @@ const dialogs = reactive({
   meter: false,
   panel: false,
   circuit: false,
-  pricing: false
+  pricing: false,
+  demand: false
 })
 
 const transformers = ref<Transformer[]>([])
@@ -436,6 +551,20 @@ const meterForm = ref<any>({})
 const panelForm = ref<any>({})
 const circuitForm = ref<any>({})
 const pricingForm = ref<any>({})
+const demandForm = ref<any>({})
+
+// 需量配置计算属性
+const totalCapacity = computed(() =>
+  transformers.value.reduce((sum, t) => sum + (t.rated_capacity || 0), 0)
+)
+
+const totalDeclaredDemand = computed(() =>
+  transformers.value.reduce((sum, t) => sum + (t.declared_demand || 0), 0)
+)
+
+const configuredCount = computed(() =>
+  transformers.value.filter(t => t.declared_demand).length
+)
 
 type TagType = 'success' | 'warning' | 'danger' | 'info' | 'primary'
 
@@ -694,6 +823,53 @@ const handleBillUpload = (file: any) => {
   void file // suppress unused variable warning
 }
 
+// 需量配置方法
+const showDemandDialog = (row?: Transformer) => {
+  if (row) {
+    demandForm.value = {
+      id: row.id,
+      transformer_name: row.transformer_name,
+      rated_capacity: row.rated_capacity,
+      declared_demand: row.declared_demand || Math.round(row.rated_capacity * 0.8),
+      demand_type: row.demand_type || 'kW',
+      demand_warning_ratio: row.demand_warning_ratio || 0.9
+    }
+  }
+  dialogs.demand = true
+}
+
+const handleSaveDemand = async () => {
+  if (demandForm.value.declared_demand > demandForm.value.rated_capacity) {
+    ElMessage.warning('申报需量不能超过额定容量')
+    return
+  }
+  saving.value = true
+  try {
+    await updateTransformer(demandForm.value.id, {
+      declared_demand: demandForm.value.declared_demand,
+      demand_type: demandForm.value.demand_type,
+      demand_warning_ratio: demandForm.value.demand_warning_ratio
+    })
+    ElMessage.success('需量配置保存成功')
+    dialogs.demand = false
+    loadTransformers()
+  } finally {
+    saving.value = false
+  }
+}
+
+const getDemandUtilization = (row: Transformer) => {
+  // TODO: 需要从后端获取当前需量使用情况
+  return 75 // 暂时返回示例值
+}
+
+const getDemandStatus = (row: Transformer): 'success' | 'warning' | 'exception' => {
+  const util = getDemandUtilization(row)
+  if (util >= 90) return 'exception'
+  if (util >= 70) return 'warning'
+  return 'success'
+}
+
 onMounted(() => {
   loadTransformers()
   loadMeterPoints()
@@ -881,5 +1057,21 @@ onMounted(() => {
 .price-value {
   font-weight: bold;
   color: var(--primary-color);
+}
+
+.demand-value {
+  font-weight: 600;
+  color: var(--primary-color);
+}
+
+.not-configured {
+  color: var(--text-placeholder);
+  font-style: italic;
+}
+
+.tip-text {
+  margin-left: 12px;
+  font-size: 12px;
+  color: var(--text-secondary);
 }
 </style>

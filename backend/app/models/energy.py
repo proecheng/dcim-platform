@@ -30,6 +30,12 @@ class Transformer(Base):
     location = Column(String(100), comment="安装位置")
     status = Column(String(20), default="running", comment="状态: running/standby/maintenance/fault")
     is_enabled = Column(Boolean, default=True, comment="是否启用")
+
+    # 需量配置
+    declared_demand = Column(Float, comment="申报需量 kW")
+    demand_type = Column(String(10), default="kW", comment="需量单位: kW/kVA")
+    demand_warning_ratio = Column(Float, default=0.9, comment="需量预警比例 0-1")
+
     created_at = Column(DateTime, default=datetime.now, comment="创建时间")
     updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now, comment="更新时间")
 

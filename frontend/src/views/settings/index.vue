@@ -175,66 +175,6 @@
           />
         </el-tab-pane>
 
-        <!-- 电价配置 -->
-        <el-tab-pane label="电价配置" name="pricing">
-          <div class="tab-header">
-            <el-button type="primary" :icon="Plus" @click="handleAddPricing">新增电价</el-button>
-          </div>
-
-          <el-table :data="pricings" stripe border v-loading="pricingLoading">
-            <el-table-column prop="pricing_name" label="电价名称" width="150" />
-            <el-table-column prop="period_type" label="时段类型" width="100">
-              <template #default="{ row }">
-                <el-tag :type="periodTypeTag[row.period_type]" size="small">
-                  {{ periodTypeText[row.period_type] }}
-                </el-tag>
-              </template>
-            </el-table-column>
-            <el-table-column prop="start_time" label="开始时间" width="100" />
-            <el-table-column prop="end_time" label="结束时间" width="100" />
-            <el-table-column prop="price" label="单价 (元/kWh)" width="120">
-              <template #default="{ row }">
-                {{ row.price.toFixed(2) }}
-              </template>
-            </el-table-column>
-            <el-table-column prop="effective_date" label="生效日期" width="110" />
-            <el-table-column prop="is_enabled" label="状态" width="80">
-              <template #default="{ row }">
-                <el-switch v-model="row.is_enabled" @change="togglePricing(row)" />
-              </template>
-            </el-table-column>
-            <el-table-column prop="remark" label="备注" min-width="150" />
-            <el-table-column label="操作" width="120" fixed="right">
-              <template #default="{ row }">
-                <el-button type="primary" link @click="handleEditPricing(row)">编辑</el-button>
-                <el-popconfirm title="确定删除？" @confirm="handleDeletePricing(row.id)">
-                  <template #reference>
-                    <el-button type="danger" link>删除</el-button>
-                  </template>
-                </el-popconfirm>
-              </template>
-            </el-table-column>
-          </el-table>
-
-          <div class="pricing-tips">
-            <el-alert
-              title="说明"
-              type="info"
-              :closable="false"
-              show-icon
-            >
-              <ul>
-                <li>尖峰电价：用电最高峰时段，电价最高（如午高峰、晚高峰核心时段）</li>
-                <li>高峰电价：用电高峰时段，电价较高（如白天工作时段）</li>
-                <li>平段电价：正常用电时段，标准电价</li>
-                <li>低谷电价：用电低谷时段，电价较低（如深夜时段）</li>
-                <li>深谷电价：用电最低谷时段，电价最低（如凌晨时段）</li>
-                <li>时段不能重叠，系统会自动检查时间冲突</li>
-              </ul>
-            </el-alert>
-          </div>
-        </el-tab-pane>
-
         <!-- 授权信息 -->
         <el-tab-pane label="授权信息" name="license">
           <el-descriptions :column="2" border>
@@ -337,69 +277,6 @@
       </template>
     </el-dialog>
 
-    <!-- 电价配置对话框 -->
-    <el-dialog v-model="pricingDialogVisible" :title="pricingEditMode ? '编辑电价' : '新增电价'" width="500px">
-      <el-form ref="pricingFormRef" :model="pricingForm" :rules="pricingRules" label-width="100px">
-        <el-form-item label="电价名称" prop="pricing_name">
-          <el-input v-model="pricingForm.pricing_name" placeholder="如：峰时电价" />
-        </el-form-item>
-        <el-form-item label="时段类型" prop="period_type">
-          <el-select v-model="pricingForm.period_type" style="width: 100%;">
-            <el-option label="尖峰 (最高峰时段)" value="sharp" />
-            <el-option label="高峰 (用电高峰)" value="peak" />
-            <el-option label="平段 (正常时段)" value="flat" />
-            <el-option label="低谷 (用电低谷)" value="valley" />
-            <el-option label="深谷 (最低谷时段)" value="deep_valley" />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="开始时间" prop="start_time">
-          <el-time-picker
-            v-model="pricingForm.start_time"
-            format="HH:mm"
-            value-format="HH:mm:00"
-            style="width: 100%;"
-            placeholder="选择开始时间"
-          />
-        </el-form-item>
-        <el-form-item label="结束时间" prop="end_time">
-          <el-time-picker
-            v-model="pricingForm.end_time"
-            format="HH:mm"
-            value-format="HH:mm:00"
-            style="width: 100%;"
-            placeholder="选择结束时间"
-          />
-        </el-form-item>
-        <el-form-item label="单价" prop="price">
-          <el-input-number
-            v-model="pricingForm.price"
-            :min="0"
-            :max="10"
-            :precision="2"
-            :step="0.1"
-            style="width: 100%;"
-          />
-          <span style="margin-left: 10px; color: #999;">元/kWh</span>
-        </el-form-item>
-        <el-form-item label="生效日期" prop="effective_date">
-          <el-date-picker
-            v-model="pricingForm.effective_date"
-            type="date"
-            value-format="YYYY-MM-DD"
-            style="width: 100%;"
-            placeholder="选择生效日期"
-          />
-        </el-form-item>
-        <el-form-item label="备注">
-          <el-input v-model="pricingForm.remark" type="textarea" :rows="2" placeholder="可选" />
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <el-button @click="pricingDialogVisible = false">取消</el-button>
-        <el-button type="primary" @click="submitPricing">确定</el-button>
-      </template>
-    </el-dialog>
-
     <!-- 重置密码对话框 -->
     <el-dialog v-model="resetPwdDialogVisible" title="重置密码" width="400px">
       <el-form ref="resetPwdFormRef" :model="resetPwdForm" :rules="resetPwdRules" label-width="80px">
@@ -435,10 +312,6 @@ import {
   getOperationLogs, getSystemLogs, exportLogs as apiExportLogs,
   type OperationLog, type SystemLog
 } from '@/api/modules/log'
-import {
-  getPricingList, createPricing, updatePricing, deletePricing,
-  type ElectricityPricing
-} from '@/api/modules/energy'
 
 const activeTab = ref('threshold')
 
@@ -584,51 +457,6 @@ const logLevelType: Record<string, TagType> = {
   critical: 'danger'
 }
 
-// ===== 电价配置 =====
-const pricings = ref<ElectricityPricing[]>([])
-const pricingLoading = ref(false)
-const pricingDialogVisible = ref(false)
-const pricingEditMode = ref(false)
-const pricingFormRef = ref()
-
-const pricingForm = reactive({
-  id: 0,
-  pricing_name: '',
-  period_type: 'peak',
-  start_time: '',
-  end_time: '',
-  price: 1.0,
-  effective_date: new Date().toISOString().split('T')[0],
-  remark: ''
-})
-
-const pricingRules = {
-  pricing_name: [{ required: true, message: '请输入电价名称', trigger: 'blur' }],
-  period_type: [{ required: true, message: '请选择时段类型', trigger: 'change' }],
-  start_time: [{ required: true, message: '请选择开始时间', trigger: 'change' }],
-  end_time: [{ required: true, message: '请选择结束时间', trigger: 'change' }],
-  price: [{ required: true, message: '请输入单价', trigger: 'blur' }],
-  effective_date: [{ required: true, message: '请选择生效日期', trigger: 'change' }]
-}
-
-const periodTypeText: Record<string, string> = {
-  sharp: '尖峰',
-  peak: '高峰',
-  flat: '平段',
-  valley: '低谷',
-  deep_valley: '深谷',
-  normal: '平段' // 兼容旧数据
-}
-
-const periodTypeTag: Record<string, TagType> = {
-  sharp: 'danger',
-  peak: 'warning',
-  flat: 'info',
-  valley: 'success',
-  deep_valley: 'primary',
-  normal: 'info' // 兼容旧数据
-}
-
 // ===== 授权信息 =====
 const licenseInfo = reactive({
   max_points: 100,
@@ -652,8 +480,6 @@ onMounted(async () => {
 watch(activeTab, (val) => {
   if (val === 'log') {
     loadLogs()
-  } else if (val === 'pricing') {
-    loadPricings()
   }
 })
 
@@ -903,104 +729,6 @@ async function exportLogs() {
     ElMessage.error('导出失败')
   }
 }
-
-// ===== 电价配置方法 =====
-async function loadPricings() {
-  pricingLoading.value = true
-  try {
-    const result = await getPricingList()
-    pricings.value = result.data || []
-  } catch (e) {
-    console.error('加载电价配置失败', e)
-    ElMessage.error('加载电价配置失败')
-  } finally {
-    pricingLoading.value = false
-  }
-}
-
-function handleAddPricing() {
-  pricingEditMode.value = false
-  Object.assign(pricingForm, {
-    id: 0,
-    pricing_name: '',
-    period_type: 'peak',
-    start_time: '',
-    end_time: '',
-    price: 1.0,
-    effective_date: new Date().toISOString().split('T')[0],
-    remark: ''
-  })
-  pricingDialogVisible.value = true
-}
-
-function handleEditPricing(row: ElectricityPricing) {
-  pricingEditMode.value = true
-  Object.assign(pricingForm, {
-    id: row.id,
-    pricing_name: row.pricing_name,
-    period_type: row.period_type,
-    start_time: row.start_time,
-    end_time: row.end_time,
-    price: row.price,
-    effective_date: row.effective_date,
-    remark: ''
-  })
-  pricingDialogVisible.value = true
-}
-
-async function submitPricing() {
-  if (!pricingFormRef.value) return
-
-  await pricingFormRef.value.validate(async (valid: boolean) => {
-    if (!valid) return
-
-    try {
-      const data = {
-        pricing_name: pricingForm.pricing_name,
-        period_type: pricingForm.period_type,
-        start_time: pricingForm.start_time,
-        end_time: pricingForm.end_time,
-        price: pricingForm.price,
-        effective_date: pricingForm.effective_date,
-        is_enabled: true
-      }
-
-      if (pricingEditMode.value) {
-        await updatePricing(pricingForm.id, data)
-        ElMessage.success('更新成功')
-      } else {
-        await createPricing(data)
-        ElMessage.success('创建成功')
-      }
-      pricingDialogVisible.value = false
-      loadPricings()
-    } catch (e) {
-      console.error('保存失败', e)
-      ElMessage.error('保存失败')
-    }
-  })
-}
-
-async function togglePricing(row: ElectricityPricing) {
-  try {
-    await updatePricing(row.id, { is_enabled: row.is_enabled })
-    ElMessage.success(row.is_enabled ? '已启用' : '已禁用')
-  } catch (e) {
-    row.is_enabled = !row.is_enabled
-    ElMessage.error('操作失败')
-  }
-}
-
-async function handleDeletePricing(id: number) {
-  try {
-    await deletePricing(id)
-    ElMessage.success('删除成功')
-    loadPricings()
-  } catch (e) {
-    console.error('删除失败', e)
-    ElMessage.error('删除失败')
-  }
-}
 </script>
 
 <style scoped lang="scss">
@@ -1068,21 +796,6 @@ async function handleDeletePricing(id: number) {
     // 表单标签颜色
     :deep(.el-form-item__label) {
       color: var(--text-regular);
-    }
-  }
-
-  .pricing-tips {
-    margin-top: 20px;
-
-    ul {
-      margin: 0;
-      padding-left: 20px;
-      list-style: disc;
-
-      li {
-        margin-bottom: 4px;
-        color: var(--text-secondary);
-      }
     }
   }
 
