@@ -39,6 +39,14 @@ class TopologySyncService:
         Returns:
             创建的点位ID列表
         """
+        # 获取设备信息以获取 device_type
+        device_result = await self.db.execute(
+            select(PowerDevice).where(PowerDevice.id == device_id)
+        )
+        device = device_result.scalar_one_or_none()
+        device_type = device.device_type if device else "OTHER"
+        area_code = device.area_code if device and device.area_code else "A1"
+
         created_point_ids = []
 
         for point_config in points_config:
@@ -69,6 +77,8 @@ class TopologySyncService:
                     point_code=point_code,
                     point_name=point_config.point_name,
                     point_type=point_config.point_type.value,
+                    device_type=device_type,
+                    area_code=area_code,
                     data_type=point_config.data_type,
                     unit=point_config.unit,
                     description=point_config.description,
@@ -90,8 +100,9 @@ class TopologySyncService:
                 realtime = PointRealtime(
                     point_id=new_point.id,
                     value=0.0,
-                    quality="good",
-                    timestamp=datetime.now()
+                    quality=0,
+                    status="normal",
+                    updated_at=datetime.now()
                 )
                 self.db.add(realtime)
 

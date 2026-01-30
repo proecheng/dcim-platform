@@ -55,6 +55,7 @@ async def get_power_devices(
     device_type: Optional[str] = Query(None, description="设备类型"),
     area_code: Optional[str] = Query(None, description="区域代码"),
     is_enabled: Optional[bool] = Query(None, description="是否启用"),
+    keyword: Optional[str] = Query(None, description="关键词搜索(编码/名称)"),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
@@ -67,6 +68,11 @@ async def get_power_devices(
         query = query.where(PowerDevice.area_code == area_code)
     if is_enabled is not None:
         query = query.where(PowerDevice.is_enabled == is_enabled)
+    if keyword:
+        query = query.where(
+            (PowerDevice.device_code.contains(keyword)) |
+            (PowerDevice.device_name.contains(keyword))
+        )
 
     query = query.order_by(PowerDevice.device_type, PowerDevice.device_code)
     result = await db.execute(query)

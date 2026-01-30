@@ -4,14 +4,17 @@ Topology Editing API
 
 提供拓扑图的可编辑操作接口
 Updated: 2025-01-29 - Added point type support
+Updated: 2026-01-29 - Added sync endpoint and device points query
 """
 from typing import List, Optional, Dict, Any
-from fastapi import APIRouter, Depends, HTTPException, Body
+from fastapi import APIRouter, Depends, HTTPException, Body, Path
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 
 from ..deps import get_db
 from ...services.energy_topology import EnergyTopologyService
 from ...services.topology_sync import TopologySyncService
+from ...services.point_device_matcher import PointDeviceMatcher
 from ...schemas.energy import (
     TopologyNodeCreate, TopologyNodeUpdate, TopologyNodeDelete,
     TopologyBatchOperation, TopologyBatchResult,
@@ -19,7 +22,8 @@ from ...schemas.energy import (
     DevicePointConfigCreate, DevicePointConfigUpdate,
     DevicePointConfigResponse
 )
-from ...models.point import Point
+from ...models.point import Point, PointRealtime
+from ...models.energy import PowerDevice
 
 router = APIRouter()
 
@@ -356,6 +360,43 @@ async def delete_device_points(
         raise HTTPException(status_code=500, detail=f"删除失败: {str(e)}")
 
 
+@router.delete("/device-points/point/{point_id}", summary="删除单个点位")
+async def delete_single_point(
+    point_id: int = Path(..., gt=0, description="点位ID，必须大于0"),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    删除单个点位
+    """
+    from sqlalchemy import delete
+
+    try:
+        # 获取点位
+        result = await db.execute(select(Point).where(Point.id == point_id))
+        point = result.scalar_one_or_none()
+        if not point:
+            raise HTTPException(status_code=404, detail="点位不存在")
+
+        # 删除实时数据
+        await db.execute(delete(PointRealtime).where(PointRealtime.point_id == point_id))
+
+        # 删除点位
+        await db.delete(point)
+        await db.commit()
+
+        return {
+            "success": True,
+            "point_id": point_id,
+            "message": "点位删除成功"
+        }
+    except HTTPException:
+        await db.rollback()
+        raise
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(status_code=500, detail=f"删除失败: {str(e)}")
+
+
 # ==================== 拓扑连接管理 ====================
 
 @router.post("/connections", summary="创建拓扑连接")
@@ -442,3 +483,158 @@ async def delete_topology_connection(
     except Exception as e:
         await db.rollback()
         raise HTTPException(status_code=500, detail=f"删除连接失败: {str(e)}")
+
+
+# ==================== 设备点位同步 ====================
+
+@router.post("/sync", summary="同步设备与点位关联")
+async def sync_device_point_relations(
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    手动触发设备与点位的双向同步
+
+    此端点会:
+    1. 遍历所有用电设备，查找匹配的点位
+    2. 更新设备的 power_point_id, current_point_id, energy_point_id
+    3. 同时设置点位的 energy_device_id（双向关联）
+    4. 返回同步统计信息
+    """
+    try:
+        result = await PointDeviceMatcher.full_sync(db)
+        await db.commit()
+
+        return {
+            "success": True,
+            "message": "同步完成",
+            "updated_devices": result["updated_devices"],
+            "updated_points": result["updated_points"],
+            "matched_count": result["matched_count"],
+            "statistics": result["statistics"]
+        }
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(status_code=500, detail=f"同步失败: {str(e)}")
+
+
+@router.get("/sync/status", summary="获取同步状态统计")
+async def get_sync_status(
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    获取当前设备与点位的关联状态统计
+
+    返回:
+    - total_devices: 总设备数
+    - linked_devices: 已关联点位的设备数
+    - orphan_devices: 孤立设备数（无点位关联）
+    - total_points: 总点位数
+    - linked_points: 已关联设备的点位数
+    - device_link_rate: 设备关联率
+    - point_link_rate: 点位关联率
+    """
+    try:
+        stats = await PointDeviceMatcher.get_sync_statistics(db)
+        return {
+            "success": True,
+            **stats
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"获取状态失败: {str(e)}")
+
+
+@router.get("/device/{device_id}/points", summary="获取设备关联的所有点位")
+async def get_device_linked_points(
+    device_id: int,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    获取指定用电设备关联的所有点位及其实时值
+
+    返回设备的功率点位、电流点位、电能点位以及通过 energy_device_id 反向关联的所有点位
+    """
+    # 获取设备信息
+    device_result = await db.execute(
+        select(PowerDevice).where(PowerDevice.id == device_id)
+    )
+    device = device_result.scalar_one_or_none()
+
+    if not device:
+        raise HTTPException(status_code=404, detail="设备不存在")
+
+    # 收集所有关联的点位ID
+    point_ids = set()
+    point_roles = {}  # 记录点位的角色
+
+    if device.power_point_id:
+        point_ids.add(device.power_point_id)
+        point_roles[device.power_point_id] = "power"
+    if device.current_point_id:
+        point_ids.add(device.current_point_id)
+        point_roles[device.current_point_id] = "current"
+    if device.energy_point_id:
+        point_ids.add(device.energy_point_id)
+        point_roles[device.energy_point_id] = "energy"
+    if device.voltage_point_id:
+        point_ids.add(device.voltage_point_id)
+        point_roles[device.voltage_point_id] = "voltage"
+    if device.pf_point_id:
+        point_ids.add(device.pf_point_id)
+        point_roles[device.pf_point_id] = "power_factor"
+
+    # 查找通过 energy_device_id 反向关联的点位
+    reverse_linked_result = await db.execute(
+        select(Point.id).where(Point.energy_device_id == device_id)
+    )
+    for (pid,) in reverse_linked_result.all():
+        point_ids.add(pid)
+        if pid not in point_roles:
+            point_roles[pid] = "associated"
+
+    if not point_ids:
+        return {
+            "device_id": device_id,
+            "device_code": device.device_code,
+            "device_name": device.device_name,
+            "points": [],
+            "point_count": 0
+        }
+
+    # 获取点位详细信息和实时值
+    points_result = await db.execute(
+        select(Point, PointRealtime)
+        .outerjoin(PointRealtime, Point.id == PointRealtime.point_id)
+        .where(Point.id.in_(point_ids))
+    )
+
+    points_data = []
+    for point, realtime in points_result.all():
+        points_data.append({
+            "id": point.id,
+            "point_code": point.point_code,
+            "point_name": point.point_name,
+            "point_type": point.point_type,
+            "unit": point.unit,
+            "role": point_roles.get(point.id, "associated"),
+            "realtime": {
+                "value": realtime.value if realtime else None,
+                "value_text": realtime.value_text if realtime else None,
+                "status": realtime.status if realtime else "offline",
+                "quality": realtime.quality if realtime else 2,
+                "updated_at": realtime.updated_at.isoformat() if realtime and realtime.updated_at else None
+            } if realtime else None
+        })
+
+    # 按角色排序: power > current > energy > voltage > power_factor > associated
+    role_order = {"power": 0, "current": 1, "energy": 2, "voltage": 3, "power_factor": 4, "associated": 5}
+    points_data.sort(key=lambda x: (role_order.get(x["role"], 99), x["point_code"]))
+
+    return {
+        "device_id": device_id,
+        "device_code": device.device_code,
+        "device_name": device.device_name,
+        "device_type": device.device_type,
+        "rated_power": device.rated_power,
+        "points": points_data,
+        "point_count": len(points_data)
+    }

@@ -79,9 +79,9 @@
             @node-contextmenu="handleContextMenu"
           >
             <template #default="{ node, data }">
-              <div class="tree-node" :class="[data.type, { selected: selectedNode?.key === data.key, virtual: data.isVirtual }]">
+              <div class="tree-node" :class="[data.type, data.pointType ? `point-${data.pointType}` : '', { selected: selectedNode?.key === data.key, virtual: data.isVirtual }]">
                 <el-icon class="node-icon">
-                  <component :is="getNodeIcon(data.type)" />
+                  <component :is="getNodeIcon(data.type, data.pointType)" />
                 </el-icon>
                 <span class="node-label">{{ data.label }}</span>
                 <span class="node-info" v-if="data.info">{{ data.info }}</span>
@@ -233,6 +233,56 @@
             <el-button type="danger" @click="handleDeleteNode(selectedNode)">删除</el-button>
           </el-form-item>
         </el-form>
+      </el-card>
+
+      <!-- 设备关联点位面板（非编辑模式时也显示） -->
+      <el-card class="device-points-panel" v-if="selectedNode && selectedNode.type === 'device' && !selectedNode.isVirtual">
+        <template #header>
+          <div class="panel-header">
+            <span>关联点位 - {{ selectedNode.label }}</span>
+            <div class="panel-actions">
+              <el-button link type="primary" @click="handleAddPoint" v-if="editMode">
+                <el-icon><Plus /></el-icon> 添加
+              </el-button>
+              <el-button link type="primary" @click="loadDevicePoints" :loading="loadingDevicePoints">
+                <el-icon><Refresh /></el-icon>
+              </el-button>
+            </div>
+          </div>
+        </template>
+        <div v-loading="loadingDevicePoints">
+          <div v-if="devicePoints.length === 0" class="no-points">
+            <el-empty description="暂无关联点位" :image-size="60">
+              <el-button v-if="editMode" type="primary" size="small" @click="handleAddPoint">添加点位</el-button>
+            </el-empty>
+          </div>
+          <div v-else class="points-list">
+            <div v-for="pt in devicePoints" :key="pt.id" class="point-item" :class="pt.role">
+              <div class="point-header">
+                <el-tag :type="getPointRoleType(pt.role)" size="small">
+                  {{ getPointRoleLabel(pt.role) }}
+                </el-tag>
+                <span class="point-name">{{ pt.point_name }}</span>
+              </div>
+              <div class="point-value" v-if="pt.realtime">
+                <span class="value" :class="{ offline: pt.realtime.status === 'offline' }">
+                  {{ pt.realtime.value !== null ? pt.realtime.value : '--' }}
+                </span>
+                <span class="unit">{{ pt.unit || '' }}</span>
+                <el-tag v-if="pt.realtime.status === 'offline'" type="info" size="small">离线</el-tag>
+              </div>
+              <div class="point-code">{{ pt.point_code }}</div>
+              <div class="point-actions" v-if="editMode">
+                <el-button link size="small" @click="handleEditPoint(pt)">
+                  <el-icon><Edit /></el-icon>
+                </el-button>
+                <el-button link size="small" type="danger" @click="handleDeletePoint(pt)">
+                  <el-icon><Delete /></el-icon>
+                </el-button>
+              </div>
+            </div>
+          </div>
+        </div>
       </el-card>
     </div>
 
@@ -405,6 +455,46 @@
       </template>
     </el-dialog>
 
+    <!-- 点位编辑对话框 -->
+    <el-dialog v-model="showPointDialog" :title="editingPoint ? '编辑点位' : '添加点位'" width="480px" class="topology-dialog">
+      <el-form :model="pointForm" label-width="100px" size="default">
+        <el-form-item label="点位名称" required>
+          <el-input v-model="pointForm.point_name" placeholder="输入点位名称" />
+        </el-form-item>
+        <el-form-item label="角色" required>
+          <el-select v-model="pointForm.role" style="width: 100%;">
+            <el-option label="功率" value="power" />
+            <el-option label="电流" value="current" />
+            <el-option label="电能" value="energy" />
+            <el-option label="电压" value="voltage" />
+            <el-option label="功率因数" value="power_factor" />
+            <el-option label="关联点位" value="associated" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="点位类型">
+          <el-select v-model="pointForm.point_type" style="width: 100%;">
+            <el-option label="模拟量输入" value="AI" />
+            <el-option label="数字量输入" value="DI" />
+            <el-option label="模拟量输出" value="AO" />
+            <el-option label="数字量输出" value="DO" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="单位">
+          <el-input v-model="pointForm.unit" placeholder="如 kW, A, kWh" />
+        </el-form-item>
+        <el-form-item label="寄存器地址">
+          <el-input v-model="pointForm.register_address" placeholder="如 40001" />
+        </el-form-item>
+        <el-form-item label="系数">
+          <el-input-number v-model="pointForm.scale_factor" :precision="4" :min="0" style="width: 100%;" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="showPointDialog = false">取消</el-button>
+        <el-button type="primary" @click="handleSavePoint" :loading="savingPoint">保存</el-button>
+      </template>
+    </el-dialog>
+
     <!-- 右键菜单 -->
     <div
       v-if="contextMenuVisible"
@@ -437,7 +527,8 @@ import { ref, computed, onMounted, onUnmounted, reactive, watch } from 'vue'
 import { ElMessage, ElMessageBox, type FormInstance } from 'element-plus'
 import {
   Refresh, OfficeBuilding, Odometer, Box, Connection, Monitor,
-  Plus, Edit, Delete, Download, Upload, Close, Grid
+  Plus, Edit, Delete, Download, Upload, Close, Grid,
+  DataLine, CircleCheck, TrendCharts, Open
 } from '@element-plus/icons-vue'
 import {
   getDistributionTopology,
@@ -446,10 +537,15 @@ import {
   deleteTopologyNode,
   exportTopology,
   importTopology,
+  getDeviceLinkedPoints,
+  createDevicePoints,
+  updateDevicePoint,
+  deleteDevicePointById,
   type DistributionTopology,
   type TopologyNodeTypeEnum,
   type TopologyNodeCreateRequest,
-  type TopologyNodeUpdateRequest
+  type TopologyNodeUpdateRequest,
+  type DeviceLinkedPoint
 } from '@/api/modules/energy'
 
 // 扩展节点类型，增加 grid 和 point
@@ -462,7 +558,7 @@ const nodeHierarchy: Record<ExtendedNodeType, { child: ExtendedNodeType | null; 
   meter_point: { child: 'panel', parent: 'transformer', label: '计量点' },
   panel: { child: 'circuit', parent: 'meter_point', label: '配电柜' },
   circuit: { child: 'device', parent: 'panel', label: '回路' },
-  device: { child: 'point', parent: 'circuit', label: '设备' },
+  device: { child: null, parent: 'circuit', label: '设备' },
   point: { child: null, parent: 'device', label: '采集点位' }
 }
 
@@ -551,6 +647,24 @@ const importClearExisting = ref(false)
 const importFile = ref<File | null>(null)
 const uploadRef = ref()
 
+// 设备关联点位
+const loadingDevicePoints = ref(false)
+const devicePoints = ref<any[]>([])
+
+// 点位编辑对话框
+const showPointDialog = ref(false)
+const editingPoint = ref<DeviceLinkedPoint | null>(null)
+const savingPoint = ref(false)
+const pointForm = reactive({
+  point_name: '',
+  point_code: '',
+  point_type: 'AI',
+  role: 'associated',
+  unit: '',
+  register_address: '',
+  scale_factor: 1.0
+})
+
 // 右键菜单
 const contextMenuVisible = ref(false)
 const contextMenuX = ref(0)
@@ -588,8 +702,8 @@ const treeData = computed(() => {
   const buildDeviceNode = (d: any, circuitId: number) => ({
     key: `device-${d.id}`,
     id: d.id,
-    label: d.device_name,
-    code: d.device_code,
+    label: d.device_name || d.name,
+    code: d.device_code || d.code,
     type: 'device',
     info: d.rated_power ? `${d.rated_power} kW` : '',
     parentId: circuitId,
@@ -598,10 +712,11 @@ const treeData = computed(() => {
     children: d.points?.map((pt: any) => ({
       key: `point-${pt.id}`,
       id: pt.id,
-      label: pt.point_name,
-      code: pt.point_code,
+      label: pt.point_name || pt.name,
+      code: pt.point_code || pt.code,
       type: 'point',
-      info: pt.measurement_type || '',
+      pointType: pt.point_type,
+      info: pt.unit || pt.measurement_type || '',
       parentId: d.id,
       parentType: 'device',
       rawData: pt
@@ -690,7 +805,18 @@ const treeData = computed(() => {
 })
 
 // 工具函数
-const getNodeIcon = (type: string) => {
+const getNodeIcon = (type: string, pointType?: string) => {
+  // 如果是采集点位，根据点位类型返回不同图标
+  if (type === 'point' && pointType) {
+    const pointIcons: Record<string, any> = {
+      AI: DataLine,       // 模拟量输入 - 数据折线
+      DI: CircleCheck,    // 开关量输入 - 圆形勾选
+      AO: TrendCharts,    // 模拟量输出 - 趋势图
+      DO: Open            // 开关量输出 - 开关
+    }
+    return pointIcons[pointType] || Odometer
+  }
+
   const icons: Record<string, any> = {
     grid: Grid,
     transformer: OfficeBuilding,
@@ -1196,12 +1322,6 @@ const handleConfirmAdd = async () => {
       node_type: nodeType as TopologyNodeTypeEnum
     }
 
-    // 调试: 打印创建数据
-    console.log('=== 准备创建节点 ===')
-    console.log('nodeType:', nodeType)
-    console.log('parentId:', parentId)
-    console.log('parentType:', parentType)
-
     // 设置父节点
     if (parentId !== null && parentType) {
       createData.parent_id = parentId
@@ -1246,18 +1366,7 @@ const handleConfirmAdd = async () => {
       createData.scale_factor = addForm.scale_factor
     }
 
-    // 调试: 打印完整请求数据
-    console.log('createData:', JSON.stringify(createData, null, 2))
-
     const res = await createTopologyNode(createData)
-
-    // 调试: 打印完整响应
-    console.log('=== createTopologyNode 响应 ===')
-    console.log('res:', res)
-    console.log('res.success:', (res as any).success)
-    console.log('res.code:', res.code)
-    console.log('res.data:', res.data)
-    console.log('typeof res:', typeof res)
 
     // 检查多种可能的成功状态：
     // 后端直接返回 {success, node_id} 或包装后的 {code, data: {success, node_id}}
@@ -1265,8 +1374,6 @@ const handleConfirmAdd = async () => {
                       res.code === 0 ||
                       res.data?.success === true ||
                       (res.data as any)?.node_id
-
-    console.log('isSuccess:', isSuccess)
 
     if (isSuccess) {
       ElMessage.success('添加成功')
@@ -1278,11 +1385,7 @@ const handleConfirmAdd = async () => {
       ElMessage.error(errorMsg)
     }
   } catch (e: any) {
-    console.error('=== createTopologyNode 异常 ===')
-    console.error('error object:', e)
-    console.error('error.response:', e?.response)
-    console.error('error.response.data:', e?.response?.data)
-    console.error('error.message:', e?.message)
+    console.error('createTopologyNode error:', e)
     // 不重复显示错误消息，因为 axios 拦截器已经显示了
     // ElMessage.error(e?.response?.data?.message || e?.message || '添加失败')
   } finally {
@@ -1360,6 +1463,167 @@ watch(editMode, (val) => {
     selectedNode.value = null
   }
 })
+
+// 设备关联点位相关函数
+const loadDevicePoints = async () => {
+  if (!selectedNode.value || selectedNode.value.type !== 'device') {
+    devicePoints.value = []
+    return
+  }
+
+  loadingDevicePoints.value = true
+  try {
+    const res = await getDeviceLinkedPoints(selectedNode.value.id)
+    const data = res.data || res
+    devicePoints.value = data.points || []
+  } catch (e: any) {
+    console.error('加载设备点位失败:', e)
+    devicePoints.value = []
+  } finally {
+    loadingDevicePoints.value = false
+  }
+}
+
+// 监听选中节点变化，自动加载设备点位
+watch(selectedNode, (newNode) => {
+  if (newNode && newNode.type === 'device' && !newNode.isVirtual) {
+    loadDevicePoints()
+  } else {
+    devicePoints.value = []
+  }
+})
+
+type PointRoleTagType = 'primary' | 'success' | 'warning' | 'danger' | 'info'
+
+const getPointRoleType = (role: string): PointRoleTagType => {
+  const map: Record<string, PointRoleTagType> = {
+    power: 'danger',
+    current: 'warning',
+    energy: 'success',
+    voltage: 'primary',
+    power_factor: 'info',
+    associated: 'info'
+  }
+  return map[role] || 'info'
+}
+
+const getPointRoleLabel = (role: string): string => {
+  const map: Record<string, string> = {
+    power: '功率',
+    current: '电流',
+    energy: '电能',
+    voltage: '电压',
+    power_factor: '功率因数',
+    associated: '关联'
+  }
+  return map[role] || role
+}
+
+// 点位增删改方法
+const handleAddPoint = () => {
+  editingPoint.value = null
+  Object.assign(pointForm, {
+    point_name: '',
+    point_code: '',
+    point_type: 'AI',
+    role: 'associated',
+    unit: '',
+    register_address: '',
+    scale_factor: 1.0
+  })
+  showPointDialog.value = true
+}
+
+const handleEditPoint = (pt: DeviceLinkedPoint) => {
+  editingPoint.value = pt
+  Object.assign(pointForm, {
+    point_name: pt.point_name,
+    point_code: pt.point_code,
+    point_type: pt.point_type,
+    role: pt.role,
+    unit: pt.unit || '',
+    register_address: '',
+    scale_factor: 1.0
+  })
+  showPointDialog.value = true
+}
+
+const handleSavePoint = async () => {
+  if (!selectedNode.value) return
+  if (savingPoint.value) return  // 防止重复提交
+  if (!pointForm.point_name?.trim()) {
+    ElMessage.warning('请输入点位名称')
+    return
+  }
+
+  savingPoint.value = true
+  try {
+    if (editingPoint.value) {
+      // 更新点位
+      await updateDevicePoint(editingPoint.value.id, {
+        point_name: pointForm.point_name,
+        unit: pointForm.unit,
+        scale_factor: pointForm.scale_factor
+      })
+      ElMessage.success('点位更新成功')
+    } else {
+      // 创建点位 - 自动生成点位编码
+      const deviceCode = selectedNode.value.code || `DEV-${selectedNode.value.id}`
+      const rolePrefix: Record<string, string> = {
+        power: 'P', current: 'I', energy: 'E', voltage: 'U', power_factor: 'PF', associated: 'PT'
+      }
+      const prefix = rolePrefix[pointForm.role] || 'PT'
+      const timestamp = Date.now().toString().slice(-6)  // 使用6位以降低重复概率
+      const pointCode = `${deviceCode}-${prefix}-${timestamp}`
+
+      // 映射前端点位类型到后端类型
+      const pointTypeMap: Record<string, string> = {
+        'AI': 'measurement',
+        'DI': 'status',
+        'AO': 'control',
+        'DO': 'control'
+      }
+
+      await createDevicePoints({
+        energy_device_id: selectedNode.value.id,
+        points: [{
+          point_code: pointCode,
+          point_name: pointForm.point_name,
+          point_type: pointTypeMap[pointForm.point_type] as 'measurement' | 'control' | 'status' | 'alarm',
+          data_type: 'FLOAT32',
+          unit: pointForm.unit,
+          scale_factor: pointForm.scale_factor,
+          offset: 0,
+          alarm_enabled: false
+        }]
+      })
+      ElMessage.success('点位创建成功')
+    }
+    showPointDialog.value = false
+    await loadDevicePoints()
+  } catch (e: any) {
+    ElMessage.error(e?.response?.data?.detail || e.message || '操作失败')
+  } finally {
+    savingPoint.value = false
+  }
+}
+
+const handleDeletePoint = async (pt: DeviceLinkedPoint) => {
+  try {
+    await ElMessageBox.confirm(
+      `确定删除点位 "${pt.point_name}" 吗？`,
+      '确认删除',
+      { type: 'warning', confirmButtonText: '确定删除', cancelButtonText: '取消' }
+    )
+    await deleteDevicePointById(pt.id)
+    ElMessage.success('点位删除成功')
+    await loadDevicePoints()
+  } catch (e: any) {
+    if (e !== 'cancel') {
+      ElMessage.error(e?.response?.data?.detail || e.message || '删除失败')
+    }
+  }
+}
 </script>
 
 <style scoped lang="scss">
@@ -1516,6 +1780,23 @@ watch(editMode, (val) => {
 
   &.selected .node-actions {
     opacity: 1 !important;
+
+    // 选中状态下按钮使用深色，与浅蓝背景形成对比
+    .el-button {
+      color: #1a1a2e !important;
+
+      &.el-button--danger {
+        color: #c0392b !important;
+      }
+
+      &:hover {
+        color: var(--primary-color) !important;
+      }
+
+      &.el-button--danger:hover {
+        color: var(--error-color) !important;
+      }
+    }
   }
 
   &:hover .node-actions {
@@ -1534,6 +1815,12 @@ watch(editMode, (val) => {
 .tree-node.device .node-icon { color: var(--info-color); }
 .tree-node.point .node-icon { color: #9c27b0; }
 .tree-node.grid .node-icon { color: #ff5722; }
+
+// 采集点位类型样式
+.tree-node.point-AI .node-icon { color: #2196f3; } // 蓝色 - 模拟量输入
+.tree-node.point-DI .node-icon { color: #4caf50; } // 绿色 - 开关量输入
+.tree-node.point-AO .node-icon { color: #ff9800; } // 橙色 - 模拟量输出
+.tree-node.point-DO .node-icon { color: #9c27b0; } // 紫色 - 开关量输出
 
 .tree-node.virtual {
   opacity: 0.8;
@@ -1555,6 +1842,133 @@ watch(editMode, (val) => {
   margin-left: 8px;
   color: var(--text-secondary);
   font-size: 12px;
+}
+
+// 设备关联点位面板样式
+.device-points-panel {
+  width: 320px;
+  background-color: var(--bg-card-solid);
+  border-color: var(--border-color);
+  max-height: 400px;
+  overflow: auto;
+
+  :deep(.el-card__header) {
+    background-color: var(--bg-tertiary);
+    border-bottom-color: var(--border-color);
+    color: var(--text-primary);
+    padding: 12px 16px;
+  }
+
+  :deep(.el-card__body) {
+    background-color: var(--bg-card-solid);
+    padding: 12px;
+  }
+
+  .panel-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+
+    .panel-actions {
+      display: flex;
+      gap: 8px;
+    }
+  }
+
+  .no-points {
+    padding: 20px 0;
+    text-align: center;
+  }
+
+  .points-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .point-item {
+    position: relative;
+    padding: 10px 12px;
+    border-radius: 6px;
+    background-color: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+
+    &:hover .point-actions {
+      opacity: 1;
+    }
+
+    &.power {
+      border-left: 3px solid var(--error-color);
+    }
+
+    &.current {
+      border-left: 3px solid var(--warning-color);
+    }
+
+    &.energy {
+      border-left: 3px solid var(--success-color);
+    }
+
+    &.voltage {
+      border-left: 3px solid var(--primary-color);
+    }
+
+    .point-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 6px;
+    }
+
+    .point-name {
+      font-weight: 500;
+      color: var(--text-primary);
+      font-size: 13px;
+    }
+
+    .point-value {
+      display: flex;
+      align-items: baseline;
+      gap: 4px;
+      margin-bottom: 4px;
+
+      .value {
+        font-size: 18px;
+        font-weight: bold;
+        color: var(--primary-color);
+
+        &.offline {
+          color: var(--text-secondary);
+        }
+      }
+
+      .unit {
+        font-size: 12px;
+        color: var(--text-secondary);
+        margin-left: 2px;
+      }
+    }
+
+    .point-code {
+      font-size: 11px;
+      color: var(--text-secondary);
+      font-family: monospace;
+    }
+
+    .point-actions {
+      position: absolute;
+      right: 8px;
+      top: 50%;
+      transform: translateY(-50%);
+      opacity: 0;
+      transition: opacity 0.2s;
+      display: flex;
+      gap: 4px;
+      background-color: var(--bg-tertiary);
+      padding: 4px;
+      border-radius: 4px;
+    }
+  }
 }
 
 // 右键菜单

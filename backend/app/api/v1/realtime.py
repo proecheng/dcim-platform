@@ -2,7 +2,7 @@
 实时数据 API - v1
 """
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Optional, List
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -205,169 +205,6 @@ async def get_dashboard_data(
     }
 
 
-@router.get("/{point_id}", response_model=RealtimeData, summary="获取单个点位实时数据")
-async def get_point_realtime(
-    point_id: int,
-    db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_viewer)
-):
-    """
-    获取单个点位的实时数据
-    """
-    result = await db.execute(
-        select(Point, PointRealtime).join(
-            PointRealtime, Point.id == PointRealtime.point_id
-        ).where(Point.id == point_id)
-    )
-    row = result.first()
-
-    if not row:
-        raise HTTPException(status_code=404, detail="点位不存在")
-
-    point, realtime = row
-    return RealtimeData(
-        point_id=point.id,
-        point_code=point.point_code,
-        point_name=point.point_name,
-        point_type=point.point_type,
-        device_type=point.device_type,
-        area_code=point.area_code,
-        value=realtime.value,
-        value_text=realtime.value_text,
-        unit=point.unit,
-        quality=realtime.quality,
-        status=realtime.status,
-        alarm_level=realtime.alarm_level,
-        updated_at=realtime.updated_at
-    )
-
-
-@router.get("/by-type/{point_type}", summary="按类型获取实时数据")
-async def get_realtime_by_type(
-    point_type: str,
-    db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_viewer)
-):
-    """
-    按点位类型获取实时数据
-    """
-    if point_type not in ["AI", "DI", "AO", "DO"]:
-        raise HTTPException(status_code=400, detail="无效的点位类型")
-
-    query = select(Point, PointRealtime).join(
-        PointRealtime, Point.id == PointRealtime.point_id
-    ).where(Point.is_enabled == True, Point.point_type == point_type)
-
-    result = await db.execute(query)
-    rows = result.all()
-
-    return [
-        RealtimeData(
-            point_id=point.id,
-            point_code=point.point_code,
-            point_name=point.point_name,
-            point_type=point.point_type,
-            device_type=point.device_type,
-            area_code=point.area_code,
-            value=realtime.value,
-            value_text=realtime.value_text,
-            unit=point.unit,
-            quality=realtime.quality,
-            status=realtime.status,
-            alarm_level=realtime.alarm_level,
-            updated_at=realtime.updated_at
-        ) for point, realtime in rows
-    ]
-
-
-@router.get("/by-area/{area_code}", summary="按区域获取实时数据")
-async def get_realtime_by_area(
-    area_code: str,
-    db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_viewer)
-):
-    """
-    按区域获取实时数据
-    """
-    query = select(Point, PointRealtime).join(
-        PointRealtime, Point.id == PointRealtime.point_id
-    ).where(Point.is_enabled == True, Point.area_code == area_code)
-
-    result = await db.execute(query)
-    rows = result.all()
-
-    return [
-        RealtimeData(
-            point_id=point.id,
-            point_code=point.point_code,
-            point_name=point.point_name,
-            point_type=point.point_type,
-            device_type=point.device_type,
-            area_code=point.area_code,
-            value=realtime.value,
-            value_text=realtime.value_text,
-            unit=point.unit,
-            quality=realtime.quality,
-            status=realtime.status,
-            alarm_level=realtime.alarm_level,
-            updated_at=realtime.updated_at
-        ) for point, realtime in rows
-    ]
-
-
-@router.post("/control/{point_id}", summary="下发控制指令")
-async def send_control_command(
-    point_id: int,
-    command: ControlCommand,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_operator)
-):
-    """
-    向AO/DO点位下发控制指令
-    """
-    result = await db.execute(select(Point).where(Point.id == point_id))
-    point = result.scalar_one_or_none()
-
-    if not point:
-        raise HTTPException(status_code=404, detail="点位不存在")
-
-    if point.point_type not in ["AO", "DO"]:
-        raise HTTPException(status_code=400, detail="该点位不支持控制操作")
-
-    if not point.is_enabled:
-        raise HTTPException(status_code=400, detail="点位已禁用")
-
-    # 记录操作日志
-    from ...models.log import OperationLog
-    log = OperationLog(
-        user_id=current_user.id,
-        username=current_user.username,
-        module="realtime",
-        action="control",
-        target_type="point",
-        target_id=point_id,
-        target_name=point.point_name,
-        new_value=str(command.value),
-        remark=command.remark
-    )
-    db.add(log)
-
-    # 更新实时值（模拟控制）
-    await db.execute(
-        update(PointRealtime).where(PointRealtime.point_id == point_id).values(
-            value=command.value,
-            updated_at=datetime.now()
-        )
-    )
-    await db.commit()
-
-    return {
-        "message": "控制指令已下发",
-        "point_code": point.point_code,
-        "value": command.value
-    }
-
-
 # ==================== V2.3 能源仪表盘 ====================
 
 @router.get("/energy-dashboard", summary="获取能源仪表盘数据")
@@ -410,7 +247,7 @@ async def get_energy_dashboard(
     today = datetime.now().date()
     today_result = await db.execute(
         select(func.sum(EnergyDaily.total_energy)).where(
-            EnergyDaily.date == today
+            EnergyDaily.stat_date == today
         )
     )
     realtime["today_energy"] = today_result.scalar() or 0
@@ -419,7 +256,7 @@ async def get_energy_dashboard(
     month_start = today.replace(day=1)
     month_result = await db.execute(
         select(func.sum(EnergyDaily.total_energy)).where(
-            EnergyDaily.date >= month_start
+            EnergyDaily.stat_date >= month_start
         )
     )
     realtime["month_energy"] = month_result.scalar() or 0
@@ -591,3 +428,168 @@ async def get_energy_dashboard(
         "trends": trends,
         "update_time": datetime.now().isoformat()
     }
+
+
+@router.get("/{point_id}", response_model=RealtimeData, summary="获取单个点位实时数据")
+async def get_point_realtime(
+    point_id: int,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_viewer)
+):
+    """
+    获取单个点位的实时数据
+    """
+    result = await db.execute(
+        select(Point, PointRealtime).join(
+            PointRealtime, Point.id == PointRealtime.point_id
+        ).where(Point.id == point_id)
+    )
+    row = result.first()
+
+    if not row:
+        raise HTTPException(status_code=404, detail="点位不存在")
+
+    point, realtime = row
+    return RealtimeData(
+        point_id=point.id,
+        point_code=point.point_code,
+        point_name=point.point_name,
+        point_type=point.point_type,
+        device_type=point.device_type,
+        area_code=point.area_code,
+        value=realtime.value,
+        value_text=realtime.value_text,
+        unit=point.unit,
+        quality=realtime.quality,
+        status=realtime.status,
+        alarm_level=realtime.alarm_level,
+        updated_at=realtime.updated_at
+    )
+
+
+@router.get("/by-type/{point_type}", summary="按类型获取实时数据")
+async def get_realtime_by_type(
+    point_type: str,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_viewer)
+):
+    """
+    按点位类型获取实时数据
+    """
+    if point_type not in ["AI", "DI", "AO", "DO"]:
+        raise HTTPException(status_code=400, detail="无效的点位类型")
+
+    query = select(Point, PointRealtime).join(
+        PointRealtime, Point.id == PointRealtime.point_id
+    ).where(Point.is_enabled == True, Point.point_type == point_type)
+
+    result = await db.execute(query)
+    rows = result.all()
+
+    return [
+        RealtimeData(
+            point_id=point.id,
+            point_code=point.point_code,
+            point_name=point.point_name,
+            point_type=point.point_type,
+            device_type=point.device_type,
+            area_code=point.area_code,
+            value=realtime.value,
+            value_text=realtime.value_text,
+            unit=point.unit,
+            quality=realtime.quality,
+            status=realtime.status,
+            alarm_level=realtime.alarm_level,
+            updated_at=realtime.updated_at
+        ) for point, realtime in rows
+    ]
+
+
+@router.get("/by-area/{area_code}", summary="按区域获取实时数据")
+async def get_realtime_by_area(
+    area_code: str,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_viewer)
+):
+    """
+    按区域获取实时数据
+    """
+    query = select(Point, PointRealtime).join(
+        PointRealtime, Point.id == PointRealtime.point_id
+    ).where(Point.is_enabled == True, Point.area_code == area_code)
+
+    result = await db.execute(query)
+    rows = result.all()
+
+    return [
+        RealtimeData(
+            point_id=point.id,
+            point_code=point.point_code,
+            point_name=point.point_name,
+            point_type=point.point_type,
+            device_type=point.device_type,
+            area_code=point.area_code,
+            value=realtime.value,
+            value_text=realtime.value_text,
+            unit=point.unit,
+            quality=realtime.quality,
+            status=realtime.status,
+            alarm_level=realtime.alarm_level,
+            updated_at=realtime.updated_at
+        ) for point, realtime in rows
+    ]
+
+
+@router.post("/control/{point_id}", summary="下发控制指令")
+async def send_control_command(
+    point_id: int,
+    command: ControlCommand,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_operator)
+):
+    """
+    向AO/DO点位下发控制指令
+    """
+    result = await db.execute(select(Point).where(Point.id == point_id))
+    point = result.scalar_one_or_none()
+
+    if not point:
+        raise HTTPException(status_code=404, detail="点位不存在")
+
+    if point.point_type not in ["AO", "DO"]:
+        raise HTTPException(status_code=400, detail="该点位不支持控制操作")
+
+    if not point.is_enabled:
+        raise HTTPException(status_code=400, detail="点位已禁用")
+
+    # 记录操作日志
+    from ...models.log import OperationLog
+    log = OperationLog(
+        user_id=current_user.id,
+        username=current_user.username,
+        module="realtime",
+        action="control",
+        target_type="point",
+        target_id=point_id,
+        target_name=point.point_name,
+        new_value=str(command.value),
+        remark=command.remark
+    )
+    db.add(log)
+
+    # 更新实时值（模拟控制）
+    await db.execute(
+        update(PointRealtime).where(PointRealtime.point_id == point_id).values(
+            value=command.value,
+            updated_at=datetime.now()
+        )
+    )
+    await db.commit()
+
+    return {
+        "message": "控制指令已下发",
+        "point_code": point.point_code,
+        "value": command.value
+    }
+
+# reload trigger

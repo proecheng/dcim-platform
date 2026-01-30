@@ -13,10 +13,22 @@ from ..core.database import async_session, init_db
 from ..models import Point, PointRealtime, PointHistory, AlarmThreshold, PUEHistory, FloorMap
 from ..models.energy import (
     Transformer, MeterPoint, DistributionPanel, DistributionCircuit,
-    PowerDevice, EnergyHourly, EnergyDaily, ElectricityPricing, Demand15MinData
+    PowerDevice, EnergyHourly, EnergyDaily, EnergyMonthly, ElectricityPricing,
+    Demand15MinData, PricingConfig, PowerCurveData, DemandHistory, OverDemandEvent,
+    DeviceLoadProfile, DeviceShiftConfig, EnergySuggestion, LoadRegulationConfig,
+    RegulationHistory, DemandAnalysisRecord, EnergySavingProposal, ProposalMeasure,
+    MeasureExecutionLog, EnergyOpportunity, OpportunityMeasure, ExecutionPlan,
+    ExecutionTask, ExecutionResult, DispatchableDevice, StorageSystemConfig,
+    PVSystemConfig, DispatchSchedule, RealtimeMonitoring, MonthlyStatistics,
+    OptimizationResult
 )
+from ..models.alarm import Alarm
 from ..data.building_points import get_all_points, get_threshold_for_point
 from .floor_map_generator import FloorMapGenerator, FLOOR_CONFIG
+from .point_device_matcher import PointDeviceMatcher
+
+import logging
+logger = logging.getLogger(__name__)
 
 
 # 配电系统配置数据
@@ -32,6 +44,7 @@ METER_POINTS = [
 ]
 
 DISTRIBUTION_PANELS = [
+    # 原有配电柜
     {"panel_code": "MDP-001", "panel_name": "主配电柜", "panel_type": "main", "rated_current": 2000, "location": "配电室A", "area_code": "A1", "meter_point_code": "M001"},
     {"panel_code": "ATS-001", "panel_name": "ATS切换柜", "panel_type": "sub", "rated_current": 1600, "location": "配电室A", "area_code": "A1", "parent_code": "MDP-001", "meter_point_code": "M001"},
     {"panel_code": "UPS-IN-001", "panel_name": "UPS输入柜", "panel_type": "ups_input", "rated_current": 800, "location": "UPS室", "area_code": "A1", "parent_code": "ATS-001", "meter_point_code": "M001"},
@@ -39,30 +52,98 @@ DISTRIBUTION_PANELS = [
     {"panel_code": "PDU-A1-001", "panel_name": "A1区列头柜1", "panel_type": "sub", "rated_current": 250, "location": "机房A1区", "area_code": "A1", "parent_code": "UPS-OUT-001", "meter_point_code": "M002"},
     {"panel_code": "PDU-A1-002", "panel_name": "A1区列头柜2", "panel_type": "sub", "rated_current": 250, "location": "机房A1区", "area_code": "A1", "parent_code": "UPS-OUT-001", "meter_point_code": "M002"},
     {"panel_code": "AC-PANEL-001", "panel_name": "空调配电柜", "panel_type": "sub", "rated_current": 400, "location": "配电室B", "area_code": "B1", "parent_code": "MDP-001", "meter_point_code": "M003"},
+    # 新增: B1制冷系统配电柜
+    {"panel_code": "COOLING-PANEL-001", "panel_name": "制冷系统配电柜", "panel_type": "sub", "rated_current": 800, "location": "B1制冷机房", "area_code": "B1", "meter_point_code": "M003"},
+    # 新增: F1楼层配电柜
+    {"panel_code": "F1-PANEL-001", "panel_name": "F1配电柜", "panel_type": "sub", "rated_current": 500, "location": "F1机房", "area_code": "F1", "parent_code": "UPS-OUT-001", "meter_point_code": "M002"},
+    # 新增: F2楼层配电柜
+    {"panel_code": "F2-PANEL-001", "panel_name": "F2配电柜", "panel_type": "sub", "rated_current": 400, "location": "F2机房", "area_code": "F2", "parent_code": "UPS-OUT-001", "meter_point_code": "M002"},
+    # 新增: F3楼层配电柜
+    {"panel_code": "F3-PANEL-001", "panel_name": "F3配电柜", "panel_type": "sub", "rated_current": 300, "location": "F3机房", "area_code": "F3", "parent_code": "UPS-OUT-001", "meter_point_code": "M002"},
 ]
 
 DISTRIBUTION_CIRCUITS = [
+    # 原有回路
     {"circuit_code": "C-A1-01", "circuit_name": "A1机柜列1回路", "panel_code": "PDU-A1-001", "load_type": "IT", "rated_current": 63, "is_shiftable": False},
     {"circuit_code": "C-A1-02", "circuit_name": "A1机柜列2回路", "panel_code": "PDU-A1-001", "load_type": "IT", "rated_current": 63, "is_shiftable": False},
     {"circuit_code": "C-A1-03", "circuit_name": "A1机柜列3回路", "panel_code": "PDU-A1-002", "load_type": "IT", "rated_current": 63, "is_shiftable": False},
     {"circuit_code": "C-AC-01", "circuit_name": "精密空调1回路", "panel_code": "AC-PANEL-001", "load_type": "AC", "rated_current": 100, "is_shiftable": True, "shift_priority": 1},
     {"circuit_code": "C-AC-02", "circuit_name": "精密空调2回路", "panel_code": "AC-PANEL-001", "load_type": "AC", "rated_current": 100, "is_shiftable": True, "shift_priority": 2},
     {"circuit_code": "C-LIGHT", "circuit_name": "照明回路", "panel_code": "MDP-001", "load_type": "LIGHT", "rated_current": 32, "is_shiftable": True, "shift_priority": 3},
+    # 新增: B1制冷系统回路
+    {"circuit_code": "C-CH-01", "circuit_name": "冷水机组回路", "panel_code": "COOLING-PANEL-001", "load_type": "AC", "rated_current": 400, "is_shiftable": True, "shift_priority": 4},
+    {"circuit_code": "C-CT-01", "circuit_name": "冷却塔回路", "panel_code": "COOLING-PANEL-001", "load_type": "AC", "rated_current": 100, "is_shiftable": True, "shift_priority": 5},
+    {"circuit_code": "C-CHWP-01", "circuit_name": "冷冻水泵回路", "panel_code": "COOLING-PANEL-001", "load_type": "AC", "rated_current": 80, "is_shiftable": True, "shift_priority": 6},
+    {"circuit_code": "C-CWP-01", "circuit_name": "冷却水泵回路", "panel_code": "COOLING-PANEL-001", "load_type": "AC", "rated_current": 80, "is_shiftable": True, "shift_priority": 7},
+    # 新增: F1楼层回路
+    {"circuit_code": "C-F1-UPS-01", "circuit_name": "F1 UPS回路", "panel_code": "F1-PANEL-001", "load_type": "UPS", "rated_current": 200, "is_shiftable": False},
+    {"circuit_code": "C-F1-AC-01", "circuit_name": "F1空调回路", "panel_code": "F1-PANEL-001", "load_type": "AC", "rated_current": 200, "is_shiftable": True, "shift_priority": 8},
+    # 新增: F2楼层回路
+    {"circuit_code": "C-F2-UPS-01", "circuit_name": "F2 UPS回路", "panel_code": "F2-PANEL-001", "load_type": "UPS", "rated_current": 200, "is_shiftable": False},
+    {"circuit_code": "C-F2-AC-01", "circuit_name": "F2空调回路", "panel_code": "F2-PANEL-001", "load_type": "AC", "rated_current": 200, "is_shiftable": True, "shift_priority": 9},
+    # 新增: F3楼层回路
+    {"circuit_code": "C-F3-UPS-01", "circuit_name": "F3 UPS回路", "panel_code": "F3-PANEL-001", "load_type": "UPS", "rated_current": 100, "is_shiftable": False},
+    {"circuit_code": "C-F3-AC-01", "circuit_name": "F3空调回路", "panel_code": "F3-PANEL-001", "load_type": "AC", "rated_current": 100, "is_shiftable": True, "shift_priority": 10},
 ]
 
 POWER_DEVICES = [
+    # 原有IT设备
     {"device_code": "SRV-001", "device_name": "服务器机柜1", "device_type": "IT", "rated_power": 20, "is_it_load": True, "area_code": "A1", "circuit_code": "C-A1-01"},
     {"device_code": "SRV-002", "device_name": "服务器机柜2", "device_type": "IT", "rated_power": 20, "is_it_load": True, "area_code": "A1", "circuit_code": "C-A1-01"},
     {"device_code": "SRV-003", "device_name": "服务器机柜3", "device_type": "IT", "rated_power": 25, "is_it_load": True, "area_code": "A1", "circuit_code": "C-A1-02"},
     {"device_code": "SRV-004", "device_name": "服务器机柜4", "device_type": "IT", "rated_power": 25, "is_it_load": True, "area_code": "A1", "circuit_code": "C-A1-02"},
     {"device_code": "NET-001", "device_name": "网络机柜1", "device_type": "IT", "rated_power": 10, "is_it_load": True, "area_code": "A1", "circuit_code": "C-A1-03"},
     {"device_code": "STO-001", "device_name": "存储机柜1", "device_type": "IT", "rated_power": 30, "is_it_load": True, "area_code": "A1", "circuit_code": "C-A1-03"},
+    # 原有UPS
     {"device_code": "UPS-001", "device_name": "UPS主机1", "device_type": "UPS", "rated_power": 200, "is_it_load": False, "area_code": "A1"},
     {"device_code": "UPS-002", "device_name": "UPS主机2", "device_type": "UPS", "rated_power": 200, "is_it_load": False, "area_code": "A1"},
+    # 原有空调
     {"device_code": "AC-001", "device_name": "精密空调1", "device_type": "AC", "rated_power": 50, "is_it_load": False, "area_code": "B1", "circuit_code": "C-AC-01"},
     {"device_code": "AC-002", "device_name": "精密空调2", "device_type": "AC", "rated_power": 50, "is_it_load": False, "area_code": "B1", "circuit_code": "C-AC-02"},
     {"device_code": "AC-003", "device_name": "精密空调3", "device_type": "AC", "rated_power": 45, "is_it_load": False, "area_code": "B1", "circuit_code": "C-AC-02"},
+    # 原有照明
     {"device_code": "LIGHT-001", "device_name": "机房照明", "device_type": "LIGHT", "rated_power": 5, "is_it_load": False, "area_code": "A1", "circuit_code": "C-LIGHT"},
+
+    # ===== 新增: B1制冷系统设备 (与点位B1_CH_*, B1_CT_*, B1_CHWP_*, B1_CWP_*对应) =====
+    # 冷水机组 (对应点位: B1_CH_AI_001~006, B1_CH_AI_011~016)
+    {"device_code": "CH-001", "device_name": "1#冷水机组", "device_type": "CHILLER", "rated_power": 350, "is_it_load": False, "area_code": "B1", "circuit_code": "C-CH-01"},
+    {"device_code": "CH-002", "device_name": "2#冷水机组", "device_type": "CHILLER", "rated_power": 350, "is_it_load": False, "area_code": "B1", "circuit_code": "C-CH-01"},
+    # 冷却塔 (对应点位: B1_CT_AI_001~004)
+    {"device_code": "CT-001", "device_name": "1#冷却塔", "device_type": "CT", "rated_power": 30, "is_it_load": False, "area_code": "B1", "circuit_code": "C-CT-01"},
+    {"device_code": "CT-002", "device_name": "2#冷却塔", "device_type": "CT", "rated_power": 30, "is_it_load": False, "area_code": "B1", "circuit_code": "C-CT-01"},
+    # 冷冻水泵 (对应点位: B1_CHWP_AI_001~004)
+    {"device_code": "CHWP-001", "device_name": "1#冷冻水泵", "device_type": "PUMP", "rated_power": 45, "is_it_load": False, "area_code": "B1", "circuit_code": "C-CHWP-01"},
+    {"device_code": "CHWP-002", "device_name": "2#冷冻水泵", "device_type": "PUMP", "rated_power": 45, "is_it_load": False, "area_code": "B1", "circuit_code": "C-CHWP-01"},
+    # 冷却水泵 (对应点位: B1_CWP_AI_001~004)
+    {"device_code": "CWP-001", "device_name": "1#冷却水泵", "device_type": "PUMP", "rated_power": 37, "is_it_load": False, "area_code": "B1", "circuit_code": "C-CWP-01"},
+    {"device_code": "CWP-002", "device_name": "2#冷却水泵", "device_type": "PUMP", "rated_power": 37, "is_it_load": False, "area_code": "B1", "circuit_code": "C-CWP-01"},
+
+    # ===== 新增: F1楼层设备 (与点位F1_UPS_*, F1_AC_*对应) =====
+    # F1 UPS (对应点位: F1_UPS_AI_0011~0015, F1_UPS_AI_0021~0025)
+    {"device_code": "F1-UPS-001", "device_name": "F1 UPS-1", "device_type": "UPS", "rated_power": 100, "is_it_load": False, "area_code": "F1", "circuit_code": "C-F1-UPS-01"},
+    {"device_code": "F1-UPS-002", "device_name": "F1 UPS-2", "device_type": "UPS", "rated_power": 100, "is_it_load": False, "area_code": "F1", "circuit_code": "C-F1-UPS-01"},
+    # F1精密空调 (对应点位: F1_AC_AI_0011~0013, F1_AC_AI_0021~0023, etc.)
+    {"device_code": "F1-AC-001", "device_name": "F1 精密空调-1", "device_type": "AC", "rated_power": 30, "is_it_load": False, "area_code": "F1", "circuit_code": "C-F1-AC-01"},
+    {"device_code": "F1-AC-002", "device_name": "F1 精密空调-2", "device_type": "AC", "rated_power": 30, "is_it_load": False, "area_code": "F1", "circuit_code": "C-F1-AC-01"},
+    {"device_code": "F1-AC-003", "device_name": "F1 精密空调-3", "device_type": "AC", "rated_power": 30, "is_it_load": False, "area_code": "F1", "circuit_code": "C-F1-AC-01"},
+    {"device_code": "F1-AC-004", "device_name": "F1 精密空调-4", "device_type": "AC", "rated_power": 30, "is_it_load": False, "area_code": "F1", "circuit_code": "C-F1-AC-01"},
+
+    # ===== 新增: F2楼层设备 (与点位F2_UPS_*, F2_AC_*对应) =====
+    # F2 UPS (对应点位: F2_UPS_AI_0011~0015, F2_UPS_AI_0021~0025)
+    {"device_code": "F2-UPS-001", "device_name": "F2 UPS-1", "device_type": "UPS", "rated_power": 100, "is_it_load": False, "area_code": "F2", "circuit_code": "C-F2-UPS-01"},
+    {"device_code": "F2-UPS-002", "device_name": "F2 UPS-2", "device_type": "UPS", "rated_power": 100, "is_it_load": False, "area_code": "F2", "circuit_code": "C-F2-UPS-01"},
+    # F2精密空调 (对应点位: F2_AC_AI_0011~0013, etc.)
+    {"device_code": "F2-AC-001", "device_name": "F2 精密空调-1", "device_type": "AC", "rated_power": 30, "is_it_load": False, "area_code": "F2", "circuit_code": "C-F2-AC-01"},
+    {"device_code": "F2-AC-002", "device_name": "F2 精密空调-2", "device_type": "AC", "rated_power": 30, "is_it_load": False, "area_code": "F2", "circuit_code": "C-F2-AC-01"},
+    {"device_code": "F2-AC-003", "device_name": "F2 精密空调-3", "device_type": "AC", "rated_power": 30, "is_it_load": False, "area_code": "F2", "circuit_code": "C-F2-AC-01"},
+    {"device_code": "F2-AC-004", "device_name": "F2 精密空调-4", "device_type": "AC", "rated_power": 30, "is_it_load": False, "area_code": "F2", "circuit_code": "C-F2-AC-01"},
+
+    # ===== 新增: F3楼层设备 (与点位F3_UPS_*, F3_AC_*对应) =====
+    # F3 UPS (对应点位: F3_UPS_AI_0011~0015)
+    {"device_code": "F3-UPS-001", "device_name": "F3 UPS-1", "device_type": "UPS", "rated_power": 60, "is_it_load": False, "area_code": "F3", "circuit_code": "C-F3-UPS-01"},
+    # F3精密空调 (对应点位: F3_AC_AI_0011~0013, F3_AC_AI_0021~0023)
+    {"device_code": "F3-AC-001", "device_name": "F3 精密空调-1", "device_type": "AC", "rated_power": 20, "is_it_load": False, "area_code": "F3", "circuit_code": "C-F3-AC-01"},
+    {"device_code": "F3-AC-002", "device_name": "F3 精密空调-2", "device_type": "AC", "rated_power": 20, "is_it_load": False, "area_code": "F3", "circuit_code": "C-F3-AC-01"},
 ]
 
 ELECTRICITY_PRICING = [
@@ -98,13 +179,14 @@ class DemoDataService:
             point_count = result.scalar() or 0
 
             # 检查是否有模拟数据标记
-            # 演示数据点位编码以B1_/F1_/F2_/F3_开头
+            # 演示数据点位编码以B1_/F1_/F2_/F3_/A1_开头
             result = await session.execute(
                 select(func.count(Point.id)).where(
                     Point.point_code.like("B1_%") |
                     Point.point_code.like("F1_%") |
                     Point.point_code.like("F2_%") |
-                    Point.point_code.like("F3_%")
+                    Point.point_code.like("F3_%") |
+                    Point.point_code.like("A1_%")
                 )
             )
             demo_point_count = result.scalar() or 0
@@ -113,6 +195,18 @@ class DemoDataService:
             result = await session.execute(select(func.count(PointHistory.id)))
             history_count = result.scalar() or 0
 
+            # 检查配电设备数量
+            result = await session.execute(select(func.count(PowerDevice.id)))
+            device_count = result.scalar() or 0
+
+            # 检查设备与点位关联状态
+            result = await session.execute(
+                select(func.count(PowerDevice.id)).where(
+                    PowerDevice.power_point_id.isnot(None)
+                )
+            )
+            linked_device_count = result.scalar() or 0
+
             self.is_loaded = demo_point_count > 300
 
             return {
@@ -120,6 +214,9 @@ class DemoDataService:
                 "point_count": point_count,
                 "demo_point_count": demo_point_count,
                 "history_count": history_count,
+                "device_count": device_count,
+                "linked_device_count": linked_device_count,
+                "sync_status": "synced" if linked_device_count > 0 else "not_synced",
                 "loading": self.loading,
                 "progress": self.progress,
                 "progress_message": self.progress_message
@@ -187,6 +284,54 @@ class DemoDataService:
 
             except Exception as e:
                 self._update_progress(0, f"加载失败: {str(e)}", progress_callback)
+                return {"success": False, "message": str(e)}
+            finally:
+                self.loading = False
+
+    async def sync_device_point_relations(self) -> dict:
+        """
+        同步配电设备与点位的关联关系（双向同步）
+        这个方法可以在系统运行时调用，用于修复或更新关联关系
+        """
+        if self._lock.locked():
+            return {"success": False, "message": "正在操作中，请稍候"}
+
+        async with self._lock:
+            self.loading = True
+            self.progress = 0
+            self.progress_message = "开始同步..."
+
+            try:
+                async with async_session() as session:
+                    # 使用新的智能匹配引擎执行完整双向同步
+                    self._update_progress(10, "执行双向同步...")
+                    result = await PointDeviceMatcher.full_sync(session)
+
+                    self._update_progress(100, "同步完成")
+
+                    # 输出同步统计日志
+                    stats = result.get("statistics", {})
+                    logger.info(
+                        f"设备点位同步完成: "
+                        f"更新 {result['updated_devices']} 个设备, "
+                        f"{result['updated_points']} 个点位关联, "
+                        f"设备关联率 {stats.get('device_link_rate', 0)}%, "
+                        f"点位关联率 {stats.get('point_link_rate', 0)}%"
+                    )
+
+                    return {
+                        "success": True,
+                        "message": f"同步完成，更新了 {result['updated_devices']} 个设备关联，{result['updated_points']} 个点位反向关联",
+                        "total_devices": stats.get("total_devices", 0),
+                        "linked_devices": stats.get("linked_devices", 0),
+                        "updated_count": result["updated_devices"],
+                        "updated_points": result["updated_points"],
+                        "statistics": stats
+                    }
+
+            except Exception as e:
+                self._update_progress(0, f"同步失败: {str(e)}")
+                logger.error(f"设备点位同步失败: {str(e)}")
                 return {"success": False, "message": str(e)}
             finally:
                 self.loading = False
@@ -275,24 +420,27 @@ class DemoDataService:
                 self.loading = False
 
     async def _clear_demo_data(self):
-        """清理演示数据"""
+        """清理演示数据 - 清理所有相关表"""
         async with async_session() as session:
-            # 获取演示点位ID
+            # ========== 清理点位相关数据 ==========
+            # 注意：演示系统中，历史数据都是由演示数据生成器创建的，所以全部清除
+
+            # 删除所有历史数据（演示数据产生的）
+            await session.execute(delete(PointHistory))
+
+            # 获取演示点位ID (包含新增的A1_开头的点位)
             result = await session.execute(
                 select(Point.id).where(
                     Point.point_code.like("B1_%") |
                     Point.point_code.like("F1_%") |
                     Point.point_code.like("F2_%") |
-                    Point.point_code.like("F3_%")
+                    Point.point_code.like("F3_%") |
+                    Point.point_code.like("A1_%")
                 )
             )
             demo_point_ids = [r[0] for r in result.fetchall()]
 
             if demo_point_ids:
-                # 删除相关历史数据
-                await session.execute(
-                    delete(PointHistory).where(PointHistory.point_id.in_(demo_point_ids))
-                )
                 # 删除告警阈值
                 await session.execute(
                     delete(AlarmThreshold).where(AlarmThreshold.point_id.in_(demo_point_ids))
@@ -306,21 +454,68 @@ class DemoDataService:
                     delete(Point).where(Point.id.in_(demo_point_ids))
                 )
 
-            # 删除PUE历史
+            # ========== 清理告警数据（模拟器产生的）==========
+            await session.execute(delete(Alarm))
+
+            # ========== 清理能源管理相关数据（按依赖顺序删除）==========
+
+            # 1. 清理执行相关表（最底层）
+            await session.execute(delete(ExecutionResult))
+            await session.execute(delete(ExecutionTask))
+            await session.execute(delete(ExecutionPlan))
+
+            # 2. 清理措施相关表
+            await session.execute(delete(MeasureExecutionLog))
+            await session.execute(delete(OpportunityMeasure))
+            await session.execute(delete(ProposalMeasure))
+
+            # 3. 清理方案/机会表
+            await session.execute(delete(EnergyOpportunity))
+            await session.execute(delete(EnergySavingProposal))
+            await session.execute(delete(EnergySuggestion))
+
+            # 4. 清理调节/调度表
+            await session.execute(delete(RegulationHistory))
+            await session.execute(delete(LoadRegulationConfig))
+            await session.execute(delete(DispatchSchedule))
+            await session.execute(delete(DispatchableDevice))
+
+            # 5. 清理需量分析表
+            await session.execute(delete(DemandAnalysisRecord))
+            await session.execute(delete(Demand15MinData))
+            await session.execute(delete(OverDemandEvent))
+            await session.execute(delete(DemandHistory))
+
+            # 6. 清理设备负荷/曲线表
+            await session.execute(delete(DeviceShiftConfig))
+            await session.execute(delete(DeviceLoadProfile))
+            await session.execute(delete(PowerCurveData))
+
+            # 7. 清理能耗统计表
+            await session.execute(delete(OptimizationResult))
+            await session.execute(delete(MonthlyStatistics))
+            await session.execute(delete(RealtimeMonitoring))
+            await session.execute(delete(EnergyMonthly))
+            await session.execute(delete(EnergyDaily))
+            await session.execute(delete(EnergyHourly))
             await session.execute(delete(PUEHistory))
 
-            # 清理配电系统数据
-            await session.execute(delete(Demand15MinData))
-            await session.execute(delete(EnergyHourly))
-            await session.execute(delete(EnergyDaily))
+            # 8. 清理电价配置表
+            await session.execute(delete(PricingConfig))
             await session.execute(delete(ElectricityPricing))
+
+            # 9. 清理系统配置表
+            await session.execute(delete(StorageSystemConfig))
+            await session.execute(delete(PVSystemConfig))
+
+            # 10. 清理配电系统（按层级顺序删除）
             await session.execute(delete(PowerDevice))
             await session.execute(delete(DistributionCircuit))
             await session.execute(delete(DistributionPanel))
             await session.execute(delete(MeterPoint))
             await session.execute(delete(Transformer))
 
-            # 清理楼层图数据
+            # 11. 清理楼层图数据
             await session.execute(delete(FloorMap))
 
             await session.commit()
@@ -382,7 +577,7 @@ class DemoDataService:
             return total_created
 
     async def _create_distribution_system(self, progress_callback):
-        """创建配电系统数据"""
+        """创建配电系统数据（使用智能匹配引擎，支持双向关联）"""
         async with async_session() as session:
             # 1. 创建变压器
             transformer_map = {}
@@ -433,17 +628,65 @@ class DemoDataService:
                 circuit_map[c["circuit_code"]] = circuit.id
             self._update_progress(42, f"创建 {len(DISTRIBUTION_CIRCUITS)} 个配电回路", progress_callback)
 
-            # 5. 创建用电设备
+            # 5. 先获取所有点位，用于后续关联
+            point_map = await self._build_point_map(session)
+
+            # 6. 创建用电设备并使用智能匹配引擎关联点位
+            linked_count = 0
+            linked_points = 0
+            device_objects = []
+
             for d in POWER_DEVICES:
                 data = d.copy()
                 circuit_code = data.pop("circuit_code", None)
                 if circuit_code and circuit_code in circuit_map:
                     data["circuit_id"] = circuit_map[circuit_code]
+
+                # 使用智能匹配引擎查找匹配的点位
+                point_ids = PointDeviceMatcher.find_matching_points(
+                    d["device_code"],
+                    d["device_name"],
+                    d.get("area_code", ""),
+                    point_map
+                )
+
+                if point_ids["power_point_id"]:
+                    data["power_point_id"] = point_ids["power_point_id"]
+                    linked_count += 1
+                if point_ids["current_point_id"]:
+                    data["current_point_id"] = point_ids["current_point_id"]
+                if point_ids["energy_point_id"]:
+                    data["energy_point_id"] = point_ids["energy_point_id"]
+
                 device = PowerDevice(**data)
                 session.add(device)
-            self._update_progress(44, f"创建 {len(POWER_DEVICES)} 个用电设备", progress_callback)
+                await session.flush()
 
-            # 6. 创建电价配置
+                # 双向同步：设置点位的 energy_device_id
+                point_count = await PointDeviceMatcher.sync_bidirectional_relations(
+                    session,
+                    device.id,
+                    point_ids["power_point_id"],
+                    point_ids["current_point_id"],
+                    point_ids["energy_point_id"],
+                )
+                linked_points += point_count
+
+            self._update_progress(
+                44,
+                f"创建 {len(POWER_DEVICES)} 个用电设备 (关联 {linked_count} 个设备, {linked_points} 个点位)",
+                progress_callback
+            )
+
+            # 输出同步统计日志
+            logger.info(
+                f"配电系统创建完成: "
+                f"{len(POWER_DEVICES)} 个设备, "
+                f"{linked_count} 个设备已关联点位, "
+                f"{linked_points} 个点位反向关联"
+            )
+
+            # 7. 创建电价配置
             for ep in ELECTRICITY_PRICING:
                 pricing = ElectricityPricing(
                     **ep,
@@ -456,6 +699,97 @@ class DemoDataService:
 
             # 保存计量点映射供后续使用
             self._meter_point_map = meter_point_map
+
+    async def _build_point_map(self, session) -> dict:
+        """构建点位映射表，用于设备关联"""
+        result = await session.execute(select(Point))
+        points = result.scalars().all()
+
+        point_map = {}
+        for p in points:
+            point_map[p.point_code] = {
+                "id": p.id,
+                "name": p.point_name,
+                "unit": p.unit
+            }
+        return point_map
+
+    def _find_matching_points(self, device_code: str, device_name: str, area_code: str, point_map: dict) -> dict:
+        """
+        根据设备编码和名称查找匹配的点位
+        返回: {"power_point_id": id, "current_point_id": id, "energy_point_id": id}
+        """
+        result = {
+            "power_point_id": None,
+            "current_point_id": None,
+            "energy_point_id": None
+        }
+
+        # 设备编码到点位前缀的映射规则
+        mapping_rules = {
+            # 服务器机柜 SRV-001~004 -> A1_SRV_AI_001~012
+            "SRV-001": {"prefix": "A1_SRV_AI_", "power": "001", "current": "002", "energy": "003"},
+            "SRV-002": {"prefix": "A1_SRV_AI_", "power": "004", "current": "005", "energy": "006"},
+            "SRV-003": {"prefix": "A1_SRV_AI_", "power": "007", "current": "008", "energy": "009"},
+            "SRV-004": {"prefix": "A1_SRV_AI_", "power": "010", "current": "011", "energy": "012"},
+            # 网络机柜 NET-001 -> A1_NET_AI_001~003
+            "NET-001": {"prefix": "A1_NET_AI_", "power": "001", "current": "002", "energy": "003"},
+            # 存储机柜 STO-001 -> A1_STO_AI_001~003
+            "STO-001": {"prefix": "A1_STO_AI_", "power": "001", "current": "002", "energy": "003"},
+            # UPS主机 UPS-001/002 -> A1_UPS_AI_001~008
+            "UPS-001": {"prefix": "A1_UPS_AI_", "power": "002", "current": "003"},  # 输出功率
+            "UPS-002": {"prefix": "A1_UPS_AI_", "power": "006", "current": "007"},
+            # 照明 LIGHT-001 -> A1_LIGHT_AI_001~003
+            "LIGHT-001": {"prefix": "A1_LIGHT_AI_", "power": "001", "current": "002"},
+            # 冷水机组 CH-001/002 -> B1_CH_AI_005/015 (功率), B1_CH_AI_007/017 (电流)
+            "CH-001": {"prefix": "B1_CH_AI_", "power": "005", "current": "007"},
+            "CH-002": {"prefix": "B1_CH_AI_", "power": "015", "current": "017"},
+            # 冷却塔 CT-001/002 -> B1_CT_AI_005/006 (功率)
+            "CT-001": {"prefix": "B1_CT_AI_", "power": "005"},
+            "CT-002": {"prefix": "B1_CT_AI_", "power": "006"},
+            # 冷冻水泵 CHWP-001/002 -> B1_CHWP_AI_005/006 (功率), B1_CHWP_AI_002/004 (电流)
+            "CHWP-001": {"prefix": "B1_CHWP_AI_", "power": "005", "current": "002"},
+            "CHWP-002": {"prefix": "B1_CHWP_AI_", "power": "006", "current": "004"},
+            # 冷却水泵 CWP-001/002 -> B1_CWP_AI_005/006 (功率), B1_CWP_AI_002/004 (电流)
+            "CWP-001": {"prefix": "B1_CWP_AI_", "power": "005", "current": "002"},
+            "CWP-002": {"prefix": "B1_CWP_AI_", "power": "006", "current": "004"},
+            # F1/F2/F3 UPS -> F*_UPS_AI_*
+            "F1-UPS-001": {"prefix": "F1_UPS_AI_", "power": "0013"},  # 负载率作为功率指标
+            "F1-UPS-002": {"prefix": "F1_UPS_AI_", "power": "0023"},
+            "F2-UPS-001": {"prefix": "F2_UPS_AI_", "power": "0013"},
+            "F2-UPS-002": {"prefix": "F2_UPS_AI_", "power": "0023"},
+            "F3-UPS-001": {"prefix": "F3_UPS_AI_", "power": "0013"},
+            # F1/F2/F3 精密空调使用回风温度点位 (用于状态监控)
+            "F1-AC-001": {"prefix": "F1_AC_AI_", "power": "0011"},
+            "F1-AC-002": {"prefix": "F1_AC_AI_", "power": "0021"},
+            "F1-AC-003": {"prefix": "F1_AC_AI_", "power": "0031"},
+            "F1-AC-004": {"prefix": "F1_AC_AI_", "power": "0041"},
+            "F2-AC-001": {"prefix": "F2_AC_AI_", "power": "0011"},
+            "F2-AC-002": {"prefix": "F2_AC_AI_", "power": "0021"},
+            "F2-AC-003": {"prefix": "F2_AC_AI_", "power": "0031"},
+            "F2-AC-004": {"prefix": "F2_AC_AI_", "power": "0041"},
+            "F3-AC-001": {"prefix": "F3_AC_AI_", "power": "0011"},
+            "F3-AC-002": {"prefix": "F3_AC_AI_", "power": "0021"},
+            # 原有精密空调 AC-001~003 没有专用点位，暂不关联
+        }
+
+        rule = mapping_rules.get(device_code)
+        if rule:
+            prefix = rule["prefix"]
+            if rule.get("power"):
+                point_code = f"{prefix}{rule['power']}"
+                if point_code in point_map:
+                    result["power_point_id"] = point_map[point_code]["id"]
+            if rule.get("current"):
+                point_code = f"{prefix}{rule['current']}"
+                if point_code in point_map:
+                    result["current_point_id"] = point_map[point_code]["id"]
+            if rule.get("energy"):
+                point_code = f"{prefix}{rule['energy']}"
+                if point_code in point_map:
+                    result["energy_point_id"] = point_map[point_code]["id"]
+
+        return result
 
     async def _generate_demand_data(self, progress_callback):
         """生成15分钟需量数据"""

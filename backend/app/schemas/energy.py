@@ -1749,7 +1749,7 @@ class DevicePointConfigCreate(BaseModel):
 
 class DevicePointConfigUpdate(BaseModel):
     """更新设备测点"""
-    point_id: int = Field(..., description="测点ID")
+    point_id: Optional[int] = Field(None, description="测点ID")
     point_name: Optional[str] = Field(None, max_length=100)
     unit: Optional[str] = Field(None)
     description: Optional[str] = Field(None)

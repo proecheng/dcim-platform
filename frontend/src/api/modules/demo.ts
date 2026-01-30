@@ -18,9 +18,9 @@ export function getDemoProgress() {
   return request.get('/v1/demo/progress')
 }
 
-// 卸载演示数据
+// 卸载演示数据 (需要较长超时，因为要删除大量历史数据)
 export function unloadDemoData() {
-  return request.post('/v1/demo/unload')
+  return request.post('/v1/demo/unload', null, { timeout: 60000 })
 }
 
 // 刷新历史数据日期

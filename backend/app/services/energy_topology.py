@@ -235,8 +235,46 @@ class EnergyTopologyService:
             "is_it_load": device.is_it_load,
             "is_critical": device.is_critical,
             "is_metered": device.is_metered,
-            "realtime_data": None
+            "realtime_data": None,
+            "points": []
         }
+
+        # 获取关联的采集点
+        points_result = await db.execute(
+            select(Point)
+            .where(Point.energy_device_id == device.id)
+            .order_by(Point.point_code)
+        )
+        points = points_result.scalars().all()
+
+        # 批量获取所有点位的实时数据（避免 N+1 查询）
+        realtime_map: Dict[int, PointRealtime] = {}
+        if points:
+            point_ids = [pt.id for pt in points]
+            realtime_result = await db.execute(
+                select(PointRealtime).where(PointRealtime.point_id.in_(point_ids))
+            )
+            realtime_map = {r.point_id: r for r in realtime_result.scalars().all()}
+
+        for pt in points:
+            realtime = None
+            rt = realtime_map.get(pt.id)
+            if rt:
+                realtime = {
+                    "value": rt.value,
+                    "status": rt.status,
+                    "updated_at": rt.updated_at.isoformat() if rt.updated_at else None
+                }
+
+            node["points"].append({
+                "id": pt.id,
+                "code": pt.point_code,
+                "name": pt.point_name,
+                "type": "point",
+                "point_type": pt.point_type,
+                "unit": pt.unit,
+                "realtime": realtime
+            })
 
         # 如果设备关联了功率点位，获取实时数据
         if device.power_point_id:
@@ -248,7 +286,7 @@ class EnergyTopologyService:
             if realtime:
                 node["realtime_data"] = {
                     "power": realtime.value,
-                    "update_time": realtime.update_time.isoformat() if realtime.update_time else None
+                    "update_time": realtime.updated_at.isoformat() if realtime.updated_at else None
                 }
 
         return node
@@ -347,6 +385,9 @@ class EnergyTopologyService:
             if "devices" in node:
                 for device in node["devices"]:
                     echarts_node["children"].append(convert_to_echarts_node(device, level + 1))
+            if "points" in node:
+                for point in node["points"]:
+                    echarts_node["children"].append(convert_to_echarts_node(point, level + 1))
 
             return echarts_node
 
@@ -369,11 +410,70 @@ class EnergyTopologyService:
             "meter_point": "#fa8c16",    # 橙色 - 计量点
             "panel": "#1890ff",          # 蓝色 - 配电柜
             "circuit": "#52c41a",        # 绿色 - 回路
-            "device": "#722ed1"          # 紫色 - 设备
+            "device": "#722ed1",         # 紫色 - 设备
+            "point": "#13c2c2"           # 青色 - 采集点
         }
         return colors.get(node_type, "#8c8c8c")
 
     # ==================== CRUD 操作 ====================
+
+    @staticmethod
+    async def _ensure_unique_device_code(
+        db: AsyncSession,
+        device_code: str
+    ) -> str:
+        """
+        确保设备编码唯一，如果已存在则自动生成新编码
+
+        Args:
+            db: 数据库会话
+            device_code: 原始编码
+
+        Returns:
+            唯一的设备编码
+        """
+        import re
+
+        # 检查原始编码是否已存在
+        result = await db.execute(
+            select(PowerDevice).where(PowerDevice.device_code == device_code)
+        )
+        if not result.scalar_one_or_none():
+            # 编码不存在，直接返回
+            return device_code
+
+        # 编码已存在，解析前缀和序号
+        # 支持格式如 AC-004, SRV-001, DEV-123 等
+        match = re.match(r'^([A-Za-z]+-?)(\d+)$', device_code)
+        if match:
+            prefix = match.group(1)
+            # 查找该前缀下的最大序号
+            like_pattern = f"{prefix}%"
+            result = await db.execute(
+                select(PowerDevice.device_code).where(
+                    PowerDevice.device_code.like(like_pattern)
+                )
+            )
+            existing_codes = [row[0] for row in result.fetchall()]
+
+            # 提取最大序号
+            max_seq = 0
+            for code in existing_codes:
+                code_match = re.match(r'^([A-Za-z]+-?)(\d+)$', code)
+                if code_match and code_match.group(1) == prefix:
+                    seq = int(code_match.group(2))
+                    if seq > max_seq:
+                        max_seq = seq
+
+            # 生成新编码
+            new_seq = max_seq + 1
+            # 保持原始编码的数字位数格式
+            num_digits = len(match.group(2))
+            return f"{prefix}{str(new_seq).zfill(num_digits)}"
+        else:
+            # 无法解析格式，添加时间戳后缀
+            timestamp = datetime.now().strftime('%H%M%S')
+            return f"{device_code}_{timestamp}"
 
     @staticmethod
     async def create_node(
@@ -499,8 +599,13 @@ class EnergyTopologyService:
             if not data.device_name:
                 raise ValueError("设备名称不能为空")
 
+            # 检查编码是否已存在，如果存在则自动生成唯一编码
+            device_code = await EnergyTopologyService._ensure_unique_device_code(
+                db, data.device_code
+            )
+
             node = PowerDevice(
-                device_code=data.device_code,
+                device_code=device_code,
                 device_name=data.device_name,
                 device_type=data.device_type or "OTHER",
                 rated_power=data.rated_power,
@@ -715,6 +820,33 @@ class EnergyTopologyService:
         return True
 
     @staticmethod
+    async def _delete_device_points(db: AsyncSession, device_id: int) -> int:
+        """
+        删除设备关联的点位及其实时数据
+
+        Args:
+            db: 数据库会话
+            device_id: 设备ID
+
+        Returns:
+            删除的点位数量
+        """
+        point_ids_result = await db.execute(
+            select(Point.id).where(Point.energy_device_id == device_id)
+        )
+        point_ids = [pid for (pid,) in point_ids_result.all()]
+
+        if point_ids:
+            await db.execute(
+                delete(PointRealtime).where(PointRealtime.point_id.in_(point_ids))
+            )
+            await db.execute(
+                delete(Point).where(Point.id.in_(point_ids))
+            )
+            return len(point_ids)
+        return 0
+
+    @staticmethod
     async def delete_node(
         db: AsyncSession,
         data: TopologyNodeDelete,
@@ -843,6 +975,13 @@ class EnergyTopologyService:
                     select(PowerDevice).where(PowerDevice.circuit_id == data.node_id)
                 )
                 devices = result.scalars().all()
+
+                # 先删除设备下的关联点位
+                for device in devices:
+                    pts_deleted = await EnergyTopologyService._delete_device_points(db, device.id)
+                    if pts_deleted:
+                        deleted["points"] = deleted.get("points", 0) + pts_deleted
+
                 deleted["devices"] = len(devices)
                 await db.execute(
                     delete(PowerDevice).where(PowerDevice.circuit_id == data.node_id)
@@ -854,12 +993,22 @@ class EnergyTopologyService:
             deleted["circuits"] = deleted.get("circuits", 0) + 1
 
         elif data.node_type == TopologyNodeType.DEVICE:
+            # 先删除关联点位及其实时数据
+            pts_deleted = await EnergyTopologyService._delete_device_points(db, data.node_id)
+            if pts_deleted:
+                deleted["points"] = pts_deleted
+
+            # 删除设备
             await db.execute(
                 delete(PowerDevice).where(PowerDevice.id == data.node_id)
             )
             deleted["devices"] = deleted.get("devices", 0) + 1
 
         elif data.node_type == TopologyNodeType.POINT:
+            # 先删除点位实时数据
+            await db.execute(
+                delete(PointRealtime).where(PointRealtime.point_id == data.node_id)
+            )
             await db.execute(
                 delete(Point).where(Point.id == data.node_id)
             )

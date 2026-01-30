@@ -7,12 +7,14 @@ from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, update, delete
+from sqlalchemy.orm import selectinload
 import csv
 import io
 
 from ..deps import get_db, require_viewer, require_operator, require_admin
 from ...models.user import User
 from ...models.point import Point, PointRealtime, PointGroup, PointGroupMember
+from ...models.energy import PowerDevice
 from ...schemas.point import (
     PointCreate, PointUpdate, PointInfo, PointTypesSummary,
     PointGroupCreate, PointGroupInfo
@@ -31,11 +33,13 @@ async def get_points(
     device_type: Optional[str] = Query(None, description="设备类型"),
     area_code: Optional[str] = Query(None, description="区域代码"),
     is_enabled: Optional[bool] = Query(None, description="启用状态"),
+    energy_device_id: Optional[int] = Query(None, description="关联用能设备ID"),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_viewer)
 ):
     """
     获取点位列表（支持多条件筛选、分页）
+    返回数据包含关联的用能设备名称
     """
     query = select(Point)
 
@@ -52,6 +56,8 @@ async def get_points(
         query = query.where(Point.area_code == area_code)
     if is_enabled is not None:
         query = query.where(Point.is_enabled == is_enabled)
+    if energy_device_id is not None:
+        query = query.where(Point.energy_device_id == energy_device_id)
 
     count_query = select(func.count()).select_from(query.subquery())
     total = (await db.execute(count_query)).scalar()
@@ -61,8 +67,31 @@ async def get_points(
     result = await db.execute(query)
     points = result.scalars().all()
 
+    # 获取关联的用能设备名称
+    energy_device_ids = [p.energy_device_id for p in points if p.energy_device_id]
+    energy_device_map = {}
+    if energy_device_ids:
+        device_result = await db.execute(
+            select(PowerDevice.id, PowerDevice.device_name, PowerDevice.device_code)
+            .where(PowerDevice.id.in_(energy_device_ids))
+        )
+        for device_id, device_name, device_code in device_result.all():
+            energy_device_map[device_id] = {"name": device_name, "code": device_code}
+
+    # 构建返回数据，附加 energy_device_name
+    items = []
+    for p in points:
+        point_dict = PointInfo.model_validate(p).model_dump()
+        if p.energy_device_id and p.energy_device_id in energy_device_map:
+            point_dict["energy_device_name"] = energy_device_map[p.energy_device_id]["name"]
+            point_dict["energy_device_code"] = energy_device_map[p.energy_device_id]["code"]
+        else:
+            point_dict["energy_device_name"] = None
+            point_dict["energy_device_code"] = None
+        items.append(point_dict)
+
     return PageResponse(
-        items=[PointInfo.model_validate(p) for p in points],
+        items=items,
         total=total,
         page=page,
         page_size=page_size
@@ -364,3 +393,109 @@ async def disable_point(
     )
     await db.commit()
     return {"message": "点位已禁用"}
+
+
+@router.put("/{point_id}/link-device", summary="关联点位到用能设备")
+async def link_point_to_device(
+    point_id: int,
+    energy_device_id: int = Query(..., description="用能设备ID"),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_operator)
+):
+    """
+    将点位关联到用能设备
+
+    1. 验证点位和设备存在
+    2. 设置点位的 energy_device_id
+    3. 根据点位名称识别用途，设置设备的相应点位字段
+    """
+    from ...services.point_device_matcher import PointDeviceMatcher
+
+    # 验证点位存在
+    result = await db.execute(select(Point).where(Point.id == point_id))
+    point = result.scalar_one_or_none()
+    if not point:
+        raise HTTPException(status_code=404, detail="点位不存在")
+
+    # 验证设备存在
+    result = await db.execute(select(PowerDevice).where(PowerDevice.id == energy_device_id))
+    device = result.scalar_one_or_none()
+    if not device:
+        raise HTTPException(status_code=404, detail="用能设备不存在")
+
+    # 设置点位的关联
+    point.energy_device_id = energy_device_id
+    point.updated_at = datetime.now()
+
+    # 识别点位用途并设置设备的相应字段
+    usage = PointDeviceMatcher.identify_point_usage(point.point_name)
+    if usage == "power":
+        device.power_point_id = point_id
+    elif usage == "current":
+        device.current_point_id = point_id
+    elif usage == "energy":
+        device.energy_point_id = point_id
+    elif usage == "voltage":
+        device.voltage_point_id = point_id
+    elif usage == "power_factor":
+        device.pf_point_id = point_id
+
+    await db.commit()
+
+    return {
+        "message": "关联成功",
+        "point_id": point_id,
+        "energy_device_id": energy_device_id,
+        "detected_usage": usage
+    }
+
+
+@router.delete("/{point_id}/link-device", summary="取消点位与用能设备的关联")
+async def unlink_point_from_device(
+    point_id: int,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_operator)
+):
+    """
+    取消点位与用能设备的关联
+
+    1. 清除点位的 energy_device_id
+    2. 清除设备中指向该点位的字段
+    """
+    # 获取点位
+    result = await db.execute(select(Point).where(Point.id == point_id))
+    point = result.scalar_one_or_none()
+    if not point:
+        raise HTTPException(status_code=404, detail="点位不存在")
+
+    original_device_id = point.energy_device_id
+
+    if not original_device_id:
+        return {"message": "点位未关联任何设备"}
+
+    # 清除点位的关联
+    point.energy_device_id = None
+    point.updated_at = datetime.now()
+
+    # 清除设备中指向该点位的字段
+    result = await db.execute(select(PowerDevice).where(PowerDevice.id == original_device_id))
+    device = result.scalar_one_or_none()
+    if device:
+        if device.power_point_id == point_id:
+            device.power_point_id = None
+        if device.current_point_id == point_id:
+            device.current_point_id = None
+        if device.energy_point_id == point_id:
+            device.energy_point_id = None
+        if hasattr(device, 'voltage_point_id') and device.voltage_point_id == point_id:
+            device.voltage_point_id = None
+        if hasattr(device, 'pf_point_id') and device.pf_point_id == point_id:
+            device.pf_point_id = None
+
+    await db.commit()
+
+    return {
+        "message": "取消关联成功",
+        "point_id": point_id,
+        "removed_from_device_id": original_device_id
+    }

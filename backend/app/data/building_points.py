@@ -154,12 +154,103 @@ F3_OFFICE_POINTS = {
     ],
 }
 
+# ===== 新增: 配电拓扑设备的测量点位 (与POWER_DEVICES对应) =====
+
+# A1区IT设备点位 (对应服务器机柜、网络机柜、存储机柜)
+A1_IT_DEVICE_POINTS = {
+    "AI": [
+        # 服务器机柜1 (SRV-001)
+        {"point_code": "A1_SRV_AI_001", "point_name": "服务器机柜1 功率", "device_type": "IT", "unit": "kW", "min_range": 0, "max_range": 30},
+        {"point_code": "A1_SRV_AI_002", "point_name": "服务器机柜1 电流", "device_type": "IT", "unit": "A", "min_range": 0, "max_range": 50},
+        {"point_code": "A1_SRV_AI_003", "point_name": "服务器机柜1 电能", "device_type": "IT", "unit": "kWh", "min_range": 0, "max_range": 999999},
+        # 服务器机柜2 (SRV-002)
+        {"point_code": "A1_SRV_AI_004", "point_name": "服务器机柜2 功率", "device_type": "IT", "unit": "kW", "min_range": 0, "max_range": 30},
+        {"point_code": "A1_SRV_AI_005", "point_name": "服务器机柜2 电流", "device_type": "IT", "unit": "A", "min_range": 0, "max_range": 50},
+        {"point_code": "A1_SRV_AI_006", "point_name": "服务器机柜2 电能", "device_type": "IT", "unit": "kWh", "min_range": 0, "max_range": 999999},
+        # 服务器机柜3 (SRV-003)
+        {"point_code": "A1_SRV_AI_007", "point_name": "服务器机柜3 功率", "device_type": "IT", "unit": "kW", "min_range": 0, "max_range": 35},
+        {"point_code": "A1_SRV_AI_008", "point_name": "服务器机柜3 电流", "device_type": "IT", "unit": "A", "min_range": 0, "max_range": 60},
+        {"point_code": "A1_SRV_AI_009", "point_name": "服务器机柜3 电能", "device_type": "IT", "unit": "kWh", "min_range": 0, "max_range": 999999},
+        # 服务器机柜4 (SRV-004)
+        {"point_code": "A1_SRV_AI_010", "point_name": "服务器机柜4 功率", "device_type": "IT", "unit": "kW", "min_range": 0, "max_range": 35},
+        {"point_code": "A1_SRV_AI_011", "point_name": "服务器机柜4 电流", "device_type": "IT", "unit": "A", "min_range": 0, "max_range": 60},
+        {"point_code": "A1_SRV_AI_012", "point_name": "服务器机柜4 电能", "device_type": "IT", "unit": "kWh", "min_range": 0, "max_range": 999999},
+        # 网络机柜1 (NET-001)
+        {"point_code": "A1_NET_AI_001", "point_name": "网络机柜1 功率", "device_type": "IT", "unit": "kW", "min_range": 0, "max_range": 15},
+        {"point_code": "A1_NET_AI_002", "point_name": "网络机柜1 电流", "device_type": "IT", "unit": "A", "min_range": 0, "max_range": 25},
+        {"point_code": "A1_NET_AI_003", "point_name": "网络机柜1 电能", "device_type": "IT", "unit": "kWh", "min_range": 0, "max_range": 999999},
+        # 存储机柜1 (STO-001)
+        {"point_code": "A1_STO_AI_001", "point_name": "存储机柜1 功率", "device_type": "IT", "unit": "kW", "min_range": 0, "max_range": 40},
+        {"point_code": "A1_STO_AI_002", "point_name": "存储机柜1 电流", "device_type": "IT", "unit": "A", "min_range": 0, "max_range": 70},
+        {"point_code": "A1_STO_AI_003", "point_name": "存储机柜1 电能", "device_type": "IT", "unit": "kWh", "min_range": 0, "max_range": 999999},
+    ],
+    "DI": [],
+}
+
+# A1区UPS设备点位 (对应UPS-001, UPS-002)
+A1_UPS_DEVICE_POINTS = {
+    "AI": [
+        # UPS主机1 (UPS-001)
+        {"point_code": "A1_UPS_AI_001", "point_name": "UPS主机1 输入功率", "device_type": "UPS", "unit": "kW", "min_range": 0, "max_range": 250},
+        {"point_code": "A1_UPS_AI_002", "point_name": "UPS主机1 输出功率", "device_type": "UPS", "unit": "kW", "min_range": 0, "max_range": 200},
+        {"point_code": "A1_UPS_AI_003", "point_name": "UPS主机1 电流", "device_type": "UPS", "unit": "A", "min_range": 0, "max_range": 400},
+        {"point_code": "A1_UPS_AI_004", "point_name": "UPS主机1 效率", "device_type": "UPS", "unit": "%", "min_range": 0, "max_range": 100},
+        # UPS主机2 (UPS-002)
+        {"point_code": "A1_UPS_AI_005", "point_name": "UPS主机2 输入功率", "device_type": "UPS", "unit": "kW", "min_range": 0, "max_range": 250},
+        {"point_code": "A1_UPS_AI_006", "point_name": "UPS主机2 输出功率", "device_type": "UPS", "unit": "kW", "min_range": 0, "max_range": 200},
+        {"point_code": "A1_UPS_AI_007", "point_name": "UPS主机2 电流", "device_type": "UPS", "unit": "A", "min_range": 0, "max_range": 400},
+        {"point_code": "A1_UPS_AI_008", "point_name": "UPS主机2 效率", "device_type": "UPS", "unit": "%", "min_range": 0, "max_range": 100},
+    ],
+    "DI": [
+        {"point_code": "A1_UPS_DI_001", "point_name": "UPS主机1 运行状态", "device_type": "UPS", "data_type": "boolean"},
+        {"point_code": "A1_UPS_DI_002", "point_name": "UPS主机1 故障状态", "device_type": "UPS", "data_type": "boolean"},
+        {"point_code": "A1_UPS_DI_003", "point_name": "UPS主机2 运行状态", "device_type": "UPS", "data_type": "boolean"},
+        {"point_code": "A1_UPS_DI_004", "point_name": "UPS主机2 故障状态", "device_type": "UPS", "data_type": "boolean"},
+    ],
+}
+
+# 照明设备点位 (对应LIGHT-001)
+A1_LIGHT_POINTS = {
+    "AI": [
+        {"point_code": "A1_LIGHT_AI_001", "point_name": "机房照明 功率", "device_type": "LIGHT", "unit": "kW", "min_range": 0, "max_range": 10},
+        {"point_code": "A1_LIGHT_AI_002", "point_name": "机房照明 电流", "device_type": "LIGHT", "unit": "A", "min_range": 0, "max_range": 20},
+        {"point_code": "A1_LIGHT_AI_003", "point_name": "机房照明 亮度", "device_type": "LIGHT", "unit": "%", "min_range": 0, "max_range": 100},
+    ],
+    "DI": [
+        {"point_code": "A1_LIGHT_DI_001", "point_name": "机房照明 开关状态", "device_type": "LIGHT", "data_type": "boolean"},
+    ],
+}
+
+# B1区制冷设备功率点位 (补充原有温度点位，增加功率采集)
+B1_COOLING_POWER_POINTS = {
+    "AI": [
+        # 冷水机组功率点位 (CH-001, CH-002对应点位已存在: B1_CH_AI_005, B1_CH_AI_015)
+        # 这里只添加电流点位
+        {"point_code": "B1_CH_AI_007", "point_name": "1#冷水机组电流", "device_type": "CH", "unit": "A", "min_range": 0, "max_range": 600},
+        {"point_code": "B1_CH_AI_017", "point_name": "2#冷水机组电流", "device_type": "CH", "unit": "A", "min_range": 0, "max_range": 600},
+        # 冷却塔功率点位 (CT-001, CT-002)
+        {"point_code": "B1_CT_AI_005", "point_name": "1#冷却塔功率", "device_type": "CT", "unit": "kW", "min_range": 0, "max_range": 50},
+        {"point_code": "B1_CT_AI_006", "point_name": "2#冷却塔功率", "device_type": "CT", "unit": "kW", "min_range": 0, "max_range": 50},
+        # 冷冻水泵功率点位 (CHWP-001, CHWP-002)
+        {"point_code": "B1_CHWP_AI_005", "point_name": "1#冷冻水泵功率", "device_type": "PUMP", "unit": "kW", "min_range": 0, "max_range": 60},
+        {"point_code": "B1_CHWP_AI_006", "point_name": "2#冷冻水泵功率", "device_type": "PUMP", "unit": "kW", "min_range": 0, "max_range": 60},
+        # 冷却水泵功率点位 (CWP-001, CWP-002)
+        {"point_code": "B1_CWP_AI_005", "point_name": "1#冷却水泵功率", "device_type": "PUMP", "unit": "kW", "min_range": 0, "max_range": 50},
+        {"point_code": "B1_CWP_AI_006", "point_name": "2#冷却水泵功率", "device_type": "PUMP", "unit": "kW", "min_range": 0, "max_range": 50},
+    ],
+    "DI": [],
+}
+
 def get_all_points() -> dict:
     """获取所有点位"""
     all_points = {"AI": [], "DI": [], "AO": [], "DO": []}
 
     # B1 制冷系统
     for ptype, plist in B1_COOLING_POINTS.items():
+        all_points[ptype].extend(plist)
+
+    # B1 制冷系统功率点位 (新增)
+    for ptype, plist in B1_COOLING_POWER_POINTS.items():
         all_points[ptype].extend(plist)
 
     # F1-F3 机房
@@ -169,6 +260,18 @@ def get_all_points() -> dict:
 
     # F3 办公区
     for ptype, plist in F3_OFFICE_POINTS.items():
+        all_points[ptype].extend(plist)
+
+    # A1区IT设备点位 (新增)
+    for ptype, plist in A1_IT_DEVICE_POINTS.items():
+        all_points[ptype].extend(plist)
+
+    # A1区UPS设备点位 (新增)
+    for ptype, plist in A1_UPS_DEVICE_POINTS.items():
+        all_points[ptype].extend(plist)
+
+    # A1区照明点位 (新增)
+    for ptype, plist in A1_LIGHT_POINTS.items():
         all_points[ptype].extend(plist)
 
     return all_points

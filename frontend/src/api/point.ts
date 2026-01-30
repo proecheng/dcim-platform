@@ -47,3 +47,15 @@ export function disablePoint(id: number) {
 export function getPointTypes() {
   return request.get('/v1/points/types')
 }
+
+/** 关联点位到用能设备 */
+export function linkPointToDevice(pointId: number, energyDeviceId: number) {
+  return request.put(`/v1/points/${pointId}/link-device`, null, {
+    params: { energy_device_id: energyDeviceId }
+  })
+}
+
+/** 取消点位与用能设备的关联 */
+export function unlinkPointFromDevice(pointId: number) {
+  return request.delete(`/v1/points/${pointId}/link-device`)
+}

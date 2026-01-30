@@ -294,6 +294,7 @@ export function getPowerDevices(params?: {
   device_type?: string
   area_code?: string
   is_enabled?: boolean
+  keyword?: string
 }) {
   return request.get<ResponseModel<PowerDevice[]>>('/v1/energy/devices', { params })
 }
@@ -2015,4 +2016,71 @@ export function updateDevicePoint(pointId: number, data: Partial<DevicePointConf
 /** 删除设备所有测点 */
 export function deleteDevicePoints(deviceId: number) {
   return request.delete<ResponseModel<{ success: boolean; deleted_count: number }>>(`/v1/topology/device-points/${deviceId}`)
+}
+
+/** 删除单个点位 */
+export function deleteDevicePointById(pointId: number) {
+  return request.delete<ResponseModel<{ success: boolean; point_id: number }>>(`/v1/topology/device-points/point/${pointId}`)
+}
+
+// ==================== V2.8 设备点位同步 ====================
+
+/** 设备关联点位信息 */
+export interface DeviceLinkedPoint {
+  id: number
+  point_code: string
+  point_name: string
+  point_type: 'AI' | 'DI' | 'AO' | 'DO'
+  unit?: string
+  role: 'power' | 'current' | 'energy' | 'voltage' | 'power_factor' | 'associated'
+  realtime?: {
+    value: number | null
+    value_text?: string
+    status: string
+    quality: number
+    updated_at?: string
+  }
+}
+
+/** 设备关联点位响应 */
+export interface DeviceLinkedPointsResponse {
+  device_id: number
+  device_code: string
+  device_name: string
+  device_type: string
+  rated_power?: number
+  points: DeviceLinkedPoint[]
+  point_count: number
+}
+
+/** 同步状态统计 */
+export interface SyncStatistics {
+  total_devices: number
+  linked_devices: number
+  orphan_devices: number
+  total_points: number
+  linked_points: number
+  device_link_rate: number
+  point_link_rate: number
+}
+
+/** 获取设备关联的所有点位 */
+export function getDeviceLinkedPoints(deviceId: number) {
+  return request.get<ResponseModel<DeviceLinkedPointsResponse>>(`/v1/topology/device/${deviceId}/points`)
+}
+
+/** 触发设备点位同步 */
+export function syncDevicePointRelations() {
+  return request.post<ResponseModel<{
+    success: boolean
+    updated_devices: number
+    updated_points: number
+    matched_count: number
+    statistics: SyncStatistics
+  }>>('/v1/topology/sync')
+}
+
+/** 获取同步状态统计 */
+export function getSyncStatus() {
+  return request.get<ResponseModel<SyncStatistics & { success: boolean }>>('/v1/topology/sync/status')
 }

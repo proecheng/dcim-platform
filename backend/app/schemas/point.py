@@ -67,6 +67,10 @@ class PointInfo(BaseModel):
     sort_order: int = 0
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
+    # 用能设备关联
+    energy_device_id: Optional[int] = None
+    energy_device_name: Optional[str] = None  # 关联的用能设备名称
+    energy_device_code: Optional[str] = None  # 关联的用能设备编码
 
 
 class PointTypesSummary(BaseModel):
