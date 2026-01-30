@@ -19,21 +19,15 @@
             <el-option label="DO-开关量输出" value="DO" />
           </el-select>
         </el-form-item>
-        <el-form-item label="设备类型">
+        <el-form-item label="用途">
           <el-select v-model="filters.device_type" style="width: 150px">
             <el-option label="全部" value="ALL" />
-            <el-option label="IT设备" value="IT" />
-            <el-option label="UPS" value="UPS" />
-            <el-option label="空调" value="AC" />
-            <el-option label="冷水机组" value="CH" />
-            <el-option label="水泵" value="PUMP" />
-            <el-option label="冷却塔" value="CT" />
-            <el-option label="照明" value="LIGHT" />
-            <el-option label="配电" value="PDU" />
-            <el-option label="温湿度" value="TH" />
-            <el-option label="门禁" value="DOOR" />
-            <el-option label="烟感" value="SMOKE" />
-            <el-option label="漏水" value="WATER" />
+            <el-option label="功率" value="power" />
+            <el-option label="电流" value="current" />
+            <el-option label="电能" value="energy" />
+            <el-option label="电压" value="voltage" />
+            <el-option label="功率因数" value="power_factor" />
+            <el-option label="其他" value="other" />
           </el-select>
         </el-form-item>
         <el-form-item label="区域">
@@ -94,7 +88,7 @@
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="device_type" label="设备类型" width="80" />
+        <el-table-column prop="device_type" label="用途" width="80" />
         <el-table-column prop="area_code" label="区域" width="60" />
         <el-table-column label="关联设备" min-width="75">
           <template #default="{ row }">
@@ -151,15 +145,14 @@
             </el-form-item>
           </el-col>
           <el-col :span="12">
-            <el-form-item label="设备类型" prop="device_type">
+            <el-form-item label="用途" prop="device_type">
               <el-select v-model="form.device_type" :disabled="editMode">
-                <el-option label="温湿度" value="TH" />
-                <el-option label="UPS" value="UPS" />
-                <el-option label="配电" value="PDU" />
-                <el-option label="空调" value="AC" />
-                <el-option label="门禁" value="DOOR" />
-                <el-option label="烟感" value="SMOKE" />
-                <el-option label="漏水" value="WATER" />
+                <el-option label="功率" value="power" />
+                <el-option label="电流" value="current" />
+                <el-option label="电能" value="energy" />
+                <el-option label="电压" value="voltage" />
+                <el-option label="功率因数" value="power_factor" />
+                <el-option label="其他" value="other" />
               </el-select>
             </el-form-item>
           </el-col>
@@ -277,7 +270,7 @@ const form = reactive({
   point_code: '',
   point_name: '',
   point_type: 'AI',
-  device_type: 'TH',
+  device_type: 'power',
   area_code: 'A1',
   unit: '',
   data_type: 'float',
@@ -291,7 +284,7 @@ const rules = {
   point_code: [{ required: true, message: '请输入点位编码', trigger: 'blur' }],
   point_name: [{ required: true, message: '请输入点位名称', trigger: 'blur' }],
   point_type: [{ required: true, message: '请选择点位类型', trigger: 'change' }],
-  device_type: [{ required: true, message: '请选择设备类型', trigger: 'change' }],
+  device_type: [{ required: true, message: '请选择用途', trigger: 'change' }],
   area_code: [{ required: true, message: '请输入区域代码', trigger: 'blur' }]
 }
 
@@ -371,7 +364,7 @@ function handleAdd() {
     point_code: '',
     point_name: '',
     point_type: 'AI',
-    device_type: 'TH',
+    device_type: 'power',
     area_code: 'A1',
     unit: '',
     data_type: 'float',

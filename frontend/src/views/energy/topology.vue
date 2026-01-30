@@ -456,42 +456,73 @@
     </el-dialog>
 
     <!-- 点位编辑对话框 -->
-    <el-dialog v-model="showPointDialog" :title="editingPoint ? '编辑点位' : '添加点位'" width="480px" class="topology-dialog">
-      <el-form :model="pointForm" label-width="100px" size="default">
-        <el-form-item label="点位名称" required>
-          <el-input v-model="pointForm.point_name" placeholder="输入点位名称" />
+    <el-dialog v-model="showPointDialog" :title="editingPoint ? '编辑点位' : '新增点位'" width="600px" class="topology-dialog">
+      <el-form ref="pointFormRef" :model="pointForm" :rules="pointRules" label-width="100px" size="default">
+        <el-form-item label="点位编码" prop="point_code">
+          <el-input v-model="pointForm.point_code" :disabled="!!editingPoint" />
         </el-form-item>
-        <el-form-item label="角色" required>
-          <el-select v-model="pointForm.role" style="width: 100%;">
-            <el-option label="功率" value="power" />
-            <el-option label="电流" value="current" />
-            <el-option label="电能" value="energy" />
-            <el-option label="电压" value="voltage" />
-            <el-option label="功率因数" value="power_factor" />
-            <el-option label="关联点位" value="associated" />
-          </el-select>
+        <el-form-item label="点位名称" prop="point_name">
+          <el-input v-model="pointForm.point_name" />
         </el-form-item>
-        <el-form-item label="点位类型">
-          <el-select v-model="pointForm.point_type" style="width: 100%;">
-            <el-option label="模拟量输入" value="AI" />
-            <el-option label="数字量输入" value="DI" />
-            <el-option label="模拟量输出" value="AO" />
-            <el-option label="数字量输出" value="DO" />
-          </el-select>
+        <el-row :gutter="20">
+          <el-col :span="12">
+            <el-form-item label="点位类型" prop="point_type">
+              <el-select v-model="pointForm.point_type" :disabled="!!editingPoint">
+                <el-option label="AI-模拟量输入" value="AI" />
+                <el-option label="DI-开关量输入" value="DI" />
+                <el-option label="AO-模拟量输出" value="AO" />
+                <el-option label="DO-开关量输出" value="DO" />
+              </el-select>
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="用途" prop="device_type">
+              <el-select v-model="pointForm.device_type" :disabled="!!editingPoint">
+                <el-option label="功率" value="power" />
+                <el-option label="电流" value="current" />
+                <el-option label="电能" value="energy" />
+                <el-option label="电压" value="voltage" />
+                <el-option label="功率因数" value="power_factor" />
+                <el-option label="其他" value="other" />
+              </el-select>
+            </el-form-item>
+          </el-col>
+        </el-row>
+        <el-row :gutter="20">
+          <el-col :span="12">
+            <el-form-item label="区域代码" prop="area_code">
+              <el-input v-model="pointForm.area_code" :disabled="!!editingPoint" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="单位">
+              <el-input v-model="pointForm.unit" />
+            </el-form-item>
+          </el-col>
+        </el-row>
+        <el-row :gutter="20">
+          <el-col :span="12">
+            <el-form-item label="量程最小值">
+              <el-input-number v-model="pointForm.min_range" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="量程最大值">
+              <el-input-number v-model="pointForm.max_range" />
+            </el-form-item>
+          </el-col>
+        </el-row>
+        <el-form-item label="采集周期">
+          <el-input-number v-model="pointForm.collect_interval" :min="1" />
+          <span style="margin-left: 8px;">秒</span>
         </el-form-item>
-        <el-form-item label="单位">
-          <el-input v-model="pointForm.unit" placeholder="如 kW, A, kWh" />
-        </el-form-item>
-        <el-form-item label="寄存器地址">
-          <el-input v-model="pointForm.register_address" placeholder="如 40001" />
-        </el-form-item>
-        <el-form-item label="系数">
-          <el-input-number v-model="pointForm.scale_factor" :precision="4" :min="0" style="width: 100%;" />
+        <el-form-item label="描述">
+          <el-input v-model="pointForm.description" type="textarea" />
         </el-form-item>
       </el-form>
       <template #footer>
         <el-button @click="showPointDialog = false">取消</el-button>
-        <el-button type="primary" @click="handleSavePoint" :loading="savingPoint">保存</el-button>
+        <el-button type="primary" @click="handleSavePoint" :loading="savingPoint">确定</el-button>
       </template>
     </el-dialog>
 
@@ -655,15 +686,27 @@ const devicePoints = ref<any[]>([])
 const showPointDialog = ref(false)
 const editingPoint = ref<DeviceLinkedPoint | null>(null)
 const savingPoint = ref(false)
+const pointFormRef = ref()
 const pointForm = reactive({
-  point_name: '',
   point_code: '',
+  point_name: '',
   point_type: 'AI',
-  role: 'associated',
+  device_type: 'power',
+  area_code: 'A1',
   unit: '',
-  register_address: '',
-  scale_factor: 1.0
+  data_type: 'float',
+  min_range: null as number | null,
+  max_range: null as number | null,
+  collect_interval: 10,
+  description: ''
 })
+const pointRules = {
+  point_code: [{ required: true, message: '请输入点位编码', trigger: 'blur' }],
+  point_name: [{ required: true, message: '请输入点位名称', trigger: 'blur' }],
+  point_type: [{ required: true, message: '请选择点位类型', trigger: 'change' }],
+  device_type: [{ required: true, message: '请选择用途', trigger: 'change' }],
+  area_code: [{ required: true, message: '请输入区域代码', trigger: 'blur' }]
+}
 
 // 右键菜单
 const contextMenuVisible = ref(false)
@@ -1523,13 +1566,17 @@ const getPointRoleLabel = (role: string): string => {
 const handleAddPoint = () => {
   editingPoint.value = null
   Object.assign(pointForm, {
-    point_name: '',
     point_code: '',
+    point_name: '',
     point_type: 'AI',
-    role: 'associated',
+    device_type: 'power',
+    area_code: 'A1',
     unit: '',
-    register_address: '',
-    scale_factor: 1.0
+    data_type: 'float',
+    min_range: null,
+    max_range: null,
+    collect_interval: 10,
+    description: ''
   })
   showPointDialog.value = true
 }
@@ -1537,13 +1584,17 @@ const handleAddPoint = () => {
 const handleEditPoint = (pt: DeviceLinkedPoint) => {
   editingPoint.value = pt
   Object.assign(pointForm, {
+    point_code: pt.point_code || '',
     point_name: pt.point_name,
-    point_code: pt.point_code,
-    point_type: pt.point_type,
-    role: pt.role,
+    point_type: pt.point_type || 'AI',
+    device_type: pt.device_type || 'power',
+    area_code: pt.area_code || 'A1',
     unit: pt.unit || '',
-    register_address: '',
-    scale_factor: 1.0
+    data_type: pt.data_type || 'float',
+    min_range: pt.min_range ?? null,
+    max_range: pt.max_range ?? null,
+    collect_interval: pt.collect_interval || 10,
+    description: pt.description || ''
   })
   showPointDialog.value = true
 }
@@ -1551,10 +1602,10 @@ const handleEditPoint = (pt: DeviceLinkedPoint) => {
 const handleSavePoint = async () => {
   if (!selectedNode.value) return
   if (savingPoint.value) return  // 防止重复提交
-  if (!pointForm.point_name?.trim()) {
-    ElMessage.warning('请输入点位名称')
-    return
-  }
+
+  // 表单验证
+  const valid = await pointFormRef.value?.validate().catch(() => false)
+  if (!valid) return
 
   savingPoint.value = true
   try {
@@ -1563,41 +1614,31 @@ const handleSavePoint = async () => {
       await updateDevicePoint(editingPoint.value.id, {
         point_name: pointForm.point_name,
         unit: pointForm.unit,
-        scale_factor: pointForm.scale_factor
+        min_range: pointForm.min_range,
+        max_range: pointForm.max_range,
+        collect_interval: pointForm.collect_interval,
+        description: pointForm.description
       })
-      ElMessage.success('点位更新成功')
+      ElMessage.success('更新成功')
     } else {
-      // 创建点位 - 自动生成点位编码
-      const deviceCode = selectedNode.value.code || `DEV-${selectedNode.value.id}`
-      const rolePrefix: Record<string, string> = {
-        power: 'P', current: 'I', energy: 'E', voltage: 'U', power_factor: 'PF', associated: 'PT'
-      }
-      const prefix = rolePrefix[pointForm.role] || 'PT'
-      const timestamp = Date.now().toString().slice(-6)  // 使用6位以降低重复概率
-      const pointCode = `${deviceCode}-${prefix}-${timestamp}`
-
-      // 映射前端点位类型到后端类型
-      const pointTypeMap: Record<string, string> = {
-        'AI': 'measurement',
-        'DI': 'status',
-        'AO': 'control',
-        'DO': 'control'
-      }
-
+      // 创建点位
       await createDevicePoints({
         energy_device_id: selectedNode.value.id,
         points: [{
-          point_code: pointCode,
+          point_code: pointForm.point_code,
           point_name: pointForm.point_name,
-          point_type: pointTypeMap[pointForm.point_type] as 'measurement' | 'control' | 'status' | 'alarm',
-          data_type: 'FLOAT32',
+          point_type: pointForm.point_type,
+          device_type: pointForm.device_type,
+          area_code: pointForm.area_code,
           unit: pointForm.unit,
-          scale_factor: pointForm.scale_factor,
-          offset: 0,
-          alarm_enabled: false
+          data_type: pointForm.data_type,
+          min_range: pointForm.min_range,
+          max_range: pointForm.max_range,
+          collect_interval: pointForm.collect_interval,
+          description: pointForm.description
         }]
       })
-      ElMessage.success('点位创建成功')
+      ElMessage.success('创建成功')
     }
     showPointDialog.value = false
     await loadDevicePoints()

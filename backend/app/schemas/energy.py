@@ -1723,9 +1723,14 @@ class DevicePointConfig(BaseModel):
     """设备测点配置"""
     point_code: str = Field(..., max_length=50, description="点位编码")
     point_name: str = Field(..., max_length=100, description="点位名称")
-    point_type: DevicePointType = Field(..., description="点位类型")
+    point_type: str = Field("AI", description="点位类型: AI/DI/AO/DO")
+    device_type: str = Field("power", description="用途: power/current/energy/voltage/power_factor/other")
+    area_code: str = Field("A1", description="区域代码")
     data_type: str = Field("float", description="数据类型: float/int/bool/string")
     unit: Optional[str] = Field(None, description="单位")
+    min_range: Optional[float] = Field(None, description="量程最小值")
+    max_range: Optional[float] = Field(None, description="量程最大值")
+    collect_interval: int = Field(10, description="采集周期(秒)")
     description: Optional[str] = Field(None, description="描述")
 
     # 采集配置
@@ -1752,6 +1757,9 @@ class DevicePointConfigUpdate(BaseModel):
     point_id: Optional[int] = Field(None, description="测点ID")
     point_name: Optional[str] = Field(None, max_length=100)
     unit: Optional[str] = Field(None)
+    min_range: Optional[float] = Field(None, description="量程最小值")
+    max_range: Optional[float] = Field(None, description="量程最大值")
+    collect_interval: Optional[int] = Field(None, description="采集周期(秒)")
     description: Optional[str] = Field(None)
     device_id: Optional[int] = Field(None)
     register_address: Optional[str] = Field(None)

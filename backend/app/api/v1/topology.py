@@ -308,6 +308,12 @@ async def update_device_point(
             point.point_name = data.point_name
         if data.unit is not None:
             point.unit = data.unit
+        if data.min_range is not None:
+            point.min_range = data.min_range
+        if data.max_range is not None:
+            point.max_range = data.max_range
+        if data.collect_interval is not None:
+            point.collect_interval = data.collect_interval
         if data.description is not None:
             point.description = data.description
         if data.device_id is not None:

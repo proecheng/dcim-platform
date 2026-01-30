@@ -1912,16 +1912,21 @@ export interface TopologyBatchResult {
 export interface DevicePointConfig {
   point_code: string
   point_name: string
-  point_type: 'measurement' | 'control' | 'status' | 'alarm'
-  data_type: string
+  point_type: string
+  device_type?: string
+  area_code?: string
+  data_type?: string
   unit?: string
+  min_range?: number | null
+  max_range?: number | null
+  collect_interval?: number
   description?: string
   device_id?: number
   register_address?: string
   function_code?: number
-  scale_factor: number
-  offset: number
-  alarm_enabled: boolean
+  scale_factor?: number
+  offset?: number
+  alarm_enabled?: boolean
   alarm_high?: number
   alarm_low?: number
 }
@@ -1933,8 +1938,13 @@ export interface DevicePointConfigResponse {
   point_code: string
   point_name: string
   point_type: string
+  device_type?: string
+  area_code?: string
   data_type: string
   unit?: string
+  min_range?: number | null
+  max_range?: number | null
+  collect_interval?: number
   description?: string
   device_id?: number
   register_address?: string
@@ -2030,8 +2040,15 @@ export interface DeviceLinkedPoint {
   id: number
   point_code: string
   point_name: string
-  point_type: 'AI' | 'DI' | 'AO' | 'DO'
+  point_type: string
+  device_type?: string
+  area_code?: string
   unit?: string
+  data_type?: string
+  min_range?: number | null
+  max_range?: number | null
+  collect_interval?: number
+  description?: string
   role: 'power' | 'current' | 'energy' | 'voltage' | 'power_factor' | 'associated'
   realtime?: {
     value: number | null

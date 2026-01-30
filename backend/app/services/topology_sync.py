@@ -50,19 +50,37 @@ class TopologySyncService:
         created_point_ids = []
 
         for point_config in points_config:
-            # 检查点位是否已存在
-            point_code = f"{device_code}_{point_config.point_code}"
+            # 使用传入的编码或自动生成
+            point_code = point_config.point_code
+            if not point_code.startswith(device_code):
+                point_code = f"{device_code}_{point_config.point_code}"
+
             result = await self.db.execute(
                 select(Point).where(Point.point_code == point_code)
             )
             existing_point = result.scalar_one_or_none()
 
+            # 点位类型处理：支持字符串或枚举
+            point_type_value = point_config.point_type
+            if hasattr(point_type_value, 'value'):
+                point_type_value = point_type_value.value
+
+            # 使用配置中的 device_type 和 area_code，如果没有则使用设备默认值
+            config_device_type = getattr(point_config, 'device_type', None) or device_type
+            config_area_code = getattr(point_config, 'area_code', None) or area_code
+            config_min_range = getattr(point_config, 'min_range', None)
+            config_max_range = getattr(point_config, 'max_range', None)
+            config_collect_interval = getattr(point_config, 'collect_interval', 10)
+
             if existing_point:
                 # 更新现有点位
                 existing_point.point_name = point_config.point_name
-                existing_point.point_type = point_config.point_type.value
+                existing_point.point_type = point_type_value
                 existing_point.data_type = point_config.data_type
                 existing_point.unit = point_config.unit
+                existing_point.min_range = config_min_range
+                existing_point.max_range = config_max_range
+                existing_point.collect_interval = config_collect_interval
                 existing_point.description = point_config.description
                 existing_point.device_id = point_config.device_id
                 existing_point.register_address = point_config.register_address
@@ -76,11 +94,14 @@ class TopologySyncService:
                 new_point = Point(
                     point_code=point_code,
                     point_name=point_config.point_name,
-                    point_type=point_config.point_type.value,
-                    device_type=device_type,
-                    area_code=area_code,
+                    point_type=point_type_value,
+                    device_type=config_device_type,
+                    area_code=config_area_code,
                     data_type=point_config.data_type,
                     unit=point_config.unit,
+                    min_range=config_min_range,
+                    max_range=config_max_range,
+                    collect_interval=config_collect_interval,
                     description=point_config.description,
                     device_id=point_config.device_id,
                     register_address=point_config.register_address,

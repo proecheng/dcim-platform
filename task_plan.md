@@ -10,7 +10,135 @@
 4. 细化节能建议系统，使用10+种建议模板自动分析生成
 
 ## Current Phase
-Phase 25: 用电管理模块结构优化 (V4.5.0) - COMPLETE
+Phase 26: 配电拓扑与点位管理同步 (V4.6.0) - COMPLETE
+
+---
+
+### Phase 26: 配电拓扑与点位管理同步 (V4.6.0) ✅ COMPLETE
+**目标**: 确保配电拓扑中的节点与点位管理系统保持同步
+
+**问题背景**:
+- 点位中有采集点(如"1#冷冻水泵电流")，但配电拓扑中缺少对应设备
+- 配电拓扑中有设备(如"服务器机柜1")，但点位管理中缺少对应测量点
+- PowerDevice的point_id外键未正确关联到Point
+- Point的energy_device_id字段未被填充（双向关联缺失）
+
+#### 26.6 智能匹配引擎与双向关联 (V4.6.1) ✅ COMPLETE
+**目标**: 用通用规则替代30+条硬编码映射规则，实现设备与点位的双向关联
+
+**新建文件:**
+- `backend/app/services/point_device_matcher.py` - 智能匹配引擎
+  - PointDeviceMatcher 类
+  - find_matching_points() - 从设备编码和名称查找匹配点位
+  - identify_point_usage() - 根据点位名称关键词识别用途(功率/电流/电能)
+  - derive_point_prefix() - 从设备编码推导点位前缀模式
+  - sync_bidirectional_relations() - 双向更新关联关系
+  - full_sync() - 执行完整的双向同步
+  - get_sync_statistics() - 获取同步统计信息
+  - LEGACY_MAPPING_RULES - 保留原有硬编码规则作为fallback
+
+**修改文件:**
+- `backend/app/services/demo_data_service.py`
+  - 导入 PointDeviceMatcher
+  - 重构 sync_device_point_relations() 使用新引擎
+  - 重构 _create_distribution_system() 创建设备时双向关联
+
+- `backend/app/api/v1/point.py`
+  - 增加 energy_device_id 筛选参数
+  - 返回 energy_device_name 和 energy_device_code
+
+- `backend/app/schemas/point.py`
+  - PointInfo 添加 energy_device_id, energy_device_name, energy_device_code 字段
+
+- `backend/app/api/v1/topology.py`
+  - 新增 POST /topology/sync - 手动触发同步
+  - 新增 GET /topology/sync/status - 获取同步状态统计
+  - 新增 GET /topology/device/{device_id}/points - 获取设备关联点位和实时值
+
+- `frontend/src/views/device/index.vue`
+  - 新增"关联设备"列显示 PowerDevice 名称
+  - CSS 样式 .linked-device 和 .no-link
+
+- `frontend/src/views/energy/topology.vue`
+  - 新增设备点位面板显示关联点位列表
+  - watch 监听 selectedNode 自动加载设备点位
+  - loadDevicePoints(), getPointRoleType(), getPointRoleLabel() 辅助函数
+
+- `frontend/src/api/modules/energy.ts`
+  - 新增 DeviceLinkedPoint, DeviceLinkedPointsResponse, SyncStatistics 类型
+  - 新增 getDeviceLinkedPoints(), syncDevicePointRelations(), getSyncStatus() API
+
+**验证结果:**
+- [x] PointDeviceMatcher 模块导入成功
+- [x] topology API 模块导入成功
+- [x] 前端构建成功 (21.61s)
+- [x] 无编译错误
+
+#### 26.1 扩展配电拓扑设备 ✅ COMPLETE
+- [x] 新增 B1制冷系统配电柜 (COOLING-PANEL-001)
+- [x] 新增 F1/F2/F3楼层配电柜
+- [x] 新增 B1制冷系统回路 (冷水机组/冷却塔/水泵回路)
+- [x] 新增 F1/F2/F3 UPS和空调回路
+- [x] 新增 B1制冷设备 (冷水机组/冷却塔/冷冻水泵/冷却水泵)
+- [x] 新增 F1/F2/F3 UPS设备 (5台)
+- [x] 新增 F1/F2/F3 精密空调 (10台)
+
+**配电拓扑扩展统计**:
+- 配电柜: 7个 → 11个 (+4)
+- 配电回路: 6个 → 16个 (+10)
+- 用电设备: 12个 → 35个 (+23)
+
+#### 26.2 扩展点位定义 ✅ COMPLETE
+- [x] 新增 A1区IT设备点位 (服务器/网络/存储机柜功率/电流/电能)
+- [x] 新增 A1区UPS设备点位 (UPS-001/002功率/电流)
+- [x] 新增 照明设备点位 (功率/电流/亮度)
+- [x] 新增 B1制冷设备功率点位 (冷水机组电流/冷却塔功率/水泵功率)
+
+**点位扩展统计**:
+- AI点位: 253个 → 290个 (+37)
+- DI点位: 57个 → 62个 (+5)
+- 总点位: 330个 → 372个 (+42)
+
+#### 26.3 建立设备与点位关联 ✅ COMPLETE
+- [x] 创建 `_build_point_map()` 方法构建点位映射
+- [x] 创建 `_find_matching_points()` 方法匹配设备与点位
+- [x] 修改 `_create_distribution_system()` 创建设备时自动关联点位
+- [x] 支持 power_point_id、current_point_id、energy_point_id 关联
+
+**关联映射规则**:
+- SRV-001~004 → A1_SRV_AI_* (功率/电流/电能)
+- NET-001 → A1_NET_AI_* (功率/电流/电能)
+- STO-001 → A1_STO_AI_* (功率/电流/电能)
+- UPS-001/002 → A1_UPS_AI_* (功率/电流)
+- CH-001/002 → B1_CH_AI_* (功率/电流)
+- CHWP/CWP-001/002 → B1_*WP_AI_* (功率/电流)
+- F*-UPS-00* → F*_UPS_AI_* (负载率)
+- F*-AC-00* → F*_AC_AI_* (回风温度)
+
+#### 26.4 模拟数据系统优化 ✅ COMPLETE
+- [x] 增强 `check_demo_data_status()` 检查设备关联状态
+- [x] 新增 `sync_device_point_relations()` 同步关联方法
+- [x] 更新 `_clear_demo_data()` 包含A1_前缀点位
+
+#### 26.5 修改文件清单
+
+**修改文件:**
+- `backend/app/services/demo_data_service.py`
+  - 扩展 DISTRIBUTION_PANELS (+4)
+  - 扩展 DISTRIBUTION_CIRCUITS (+10)
+  - 扩展 POWER_DEVICES (+23)
+  - 新增 `_build_point_map()` 方法
+  - 新增 `_find_matching_points()` 方法
+  - 新增 `sync_device_point_relations()` 方法
+  - 修改 `_create_distribution_system()` 自动关联
+  - 增强 `check_demo_data_status()` 同步状态检查
+
+- `backend/app/data/building_points.py`
+  - 新增 A1_IT_DEVICE_POINTS
+  - 新增 A1_UPS_DEVICE_POINTS
+  - 新增 A1_LIGHT_POINTS
+  - 新增 B1_COOLING_POWER_POINTS
+  - 更新 `get_all_points()` 包含新增点位
 
 ---
 
