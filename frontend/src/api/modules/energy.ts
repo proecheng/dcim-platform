@@ -1799,7 +1799,8 @@ export function getShiftRatioRecommendations(days: number = 30) {
 export function updateDeviceShiftRatio(deviceId: number, ratio: number) {
   return request.put<ResponseModel<{ device_id: number; old_ratio: number; new_ratio: number; success: boolean }>>(
     `/v1/energy/devices/${deviceId}/shift-ratio`,
-    { ratio }
+    null,
+    { params: { ratio } }
   )
 }
 

@@ -312,9 +312,13 @@
           <p>推荐值基于设备历史运行数据(负荷波动、峰谷用电分布)智能计算，置信度反映数据充足程度。</p>
         </el-alert>
 
-        <el-table :data="ratioRecommendations" v-loading="loading.shift" stripe highlight-current-row @row-click="handleShiftDeviceRowClick">
+        <el-table :data="ratioRecommendations" v-loading="loading.shift" stripe highlight-current-row>
           <el-table-column prop="device_code" label="设备编码" width="120" />
-          <el-table-column prop="device_name" label="设备名称" min-width="140" />
+          <el-table-column prop="device_name" label="设备名称" min-width="140">
+            <template #default="{ row }">
+              <el-link type="primary" @click="handleShiftDeviceRowClick(row)">{{ row.device_name }}</el-link>
+            </template>
+          </el-table-column>
           <el-table-column prop="device_type" label="类型" width="90">
             <template #default="{ row }">
               {{ getDeviceTypeText(row.device_type) }}
@@ -357,8 +361,8 @@
           </el-table-column>
           <el-table-column label="操作" width="160" fixed="right">
             <template #default="{ row }">
-              <el-button link type="primary" @click="showRatioAdjustDialog(row)">调整</el-button>
-              <el-button link type="success" @click="handleAcceptOneRatio(row)" v-if="row.has_change" :loading="saving">
+              <el-button link type="primary" @click.stop="showRatioAdjustDialog(row)">调整</el-button>
+              <el-button link type="success" @click.stop="handleAcceptOneRatio(row)" v-if="row.has_change" :loading="saving">
                 接受
               </el-button>
             </template>
