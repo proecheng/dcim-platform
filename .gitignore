@@ -64,3 +64,13 @@ nul
 
 # Claude 相关
 .claude/
+
+# 截图文件（不提交到仓库）
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.bmp
+*.webp
+*.ico
+.playwright-mcp/
