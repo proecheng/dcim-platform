@@ -13,7 +13,7 @@
       </el-col>
       <el-col :span="8">
         <el-statistic
-          title="总可转移功率"
+          title="总可调节容量"
           :value="totalShiftablePower"
           :precision="1"
         >
@@ -56,7 +56,7 @@
           {{ row.rated_power?.toFixed(1) || '-' }} kW
         </template>
       </el-table-column>
-      <el-table-column prop="shiftable_power" label="可转移功率" width="110" align="right">
+      <el-table-column prop="shiftable_power" label="可调节容量" width="110" align="right">
         <template #default="{ row }">
           <span class="highlight">{{ row.shiftable_power?.toFixed(1) || '-' }} kW</span>
         </template>

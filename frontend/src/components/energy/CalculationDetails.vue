@@ -75,7 +75,7 @@
         </div>
       </template>
       <el-descriptions :column="2" border size="small">
-        <el-descriptions-item label="总可转移功率">
+        <el-descriptions-item label="总可调节容量">
           {{ parameters?.total_shiftable_power?.toFixed(1) || 0 }} kW
         </el-descriptions-item>
         <el-descriptions-item label="默认转移时长">

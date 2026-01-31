@@ -308,7 +308,7 @@
 
         <el-alert type="info" :closable="false" style="margin-bottom: 16px;">
           <template #title>转移配置说明</template>
-          <p>可转移功率比例(shiftable_power_ratio)决定设备在负荷转移时可调节的功率占比。</p>
+          <p>可调节容量比例(shiftable_power_ratio)决定设备在负荷转移时可调节的功率占比。</p>
           <p>推荐值基于设备历史运行数据(负荷波动、峰谷用电分布)智能计算，置信度反映数据充足程度。</p>
         </el-alert>
 
@@ -340,7 +340,7 @@
               </el-tag>
             </template>
           </el-table-column>
-          <el-table-column label="可转移功率" width="145">
+          <el-table-column label="可调节容量" width="145">
             <template #default="{ row }">
               {{ row.current_shiftable_power.toFixed(1) }} kW
               <span v-if="row.has_change" class="power-change">
@@ -381,13 +381,13 @@
           </el-col>
           <el-col :span="6">
             <el-card shadow="hover" class="summary-card">
-              <div class="summary-label">当前可转移功率</div>
+              <div class="summary-label">当前可调节容量</div>
               <div class="summary-value">{{ ratioSummary.current_total_power?.toFixed(1) || '0' }} kW</div>
             </el-card>
           </el-col>
           <el-col :span="6">
             <el-card shadow="hover" class="summary-card">
-              <div class="summary-label">推荐可转移功率</div>
+              <div class="summary-label">推荐可调节容量</div>
               <div class="summary-value primary">{{ ratioSummary.recommended_total_power?.toFixed(1) || '0' }} kW</div>
             </el-card>
           </el-col>
@@ -636,7 +636,7 @@
             style="width: 100%;"
           />
           <div class="power-preview" style="margin-top: 8px; color: #606266;">
-            对应可转移功率: <strong>{{ (ratioForm.rated_power * ratioForm.new_ratio_percent / 100).toFixed(1) }} kW</strong>
+            对应可调节容量: <strong>{{ (ratioForm.rated_power * ratioForm.new_ratio_percent / 100).toFixed(1) }} kW</strong>
           </div>
         </el-form-item>
       </el-form>

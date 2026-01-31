@@ -2764,7 +2764,10 @@ async def analyze_device_shift(
         rated_power = device.rated_power or 10.0
         current_power = rated_power * random.uniform(0.5, 0.9)
         shiftable_ratio = config.shiftable_power_ratio if config else (0.5 if is_shiftable else 0)
-        shiftable_power = current_power * shiftable_ratio
+        # V2.7 FIX: 可调节容量基于额定功率计算，与配电配置页面保持一致
+        # 修改前: shiftable_power = current_power * shiftable_ratio (随机值)
+        # 修改后: shiftable_power = rated_power * shiftable_ratio (固定值)
+        shiftable_power = rated_power * shiftable_ratio
 
         # 计算5时段用电比例（模拟数据）
         # 确保5个时段占比之和为100%
@@ -3539,3 +3542,4 @@ async def forecast_demand(
     })
 
 
+# trigger reload

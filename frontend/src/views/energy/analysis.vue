@@ -197,7 +197,7 @@
             <el-statistic title="可转移设备" :value="shiftResult.shiftable_devices" />
           </el-col>
           <el-col :span="6">
-            <el-statistic title="可转移功率(kW)" :value="shiftResult.total_shiftable_power" :precision="1" />
+            <el-statistic title="可调节容量(kW)" :value="shiftResult.total_shiftable_power" :precision="1" />
           </el-col>
           <el-col :span="6">
             <el-statistic title="潜在节省(元/月)" :value="shiftResult.total_potential_saving" :precision="2" />

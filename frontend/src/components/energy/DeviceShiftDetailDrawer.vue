@@ -37,14 +37,14 @@
           <div class="metric-sub">尖峰+高峰时段占总用电</div>
         </div>
         <div class="metric-card">
-          <div class="metric-label">当前可转移功率</div>
+          <div class="metric-label">当前可调节容量</div>
           <div class="metric-value">
             {{ device ? device.current_shiftable_power.toFixed(1) : '--' }} kW
           </div>
           <div class="metric-sub">比例 {{ device ? (device.current_ratio * 100).toFixed(0) : '--' }}%</div>
         </div>
         <div class="metric-card highlight">
-          <div class="metric-label">推荐可转移功率</div>
+          <div class="metric-label">推荐可调节容量</div>
           <div class="metric-value recommend-color">
             {{ device ? device.recommended_shiftable_power.toFixed(1) : '--' }} kW
           </div>

@@ -450,9 +450,9 @@ class LoadShiftAnalysisService:
             valley_ratio = 20
             total_energy = device.rated_power * 24 * days * 0.6  # 假设60%负载率
 
-        # 计算可转移量
+        # 计算可调节容量 (shiftable_power_ratio 已经是小数形式，如 0.17 表示 17%)
         shiftable_ratio = config.shiftable_power_ratio or 0
-        shiftable_power = device.rated_power * shiftable_ratio / 100 if device.rated_power else 0
+        shiftable_power = device.rated_power * shiftable_ratio if device.rated_power else 0
 
         # 计算节省电费
         peak_price = 1.2

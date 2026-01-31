@@ -43,7 +43,7 @@
             <el-descriptions-item label="峰谷价差" v-if="parameters?.price_diff">
               <span class="highlight">{{ parameters.price_diff?.toFixed(3) }} 元/kWh</span>
             </el-descriptions-item>
-            <el-descriptions-item label="可转移功率" v-if="parameters?.total_shiftable_power">
+            <el-descriptions-item label="可调节容量" v-if="parameters?.total_shiftable_power">
               <span class="highlight">{{ parameters.total_shiftable_power }} kW</span>
             </el-descriptions-item>
           </el-descriptions>
