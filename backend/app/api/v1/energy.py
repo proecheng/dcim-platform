@@ -155,6 +155,62 @@ async def create_power_device(
 
 
 # 注意: 静态路由必须在动态路由 /devices/{device_id} 之前定义
+@router.get("/devices/shift-ratio/recommendations", response_model=ResponseModel, summary="获取设备转移比例推荐值")
+async def get_shift_ratio_recommendations(
+    days: int = Query(30, ge=7, le=90, description="分析历史数据天数"),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    基于历史用电数据智能计算每个设备的推荐可转移功率比例
+
+    算法考虑因素：
+    - 设备负荷波动空间
+    - 峰谷时段用电分布
+    - 设备类型安全上限
+    - 最低功率约束
+    """
+    from ...services.device_regulation_service import DeviceRegulationService
+
+    service = DeviceRegulationService(db)
+    result = await service.get_ratio_recommendations(days)
+    return ResponseModel(data=result)
+
+
+@router.post("/devices/shift-ratio/accept-all", response_model=ResponseModel, summary="接受全部推荐值")
+async def accept_all_recommendations(
+    days: int = Query(30, ge=7, le=90, description="分析历史数据天数"),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    批量更新所有有变更建议的设备转移比例为推荐值
+    """
+    from ...services.device_regulation_service import DeviceRegulationService
+
+    service = DeviceRegulationService(db)
+    result = await service.accept_all_recommendations(days)
+    return ResponseModel(data=result)
+
+
+@router.post("/devices/shift-ratio/batch-update", response_model=ResponseModel, summary="批量更新设备转移比例")
+async def batch_update_shift_ratios(
+    updates: Dict[int, float],
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    批量更新多个设备的转移功率比例
+
+    参数: {device_id: new_ratio, ...}
+    """
+    from ...services.device_regulation_service import DeviceRegulationService
+
+    service = DeviceRegulationService(db)
+    result = await service.batch_update_ratios(updates)
+    return ResponseModel(data=result)
+
+
 @router.get("/devices/shiftable", response_model=ResponseModel, summary="获取可转移负荷设备列表")
 async def get_shiftable_devices(
     db: AsyncSession = Depends(get_db),
@@ -242,6 +298,46 @@ async def batch_generate_device_configs(
         "message": f"已为 {result['total_devices']} 个设备生成配置",
         **result
     })
+
+
+@router.get("/devices/{device_id}/typical-day-profile", response_model=ResponseModel, summary="获取设备典型日功率Profile")
+async def get_device_typical_day_profile(
+    device_id: int,
+    days: int = Query(30, ge=7, le=90, description="分析历史数据天数"),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    获取指定设备的24小时典型日功率曲线数据
+
+    返回每小时平均/最大/最小功率，用于功率曲线图展示
+    """
+    from ...services.device_regulation_service import DeviceRegulationService
+
+    service = DeviceRegulationService(db)
+    result = await service.get_device_typical_profile(device_id, days)
+    if not result:
+        raise HTTPException(status_code=404, detail=f"设备 {device_id} 不存在")
+    return ResponseModel(data=result)
+
+
+@router.put("/devices/{device_id}/shift-ratio", response_model=ResponseModel, summary="更新单个设备转移比例")
+async def update_device_shift_ratio(
+    device_id: int,
+    ratio: float = Query(..., ge=0, le=1, description="新的转移功率比例(0-1)"),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    更新指定设备的可转移功率比例
+    """
+    from ...services.device_regulation_service import DeviceRegulationService
+
+    service = DeviceRegulationService(db)
+    result = await service.update_device_ratio(device_id, ratio)
+    if not result.get("success"):
+        raise HTTPException(status_code=404, detail=result.get("message", "更新失败"))
+    return ResponseModel(data=result)
 
 
 @router.get("/devices/{device_id}", response_model=ResponseModel[PowerDeviceResponse], summary="获取用电设备详情")

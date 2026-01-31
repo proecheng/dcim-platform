@@ -29,11 +29,11 @@ export default defineConfig({
     allowedHosts: ['powerlab.cn', 'localhost', '127.0.0.1'],
     proxy: {
       '/api': {
-        target: 'http://localhost:8000',
+        target: 'http://localhost:8080',
         changeOrigin: true
       },
       '/ws': {
-        target: 'ws://localhost:8000',
+        target: 'ws://localhost:8080',
         ws: true
       }
     }

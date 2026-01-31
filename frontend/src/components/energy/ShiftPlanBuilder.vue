@@ -10,22 +10,22 @@
         </div>
       </template>
 
-      <el-row :gutter="20">
+      <el-row :gutter="16">
       <!-- 左侧：设备选择 + 推荐方案 -->
-      <el-col :span="10">
+      <el-col :span="12">
         <div class="section-title">可转移设备列表</div>
         <el-table
           ref="deviceTableRef"
           :data="shiftableDevices"
           size="small"
-          max-height="250"
+          max-height="200"
           @selection-change="handleDeviceSelection"
           class="device-select-table"
         >
-          <el-table-column type="selection" width="40" :selectable="(row: DeviceShiftPotential) => row.is_shiftable" />
-          <el-table-column prop="device_name" label="设备" min-width="100" show-overflow-tooltip />
-          <el-table-column prop="device_type" label="类型" width="60" />
-          <el-table-column prop="shiftable_power" label="可转移(kW)" width="90" align="right">
+          <el-table-column type="selection" width="32" :selectable="(row: DeviceShiftPotential) => row.is_shiftable" />
+          <el-table-column prop="device_name" label="设备" width="180" show-overflow-tooltip />
+          <el-table-column prop="device_type" label="类型" width="65" />
+          <el-table-column prop="shiftable_power" label="可调节容量(kW)" width="110" align="right">
             <template #default="{ row }">
               <span :class="{ 'power-value': row.is_shiftable }">{{ row.shiftable_power }}</span>
             </template>
@@ -99,7 +99,7 @@
       </el-col>
 
       <!-- 右侧：设备转移规则配置 -->
-      <el-col :span="14">
+      <el-col :span="12">
         <div class="section-title">
           设备转移规则配置
           <span class="config-hint">每个设备可配置多条转移规则</span>
@@ -829,14 +829,30 @@ function doRestoreRules(data: PendingRestoreData) {
   }
 
   .device-select-table {
-    :deep(.el-table__header th) {
-      background-color: var(--bg-tertiary);
-      color: var(--text-primary);
-      font-size: 12px;
+    :deep(.el-table__header-wrapper th.el-table__cell),
+    :deep(.el-table__body-wrapper td.el-table__cell) {
+      padding: 0 !important;
+      height: 32px !important;
+      font-size: 12px !important;
+
+      .cell {
+        white-space: nowrap !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+        padding: 0 4px !important;
+        line-height: 32px !important;
+        height: 32px !important;
+      }
     }
 
-    :deep(.el-table__body td) {
-      font-size: 12px;
+    :deep(.el-table__header-wrapper th.el-table__cell) {
+      background: var(--bg-tertiary) !important;
+      color: var(--text-primary) !important;
+      border-bottom: 1px solid var(--border-color) !important;
+    }
+
+    :deep(.el-table__body-wrapper tr.el-table__row) {
+      height: 32px !important;
     }
 
     .power-value {
@@ -1132,6 +1148,37 @@ function doRestoreRules(data: PendingRestoreData) {
       font-size: 12px;
       color: var(--text-secondary);
     }
+  }
+}
+</style>
+
+<!-- 非 scoped 样式，用于覆盖全局 el-table 样式 -->
+<style lang="scss">
+.device-select-table.el-table {
+  .el-table__header-wrapper th.el-table__cell,
+  .el-table__body-wrapper td.el-table__cell {
+    padding: 0 !important;
+    height: 32px !important;
+    font-size: 12px !important;
+
+    .cell {
+      white-space: nowrap !important;
+      overflow: hidden !important;
+      text-overflow: ellipsis !important;
+      padding: 0 4px !important;
+      line-height: 32px !important;
+      height: 32px !important;
+    }
+  }
+
+  .el-table__header-wrapper th.el-table__cell {
+    background: var(--bg-tertiary, #1a2332) !important;
+    color: var(--text-primary, #fff) !important;
+    border-bottom: 1px solid var(--border-color, #3a4a5a) !important;
+  }
+
+  .el-table__body-wrapper tr.el-table__row {
+    height: 32px !important;
   }
 }
 </style>

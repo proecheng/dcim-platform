@@ -7,7 +7,7 @@ title Computing Center Intelligent Monitoring System Launcher
 echo.
 echo ========================================================
 echo       Computing Center Intelligent Monitoring System
-echo                    Startup Script v4.8
+echo                    Startup Script v5.0
 echo ========================================================
 echo.
 
@@ -37,17 +37,25 @@ for /f "tokens=*" %%i in ('node --version 2^>^&1') do echo       Node.js %%i
 echo.
 echo [2/7] Cleaning occupied ports...
 
-for /f "tokens=5" %%a in ('netstat -ano 2^>nul ^| findstr ":3000.*LISTENING"') do (
-    echo       Stopping port 3000 process [PID: %%a]
-    taskkill /F /PID %%a >nul 2>&1
-)
+REM Use PowerShell to reliably kill processes on ports
+echo       Checking port 3000...
+powershell -Command "Get-NetTCPConnection -LocalPort 3000 -ErrorAction SilentlyContinue | ForEach-Object { $p = $_.OwningProcess; if ($p -gt 0) { Write-Host '       Stopping PID:' $p; Stop-Process -Id $p -Force -ErrorAction SilentlyContinue } }" 2>nul
 
-for /f "tokens=5" %%a in ('netstat -ano 2^>nul ^| findstr ":8080.*LISTENING"') do (
-    echo       Stopping port 8080 process [PID: %%a]
-    taskkill /F /PID %%a >nul 2>&1
-)
+echo       Checking port 8080...
+powershell -Command "Get-NetTCPConnection -LocalPort 8080 -ErrorAction SilentlyContinue | ForEach-Object { $p = $_.OwningProcess; if ($p -gt 0) { Write-Host '       Stopping PID:' $p; Stop-Process -Id $p -Force -ErrorAction SilentlyContinue } }" 2>nul
 
-timeout /t 2 /nobreak >nul
+REM Fallback: kill all node processes with specific window titles
+taskkill /F /FI "WINDOWTITLE eq Proxy*" >nul 2>&1
+taskkill /F /FI "WINDOWTITLE eq Monitor-Proxy*" >nul 2>&1
+taskkill /F /FI "WINDOWTITLE eq Backend*" >nul 2>&1
+taskkill /F /FI "WINDOWTITLE eq Monitor-Backend*" >nul 2>&1
+
+echo       Waiting for ports to release...
+ping 127.0.0.1 -n 5 >nul
+
+REM Verify ports are free
+powershell -Command "$p3000 = Get-NetTCPConnection -LocalPort 3000 -ErrorAction SilentlyContinue; $p8080 = Get-NetTCPConnection -LocalPort 8080 -ErrorAction SilentlyContinue; if ($p3000 -or $p8080) { Write-Host '       [WARNING] Some ports still in use, retrying...'; Start-Sleep -Seconds 3 }" 2>nul
+
 echo       Ports cleaned
 
 echo.
@@ -147,13 +155,13 @@ if exist "%BACKEND_DIR%\.venv\Scripts\activate.bat" (
 )
 
 echo Waiting for backend to start...
-timeout /t 3 /nobreak >nul
+ping 127.0.0.1 -n 6 >nul
 
 echo Starting proxy service (port 3000)...
 start "Monitor-Proxy" cmd /k "title Proxy [Port 3000] && cd /d %PROXY_DIR% && echo Starting proxy... && node server.js"
 
 echo.
-timeout /t 5 /nobreak >nul
+ping 127.0.0.1 -n 6 >nul
 
 echo.
 echo ========================================================

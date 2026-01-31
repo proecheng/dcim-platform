@@ -1547,6 +1547,69 @@ export interface ShiftableDevicesResponse {
   }
 }
 
+// ==================== 转移比例智能推荐 ====================
+
+/** 单个设备的ratio推荐 */
+export interface RatioRecommendation {
+  device_id: number
+  device_code: string
+  device_name: string
+  device_type: string
+  rated_power: number
+  current_ratio: number
+  recommended_ratio: number
+  current_shiftable_power: number
+  recommended_shiftable_power: number
+  confidence: 'high' | 'medium' | 'low'
+  data_days: number
+  has_change: boolean
+  calculation_details?: {
+    avg_power: number
+    max_power: number
+    min_power: number
+    peak_ratio: number
+    flexibility_factor: number
+    type_max_ratio: number
+    constraints: number[]
+    raw_ratio: number
+  }
+}
+
+/** ratio推荐响应 */
+export interface RatioRecommendationResponse {
+  total_devices: number
+  devices_with_change: number
+  recommendations: RatioRecommendation[]
+  summary: {
+    current_total_power: number
+    recommended_total_power: number
+    power_change: number
+    analysis_days: number
+  }
+}
+
+/** 批量更新ratio请求 */
+export interface BatchUpdateRatioRequest {
+  device_ids: number[]
+  use_recommended?: boolean
+  custom_ratios?: Record<number, number>
+}
+
+/** 批量更新ratio响应 */
+export interface BatchUpdateRatioResponse {
+  total: number
+  success_count: number
+  failed_count: number
+  message?: string
+  results?: Array<{
+    device_id: number
+    old_ratio?: number
+    new_ratio?: number
+    success: boolean
+    error?: string
+  }>
+}
+
 /** 可调节设备 */
 export interface AdjustableDevice {
   device_id: number
@@ -1720,6 +1783,78 @@ export function getCurrentPricing() {
 /** 获取可转移负荷设备列表 */
 export function getShiftableDevices() {
   return request.get<ResponseModel<ShiftableDevicesResponse>>('/v1/energy/devices/shiftable')
+}
+
+// ==================== 转移比例智能推荐 API ====================
+
+/** 获取转移比例推荐值 */
+export function getShiftRatioRecommendations(days: number = 30) {
+  return request.get<ResponseModel<RatioRecommendationResponse>>(
+    '/v1/energy/devices/shift-ratio/recommendations',
+    { params: { days } }
+  )
+}
+
+/** 更新单个设备的转移比例 */
+export function updateDeviceShiftRatio(deviceId: number, ratio: number) {
+  return request.put<ResponseModel<{ device_id: number; old_ratio: number; new_ratio: number; success: boolean }>>(
+    `/v1/energy/devices/${deviceId}/shift-ratio`,
+    { ratio }
+  )
+}
+
+/** 批量更新转移比例 */
+export function batchUpdateShiftRatio(data: BatchUpdateRatioRequest) {
+  return request.post<ResponseModel<BatchUpdateRatioResponse>>(
+    '/v1/energy/devices/shift-ratio/batch-update',
+    data
+  )
+}
+
+/** 全部接受推荐值 */
+export function acceptAllRecommendations(days: number = 30) {
+  return request.post<ResponseModel<BatchUpdateRatioResponse>>(
+    '/v1/energy/devices/shift-ratio/accept-all',
+    null,
+    { params: { days } }
+  )
+}
+
+// ==================== 设备典型日功率 Profile ====================
+
+/** 24小时典型日功率数据点 */
+export interface HourlyProfilePoint {
+  hour: number
+  avg_power: number
+  max_power: number
+  min_power: number
+  period_type: 'sharp' | 'peak' | 'flat' | 'valley' | 'deep_valley'
+}
+
+/** 设备典型日功率 Profile 响应 */
+export interface TypicalDayProfileResponse {
+  device_id: number
+  device_name: string
+  device_type: string
+  rated_power: number
+  data_days: number
+  hourly_profile: HourlyProfilePoint[]
+  summary: {
+    avg_power: number
+    max_power: number
+    min_power: number
+    load_rate: number
+    peak_energy_ratio: number
+    has_real_data: boolean
+  }
+}
+
+/** 获取设备典型日功率Profile */
+export function getDeviceTypicalDayProfile(deviceId: number, days: number = 30) {
+  return request.get<ResponseModel<TypicalDayProfileResponse>>(
+    `/v1/energy/devices/${deviceId}/typical-day-profile`,
+    { params: { days } }
+  )
 }
 
 /** 获取可调节参数设备列表 */

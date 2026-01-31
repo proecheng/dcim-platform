@@ -39,6 +39,10 @@
       size="small"
       class="device-table"
       max-height="400"
+      :row-style="{ height: '36px' }"
+      :cell-style="{ padding: '4px 8px' }"
+      :header-row-style="{ height: '32px' }"
+      :header-cell-style="{ padding: '6px 8px' }"
     >
       <el-table-column prop="device_code" label="设备编码" width="120" fixed />
       <el-table-column prop="device_name" label="设备名称" min-width="150" />
@@ -176,6 +180,18 @@ function formatHoursShort(hours: number[]): string {
   }
 
   .device-table {
+    :deep(.el-table__header th) {
+      padding: 6px 0;
+    }
+
+    :deep(.el-table__body td) {
+      padding: 4px 0;
+    }
+
+    :deep(.el-table__row) {
+      height: 36px;
+    }
+
     .highlight {
       color: var(--success-color, #52c41a);
       font-weight: bold;

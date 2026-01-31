@@ -34,6 +34,13 @@ from .topology import router as topology_router
 # TODO: Enable after installing numpy
 # from .optimization import router as optimization_router
 
+# 深度学习节能优化模块 (需要安装 torch)
+try:
+    from .ml import router as ml_router
+    _ml_available = True
+except ImportError:
+    _ml_available = False
+
 api_router = APIRouter()
 
 api_router.include_router(auth_router, prefix="/auth", tags=["认证"])
@@ -66,5 +73,9 @@ api_router.include_router(monitoring_router, prefix="/monitoring", tags=["电费
 api_router.include_router(topology_router, prefix="/topology", tags=["拓扑编辑"])
 # TODO: Enable after installing numpy
 # api_router.include_router(optimization_router, prefix="/optimization", tags=["日前调度优化"])
+
+# 深度学习节能优化API
+if _ml_available:
+    api_router.include_router(ml_router, prefix="/ml", tags=["深度学习节能优化"])
 
 # reload 1769696750.1147227

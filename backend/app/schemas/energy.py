@@ -2,8 +2,8 @@
 用电管理数据模型
 """
 from enum import Enum
-from typing import Optional, List, Dict
-from pydantic import BaseModel, Field
+from typing import Optional, List, Dict, Any
+from pydantic import BaseModel, Field, field_validator
 from datetime import datetime, date
 
 
@@ -899,6 +899,76 @@ class DeviceShiftConfigCreate(BaseModel):
 class DeviceShiftConfigResponse(DeviceShiftConfigCreate):
     """设备负荷转移配置响应"""
     device_id: int
+
+
+# ========== 设备典型日功率 Profile ==========
+
+class HourlyProfilePoint(BaseModel):
+    """24小时典型日功率数据点"""
+    hour: int = Field(..., ge=0, le=23, description="小时 0-23")
+    avg_power: float = Field(..., description="平均功率 kW")
+    max_power: float = Field(..., description="最大功率 kW")
+    min_power: float = Field(..., description="最小功率 kW")
+    period_type: str = Field("flat", description="时段类型: sharp/peak/flat/valley/deep_valley")
+
+
+class TypicalDayProfileResponse(BaseModel):
+    """设备典型日功率 Profile 响应"""
+    device_id: int
+    device_name: str
+    device_type: str
+    rated_power: float = Field(..., description="额定功率 kW")
+    data_days: int = Field(..., description="有效数据天数")
+    hourly_profile: List[HourlyProfilePoint] = Field(..., description="24小时功率数据")
+    summary: Dict[str, Any] = Field(default_factory=dict, description="汇总指标")
+
+
+# ========== shiftable_power_ratio 推荐值 ==========
+
+class RatioRecommendation(BaseModel):
+    """单个设备的 ratio 推荐"""
+    device_id: int
+    device_code: str
+    device_name: str
+    device_type: str
+    rated_power: float = Field(..., description="额定功率 kW")
+    current_ratio: float = Field(..., description="当前 shiftable_power_ratio")
+    recommended_ratio: float = Field(..., description="推荐 shiftable_power_ratio")
+    current_shiftable_power: float = Field(..., description="当前可转移功率 kW")
+    recommended_shiftable_power: float = Field(..., description="推荐可转移功率 kW")
+    confidence: str = Field(..., description="置信度: high/medium/low")
+    data_days: int = Field(..., description="有效数据天数")
+    has_change: bool = Field(..., description="推荐值与当前值是否不同")
+    calculation_details: Optional[Dict[str, Any]] = Field(None, description="计算详情")
+
+
+class RatioRecommendationResponse(BaseModel):
+    """ratio 推荐响应"""
+    total_devices: int
+    devices_with_change: int
+    recommendations: List[RatioRecommendation]
+    summary: Dict[str, Any]
+
+
+class BatchUpdateRatioRequest(BaseModel):
+    """批量更新 ratio 请求"""
+    device_ids: List[int] = Field(..., min_length=1, description="要更新的设备ID列表")
+    use_recommended: bool = Field(True, description="是否使用推荐值")
+    custom_ratios: Optional[Dict[int, float]] = Field(None, description="自定义 ratio 值 {device_id: ratio}")
+
+    @field_validator('custom_ratios')
+    @classmethod
+    def validate_ratios(cls, v):
+        if v is not None:
+            for device_id, ratio in v.items():
+                if not (0 <= ratio <= 1):
+                    raise ValueError(f"设备 {device_id} 的 ratio 值 {ratio} 必须在 0-1 之间")
+        return v
+
+
+class UpdateSingleRatioRequest(BaseModel):
+    """单个设备更新 ratio 请求"""
+    ratio: float = Field(..., ge=0, le=1, description="新的 shiftable_power_ratio")
 
 
 # ========== 需量分析结果 ==========

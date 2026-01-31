@@ -1,7 +1,7 @@
 <template>
   <div class="energy-config">
     <el-tabs v-model="activeTab" type="border-card">
-      <!-- 变压器管理 -->
+      <!-- 变压器管理  -->
       <el-tab-pane label="变压器" name="transformer">
         <div class="tab-header">
           <el-button type="primary" @click="showTransformerDialog()">
@@ -291,6 +291,108 @@
           </el-col>
         </el-row>
       </el-tab-pane>
+
+      <!-- 转移配置 (智能推荐) -->
+      <el-tab-pane label="转移配置" name="shift">
+        <div class="tab-header">
+          <el-button type="success" @click="handleAcceptAllRatios" :disabled="!hasRatioChanges" :loading="saving">
+            <el-icon><Check /></el-icon>全部接受推荐值
+          </el-button>
+          <el-button @click="loadRatioRecommendations" :loading="loading.shift">
+            <el-icon><Refresh /></el-icon>刷新推荐
+          </el-button>
+          <span class="tip-text" style="margin-left: 12px; color: #909399; font-size: 13px;">
+            基于过去30天历史数据智能分析
+          </span>
+        </div>
+
+        <el-alert type="info" :closable="false" style="margin-bottom: 16px;">
+          <template #title>转移配置说明</template>
+          <p>可转移功率比例(shiftable_power_ratio)决定设备在负荷转移时可调节的功率占比。</p>
+          <p>推荐值基于设备历史运行数据(负荷波动、峰谷用电分布)智能计算，置信度反映数据充足程度。</p>
+        </el-alert>
+
+        <el-table :data="ratioRecommendations" v-loading="loading.shift" stripe highlight-current-row @row-click="handleShiftDeviceRowClick">
+          <el-table-column prop="device_code" label="设备编码" width="120" />
+          <el-table-column prop="device_name" label="设备名称" min-width="140" />
+          <el-table-column prop="device_type" label="类型" width="90">
+            <template #default="{ row }">
+              {{ getDeviceTypeText(row.device_type) }}
+            </template>
+          </el-table-column>
+          <el-table-column prop="rated_power" label="额定功率" width="100">
+            <template #default="{ row }">
+              {{ row.rated_power }} kW
+            </template>
+          </el-table-column>
+          <el-table-column label="当前比例" width="95">
+            <template #default="{ row }">
+              {{ (row.current_ratio * 100).toFixed(0) }}%
+            </template>
+          </el-table-column>
+          <el-table-column label="推荐比例" width="120">
+            <template #default="{ row }">
+              <span :class="{ 'recommend-highlight': row.has_change }">
+                {{ (row.recommended_ratio * 100).toFixed(0) }}%
+              </span>
+              <el-tag v-if="row.has_change" type="warning" size="small" style="margin-left: 4px;">
+                变更
+              </el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column label="可转移功率" width="145">
+            <template #default="{ row }">
+              {{ row.current_shiftable_power.toFixed(1) }} kW
+              <span v-if="row.has_change" class="power-change">
+                → {{ row.recommended_shiftable_power.toFixed(1) }}
+              </span>
+            </template>
+          </el-table-column>
+          <el-table-column prop="confidence" label="置信度" width="80">
+            <template #default="{ row }">
+              <el-tag :type="getConfidenceTagType(row.confidence)" size="small">
+                {{ getConfidenceText(row.confidence) }}
+              </el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column label="操作" width="160" fixed="right">
+            <template #default="{ row }">
+              <el-button link type="primary" @click="showRatioAdjustDialog(row)">调整</el-button>
+              <el-button link type="success" @click="handleAcceptOneRatio(row)" v-if="row.has_change" :loading="saving">
+                接受
+              </el-button>
+            </template>
+          </el-table-column>
+        </el-table>
+
+        <!-- 汇总卡片 -->
+        <el-row :gutter="20" style="margin-top: 20px;">
+          <el-col :span="6">
+            <el-card shadow="hover" class="summary-card">
+              <div class="summary-label">可转移设备</div>
+              <div class="summary-value">{{ ratioSummary.total_devices || 0 }} 台</div>
+            </el-card>
+          </el-col>
+          <el-col :span="6">
+            <el-card shadow="hover" class="summary-card">
+              <div class="summary-label">有变更建议</div>
+              <div class="summary-value warning">{{ ratioSummary.devices_with_change || 0 }} 台</div>
+            </el-card>
+          </el-col>
+          <el-col :span="6">
+            <el-card shadow="hover" class="summary-card">
+              <div class="summary-label">当前可转移功率</div>
+              <div class="summary-value">{{ ratioSummary.current_total_power?.toFixed(1) || '0' }} kW</div>
+            </el-card>
+          </el-col>
+          <el-col :span="6">
+            <el-card shadow="hover" class="summary-card">
+              <div class="summary-label">推荐可转移功率</div>
+              <div class="summary-value primary">{{ ratioSummary.recommended_total_power?.toFixed(1) || '0' }} kW</div>
+            </el-card>
+          </el-col>
+        </el-row>
+      </el-tab-pane>
     </el-tabs>
 
     <!-- 变压器对话框 -->
@@ -503,20 +605,72 @@
         <el-button type="primary" @click="handleSaveDemand" :loading="saving">保存</el-button>
       </template>
     </el-dialog>
+
+    <!-- 转移配置调整对话框 -->
+    <el-dialog v-model="dialogs.ratio" title="调整转移配置" width="520px">
+      <el-form :model="ratioForm" label-width="120px">
+        <el-form-item label="设备名称">
+          <el-input :value="ratioForm.device_name" disabled />
+        </el-form-item>
+        <el-form-item label="设备类型">
+          <el-input :value="getDeviceTypeText(ratioForm.device_type)" disabled />
+        </el-form-item>
+        <el-form-item label="额定功率">
+          <el-input :value="`${ratioForm.rated_power} kW`" disabled />
+        </el-form-item>
+        <el-form-item label="当前比例">
+          <el-input :value="`${(ratioForm.current_ratio * 100).toFixed(0)}%`" disabled />
+        </el-form-item>
+        <el-form-item label="推荐比例">
+          <el-tag type="warning" size="large">{{ (ratioForm.recommended_ratio * 100).toFixed(0) }}%</el-tag>
+          <span style="margin-left: 8px; color: #909399; font-size: 13px;">
+            (置信度: {{ getConfidenceText(ratioForm.confidence) }})
+          </span>
+        </el-form-item>
+        <el-form-item label="新比例" required>
+          <el-slider
+            v-model="ratioForm.new_ratio_percent"
+            :min="0" :max="100" :step="5"
+            :marks="{ 0: '0%', 25: '25%', 50: '50%', 75: '75%', 100: '100%' }"
+            show-input
+            style="width: 100%;"
+          />
+          <div class="power-preview" style="margin-top: 8px; color: #606266;">
+            对应可转移功率: <strong>{{ (ratioForm.rated_power * ratioForm.new_ratio_percent / 100).toFixed(1) }} kW</strong>
+          </div>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="dialogs.ratio = false">取消</el-button>
+        <el-button type="warning" @click="handleUseRecommendedRatio">使用推荐值</el-button>
+        <el-button type="primary" @click="handleSaveRatio" :loading="saving">保存</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 设备用电详情抽屉 -->
+    <DeviceShiftDetailDrawer
+      :visible="shiftDetailDrawerVisible"
+      :device="selectedShiftDevice"
+      @close="shiftDetailDrawerVisible = false"
+      @accept-ratio="handleAcceptFromDrawer"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, reactive, onMounted, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Plus, Upload, Edit } from '@element-plus/icons-vue'
+import { Plus, Upload, Edit, Check, Refresh } from '@element-plus/icons-vue'
+import DeviceShiftDetailDrawer from '@/components/energy/DeviceShiftDetailDrawer.vue'
 import {
   getTransformers, createTransformer, updateTransformer, deleteTransformer,
   getMeterPoints, createMeterPoint, updateMeterPoint, deleteMeterPoint,
   getDistributionPanels, createDistributionPanel, updateDistributionPanel, deleteDistributionPanel,
   getDistributionCircuits, createDistributionCircuit, updateDistributionCircuit, deleteDistributionCircuit,
   getPricingList, createPricing, updatePricing, deletePricing,
-  type Transformer, type MeterPoint, type DistributionPanel, type DistributionCircuit, type ElectricityPricing
+  getShiftRatioRecommendations, updateDeviceShiftRatio, acceptAllRecommendations,
+  type Transformer, type MeterPoint, type DistributionPanel, type DistributionCircuit, type ElectricityPricing,
+  type RatioRecommendation
 } from '@/api/modules/energy'
 
 const activeTab = ref('transformer')
@@ -528,7 +682,8 @@ const loading = reactive({
   meter: false,
   panel: false,
   circuit: false,
-  pricing: false
+  pricing: false,
+  shift: false
 })
 
 const dialogs = reactive({
@@ -537,7 +692,8 @@ const dialogs = reactive({
   panel: false,
   circuit: false,
   pricing: false,
-  demand: false
+  demand: false,
+  ratio: false
 })
 
 const transformers = ref<Transformer[]>([])
@@ -553,6 +709,22 @@ const circuitForm = ref<any>({})
 const pricingForm = ref<any>({})
 const demandForm = ref<any>({})
 
+// 转移配置推荐数据
+const ratioRecommendations = ref<RatioRecommendation[]>([])
+const ratioSummary = ref<{
+  current_total_power?: number
+  recommended_total_power?: number
+  power_change?: number
+  analysis_days?: number
+  total_devices?: number
+  devices_with_change?: number
+}>({})
+const ratioForm = ref<any>({})
+
+// 设备详情抽屉
+const shiftDetailDrawerVisible = ref(false)
+const selectedShiftDevice = ref<RatioRecommendation | null>(null)
+
 // 需量配置计算属性
 const totalCapacity = computed(() =>
   transformers.value.reduce((sum, t) => sum + (t.rated_capacity || 0), 0)
@@ -564,6 +736,11 @@ const totalDeclaredDemand = computed(() =>
 
 const configuredCount = computed(() =>
   transformers.value.filter(t => t.declared_demand).length
+)
+
+// 转移配置计算属性
+const hasRatioChanges = computed(() =>
+  ratioRecommendations.value.some(r => r.has_change)
 )
 
 type TagType = 'success' | 'warning' | 'danger' | 'info' | 'primary'
@@ -870,12 +1047,158 @@ const getDemandStatus = (row: Transformer): 'success' | 'warning' | 'exception' 
   return 'success'
 }
 
+// ==================== 转移配置推荐 ====================
+
+const getDeviceTypeText = (type: string) => {
+  const map: Record<string, string> = {
+    PUMP: '水泵', AC: '空调', HVAC: '暖通', LIGHTING: '照明',
+    CHILLER: '冷水机', COOLING_TOWER: '冷却塔', AHU: '空调机组',
+    UPS: 'UPS', IT_SERVER: '服务器', COMPRESSOR: '压缩机'
+  }
+  return map[type?.toUpperCase()] || type || '-'
+}
+
+const getConfidenceTagType = (confidence: string): TagType => {
+  const map: Record<string, TagType> = { high: 'success', medium: 'warning', low: 'info' }
+  return map[confidence] || 'info'
+}
+
+const getConfidenceText = (confidence: string) => {
+  const map: Record<string, string> = { high: '高', medium: '中', low: '低' }
+  return map[confidence] || confidence || '-'
+}
+
+const loadRatioRecommendations = async () => {
+  loading.shift = true
+  try {
+    const res = await getShiftRatioRecommendations(30)
+    if (res.code === 0 && res.data) {
+      ratioRecommendations.value = res.data.recommendations || []
+      ratioSummary.value = {
+        ...res.data.summary,
+        total_devices: res.data.total_devices,
+        devices_with_change: res.data.devices_with_change
+      }
+    } else {
+      ElMessage.error(res.message || '获取推荐数据失败')
+    }
+  } catch (e) {
+    console.error('加载转移配置推荐失败:', e)
+    ElMessage.error('网络错误，请稍后重试')
+  } finally {
+    loading.shift = false
+  }
+}
+
+const handleAcceptAllRatios = async () => {
+  const count = ratioSummary.value?.devices_with_change ?? 0
+  if (count === 0) {
+    ElMessage.info('没有需要更新的设备')
+    return
+  }
+  await ElMessageBox.confirm(
+    `确定接受所有 ${count} 个设备的推荐值？`,
+    '确认批量更新',
+    { type: 'warning' }
+  )
+  saving.value = true
+  try {
+    const res = await acceptAllRecommendations(30)
+    if (res.code === 0 && res.data) {
+      ElMessage.success(res.data.message || `已更新 ${res.data.success_count ?? 0} 台设备`)
+      loadRatioRecommendations()
+    } else {
+      ElMessage.error(res.message || '操作失败')
+    }
+  } catch (e) {
+    console.error('批量更新失败:', e)
+    ElMessage.error('网络错误，请稍后重试')
+  } finally {
+    saving.value = false
+  }
+}
+
+const handleAcceptOneRatio = async (row: RatioRecommendation) => {
+  saving.value = true
+  try {
+    const res = await updateDeviceShiftRatio(row.device_id, row.recommended_ratio)
+    if (res.code === 0) {
+      ElMessage.success(`${row.device_name} 已更新为推荐值`)
+      loadRatioRecommendations()
+    } else {
+      ElMessage.error(res.message || '更新失败')
+    }
+  } catch (e) {
+    console.error('更新失败:', e)
+    ElMessage.error('网络错误，请稍后重试')
+  } finally {
+    saving.value = false
+  }
+}
+
+const handleShiftDeviceRowClick = (row: RatioRecommendation) => {
+  selectedShiftDevice.value = row
+  shiftDetailDrawerVisible.value = true
+}
+
+const handleAcceptFromDrawer = async (device: RatioRecommendation) => {
+  saving.value = true
+  try {
+    const res = await updateDeviceShiftRatio(device.device_id, device.recommended_ratio)
+    if (res.code === 0) {
+      ElMessage.success(`已将 ${device.device_name} 的转移比例更新为 ${(device.recommended_ratio * 100).toFixed(0)}%`)
+      shiftDetailDrawerVisible.value = false
+      loadRatioRecommendations()
+    } else {
+      ElMessage.error(res.message || '更新失败')
+    }
+  } catch (e) {
+    console.error('更新失败:', e)
+    ElMessage.error('网络错误，请稍后重试')
+  } finally {
+    saving.value = false
+  }
+}
+
+const showRatioAdjustDialog = (row: RatioRecommendation) => {
+  ratioForm.value = {
+    ...row,
+    new_ratio_percent: Math.round(row.current_ratio * 100)
+  }
+  dialogs.ratio = true
+}
+
+const handleUseRecommendedRatio = () => {
+  ratioForm.value.new_ratio_percent = Math.round(ratioForm.value.recommended_ratio * 100)
+}
+
+const handleSaveRatio = async () => {
+  const newRatio = ratioForm.value.new_ratio_percent / 100
+  saving.value = true
+  try {
+    const res = await updateDeviceShiftRatio(ratioForm.value.device_id, newRatio)
+    if (res.code === 0) {
+      ElMessage.success('保存成功')
+      dialogs.ratio = false
+      loadRatioRecommendations()
+    } else {
+      ElMessage.error(res.message || '保存失败')
+    }
+  } catch (e) {
+    console.error('保存失败:', e)
+    ElMessage.error('网络错误，请稍后重试')
+  } finally {
+    saving.value = false
+  }
+}
+
 onMounted(() => {
   loadTransformers()
   loadMeterPoints()
   loadPanels()
   loadCircuits()
   loadPricing()
+  loadRatioRecommendations()
 })
 </script>
 
@@ -1073,5 +1396,25 @@ onMounted(() => {
   margin-left: 12px;
   font-size: 12px;
   color: var(--text-secondary);
+}
+
+// 转移配置推荐样式
+.recommend-highlight {
+  color: var(--warning-color);
+  font-weight: 600;
+}
+
+.power-change {
+  color: var(--success-color);
+  font-size: 12px;
+  margin-left: 4px;
+}
+
+.power-preview {
+  margin-top: 8px;
+  padding: 8px 12px;
+  background-color: var(--bg-tertiary);
+  border-radius: 4px;
+  font-size: 13px;
 }
 </style>
