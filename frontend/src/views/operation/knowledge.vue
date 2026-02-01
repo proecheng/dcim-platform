@@ -196,9 +196,7 @@
 
       <el-divider />
 
-      <div class="detail-content">
-        <pre class="content-text">{{ currentArticle?.content }}</pre>
-      </div>
+      <div class="detail-content markdown-body" v-html="renderedContent"></div>
 
       <template #footer>
         <el-button @click="handleEdit(currentArticle!)">编辑</el-button>
@@ -210,9 +208,12 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, computed } from 'vue'
 import { ElMessage, ElMessageBox, type FormInstance } from 'element-plus'
 import { Plus, Search, View, Star, User, Calendar } from '@element-plus/icons-vue'
+import { marked } from 'marked'
+import hljs from 'highlight.js'
+import 'highlight.js/styles/atom-one-dark.css'
 import {
   getKnowledgeList,
   createKnowledge,
@@ -220,6 +221,45 @@ import {
   deleteKnowledge,
   type Knowledge
 } from '@/api/modules/operation'
+
+// 配置 marked
+marked.setOptions({
+  gfm: true,
+  breaks: true,
+  highlight: function(code, lang) {
+    if (lang && hljs.getLanguage(lang)) {
+      try {
+        return hljs.highlight(code, { language: lang }).value
+      } catch (_) {}
+    }
+    return hljs.highlightAuto(code).value
+  }
+})
+
+// Markdown 渲染
+function renderMarkdown(content: string): string {
+  if (!content) return ''
+  return marked(content) as string
+}
+
+// 从 Markdown 中提取纯文本（用于卡片摘要）
+function stripMarkdown(content: string): string {
+  if (!content) return ''
+  return content
+    .replace(/^#+\s+.+$/gm, '')  // 移除标题
+    .replace(/\*\*(.+?)\*\*/g, '$1')  // 粗体
+    .replace(/\*(.+?)\*/g, '$1')  // 斜体
+    .replace(/`(.+?)`/g, '$1')  // 行内代码
+    .replace(/```[\s\S]*?```/g, '')  // 代码块
+    .replace(/\[(.+?)\]\(.+?\)/g, '$1')  // 链接
+    .replace(/>\s+.+$/gm, '')  // 引用
+    .replace(/^[-*+]\s+/gm, '')  // 列表
+    .replace(/^\d+\.\s+/gm, '')  // 有序列表
+    .replace(/^---$/gm, '')  // 分隔线
+    .replace(/\|.+\|/g, '')  // 表格
+    .replace(/\n{2,}/g, '\n')  // 多余换行
+    .trim()
+}
 
 // 类型定义
 type TagType = 'success' | 'warning' | 'danger' | 'info' | 'primary'
@@ -263,6 +303,11 @@ const createRules = {
 // 详情对话框
 const detailDialogVisible = ref(false)
 
+// 渲染后的 Markdown 内容
+const renderedContent = computed(() => {
+  return currentArticle.value ? renderMarkdown(currentArticle.value.content) : ''
+})
+
 // 初始化加载
 onMounted(() => {
   loadKnowledgeList()
@@ -278,11 +323,34 @@ async function loadKnowledgeList() {
       category: filterCategory.value || undefined,
       keyword: filterKeyword.value || undefined
     })
-    if (res.data) {
-      const data = res.data as any
+    // 兼容两种返回格式：
+    // 1. 统一格式 {code, message, data: {items, total}}
+    // 2. 原始列表 [{...}, ...]
+    const raw = res as any
+    if (Array.isArray(raw)) {
+      // 后端直接返回列表
+      knowledgeList.value = raw
+      total.value = raw.length
+    } else if (raw?.data) {
+      // 统一格式
+      const data = raw.data
       knowledgeList.value = Array.isArray(data) ? data : data.items || []
       total.value = data.total || knowledgeList.value.length
+    } else if (raw?.items) {
+      knowledgeList.value = raw.items
+      total.value = raw.total || raw.items.length
+    } else {
+      knowledgeList.value = []
+      total.value = 0
     }
+
+    // 字段映射: 后端 view_count/tags -> 前端 views/keywords
+    knowledgeList.value = knowledgeList.value.map((item: any) => ({
+      ...item,
+      views: item.views ?? item.view_count ?? 0,
+      likes: item.likes ?? 0,
+      keywords: item.keywords ?? (item.tags ? item.tags.split(',').map((s: string) => s.trim()).filter(Boolean) : [])
+    }))
   } catch (e) {
     console.error('加载知识库列表失败', e)
     ElMessage.error('加载知识库列表失败')
@@ -403,8 +471,9 @@ function getCategoryType(category?: string): TagType {
 
 function truncateContent(content: string): string {
   if (!content) return ''
+  const plainText = stripMarkdown(content)
   const maxLength = 100
-  return content.length > maxLength ? content.substring(0, maxLength) + '...' : content
+  return plainText.length > maxLength ? plainText.substring(0, maxLength) + '...' : plainText
 }
 
 function formatDate(dateStr?: string): string {
@@ -578,14 +647,138 @@ function formatDateTime(dateStr?: string): string {
   }
 
   .detail-content {
-    .content-text {
+    max-height: 60vh;
+    overflow-y: auto;
+
+    &.markdown-body {
       font-size: 14px;
       color: var(--text-primary);
       line-height: 1.8;
-      white-space: pre-wrap;
-      word-wrap: break-word;
-      font-family: inherit;
-      margin: 0;
+
+      h1, h2, h3, h4, h5, h6 {
+        color: var(--text-primary);
+        margin-top: 1.5em;
+        margin-bottom: 0.5em;
+        font-weight: 600;
+        border-bottom: 1px solid var(--border-color);
+        padding-bottom: 0.3em;
+      }
+
+      h1 { font-size: 1.8em; }
+      h2 { font-size: 1.5em; }
+      h3 { font-size: 1.25em; }
+      h4 { font-size: 1.1em; border-bottom: none; }
+
+      p {
+        margin: 0.8em 0;
+      }
+
+      a {
+        color: var(--accent-color);
+        text-decoration: none;
+        &:hover {
+          text-decoration: underline;
+        }
+      }
+
+      code {
+        background: rgba(0, 0, 0, 0.3);
+        padding: 0.2em 0.4em;
+        border-radius: 4px;
+        font-family: 'Consolas', 'Monaco', monospace;
+        font-size: 0.9em;
+      }
+
+      pre {
+        background: #1e1e1e;
+        border-radius: 8px;
+        padding: 16px;
+        overflow-x: auto;
+        margin: 1em 0;
+
+        code {
+          background: transparent;
+          padding: 0;
+          font-size: 13px;
+          line-height: 1.6;
+        }
+      }
+
+      blockquote {
+        margin: 1em 0;
+        padding: 0.5em 1em;
+        border-left: 4px solid var(--accent-color);
+        background: rgba(64, 158, 255, 0.1);
+        border-radius: 0 4px 4px 0;
+
+        p {
+          margin: 0;
+        }
+      }
+
+      ul, ol {
+        padding-left: 2em;
+        margin: 0.8em 0;
+
+        li {
+          margin: 0.3em 0;
+        }
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 1em 0;
+
+        th, td {
+          border: 1px solid var(--border-color);
+          padding: 8px 12px;
+          text-align: left;
+        }
+
+        th {
+          background: rgba(64, 158, 255, 0.1);
+          font-weight: 600;
+        }
+
+        tr:nth-child(even) {
+          background: rgba(255, 255, 255, 0.02);
+        }
+      }
+
+      hr {
+        border: none;
+        border-top: 1px solid var(--border-color);
+        margin: 1.5em 0;
+      }
+
+      img {
+        max-width: 100%;
+        border-radius: 8px;
+      }
+
+      // details/summary 折叠样式
+      details {
+        margin: 1em 0;
+        padding: 0.5em 1em;
+        background: rgba(255, 255, 255, 0.02);
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+
+        summary {
+          cursor: pointer;
+          font-weight: 500;
+          outline: none;
+
+          &:hover {
+            color: var(--accent-color);
+          }
+
+          strong {
+            font-weight: 600;
+          }
+        }
+      }
     }
   }
 

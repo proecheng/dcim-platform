@@ -8,6 +8,11 @@
 // 导入 Element Plus 深色主题覆盖
 @import './element-dark.scss';
 
+// ============= 科技风字体引入 =============
+// Rajdhani: 数据展示用科技风字体 (Google Fonts 免费)
+// Orbitron: 标题/数据大字号字体
+@import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Orbitron:wght@400;500;600;700&family=Share+Tech+Mono&display=swap');
+
 // ============= 基础重置 =============
 * {
   box-sizing: border-box;
@@ -269,4 +274,210 @@ a {
 
 .pulse-glow {
   animation: pulse-glow 2s ease-in-out infinite;
+}
+
+// ============= 科技风字体应用 =============
+// 数据数字使用科技风等宽字体
+.tech-data,
+.tech-number {
+  font-family: var(--font-tech-data);
+  letter-spacing: 0.05em;
+}
+
+// 标题使用科技风字体
+.tech-heading {
+  font-family: var(--font-tech-heading);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+// 统计卡片数值自动应用科技字体
+.el-statistic__number,
+.statistic-value,
+.stat-value,
+.data-value,
+.metric-value {
+  font-family: var(--font-tech-data);
+  letter-spacing: 0.03em;
+}
+
+// ============= 入场动画 =============
+// 卡片从下方淡入
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+// 卡片从左侧滑入
+@keyframes fadeInLeft {
+  from {
+    opacity: 0;
+    transform: translateX(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+// 缩放淡入
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+// 数字滚动效果
+@keyframes countUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+// 入场动画类
+.animate-fade-in-up {
+  animation: fadeInUp 0.5s ease-out both;
+}
+
+.animate-fade-in-left {
+  animation: fadeInLeft 0.5s ease-out both;
+}
+
+.animate-scale-in {
+  animation: scaleIn 0.4s ease-out both;
+}
+
+// Stagger 延迟动画（交错入场）
+@for $i from 1 through 12 {
+  .animate-delay-#{$i} {
+    animation-delay: #{$i * 0.08}s;
+  }
+}
+
+// 卡片入场动画（自动应用）
+.el-card,
+.dark-card,
+.dark-card-solid {
+  animation: fadeInUp 0.4s ease-out both;
+}
+
+// 页面切换过渡
+.page-enter-active {
+  animation: fadeInUp 0.35s ease-out;
+}
+
+.page-leave-active {
+  transition: opacity 0.2s ease;
+}
+
+.page-leave-to {
+  opacity: 0;
+}
+
+// 列表项交错入场
+.stagger-list > * {
+  animation: fadeInUp 0.4s ease-out both;
+
+  @for $i from 1 through 20 {
+    &:nth-child(#{$i}) {
+      animation-delay: #{($i - 1) * 0.06}s;
+    }
+  }
+}
+
+// 数值跳动效果
+.animate-count {
+  animation: countUp 0.3s ease-out both;
+}
+
+// ============= 微交互增强 =============
+// 卡片悬停提升效果
+.dark-card,
+.el-card {
+  transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
+
+  &:hover {
+    transform: translateY(-2px);
+  }
+}
+
+// 按钮点击反馈
+.el-button {
+  transition: all 0.2s ease;
+
+  &:active {
+    transform: scale(0.97);
+  }
+}
+
+// 表格行悬停高亮增强
+.el-table .el-table__row {
+  transition: background-color 0.2s ease;
+}
+
+// ============= 渐变边框效果 =============
+.gradient-border {
+  position: relative;
+  border: none !important;
+
+  &::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    padding: 1px;
+    background: linear-gradient(135deg, var(--accent-color), var(--primary-color), transparent);
+    mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    mask-composite: exclude;
+    -webkit-mask-composite: xor;
+    pointer-events: none;
+  }
+}
+
+// ============= 呼吸灯效果 =============
+@keyframes breathe {
+  0%, 100% { opacity: 0.6; }
+  50% { opacity: 1; }
+}
+
+.breathe {
+  animation: breathe 3s ease-in-out infinite;
+}
+
+// ============= 扫描线效果（大屏用）=============
+@keyframes scanline {
+  0% { top: -5%; }
+  100% { top: 105%; }
+}
+
+.scanline-effect {
+  position: relative;
+  overflow: hidden;
+
+  &::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    width: 100%;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, var(--accent-color), transparent);
+    opacity: 0.3;
+    animation: scanline 4s linear infinite;
+  }
 }

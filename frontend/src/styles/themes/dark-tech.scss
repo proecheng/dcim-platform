@@ -2,6 +2,13 @@
 // 深色科技风主题变量 - 基于行业DCIM系统UI研究
 // ============================================
 
+// ============= 科技风字体 =============
+// 引入 DIN Pro 风格字体用于数据展示
+// 回退到系统无衬线字体确保兼容性
+$font-tech-data: 'DIN Pro', 'Rajdhani', 'Share Tech Mono', 'Roboto Mono', 'Consolas', monospace;
+$font-tech-heading: 'Orbitron', 'Audiowide', 'Rajdhani', 'Microsoft YaHei', sans-serif;
+$font-base: 'Microsoft YaHei', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+
 // ============= 背景色系 =============
 $bg-primary: #0a1628;           // 主背景色 (最深)
 $bg-secondary: #0d1b2a;         // 次级背景
@@ -245,4 +252,9 @@ html.dark,
   // 过渡
   --transition-fast: #{$transition-fast};
   --transition-base: #{$transition-base};
+
+  // 字体
+  --font-tech-data: #{$font-tech-data};
+  --font-tech-heading: #{$font-tech-heading};
+  --font-base: #{$font-base};
 }

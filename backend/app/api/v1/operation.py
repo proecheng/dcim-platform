@@ -630,27 +630,57 @@ async def complete_inspection_task(
 
 # ==================== 知识库管理 ====================
 
-@router.get("/knowledge", response_model=List[KnowledgeResponse], summary="获取知识库列表")
+@router.get("/knowledge", summary="获取知识库列表")
 async def get_knowledge_list(
     skip: int = Query(0, ge=0, description="跳过记录数"),
     limit: int = Query(100, ge=1, le=1000, description="返回记录数"),
+    page: int = Query(None, ge=1, description="页码（替代skip）"),
+    page_size: int = Query(None, ge=1, le=100, description="每页数量（替代limit）"),
     category: Optional[str] = Query(None, description="分类过滤"),
+    keyword: Optional[str] = Query(None, description="关键词搜索"),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_viewer)
 ):
     """
     获取知识库列表（分页）
     """
+    # 支持 page/page_size 参数
+    if page is not None and page_size is not None:
+        skip = (page - 1) * page_size
+        limit = page_size
+
     query = select(KnowledgeBase)
 
     if category:
         query = query.where(KnowledgeBase.category == category)
 
+    if keyword:
+        query = query.where(
+            KnowledgeBase.title.contains(keyword) |
+            KnowledgeBase.content.contains(keyword) |
+            KnowledgeBase.tags.contains(keyword)
+        )
+
+    # 获取总数
+    from sqlalchemy import func
+    count_query = select(func.count()).select_from(query.subquery())
+    total_result = await db.execute(count_query)
+    total = total_result.scalar() or 0
+
     query = query.order_by(KnowledgeBase.created_at.desc()).offset(skip).limit(limit)
     result = await db.execute(query)
     articles = result.scalars().all()
 
-    return [KnowledgeResponse.model_validate(article) for article in articles]
+    return {
+        "code": 0,
+        "message": "success",
+        "data": {
+            "items": [KnowledgeResponse.model_validate(article) for article in articles],
+            "total": total,
+            "skip": skip,
+            "limit": limit
+        }
+    }
 
 
 @router.post("/knowledge", response_model=KnowledgeResponse, summary="创建知识库文章")
