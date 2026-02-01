@@ -663,6 +663,17 @@ class EnergySavingProposal(Base):
     current_situation = Column(JSON, comment="当前状况数据")
     analysis_start_date = Column(Date, comment="分析起始日期")
     analysis_end_date = Column(Date, comment="分析结束日期")
+
+    # ========== V3.1 数据追溯链 (专利S1) ==========
+    trace_summary = Column(JSON, comment="""追溯汇总信息 JSON:
+        {
+            "total_traces": 15,
+            "data_sources": ["energy_daily", "power_devices", ...],
+            "time_range": {"start": "...", "end": "..."},
+            "root_trace_ids": ["TR-001", "TR-002", ...]
+        }
+    """)
+
     created_at = Column(DateTime, default=func.now(), comment="创建时间")
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
     status = Column(String(20), default="pending", comment="状态: pending/accepted/rejected/executing/completed")
@@ -688,6 +699,22 @@ class ProposalMeasure(Base):
     investment = Column(Numeric(10, 2), default=0, comment="投资 万元")
     is_selected = Column(Boolean, default=False, comment="用户是否选择该措施")
     execution_status = Column(String(20), default="pending", comment="执行状态: pending/executing/completed/failed")
+
+    # ========== V3.1 数据追溯链 (专利S1) ==========
+    trace_data = Column(JSON, comment="""数据追溯链信息 JSON:
+        {
+            "root_trace_id": "TR-20260201-001",
+            "traces": {
+                "param_code": "trace_id",
+                ...
+            },
+            "calculation_steps": [
+                {"step": 1, "description": "...", "trace_id": "..."},
+                ...
+            ]
+        }
+    """)
+
     created_at = Column(DateTime, default=func.now())
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
 
@@ -714,6 +741,278 @@ class MeasureExecutionLog(Base):
 
     # 关系
     measure = relationship("ProposalMeasure", back_populates="execution_logs")
+
+
+# ==================== 效果监测模型 (专利 S4) ====================
+
+class MeasureBaseline(Base):
+    """
+    措施基准值表 (S4a)
+
+    在措施执行前采集目标设备的运行参数作为基准值
+    """
+    __tablename__ = "measure_baselines"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    measure_id = Column(Integer, ForeignKey("proposal_measures.id", ondelete="CASCADE"), nullable=False)
+
+    # 基准采集时间
+    captured_at = Column(DateTime, nullable=False, default=func.now(), comment="采集时间")
+    capture_duration = Column(Integer, default=60, comment="采集时长(分钟)")
+
+    # 功率基准
+    power_avg = Column(Numeric(10, 2), comment="平均功率 kW")
+    power_max = Column(Numeric(10, 2), comment="最大功率 kW")
+    power_min = Column(Numeric(10, 2), comment="最小功率 kW")
+
+    # 能耗基准
+    energy_hourly = Column(Numeric(10, 2), comment="小时能耗 kWh")
+    energy_daily = Column(Numeric(12, 2), comment="日能耗 kWh")
+
+    # 设备参数基准
+    device_params = Column(JSON, comment="设备参数快照 {temp, speed, load, etc}")
+
+    # 数据来源
+    data_source = Column(String(50), comment="数据来源: realtime/history/simulation")
+    device_ids = Column(JSON, comment="关联设备ID列表")
+    point_ids = Column(JSON, comment="关联监测点位ID列表")
+
+    created_at = Column(DateTime, default=func.now())
+
+    # 关系
+    measure = relationship("ProposalMeasure", backref="baselines")
+
+
+class MonitoringRecord(Base):
+    """
+    监测记录表 (S4b)
+
+    在措施执行后按预设周期持续采集设备运行参数
+    """
+    __tablename__ = "monitoring_records"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    measure_id = Column(Integer, ForeignKey("proposal_measures.id", ondelete="CASCADE"), nullable=False)
+    baseline_id = Column(Integer, ForeignKey("measure_baselines.id"), comment="关联基准ID")
+
+    # 监测时间
+    recorded_at = Column(DateTime, nullable=False, default=func.now(), comment="记录时间")
+    monitoring_period = Column(Integer, default=15, comment="监测周期(分钟)")
+
+    # 实时功率
+    power_current = Column(Numeric(10, 2), comment="当前功率 kW")
+    power_baseline = Column(Numeric(10, 2), comment="对比基准功率 kW")
+    power_diff = Column(Numeric(10, 2), comment="功率差值 kW (正=节省)")
+
+    # 累计节能
+    energy_saved = Column(Numeric(12, 2), comment="累计节能量 kWh")
+    cost_saved = Column(Numeric(12, 2), comment="累计节省金额 元")
+
+    # 设备参数
+    device_params = Column(JSON, comment="当前设备参数")
+    param_changes = Column(JSON, comment="参数变化对比")
+
+    # 监测状态
+    status = Column(String(20), default="normal", comment="状态: normal/warning/anomaly")
+    anomaly_message = Column(Text, comment="异常描述")
+
+    created_at = Column(DateTime, default=func.now())
+
+    # 关系
+    measure = relationship("ProposalMeasure", backref="monitoring_records")
+
+
+class EffectReport(Base):
+    """
+    效果报告表 (S4c/S4d)
+
+    计算实际节能收益和效果达成率
+    """
+    __tablename__ = "effect_reports"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    proposal_id = Column(Integer, ForeignKey("energy_saving_proposals.id", ondelete="CASCADE"), nullable=False)
+    measure_id = Column(Integer, ForeignKey("proposal_measures.id", ondelete="CASCADE"), comment="关联措施ID(可选)")
+
+    # 报告周期
+    report_type = Column(String(20), nullable=False, comment="报告类型: daily/weekly/monthly/custom")
+    period_start = Column(DateTime, nullable=False, comment="周期开始")
+    period_end = Column(DateTime, nullable=False, comment="周期结束")
+
+    # 预期收益
+    expected_energy_saved = Column(Numeric(12, 2), comment="预期节能量 kWh")
+    expected_cost_saved = Column(Numeric(12, 2), comment="预期节省金额 元")
+
+    # 实际收益 (S4c)
+    actual_energy_saved = Column(Numeric(12, 2), comment="实际节能量 kWh")
+    actual_cost_saved = Column(Numeric(12, 2), comment="实际节省金额 元")
+
+    # 效果达成率 (S4d)
+    achievement_rate = Column(Numeric(5, 2), comment="效果达成率 % = 实际/预期*100")
+    energy_achievement_rate = Column(Numeric(5, 2), comment="节能量达成率 %")
+    cost_achievement_rate = Column(Numeric(5, 2), comment="成本节省达成率 %")
+
+    # 偏差分析
+    deviation_reason = Column(Text, comment="偏差原因分析")
+    improvement_suggestion = Column(Text, comment="改进建议")
+
+    # RL 反馈状态 (S4e)
+    rl_feedback_sent = Column(Boolean, default=False, comment="是否已推送RL模块")
+    rl_feedback_at = Column(DateTime, comment="RL反馈时间")
+    rl_adjustment_action = Column(JSON, comment="RL建议的调整动作")
+
+    # 元数据
+    data_quality = Column(Numeric(3, 2), comment="数据质量评分 0-1")
+    monitoring_coverage = Column(Numeric(3, 2), comment="监测覆盖率 0-1")
+
+    created_at = Column(DateTime, default=func.now())
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+
+    # 关系
+    proposal = relationship("EnergySavingProposal", backref="effect_reports")
+    measure = relationship("ProposalMeasure", backref="effect_reports")
+
+
+class MonitoringSession(Base):
+    """
+    监测会话表
+
+    管理措施的持续监测周期
+    """
+    __tablename__ = "monitoring_sessions"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    proposal_id = Column(Integer, ForeignKey("energy_saving_proposals.id", ondelete="CASCADE"), nullable=False)
+
+    # 会话状态
+    status = Column(String(20), default="pending", comment="状态: pending/active/paused/completed/failed")
+    started_at = Column(DateTime, comment="开始时间")
+    ended_at = Column(DateTime, comment="结束时间")
+
+    # 监测配置
+    monitoring_interval = Column(Integer, default=15, comment="监测间隔(分钟)")
+    report_interval = Column(String(20), default="daily", comment="报告周期: hourly/daily/weekly")
+    auto_rl_feedback = Column(Boolean, default=True, comment="是否自动RL反馈")
+
+    # 汇总统计
+    total_records = Column(Integer, default=0, comment="总记录数")
+    total_energy_saved = Column(Numeric(12, 2), default=0, comment="累计节能量 kWh")
+    avg_achievement_rate = Column(Numeric(5, 2), comment="平均达成率 %")
+
+    created_at = Column(DateTime, default=func.now())
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+
+    # 关系
+    proposal = relationship("EnergySavingProposal", backref="monitoring_sessions")
+
+
+# ==================== V3.2 RL 自适应优化 (专利 S5) ====================
+
+class RLOptimizationHistory(Base):
+    """
+    RL 优化历史表
+
+    记录每次 RL 优化的输入状态、输出动作和效果
+    """
+    __tablename__ = "rl_optimization_history"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    proposal_id = Column(Integer, ForeignKey("energy_saving_proposals.id", ondelete="CASCADE"), nullable=False)
+
+    # 输入状态
+    state_vector = Column(JSON, comment="输入状态向量")
+    state_summary = Column(JSON, comment="状态摘要 (可读)")
+
+    # 输出动作
+    actions = Column(JSON, comment="RL 输出动作")
+    adjustments = Column(JSON, comment="转换后的调整建议")
+
+    # 执行信息
+    exploration = Column(Boolean, default=False, comment="是否为探索动作")
+    exploration_rate = Column(Numeric(5, 4), comment="当前探索率")
+    confidence = Column(Numeric(5, 4), comment="置信度")
+    state_value = Column(Numeric(10, 4), comment="状态价值估计")
+
+    # 效果反馈
+    applied = Column(Boolean, default=False, comment="是否已应用")
+    applied_at = Column(DateTime, comment="应用时间")
+    reward = Column(Numeric(10, 4), comment="实际奖励")
+    achievement_rate = Column(Numeric(5, 2), comment="达成率 %")
+
+    created_at = Column(DateTime, default=func.now())
+
+    # 关系
+    proposal = relationship("EnergySavingProposal", backref="rl_optimizations")
+
+
+class RLTrainingLog(Base):
+    """
+    RL 训练日志表
+
+    记录在线训练的每一步信息
+    """
+    __tablename__ = "rl_training_logs"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    proposal_id = Column(Integer, ForeignKey("energy_saving_proposals.id", ondelete="CASCADE"), comment="关联方案")
+
+    # 训练输入
+    actual_saving = Column(Numeric(12, 2), comment="实际节能收益")
+    expected_saving = Column(Numeric(12, 2), comment="预期节能收益")
+    comfort_violation = Column(Numeric(5, 4), default=0, comment="舒适度违反程度")
+    safety_violation = Column(Numeric(5, 4), default=0, comment="安全约束违反")
+
+    # 训练结果
+    reward = Column(Numeric(10, 4), comment="计算奖励")
+    achievement_rate = Column(Numeric(5, 4), comment="达成率")
+    exploration_rate = Column(Numeric(5, 4), comment="当前探索率")
+    step_count = Column(Integer, comment="全局步数")
+
+    # 网络更新信息
+    policy_loss = Column(Numeric(10, 6), comment="策略损失")
+    value_loss = Column(Numeric(10, 6), comment="价值损失")
+    entropy = Column(Numeric(10, 6), comment="策略熵")
+    network_updated = Column(Boolean, default=False, comment="本步是否更新了网络")
+
+    created_at = Column(DateTime, default=func.now())
+
+    # 关系
+    proposal = relationship("EnergySavingProposal", backref="rl_training_logs")
+
+
+class RLModelState(Base):
+    """
+    RL 模型状态表
+
+    保存模型运行状态和探索率信息
+    """
+    __tablename__ = "rl_model_states"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    model_name = Column(String(100), default="adaptive_optimizer", comment="模型名称")
+
+    # 模型状态
+    is_trained = Column(Boolean, default=False, comment="是否已训练")
+    total_steps = Column(Integer, default=0, comment="总训练步数")
+    total_episodes = Column(Integer, default=0, comment="总训练回合")
+    exploration_rate = Column(Numeric(5, 4), default=0.3, comment="当前探索率")
+    exploration_phase = Column(String(20), default="initial", comment="探索阶段: initial/stable/fluctuating/decaying")
+
+    # 性能统计
+    avg_reward = Column(Numeric(10, 4), comment="平均奖励")
+    avg_achievement_rate = Column(Numeric(5, 2), comment="平均达成率 %")
+    best_reward = Column(Numeric(10, 4), comment="最佳奖励")
+    recent_achievements = Column(JSON, comment="最近100次达成率")
+
+    # 模型检查点
+    checkpoint_path = Column(String(500), comment="检查点路径")
+    checkpoint_saved_at = Column(DateTime, comment="检查点保存时间")
+
+    # 配置快照
+    config_snapshot = Column(JSON, comment="训练配置快照")
+
+    created_at = Column(DateTime, default=func.now())
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
 
 
 # ==================== 节能中心重构模型 V2.5 ====================

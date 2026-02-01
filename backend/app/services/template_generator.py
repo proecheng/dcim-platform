@@ -1,14 +1,19 @@
 """
 模板生成器服务
 从6种模板生成节能方案，每个方案包含多个独立可选的措施
+
+V3.1: 集成数据追溯链支持 (专利S1)
+V3.2: 异步SQLAlchemy 2.0兼容版本
 """
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select, func
 from datetime import datetime, timedelta, date
 from typing import List, Dict, Any, Optional
 from decimal import Decimal
 
 from ..models.energy import EnergySavingProposal, ProposalMeasure
 from .formula_calculator import FormulaCalculator
+from .traced_formula_calculator import TracedFormulaCalculator
 
 
 class TemplateGenerator:
@@ -48,11 +53,23 @@ class TemplateGenerator:
         }
     }
 
-    def __init__(self, db: Session):
+    def __init__(self, db: AsyncSession, enable_trace: bool = True):
         self.db = db
+        self.enable_trace = enable_trace
         self.calculator = FormulaCalculator(db)
+        self._traced_calculator = None
 
-    def generate_proposal(
+    def _get_traced_calculator(self, proposal_id: int = None, measure_id: int = None) -> TracedFormulaCalculator:
+        """获取带追溯功能的计算器"""
+        if self._traced_calculator is None or self._traced_calculator.proposal_id != proposal_id:
+            self._traced_calculator = TracedFormulaCalculator(
+                self.db, proposal_id=proposal_id, measure_id=measure_id
+            )
+        else:
+            self._traced_calculator.measure_id = measure_id
+        return self._traced_calculator
+
+    async def generate_proposal(
         self,
         template_id: str,
         analysis_days: int = 30
@@ -80,11 +97,18 @@ class TemplateGenerator:
             "B1": self.generate_equipment_upgrade_proposal
         }
 
-        return generator_map[template_id](analysis_days)
+        proposal = await generator_map[template_id](analysis_days)
+
+        # V3.1: 写入追溯汇总信息
+        if self.enable_trace and self._traced_calculator:
+            proposal.trace_summary = self._traced_calculator.get_trace_summary()
+            await self.db.flush()
+
+        return proposal
 
     # ==================== A1: 峰谷套利优化方案 ====================
 
-    def generate_peak_valley_proposal(self, analysis_days: int) -> EnergySavingProposal:
+    async def generate_peak_valley_proposal(self, analysis_days: int) -> EnergySavingProposal:
         """
         生成A1-峰谷套利优化方案
 
@@ -100,14 +124,19 @@ class TemplateGenerator:
         - calculation_formula: 计算公式和步骤
         - annual_benefit: 年收益
         """
-        # 1. 计算当前峰谷数据
+        # 1. 计算当前峰谷数据 (使用带追溯的计算器)
         end_date = datetime.now()
         start_date = end_date - timedelta(days=analysis_days)
-        peak_valley_data = self.calculator.calc_peak_valley_data(start_date.date(), end_date.date())
+
+        if self.enable_trace:
+            tc = self._get_traced_calculator()
+            peak_valley_data = await tc.traced_peak_valley_data(start_date.date(), end_date.date())
+        else:
+            peak_valley_data = await self.calculator.calc_peak_valley_data(start_date.date(), end_date.date())
 
         # 2. 创建方案对象
         proposal = EnergySavingProposal(
-            proposal_code=self._generate_proposal_code("A1"),
+            proposal_code=await self._generate_proposal_code("A1"),
             proposal_type="A",
             template_id="A1",
             template_name=self.TEMPLATE_CONFIGS["A1"]["name"],
@@ -132,15 +161,15 @@ class TemplateGenerator:
         measures = []
 
         # 措施1: 热处理预热工序时段调整
-        measure1 = self._generate_measure_heat_treatment_shift(proposal, analysis_days)
+        measure1 = await self._generate_measure_heat_treatment_shift(proposal, analysis_days)
         measures.append(measure1)
 
         # 措施2: 辅助设备错峰运行
-        measure2 = self._generate_measure_auxiliary_equipment_shift(proposal, analysis_days)
+        measure2 = await self._generate_measure_auxiliary_equipment_shift(proposal, analysis_days)
         measures.append(measure2)
 
         # 措施3: 空压机储气罐充气策略优化
-        measure3 = self._generate_measure_compressor_optimization(proposal, analysis_days)
+        measure3 = await self._generate_measure_compressor_optimization(proposal, analysis_days)
         measures.append(measure3)
 
         # 4. 计算总收益
@@ -150,7 +179,7 @@ class TemplateGenerator:
 
         return proposal
 
-    def _generate_measure_heat_treatment_shift(
+    async def _generate_measure_heat_treatment_shift(
         self,
         proposal: EnergySavingProposal,
         analysis_days: int
@@ -163,10 +192,18 @@ class TemplateGenerator:
         sharp_price = Decimal("1.1")       # 尖峰电价
         valley_price = Decimal("0.111")    # 低谷电价
 
-        # 调用计算器
-        benefit = self.calculator.calc_peak_shift_benefit(
-            shiftable_power, shift_hours, sharp_price, valley_price
-        )
+        # 调用计算器 (带追溯)
+        if self.enable_trace:
+            tc = self._get_traced_calculator(proposal_id=None, measure_id=None)
+            benefit = await tc.traced_peak_shift_benefit(
+                shiftable_power, shift_hours, sharp_price, valley_price
+            )
+            measure_traces = benefit.get("_traces", {})
+        else:
+            benefit = await self.calculator.calc_peak_shift_benefit(
+                shiftable_power, shift_hours, sharp_price, valley_price
+            )
+            measure_traces = {}
 
         measure = ProposalMeasure(
             measure_code=f"{proposal.proposal_code}-M001",
@@ -198,9 +235,14 @@ class TemplateGenerator:
             investment=Decimal("0")
         )
 
+        # V3.1: 写入追溯数据
+        if self.enable_trace and measure_traces:
+            tc = self._get_traced_calculator()
+            measure.trace_data = tc.get_measure_trace_data(measure_traces)
+
         return measure
 
-    def _generate_measure_auxiliary_equipment_shift(
+    async def _generate_measure_auxiliary_equipment_shift(
         self,
         proposal: EnergySavingProposal,
         analysis_days: int
@@ -213,10 +255,18 @@ class TemplateGenerator:
         peak_price = Decimal("0.68")       # 高峰电价
         flat_price = Decimal("0.425")      # 平段电价
 
-        # 调用计算器
-        benefit = self.calculator.calc_peak_shift_benefit(
-            shiftable_power, shift_hours, peak_price, flat_price
-        )
+        # 调用计算器 (带追溯)
+        if self.enable_trace:
+            tc = self._get_traced_calculator()
+            benefit = await tc.traced_peak_shift_benefit(
+                shiftable_power, shift_hours, peak_price, flat_price
+            )
+            measure_traces = benefit.get("_traces", {})
+        else:
+            benefit = await self.calculator.calc_peak_shift_benefit(
+                shiftable_power, shift_hours, peak_price, flat_price
+            )
+            measure_traces = {}
 
         measure = ProposalMeasure(
             measure_code=f"{proposal.proposal_code}-M002",
@@ -246,9 +296,14 @@ class TemplateGenerator:
             investment=Decimal("0")
         )
 
+        # V3.1: 写入追溯数据
+        if self.enable_trace and measure_traces:
+            tc = self._get_traced_calculator()
+            measure.trace_data = tc.get_measure_trace_data(measure_traces)
+
         return measure
 
-    def _generate_measure_compressor_optimization(
+    async def _generate_measure_compressor_optimization(
         self,
         proposal: EnergySavingProposal,
         analysis_days: int
@@ -261,10 +316,18 @@ class TemplateGenerator:
         sharp_price = Decimal("1.1")       # 尖峰电价
         valley_price = Decimal("0.111")    # 低谷电价
 
-        # 调用计算器
-        benefit = self.calculator.calc_peak_shift_benefit(
-            shiftable_power, shift_hours, sharp_price, valley_price
-        )
+        # 调用计算器 (带追溯)
+        if self.enable_trace:
+            tc = self._get_traced_calculator()
+            benefit = await tc.traced_peak_shift_benefit(
+                shiftable_power, shift_hours, sharp_price, valley_price
+            )
+            measure_traces = benefit.get("_traces", {})
+        else:
+            benefit = await self.calculator.calc_peak_shift_benefit(
+                shiftable_power, shift_hours, sharp_price, valley_price
+            )
+            measure_traces = {}
 
         measure = ProposalMeasure(
             measure_code=f"{proposal.proposal_code}-M003",
@@ -299,11 +362,16 @@ class TemplateGenerator:
             investment=Decimal("0")
         )
 
+        # V3.1: 写入追溯数据
+        if self.enable_trace and measure_traces:
+            tc = self._get_traced_calculator()
+            measure.trace_data = tc.get_measure_trace_data(measure_traces)
+
         return measure
 
     # ==================== A2: 需量控制方案 ====================
 
-    def generate_demand_control_proposal(self, analysis_days: int) -> EnergySavingProposal:
+    async def generate_demand_control_proposal(self, analysis_days: int) -> EnergySavingProposal:
         """
         生成A2-需量控制方案
 
@@ -312,15 +380,21 @@ class TemplateGenerator:
         - 措施2: 需量实时监控与预警
         - 措施3: 高峰时段负荷控制
         """
-        # 1. 计算需量控制数据
-        demand_data = self.calculator.calc_demand_control_data()
+        # 1. 计算需量控制数据 (使用带追溯的计算器)
+        if self.enable_trace:
+            tc = self._get_traced_calculator()
+            demand_data = await tc.traced_demand_control_data()
+            demand_traces = demand_data.get("_traces", {})
+        else:
+            demand_data = await self.calculator.calc_demand_control_data()
+            demand_traces = {}
 
         # 2. 创建方案对象
         end_date = datetime.now()
         start_date = end_date - timedelta(days=analysis_days)
 
         proposal = EnergySavingProposal(
-            proposal_code=self._generate_proposal_code("A2"),
+            proposal_code=await self._generate_proposal_code("A2"),
             proposal_type="A",
             template_id="A2",
             template_name=self.TEMPLATE_CONFIGS["A2"]["name"],
@@ -338,15 +412,15 @@ class TemplateGenerator:
         measures = []
 
         # 措施1: 降低申报需量
-        measure1 = self._generate_measure_demand_reduction(proposal, demand_data)
+        measure1 = await self._generate_measure_demand_reduction(proposal, demand_data, demand_traces)
         measures.append(measure1)
 
         # 措施2: 需量实时监控
-        measure2 = self._generate_measure_demand_monitoring(proposal, demand_data)
+        measure2 = await self._generate_measure_demand_monitoring(proposal, demand_data)
         measures.append(measure2)
 
         # 措施3: 高峰时段负荷控制
-        measure3 = self._generate_measure_peak_load_control(proposal, demand_data)
+        measure3 = await self._generate_measure_peak_load_control(proposal, demand_data)
         measures.append(measure3)
 
         # 4. 计算总收益
@@ -356,10 +430,11 @@ class TemplateGenerator:
 
         return proposal
 
-    def _generate_measure_demand_reduction(
+    async def _generate_measure_demand_reduction(
         self,
         proposal: EnergySavingProposal,
-        demand_data: Dict[str, Decimal]
+        demand_data: Dict[str, Decimal],
+        demand_traces: Dict = None
     ) -> ProposalMeasure:
         """生成措施1: 降低申报需量至合理水平"""
 
@@ -398,9 +473,14 @@ class TemplateGenerator:
             investment=Decimal("0")
         )
 
+        # V3.1: 写入追溯数据
+        if self.enable_trace and demand_traces:
+            tc = self._get_traced_calculator()
+            measure.trace_data = tc.get_measure_trace_data(demand_traces)
+
         return measure
 
-    def _generate_measure_demand_monitoring(
+    async def _generate_measure_demand_monitoring(
         self,
         proposal: EnergySavingProposal,
         demand_data: Dict[str, Decimal]
@@ -444,7 +524,7 @@ class TemplateGenerator:
 
         return measure
 
-    def _generate_measure_peak_load_control(
+    async def _generate_measure_peak_load_control(
         self,
         proposal: EnergySavingProposal,
         demand_data: Dict[str, Decimal]
@@ -495,7 +575,7 @@ class TemplateGenerator:
 
     # ==================== A3: 设备运行优化方案 ====================
 
-    def generate_equipment_optimization_proposal(self, analysis_days: int) -> EnergySavingProposal:
+    async def generate_equipment_optimization_proposal(self, analysis_days: int) -> EnergySavingProposal:
         """
         生成A3-设备运行优化方案
 
@@ -508,12 +588,19 @@ class TemplateGenerator:
         end_date = datetime.now()
         start_date = end_date - timedelta(days=analysis_days)
 
-        # 计算各设备类型的负荷率
-        hvac_load_rate = self.calculator.calc_equipment_load_rate("HVAC", start_date.date(), end_date.date())
-        pump_load_rate = self.calculator.calc_equipment_load_rate("PUMP", start_date.date(), end_date.date())
+        # 计算各设备类型的负荷率 (使用带追溯的计算器)
+        if self.enable_trace:
+            tc = self._get_traced_calculator()
+            hvac_result = await tc.traced_equipment_load_rate("HVAC", start_date.date(), end_date.date())
+            pump_result = await tc.traced_equipment_load_rate("PUMP", start_date.date(), end_date.date())
+            hvac_load_rate = hvac_result["负荷率"]
+            pump_load_rate = pump_result["负荷率"]
+        else:
+            hvac_load_rate = await self.calculator.calc_equipment_load_rate("HVAC", start_date.date(), end_date.date())
+            pump_load_rate = await self.calculator.calc_equipment_load_rate("PUMP", start_date.date(), end_date.date())
 
         proposal = EnergySavingProposal(
-            proposal_code=self._generate_proposal_code("A3"),
+            proposal_code=await self._generate_proposal_code("A3"),
             proposal_type="A",
             template_id="A3",
             template_name=self.TEMPLATE_CONFIGS["A3"]["name"],
@@ -530,15 +617,15 @@ class TemplateGenerator:
         measures = []
 
         # 措施1: 空压机负荷匹配优化
-        measure1 = self._generate_measure_compressor_load_matching(proposal)
+        measure1 = await self._generate_measure_compressor_load_matching(proposal)
         measures.append(measure1)
 
         # 措施2: 循环水泵变频调速优化
-        measure2 = self._generate_measure_pump_frequency_control(proposal)
+        measure2 = await self._generate_measure_pump_frequency_control(proposal)
         measures.append(measure2)
 
         # 措施3: 照明分区控制
-        measure3 = self._generate_measure_lighting_zone_control(proposal)
+        measure3 = await self._generate_measure_lighting_zone_control(proposal)
         measures.append(measure3)
 
         # 3. 计算总收益
@@ -548,7 +635,7 @@ class TemplateGenerator:
 
         return proposal
 
-    def _generate_measure_compressor_load_matching(
+    async def _generate_measure_compressor_load_matching(
         self,
         proposal: EnergySavingProposal
     ) -> ProposalMeasure:
@@ -598,7 +685,7 @@ class TemplateGenerator:
 
         return measure
 
-    def _generate_measure_pump_frequency_control(
+    async def _generate_measure_pump_frequency_control(
         self,
         proposal: EnergySavingProposal
     ) -> ProposalMeasure:
@@ -650,7 +737,7 @@ class TemplateGenerator:
 
         return measure
 
-    def _generate_measure_lighting_zone_control(
+    async def _generate_measure_lighting_zone_control(
         self,
         proposal: EnergySavingProposal
     ) -> ProposalMeasure:
@@ -705,7 +792,7 @@ class TemplateGenerator:
 
     # ==================== A4: VPP需求响应方案 ====================
 
-    def generate_vpp_response_proposal(self, analysis_days: int) -> EnergySavingProposal:
+    async def generate_vpp_response_proposal(self, analysis_days: int) -> EnergySavingProposal:
         """
         生成A4-VPP需求响应方案
 
@@ -714,15 +801,21 @@ class TemplateGenerator:
         - 措施2: Ⅱ级常规响应资源
         - 措施3: Ⅲ级计划响应资源
         """
-        # 1. 计算VPP响应潜力
-        vpp_data = self.calculator.calc_vpp_response_potential()
+        # 1. 计算VPP响应潜力 (使用带追溯的计算器)
+        if self.enable_trace:
+            tc = self._get_traced_calculator()
+            vpp_data = await tc.traced_vpp_response_potential()
+            vpp_traces = vpp_data.get("_traces", {})
+        else:
+            vpp_data = await self.calculator.calc_vpp_response_potential()
+            vpp_traces = {}
 
         # 2. 创建方案对象
         end_date = datetime.now()
         start_date = end_date - timedelta(days=analysis_days)
 
         proposal = EnergySavingProposal(
-            proposal_code=self._generate_proposal_code("A4"),
+            proposal_code=await self._generate_proposal_code("A4"),
             proposal_type="A",
             template_id="A4",
             template_name=self.TEMPLATE_CONFIGS["A4"]["name"],
@@ -741,15 +834,15 @@ class TemplateGenerator:
         measures = []
 
         # 措施1: Ⅰ级快速响应资源
-        measure1 = self._generate_measure_vpp_level1(proposal, vpp_data)
+        measure1 = await self._generate_measure_vpp_level1(proposal, vpp_data, vpp_traces)
         measures.append(measure1)
 
         # 措施2: Ⅱ级常规响应资源
-        measure2 = self._generate_measure_vpp_level2(proposal, vpp_data)
+        measure2 = await self._generate_measure_vpp_level2(proposal, vpp_data, vpp_traces)
         measures.append(measure2)
 
         # 措施3: Ⅲ级计划响应资源
-        measure3 = self._generate_measure_vpp_level3(proposal, vpp_data)
+        measure3 = await self._generate_measure_vpp_level3(proposal, vpp_data, vpp_traces)
         measures.append(measure3)
 
         # 4. 计算总收益
@@ -759,10 +852,11 @@ class TemplateGenerator:
 
         return proposal
 
-    def _generate_measure_vpp_level1(
+    async def _generate_measure_vpp_level1(
         self,
         proposal: EnergySavingProposal,
-        vpp_data: Dict[str, Any]
+        vpp_data: Dict[str, Any],
+        vpp_traces: Dict = None
     ) -> ProposalMeasure:
         """生成措施1: Ⅰ级快速响应资源"""
 
@@ -809,12 +903,20 @@ class TemplateGenerator:
             investment=Decimal("0")
         )
 
+        # V3.1: 写入追溯数据
+        if self.enable_trace and vpp_traces:
+            level_traces = {k: v for k, v in vpp_traces.items() if "Ⅰ级" in k}
+            if level_traces:
+                tc = self._get_traced_calculator()
+                measure.trace_data = tc.get_measure_trace_data(level_traces)
+
         return measure
 
-    def _generate_measure_vpp_level2(
+    async def _generate_measure_vpp_level2(
         self,
         proposal: EnergySavingProposal,
-        vpp_data: Dict[str, Any]
+        vpp_data: Dict[str, Any],
+        vpp_traces: Dict = None
     ) -> ProposalMeasure:
         """生成措施2: Ⅱ级常规响应资源"""
 
@@ -863,12 +965,20 @@ class TemplateGenerator:
             investment=Decimal("0")
         )
 
+        # V3.1: 写入追溯数据
+        if self.enable_trace and vpp_traces:
+            level_traces = {k: v for k, v in vpp_traces.items() if "Ⅱ级" in k}
+            if level_traces:
+                tc = self._get_traced_calculator()
+                measure.trace_data = tc.get_measure_trace_data(level_traces)
+
         return measure
 
-    def _generate_measure_vpp_level3(
+    async def _generate_measure_vpp_level3(
         self,
         proposal: EnergySavingProposal,
-        vpp_data: Dict[str, Any]
+        vpp_data: Dict[str, Any],
+        vpp_traces: Dict = None
     ) -> ProposalMeasure:
         """生成措施3: Ⅲ级计划响应资源"""
 
@@ -923,11 +1033,18 @@ class TemplateGenerator:
             investment=Decimal("0")
         )
 
+        # V3.1: 写入追溯数据
+        if self.enable_trace and vpp_traces:
+            level_traces = {k: v for k, v in vpp_traces.items() if "Ⅲ级" in k}
+            if level_traces:
+                tc = self._get_traced_calculator()
+                measure.trace_data = tc.get_measure_trace_data(level_traces)
+
         return measure
 
     # ==================== A5: 负荷调度优化方案 ====================
 
-    def generate_load_scheduling_proposal(self, analysis_days: int) -> EnergySavingProposal:
+    async def generate_load_scheduling_proposal(self, analysis_days: int) -> EnergySavingProposal:
         """
         生成A5-负荷调度优化方案
 
@@ -936,16 +1053,23 @@ class TemplateGenerator:
         - 措施2: 设备启停时序优化
         - 措施3: 负荷曲线平滑化
         """
-        # 1. 计算负荷曲线数据
+        # 1. 计算负荷曲线数据 (使用带追溯的计算器)
         end_date = datetime.now()
         start_date = end_date - timedelta(days=analysis_days)
 
         # 使用昨天的数据作为示例
         yesterday = (datetime.now() - timedelta(days=1)).date()
-        load_curve = self.calculator.calc_load_curve_analysis(yesterday)
+
+        if self.enable_trace:
+            tc = self._get_traced_calculator()
+            load_curve = await tc.traced_load_curve_analysis(yesterday)
+            load_traces = load_curve.get("_traces", {})
+        else:
+            load_curve = await self.calculator.calc_load_curve_analysis(yesterday)
+            load_traces = {}
 
         proposal = EnergySavingProposal(
-            proposal_code=self._generate_proposal_code("A5"),
+            proposal_code=await self._generate_proposal_code("A5"),
             proposal_type="A",
             template_id="A5",
             template_name=self.TEMPLATE_CONFIGS["A5"]["name"],
@@ -965,15 +1089,15 @@ class TemplateGenerator:
         measures = []
 
         # 措施1: 生产计划优化
-        measure1 = self._generate_measure_production_scheduling(proposal, load_curve)
+        measure1 = await self._generate_measure_production_scheduling(proposal, load_curve, load_traces)
         measures.append(measure1)
 
         # 措施2: 设备启停时序优化
-        measure2 = self._generate_measure_equipment_sequencing(proposal, load_curve)
+        measure2 = await self._generate_measure_equipment_sequencing(proposal, load_curve, load_traces)
         measures.append(measure2)
 
         # 措施3: 负荷曲线平滑化
-        measure3 = self._generate_measure_load_smoothing(proposal, load_curve)
+        measure3 = await self._generate_measure_load_smoothing(proposal, load_curve, load_traces)
         measures.append(measure3)
 
         # 3. 计算总收益
@@ -983,10 +1107,11 @@ class TemplateGenerator:
 
         return proposal
 
-    def _generate_measure_production_scheduling(
+    async def _generate_measure_production_scheduling(
         self,
         proposal: EnergySavingProposal,
-        load_curve: Dict[str, Decimal]
+        load_curve: Dict[str, Decimal],
+        load_traces: Dict = None
     ) -> ProposalMeasure:
         """生成措施1: 生产计划优化"""
 
@@ -1036,12 +1161,18 @@ class TemplateGenerator:
             investment=Decimal("0")
         )
 
+        # V3.1: 写入追溯数据
+        if self.enable_trace and load_traces:
+            tc = self._get_traced_calculator()
+            measure.trace_data = tc.get_measure_trace_data(load_traces)
+
         return measure
 
-    def _generate_measure_equipment_sequencing(
+    async def _generate_measure_equipment_sequencing(
         self,
         proposal: EnergySavingProposal,
-        load_curve: Dict[str, Decimal]
+        load_curve: Dict[str, Decimal],
+        load_traces: Dict = None
     ) -> ProposalMeasure:
         """生成措施2: 设备启停时序优化"""
 
@@ -1093,12 +1224,18 @@ class TemplateGenerator:
             investment=Decimal("0")
         )
 
+        # V3.1: 写入追溯数据
+        if self.enable_trace and load_traces:
+            tc = self._get_traced_calculator()
+            measure.trace_data = tc.get_measure_trace_data(load_traces)
+
         return measure
 
-    def _generate_measure_load_smoothing(
+    async def _generate_measure_load_smoothing(
         self,
         proposal: EnergySavingProposal,
-        load_curve: Dict[str, Decimal]
+        load_curve: Dict[str, Decimal],
+        load_traces: Dict = None
     ) -> ProposalMeasure:
         """生成措施3: 负荷曲线平滑化"""
 
@@ -1149,11 +1286,14 @@ class TemplateGenerator:
             investment=Decimal("0")
         )
 
+        # V3.1: 写入追溯数据
+        if self.enable_trace and load_traces:
+            tc = self._get_traced_calculator()
+            measure.trace_data = tc.get_measure_trace_data(load_traces)
+
         return measure
 
-    # ==================== B1: 设备改造升级方案 ====================
-
-    def generate_equipment_upgrade_proposal(self, analysis_days: int) -> EnergySavingProposal:
+    async def generate_equipment_upgrade_proposal(self, analysis_days: int) -> EnergySavingProposal:
         """
         生成B1-设备改造升级方案（需要投资）
 
@@ -1166,11 +1306,17 @@ class TemplateGenerator:
         end_date = datetime.now()
         start_date = end_date - timedelta(days=analysis_days)
 
-        # 计算设备能效对标
-        pump_benchmark = self.calculator.calc_equipment_efficiency_benchmark("PUMP")
+        # 计算设备能效对标 (使用带追溯的计算器)
+        if self.enable_trace:
+            tc = self._get_traced_calculator()
+            pump_benchmark = await tc.traced_equipment_efficiency_benchmark("PUMP")
+            benchmark_traces = pump_benchmark.get("_traces", {})
+        else:
+            pump_benchmark = await self.calculator.calc_equipment_efficiency_benchmark("PUMP")
+            benchmark_traces = {}
 
         proposal = EnergySavingProposal(
-            proposal_code=self._generate_proposal_code("B1"),
+            proposal_code=await self._generate_proposal_code("B1"),
             proposal_type="B",
             template_id="B1",
             template_name=self.TEMPLATE_CONFIGS["B1"]["name"],
@@ -1187,15 +1333,15 @@ class TemplateGenerator:
         measures = []
 
         # 措施1: 老旧空压机更换
-        measure1 = self._generate_measure_compressor_replacement(proposal)
+        measure1 = await self._generate_measure_compressor_replacement(proposal)
         measures.append(measure1)
 
         # 措施2: 水泵加装变频器
-        measure2 = self._generate_measure_pump_vfd_installation(proposal)
+        measure2 = await self._generate_measure_pump_vfd_installation(proposal)
         measures.append(measure2)
 
         # 措施3: LED照明改造
-        measure3 = self._generate_measure_led_retrofit(proposal)
+        measure3 = await self._generate_measure_led_retrofit(proposal)
         measures.append(measure3)
 
         # 3. 计算总收益和总投资
@@ -1205,7 +1351,7 @@ class TemplateGenerator:
 
         return proposal
 
-    def _generate_measure_compressor_replacement(
+    async def _generate_measure_compressor_replacement(
         self,
         proposal: EnergySavingProposal
     ) -> ProposalMeasure:
@@ -1268,7 +1414,7 @@ class TemplateGenerator:
 
         return measure
 
-    def _generate_measure_pump_vfd_installation(
+    async def _generate_measure_pump_vfd_installation(
         self,
         proposal: EnergySavingProposal
     ) -> ProposalMeasure:
@@ -1330,7 +1476,7 @@ class TemplateGenerator:
 
         return measure
 
-    def _generate_measure_led_retrofit(
+    async def _generate_measure_led_retrofit(
         self,
         proposal: EnergySavingProposal
     ) -> ProposalMeasure:
@@ -1401,17 +1547,19 @@ class TemplateGenerator:
 
     # ==================== 辅助方法 ====================
 
-    def _generate_proposal_code(self, template_id: str) -> str:
+    async def _generate_proposal_code(self, template_id: str) -> str:
         """
         生成方案编号
         格式: A1-20260125-001
         """
         date_str = datetime.now().strftime("%Y%m%d")
 
-        # 查询今天已有的同类型方案数量
-        count = self.db.query(EnergySavingProposal).filter(
+        # 查询今天已有的同类型方案数量 (异步查询)
+        stmt = select(func.count(EnergySavingProposal.id)).where(
             EnergySavingProposal.proposal_code.like(f"{template_id}-{date_str}-%")
-        ).count()
+        )
+        result = await self.db.execute(stmt)
+        count = result.scalar() or 0
 
         seq = str(count + 1).zfill(3)
         return f"{template_id}-{date_str}-{seq}"

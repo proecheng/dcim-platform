@@ -1,4 +1,5 @@
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select, func
 from datetime import datetime
 from decimal import Decimal
 from typing import Dict, Any, Optional
@@ -6,46 +7,95 @@ from app.models.energy import EnergySavingProposal, ProposalMeasure, MeasureExec
 
 
 class ProposalExecutor:
-    """方案执行器 - 执行已接受的措施并记录日志"""
+    """
+    方案执行器 - 执行已接受的措施并记录日志
 
-    def __init__(self, db: Session):
+    增强功能 (专利 S4):
+    - 执行前自动采集基准值
+    - 执行后触发持续监测
+    - 监测数据自动推送到 RL 模块
+    """
+
+    def __init__(self, db: AsyncSession, enable_monitoring: bool = True):
         self.db = db
+        self.enable_monitoring = enable_monitoring
+        self._monitoring_service = None
 
-    def execute_proposal(self, proposal: EnergySavingProposal) -> Dict[str, Any]:
+    def _get_monitoring_service(self):
+        """延迟加载监测服务"""
+        if self._monitoring_service is None and self.enable_monitoring:
+            try:
+                from app.services.effect_monitoring_service import EffectMonitoringService
+                self._monitoring_service = EffectMonitoringService(self.db)
+            except Exception as e:
+                print(f"监测服务初始化失败: {e}")
+        return self._monitoring_service
+
+    async def execute_proposal(self, proposal: EnergySavingProposal) -> Dict[str, Any]:
         """
         执行整个方案（所有已选择的措施）
+
+        增强流程:
+        1. 为每个措施采集基准值 (S4a)
+        2. 执行措施
+        3. 启动持续监测 (S4b)
 
         返回:
         {
             "proposal_id": int,
             "executed_count": int,
             "success_count": int,
-            "results": [...]
+            "results": [...],
+            "monitoring_started": bool
         }
         """
         results = []
         success_count = 0
+        baselines = {}
 
+        # S4a: 为每个待执行措施采集基准值
+        monitoring_service = self._get_monitoring_service()
+        if monitoring_service:
+            for measure in proposal.measures:
+                if measure.is_selected:
+                    try:
+                        baseline = await monitoring_service.capture_baseline(measure)
+                        baselines[measure.id] = baseline
+                    except Exception as e:
+                        print(f"基准采集失败: {e}")
+
+        # 执行措施
         for measure in proposal.measures:
             if not measure.is_selected:
                 continue
 
-            result = self.execute_measure(measure)
+            result = await self.execute_measure(measure, baselines.get(measure.id))
             results.append(result)
             if result["success"]:
                 success_count += 1
 
         proposal.status = "executing"
-        self.db.commit()
+        await self.db.commit()
+
+        # S4b: 启动持续监测
+        monitoring_started = False
+        if monitoring_service and success_count > 0:
+            try:
+                session = await monitoring_service.start_monitoring(proposal)
+                monitoring_started = True
+            except Exception as e:
+                print(f"启动监测失败: {e}")
 
         return {
             "proposal_id": proposal.id,
             "executed_count": len(results),
             "success_count": success_count,
-            "results": results
+            "results": results,
+            "monitoring_started": monitoring_started,
+            "baselines_captured": len(baselines)
         }
 
-    def execute_measure(self, measure: ProposalMeasure) -> Dict[str, Any]:
+    async def execute_measure(self, measure: ProposalMeasure, baseline=None) -> Dict[str, Any]:
         """
         执行单个措施
 
@@ -56,8 +106,12 @@ class ProposalExecutor:
         4. 记录执行日志
         """
         try:
-            # 1. 获取执行前状态
-            power_before = self._get_current_power(measure)
+            # 1. 获取执行前状态 (优先使用基准值)
+            if baseline:
+                power_before = baseline.power_avg
+            else:
+                power_before = self._get_current_power(measure)
+
             expected_power_saved = self._calculate_expected_savings(measure)
 
             # 2. 执行控制动作（模拟）
@@ -86,7 +140,7 @@ class ProposalExecutor:
 
             # 5. 更新措施状态
             measure.execution_status = "completed" if success else "failed"
-            self.db.commit()
+            await self.db.commit()
 
             return {
                 "measure_id": measure.id,
@@ -106,7 +160,7 @@ class ProposalExecutor:
             )
             self.db.add(log)
             measure.execution_status = "failed"
-            self.db.commit()
+            await self.db.commit()
 
             return {
                 "measure_id": measure.id,
@@ -138,11 +192,13 @@ class ProposalExecutor:
         import random
         return random.random() < 0.95
 
-    def get_execution_summary(self, proposal_id: int) -> Dict[str, Any]:
+    async def get_execution_summary(self, proposal_id: int) -> Dict[str, Any]:
         """获取执行摘要"""
-        proposal = self.db.query(EnergySavingProposal).filter(
+        stmt = select(EnergySavingProposal).where(
             EnergySavingProposal.id == proposal_id
-        ).first()
+        )
+        result = await self.db.execute(stmt)
+        proposal = result.scalar_one_or_none()
 
         if not proposal:
             return None
@@ -152,9 +208,11 @@ class ProposalExecutor:
         total_power_saved = Decimal("0")
 
         for measure in proposal.measures:
-            logs = self.db.query(MeasureExecutionLog).filter(
+            logs_stmt = select(MeasureExecutionLog).where(
                 MeasureExecutionLog.measure_id == measure.id
-            ).all()
+            )
+            logs_result = await self.db.execute(logs_stmt)
+            logs = logs_result.scalars().all()
 
             total_logs += len(logs)
             success_logs += len([l for l in logs if l.result == "success"])
@@ -168,3 +226,37 @@ class ProposalExecutor:
             "total_power_saved_kwh": float(total_power_saved),
             "estimated_annual_savings": float(total_power_saved * Decimal("0.5") / Decimal("10000"))
         }
+
+    async def trigger_rl_feedback(self, proposal_id: int) -> Dict[str, Any]:
+        """
+        触发 RL 反馈 (S4e)
+
+        计算当前效果达成率并推送到 RL 模块
+        """
+        monitoring_service = self._get_monitoring_service()
+        if not monitoring_service:
+            return {"success": False, "reason": "Monitoring service unavailable"}
+
+        try:
+            # 生成效果报告
+            report = await monitoring_service.generate_daily_report(proposal_id)
+
+            # 推送到 RL
+            result = await monitoring_service.feed_to_rl(report)
+
+            return {
+                "success": True,
+                "report_id": report.id,
+                "achievement_rate": float(report.achievement_rate or 0),
+                "rl_feedback": result
+            }
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    async def get_monitoring_status(self, proposal_id: int) -> Dict[str, Any]:
+        """获取方案监测状态"""
+        monitoring_service = self._get_monitoring_service()
+        if not monitoring_service:
+            return {"active": False, "reason": "Monitoring service unavailable"}
+
+        return await monitoring_service.get_monitoring_status(proposal_id)

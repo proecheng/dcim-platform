@@ -16,7 +16,11 @@ from .energy import (
     ExecutionPlan, ExecutionTask, ExecutionResult,
     # V3.0 电费综合优化
     DispatchableDevice, StorageSystemConfig, PVSystemConfig,
-    DispatchSchedule, RealtimeMonitoring, MonthlyStatistics, OptimizationResult
+    DispatchSchedule, RealtimeMonitoring, MonthlyStatistics, OptimizationResult,
+    # V3.2 效果监测 (专利 S4)
+    MeasureBaseline, MonitoringRecord, EffectReport, MonitoringSession,
+    # V3.2 RL 自适应优化 (专利 S5)
+    RLOptimizationHistory, RLTrainingLog, RLModelState
 )
 from .asset import (
     AssetStatus, AssetType, Cabinet, Asset, AssetLifecycle,
@@ -38,6 +42,10 @@ from .vpp_data import (
     AdjustableLoad,
     VPPConfig,
     TimePeriodType
+)
+from .trace import (
+    DataSourceMapping, TraceRecord, TraceTree, TemplateParameter,
+    MappingType, AggregationType, MLModelType
 )
 
 __all__ = [
@@ -132,5 +140,22 @@ __all__ = [
     "ElectricityPrice",
     "AdjustableLoad",
     "VPPConfig",
-    "TimePeriodType"
+    "TimePeriodType",
+    # V3.1 数据追溯链
+    "DataSourceMapping",
+    "TraceRecord",
+    "TraceTree",
+    "TemplateParameter",
+    "MappingType",
+    "AggregationType",
+    "MLModelType",
+    # V3.2 效果监测 (专利 S4)
+    "MeasureBaseline",
+    "MonitoringRecord",
+    "EffectReport",
+    "MonitoringSession",
+    # V3.2 RL 自适应优化 (专利 S5)
+    "RLOptimizationHistory",
+    "RLTrainingLog",
+    "RLModelState",
 ]

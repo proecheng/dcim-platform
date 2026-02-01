@@ -1,11 +1,13 @@
 """
-公式计算器服务
+公式计算器服务 (异步版本)
 负责将所有 *** 占位符映射到实际数据源，并提供步骤化的计算公式
 
 这是节能方案模板系统的核心服务，提供15+个计算方法用于6种模板类型
+
+V2.0: 改为异步实现，使用 AsyncSession + select() 语法
 """
-from sqlalchemy.orm import Session
-from sqlalchemy import func, extract
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import func, select
 from datetime import datetime, timedelta, date
 from typing import Dict, Any, Optional, List
 from decimal import Decimal
@@ -27,14 +29,14 @@ from ..models.energy import (
 
 
 class FormulaCalculator:
-    """公式计算器 - 将所有 *** 占位符映射到数据源"""
+    """公式计算器 - 将所有 *** 占位符映射到数据源 (异步版本)"""
 
-    def __init__(self, db: Session):
+    def __init__(self, db: AsyncSession):
         self.db = db
 
     # ==================== 通用数据方法 ====================
 
-    def calc_annual_energy(self, year: int) -> Decimal:
+    async def calc_annual_energy(self, year: int) -> Decimal:
         """
         计算年度总用电量
 
@@ -47,15 +49,15 @@ class FormulaCalculator:
         返回:
             年用电量 (kWh)
         """
-        result = self.db.query(
-            func.sum(EnergyMonthly.total_energy)
-        ).filter(
+        stmt = select(func.sum(EnergyMonthly.total_energy)).where(
             EnergyMonthly.stat_year == year
-        ).scalar()
+        )
+        result = await self.db.execute(stmt)
+        value = result.scalar()
 
-        return Decimal(str(result)) if result else Decimal('0')
+        return Decimal(str(value)) if value else Decimal('0')
 
-    def calc_max_demand(self, year: int, month: Optional[int] = None) -> Decimal:
+    async def calc_max_demand(self, year: int, month: Optional[int] = None) -> Decimal:
         """
         计算年度或月度最大需量
 
@@ -69,16 +71,18 @@ class FormulaCalculator:
         返回:
             最大需量 (kW)
         """
-        query = self.db.query(func.max(DemandHistory.max_demand))
-        query = query.filter(DemandHistory.stat_year == year)
+        stmt = select(func.max(DemandHistory.max_demand)).where(
+            DemandHistory.stat_year == year
+        )
 
         if month is not None:
-            query = query.filter(DemandHistory.stat_month == month)
+            stmt = stmt.where(DemandHistory.stat_month == month)
 
-        result = query.scalar()
-        return Decimal(str(result)) if result else Decimal('0')
+        result = await self.db.execute(stmt)
+        value = result.scalar()
+        return Decimal(str(value)) if value else Decimal('0')
 
-    def calc_average_load(self, year: int) -> Decimal:
+    async def calc_average_load(self, year: int) -> Decimal:
         """
         计算年度平均负荷
 
@@ -90,7 +94,7 @@ class FormulaCalculator:
         返回:
             平均负荷 (kW)
         """
-        annual_energy = self.calc_annual_energy(year)
+        annual_energy = await self.calc_annual_energy(year)
         if annual_energy == 0:
             return Decimal('0')
 
@@ -119,7 +123,7 @@ class FormulaCalculator:
 
     # ==================== A1: 峰谷套利相关方法 ====================
 
-    def calc_peak_valley_data(self, start_date: date, end_date: date) -> Dict[str, Any]:
+    async def calc_peak_valley_data(self, start_date: date, end_date: date) -> Dict[str, Any]:
         """
         计算峰谷电量数据（分尖峰、高峰、平段、低谷、深谷）
 
@@ -144,41 +148,38 @@ class FormulaCalculator:
             "总电量": Decimal
         }
         """
-        # 查询时段数据（假设 peak_energy=尖峰+高峰, normal_energy=平段, valley_energy=低谷+深谷）
-        # 注：实际实现需要根据 PowerCurveData.time_period 字段更精细地统计
-
         # 统计总电量
-        total_energy_result = self.db.query(
-            func.sum(EnergyDaily.total_energy)
-        ).filter(
+        stmt = select(func.sum(EnergyDaily.total_energy)).where(
             EnergyDaily.stat_date >= start_date,
             EnergyDaily.stat_date <= end_date
-        ).scalar()
+        )
+        result = await self.db.execute(stmt)
+        total_energy_result = result.scalar()
         total_energy = Decimal(str(total_energy_result)) if total_energy_result else Decimal('0')
 
         # 统计各时段电量
-        peak_energy_result = self.db.query(
-            func.sum(EnergyDaily.peak_energy)
-        ).filter(
+        stmt = select(func.sum(EnergyDaily.peak_energy)).where(
             EnergyDaily.stat_date >= start_date,
             EnergyDaily.stat_date <= end_date
-        ).scalar()
+        )
+        result = await self.db.execute(stmt)
+        peak_energy_result = result.scalar()
         peak_energy = Decimal(str(peak_energy_result)) if peak_energy_result else Decimal('0')
 
-        normal_energy_result = self.db.query(
-            func.sum(EnergyDaily.normal_energy)
-        ).filter(
+        stmt = select(func.sum(EnergyDaily.normal_energy)).where(
             EnergyDaily.stat_date >= start_date,
             EnergyDaily.stat_date <= end_date
-        ).scalar()
+        )
+        result = await self.db.execute(stmt)
+        normal_energy_result = result.scalar()
         normal_energy = Decimal(str(normal_energy_result)) if normal_energy_result else Decimal('0')
 
-        valley_energy_result = self.db.query(
-            func.sum(EnergyDaily.valley_energy)
-        ).filter(
+        stmt = select(func.sum(EnergyDaily.valley_energy)).where(
             EnergyDaily.stat_date >= start_date,
             EnergyDaily.stat_date <= end_date
-        ).scalar()
+        )
+        result = await self.db.execute(stmt)
+        valley_energy_result = result.scalar()
         valley_energy = Decimal(str(valley_energy_result)) if valley_energy_result else Decimal('0')
 
         # 计算占比
@@ -209,7 +210,7 @@ class FormulaCalculator:
             "总电量": total_energy
         }
 
-    def calc_shiftable_load(self, meter_point_id: Optional[int] = None) -> Decimal:
+    async def calc_shiftable_load(self, meter_point_id: Optional[int] = None) -> Decimal:
         """
         计算可从尖峰高峰转移的负荷
 
@@ -227,22 +228,19 @@ class FormulaCalculator:
         返回:
             可转移负荷 (kW)
         """
-        query = self.db.query(
+        stmt = select(
             func.sum(PowerDevice.rated_power * DeviceShiftConfig.shiftable_power_ratio)
-        ).join(
+        ).select_from(PowerDevice).join(
             DeviceShiftConfig,
             PowerDevice.id == DeviceShiftConfig.device_id
-        ).filter(
+        ).where(
             DeviceShiftConfig.is_shiftable == True,
             PowerDevice.is_enabled == True
         )
 
-        # TODO: 如果需要按计量点过滤，需要通过配电关系追溯
-        # if meter_point_id:
-        #     query = query.filter(...)
-
-        result = query.scalar()
-        return Decimal(str(result)) if result else Decimal('0')
+        result = await self.db.execute(stmt)
+        value = result.scalar()
+        return Decimal(str(value)) if value else Decimal('0')
 
     def calc_peak_shift_benefit(
         self,
@@ -288,7 +286,7 @@ class FormulaCalculator:
 
     # ==================== A2: 需量控制相关方法 ====================
 
-    def calc_demand_control_data(self, meter_point_id: Optional[int] = None) -> Dict[str, Any]:
+    async def calc_demand_control_data(self, meter_point_id: Optional[int] = None) -> Dict[str, Any]:
         """
         计算需量控制相关数据
 
@@ -310,12 +308,13 @@ class FormulaCalculator:
         """
         # 获取计量点
         if meter_point_id is None:
-            # 如果没有指定，取第一个启用的计量点
-            meter_point = self.db.query(MeterPoint).filter(
-                MeterPoint.is_enabled == True
-            ).first()
+            stmt = select(MeterPoint).where(MeterPoint.is_enabled == True).limit(1)
+            result = await self.db.execute(stmt)
+            meter_point = result.scalar_one_or_none()
         else:
-            meter_point = self.db.query(MeterPoint).get(meter_point_id)
+            stmt = select(MeterPoint).where(MeterPoint.id == meter_point_id)
+            result = await self.db.execute(stmt)
+            meter_point = result.scalar_one_or_none()
 
         if not meter_point:
             return {
@@ -333,22 +332,26 @@ class FormulaCalculator:
         current_year = datetime.now().year
         current_month = datetime.now().month
 
-        demand_history = self.db.query(DemandHistory).filter(
+        stmt = select(DemandHistory).where(
             DemandHistory.meter_point_id == meter_point.id,
             DemandHistory.stat_year == current_year,
             DemandHistory.stat_month == current_month
-        ).first()
+        ).limit(1)
+        result = await self.db.execute(stmt)
+        demand_history = result.scalar_one_or_none()
 
         if not demand_history or not demand_history.demand_95th:
             # 如果没有当月数据，查询上个月
             prev_month = current_month - 1 if current_month > 1 else 12
             prev_year = current_year if current_month > 1 else current_year - 1
 
-            demand_history = self.db.query(DemandHistory).filter(
+            stmt = select(DemandHistory).where(
                 DemandHistory.meter_point_id == meter_point.id,
                 DemandHistory.stat_year == prev_year,
                 DemandHistory.stat_month == prev_month
-            ).first()
+            ).limit(1)
+            result = await self.db.execute(stmt)
+            demand_history = result.scalar_one_or_none()
 
         demand_95th = Decimal(str(demand_history.demand_95th)) if demand_history and demand_history.demand_95th else Decimal('0')
 
@@ -377,7 +380,7 @@ class FormulaCalculator:
 
     # ==================== A3: 设备运行优化相关方法 ====================
 
-    def calc_equipment_load_rate(self, equipment_type: str, start_date: date, end_date: date) -> Decimal:
+    async def calc_equipment_load_rate(self, equipment_type: str, start_date: date, end_date: date) -> Decimal:
         """
         计算设备平均负荷率
 
@@ -391,23 +394,24 @@ class FormulaCalculator:
 
         返回: 负荷率 (%)
         """
-        # 获取该类型设备的平均负荷率
-        result = self.db.query(
+        stmt = select(
             func.avg(EnergyHourly.avg_power / PowerDevice.rated_power * 100)
-        ).join(
+        ).select_from(EnergyHourly).join(
             PowerDevice,
             EnergyHourly.device_id == PowerDevice.id
-        ).filter(
+        ).where(
             PowerDevice.device_type == equipment_type,
             PowerDevice.is_enabled == True,
             EnergyHourly.stat_time >= start_date,
             EnergyHourly.stat_time <= end_date,
             PowerDevice.rated_power > 0  # 避免除零
-        ).scalar()
+        )
 
-        return Decimal(str(result)).quantize(Decimal('0.01')) if result else Decimal('0')
+        result = await self.db.execute(stmt)
+        value = result.scalar()
+        return Decimal(str(value)).quantize(Decimal('0.01')) if value else Decimal('0')
 
-    def calc_equipment_optimization_potential(self, equipment_type: str) -> Dict[str, Decimal]:
+    async def calc_equipment_optimization_potential(self, equipment_type: str) -> Dict[str, Decimal]:
         """
         计算设备优化潜力
 
@@ -426,15 +430,17 @@ class FormulaCalculator:
             "年节省金额": Decimal    # 万元
         }
         """
-        # 获取该类型设备的平均功率
-        device_stats = self.db.query(
+        stmt = select(
             func.avg(PowerDevice.rated_power).label('avg_rated_power'),
             func.avg(PowerDevice.avg_load_rate).label('avg_load_rate'),
             func.count(PowerDevice.id).label('device_count')
-        ).filter(
+        ).where(
             PowerDevice.device_type == equipment_type,
             PowerDevice.is_enabled == True
-        ).first()
+        )
+
+        result = await self.db.execute(stmt)
+        device_stats = result.first()
 
         if not device_stats or not device_stats.avg_rated_power:
             return {
@@ -487,7 +493,7 @@ class FormulaCalculator:
 
     # ==================== A4: VPP 需求响应相关方法 ====================
 
-    def calc_vpp_response_potential(self) -> Dict[str, Any]:
+    async def calc_vpp_response_potential(self) -> Dict[str, Any]:
         """
         计算 VPP 需求响应潜力
 
@@ -506,43 +512,49 @@ class FormulaCalculator:
         }
         """
         # Ⅰ级快速响应 (响应时间 ≤ 5 分钟)
-        level1_capacity_result = self.db.query(
+        stmt = select(
             func.sum(PowerDevice.rated_power * DeviceShiftConfig.shiftable_power_ratio)
-        ).join(
+        ).select_from(PowerDevice).join(
             DeviceShiftConfig,
             PowerDevice.id == DeviceShiftConfig.device_id
-        ).filter(
+        ).where(
             DeviceShiftConfig.is_shiftable == True,
             DeviceShiftConfig.shift_notice_time <= 5,
             PowerDevice.is_enabled == True
-        ).scalar()
+        )
+        result = await self.db.execute(stmt)
+        level1_capacity_result = result.scalar()
         level1_capacity = Decimal(str(level1_capacity_result)) if level1_capacity_result else Decimal('0')
 
         # Ⅱ级常规响应 (响应时间 ≤ 15 分钟)
-        level2_capacity_result = self.db.query(
+        stmt = select(
             func.sum(PowerDevice.rated_power * DeviceShiftConfig.shiftable_power_ratio)
-        ).join(
+        ).select_from(PowerDevice).join(
             DeviceShiftConfig,
             PowerDevice.id == DeviceShiftConfig.device_id
-        ).filter(
+        ).where(
             DeviceShiftConfig.is_shiftable == True,
             DeviceShiftConfig.shift_notice_time > 5,
             DeviceShiftConfig.shift_notice_time <= 15,
             PowerDevice.is_enabled == True
-        ).scalar()
+        )
+        result = await self.db.execute(stmt)
+        level2_capacity_result = result.scalar()
         level2_capacity = Decimal(str(level2_capacity_result)) if level2_capacity_result else Decimal('0')
 
         # Ⅲ级计划响应 (响应时间 > 240 分钟)
-        level3_capacity_result = self.db.query(
+        stmt = select(
             func.sum(PowerDevice.rated_power * DeviceShiftConfig.shiftable_power_ratio)
-        ).join(
+        ).select_from(PowerDevice).join(
             DeviceShiftConfig,
             PowerDevice.id == DeviceShiftConfig.device_id
-        ).filter(
+        ).where(
             DeviceShiftConfig.is_shiftable == True,
             DeviceShiftConfig.shift_notice_time > 240,
             PowerDevice.is_enabled == True
-        ).scalar()
+        )
+        result = await self.db.execute(stmt)
+        level3_capacity_result = result.scalar()
         level3_capacity = Decimal(str(level3_capacity_result)) if level3_capacity_result else Decimal('0')
 
         # 响应次数和补偿标准 (基于市场数据)
@@ -585,7 +597,7 @@ class FormulaCalculator:
 
     # ==================== A5: 负荷调度优化相关方法 ====================
 
-    def calc_load_curve_analysis(self, analysis_date: date) -> Dict[str, Any]:
+    async def calc_load_curve_analysis(self, analysis_date: date) -> Dict[str, Any]:
         """
         分析负荷曲线特征
 
@@ -604,14 +616,16 @@ class FormulaCalculator:
             "峰谷比": Decimal
         }
         """
-        # 查询当天的功率曲线数据
-        stats = self.db.query(
+        stmt = select(
             func.max(PowerCurveData.active_power).label('max_power'),
             func.min(PowerCurveData.active_power).label('min_power'),
             func.avg(PowerCurveData.active_power).label('avg_power')
-        ).filter(
+        ).where(
             func.date(PowerCurveData.timestamp) == analysis_date
-        ).first()
+        )
+
+        result = await self.db.execute(stmt)
+        stats = result.first()
 
         if not stats or not stats.max_power:
             return {
@@ -647,7 +661,7 @@ class FormulaCalculator:
 
     # ==================== B1: 设备改造升级相关方法 ====================
 
-    def calc_equipment_efficiency_benchmark(self, equipment_type: str) -> Dict[str, Any]:
+    async def calc_equipment_efficiency_benchmark(self, equipment_type: str) -> Dict[str, Any]:
         """
         设备能效对标分析
 
@@ -667,12 +681,12 @@ class FormulaCalculator:
         }
         """
         # 获取设备当前能效
-        current_efficiency_result = self.db.query(
-            func.avg(PowerDevice.efficiency)
-        ).filter(
+        stmt = select(func.avg(PowerDevice.efficiency)).where(
             PowerDevice.device_type == equipment_type,
             PowerDevice.is_enabled == True
-        ).scalar()
+        )
+        result = await self.db.execute(stmt)
+        current_efficiency_result = result.scalar()
         current_efficiency = Decimal(str(current_efficiency_result)) if current_efficiency_result else Decimal('90')
 
         # 行业先进能效水平 (基于设备类型)
@@ -689,13 +703,15 @@ class FormulaCalculator:
         efficiency_gap = industry_efficiency - current_efficiency
 
         # 获取设备额定功率和年运行时间
-        device_stats = self.db.query(
+        stmt = select(
             func.sum(PowerDevice.rated_power).label('total_rated_power'),
             func.count(PowerDevice.id).label('device_count')
-        ).filter(
+        ).where(
             PowerDevice.device_type == equipment_type,
             PowerDevice.is_enabled == True
-        ).first()
+        )
+        result = await self.db.execute(stmt)
+        device_stats = result.first()
 
         if not device_stats or not device_stats.total_rated_power:
             total_rated_power = Decimal('0')
@@ -741,7 +757,7 @@ class FormulaCalculator:
 
     # ==================== 辅助方法 ====================
 
-    def _get_electricity_price(self, time_slot: str) -> Decimal:
+    async def _get_electricity_price(self, time_slot: str) -> Decimal:
         """
         获取电价（尖峰/高峰/平段/低谷/深谷）
 
@@ -751,10 +767,13 @@ class FormulaCalculator:
         返回:
             电价 (元/kWh)
         """
-        pricing = self.db.query(ElectricityPricing).filter(
+        stmt = select(ElectricityPricing).where(
             ElectricityPricing.period_type == time_slot,
             ElectricityPricing.is_enabled == True
-        ).first()
+        ).limit(1)
+
+        result = await self.db.execute(stmt)
+        pricing = result.scalar_one_or_none()
 
         if pricing:
             return Decimal(str(pricing.price))

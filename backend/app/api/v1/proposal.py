@@ -16,7 +16,16 @@ from app.schemas.proposal_schema import (
     MeasureAcceptRequest,
     ProposalMonitoringResponse,
     MeasureMonitoringResponse,
-    ExecutionLogResponse
+    ExecutionLogResponse,
+    MLProposalCreate,
+    MLAnalysisResponse,
+    RLOptimizationRequest,
+    RLOptimizationResponse,
+    RLTrainingRequest,
+    RLTrainingResponse,
+    RLModelInfoResponse,
+    RLOptimizationHistoryResponse,
+    RLExplorationRateUpdateRequest,
 )
 from app.services.template_generator import TemplateGenerator
 from app.services.proposal_executor import ProposalExecutor
@@ -243,6 +252,107 @@ async def generate_proposal(
         raise HTTPException(status_code=500, detail=f"生成方案失败: {str(e)}")
 
 
+# ==================== 1.1 ML 增强方案生成 (专利 S2) ====================
+
+@router.post("/generate-ml-enhanced", response_model=ProposalResponse, summary="ML增强方案生成")
+async def generate_ml_enhanced_proposal(
+    request: MLProposalCreate,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    使用深度学习增强的方案生成 (专利 S2)
+
+    - **template_id**: A1/A2/A3/A4/A5/B1
+    - **analysis_days**: 分析天数 (1-365，默认30)
+    - **device_power_data**: 设备功率数据 (可选，用于 Transformer 分析)
+
+    功能:
+    - S2-TF: 使用 Transformer 识别可转移负荷 (A1 方案)
+    - S2-GNN: 使用 GNN 分析措施冲突和收益耦合
+    - 自动降级: ML 不可用时使用传统算法
+
+    返回包含 ML 分析结果的完整方案
+    """
+    from app.services.ml_template_generator import MLTemplateGenerator
+
+    try:
+        generator = MLTemplateGenerator(db, enable_trace=True, enable_ml=True)
+
+        # 转换 device_power_data 格式
+        device_data = None
+        if request.device_power_data:
+            device_data = {
+                device_id: {
+                    "power": data.power,
+                    "period_types": data.period_types,
+                    "is_weekday": data.is_weekday,
+                    "temperature": data.temperature
+                }
+                for device_id, data in request.device_power_data.items()
+            }
+
+        proposal = generator.generate_ml_enhanced_proposal(
+            template_id=request.template_id,
+            analysis_days=request.analysis_days,
+            device_power_data=device_data
+        )
+
+        # 保存到数据库
+        db.add(proposal)
+        await db.commit()
+        await db.refresh(proposal)
+
+        return proposal
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(status_code=500, detail=f"ML增强方案生成失败: {str(e)}")
+
+
+# ==================== 1.2 获取 ML 分析详情 ====================
+
+@router.get("/{proposal_id}/ml-analysis", response_model=MLAnalysisResponse, summary="获取ML分析详情")
+async def get_ml_analysis(
+    proposal_id: int,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    获取方案的 ML 分析详情
+
+    返回:
+    - Transformer 分析结果 (可转移负荷识别)
+    - GNN 分析结果 (措施冲突和收益耦合)
+    - RL 调整结果 (参数自适应)
+    - 追溯汇总
+    """
+    from app.services.ml_template_generator import MLTemplateGenerator
+
+    query = select(EnergySavingProposal).where(EnergySavingProposal.id == proposal_id)
+    result = await db.execute(query)
+    proposal = result.scalar_one_or_none()
+
+    if not proposal:
+        raise HTTPException(status_code=404, detail="方案不存在")
+
+    # 获取 ML 状态
+    generator = MLTemplateGenerator(db, enable_trace=True, enable_ml=True)
+    ml_status = generator.get_ml_status()
+
+    # 从 trace_summary 提取 ML 分析结果
+    trace_summary = proposal.trace_summary or {}
+
+    return MLAnalysisResponse(
+        proposal_id=proposal.id,
+        ml_enabled=ml_status.get("ml_enabled", False),
+        ml_available=ml_status.get("ml_available", False),
+        transformer_analysis=trace_summary.get("transformer_analysis"),
+        gnn_analysis=trace_summary.get("gnn_analysis"),
+        rl_adjustment=trace_summary.get("rl_adjustment"),
+        trace_summary=trace_summary
+    )
+
+
 # ==================== 2. 获取方案详情 ====================
 
 # 注意: enhanced 路由必须在 {proposal_id} 之前定义，否则 FastAPI 会把 "enhanced" 当成 proposal_id
@@ -398,6 +508,126 @@ async def get_proposal_enhanced(
     }
 
 
+# ==================== RL 模型管理 (全局端点，无 proposal_id) ====================
+# 重要：这些路由必须定义在 /{proposal_id} 路由之前，否则会被参数路由拦截
+
+@router.post("/rl/train", response_model=RLTrainingResponse, summary="执行RL在线训练")
+async def rl_train_step(
+    request: RLTrainingRequest,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    执行一步在线训练
+
+    接收实际效果反馈并更新 RL 模型:
+    - actual_saving: 实际节能收益
+    - expected_saving: 预期节能收益
+    - comfort_violation: 舒适度违反程度 (0-1)
+    - safety_violation: 安全约束违反 (0-1)
+    """
+    from app.services.adaptive_optimization_service import AdaptiveOptimizationService
+
+    optimization_service = AdaptiveOptimizationService(db)
+
+    current_state = None
+    if request.current_state:
+        current_state = request.current_state.model_dump()
+
+    result = optimization_service.train_step(
+        actual_saving=request.actual_saving,
+        expected_saving=request.expected_saving,
+        comfort_violation=request.comfort_violation,
+        safety_violation=request.safety_violation,
+        current_state=current_state,
+        proposal_id=request.proposal_id
+    )
+
+    if not result.get("success"):
+        raise HTTPException(status_code=500, detail=result.get("error", "训练失败"))
+
+    return RLTrainingResponse(
+        success=True,
+        reward=result.get("reward", 0),
+        achievement_rate=result.get("achievement_rate", 0),
+        exploration_rate=result.get("exploration_rate", 0),
+        step=result.get("step", 0),
+        network_updated=result.get("network_updated", False),
+        update_info=result.get("update_info"),
+        training_log_id=result.get("training_log_id"),
+    )
+
+
+@router.get("/rl/model-info", response_model=RLModelInfoResponse, summary="获取RL模型信息")
+async def get_rl_model_info(
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    获取 RL 模型信息
+
+    包含模型训练状态、探索率、统计指标等
+    """
+    from app.services.adaptive_optimization_service import AdaptiveOptimizationService
+
+    optimization_service = AdaptiveOptimizationService(db)
+    info = optimization_service.get_model_info()
+
+    return RLModelInfoResponse(**info)
+
+
+@router.put("/rl/exploration-rate", summary="更新探索率")
+async def update_exploration_rate(
+    request: RLExplorationRateUpdateRequest,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    手动更新 RL 探索率 (S5f)
+
+    用于干预自适应探索率调整机制
+    """
+    from app.services.adaptive_optimization_service import AdaptiveOptimizationService
+
+    optimization_service = AdaptiveOptimizationService(db)
+    result = optimization_service.update_exploration_rate(
+        exploration_rate=request.exploration_rate,
+        phase=request.phase
+    )
+
+    if not result.get("success"):
+        raise HTTPException(status_code=500, detail=result.get("error", "更新失败"))
+
+    return {
+        "code": 0,
+        "message": "探索率已更新",
+        "data": result
+    }
+
+
+@router.post("/rl/save-checkpoint", summary="保存模型检查点")
+async def save_rl_checkpoint(
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    保存 RL 模型检查点
+
+    将当前模型参数保存到磁盘
+    """
+    from app.services.adaptive_optimization_service import AdaptiveOptimizationService
+
+    optimization_service = AdaptiveOptimizationService(db)
+    result = optimization_service.save_checkpoint()
+
+    if not result.get("success"):
+        raise HTTPException(status_code=500, detail=result.get("error", "保存失败"))
+
+    return {
+        "code": 0,
+        "message": "检查点已保存",
+        "data": result
+    }
+
+
+# ==================== 2. 获取方案详情 ====================
+
 @router.get("/{proposal_id}", response_model=ProposalResponse, summary="获取方案详情")
 async def get_proposal(
     proposal_id: int,
@@ -416,7 +646,7 @@ async def get_proposal(
 
 # ==================== 3. 获取方案列表 ====================
 
-@router.get("/", response_model=List[ProposalResponse], summary="获取方案列表")
+@router.get("/", summary="获取方案列表")
 async def get_proposals(
     template_id: Optional[str] = None,
     status: Optional[str] = None,
@@ -443,7 +673,17 @@ async def get_proposals(
     result = await db.execute(query)
     proposals = result.scalars().all()
 
-    return proposals
+    # 统一响应格式
+    return {
+        "code": 0,
+        "message": "success",
+        "data": {
+            "items": [ProposalResponse.model_validate(p) for p in proposals],
+            "total": len(proposals),
+            "skip": skip,
+            "limit": limit
+        }
+    }
 
 
 # ==================== 4. 接受方案（选择措施）====================
@@ -513,14 +753,20 @@ async def execute_proposal(
     try:
         # 使用 ProposalExecutor 执行方案
         executor = ProposalExecutor(db)
-        result = executor.execute_proposal(proposal)
+        result = await executor.execute_proposal(proposal)
 
+        # 统一响应格式
         return {
+            "code": 0,
             "message": "方案执行完成",
-            "proposal_id": proposal_id,
-            "executed_count": result["executed_count"],
-            "success_count": result["success_count"],
-            "results": result["results"]
+            "data": {
+                "proposal_id": proposal_id,
+                "executed_count": result["executed_count"],
+                "success_count": result["success_count"],
+                "monitoring_started": result.get("monitoring_started", False),
+                "baselines_captured": result.get("baselines_captured", 0),
+                "results": result["results"]
+            }
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"执行方案失败: {str(e)}")
@@ -543,12 +789,17 @@ async def get_execution_summary(
     - 预估年度节省
     """
     executor = ProposalExecutor(db)
-    summary = executor.get_execution_summary(proposal_id)
+    summary = await executor.get_execution_summary(proposal_id)
 
     if summary is None:
         raise HTTPException(status_code=404, detail="方案不存在")
 
-    return summary
+    # 统一响应格式
+    return {
+        "code": 0,
+        "message": "success",
+        "data": summary
+    }
 
 
 # ==================== 6. 获取方案监控数据 ====================
@@ -643,7 +894,685 @@ async def delete_proposal(
     await db.delete(proposal)
     await db.commit()
 
-    return {"message": "方案已删除", "proposal_id": proposal_id}
+    # 统一响应格式
+    return {
+        "code": 0,
+        "message": "方案已删除",
+        "data": {"proposal_id": proposal_id}
+    }
+
+
+# ==================== 8. 措施详情增强 (专利 S3) ====================
+
+@router.get("/{proposal_id}/measures/{measure_id}/detail", summary="获取措施详情（含ML和追溯）")
+async def get_measure_detail(
+    proposal_id: int,
+    measure_id: int,
+    include_trace: bool = True,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    获取措施详情，包含 ML 预测置信度和数据追溯链
+
+    专利 S3 对应接口:
+    - 措施基本信息和状态
+    - ML 预测信息 (可转移性置信度等)
+    - 数据追溯链 (可展开查看计算路径)
+    - 当前状态和目标状态对比
+    """
+    from app.services.data_trace_service import DataTraceService
+    from app.models.trace import TraceRecord
+
+    # 查询措施
+    query = select(ProposalMeasure).where(
+        ProposalMeasure.id == measure_id,
+        ProposalMeasure.proposal_id == proposal_id
+    )
+    result = await db.execute(query)
+    measure = result.scalar_one_or_none()
+
+    if not measure:
+        raise HTTPException(status_code=404, detail="措施不存在")
+
+    # 构建基本信息
+    detail = {
+        "id": measure.id,
+        "measure_code": measure.measure_code,
+        "regulation_object": measure.regulation_object,
+        "regulation_description": measure.regulation_description,
+        "current_state": measure.current_state,
+        "target_state": measure.target_state,
+        "state_comparison": _build_state_comparison(measure.current_state, measure.target_state),
+        "calculation_formula": measure.calculation_formula,
+        "calculation_basis": measure.calculation_basis,
+        "annual_benefit": float(measure.annual_benefit) if measure.annual_benefit else None,
+        "investment": float(measure.investment) if measure.investment else 0,
+        "is_selected": measure.is_selected,
+        "execution_status": measure.execution_status or "pending",
+        "created_at": measure.created_at.isoformat() if measure.created_at else None,
+        "updated_at": measure.updated_at.isoformat() if measure.updated_at else None,
+    }
+
+    # 查询 ML 预测信息
+    ml_query = select(TraceRecord).where(
+        TraceRecord.measure_id == measure_id,
+        TraceRecord.mapping_type == "ml_prediction"
+    )
+    ml_result = await db.execute(ml_query)
+    ml_traces = ml_result.scalars().all()
+
+    if ml_traces:
+        # 找到置信度最高的预测
+        best_trace = max(ml_traces, key=lambda t: t.ml_confidence or 0)
+        detail["ml_prediction"] = {
+            "has_ml_prediction": True,
+            "model_type": best_trace.ml_model_type,
+            "confidence": best_trace.ml_confidence,
+            "prediction_details": {
+                "param_name": best_trace.param_name,
+                "value": float(best_trace.raw_value) if best_trace.raw_value else None,
+                "unit": best_trace.value_unit,
+                "input_features": best_trace.ml_input_features,
+                "output_raw": best_trace.ml_output_raw
+            }
+        }
+    else:
+        detail["ml_prediction"] = {
+            "has_ml_prediction": False,
+            "model_type": None,
+            "confidence": None,
+            "prediction_details": None
+        }
+
+    # 查询追溯信息
+    if include_trace:
+        trace_service = DataTraceService(db)
+        traces = await trace_service.get_traces_by_measure(measure_id)
+        detail["trace_info"] = {
+            "trace_count": len(traces),
+            "trace_tree_available": any(t.child_trace_ids for t in traces),
+            "key_traces": [
+                {
+                    "trace_id": t.trace_id,
+                    "param_name": t.param_name,
+                    "mapping_type": t.mapping_type,
+                    "value": float(t.raw_value) if t.raw_value else None,
+                    "unit": t.value_unit,
+                    "formula_display": t.formula_display
+                }
+                for t in traces[:5]  # 只返回前5个关键追溯
+            ]
+        }
+
+    return {
+        "code": 0,
+        "message": "success",
+        "data": detail
+    }
+
+
+# ==================== 9. 措施状态更新 (专利 S3) ====================
+
+@router.patch("/{proposal_id}/measures/{measure_id}/status", summary="更新措施状态")
+async def update_measure_status(
+    proposal_id: int,
+    measure_id: int,
+    status: str,
+    reason: Optional[str] = None,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    更新单个措施的选择状态
+
+    专利 S3 对应接口:
+    - accepted: 接受执行该措施
+    - rejected: 拒绝执行该措施
+    - deferred: 暂缓决定
+    """
+    valid_statuses = ["accepted", "rejected", "deferred", "pending"]
+    if status not in valid_statuses:
+        raise HTTPException(
+            status_code=400,
+            detail=f"无效状态，可选值: {valid_statuses}"
+        )
+
+    # 查询措施
+    query = select(ProposalMeasure).where(
+        ProposalMeasure.id == measure_id,
+        ProposalMeasure.proposal_id == proposal_id
+    )
+    result = await db.execute(query)
+    measure = result.scalar_one_or_none()
+
+    if not measure:
+        raise HTTPException(status_code=404, detail="措施不存在")
+
+    old_status = "accepted" if measure.is_selected else "pending"
+
+    # 更新状态
+    measure.is_selected = (status == "accepted")
+
+    # 重新计算方案总收益
+    proposal_query = select(EnergySavingProposal).options(
+        selectinload(EnergySavingProposal.measures)
+    ).where(EnergySavingProposal.id == proposal_id)
+    proposal_result = await db.execute(proposal_query)
+    proposal = proposal_result.scalar_one_or_none()
+
+    if proposal:
+        proposal.total_benefit = sum(
+            m.annual_benefit or Decimal("0")
+            for m in proposal.measures
+            if m.is_selected
+        )
+
+    await db.commit()
+
+    return {
+        "code": 0,
+        "message": "状态更新成功",
+        "data": {
+            "measure_id": measure_id,
+            "old_status": old_status,
+            "new_status": status,
+            "proposal_total_benefit": float(proposal.total_benefit) if proposal else None
+        }
+    }
+
+
+@router.post("/{proposal_id}/measures/batch-status", summary="批量更新措施状态")
+async def batch_update_measure_status(
+    proposal_id: int,
+    updates: List[dict],
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    批量更新措施状态
+
+    请求体格式:
+    [
+        {"measure_id": 1, "status": "accepted"},
+        {"measure_id": 2, "status": "rejected"}
+    ]
+    """
+    valid_statuses = ["accepted", "rejected", "deferred", "pending"]
+
+    # 获取方案和所有措施
+    proposal_query = select(EnergySavingProposal).options(
+        selectinload(EnergySavingProposal.measures)
+    ).where(EnergySavingProposal.id == proposal_id)
+    result = await db.execute(proposal_query)
+    proposal = result.scalar_one_or_none()
+
+    if not proposal:
+        raise HTTPException(status_code=404, detail="方案不存在")
+
+    # 构建措施ID到措施的映射
+    measure_map = {m.id: m for m in proposal.measures}
+
+    results = []
+    for update in updates:
+        measure_id = update.get("measure_id")
+        new_status = update.get("status")
+
+        if measure_id not in measure_map:
+            results.append({
+                "measure_id": measure_id,
+                "success": False,
+                "message": "措施不存在"
+            })
+            continue
+
+        if new_status not in valid_statuses:
+            results.append({
+                "measure_id": measure_id,
+                "success": False,
+                "message": f"无效状态: {new_status}"
+            })
+            continue
+
+        measure = measure_map[measure_id]
+        measure.is_selected = (new_status == "accepted")
+        results.append({
+            "measure_id": measure_id,
+            "success": True,
+            "new_status": new_status
+        })
+
+    # 重新计算总收益
+    proposal.total_benefit = sum(
+        m.annual_benefit or Decimal("0")
+        for m in proposal.measures
+        if m.is_selected
+    )
+
+    await db.commit()
+
+    return {
+        "code": 0,
+        "message": "批量更新完成",
+        "data": {
+            "updated_count": sum(1 for r in results if r.get("success")),
+            "results": results,
+            "proposal_total_benefit": float(proposal.total_benefit)
+        }
+    }
+
+
+# ==================== 10. 效果监测 (专利 S4) ====================
+
+@router.post("/{proposal_id}/monitoring/start", summary="启动效果监测")
+async def start_monitoring(
+    proposal_id: int,
+    interval_minutes: int = 15,
+    report_interval: str = "daily",
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    启动方案的持续效果监测 (S4b)
+
+    - interval_minutes: 监测间隔 (分钟)
+    - report_interval: 报告周期 (hourly/daily/weekly)
+    """
+    from app.services.effect_monitoring_service import EffectMonitoringService
+
+    query = select(EnergySavingProposal).where(EnergySavingProposal.id == proposal_id)
+    result = await db.execute(query)
+    proposal = result.scalar_one_or_none()
+
+    if not proposal:
+        raise HTTPException(status_code=404, detail="方案不存在")
+
+    if proposal.status not in ["executing", "accepted"]:
+        raise HTTPException(status_code=400, detail="方案未在执行状态")
+
+    monitoring_service = EffectMonitoringService(db)
+    session = monitoring_service.start_monitoring(
+        proposal,
+        interval_minutes=interval_minutes,
+        report_interval=report_interval
+    )
+
+    return {
+        "code": 0,
+        "message": "监测已启动",
+        "data": {
+            "session_id": session.id,
+            "proposal_id": proposal_id,
+            "interval_minutes": interval_minutes,
+            "report_interval": report_interval,
+            "started_at": session.started_at.isoformat()
+        }
+    }
+
+
+@router.post("/{proposal_id}/monitoring/stop", summary="停止效果监测")
+async def stop_monitoring(
+    proposal_id: int,
+    db: AsyncSession = Depends(get_db)
+):
+    """停止方案的效果监测"""
+    from app.services.effect_monitoring_service import EffectMonitoringService
+    from app.models.energy import MonitoringSession
+
+    # 查找活跃会话
+    query = select(MonitoringSession).where(
+        MonitoringSession.proposal_id == proposal_id,
+        MonitoringSession.status == "active"
+    )
+    result = await db.execute(query)
+    session = result.scalar_one_or_none()
+
+    if not session:
+        raise HTTPException(status_code=404, detail="未找到活跃的监测会话")
+
+    monitoring_service = EffectMonitoringService(db)
+    monitoring_service.stop_monitoring(session.id)
+
+    return {
+        "code": 0,
+        "message": "监测已停止",
+        "data": {
+            "session_id": session.id,
+            "ended_at": session.ended_at.isoformat() if session.ended_at else None
+        }
+    }
+
+
+@router.get("/{proposal_id}/monitoring/status", summary="获取监测状态")
+async def get_monitoring_status(
+    proposal_id: int,
+    db: AsyncSession = Depends(get_db)
+):
+    """获取方案的监测状态"""
+    from app.services.effect_monitoring_service import EffectMonitoringService
+
+    monitoring_service = EffectMonitoringService(db)
+    status = monitoring_service.get_monitoring_status(proposal_id)
+
+    return {
+        "code": 0,
+        "message": "success",
+        "data": status
+    }
+
+
+@router.get("/{proposal_id}/effect-report", summary="获取效果达成率报告")
+async def get_effect_report(
+    proposal_id: int,
+    report_type: str = "daily",
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    获取效果达成率报告 (S4d)
+
+    返回:
+    - 预期收益 vs 实际收益
+    - 效果达成率
+    - RL 反馈状态
+    """
+    from app.services.effect_monitoring_service import EffectMonitoringService
+
+    query = select(EnergySavingProposal).where(EnergySavingProposal.id == proposal_id)
+    result = await db.execute(query)
+    proposal = result.scalar_one_or_none()
+
+    if not proposal:
+        raise HTTPException(status_code=404, detail="方案不存在")
+
+    monitoring_service = EffectMonitoringService(db)
+
+    # 生成或获取报告
+    if report_type == "daily":
+        report = monitoring_service.generate_daily_report(proposal_id)
+    else:
+        from datetime import datetime, timedelta
+        now = datetime.now()
+        if report_type == "weekly":
+            start = now - timedelta(days=7)
+        else:  # monthly
+            start = now - timedelta(days=30)
+        report = monitoring_service.calculate_achievement_rate(proposal_id, start, now)
+
+    return {
+        "code": 0,
+        "message": "success",
+        "data": {
+            "report_id": report.id,
+            "proposal_id": proposal_id,
+            "report_type": report.report_type,
+            "period": {
+                "start": report.period_start.isoformat(),
+                "end": report.period_end.isoformat()
+            },
+            "expected": {
+                "energy_saved": float(report.expected_energy_saved or 0),
+                "cost_saved": float(report.expected_cost_saved or 0)
+            },
+            "actual": {
+                "energy_saved": float(report.actual_energy_saved or 0),
+                "cost_saved": float(report.actual_cost_saved or 0)
+            },
+            "achievement_rate": float(report.achievement_rate or 0),
+            "rl_feedback": {
+                "sent": report.rl_feedback_sent,
+                "sent_at": report.rl_feedback_at.isoformat() if report.rl_feedback_at else None,
+                "action": report.rl_adjustment_action
+            },
+            "data_quality": float(report.data_quality or 0)
+        }
+    }
+
+
+@router.get("/{proposal_id}/effect-summary", summary="获取效果汇总")
+async def get_effect_summary(
+    proposal_id: int,
+    db: AsyncSession = Depends(get_db)
+):
+    """获取方案的效果汇总统计"""
+    from app.services.effect_monitoring_service import EffectMonitoringService
+
+    monitoring_service = EffectMonitoringService(db)
+    summary = monitoring_service.get_effect_summary(proposal_id)
+
+    return {
+        "code": 0,
+        "message": "success",
+        "data": summary
+    }
+
+
+@router.post("/{proposal_id}/rl-feedback", summary="触发RL反馈")
+async def trigger_rl_feedback(
+    proposal_id: int,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    手动触发 RL 反馈 (S4e)
+
+    计算当前效果达成率并推送到 RL 模块
+    """
+    from app.services.effect_monitoring_service import EffectMonitoringService
+
+    query = select(EnergySavingProposal).where(EnergySavingProposal.id == proposal_id)
+    result = await db.execute(query)
+    proposal = result.scalar_one_or_none()
+
+    if not proposal:
+        raise HTTPException(status_code=404, detail="方案不存在")
+
+    monitoring_service = EffectMonitoringService(db)
+
+    # 生成报告并推送 RL
+    report = monitoring_service.generate_daily_report(proposal_id)
+    rl_result = monitoring_service.feed_to_rl(report)
+
+    return {
+        "code": 0,
+        "message": "RL 反馈已触发",
+        "data": {
+            "report_id": report.id,
+            "achievement_rate": float(report.achievement_rate or 0),
+            "rl_feedback": rl_result
+        }
+    }
+
+
+# ==================== 11. RL 自适应优化 (专利 S5) ====================
+
+@router.post("/{proposal_id}/rl/optimize", response_model=RLOptimizationResponse, summary="执行RL优化")
+async def rl_optimize(
+    proposal_id: int,
+    request: RLOptimizationRequest = None,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    执行 RL 优化 (S5e)
+
+    基于当前系统状态，使用深度强化学习输出方案参数调整建议
+
+    - 调整措施优先级权重
+    - 推荐转移负荷目标时段
+    - 调整需量安全系数
+    - 建议温度设定值
+    """
+    from app.services.adaptive_optimization_service import AdaptiveOptimizationService
+
+    optimization_service = AdaptiveOptimizationService(db)
+
+    current_state = None
+    if request and request.current_state:
+        current_state = request.current_state.model_dump()
+
+    result = optimization_service.optimize(proposal_id, current_state)
+
+    if not result.get("success"):
+        raise HTTPException(status_code=500, detail=result.get("error", "RL 优化失败"))
+
+    return RLOptimizationResponse(
+        proposal_id=proposal_id,
+        success=True,
+        adjustments={k: {"value": v.get("value"), "description": v.get("description", ""), "unit": v.get("unit"), "index": v.get("index")}
+                     for k, v in result.get("adjustments", {}).items()},
+        raw_actions=result.get("raw_actions"),
+        exploration=result.get("exploration", False),
+        exploration_rate=result.get("exploration_rate", 0),
+        confidence=result.get("confidence", 0),
+        state_value=result.get("state_value"),
+        optimization_id=result.get("optimization_id"),
+    )
+
+
+@router.get("/{proposal_id}/rl/status", summary="获取方案RL优化状态")
+async def get_rl_optimization_status(
+    proposal_id: int,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    获取方案的 RL 优化状态
+
+    包含优化历史统计和最近一次优化结果
+    """
+    from app.services.adaptive_optimization_service import AdaptiveOptimizationService
+
+    # 验证方案存在
+    query = select(EnergySavingProposal).where(EnergySavingProposal.id == proposal_id)
+    result = await db.execute(query)
+    proposal = result.scalar_one_or_none()
+
+    if not proposal:
+        raise HTTPException(status_code=404, detail="方案不存在")
+
+    optimization_service = AdaptiveOptimizationService(db)
+    history = optimization_service.get_optimization_history(proposal_id, limit=1)
+
+    return {
+        "code": 0,
+        "data": {
+            "proposal_id": proposal_id,
+            "total_optimizations": history.get("total", 0),
+            "latest_optimization": history.get("items", [None])[0],
+        }
+    }
+
+
+@router.get("/{proposal_id}/rl/history", response_model=RLOptimizationHistoryResponse, summary="获取RL优化历史")
+async def get_rl_optimization_history(
+    proposal_id: int,
+    limit: int = 20,
+    offset: int = 0,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    获取方案的 RL 优化历史记录
+    """
+    from app.services.adaptive_optimization_service import AdaptiveOptimizationService
+
+    # 验证方案存在
+    query = select(EnergySavingProposal).where(EnergySavingProposal.id == proposal_id)
+    result = await db.execute(query)
+    proposal = result.scalar_one_or_none()
+
+    if not proposal:
+        raise HTTPException(status_code=404, detail="方案不存在")
+
+    optimization_service = AdaptiveOptimizationService(db)
+    history = optimization_service.get_optimization_history(proposal_id, limit=limit, offset=offset)
+
+    return RLOptimizationHistoryResponse(
+        total=history.get("total", 0),
+        items=history.get("items", [])
+    )
+
+
+@router.post("/{proposal_id}/rl/apply/{optimization_id}", summary="应用RL优化建议")
+async def apply_rl_optimization(
+    proposal_id: int,
+    optimization_id: int,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    标记 RL 优化建议为已应用
+
+    用于跟踪哪些优化建议被实际采纳
+    """
+    from app.services.adaptive_optimization_service import AdaptiveOptimizationService
+
+    optimization_service = AdaptiveOptimizationService(db)
+    result = optimization_service.apply_optimization(optimization_id)
+
+    if not result.get("success"):
+        raise HTTPException(status_code=400, detail=result.get("error", "应用失败"))
+
+    return {
+        "code": 0,
+        "message": "优化建议已标记为已应用",
+        "data": result
+    }
+
+
+# ==================== 12. 从监测数据训练 ====================
+
+@router.post("/{proposal_id}/rl/train-from-monitoring", summary="从监测数据训练")
+async def rl_train_from_monitoring(
+    proposal_id: int,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    从监测数据自动训练 (S4e → S5 闭环)
+
+    读取方案的效果监测报告，自动计算达成率并执行训练步骤
+    """
+    from app.services.adaptive_optimization_service import AdaptiveOptimizationService
+
+    # 验证方案存在
+    query = select(EnergySavingProposal).where(EnergySavingProposal.id == proposal_id)
+    result = await db.execute(query)
+    proposal = result.scalar_one_or_none()
+
+    if not proposal:
+        raise HTTPException(status_code=404, detail="方案不存在")
+
+    optimization_service = AdaptiveOptimizationService(db)
+    train_result = optimization_service.train_from_monitoring(proposal_id)
+
+    if not train_result.get("success"):
+        raise HTTPException(status_code=400, detail=train_result.get("error", "训练失败"))
+
+    return {
+        "code": 0,
+        "message": "从监测数据训练成功",
+        "data": train_result
+    }
+
+
+# ==================== 辅助函数 ====================
+
+def _build_state_comparison(current_state: dict, target_state: dict) -> dict:
+    """构建当前状态和目标状态的对比"""
+    if not current_state or not target_state:
+        return None
+
+    comparison = {
+        "changes": [],
+        "summary": ""
+    }
+
+    all_keys = set(current_state.keys()) | set(target_state.keys())
+    for key in all_keys:
+        current_val = current_state.get(key)
+        target_val = target_state.get(key)
+        if current_val != target_val:
+            comparison["changes"].append({
+                "field": key,
+                "from": current_val,
+                "to": target_val
+            })
+
+    if comparison["changes"]:
+        comparison["summary"] = f"共 {len(comparison['changes'])} 项参数变更"
+
+    return comparison
 
 
 
