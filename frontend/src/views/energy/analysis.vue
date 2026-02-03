@@ -614,10 +614,11 @@ const pendingRestoreData = ref<{
 } | null>(null)
 
 const getUtilizationColor = (rate: number) => {
-  if (rate < 0.5) return '#f56c6c'
-  if (rate < 0.7) return '#e6a23c'
-  if (rate <= 1) return '#67c23a'
-  return '#f56c6c'
+  // 统一阈值: low=80%, high=105%
+  if (rate < 0.5) return '#f56c6c'    // 严重过低
+  if (rate < 0.8) return '#e6a23c'    // 利用率偏低，可优化
+  if (rate <= 1.05) return '#67c23a'  // 配置合理
+  return '#f56c6c'                     // 超申报风险
 }
 
 const loadDemandAnalysis = async () => {

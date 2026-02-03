@@ -149,9 +149,9 @@ set "PROXY_DIR=%SCRIPT_DIR%proxy"
 echo Starting backend service (port 8080)...
 
 if exist "%BACKEND_DIR%\.venv\Scripts\activate.bat" (
-    start "Monitor-Backend" cmd /k "title Backend [Port 8080] && cd /d %BACKEND_DIR% && call .venv\Scripts\activate.bat && echo Starting backend... && python -m uvicorn app.main:app --host 0.0.0.0 --port 8080"
+    start "Monitor-Backend" cmd /k "title Backend [Port 8080] && cd /d %BACKEND_DIR% && call .venv\Scripts\activate.bat && echo Starting backend... && python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8080"
 ) else (
-    start "Monitor-Backend" cmd /k "title Backend [Port 8080] && cd /d %BACKEND_DIR% && echo Starting backend... && python -m uvicorn app.main:app --host 0.0.0.0 --port 8080"
+    start "Monitor-Backend" cmd /k "title Backend [Port 8080] && cd /d %BACKEND_DIR% && echo Starting backend... && python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8080"
 )
 
 echo Waiting for backend to start...

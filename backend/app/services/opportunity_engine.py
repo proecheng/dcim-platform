@@ -4,6 +4,8 @@ Opportunity Analysis Engine
 
 整合现有分析插件，提供统一的机会发现和分析接口
 根据能源中心重新设计方案，将6种模板整合为4大类别
+
+注: 需量分析统一使用 DemandAnalysisService 确保数据源一致
 """
 import logging
 from typing import Dict, List, Optional, Any
@@ -25,6 +27,7 @@ from .analysis_plugins import (
     PowerFactorPlugin
 )
 from .pricing_service import PricingService
+from .demand_analysis_service import DemandAnalysisService
 from ..models.energy import (
     PowerDevice, EnergySuggestion, ElectricityPricing,
     EnergyDaily, PUEHistory
@@ -136,73 +139,70 @@ class OpportunityEngine:
         """
         分析需量优化机会
 
+        使用统一的 DemandAnalysisService 确保数据源和计算逻辑一致
+
         返回需量配置优化建议、预期节省等
         """
-        # 获取电价配置
-        full_pricing = await self.pricing_service.get_full_pricing_config()
-        global_config = full_pricing.get("global_config")
+        # 使用统一的需量分析服务
+        demand_service = DemandAnalysisService(self.db)
+        result = await demand_service.analyze(meter_point_id)
 
-        if not global_config:
+        if not result.get("has_opportunity"):
             return {
                 "has_opportunity": False,
-                "message": "未配置全局电价，无法进行需量分析",
+                "message": result.get("message", "未发现需量优化机会"),
                 "suggestions": []
             }
 
-        # 获取需量相关数据
-        declared_demand = global_config.get("declared_demand", 0)
-        demand_price = global_config.get("demand_price", 0)
-        over_multiplier = global_config.get("over_demand_multiplier", 2)
+        stats = result["statistics"]
+        rec = result["recommendation"]
+        demand_price = result["demand_price"]
 
-        # 从PUE历史获取功率数据估算需量
-        max_demand = await self._get_max_demand_from_history(days=30)
-        avg_demand = await self._get_avg_demand_from_history(days=30)
-
-        # 分析
+        # 构建建议
         suggestions = []
-        potential_saving = 0
 
-        if declared_demand > 0:
-            utilization = (max_demand / declared_demand * 100) if declared_demand else 0
+        if rec["type"] == "reduce":
+            suggestions.append({
+                "type": "reduce_declared_demand",
+                "title": "降低申报需量",
+                "description": rec["description"],
+                "recommendation": f"建议将申报需量调整为{rec['suggested_demand']:.0f}kW",
+                "potential_saving_monthly": rec["monthly_saving"],
+                "potential_saving_annual": rec["annual_saving"],
+                "confidence": rec["confidence"]
+            })
 
-            if utilization < 70:
-                # 申报需量过高
-                optimal_demand = max_demand * 1.1  # 留10%余量
-                saving = (declared_demand - optimal_demand) * demand_price * 12
-                potential_saving += saving
-                suggestions.append({
-                    "type": "reduce_declared_demand",
-                    "title": "降低申报需量",
-                    "description": f"当前申报需量{declared_demand:.0f}kW，实际最大需量{max_demand:.0f}kW，利用率仅{utilization:.1f}%",
-                    "recommendation": f"建议将申报需量调整为{optimal_demand:.0f}kW",
-                    "potential_saving_monthly": saving / 12,
-                    "potential_saving_annual": saving,
-                    "confidence": 0.85
-                })
+        elif rec["type"] == "increase":
+            suggestions.append({
+                "type": "increase_declared_demand",
+                "title": "提高申报需量或控制峰值",
+                "description": rec["description"],
+                "recommendation": "建议提高申报需量或采取需量控制措施",
+                "over_risk_cost": abs(rec["annual_saving"]),
+                "confidence": rec["confidence"]
+            })
 
-            elif utilization > 95:
-                # 申报需量过低，有超需量风险
-                over_risk_cost = (max_demand - declared_demand) * demand_price * over_multiplier
-                suggestions.append({
-                    "type": "increase_declared_demand",
-                    "title": "提高申报需量或控制峰值",
-                    "description": f"当前利用率{utilization:.1f}%，超需量风险较高",
-                    "recommendation": "建议提高申报需量或采取需量控制措施",
-                    "over_risk_cost": over_risk_cost,
-                    "confidence": 0.75
-                })
+        elif rec["type"] == "shave":
+            suggestions.append({
+                "type": "peak_shaving",
+                "title": "实施需量削峰",
+                "description": rec["description"],
+                "recommendation": "建议安装需量控制系统或优化设备启动策略",
+                "potential_saving_annual": rec["annual_saving"],
+                "confidence": rec["confidence"]
+            })
 
         return {
-            "has_opportunity": len(suggestions) > 0,
+            "has_opportunity": True,
             "current_status": {
-                "declared_demand": declared_demand,
-                "max_demand": max_demand,
-                "avg_demand": avg_demand,
-                "utilization_rate": (max_demand / declared_demand * 100) if declared_demand else 0,
+                "declared_demand": stats["declared_demand"],
+                "max_demand": stats["max_demand_12m"],
+                "avg_demand": stats["avg_demand_12m"],
+                "utilization_rate": stats["utilization_rate"] * 100,  # 转换为百分比
                 "demand_price": demand_price
             },
             "suggestions": suggestions,
-            "potential_saving_annual": potential_saving
+            "potential_saving_annual": abs(rec["annual_saving"])
         }
 
     async def analyze_peak_valley_opportunity(self) -> Dict[str, Any]:

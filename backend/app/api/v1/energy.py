@@ -2667,19 +2667,26 @@ async def get_demand_history(
     result = await db.execute(query)
     history_data = result.scalars().all()
 
-    import random
     if not history_data:
-        # 生成模拟数据
+        # 生成模拟数据 - 使用固定比例确保结果稳定
         history_list = []
         declared = meter.declared_demand or 500
+        # 基于计量点ID生成确定性的基础利用率
+        base_utilization = 0.78 + (meter_point_id % 10) * 0.015  # 0.78-0.915
+
         for i in range(months):
             month_offset = now.month - i - 1
             year = now.year + (month_offset // 12)
             month = month_offset % 12 + 1
 
-            max_d = declared * random.uniform(0.7, 1.05)
-            avg_d = max_d * random.uniform(0.6, 0.8)
-            d_95th = max_d * random.uniform(0.9, 0.98)
+            # 使用确定性的月度波动（基于月份）
+            month_factor = 1.0 + (month - 6) * 0.02  # 夏季(6月)基准，冬夏略高
+            if month in [7, 8, 1, 2]:  # 夏季/冬季用电高峰
+                month_factor += 0.05
+
+            max_d = declared * base_utilization * month_factor
+            avg_d = max_d * 0.72
+            d_95th = max_d * 0.94
             utilization = max_d / declared if declared > 0 else 0
 
             history_list.append(DemandHistoryItem(
@@ -2856,14 +2863,24 @@ async def analyze_demand_config(
     """
     分析各计量点的需量配置是否合理
     识别申报过高或过低的计量点
+
+    [V2.8-FIX] 使用确定性模拟数据，移除随机值
+    [V2.9-FIX] 修复: 导入移至函数开头，使用统一服务常量
     """
+    import math as _math
+    from ...services.demand_analysis_service import DemandAnalysisService, DemandThresholds
+
+    # 初始化统一阈值和服务常量
+    _thresholds = DemandThresholds()
+    _demand_price = DemandAnalysisService.DEFAULT_DEMAND_PRICE  # 38.0 元/kW·月
+
     # 获取所有计量点
     meters_result = await db.execute(
         select(MeterPoint).where(MeterPoint.is_enabled == True)
     )
     meters = meters_result.scalars().all()
 
-    import random
+    # [V2.8] 移除 import random，使用确定性计算
 
     analysis_items = []
     over_declared_count = 0
@@ -2888,32 +2905,41 @@ async def analyze_demand_config(
             avg_demands = [h.avg_demand for h in history if h.avg_demand]
             max_demand_12m = max(max_demands) if max_demands else declared * 0.8
             avg_demand_12m = sum(avg_demands) / len(avg_demands) if avg_demands else max_demand_12m * 0.7
-            demand_95th = sorted(max_demands)[int(len(max_demands) * 0.95)] if len(max_demands) > 1 else max_demand_12m * 0.95
+            # [V2.9-FIX] 修复95分位数计算，避免越界
+            if len(max_demands) > 1:
+                sorted_demands = sorted(max_demands)
+                idx_95 = int(len(sorted_demands) * 0.95)
+                demand_95th = sorted_demands[min(idx_95, len(sorted_demands) - 1)]
+            else:
+                demand_95th = max_demand_12m * 0.95
         else:
-            # 模拟数据
-            max_demand_12m = declared * random.uniform(0.6, 1.1)
-            avg_demand_12m = max_demand_12m * random.uniform(0.6, 0.8)
-            demand_95th = max_demand_12m * random.uniform(0.9, 0.98)
+            # 模拟数据 - 使用固定比例而非随机值，确保结果稳定
+            # 基于计量点ID生成确定性的模拟数据
+            seed_factor = (meter.id % 10 + 1) / 10  # 0.1-1.0 基于ID
+            base_ratio = 0.75 + seed_factor * 0.2    # 0.77-0.95 利用率范围
+            max_demand_12m = declared * base_ratio
+            avg_demand_12m = max_demand_12m * 0.72
+            demand_95th = max_demand_12m * 0.94
 
         utilization = max_demand_12m / declared if declared > 0 else 0
 
-        # 计算最优需量（基于95%分位数，留5%余量）
-        optimal_demand = demand_95th * 1.05
+        # 使用统一阈值计算最优需量 (95分位数 + 10%安全裕度，按5取整)
+        # [V2.9-FIX] 使用函数开头初始化的 _thresholds 和 _math
+        optimal_demand = _math.ceil(demand_95th * (1 + _thresholds.safety_margin) / 5) * 5
 
-        # 判断配置状态
-        is_over_declared = utilization < 0.7  # 利用率低于70%视为申报过高
-        is_under_declared = max_demand_12m > declared  # 最大需量超过申报值
+        # 使用统一阈值判断配置状态 (low=80%, high=105%)
+        is_over_declared = utilization < _thresholds.low_utilization   # 利用率低于80%视为申报过高
+        is_under_declared = utilization > _thresholds.high_utilization  # 利用率超过105%视为申报过低
 
-        # 计算潜在节省
-        demand_price = 38  # 元/kW·月
+        # 计算潜在节省 - 使用统一的需量电价常量
         if is_over_declared:
-            saving = (declared - optimal_demand) * demand_price * 12
+            saving = (declared - optimal_demand) * _demand_price * 12
             over_declared_count += 1
         elif is_under_declared:
             # 超需量罚款估算（假设超量部分按2倍计费）
             over_amount = max_demand_12m - declared
-            penalty = over_amount * demand_price * 2 * 3  # 假设一年超3次
-            saving = penalty - (optimal_demand - declared) * demand_price * 12
+            penalty = over_amount * _demand_price * 2 * 3  # 假设一年超3次
+            saving = penalty - (optimal_demand - declared) * _demand_price * 12
             under_declared_count += 1
         else:
             saving = 0

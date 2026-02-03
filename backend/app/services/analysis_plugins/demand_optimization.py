@@ -6,6 +6,8 @@ Demand Optimization Analysis Plugin
 Analyzes power demand and optimizes demand charges
 
 Enhanced: 支持需量配置合理性分析、设备需量贡献分析、削峰措施建议
+
+注: 核心计算逻辑已统一到 DemandAnalysisService，本插件调用该服务
 """
 
 from typing import List, Dict, Any, Optional
@@ -23,6 +25,9 @@ from .base import (
     DemandHistoryData,
     MeterPointData
 )
+
+# 导入统一的阈值配置
+from ..demand_analysis_service import DemandThresholds
 
 
 class DemandOptimizationPlugin(AnalysisPlugin):

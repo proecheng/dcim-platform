@@ -76,18 +76,24 @@ const router = useRouter()
 const loading = ref(false)
 const data = ref<DemandComparisonData | null>(null)
 
+// 统一阈值配置（与后端 DemandThresholds 保持一致）
+const DEMAND_THRESHOLDS = {
+  low_utilization: 0.80,   // 低利用率阈值 (80%)
+  high_utilization: 1.05   // 高利用率阈值 (105%)
+}
+
 const utilizationClass = computed(() => {
   const rate = data.value?.utilization_rate || 0
-  if (rate < 0.7) return 'low'
-  if (rate < 0.9) return 'good'
-  return 'high'
+  if (rate < DEMAND_THRESHOLDS.low_utilization) return 'low'      // < 80%: 申报过高
+  if (rate <= DEMAND_THRESHOLDS.high_utilization) return 'good'   // 80%-105%: 合理
+  return 'high'                                                    // > 105%: 风险
 })
 
 const utilizationColor = computed(() => {
   const rate = data.value?.utilization_rate || 0
-  if (rate < 0.7) return '#faad14'  // 利用率过低，浪费
-  if (rate < 0.9) return '#52c41a'  // 合理区间
-  return '#f5222d'  // 接近上限，有风险
+  if (rate < DEMAND_THRESHOLDS.low_utilization) return '#faad14'  // 利用率过低，可优化
+  if (rate <= DEMAND_THRESHOLDS.high_utilization) return '#52c41a'  // 配置合理
+  return '#f5222d'  // 超申报风险
 })
 
 onMounted(() => {

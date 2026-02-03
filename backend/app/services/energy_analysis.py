@@ -3,6 +3,9 @@
 Energy Analysis Service
 
 提供需量配置分析、负荷转移分析功能
+
+注: 需量配置分析已统一到 demand_analysis_service.DemandAnalysisService
+    本文件的 DemandAnalysisService 类保留向后兼容，但使用统一阈值
 """
 from typing import List, Optional, Dict, Any
 from datetime import datetime, timedelta
@@ -14,6 +17,9 @@ from ..models.energy import (
     MeterPoint, PowerDevice, DeviceShiftConfig,
     PowerCurveData, DemandHistory, EnergyDaily, EnergyMonthly
 )
+
+# 导入统一的阈值配置
+from .demand_analysis_service import DemandThresholds
 
 
 class DemandAnalysisService:
@@ -85,25 +91,33 @@ class DemandAnalysisService:
             if h.over_declared_times
         )
 
-        # 计算建议需量
+        # 使用统一阈值配置
+        thresholds = DemandThresholds()
+
+        # 计算建议需量 (统一使用95分位数 + 安全裕度)
         recommended_demand = DemandAnalysisService._calculate_recommended_demand(
-            max_demand, demand_95th, avg_demand
+            max_demand, demand_95th, avg_demand, thresholds.safety_margin
         )
 
-        # 计算费用优化
-        demand_price = 38.0  # 默认需量电价
+        # 计算费用优化 (使用统一默认电价)
+        from .demand_analysis_service import DemandAnalysisService as UnifiedDemandService
+        demand_price = 38.0  # 默认需量电价，与统一服务一致
         current_cost = declared_demand * demand_price
         recommended_cost = recommended_demand * demand_price
         annual_saving = (current_cost - recommended_cost) * 12
 
-        # 分析状态
-        if utilization_rate > 95:
+        # 分析状态 (使用统一阈值: low=80%, high=105%)
+        # utilization_rate 在此处是百分比值 (如 85.0)
+        low_pct = thresholds.low_utilization * 100    # 80
+        high_pct = thresholds.high_utilization * 100  # 105
+
+        if utilization_rate > high_pct:
             status = "high_risk"
             status_text = "风险较高"
-        elif utilization_rate > 85:
+        elif utilization_rate >= low_pct:
             status = "optimal"
             status_text = "配置合理"
-        elif utilization_rate > 70:
+        elif utilization_rate >= 60:
             status = "can_optimize"
             status_text = "可优化"
         else:
@@ -179,21 +193,23 @@ class DemandAnalysisService:
     def _calculate_recommended_demand(
         max_demand: float,
         demand_95th: float,
-        avg_demand: float
+        avg_demand: float,
+        safety_margin: float = 0.10
     ) -> float:
-        """计算推荐需量"""
-        # 基于95%分位数 + 5%安全余量
-        base = demand_95th * 1.05
-        # 不低于平均值的1.3倍
-        min_value = avg_demand * 1.3
-        # 不高于最大值的1.15倍
-        max_value = max_demand * 1.15
+        """
+        计算推荐需量
 
-        recommended = max(base, min_value)
-        recommended = min(recommended, max_value)
+        统一使用: 95分位数 * (1 + 安全裕度)，按5的倍数取整
+        与 demand_analysis_service.calculate_optimal_demand 保持一致
+        """
+        import math
+        # 基于95%分位数 + 安全裕度 (统一10%)
+        optimal = demand_95th * (1 + safety_margin)
 
-        # 取整到10的倍数
-        return round(recommended / 10) * 10
+        # 按5的倍数向上取整 (kW)
+        optimal = math.ceil(optimal / 5) * 5
+
+        return optimal
 
     @staticmethod
     async def _generate_mock_analysis(meter_point: MeterPoint) -> Dict[str, Any]:
