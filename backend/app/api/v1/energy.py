@@ -42,10 +42,62 @@ from ...schemas.energy import (
     DeviceShiftPotential, DeviceShiftAnalysisResult,
     DemandConfigAnalysisItem, DemandConfigAnalysisResult,
     TopologyCircuitNode, TopologyPanelNode, TopologyMeterNode, TopologyTransformerNode,
-    DistributionTopologyResponse
+    DistributionTopologyResponse,
+    # 需量配置层级展示
+    MeterPointDemandInfo, TransformerWithMeterPointsResponse
 )
 
 router = APIRouter()
+
+
+# ==================== 确定性模拟数据辅助函数 ====================
+# [V2.11] 替换 random 模块，使用基于种子的确定性计算
+
+def _deterministic_ratio(seed: int, min_val: float = 0.5, max_val: float = 0.9) -> float:
+    """
+    基于种子生成确定性比率值
+
+    Args:
+        seed: 种子值（可使用 device.id、索引、日期等）
+        min_val: 最小值
+        max_val: 最大值
+
+    Returns:
+        在 [min_val, max_val] 范围内的确定性值
+    """
+    # 使用简单的线性同余生成器思路
+    normalized = ((seed * 1103515245 + 12345) % (2**31)) / (2**31)
+    return min_val + normalized * (max_val - min_val)
+
+
+def _deterministic_offset(seed: int, amplitude: float = 5.0) -> float:
+    """
+    基于种子生成确定性偏移值（围绕0波动）
+
+    Args:
+        seed: 种子值
+        amplitude: 波动幅度
+
+    Returns:
+        在 [-amplitude, +amplitude] 范围内的值
+    """
+    normalized = ((seed * 1103515245 + 12345) % (2**31)) / (2**31)
+    return (normalized - 0.5) * 2 * amplitude
+
+
+def _device_seed(device_id: int, phase: int = 0) -> int:
+    """为设备生成确定性种子"""
+    return device_id * 17 + phase * 31
+
+
+def _time_seed(dt: datetime, offset: int = 0) -> int:
+    """为时间点生成确定性种子"""
+    return dt.year * 10000 + dt.month * 100 + dt.day + dt.hour * 3 + offset
+
+
+def _date_seed(d: date, offset: int = 0) -> int:
+    """为日期生成确定性种子"""
+    return d.year * 10000 + d.month * 100 + d.day + offset
 
 
 # ==================== 用电设备管理 ====================
@@ -429,30 +481,30 @@ async def get_realtime_power(
     devices = result.scalars().all()
 
     power_data = []
-    for device in devices:
+    for idx, device in enumerate(devices):
         # 从 PointRealtime 获取实时数据（如果有对应的电力点位）
-        # 这里使用模拟数据作为示例
-        import random
+        # [V2.11] 使用确定性模拟数据
         base_power = device.rated_power or 10.0
+        seed = _device_seed(device.id)
 
         data = RealtimePowerData(
             device_id=device.id,
             device_code=device.device_code,
             device_name=device.device_name,
             device_type=device.device_type,
-            voltage_a=380 + random.uniform(-5, 5),
-            voltage_b=380 + random.uniform(-5, 5) if device.phase_type == "3P" else None,
-            voltage_c=380 + random.uniform(-5, 5) if device.phase_type == "3P" else None,
-            current_a=base_power * 1.52 * random.uniform(0.5, 0.9),
-            current_b=base_power * 1.52 * random.uniform(0.5, 0.9) if device.phase_type == "3P" else None,
-            current_c=base_power * 1.52 * random.uniform(0.5, 0.9) if device.phase_type == "3P" else None,
-            active_power=base_power * random.uniform(0.5, 0.9),
-            reactive_power=base_power * 0.2 * random.uniform(0.5, 1.0),
-            apparent_power=base_power * 1.1 * random.uniform(0.5, 0.9),
-            power_factor=random.uniform(0.85, 0.98),
-            frequency=50 + random.uniform(-0.1, 0.1),
-            total_energy=base_power * 24 * 30 * random.uniform(0.5, 1.0),
-            load_rate=random.uniform(0.4, 0.85) if device.rated_power else None,
+            voltage_a=380 + _deterministic_offset(seed, 5),
+            voltage_b=380 + _deterministic_offset(seed + 1, 5) if device.phase_type == "3P" else None,
+            voltage_c=380 + _deterministic_offset(seed + 2, 5) if device.phase_type == "3P" else None,
+            current_a=base_power * 1.52 * _deterministic_ratio(seed + 3, 0.5, 0.9),
+            current_b=base_power * 1.52 * _deterministic_ratio(seed + 4, 0.5, 0.9) if device.phase_type == "3P" else None,
+            current_c=base_power * 1.52 * _deterministic_ratio(seed + 5, 0.5, 0.9) if device.phase_type == "3P" else None,
+            active_power=base_power * _deterministic_ratio(seed + 6, 0.5, 0.9),
+            reactive_power=base_power * 0.2 * _deterministic_ratio(seed + 7, 0.5, 1.0),
+            apparent_power=base_power * 1.1 * _deterministic_ratio(seed + 8, 0.5, 0.9),
+            power_factor=_deterministic_ratio(seed + 9, 0.85, 0.98),
+            frequency=50 + _deterministic_offset(seed + 10, 0.1),
+            total_energy=base_power * 24 * 30 * _deterministic_ratio(seed + 11, 0.5, 1.0),
+            load_rate=_deterministic_ratio(seed + 12, 0.4, 0.85) if device.rated_power else None,
             status="normal",
             update_time=datetime.now()
         )
@@ -472,7 +524,7 @@ async def get_power_summary(
     )
     devices = result.scalars().all()
 
-    import random
+    # [V2.11] 使用确定性计算替代 random
     total_power = 0.0
     it_power = 0.0
     cooling_power = 0.0
@@ -480,7 +532,8 @@ async def get_power_summary(
     other_power = 0.0
 
     for device in devices:
-        base_power = (device.rated_power or 10.0) * random.uniform(0.5, 0.9)
+        seed = _device_seed(device.id)
+        base_power = (device.rated_power or 10.0) * _deterministic_ratio(seed, 0.5, 0.9)
 
         if device.device_type == "IT":
             it_power += base_power
@@ -549,27 +602,28 @@ async def get_device_realtime_power(
     if not device:
         raise HTTPException(status_code=404, detail="设备不存在")
 
-    import random
+    # [V2.11] 使用确定性模拟数据
     base_power = device.rated_power or 10.0
+    seed = _device_seed(device.id)
 
     data = RealtimePowerData(
         device_id=device.id,
         device_code=device.device_code,
         device_name=device.device_name,
         device_type=device.device_type,
-        voltage_a=380 + random.uniform(-5, 5),
-        voltage_b=380 + random.uniform(-5, 5) if device.phase_type == "3P" else None,
-        voltage_c=380 + random.uniform(-5, 5) if device.phase_type == "3P" else None,
-        current_a=base_power * 1.52 * random.uniform(0.5, 0.9),
-        current_b=base_power * 1.52 * random.uniform(0.5, 0.9) if device.phase_type == "3P" else None,
-        current_c=base_power * 1.52 * random.uniform(0.5, 0.9) if device.phase_type == "3P" else None,
-        active_power=base_power * random.uniform(0.5, 0.9),
-        reactive_power=base_power * 0.2 * random.uniform(0.5, 1.0),
-        apparent_power=base_power * 1.1 * random.uniform(0.5, 0.9),
-        power_factor=random.uniform(0.85, 0.98),
-        frequency=50 + random.uniform(-0.1, 0.1),
-        total_energy=base_power * 24 * 30 * random.uniform(0.5, 1.0),
-        load_rate=random.uniform(0.4, 0.85) if device.rated_power else None,
+        voltage_a=380 + _deterministic_offset(seed, 5),
+        voltage_b=380 + _deterministic_offset(seed + 1, 5) if device.phase_type == "3P" else None,
+        voltage_c=380 + _deterministic_offset(seed + 2, 5) if device.phase_type == "3P" else None,
+        current_a=base_power * 1.52 * _deterministic_ratio(seed + 3, 0.5, 0.9),
+        current_b=base_power * 1.52 * _deterministic_ratio(seed + 4, 0.5, 0.9) if device.phase_type == "3P" else None,
+        current_c=base_power * 1.52 * _deterministic_ratio(seed + 5, 0.5, 0.9) if device.phase_type == "3P" else None,
+        active_power=base_power * _deterministic_ratio(seed + 6, 0.5, 0.9),
+        reactive_power=base_power * 0.2 * _deterministic_ratio(seed + 7, 0.5, 1.0),
+        apparent_power=base_power * 1.1 * _deterministic_ratio(seed + 8, 0.5, 0.9),
+        power_factor=_deterministic_ratio(seed + 9, 0.85, 0.98),
+        frequency=50 + _deterministic_offset(seed + 10, 0.1),
+        total_energy=base_power * 24 * 30 * _deterministic_ratio(seed + 11, 0.5, 1.0),
+        load_rate=_deterministic_ratio(seed + 12, 0.4, 0.85) if device.rated_power else None,
         status="normal",
         update_time=datetime.now()
     )
@@ -590,7 +644,7 @@ async def get_current_pue(
     )
     devices = result.scalars().all()
 
-    import random
+    # [V2.11] 使用确定性计算替代 random
     total_power = 0.0
     it_power = 0.0
     cooling_power = 0.0
@@ -599,7 +653,8 @@ async def get_current_pue(
     other_power = 0.0
 
     for device in devices:
-        base_power = (device.rated_power or 10.0) * random.uniform(0.5, 0.9)
+        seed = _device_seed(device.id)
+        base_power = (device.rated_power or 10.0) * _deterministic_ratio(seed, 0.5, 0.9)
 
         if device.is_it_load or device.device_type == "IT":
             it_power += base_power
@@ -676,12 +731,14 @@ async def get_pue_trend(
 
     # 如果没有历史数据，生成模拟数据
     if not history:
-        import random
+        # [V2.11] 使用确定性模拟数据
         data_list = []
         current = start_time
+        idx = 0
         while current <= end_time:
-            pue = 1.4 + random.uniform(-0.2, 0.3)
-            total = 500 + random.uniform(-50, 50)
+            seed = _time_seed(current, idx)
+            pue = 1.4 + _deterministic_offset(seed, 0.25)  # 1.15-1.65
+            total = 500 + _deterministic_offset(seed + 1, 50)  # 450-550
             it = total / pue
             data_list.append(PUEHistoryItem(
                 record_time=current,
@@ -697,6 +754,7 @@ async def get_pue_trend(
                 current += timedelta(days=7)
             else:
                 current += timedelta(days=30)
+            idx += 1
     else:
         data_list = [PUEHistoryItem.model_validate(h) for h in history]
 
@@ -742,11 +800,12 @@ async def get_daily_statistics(
 
     # 如果没有数据，生成模拟数据
     if not daily_data:
-        import random
+        # [V2.11] 使用确定性模拟数据
         data_list = []
         current_date = start_date
         while current_date <= end_date:
-            total = 1000 + random.uniform(-200, 200)
+            seed = _date_seed(current_date)
+            total = 1000 + _deterministic_offset(seed, 200)
             peak = total * 0.4
             normal = total * 0.35
             valley = total * 0.25
@@ -762,7 +821,7 @@ async def get_daily_statistics(
                 avg_power=round(total / 24, 2),
                 max_power_time=datetime.combine(current_date, datetime.min.time()) + timedelta(hours=14),
                 energy_cost=round(peak * 1.2 + normal * 0.8 + valley * 0.4, 2),
-                pue=round(1.4 + random.uniform(-0.1, 0.2), 2)
+                pue=round(1.4 + _deterministic_offset(seed + 1, 0.15), 2)
             )
             data_list.append(data)
             current_date += timedelta(days=1)
@@ -791,10 +850,11 @@ async def get_monthly_statistics(
 
     # 如果没有数据，生成模拟数据
     if not monthly_data:
-        import random
+        # [V2.11] 使用确定性模拟数据
         data_list = []
         for month in range(1, 13):
-            total = 30000 + random.uniform(-5000, 5000)
+            seed = year * 100 + month
+            total = 30000 + _deterministic_offset(seed, 5000)
             peak = total * 0.4
             normal = total * 0.35
             valley = total * 0.25
@@ -817,7 +877,7 @@ async def get_monthly_statistics(
                 peak_cost=round(peak_cost, 2),
                 normal_cost=round(normal_cost, 2),
                 valley_cost=round(valley_cost, 2),
-                avg_pue=round(1.45 + random.uniform(-0.1, 0.15), 2)
+                avg_pue=round(1.45 + _deterministic_offset(seed + 1, 0.125), 2)
             )
             data_list.append(data)
         return ResponseModel(data=data_list)
@@ -859,8 +919,9 @@ async def get_energy_summary(
     # 如果没有数据，返回模拟数据
     days = (end_date - start_date).days + 1
     if stats[0] is None:
-        import random
-        total = 1000 * days + random.uniform(-500, 500)
+        # [V2.11] 使用确定性模拟数据
+        seed = _date_seed(start_date)
+        total = 1000 * days + _deterministic_offset(seed, 500)
         peak = total * 0.4
         normal = total * 0.35
         valley = total * 0.25
@@ -916,15 +977,17 @@ async def get_energy_trend(
     current_user: User = Depends(get_current_user)
 ):
     """获取能耗趋势数据"""
-    import random
+    # [V2.11] 使用确定性模拟数据
     data_list = []
     total_energy = 0.0
     total_cost = 0.0
 
     if granularity == "daily":
         current = start_date
+        idx = 0
         while current <= end_date:
-            energy = 1000 + random.uniform(-200, 200)
+            seed = _date_seed(current, idx)
+            energy = 1000 + _deterministic_offset(seed, 200)
             cost = energy * 0.8
             total_energy += energy
             total_cost += cost
@@ -935,10 +998,12 @@ async def get_energy_trend(
                 power=round(energy / 24, 2)
             ))
             current += timedelta(days=1)
+            idx += 1
     elif granularity == "monthly":
         year = start_date.year
         for month in range(1, 13):
-            energy = 30000 + random.uniform(-5000, 5000)
+            seed = year * 100 + month
+            energy = 30000 + _deterministic_offset(seed, 5000)
             cost = energy * 0.8
             total_energy += energy
             total_cost += cost
@@ -951,8 +1016,10 @@ async def get_energy_trend(
     else:  # hourly
         current = datetime.combine(start_date, datetime.min.time())
         end = datetime.combine(end_date, datetime.max.time())
+        idx = 0
         while current <= end:
-            energy = 40 + random.uniform(-10, 10)
+            seed = _time_seed(current, idx)
+            energy = 40 + _deterministic_offset(seed, 10)
             cost = energy * 0.8
             total_energy += energy
             total_cost += cost
@@ -963,6 +1030,7 @@ async def get_energy_trend(
                 power=round(energy, 2)
             ))
             current += timedelta(hours=1)
+            idx += 1
             if len(data_list) > 168:  # 最多一周的小时数据
                 break
 
@@ -985,20 +1053,21 @@ async def get_energy_comparison(
     current_user: User = Depends(get_current_user)
 ):
     """获取能耗环比/同比对比"""
-    import random
+    # [V2.11] 使用确定性模拟数据
     today = date.today()
+    seed = _date_seed(today)
 
     # 生成模拟数据
-    current_total = 30000 + random.uniform(-3000, 3000)
+    current_total = 30000 + _deterministic_offset(seed, 3000)
     current_peak = current_total * 0.4
     current_normal = current_total * 0.35
     current_valley = current_total * 0.25
     current_cost = current_peak * 1.2 + current_normal * 0.8 + current_valley * 0.4
 
     if comparison_type == "yoy":  # 同比
-        change_rate = random.uniform(-0.15, 0.15)
+        change_rate = _deterministic_offset(seed + 1, 0.15)
     else:  # 环比
-        change_rate = random.uniform(-0.1, 0.1)
+        change_rate = _deterministic_offset(seed + 2, 0.1)
 
     prev_total = current_total / (1 + change_rate)
     prev_peak = prev_total * 0.4
@@ -1063,13 +1132,14 @@ async def get_daily_cost(
     )
     daily_data = result.scalars().all()
 
-    import random
+    # [V2.11] 使用确定性模拟数据
     if not daily_data:
         # 生成模拟数据
         data_list = []
         current = start_date
         while current <= end_date:
-            total = 1000 + random.uniform(-200, 200)
+            seed = _date_seed(current)
+            total = 1000 + _deterministic_offset(seed, 200)
             peak = total * 0.4
             normal = total * 0.35
             valley = total * 0.25
@@ -1120,13 +1190,14 @@ async def get_monthly_cost(
     result = await db.execute(query)
     monthly_data = result.scalars().all()
 
-    import random
+    # [V2.11] 使用确定性模拟数据
     if not monthly_data:
         # 生成模拟数据
         data_list = []
         months = [month] if month else range(1, 13)
         for m in months:
-            total = 30000 + random.uniform(-5000, 5000)
+            seed = year * 100 + m
+            total = 30000 + _deterministic_offset(seed, 5000)
             peak = total * 0.4
             normal = total * 0.35
             valley = total * 0.25
@@ -1699,12 +1770,13 @@ async def get_distribution_diagram(
     if not devices:
         raise HTTPException(status_code=404, detail="暂无配电设备数据")
 
-    import random
+    # [V2.11] 使用确定性模拟数据
 
     # 构建设备节点字典
     node_dict = {}
     for device in devices:
-        base_power = (device.rated_power or 10.0) * random.uniform(0.5, 0.9)
+        seed = _device_seed(device.id)
+        base_power = (device.rated_power or 10.0) * _deterministic_ratio(seed, 0.5, 0.9)
         load_rate = base_power / device.rated_power if device.rated_power else None
 
         node = DistributionNode(
@@ -1771,14 +1843,15 @@ async def export_daily_data(
     )
     daily_data = result.scalars().all()
 
-    import random
+    # [V2.11] 使用确定性模拟数据
 
     # 如果没有数据，生成模拟数据
     if not daily_data:
         data_list = []
         current = start_date
         while current <= end_date:
-            total = 1000 + random.uniform(-200, 200)
+            seed = _date_seed(current)
+            total = 1000 + _deterministic_offset(seed, 200)
             peak = total * 0.4
             normal = total * 0.35
             valley = total * 0.25
@@ -1791,7 +1864,7 @@ async def export_daily_data(
                 "最大功率(kW)": round(total / 20, 2),
                 "平均功率(kW)": round(total / 24, 2),
                 "电费(元)": round(peak * 1.2 + normal * 0.8 + valley * 0.4, 2),
-                "PUE": round(1.4 + random.uniform(-0.1, 0.2), 2)
+                "PUE": round(1.4 + _deterministic_offset(seed + 1, 0.15), 2)
             })
             current += timedelta(days=1)
     else:
@@ -1875,12 +1948,13 @@ async def export_monthly_data(
     )
     monthly_data = result.scalars().all()
 
-    import random
+    # [V2.11] 使用确定性模拟数据
 
     if not monthly_data:
         data_list = []
         for month in range(1, 13):
-            total = 30000 + random.uniform(-5000, 5000)
+            seed = year * 100 + month
+            total = 30000 + _deterministic_offset(seed, 5000)
             peak = total * 0.4
             normal = total * 0.35
             valley = total * 0.25
@@ -1897,7 +1971,7 @@ async def export_monthly_data(
                 "平时电费(元)": round(normal * 0.8, 2),
                 "谷时电费(元)": round(valley * 0.4, 2),
                 "总电费(元)": round(peak * 1.2 + normal * 0.8 + valley * 0.4, 2),
-                "平均PUE": round(1.45 + random.uniform(-0.1, 0.15), 2)
+                "平均PUE": round(1.45 + _deterministic_offset(seed + 1, 0.125), 2)
             })
     else:
         data_list = []
@@ -1969,6 +2043,61 @@ async def export_monthly_data(
 
 
 # ==================== 变压器管理 ====================
+
+@router.get("/transformers/with-meters", response_model=ResponseModel[List[TransformerWithMeterPointsResponse]], summary="获取变压器及其计量点")
+async def get_transformers_with_meters(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    获取变压器及其下属计量点（基于配电拓扑关系）
+
+    用于需量配置页面展示，显示变压器-计量点的层级结构及各计量点的需量配置状态。
+    数据来源于配电拓扑的 transformer_id 外键关系，当拓扑变化时自动反映到此接口。
+    """
+    from sqlalchemy.orm import selectinload
+
+    # 使用 selectinload 预加载 meter_points 关系
+    query = select(Transformer).options(selectinload(Transformer.meter_points)).order_by(Transformer.transformer_code)
+    result = await db.execute(query)
+    transformers = result.scalars().all()
+
+    response_data = []
+    for t in transformers:
+        # 过滤已启用的计量点
+        enabled_meters = [m for m in t.meter_points if m.is_enabled]
+
+        # 构建计量点需量信息列表
+        meter_infos = []
+        for m in enabled_meters:
+            meter_infos.append(MeterPointDemandInfo(
+                id=m.id,
+                meter_name=m.meter_name,
+                meter_code=m.meter_code,
+                declared_demand=m.declared_demand,
+                demand_type=m.demand_type,
+                demand_period=m.demand_period
+            ))
+
+        # 计算汇总数据
+        total_declared = sum(m.declared_demand or 0 for m in enabled_meters)
+        configured_count = len([m for m in enabled_meters if m.declared_demand])
+
+        response_data.append(TransformerWithMeterPointsResponse(
+            id=t.id,
+            transformer_code=t.transformer_code,
+            transformer_name=t.transformer_name,
+            rated_capacity=t.rated_capacity,
+            status=t.status or "running",
+            is_enabled=t.is_enabled,
+            meter_points=meter_infos,
+            total_declared_demand=total_declared,
+            meter_point_count=len(enabled_meters),
+            configured_count=configured_count
+        ))
+
+    return ResponseModel(data=response_data)
+
 
 @router.get("/transformers", response_model=ResponseModel[List[TransformerResponse]], summary="获取变压器列表")
 async def get_transformers(
@@ -2548,7 +2677,7 @@ async def get_power_curve(
     curve_data = result.scalars().all()
 
     # 如果没有数据，生成模拟数据
-    import random
+    # [V2.11] 使用确定性模拟数据
     if not curve_data:
         data_list = []
         current = start_time
@@ -2556,26 +2685,29 @@ async def get_power_curve(
         total_power = 0.0
         max_demand = 0.0
         count = 0
+        idx = 0
 
         while current <= end_time:
             hour = current.hour
-            # 根据时段确定负载系数
+            seed = _time_seed(current, idx)
+
+            # 根据时段确定负载系数（确定性）
             if 10 <= hour < 12 or 19 <= hour < 21:
                 time_period = "sharp"
-                load_factor = random.uniform(0.85, 1.0)
+                load_factor = _deterministic_ratio(seed, 0.85, 1.0)
             elif 8 <= hour < 10 or 12 <= hour < 14 or 17 <= hour < 19 or 21 <= hour < 23:
                 time_period = "peak"
-                load_factor = random.uniform(0.7, 0.9)
+                load_factor = _deterministic_ratio(seed, 0.7, 0.9)
             elif 0 <= hour < 7:
                 time_period = "valley"
-                load_factor = random.uniform(0.3, 0.5)
+                load_factor = _deterministic_ratio(seed, 0.3, 0.5)
             else:
                 time_period = "flat"
-                load_factor = random.uniform(0.5, 0.7)
+                load_factor = _deterministic_ratio(seed, 0.5, 0.7)
 
             base_power = 100  # 基准功率
             power = base_power * load_factor
-            demand = power * random.uniform(0.95, 1.05)
+            demand = power * _deterministic_ratio(seed + 1, 0.95, 1.05)
 
             max_power = max(max_power, power)
             max_demand = max(max_demand, demand)
@@ -2588,11 +2720,12 @@ async def get_power_curve(
                 device_id=device_id,
                 active_power=round(power, 2),
                 reactive_power=round(power * 0.2, 2),
-                power_factor=round(random.uniform(0.85, 0.95), 3),
+                power_factor=round(_deterministic_ratio(seed + 2, 0.85, 0.95), 3),
                 demand_15min=round(demand, 2),
                 time_period=time_period
             ))
             current += timedelta(minutes=15)
+            idx += 1
 
         avg_power = total_power / count if count > 0 else 0
 
@@ -2751,7 +2884,7 @@ async def analyze_device_shift(
     shift_configs_result = await db.execute(select(DeviceShiftConfig))
     shift_configs = {sc.device_id: sc for sc in shift_configs_result.scalars().all()}
 
-    import random
+    # [V2.11] 使用确定性模拟数据
 
     device_potentials = []
     total_shiftable_power = 0.0
@@ -2760,6 +2893,7 @@ async def analyze_device_shift(
 
     for device in devices:
         config = shift_configs.get(device.id)
+        seed = _device_seed(device.id)
 
         # 判断是否可转移
         is_shiftable = config.is_shiftable if config else (
@@ -2769,27 +2903,27 @@ async def analyze_device_shift(
 
         # 计算当前功率和可转移功率
         rated_power = device.rated_power or 10.0
-        current_power = rated_power * random.uniform(0.5, 0.9)
+        current_power = rated_power * _deterministic_ratio(seed, 0.5, 0.9)
         shiftable_ratio = config.shiftable_power_ratio if config else (0.5 if is_shiftable else 0)
         # V2.7 FIX: 可调节容量基于额定功率计算，与配电配置页面保持一致
         # 修改前: shiftable_power = current_power * shiftable_ratio (随机值)
         # 修改后: shiftable_power = rated_power * shiftable_ratio (固定值)
         shiftable_power = rated_power * shiftable_ratio
 
-        # 计算5时段用电比例（模拟数据）
+        # 计算5时段用电比例（确定性模拟数据）
         # 确保5个时段占比之和为100%
         if is_shiftable:
             # 可转移设备：高价时段占比较高
-            sharp_ratio = random.uniform(0.08, 0.15)
-            peak_ratio = random.uniform(0.30, 0.40)
-            flat_ratio = random.uniform(0.25, 0.35)
-            valley_ratio = random.uniform(0.10, 0.18)
+            sharp_ratio = _deterministic_ratio(seed + 1, 0.08, 0.15)
+            peak_ratio = _deterministic_ratio(seed + 2, 0.30, 0.40)
+            flat_ratio = _deterministic_ratio(seed + 3, 0.25, 0.35)
+            valley_ratio = _deterministic_ratio(seed + 4, 0.10, 0.18)
         else:
             # 不可转移设备：分布相对均匀
-            sharp_ratio = random.uniform(0.05, 0.10)
-            peak_ratio = random.uniform(0.25, 0.35)
-            flat_ratio = random.uniform(0.30, 0.40)
-            valley_ratio = random.uniform(0.12, 0.20)
+            sharp_ratio = _deterministic_ratio(seed + 1, 0.05, 0.10)
+            peak_ratio = _deterministic_ratio(seed + 2, 0.25, 0.35)
+            flat_ratio = _deterministic_ratio(seed + 3, 0.30, 0.40)
+            valley_ratio = _deterministic_ratio(seed + 4, 0.12, 0.20)
 
         # 深谷占比为剩余部分，确保总和为100%
         deep_valley_ratio = max(0, 1.0 - sharp_ratio - peak_ratio - flat_ratio - valley_ratio)
@@ -2866,9 +3000,11 @@ async def analyze_demand_config(
 
     [V2.8-FIX] 使用确定性模拟数据，移除随机值
     [V2.9-FIX] 修复: 导入移至函数开头，使用统一服务常量
+    [V2.10-FIX] 修复数据源不一致: 统一使用 Demand15MinData/DemandHistory，确保与 optimization-plan 端点数据一致
     """
     import math as _math
     from ...services.demand_analysis_service import DemandAnalysisService, DemandThresholds
+    from ...models.energy import Demand15MinData
 
     # 初始化统一阈值和服务常量
     _thresholds = DemandThresholds()
@@ -2891,7 +3027,11 @@ async def analyze_demand_config(
     for meter in meters:
         declared = meter.declared_demand or 500
 
-        # 获取或模拟需量历史数据
+        # [V2.10-FIX] 数据源优先级:
+        # 1. 首先尝试 DemandHistory (月度统计数据)
+        # 2. 其次尝试 Demand15MinData (15分钟实时数据) - 与 optimization-plan 端点一致
+        # 3. 最后使用确定性模拟数据
+
         history_result = await db.execute(
             select(DemandHistory)
             .where(DemandHistory.meter_point_id == meter.id)
@@ -2901,6 +3041,7 @@ async def analyze_demand_config(
         history = history_result.scalars().all()
 
         if history:
+            # 优先使用 DemandHistory 数据
             max_demands = [h.max_demand for h in history if h.max_demand]
             avg_demands = [h.avg_demand for h in history if h.avg_demand]
             max_demand_12m = max(max_demands) if max_demands else declared * 0.8
@@ -2913,23 +3054,49 @@ async def analyze_demand_config(
             else:
                 demand_95th = max_demand_12m * 0.95
         else:
-            # 模拟数据 - 使用固定比例而非随机值，确保结果稳定
-            # 基于计量点ID生成确定性的模拟数据
-            seed_factor = (meter.id % 10 + 1) / 10  # 0.1-1.0 基于ID
-            base_ratio = 0.75 + seed_factor * 0.2    # 0.77-0.95 利用率范围
-            max_demand_12m = declared * base_ratio
-            avg_demand_12m = max_demand_12m * 0.72
-            demand_95th = max_demand_12m * 0.94
+            # [V2.10-FIX] 尝试从 Demand15MinData 获取数据 (与 optimization-plan 端点相同数据源)
+            end_date = datetime.now()
+            start_date = end_date - timedelta(days=30)
+
+            demand_15min_result = await db.execute(
+                select(Demand15MinData.rolling_demand).where(
+                    Demand15MinData.meter_point_id == meter.id,
+                    Demand15MinData.timestamp >= start_date,
+                    Demand15MinData.rolling_demand.isnot(None)
+                )
+            )
+            demands = [r[0] for r in demand_15min_result.all()]
+
+            if demands and len(demands) >= 10:
+                # 使用 Demand15MinData 数据 - 确保与 optimization-plan 端点数据一致
+                max_demand_12m = max(demands)
+                avg_demand_12m = sum(demands) / len(demands)
+                # 计算95分位数
+                sorted_demands = sorted(demands)
+                idx_95 = int(len(sorted_demands) * 0.95)
+                demand_95th = sorted_demands[min(idx_95, len(sorted_demands) - 1)]
+            else:
+                # 无实际数据时使用确定性模拟数据
+                # 基于计量点ID生成确定性的模拟数据
+                seed_factor = (meter.id % 10 + 1) / 10  # 0.1-1.0 基于ID
+                base_ratio = 0.75 + seed_factor * 0.2    # 0.77-0.95 利用率范围
+                max_demand_12m = declared * base_ratio
+                avg_demand_12m = max_demand_12m * 0.72
+                demand_95th = max_demand_12m * 0.94
 
         utilization = max_demand_12m / declared if declared > 0 else 0
-
-        # 使用统一阈值计算最优需量 (95分位数 + 10%安全裕度，按5取整)
-        # [V2.9-FIX] 使用函数开头初始化的 _thresholds 和 _math
-        optimal_demand = _math.ceil(demand_95th * (1 + _thresholds.safety_margin) / 5) * 5
 
         # 使用统一阈值判断配置状态 (low=80%, high=105%)
         is_over_declared = utilization < _thresholds.low_utilization   # 利用率低于80%视为申报过高
         is_under_declared = utilization > _thresholds.high_utilization  # 利用率超过105%视为申报过低
+
+        # [V2.10-FIX] 根据不同情况计算最优需量
+        if is_under_declared:
+            # 申报不足时：基于最大需量 + 更大安全裕度计算建议需量
+            optimal_demand = _math.ceil(max_demand_12m * (1 + _thresholds.safety_margin * 1.5) / 5) * 5
+        else:
+            # 申报过高或合理时：基于95分位数 + 标准安全裕度
+            optimal_demand = _math.ceil(demand_95th * (1 + _thresholds.safety_margin) / 5) * 5
 
         # 计算潜在节省 - 使用统一的需量电价常量
         if is_over_declared:
@@ -3374,8 +3541,11 @@ async def get_demand_optimization_plan(
     生成需量优化方案
 
     基于历史数据分析，给出申报需量调整建议
+
+    [V2.10-FIX] 统一数据源：无实际数据时使用与 analyze_demand_config 相同的确定性模拟数据
     """
     from ...models.energy import Demand15MinData
+    from ...services.demand_analysis_service import DemandAnalysisService, DemandThresholds
 
     # 获取计量点信息
     meter_result = await db.execute(
@@ -3400,29 +3570,42 @@ async def get_demand_optimization_plan(
     )
     demands = [r[0] for r in result.all()]
 
-    if not demands:
-        return ResponseModel(data={
-            "meter_point_id": meter_point_id,
-            "message": "数据不足，无法生成优化方案"
-        })
-
-    # 计算统计指标
-    max_demand = max(demands)
-    avg_demand = sum(demands) / len(demands)
-    p95_demand = sorted(demands)[int(len(demands) * 0.95)]  # 95分位数
+    # [V2.10-FIX] 无实际数据时使用确定性模拟数据
+    use_mock_data = False
+    if not demands or len(demands) < 10:
+        use_mock_data = True
+        # 使用与 analyze_demand_config 相同的确定性算法
+        seed_factor = (meter_point_id % 10 + 1) / 10  # 0.1-1.0 基于ID
+        base_ratio = 0.75 + seed_factor * 0.2  # 0.77-0.95 利用率范围
+        max_demand = declared_demand * base_ratio
+        avg_demand = max_demand * 0.72
+        p95_demand = max_demand * 0.94
+    else:
+        # 使用实际数据
+        max_demand = max(demands)
+        avg_demand = sum(demands) / len(demands)
+        p95_demand = sorted(demands)[int(len(demands) * 0.95)]  # 95分位数
 
     # 计算利用率
     utilization = max_demand / declared_demand * 100 if declared_demand > 0 else 0
+
+    # [V2.10-FIX] 使用统一阈值判断 (与 analyze_demand_config 一致)
+    _thresholds = DemandThresholds()
+    _demand_price = DemandAnalysisService.DEFAULT_DEMAND_PRICE  # 38.0 元/kW·月
 
     # 生成优化建议
     recommendations = []
     recommended_demand = declared_demand
     annual_saving = 0
 
-    if utilization < 70:
+    # 使用统一阈值: low_utilization=80%, high_utilization=105%
+    utilization_decimal = utilization / 100  # 转为小数
+
+    if utilization_decimal < _thresholds.low_utilization:  # < 80%
         # 申报过高
-        recommended_demand = round(p95_demand * 1.1, 0)  # 95分位数 + 10%余量
-        fee_diff = (declared_demand - recommended_demand) * 30  # 假设30元/kW·月
+        import math as _math
+        recommended_demand = _math.ceil(p95_demand * (1 + _thresholds.safety_margin) / 5) * 5
+        fee_diff = (declared_demand - recommended_demand) * _demand_price
         annual_saving = fee_diff * 12
         recommendations.append({
             "type": "reduce_declared",
@@ -3431,10 +3614,12 @@ async def get_demand_optimization_plan(
             "action": f"建议将申报需量调整为{recommended_demand:.0f}kW",
             "saving": f"年节省容量电费约{annual_saving:.0f}元"
         })
-    elif utilization > 95:
+    elif utilization_decimal > _thresholds.high_utilization:  # > 105%
         # 申报偏低，有超需量风险
-        recommended_demand = round(max_demand * 1.1, 0)
-        penalty_risk = (max_demand - declared_demand) * 2 * 30  # 超需量罚款风险
+        import math as _math
+        recommended_demand = _math.ceil(max_demand * (1 + _thresholds.safety_margin * 1.5) / 5) * 5
+        over_amount = max_demand - declared_demand
+        penalty_risk = over_amount * _demand_price * 2  # 超需量罚款风险（月）
         recommendations.append({
             "type": "increase_declared",
             "title": "建议提高申报需量",

@@ -474,6 +474,38 @@ class DistributionDiagram(BaseModel):
     timestamp: datetime
 
 
+# ========== 变压器及计量点层级展示（需量配置） ==========
+
+class MeterPointDemandInfo(BaseModel):
+    """计量点需量信息（用于需量配置页面展示）"""
+    id: int
+    meter_name: str
+    meter_code: str
+    declared_demand: Optional[float] = None
+    demand_type: Optional[str] = None
+    demand_period: Optional[int] = None
+
+    class Config:
+        from_attributes = True
+
+
+class TransformerWithMeterPointsResponse(BaseModel):
+    """变压器及下属计量点（引用配电拓扑关系，用于需量配置展示）"""
+    id: int
+    transformer_code: str
+    transformer_name: str
+    rated_capacity: float
+    status: str = "running"
+    is_enabled: bool = True
+    meter_points: List[MeterPointDemandInfo] = []
+    total_declared_demand: float = 0  # 下属计量点申报需量合计
+    meter_point_count: int = 0  # 计量点数量
+    configured_count: int = 0  # 已配置需量的计量点数量
+
+    class Config:
+        from_attributes = True
+
+
 # ========== 变压器 ==========
 
 class TransformerBase(BaseModel):
@@ -1709,6 +1741,8 @@ class TopologyNodeUpdate(BaseModel):
     ct_ratio: Optional[float] = Field(None, description="CT变比")
     pt_ratio: Optional[float] = Field(None, description="PT变比")
     declared_demand: Optional[float] = Field(None, description="申报需量")
+    meter_type: Optional[str] = Field(None, description="计量类型")
+    measurement_types: Optional[list] = Field(None, description="测量类型列表")
 
 
 class TopologyNodeDelete(BaseModel):

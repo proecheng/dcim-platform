@@ -160,10 +160,12 @@
             <el-table-column prop="avg_demand_12m" label="12月平均(kW)" width="120" />
             <el-table-column prop="utilization_rate" label="利用率" width="100">
               <template #default="{ row }">
+                <!-- [V2.10-FIX] 修复：utilization_rate 已经是百分比，不需要再乘100；超过100%时显示实际值 -->
                 <el-progress
-                  :percentage="Math.min(row.utilization_rate * 100, 100)"
-                  :color="getUtilizationColor(row.utilization_rate)"
+                  :percentage="Math.min(row.utilization_rate, 100)"
+                  :color="getUtilizationColor(row.utilization_rate / 100)"
                   :stroke-width="10"
+                  :format="() => `${row.utilization_rate.toFixed(1)}%`"
                 />
               </template>
             </el-table-column>

@@ -85,6 +85,13 @@
                 </el-icon>
                 <span class="node-label">{{ data.label }}</span>
                 <span class="node-info" v-if="data.info">{{ data.info }}</span>
+                <el-tooltip
+                  v-if="data.isOverloaded"
+                  :content="`容量超限！下属计量点申报需量合计 ${data.totalDeclaredDemand} kW 超过额定容量 ${data.rawData?.rated_capacity} kVA`"
+                  placement="top"
+                >
+                  <el-icon class="overload-warning" color="#E6A23C" :size="16"><WarningFilled /></el-icon>
+                </el-tooltip>
                 <el-tag v-if="data.isVirtual" type="info" size="small">虚拟节点</el-tag>
                 <el-tag v-else-if="data.status" :type="getStatusType(data.status)" size="small">
                   {{ getStatusText(data.status) }}
@@ -559,7 +566,7 @@ import { ElMessage, ElMessageBox, type FormInstance } from 'element-plus'
 import {
   Refresh, OfficeBuilding, Odometer, Box, Connection, Monitor,
   Plus, Edit, Delete, Download, Upload, Close, Grid,
-  DataLine, CircleCheck, TrendCharts, Open
+  DataLine, CircleCheck, TrendCharts, Open, WarningFilled
 } from '@element-plus/icons-vue'
 import {
   getDistributionTopology,
@@ -815,19 +822,31 @@ const treeData = computed(() => {
 
   // 构建变压器节点
   // API returns transformer_id, not id
-  const buildTransformerNode = (t: any) => ({
-    key: `transformer-${t.transformer_id}`,
-    id: t.transformer_id,
-    label: t.transformer_name,
-    code: t.transformer_code,
-    type: 'transformer',
-    info: `${t.rated_capacity} kVA`,
-    status: t.status,
-    parentId: null,
-    parentType: 'grid',
-    rawData: t,
-    children: t.meter_points?.map((m: any) => buildMeterPointNode(m, t.transformer_id)) || []
-  })
+  const buildTransformerNode = (t: any) => {
+    // 计算下属计量点的申报需量总和
+    const meterPoints = t.meter_points || []
+    const totalDeclaredDemand = meterPoints.reduce(
+      (sum: number, m: any) => sum + (m.declared_demand || 0), 0
+    )
+    // 判断是否超限（申报需量总和超过变压器额定容量，按 kVA ≈ kW 近似）
+    const isOverloaded = totalDeclaredDemand > (t.rated_capacity || 0)
+
+    return {
+      key: `transformer-${t.transformer_id}`,
+      id: t.transformer_id,
+      label: t.transformer_name,
+      code: t.transformer_code,
+      type: 'transformer',
+      info: `${t.rated_capacity} kVA`,
+      status: t.status,
+      parentId: null,
+      parentType: 'grid',
+      rawData: t,
+      isOverloaded,
+      totalDeclaredDemand,
+      children: meterPoints.map((m: any) => buildMeterPointNode(m, t.transformer_id))
+    }
+  }
 
   // 始终添加虚拟电网主节点
   const gridRoot = {
@@ -1877,6 +1896,16 @@ const handleDeletePoint = async (pt: DeviceLinkedPoint) => {
 .node-info {
   color: var(--text-secondary);
   font-size: 12px;
+}
+
+.overload-warning {
+  margin-left: 4px;
+  animation: pulse-warning 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse-warning {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
 }
 
 .unit {

@@ -59,13 +59,14 @@ class EnergyTopologyService:
     ) -> Dict[str, Any]:
         """构建变压器节点"""
         node = {
-            "id": transformer.id,
-            "code": transformer.transformer_code,
-            "name": transformer.transformer_name,
+            "transformer_id": transformer.id,
+            "transformer_code": transformer.transformer_code,
+            "transformer_name": transformer.transformer_name,
             "type": "transformer",
             "rated_capacity": transformer.rated_capacity,
             "voltage_high": transformer.voltage_high,
             "voltage_low": transformer.voltage_low,
+            "declared_demand": transformer.declared_demand,
             "status": transformer.status,
             "location": transformer.location,
             "meter_points": []
@@ -95,15 +96,20 @@ class EnergyTopologyService:
     ) -> Dict[str, Any]:
         """构建计量点节点"""
         node = {
-            "id": meter_point.id,
-            "code": meter_point.meter_code,
-            "name": meter_point.meter_name,
+            "meter_point_id": meter_point.id,
+            "meter_code": meter_point.meter_code,
+            "meter_name": meter_point.meter_name,
             "type": "meter_point",
+            "meter_type": meter_point.meter_type,
             "meter_no": meter_point.meter_no,
             "declared_demand": meter_point.declared_demand,
             "demand_type": meter_point.demand_type,
             "customer_no": meter_point.customer_no,
+            "ct_ratio": meter_point.ct_ratio,
+            "pt_ratio": meter_point.pt_ratio,
+            "measurement_types": meter_point.measurement_types,
             "status": meter_point.status,
+            "remark": meter_point.remark,
             "panels": []
         }
 
@@ -136,15 +142,16 @@ class EnergyTopologyService:
             return {}
 
         node = {
-            "id": panel.id,
-            "code": panel.panel_code,
-            "name": panel.panel_name,
+            "panel_id": panel.id,
+            "panel_code": panel.panel_code,
+            "panel_name": panel.panel_name,
             "type": "panel",
             "panel_type": panel.panel_type,
             "rated_current": panel.rated_current,
             "rated_voltage": panel.rated_voltage,
             "location": panel.location,
             "status": panel.status,
+            "remark": panel.remark,
             "circuits": [],
             "sub_panels": []
         }
@@ -190,9 +197,9 @@ class EnergyTopologyService:
     ) -> Dict[str, Any]:
         """构建配电回路节点"""
         node = {
-            "id": circuit.id,
-            "code": circuit.circuit_code,
-            "name": circuit.circuit_name,
+            "circuit_id": circuit.id,
+            "circuit_code": circuit.circuit_code,
+            "circuit_name": circuit.circuit_name,
             "type": "circuit",
             "load_type": circuit.load_type,
             "rated_current": circuit.rated_current,
@@ -226,15 +233,16 @@ class EnergyTopologyService:
     ) -> Dict[str, Any]:
         """构建用电设备节点"""
         node = {
-            "id": device.id,
-            "code": device.device_code,
-            "name": device.device_name,
+            "device_id": device.id,
+            "device_code": device.device_code,
+            "device_name": device.device_name,
             "type": "device",
             "device_type": device.device_type,
             "rated_power": device.rated_power,
             "is_it_load": device.is_it_load,
             "is_critical": device.is_critical,
             "is_metered": device.is_metered,
+            "remark": device.remark,
             "realtime_data": None,
             "points": []
         }
@@ -732,6 +740,10 @@ class EnergyTopologyService:
                 node.pt_ratio = data.pt_ratio
             if data.declared_demand is not None:
                 node.declared_demand = data.declared_demand
+            if data.meter_type is not None:
+                node.meter_type = data.meter_type
+            if data.measurement_types is not None:
+                node.measurement_types = data.measurement_types
             if data.remark is not None:
                 node.remark = data.remark
             node.updated_at = now

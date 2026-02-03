@@ -650,6 +650,30 @@ export interface TransformerUpdate {
   demand_warning_ratio?: number
 }
 
+/** 计量点需量信息（用于需量配置页面展示） */
+export interface MeterPointDemandInfo {
+  id: number
+  meter_name: string
+  meter_code: string
+  declared_demand: number | null
+  demand_type: string | null
+  demand_period: number | null
+}
+
+/** 变压器及下属计量点（用于需量配置层级展示） */
+export interface TransformerWithMeterPoints {
+  id: number
+  transformer_code: string
+  transformer_name: string
+  rated_capacity: number
+  status: string
+  is_enabled: boolean
+  meter_points: MeterPointDemandInfo[]
+  total_declared_demand: number
+  meter_point_count: number
+  configured_count: number
+}
+
 /** 计量点 */
 export interface MeterPoint {
   id: number
@@ -682,6 +706,7 @@ export interface MeterPointUpdate {
   meter_no?: string
   declared_demand?: number
   demand_type?: string
+  demand_period?: number
   customer_no?: string
   status?: string
   is_enabled?: boolean
@@ -906,6 +931,11 @@ export interface DemandConfigAnalysisResult {
 }
 
 // ==================== 配电系统配置 API ====================
+
+/** 获取变压器及其计量点（用于需量配置层级展示） */
+export function getTransformersWithMeters() {
+  return request.get<ResponseModel<TransformerWithMeterPoints[]>>('/v1/energy/transformers/with-meters')
+}
 
 /** 获取变压器列表 */
 export function getTransformers(params?: { status?: string; is_enabled?: boolean }) {

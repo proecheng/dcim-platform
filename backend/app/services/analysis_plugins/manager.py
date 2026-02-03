@@ -263,15 +263,24 @@ class PluginManager:
         start_date: datetime,
         end_date: datetime
     ) -> List[EnergyData]:
-        """生成模拟能耗数据"""
-        import random
+        """
+        生成确定性的模拟能耗数据
+
+        [V2.9-FIX] 移除 random 模块，使用基于日期的确定性波动
+        """
         energy_data = []
         current = start_date
 
         while current <= end_date:
-            base_energy = 1000 + random.uniform(-100, 100)
-            peak_ratio = 0.4 + random.uniform(-0.05, 0.05)
-            valley_ratio = 0.25 + random.uniform(-0.03, 0.03)
+            # 确定性波动 - 基于日期计算
+            day_of_year = current.timetuple().tm_yday
+            day_offset = ((day_of_year * 7) % 200 - 100) / 1000  # -0.1 到 +0.1
+
+            base_energy = 1000 * (1 + day_offset)
+
+            # 确定性的时段比例
+            peak_ratio = 0.4 + (day_of_year % 10) * 0.01 - 0.05  # 0.35-0.45
+            valley_ratio = 0.25 + ((day_of_year * 3) % 6) * 0.01 - 0.03  # 0.22-0.28
             flat_ratio = 1 - peak_ratio - valley_ratio
 
             peak_energy = base_energy * peak_ratio
@@ -327,8 +336,11 @@ class PluginManager:
         return power_data
 
     def _generate_mock_power_data(self) -> List[PowerData]:
-        """生成模拟功率数据"""
-        import random
+        """
+        生成确定性的模拟功率数据
+
+        [V2.9-FIX] 移除 random 模块，使用固定的设备参数
+        """
         power_data = []
 
         device_types = [
@@ -345,9 +357,11 @@ class PluginManager:
         ]
 
         for i, (name, dtype, rated_power) in enumerate(device_types):
-            load_rate = random.uniform(0.4, 0.85)
+            # 确定性的负载率 - 基于设备索引
+            load_rate = 0.5 + (i % 5) * 0.08  # 0.50-0.82
             active_power = rated_power * load_rate
-            power_factor = random.uniform(0.85, 0.98)
+            # 确定性的功率因数
+            power_factor = 0.88 + (i % 10) * 0.01  # 0.88-0.97
             apparent_power = active_power / power_factor
             reactive_power = (apparent_power**2 - active_power**2)**0.5
 
@@ -356,13 +370,13 @@ class PluginManager:
                 device_id=str(i + 1),
                 device_name=name,
                 device_type=dtype,
-                voltage=380 + random.uniform(-5, 5),
+                voltage=380 + (i % 5) - 2,  # 378-382
                 current=active_power * 1000 / (380 * 1.732),
                 active_power=active_power,
                 reactive_power=reactive_power,
                 apparent_power=apparent_power,
                 power_factor=power_factor,
-                frequency=50 + random.uniform(-0.1, 0.1),
+                frequency=50.0,
                 load_rate=load_rate * 100
             ))
 
@@ -408,17 +422,49 @@ class PluginManager:
         return bill_data
 
     def _generate_mock_bill_data(self, days: int) -> List[BillData]:
-        """生成模拟账单数据"""
-        import random
-        bill_data = []
+        """
+        生成确定性的模拟账单数据
 
+        [V2.9-FIX] 移除 random 模块，使用与 energy.py 和 DemandAnalysisService 一致的算法
+        这是解决"优化建议"与"计量点配置表"数据不一致的关键修复
+
+        关键: max_demand 必须与 DemandAnalysisService 中的模拟数据保持一致
+        - 申报需量默认 800kW
+        - 实际最大需量 = 申报需量 * 基础比率 * 季节因子
+        - 基础比率范围: 0.77-0.87 (确定性)
+        """
+        from ..demand_analysis_service import DemandAnalysisService
+
+        bill_data = []
         months = days // 30
         current = datetime.now() - timedelta(days=days)
 
-        for _ in range(months):
-            total_energy = 30000 + random.uniform(-3000, 3000)
-            peak_ratio = 0.4 + random.uniform(-0.05, 0.05)
-            valley_ratio = 0.25 + random.uniform(-0.03, 0.03)
+        # 使用与 DemandAnalysisService 一致的常量
+        declared_demand = DemandAnalysisService.DEFAULT_DECLARED_DEMAND  # 800.0 kW
+        demand_price = DemandAnalysisService.DEFAULT_DEMAND_PRICE  # 38.0 元/kW·月
+
+        for month_idx in range(months):
+            month_num = (current.month + month_idx - 1) % 12 + 1
+
+            # 确定性的月度波动 - 与 DemandAnalysisService.generate_mock_demand_curve 保持一致
+            # 基础比率 (全站 meter_point_id=None 对应 seed=0)
+            seed_factor = 0.1  # seed=0 时: (0 + 1) / 10 = 0.1
+            base_ratio = 0.75 + seed_factor * 0.2  # = 0.77
+
+            # 季节性波动
+            month_factor = 1.0 + (month_num - 6) * 0.015
+            if month_num in [7, 8, 1, 2]:  # 夏季和冬季高峰
+                month_factor += 0.04
+
+            # 计算最大需量 - 使用与 DemandAnalysisService 完全一致的公式
+            # 基础需量 650.0 * base_ratio * month_factor
+            base_demand = 650.0  # 与 DemandAnalysisService 一致
+            max_demand = base_demand * base_ratio * month_factor
+
+            # 能耗计算
+            total_energy = 30000 + (month_idx % 5) * 1000 - 2000  # 28000-32000
+            peak_ratio = 0.40 + (month_idx % 10) * 0.01 - 0.05  # 0.35-0.45
+            valley_ratio = 0.25 + (month_idx % 6) * 0.01 - 0.03  # 0.22-0.28
             flat_ratio = 1 - peak_ratio - valley_ratio
 
             total_cost = (
@@ -426,6 +472,9 @@ class PluginManager:
                 total_energy * valley_ratio * 0.4 +
                 total_energy * flat_ratio * 0.8
             )
+
+            # 需量费用 = 申报需量 * 需量电价
+            demand_cost = declared_demand * demand_price
 
             bill_data.append(BillData(
                 period_start=current,
@@ -435,9 +484,9 @@ class PluginManager:
                 peak_ratio=peak_ratio,
                 valley_ratio=valley_ratio,
                 flat_ratio=flat_ratio,
-                demand_cost=500 + random.uniform(-50, 50),
+                demand_cost=demand_cost,
                 basic_cost=200,
-                max_demand=80 + random.uniform(-10, 10)
+                max_demand=round(max_demand, 1)  # 关键：使用确定性的 max_demand
             ))
             current += timedelta(days=30)
 
@@ -469,8 +518,11 @@ class PluginManager:
         return device_data
 
     def _generate_mock_device_data(self) -> List[DeviceData]:
-        """生成模拟设备数据"""
-        import random
+        """
+        生成确定性的模拟设备数据
+
+        [V2.9-FIX] 移除 random 模块，使用基于索引的确定性值
+        """
         device_data = []
 
         devices = [
@@ -487,8 +539,13 @@ class PluginManager:
         ]
 
         for i, (name, dtype, rated_power, location) in enumerate(devices):
-            load_rate = random.uniform(0.4, 0.85)
-            efficiency = random.uniform(90, 98) if dtype in ['UPS', 'PDU'] else random.uniform(80, 95)
+            # 确定性的负载率
+            load_rate = 0.5 + (i % 5) * 0.08  # 0.50-0.82
+            # 确定性的效率值
+            if dtype in ['UPS', 'PDU']:
+                efficiency = 92.0 + (i % 5) * 1.2  # 92.0-96.8
+            else:
+                efficiency = 84.0 + (i % 8) * 1.5  # 84.0-94.5
 
             device_data.append(DeviceData(
                 device_id=str(i + 1),
@@ -537,27 +594,41 @@ class PluginManager:
         return environment_data
 
     def _generate_mock_environment_data(self, days: int) -> List[EnvironmentData]:
-        """生成模拟环境数据"""
-        import random
+        """
+        生成确定性的模拟环境数据
+
+        [V2.9-FIX] 移除 random 模块，使用基于小时的确定性波动
+        """
         environment_data = []
 
         current = datetime.now() - timedelta(days=days)
-        while current <= datetime.now():
-            it_power = 50 + random.uniform(-5, 5)
-            cooling_power = 15 + random.uniform(-2, 2)
-            other_power = 10 + random.uniform(-1, 1)
+        now = datetime.now()
+        hour_idx = 0
+
+        while current <= now:
+            # 确定性波动 - 基于小时索引
+            offset = (hour_idx * 7) % 100
+            it_power = 50 + (offset % 10) - 5  # 45-55
+            cooling_power = 15 + (offset % 4) - 2  # 13-17
+            other_power = 10 + (offset % 2) - 1  # 9-11
             total_power = it_power + cooling_power + other_power
+
+            # 温湿度确定性波动
+            hour_of_day = current.hour
+            temp_offset = (hour_of_day - 12) * 0.15  # 日间偏暖
+            humidity_offset = ((hour_idx * 3) % 20) - 10  # -10 到 +10
 
             environment_data.append(EnvironmentData(
                 timestamp=current,
-                temperature=24 + random.uniform(-2, 2),
-                humidity=50 + random.uniform(-10, 10),
+                temperature=24 + temp_offset,
+                humidity=50 + humidity_offset,
                 pue=total_power / it_power if it_power > 0 else 1.5,
                 it_power=it_power,
                 cooling_power=cooling_power,
                 total_power=total_power
             ))
             current += timedelta(hours=1)
+            hour_idx += 1
 
         return environment_data
 

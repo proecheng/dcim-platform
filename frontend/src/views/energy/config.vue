@@ -39,6 +39,12 @@
         <el-table :data="meterPoints" v-loading="loading.meter" stripe>
           <el-table-column prop="meter_code" label="编码" width="120" />
           <el-table-column prop="meter_name" label="名称" min-width="150" />
+          <el-table-column label="所属变压器" width="140">
+            <template #default="{ row }">
+              <span v-if="row.transformer_id">{{ getTransformerName(row.transformer_id) }}</span>
+              <span v-else class="not-configured">未关联</span>
+            </template>
+          </el-table-column>
           <el-table-column prop="meter_no" label="电表号" width="120" />
           <el-table-column prop="declared_demand" label="申报需量(kW)" width="120" />
           <el-table-column prop="demand_type" label="需量类型" width="100">
@@ -217,48 +223,94 @@
       <!-- 需量配置 -->
       <el-tab-pane label="需量配置" name="demand">
         <div class="tab-header">
-          <el-button type="primary" @click="showDemandDialog()">
-            <el-icon><Edit /></el-icon>配置需量
+          <el-button @click="loadTransformersWithMeters" :loading="loading.demandConfig">
+            <el-icon><Refresh /></el-icon>刷新
           </el-button>
         </div>
 
         <el-alert type="info" :closable="false" style="margin-bottom: 16px;">
-          <template #title>需量说明</template>
-          <p>申报需量是向电力公司申报的最大用电功率,超出申报需量将产生超需量罚款。</p>
-          <p>建议:申报需量应设置在实际最大需量的110%-120%之间,且不能超过变压器容量。</p>
+          <template #title>需量配置说明</template>
+          <p>此页面展示变压器与计量点的层级关系（来自配电拓扑），并配置各计量点的申报需量。</p>
+          <p>当配电拓扑变化时，本页面会自动反映变化。需量配置保存在计量点上。</p>
         </el-alert>
 
-        <!-- 变压器需量列表 -->
-        <el-table :data="transformers" v-loading="loading.transformer" stripe>
+        <!-- 变压器-计量点层级表格 -->
+        <el-table
+          :data="transformersWithMeters"
+          v-loading="loading.demandConfig"
+          stripe
+          row-key="id"
+          :expand-row-keys="expandedTransformerIds"
+          @expand-change="handleTransformerExpand"
+        >
+          <el-table-column type="expand">
+            <template #default="{ row }">
+              <div class="meter-points-container">
+                <el-table :data="row.meter_points" size="small" :show-header="false">
+                  <el-table-column width="40">
+                    <template #default>
+                      <span class="tree-indent">└</span>
+                    </template>
+                  </el-table-column>
+                  <el-table-column prop="meter_name" label="计量点名称" min-width="180">
+                    <template #default="{ row: meter }">
+                      <span class="meter-name">{{ meter.meter_name }}</span>
+                      <span class="meter-code">({{ meter.meter_code }})</span>
+                    </template>
+                  </el-table-column>
+                  <el-table-column label="申报需量" width="150">
+                    <template #default="{ row: meter }">
+                      <span v-if="meter.declared_demand" class="demand-value">
+                        {{ meter.declared_demand }} {{ meter.demand_type || 'kW' }}
+                      </span>
+                      <el-tag v-else type="info" size="small">未配置</el-tag>
+                    </template>
+                  </el-table-column>
+                  <el-table-column label="需量周期" width="100">
+                    <template #default="{ row: meter }">
+                      {{ meter.demand_period || 15 }} 分钟
+                    </template>
+                  </el-table-column>
+                  <el-table-column label="状态" width="90">
+                    <template #default="{ row: meter }">
+                      <el-tag :type="meter.declared_demand ? 'success' : 'warning'" size="small">
+                        {{ meter.declared_demand ? '已配置' : '未配置' }}
+                      </el-tag>
+                    </template>
+                  </el-table-column>
+                  <el-table-column label="操作" width="100" fixed="right">
+                    <template #default="{ row: meter }">
+                      <el-button link type="primary" @click="showMeterDemandDialog(meter)">编辑</el-button>
+                    </template>
+                  </el-table-column>
+                </el-table>
+                <div v-if="row.meter_points.length === 0" class="no-meter-tip">
+                  暂无关联计量点，请在配电拓扑中配置
+                </div>
+              </div>
+            </template>
+          </el-table-column>
           <el-table-column prop="transformer_code" label="变压器编码" width="120" />
           <el-table-column prop="transformer_name" label="变压器名称" min-width="150" />
           <el-table-column prop="rated_capacity" label="额定容量(kVA)" width="130" />
-          <el-table-column prop="declared_demand" label="申报需量" width="130">
+          <el-table-column label="计量点数" width="100">
             <template #default="{ row }">
-              <span v-if="row.declared_demand" class="demand-value">
-                {{ row.declared_demand }} {{ row.demand_type || 'kW' }}
+              <el-tag size="small">{{ row.meter_point_count }} 个</el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column label="总申报需量(kW)" width="140">
+            <template #default="{ row }">
+              <span v-if="row.total_declared_demand > 0" class="demand-value">
+                {{ row.total_declared_demand.toFixed(1) }}
               </span>
-              <span v-else class="not-configured">未配置</span>
+              <span v-else class="not-configured">-</span>
             </template>
           </el-table-column>
-          <el-table-column prop="demand_warning_ratio" label="预警阈值" width="100">
+          <el-table-column label="配置状态" width="120">
             <template #default="{ row }">
-              {{ ((row.demand_warning_ratio || 0.9) * 100).toFixed(0) }}%
-            </template>
-          </el-table-column>
-          <el-table-column label="使用率" width="150">
-            <template #default="{ row }">
-              <el-progress
-                v-if="row.declared_demand"
-                :percentage="getDemandUtilization(row)"
-                :status="getDemandStatus(row)"
-              />
-              <span v-else>-</span>
-            </template>
-          </el-table-column>
-          <el-table-column label="操作" width="100" fixed="right">
-            <template #default="{ row }">
-              <el-button link type="primary" @click="showDemandDialog(row)">配置</el-button>
+              <el-tag :type="row.configured_count === row.meter_point_count && row.meter_point_count > 0 ? 'success' : 'warning'" size="small">
+                {{ row.configured_count }}/{{ row.meter_point_count }} 已配置
+              </el-tag>
             </template>
           </el-table-column>
         </el-table>
@@ -268,25 +320,25 @@
           <el-col :span="6">
             <el-card shadow="hover" class="summary-card">
               <div class="summary-label">变压器总数</div>
-              <div class="summary-value">{{ transformers.length }} 台</div>
+              <div class="summary-value">{{ transformersWithMeters.length }} 台</div>
             </el-card>
           </el-col>
           <el-col :span="6">
             <el-card shadow="hover" class="summary-card">
-              <div class="summary-label">总额定容量</div>
-              <div class="summary-value">{{ totalCapacity }} kVA</div>
+              <div class="summary-label">计量点总数</div>
+              <div class="summary-value">{{ demandTotalMeterPoints }} 个</div>
             </el-card>
           </el-col>
           <el-col :span="6">
             <el-card shadow="hover" class="summary-card">
               <div class="summary-label">总申报需量</div>
-              <div class="summary-value primary">{{ totalDeclaredDemand }} kW</div>
+              <div class="summary-value primary">{{ demandTotalDeclared.toFixed(1) }} kW</div>
             </el-card>
           </el-col>
           <el-col :span="6">
             <el-card shadow="hover" class="summary-card">
-              <div class="summary-label">已配置</div>
-              <div class="summary-value success">{{ configuredCount }} / {{ transformers.length }}</div>
+              <div class="summary-label">已配置计量点</div>
+              <div class="summary-value success">{{ demandConfiguredCount }} / {{ demandTotalMeterPoints }}</div>
             </el-card>
           </el-col>
         </el-row>
@@ -610,6 +662,41 @@
       </template>
     </el-dialog>
 
+    <!-- 计量点需量配置对话框 -->
+    <el-dialog v-model="dialogs.meterDemand" title="配置计量点需量" width="500px">
+      <el-form :model="meterDemandForm" label-width="120px">
+        <el-form-item label="计量点名称">
+          <el-input :value="meterDemandForm.meter_name" disabled />
+        </el-form-item>
+        <el-form-item label="计量点编码">
+          <el-input :value="meterDemandForm.meter_code" disabled />
+        </el-form-item>
+        <el-form-item label="申报需量" required>
+          <el-input-number
+            v-model="meterDemandForm.declared_demand"
+            :min="0"
+            :precision="1"
+            style="width: 180px"
+          />
+          <el-select v-model="meterDemandForm.demand_type" style="width: 80px; margin-left: 8px;">
+            <el-option label="kW" value="kW" />
+            <el-option label="kVA" value="kVA" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="需量周期">
+          <el-select v-model="meterDemandForm.demand_period" style="width: 100%">
+            <el-option :label="'15分钟'" :value="15" />
+            <el-option :label="'30分钟'" :value="30" />
+          </el-select>
+          <span class="tip-text">电力公司通常按15分钟滑动窗口计算需量</span>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="dialogs.meterDemand = false">取消</el-button>
+        <el-button type="primary" @click="handleSaveMeterDemand" :loading="saving">保存</el-button>
+      </template>
+    </el-dialog>
+
     <!-- 转移配置调整对话框 -->
     <el-dialog v-model="dialogs.ratio" title="调整转移配置" width="520px">
       <el-form :model="ratioForm" label-width="120px">
@@ -673,8 +760,9 @@ import {
   getDistributionCircuits, createDistributionCircuit, updateDistributionCircuit, deleteDistributionCircuit,
   getPricingList, createPricing, updatePricing, deletePricing,
   getShiftRatioRecommendations, updateDeviceShiftRatio, acceptAllRecommendations,
+  getTransformersWithMeters,
   type Transformer, type MeterPoint, type DistributionPanel, type DistributionCircuit, type ElectricityPricing,
-  type RatioRecommendation
+  type RatioRecommendation, type TransformerWithMeterPoints, type MeterPointDemandInfo
 } from '@/api/modules/energy'
 
 const activeTab = ref('transformer')
@@ -687,7 +775,8 @@ const loading = reactive({
   panel: false,
   circuit: false,
   pricing: false,
-  shift: false
+  shift: false,
+  demandConfig: false
 })
 
 const dialogs = reactive({
@@ -697,7 +786,8 @@ const dialogs = reactive({
   circuit: false,
   pricing: false,
   demand: false,
-  ratio: false
+  ratio: false,
+  meterDemand: false
 })
 
 const transformers = ref<Transformer[]>([])
@@ -712,6 +802,11 @@ const panelForm = ref<any>({})
 const circuitForm = ref<any>({})
 const pricingForm = ref<any>({})
 const demandForm = ref<any>({})
+const meterDemandForm = ref<any>({})
+
+// 需量配置层级数据
+const transformersWithMeters = ref<TransformerWithMeterPoints[]>([])
+const expandedTransformerIds = ref<string[]>([])
 
 // 转移配置推荐数据
 const ratioRecommendations = ref<RatioRecommendation[]>([])
@@ -740,6 +835,19 @@ const totalDeclaredDemand = computed(() =>
 
 const configuredCount = computed(() =>
   transformers.value.filter(t => t.declared_demand).length
+)
+
+// 需量配置层级展示计算属性
+const demandTotalMeterPoints = computed(() =>
+  transformersWithMeters.value.reduce((sum, t) => sum + t.meter_point_count, 0)
+)
+
+const demandTotalDeclared = computed(() =>
+  transformersWithMeters.value.reduce((sum, t) => sum + t.total_declared_demand, 0)
+)
+
+const demandConfiguredCount = computed(() =>
+  transformersWithMeters.value.reduce((sum, t) => sum + t.configured_count, 0)
 )
 
 // 转移配置计算属性
@@ -806,6 +914,32 @@ const loadMeterPoints = async () => {
   } finally {
     loading.meter = false
   }
+}
+
+const loadTransformersWithMeters = async () => {
+  loading.demandConfig = true
+  try {
+    const res = await getTransformersWithMeters()
+    if (res.code === 0 && res.data) {
+      transformersWithMeters.value = res.data
+      // 默认展开所有变压器
+      expandedTransformerIds.value = res.data.map(t => String(t.id))
+    }
+  } catch (e) {
+    console.error('加载变压器计量点层级数据失败:', e)
+    ElMessage.error('加载需量配置数据失败')
+  } finally {
+    loading.demandConfig = false
+  }
+}
+
+const handleTransformerExpand = (row: TransformerWithMeterPoints, expandedRows: TransformerWithMeterPoints[]) => {
+  expandedTransformerIds.value = expandedRows.map(r => String(r.id))
+}
+
+const getTransformerName = (transformerId: number) => {
+  const t = transformers.value.find(t => t.id === transformerId)
+  return t?.transformer_name || '-'
 }
 
 const loadPanels = async () => {
@@ -1039,6 +1173,40 @@ const handleSaveDemand = async () => {
   }
 }
 
+// 计量点需量配置方法
+const showMeterDemandDialog = (meter: MeterPointDemandInfo) => {
+  meterDemandForm.value = {
+    id: meter.id,
+    meter_name: meter.meter_name,
+    meter_code: meter.meter_code,
+    declared_demand: meter.declared_demand || 0,
+    demand_type: meter.demand_type || 'kW',
+    demand_period: meter.demand_period || 15
+  }
+  dialogs.meterDemand = true
+}
+
+const handleSaveMeterDemand = async () => {
+  saving.value = true
+  try {
+    await updateMeterPoint(meterDemandForm.value.id, {
+      declared_demand: meterDemandForm.value.declared_demand,
+      demand_type: meterDemandForm.value.demand_type,
+      demand_period: meterDemandForm.value.demand_period
+    })
+    ElMessage.success('计量点需量配置保存成功')
+    dialogs.meterDemand = false
+    // 刷新层级数据
+    loadTransformersWithMeters()
+    loadMeterPoints()
+  } catch (e) {
+    console.error('保存计量点需量失败:', e)
+    ElMessage.error('保存失败，请重试')
+  } finally {
+    saving.value = false
+  }
+}
+
 const getDemandUtilization = (row: Transformer) => {
   // TODO: 需要从后端获取当前需量使用情况
   return 75 // 暂时返回示例值
@@ -1203,6 +1371,7 @@ onMounted(() => {
   loadCircuits()
   loadPricing()
   loadRatioRecommendations()
+  loadTransformersWithMeters()
 })
 </script>
 
@@ -1400,6 +1569,54 @@ onMounted(() => {
   margin-left: 12px;
   font-size: 12px;
   color: var(--text-secondary);
+}
+
+// 需量配置层级展示样式
+.meter-points-container {
+  padding: 12px 20px 12px 40px;
+  background-color: var(--bg-tertiary);
+
+  :deep(.el-table) {
+    background-color: transparent;
+
+    &::before {
+      display: none;
+    }
+
+    th.el-table__cell,
+    td.el-table__cell {
+      background-color: transparent;
+      border: none;
+    }
+
+    tr:hover > td.el-table__cell {
+      background-color: rgba(255, 255, 255, 0.03);
+    }
+  }
+}
+
+.tree-indent {
+  color: var(--text-placeholder);
+  font-family: monospace;
+  margin-right: 8px;
+}
+
+.meter-name {
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.meter-code {
+  margin-left: 8px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.no-meter-tip {
+  padding: 16px;
+  text-align: center;
+  color: var(--text-placeholder);
+  font-style: italic;
 }
 
 // 转移配置推荐样式

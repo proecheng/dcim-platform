@@ -53,6 +53,10 @@ class MeterPoint(Base):
     meter_no = Column(String(50), comment="电表号")
     transformer_id = Column(Integer, ForeignKey("transformers.id"), comment="关联变压器ID")
 
+    # 计量点类型和测量类型
+    meter_type = Column(String(20), default="main", comment="计量类型: main/sub/check")
+    measurement_types = Column(JSON, default=list, comment="测量类型列表")
+
     # 计量参数
     ct_ratio = Column(String(20), comment="电流互感器倍率 如400/5")
     pt_ratio = Column(String(20), comment="电压互感器倍率 如10000/100")
@@ -72,6 +76,7 @@ class MeterPoint(Base):
 
     status = Column(String(20), default="normal", comment="状态: normal/fault/offline")
     is_enabled = Column(Boolean, default=True, comment="是否启用")
+    remark = Column(Text, comment="备注")
     created_at = Column(DateTime, default=datetime.now, comment="创建时间")
     updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now, comment="更新时间")
 
