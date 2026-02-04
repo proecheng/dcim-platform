@@ -157,13 +157,15 @@ function generateMockData() {
     20: 'peak', 21: 'flat', 22: 'valley', 23: 'valley'
   }
 
+  // 使用确定性波动代替 Math.random()
   const hourlyData = Array.from({ length: 24 }, (_, hour) => {
     const period = periodMap[hour]
     const basePower = MOCK_BASE_POWER_KW[period]
-    const randomVariation = (Math.random() - 0.5) * POWER_RANDOM_VARIANCE_KW
+    // 使用正弦波生成确定性波动
+    const deterministicVariation = Math.sin(hour * 0.5) * (POWER_RANDOM_VARIANCE_KW / 2)
     return {
       hour,
-      power: Math.round(basePower + randomVariation),
+      power: Math.round(basePower + deterministicVariation),
       period
     }
   })

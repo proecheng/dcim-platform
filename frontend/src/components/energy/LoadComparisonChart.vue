@@ -179,6 +179,7 @@ function generateTimeLabels(): string[] {
 }
 
 // 生成模拟负荷数据（基于时段特征）
+// 使用确定性算法，仅作为 fallback 数据
 function generateMockLoadData(): number[] {
   const count = timePointCount.value
   const data: number[] = []
@@ -186,34 +187,27 @@ function generateMockLoadData(): number[] {
   // 基础负荷 (kW)
   const baseLoad = 450
 
+  // 每个时段的确定性负荷因子
+  const periodFactors: Record<string, number> = {
+    'sharp': 1.40,
+    'peak': 1.24,
+    'flat': 0.93,
+    'valley': 0.68,
+    'deep_valley': 0.48
+  }
+
   for (let i = 0; i < count; i++) {
     const hour = count === 96 ? Math.floor(i / 4) : i
     const period = getHourPeriod(hour)
 
-    // 根据时段设置负荷因子
-    let loadFactor = 1.0
-    switch (period) {
-      case 'sharp':
-        loadFactor = 1.35 + Math.random() * 0.1  // 尖峰负荷最高
-        break
-      case 'peak':
-        loadFactor = 1.20 + Math.random() * 0.08
-        break
-      case 'flat':
-        loadFactor = 0.90 + Math.random() * 0.06
-        break
-      case 'valley':
-        loadFactor = 0.65 + Math.random() * 0.05
-        break
-      case 'deep_valley':
-        loadFactor = 0.45 + Math.random() * 0.05
-        break
-    }
+    // 使用确定性负荷因子
+    const loadFactor = periodFactors[period] || 1.0
 
-    // 添加一些平滑的波动
+    // 添加确定性的平滑波动（代替 Math.random()）
     const timeWave = Math.sin(i / count * Math.PI * 2) * 0.03
+    const slotWave = Math.sin(i * 0.2) * 0.02 // 小幅周期性波动
 
-    data.push(baseLoad * (loadFactor + timeWave))
+    data.push(baseLoad * (loadFactor + timeWave + slotWave))
   }
 
   // 如果是7天平均，稍微平滑一下数据

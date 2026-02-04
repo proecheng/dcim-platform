@@ -143,17 +143,20 @@ const panelRef = ref()
 // 从store获取面板状态
 const panelState = computed(() => store.panelStates.leftPanel || { x: 20, y: 60, collapsed: false })
 
-// 模拟24小时温度趋势数据
+// 模拟24小时温度趋势数据（使用确定性波动）
 const temperatureTrendData = computed(() => {
   const now = new Date()
   const data = []
   for (let i = 23; i >= 0; i--) {
     const time = new Date(now.getTime() - i * 3600000)
     const baseTemp = store.environment.temperature.avg
-    const variation = Math.sin(i / 4) * 2 + Math.random() * 1 - 0.5
+    // 使用确定性波动代替 Math.random()
+    // 模拟日间温度略高、夜间温度略低的趋势
+    const hourWave = Math.sin(i / 4) * 2
+    const fineTune = Math.sin(i * 0.8) * 0.5 // 小幅周期性波动
     data.push({
       time: `${time.getHours().toString().padStart(2, '0')}:00`,
-      value: Math.round((baseTemp + variation) * 10) / 10
+      value: Math.round((baseTemp + hourWave + fineTune) * 10) / 10
     })
   }
   return data

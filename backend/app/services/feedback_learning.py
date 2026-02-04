@@ -297,23 +297,59 @@ class FeedbackLearner:
         start_date: datetime,
         end_date: datetime
     ) -> Dict:
-        """生成模拟执行数据"""
-        import random
+        """生成模拟执行数据（仅在 Demo 模式下使用）
+
+        使用确定性算法基于日期生成可预测的模拟数据，避免使用随机数。
+        """
+        import math
+        from ..core.config import get_settings
+
+        settings = get_settings()
+        if not settings.simulation_enabled:
+            # 非模拟模式返回空数据
+            return {
+                'planned_saving': 0,
+                'actual_saving': 0,
+                'saving_achievement': 0,
+                'total_schedules': 0,
+                'executed_schedules': 0,
+                'success_rate': 0,
+                'demand_violations': 0,
+                'max_demand_reached': 0,
+                'demand_target': 800.0,
+                'demand_utilization': 0,
+                'is_demo_data': False
+            }
 
         days = (end_date - start_date).days
         demand_target = 800.0
 
+        # 使用日期作为种子生成确定性数值
+        seed = start_date.toordinal() + end_date.toordinal()
+
+        def deterministic_value(offset: int, min_val: float, max_val: float) -> float:
+            """基于种子生成确定性数值"""
+            phase = ((seed + offset) * 0.1) % (2 * math.pi)
+            normalized = (math.sin(phase) + 1) / 2  # 0-1 范围
+            return min_val + (max_val - min_val) * normalized
+
+        planned_saving = round(deterministic_value(1, 8000, 15000) * (days / 30), 2)
+        actual_saving = round(deterministic_value(2, 6000, 12000) * (days / 30), 2)
+        total_schedules = int(days * deterministic_value(3, 3, 8))
+        executed_schedules = int(days * deterministic_value(4, 2, 7))
+
         return {
-            'planned_saving': round(random.uniform(8000, 15000) * (days / 30), 2),
-            'actual_saving': round(random.uniform(6000, 12000) * (days / 30), 2),
-            'saving_achievement': round(random.uniform(0.75, 0.95) * 100, 1),
-            'total_schedules': days * random.randint(3, 8),
-            'executed_schedules': days * random.randint(2, 7),
-            'success_rate': round(random.uniform(0.85, 0.98) * 100, 1),
-            'demand_violations': random.randint(0, 3),
-            'max_demand_reached': round(demand_target * random.uniform(0.88, 1.02), 1),
+            'planned_saving': planned_saving,
+            'actual_saving': actual_saving,
+            'saving_achievement': round(deterministic_value(5, 75, 95), 1),
+            'total_schedules': total_schedules,
+            'executed_schedules': min(executed_schedules, total_schedules),
+            'success_rate': round(deterministic_value(6, 85, 98), 1),
+            'demand_violations': int(deterministic_value(7, 0, 3)),
+            'max_demand_reached': round(demand_target * deterministic_value(8, 0.88, 1.02), 1),
             'demand_target': demand_target,
-            'demand_utilization': round(random.uniform(0.85, 0.98) * 100, 1),
+            'demand_utilization': round(deterministic_value(9, 85, 98), 1),
+            'is_demo_data': True
         }
 
     def _generate_recommendations(
@@ -391,7 +427,10 @@ def get_feedback_learner() -> FeedbackLearner:
 
 def generate_sample_history(days: int = 30) -> List[DeviationRecord]:
     """
-    生成样本历史数据（用于演示）
+    生成样本历史数据（仅用于 Demo 演示）
+
+    使用确定性算法生成可预测的样本数据。
+    仅在 SIMULATION_ENABLED=True 时生成数据。
 
     Args:
         days: 天数
@@ -399,12 +438,23 @@ def generate_sample_history(days: int = 30) -> List[DeviationRecord]:
     Returns:
         偏差记录列表
     """
-    import random
+    import math
+    from ..core.config import get_settings
+
+    settings = get_settings()
+    if not settings.simulation_enabled:
+        return []  # 非模拟模式返回空列表
 
     learner = get_feedback_learner()
     records = []
 
     base_date = datetime.now() - timedelta(days=days)
+
+    def deterministic_value(seed: int, base: float, variation: float) -> float:
+        """基于种子生成确定性波动值"""
+        phase = (seed * 0.1) % (2 * math.pi)
+        normalized = math.sin(phase)  # -1 到 1
+        return base + variation * normalized
 
     for day in range(days):
         current_date = base_date + timedelta(days=day)
@@ -413,15 +463,19 @@ def generate_sample_history(days: int = 30) -> List[DeviationRecord]:
         for slot in range(96):
             timestamp = current_date + timedelta(minutes=slot * 15)
 
+            # 使用时间戳作为种子
+            seed = day * 96 + slot
+
             # 模拟计划值和实际值
             hour = timestamp.hour
             if 8 <= hour <= 22:
-                planned = 600 + random.uniform(-50, 50)
+                planned = deterministic_value(seed, 600, 50)
             else:
-                planned = 300 + random.uniform(-30, 30)
+                planned = deterministic_value(seed, 300, 30)
 
-            # 实际值有一定偏差
-            bias = random.gauss(0, planned * 0.08)  # 8%标准差
+            # 实际值有一定偏差（使用正弦波模拟高斯分布的波动）
+            bias_seed = seed + 10000
+            bias = deterministic_value(bias_seed, 0, planned * 0.08)
             actual = planned + bias
 
             record = learner.add_comparison_data(

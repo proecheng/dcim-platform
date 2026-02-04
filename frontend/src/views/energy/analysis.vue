@@ -669,7 +669,8 @@ const loadLoadPeriodData = async () => {
   }
 }
 
-// 生成模拟24小时负荷数据（用于开发测试）
+// 生成模拟24小时负荷数据（用于开发测试，仅在 API 无数据时使用）
+// 使用确定性算法生成数据，避免每次刷新数据变化
 const generateMockHourlyData = () => {
   const periods: Array<'sharp' | 'peak' | 'flat' | 'valley' | 'deep_valley'> = []
 
@@ -683,13 +684,25 @@ const generateMockHourlyData = () => {
     20: 'peak', 21: 'flat', 22: 'valley', 23: 'valley'
   }
 
+  // 使用确定性负荷曲线（典型数据中心日负荷曲线）
+  const typicalLoadFactors = [
+    0.55, 0.52, 0.50, 0.48, // 0-3点: 深谷
+    0.52, 0.55, 0.60, 0.65, // 4-7点: 谷时渐升
+    0.75, 0.82, 0.88, 0.95, // 8-11点: 平/峰/尖
+    0.90, 0.80, 0.78, 0.80, // 12-15点: 峰/平
+    0.82, 0.88, 0.95, 0.90, // 16-19点: 平/峰/尖
+    0.85, 0.75, 0.65, 0.58  // 20-23点: 峰/平/谷
+  ]
+
+  const basePower = 200 // 基准功率 kW
+
   hourlyLoadData.value = Array.from({ length: 24 }, (_, hour) => ({
     hour,
-    power: Math.random() * 200 + 100, // 100-300 kW 随机功率
+    power: Math.round(basePower * typicalLoadFactors[hour] * 10) / 10, // 使用典型负荷因子
     period: periodMap[hour]
   }))
 
-  console.log('[analysis.vue] Generated mock hourly data:', hourlyLoadData.value.length, 'points')
+  console.log('[analysis.vue] Generated deterministic mock hourly data:', hourlyLoadData.value.length, 'points')
 }
 
 const handleShiftPlanChange = (plan: {
@@ -1093,7 +1106,8 @@ async function loadCurveData() {
   }
 }
 
-// 生成模拟15分钟需量曲线数据
+// 生成模拟15分钟需量曲线数据（仅在 API 无数据时使用）
+// 使用确定性算法生成数据
 function generateMockCurveData() {
   const baseDate = curveDate.value || new Date().toISOString().split('T')[0]
   const declaredDemand = peakAnalysis.value?.declared_demand || 500
@@ -1110,20 +1124,23 @@ function generateMockCurveData() {
       if (hour >= 18 && hour < 22) basePower = 300 // 晚间
       if (hour >= 22 || hour < 6) basePower = 150  // 深夜
 
-      const randomVariation = (Math.random() - 0.5) * 100
-      const power = Math.max(50, basePower + randomVariation)
+      // 使用确定性波动代替 Math.random()
+      // 基于小时和分钟生成周期性波动
+      const slot = hour * 4 + min / 15
+      const variation = Math.sin(slot * 0.3) * 50 // ±50 kW 的确定性波动
+      const power = Math.max(50, basePower + variation)
 
       points.push({
         timestamp,
         average_power: power,
-        rolling_demand: power * (1 + Math.random() * 0.1),
+        rolling_demand: power * (1 + Math.sin(slot * 0.5) * 0.05), // ±5% 确定性波动
         is_over_declared: power > declaredDemand
       })
     }
   }
 
   curveData.value = points
-  console.log('[analysis.vue] Generated mock curve data:', points.length, 'points')
+  console.log('[analysis.vue] Generated deterministic mock curve data:', points.length, 'points')
 }
 
 async function loadPeakAnalysis() {

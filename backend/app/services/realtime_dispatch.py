@@ -7,7 +7,6 @@ from datetime import datetime, timedelta
 from typing import List, Dict, Optional, Callable, Any
 from dataclasses import dataclass, field
 from enum import Enum
-import random
 
 
 class AlertLevel(Enum):
@@ -381,7 +380,10 @@ def get_dispatch_controller(demand_target: float = 800.0) -> RealtimeDispatchCon
 
 def simulate_realtime_monitoring(duration_minutes: int = 5) -> List[Dict]:
     """
-    模拟实时监控（用于演示）
+    模拟实时监控（仅用于 Demo 演示）
+
+    此函数专门用于演示实时调度功能，始终使用模拟数据。
+    使用确定性算法生成可预测的功率波动。
 
     Args:
         duration_minutes: 模拟时长（分钟）
@@ -389,6 +391,8 @@ def simulate_realtime_monitoring(duration_minutes: int = 5) -> List[Dict]:
     Returns:
         模拟结果列表
     """
+    import math
+
     controller = get_dispatch_controller(demand_target=800.0)
 
     # 设置可削减设备
@@ -403,8 +407,9 @@ def simulate_realtime_monitoring(duration_minutes: int = 5) -> List[Dict]:
     base_power = 700  # 基础负荷
 
     for i in range(duration_minutes * 4):  # 每15秒一个点
-        # 模拟功率波动
-        noise = random.gauss(0, 30)
+        # 使用确定性算法模拟功率波动（代替 random.gauss）
+        phase = (i * 0.5) % (2 * math.pi)
+        noise = math.sin(phase) * 30  # ±30 的确定性波动
         trend = 50 * (i / (duration_minutes * 4))  # 逐渐上升
         power = base_power + trend + noise
 

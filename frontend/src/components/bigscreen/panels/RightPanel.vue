@@ -134,12 +134,15 @@ const initialX = computed(() => {
 // 模拟 PUE 趋势数据
 const pueTrend = ref(-2.1)
 
+// PUE历史数据（使用确定性波动）
 const pueHistoryData = computed(() => {
   const days = ['周一', '周二', '周三', '周四', '周五', '周六', '周日']
   const baseValue = store.energy.pue
-  return days.map((day) => ({
+  // 使用确定性波动代替 Math.random()
+  const offsets = [0.02, -0.03, 0.01, -0.02, 0.03, -0.01, 0.02]
+  return days.map((day, index) => ({
     date: day,
-    value: Math.round((baseValue + (Math.random() - 0.5) * 0.1) * 100) / 100
+    value: Math.round((baseValue + offsets[index]) * 100) / 100
   }))
 })
 

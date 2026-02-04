@@ -101,7 +101,8 @@ function generateDefaultLayout(): DataCenterLayout {
           z: -5 + row * 10
         },
         size: { width: 0.6, height: 2.0, depth: 1.0 },
-        status: Math.random() > 0.9 ? 'alarm' : 'normal' as const
+        // 使用确定性状态（基于位置），避免随机
+        status: ((row * 8 + i) % 11 === 0) ? 'alarm' : 'normal' as const
       })
     }
   }
