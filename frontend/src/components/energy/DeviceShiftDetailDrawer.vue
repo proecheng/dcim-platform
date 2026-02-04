@@ -54,7 +54,13 @@
 
       <!-- 24小时典型日功率曲线图 -->
       <div class="chart-section">
-        <div class="section-title">24小时典型日功率曲线</div>
+        <div class="section-header">
+          <div class="section-title">24小时典型日功率曲线</div>
+          <el-radio-group v-model="profileDays" size="small" @change="reloadProfile">
+            <el-radio-button :value="30">30天</el-radio-button>
+            <el-radio-button :value="90">90天</el-radio-button>
+          </el-radio-group>
+        </div>
         <div class="chart-info" v-if="profile">
           <template v-if="profile.summary.has_real_data">
             基于过去 {{ profile.data_days }} 天历史数据
@@ -138,6 +144,7 @@ const drawerVisible = computed({
 
 const loading = ref(false)
 const profile = ref<TypicalDayProfileResponse | null>(null)
+const profileDays = ref(30)
 const chartRef = ref<HTMLElement>()
 let chart: echarts.ECharts | null = null
 
@@ -341,6 +348,24 @@ function buildChart() {
   chart.setOption(option)
 }
 
+// 重新加载功率Profile（切换天数时）
+async function reloadProfile() {
+  if (!props.device) return
+  loading.value = true
+  try {
+    const res = await getDeviceTypicalDayProfile(props.device.device_id, profileDays.value)
+    if (res.code === 0 && res.data) {
+      profile.value = res.data
+      await nextTick()
+      buildChart()
+    }
+  } catch (e) {
+    console.error('加载设备功率Profile失败:', e)
+  } finally {
+    loading.value = false
+  }
+}
+
 // 监听设备变化，加载数据
 watch(() => props.device, async (newDevice) => {
   if (!newDevice) {
@@ -350,7 +375,7 @@ watch(() => props.device, async (newDevice) => {
 
   loading.value = true
   try {
-    const res = await getDeviceTypicalDayProfile(newDevice.device_id)
+    const res = await getDeviceTypicalDayProfile(newDevice.device_id, profileDays.value)
     if (res.code === 0 && res.data) {
       profile.value = res.data
       await nextTick()
@@ -451,11 +476,17 @@ onUnmounted(() => {
 .chart-section {
   margin-bottom: 20px;
 
+  .section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 4px;
+  }
+
   .section-title {
     font-size: 14px;
     font-weight: 600;
     color: var(--text-primary);
-    margin-bottom: 4px;
   }
 
   .chart-info {

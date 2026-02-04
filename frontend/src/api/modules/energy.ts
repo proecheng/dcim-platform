@@ -1330,6 +1330,47 @@ export interface DemandForecastResponse {
   }>
 }
 
+/** 聚合需量曲线数据点 */
+export interface DemandAggregatedPoint {
+  slot: number
+  time: string
+  avg_demand: number
+  max_demand: number
+  min_demand: number
+  over_declared_ratio: number
+  data_count: number
+}
+
+/** 聚合需量曲线响应 */
+export interface DemandAggregatedCurveResponse {
+  meter_point_id: number
+  meter_name: string
+  declared_demand: number
+  analysis_period: {
+    start: string
+    end: string
+    requested_days: number
+    actual_days: number
+  }
+  statistics: {
+    max_demand: number
+    avg_demand: number
+    utilization_rate: number
+    over_declared_count: number
+    over_declared_ratio: number
+    total_data_points: number
+  }
+  aggregated_points: DemandAggregatedPoint[]
+}
+
+/** 获取聚合需量曲线 */
+export function getDemandAggregatedCurve(params: {
+  meter_point_id: number
+  days: number
+}) {
+  return request.get<ResponseModel<DemandAggregatedCurveResponse>>('/v1/energy/demand/aggregated-curve', { params })
+}
+
 /** 获取15分钟需量曲线 */
 export function getDemand15MinCurve(params: {
   meter_point_id: number
