@@ -13,7 +13,7 @@
           <span class="device-name">{{ device?.device_name }}</span>
           <el-tag size="small" style="margin-left: 8px;">{{ getDeviceTypeText(device?.device_type) }}</el-tag>
         </div>
-        <div class="header-meta" style="margin-top: 4px; color: #909399; font-size: 13px;">
+        <div class="header-meta" style="margin-top: 4px; color: var(--text-secondary, #909399); font-size: 13px;">
           {{ device?.device_code }} · 额定功率 {{ device?.rated_power }} kW
         </div>
       </div>
@@ -396,7 +396,7 @@ onUnmounted(() => {
     .device-name {
       font-size: 16px;
       font-weight: 600;
-      color: #303133;
+      color: var(--text-primary);
     }
   }
 }
@@ -412,28 +412,28 @@ onUnmounted(() => {
   margin-bottom: 20px;
 
   .metric-card {
-    background: #f5f7fa;
+    background: var(--bg-tertiary, rgba(17, 34, 64, 0.8));
     border-radius: 8px;
     padding: 12px;
     text-align: center;
-    border: 1px solid #e4e7ed;
+    border: 1px solid var(--border-color);
     transition: border-color 0.3s;
 
     &.highlight {
-      background: #f0f9eb;
-      border-color: #b3e19d;
+      background: rgba(103, 194, 58, 0.15);
+      border-color: rgba(103, 194, 58, 0.5);
     }
 
     .metric-label {
       font-size: 12px;
-      color: #909399;
+      color: var(--text-secondary);
       margin-bottom: 6px;
     }
 
     .metric-value {
       font-size: 20px;
       font-weight: 700;
-      color: #303133;
+      color: var(--text-primary);
       line-height: 1.3;
 
       &.peak-color { color: #f56c6c; }
@@ -442,7 +442,7 @@ onUnmounted(() => {
 
     .metric-sub {
       font-size: 11px;
-      color: #c0c4cc;
+      color: var(--text-placeholder);
       margin-top: 4px;
     }
   }
@@ -454,13 +454,13 @@ onUnmounted(() => {
   .section-title {
     font-size: 14px;
     font-weight: 600;
-    color: #303133;
+    color: var(--text-primary);
     margin-bottom: 4px;
   }
 
   .chart-info {
     font-size: 12px;
-    color: #909399;
+    color: var(--text-secondary);
     margin-bottom: 8px;
   }
 
@@ -474,7 +474,7 @@ onUnmounted(() => {
   .section-title {
     font-size: 14px;
     font-weight: 600;
-    color: #303133;
+    color: var(--text-primary);
     margin-bottom: 12px;
   }
 
@@ -487,13 +487,13 @@ onUnmounted(() => {
   .constraint-item {
     padding: 10px 12px;
     border-radius: 6px;
-    background: #fafafa;
-    border: 1px solid #ebeef5;
+    background: var(--bg-tertiary, rgba(17, 34, 64, 0.8));
+    border: 1px solid var(--border-color);
     transition: all 0.3s;
 
     &.is-binding {
-      background: #fff1f0;
-      border-color: #ffa39e;
+      background: rgba(245, 108, 108, 0.15);
+      border-color: rgba(245, 108, 108, 0.5);
     }
 
     .constraint-header {
@@ -506,18 +506,18 @@ onUnmounted(() => {
     .constraint-name {
       font-size: 13px;
       font-weight: 500;
-      color: #303133;
+      color: var(--text-primary);
     }
 
     .constraint-value {
       font-size: 14px;
       font-weight: 600;
-      color: #606266;
+      color: var(--text-regular);
     }
 
     .constraint-desc {
       font-size: 11px;
-      color: #909399;
+      color: var(--text-secondary);
       margin-top: 6px;
     }
   }

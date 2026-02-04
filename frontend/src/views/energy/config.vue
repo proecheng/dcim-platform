@@ -714,7 +714,7 @@
         </el-form-item>
         <el-form-item label="推荐比例">
           <el-tag type="warning" size="large">{{ (ratioForm.recommended_ratio * 100).toFixed(0) }}%</el-tag>
-          <span style="margin-left: 8px; color: #909399; font-size: 13px;">
+          <span style="margin-left: 8px; color: var(--text-secondary, #909399); font-size: 13px;">
             (置信度: {{ getConfidenceText(ratioForm.confidence) }})
           </span>
         </el-form-item>
@@ -726,7 +726,7 @@
             show-input
             style="width: 100%;"
           />
-          <div class="power-preview" style="margin-top: 8px; color: #606266;">
+          <div class="power-preview" style="margin-top: 8px; color: var(--text-regular, #606266);">
             对应可调节容量: <strong>{{ (ratioForm.rated_power * ratioForm.new_ratio_percent / 100).toFixed(1) }} kW</strong>
           </div>
         </el-form-item>
