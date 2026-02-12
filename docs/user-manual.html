@@ -1,0 +1,1829 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>算力监控系统 用户使用说明书 - DCIM</title>
+    <style>
+        :root {
+            --primary-color: #1890ff;
+            --primary-dark: #096dd9;
+            --text-color: #333;
+            --text-secondary: #666;
+            --bg-color: #fff;
+            --bg-secondary: #f5f7fa;
+            --border-color: #e8e8e8;
+            --code-bg: #f6f8fa;
+            --sidebar-width: 280px;
+            --header-height: 60px;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+            font-size: 15px;
+            line-height: 1.7;
+            color: var(--text-color);
+            background: var(--bg-color);
+        }
+
+        /* Header */
+        .header {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: var(--header-height);
+            background: linear-gradient(135deg, #1890ff 0%, #096dd9 100%);
+            color: white;
+            display: flex;
+            align-items: center;
+            padding: 0 24px;
+            z-index: 1000;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+        }
+
+        .header-logo {
+            font-size: 20px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .header-logo svg {
+            width: 32px;
+            height: 32px;
+        }
+
+        .header-version {
+            margin-left: auto;
+            font-size: 13px;
+            opacity: 0.9;
+            background: rgba(255,255,255,0.15);
+            padding: 4px 12px;
+            border-radius: 12px;
+        }
+
+        /* Sidebar */
+        .sidebar {
+            position: fixed;
+            top: var(--header-height);
+            left: 0;
+            width: var(--sidebar-width);
+            height: calc(100vh - var(--header-height));
+            background: var(--bg-secondary);
+            border-right: 1px solid var(--border-color);
+            overflow-y: auto;
+            z-index: 100;
+        }
+
+        .sidebar-nav {
+            padding: 16px 0;
+        }
+
+        .nav-section {
+            margin-bottom: 8px;
+        }
+
+        .nav-section-title {
+            padding: 10px 20px;
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-color);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: background 0.2s;
+        }
+
+        .nav-section-title:hover {
+            background: rgba(24, 144, 255, 0.08);
+        }
+
+        .nav-section-title.active {
+            color: var(--primary-color);
+            background: rgba(24, 144, 255, 0.1);
+        }
+
+        .nav-section-icon {
+            width: 18px;
+            text-align: center;
+        }
+
+        .nav-subsection {
+            padding-left: 46px;
+        }
+
+        .nav-subsection a {
+            display: block;
+            padding: 6px 16px;
+            font-size: 13px;
+            color: var(--text-secondary);
+            text-decoration: none;
+            transition: all 0.2s;
+            border-left: 2px solid transparent;
+        }
+
+        .nav-subsection a:hover {
+            color: var(--primary-color);
+            background: rgba(24, 144, 255, 0.05);
+        }
+
+        .nav-subsection a.active {
+            color: var(--primary-color);
+            border-left-color: var(--primary-color);
+            background: rgba(24, 144, 255, 0.08);
+        }
+
+        /* Main Content */
+        .main-content {
+            margin-left: var(--sidebar-width);
+            margin-top: var(--header-height);
+            padding: 32px 48px;
+            max-width: 1000px;
+        }
+
+        /* Typography */
+        h1, h2, h3, h4, h5, h6 {
+            color: var(--text-color);
+            font-weight: 600;
+            margin-top: 32px;
+            margin-bottom: 16px;
+        }
+
+        h1 {
+            font-size: 32px;
+            border-bottom: 2px solid var(--primary-color);
+            padding-bottom: 12px;
+            margin-top: 0;
+        }
+
+        h2 {
+            font-size: 24px;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 8px;
+        }
+
+        h3 {
+            font-size: 18px;
+        }
+
+        h4 {
+            font-size: 16px;
+        }
+
+        p {
+            margin-bottom: 16px;
+        }
+
+        /* Section */
+        .section {
+            margin-bottom: 48px;
+            scroll-margin-top: calc(var(--header-height) + 24px);
+        }
+
+        .section-meta {
+            background: var(--bg-secondary);
+            border-left: 4px solid var(--primary-color);
+            padding: 16px 20px;
+            margin-bottom: 24px;
+            border-radius: 0 8px 8px 0;
+        }
+
+        .section-meta p {
+            margin: 4px 0;
+            font-size: 14px;
+            color: var(--text-secondary);
+        }
+
+        .section-meta strong {
+            color: var(--text-color);
+        }
+
+        /* Tables */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 16px 0 24px;
+            font-size: 14px;
+        }
+
+        th, td {
+            padding: 12px 16px;
+            text-align: left;
+            border: 1px solid var(--border-color);
+        }
+
+        th {
+            background: var(--bg-secondary);
+            font-weight: 600;
+            color: var(--text-color);
+        }
+
+        tr:hover td {
+            background: rgba(24, 144, 255, 0.03);
+        }
+
+        /* Code blocks */
+        pre {
+            background: var(--code-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 16px 20px;
+            overflow-x: auto;
+            margin: 16px 0 24px;
+            font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+            font-size: 13px;
+            line-height: 1.6;
+        }
+
+        code {
+            font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+            font-size: 13px;
+            background: var(--code-bg);
+            padding: 2px 6px;
+            border-radius: 4px;
+        }
+
+        pre code {
+            background: none;
+            padding: 0;
+        }
+
+        /* ASCII Diagrams */
+        .diagram {
+            background: #1a1a2e;
+            color: #00ff88;
+            border-radius: 8px;
+            padding: 20px 24px;
+            margin: 16px 0 24px;
+            overflow-x: auto;
+            font-family: 'SFMono-Regular', Consolas, monospace;
+            font-size: 12px;
+            line-height: 1.4;
+        }
+
+        /* Cards */
+        .card-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+            margin: 20px 0;
+        }
+
+        .card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 20px;
+            text-align: center;
+        }
+
+        .card-value {
+            font-size: 28px;
+            font-weight: 600;
+            color: var(--primary-color);
+        }
+
+        .card-label {
+            font-size: 14px;
+            color: var(--text-secondary);
+            margin-top: 4px;
+        }
+
+        /* Alerts */
+        .alert {
+            padding: 16px 20px;
+            border-radius: 8px;
+            margin: 16px 0;
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+        }
+
+        .alert-warning {
+            background: #fff7e6;
+            border: 1px solid #ffd591;
+            color: #ad6800;
+        }
+
+        .alert-info {
+            background: #e6f7ff;
+            border: 1px solid #91d5ff;
+            color: #0050b3;
+        }
+
+        .alert-icon {
+            font-size: 18px;
+            flex-shrink: 0;
+        }
+
+        /* Lists */
+        ul, ol {
+            margin: 12px 0 16px 24px;
+        }
+
+        li {
+            margin: 6px 0;
+        }
+
+        /* Blockquote */
+        blockquote {
+            border-left: 4px solid var(--primary-color);
+            padding-left: 16px;
+            margin: 16px 0;
+            color: var(--text-secondary);
+            font-style: italic;
+        }
+
+        /* Status badges */
+        .badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+
+        .badge-success { background: #f6ffed; color: #52c41a; border: 1px solid #b7eb8f; }
+        .badge-warning { background: #fffbe6; color: #faad14; border: 1px solid #ffe58f; }
+        .badge-danger { background: #fff2f0; color: #ff4d4f; border: 1px solid #ffccc7; }
+        .badge-info { background: #e6f7ff; color: #1890ff; border: 1px solid #91d5ff; }
+
+        /* Flow diagram */
+        .flow {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin: 16px 0;
+        }
+
+        .flow-step {
+            background: var(--primary-color);
+            color: white;
+            padding: 8px 16px;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+
+        .flow-arrow {
+            color: var(--text-secondary);
+            font-size: 18px;
+        }
+
+        /* Back to top */
+        .back-to-top {
+            position: fixed;
+            bottom: 32px;
+            right: 32px;
+            width: 44px;
+            height: 44px;
+            background: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 12px rgba(24, 144, 255, 0.4);
+            opacity: 0;
+            transition: opacity 0.3s;
+            z-index: 1000;
+        }
+
+        .back-to-top.visible {
+            opacity: 1;
+        }
+
+        .back-to-top:hover {
+            background: var(--primary-dark);
+        }
+
+        /* Print styles */
+        @media print {
+            .header, .sidebar, .back-to-top {
+                display: none;
+            }
+            .main-content {
+                margin: 0;
+                padding: 20px;
+                max-width: none;
+            }
+            pre, .diagram {
+                white-space: pre-wrap;
+                word-wrap: break-word;
+            }
+        }
+
+        /* Mobile responsive */
+        @media (max-width: 768px) {
+            .sidebar {
+                transform: translateX(-100%);
+                transition: transform 0.3s;
+            }
+            .sidebar.open {
+                transform: translateX(0);
+            }
+            .main-content {
+                margin-left: 0;
+                padding: 24px 16px;
+            }
+            .menu-toggle {
+                display: block;
+            }
+        }
+
+        /* Screenshot placeholder */
+        .screenshot-placeholder {
+            background: linear-gradient(135deg, #f0f5ff 0%, #e6f7ff 100%);
+            border: 2px dashed #91d5ff;
+            border-radius: 8px;
+            padding: 40px 20px;
+            text-align: center;
+            color: var(--primary-color);
+            margin: 16px 0;
+        }
+
+        .screenshot-placeholder::before {
+            content: "📷";
+            font-size: 32px;
+            display: block;
+            margin-bottom: 8px;
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="header-logo">
+            <svg viewBox="0 0 24 24" fill="currentColor">
+                <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+            </svg>
+            算力监控系统 用户使用说明书
+        </div>
+        <div class="header-version">版本 V1.0 | DCIM</div>
+    </header>
+
+    <!-- Sidebar Navigation -->
+    <aside class="sidebar">
+        <nav class="sidebar-nav">
+            <div class="nav-section">
+                <div class="nav-section-title" onclick="scrollToSection('section-1')">
+                    <span class="nav-section-icon">📖</span>
+                    1. 系统概述
+                </div>
+                <div class="nav-subsection">
+                    <a href="#section-1-1">1.1 系统简介</a>
+                    <a href="#section-1-2">1.2 系统架构</a>
+                    <a href="#section-1-3">1.3 功能模块一览</a>
+                    <a href="#section-1-4">1.4 技术要求</a>
+                </div>
+            </div>
+            <div class="nav-section">
+                <div class="nav-section-title" onclick="scrollToSection('section-2')">
+                    <span class="nav-section-icon">🚀</span>
+                    2. 快速入门
+                </div>
+                <div class="nav-subsection">
+                    <a href="#section-2-1">2.1 系统登录</a>
+                    <a href="#section-2-2">2.2 主界面导航</a>
+                    <a href="#section-2-3">2.3 常用操作流程</a>
+                </div>
+            </div>
+            <div class="nav-section">
+                <div class="nav-section-title" onclick="scrollToSection('section-3')">
+                    <span class="nav-section-icon">📊</span>
+                    3. 监控仪表盘
+                </div>
+                <div class="nav-subsection">
+                    <a href="#section-3-1">3.1 功能概述</a>
+                    <a href="#section-3-2">3.2 界面布局</a>
+                    <a href="#section-3-3">3.3 统计卡片说明</a>
+                    <a href="#section-3-4">3.4 能源统计卡片</a>
+                    <a href="#section-3-5">3.5 操作指南</a>
+                </div>
+            </div>
+            <div class="nav-section">
+                <div class="nav-section-title" onclick="scrollToSection('section-4')">
+                    <span class="nav-section-icon">⚡</span>
+                    4. 用电管理
+                </div>
+                <div class="nav-subsection">
+                    <a href="#section-4-1">4.1 模块导航</a>
+                    <a href="#section-4-2">4.2 用电监控</a>
+                    <a href="#section-4-3">4.3 节能中心</a>
+                    <a href="#section-4-4">4.4 执行管理</a>
+                    <a href="#section-4-5">4.5 配电配置</a>
+                </div>
+            </div>
+            <div class="nav-section">
+                <div class="nav-section-title" onclick="scrollToSection('section-5')">
+                    <span class="nav-section-icon">🔔</span>
+                    5. 告警管理
+                </div>
+                <div class="nav-subsection">
+                    <a href="#section-5-1">5.1 功能概述</a>
+                    <a href="#section-5-2">5.2 界面布局</a>
+                    <a href="#section-5-3">5.3 告警级别说明</a>
+                    <a href="#section-5-4">5.4 告警状态流转</a>
+                    <a href="#section-5-5">5.5 操作指南</a>
+                </div>
+            </div>
+            <div class="nav-section">
+                <div class="nav-section-title" onclick="scrollToSection('section-6')">
+                    <span class="nav-section-icon">📦</span>
+                    6. 资产管理
+                </div>
+                <div class="nav-subsection">
+                    <a href="#section-6-1">6.1 资产台账</a>
+                    <a href="#section-6-2">6.2 机柜管理</a>
+                </div>
+            </div>
+            <div class="nav-section">
+                <div class="nav-section-title" onclick="scrollToSection('section-7')">
+                    <span class="nav-section-icon">🔧</span>
+                    7. 运维管理
+                </div>
+                <div class="nav-subsection">
+                    <a href="#section-7-1">7.1 工单管理</a>
+                    <a href="#section-7-2">7.2 巡检管理</a>
+                    <a href="#section-7-3">7.3 知识库</a>
+                </div>
+            </div>
+            <div class="nav-section">
+                <div class="nav-section-title" onclick="scrollToSection('section-8')">
+                    <span class="nav-section-icon">📈</span>
+                    8. 数据分析与报表
+                </div>
+                <div class="nav-subsection">
+                    <a href="#section-8-1">8.1 历史数据</a>
+                    <a href="#section-8-2">8.2 报表分析</a>
+                </div>
+            </div>
+            <div class="nav-section">
+                <div class="nav-section-title" onclick="scrollToSection('section-9')">
+                    <span class="nav-section-icon">⚙️</span>
+                    9. 系统设置
+                </div>
+                <div class="nav-subsection">
+                    <a href="#section-9-1">9.1 阈值配置</a>
+                    <a href="#section-9-2">9.2 用户管理</a>
+                    <a href="#section-9-3">9.3 系统日志</a>
+                </div>
+            </div>
+            <div class="nav-section">
+                <div class="nav-section-title" onclick="scrollToSection('section-10')">
+                    <span class="nav-section-icon">🖥️</span>
+                    10. 数字孪生大屏
+                </div>
+                <div class="nav-subsection">
+                    <a href="#section-10-1">10.1 功能概述</a>
+                    <a href="#section-10-2">10.2 界面布局</a>
+                    <a href="#section-10-3">10.3 显示模式</a>
+                    <a href="#section-10-4">10.4 图层控制</a>
+                    <a href="#section-10-5">10.5 操作说明</a>
+                </div>
+            </div>
+            <div class="nav-section">
+                <div class="nav-section-title" onclick="scrollToSection('section-11')">
+                    <span class="nav-section-icon">❓</span>
+                    11. 常见问题
+                </div>
+                <div class="nav-subsection">
+                    <a href="#section-11-1">11.1 登录问题</a>
+                    <a href="#section-11-2">11.2 数据问题</a>
+                    <a href="#section-11-3">11.3 告警问题</a>
+                    <a href="#section-11-4">11.4 能源管理问题</a>
+                    <a href="#section-11-5">11.5 系统问题</a>
+                </div>
+            </div>
+            <div class="nav-section">
+                <div class="nav-section-title" onclick="scrollToSection('appendix')">
+                    <span class="nav-section-icon">📋</span>
+                    附录
+                </div>
+                <div class="nav-subsection">
+                    <a href="#appendix-a">A. 快捷键汇总</a>
+                    <a href="#appendix-b">B. 状态图标说明</a>
+                    <a href="#appendix-c">C. 术语表</a>
+                    <a href="#appendix-d">D. 联系支持</a>
+                </div>
+            </div>
+        </nav>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <!-- Title Section -->
+        <section class="section" id="title">
+            <h1>算力监控系统 用户使用说明书</h1>
+            <div class="section-meta">
+                <p><strong>版本:</strong> V1.0</p>
+                <p><strong>更新日期:</strong> 2026-01-27</p>
+                <p><strong>适用版本:</strong> DCIM 智能数据中心监控管理平台</p>
+            </div>
+        </section>
+
+        <!-- Section 1: System Overview -->
+        <section class="section" id="section-1">
+            <h2>1. 系统概述</h2>
+
+            <h3 id="section-1-1">1.1 系统简介</h3>
+            <p><strong>算力监控系统</strong>（DCIM - Data Center Infrastructure Management）是一套智能化的数据中心基础设施管理平台，提供从实时监控、能源管理、资产追踪到运维管理的全方位解决方案。</p>
+
+            <h3 id="section-1-2">1.2 系统架构</h3>
+            <div class="diagram">
+┌─────────────────────────────────────────────────────────────────────┐
+│                        算力监控系统                                  │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                     │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌────────────┐ │
+│  │  实时监控   │  │  用电管理   │  │  资产管理   │  │  运维管理  │ │
+│  │             │  │             │  │             │  │            │ │
+│  │ • 仪表盘    │  │ • 用电监控  │  │ • 资产台账  │  │ • 工单管理 │ │
+│  │ • 点位管理  │  │ • 节能中心  │  │ • 机柜管理  │  │ • 巡检管理 │ │
+│  │ • 告警管理  │  │ • 负荷调节  │  │ • 容量管理  │  │ • 知识库   │ │
+│  │ • 历史数据  │  │ • 执行管理  │  │             │  │            │ │
+│  └─────────────┘  └─────────────┘  └─────────────┘  └────────────┘ │
+│                                                                     │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────────────┐ │
+│  │  报表分析   │  │  系统设置   │  │      数字孪生大屏           │ │
+│  │             │  │             │  │                             │ │
+│  │ • 日报/周报 │  │ • 阈值配置  │  │  • 3D可视化  • 热力图      │ │
+│  │ • 月报/自定 │  │ • 用户管理  │  │  • 实时状态  • 自动巡航    │ │
+│  │ • 数据导出  │  │ • 系统日志  │  │                             │ │
+│  └─────────────┘  └─────────────┘  └─────────────────────────────┘ │
+│                                                                     │
+└─────────────────────────────────────────────────────────────────────┘
+            </div>
+
+            <h3 id="section-1-3">1.3 功能模块一览</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>模块</th>
+                        <th>功能描述</th>
+                        <th>适用角色</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>监控仪表盘</td>
+                        <td>实时数据概览、快捷操作入口</td>
+                        <td>所有用户</td>
+                    </tr>
+                    <tr>
+                        <td>点位管理</td>
+                        <td>监控点位配置、采集参数设置</td>
+                        <td>管理员、运维</td>
+                    </tr>
+                    <tr>
+                        <td>告警管理</td>
+                        <td>告警查看、确认、处理</td>
+                        <td>所有用户</td>
+                    </tr>
+                    <tr>
+                        <td>用电监控</td>
+                        <td>PUE监控、能耗统计、成本分析</td>
+                        <td>能源管理员</td>
+                    </tr>
+                    <tr>
+                        <td>节能中心</td>
+                        <td>需量分析、负荷转移、优化建议</td>
+                        <td>能源管理员</td>
+                    </tr>
+                    <tr>
+                        <td>执行管理</td>
+                        <td>节能方案执行跟踪、效果追踪</td>
+                        <td>能源管理员</td>
+                    </tr>
+                    <tr>
+                        <td>资产台账</td>
+                        <td>设备资产登记、生命周期管理</td>
+                        <td>资产管理员</td>
+                    </tr>
+                    <tr>
+                        <td>机柜管理</td>
+                        <td>U位管理、容量规划</td>
+                        <td>运维人员</td>
+                    </tr>
+                    <tr>
+                        <td>工单管理</td>
+                        <td>故障报修、维护工单流转</td>
+                        <td>运维人员</td>
+                    </tr>
+                    <tr>
+                        <td>巡检管理</td>
+                        <td>巡检计划、任务执行、结果记录</td>
+                        <td>运维人员</td>
+                    </tr>
+                    <tr>
+                        <td>报表分析</td>
+                        <td>日报/周报/月报生成、数据导出</td>
+                        <td>管理层</td>
+                    </tr>
+                    <tr>
+                        <td>系统设置</td>
+                        <td>用户管理、阈值配置、系统日志</td>
+                        <td>系统管理员</td>
+                    </tr>
+                    <tr>
+                        <td>数字孪生</td>
+                        <td>3D可视化、热力图、实时状态</td>
+                        <td>展示/管理层</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h3 id="section-1-4">1.4 技术要求</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>项目</th>
+                        <th>要求</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>浏览器</td>
+                        <td>Chrome 80+、Edge 80+、Firefox 75+</td>
+                    </tr>
+                    <tr>
+                        <td>分辨率</td>
+                        <td>推荐 1920×1080 及以上</td>
+                    </tr>
+                    <tr>
+                        <td>网络</td>
+                        <td>稳定的内网连接</td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+
+        <!-- Section 2: Quick Start -->
+        <section class="section" id="section-2">
+            <h2>2. 快速入门</h2>
+
+            <h3 id="section-2-1">2.1 系统登录</h3>
+            <div class="screenshot-placeholder">截图位置: 登录页面</div>
+            <div class="diagram">
+┌─────────────────────────────────────────────────────────────┐
+│                                                             │
+│                      算力监控系统                            │
+│                                                             │
+│              ┌─────────────────────────────┐               │
+│              │  👤 用户名                   │               │
+│              │  ┌─────────────────────┐    │               │
+│              │  │ admin               │    │               │
+│              │  └─────────────────────┘    │               │
+│              │                             │               │
+│              │  🔒 密码                     │               │
+│              │  ┌─────────────────────┐    │               │
+│              │  │ ••••••••            │    │               │
+│              │  └─────────────────────┘    │               │
+│              │                             │               │
+│              │  ┌─────────────────────┐    │               │
+│              │  │      登  录         │    │               │
+│              │  └─────────────────────┘    │               │
+│              └─────────────────────────────┘               │
+│                                                             │
+│              默认账户: admin / admin123                      │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+            </div>
+
+            <h4>操作步骤：</h4>
+            <ol>
+                <li>在浏览器中输入系统地址</li>
+                <li>输入用户名和密码</li>
+                <li>点击【登录】按钮</li>
+                <li>首次登录建议修改默认密码</li>
+            </ol>
+
+            <h3 id="section-2-2">2.2 主界面导航</h3>
+            <div class="screenshot-placeholder">截图位置: 主界面布局</div>
+            <div class="diagram">
+┌────────────────────────────────────────────────────────────────────┐
+│  🖥️ 算力监控                                    admin ▼  [退出]   │
+├──────────────┬─────────────────────────────────────────────────────┤
+│              │                                                     │
+│  📊 监控仪表盘 │                    主 内 容 区                     │
+│              │                                                     │
+│  📍 点位管理   │   ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌─────────┐ │
+│              │   │ 监控点位 │ │ 正常点位 │ │ 告警点位 │ │ 离线点位 │ │
+│  🔔 告警管理   │   │   156   │ │   142   │ │    8    │ │    6    │ │
+│              │   └─────────┘ └─────────┘ └─────────┘ └─────────┘ │
+│  📈 历史数据   │                                                     │
+│              │   ┌─────────────────────────────────────────────┐   │
+│  📋 报表分析   │   │                                             │   │
+│              │   │              数据展示区域                    │   │
+│  ⚙️ 系统设置   │   │                                             │   │
+│              │   │                                             │   │
+│  ⚡ 用电管理 ▼ │   └─────────────────────────────────────────────┘   │
+│    └ 用电监控  │                                                     │
+│    └ 能耗统计  │                                                     │
+│    └ 节能中心  │                                                     │
+│    └ 执行管理  │                                                     │
+│              │                                                     │
+│  📦 资产管理 ▼ │                                                     │
+│    └ 资产台账  │                                                     │
+│    └ 机柜管理  │                                                     │
+│              │                                                     │
+│  🔧 运维管理 ▼ │                                                     │
+│    └ 工单管理  │                                                     │
+│    └ 巡检管理  │                                                     │
+│    └ 知识库   │                                                     │
+│              │                                                     │
+└──────────────┴─────────────────────────────────────────────────────┘
+            </div>
+
+            <h4>界面说明：</h4>
+            <ul>
+                <li><strong>顶部导航栏</strong>：显示系统名称、当前用户、退出按钮</li>
+                <li><strong>左侧菜单栏</strong>：可折叠的功能模块导航，点击展开/收起子菜单</li>
+                <li><strong>主内容区</strong>：显示当前模块的详细内容</li>
+            </ul>
+
+            <h3 id="section-2-3">2.3 常用操作流程</h3>
+
+            <h4>流程1：查看实时监控状态</h4>
+            <div class="flow">
+                <span class="flow-step">登录系统</span>
+                <span class="flow-arrow">→</span>
+                <span class="flow-step">进入仪表盘</span>
+                <span class="flow-arrow">→</span>
+                <span class="flow-step">查看概览数据</span>
+            </div>
+
+            <h4>流程2：处理告警事件</h4>
+            <div class="flow">
+                <span class="flow-step">发现告警</span>
+                <span class="flow-arrow">→</span>
+                <span class="flow-step">查看详情</span>
+                <span class="flow-arrow">→</span>
+                <span class="flow-step">确认告警</span>
+                <span class="flow-arrow">→</span>
+                <span class="flow-step">处理问题</span>
+                <span class="flow-arrow">→</span>
+                <span class="flow-step">解除告警</span>
+            </div>
+
+            <h4>流程3：节能优化闭环</h4>
+            <div class="flow">
+                <span class="flow-step">需量分析</span>
+                <span class="flow-arrow">→</span>
+                <span class="flow-step">发现机会</span>
+                <span class="flow-arrow">→</span>
+                <span class="flow-step">配置方案</span>
+                <span class="flow-arrow">→</span>
+                <span class="flow-step">创建执行计划</span>
+                <span class="flow-arrow">→</span>
+                <span class="flow-step">效果追踪</span>
+            </div>
+        </section>
+
+        <!-- Section 3: Dashboard -->
+        <section class="section" id="section-3">
+            <h2>3. 监控仪表盘</h2>
+
+            <h3 id="section-3-1">3.1 功能概述</h3>
+            <p>监控仪表盘是系统的首页，提供数据中心运行状态的全局视图，包括：</p>
+            <ul>
+                <li>监控点位统计</li>
+                <li>能源关键指标</li>
+                <li>实时数据表格</li>
+                <li>最新告警列表</li>
+            </ul>
+
+            <h3 id="section-3-2">3.2 界面布局</h3>
+            <div class="screenshot-placeholder">截图位置: 仪表盘完整界面</div>
+
+            <div class="card-grid">
+                <div class="card">
+                    <div class="card-value">156</div>
+                    <div class="card-label">🖥️ 监控点位</div>
+                </div>
+                <div class="card">
+                    <div class="card-value">142</div>
+                    <div class="card-label">✅ 正常点位</div>
+                </div>
+                <div class="card">
+                    <div class="card-value">8</div>
+                    <div class="card-label">⚠️ 告警点位</div>
+                </div>
+                <div class="card">
+                    <div class="card-value">6</div>
+                    <div class="card-label">⭕ 离线点位</div>
+                </div>
+            </div>
+
+            <h3 id="section-3-3">3.3 统计卡片说明</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>卡片</th>
+                        <th>数据含义</th>
+                        <th>点击跳转</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>监控点位</td>
+                        <td>系统中配置的监控点总数</td>
+                        <td>点位管理页面</td>
+                    </tr>
+                    <tr>
+                        <td>正常点位</td>
+                        <td>当前状态正常的点位数</td>
+                        <td>-</td>
+                    </tr>
+                    <tr>
+                        <td>告警点位</td>
+                        <td>当前处于告警状态的点位数</td>
+                        <td>告警管理页面</td>
+                    </tr>
+                    <tr>
+                        <td>离线点位</td>
+                        <td>当前离线或通讯中断的点位数</td>
+                        <td>点位管理页面</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h3 id="section-3-4">3.4 能源统计卡片</h3>
+            <div class="screenshot-placeholder">截图位置: 能源统计卡片区域</div>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>卡片</th>
+                        <th>说明</th>
+                        <th>交互功能</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>实时功率</td>
+                        <td>当前总功率消耗，含IT负载和制冷分项</td>
+                        <td>悬停显示趋势曲线，点击进入用电监控</td>
+                    </tr>
+                    <tr>
+                        <td>PUE</td>
+                        <td>电源使用效率指标，越接近1越好</td>
+                        <td>显示目标对比、趋势曲线</td>
+                    </tr>
+                    <tr>
+                        <td>需量状态</td>
+                        <td>当前需量利用率及超申报风险</td>
+                        <td>显示申报值对比，点击进入需量分析</td>
+                    </tr>
+                    <tr>
+                        <td>今日费用</td>
+                        <td>今日累计电费，含峰谷分布</td>
+                        <td>点击进入能耗统计</td>
+                    </tr>
+                    <tr>
+                        <td>节能建议</td>
+                        <td>待处理节能建议数量</td>
+                        <td>点击进入节能中心</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h3 id="section-3-5">3.5 操作指南</h3>
+
+            <h4>刷新数据</h4>
+            <p>点击【刷新数据】按钮可手动刷新所有数据。系统默认每10秒自动刷新。</p>
+
+            <h4>打开数字孪生大屏</h4>
+            <p>点击【打开数字孪生大屏】按钮，将在新窗口中打开3D可视化大屏展示界面。</p>
+
+            <h4>加载演示数据</h4>
+            <p>点击【演示数据】按钮，可加载模拟数据用于功能演示和培训。</p>
+
+            <div class="alert alert-warning">
+                <span class="alert-icon">⚠️</span>
+                <span><strong>注意</strong>：演示数据仅供测试使用，不会影响真实数据。</span>
+            </div>
+        </section>
+
+        <!-- Section 4: Power Management -->
+        <section class="section" id="section-4">
+            <h2>4. 用电管理</h2>
+            <p>用电管理模块是系统的核心功能之一，提供全面的能源监控和优化能力。</p>
+
+            <h3 id="section-4-1">4.1 模块导航</h3>
+            <pre>
+用电管理
+├── 用电监控    ─── 实时能耗监控、PUE分析
+├── 能耗统计    ─── 历史能耗数据、趋势分析
+├── 节能中心    ─── 需量分析、负荷转移、优化建议
+├── 配电配置    ─── 变压器、计量点、电价配置
+├── 配电拓扑    ─── 配电系统可视化
+├── 负荷调节    ─── 设备负荷调节配置
+└── 执行管理    ─── 节能方案执行跟踪
+            </pre>
+
+            <h3 id="section-4-2">4.2 用电监控</h3>
+            <div class="screenshot-placeholder">截图位置: 用电监控页面</div>
+
+            <h4>PUE指标说明</h4>
+            <table>
+                <thead>
+                    <tr>
+                        <th>PUE范围</th>
+                        <th>等级</th>
+                        <th>颜色</th>
+                        <th>说明</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>&lt; 1.4</td>
+                        <td>优秀</td>
+                        <td><span class="badge badge-success">🟢 绿色</span></td>
+                        <td>能效优秀，处于行业领先水平</td>
+                    </tr>
+                    <tr>
+                        <td>1.4-1.6</td>
+                        <td>良好</td>
+                        <td><span class="badge badge-info">🔵 蓝色</span></td>
+                        <td>能效良好，达到行业平均水平</td>
+                    </tr>
+                    <tr>
+                        <td>1.6-2.0</td>
+                        <td>一般</td>
+                        <td><span class="badge badge-warning">🟡 黄色</span></td>
+                        <td>有优化空间，建议关注</td>
+                    </tr>
+                    <tr>
+                        <td>&gt; 2.0</td>
+                        <td>较差</td>
+                        <td><span class="badge badge-danger">🔴 红色</span></td>
+                        <td>能效较低，需要改进</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <blockquote>
+                <strong>PUE计算公式</strong>: PUE = 总功率 ÷ IT功率
+            </blockquote>
+
+            <h3 id="section-4-3">4.3 节能中心</h3>
+            <p>节能中心是能源优化的核心模块，提供从分析到执行的完整闭环。</p>
+            <div class="screenshot-placeholder">截图位置: 节能中心页面</div>
+
+            <h4>4.3.1 Tab页结构</h4>
+            <ul>
+                <li><strong>优化总览</strong> - 为初学者设计的快速入口，展示整体优化状况</li>
+                <li><strong>需量分析</strong> - 分析申报需量与实际用量的关系，发现优化机会</li>
+                <li><strong>负荷转移</strong> - 分析可转移设备，将高峰负荷转移到低谷时段</li>
+            </ul>
+
+            <h4>需量利用率说明</h4>
+            <table>
+                <thead>
+                    <tr>
+                        <th>利用率范围</th>
+                        <th>状态</th>
+                        <th>建议</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>&lt; 70%</td>
+                        <td><span class="badge badge-danger">🔴 过低</span></td>
+                        <td>申报需量偏高，建议下调以减少基本电费</td>
+                    </tr>
+                    <tr>
+                        <td>70%-85%</td>
+                        <td><span class="badge badge-success">🟢 合理</span></td>
+                        <td>申报需量合理，保持当前设置</td>
+                    </tr>
+                    <tr>
+                        <td>85%-95%</td>
+                        <td><span class="badge badge-warning">🟡 偏高</span></td>
+                        <td>接近申报值，注意监控避免超限</td>
+                    </tr>
+                    <tr>
+                        <td>&gt; 95%</td>
+                        <td><span class="badge badge-danger">🔴 危险</span></td>
+                        <td>存在超申报风险，需立即关注</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h3 id="section-4-4">4.4 执行管理</h3>
+            <p>跟踪节能方案的执行进度和效果。</p>
+            <div class="screenshot-placeholder">截图位置: 执行管理页面</div>
+
+            <h4>统计指标计算说明</h4>
+            <table>
+                <thead>
+                    <tr>
+                        <th>指标</th>
+                        <th>计算方式</th>
+                        <th>说明</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>总计划数</td>
+                        <td>COUNT(所有计划)</td>
+                        <td>包含所有状态的执行计划</td>
+                    </tr>
+                    <tr>
+                        <td>预期年节省</td>
+                        <td>SUM(所有计划的expected_saving)</td>
+                        <td>所有计划的预期节省总和</td>
+                    </tr>
+                    <tr>
+                        <td>实际年节省</td>
+                        <td>SUM(已追踪计划的actual_saving年化值)</td>
+                        <td>仅统计已完成追踪的计划</td>
+                    </tr>
+                    <tr>
+                        <td>总体达成率</td>
+                        <td>实际年节省 / 已追踪计划预期节省 × 100%</td>
+                        <td>仅计算已追踪计划的达成情况</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h3 id="section-4-5">4.5 配电配置</h3>
+            <p>配置电力基础设施和电价信息。</p>
+            <div class="screenshot-placeholder">截图位置: 配电配置页面</div>
+
+            <h4>Tab页说明</h4>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Tab</th>
+                        <th>功能</th>
+                        <th>主要字段</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>变压器</td>
+                        <td>配置变压器信息</td>
+                        <td>编号、名称、容量(kVA)、高/低压侧电压、位置、状态</td>
+                    </tr>
+                    <tr>
+                        <td>计量点</td>
+                        <td>配置电表计量点</td>
+                        <td>编号、名称、表号、申报需量(kW)、计费方式</td>
+                    </tr>
+                    <tr>
+                        <td>配电柜</td>
+                        <td>配置配电柜信息</td>
+                        <td>编号、名称、类型、额定电流(A)、位置</td>
+                    </tr>
+                    <tr>
+                        <td>配电回路</td>
+                        <td>配置供电回路</td>
+                        <td>编号、名称、负载类型、额定电流、可转移性</td>
+                    </tr>
+                    <tr>
+                        <td>电价配置</td>
+                        <td>配置分时电价</td>
+                        <td>时段名称、类型(尖/峰/平/谷)、起止时间、电价(元/kWh)</td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+
+        <!-- Section 5: Alarm Management -->
+        <section class="section" id="section-5">
+            <h2>5. 告警管理</h2>
+
+            <h3 id="section-5-1">5.1 功能概述</h3>
+            <p>告警管理模块用于查看、处理和跟踪系统中产生的各类告警事件。</p>
+
+            <h3 id="section-5-2">5.2 界面布局</h3>
+            <div class="screenshot-placeholder">截图位置: 告警管理页面</div>
+
+            <div class="card-grid">
+                <div class="card">
+                    <div class="card-value" style="color: #ff4d4f;">3</div>
+                    <div class="card-label">🔴 严重</div>
+                </div>
+                <div class="card">
+                    <div class="card-value" style="color: #fa8c16;">5</div>
+                    <div class="card-label">🟠 重要</div>
+                </div>
+                <div class="card">
+                    <div class="card-value" style="color: #faad14;">12</div>
+                    <div class="card-label">🟡 一般</div>
+                </div>
+                <div class="card">
+                    <div class="card-value" style="color: #1890ff;">8</div>
+                    <div class="card-label">🔵 提示</div>
+                </div>
+            </div>
+
+            <h3 id="section-5-3">5.3 告警级别说明</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>级别</th>
+                        <th>颜色</th>
+                        <th>含义</th>
+                        <th>典型场景</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>严重</td>
+                        <td><span class="badge badge-danger">🔴 红色</span></td>
+                        <td>需要立即处理的紧急情况</td>
+                        <td>UPS故障、温度超限、供电中断</td>
+                    </tr>
+                    <tr>
+                        <td>重要</td>
+                        <td><span style="color:#fa8c16;">🟠 橙色</span></td>
+                        <td>较严重问题，需优先处理</td>
+                        <td>设备过载、通讯中断</td>
+                    </tr>
+                    <tr>
+                        <td>一般</td>
+                        <td><span class="badge badge-warning">🟡 黄色</span></td>
+                        <td>一般性告警，需关注</td>
+                        <td>阈值预警、性能下降</td>
+                    </tr>
+                    <tr>
+                        <td>提示</td>
+                        <td><span class="badge badge-info">🔵 蓝色</span></td>
+                        <td>信息性提示</td>
+                        <td>设备维护、数据异常</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h3 id="section-5-4">5.4 告警状态流转</h3>
+            <div class="flow">
+                <span class="flow-step">活动 (Active)</span>
+                <span class="flow-arrow">→ 确认 →</span>
+                <span class="flow-step">已确认 (Ack'd)</span>
+                <span class="flow-arrow">→ 解除 →</span>
+                <span class="flow-step">已解除 (Resolved)</span>
+            </div>
+
+            <h3 id="section-5-5">5.5 操作指南</h3>
+
+            <h4>确认告警</h4>
+            <ol>
+                <li>在告警列表中找到需要确认的告警</li>
+                <li>点击【确认】按钮</li>
+                <li>告警状态变为"已确认"</li>
+            </ol>
+
+            <h4>批量确认</h4>
+            <ol>
+                <li>勾选多条告警记录</li>
+                <li>点击【批量确认】按钮</li>
+                <li>所有选中的告警变为"已确认"状态</li>
+            </ol>
+
+            <h4>解除告警</h4>
+            <ol>
+                <li>找到已确认的告警</li>
+                <li>在问题解决后，点击【解除】按钮</li>
+                <li>告警状态变为"已解除"</li>
+            </ol>
+        </section>
+
+        <!-- Section 6: Asset Management -->
+        <section class="section" id="section-6">
+            <h2>6. 资产管理</h2>
+
+            <h3 id="section-6-1">6.1 资产台账</h3>
+            <div class="screenshot-placeholder">截图位置: 资产台账页面</div>
+
+            <h4>资产类型</h4>
+            <table>
+                <thead>
+                    <tr>
+                        <th>类型</th>
+                        <th>图标</th>
+                        <th>说明</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr><td>服务器</td><td>🖥️</td><td>计算服务器、存储服务器</td></tr>
+                    <tr><td>网络设备</td><td>🌐</td><td>交换机、路由器、防火墙</td></tr>
+                    <tr><td>存储设备</td><td>💾</td><td>NAS、SAN存储</td></tr>
+                    <tr><td>UPS</td><td>🔋</td><td>不间断电源</td></tr>
+                    <tr><td>PDU</td><td>🔌</td><td>配电单元</td></tr>
+                    <tr><td>空调</td><td>❄️</td><td>精密空调、新风机</td></tr>
+                    <tr><td>机柜</td><td>📦</td><td>服务器机柜</td></tr>
+                    <tr><td>传感器</td><td>📡</td><td>温湿度、烟感、漏水传感器</td></tr>
+                </tbody>
+            </table>
+
+            <h4>资产状态</h4>
+            <table>
+                <thead>
+                    <tr>
+                        <th>状态</th>
+                        <th>含义</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr><td>库存</td><td>采购入库，待部署</td></tr>
+                    <tr><td>在用</td><td>已部署使用中</td></tr>
+                    <tr><td>借用</td><td>临时借出使用</td></tr>
+                    <tr><td>维护</td><td>正在维修维护</td></tr>
+                    <tr><td>报废</td><td>已报废淘汰</td></tr>
+                </tbody>
+            </table>
+
+            <h3 id="section-6-2">6.2 机柜管理</h3>
+            <div class="screenshot-placeholder">截图位置: 机柜管理页面</div>
+
+            <p>点击【U位图】按钮，可显示机柜详细U位占用情况，直观展示每个U位的设备分布。</p>
+        </section>
+
+        <!-- Section 7: Operation Management -->
+        <section class="section" id="section-7">
+            <h2>7. 运维管理</h2>
+
+            <h3 id="section-7-1">7.1 工单管理</h3>
+            <div class="screenshot-placeholder">截图位置: 工单管理页面</div>
+
+            <h4>工单类型</h4>
+            <table>
+                <thead>
+                    <tr>
+                        <th>类型</th>
+                        <th>说明</th>
+                        <th>示例</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr><td>故障</td><td>设备故障报修</td><td>空调故障、UPS告警</td></tr>
+                    <tr><td>维护</td><td>计划性维护保养</td><td>电池更换、滤网清洗</td></tr>
+                    <tr><td>巡检</td><td>日常巡检任务</td><td>设备巡检、线路检查</td></tr>
+                    <tr><td>变更</td><td>设备变更操作</td><td>服务器上架、网络调整</td></tr>
+                    <tr><td>其他</td><td>其他类型工单</td><td>咨询、建议</td></tr>
+                </tbody>
+            </table>
+
+            <h4>工单状态流转</h4>
+            <div class="flow">
+                <span class="flow-step">待处理</span>
+                <span class="flow-arrow">→</span>
+                <span class="flow-step">已分配</span>
+                <span class="flow-arrow">→</span>
+                <span class="flow-step">处理中</span>
+                <span class="flow-arrow">→</span>
+                <span class="flow-step">已完成</span>
+            </div>
+
+            <h3 id="section-7-2">7.2 巡检管理</h3>
+            <div class="screenshot-placeholder">截图位置: 巡检管理页面</div>
+
+            <p>巡检管理包含两个Tab页：</p>
+            <ul>
+                <li><strong>巡检计划</strong> - 配置周期性巡检任务</li>
+                <li><strong>巡检任务</strong> - 查看和执行巡检任务</li>
+            </ul>
+
+            <h3 id="section-7-3">7.3 知识库</h3>
+            <div class="screenshot-placeholder">截图位置: 知识库页面</div>
+
+            <h4>文章分类</h4>
+            <table>
+                <thead>
+                    <tr>
+                        <th>分类</th>
+                        <th>说明</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr><td>故障处理</td><td>各类设备故障诊断与处理方法</td></tr>
+                    <tr><td>操作指南</td><td>标准操作规程和使用说明</td></tr>
+                    <tr><td>维护标准</td><td>设备维护保养标准和规范</td></tr>
+                    <tr><td>安全规程</td><td>安全操作规程和应急预案</td></tr>
+                    <tr><td>设备手册</td><td>设备技术资料和操作手册</td></tr>
+                    <tr><td>最佳实践</td><td>运维经验总结和最佳实践</td></tr>
+                </tbody>
+            </table>
+        </section>
+
+        <!-- Section 8: Reports -->
+        <section class="section" id="section-8">
+            <h2>8. 数据分析与报表</h2>
+
+            <h3 id="section-8-1">8.1 历史数据</h3>
+            <div class="screenshot-placeholder">截图位置: 历史数据页面</div>
+
+            <p>历史数据页面支持：</p>
+            <ul>
+                <li>选择监控点位查看历史趋势</li>
+                <li>自定义时间范围</li>
+                <li>多种数据粒度：原始数据、分钟均值、小时均值、日均值</li>
+                <li>统计信息：最小值、最大值、平均值、标准差</li>
+                <li>数据导出为Excel</li>
+            </ul>
+
+            <h3 id="section-8-2">8.2 报表分析</h3>
+            <div class="screenshot-placeholder">截图位置: 报表分析页面</div>
+
+            <p>报表分析支持四种报表类型：</p>
+            <ul>
+                <li><strong>日报表</strong> - 每日运行数据汇总</li>
+                <li><strong>周报表</strong> - 每周运行数据汇总</li>
+                <li><strong>月报表</strong> - 每月运行数据汇总</li>
+                <li><strong>自定义报表</strong> - 自定义时间范围和数据项</li>
+            </ul>
+        </section>
+
+        <!-- Section 9: Settings -->
+        <section class="section" id="section-9">
+            <h2>9. 系统设置</h2>
+
+            <h3 id="section-9-1">9.1 阈值配置</h3>
+            <div class="screenshot-placeholder">截图位置: 阈值配置页面</div>
+
+            <h4>阈值说明</h4>
+            <table>
+                <thead>
+                    <tr>
+                        <th>阈值类型</th>
+                        <th>告警级别</th>
+                        <th>说明</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>高高限</td>
+                        <td><span class="badge badge-danger">🔴 严重</span></td>
+                        <td>超过此值触发严重告警</td>
+                    </tr>
+                    <tr>
+                        <td>高限</td>
+                        <td><span class="badge badge-warning">🟡 一般</span></td>
+                        <td>超过此值触发一般告警</td>
+                    </tr>
+                    <tr>
+                        <td>低限</td>
+                        <td><span class="badge badge-warning">🟡 一般</span></td>
+                        <td>低于此值触发一般告警</td>
+                    </tr>
+                    <tr>
+                        <td>低低限</td>
+                        <td><span class="badge badge-danger">🔴 严重</span></td>
+                        <td>低于此值触发严重告警</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h3 id="section-9-2">9.2 用户管理</h3>
+            <div class="screenshot-placeholder">截图位置: 用户管理页面</div>
+
+            <h4>用户角色权限</h4>
+            <table>
+                <thead>
+                    <tr>
+                        <th>角色</th>
+                        <th>权限说明</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr><td>系统管理员</td><td>所有功能的完全访问权限</td></tr>
+                    <tr><td>运维人员</td><td>监控、告警、工单、巡检、资产管理权限</td></tr>
+                    <tr><td>能源管理</td><td>用电管理模块完全权限，其他模块只读</td></tr>
+                    <tr><td>只读用户</td><td>所有模块的只读权限</td></tr>
+                </tbody>
+            </table>
+
+            <h3 id="section-9-3">9.3 系统日志</h3>
+            <div class="screenshot-placeholder">截图位置: 系统日志页面</div>
+
+            <p>系统日志包含两个Tab页：</p>
+            <ul>
+                <li><strong>操作日志</strong> - 记录用户的所有操作行为</li>
+                <li><strong>系统日志</strong> - 记录系统运行状态和异常</li>
+            </ul>
+        </section>
+
+        <!-- Section 10: Digital Twin -->
+        <section class="section" id="section-10">
+            <h2>10. 数字孪生大屏</h2>
+
+            <h3 id="section-10-1">10.1 功能概述</h3>
+            <p>数字孪生大屏提供数据中心的3D可视化展示，支持实时监控、热力图显示和自动巡航功能。</p>
+            <div class="screenshot-placeholder">截图位置: 数字孪生大屏全景</div>
+
+            <h3 id="section-10-2">10.2 界面布局</h3>
+            <div class="diagram">
+┌─────────────────────────────────────────────────────────────────────┐
+│  [📊模式] [🎬自动巡航]                    PUE: 1.42  告警: 3  [×]  │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                     │
+│  ┌─ 环境监控 ─┐                                    ┌─ 能耗统计 ─┐  │
+│  │            │                                    │            │  │
+│  │ 温度 24.5℃│                                    │总功率 485kW│  │
+│  │ 湿度 45.2% │         ┌─────────────────┐       │IT功率 320kW│  │
+│  │ 气压 1013  │         │                 │       │制冷   145kW│  │
+│  │            │         │   3D机房模型    │       │            │  │
+│  └────────────┘         │                 │       │今日 8520kWh│  │
+│                          │   [机柜群]     │       │费用 ¥2340  │  │
+│  ┌─ 楼层选择 ─┐         │                 │       │            │  │
+│  │            │         │   ▲ ▲ ▲ ▲     │       └────────────┘  │
+│  │ [F1] [F2] │         │   █ █ █ █      │                        │
+│  │ [F3] [F4] │         │   █ █ █ █      │       ┌─ 图层控制 ─┐  │
+│  │            │         │   █ █ █ █      │       │            │  │
+│  └────────────┘         │                 │       │ ☑ 热力图  │  │
+│                          │    视角控制:    │       │ ☑ 状态    │  │
+│                          │  [俯视] [环绕]  │       │ ☐ 功率    │  │
+│                          │                 │       │ ☐ 气流    │  │
+│                          └─────────────────┘       │            │  │
+│                                                    └────────────┘  │
+│                                                                     │
+└─────────────────────────────────────────────────────────────────────┘
+            </div>
+
+            <h3 id="section-10-3">10.3 显示模式</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>模式</th>
+                        <th>说明</th>
+                        <th>适用场景</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr><td>指挥中心</td><td>全功能模式，显示所有面板和控制</td><td>日常运维监控</td></tr>
+                    <tr><td>运营模式</td><td>简化面板，突出关键指标</td><td>运营值班</td></tr>
+                    <tr><td>展示模式</td><td>自动巡航，隐藏控制面板</td><td>参观展示</td></tr>
+                </tbody>
+            </table>
+
+            <h3 id="section-10-4">10.4 图层控制</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>图层</th>
+                        <th>说明</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr><td>热力图</td><td>显示温度分布，红色高温，蓝色低温</td></tr>
+                    <tr><td>状态层</td><td>显示设备运行状态，绿色正常，红色告警</td></tr>
+                    <tr><td>功率层</td><td>显示功率分布热力图</td></tr>
+                    <tr><td>气流层</td><td>显示冷热通道气流方向</td></tr>
+                </tbody>
+            </table>
+
+            <h3 id="section-10-5">10.5 操作说明</h3>
+
+            <h4>视角控制</h4>
+            <ul>
+                <li><strong>鼠标左键拖动</strong>: 旋转视角</li>
+                <li><strong>鼠标右键拖动</strong>: 平移视角</li>
+                <li><strong>滚轮</strong>: 缩放视角</li>
+                <li><strong>双击设备</strong>: 聚焦查看设备详情</li>
+            </ul>
+
+            <h4>快捷键</h4>
+            <table>
+                <thead>
+                    <tr>
+                        <th>按键</th>
+                        <th>功能</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr><td>ESC</td><td>退出大屏</td></tr>
+                    <tr><td>Space</td><td>暂停/继续自动巡航</td></tr>
+                    <tr><td>1-4</td><td>切换楼层</td></tr>
+                    <tr><td>H</td><td>切换热力图</td></tr>
+                </tbody>
+            </table>
+        </section>
+
+        <!-- Section 11: FAQ -->
+        <section class="section" id="section-11">
+            <h2>11. 常见问题</h2>
+
+            <h3 id="section-11-1">11.1 登录问题</h3>
+
+            <h4>Q: 忘记密码怎么办？</h4>
+            <p>A: 请联系系统管理员重置密码。管理员可在【系统设置】>【用户管理】中点击【重置密码】。</p>
+
+            <h4>Q: 登录后显示空白页面？</h4>
+            <p>A: 请检查浏览器版本是否符合要求（Chrome 80+），清除浏览器缓存后重试。</p>
+
+            <h3 id="section-11-2">11.2 数据问题</h3>
+
+            <h4>Q: 实时数据不更新？</h4>
+            <p>A:</p>
+            <ol>
+                <li>检查网络连接是否正常</li>
+                <li>点击【刷新数据】按钮</li>
+                <li>检查对应设备/传感器是否在线</li>
+            </ol>
+
+            <h4>Q: 历史数据查询很慢？</h4>
+            <p>A: 建议缩小查询时间范围，或选择较粗的数据粒度（如小时均值、日均值）。</p>
+
+            <h3 id="section-11-3">11.3 告警问题</h3>
+
+            <h4>Q: 如何设置告警通知？</h4>
+            <p>A: 在【系统设置】>【阈值配置】中为监控点位配置告警阈值。超过阈值时系统会自动产生告警。</p>
+
+            <h4>Q: 误报的告警如何处理？</h4>
+            <p>A:</p>
+            <ol>
+                <li>确认告警后分析原因</li>
+                <li>如为阈值设置不合理，请调整阈值配置</li>
+                <li>如为设备问题，请联系运维处理</li>
+            </ol>
+
+            <h3 id="section-11-4">11.4 能源管理问题</h3>
+
+            <h4>Q: PUE数据不准确？</h4>
+            <p>A:</p>
+            <ol>
+                <li>检查总表和IT分表的计量是否正确</li>
+                <li>确认电表配置是否完整</li>
+                <li>检查数据采集是否正常</li>
+            </ol>
+
+            <h4>Q: 节能建议的收益如何计算？</h4>
+            <p>A: 系统基于历史数据、电价配置和优化参数自动计算。计算公式在建议详情中会详细展示。</p>
+
+            <h3 id="section-11-5">11.5 系统问题</h3>
+
+            <h4>Q: 系统运行缓慢？</h4>
+            <p>A:</p>
+            <ol>
+                <li>检查网络延迟</li>
+                <li>关闭不必要的浏览器标签页</li>
+                <li>清理浏览器缓存</li>
+                <li>如持续缓慢请联系管理员</li>
+            </ol>
+
+            <h4>Q: 大屏无法加载3D模型？</h4>
+            <p>A:</p>
+            <ol>
+                <li>确认浏览器支持WebGL</li>
+                <li>检查显卡驱动是否最新</li>
+                <li>尝试关闭浏览器硬件加速后重试</li>
+            </ol>
+        </section>
+
+        <!-- Appendix -->
+        <section class="section" id="appendix">
+            <h2>附录</h2>
+
+            <h3 id="appendix-a">A. 快捷键汇总</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>快捷键</th>
+                        <th>功能</th>
+                        <th>适用页面</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr><td><code>F5</code></td><td>刷新页面</td><td>所有页面</td></tr>
+                    <tr><td><code>ESC</code></td><td>关闭弹窗/退出大屏</td><td>所有页面</td></tr>
+                    <tr><td><code>Ctrl+F</code></td><td>页面搜索</td><td>所有页面</td></tr>
+                </tbody>
+            </table>
+
+            <h3 id="appendix-b">B. 状态图标说明</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>图标</th>
+                        <th>含义</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr><td>🟢 / ✅</td><td>正常/成功</td></tr>
+                    <tr><td>🟡 / ⚠️</td><td>警告/注意</td></tr>
+                    <tr><td>🔴 / ❌</td><td>异常/失败</td></tr>
+                    <tr><td>🔵 / ℹ️</td><td>信息/提示</td></tr>
+                    <tr><td>⏳</td><td>等待中/处理中</td></tr>
+                    <tr><td>⭕</td><td>离线/禁用</td></tr>
+                </tbody>
+            </table>
+
+            <h3 id="appendix-c">C. 术语表</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>术语</th>
+                        <th>英文</th>
+                        <th>说明</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr><td>PUE</td><td>Power Usage Effectiveness</td><td>电源使用效率，数据中心能效指标</td></tr>
+                    <tr><td>需量</td><td>Demand</td><td>15分钟平均功率最大值</td></tr>
+                    <tr><td>峰谷平</td><td>Peak-Valley-Flat</td><td>分时电价时段划分</td></tr>
+                    <tr><td>U位</td><td>Rack Unit</td><td>机柜空间单位，1U=44.45mm</td></tr>
+                    <tr><td>PDU</td><td>Power Distribution Unit</td><td>机架式配电单元</td></tr>
+                    <tr><td>UPS</td><td>Uninterruptible Power Supply</td><td>不间断电源</td></tr>
+                    <tr><td>DCIM</td><td>Data Center Infrastructure Management</td><td>数据中心基础设施管理</td></tr>
+                </tbody>
+            </table>
+
+            <h3 id="appendix-d">D. 联系支持</h3>
+            <p>如有问题，请联系系统管理员或技术支持：</p>
+            <ul>
+                <li>技术支持邮箱: support@example.com</li>
+                <li>系统管理员: admin</li>
+            </ul>
+        </section>
+
+        <!-- Footer -->
+        <footer style="margin-top: 48px; padding-top: 24px; border-top: 1px solid var(--border-color); color: var(--text-secondary); font-size: 14px;">
+            <p><strong>文档信息</strong></p>
+            <ul>
+                <li>文档版本: V1.0</li>
+                <li>编写日期: 2026-01-27</li>
+                <li>适用系统: 算力监控系统 DCIM V1.0</li>
+            </ul>
+        </footer>
+    </main>
+
+    <!-- Back to Top Button -->
+    <button class="back-to-top" id="backToTop" onclick="scrollToTop()">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M18 15l-6-6-6 6"/>
+        </svg>
+    </button>
+
+    <script>
+        // Smooth scroll to section
+        function scrollToSection(sectionId) {
+            const element = document.getElementById(sectionId);
+            if (element) {
+                element.scrollIntoView({ behavior: 'smooth' });
+            }
+        }
+
+        // Scroll to top
+        function scrollToTop() {
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        // Show/hide back to top button
+        window.addEventListener('scroll', function() {
+            const backToTop = document.getElementById('backToTop');
+            if (window.scrollY > 300) {
+                backToTop.classList.add('visible');
+            } else {
+                backToTop.classList.remove('visible');
+            }
+
+            // Highlight current section in nav
+            highlightCurrentSection();
+        });
+
+        // Highlight current section in navigation
+        function highlightCurrentSection() {
+            const sections = document.querySelectorAll('.section');
+            const navLinks = document.querySelectorAll('.nav-subsection a');
+
+            let currentSection = '';
+            sections.forEach(section => {
+                const sectionTop = section.offsetTop - 100;
+                if (window.scrollY >= sectionTop) {
+                    currentSection = section.id;
+                }
+            });
+
+            navLinks.forEach(link => {
+                link.classList.remove('active');
+                if (link.getAttribute('href') === '#' + currentSection) {
+                    link.classList.add('active');
+                }
+            });
+        }
+
+        // Handle nav link clicks
+        document.querySelectorAll('.nav-subsection a').forEach(link => {
+            link.addEventListener('click', function(e) {
+                e.preventDefault();
+                const targetId = this.getAttribute('href').substring(1);
+                scrollToSection(targetId);
+            });
+        });
+    </script>
+</body>
+</html>

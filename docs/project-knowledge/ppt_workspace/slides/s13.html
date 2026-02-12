@@ -1,0 +1,71 @@
+<!DOCTYPE html><html><head><style>
+html{background:#0A1525}
+body{width:720pt;height:405pt;margin:0;padding:0;font-family:Arial,Helvetica,sans-serif;
+  background:#0A1525;display:flex;flex-direction:column}
+.pad{margin:36pt 44pt}
+h1{color:#FFFFFF;font-size:28pt;margin:0 0 8pt 0;letter-spacing:1pt}
+h2{color:#00B4D8;font-size:20pt;margin:0 0 12pt 0}
+h3{color:#FFFFFF;font-size:16pt;margin:0 0 6pt 0}
+p{color:#B8C9D4;font-size:11pt;line-height:1.6;margin:4pt 0}
+.accent{color:#00B4D8}
+.teal{color:#00E5A0}
+.orange{color:#FF8C42}
+.white{color:#FFFFFF}
+.small{font-size:9pt;color:#8FA3B0}
+</style></head><body>
+    <div class="pad">
+      <p style="color:#00B4D8;font-size:10pt;letter-spacing:2pt">TECHNOLOGY</p>
+      <h1 style="font-size:22pt">技术架构：模块化单体 → 微服务演进</h1>
+      <div style="display:flex;gap:14pt;margin-top:10pt">
+        <div style="flex:3">
+          <div style="background:#132D4A;border-radius:6pt;padding:14pt">
+            <h3 style="color:#00B4D8;font-size:11pt;margin-bottom:8pt">MVP 架构 (6 容器)</h3>
+            <div style="display:flex;gap:6pt;flex-wrap:wrap">
+              <div style="background:#0B1929;border:1pt solid #0077B6;border-radius:4pt;padding:6pt 10pt;flex:1;min-width:80pt">
+                <p style="font-size:8pt;color:#00B4D8"><b>Nginx</b></p>
+                <p style="font-size:7pt">反向代理 + SSL</p>
+              </div>
+              <div style="background:#0B1929;border:1pt solid #00E5A0;border-radius:4pt;padding:6pt 10pt;flex:2;min-width:160pt">
+                <p style="font-size:8pt;color:#00E5A0"><b>FastAPI 单体应用</b></p>
+                <p style="font-size:7pt">3D场景 | 数据 | 告警 | 用户 | 能源 | 报告 | 集成</p>
+              </div>
+              <div style="background:#0B1929;border:1pt solid #48CAE4;border-radius:4pt;padding:6pt 10pt;flex:1;min-width:80pt">
+                <p style="font-size:8pt;color:#48CAE4"><b>Vue3 前端</b></p>
+                <p style="font-size:7pt">Babylon.js 3D</p>
+              </div>
+            </div>
+            <div style="display:flex;gap:6pt;margin-top:6pt">
+              <div style="background:#0B1929;border:1pt solid #FF8C42;border-radius:4pt;padding:6pt 10pt;flex:1">
+                <p style="font-size:8pt;color:#FF8C42"><b>TimescaleDB</b></p>
+                <p style="font-size:7pt">时序 + 关系</p>
+              </div>
+              <div style="background:#0B1929;border:1pt solid #FF8C42;border-radius:4pt;padding:6pt 10pt;flex:1">
+                <p style="font-size:8pt;color:#FF8C42"><b>Redis</b></p>
+                <p style="font-size:7pt">缓存</p>
+              </div>
+              <div style="background:#0B1929;border:1pt solid #FF8C42;border-radius:4pt;padding:6pt 10pt;flex:1">
+                <p style="font-size:8pt;color:#FF8C42"><b>EMQX</b></p>
+                <p style="font-size:7pt">MQTT Broker</p>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div style="flex:2">
+          <div style="background:#132D4A;border-radius:6pt;padding:14pt;margin-bottom:8pt">
+            <h3 style="color:#00E5A0;font-size:11pt">技术栈</h3>
+            <p style="font-size:8pt;margin-top:6pt"><b style="color:#FFFFFF">3D 引擎:</b> Babylon.js (GPU 粒子)</p>
+            <p style="font-size:8pt"><b style="color:#FFFFFF">前端:</b> Vue 3 + TypeScript</p>
+            <p style="font-size:8pt"><b style="color:#FFFFFF">后端:</b> FastAPI (Python)</p>
+            <p style="font-size:8pt"><b style="color:#FFFFFF">数据库:</b> TimescaleDB</p>
+            <p style="font-size:8pt"><b style="color:#FFFFFF">协议:</b> Modbus/SNMP/BACnet/OPC-UA/MQTT</p>
+          </div>
+          <div style="background:#132D4A;border-radius:6pt;padding:14pt">
+            <h3 style="color:#FF8C42;font-size:11pt">演进路线</h3>
+            <p style="font-size:8pt;margin-top:6pt"><b style="color:#00B4D8">Phase 1:</b> 模块化单体 (6容器)</p>
+            <p style="font-size:8pt"><b style="color:#00B4D8">Phase 2:</b> 部分拆分 (采集+AI)</p>
+            <p style="font-size:8pt"><b style="color:#00B4D8">Phase 3:</b> 完整微服务</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </body></html>

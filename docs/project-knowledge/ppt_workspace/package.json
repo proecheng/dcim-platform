@@ -1,0 +1,18 @@
+{
+  "name": "ppt_workspace",
+  "version": "1.0.0",
+  "description": "",
+  "main": "build_ppt.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "playwright": "^1.58.2",
+    "pptxgenjs": "^4.0.1",
+    "sharp": "^0.34.5"
+  }
+}

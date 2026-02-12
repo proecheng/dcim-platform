@@ -222,8 +222,89 @@ const count = ref(0)
 
 ---
 
+## 常见问题排查
+
+### 1. 登录失败 - 500 Internal Server Error
+
+**症状**: 启动服务后，在浏览器输入用户名密码登录，返回 500 错误，无法登录。
+
+**原因**: `bcrypt` 库版本 5.0+ 与 `passlib 1.7.4` 不兼容。
+
+**诊断方法**:
+```bash
+# 直接测试后端登录 API
+curl -X POST "http://localhost:8080/api/v1/auth/login" \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "username=admin&password=admin123"
+
+# 如果返回 "Internal Server Error"，检查 bcrypt 版本
+cd backend
+.venv\Scripts\python.exe -c "import bcrypt; print(bcrypt.__version__)"
+# 如果版本 >= 5.0.0，需要降级
+```
+
+**解决方法**:
+```bash
+cd backend
+.venv\Scripts\python.exe -m pip install "bcrypt==4.0.1"
+# 然后重启后端服务
+```
+
+**根本原因**: `bcrypt 5.0` 移除了 `__about__` 属性，且在密码验证时触发 `ValueError`，导致 `passlib` 无法正常工作。
+
+### 2. 端口被占用
+
+**症状**: 启动服务时提示端口 8080 或 3000 已被占用。
+
+**解决方法**:
+```bash
+# 查看占用端口的进程
+netstat -ano | findstr ":8080" | findstr "LISTENING"
+netstat -ano | findstr ":3000" | findstr "LISTENING"
+
+# 杀掉占用进程 (替换 <PID> 为实际进程ID)
+taskkill /F /PID <PID>
+
+# 或者直接运行 stop.bat
+stop.bat
+```
+
+### 3. 前端修改后不生效
+
+**症状**: 修改了前端代码，但浏览器刷新后没有变化。
+
+**原因**: `start.bat` 使用静态文件模式，不会自动热更新。
+
+**解决方法**:
+```bash
+# 方法1: 重新构建前端
+cd frontend && npm run build
+# 然后 Ctrl+Shift+R 强制刷新浏览器
+
+# 方法2: 使用开发模式（推荐）
+cd frontend && npm run dev
+# 访问 http://localhost:5173
+```
+
+### 4. 数据库表不存在
+
+**症状**: API 返回数据库相关错误。
+
+**解决方法**:
+```bash
+cd backend
+# 运行数据库迁移
+alembic upgrade head
+
+# 或者删除 dcim.db 重新初始化（会丢失数据）
+del dcim.db
+# 重启后端，会自动创建表和初始数据
+```
+
+---
+
 ## 详细文档
 
 `docs/project-knowledge/` 包含完整项目文档: 架构、开发指南、部署指南等。
 
-*最后更新: 2026-02-03*
+*最后更新: 2026-02-04*
