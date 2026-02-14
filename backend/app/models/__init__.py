@@ -35,6 +35,7 @@ from .operation import (
     WorkOrder, WorkOrderLog, InspectionPlan, InspectionTask, KnowledgeBase
 )
 from .floor_map import FloorMap
+from .power import UPSDevice, BatteryGroup
 from .vpp_data import (
     ElectricityBill,
     LoadCurve,
@@ -134,6 +135,9 @@ __all__ = [
     "KnowledgeBase",
     # 楼层图
     "FloorMap",
+    # 供配电管理
+    "UPSDevice",
+    "BatteryGroup",
     # VPP虚拟电厂
     "ElectricityBill",
     "LoadCurve",

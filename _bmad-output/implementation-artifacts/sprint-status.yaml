@@ -1,43 +1,71 @@
-generated: 2026-02-12 10:00
-project: DCIM 算力中心智能监控系统
-project_key: DCIM
+# generated: 2026-02-14
+# project: DCIM
+# project_key: NOKEY
+# tracking_system: file-system
+# story_location: implementation-artifacts
+
+generated: 2026-02-14
+project: DCIM
+project_key: NOKEY
 tracking_system: file-system
-story_location: "_bmad-output/implementation-artifacts"
+story_location: implementation-artifacts
 
 development_status:
-  epic-1: backlog
-  1-1-user-management-page: ready-for-dev
-  1-2-device-management-page: ready-for-dev
-  1-3-alarm-rule-management-ui: ready-for-dev
-  1-4-alarm-shield-management-ui: ready-for-dev
-  epic-1-retrospective: optional
+  # Epic 7: Navigation and Framework Restructuring
+  epic-7: done
+  7-1-sidebar-menu-restructuring: done
+  7-2-route-migration-with-redirects: done
+  7-3-dashboard-enhancement: done
+  7-4-new-route-registration: done
+  epic-7-retrospective: optional
 
-  epic-2: backlog
-  2-1-pdf-report-export: backlog
-  2-2-enable-optimization-router: backlog
-  2-3-operation-log-viewer: backlog
-  epic-2-retrospective: optional
+  # Epic 8: Power Distribution Management
+  epic-8: done
+  8-1-backend-ups-and-battery-models-api: done
+  8-2-backend-power-distribution-cabinet-pdu-api: done
+  8-3-frontend-power-overview-page: done
+  8-4-frontend-ups-monitoring-panel: done
+  8-5-frontend-battery-group-panel: done
+  8-6-frontend-distribution-cabinet-and-pdu-pages: done
+  8-7-simulator-power-domain-data-generation: done
+  epic-8-retrospective: optional
 
-  epic-3: backlog
-  3-1-auth-module-tests: backlog
-  3-2-alarm-module-tests: backlog
-  3-3-energy-module-tests: backlog
-  3-4-asset-module-tests: backlog
-  3-5-operation-module-tests: backlog
-  3-6-frontend-component-tests: backlog
-  epic-3-retrospective: optional
+  # Epic 9: Cooling System
+  epic-9: backlog
+  9-1-backend-cooling-models-api: backlog
+  9-2-frontend-cooling-overview-page: backlog
+  9-3-frontend-precision-ac-monitoring-indoor-outdoor: backlog
+  9-4-frontend-cold-aisle-and-group-control-pages: backlog
+  9-5-simulator-cooling-domain-data-generation: backlog
+  epic-9-retrospective: optional
 
-  epic-4: backlog
-  4-1-fix-backend-type-errors: backlog
-  4-2-frontend-typescript-strict: backlog
-  epic-4-retrospective: optional
+  # Epic 10: Environment Monitoring + Security and Fire Protection
+  epic-10: backlog
+  10-1-backend-environment-sensor-api: backlog
+  10-2-frontend-environment-monitoring-overview-page: backlog
+  10-2a-frontend-temperature-humidity-monitoring-page: backlog
+  10-2b-frontend-water-leak-detection-page: backlog
+  10-2c-frontend-smoke-detection-page: backlog
+  10-2d-frontend-infrared-security-page: backlog
+  10-3-backend-access-control-fire-protection-models-and-api: backlog
+  10-4-frontend-access-control-page: backlog
+  10-5-frontend-video-monitoring-placeholder: backlog
+  10-6-frontend-fire-protection-page: backlog
+  10-7-backend-alarm-linkage-rules: backlog
+  10-8-simulator-environment-security-data-generation: backlog
+  epic-10-retrospective: optional
 
-  epic-5: backlog
-  5-1-inspection-auto-generation: backlog
-  5-2-knowledge-rich-text-editor: backlog
-  epic-5-retrospective: optional
+  # Epic 11: Smart Infrastructure + Energy Saving Enhancement
+  epic-11: backlog
+  11-1-frontend-enhanced-cabinet-space-management: backlog
+  11-2-backend-frontend-smart-lighting: backlog
+  11-3-backend-icooling-and-cooling-efficiency-plugins: backlog
+  11-4-frontend-energy-saving-overview-enhancement: backlog
+  11-5-simulator-infrastructure-domain-data: backlog
+  epic-11-retrospective: optional
 
-  epic-6: backlog
-  6-1-capacity-trend-prediction: backlog
-  6-2-asset-import-export: backlog
-  epic-6-retrospective: optional
+  # Epic 12: Simulator Extension and Protocol Adapter Foundation
+  epic-12: backlog
+  12-1-simulator-architecture-refactor: backlog
+  12-2-protocol-adapter-abstraction-layer: backlog
+  epic-12-retrospective: optional

@@ -56,6 +56,20 @@ class DataSimulator:
                 current_value = 3 + random.uniform(-1, 1)  # PDU功率约3kW
             elif "压力" in point.point_name:
                 current_value = 0.5 + random.uniform(-0.1, 0.1)  # 水压约0.5MPa
+            elif "健康度" in point.point_name or "soh" in (point.point_code or "").lower():
+                current_value = 92 + random.uniform(-2, 2)  # SOH约92%，缓慢下降
+            elif "荷电状态" in point.point_name or "soc" in (point.point_code or "").lower():
+                current_value = 85 + random.uniform(-10, 10)  # SOC在60-100%循环
+            elif "内阻" in point.point_name or "internal_resistance" in (point.point_code or "").lower():
+                current_value = 2.5 + random.uniform(-0.5, 0.5)  # 内阻约2.5mΩ
+            elif "备电时间" in point.point_name or "backup_time" in (point.point_code or "").lower():
+                current_value = 60 + random.uniform(-10, 10)  # 备电时间约60min
+            elif "母排温度" in point.point_name or "bus_temp" in (point.point_code or "").lower():
+                current_value = 35 + random.uniform(-3, 3)  # 母排温度约35℃
+            elif "总功率" in point.point_name or "total_power" in (point.point_code or "").lower():
+                current_value = 150 + random.uniform(-20, 20)  # 总功率约150kW
+            elif "功率因数" in point.point_name or "power_factor" in (point.point_code or "").lower():
+                current_value = 0.95 + random.uniform(-0.05, 0.05)
             else:
                 current_value = (min_val + max_val) / 2
 

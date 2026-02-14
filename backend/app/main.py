@@ -17,6 +17,7 @@ from .models import User
 from .api.v1 import api_router
 from .services.websocket import ws_manager
 from .services.simulator import simulator
+from .services.power_seed import seed_power_devices
 
 settings = get_settings()
 
@@ -149,6 +150,7 @@ async def lifespan(app: FastAPI):
     await init_db()
     await init_default_data()
     await init_default_configs()
+    await seed_power_devices()
 
     # 启动数据模拟器（后台任务）
     simulator_task = asyncio.create_task(simulator.start(interval=5))

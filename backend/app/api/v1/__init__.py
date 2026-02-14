@@ -16,6 +16,7 @@ from .log import router as log_router
 from .statistics import router as statistics_router
 from .config import router as config_router
 from .energy import router as energy_router
+from .power import router as power_router
 from .regulation import router as regulation_router
 from .asset import router as asset_router
 from .capacity import router as capacity_router
@@ -57,6 +58,7 @@ api_router.include_router(log_router, prefix="/logs", tags=["日志"])
 api_router.include_router(statistics_router, prefix="/statistics", tags=["统计分析"])
 api_router.include_router(config_router, prefix="/configs", tags=["系统配置"])
 api_router.include_router(energy_router, prefix="/energy", tags=["用电管理"])
+api_router.include_router(power_router, prefix="/power", tags=["供配电管理"])
 api_router.include_router(regulation_router, prefix="/regulation", tags=["负荷调节"])
 api_router.include_router(asset_router)
 api_router.include_router(capacity_router)

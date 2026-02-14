@@ -50,9 +50,39 @@ const routes: RouteRecordRaw[] = [
       {
         path: 'power',
         name: 'Power',
-        redirect: '/power/monitor',
+        redirect: '/power/overview',
         meta: { title: '供配电管理', icon: 'Lightning' },
         children: [
+          {
+            path: 'overview',
+            name: 'PowerOverview',
+            component: () => import('@/views/power/overview.vue'),
+            meta: { title: '供配电总览', icon: 'DataBoard' }
+          },
+          {
+            path: 'ups',
+            name: 'PowerUPS',
+            component: () => import('@/views/power/ups.vue'),
+            meta: { title: 'UPS监控', icon: 'Lightning' }
+          },
+          {
+            path: 'battery',
+            name: 'PowerBattery',
+            component: () => import('@/views/power/battery.vue'),
+            meta: { title: '电池组', icon: 'Coin' }
+          },
+          {
+            path: 'cabinet',
+            name: 'PowerCabinet',
+            component: () => import('@/views/power/cabinet.vue'),
+            meta: { title: '配电柜', icon: 'Grid' }
+          },
+          {
+            path: 'pdu',
+            name: 'PowerPDU',
+            component: () => import('@/views/power/pdu.vue'),
+            meta: { title: '机柜PDU', icon: 'Menu' }
+          },
           {
             path: 'monitor',
             name: 'PowerMonitor',

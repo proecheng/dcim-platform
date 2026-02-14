@@ -39,6 +39,26 @@
             <el-icon><Lightning /></el-icon>
             <span>供配电管理</span>
           </template>
+          <el-menu-item index="/power/overview">
+            <el-icon><DataBoard /></el-icon>
+            <template #title>供配电总览</template>
+          </el-menu-item>
+          <el-menu-item index="/power/ups">
+            <el-icon><Lightning /></el-icon>
+            <template #title>UPS监控</template>
+          </el-menu-item>
+          <el-menu-item index="/power/battery">
+            <el-icon><Coin /></el-icon>
+            <template #title>电池组</template>
+          </el-menu-item>
+          <el-menu-item index="/power/cabinet">
+            <el-icon><Grid /></el-icon>
+            <template #title>配电柜</template>
+          </el-menu-item>
+          <el-menu-item index="/power/pdu">
+            <el-icon><Menu /></el-icon>
+            <template #title>机柜PDU</template>
+          </el-menu-item>
           <el-menu-item index="/power/monitor">
             <el-icon><Odometer /></el-icon>
             <template #title>用电监控</template>
@@ -250,7 +270,8 @@ import {
   Lightning, Odometer, Share, DataAnalysis,
   Grid, SetUp, Tickets, List, Reading,
   Opportunity, Operation, VideoPlay,
-  IceCream, Sunny, Lock, OfficeBuilding, DataBoard, Tools, Connection
+  IceCream, Sunny, Lock, OfficeBuilding, DataBoard, Tools, Connection,
+  Coin, Menu
 } from '@element-plus/icons-vue'
 import { useUserStore, useAlarmStore } from '@/stores'
 import { getAlarmCount } from '@/api/alarm'
