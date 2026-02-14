@@ -68,6 +68,26 @@
       </el-col>
     </el-row>
 
+    <!-- 6大域概览卡片 -->
+    <el-row :gutter="16" class="domain-cards">
+      <el-col :span="4" v-for="domain in domainOverview" :key="domain.path">
+        <el-card
+          shadow="hover"
+          class="domain-card"
+          :style="{ '--domain-color': domain.color }"
+          @click="$router.push(domain.path)"
+        >
+          <div class="domain-icon">
+            <el-icon :size="28"><component :is="domain.icon" /></el-icon>
+          </div>
+          <div class="domain-info">
+            <div class="domain-name">{{ domain.name }}</div>
+            <div class="domain-stat">{{ domain.stat }}</div>
+          </div>
+        </el-card>
+      </el-col>
+    </el-row>
+
     <!-- 能源统计卡片 (V2.3 Enhanced) -->
     <el-row :gutter="20" class="energy-cards" v-if="energyData">
       <el-col :span="5">
@@ -83,7 +103,7 @@
             { label: 'IT', value: `${energyData.realtime?.it_power?.toFixed(1) || 0} kW` },
             { label: '制冷', value: `${energyData.realtime?.cooling_power?.toFixed(1) || 0} kW` }
           ]"
-          navigate-to="/energy/monitor"
+          navigate-to="/power/monitor"
           tooltip="数据中心总功率消耗，包括IT设备和基础设施"
         />
       </el-col>
@@ -198,9 +218,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, onMounted, onUnmounted, markRaw } from 'vue'
 import { Monitor, CircleCheck, Warning, Remove } from '@element-plus/icons-vue'
 import { Lightning, FullScreen, Refresh, Coin } from '@element-plus/icons-vue'
+import { IceCream, Sunny, Lock, OfficeBuilding, Opportunity } from '@element-plus/icons-vue'
 import { getAllRealtimeData, getRealtimeSummary, type RealtimeData } from '@/api/modules/realtime'
 import { getActiveAlarms } from '@/api/modules/alarm'
 import { getEnergyDashboard, type EnergyDashboardData } from '@/api/modules/energy'
@@ -227,6 +248,16 @@ const activeAlarms = ref<AlarmItem[]>([])
 const energyData = ref<EnergyDashboardData | null>(null)
 const showDemoLoader = ref(false)
 let timer: number | null = null
+
+// 6大域概览数据
+const domainOverview = ref([
+  { name: '供配电', icon: markRaw(Lightning), path: '/power/monitor', color: '#409EFF', stat: '运行中' },
+  { name: '制冷系统', icon: markRaw(IceCream), path: '/cooling/overview', color: '#67C23A', stat: '开发中' },
+  { name: '环境监控', icon: markRaw(Sunny), path: '/environment/overview', color: '#E6A23C', stat: '开发中' },
+  { name: '安防消防', icon: markRaw(Lock), path: '/security/overview', color: '#F56C6C', stat: '开发中' },
+  { name: '基础设施', icon: markRaw(OfficeBuilding), path: '/infrastructure/asset', color: '#909399', stat: '运行中' },
+  { name: '节能中心', icon: markRaw(Opportunity), path: '/energy-saving/analysis', color: '#00D1B2', stat: '运行中' }
+])
 
 onMounted(() => {
   refreshData()
@@ -484,6 +515,62 @@ function openBigscreen() {
   // V2.3: 能源统计卡片样式
   .energy-cards {
     margin-bottom: 20px;
+  }
+
+  // V4.0: 6大域概览卡片
+  .domain-cards {
+    margin-bottom: 20px;
+
+    .domain-card {
+      cursor: pointer;
+      background: var(--bg-card);
+      border-color: var(--border-color);
+      transition: all var(--transition-fast);
+
+      :deep(.el-card__body) {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 16px;
+      }
+
+      .domain-icon {
+        width: 48px;
+        height: 48px;
+        border-radius: var(--radius-base);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: color-mix(in srgb, var(--domain-color) 15%, transparent);
+        color: var(--domain-color);
+        flex-shrink: 0;
+      }
+
+      .domain-info {
+        min-width: 0;
+
+        .domain-name {
+          font-size: 14px;
+          font-weight: 600;
+          color: var(--text-primary);
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+
+        .domain-stat {
+          font-size: 12px;
+          color: var(--text-secondary);
+          margin-top: 2px;
+        }
+      }
+
+      &:hover {
+        border-color: var(--domain-color);
+        box-shadow: 0 0 12px color-mix(in srgb, var(--domain-color) 30%, transparent);
+        transform: translateY(-2px);
+      }
+    }
   }
 
   .energy-card {
