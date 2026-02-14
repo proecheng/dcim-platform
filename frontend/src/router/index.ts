@@ -24,6 +24,7 @@ const routes: RouteRecordRaw[] = [
     component: () => import('@/layouts/MainLayout.vue'),
     redirect: '/dashboard',
     children: [
+      // ===== 独立入口 =====
       {
         path: 'dashboard',
         name: 'Dashboard',
@@ -36,6 +37,154 @@ const routes: RouteRecordRaw[] = [
         component: () => import('@/views/device/index.vue'),
         meta: { title: '点位管理', icon: 'Cpu' }
       },
+      {
+        path: 'device-manage',
+        name: 'DeviceManage',
+        component: () => import('@/views/device-manage/index.vue'),
+        meta: { title: '设备管理', icon: 'SetUp' }
+      },
+
+      // ===== 华为6大域 =====
+
+      // 域1: 供配电管理
+      {
+        path: 'power',
+        name: 'Power',
+        redirect: '/power/monitor',
+        meta: { title: '供配电管理', icon: 'Lightning' },
+        children: [
+          {
+            path: 'monitor',
+            name: 'PowerMonitor',
+            component: () => import('@/views/energy/monitor.vue'),
+            meta: { title: '用电监控', icon: 'Odometer' }
+          },
+          {
+            path: 'statistics',
+            name: 'PowerStatistics',
+            component: () => import('@/views/energy/statistics.vue'),
+            meta: { title: '能耗统计', icon: 'TrendCharts' }
+          },
+          {
+            path: 'config',
+            name: 'PowerConfig',
+            component: () => import('@/views/energy/config.vue'),
+            meta: { title: '配电配置', icon: 'Setting' }
+          },
+          {
+            path: 'topology',
+            name: 'PowerTopology',
+            component: () => import('@/views/energy/topology.vue'),
+            meta: { title: '配电拓扑', icon: 'Share' }
+          }
+        ]
+      },
+
+      // 域2: 制冷系统
+      {
+        path: 'cooling',
+        name: 'Cooling',
+        redirect: '/cooling/overview',
+        meta: { title: '制冷系统', icon: 'IceCream' },
+        children: [
+          {
+            path: 'overview',
+            name: 'CoolingOverview',
+            component: () => import('@/views/cooling/overview.vue'),
+            meta: { title: '制冷总览', icon: 'DataBoard' }
+          }
+        ]
+      },
+
+      // 域3: 环境监控
+      {
+        path: 'environment',
+        name: 'Environment',
+        redirect: '/environment/overview',
+        meta: { title: '环境监控', icon: 'Sunny' },
+        children: [
+          {
+            path: 'overview',
+            name: 'EnvironmentOverview',
+            component: () => import('@/views/environment/overview.vue'),
+            meta: { title: '环境总览', icon: 'DataBoard' }
+          }
+        ]
+      },
+
+      // 域4: 安防消防
+      {
+        path: 'security',
+        name: 'Security',
+        redirect: '/security/overview',
+        meta: { title: '安防消防', icon: 'Lock' },
+        children: [
+          {
+            path: 'overview',
+            name: 'SecurityOverview',
+            component: () => import('@/views/security/overview.vue'),
+            meta: { title: '安防总览', icon: 'DataBoard' }
+          }
+        ]
+      },
+
+      // 域5: 基础设施
+      {
+        path: 'infrastructure',
+        name: 'Infrastructure',
+        redirect: '/infrastructure/asset',
+        meta: { title: '基础设施', icon: 'OfficeBuilding' },
+        children: [
+          {
+            path: 'asset',
+            name: 'InfraAssetList',
+            component: () => import('@/views/asset/index.vue'),
+            meta: { title: '资产台账', icon: 'Document' }
+          },
+          {
+            path: 'cabinet',
+            name: 'InfraCabinetManage',
+            component: () => import('@/views/asset/cabinet.vue'),
+            meta: { title: '机柜管理', icon: 'Grid' }
+          },
+          {
+            path: 'capacity',
+            name: 'InfraCapacity',
+            component: () => import('@/views/capacity/index.vue'),
+            meta: { title: '容量管理', icon: 'DataAnalysis' }
+          }
+        ]
+      },
+
+      // 域6: 节能中心
+      {
+        path: 'energy-saving',
+        name: 'EnergySaving',
+        redirect: '/energy-saving/analysis',
+        meta: { title: '节能中心', icon: 'Opportunity' },
+        children: [
+          {
+            path: 'analysis',
+            name: 'SavingAnalysis',
+            component: () => import('@/views/energy/analysis.vue'),
+            meta: { title: '节能分析', icon: 'Opportunity' }
+          },
+          {
+            path: 'regulation',
+            name: 'SavingRegulation',
+            component: () => import('@/views/energy/regulation.vue'),
+            meta: { title: '负荷调节', icon: 'Operation' }
+          },
+          {
+            path: 'execution',
+            name: 'SavingExecution',
+            component: () => import('@/views/energy/execution.vue'),
+            meta: { title: '执行管理', icon: 'VideoPlay' }
+          }
+        ]
+      },
+
+      // ===== 独立入口（续） =====
       {
         path: 'alarms',
         name: 'Alarms',
@@ -53,88 +202,6 @@ const routes: RouteRecordRaw[] = [
         name: 'Reports',
         component: () => import('@/views/report/index.vue'),
         meta: { title: '报表分析', icon: 'Document' }
-      },
-      {
-        path: 'settings',
-        name: 'Settings',
-        component: () => import('@/views/settings/index.vue'),
-        meta: { title: '系统设置', icon: 'Setting' }
-      },
-      {
-        path: 'energy',
-        name: 'Energy',
-        redirect: '/energy/monitor',
-        meta: { title: '用电管理', icon: 'Lightning' },
-        children: [
-          {
-            path: 'monitor',
-            name: 'EnergyMonitor',
-            component: () => import('@/views/energy/monitor.vue'),
-            meta: { title: '用电监控', icon: 'Odometer' }
-          },
-          {
-            path: 'statistics',
-            name: 'EnergyStatistics',
-            component: () => import('@/views/energy/statistics.vue'),
-            meta: { title: '能耗统计', icon: 'TrendCharts' }
-          },
-          {
-            path: 'analysis',
-            name: 'EnergyAnalysis',
-            component: () => import('@/views/energy/analysis.vue'),
-            meta: { title: '节能中心', icon: 'Opportunity' }
-          },
-          {
-            path: 'config',
-            name: 'EnergyConfig',
-            component: () => import('@/views/energy/config.vue'),
-            meta: { title: '配电配置', icon: 'Setting' }
-          },
-          {
-            path: 'topology',
-            name: 'EnergyTopology',
-            component: () => import('@/views/energy/topology.vue'),
-            meta: { title: '配电拓扑', icon: 'Share' }
-          },
-          {
-            path: 'regulation',
-            name: 'EnergyRegulation',
-            component: () => import('@/views/energy/regulation.vue'),
-            meta: { title: '负荷调节', icon: 'Operation' }
-          },
-          {
-            path: 'execution',
-            name: 'EnergyExecution',
-            component: () => import('@/views/energy/execution.vue'),
-            meta: { title: '执行管理', icon: 'VideoPlay' }
-          }
-        ]
-      },
-      {
-        path: 'asset',
-        name: 'Asset',
-        redirect: '/asset/list',
-        meta: { title: '资产管理', icon: 'Box' },
-        children: [
-          {
-            path: 'list',
-            name: 'AssetList',
-            component: () => import('@/views/asset/index.vue'),
-            meta: { title: '资产台账', icon: 'Document' }
-          },
-          {
-            path: 'cabinet',
-            name: 'CabinetManage',
-            component: () => import('@/views/asset/cabinet.vue'),
-            meta: { title: '机柜管理', icon: 'Grid' }
-          }
-        ]
-      },
-      {
-        path: 'capacity',
-        name: 'Capacity',
-        component: () => import('@/views/capacity/index.vue'),
-        meta: { title: '容量管理' }
       },
       {
         path: 'operation',
@@ -175,7 +242,27 @@ const routes: RouteRecordRaw[] = [
             meta: { title: 'VPP方案分析', icon: 'DataAnalysis' }
           }
         ]
-      }
+      },
+      {
+        path: 'settings',
+        name: 'Settings',
+        component: () => import('@/views/settings/index.vue'),
+        meta: { title: '系统设置', icon: 'Setting' }
+      },
+
+      // ===== 旧路由重定向（向后兼容） =====
+      { path: 'energy/monitor', redirect: '/power/monitor' },
+      { path: 'energy/statistics', redirect: '/power/statistics' },
+      { path: 'energy/config', redirect: '/power/config' },
+      { path: 'energy/topology', redirect: '/power/topology' },
+      { path: 'energy/analysis', redirect: '/energy-saving/analysis' },
+      { path: 'energy/regulation', redirect: '/energy-saving/regulation' },
+      { path: 'energy/execution', redirect: '/energy-saving/execution' },
+      { path: 'energy', redirect: '/power/monitor' },
+      { path: 'asset/list', redirect: '/infrastructure/asset' },
+      { path: 'asset/cabinet', redirect: '/infrastructure/cabinet' },
+      { path: 'asset', redirect: '/infrastructure/asset' },
+      { path: 'capacity', name: 'CapacityRedirect', redirect: '/infrastructure/capacity' }
     ]
   }
 ]

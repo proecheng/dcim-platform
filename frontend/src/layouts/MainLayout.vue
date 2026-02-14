@@ -13,85 +13,150 @@
         class="dark-menu"
         @select="handleMenuSelect"
       >
+        <!-- 监控仪表盘 -->
         <el-menu-item index="/dashboard">
           <el-icon><Monitor /></el-icon>
           <template #title>监控仪表盘</template>
         </el-menu-item>
+
+        <!-- 点位管理 -->
         <el-menu-item index="/devices">
           <el-icon><Cpu /></el-icon>
           <template #title>点位管理</template>
         </el-menu-item>
-        <el-menu-item index="/alarms">
-          <el-icon><Bell /></el-icon>
-          <template #title>告警管理</template>
+
+        <!-- 设备管理 -->
+        <el-menu-item index="/device-manage">
+          <el-icon><SetUp /></el-icon>
+          <template #title>设备管理</template>
         </el-menu-item>
-        <el-menu-item index="/history">
-          <el-icon><TrendCharts /></el-icon>
-          <template #title>历史数据</template>
-        </el-menu-item>
-        <el-menu-item index="/reports">
-          <el-icon><Document /></el-icon>
-          <template #title>报表分析</template>
-        </el-menu-item>
-        <el-menu-item index="/settings">
-          <el-icon><Setting /></el-icon>
-          <template #title>系统设置</template>
-        </el-menu-item>
-        <el-sub-menu index="/energy">
+
+        <!-- ===== 华为6大域 ===== -->
+
+        <!-- 域1: 供配电管理 -->
+        <el-sub-menu index="/power">
           <template #title>
             <el-icon><Lightning /></el-icon>
-            <span>用电管理</span>
+            <span>供配电管理</span>
           </template>
-          <el-menu-item index="/energy/monitor">
+          <el-menu-item index="/power/monitor">
             <el-icon><Odometer /></el-icon>
             <template #title>用电监控</template>
           </el-menu-item>
-          <el-menu-item index="/energy/statistics">
-            <el-icon><DataLine /></el-icon>
+          <el-menu-item index="/power/statistics">
+            <el-icon><TrendCharts /></el-icon>
             <template #title>能耗统计</template>
           </el-menu-item>
-          <el-menu-item index="/energy/analysis">
-            <el-icon><Opportunity /></el-icon>
-            <template #title>节能中心</template>
-          </el-menu-item>
-          <el-menu-item index="/energy/config">
+          <el-menu-item index="/power/config">
             <el-icon><Setting /></el-icon>
             <template #title>配电配置</template>
           </el-menu-item>
-          <el-menu-item index="/energy/topology">
+          <el-menu-item index="/power/topology">
             <el-icon><Share /></el-icon>
             <template #title>配电拓扑</template>
           </el-menu-item>
-          <el-menu-item index="/energy/regulation">
+        </el-sub-menu>
+
+        <!-- 域2: 制冷系统 -->
+        <el-sub-menu index="/cooling">
+          <template #title>
+            <el-icon><IceCream /></el-icon>
+            <span>制冷系统</span>
+          </template>
+          <el-menu-item index="/cooling/overview">
+            <el-icon><DataBoard /></el-icon>
+            <template #title>制冷总览</template>
+          </el-menu-item>
+        </el-sub-menu>
+
+        <!-- 域3: 环境监控 -->
+        <el-sub-menu index="/environment">
+          <template #title>
+            <el-icon><Sunny /></el-icon>
+            <span>环境监控</span>
+          </template>
+          <el-menu-item index="/environment/overview">
+            <el-icon><DataBoard /></el-icon>
+            <template #title>环境总览</template>
+          </el-menu-item>
+        </el-sub-menu>
+
+        <!-- 域4: 安防消防 -->
+        <el-sub-menu index="/security">
+          <template #title>
+            <el-icon><Lock /></el-icon>
+            <span>安防消防</span>
+          </template>
+          <el-menu-item index="/security/overview">
+            <el-icon><DataBoard /></el-icon>
+            <template #title>安防总览</template>
+          </el-menu-item>
+        </el-sub-menu>
+
+        <!-- 域5: 基础设施 -->
+        <el-sub-menu index="/infrastructure">
+          <template #title>
+            <el-icon><OfficeBuilding /></el-icon>
+            <span>基础设施</span>
+          </template>
+          <el-menu-item index="/infrastructure/asset">
+            <el-icon><Document /></el-icon>
+            <template #title>资产台账</template>
+          </el-menu-item>
+          <el-menu-item index="/infrastructure/cabinet">
+            <el-icon><Grid /></el-icon>
+            <template #title>机柜管理</template>
+          </el-menu-item>
+          <el-menu-item index="/infrastructure/capacity">
+            <el-icon><DataAnalysis /></el-icon>
+            <template #title>容量管理</template>
+          </el-menu-item>
+        </el-sub-menu>
+
+        <!-- 域6: 节能中心 -->
+        <el-sub-menu index="/energy-saving">
+          <template #title>
+            <el-icon><Opportunity /></el-icon>
+            <span>节能中心</span>
+          </template>
+          <el-menu-item index="/energy-saving/analysis">
+            <el-icon><Opportunity /></el-icon>
+            <template #title>节能分析</template>
+          </el-menu-item>
+          <el-menu-item index="/energy-saving/regulation">
             <el-icon><Operation /></el-icon>
             <template #title>负荷调节</template>
           </el-menu-item>
-          <el-menu-item index="/energy/execution">
+          <el-menu-item index="/energy-saving/execution">
             <el-icon><VideoPlay /></el-icon>
             <template #title>执行管理</template>
           </el-menu-item>
         </el-sub-menu>
-        <el-sub-menu index="/asset">
-          <template #title>
-            <el-icon><Box /></el-icon>
-            <span>资产管理</span>
-          </template>
-          <el-menu-item index="/asset/list">
-            <el-icon><Document /></el-icon>
-            <template #title>资产台账</template>
-          </el-menu-item>
-          <el-menu-item index="/asset/cabinet">
-            <el-icon><Grid /></el-icon>
-            <template #title>机柜管理</template>
-          </el-menu-item>
-        </el-sub-menu>
-        <el-menu-item index="/capacity">
-          <el-icon><DataAnalysis /></el-icon>
-          <template #title>容量管理</template>
+
+        <!-- ===== 独立入口 ===== -->
+
+        <!-- 告警管理 -->
+        <el-menu-item index="/alarms">
+          <el-icon><Bell /></el-icon>
+          <template #title>告警管理</template>
         </el-menu-item>
+
+        <!-- 历史数据 -->
+        <el-menu-item index="/history">
+          <el-icon><TrendCharts /></el-icon>
+          <template #title>历史数据</template>
+        </el-menu-item>
+
+        <!-- 报表分析 -->
+        <el-menu-item index="/reports">
+          <el-icon><Document /></el-icon>
+          <template #title>报表分析</template>
+        </el-menu-item>
+
+        <!-- 运维管理 -->
         <el-sub-menu index="/operation">
           <template #title>
-            <el-icon><SetUp /></el-icon>
+            <el-icon><Tools /></el-icon>
             <span>运维管理</span>
           </template>
           <el-menu-item index="/operation/workorder">
@@ -107,6 +172,24 @@
             <template #title>知识库</template>
           </el-menu-item>
         </el-sub-menu>
+
+        <!-- 虚拟电厂 -->
+        <el-sub-menu index="/vpp">
+          <template #title>
+            <el-icon><Connection /></el-icon>
+            <span>虚拟电厂</span>
+          </template>
+          <el-menu-item index="/vpp/analysis">
+            <el-icon><DataAnalysis /></el-icon>
+            <template #title>VPP方案分析</template>
+          </el-menu-item>
+        </el-sub-menu>
+
+        <!-- 系统设置 -->
+        <el-menu-item index="/settings">
+          <el-icon><Setting /></el-icon>
+          <template #title>系统设置</template>
+        </el-menu-item>
       </el-menu>
     </el-aside>
 
@@ -164,9 +247,10 @@ import { useRouter, useRoute } from 'vue-router'
 import {
   Monitor, Cpu, Bell, TrendCharts, Setting, Document,
   Expand, Fold, UserFilled, ArrowDown,
-  Lightning, Odometer, DataLine, Share, DataAnalysis,
-  Box, Grid, SetUp, Tickets, List, Reading,
-  Opportunity, Operation, VideoPlay
+  Lightning, Odometer, Share, DataAnalysis,
+  Grid, SetUp, Tickets, List, Reading,
+  Opportunity, Operation, VideoPlay,
+  IceCream, Sunny, Lock, OfficeBuilding, DataBoard, Tools, Connection
 } from '@element-plus/icons-vue'
 import { useUserStore, useAlarmStore } from '@/stores'
 import { getAlarmCount } from '@/api/alarm'
