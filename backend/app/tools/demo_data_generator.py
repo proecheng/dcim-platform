@@ -77,7 +77,7 @@ DATACENTER_CONFIG = {
         {"code": "PUMP-001", "name": "冷冻水泵", "type": "PUMP", "power": 15, "is_it": False, "circuit": "AC-001"},
         {"code": "PUMP-002", "name": "冷却水泵", "type": "PUMP", "power": 12, "is_it": False, "circuit": "AC-001"},
     ],
-    # 电价配置 (峰谷平)
+    # 电价配置（五时段：尖峰/高峰/平段/低谷/深谷）
     "pricing": [
         {"name": "尖峰", "type": "sharp", "start": "10:00", "end": "12:00", "price": 1.2},
         {"name": "尖峰", "type": "sharp", "start": "14:00", "end": "17:00", "price": 1.2},

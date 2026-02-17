@@ -16,7 +16,9 @@ class ConnectionManager:
         self.active_connections: Dict[str, List[WebSocket]] = {
             "realtime": [],
             "alarms": [],
-            "control": []
+            "control": [],
+            "system": [],
+            "linkage": []
         }
 
     async def connect(self, websocket: WebSocket, channel: str = "realtime"):
@@ -54,12 +56,26 @@ class ConnectionManager:
         await self.broadcast(message, "realtime")
 
     async def broadcast_alarm(self, alarm_data: dict):
-        """广播告警"""
+        """广播告警 — 提取 action 字段到消息顶层，兼容前端路由逻辑"""
+        action = alarm_data.get("action", "new")
+        # 构建消息时排除 action 字段，避免重复
+        data = {k: v for k, v in alarm_data.items() if k != "action"}
         message = {
             "type": "alarm",
-            "data": alarm_data
+            "action": action,
+            "data": data
         }
         await self.broadcast(message, "alarms")
+
+    async def broadcast_system(self, system_data: dict):
+        """广播系统状态消息"""
+        message = {"type": "system", "data": system_data}
+        await self.broadcast(message, "system")
+
+    async def broadcast_linkage(self, linkage_data: dict):
+        """广播联动执行结果"""
+        message = {"type": "linkage", "data": linkage_data}
+        await self.broadcast(message, "linkage")
 
 
 # 全局连接管理器

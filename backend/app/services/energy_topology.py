@@ -31,6 +31,19 @@ class EnergyTopologyService:
         获取完整的配电系统拓扑
         返回树形结构数据
         """
+        # 批量加载所有 PowerDevice 的 PointRealtime 数据（避免 N+1）
+        all_devices_result = await db.execute(
+            select(PowerDevice).where(PowerDevice.is_enabled == True)
+        )
+        all_devices = all_devices_result.scalars().all()
+        power_point_ids = [d.power_point_id for d in all_devices if d.power_point_id]
+        realtime_map: Dict[int, PointRealtime] = {}
+        if power_point_ids:
+            rt_result = await db.execute(
+                select(PointRealtime).where(PointRealtime.point_id.in_(power_point_ids))
+            )
+            realtime_map = {r.point_id: r for r in rt_result.scalars().all()}
+
         # 获取所有变压器及其关联数据
         result = await db.execute(
             select(Transformer)
@@ -46,7 +59,7 @@ class EnergyTopologyService:
 
         for transformer in transformers:
             transformer_node = await EnergyTopologyService._build_transformer_node(
-                db, transformer
+                db, transformer, realtime_map
             )
             topology["transformers"].append(transformer_node)
 
@@ -55,9 +68,13 @@ class EnergyTopologyService:
     @staticmethod
     async def _build_transformer_node(
         db: AsyncSession,
-        transformer: Transformer
+        transformer: Transformer,
+        realtime_map: Dict[int, PointRealtime] = None
     ) -> Dict[str, Any]:
         """构建变压器节点"""
+        if realtime_map is None:
+            realtime_map = {}
+
         node = {
             "transformer_id": transformer.id,
             "transformer_code": transformer.transformer_code,
@@ -69,7 +86,8 @@ class EnergyTopologyService:
             "declared_demand": transformer.declared_demand,
             "status": transformer.status,
             "location": transformer.location,
-            "meter_points": []
+            "meter_points": [],
+            "realtime_power": None,
         }
 
         # 获取计量点
@@ -84,15 +102,26 @@ class EnergyTopologyService:
         meter_points = meter_points_result.scalars().all()
 
         for mp in meter_points:
-            mp_node = await EnergyTopologyService._build_meter_point_node(db, mp)
+            mp_node = await EnergyTopologyService._build_meter_point_node(db, mp, realtime_map)
             node["meter_points"].append(mp_node)
+
+        # 汇总下游计量点的 realtime_power
+        total_power = 0.0
+        has_power = False
+        for mp_node in node["meter_points"]:
+            for panel in mp_node.get("panels", []):
+                if panel.get("realtime_power") is not None:
+                    total_power += panel["realtime_power"]
+                    has_power = True
+        node["realtime_power"] = round(total_power, 2) if has_power else None
 
         return node
 
     @staticmethod
     async def _build_meter_point_node(
         db: AsyncSession,
-        meter_point: MeterPoint
+        meter_point: MeterPoint,
+        realtime_map: Dict[int, PointRealtime] = None
     ) -> Dict[str, Any]:
         """构建计量点节点"""
         node = {
@@ -125,8 +154,11 @@ class EnergyTopologyService:
         )
         panels = panels_result.scalars().all()
 
+        if realtime_map is None:
+            realtime_map = {}
+
         for panel in panels:
-            panel_node = await EnergyTopologyService._build_panel_node(db, panel)
+            panel_node = await EnergyTopologyService._build_panel_node(db, panel, realtime_map=realtime_map)
             node["panels"].append(panel_node)
 
         return node
@@ -135,9 +167,12 @@ class EnergyTopologyService:
     async def _build_panel_node(
         db: AsyncSession,
         panel: DistributionPanel,
-        depth: int = 0
+        depth: int = 0,
+        realtime_map: Dict[int, PointRealtime] = None
     ) -> Dict[str, Any]:
         """构建配电柜节点（递归处理子配电柜）"""
+        if realtime_map is None:
+            realtime_map = {}
         if depth > 10:  # 防止无限递归
             return {}
 
@@ -153,7 +188,8 @@ class EnergyTopologyService:
             "status": panel.status,
             "remark": panel.remark,
             "circuits": [],
-            "sub_panels": []
+            "sub_panels": [],
+            "realtime_power": None,
         }
 
         # 获取配电回路
@@ -168,7 +204,7 @@ class EnergyTopologyService:
         circuits = circuits_result.scalars().all()
 
         for circuit in circuits:
-            circuit_node = await EnergyTopologyService._build_circuit_node(db, circuit)
+            circuit_node = await EnergyTopologyService._build_circuit_node(db, circuit, realtime_map)
             node["circuits"].append(circuit_node)
 
         # 获取子配电柜
@@ -184,18 +220,35 @@ class EnergyTopologyService:
 
         for sub_panel in sub_panels:
             sub_panel_node = await EnergyTopologyService._build_panel_node(
-                db, sub_panel, depth + 1
+                db, sub_panel, depth + 1, realtime_map=realtime_map
             )
             node["sub_panels"].append(sub_panel_node)
+
+        # 汇总下游回路和子配电柜的 realtime_power
+        total_power = 0.0
+        has_power = False
+        for circuit_node in node["circuits"]:
+            if circuit_node.get("realtime_power") is not None:
+                total_power += circuit_node["realtime_power"]
+                has_power = True
+        for sp_node in node["sub_panels"]:
+            if sp_node.get("realtime_power") is not None:
+                total_power += sp_node["realtime_power"]
+                has_power = True
+        node["realtime_power"] = round(total_power, 2) if has_power else None
 
         return node
 
     @staticmethod
     async def _build_circuit_node(
         db: AsyncSession,
-        circuit: DistributionCircuit
+        circuit: DistributionCircuit,
+        realtime_map: Dict[int, PointRealtime] = None
     ) -> Dict[str, Any]:
         """构建配电回路节点"""
+        if realtime_map is None:
+            realtime_map = {}
+
         node = {
             "circuit_id": circuit.id,
             "circuit_code": circuit.circuit_code,
@@ -206,7 +259,8 @@ class EnergyTopologyService:
             "breaker_type": circuit.breaker_type,
             "is_shiftable": circuit.is_shiftable,
             "shift_priority": circuit.shift_priority,
-            "devices": []
+            "devices": [],
+            "realtime_power": None,
         }
 
         # 获取用电设备
@@ -221,17 +275,31 @@ class EnergyTopologyService:
         devices = devices_result.scalars().all()
 
         for device in devices:
-            device_node = await EnergyTopologyService._build_device_node(db, device)
+            device_node = await EnergyTopologyService._build_device_node(db, device, realtime_map)
             node["devices"].append(device_node)
+
+        # 汇总下游设备的 realtime_data.power
+        total_power = 0.0
+        has_power = False
+        for dev_node in node["devices"]:
+            rd = dev_node.get("realtime_data")
+            if rd and rd.get("power") is not None:
+                total_power += rd["power"]
+                has_power = True
+        node["realtime_power"] = round(total_power, 2) if has_power else None
 
         return node
 
     @staticmethod
     async def _build_device_node(
         db: AsyncSession,
-        device: PowerDevice
+        device: PowerDevice,
+        power_realtime_map: Dict[int, PointRealtime] = None
     ) -> Dict[str, Any]:
         """构建用电设备节点"""
+        if power_realtime_map is None:
+            power_realtime_map = {}
+
         node = {
             "device_id": device.id,
             "device_code": device.device_code,
@@ -256,17 +324,17 @@ class EnergyTopologyService:
         points = points_result.scalars().all()
 
         # 批量获取所有点位的实时数据（避免 N+1 查询）
-        realtime_map: Dict[int, PointRealtime] = {}
+        point_realtime_map: Dict[int, PointRealtime] = {}
         if points:
             point_ids = [pt.id for pt in points]
             realtime_result = await db.execute(
                 select(PointRealtime).where(PointRealtime.point_id.in_(point_ids))
             )
-            realtime_map = {r.point_id: r for r in realtime_result.scalars().all()}
+            point_realtime_map = {r.point_id: r for r in realtime_result.scalars().all()}
 
         for pt in points:
             realtime = None
-            rt = realtime_map.get(pt.id)
+            rt = point_realtime_map.get(pt.id)
             if rt:
                 realtime = {
                     "value": rt.value,
@@ -284,17 +352,14 @@ class EnergyTopologyService:
                 "realtime": realtime
             })
 
-        # 如果设备关联了功率点位，获取实时数据
+        # 如果设备关联了功率点位，从传入的 map 读取实时数据（避免单独查询）
         if device.power_point_id:
-            realtime_result = await db.execute(
-                select(PointRealtime)
-                .where(PointRealtime.point_id == device.power_point_id)
-            )
-            realtime = realtime_result.scalar_one_or_none()
-            if realtime:
+            rt = power_realtime_map.get(device.power_point_id)
+            if rt:
                 node["realtime_data"] = {
-                    "power": realtime.value,
-                    "update_time": realtime.updated_at.isoformat() if realtime.updated_at else None
+                    "power": rt.value,
+                    "update_time": rt.updated_at.isoformat() if rt.updated_at else None,
+                    "quality": rt.quality if rt.quality is not None else 0,
                 }
 
         return node

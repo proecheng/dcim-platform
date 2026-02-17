@@ -24,7 +24,7 @@ class PeakValleyOptimizationPlugin(AnalysisPlugin):
     峰谷优化分析插件
 
     分析内容:
-    - 峰谷平电量分布
+    - 五时段电量分布（尖峰/高峰/平段/低谷/深谷）
     - 电价差利用效率
     - 储能系统可行性分析
     """

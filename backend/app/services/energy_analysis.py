@@ -410,6 +410,8 @@ class LoadShiftAnalysisService:
         total_valley = sum(d.valley_energy or 0 for d in daily_data)
         total_energy = total_peak + total_flat + total_valley
 
+        # 注意：此处为 fallback 默认电价，实际应从 PricingService 获取
+        # 五时段电价中，sharp+peak 合并为 peak_price，valley+deep_valley 合并为 valley_price
         peak_price = 1.2
         flat_price = 0.8
         valley_price = 0.4
@@ -470,7 +472,8 @@ class LoadShiftAnalysisService:
         shiftable_ratio = config.shiftable_power_ratio or 0
         shiftable_power = device.rated_power * shiftable_ratio if device.rated_power else 0
 
-        # 计算节省电费
+        # 注意：此处为 fallback 默认电价，实际应从 PricingService 获取
+        # 五时段电价中，sharp+peak 合并为 peak_price，valley+deep_valley 合并为 valley_price
         peak_price = 1.2
         valley_price = 0.4
         price_diff = peak_price - valley_price
