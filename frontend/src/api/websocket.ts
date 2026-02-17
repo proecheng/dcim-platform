@@ -1,7 +1,8 @@
 /**
  * WebSocket 封装
- * 支持自动重连、心跳检测、订阅机制
+ * 支持自动重连（指数退避）、心跳检测、订阅机制、降级状态集成
  */
+import { degradationFlags } from '@/stores/degradation'
 
 type MessageHandler = (data: any) => void
 type ConnectionHandler = () => void
@@ -82,12 +83,14 @@ export class WebSocketClient {
       console.log('WebSocket 已连接:', this.url)
       this.reconnectAttempts = 0
       this.startHeartbeat()
+      degradationFlags.websocketDown = false
       this.onOpenCallback?.()
     }
 
     this.ws.onclose = () => {
       console.log('WebSocket 已关闭:', this.url)
       this.stopHeartbeat()
+      degradationFlags.websocketDown = true
       this.onCloseCallback?.()
 
       if (!this.isManualClose) {
@@ -155,7 +158,7 @@ export class WebSocketClient {
   }
 
   /**
-   * 安排重连
+   * 安排重连（指数退避：1s, 2s, 4s, 8s, 16s, 30s, 30s, ...）
    */
   private scheduleReconnect(): void {
     if (this.reconnectAttempts >= this.maxReconnectAttempts) {
@@ -164,11 +167,12 @@ export class WebSocketClient {
     }
 
     this.reconnectAttempts++
-    console.log(`WebSocket 将在 ${this.reconnectInterval}ms 后重连 (${this.reconnectAttempts}/${this.maxReconnectAttempts})`)
+    const delay = Math.min(1000 * Math.pow(2, this.reconnectAttempts - 1), 30000)
+    console.log(`WebSocket 将在 ${delay}ms 后重连 (${this.reconnectAttempts}/${this.maxReconnectAttempts})`)
 
     this.reconnectTimer = window.setTimeout(() => {
       this.connect()
-    }, this.reconnectInterval)
+    }, delay)
   }
 
   /**

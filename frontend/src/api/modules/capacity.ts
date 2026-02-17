@@ -9,9 +9,6 @@ import type { ResponseModel, PageParams } from './types'
 /** 容量状态 */
 export type CapacityStatus = 'normal' | 'warning' | 'critical' | 'full'
 
-/** 计划状态 */
-export type PlanStatus = 'draft' | 'pending' | 'approved' | 'in_progress' | 'completed' | 'cancelled'
-
 /** 空间容量信息 */
 export interface SpaceCapacity {
   id: number
@@ -50,15 +47,16 @@ export interface PowerCapacity {
   id: number
   name: string
   location?: string
-  total_power: number
-  used_power: number
-  reserved_power: number
-  available_power: number
+  capacity_type?: string
+  total_capacity_kva?: number
+  used_capacity_kva?: number
+  total_capacity_kw?: number
+  used_capacity_kw?: number
+  redundancy_mode?: string
   warning_threshold: number
   critical_threshold: number
   status: CapacityStatus
   usage_rate: number
-  pue?: number
   created_at: string
   updated_at: string
 }
@@ -67,11 +65,15 @@ export interface PowerCapacity {
 export interface PowerCapacityCreate {
   name: string
   location?: string
-  total_power: number
-  used_power?: number
-  reserved_power?: number
+  capacity_type?: string
+  total_capacity_kva?: number
+  used_capacity_kva?: number
+  total_capacity_kw?: number
+  used_capacity_kw?: number
+  redundancy_mode?: string
   warning_threshold?: number
   critical_threshold?: number
+  parent_id?: number
 }
 
 /** 制冷容量信息 */
@@ -79,10 +81,12 @@ export interface CoolingCapacity {
   id: number
   name: string
   location?: string
-  total_cooling: number
-  used_cooling: number
-  reserved_cooling: number
-  available_cooling: number
+  total_cooling_kw?: number
+  used_cooling_kw?: number
+  target_temperature?: number
+  current_temperature?: number
+  humidity_target?: number
+  current_humidity?: number
   warning_threshold: number
   critical_threshold: number
   status: CapacityStatus
@@ -95,9 +99,12 @@ export interface CoolingCapacity {
 export interface CoolingCapacityCreate {
   name: string
   location?: string
-  total_cooling: number
-  used_cooling?: number
-  reserved_cooling?: number
+  total_cooling_kw?: number
+  used_cooling_kw?: number
+  target_temperature?: number
+  current_temperature?: number
+  humidity_target?: number
+  current_humidity?: number
   warning_threshold?: number
   critical_threshold?: number
 }
@@ -107,8 +114,9 @@ export interface WeightCapacity {
   id: number
   name: string
   location?: string
-  total_weight: number
-  used_weight: number
+  capacity_type?: string
+  total_weight_kg?: number
+  used_weight_kg?: number
   warning_threshold: number
   critical_threshold: number
   status: CapacityStatus
@@ -121,8 +129,9 @@ export interface WeightCapacity {
 export interface WeightCapacityCreate {
   name: string
   location?: string
-  total_weight: number
-  used_weight?: number
+  capacity_type?: string
+  total_weight_kg?: number
+  used_weight_kg?: number
   warning_threshold?: number
   critical_threshold?: number
 }
@@ -130,73 +139,68 @@ export interface WeightCapacityCreate {
 /** 容量规划 */
 export interface CapacityPlan {
   id: number
-  plan_name: string
-  plan_type: string
+  name: string
   description?: string
-  target_date: string
-  space_requirement?: number
-  power_requirement?: number
-  cooling_requirement?: number
-  weight_requirement?: number
-  status: PlanStatus
-  priority: number
+  device_count?: number
+  required_u?: number
+  required_power_kw?: number
+  required_cooling_kw?: number
+  required_weight_kg?: number
+  target_cabinet_id?: number
+  is_feasible?: boolean
+  feasibility_notes?: string
   created_by?: string
-  approved_by?: string
-  approved_at?: string
   created_at: string
   updated_at: string
 }
 
 /** 容量规划创建参数 */
 export interface CapacityPlanCreate {
-  plan_name: string
-  plan_type: string
+  name: string
   description?: string
-  target_date: string
-  space_requirement?: number
-  power_requirement?: number
-  cooling_requirement?: number
-  weight_requirement?: number
-  priority?: number
+  device_count?: number
+  required_u?: number
+  required_power_kw?: number
+  required_cooling_kw?: number
+  required_weight_kg?: number
+  target_cabinet_id?: number
+  created_by?: string
 }
 
 /** 容量统计 - 空间 */
 export interface SpaceStatistics {
-  total_area: number
-  used_area: number
-  available_area: number
-  usage_rate: number
-  total_cabinets: number
-  used_cabinets: number
   total_u_positions: number
   used_u_positions: number
+  available_u_positions: number
+  usage_rate: number
+  count: number
 }
 
 /** 容量统计 - 电力 */
 export interface PowerStatistics {
-  total_power: number
-  used_power: number
-  reserved_power: number
-  available_power: number
+  total_capacity_kw: number
+  used_capacity_kw: number
+  available_capacity_kw: number
   usage_rate: number
-  average_pue: number
+  count: number
 }
 
 /** 容量统计 - 制冷 */
 export interface CoolingStatistics {
-  total_cooling: number
-  used_cooling: number
-  reserved_cooling: number
-  available_cooling: number
+  total_cooling_kw: number
+  used_cooling_kw: number
+  available_cooling_kw: number
   usage_rate: number
+  count: number
 }
 
 /** 容量统计 - 承重 */
 export interface WeightStatistics {
-  total_weight: number
-  used_weight: number
-  available_weight: number
+  total_weight_kg: number
+  used_weight_kg: number
+  available_weight_kg: number
   usage_rate: number
+  count: number
 }
 
 /** 容量综合统计 */
@@ -205,9 +209,8 @@ export interface CapacityStatistics {
   power: PowerStatistics
   cooling: CoolingStatistics
   weight: WeightStatistics
-  warning_count: number
-  critical_count: number
-  plan_count: number
+  status_summary: Record<string, number>
+  total_capacity_records: number
 }
 
 // ==================== 空间容量 API ====================
@@ -338,8 +341,6 @@ export function deleteWeightCapacity(id: number) {
 
 /** 获取容量规划列表 */
 export function getCapacityPlans(params?: PageParams & {
-  plan_type?: string
-  status?: PlanStatus
   keyword?: string
 }) {
   return request.get<ResponseModel<CapacityPlan[]>>('/v1/capacity/plans', { params })
@@ -365,21 +366,26 @@ export function deleteCapacityPlan(id: number) {
   return request.delete<ResponseModel>(`/v1/capacity/plans/${id}`)
 }
 
-/** 审批容量规划 */
-export function approveCapacityPlan(id: number, approved: boolean, comment?: string) {
-  return request.post<ResponseModel<CapacityPlan>>(`/v1/capacity/plans/${id}/approve`, { approved, comment })
-}
-
-/** 更新容量规划状态 */
-export function updateCapacityPlanStatus(id: number, status: PlanStatus) {
-  return request.put<ResponseModel<CapacityPlan>>(`/v1/capacity/plans/${id}/status`, { status })
-}
-
 // ==================== 统计 API ====================
 
 /** 获取容量综合统计 */
 export function getCapacityStatistics() {
   return request.get<ResponseModel<CapacityStatistics>>('/v1/capacity/statistics')
+}
+
+/** 按位置获取容量统计 */
+export function getCapacityByLocation(params?: {
+  dimension?: 'area' | 'floor' | 'room'
+}) {
+  return request.get<ResponseModel<{
+    items: Array<{
+      location: string
+      space: { total_u_positions: number; used_u_positions: number; usage_rate: number }
+      power: { total_capacity_kw: number; used_capacity_kw: number; usage_rate: number }
+      cooling: { total_cooling_kw: number; used_cooling_kw: number; usage_rate: number }
+      weight: { total_weight_kg: number; used_weight_kg: number; usage_rate: number }
+    }>
+  }>>('/v1/capacity/statistics/by-location', { params })
 }
 
 /** 获取容量趋势数据 */
@@ -397,6 +403,16 @@ export function getCapacityTrend(params?: {
   }>>('/v1/capacity/trend', { params })
 }
 
+/** 扩容建议 */
+export interface ExpansionSuggestion {
+  capacity_type: string
+  current_usage_rate: number
+  predicted_exceed_date: string
+  predicted_usage_rate: number
+  resource_gap: string
+  suggestion: string
+}
+
 /** 获取容量预测数据 */
 export function getCapacityForecast(params?: {
   type?: 'space' | 'power' | 'cooling' | 'weight'
@@ -407,6 +423,8 @@ export function getCapacityForecast(params?: {
     predicted_usage: number[]
     confidence_upper: number[]
     confidence_lower: number[]
+    is_demo: boolean
+    expansion_suggestions: ExpansionSuggestion[]
   }>>('/v1/capacity/forecast', { params })
 }
 
@@ -425,4 +443,50 @@ export function getCapacityAlerts(params?: PageParams & {
     threshold: number
     created_at: string
   }[]>>('/v1/capacity/alerts', { params })
+}
+
+// ==================== 智能上架推荐 ====================
+
+/** 上架推荐请求 */
+export interface RackingRecommendationRequest {
+  required_u: number
+  required_power_kw?: number
+  required_cooling_kw?: number
+  required_weight_kg?: number
+  limit?: number
+}
+
+/** 机柜评分 */
+export interface CabinetScore {
+  cabinet_id: number
+  cabinet_code: string
+  cabinet_name: string
+  location?: string
+  space_score: number
+  power_score: number
+  cooling_score: number
+  weight_score: number
+  total_score: number
+  available_u: number
+  max_power?: number
+  max_weight?: number
+  notes: string
+}
+
+/** 上架推荐响应 */
+export interface RackingRecommendationResponse {
+  request: RackingRecommendationRequest
+  candidates: CabinetScore[]
+  total_cabinets_evaluated: number
+  qualified_count: number
+}
+
+/** 获取上架推荐 */
+export function getRackingRecommendation(data: RackingRecommendationRequest) {
+  return request.post<ResponseModel<RackingRecommendationResponse>>('/v1/capacity/recommend', data)
+}
+
+/** 覆盖推荐机柜 */
+export function overridePlanCabinet(planId: number, cabinetId: number) {
+  return request.put<ResponseModel<CapacityPlan>>(`/v1/capacity/plans/${planId}/override-cabinet`, { target_cabinet_id: cabinetId })
 }

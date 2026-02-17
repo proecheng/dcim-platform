@@ -18,8 +18,8 @@ export interface Cabinet {
   cabinet_code: string
   cabinet_name: string
   location: string
-  row_number: number
-  column_number: number
+  row_number: string
+  column_number: string
   total_u: number
   max_power: number
   max_weight: number
@@ -34,8 +34,8 @@ export interface CabinetCreate {
   cabinet_code: string
   cabinet_name: string
   location: string
-  row_number: number
-  column_number: number
+  row_number: string
+  column_number: string
   total_u: number
   max_power?: number
   max_weight?: number
@@ -45,8 +45,8 @@ export interface CabinetCreate {
 export interface CabinetUpdate {
   cabinet_name?: string
   location?: string
-  row_number?: number
-  column_number?: number
+  row_number?: string
+  column_number?: string
   total_u?: number
   max_power?: number
   max_weight?: number
@@ -61,19 +61,22 @@ export interface Asset {
   brand: string
   model: string
   serial_number: string
+  specifications?: string
   status: AssetStatus
   cabinet_id?: number
   cabinet_name?: string
-  start_u?: number
-  end_u?: number
+  u_position?: number
+  u_height?: number
   purchase_date?: string
-  warranty_date?: string
-  warranty_status?: string
   purchase_price?: number
   supplier?: string
-  responsible_person?: string
+  warranty_start?: string
+  warranty_end?: string
+  warranty_status?: string
+  maintenance_vendor?: string
+  owner?: string
   department?: string
-  description?: string
+  remark?: string
   created_at: string
   updated_at: string
 }
@@ -86,17 +89,20 @@ export interface AssetCreate {
   brand?: string
   model?: string
   serial_number?: string
+  specifications?: string
   status?: AssetStatus
   cabinet_id?: number
-  start_u?: number
-  end_u?: number
+  u_position?: number
+  u_height?: number
   purchase_date?: string
-  warranty_date?: string
   purchase_price?: number
   supplier?: string
-  responsible_person?: string
+  warranty_start?: string
+  warranty_end?: string
+  maintenance_vendor?: string
+  owner?: string
   department?: string
-  description?: string
+  remark?: string
 }
 
 /** 资产更新参数 */
@@ -106,27 +112,32 @@ export interface AssetUpdate {
   brand?: string
   model?: string
   serial_number?: string
+  specifications?: string
   status?: AssetStatus
   cabinet_id?: number
-  start_u?: number
-  end_u?: number
+  u_position?: number
+  u_height?: number
   purchase_date?: string
-  warranty_date?: string
   purchase_price?: number
   supplier?: string
-  responsible_person?: string
+  warranty_start?: string
+  warranty_end?: string
+  maintenance_vendor?: string
+  owner?: string
   department?: string
-  description?: string
+  remark?: string
 }
 
 /** 生命周期记录 */
 export interface LifecycleRecord {
   id: number
   asset_id: number
-  event_type: string
-  event_description: string
+  action: string
+  action_date: string
   operator?: string
-  event_time: string
+  from_location?: string
+  to_location?: string
+  remark?: string
   created_at: string
 }
 
@@ -134,83 +145,86 @@ export interface LifecycleRecord {
 export interface MaintenanceRecord {
   id: number
   asset_id: number
-  asset_code?: string
-  asset_name?: string
   maintenance_type: string
-  maintenance_description: string
-  maintenance_date: string
-  maintenance_person?: string
-  maintenance_cost?: number
-  status: string
+  start_time: string
+  end_time?: string
+  technician?: string
+  vendor?: string
+  cost?: number
+  description?: string
   result?: string
-  completed_at?: string
   created_at: string
-  updated_at: string
 }
 
 /** 维护记录创建参数 */
 export interface MaintenanceCreate {
   asset_id: number
   maintenance_type: string
-  maintenance_description: string
-  maintenance_date: string
-  maintenance_person?: string
-  maintenance_cost?: number
+  start_time: string
+  end_time?: string
+  technician?: string
+  vendor?: string
+  cost?: number
+  description?: string
 }
 
 /** 盘点记录 */
 export interface InventoryRecord {
   id: number
-  inventory_no: string
-  inventory_name: string
-  inventory_type: string
-  status: string
-  start_time?: string
-  end_time?: string
+  inventory_code: string
+  inventory_date: string
   operator?: string
+  status: string
   total_count: number
   checked_count: number
-  normal_count: number
-  abnormal_count: number
-  missing_count: number
+  matched_count: number
+  unmatched_count: number
   remark?: string
   created_at: string
-  updated_at: string
+  completed_at?: string
 }
 
 /** 盘点创建参数 */
 export interface InventoryCreate {
-  inventory_name: string
-  inventory_type: string
+  inventory_code: string
+  inventory_date: string
+  operator?: string
   remark?: string
 }
 
 /** 资产统计 */
 export interface AssetStatistics {
   total_count: number
-  by_status: Record<AssetStatus, number>
-  by_type: Record<AssetType, number>
+  by_status: Record<string, number>
+  by_type: Record<string, number>
+  by_department: Record<string, number>
   total_value: number
   warranty_expiring_count: number
-  maintenance_count: number
+}
+
+/** U位图资产项 */
+export interface CabinetAssetItem {
+  asset_id: number
+  asset_code: string
+  asset_name: string
+  asset_type: string
+  model: string
+  brand: string
+  status: string
+  u_position: number
+  u_height: number
 }
 
 /** 机柜使用情况 */
 export interface CabinetUsage {
   cabinet_id: number
-  cabinet_code: string
   cabinet_name: string
   total_u: number
   used_u: number
   available_u: number
   usage_rate: number
-  max_power: number
-  current_power?: number
-  power_usage_rate?: number
-  max_weight: number
-  current_weight?: number
-  weight_usage_rate?: number
-  assets: Asset[]
+  u_map: Record<string, { asset_id: number; asset_code: string; asset_name: string; asset_type: string }>
+  assets: CabinetAssetItem[]
 }
 
 // ==================== 机柜 API ====================
@@ -230,7 +244,7 @@ export function getCabinet(cabinetId: number) {
 
 /** 获取机柜使用情况 */
 export function getCabinetUsage(cabinetId: number) {
-  return request.get<{ code: number; data: CabinetUsage }>(`/v1/asset/cabinets/${cabinetId}/usage`)
+  return request.get<CabinetUsage>(`/v1/asset/cabinets/${cabinetId}/usage`)
 }
 
 /** 创建机柜 */
@@ -246,6 +260,11 @@ export function updateCabinet(cabinetId: number, data: CabinetUpdate) {
 /** 删除机柜 */
 export function deleteCabinet(cabinetId: number) {
   return request.delete<ResponseModel>(`/v1/asset/cabinets/${cabinetId}`)
+}
+
+/** 机柜内移动资产U位 */
+export function moveAssetInCabinet(cabinetId: number, data: { asset_id: number; new_u_position: number }) {
+  return request.put<ResponseModel>(`/v1/asset/cabinets/${cabinetId}/move-asset`, data)
 }
 
 // ==================== 资产 API ====================
@@ -345,4 +364,61 @@ export function getAssetStatistics() {
 /** 获取即将过保资产 */
 export function getWarrantyExpiringAssets(days?: number) {
   return request.get<ResponseModel<Asset[]>>('/v1/asset/warranty-expiring', { params: { days } })
+}
+
+// ==================== 导入导出 API ====================
+
+/** 批量导入资产 */
+export function importAssets(file: File, mode: 'preview' | 'confirm' = 'preview') {
+  const formData = new FormData()
+  formData.append('file', file)
+  return request.post<ResponseModel>(`/v1/asset/assets/import?mode=${mode}`, formData, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  })
+}
+
+/** 导出资产列表 */
+export function exportAssets(params?: {
+  asset_type?: string
+  status?: string
+  cabinet_id?: number
+  keyword?: string
+}) {
+  return request.get('/v1/asset/assets/export', {
+    params,
+    responseType: 'blob'
+  })
+}
+
+/** 下载导入模板 */
+export function downloadImportTemplate() {
+  return request.get('/v1/asset/assets/export?template=true', {
+    responseType: 'blob'
+  })
+}
+
+// ==================== 保修预警 API ====================
+
+/** 保修预警项 */
+export interface WarrantyAlertItem {
+  asset_id: number
+  asset_code: string
+  asset_name: string
+  asset_type: string | null
+  warranty_end: string
+  days_remaining: number
+  status: string | null
+}
+
+/** 保修预警汇总 */
+export interface WarrantyAlertResponse {
+  within_30_days: WarrantyAlertItem[]
+  within_60_days: WarrantyAlertItem[]
+  within_90_days: WarrantyAlertItem[]
+  total_count: number
+}
+
+/** 获取保修预警汇总 */
+export function getWarrantyAlerts() {
+  return request.get<WarrantyAlertResponse>('/v1/asset/warranty-alerts')
 }

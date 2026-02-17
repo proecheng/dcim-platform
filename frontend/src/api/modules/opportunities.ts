@@ -452,3 +452,26 @@ export function getTrackingResults(params?: PageParams & {
 export function getExecutionStats() {
   return request.get<ResponseModel<ExecutionStats>>('/v1/execution/stats/summary')
 }
+
+// ==================== API 函数 - 机会检测 ====================
+
+/** 手动触发节能机会检测 */
+export function triggerDetection(days?: number) {
+  return request.post<ResponseModel<DetectionResult>>('/v1/opportunities/detect', null, {
+    params: { days }
+  })
+}
+
+/** 检测结果 */
+export interface DetectionResult {
+  total_analyzed: number
+  new_opportunities: number
+  skipped_duplicates: number
+  errors: number
+  details: Array<{
+    plugin_id: string
+    opportunities_found: number
+    new_created: number
+    skipped: number
+  }>
+}

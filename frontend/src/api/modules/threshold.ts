@@ -115,3 +115,57 @@ export function copyThresholds(data: ThresholdCopyParams): Promise<{
 }> {
   return request.post('/v1/thresholds/copy', data)
 }
+
+// ==================== 4级阈值一体化配置 ====================
+
+export interface FourLevelThresholdItem {
+  value: number | null
+  message?: string
+  enabled?: boolean
+}
+
+export interface FourLevelThresholdParams {
+  high_high?: FourLevelThresholdItem
+  high?: FourLevelThresholdItem
+  low?: FourLevelThresholdItem
+  low_low?: FourLevelThresholdItem
+  delay_seconds?: number
+  dead_band?: number
+}
+
+export interface BatchByDeviceTypeParams {
+  device_type: string
+  thresholds: FourLevelThresholdParams
+}
+
+/**
+ * 4级阈值一体化配置
+ */
+export function setFourLevelThresholds(
+  pointId: number,
+  data: FourLevelThresholdParams
+): Promise<ThresholdInfo[]> {
+  return request.put(`/v1/thresholds/point/${pointId}/four-level`, data)
+}
+
+/**
+ * 按设备类型批量配置阈值
+ */
+export function batchSetByDeviceType(data: BatchByDeviceTypeParams): Promise<{
+  success_count: number
+  error_count: number
+  errors: string[]
+  total_points: number
+}> {
+  return request.post('/v1/thresholds/batch-by-device-type', data)
+}
+
+/**
+ * 获取阈值配置版本号
+ */
+export function getThresholdVersion(): Promise<{
+  version: number
+  updated_at: string
+}> {
+  return request.get('/v1/thresholds/version')
+}

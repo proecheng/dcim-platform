@@ -28,6 +28,9 @@ export interface AlarmInfo {
   is_notified: boolean
   notify_count: number
   created_at: string
+  escalation_count?: number
+  escalated_from?: string | null
+  escalation_remark?: string | null
 }
 
 export interface AlarmCount {
@@ -64,6 +67,10 @@ export interface AlarmAcknowledgeParams {
 export interface AlarmResolveParams {
   resolve_type?: 'manual' | 'auto' | 'timeout'
   remark?: string
+}
+
+export interface AlarmProcessParams {
+  process_remark: string
 }
 
 /**
@@ -111,10 +118,17 @@ export function resolveAlarm(id: number, data?: AlarmResolveParams): Promise<voi
 }
 
 /**
+ * 处理告警
+ */
+export function processAlarm(id: number, data: AlarmProcessParams): Promise<void> {
+  return request.put(`/v1/alarms/${id}/process`, data)
+}
+
+/**
  * 批量确认告警
  */
-export function batchAcknowledgeAlarms(ids: number[], data?: AlarmAcknowledgeParams): Promise<void> {
-  return request.put('/v1/alarms/batch-acknowledge', { ids, ...data })
+export function batchAcknowledgeAlarms(ids: number[], remark?: string): Promise<void> {
+  return request.put('/v1/alarms/batch-acknowledge', { alarm_ids: ids, remark })
 }
 
 /**
@@ -161,4 +175,189 @@ export function exportAlarms(params?: ExportParams & {
     params,
     responseType: 'blob'
   })
+}
+
+// ==================== 告警规则管理 ====================
+
+export interface AlarmRuleInfo {
+  id: number
+  rule_name: string
+  rule_type: 'and' | 'or' | 'sequence'
+  condition_expr: string | null
+  alarm_level: 'critical' | 'major' | 'minor' | 'info'
+  alarm_message: string | null
+  is_enabled: boolean
+  created_at: string
+}
+
+export interface AlarmRuleCreateParams {
+  rule_name: string
+  rule_type?: 'and' | 'or' | 'sequence'
+  condition_expr?: string
+  alarm_level?: 'critical' | 'major' | 'minor' | 'info'
+  alarm_message?: string
+  is_enabled?: boolean
+}
+
+export interface AlarmRuleUpdateParams {
+  rule_name?: string
+  rule_type?: 'and' | 'or' | 'sequence'
+  condition_expr?: string
+  alarm_level?: 'critical' | 'major' | 'minor' | 'info'
+  alarm_message?: string
+  is_enabled?: boolean
+}
+
+/**
+ * 获取告警规则列表
+ */
+export function getAlarmRules(params?: PageParams & {
+  rule_type?: string
+  alarm_level?: string
+  is_enabled?: boolean
+}): Promise<PageResponse<AlarmRuleInfo>> {
+  return request.get('/v1/alarms/rules', { params })
+}
+
+/**
+ * 创建告警规则
+ */
+export function createAlarmRule(data: AlarmRuleCreateParams): Promise<AlarmRuleInfo> {
+  return request.post('/v1/alarms/rules', data)
+}
+
+/**
+ * 获取告警规则详情
+ */
+export function getAlarmRuleById(id: number): Promise<AlarmRuleInfo> {
+  return request.get(`/v1/alarms/rules/${id}`)
+}
+
+/**
+ * 更新告警规则
+ */
+export function updateAlarmRule(id: number, data: AlarmRuleUpdateParams): Promise<AlarmRuleInfo> {
+  return request.put(`/v1/alarms/rules/${id}`, data)
+}
+
+/**
+ * 删除告警规则
+ */
+export function deleteAlarmRule(id: number): Promise<void> {
+  return request.delete(`/v1/alarms/rules/${id}`)
+}
+
+/**
+ * 切换告警规则启用状态
+ */
+export function toggleAlarmRule(id: number): Promise<{ message: string; is_enabled: boolean }> {
+  return request.put(`/v1/alarms/rules/${id}/toggle`)
+}
+
+// ==================== 告警屏蔽管理 ====================
+
+export interface AlarmShieldInfo {
+  id: number
+  point_id: number | null
+  point_code: string | null
+  point_name: string | null
+  alarm_level: 'critical' | 'major' | 'minor' | 'info' | null
+  start_time: string
+  end_time: string
+  reason: string | null
+  created_by: number | null
+  creator_name: string | null
+  created_at: string
+  status: 'active' | 'expired' | null
+}
+
+export interface AlarmShieldCreateParams {
+  point_id?: number | null
+  alarm_level?: 'critical' | 'major' | 'minor' | 'info' | null
+  start_time: string
+  end_time: string
+  reason?: string
+}
+
+/**
+ * 获取告警屏蔽列表
+ */
+export function getAlarmShields(params?: PageParams & {
+  point_id?: number
+  alarm_level?: string
+}): Promise<PageResponse<AlarmShieldInfo>> {
+  return request.get('/v1/alarms/shields', { params })
+}
+
+/**
+ * 创建告警屏蔽
+ */
+export function createAlarmShield(data: AlarmShieldCreateParams): Promise<AlarmShieldInfo> {
+  return request.post('/v1/alarms/shields', data)
+}
+
+/**
+ * 删除告警屏蔽
+ */
+export function deleteAlarmShield(id: number): Promise<void> {
+  return request.delete(`/v1/alarms/shields/${id}`)
+}
+
+// ==================== 告警升级规则管理 ====================
+
+export interface AlarmEscalationInfo {
+  id: number
+  rule_name: string
+  source_level: string
+  timeout_minutes: number
+  target_level: string
+  notify_user_ids: number[]
+  is_enabled: boolean
+  description: string | null
+  created_at: string | null
+  updated_at: string | null
+}
+
+export interface AlarmEscalationCreateParams {
+  rule_name: string
+  source_level: string
+  timeout_minutes: number
+  target_level: string
+  notify_user_ids: number[]
+  is_enabled?: boolean
+  description?: string
+}
+
+export interface AlarmEscalationUpdateParams {
+  rule_name?: string
+  source_level?: string
+  timeout_minutes?: number
+  target_level?: string
+  notify_user_ids?: number[]
+  is_enabled?: boolean
+  description?: string
+}
+
+export function getEscalations(params?: { source_level?: string; is_enabled?: boolean; page?: number; page_size?: number }) {
+  return request.get('/v1/escalations', { params })
+}
+
+export function createEscalation(data: AlarmEscalationCreateParams) {
+  return request.post('/v1/escalations', data)
+}
+
+export function getEscalation(id: number) {
+  return request.get(`/v1/escalations/${id}`)
+}
+
+export function updateEscalation(id: number, data: AlarmEscalationUpdateParams) {
+  return request.put(`/v1/escalations/${id}`, data)
+}
+
+export function deleteEscalation(id: number) {
+  return request.delete(`/v1/escalations/${id}`)
+}
+
+export function toggleEscalation(id: number) {
+  return request.put(`/v1/escalations/${id}/toggle`)
 }

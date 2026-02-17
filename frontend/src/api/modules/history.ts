@@ -70,6 +70,7 @@ export function getPointHistory(pointId: number, params: TimeRangeParams & PageP
 export function getPointTrend(pointId: number, params: TimeRangeParams & {
   granularity?: 'raw' | 'minute' | 'hour' | 'day'
   limit?: number
+  duration?: number
 }): Promise<TrendData[]> {
   return request.get(`/v1/history/${pointId}/trend`, { params })
 }

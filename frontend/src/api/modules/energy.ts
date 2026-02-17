@@ -84,6 +84,7 @@ export interface RealtimePowerData {
   load_rate?: number
   status: 'normal' | 'warning' | 'alarm' | 'offline'
   update_time: string
+  data_quality?: number
 }
 
 export interface RealtimePowerSummary {
@@ -92,16 +93,17 @@ export interface RealtimePowerSummary {
   cooling_power: number
   ups_power: number
   other_power: number
-  current_pue: number
+  current_pue: number | null
   today_energy: number
   today_cost: number
   month_energy: number
   month_cost: number
+  data_source?: string
 }
 
 /** PUE数据 */
 export interface PUEData {
-  current_pue: number
+  current_pue: number | null
   total_power: number
   it_power: number
   cooling_power: number
@@ -109,6 +111,8 @@ export interface PUEData {
   lighting_power: number
   other_power: number
   update_time: string
+  data_source?: string
+  unreliable_count?: number
 }
 
 export interface PUEHistoryItem {
@@ -173,6 +177,7 @@ export interface EnergyStat {
   avg_power: number
   max_power: number
   avg_pue?: number
+  data_source?: string | null
 }
 
 export interface EnergyTrendItem {
@@ -187,6 +192,7 @@ export interface EnergyTrend {
   data: EnergyTrendItem[]
   total_energy: number
   total_cost: number
+  data_source?: string | null
 }
 
 export interface EnergyComparison {
@@ -196,6 +202,7 @@ export interface EnergyComparison {
   energy_change_rate: number
   cost_change: number
   cost_change_rate: number
+  data_source?: string | null
 }
 
 /** 电价配置 */
@@ -798,6 +805,7 @@ export interface TopologyCircuitNode {
   load_type?: string
   is_shiftable: boolean
   devices: PowerDevice[]
+  realtime_power?: number
 }
 
 export interface TopologyPanelNode {
@@ -806,6 +814,7 @@ export interface TopologyPanelNode {
   panel_name: string
   panel_type: string
   circuits: TopologyCircuitNode[]
+  realtime_power?: number
 }
 
 export interface TopologyMeterNode {
@@ -823,6 +832,7 @@ export interface TopologyTransformerNode {
   transformer_name: string
   rated_capacity: number
   meter_points: TopologyMeterNode[]
+  realtime_power?: number
 }
 
 export interface DistributionTopology {
@@ -2307,4 +2317,65 @@ export function syncDevicePointRelations() {
 /** 获取同步状态统计 */
 export function getSyncStatus() {
   return request.get<ResponseModel<SyncStatistics & { success: boolean }>>('/v1/topology/sync/status')
+}
+
+// ==================== 能效报告 ====================
+
+/** 能效报告预览数据 */
+export interface EnergyReportData {
+  report_info: {
+    year: number
+    month: number
+    generated_at: string
+    period_start: string
+    period_end: string
+  }
+  pue_trend: {
+    daily_values: Array<{ date: string; avg_pue: number; min_pue: number; max_pue: number }>
+    month_avg_pue: number | null
+    month_min_pue: number | null
+    month_max_pue: number | null
+    yoy_change: number | null
+    mom_change: number | null
+  }
+  cost_comparison: {
+    current_month: {
+      total_energy: number; total_cost: number
+      peak_energy: number; peak_cost: number
+      normal_energy: number; normal_cost: number
+      valley_energy: number; valley_cost: number
+    }
+    last_month: Record<string, number> | null
+    last_year_month: Record<string, number> | null
+    yoy_change_rate: number | null
+    mom_change_rate: number | null
+  }
+  energy_saving: {
+    total_saving_cost: number
+    total_saving_kwh: number
+    opportunities_count: number
+    executed_count: number
+    avg_achievement_rate: number
+    details: Array<{
+      title: string
+      category: number
+      saving_kwh: number
+      saving_cost: number
+      achievement_rate: number
+    }>
+  }
+  energy_overview: {
+    total_energy: number
+    daily_trend: Array<{ date: string; total_energy: number; pue: number }>
+  }
+}
+
+/** 获取能效报告预览数据 */
+export function getEnergyReportPreview(params: { year: number; month: number }) {
+  return request.get<ResponseModel<EnergyReportData>>('/v1/energy/report/preview', { params })
+}
+
+/** 导出能效报告 */
+export function exportEnergyReport(params: { year: number; month: number; format: 'excel' | 'pdf' }) {
+  return request.get('/v1/energy/report/export', { params, responseType: 'blob' })
 }

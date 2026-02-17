@@ -92,14 +92,14 @@ export function deleteUser(id: number): Promise<void> {
  * 启用/禁用用户
  */
 export function toggleUserStatus(id: number, is_active: boolean): Promise<void> {
-  return request.put(`/v1/users/${id}/status`, { is_active })
+  return request.put(`/v1/users/${id}/status`, null, { params: { is_active } })
 }
 
 /**
  * 重置密码
  */
 export function resetPassword(id: number, new_password: string): Promise<void> {
-  return request.put(`/v1/users/${id}/reset-password`, { new_password })
+  return request.put(`/v1/users/${id}/reset-password`, null, { params: { new_password } })
 }
 
 /**

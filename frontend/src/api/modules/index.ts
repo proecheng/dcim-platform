@@ -44,11 +44,20 @@ export {
   getAlarmTrend,
   getTopAlarmPoints,
   exportAlarms,
+  getEscalations,
+  createEscalation,
+  getEscalation,
+  updateEscalation,
+  deleteEscalation,
+  toggleEscalation,
   type AlarmInfo,
   type AlarmCount,
   type AlarmTrend,
   type AlarmAcknowledgeParams,
-  type AlarmResolveParams
+  type AlarmResolveParams,
+  type AlarmEscalationInfo,
+  type AlarmEscalationCreateParams,
+  type AlarmEscalationUpdateParams
 } from './alarm'
 
 // 历史数据 - 排除getPointStatistics (与statistics模块冲突)
@@ -114,3 +123,6 @@ export * from './monitoring'
 
 // 日前调度优化
 export * from './optimization'
+
+// 数据质量
+export * from './dataQuality'

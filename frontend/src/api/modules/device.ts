@@ -55,6 +55,7 @@ export interface DeviceStatusSummary {
   online: number
   offline: number
   maintenance: number
+  alarm: number
   by_type: Record<string, number>
 }
 
@@ -99,6 +100,55 @@ export function deleteDevice(id: number): Promise<void> {
 }
 
 /**
+ * 设备详情聚合响应 — 点位实时数据项
+ */
+export interface PointRealtimeItem {
+  id: number
+  point_code: string
+  point_name: string
+  point_type: string
+  device_type: string | null
+  unit: string | null
+  value: number | null
+  value_text: string | null
+  status: string
+  alarm_level: string | null
+  quality: number | null
+  updated_at: string | null
+}
+
+/**
+ * 设备详情聚合响应 — 告警项
+ */
+export interface AlarmItem {
+  id: number
+  alarm_no: string
+  point_id: number
+  alarm_level: string
+  alarm_message: string
+  trigger_value: number | null
+  threshold_value: number | null
+  status: string
+  created_at: string | null
+}
+
+/**
+ * 设备详情聚合响应
+ */
+export interface DeviceDetailResponse {
+  device: DeviceInfo
+  points: PointRealtimeItem[]
+  alarms: AlarmItem[]
+}
+
+/**
+ * 获取设备详情（聚合：设备信息 + 点位实时数据 + 活动告警）
+ */
+export function getDeviceDetail(id: number): Promise<DeviceDetailResponse> {
+  return request.get(`/v1/devices/${id}/detail`)
+}
+
+/**
  * 获取设备下的点位
  */
 export function getDevicePoints(id: number): Promise<any[]> {
@@ -117,4 +167,39 @@ export function getDeviceTree(): Promise<DeviceTreeNode[]> {
  */
 export function getDeviceStatusSummary(): Promise<DeviceStatusSummary> {
   return request.get('/v1/devices/status-summary')
+}
+
+/**
+ * 设备状态看板 — 状态项
+ */
+export interface DeviceStatusItem {
+  id: number
+  device_code: string
+  device_name: string
+  status: string
+}
+
+/**
+ * 设备状态看板 — 分组
+ */
+export interface DeviceStatusGroup {
+  area_code: string
+  device_type: string
+  devices: DeviceStatusItem[]
+  stats: { online: number; offline: number; alarm: number; maintenance: number }
+}
+
+/**
+ * 设备状态看板 — 响应
+ */
+export interface DeviceStatusBoardResponse {
+  summary: { total: number; online: number; offline: number; alarm: number; maintenance: number }
+  groups: DeviceStatusGroup[]
+}
+
+/**
+ * 获取设备状态看板
+ */
+export function getDeviceStatusBoard(params?: { area_code?: string; device_type?: string }): Promise<DeviceStatusBoardResponse> {
+  return request.get('/v1/devices/status-board', { params })
 }

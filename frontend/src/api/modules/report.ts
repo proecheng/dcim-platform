@@ -132,8 +132,9 @@ export function getReportRecords(params?: PageParams & TimeRangeParams & {
 /**
  * 下载报表
  */
-export function downloadReport(id: number): Promise<Blob> {
+export function downloadReport(id: number, format: 'json' | 'csv' | 'pdf' = 'json'): Promise<Blob> {
   return request.get(`/v1/reports/download/${id}`, {
+    params: { format },
     responseType: 'blob'
   })
 }
