@@ -1,0 +1,129 @@
+# 消防分级联动策略 — YAML 预定义
+# Story 9-2: 消防分级联动策略
+# 说明: 系统启动时自动加载到数据库（is_system=True）
+# 当前系统仅有 SMOKE 类型设备可触发预警级策略
+# VESDA/FIRE_PANEL/FIRE_ALARM_PANEL 为预留类型，待未来设备扩展
+
+fire_protection_policies:
+  # ========== 预警级别 — 单一传感器触发 ==========
+
+  - name: "消防预警-烟感触发"
+    description: "单一烟雾传感器触发时发送预警通知并调取区域摄像头"
+    trigger_type: "alarm.triggered"
+    trigger_condition:
+      alarm_type: "threshold"
+      device_type:
+        - "SMOKE"
+        - "SMOKE_DETECTOR"
+      fire_level: "warning"
+    priority: "critical"
+    actions:
+      - action_type: "ALARM_NOTIFY"
+        action_config:
+          message: "消防预警：烟雾传感器触发，请值班人员确认"
+          alarm_level: "critical"
+        sort_order: 0
+        timeout_seconds: 3
+        retry_count: 1
+      - action_type: "VIDEO_POPUP"
+        action_config:
+          zone: "auto"
+          message: "消防预警：调取区域摄像头"
+        sort_order: 1
+        timeout_seconds: 5
+        retry_count: 0
+
+  - name: "消防预警-VESDA触发"
+    description: "极早期火灾探测器(VESDA)触发时发送预警通知"
+    trigger_type: "alarm.triggered"
+    trigger_condition:
+      alarm_type: "threshold"
+      device_type:
+        - "VESDA"
+        - "VESDA_DETECTOR"
+      fire_level: "warning"
+    priority: "critical"
+    actions:
+      - action_type: "ALARM_NOTIFY"
+        action_config:
+          message: "消防预警：VESDA探测器触发，请值班人员确认"
+          alarm_level: "critical"
+        sort_order: 0
+        timeout_seconds: 3
+        retry_count: 1
+      - action_type: "VIDEO_POPUP"
+        action_config:
+          zone: "auto"
+          message: "消防预警：调取区域摄像头"
+        sort_order: 1
+        timeout_seconds: 5
+        retry_count: 0
+
+  # ========== 联动级别 — 消防主机干接点信号或交叉确认 ==========
+
+  - name: "消防联动-全区域应急响应"
+    description: "消防主机干接点信号或多传感器交叉确认时执行全部联动策略（GB 50116）"
+    trigger_type: "alarm.triggered"
+    trigger_condition:
+      alarm_type: "threshold"
+      device_type:
+        - "FIRE_PANEL"
+        - "FIRE_ALARM_PANEL"
+        - "CROSS_CONFIRMED"
+      fire_level: "linkage"
+    priority: "fire_signal"
+    actions:
+      - action_type: "MQTT_COMMAND"
+        action_config:
+          command: "shutdown"
+          target_type: "HVAC"
+          message: "关闭空调系统"
+        sort_order: 0
+        timeout_seconds: 3
+        retry_count: 1
+      - action_type: "MQTT_COMMAND"
+        action_config:
+          command: "start"
+          target_type: "EXHAUST_FAN"
+          message: "启动排烟风机"
+        sort_order: 1
+        timeout_seconds: 3
+        retry_count: 1
+      - action_type: "MQTT_COMMAND"
+        action_config:
+          command: "cutoff"
+          target_type: "NON_CRITICAL_POWER"
+          message: "切断非关键电源"
+        sort_order: 2
+        timeout_seconds: 3
+        retry_count: 1
+      - action_type: "MQTT_COMMAND"
+        action_config:
+          command: "unlock"
+          target_type: "ACCESS_CONTROL"
+          message: "解锁门禁系统"
+        sort_order: 3
+        timeout_seconds: 3
+        retry_count: 1
+      - action_type: "MQTT_COMMAND"
+        action_config:
+          command: "activate"
+          target_type: "EMERGENCY_LIGHTING"
+          message: "开启应急照明"
+        sort_order: 4
+        timeout_seconds: 3
+        retry_count: 1
+      - action_type: "VIDEO_RECORD"
+        action_config:
+          zone: "all"
+          message: "全区域录像"
+        sort_order: 5
+        timeout_seconds: 5
+        retry_count: 0
+      - action_type: "ALARM_NOTIFY"
+        action_config:
+          message: "紧急通知：消防联动已触发，全区域应急响应已启动"
+          alarm_level: "critical"
+        sort_order: 6
+        timeout_seconds: 3
+        retry_count: 1
