@@ -1,5 +1,33 @@
 {
   "dependencies": {
     "docx": "^9.5.1"
-  }
+  },
+  "name": "mytest1",
+  "version": "1.0.0",
+  "description": "数据中心基础设施管理系统，提供机房环境监控、设备管理、告警管理、历史数据分析和用电管理等功能。",
+  "main": "generate_manual.js",
+  "directories": {
+    "doc": "docs",
+    "test": "tests"
+  },
+  "devDependencies": {
+    "@playwright/mcp": "^0.0.64",
+    "@playwright/test": "^1.58.2"
+  },
+  "scripts": {
+    "test": "npx playwright test",
+    "test:ui": "npx playwright test --ui"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/proecheng/dcim-platform.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/proecheng/dcim-platform/issues"
+  },
+  "homepage": "https://github.com/proecheng/dcim-platform#readme"
 }
