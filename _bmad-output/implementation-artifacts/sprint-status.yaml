@@ -1,71 +1,167 @@
-# generated: 2026-02-14
+# generated: 2026-02-15
 # project: DCIM
 # project_key: NOKEY
 # tracking_system: file-system
-# story_location: implementation-artifacts
+# story_location: _bmad-output/implementation-artifacts
 
-generated: 2026-02-14
+# STATUS DEFINITIONS:
+#   backlog       - Not yet started
+#   in-progress   - Currently being worked on
+#   review        - In code review or QA
+#   done          - Completed and verified
+#   blocked       - Cannot proceed due to dependency or issue
+#   cancelled     - No longer needed
+#   optional      - May be done if time permits (used for retrospectives)
+
+generated: 2026-02-15
 project: DCIM
 project_key: NOKEY
 tracking_system: file-system
-story_location: implementation-artifacts
+story_location: _bmad-output/implementation-artifacts
 
 development_status:
-  # Epic 7: Navigation and Framework Restructuring
+  # Epic 1: 采集网关框架 + Modbus/SNMP 适配器 (MVP)
+  epic-1: done
+  1-1-protocol-adapter-plugin-framework: done
+  1-2-modbus-tcp-adapter: done
+  1-3-modbus-rtu-adapter: done
+  1-4-snmp-v2c-v3-adapter: done
+  1-5-connection-test: done
+  1-6-dry-contact-signal-collection: done
+  epic-1-retrospective: optional
+
+  # Epic 2: 网关管理 + MQTT 通信链路 (MVP)
+  epic-2: done
+  2-1-gateway-auto-registration: done
+  2-2-gateway-status-monitoring: done
+  2-3-remote-config-push: done
+  2-4-offline-cache-and-resume: done
+  2-5-mqtt-data-reporting-pipeline: done
+  2-6-redis-cache-strategy: done
+  epic-2-retrospective: optional
+
+  # Epic 3: 数据源管理 UI + 设备模板 (MVP)
+  epic-3: done
+  3-1-datasource-config-management: done
+  3-2-point-batch-import-and-validation: done
+  3-3-readonly-mode-and-write-permission: done
+  3-4-device-template-management: done
+  3-5-integration-report-export: done
+  epic-3-retrospective: optional
+
+  # Epic 4: 实时监控适配 (MVP)
+  epic-4: done
+  4-1-six-subsystem-dashboard-adaptation: done
+  4-2-device-detail-and-history-chart: done
+  4-3-device-status-board: done
+  4-4-communication-interruption-detection: done
+  4-5-graceful-degradation: done
+  epic-4-retrospective: optional
+
+  # Epic 5: 告警管理增强 (MVP)
+  epic-5: done
+  5-1-alarm-threshold-config-enhancement: done
+  5-2-realtime-alarm-trigger-and-notification: done
+  5-3-alarm-handling-closed-loop: done
+  5-4-data-quality-marking-and-false-alarm-prevention: done
+  5-5-alarm-escalation-rules-and-frontend-management: done
+  epic-5-retrospective: optional
+
+  # Epic 6: 能源管理 (MVP + Phase 2)
+  epic-6: done
+  6-1-pue-monitoring-and-power-topology-adaptation: done
+  6-2-energy-statistics-and-pricing-management: done
+  6-3-energy-saving-opportunity-identification: done
+  6-4-energy-saving-plan-execution-and-tracking: done
+  6-5-energy-efficiency-report-export: done
+  epic-6-retrospective: optional
+
+  # Epic 7: 资产与容量管理 (Phase 1.5 + Phase 2)
   epic-7: done
-  7-1-sidebar-menu-restructuring: done
-  7-2-route-migration-with-redirects: done
-  7-3-dashboard-enhancement: done
-  7-4-new-route-registration: done
-  epic-7-retrospective: optional
+  7-1-asset-ledger-management: done
+  7-2-cabinet-u-position-visualization: done
+  7-3-asset-lifecycle-and-warranty-alert: done
+  7-4-four-dimension-capacity-monitoring: done
+  7-5-smart-racking-recommendation: done
+  7-6-capacity-trend-prediction: done
+  epic-7-retrospective: done
 
-  # Epic 8: Power Distribution Management
+  # Epic 8: 机房物理拓扑 + 智能选址 (Phase 2)
   epic-8: done
-  8-1-backend-ups-and-battery-models-api: done
-  8-2-backend-power-distribution-cabinet-pdu-api: done
-  8-3-frontend-power-overview-page: done
-  8-4-frontend-ups-monitoring-panel: done
-  8-5-frontend-battery-group-panel: done
-  8-6-frontend-distribution-cabinet-and-pdu-pages: done
-  8-7-simulator-power-domain-data-generation: done
-  epic-8-retrospective: optional
+  8-1-space-topology-configuration: done
+  8-2-power-and-cooling-topology-configuration: done
+  8-3-multi-dimension-smart-site-selection: done
+  8-4-fault-impact-analysis: done
+  epic-8-retrospective: done
 
-  # Epic 9: Cooling System
-  epic-9: backlog
-  9-1-backend-cooling-models-api: backlog
-  9-2-frontend-cooling-overview-page: backlog
-  9-3-frontend-precision-ac-monitoring-indoor-outdoor: backlog
-  9-4-frontend-cold-aisle-and-group-control-pages: backlog
-  9-5-simulator-cooling-domain-data-generation: backlog
+  # Epic 9: 联动引擎 + 消防联动 (Phase 2)
+  epic-9: in-progress
+  9-1-linkage-engine-core-framework: done
+  9-2-fire-protection-tiered-linkage-strategy: done
+  9-3-intelligent-fault-diagnosis: backlog
+  9-4-linkage-recovery-process: backlog
+  9-5-event-timeline-report: backlog
+  9-6-control-command-tiered-confirmation: backlog
+  9-7-sensor-data-drift-detection: backlog
   epic-9-retrospective: optional
 
-  # Epic 10: Environment Monitoring + Security and Fire Protection
+  # Epic 10: 视频监控集成 (Phase 2)
   epic-10: backlog
-  10-1-backend-environment-sensor-api: backlog
-  10-2-frontend-environment-monitoring-overview-page: backlog
-  10-2a-frontend-temperature-humidity-monitoring-page: backlog
-  10-2b-frontend-water-leak-detection-page: backlog
-  10-2c-frontend-smoke-detection-page: backlog
-  10-2d-frontend-infrared-security-page: backlog
-  10-3-backend-access-control-fire-protection-models-and-api: backlog
-  10-4-frontend-access-control-page: backlog
-  10-5-frontend-video-monitoring-placeholder: backlog
-  10-6-frontend-fire-protection-page: backlog
-  10-7-backend-alarm-linkage-rules: backlog
-  10-8-simulator-environment-security-data-generation: backlog
+  10-1-camera-metadata-management: backlog
+  10-2-alarm-linked-video-retrieval: backlog
+  10-3-zone-linked-recording-and-ptz-control: backlog
+  10-4-alarm-playback: backlog
   epic-10-retrospective: optional
 
-  # Epic 11: Smart Infrastructure + Energy Saving Enhancement
+  # Epic 11: 运维管理 (Phase 2)
   epic-11: backlog
-  11-1-frontend-enhanced-cabinet-space-management: backlog
-  11-2-backend-frontend-smart-lighting: backlog
-  11-3-backend-icooling-and-cooling-efficiency-plugins: backlog
-  11-4-frontend-energy-saving-overview-enhancement: backlog
-  11-5-simulator-infrastructure-domain-data: backlog
+  11-1-work-order-management: backlog
+  11-2-inspection-plan-and-task: backlog
+  11-3-knowledge-base: backlog
+  11-4-alarm-auto-create-work-order: backlog
+  11-5-work-order-approval-process: backlog
   epic-11-retrospective: optional
 
-  # Epic 12: Simulator Extension and Protocol Adapter Foundation
+  # Epic 12: 报表与决策支持 (Phase 2)
   epic-12: backlog
-  12-1-simulator-architecture-refactor: backlog
-  12-2-protocol-adapter-abstraction-layer: backlog
+  12-1-auto-operation-report: backlog
+  12-2-intelligent-summary-panel: backlog
+  12-3-pdf-report-export: backlog
+  12-4-device-health-assessment: backlog
   epic-12-retrospective: optional
+
+  # Epic 13: 用户与系统管理 (MVP)
+  epic-13: backlog
+  13-1-user-management-frontend-page: backlog
+  13-2-auth-and-session-management-enhancement: backlog
+  13-3-operation-audit-log: backlog
+  13-4-data-backup-and-system-health: backlog
+  13-5-site-level-data-isolation: backlog
+  13-6-password-policy-management: backlog
+  epic-13-retrospective: optional
+
+  # Epic 14: 棕地改进 - 代码质量与测试 (MVP)
+  epic-14: backlog
+  14-1-backend-automated-test-suite: backlog
+  14-2-standalone-device-management-page: backlog
+  14-3-typescript-type-check-zero-errors: backlog
+  14-4-frontend-critical-component-tests: backlog
+  14-5-database-migration-and-timescaledb-config: backlog
+  14-6-docker-compose-one-click-deploy: backlog
+  epic-14-retrospective: optional
+
+  # Epic 15: 协议扩展 (Phase 1.5 + Phase 2)
+  epic-15: backlog
+  15-1-mqtt-device-adapter: backlog
+  15-2-http-rest-adapter: backlog
+  15-3-bacnet-ip-adapter: backlog
+  15-4-opc-ua-adapter: backlog
+  15-5-ota-gateway-upgrade: backlog
+  epic-15-retrospective: optional
+
+  # Epic 16: 多站点集中管理 (推广阶段)
+  epic-16: backlog
+  16-1-site-management: backlog
+  16-2-site-switching-and-unified-view: backlog
+  16-3-multi-site-gateway-access: backlog
+  epic-16-retrospective: optional
