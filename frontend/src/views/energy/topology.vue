@@ -84,6 +84,14 @@
                   <component :is="getNodeIcon(data.type, data.pointType)" />
                 </el-icon>
                 <span class="node-label">{{ data.label }}</span>
+                <span
+                  v-if="getNodePower(data) !== undefined"
+                  class="node-power"
+                  :class="getNodePowerClass(data)"
+                  :style="getNodePowerStyle(data)"
+                >
+                  ({{ getNodePower(data) != null ? getNodePower(data)!.toFixed(1) : '--' }} kW)
+                </span>
                 <span class="node-info" v-if="data.info">{{ data.info }}</span>
                 <el-tooltip
                   v-if="data.isOverloaded"
@@ -903,6 +911,37 @@ const getStatusText = (status: string) => {
   return map[status] || status
 }
 
+// 获取节点实时功率
+const getNodePower = (data: any): number | null | undefined => {
+  if (data.type === 'device') {
+    return data.rawData?.realtime_data?.power
+  }
+  if (['transformer', 'panel', 'circuit'].includes(data.type)) {
+    return data.rawData?.realtime_power
+  }
+  return undefined
+}
+
+// 获取功率着色 class（仅设备节点）
+const getNodePowerClass = (data: any): string => {
+  if (data.type !== 'device') return ''
+  const power = data.rawData?.realtime_data?.power
+  const ratedPower = data.rawData?.rated_power
+  if (power == null || !ratedPower) return ''
+  const ratio = power / ratedPower
+  if (ratio > 0.8) return 'power-danger'
+  if (ratio > 0.6) return 'power-warning'
+  return 'power-normal'
+}
+
+// 获取功率样式（数据质量不可靠时灰色斜体）
+const getNodePowerStyle = (data: any): Record<string, string> => {
+  if (data.type === 'device' && data.rawData?.realtime_data?.quality > 0) {
+    return { color: '#999', fontStyle: 'italic' }
+  }
+  return {}
+}
+
 const getNodeTypeName = (type: string | undefined) => {
   if (!type) return ''
   return nodeHierarchy[type as ExtendedNodeType]?.label || type
@@ -1687,7 +1726,10 @@ const handleDeletePoint = async (pt: DeviceLinkedPoint) => {
 </script>
 
 <style scoped lang="scss">
+@use '@/styles/mixins-25d' as *;
+
 .energy-topology {
+  @include page-form;
   padding: 20px;
   height: calc(100vh - var(--header-height) - 40px);
   display: flex;
@@ -1896,6 +1938,24 @@ const handleDeletePoint = async (pt: DeviceLinkedPoint) => {
 .node-info {
   color: var(--text-secondary);
   font-size: 12px;
+}
+
+.node-power {
+  font-size: 12px;
+  font-weight: 500;
+  margin-left: 2px;
+
+  &.power-normal {
+    color: var(--success-color);
+  }
+
+  &.power-warning {
+    color: var(--warning-color);
+  }
+
+  &.power-danger {
+    color: var(--error-color);
+  }
 }
 
 .overload-warning {

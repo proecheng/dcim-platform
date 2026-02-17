@@ -516,7 +516,10 @@ async function submitCreate() {
 </script>
 
 <style scoped lang="scss">
+@use '@/styles/mixins-25d' as *;
+
 .energy-regulation {
+  @include page-dashboard(4);
   .stat-cards {
     margin-bottom: 20px;
   }

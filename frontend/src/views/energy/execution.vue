@@ -236,14 +236,17 @@
             <div class="tracking-data">
               <div class="data-item">
                 <span class="label">实际节省</span>
-                <span class="value">{{ result.actual_saving.toFixed(2) }} 元</span>
+                <span class="value">{{ (result.actual_saving ?? 0).toFixed(2) }} 元</span>
               </div>
               <div class="data-item">
                 <span class="label">达成率</span>
                 <span class="value" :class="getAchievementClass(result.achievement_rate)">
-                  {{ result.achievement_rate.toFixed(1) }}%
+                  {{ (result.achievement_rate ?? 0).toFixed(1) }}%
                 </span>
               </div>
+            </div>
+            <div class="tracking-chart" v-if="hasChartData(result)">
+              <div :ref="(el: any) => setChartRef(el, result.id)" style="width: 100%; height: 280px;"></div>
             </div>
             <div class="tracking-conclusion" v-if="result.analysis_conclusion">
               {{ result.analysis_conclusion }}
@@ -256,10 +259,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, nextTick } from 'vue'
+import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Setting, InfoFilled } from '@element-plus/icons-vue'
+import * as echarts from 'echarts'
 import {
   getExecutionPlans,
   getExecutionPlanDetail,
@@ -491,6 +495,97 @@ function getRowClassName({ row }: { row: any }) {
   return ''
 }
 
+// ==================== 效果对比图表 ====================
+
+const chartInstances = new Map<number, echarts.ECharts>()
+
+function hasChartData(result: any): boolean {
+  const before = result.energy_before
+  const after = result.energy_after
+  return (Array.isArray(before) && before.length > 0) || (Array.isArray(after) && after.length > 0)
+}
+
+function setChartRef(el: HTMLElement | null, resultId: number) {
+  if (!el) {
+    chartInstances.get(resultId)?.dispose()
+    chartInstances.delete(resultId)
+    return
+  }
+  nextTick(() => {
+    if (el.offsetWidth === 0) return
+    let chart = chartInstances.get(resultId)
+    if (!chart) {
+      chart = echarts.init(el)
+      chartInstances.set(resultId, chart)
+    }
+    const result = currentPlan.value?.results.find((r: any) => r.id === resultId)
+    if (result) {
+      renderEffectChart(chart, result)
+    }
+  })
+}
+
+function renderEffectChart(chart: echarts.ECharts, result: any) {
+  const beforeData = Array.isArray(result.energy_before) ? result.energy_before : []
+  const afterData = Array.isArray(result.energy_after) ? result.energy_after : []
+
+  const beforeEnergy = beforeData.map((d: any) => d.energy || 0)
+  const afterEnergy = afterData.map((d: any) => d.energy || 0)
+
+  const maxLen = Math.max(beforeData.length, afterData.length)
+  const labels = Array.from({ length: maxLen }, (_, i) => `第${i + 1}天`)
+
+  const option: echarts.EChartsOption = {
+    tooltip: {
+      trigger: 'axis',
+      backgroundColor: 'rgba(13, 27, 42, 0.9)',
+      borderColor: 'rgba(64, 158, 255, 0.3)',
+      textStyle: { color: '#fff' }
+    },
+    legend: {
+      data: ['执行前', '执行后'],
+      textStyle: { color: 'rgba(255,255,255,0.65)' },
+      top: 0
+    },
+    grid: { left: 60, right: 20, top: 40, bottom: 30 },
+    xAxis: {
+      type: 'category',
+      data: labels,
+      axisLabel: { color: 'rgba(255,255,255,0.45)' },
+      axisLine: { lineStyle: { color: 'rgba(255,255,255,0.15)' } }
+    },
+    yAxis: {
+      type: 'value',
+      name: '能耗(kWh)',
+      nameTextStyle: { color: 'rgba(255,255,255,0.45)' },
+      axisLabel: { color: 'rgba(255,255,255,0.45)' },
+      splitLine: { lineStyle: { color: 'rgba(255,255,255,0.08)' } }
+    },
+    series: [
+      {
+        name: '执行前',
+        type: 'bar',
+        data: beforeEnergy,
+        itemStyle: { color: 'rgba(245, 34, 45, 0.7)', borderRadius: [4, 4, 0, 0] },
+        barMaxWidth: 30
+      },
+      {
+        name: '执行后',
+        type: 'bar',
+        data: afterEnergy,
+        itemStyle: { color: 'rgba(82, 196, 26, 0.7)', borderRadius: [4, 4, 0, 0] },
+        barMaxWidth: 30
+      }
+    ]
+  }
+  chart.setOption(option)
+}
+
+onUnmounted(() => {
+  chartInstances.forEach(chart => chart.dispose())
+  chartInstances.clear()
+})
+
 // 判断是否可以查看原配置
 const canViewOriginalConfig = computed(() => {
   if (!currentPlan.value?.opportunity) return false
@@ -571,7 +666,10 @@ function goToOriginalConfig() {
 </script>
 
 <style scoped lang="scss">
+@use '@/styles/mixins-25d' as *;
+
 .execution-management {
+  @include page-dashboard(4);
   .stat-cards {
     margin-bottom: 20px;
   }
@@ -791,6 +889,14 @@ function goToOriginalConfig() {
       border-top: 1px dashed var(--border-color, rgba(255, 255, 255, 0.1));
       color: var(--text-secondary, rgba(255, 255, 255, 0.65));
       font-size: 13px;
+    }
+
+    .tracking-chart {
+      margin-top: 16px;
+      padding: 12px;
+      background: rgba(0, 0, 0, 0.2);
+      border-radius: 8px;
+      border: 1px solid rgba(64, 158, 255, 0.1);
     }
   }
 }

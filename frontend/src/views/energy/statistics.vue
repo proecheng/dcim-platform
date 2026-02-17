@@ -31,6 +31,8 @@
         <el-form-item>
           <el-button type="primary" @click="loadData">查询</el-button>
           <el-button type="success" @click="handleExport">导出</el-button>
+          <el-tag v-if="dataSource === 'realtime'" type="success" size="small" style="margin-left: 12px;">实时数据</el-tag>
+          <el-tag v-else-if="dataSource === 'simulation'" type="warning" size="small" style="margin-left: 12px;">模拟数据</el-tag>
         </el-form-item>
       </el-form>
     </el-card>
@@ -39,7 +41,7 @@
     <el-row :gutter="20" class="summary-cards">
       <el-col :span="6">
         <el-card shadow="hover" class="summary-card">
-          <el-statistic title="总用电量" :value="energyStat.total_energy || 0" suffix="kWh">
+          <el-statistic title="总用电量" :value="energyStat.total_energy ?? 0" suffix="kWh">
             <template #prefix>
               <el-icon><Lightning /></el-icon>
             </template>
@@ -48,7 +50,7 @@
       </el-col>
       <el-col :span="6">
         <el-card shadow="hover" class="summary-card">
-          <el-statistic title="总电费" :value="energyStat.total_cost || 0" suffix="元" :precision="2">
+          <el-statistic title="总电费" :value="energyStat.total_cost ?? 0" suffix="元" :precision="2">
             <template #prefix>
               <el-icon><Money /></el-icon>
             </template>
@@ -57,7 +59,7 @@
       </el-col>
       <el-col :span="6">
         <el-card shadow="hover" class="summary-card">
-          <el-statistic title="平均功率" :value="energyStat.avg_power || 0" suffix="kW" :precision="1">
+          <el-statistic title="平均功率" :value="energyStat.avg_power ?? 0" suffix="kW" :precision="1">
             <template #prefix>
               <el-icon><Odometer /></el-icon>
             </template>
@@ -66,7 +68,7 @@
       </el-col>
       <el-col :span="6">
         <el-card shadow="hover" class="summary-card">
-          <el-statistic title="平均PUE" :value="energyStat.avg_pue || 0" :precision="2">
+          <el-statistic title="平均PUE" :value="energyStat.avg_pue ?? 0" :precision="2">
             <template #prefix>
               <el-icon><TrendCharts /></el-icon>
             </template>
@@ -84,23 +86,23 @@
         </el-card>
       </el-col>
 
-      <!-- 峰谷平分布 -->
+      <!-- 分时电量分布 -->
       <el-col :span="8">
         <el-card shadow="hover">
-          <template #header>峰谷平分布</template>
+          <template #header>分时电量分布</template>
           <div ref="pieChartRef" class="chart"></div>
           <div class="pie-legend">
             <div class="legend-item">
               <span class="dot peak"></span>
-              <span>峰时: {{ energyStat.peak_energy?.toFixed(0) || 0 }} kWh</span>
+              <span>尖峰+高峰: {{ energyStat.peak_energy?.toFixed(0) || 0 }} kWh</span>
             </div>
             <div class="legend-item">
               <span class="dot normal"></span>
-              <span>平时: {{ energyStat.normal_energy?.toFixed(0) || 0 }} kWh</span>
+              <span>平段: {{ energyStat.normal_energy?.toFixed(0) || 0 }} kWh</span>
             </div>
             <div class="legend-item">
               <span class="dot valley"></span>
-              <span>谷时: {{ energyStat.valley_energy?.toFixed(0) || 0 }} kWh</span>
+              <span>低谷+深谷: {{ energyStat.valley_energy?.toFixed(0) || 0 }} kWh</span>
             </div>
           </div>
         </el-card>
@@ -187,13 +189,13 @@
         <el-table-column prop="total_energy" label="总电量 (kWh)" width="120">
           <template #default="{ row }">{{ row.total_energy?.toFixed(1) }}</template>
         </el-table-column>
-        <el-table-column prop="peak_energy" label="峰时电量" width="100">
+        <el-table-column prop="peak_energy" label="尖峰+高峰电量" width="120">
           <template #default="{ row }">{{ row.peak_energy?.toFixed(1) }}</template>
         </el-table-column>
-        <el-table-column prop="normal_energy" label="平时电量" width="100">
+        <el-table-column prop="normal_energy" label="平段电量" width="100">
           <template #default="{ row }">{{ row.normal_energy?.toFixed(1) }}</template>
         </el-table-column>
-        <el-table-column prop="valley_energy" label="谷时电量" width="100">
+        <el-table-column prop="valley_energy" label="低谷+深谷电量" width="120">
           <template #default="{ row }">{{ row.valley_energy?.toFixed(1) }}</template>
         </el-table-column>
         <el-table-column prop="max_power" label="最大功率 (kW)" width="120">
@@ -237,6 +239,7 @@ const loading = ref(false)
 const detailData = ref<(EnergyDailyData | EnergyMonthlyData)[]>([])
 const energyStat = ref<Partial<EnergyStat>>({})
 const comparison = ref<Partial<EnergyComparison>>({})
+const dataSource = ref<string | null>(null)
 
 const filters = reactive({
   period: 'daily' as 'daily' | 'monthly',
@@ -365,6 +368,7 @@ async function loadDailySummary() {
       end_date: filters.dateRange[1]
     })
     energyStat.value = res.data || {}
+    dataSource.value = res.data?.data_source ?? null
     updatePieChart()
   } catch (e) {
     console.error('加载汇总失败', e)
@@ -380,6 +384,7 @@ async function loadMonthlySummary() {
       end_date: endDate
     })
     energyStat.value = res.data || {}
+    dataSource.value = res.data?.data_source ?? null
     updatePieChart()
   } catch (e) {
     console.error('加载汇总失败', e)
@@ -507,9 +512,9 @@ function updatePieChart() {
   if (!pieChart) return
 
   const data = [
-    { value: energyStat.value.peak_energy || 0, name: '峰时', itemStyle: { color: themeColors.error } },
-    { value: energyStat.value.normal_energy || 0, name: '平时', itemStyle: { color: themeColors.primary } },
-    { value: energyStat.value.valley_energy || 0, name: '谷时', itemStyle: { color: themeColors.success } }
+      { value: energyStat.value.peak_energy || 0, name: '尖峰+高峰', itemStyle: { color: themeColors.error } },
+      { value: energyStat.value.normal_energy || 0, name: '平段', itemStyle: { color: themeColors.primary } },
+      { value: energyStat.value.valley_energy || 0, name: '低谷+深谷', itemStyle: { color: themeColors.success } }
   ]
 
   const option: echarts.EChartsOption = {
@@ -607,7 +612,11 @@ async function handleExport() {
 </script>
 
 <style scoped lang="scss">
+@use '@/styles/mixins-25d' as *;
+
 .energy-statistics {
+  @include page-form;
+
   .filter-card {
     margin-bottom: 20px;
   }

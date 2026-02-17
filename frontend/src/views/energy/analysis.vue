@@ -1472,7 +1472,10 @@ function updateDemandChart() {
 </script>
 
 <style scoped lang="scss">
+@use '@/styles/mixins-25d' as *;
+
 .energy-analysis {
+  @include page-special;
   padding: 20px;
 
   // el-tabs border-card 深色主题样式

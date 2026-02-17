@@ -1376,7 +1376,10 @@ onMounted(() => {
 </script>
 
 <style scoped lang="scss">
+@use '@/styles/mixins-25d' as *;
+
 .energy-config {
+  @include page-list;
   padding: 20px;
 
   // el-tabs border-card 深色主题样式

@@ -542,7 +542,10 @@ function handleDetailAccepted() {
 </script>
 
 <style scoped lang="scss">
+@use '@/styles/mixins-25d' as *;
+
 .energy-suggestions {
+  @include page-dashboard(4);
   .potential-cards {
     margin-bottom: 20px;
   }

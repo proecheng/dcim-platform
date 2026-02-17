@@ -30,7 +30,7 @@
         <el-card shadow="hover" class="stat-card pue-card">
           <div class="stat-content">
             <div class="stat-value pue" :class="getPUEClass(summary.current_pue)">
-              {{ summary.current_pue?.toFixed(2) || '-' }}
+              {{ summary.current_pue != null ? summary.current_pue.toFixed(2) : '--' }}
             </div>
             <div class="stat-label">当前 PUE</div>
           </div>
@@ -58,24 +58,44 @@
       <!-- PUE仪表盘 -->
       <el-col :span="8">
         <el-card shadow="hover">
-          <template #header>PUE 实时监测</template>
+          <template #header>
+            <div class="card-header">
+              <span>PUE 实时监测</span>
+              <el-tag
+                :type="pueData.data_source === 'realtime' ? 'success' : 'info'"
+                size="small"
+              >
+                {{ pueData.data_source === 'realtime' ? '实时数据' : '模拟数据' }}
+              </el-tag>
+            </div>
+          </template>
           <div ref="pueChartRef" class="pue-chart"></div>
+          <el-alert
+            v-if="(pueData.unreliable_count ?? 0) > 0"
+            type="warning"
+            :closable="false"
+            style="margin-bottom: 8px;"
+          >
+            <template #title>
+              有 {{ pueData.unreliable_count }} 个点位数据不可靠，PUE 可能不准确
+            </template>
+          </el-alert>
           <div class="pue-breakdown">
             <div class="breakdown-item">
               <span class="label">总功率</span>
-              <span class="value">{{ pueData.total_power?.toFixed(1) }} kW</span>
+              <span class="value">{{ pueData.total_power != null ? pueData.total_power.toFixed(1) : '--' }} kW</span>
             </div>
             <div class="breakdown-item">
               <span class="label">IT负载</span>
-              <span class="value">{{ pueData.it_power?.toFixed(1) }} kW</span>
+              <span class="value">{{ pueData.it_power != null ? pueData.it_power.toFixed(1) : '--' }} kW</span>
             </div>
             <div class="breakdown-item">
               <span class="label">制冷功率</span>
-              <span class="value">{{ pueData.cooling_power?.toFixed(1) }} kW</span>
+              <span class="value">{{ pueData.cooling_power != null ? pueData.cooling_power.toFixed(1) : '--' }} kW</span>
             </div>
             <div class="breakdown-item">
               <span class="label">UPS损耗</span>
-              <span class="value">{{ pueData.ups_loss?.toFixed(1) }} kW</span>
+              <span class="value">{{ pueData.ups_loss != null ? pueData.ups_loss.toFixed(1) : '--' }} kW</span>
             </div>
           </div>
         </el-card>
@@ -646,7 +666,48 @@ function formatDateTime(dateTimeStr: string): string {
 function updatePUEChart() {
   if (!pueChart) return
 
-  const pue = pueData.value.current_pue || 0
+  const pue = pueData.value.current_pue
+  if (pue == null) {
+    // PUE 不可用时显示空仪表盘
+    const option: echarts.EChartsOption = {
+      series: [{
+        type: 'gauge',
+        startAngle: 200,
+        endAngle: -20,
+        min: 1,
+        max: 3,
+        splitNumber: 4,
+        progress: { show: false },
+        pointer: { show: false },
+        axisLine: {
+          lineStyle: {
+            width: 20,
+            color: [[1, 'rgba(255,255,255,0.1)']]
+          }
+        },
+        axisTick: { show: false },
+        splitLine: { show: false },
+        axisLabel: { show: false },
+        anchor: { show: false },
+        title: { show: false },
+        detail: {
+          valueAnimation: false,
+          width: '60%',
+          lineHeight: 40,
+          borderRadius: 8,
+          offsetCenter: [0, '20%'],
+          fontSize: 32,
+          fontWeight: 'bold',
+          formatter: '--',
+          color: chartColors.textSecondary
+        },
+        data: [{ value: 0 }]
+      }]
+    }
+    pueChart.setOption(option)
+    return
+  }
+
   const pueColor = getPUEColor(pue)
   const option: echarts.EChartsOption = {
     series: [{
@@ -780,8 +841,8 @@ function updatePUETrendChart() {
   pueTrendChart.setOption(option)
 }
 
-function getPUEClass(pue: number | undefined) {
-  if (!pue) return ''
+function getPUEClass(pue: number | null | undefined) {
+  if (pue == null) return ''
   if (pue < 1.5) return 'excellent'
   if (pue < 2.0) return 'good'
   if (pue < 2.5) return 'normal'
@@ -803,7 +864,10 @@ function getLoadColor(percent: number) {
 </script>
 
 <style scoped lang="scss">
+@use '@/styles/mixins-25d' as *;
+
 .energy-monitor {
+  @include page-dashboard(6);
   .stat-cards {
     margin-bottom: 20px;
   }
