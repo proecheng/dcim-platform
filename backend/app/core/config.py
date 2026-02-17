@@ -47,6 +47,18 @@ class Settings(BaseSettings):
     license_key: str = "DEMO-0000-0000-0000"
     max_points: int = 100
 
+    # Redis 配置
+    redis_enabled: bool = True
+    redis_url: str = "redis://localhost:6379/0"
+
+    # MQTT 配置
+    mqtt_enabled: bool = True
+    mqtt_host: str = "localhost"
+    mqtt_port: int = 1883
+    mqtt_username: str = ""
+    mqtt_password: str = ""
+    mqtt_client_id: str = "dcim-backend"
+
     class Config:
         env_file = ".env"
         case_sensitive = False

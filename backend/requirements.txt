@@ -31,3 +31,10 @@ openpyxl==3.1.2
 # Deep learning (optional)
 torch>=2.0.0
 numpy>=1.24.0
+reportlab>=4.0
+
+# HTTP client (联动引擎 Webhook)
+httpx>=0.25.0
+
+# YAML 配置 (消防策略)
+PyYAML>=6.0

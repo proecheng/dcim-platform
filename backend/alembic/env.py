@@ -26,7 +26,7 @@ from app.core.database import Base
 from app.models import (
     User, RolePermission, UserLoginHistory,
     Device, Point, PointRealtime, PointGroup, PointGroupMember,
-    AlarmThreshold, Alarm, AlarmRule, AlarmShield, AlarmDailyStats,
+    AlarmThreshold, Alarm, AlarmRule, AlarmShield, AlarmDailyStats, AlarmEscalation,
     PointHistory, PointHistoryArchive, PointChangeLog,
     OperationLog, SystemLog, CommunicationLog,
     ReportTemplate, ReportRecord,
