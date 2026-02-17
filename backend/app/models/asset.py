@@ -51,8 +51,15 @@ class Cabinet(Base):
     created_at = Column(DateTime, default=datetime.now, comment="创建时间")
     updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now, comment="更新时间")
 
+    # 空间拓扑字段
+    row_id = Column(Integer, ForeignKey("rows.id"), nullable=True, comment="所属行ID")
+    aisle_type = Column(String(10), nullable=True, comment="通道类型: cold/hot/none")
+    grid_x = Column(Integer, nullable=True, comment="网格X坐标")
+    grid_y = Column(Integer, nullable=True, comment="网格Y坐标")
+
     # 关系
     assets = relationship("Asset", back_populates="cabinet")
+    row = relationship("Row", back_populates="cabinets")
 
 
 # ==================== 资产模型 ====================

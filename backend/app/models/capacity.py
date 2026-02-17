@@ -3,7 +3,7 @@
 """
 from datetime import datetime
 from enum import Enum as PyEnum
-from sqlalchemy import Column, Integer, String, Boolean, Float, Text, DateTime, ForeignKey, Enum
+from sqlalchemy import Column, Integer, String, Boolean, Float, Text, DateTime, ForeignKey, Enum, Index
 from sqlalchemy.orm import relationship
 
 from ..core.database import Base
@@ -147,6 +147,9 @@ class CapacityPlan(Base):
 class CapacityHistory(Base):
     """容量历史记录表"""
     __tablename__ = "capacity_histories"
+    __table_args__ = (
+        Index('ix_capacity_history_type_time', 'capacity_type', 'recorded_at'),
+    )
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     capacity_type = Column(Enum(CapacityType), nullable=False, comment="容量类型")

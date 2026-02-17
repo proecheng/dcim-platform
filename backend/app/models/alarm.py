@@ -47,8 +47,15 @@ class Alarm(Base):
     resolve_remark = Column(Text, comment="解决备注")
     resolve_type = Column(String(20), comment="解决类型: manual/auto/timeout")
     duration_seconds = Column(Integer, comment="持续时间(秒)")
+    process_remark = Column(Text, comment="处理备注")
+    processed_by = Column(Integer, ForeignKey("users.id"), comment="处理人")
+    processed_at = Column(DateTime, comment="处理时间")
     is_notified = Column(Boolean, default=False, comment="是否已通知")
     notify_count = Column(Integer, default=0, comment="通知次数")
+    escalation_count = Column(Integer, default=0, server_default="0", comment="升级次数")
+    escalated_from = Column(String(20), comment="升级前告警级别")
+    escalation_remark = Column(Text, comment="升级备注")
+    last_escalated_at = Column(DateTime, comment="最后升级时间")
     created_at = Column(DateTime, default=datetime.now, comment="创建时间")
 
 
@@ -94,3 +101,19 @@ class AlarmDailyStats(Base):
     avg_duration_seconds = Column(Integer, comment="平均持续时间")
     max_duration_seconds = Column(Integer, comment="最大持续时间")
     created_at = Column(DateTime, default=datetime.now, comment="创建时间")
+
+
+class AlarmEscalation(Base):
+    """告警升级规则表"""
+    __tablename__ = "alarm_escalations"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    rule_name = Column(String(100), nullable=False, comment="规则名称")
+    source_level = Column(String(20), nullable=False, comment="源告警级别")
+    timeout_minutes = Column(Integer, nullable=False, comment="超时时间(分钟)")
+    target_level = Column(String(20), nullable=False, comment="升级后告警级别")
+    notify_user_ids = Column(String(500), default="", comment="通知对象(逗号分隔用户ID)")
+    is_enabled = Column(Boolean, default=True, comment="是否启用")
+    description = Column(Text, comment="规则描述")
+    created_at = Column(DateTime, default=datetime.now, comment="创建时间")
+    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now, comment="更新时间")
