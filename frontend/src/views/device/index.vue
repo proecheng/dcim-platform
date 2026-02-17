@@ -507,7 +507,10 @@ async function handleUnlink(row: any) {
 </script>
 
 <style scoped lang="scss">
+@use '@/styles/mixins-25d' as *;
+
 .device-page {
+  @include page-list;
   .card-header {
     display: flex;
     justify-content: space-between;

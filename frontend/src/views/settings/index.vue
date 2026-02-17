@@ -6,6 +6,8 @@
         <el-tab-pane label="阈值配置" name="threshold">
           <div class="tab-header">
             <el-button type="primary" :icon="Plus" @click="handleAddThreshold">新增阈值</el-button>
+            <el-button type="success" @click="handleFourLevelConfig">4级阈值配置</el-button>
+            <el-button type="warning" @click="handleBatchByDeviceType">按设备类型批量配置</el-button>
           </div>
 
           <el-form :inline="true" class="filter-form">
@@ -27,6 +29,11 @@
                 <el-option label="提示" value="info" />
               </el-select>
             </el-form-item>
+            <el-form-item label="设备类型">
+              <el-select v-model="thresholdFilters.device_type" placeholder="全部" clearable style="width: 150px;">
+                <el-option v-for="dt in deviceTypeOptions" :key="dt.value" :label="dt.label" :value="dt.value" />
+              </el-select>
+            </el-form-item>
             <el-form-item>
               <el-button type="primary" @click="loadThresholds">查询</el-button>
             </el-form-item>
@@ -35,6 +42,11 @@
           <el-table :data="thresholds" stripe border v-loading="thresholdLoading">
             <el-table-column prop="point_code" label="点位编码" width="140" />
             <el-table-column prop="point_name" label="点位名称" width="150" />
+            <el-table-column prop="device_type" label="设备类型" width="110">
+              <template #default="{ row }">
+                {{ deviceTypeText[row.device_type] || row.device_type || '--' }}
+              </template>
+            </el-table-column>
             <el-table-column prop="threshold_type" label="阈值类型" width="100">
               <template #default="{ row }">
                 {{ thresholdTypeText[row.threshold_type] }}
@@ -67,57 +79,17 @@
           </el-table>
         </el-tab-pane>
 
-        <!-- 用户管理 -->
-        <el-tab-pane label="用户管理" name="user">
-          <div class="tab-header">
-            <el-button type="primary" :icon="Plus" @click="handleAddUser">新增用户</el-button>
-          </div>
-
-          <el-table :data="users" stripe border v-loading="userLoading">
-            <el-table-column prop="username" label="用户名" width="120" />
-            <el-table-column prop="real_name" label="姓名" width="100" />
-            <el-table-column prop="email" label="邮箱" width="180" />
-            <el-table-column prop="phone" label="电话" width="130" />
-            <el-table-column prop="role" label="角色" width="100">
-              <template #default="{ row }">
-                <el-tag :type="roleType[row.role]" size="small">
-                  {{ roleText[row.role] }}
-                </el-tag>
-              </template>
-            </el-table-column>
-            <el-table-column prop="department" label="部门" width="120" />
-            <el-table-column prop="is_active" label="状态" width="80">
-              <template #default="{ row }">
-                <el-switch v-model="row.is_active" @change="toggleUserStatus(row)" />
-              </template>
-            </el-table-column>
-            <el-table-column prop="last_login_at" label="最后登录" width="160" />
-            <el-table-column label="操作" width="180" fixed="right">
-              <template #default="{ row }">
-                <el-button type="primary" link @click="handleEditUser(row)">编辑</el-button>
-                <el-button type="warning" link @click="handleResetPwd(row)">重置密码</el-button>
-                <el-popconfirm v-if="row.username !== 'admin'" title="确定删除？" @confirm="handleDeleteUser(row.id)">
-                  <template #reference>
-                    <el-button type="danger" link>删除</el-button>
-                  </template>
-                </el-popconfirm>
-              </template>
-            </el-table-column>
-          </el-table>
+        <!-- 用户管理（仅管理员可见） -->
+        <el-tab-pane v-if="isAdmin" label="用户管理" name="user">
+          <UserManagement />
         </el-tab-pane>
 
-        <!-- 系统日志 -->
-        <el-tab-pane label="系统日志" name="log">
+        <!-- 操作日志 -->
+        <el-tab-pane label="操作日志" name="operation-log">
           <el-form :inline="true" class="filter-form">
-            <el-form-item label="日志类型">
-              <el-select v-model="logFilters.log_type" style="width: 120px;">
-                <el-option label="操作日志" value="operation" />
-                <el-option label="系统日志" value="system" />
-              </el-select>
-            </el-form-item>
             <el-form-item label="时间范围">
               <el-date-picker
-                v-model="logFilters.dateRange"
+                v-model="operationLogFilters.dateRange"
                 type="daterange"
                 range-separator="至"
                 start-placeholder="开始"
@@ -125,19 +97,52 @@
                 value-format="YYYY-MM-DD"
               />
             </el-form-item>
+            <el-form-item label="操作类型">
+              <el-select v-model="operationLogFilters.action" placeholder="全部" clearable style="width: 120px;">
+                <el-option label="创建" value="create" />
+                <el-option label="更新" value="update" />
+                <el-option label="删除" value="delete" />
+                <el-option label="查询" value="query" />
+                <el-option label="导出" value="export" />
+              </el-select>
+            </el-form-item>
+            <el-form-item label="模块">
+              <el-select v-model="operationLogFilters.module" placeholder="全部" clearable style="width: 120px;">
+                <el-option label="用户" value="user" />
+                <el-option label="点位" value="point" />
+                <el-option label="设备" value="device" />
+                <el-option label="告警" value="alarm" />
+                <el-option label="配置" value="config" />
+                <el-option label="报表" value="report" />
+              </el-select>
+            </el-form-item>
+            <el-form-item label="关键词">
+              <el-input v-model="operationLogFilters.keyword" placeholder="目标名称/备注" clearable style="width: 150px;" />
+            </el-form-item>
             <el-form-item>
-              <el-button type="primary" @click="loadLogs">查询</el-button>
-              <el-button type="success" @click="exportLogs">导出</el-button>
+              <el-button type="primary" @click="loadOperationLogs">查询</el-button>
+              <el-button @click="resetOperationLogFilters">重置</el-button>
+              <el-button type="success" @click="exportOperationLogs">导出</el-button>
             </el-form-item>
           </el-form>
 
           <!-- 操作日志表格 -->
-          <el-table v-if="logFilters.log_type === 'operation'" :data="operationLogs" stripe border v-loading="logLoading">
+          <el-table :data="operationLogs" stripe border v-loading="operationLogLoading">
             <el-table-column prop="created_at" label="时间" width="160" />
             <el-table-column prop="username" label="用户" width="100" />
-            <el-table-column prop="module" label="模块" width="100" />
-            <el-table-column prop="action" label="操作" width="100" />
-            <el-table-column prop="target_name" label="目标" width="150" />
+            <el-table-column prop="action" label="操作" width="90">
+              <template #default="{ row }">
+                <el-tag :type="actionType[row.action] || 'info'" size="small">
+                  {{ actionText[row.action] || row.action }}
+                </el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column prop="module" label="模块" width="90">
+              <template #default="{ row }">
+                {{ moduleText[row.module] || row.module }}
+              </template>
+            </el-table-column>
+            <el-table-column prop="target_name" label="目标名称" min-width="150" show-overflow-tooltip />
             <el-table-column prop="ip_address" label="IP地址" width="130" />
             <el-table-column prop="response_code" label="状态" width="80">
               <template #default="{ row }">
@@ -146,32 +151,91 @@
                 </el-tag>
               </template>
             </el-table-column>
-            <el-table-column prop="remark" label="备注" min-width="150" />
+            <el-table-column prop="remark" label="备注" min-width="150" show-overflow-tooltip />
           </el-table>
 
+          <el-pagination
+            v-model:current-page="operationLogPagination.page"
+            v-model:page-size="operationLogPagination.page_size"
+            :total="operationLogPagination.total"
+            :page-sizes="[20, 50, 100]"
+            layout="total, sizes, prev, pager, next"
+            style="margin-top: 20px; justify-content: flex-end;"
+            @size-change="loadOperationLogs"
+            @current-change="loadOperationLogs"
+          />
+        </el-tab-pane>
+
+        <!-- 系统日志 -->
+        <el-tab-pane label="系统日志" name="system-log">
+          <el-form :inline="true" class="filter-form">
+            <el-form-item label="时间范围">
+              <el-date-picker
+                v-model="systemLogFilters.dateRange"
+                type="daterange"
+                range-separator="至"
+                start-placeholder="开始"
+                end-placeholder="结束"
+                value-format="YYYY-MM-DD"
+              />
+            </el-form-item>
+            <el-form-item label="日志级别">
+              <el-select v-model="systemLogFilters.log_level" placeholder="全部" clearable style="width: 120px;">
+                <el-option label="DEBUG" value="debug" />
+                <el-option label="INFO" value="info" />
+                <el-option label="WARNING" value="warning" />
+                <el-option label="ERROR" value="error" />
+                <el-option label="FATAL" value="fatal" />
+              </el-select>
+            </el-form-item>
+            <el-form-item label="模块">
+              <el-select v-model="systemLogFilters.module" placeholder="全部" clearable style="width: 120px;">
+                <el-option label="API" value="api" />
+                <el-option label="数据库" value="database" />
+                <el-option label="任务调度" value="scheduler" />
+                <el-option label="WebSocket" value="websocket" />
+                <el-option label="缓存" value="cache" />
+              </el-select>
+            </el-form-item>
+            <el-form-item label="关键词">
+              <el-input v-model="systemLogFilters.keyword" placeholder="消息内容" clearable style="width: 150px;" />
+            </el-form-item>
+            <el-form-item>
+              <el-button type="primary" @click="loadSystemLogs">查询</el-button>
+              <el-button @click="resetSystemLogFilters">重置</el-button>
+              <el-button type="success" @click="exportSystemLogs">导出</el-button>
+            </el-form-item>
+          </el-form>
+
           <!-- 系统日志表格 -->
-          <el-table v-else :data="systemLogs" stripe border v-loading="logLoading">
+          <el-table :data="systemLogs" stripe border v-loading="systemLogLoading">
             <el-table-column prop="created_at" label="时间" width="160" />
-            <el-table-column prop="log_level" label="级别" width="80">
+            <el-table-column prop="log_level" label="级别" width="90">
               <template #default="{ row }">
                 <el-tag :type="logLevelType[row.log_level]" size="small">
-                  {{ row.log_level }}
+                  {{ row.log_level?.toUpperCase() }}
                 </el-tag>
               </template>
             </el-table-column>
             <el-table-column prop="module" label="模块" width="120" />
-            <el-table-column prop="message" label="消息" min-width="300" />
+            <el-table-column prop="message" label="消息" min-width="300" show-overflow-tooltip />
+            <el-table-column prop="exception" label="异常信息" min-width="200" show-overflow-tooltip>
+              <template #default="{ row }">
+                <span v-if="row.exception" class="error-text">{{ row.exception }}</span>
+                <span v-else>-</span>
+              </template>
+            </el-table-column>
           </el-table>
 
           <el-pagination
-            v-model:current-page="logPagination.page"
-            v-model:page-size="logPagination.page_size"
-            :total="logPagination.total"
+            v-model:current-page="systemLogPagination.page"
+            v-model:page-size="systemLogPagination.page_size"
+            :total="systemLogPagination.total"
             :page-sizes="[20, 50, 100]"
             layout="total, sizes, prev, pager, next"
             style="margin-top: 20px; justify-content: flex-end;"
-            @size-change="loadLogs"
-            @current-change="loadLogs"
+            @size-change="loadSystemLogs"
+            @current-change="loadSystemLogs"
           />
         </el-tab-pane>
 
@@ -242,76 +306,143 @@
       </template>
     </el-dialog>
 
-    <!-- 用户编辑对话框 -->
-    <el-dialog v-model="userDialogVisible" :title="userEditMode ? '编辑用户' : '新增用户'" width="500px">
-      <el-form ref="userFormRef" :model="userForm" :rules="userRules" label-width="80px">
-        <el-form-item label="用户名" prop="username">
-          <el-input v-model="userForm.username" :disabled="userEditMode" />
-        </el-form-item>
-        <el-form-item v-if="!userEditMode" label="密码" prop="password">
-          <el-input v-model="userForm.password" type="password" show-password />
-        </el-form-item>
-        <el-form-item label="姓名" prop="real_name">
-          <el-input v-model="userForm.real_name" />
-        </el-form-item>
-        <el-form-item label="邮箱" prop="email">
-          <el-input v-model="userForm.email" />
-        </el-form-item>
-        <el-form-item label="电话" prop="phone">
-          <el-input v-model="userForm.phone" />
-        </el-form-item>
-        <el-form-item label="角色" prop="role">
-          <el-select v-model="userForm.role" style="width: 100%;">
-            <el-option label="管理员" value="admin" />
-            <el-option label="操作员" value="operator" />
-            <el-option label="观察者" value="viewer" />
+    <!-- 4级阈值配置对话框 -->
+    <el-dialog v-model="fourLevelDialogVisible" title="4级阈值配置" width="720px">
+      <el-form :model="fourLevelForm" label-width="100px">
+        <el-form-item label="选择点位" required>
+          <el-select v-model="fourLevelForm.point_id" filterable placeholder="请选择AI点位"
+            style="width: 100%;" @change="loadExistingThresholds">
+            <el-option v-for="p in aiPointList" :key="p.id"
+              :label="`${p.point_code} - ${p.point_name}`" :value="p.id" />
           </el-select>
         </el-form-item>
-        <el-form-item label="部门" prop="department">
-          <el-input v-model="userForm.department" />
-        </el-form-item>
+
+        <el-divider content-position="left">阈值配置</el-divider>
+
+        <el-table :data="fourLevelRows" border size="small" style="margin-bottom: 16px;">
+          <el-table-column prop="levelLabel" label="告警级别" width="90" align="center">
+            <template #default="{ row }">
+              <el-tag :type="alarmLevelType[row.alarmLevel]" size="small">{{ row.levelLabel }}</el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column prop="typeLabel" label="阈值类型" width="90" align="center" />
+          <el-table-column label="阈值" width="150">
+            <template #default="{ row }">
+              <el-input-number v-model="row.value" :precision="2" size="small" controls-position="right" style="width: 120px;" />
+            </template>
+          </el-table-column>
+          <el-table-column label="告警消息" min-width="180">
+            <template #default="{ row }">
+              <el-input v-model="row.message" size="small" placeholder="留空自动生成" />
+            </template>
+          </el-table-column>
+          <el-table-column label="启用" width="70" align="center">
+            <template #default="{ row }">
+              <el-switch v-model="row.enabled" size="small" />
+            </template>
+          </el-table-column>
+        </el-table>
+
+        <el-row :gutter="20">
+          <el-col :span="12">
+            <el-form-item label="延迟触发">
+              <el-input-number v-model="fourLevelForm.delay_seconds" :min="0" :max="300" size="small" />
+              <span style="margin-left: 8px; color: var(--text-secondary); font-size: 12px;">秒</span>
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="死区(回差)">
+              <el-input-number v-model="fourLevelForm.dead_band" :min="0" :precision="2" size="small" />
+            </el-form-item>
+          </el-col>
+        </el-row>
       </el-form>
       <template #footer>
-        <el-button @click="userDialogVisible = false">取消</el-button>
-        <el-button type="primary" @click="submitUser">确定</el-button>
+        <el-button @click="fourLevelDialogVisible = false">取消</el-button>
+        <el-button type="primary" @click="submitFourLevel">确定</el-button>
       </template>
     </el-dialog>
 
-    <!-- 重置密码对话框 -->
-    <el-dialog v-model="resetPwdDialogVisible" title="重置密码" width="400px">
-      <el-form ref="resetPwdFormRef" :model="resetPwdForm" :rules="resetPwdRules" label-width="80px">
-        <el-form-item label="新密码" prop="password">
-          <el-input v-model="resetPwdForm.password" type="password" show-password />
+    <!-- 按设备类型批量配置对话框 -->
+    <el-dialog v-model="batchDeviceTypeDialogVisible" title="按设备类型批量配置阈值" width="720px">
+      <el-form :model="batchDeviceTypeForm" label-width="100px">
+        <el-form-item label="设备类型" required>
+          <el-select v-model="batchDeviceTypeForm.device_type" placeholder="请选择设备类型"
+            style="width: 100%;" @change="onDeviceTypeChange">
+            <el-option v-for="dt in deviceTypeOptions" :key="dt.value" :label="dt.label" :value="dt.value" />
+          </el-select>
         </el-form-item>
-        <el-form-item label="确认密码" prop="confirmPassword">
-          <el-input v-model="resetPwdForm.confirmPassword" type="password" show-password />
-        </el-form-item>
+        <el-alert v-if="batchDeviceTypeForm.device_type" :title="`该设备类型下共 ${batchDeviceTypePointCount} 个 AI 点位`"
+          type="info" :closable="false" show-icon style="margin-bottom: 16px;" />
+
+        <el-divider content-position="left">阈值模板</el-divider>
+
+        <el-table :data="batchDeviceTypeRows" border size="small" style="margin-bottom: 16px;">
+          <el-table-column prop="levelLabel" label="告警级别" width="90" align="center">
+            <template #default="{ row }">
+              <el-tag :type="alarmLevelType[row.alarmLevel]" size="small">{{ row.levelLabel }}</el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column prop="typeLabel" label="阈值类型" width="90" align="center" />
+          <el-table-column label="阈值" width="150">
+            <template #default="{ row }">
+              <el-input-number v-model="row.value" :precision="2" size="small" controls-position="right" style="width: 120px;" />
+            </template>
+          </el-table-column>
+          <el-table-column label="告警消息" min-width="180">
+            <template #default="{ row }">
+              <el-input v-model="row.message" size="small" placeholder="留空自动生成" />
+            </template>
+          </el-table-column>
+          <el-table-column label="启用" width="70" align="center">
+            <template #default="{ row }">
+              <el-switch v-model="row.enabled" size="small" />
+            </template>
+          </el-table-column>
+        </el-table>
+
+        <el-row :gutter="20">
+          <el-col :span="12">
+            <el-form-item label="延迟触发">
+              <el-input-number v-model="batchDeviceTypeForm.delay_seconds" :min="0" :max="300" size="small" />
+              <span style="margin-left: 8px; color: var(--text-secondary); font-size: 12px;">秒</span>
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="死区(回差)">
+              <el-input-number v-model="batchDeviceTypeForm.dead_band" :min="0" :precision="2" size="small" />
+            </el-form-item>
+          </el-col>
+        </el-row>
       </el-form>
       <template #footer>
-        <el-button @click="resetPwdDialogVisible = false">取消</el-button>
-        <el-button type="primary" @click="submitResetPwd">确定</el-button>
+        <el-button @click="batchDeviceTypeDialogVisible = false">取消</el-button>
+        <el-button type="primary" @click="submitBatchByDeviceType" :disabled="batchDeviceTypePointCount === 0">确定</el-button>
       </template>
     </el-dialog>
+
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted, watch } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ref, reactive, computed, onMounted, watch } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus } from '@element-plus/icons-vue'
 import { getPointList, type PointInfo } from '@/api/modules/point'
 import {
   getThresholdList, createThreshold, updateThreshold, deleteThreshold,
-  type ThresholdInfo
+  getPointThresholds, setFourLevelThresholds, batchSetByDeviceType,
+  type ThresholdInfo, type FourLevelThresholdItem
 } from '@/api/modules/threshold'
-import {
-  getUserList, createUser, updateUser, deleteUser, toggleUserStatus as apiToggleUserStatus, resetPassword,
-  type UserInfo
-} from '@/api/modules/user'
 import {
   getOperationLogs, getSystemLogs, exportLogs as apiExportLogs,
   type OperationLog, type SystemLog
 } from '@/api/modules/log'
+import { useUserStore } from '@/stores/user'
+import UserManagement from './UserManagement.vue'
+
+const userStore = useUserStore()
+const isAdmin = computed(() => userStore.isAdmin)
 
 const activeTab = ref('threshold')
 
@@ -327,7 +458,8 @@ const thresholdFormRef = ref()
 
 const thresholdFilters = reactive({
   point_id: null as number | null,
-  alarm_level: ''
+  alarm_level: '',
+  device_type: ''
 })
 
 type ThresholdType = 'high' | 'low' | 'high_high' | 'low_low' | 'equal' | 'change'
@@ -347,6 +479,38 @@ const thresholdRules = {
   threshold_type: [{ required: true, message: '请选择阈值类型', trigger: 'change' }],
   threshold_value: [{ required: true, message: '请输入阈值', trigger: 'blur' }]
 }
+
+// ===== 4级阈值配置 =====
+const fourLevelDialogVisible = ref(false)
+const fourLevelForm = reactive({
+  point_id: null as number | null,
+  delay_seconds: 0,
+  dead_band: 0
+})
+const fourLevelRows = ref([
+  { key: 'high_high', levelLabel: '紧急', typeLabel: '高高限', alarmLevel: 'critical' as string, value: null as number | null, message: '', enabled: true },
+  { key: 'high', levelLabel: '重要', typeLabel: '高限', alarmLevel: 'major' as string, value: null as number | null, message: '', enabled: true },
+  { key: 'low', levelLabel: '次要', typeLabel: '低限', alarmLevel: 'minor' as string, value: null as number | null, message: '', enabled: true },
+  { key: 'low_low', levelLabel: '提示', typeLabel: '低低限', alarmLevel: 'info' as string, value: null as number | null, message: '', enabled: true },
+])
+
+// AI点位列表（仅AI类型）
+const aiPointList = computed(() => pointList.value.filter(p => p.point_type === 'AI'))
+
+// ===== 按设备类型批量配置 =====
+const batchDeviceTypeDialogVisible = ref(false)
+const batchDeviceTypeForm = reactive({
+  device_type: '',
+  delay_seconds: 0,
+  dead_band: 0
+})
+const batchDeviceTypeRows = ref([
+  { key: 'high_high', levelLabel: '紧急', typeLabel: '高高限', alarmLevel: 'critical' as string, value: null as number | null, message: '', enabled: true },
+  { key: 'high', levelLabel: '重要', typeLabel: '高限', alarmLevel: 'major' as string, value: null as number | null, message: '', enabled: true },
+  { key: 'low', levelLabel: '次要', typeLabel: '低限', alarmLevel: 'minor' as string, value: null as number | null, message: '', enabled: true },
+  { key: 'low_low', levelLabel: '提示', typeLabel: '低低限', alarmLevel: 'info' as string, value: null as number | null, message: '', enabled: true },
+])
+const batchDeviceTypePointCount = ref(0)
 
 const thresholdTypeText: Record<string, string> = {
   high_high: '高高限',
@@ -373,77 +537,80 @@ const alarmLevelType: Record<string, TagType> = {
   info: 'info'
 }
 
-// ===== 用户管理 =====
-const users = ref<UserInfo[]>([])
-const userLoading = ref(false)
-const userDialogVisible = ref(false)
-const userEditMode = ref(false)
-const userFormRef = ref()
-const resetPwdDialogVisible = ref(false)
-const resetPwdFormRef = ref()
-const resetPwdUserId = ref(0)
+const deviceTypeOptions = [
+  { label: '温湿度传感器', value: 'TH' },
+  { label: 'UPS', value: 'UPS' },
+  { label: 'PDU', value: 'PDU' },
+  { label: '精密空调', value: 'AC' },
+  { label: '门禁', value: 'DOOR' },
+  { label: '烟感', value: 'SMOKE' },
+  { label: '漏水', value: 'WATER' },
+  { label: '红外', value: 'IR' },
+  { label: '风机', value: 'FAN' },
+  { label: '照明', value: 'LIGHT' },
+]
 
-const userForm = reactive({
-  id: 0,
-  username: '',
-  password: '',
-  real_name: '',
-  email: '',
-  phone: '',
-  role: 'operator',
-  department: ''
+const deviceTypeText: Record<string, string> = {
+  TH: '温湿度', UPS: 'UPS', PDU: 'PDU', AC: '精密空调',
+  DOOR: '门禁', SMOKE: '烟感', WATER: '漏水', IR: '红外',
+  FAN: '风机', LIGHT: '照明'
+}
+
+// ===== 操作日志 =====
+const operationLogs = ref<OperationLog[]>([])
+const operationLogLoading = ref(false)
+
+const operationLogFilters = reactive({
+  dateRange: [] as string[],
+  action: '',
+  module: '',
+  keyword: ''
 })
 
-const userRules = {
-  username: [{ required: true, message: '请输入用户名', trigger: 'blur' }],
-  password: [{ required: true, message: '请输入密码', trigger: 'blur' }]
-}
-
-const resetPwdForm = reactive({
-  password: '',
-  confirmPassword: ''
+const operationLogPagination = reactive({
+  page: 1,
+  page_size: 20,
+  total: 0
 })
 
-const resetPwdRules = {
-  password: [{ required: true, message: '请输入新密码', trigger: 'blur' }],
-  confirmPassword: [
-    { required: true, message: '请确认密码', trigger: 'blur' },
-    {
-      validator: (_: any, value: string, callback: any) => {
-        if (value !== resetPwdForm.password) {
-          callback(new Error('两次密码不一致'))
-        } else {
-          callback()
-        }
-      },
-      trigger: 'blur'
-    }
-  ]
+// 操作类型映射
+const actionType: Record<string, TagType> = {
+  create: 'success',
+  update: 'primary',
+  delete: 'danger',
+  query: 'info',
+  export: 'warning'
 }
 
-const roleText: Record<string, string> = {
-  admin: '管理员',
-  operator: '操作员',
-  viewer: '观察者'
+const actionText: Record<string, string> = {
+  create: '创建',
+  update: '更新',
+  delete: '删除',
+  query: '查询',
+  export: '导出'
 }
 
-const roleType: Record<string, TagType> = {
-  admin: 'danger',
-  operator: 'warning',
-  viewer: 'info'
+const moduleText: Record<string, string> = {
+  user: '用户',
+  point: '点位',
+  device: '设备',
+  alarm: '告警',
+  config: '配置',
+  report: '报表'
 }
 
 // ===== 系统日志 =====
-const operationLogs = ref<OperationLog[]>([])
 const systemLogs = ref<SystemLog[]>([])
-const logLoading = ref(false)
+const systemLogLoading = ref(false)
 
-const logFilters = reactive({
-  log_type: 'operation' as 'operation' | 'system',
-  dateRange: [] as string[]
+const systemLogFilters = reactive({
+  dateRange: [] as string[],
+  log_level: '',
+  module: '',
+  keyword: ''
 })
 
-const logPagination = reactive({
+const systemLogPagination = reactive({
   page: 1,
   page_size: 20,
   total: 0
@@ -454,7 +621,7 @@ const logLevelType: Record<string, TagType> = {
   info: 'success',
   warning: 'warning',
   error: 'danger',
-  critical: 'danger'
+  fatal: 'danger'
 }
 
 // ===== 授权信息 =====
@@ -473,13 +640,14 @@ const systemInfo = reactive({
 onMounted(async () => {
   await loadPoints()
   loadThresholds()
-  loadUsers()
   loadSystemInfo()
 })
 
 watch(activeTab, (val) => {
-  if (val === 'log') {
-    loadLogs()
+  if (val === 'operation-log') {
+    loadOperationLogs()
+  } else if (val === 'system-log') {
+    loadSystemLogs()
   }
 })
 
@@ -516,6 +684,7 @@ async function loadThresholds() {
     const params: any = { page: 1, page_size: 100 }
     if (thresholdFilters.point_id) params.point_id = thresholdFilters.point_id
     if (thresholdFilters.alarm_level) params.alarm_level = thresholdFilters.alarm_level
+    if (thresholdFilters.device_type) params.device_type = thresholdFilters.device_type
     const res = await getThresholdList(params)
     thresholds.value = res.items
   } catch (e) {
@@ -583,144 +752,264 @@ async function handleDeleteThreshold(id: number) {
   }
 }
 
-// ===== 用户方法 =====
-async function loadUsers() {
-  userLoading.value = true
-  try {
-    const res = await getUserList({ page: 1, page_size: 100 })
-    users.value = res.items
-  } catch (e) {
-    console.error('加载用户失败', e)
-  } finally {
-    userLoading.value = false
-  }
-}
-
-function handleAddUser() {
-  userEditMode.value = false
-  Object.assign(userForm, {
-    id: 0,
-    username: '',
-    password: '',
-    real_name: '',
-    email: '',
-    phone: '',
-    role: 'operator',
-    department: ''
+// ===== 4级阈值配置方法 =====
+function handleFourLevelConfig() {
+  fourLevelForm.point_id = null
+  fourLevelForm.delay_seconds = 0
+  fourLevelForm.dead_band = 0
+  fourLevelRows.value.forEach(row => {
+    row.value = null
+    row.message = ''
+    row.enabled = true
   })
-  userDialogVisible.value = true
+  fourLevelDialogVisible.value = true
 }
 
-function handleEditUser(row: UserInfo) {
-  userEditMode.value = true
-  Object.assign(userForm, row)
-  userDialogVisible.value = true
-}
-
-async function submitUser() {
-  const valid = await userFormRef.value?.validate()
-  if (!valid) return
-
+async function loadExistingThresholds(pointId: number) {
+  if (!pointId) return
   try {
-    if (userEditMode.value) {
-      await updateUser(userForm.id, userForm)
-      ElMessage.success('更新成功')
-    } else {
-      await createUser(userForm)
-      ElMessage.success('创建成功')
+    const existing = await getPointThresholds(pointId)
+    // 回填已有阈值
+    for (const t of existing) {
+      const row = fourLevelRows.value.find(r => r.key === t.threshold_type)
+      if (row) {
+        row.value = t.threshold_value
+        row.message = t.alarm_message || ''
+        row.enabled = t.is_enabled
+      }
     }
-    userDialogVisible.value = false
-    loadUsers()
+    if (existing.length > 0) {
+      fourLevelForm.delay_seconds = existing[0].delay_seconds || 0
+      fourLevelForm.dead_band = existing[0].dead_band || 0
+    }
   } catch (e) {
-    console.error('操作失败', e)
+    console.error('加载现有阈值失败', e)
   }
 }
 
-async function toggleUserStatus(row: UserInfo) {
-  try {
-    await apiToggleUserStatus(row.id, row.is_active)
-    ElMessage.success(row.is_active ? '已启用' : '已禁用')
-  } catch (e) {
-    row.is_active = !row.is_active
-    console.error('操作失败', e)
+async function submitFourLevel() {
+  if (!fourLevelForm.point_id) {
+    ElMessage.warning('请选择点位')
+    return
   }
-}
 
-async function handleDeleteUser(id: number) {
-  try {
-    await deleteUser(id)
-    ElMessage.success('删除成功')
-    loadUsers()
-  } catch (e) {
-    console.error('删除失败', e)
+  const data: Record<string, any> = {
+    delay_seconds: fourLevelForm.delay_seconds,
+    dead_band: fourLevelForm.dead_band
   }
-}
-
-function handleResetPwd(row: UserInfo) {
-  resetPwdUserId.value = row.id
-  resetPwdForm.password = ''
-  resetPwdForm.confirmPassword = ''
-  resetPwdDialogVisible.value = true
-}
-
-async function submitResetPwd() {
-  const valid = await resetPwdFormRef.value?.validate()
-  if (!valid) return
+  for (const row of fourLevelRows.value) {
+    data[row.key] = {
+      value: row.value,
+      message: row.message || undefined,
+      enabled: row.enabled
+    }
+  }
 
   try {
-    await resetPassword(resetPwdUserId.value, resetPwdForm.password)
-    ElMessage.success('密码重置成功')
-    resetPwdDialogVisible.value = false
+    await setFourLevelThresholds(fourLevelForm.point_id, data as any)
+    ElMessage.success('4级阈值配置成功')
+    fourLevelDialogVisible.value = false
+    loadThresholds()
   } catch (e) {
-    console.error('重置失败', e)
+    console.error('配置失败', e)
+    ElMessage.error('配置失败')
   }
 }
 
-// ===== 日志方法 =====
-async function loadLogs() {
-  logLoading.value = true
+// ===== 按设备类型批量配置方法 =====
+function handleBatchByDeviceType() {
+  batchDeviceTypeForm.device_type = ''
+  batchDeviceTypeForm.delay_seconds = 0
+  batchDeviceTypeForm.dead_band = 0
+  batchDeviceTypeRows.value.forEach(row => {
+    row.value = null
+    row.message = ''
+    row.enabled = true
+  })
+  batchDeviceTypePointCount.value = 0
+  batchDeviceTypeDialogVisible.value = true
+}
+
+async function onDeviceTypeChange(deviceType: string) {
+  if (!deviceType) {
+    batchDeviceTypePointCount.value = 0
+    return
+  }
+  try {
+    const result = await getPointList({ device_type: deviceType, point_type: 'AI', page_size: 1 } as any)
+    batchDeviceTypePointCount.value = result.total || 0
+  } catch (e) {
+    batchDeviceTypePointCount.value = 0
+  }
+}
+
+async function submitBatchByDeviceType() {
+  if (!batchDeviceTypeForm.device_type) {
+    ElMessage.warning('请选择设备类型')
+    return
+  }
+
+  try {
+    await ElMessageBox.confirm(
+      `确定为设备类型「${deviceTypeText[batchDeviceTypeForm.device_type] || batchDeviceTypeForm.device_type}」下的 ${batchDeviceTypePointCount.value} 个 AI 点位批量设置阈值？`,
+      '批量配置确认',
+      { type: 'warning' }
+    )
+  } catch {
+    return
+  }
+
+  const thresholds: Record<string, any> = {
+    delay_seconds: batchDeviceTypeForm.delay_seconds,
+    dead_band: batchDeviceTypeForm.dead_band
+  }
+  for (const row of batchDeviceTypeRows.value) {
+    thresholds[row.key] = {
+      value: row.value,
+      message: row.message || undefined,
+      enabled: row.enabled
+    }
+  }
+
+  try {
+    const result = await batchSetByDeviceType({
+      device_type: batchDeviceTypeForm.device_type,
+      thresholds: thresholds as any
+    })
+    ElMessage.success(`批量配置完成：成功 ${result.success_count} 个，失败 ${result.error_count} 个`)
+    batchDeviceTypeDialogVisible.value = false
+    loadThresholds()
+  } catch (e) {
+    console.error('批量配置失败', e)
+    ElMessage.error('批量配置失败')
+  }
+}
+
+// ===== 操作日志方法 =====
+async function loadOperationLogs() {
+  operationLogLoading.value = true
   try {
     const params: any = {
-      page: logPagination.page,
-      page_size: logPagination.page_size
+      page: operationLogPagination.page,
+      page_size: operationLogPagination.page_size
     }
-    if (logFilters.dateRange && logFilters.dateRange.length === 2) {
-      params.start_time = logFilters.dateRange[0]
-      params.end_time = logFilters.dateRange[1]
+    if (operationLogFilters.dateRange && operationLogFilters.dateRange.length === 2) {
+      params.start_time = operationLogFilters.dateRange[0] + 'T00:00:00'
+      params.end_time = operationLogFilters.dateRange[1] + 'T23:59:59'
+    }
+    if (operationLogFilters.action) {
+      params.action = operationLogFilters.action
+    }
+    if (operationLogFilters.module) {
+      params.module = operationLogFilters.module
+    }
+    if (operationLogFilters.keyword) {
+      params.keyword = operationLogFilters.keyword
     }
 
-    if (logFilters.log_type === 'operation') {
-      const res = await getOperationLogs(params)
-      operationLogs.value = res.items
-      logPagination.total = res.total
-    } else {
-      const res = await getSystemLogs(params)
-      systemLogs.value = res.items
-      logPagination.total = res.total
-    }
+    const res = await getOperationLogs(params)
+    operationLogs.value = res.items
+    operationLogPagination.total = res.total
   } catch (e) {
-    console.error('加载日志失败', e)
+    console.error('加载操作日志失败', e)
+    ElMessage.error('加载操作日志失败')
   } finally {
-    logLoading.value = false
+    operationLogLoading.value = false
   }
 }
 
-async function exportLogs() {
+function resetOperationLogFilters() {
+  operationLogFilters.dateRange = []
+  operationLogFilters.action = ''
+  operationLogFilters.module = ''
+  operationLogFilters.keyword = ''
+  operationLogPagination.page = 1
+  loadOperationLogs()
+}
+
+async function exportOperationLogs() {
   try {
     const params: any = {
-      log_type: logFilters.log_type,
-      format: 'xlsx'
+      log_type: 'operation',
+      format: 'csv'
     }
-    if (logFilters.dateRange && logFilters.dateRange.length === 2) {
-      params.start_time = logFilters.dateRange[0]
-      params.end_time = logFilters.dateRange[1]
+    if (operationLogFilters.dateRange && operationLogFilters.dateRange.length === 2) {
+      params.start_time = operationLogFilters.dateRange[0]
+      params.end_time = operationLogFilters.dateRange[1]
     }
 
     const blob = await apiExportLogs(params)
     const url = window.URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `${logFilters.log_type}_logs_${Date.now()}.xlsx`
+    a.download = `operation_logs_${Date.now()}.csv`
+    a.click()
+    window.URL.revokeObjectURL(url)
+    ElMessage.success('导出成功')
+  } catch (e) {
+    console.error('导出失败', e)
+    ElMessage.error('导出失败')
+  }
+}
+
+// ===== 系统日志方法 =====
+async function loadSystemLogs() {
+  systemLogLoading.value = true
+  try {
+    const params: any = {
+      page: systemLogPagination.page,
+      page_size: systemLogPagination.page_size
+    }
+    if (systemLogFilters.dateRange && systemLogFilters.dateRange.length === 2) {
+      params.start_time = systemLogFilters.dateRange[0] + 'T00:00:00'
+      params.end_time = systemLogFilters.dateRange[1] + 'T23:59:59'
+    }
+    if (systemLogFilters.log_level) {
+      params.log_level = systemLogFilters.log_level
+    }
+    if (systemLogFilters.module) {
+      params.module = systemLogFilters.module
+    }
+    if (systemLogFilters.keyword) {
+      params.keyword = systemLogFilters.keyword
+    }
+
+    const res = await getSystemLogs(params)
+    systemLogs.value = res.items
+    systemLogPagination.total = res.total
+  } catch (e) {
+    console.error('加载系统日志失败', e)
+    ElMessage.error('加载系统日志失败')
+  } finally {
+    systemLogLoading.value = false
+  }
+}
+
+function resetSystemLogFilters() {
+  systemLogFilters.dateRange = []
+  systemLogFilters.log_level = ''
+  systemLogFilters.module = ''
+  systemLogFilters.keyword = ''
+  systemLogPagination.page = 1
+  loadSystemLogs()
+}
+
+async function exportSystemLogs() {
+  try {
+    const params: any = {
+      log_type: 'system',
+      format: 'csv'
+    }
+    if (systemLogFilters.dateRange && systemLogFilters.dateRange.length === 2) {
+      params.start_time = systemLogFilters.dateRange[0]
+      params.end_time = systemLogFilters.dateRange[1]
+    }
+
+    const blob = await apiExportLogs(params)
+    const url = window.URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `system_logs_${Date.now()}.csv`
     a.click()
     window.URL.revokeObjectURL(url)
     ElMessage.success('导出成功')
@@ -732,7 +1021,10 @@ async function exportLogs() {
 </script>
 
 <style scoped lang="scss">
+@use '@/styles/mixins-25d' as *;
+
 .settings-page {
+  @include page-list;
   // 主卡片样式 - 确保深色背景
   :deep(.el-card) {
     background-color: var(--bg-card-solid);

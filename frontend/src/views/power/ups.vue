@@ -248,7 +248,10 @@ onMounted(() => {
 </script>
 
 <style scoped lang="scss">
+@use '@/styles/mixins-25d' as *;
+
 .ups-monitor {
+  @include page-list;
   .summary-bar {
     margin-bottom: 16px;
   }

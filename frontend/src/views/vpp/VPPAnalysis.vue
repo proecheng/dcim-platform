@@ -373,7 +373,10 @@ onMounted(() => {
 </script>
 
 <style lang="scss" scoped>
+@use '@/styles/mixins-25d' as *;
+
 .vpp-analysis {
+  @include page-special;
   padding: 20px;
   background-color: #f5f7fa;
   min-height: calc(100vh - 60px);

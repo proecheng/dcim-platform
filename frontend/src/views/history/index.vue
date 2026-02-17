@@ -417,7 +417,11 @@ async function handleExport() {
 </script>
 
 <style scoped lang="scss">
+@use '@/styles/mixins-25d' as *;
+
 .history-page {
+  @include page-form;
+
   .filter-card {
     margin-bottom: 20px;
   }

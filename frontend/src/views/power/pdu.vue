@@ -191,7 +191,10 @@ onMounted(() => {
 </script>
 
 <style scoped lang="scss">
+@use '@/styles/mixins-25d' as *;
+
 .pdu-monitor {
+  @include page-list;
   .table-card {
     background: var(--bg-card);
     border-color: var(--border-color);

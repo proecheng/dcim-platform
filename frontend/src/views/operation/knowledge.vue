@@ -500,7 +500,10 @@ function formatDateTime(dateStr?: string): string {
 </script>
 
 <style scoped lang="scss">
+@use '@/styles/mixins-25d' as *;
+
 .knowledge-page {
+  @include page-list;
   .toolbar-card {
     background: var(--bg-card);
     border-color: var(--border-color);

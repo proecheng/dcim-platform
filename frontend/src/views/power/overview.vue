@@ -170,7 +170,10 @@ onMounted(async () => {
 </script>
 
 <style scoped lang="scss">
+@use '@/styles/mixins-25d' as *;
+
 .power-overview {
+  @include page-dashboard(6);
   .stat-row {
     margin-bottom: 16px;
   }

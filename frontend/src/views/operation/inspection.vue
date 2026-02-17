@@ -711,7 +711,10 @@ function formatDateTime(dateStr?: string): string {
 </script>
 
 <style scoped lang="scss">
+@use '@/styles/mixins-25d' as *;
+
 .inspection-page {
+  @include page-list;
   .main-card {
     background: var(--bg-card-solid);
     border-color: var(--border-color);

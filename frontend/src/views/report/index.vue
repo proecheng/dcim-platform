@@ -262,7 +262,7 @@
               {{ formatDate(row.created_at) }}
             </template>
           </el-table-column>
-          <el-table-column label="操作" width="100" fixed="right">
+          <el-table-column label="操作" width="180" fixed="right">
             <template #default="{ row }">
               <el-button
                 type="primary"
@@ -271,7 +271,15 @@
                 @click="downloadReportFile(row.id)"
                 :disabled="row.status !== 'completed'"
               >
-                下载
+                JSON
+              </el-button>
+              <el-button
+                type="success"
+                link
+                @click="downloadReportPDF(row.id)"
+                :disabled="row.status !== 'completed'"
+              >
+                PDF
               </el-button>
             </template>
           </el-table-column>
@@ -563,7 +571,7 @@ async function generateCustomReport() {
 
 async function downloadReportFile(id: number) {
   try {
-    const blob = await downloadReport(id)
+    const blob = await downloadReport(id, 'json')
     const url = window.URL.createObjectURL(blob)
     const link = document.createElement('a')
     link.href = url
@@ -573,6 +581,22 @@ async function downloadReportFile(id: number) {
   } catch (e) {
     console.error('下载报表失败', e)
     ElMessage.error('下载报表失败')
+  }
+}
+
+async function downloadReportPDF(id: number) {
+  try {
+    const blob = await downloadReport(id, 'pdf')
+    const url = window.URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `report_${id}.pdf`
+    link.click()
+    window.URL.revokeObjectURL(url)
+    ElMessage.success('PDF 导出成功')
+  } catch (e) {
+    console.error('导出 PDF 失败', e)
+    ElMessage.error('导出 PDF 失败')
   }
 }
 
@@ -625,7 +649,10 @@ window.addEventListener('resize', () => {
 </script>
 
 <style scoped lang="scss">
+@use '@/styles/mixins-25d' as *;
+
 .report-page {
+  @include page-list;
   .type-card {
     margin-bottom: 20px;
     text-align: center;
