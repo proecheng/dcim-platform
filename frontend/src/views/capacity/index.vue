@@ -1,5 +1,21 @@
 <template>
   <div class="capacity-page">
+    <!-- 区域维度筛选器 -->
+    <el-row class="filter-row" :gutter="12" style="margin-bottom: 16px;">
+      <el-col :span="6">
+        <el-select v-model="locationDimension" placeholder="聚合维度" @change="handleDimensionChange" clearable>
+          <el-option label="按区域" value="area" />
+          <el-option label="按楼层" value="floor" />
+          <el-option label="按房间" value="room" />
+        </el-select>
+      </el-col>
+      <el-col :span="6" v-if="locationDimension && locationOptions.length > 0">
+        <el-select v-model="selectedLocation" placeholder="选择位置" @change="handleLocationChange" clearable>
+          <el-option v-for="loc in locationOptions" :key="loc" :label="loc" :value="loc" />
+        </el-select>
+      </el-col>
+    </el-row>
+
     <!-- 统计卡片 -->
     <el-row :gutter="20" class="stat-cards">
       <el-col :span="6">
@@ -28,7 +44,7 @@
           <div class="stat-info">
             <div class="stat-value">{{ statistics.power?.usage_rate?.toFixed(1) || 0 }}%</div>
             <div class="stat-label">电力容量</div>
-            <div class="stat-detail">{{ statistics.power?.used_power || 0 }}/{{ statistics.power?.total_power || 0 }} kW</div>
+            <div class="stat-detail">{{ statistics.power?.used_capacity_kw || 0 }}/{{ statistics.power?.total_capacity_kw || 0 }} kW</div>
             <el-progress
               :percentage="statistics.power?.usage_rate || 0"
               :stroke-width="6"
@@ -46,7 +62,7 @@
           <div class="stat-info">
             <div class="stat-value">{{ statistics.cooling?.usage_rate?.toFixed(1) || 0 }}%</div>
             <div class="stat-label">制冷容量</div>
-            <div class="stat-detail">{{ statistics.cooling?.used_cooling || 0 }}/{{ statistics.cooling?.total_cooling || 0 }} kW</div>
+            <div class="stat-detail">{{ statistics.cooling?.used_cooling_kw || 0 }}/{{ statistics.cooling?.total_cooling_kw || 0 }} kW</div>
             <el-progress
               :percentage="statistics.cooling?.usage_rate || 0"
               :stroke-width="6"
@@ -64,7 +80,7 @@
           <div class="stat-info">
             <div class="stat-value">{{ statistics.weight?.usage_rate?.toFixed(1) || 0 }}%</div>
             <div class="stat-label">承重容量</div>
-            <div class="stat-detail">{{ statistics.weight?.used_weight || 0 }}/{{ statistics.weight?.total_weight || 0 }} kg</div>
+            <div class="stat-detail">{{ statistics.weight?.used_weight_kg || 0 }}/{{ statistics.weight?.total_weight_kg || 0 }} kg</div>
             <el-progress
               :percentage="statistics.weight?.usage_rate || 0"
               :stroke-width="6"
@@ -133,7 +149,7 @@
             </el-table-column>
             <el-table-column label="功率使用" width="140">
               <template #default="{ row }">
-                {{ row.used_power }}/{{ row.total_power }} kW
+                {{ row.used_capacity_kw }}/{{ row.total_capacity_kw }} kW
               </template>
             </el-table-column>
             <el-table-column prop="redundancy_mode" label="冗余模式" width="100">
@@ -178,7 +194,7 @@
             <el-table-column prop="location" label="位置" min-width="120" />
             <el-table-column label="制冷量" width="140">
               <template #default="{ row }">
-                {{ row.total_cooling }} kW
+                {{ row.total_cooling_kw }} kW
               </template>
             </el-table-column>
             <el-table-column label="温度" width="140">
@@ -213,32 +229,66 @@
           </el-table>
         </el-tab-pane>
 
+        <!-- 承重容量标签页 -->
+        <el-tab-pane label="承重容量" name="weight">
+          <div class="tab-toolbar">
+            <el-button type="primary" :icon="Plus" @click="showWeightDialog()">新增承重</el-button>
+          </div>
+          <el-table :data="weightList" stripe border v-loading="loading">
+            <el-table-column prop="name" label="名称" min-width="120" />
+            <el-table-column prop="location" label="位置" min-width="120" />
+            <el-table-column label="承重使用" width="160">
+              <template #default="{ row }">
+                {{ row.used_weight_kg || 0 }}/{{ row.total_weight_kg || 0 }} kg
+              </template>
+            </el-table-column>
+            <el-table-column label="使用率" width="180">
+              <template #default="{ row }">
+                <div class="usage-cell">
+                  <el-progress :percentage="row.usage_rate" :stroke-width="8" :color="getProgressColor(row.usage_rate)" />
+                </div>
+              </template>
+            </el-table-column>
+            <el-table-column prop="status" label="状态" width="100">
+              <template #default="{ row }">
+                <el-tag :type="getStatusType(row.status)" size="small">{{ getStatusLabel(row.status) }}</el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column label="操作" width="150" fixed="right">
+              <template #default="{ row }">
+                <el-button type="primary" link @click="showWeightDialog(row)">编辑</el-button>
+                <el-button type="danger" link @click="confirmDeleteWeight(row)">删除</el-button>
+              </template>
+            </el-table-column>
+          </el-table>
+        </el-tab-pane>
+
         <!-- 上架评估标签页 -->
         <el-tab-pane label="上架评估" name="plan">
           <div class="tab-toolbar">
             <el-button type="primary" :icon="Plus" @click="showPlanDialog()">新建评估</el-button>
           </div>
           <el-table :data="planList" stripe border v-loading="loading">
-            <el-table-column prop="plan_name" label="名称" min-width="150" />
+            <el-table-column prop="name" label="名称" min-width="150" />
             <el-table-column prop="device_count" label="设备数量" width="100">
               <template #default="{ row }">
                 {{ row.device_count || 0 }}
               </template>
             </el-table-column>
-            <el-table-column prop="space_requirement" label="需求U位" width="100">
+            <el-table-column prop="required_u" label="需求U位" width="100">
               <template #default="{ row }">
-                {{ row.space_requirement || 0 }} U
+                {{ row.required_u || 0 }} U
               </template>
             </el-table-column>
-            <el-table-column prop="power_requirement" label="需求功率" width="120">
+            <el-table-column prop="required_power_kw" label="需求功率" width="120">
               <template #default="{ row }">
-                {{ row.power_requirement || 0 }} kW
+                {{ row.required_power_kw || 0 }} kW
               </template>
             </el-table-column>
             <el-table-column label="可行性" width="100">
               <template #default="{ row }">
-                <el-tag :type="row.feasible ? 'success' : 'danger'" size="small">
-                  {{ row.feasible ? '可行' : '不可行' }}
+                <el-tag :type="row.is_feasible ? 'success' : 'danger'" size="small">
+                  {{ row.is_feasible ? '可行' : '不可行' }}
                 </el-tag>
               </template>
             </el-table-column>
@@ -247,13 +297,118 @@
                 {{ row.feasibility_notes || row.description || '--' }}
               </template>
             </el-table-column>
-            <el-table-column label="操作" width="150" fixed="right">
+            <el-table-column label="目标机柜" width="120">
+              <template #default="{ row }">
+                <span v-if="row.target_cabinet_id">{{ cabinetMap[row.target_cabinet_id] || `#${row.target_cabinet_id}` }}</span>
+                <span v-else style="color: #999">未指定</span>
+              </template>
+            </el-table-column>
+            <el-table-column label="操作" width="200" fixed="right">
               <template #default="{ row }">
                 <el-button type="primary" link @click="showPlanDialog(row)">编辑</el-button>
+                <el-button type="warning" size="small" link @click="showOverrideDialog(row)">覆盖机柜</el-button>
                 <el-button type="danger" link @click="confirmDeletePlan(row)">删除</el-button>
               </template>
             </el-table-column>
           </el-table>
+        </el-tab-pane>
+
+        <!-- 容量预警标签页 -->
+        <el-tab-pane label="容量预警" name="alerts">
+          <div class="tab-toolbar">
+            <el-select v-model="alertTypeFilter" placeholder="类型筛选" clearable style="width: 150px; margin-right: 12px;" @change="loadAlertList">
+              <el-option label="空间" value="space" />
+              <el-option label="电力" value="power" />
+              <el-option label="制冷" value="cooling" />
+              <el-option label="承重" value="weight" />
+            </el-select>
+            <el-select v-model="alertStatusFilter" placeholder="状态筛选" clearable style="width: 150px;" @change="loadAlertList">
+              <el-option label="警告" value="warning" />
+              <el-option label="严重" value="critical" />
+              <el-option label="已满" value="full" />
+            </el-select>
+          </div>
+          <el-table :data="alertList" stripe border v-loading="loading" :row-class-name="getAlertRowClass">
+            <el-table-column prop="type" label="类型" width="100">
+              <template #default="{ row }">
+                {{ { space: '空间', power: '电力', cooling: '制冷', weight: '承重' }[row.type] || row.type }}
+              </template>
+            </el-table-column>
+            <el-table-column prop="name" label="名称" min-width="120" />
+            <el-table-column prop="location" label="位置" min-width="120" />
+            <el-table-column prop="status" label="状态" width="100">
+              <template #default="{ row }">
+                <el-tag :type="getStatusType(row.status)" size="small">{{ getStatusLabel(row.status) }}</el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column label="使用率" width="180">
+              <template #default="{ row }">
+                <div class="usage-cell">
+                  <el-progress :percentage="row.usage_rate" :stroke-width="8" :color="getProgressColor(row.usage_rate)" />
+                </div>
+              </template>
+            </el-table-column>
+            <el-table-column prop="threshold" label="阈值" width="100">
+              <template #default="{ row }">{{ row.threshold }}%</template>
+            </el-table-column>
+          </el-table>
+        </el-tab-pane>
+
+        <!-- 容量趋势标签页 -->
+        <el-tab-pane label="容量趋势" name="trend">
+          <!-- 区域 A：趋势图表 -->
+          <div style="display: flex; gap: 16px; margin-bottom: 16px; align-items: center;">
+            <el-select v-model="trendType" placeholder="容量类型" style="width: 140px;" @change="loadTrendData">
+              <el-option label="空间容量" value="space" />
+              <el-option label="电力容量" value="power" />
+              <el-option label="制冷容量" value="cooling" />
+              <el-option label="承重容量" value="weight" />
+            </el-select>
+            <el-select v-model="trendRange" placeholder="时间范围" style="width: 140px;" @change="loadTrendData">
+              <el-option label="最近7天" value="7" />
+              <el-option label="最近30天" value="30" />
+              <el-option label="最近90天" value="90" />
+            </el-select>
+            <el-select v-model="trendInterval" placeholder="聚合粒度" style="width: 140px;" @change="loadTrendData">
+              <el-option label="按小时" value="hour" />
+              <el-option label="按天" value="day" />
+              <el-option label="按周" value="week" />
+              <el-option label="按月" value="month" />
+            </el-select>
+          </div>
+          <div ref="trendChartRef" style="width: 100%; height: 400px;"></div>
+
+          <!-- 区域 B：预测图表 -->
+          <el-divider content-position="left">容量预测</el-divider>
+          <div style="display: flex; gap: 16px; margin-bottom: 16px; align-items: center;">
+            <el-select v-model="forecastDays" placeholder="预测周期" style="width: 140px;" @change="loadForecastData">
+              <el-option label="3个月" :value="90" />
+              <el-option label="6个月" :value="180" />
+              <el-option label="12个月" :value="365" />
+            </el-select>
+          </div>
+          <el-alert v-if="forecastData.is_demo" title="当前为演示数据，系统需积累更多历史数据后将显示真实预测" type="info" :closable="false" show-icon style="margin-bottom: 16px;" />
+          <div ref="forecastChartRef" style="width: 100%; height: 400px;"></div>
+
+          <!-- 区域 C：扩容建议 -->
+          <el-divider content-position="left" v-if="forecastData.expansion_suggestions?.length">扩容建议</el-divider>
+          <el-row :gutter="16" v-if="forecastData.expansion_suggestions?.length">
+            <el-col :span="12" v-for="(item, index) in forecastData.expansion_suggestions" :key="index" style="margin-bottom: 16px;">
+              <el-card shadow="hover">
+                <template #header>
+                  <div style="display: flex; align-items: center; gap: 8px;">
+                    <el-icon :size="20" color="#E6A23C"><WarningFilled /></el-icon>
+                    <span>{{ trendTypeLabels[item.capacity_type] || item.capacity_type }}</span>
+                  </div>
+                </template>
+                <p>预计超阈值日期：<strong>{{ item.predicted_exceed_date }}</strong></p>
+                <p>当前使用率：{{ item.current_usage_rate.toFixed(1) }}%</p>
+                <p>预计使用率：{{ item.predicted_usage_rate.toFixed(1) }}%</p>
+                <p>资源缺口：{{ item.resource_gap }}</p>
+                <p style="color: #409EFF;">{{ item.suggestion }}</p>
+              </el-card>
+            </el-col>
+          </el-row>
         </el-tab-pane>
       </el-tabs>
     </el-card>
@@ -425,7 +580,7 @@
     <el-dialog
       v-model="planDialogVisible"
       :title="isEdit ? '编辑上架评估' : '新建上架评估'"
-      width="600px"
+      width="1000px"
       destroy-on-close
     >
       <el-form
@@ -501,27 +656,151 @@
           />
         </el-form-item>
       </el-form>
+
+      <!-- 获取推荐按钮 -->
+      <div style="margin: 16px 0; text-align: center;">
+        <el-button type="primary" :loading="recommendLoading" @click="handleGetRecommendation" :disabled="!planForm.required_u || planForm.required_u < 1">
+          <el-icon><Search /></el-icon> 获取上架推荐
+        </el-button>
+      </div>
+
+      <!-- 推荐结果 -->
+      <div v-if="showRecommendResult" style="margin-top: 16px;">
+        <el-divider content-position="left">推荐候选机柜</el-divider>
+        <el-table :data="recommendResult" size="small" border stripe max-height="300">
+          <el-table-column prop="cabinet_code" label="编码" width="100" />
+          <el-table-column prop="cabinet_name" label="名称" width="120" />
+          <el-table-column prop="location" label="位置" width="120" show-overflow-tooltip />
+          <el-table-column label="空间" width="70" align="center">
+            <template #default="{ row }">
+              <span :style="{ color: row.space_score >= 80 ? '#67C23A' : row.space_score >= 60 ? '#E6A23C' : '#F56C6C' }">
+                {{ row.space_score }}
+              </span>
+            </template>
+          </el-table-column>
+          <el-table-column label="电力" width="70" align="center">
+            <template #default="{ row }">
+              <span :style="{ color: row.power_score >= 80 ? '#67C23A' : row.power_score >= 60 ? '#E6A23C' : '#F56C6C' }">
+                {{ row.power_score }}
+              </span>
+            </template>
+          </el-table-column>
+          <el-table-column label="制冷" width="70" align="center">
+            <template #default="{ row }">
+              <span :style="{ color: row.cooling_score >= 80 ? '#67C23A' : row.cooling_score >= 60 ? '#E6A23C' : '#F56C6C' }">
+                {{ row.cooling_score }}
+              </span>
+            </template>
+          </el-table-column>
+          <el-table-column label="承重" width="70" align="center">
+            <template #default="{ row }">
+              <span :style="{ color: row.weight_score >= 80 ? '#67C23A' : row.weight_score >= 60 ? '#E6A23C' : '#F56C6C' }">
+                {{ row.weight_score }}
+              </span>
+            </template>
+          </el-table-column>
+          <el-table-column label="综合" width="70" align="center">
+            <template #default="{ row }">
+              <el-tag :type="row.total_score >= 80 ? 'success' : row.total_score >= 60 ? 'warning' : 'danger'" size="small">
+                {{ row.total_score }}
+              </el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column prop="notes" label="备注" min-width="150" show-overflow-tooltip />
+          <el-table-column label="操作" width="80" align="center" fixed="right">
+            <template #default="{ row }">
+              <el-button type="primary" size="small" link @click="selectRecommendedCabinet(row)">选择</el-button>
+            </template>
+          </el-table-column>
+        </el-table>
+      </div>
+
       <template #footer>
         <el-button @click="planDialogVisible = false">取消</el-button>
         <el-button type="primary" @click="submitPlanForm" :loading="submitting">确定</el-button>
       </template>
     </el-dialog>
+
+    <!-- 承重容量对话框 -->
+    <el-dialog
+      v-model="weightDialogVisible"
+      :title="isEdit ? '编辑承重容量' : '新增承重容量'"
+      width="500px"
+      destroy-on-close
+    >
+      <el-form
+        ref="weightFormRef"
+        :model="weightForm"
+        :rules="weightRules"
+        label-width="100px"
+      >
+        <el-form-item label="名称" prop="name">
+          <el-input v-model="weightForm.name" placeholder="请输入名称" />
+        </el-form-item>
+        <el-form-item label="位置" prop="location">
+          <el-input v-model="weightForm.location" placeholder="请输入位置" />
+        </el-form-item>
+        <el-form-item label="总承重(kg)" prop="total_weight_kg">
+          <el-input-number
+            v-model="weightForm.total_weight_kg"
+            :min="0"
+            :precision="2"
+            placeholder="请输入总承重"
+            style="width: 100%"
+          />
+        </el-form-item>
+        <el-form-item label="已用(kg)" prop="used_weight_kg">
+          <el-input-number
+            v-model="weightForm.used_weight_kg"
+            :min="0"
+            :precision="2"
+            placeholder="请输入已用承重"
+            style="width: 100%"
+          />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="weightDialogVisible = false">取消</el-button>
+        <el-button type="primary" @click="submitWeightForm" :loading="submitting">确定</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 覆盖机柜对话框 -->
+    <el-dialog v-model="overrideDialogVisible" title="选择目标机柜" width="700px" destroy-on-close>
+      <el-table :data="cabinetList" v-loading="cabinetLoading" size="small" border stripe max-height="400">
+        <el-table-column prop="cabinet_code" label="编码" width="120" />
+        <el-table-column prop="cabinet_name" label="名称" width="150" />
+        <el-table-column prop="location" label="位置" width="150" show-overflow-tooltip />
+        <el-table-column prop="total_u" label="总U" width="70" align="center" />
+        <el-table-column prop="available_u" label="可用U" width="70" align="center" />
+        <el-table-column label="操作" width="80" align="center">
+          <template #default="{ row }">
+            <el-button type="primary" size="small" link @click="handleOverrideCabinet(row.id)">选择</el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+    </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, watch, nextTick, onUnmounted } from 'vue'
 import { ElMessage, ElMessageBox, type FormInstance } from 'element-plus'
-import { Grid, Lightning, Odometer, Box, Plus } from '@element-plus/icons-vue'
+import { Grid, Lightning, Odometer, Box, Plus, Search, WarningFilled } from '@element-plus/icons-vue'
+import * as echarts from 'echarts'
 import {
   getSpaceCapacities, createSpaceCapacity, updateSpaceCapacity, deleteSpaceCapacity,
   getPowerCapacities, createPowerCapacity, updatePowerCapacity, deletePowerCapacity,
   getCoolingCapacities, createCoolingCapacity, updateCoolingCapacity, deleteCoolingCapacity,
+  getWeightCapacities, createWeightCapacity, updateWeightCapacity, deleteWeightCapacity,
   getCapacityPlans, createCapacityPlan, updateCapacityPlan, deleteCapacityPlan,
-  getCapacityStatistics,
-  type SpaceCapacity, type PowerCapacity, type CoolingCapacity, type CapacityPlan,
-  type CapacityStatistics, type CapacityStatus
+  getCapacityStatistics, getCapacityAlerts, getCapacityByLocation,
+  getRackingRecommendation, overridePlanCabinet,
+  getCapacityTrend, getCapacityForecast,
+  type SpaceCapacity, type PowerCapacity, type CoolingCapacity, type WeightCapacity, type CapacityPlan,
+  type CapacityStatistics, type CapacityStatus, type CabinetScore, type ExpansionSuggestion
 } from '@/api/modules/capacity'
+import { getCabinets } from '@/api/modules/asset'
 
 // 类型定义
 type TagType = 'success' | 'warning' | 'danger' | 'info' | 'primary'
@@ -533,9 +812,9 @@ const activeTab = ref('space')
 
 // 列表数据
 const spaceList = ref<SpaceCapacity[]>([])
-const powerList = ref<(PowerCapacity & { capacity_type?: string; redundancy_mode?: string })[]>([])
-const coolingList = ref<(CoolingCapacity & { current_temperature?: number; target_temperature?: number })[]>([])
-const planList = ref<(CapacityPlan & { device_count?: number; feasible?: boolean; feasibility_notes?: string })[]>([])
+const powerList = ref<PowerCapacity[]>([])
+const coolingList = ref<CoolingCapacity[]>([])
+const planList = ref<CapacityPlan[]>([])
 const statistics = ref<Partial<CapacityStatistics>>({})
 
 // 对话框状态
@@ -600,7 +879,8 @@ const planForm = reactive({
   required_u: 0,
   required_power_kw: 0,
   required_cooling_kw: 0,
-  required_weight_kg: 0
+  required_weight_kg: 0,
+  target_cabinet_id: null as number | null
 })
 
 const planRules = {
@@ -608,10 +888,53 @@ const planRules = {
   device_count: [{ required: true, message: '请输入设备数量', trigger: 'blur' }]
 }
 
+// 承重容量对话框
+const weightList = ref<WeightCapacity[]>([])
+const weightDialogVisible = ref(false)
+const weightFormRef = ref<FormInstance>()
+const weightForm = reactive({
+  name: '',
+  location: '',
+  total_weight_kg: 0,
+  used_weight_kg: 0
+})
+
+const weightRules = {
+  name: [{ required: true, message: '请输入名称', trigger: 'blur' }],
+  total_weight_kg: [{ required: true, message: '请输入总承重', trigger: 'blur' }]
+}
+
+// 区域维度筛选
+const locationDimension = ref<string>('')
+const selectedLocation = ref<string>('')
+const locationOptions = ref<string[]>([])
+const locationData = ref<any[]>([])
+const originalStatistics = ref<Partial<CapacityStatistics>>({})
+
+// 容量预警
+const alertList = ref<any[]>([])
+const alertTypeFilter = ref<string>('')
+const alertStatusFilter = ref<string>('')
+
+// 推荐相关
+const recommendLoading = ref(false)
+const recommendResult = ref<CabinetScore[]>([])
+const showRecommendResult = ref(false)
+
+// 覆盖机柜相关
+const overrideDialogVisible = ref(false)
+const overridePlanId = ref<number | null>(null)
+const cabinetList = ref<any[]>([])
+const cabinetLoading = ref(false)
+
+// 机柜名称映射
+const cabinetMap = ref<Record<number, string>>({})
+
 // 初始化加载
 onMounted(() => {
   loadStatistics()
   loadSpaceList()
+  window.addEventListener('resize', handleTrendChartResize)
 })
 
 // 加载统计数据
@@ -620,6 +943,7 @@ async function loadStatistics() {
     const res = await getCapacityStatistics()
     if (res.data) {
       statistics.value = res.data
+      originalStatistics.value = { ...res.data }
     }
   } catch (e) {
     console.error('加载统计数据失败', e)
@@ -638,8 +962,20 @@ function handleTabChange(tab: string) {
     case 'cooling':
       loadCoolingList()
       break
+    case 'weight':
+      loadWeightList()
+      break
     case 'plan':
       loadPlanList()
+      break
+    case 'alerts':
+      loadAlertList()
+      break
+    case 'trend':
+      nextTick(() => {
+        loadTrendData()
+        loadForecastData()
+      })
       break
   }
 }
@@ -751,15 +1087,15 @@ async function loadPowerList() {
   }
 }
 
-function showPowerDialog(row?: PowerCapacity & { capacity_type?: string; redundancy_mode?: string }) {
+function showPowerDialog(row?: PowerCapacity) {
   isEdit.value = !!row
   currentId.value = row?.id || null
   if (row) {
     Object.assign(powerForm, {
       name: row.name,
       capacity_type: row.capacity_type || 'UPS',
-      total_capacity_kw: row.total_power,
-      used_capacity_kw: row.used_power,
+      total_capacity_kw: row.total_capacity_kw || 0,
+      used_capacity_kw: row.used_capacity_kw || 0,
       redundancy_mode: row.redundancy_mode || 'N'
     })
   } else {
@@ -782,8 +1118,10 @@ async function submitPowerForm() {
   try {
     const data = {
       name: powerForm.name,
-      total_power: powerForm.total_capacity_kw,
-      used_power: powerForm.used_capacity_kw
+      capacity_type: powerForm.capacity_type,
+      total_capacity_kw: powerForm.total_capacity_kw,
+      used_capacity_kw: powerForm.used_capacity_kw,
+      redundancy_mode: powerForm.redundancy_mode
     }
 
     if (isEdit.value && currentId.value) {
@@ -838,15 +1176,15 @@ async function loadCoolingList() {
   }
 }
 
-function showCoolingDialog(row?: CoolingCapacity & { target_temperature?: number }) {
+function showCoolingDialog(row?: CoolingCapacity) {
   isEdit.value = !!row
   currentId.value = row?.id || null
   if (row) {
     Object.assign(coolingForm, {
       name: row.name,
       location: row.location || '',
-      total_cooling_kw: row.total_cooling,
-      used_cooling_kw: row.used_cooling,
+      total_cooling_kw: row.total_cooling_kw || 0,
+      used_cooling_kw: row.used_cooling_kw || 0,
       target_temperature: row.target_temperature || 24
     })
   } else {
@@ -870,8 +1208,9 @@ async function submitCoolingForm() {
     const data = {
       name: coolingForm.name,
       location: coolingForm.location || undefined,
-      total_cooling: coolingForm.total_cooling_kw,
-      used_cooling: coolingForm.used_cooling_kw
+      total_cooling_kw: coolingForm.total_cooling_kw,
+      used_cooling_kw: coolingForm.used_cooling_kw,
+      target_temperature: coolingForm.target_temperature
     }
 
     if (isEdit.value && currentId.value) {
@@ -924,20 +1263,35 @@ async function loadPlanList() {
   } finally {
     loading.value = false
   }
+  // 加载机柜名称映射
+  try {
+    const cabRes = await getCabinets()
+    if (cabRes.data) {
+      const cabs = Array.isArray(cabRes.data) ? cabRes.data : []
+      const map: Record<number, string> = {}
+      cabs.forEach((c: any) => { map[c.id] = c.cabinet_name })
+      cabinetMap.value = map
+    }
+  } catch (e) {
+    // 忽略，不影响主功能
+  }
 }
 
-function showPlanDialog(row?: CapacityPlan & { device_count?: number }) {
+function showPlanDialog(row?: CapacityPlan) {
   isEdit.value = !!row
   currentId.value = row?.id || null
+  recommendResult.value = []
+  showRecommendResult.value = false
   if (row) {
     Object.assign(planForm, {
-      name: row.plan_name,
+      name: row.name,
       description: row.description || '',
       device_count: row.device_count || 1,
-      required_u: row.space_requirement || 0,
-      required_power_kw: row.power_requirement || 0,
-      required_cooling_kw: row.cooling_requirement || 0,
-      required_weight_kg: row.weight_requirement || 0
+      required_u: row.required_u || 0,
+      required_power_kw: row.required_power_kw || 0,
+      required_cooling_kw: row.required_cooling_kw || 0,
+      required_weight_kg: row.required_weight_kg || 0,
+      target_cabinet_id: row.target_cabinet_id || null
     })
   } else {
     Object.assign(planForm, {
@@ -947,7 +1301,8 @@ function showPlanDialog(row?: CapacityPlan & { device_count?: number }) {
       required_u: 0,
       required_power_kw: 0,
       required_cooling_kw: 0,
-      required_weight_kg: 0
+      required_weight_kg: 0,
+      target_cabinet_id: null
     })
   }
   planDialogVisible.value = true
@@ -960,14 +1315,14 @@ async function submitPlanForm() {
   submitting.value = true
   try {
     const data = {
-      plan_name: planForm.name,
-      plan_type: 'deployment',
+      name: planForm.name,
       description: planForm.description || undefined,
-      target_date: new Date().toISOString().split('T')[0],
-      space_requirement: planForm.required_u,
-      power_requirement: planForm.required_power_kw,
-      cooling_requirement: planForm.required_cooling_kw,
-      weight_requirement: planForm.required_weight_kg
+      device_count: planForm.device_count,
+      required_u: planForm.required_u,
+      required_power_kw: planForm.required_power_kw,
+      required_cooling_kw: planForm.required_cooling_kw,
+      required_weight_kg: planForm.required_weight_kg,
+      target_cabinet_id: planForm.target_cabinet_id || undefined
     }
 
     if (isEdit.value && currentId.value) {
@@ -989,7 +1344,7 @@ async function submitPlanForm() {
 
 function confirmDeletePlan(row: CapacityPlan) {
   ElMessageBox.confirm(
-    `确定要删除上架评估 "${row.plan_name}" 吗？`,
+    `确定要删除上架评估 "${row.name}" 吗？`,
     '删除确认',
     { confirmButtonText: '确定', cancelButtonText: '取消', type: 'warning' }
   ).then(async () => {
@@ -1003,6 +1358,406 @@ function confirmDeletePlan(row: CapacityPlan) {
     }
   }).catch(() => {})
 }
+
+async function handleGetRecommendation() {
+  if (!planForm.required_u || planForm.required_u < 1) {
+    ElMessage.warning('请先填写所需U位数（至少1U）')
+    return
+  }
+  recommendLoading.value = true
+  showRecommendResult.value = false
+  try {
+    const res = await getRackingRecommendation({
+      required_u: planForm.required_u,
+      required_power_kw: planForm.required_power_kw || undefined,
+      required_cooling_kw: planForm.required_cooling_kw || undefined,
+      required_weight_kg: planForm.required_weight_kg || undefined,
+      limit: 5
+    })
+    if (res.data) {
+      recommendResult.value = res.data.candidates || []
+      showRecommendResult.value = true
+      if (recommendResult.value.length === 0) {
+        ElMessage.info('没有找到满足条件的候选机柜')
+      }
+    }
+  } catch (e) {
+    console.error('获取推荐失败', e)
+    ElMessage.error('获取推荐失败')
+  } finally {
+    recommendLoading.value = false
+  }
+}
+
+function selectRecommendedCabinet(row: CabinetScore) {
+  planForm.target_cabinet_id = row.cabinet_id
+  ElMessage.success(`已选择机柜: ${row.cabinet_name}(${row.cabinet_code})`)
+}
+
+async function showOverrideDialog(row: CapacityPlan) {
+  overridePlanId.value = row.id
+  cabinetLoading.value = true
+  overrideDialogVisible.value = true
+  try {
+    const res = await getCabinets()
+    if (res.data) {
+      cabinetList.value = Array.isArray(res.data) ? res.data : []
+    }
+  } catch (e) {
+    console.error('加载机柜列表失败', e)
+    ElMessage.error('加载机柜列表失败')
+  } finally {
+    cabinetLoading.value = false
+  }
+}
+
+async function handleOverrideCabinet(cabinetId: number) {
+  if (!overridePlanId.value) return
+  try {
+    await overridePlanCabinet(overridePlanId.value, cabinetId)
+    ElMessage.success('覆盖机柜成功')
+    overrideDialogVisible.value = false
+    loadPlanList()
+  } catch (e) {
+    console.error('覆盖机柜失败', e)
+    ElMessage.error('覆盖机柜失败')
+  }
+}
+
+// ==================== 承重容量 ====================
+async function loadWeightList() {
+  loading.value = true
+  try {
+    const res = await getWeightCapacities()
+    if (res.data) {
+      weightList.value = Array.isArray(res.data) ? res.data : (res.data as any).items || []
+    }
+  } catch (e) {
+    console.error('加载承重容量列表失败', e)
+    ElMessage.error('加载承重容量列表失败')
+  } finally {
+    loading.value = false
+  }
+}
+
+function showWeightDialog(row?: WeightCapacity) {
+  isEdit.value = !!row
+  currentId.value = row?.id || null
+  if (row) {
+    Object.assign(weightForm, {
+      name: row.name,
+      location: row.location || '',
+      total_weight_kg: row.total_weight_kg || 0,
+      used_weight_kg: row.used_weight_kg || 0
+    })
+  } else {
+    Object.assign(weightForm, {
+      name: '',
+      location: '',
+      total_weight_kg: 0,
+      used_weight_kg: 0
+    })
+  }
+  weightDialogVisible.value = true
+}
+
+async function submitWeightForm() {
+  const valid = await weightFormRef.value?.validate()
+  if (!valid) return
+
+  submitting.value = true
+  try {
+    const data = {
+      name: weightForm.name,
+      location: weightForm.location || undefined,
+      total_weight_kg: weightForm.total_weight_kg,
+      used_weight_kg: weightForm.used_weight_kg
+    }
+
+    if (isEdit.value && currentId.value) {
+      await updateWeightCapacity(currentId.value, data)
+      ElMessage.success('更新成功')
+    } else {
+      await createWeightCapacity(data)
+      ElMessage.success('创建成功')
+    }
+    weightDialogVisible.value = false
+    loadWeightList()
+    loadStatistics()
+  } catch (e) {
+    console.error('操作失败', e)
+    ElMessage.error('操作失败')
+  } finally {
+    submitting.value = false
+  }
+}
+
+function confirmDeleteWeight(row: WeightCapacity) {
+  ElMessageBox.confirm(
+    `确定要删除承重容量 "${row.name}" 吗？`,
+    '删除确认',
+    { confirmButtonText: '确定', cancelButtonText: '取消', type: 'warning' }
+  ).then(async () => {
+    try {
+      await deleteWeightCapacity(row.id)
+      ElMessage.success('删除成功')
+      loadWeightList()
+      loadStatistics()
+    } catch (e) {
+      console.error('删除失败', e)
+      ElMessage.error('删除失败')
+    }
+  }).catch(() => {})
+}
+
+// ==================== 区域维度筛选 ====================
+async function handleDimensionChange(val: string) {
+  selectedLocation.value = ''
+  locationOptions.value = []
+  locationData.value = []
+
+  if (!val) {
+    // 清除维度，恢复总体统计
+    if (Object.keys(originalStatistics.value).length > 0) {
+      statistics.value = { ...originalStatistics.value }
+    }
+    return
+  }
+
+  try {
+    const res = await getCapacityByLocation({ dimension: val as 'area' | 'floor' | 'room' })
+    if (res.data?.items) {
+      locationData.value = res.data.items
+      locationOptions.value = res.data.items.map((item: any) => item.location)
+    }
+  } catch (e) {
+    console.error('加载区域数据失败', e)
+  }
+}
+
+function handleLocationChange(val: string) {
+  if (!val) {
+    // 清除位置选择，恢复总体统计
+    if (Object.keys(originalStatistics.value).length > 0) {
+      statistics.value = { ...originalStatistics.value }
+    }
+    return
+  }
+
+  const item = locationData.value.find((d: any) => d.location === val)
+  if (item) {
+    statistics.value = {
+      ...statistics.value,
+      space: { ...statistics.value.space, ...item.space } as any,
+      power: { ...statistics.value.power, ...item.power } as any,
+      cooling: { ...statistics.value.cooling, ...item.cooling } as any,
+      weight: { ...statistics.value.weight, ...item.weight } as any
+    }
+  }
+}
+
+// ==================== 容量预警 ====================
+async function loadAlertList() {
+  loading.value = true
+  try {
+    const params: any = {}
+    if (alertTypeFilter.value) params.type = alertTypeFilter.value
+    if (alertStatusFilter.value) params.status = alertStatusFilter.value
+    const res = await getCapacityAlerts(params)
+    if (res.data) {
+      alertList.value = Array.isArray(res.data) ? res.data : (res.data as any).items || []
+    }
+  } catch (e) {
+    console.error('加载容量预警列表失败', e)
+    ElMessage.error('加载容量预警列表失败')
+  } finally {
+    loading.value = false
+  }
+}
+
+function getAlertRowClass({ row }: { row: any }) {
+  if (row.status === 'critical' || row.status === 'full') return 'alert-row-critical'
+  if (row.status === 'warning') return 'alert-row-warning'
+  return ''
+}
+
+// ==================== 容量趋势 ====================
+const trendType = ref('space')
+const trendRange = ref('30')
+const trendInterval = ref('day')
+const trendChartRef = ref<HTMLElement>()
+let trendChart: echarts.ECharts | null = null
+
+const forecastDays = ref(90)
+const forecastChartRef = ref<HTMLElement>()
+let forecastChart: echarts.ECharts | null = null
+const forecastData = ref<{
+  timestamps: string[]
+  predicted_usage: number[]
+  confidence_upper: number[]
+  confidence_lower: number[]
+  is_demo: boolean
+  expansion_suggestions: ExpansionSuggestion[]
+}>({
+  timestamps: [],
+  predicted_usage: [],
+  confidence_upper: [],
+  confidence_lower: [],
+  is_demo: false,
+  expansion_suggestions: []
+})
+
+const trendTypeLabels: Record<string, string> = {
+  space: '空间容量',
+  power: '电力容量',
+  cooling: '制冷容量',
+  weight: '承重容量'
+}
+
+async function loadTrendData() {
+  try {
+    const end = new Date()
+    const start = new Date()
+    start.setDate(start.getDate() - parseInt(trendRange.value))
+
+    const res = await getCapacityTrend({
+      type: trendType.value as 'space' | 'power' | 'cooling' | 'weight',
+      start_time: start.toISOString(),
+      end_time: end.toISOString(),
+      interval: trendInterval.value as 'hour' | 'day' | 'week' | 'month'
+    })
+
+    if (res.data) {
+      renderTrendChart(res.data)
+    }
+  } catch (e) {
+    console.error('加载趋势数据失败', e)
+  }
+}
+
+function renderTrendChart(data: { timestamps: string[], total: number[], used: number[], usage_rate: number[] }) {
+  if (!trendChartRef.value) return
+  if (!trendChart) {
+    trendChart = echarts.init(trendChartRef.value)
+  }
+
+  const option: echarts.EChartsOption = {
+    tooltip: { trigger: 'axis' },
+    legend: { data: ['总量', '已用量', '使用率'] },
+    grid: { left: '3%', right: '4%', bottom: '3%', containLabel: true },
+    xAxis: { type: 'category', data: data.timestamps, axisLabel: { rotate: 30 } },
+    yAxis: [
+      { type: 'value', name: '容量值' },
+      { type: 'value', name: '使用率(%)', min: 0, max: 100, axisLabel: { formatter: '{value}%' } }
+    ],
+    series: [
+      {
+        name: '总量',
+        type: 'line',
+        data: data.total,
+        lineStyle: { type: 'dashed' },
+        itemStyle: { color: '#91CC75' }
+      },
+      {
+        name: '已用量',
+        type: 'line',
+        data: data.used,
+        itemStyle: { color: '#5470C6' }
+      },
+      {
+        name: '使用率',
+        type: 'line',
+        yAxisIndex: 1,
+        data: data.usage_rate,
+        itemStyle: { color: '#EE6666' }
+      }
+    ]
+  }
+  trendChart.setOption(option)
+}
+
+async function loadForecastData() {
+  try {
+    const res = await getCapacityForecast({
+      type: trendType.value as 'space' | 'power' | 'cooling' | 'weight',
+      days: forecastDays.value
+    })
+
+    if (res.data) {
+      forecastData.value = res.data
+      renderForecastChart(res.data)
+    }
+  } catch (e) {
+    console.error('加载预测数据失败', e)
+  }
+}
+
+function renderForecastChart(data: typeof forecastData.value) {
+  if (!forecastChartRef.value) return
+  if (!forecastChart) {
+    forecastChart = echarts.init(forecastChartRef.value)
+  }
+
+  const option: echarts.EChartsOption = {
+    tooltip: {
+      trigger: 'axis',
+      formatter: (params: any) => {
+        let result = params[0]?.axisValue + '<br/>'
+        params.forEach((p: any) => {
+          if (p.seriesName !== '置信下界') {
+            result += `${p.marker}${p.seriesName}: ${p.value?.toFixed?.(1) ?? '-'}%<br/>`
+          }
+        })
+        result += '<span style="color:#999;font-size:11px;">预测仅供参考</span>'
+        return result
+      }
+    },
+    legend: { data: ['预测使用率', '置信上界'] },
+    grid: { left: '3%', right: '4%', bottom: '3%', containLabel: true },
+    xAxis: { type: 'category', data: data.timestamps, axisLabel: { rotate: 30 } },
+    yAxis: { type: 'value', name: '使用率(%)', min: 0, max: 100, axisLabel: { formatter: '{value}%' } },
+    series: [
+      {
+        name: '预测使用率',
+        type: 'line',
+        data: data.predicted_usage,
+        itemStyle: { color: '#5470C6' },
+        markLine: {
+          silent: true,
+          data: [{ yAxis: 80, label: { formatter: '阈值 80%' }, lineStyle: { color: '#EE6666', type: 'dashed' } }]
+        }
+      },
+      {
+        name: '置信上界',
+        type: 'line',
+        data: data.confidence_upper,
+        lineStyle: { opacity: 0 },
+        areaStyle: { color: 'rgba(84,112,198,0.15)' },
+        symbol: 'none'
+      },
+      {
+        name: '置信下界',
+        type: 'line',
+        data: data.confidence_lower,
+        lineStyle: { opacity: 0 },
+        areaStyle: { color: '#fff', origin: 'start' },
+        symbol: 'none'
+      }
+    ]
+  }
+  forecastChart.setOption(option)
+}
+
+function handleTrendChartResize() {
+  trendChart?.resize()
+  forecastChart?.resize()
+}
+
+onUnmounted(() => {
+  window.removeEventListener('resize', handleTrendChartResize)
+  trendChart?.dispose()
+  forecastChart?.dispose()
+})
 
 // ==================== 辅助函数 ====================
 
@@ -1038,7 +1793,10 @@ function getProgressColor(percentage: number | undefined): string {
 </script>
 
 <style scoped lang="scss">
+@use '@/styles/mixins-25d' as *;
+
 .capacity-page {
+  @include page-dashboard(4);
   .stat-cards {
     margin-bottom: 20px;
   }
@@ -1227,6 +1985,18 @@ function getProgressColor(percentage: number | undefined): string {
 
   :deep(.el-form-item__label) {
     color: var(--text-secondary);
+  }
+
+  :deep(.alert-row-warning) {
+    td.el-table__cell {
+      background-color: rgba(230, 162, 60, 0.1) !important;
+    }
+  }
+
+  :deep(.alert-row-critical) {
+    td.el-table__cell {
+      background-color: rgba(245, 108, 108, 0.1) !important;
+    }
   }
 
   :deep(.el-input__wrapper),

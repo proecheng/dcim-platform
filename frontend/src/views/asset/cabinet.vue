@@ -161,7 +161,7 @@
             </el-col>
             <el-col :span="6">
               <div class="summary-item">
-                <div class="summary-value rate">{{ (currentUsage.usage_rate * 100).toFixed(1) }}%</div>
+                <div class="summary-value rate">{{ currentUsage.usage_rate.toFixed(1) }}%</div>
                 <div class="summary-label">使用率</div>
               </div>
             </el-col>
@@ -171,15 +171,43 @@
         <div class="usage-visual">
           <div class="rack-container">
             <div
-              v-for="u in currentUsage.total_u"
-              :key="u"
-              class="rack-unit"
-              :class="{ occupied: isUnitOccupied(currentUsage.total_u - u + 1) }"
+              v-for="(slot, idx) in rackSlots"
+              :key="idx"
+              class="rack-slot"
+              :class="{
+                'rack-slot--asset': slot.type === 'asset',
+                'rack-slot--empty': slot.type === 'empty',
+                'rack-slot--drop-target': isDragTarget(slot)
+              }"
+              :style="{
+                height: slot.height * 28 + 'px',
+                backgroundColor: slot.type === 'asset' && slot.asset ? statusColorMap[slot.asset.status] || '#409eff' : undefined
+              }"
+              :draggable="slot.type === 'asset' ? 'true' : 'false'"
+              @dragstart="onDragStart($event, slot)"
+              @dragover="onDragOver($event, slot)"
+              @dragleave="onDragLeave($event)"
+              @drop="onDrop($event, slot)"
             >
-              <span class="unit-number">{{ currentUsage.total_u - u + 1 }}U</span>
-              <span class="unit-asset" v-if="getAssetAtUnit(currentUsage.total_u - u + 1)">
-                {{ getAssetAtUnit(currentUsage.total_u - u + 1)?.asset_name }}
+              <span class="slot-u-label">
+                {{ slot.type === 'asset' && slot.height > 1 ? `${slot.u}-${slot.u + slot.height - 1}U` : `${slot.u}U` }}
               </span>
+              <template v-if="slot.type === 'asset' && slot.asset">
+                <el-tooltip placement="right" :show-after="300">
+                  <template #content>
+                    <div>编码: {{ slot.asset.asset_code }}</div>
+                    <div>名称: {{ slot.asset.asset_name }}</div>
+                    <div>品牌: {{ slot.asset.brand }}</div>
+                    <div>型号: {{ slot.asset.model }}</div>
+                    <div>状态: {{ statusNameMap[slot.asset.status] || slot.asset.status }}</div>
+                    <div>U位: {{ slot.asset.u_position }}-{{ slot.asset.u_position + slot.asset.u_height - 1 }}U</div>
+                  </template>
+                  <span class="slot-asset-info">
+                    {{ slot.asset.asset_name }}
+                    <span v-if="slot.asset.model" class="slot-model">{{ slot.asset.model }}</span>
+                  </span>
+                </el-tooltip>
+              </template>
             </div>
           </div>
         </div>
@@ -196,7 +224,7 @@
             </el-table-column>
             <el-table-column label="U位" width="100">
               <template #default="{ row }">
-                {{ row.start_u }}-{{ row.end_u }}U
+                {{ row.u_position }}-{{ row.u_position + row.u_height - 1 }}U
               </template>
             </el-table-column>
             <el-table-column prop="status" label="状态" width="90">
@@ -217,12 +245,13 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox, type FormInstance } from 'element-plus'
 import { Plus } from '@element-plus/icons-vue'
 import {
   getCabinets, createCabinet, updateCabinet, deleteCabinet, getCabinetUsage,
-  type Cabinet, type CabinetUsage, type AssetType, type AssetStatus, type Asset
+  moveAssetInCabinet,
+  type Cabinet, type CabinetUsage, type CabinetAssetItem, type AssetType, type AssetStatus
 } from '@/api/modules/asset'
 
 // 数据状态
@@ -262,6 +291,69 @@ const formRules = {
 const usageDialogVisible = ref(false)
 const currentCabinet = ref<Cabinet | null>(null)
 const currentUsage = ref<CabinetUsage | null>(null)
+
+// 状态颜色映射
+const statusColorMap: Record<string, string> = {
+  in_use: '#409eff',
+  maintenance: '#e6a23c',
+  borrowed: '#f2c037',
+  in_stock: '#909399',
+  scrapped: '#f56c6c',
+}
+
+// 状态名称映射
+const statusNameMap: Record<string, string> = {
+  in_use: '使用中',
+  maintenance: '维护中',
+  borrowed: '借出',
+  in_stock: '库存',
+  scrapped: '报废',
+}
+
+// 构建 U 位渲染列表
+interface RackSlot {
+  type: 'asset' | 'empty'
+  u: number
+  height: number
+  asset?: CabinetAssetItem
+}
+
+const rackSlots = computed<RackSlot[]>(() => {
+  if (!currentUsage.value) return []
+  const totalU = currentUsage.value.total_u
+  const assets = currentUsage.value.assets || []
+
+  // 构建 U 位占用映射: u_number -> asset
+  const uMap = new Map<number, CabinetAssetItem>()
+  for (const asset of assets) {
+    for (let u = asset.u_position; u < asset.u_position + asset.u_height; u++) {
+      uMap.set(u, asset)
+    }
+  }
+
+  const slots: RackSlot[] = []
+  let u = totalU // 从顶部开始
+  while (u >= 1) {
+    const asset = uMap.get(u)
+    if (asset && u === asset.u_position + asset.u_height - 1) {
+      // 这是设备的最顶部 U 位，渲染整个设备块
+      slots.push({ type: 'asset', u: asset.u_position, height: asset.u_height, asset })
+      u -= asset.u_height
+    } else if (asset) {
+      // 这个 U 位被设备占用但不是起始位，跳过
+      u--
+    } else {
+      // 空闲 U 位
+      slots.push({ type: 'empty', u, height: 1 })
+      u--
+    }
+  }
+  return slots
+})
+
+// 拖拽状态
+const dragAsset = ref<CabinetAssetItem | null>(null)
+const dropTargetU = ref<number | null>(null)
 
 // 初始化加载
 onMounted(() => {
@@ -317,12 +409,14 @@ function editCabinet(row: Cabinet) {
 async function viewUsage(row: Cabinet) {
   currentCabinet.value = row
   currentUsage.value = null
+  dragAsset.value = null
+  dropTargetU.value = null
   usageDialogVisible.value = true
 
   try {
     const res = await getCabinetUsage(row.id)
-    if (res.data) {
-      currentUsage.value = res.data
+    if (res) {
+      currentUsage.value = res as unknown as CabinetUsage
     }
   } catch (e) {
     console.error('获取机柜使用情况失败', e)
@@ -420,22 +514,63 @@ function getProgressColor(percentage: number): string {
   return '#f5222d'  // var(--error-color)
 }
 
-// 检查U位是否被占用
+// 检查U位是否被占用（用于拖拽预校验）
 function isUnitOccupied(unitNumber: number): boolean {
   if (!currentUsage.value?.assets) return false
   return currentUsage.value.assets.some(
-    asset => asset.start_u && asset.end_u &&
-      unitNumber >= asset.start_u && unitNumber <= asset.end_u
+    asset => unitNumber >= asset.u_position && unitNumber < asset.u_position + asset.u_height
   )
 }
 
-// 获取指定U位的设备
-function getAssetAtUnit(unitNumber: number): Asset | undefined {
-  if (!currentUsage.value?.assets) return undefined
-  return currentUsage.value.assets.find(
-    asset => asset.start_u && asset.end_u &&
-      unitNumber >= asset.start_u && unitNumber <= asset.end_u
-  )
+// 拖拽功能
+function onDragStart(event: DragEvent, slot: RackSlot) {
+  if (slot.type !== 'asset' || !slot.asset) return
+  dragAsset.value = slot.asset
+  event.dataTransfer?.setData('text/plain', String(slot.asset.asset_id))
+}
+
+function onDragOver(event: DragEvent, slot: RackSlot) {
+  if (!dragAsset.value || slot.type !== 'empty') return
+  event.preventDefault()
+  dropTargetU.value = slot.u
+}
+
+function onDragLeave(_event: DragEvent) {
+  dropTargetU.value = null
+}
+
+function isDragTarget(slot: RackSlot): boolean {
+  if (!dragAsset.value || !dropTargetU.value || slot.type !== 'empty') return false
+  return slot.u === dropTargetU.value
+}
+
+async function onDrop(event: DragEvent, slot: RackSlot) {
+  event.preventDefault()
+  if (!dragAsset.value || slot.type !== 'empty' || !currentCabinet.value) {
+    dragAsset.value = null
+    dropTargetU.value = null
+    return
+  }
+
+  const assetId = dragAsset.value.asset_id
+  const newUPosition = slot.u
+
+  dragAsset.value = null
+  dropTargetU.value = null
+
+  try {
+    await moveAssetInCabinet(currentCabinet.value.id, {
+      asset_id: assetId,
+      new_u_position: newUPosition
+    })
+    ElMessage.success('移动成功')
+    // 刷新 U 位图
+    await viewUsage(currentCabinet.value)
+  } catch (e: unknown) {
+    const err = e as { response?: { data?: { detail?: string } } }
+    const msg = err?.response?.data?.detail || '移动失败'
+    ElMessage.error(typeof msg === 'string' ? msg : '移动失败：U位冲突或超出范围')
+  }
 }
 
 // 获取类型名称
@@ -482,7 +617,10 @@ function getStatusType(status: AssetStatus): TagType {
 </script>
 
 <style scoped lang="scss">
+@use '@/styles/mixins-25d' as *;
+
 .cabinet-page {
+  @include page-list;
   .main-card {
     background: var(--bg-card);
     border-color: var(--border-color);
@@ -541,43 +679,63 @@ function getStatusType(status: AssetStatus): TagType {
       margin-bottom: 24px;
 
       .rack-container {
-        max-height: 400px;
+        max-height: 500px;
         overflow-y: auto;
         border: 2px solid var(--border-color, #dcdfe6);
         border-radius: var(--radius-base, 4px);
         background: var(--bg-card, #1a2a4a);
       }
 
-      .rack-unit {
+      .rack-slot {
         display: flex;
         align-items: center;
-        height: 24px;
+        min-height: 28px;
         padding: 0 12px;
-        border-bottom: 1px solid var(--border-color, #ebeef5);
+        border-bottom: 1px solid var(--border-color, rgba(255, 255, 255, 0.1));
         font-size: 12px;
-        background: var(--bg-card, #1a2a4a);
-        transition: background-color 0.2s;
+        transition: all 0.2s;
+        cursor: default;
 
-        &:last-child {
-          border-bottom: none;
+        &--asset {
+          cursor: grab;
+          border-left: 3px solid rgba(255, 255, 255, 0.3);
+          color: #fff;
+
+          &:active {
+            cursor: grabbing;
+          }
         }
 
-        &.occupied {
-          background: rgba(64, 158, 255, 0.15);
-          border-left: 3px solid #409eff;
+        &--empty {
+          background: var(--bg-card, #1a2a4a);
+          color: var(--text-secondary, rgba(255, 255, 255, 0.45));
         }
 
-        .unit-number {
-          width: 50px;
+        &--drop-target {
+          background: rgba(64, 158, 255, 0.3) !important;
+          border: 2px dashed #409eff;
+        }
+
+        .slot-u-label {
+          width: 60px;
           font-weight: 500;
-          color: var(--text-secondary);
+          flex-shrink: 0;
         }
 
-        .unit-asset {
+        .slot-asset-info {
           flex: 1;
-          color: var(--text-primary);
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
           font-weight: 500;
-          padding-left: 12px;
+          cursor: pointer;
+        }
+
+        .slot-model {
+          margin-left: 8px;
+          opacity: 0.8;
+          font-weight: normal;
+          font-size: 11px;
         }
       }
     }

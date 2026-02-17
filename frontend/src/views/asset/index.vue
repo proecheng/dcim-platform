@@ -41,7 +41,7 @@
             <el-icon :size="28"><Tools /></el-icon>
           </div>
           <div class="stat-info">
-            <div class="stat-value">{{ statistics.maintenance_count || 0 }}</div>
+            <div class="stat-value">{{ statistics.by_status?.maintenance || 0 }}</div>
             <div class="stat-label">维护中</div>
           </div>
         </el-card>
@@ -69,6 +69,87 @@
         </el-card>
       </el-col>
     </el-row>
+
+    <!-- 保修预警面板 -->
+    <el-card class="warranty-alert-card" shadow="hover" v-if="warrantyAlerts.total_count > 0">
+      <template #header>
+        <div class="warranty-alert-header">
+          <span>保修预警</span>
+          <el-badge :value="warrantyAlerts.total_count" type="danger" />
+        </div>
+      </template>
+      <el-row :gutter="20">
+        <el-col :span="8">
+          <div class="alert-column alert-30">
+            <div class="alert-title">
+              <span>30天内到期</span>
+              <el-badge :value="warrantyAlerts.within_30_days.length" type="danger" v-if="warrantyAlerts.within_30_days.length > 0" />
+            </div>
+            <div class="alert-list" v-if="warrantyAlerts.within_30_days.length > 0">
+              <div
+                class="alert-item"
+                v-for="item in warrantyAlerts.within_30_days"
+                :key="item.asset_id"
+                @click="viewAlertAsset(item.asset_id)"
+              >
+                <div class="alert-item-name">{{ item.asset_name }}</div>
+                <div class="alert-item-info">
+                  <span>{{ item.asset_code }}</span>
+                  <el-tag type="danger" size="small">{{ item.days_remaining }}天</el-tag>
+                </div>
+              </div>
+            </div>
+            <div class="alert-empty" v-else>无</div>
+          </div>
+        </el-col>
+        <el-col :span="8">
+          <div class="alert-column alert-60">
+            <div class="alert-title">
+              <span>60天内到期</span>
+              <el-badge :value="warrantyAlerts.within_60_days.length" type="warning" v-if="warrantyAlerts.within_60_days.length > 0" />
+            </div>
+            <div class="alert-list" v-if="warrantyAlerts.within_60_days.length > 0">
+              <div
+                class="alert-item"
+                v-for="item in warrantyAlerts.within_60_days"
+                :key="item.asset_id"
+                @click="viewAlertAsset(item.asset_id)"
+              >
+                <div class="alert-item-name">{{ item.asset_name }}</div>
+                <div class="alert-item-info">
+                  <span>{{ item.asset_code }}</span>
+                  <el-tag type="warning" size="small">{{ item.days_remaining }}天</el-tag>
+                </div>
+              </div>
+            </div>
+            <div class="alert-empty" v-else>无</div>
+          </div>
+        </el-col>
+        <el-col :span="8">
+          <div class="alert-column alert-90">
+            <div class="alert-title">
+              <span>90天内到期</span>
+              <el-badge :value="warrantyAlerts.within_90_days.length" type="info" v-if="warrantyAlerts.within_90_days.length > 0" />
+            </div>
+            <div class="alert-list" v-if="warrantyAlerts.within_90_days.length > 0">
+              <div
+                class="alert-item"
+                v-for="item in warrantyAlerts.within_90_days"
+                :key="item.asset_id"
+                @click="viewAlertAsset(item.asset_id)"
+              >
+                <div class="alert-item-name">{{ item.asset_name }}</div>
+                <div class="alert-item-info">
+                  <span>{{ item.asset_code }}</span>
+                  <el-tag type="info" size="small">{{ item.days_remaining }}天</el-tag>
+                </div>
+              </div>
+            </div>
+            <div class="alert-empty" v-else>无</div>
+          </div>
+        </el-col>
+      </el-row>
+    </el-card>
 
     <!-- 工具栏 -->
     <el-card shadow="hover" class="toolbar-card">
@@ -115,8 +196,8 @@
         </div>
         <div class="toolbar-actions">
           <el-button type="primary" :icon="Plus" @click="showAddDialog">新增资产</el-button>
-          <el-button :icon="Upload">导入</el-button>
-          <el-button :icon="Download">导出</el-button>
+          <el-button :icon="Upload" @click="importDialogVisible = true">导入</el-button>
+          <el-button :icon="Download" @click="handleExport">导出</el-button>
         </div>
       </div>
     </el-card>
@@ -143,7 +224,7 @@
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="responsible_person" label="负责人" width="100" />
+        <el-table-column prop="owner" label="负责人" width="100" />
         <el-table-column prop="warranty_status" label="保修状态" width="100">
           <template #default="{ row }">
             <el-tag
@@ -250,8 +331,8 @@
             </el-form-item>
           </el-col>
           <el-col :span="12">
-            <el-form-item label="负责人" prop="responsible_person">
-              <el-input v-model="form.responsible_person" placeholder="请输入负责人" />
+            <el-form-item label="负责人" prop="owner">
+              <el-input v-model="form.owner" placeholder="请输入负责人" />
             </el-form-item>
           </el-col>
         </el-row>
@@ -315,9 +396,9 @@
             </el-form-item>
           </el-col>
         </el-row>
-        <el-form-item label="备注" prop="description">
+        <el-form-item label="备注" prop="remark">
           <el-input
-            v-model="form.description"
+            v-model="form.remark"
             type="textarea"
             :rows="3"
             placeholder="请输入备注信息"
@@ -354,30 +435,30 @@
             <el-option label="巡检" value="inspection" />
           </el-select>
         </el-form-item>
-        <el-form-item label="维护日期" prop="maintenance_date">
+        <el-form-item label="维护日期" prop="start_time">
           <el-date-picker
-            v-model="maintenanceForm.maintenance_date"
+            v-model="maintenanceForm.start_time"
             type="date"
             placeholder="选择维护日期"
             value-format="YYYY-MM-DD"
             style="width: 100%"
           />
         </el-form-item>
-        <el-form-item label="维护人员" prop="maintenance_person">
-          <el-input v-model="maintenanceForm.maintenance_person" placeholder="请输入维护人员" />
+        <el-form-item label="维护人员" prop="technician">
+          <el-input v-model="maintenanceForm.technician" placeholder="请输入维护人员" />
         </el-form-item>
-        <el-form-item label="维护费用" prop="maintenance_cost">
+        <el-form-item label="维护费用" prop="cost">
           <el-input-number
-            v-model="maintenanceForm.maintenance_cost"
+            v-model="maintenanceForm.cost"
             :min="0"
             :precision="2"
             placeholder="请输入费用"
             style="width: 100%"
           />
         </el-form-item>
-        <el-form-item label="维护描述" prop="maintenance_description">
+        <el-form-item label="维护描述" prop="description">
           <el-input
-            v-model="maintenanceForm.maintenance_description"
+            v-model="maintenanceForm.description"
             type="textarea"
             :rows="3"
             placeholder="请输入维护描述"
@@ -389,21 +470,153 @@
         <el-button type="primary" @click="submitMaintenance" :loading="submitting">确定</el-button>
       </template>
     </el-dialog>
+
+    <!-- 导入对话框 -->
+    <el-dialog
+      v-model="importDialogVisible"
+      title="批量导入资产"
+      width="650px"
+      destroy-on-close
+      @close="resetImport"
+    >
+      <div class="import-section">
+        <el-upload
+          ref="uploadRef"
+          :auto-upload="false"
+          :limit="1"
+          accept=".xlsx,.xls"
+          :on-change="handleFileChange"
+          :on-remove="handleFileRemove"
+          drag
+        >
+          <el-icon :size="40" style="color: #909399;"><Upload /></el-icon>
+          <div style="margin-top: 8px;">将文件拖到此处，或<em>点击上传</em></div>
+          <template #tip>
+            <div class="el-upload__tip">
+              仅支持 .xlsx / .xls 格式，
+              <el-button type="primary" link @click.stop="handleDownloadTemplate">下载导入模板</el-button>
+            </div>
+          </template>
+        </el-upload>
+      </div>
+
+      <!-- 预校验结果 -->
+      <div v-if="importResult" class="import-result">
+        <el-alert
+          :title="`校验完成：成功 ${importResult.success_count} 条，失败 ${importResult.error_count} 条`"
+          :type="importResult.error_count > 0 ? 'warning' : 'success'"
+          :closable="false"
+          show-icon
+          style="margin-bottom: 12px;"
+        />
+        <el-table
+          v-if="importResult.errors && importResult.errors.length > 0"
+          :data="importResult.errors"
+          border
+          size="small"
+          max-height="250"
+        >
+          <el-table-column prop="row" label="行号" width="70" />
+          <el-table-column prop="field" label="字段" width="120" />
+          <el-table-column prop="message" label="错误信息" />
+        </el-table>
+      </div>
+
+      <template #footer>
+        <el-button @click="importDialogVisible = false">取消</el-button>
+        <el-button
+          type="primary"
+          :loading="importLoading"
+          :disabled="!importFile"
+          @click="handlePreview"
+        >
+          预校验
+        </el-button>
+        <el-button
+          type="success"
+          :loading="importLoading"
+          :disabled="!importResult || importResult.success_count === 0"
+          @click="handleConfirmImport"
+        >
+          确认导入
+        </el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 资产详情对话框 -->
+    <el-dialog
+      v-model="detailDialogVisible"
+      title="资产详情"
+      width="800px"
+      destroy-on-close
+    >
+      <el-tabs v-model="detailActiveTab">
+        <el-tab-pane label="基本信息" name="info">
+          <el-descriptions :column="2" border v-if="detailAsset">
+            <el-descriptions-item label="资产编码">{{ detailAsset.asset_code }}</el-descriptions-item>
+            <el-descriptions-item label="资产名称">{{ detailAsset.asset_name }}</el-descriptions-item>
+            <el-descriptions-item label="资产类型">{{ getTypeName(detailAsset.asset_type) }}</el-descriptions-item>
+            <el-descriptions-item label="状态">
+              <el-tag :type="getStatusType(detailAsset.status)" size="small">{{ getStatusName(detailAsset.status) }}</el-tag>
+            </el-descriptions-item>
+            <el-descriptions-item label="品牌">{{ detailAsset.brand || '-' }}</el-descriptions-item>
+            <el-descriptions-item label="型号">{{ detailAsset.model || '-' }}</el-descriptions-item>
+            <el-descriptions-item label="序列号">{{ detailAsset.serial_number || '-' }}</el-descriptions-item>
+            <el-descriptions-item label="所在机柜">{{ detailAsset.cabinet_name || '-' }}</el-descriptions-item>
+            <el-descriptions-item label="负责人">{{ detailAsset.owner || '-' }}</el-descriptions-item>
+            <el-descriptions-item label="部门">{{ detailAsset.department || '-' }}</el-descriptions-item>
+            <el-descriptions-item label="保修开始">{{ detailAsset.warranty_start || '-' }}</el-descriptions-item>
+            <el-descriptions-item label="保修结束">{{ detailAsset.warranty_end || '-' }}</el-descriptions-item>
+            <el-descriptions-item label="供应商">{{ detailAsset.supplier || '-' }}</el-descriptions-item>
+            <el-descriptions-item label="采购价格">{{ detailAsset.purchase_price ? '¥' + detailAsset.purchase_price : '-' }}</el-descriptions-item>
+          </el-descriptions>
+        </el-tab-pane>
+        <el-tab-pane label="生命周期" name="lifecycle" lazy>
+          <LifecycleTimeline v-if="detailAsset" :asset-id="detailAsset.id" />
+        </el-tab-pane>
+        <el-tab-pane label="维护记录" name="maintenance" lazy>
+          <div v-loading="maintenanceLoading">
+            <el-table :data="maintenanceRecords" border size="small" v-if="maintenanceRecords.length > 0">
+              <el-table-column prop="maintenance_type" label="类型" width="100">
+                <template #default="{ row }">
+                  {{ { routine: '定期维护', repair: '故障维修', upgrade: '升级更新', inspection: '巡检' }[row.maintenance_type as string] || row.maintenance_type }}
+                </template>
+              </el-table-column>
+              <el-table-column prop="start_time" label="开始时间" width="160" />
+              <el-table-column prop="end_time" label="结束时间" width="160" />
+              <el-table-column prop="technician" label="维护人员" width="100" />
+              <el-table-column prop="description" label="描述" />
+              <el-table-column prop="result" label="结果" width="120" />
+              <el-table-column prop="cost" label="费用" width="100">
+                <template #default="{ row }">
+                  {{ row.cost ? '¥' + row.cost : '-' }}
+                </template>
+              </el-table-column>
+            </el-table>
+            <el-empty v-else description="暂无维护记录" />
+          </div>
+        </el-tab-pane>
+      </el-tabs>
+    </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, watch } from 'vue'
 import { ElMessage, ElMessageBox, type FormInstance } from 'element-plus'
 import {
   Plus, Upload, Download, Search,
   Box, CircleCheck, Coin, Tools, Money, Warning
 } from '@element-plus/icons-vue'
 import {
-  getAssets, createAsset, updateAsset, deleteAsset,
+  getAssets, getAsset, createAsset, updateAsset, deleteAsset,
   getAssetStatistics, createMaintenance,
-  type Asset, type AssetType, type AssetStatus, type AssetStatistics
+  getMaintenanceRecords, getWarrantyAlerts,
+  importAssets, exportAssets, downloadImportTemplate,
+  type Asset, type AssetType, type AssetStatus, type AssetStatistics,
+  type WarrantyAlertResponse
 } from '@/api/modules/asset'
+import LifecycleTimeline from '@/components/asset/LifecycleTimeline.vue'
 
 // 数据状态
 const loading = ref(false)
@@ -440,14 +653,14 @@ const form = reactive({
   brand: '',
   model: '',
   serial_number: '',
-  responsible_person: '',
+  owner: '',
   department: '',
   supplier: '',
   purchase_date: '',
   purchase_price: undefined as number | undefined,
   warranty_start: '',
   warranty_end: '',
-  description: ''
+  remark: ''
 })
 
 // 表单校验规则
@@ -464,22 +677,38 @@ const currentAsset = ref<Asset | null>(null)
 
 const maintenanceForm = reactive({
   maintenance_type: '',
-  maintenance_date: '',
-  maintenance_person: '',
-  maintenance_cost: undefined as number | undefined,
-  maintenance_description: ''
+  start_time: '',
+  technician: '',
+  cost: undefined as number | undefined,
+  description: ''
 })
 
 const maintenanceRules = {
   maintenance_type: [{ required: true, message: '请选择维护类型', trigger: 'change' }],
-  maintenance_date: [{ required: true, message: '请选择维护日期', trigger: 'change' }],
-  maintenance_description: [{ required: true, message: '请输入维护描述', trigger: 'blur' }]
+  start_time: [{ required: true, message: '请选择维护日期', trigger: 'change' }],
+  description: [{ required: true, message: '请输入维护描述', trigger: 'blur' }]
 }
+
+// 详情对话框
+const detailDialogVisible = ref(false)
+const detailActiveTab = ref('info')
+const detailAsset = ref<Asset | null>(null)
+const maintenanceLoading = ref(false)
+const maintenanceRecords = ref<any[]>([])
+
+// 保修预警
+const warrantyAlerts = ref<WarrantyAlertResponse>({
+  within_30_days: [],
+  within_60_days: [],
+  within_90_days: [],
+  total_count: 0
+})
 
 // 初始化加载
 onMounted(() => {
   loadAssets()
   loadStatistics()
+  loadWarrantyAlerts()
 })
 
 // 加载资产列表
@@ -487,8 +716,8 @@ async function loadAssets() {
   loading.value = true
   try {
     const params: Record<string, any> = {
-      page: pagination.page,
-      page_size: pagination.page_size
+      skip: (pagination.page - 1) * pagination.page_size,
+      limit: pagination.page_size
     }
     if (filters.asset_type) params.asset_type = filters.asset_type
     if (filters.status) params.status = filters.status
@@ -553,31 +782,34 @@ function editAsset(row: Asset) {
     brand: row.brand || '',
     model: row.model || '',
     serial_number: row.serial_number || '',
-    responsible_person: row.responsible_person || '',
+    owner: row.owner || '',
     department: row.department || '',
     supplier: row.supplier || '',
     purchase_date: row.purchase_date || '',
     purchase_price: row.purchase_price,
-    warranty_start: '',
-    warranty_end: row.warranty_date || '',
-    description: row.description || ''
+    warranty_start: row.warranty_start || '',
+    warranty_end: row.warranty_end || '',
+    remark: row.remark || ''
   })
   dialogVisible.value = true
 }
 
 // 查看资产详情
-function viewAsset(row: Asset) {
-  editAsset(row)
+async function viewAsset(row: Asset) {
+  detailAsset.value = row
+  detailActiveTab.value = 'info'
+  maintenanceRecords.value = []
+  detailDialogVisible.value = true
 }
 
 // 显示维护记录对话框
 function showMaintenanceDialog(row: Asset) {
   currentAsset.value = row
   maintenanceForm.maintenance_type = ''
-  maintenanceForm.maintenance_date = ''
-  maintenanceForm.maintenance_person = ''
-  maintenanceForm.maintenance_cost = undefined
-  maintenanceForm.maintenance_description = ''
+  maintenanceForm.start_time = ''
+  maintenanceForm.technician = ''
+  maintenanceForm.cost = undefined
+  maintenanceForm.description = ''
   maintenanceDialogVisible.value = true
 }
 
@@ -596,13 +828,14 @@ async function submitForm() {
       brand: form.brand || undefined,
       model: form.model || undefined,
       serial_number: form.serial_number || undefined,
-      responsible_person: form.responsible_person || undefined,
+      owner: form.owner || undefined,
       department: form.department || undefined,
       supplier: form.supplier || undefined,
       purchase_date: form.purchase_date || undefined,
       purchase_price: form.purchase_price,
-      warranty_date: form.warranty_end || undefined,
-      description: form.description || undefined
+      warranty_start: form.warranty_start || undefined,
+      warranty_end: form.warranty_end || undefined,
+      remark: form.remark || undefined
     }
 
     if (isEdit.value && currentAssetId.value) {
@@ -633,10 +866,10 @@ async function submitMaintenance() {
     await createMaintenance({
       asset_id: currentAsset.value.id,
       maintenance_type: maintenanceForm.maintenance_type,
-      maintenance_date: maintenanceForm.maintenance_date,
-      maintenance_person: maintenanceForm.maintenance_person || undefined,
-      maintenance_cost: maintenanceForm.maintenance_cost,
-      maintenance_description: maintenanceForm.maintenance_description
+      start_time: maintenanceForm.start_time,
+      technician: maintenanceForm.technician || undefined,
+      cost: maintenanceForm.cost,
+      description: maintenanceForm.description
     })
     ElMessage.success('维护记录创建成功')
     maintenanceDialogVisible.value = false
@@ -682,14 +915,107 @@ function resetForm() {
   form.brand = ''
   form.model = ''
   form.serial_number = ''
-  form.responsible_person = ''
+  form.owner = ''
   form.department = ''
   form.supplier = ''
   form.purchase_date = ''
   form.purchase_price = undefined
   form.warranty_start = ''
   form.warranty_end = ''
-  form.description = ''
+  form.remark = ''
+}
+
+// ==================== 导入功能 ====================
+const importDialogVisible = ref(false)
+const importLoading = ref(false)
+const importFile = ref<File | null>(null)
+const uploadRef = ref()
+const importResult = ref<{
+  success_count: number
+  error_count: number
+  errors?: { row: number; field: string; message: string }[]
+} | null>(null)
+
+function handleFileChange(file: any) {
+  importFile.value = file.raw
+}
+
+function handleFileRemove() {
+  importFile.value = null
+  importResult.value = null
+}
+
+function resetImport() {
+  importFile.value = null
+  importResult.value = null
+  importLoading.value = false
+}
+
+async function handlePreview() {
+  if (!importFile.value) return
+  importLoading.value = true
+  try {
+    const res = await importAssets(importFile.value, 'preview')
+    importResult.value = res.data as any
+  } catch (e) {
+    console.error('预校验失败', e)
+    ElMessage.error('预校验失败')
+  } finally {
+    importLoading.value = false
+  }
+}
+
+async function handleConfirmImport() {
+  if (!importFile.value) return
+  importLoading.value = true
+  try {
+    await importAssets(importFile.value, 'confirm')
+    ElMessage.success('导入成功')
+    importDialogVisible.value = false
+    resetImport()
+    loadAssets()
+    loadStatistics()
+  } catch (e) {
+    console.error('导入失败', e)
+    ElMessage.error('导入失败')
+  } finally {
+    importLoading.value = false
+  }
+}
+
+async function handleDownloadTemplate() {
+  try {
+    const res = await downloadImportTemplate()
+    const blob = new Blob([res.data], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
+    const url = window.URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = '资产导入模板.xlsx'
+    a.click()
+    window.URL.revokeObjectURL(url)
+  } catch (e) {
+    ElMessage.error('下载模板失败')
+  }
+}
+
+// ==================== 导出功能 ====================
+async function handleExport() {
+  try {
+    const res = await exportAssets({
+      asset_type: filters.asset_type || undefined,
+      status: filters.status || undefined,
+      keyword: filters.keyword || undefined
+    })
+    const blob = new Blob([res.data], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
+    const url = window.URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `资产列表_${new Date().toISOString().slice(0, 10)}.xlsx`
+    a.click()
+    window.URL.revokeObjectURL(url)
+  } catch (e) {
+    ElMessage.error('导出失败')
+  }
 }
 
 // 格式化资产总值
@@ -758,10 +1084,56 @@ function getStatusType(status: AssetStatus): TagType {
   }
   return map[status] || 'info'
 }
+
+// 加载维护记录
+watch(() => detailActiveTab.value, async (tab) => {
+  if (tab === 'maintenance' && detailAsset.value) {
+    maintenanceLoading.value = true
+    try {
+      const res = await getMaintenanceRecords({ asset_id: detailAsset.value.id })
+      maintenanceRecords.value = Array.isArray(res) ? res : (res as any).data || []
+    } catch (e) {
+      console.error('加载维护记录失败', e)
+      maintenanceRecords.value = []
+    } finally {
+      maintenanceLoading.value = false
+    }
+  }
+})
+
+// 加载保修预警
+async function loadWarrantyAlerts() {
+  try {
+    const res = await getWarrantyAlerts()
+    warrantyAlerts.value = res as any
+  } catch (e) {
+    console.error('加载保修预警失败', e)
+  }
+}
+
+// 查看预警资产详情
+async function viewAlertAsset(assetId: number) {
+  let asset = assets.value.find(a => a.id === assetId)
+  if (!asset) {
+    try {
+      const res = await getAsset(assetId)
+      asset = Array.isArray(res) ? res[0] : (res as any).data ?? (res as any)
+    } catch {
+      ElMessage.warning('资产不存在或已被删除')
+      return
+    }
+  }
+  if (asset) {
+    viewAsset(asset)
+  }
+}
 </script>
 
 <style scoped lang="scss">
+@use '@/styles/mixins-25d' as *;
+
 .asset-page {
+  @include page-dashboard(6);
   .stat-cards {
     margin-bottom: 20px;
   }
@@ -858,6 +1230,72 @@ function getStatusType(status: AssetStatus): TagType {
       margin-top: 20px;
       display: flex;
       justify-content: flex-end;
+    }
+  }
+
+  .warranty-alert-card {
+    margin-bottom: 20px;
+    background: var(--bg-card);
+    border-color: var(--border-color);
+
+    .warranty-alert-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-weight: 600;
+    }
+
+    .alert-column {
+      .alert-title {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-weight: 600;
+        margin-bottom: 12px;
+        padding-bottom: 8px;
+        border-bottom: 2px solid;
+      }
+
+      &.alert-30 .alert-title { border-color: #f56c6c; color: #f56c6c; }
+      &.alert-60 .alert-title { border-color: #e6a23c; color: #e6a23c; }
+      &.alert-90 .alert-title { border-color: #909399; color: #909399; }
+    }
+
+    .alert-list {
+      max-height: 200px;
+      overflow-y: auto;
+    }
+
+    .alert-item {
+      padding: 8px;
+      border-radius: 4px;
+      cursor: pointer;
+      margin-bottom: 4px;
+      transition: background 0.2s;
+
+      &:hover {
+        background: rgba(64, 158, 255, 0.08);
+      }
+
+      .alert-item-name {
+        font-size: 14px;
+        font-weight: 500;
+        margin-bottom: 2px;
+      }
+
+      .alert-item-info {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        font-size: 12px;
+        color: #909399;
+      }
+    }
+
+    .alert-empty {
+      text-align: center;
+      color: #c0c4cc;
+      padding: 20px 0;
     }
   }
 }
