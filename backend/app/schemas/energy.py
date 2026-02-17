@@ -107,6 +107,7 @@ class RealtimePowerData(BaseModel):
     load_rate: Optional[float] = Field(None, description="负载率 %")
     status: str = Field("normal", description="状态: normal/warning/alarm/offline")
     update_time: datetime
+    data_quality: Optional[int] = 0
 
 
 class RealtimePowerSummary(BaseModel):
@@ -116,18 +117,19 @@ class RealtimePowerSummary(BaseModel):
     cooling_power: float = Field(..., description="制冷功率 kW")
     ups_power: float = Field(..., description="UPS功率 kW")
     other_power: float = Field(..., description="其他功率 kW")
-    current_pue: float = Field(..., description="当前PUE")
+    current_pue: Optional[float] = None
     today_energy: float = Field(..., description="今日用电 kWh")
     today_cost: float = Field(..., description="今日电费 元")
     month_energy: float = Field(..., description="本月用电 kWh")
     month_cost: float = Field(..., description="本月电费 元")
+    data_source: Optional[str] = None
 
 
 # ========== PUE ==========
 
 class PUEData(BaseModel):
     """PUE数据"""
-    current_pue: float = Field(..., description="当前PUE")
+    current_pue: Optional[float] = None
     total_power: float = Field(..., description="总功率 kW")
     it_power: float = Field(..., description="IT功率 kW")
     cooling_power: float = Field(..., description="制冷功率 kW")
@@ -135,6 +137,8 @@ class PUEData(BaseModel):
     lighting_power: float = Field(..., description="照明功率 kW")
     other_power: float = Field(..., description="其他功率 kW")
     update_time: datetime
+    data_source: Optional[str] = None
+    unreliable_count: Optional[int] = 0
 
 
 class PUEHistoryItem(BaseModel):
@@ -231,16 +235,17 @@ class EnergyStatQuery(BaseModel):
 class EnergyStat(BaseModel):
     """能耗统计结果"""
     total_energy: float = Field(..., description="总电量 kWh")
-    peak_energy: float = Field(..., description="峰时电量 kWh")
-    normal_energy: float = Field(..., description="平时电量 kWh")
-    valley_energy: float = Field(..., description="谷时电量 kWh")
+    peak_energy: float = Field(..., description="尖峰+高峰电量 kWh")
+    normal_energy: float = Field(..., description="平段电量 kWh")
+    valley_energy: float = Field(..., description="低谷+深谷电量 kWh")
     total_cost: float = Field(..., description="总电费 元")
-    peak_cost: float = Field(..., description="峰时电费 元")
-    normal_cost: float = Field(..., description="平时电费 元")
-    valley_cost: float = Field(..., description="谷时电费 元")
+    peak_cost: float = Field(..., description="尖峰+高峰电费 元")
+    normal_cost: float = Field(..., description="平段电费 元")
+    valley_cost: float = Field(..., description="低谷+深谷电费 元")
     avg_power: float = Field(..., description="平均功率 kW")
     max_power: float = Field(..., description="最大功率 kW")
     avg_pue: Optional[float] = Field(None, description="平均PUE")
+    data_source: Optional[str] = Field(None, description="数据来源: real/simulated")
 
 
 class EnergyTrendItem(BaseModel):
@@ -257,6 +262,7 @@ class EnergyTrend(BaseModel):
     data: List[EnergyTrendItem]
     total_energy: float
     total_cost: float
+    data_source: Optional[str] = Field(None, description="数据来源: real/simulated")
 
 
 class EnergyComparison(BaseModel):
@@ -267,6 +273,7 @@ class EnergyComparison(BaseModel):
     energy_change_rate: float = Field(..., description="电量变化率 %")
     cost_change: float = Field(..., description="电费变化 元")
     cost_change_rate: float = Field(..., description="电费变化率 %")
+    data_source: Optional[str] = Field(None, description="数据来源: real/simulated")
 
 
 # ========== 电价配置 ==========

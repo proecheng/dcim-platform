@@ -38,6 +38,7 @@ class ThresholdInfo(BaseModel):
     point_id: int
     point_code: Optional[str] = None
     point_name: Optional[str] = None
+    device_type: Optional[str] = None
     threshold_type: str
     threshold_value: Optional[float] = None
     alarm_level: str
@@ -59,3 +60,26 @@ class ThresholdBatchCreate(BaseModel):
     alarm_message: Optional[str] = None
     delay_seconds: int = 0
     dead_band: float = 0
+
+
+class FourLevelThresholdItem(BaseModel):
+    """单级阈值配置"""
+    value: Optional[float] = None
+    message: Optional[str] = None
+    enabled: Optional[bool] = True
+
+
+class FourLevelThresholdCreate(BaseModel):
+    """4级阈值一体化配置"""
+    high_high: Optional[FourLevelThresholdItem] = None
+    high: Optional[FourLevelThresholdItem] = None
+    low: Optional[FourLevelThresholdItem] = None
+    low_low: Optional[FourLevelThresholdItem] = None
+    delay_seconds: int = 0
+    dead_band: float = 0
+
+
+class BatchByDeviceTypeCreate(BaseModel):
+    """按设备类型批量配置阈值"""
+    device_type: str
+    thresholds: FourLevelThresholdCreate

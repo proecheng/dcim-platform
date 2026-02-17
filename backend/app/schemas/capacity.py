@@ -239,3 +239,69 @@ class CapacityTrend(BaseModel):
     timestamps: List[datetime] = Field(default_factory=list, description="时间戳列表")
     values: List[float] = Field(default_factory=list, description="数值列表")
     capacity_type: CapacityType = Field(..., description="容量类型")
+
+
+# ==================== 智能上架推荐 Schemas ====================
+
+class RackingRecommendationRequest(BaseModel):
+    """上架推荐请求"""
+    required_u: int = Field(..., ge=1, description="所需U位数")
+    required_power_kw: Optional[float] = Field(None, ge=0, description="所需电力(kW)")
+    required_cooling_kw: Optional[float] = Field(None, ge=0, description="所需制冷量(kW)")
+    required_weight_kg: Optional[float] = Field(None, ge=0, description="所需承重(kg)")
+    limit: int = Field(5, ge=1, le=20, description="返回候选数量")
+
+
+class CabinetScore(BaseModel):
+    """机柜评分"""
+    cabinet_id: int = Field(..., description="机柜ID")
+    cabinet_code: str = Field(..., description="机柜编码")
+    cabinet_name: str = Field(..., description="机柜名称")
+    location: Optional[str] = Field(None, description="位置")
+    space_score: float = Field(..., description="空间评分(0-100)")
+    power_score: float = Field(..., description="电力评分(0-100)")
+    cooling_score: float = Field(..., description="制冷评分(0-100)")
+    weight_score: float = Field(..., description="承重评分(0-100)")
+    total_score: float = Field(..., description="综合评分(0-100)")
+    available_u: int = Field(..., description="可用U位")
+    max_power: Optional[float] = Field(None, description="最大功率(kW)")
+    max_weight: Optional[float] = Field(None, description="最大承重(kg)")
+    notes: str = Field("", description="评估说明")
+
+
+class RackingRecommendationResponse(BaseModel):
+    """上架推荐响应"""
+    request: RackingRecommendationRequest = Field(..., description="请求参数")
+    candidates: List[CabinetScore] = Field(default_factory=list, description="候选机柜列表")
+    total_cabinets_evaluated: int = Field(0, description="评估机柜总数")
+    qualified_count: int = Field(0, description="合格候选数")
+
+
+# ==================== 容量趋势预测 Schemas ====================
+
+class ExpansionSuggestion(BaseModel):
+    """扩容建议"""
+    capacity_type: str = Field(..., description="容量类型")
+    current_usage_rate: float = Field(..., description="当前使用率(%)")
+    predicted_exceed_date: str = Field(..., description="预计超阈值日期")
+    predicted_usage_rate: float = Field(..., description="预计使用率(%)")
+    resource_gap: str = Field(..., description="资源缺口描述")
+    suggestion: str = Field(..., description="扩容建议")
+
+
+class CapacityTrendResponse(BaseModel):
+    """容量趋势响应 — 对齐前端 getCapacityTrend 期望"""
+    timestamps: List[str] = Field(default_factory=list, description="时间戳列表")
+    total: List[float] = Field(default_factory=list, description="总量列表")
+    used: List[float] = Field(default_factory=list, description="已用量列表")
+    usage_rate: List[float] = Field(default_factory=list, description="使用率列表(%)")
+
+
+class CapacityForecastResponse(BaseModel):
+    """容量预测响应 — 对齐前端 getCapacityForecast 期望"""
+    timestamps: List[str] = Field(default_factory=list, description="时间戳列表")
+    predicted_usage: List[float] = Field(default_factory=list, description="预测使用率(%)")
+    confidence_upper: List[float] = Field(default_factory=list, description="置信区间上界(%)")
+    confidence_lower: List[float] = Field(default_factory=list, description="置信区间下界(%)")
+    is_demo: bool = Field(False, description="是否为演示数据")
+    expansion_suggestions: List[ExpansionSuggestion] = Field(default_factory=list, description="扩容建议")

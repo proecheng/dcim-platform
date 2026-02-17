@@ -20,6 +20,10 @@ class CabinetBase(BaseModel):
     total_u: int = Field(42, description="总U数")
     max_power: Optional[float] = Field(None, description="最大功率 kW")
     max_weight: Optional[float] = Field(None, description="最大承重 kg")
+    row_id: Optional[int] = Field(None, description="所属行ID")
+    aisle_type: Optional[str] = Field(None, description="通道类型: cold/hot/none")
+    grid_x: Optional[int] = Field(None, description="网格X坐标")
+    grid_y: Optional[int] = Field(None, description="网格Y坐标")
 
 
 class CabinetCreate(CabinetBase):
@@ -37,6 +41,10 @@ class CabinetUpdate(BaseModel):
     total_u: Optional[int] = Field(None, description="总U数")
     max_power: Optional[float] = Field(None, description="最大功率 kW")
     max_weight: Optional[float] = Field(None, description="最大承重 kg")
+    row_id: Optional[int] = Field(None, description="所属行ID")
+    aisle_type: Optional[str] = Field(None, description="通道类型: cold/hot/none")
+    grid_x: Optional[int] = Field(None, description="网格X坐标")
+    grid_y: Optional[int] = Field(None, description="网格Y坐标")
 
 
 class CabinetResponse(CabinetBase):
@@ -44,6 +52,7 @@ class CabinetResponse(CabinetBase):
     id: int = Field(..., description="机柜ID")
     used_u: int = Field(0, description="已使用U数")
     available_u: int = Field(42, description="可用U数")
+    row_name: Optional[str] = Field(None, description="所属行名称")
     created_at: datetime = Field(..., description="创建时间")
     updated_at: datetime = Field(..., description="更新时间")
 
@@ -255,3 +264,23 @@ class AssetStatistics(BaseModel):
     by_department: Dict[str, int] = Field(default_factory=dict, description="按部门统计")
     total_value: float = Field(0, description="资产总价值")
     warranty_expiring_count: int = Field(0, description="保修即将到期数量(30天内)")
+
+
+# ==================== 保修预警 Schemas ====================
+
+class WarrantyAlertItem(BaseModel):
+    """保修预警项"""
+    asset_id: int
+    asset_code: str
+    asset_name: str
+    asset_type: Optional[str] = None
+    warranty_end: str
+    days_remaining: int
+    status: Optional[str] = None
+
+class WarrantyAlertResponse(BaseModel):
+    """保修预警汇总"""
+    within_30_days: List[WarrantyAlertItem] = []
+    within_60_days: List[WarrantyAlertItem] = []
+    within_90_days: List[WarrantyAlertItem] = []
+    total_count: int = 0
