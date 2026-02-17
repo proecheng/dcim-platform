@@ -7,6 +7,7 @@ import DateRangePicker from './DateRangePicker.vue'
 import ExportButton from './ExportButton.vue'
 import StatusTag from './StatusTag.vue'
 import ConfirmDialog from './ConfirmDialog.vue'
+import DegradationBanner from './DegradationBanner.vue'
 
 export {
   DataTable,
@@ -14,7 +15,8 @@ export {
   DateRangePicker,
   ExportButton,
   StatusTag,
-  ConfirmDialog
+  ConfirmDialog,
+  DegradationBanner
 }
 
 export default {
@@ -23,5 +25,6 @@ export default {
   DateRangePicker,
   ExportButton,
   StatusTag,
-  ConfirmDialog
+  ConfirmDialog,
+  DegradationBanner
 }

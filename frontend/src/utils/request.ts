@@ -1,6 +1,7 @@
 import axios, { AxiosRequestConfig, AxiosResponse } from 'axios'
 import { ElMessage } from 'element-plus'
 import router from '@/router'
+import { degradationFlags } from '@/stores/degradation'
 
 // API基础URL - 始终使用相对路径，通过代理访问后端
 // 开发环境: Vite 代理转发到 localhost:8080
@@ -31,6 +32,18 @@ instance.interceptors.request.use(
 // 响应拦截器
 instance.interceptors.response.use(
   (response) => {
+    // 检测降级标志
+    const degraded = response.headers['x-degraded']
+    if (degraded === 'true') {
+      degradationFlags.redisDown = true
+      degradationFlags.degradedMessage = '实时数据可能有延迟'
+    } else if (degraded === 'false' || !degraded) {
+      // 仅在明确收到非降级响应时清除（避免非 realtime 接口误清）
+      if (response.config.url?.includes('/realtime')) {
+        degradationFlags.redisDown = false
+        degradationFlags.degradedMessage = ''
+      }
+    }
     return response.data
   },
   (error) => {

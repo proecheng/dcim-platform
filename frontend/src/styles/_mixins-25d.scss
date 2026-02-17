@@ -1,0 +1,169 @@
+// ============================================================
+// 2.5D 视觉增强 SCSS Mixin 系统
+// 为 DCIM 所有页面提供统一的轻度 3D 透视效果
+// ============================================================
+
+// ── 变量 ──────────────────────────────────────────────────
+$perspective-25d: 1200px !default;
+$hover-lift-25d: -6px !default;
+$hover-glow-25d: rgba(0, 212, 255, 0.15) !default;
+$enter-duration-25d: 0.6s !default;
+$enter-stagger-25d: 0.08s !default;
+$transition-25d: cubic-bezier(0.25, 0.46, 0.45, 0.94);
+
+// ── 基础层：透视容器 ─────────────────────────────────────
+@mixin perspective-container($distance: $perspective-25d) {
+  perspective: $distance;
+  perspective-origin: 50% 30%;
+
+  // 覆盖全局 fadeInUp 动画（其 fill-mode:both 会锁定 transform）
+  :deep(.el-card) {
+    animation: none;
+  }
+}
+
+// ── 组件层 A：统计卡片弧形倾斜 ──────────────────────────
+// $count: 卡片数量（用于计算弧形分布）
+// $max-tilt: 最外侧卡片的最大倾斜角度
+@mixin stat-cards-arc($count: 4, $max-tilt: 2deg) {
+  animation: slideInDepth $enter-duration-25d ease-out both;
+
+  .el-col {
+    @for $i from 1 through 8 {
+      &:nth-child(#{$i}) .stat-card,
+      &:nth-child(#{$i}) .summary-card,
+      &:nth-child(#{$i}) .potential-card,
+      &:nth-child(#{$i}) > .el-card {
+        $mid: ($count + 1) / 2;
+        $offset: $i - $mid;
+        $tilt: $max-tilt * $offset / ($count / 2);
+        transform: perspective(800px) rotateY(#{$tilt}) rotateX(1deg);
+        transform-style: preserve-3d;
+        will-change: transform;
+        transition: all 0.4s $transition-25d;
+
+        &:hover {
+          transform: perspective(800px) rotateY(0deg) rotateX(0deg) translateY($hover-lift-25d) scale(1.02);
+          box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5), 0 0 20px $hover-glow-25d;
+        }
+      }
+    }
+  }
+}
+
+// ── 组件层 B：表格景深 ──────────────────────────────────
+@mixin table-depth($tilt: 0.5deg) {
+  :deep(.el-card) {
+    transform: perspective($perspective-25d) rotateX($tilt);
+    transform-origin: center top;
+    will-change: transform;
+    transition: all 0.4s $transition-25d;
+
+    &:hover {
+      transform: perspective($perspective-25d) rotateX(0deg) translateY(-2px);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+    }
+  }
+
+  :deep(.el-table .el-table__row) {
+    transition: transform 0.25s ease, box-shadow 0.25s ease;
+
+    &:hover {
+      transform: translateY(-1px) translateZ(2px);
+    }
+  }
+}
+
+// ── 组件层 C：图表区景深差 ──────────────────────────────
+@mixin chart-depth-split($left-tilt: 0.5deg, $right-tilt: -1deg) {
+  animation: slideInDepth $enter-duration-25d ease-out 0.4s both;
+
+  > .el-col:first-child > .el-card {
+    transform: perspective(800px) rotateY($left-tilt);
+    will-change: transform;
+    transition: all 0.4s $transition-25d;
+
+    &:hover {
+      transform: perspective(800px) rotateY(0deg) translateY(-2px);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+    }
+  }
+
+  > .el-col:last-child > .el-card {
+    transform: perspective(800px) rotateY($right-tilt) translateZ(-5px);
+    will-change: transform;
+    transition: all 0.4s $transition-25d;
+
+    &:hover {
+      transform: perspective(800px) rotateY(0deg) translateZ(0) translateY(-2px);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+    }
+  }
+}
+
+// ── 组件层 D：表单/配置区 ───────────────────────────────
+@mixin form-depth($tilt: 0.8deg) {
+  :deep(.el-card) {
+    transform: perspective($perspective-25d) rotateX($tilt);
+    transform-origin: center bottom;
+    will-change: transform;
+    transition: all 0.3s $transition-25d;
+
+    &:hover {
+      transform: perspective($perspective-25d) rotateX(0deg) translateY(-2px);
+      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+    }
+  }
+}
+
+// ── 组件层 E：入场动画 ──────────────────────────────────
+@mixin enter-stagger($animation: fadeInDepthSubtle, $duration: 0.5s, $stagger: $enter-stagger-25d) {
+  > * {
+    @for $i from 1 through 12 {
+      &:nth-child(#{$i}) {
+        animation: #{$animation} #{$duration} ease-out both;
+        animation-delay: calc(#{$stagger} * #{$i});
+      }
+    }
+  }
+}
+
+// ── 页面级 Preset ───────────────────────────────────────
+
+// 仪表盘/概览类（stat-cards + charts）
+@mixin page-dashboard($card-count: 4, $max-tilt: 2deg) {
+  @include perspective-container;
+
+  .stat-cards,
+  .stat-row,
+  .summary-bar,
+  .potential-cards {
+    @include stat-cards-arc($card-count, $max-tilt);
+  }
+
+  .chart-row {
+    @include chart-depth-split;
+  }
+
+  @include enter-stagger(slideInDepth);
+}
+
+// 列表类（table + filter）
+@mixin page-list {
+  @include perspective-container;
+  @include table-depth;
+  @include enter-stagger;
+}
+
+// 表单/配置类
+@mixin page-form($tilt: 0.8deg) {
+  @include perspective-container;
+  @include form-depth($tilt);
+  @include enter-stagger;
+}
+
+// 特殊页面（轻量，只加容器 + 入场）
+@mixin page-special {
+  @include perspective-container;
+  @include enter-stagger(slideInDepth, 0.5s, 0.06s);
+}

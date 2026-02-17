@@ -38,10 +38,34 @@ const routes: RouteRecordRaw[] = [
         meta: { title: '点位管理', icon: 'Cpu' }
       },
       {
+        path: 'datasources',
+        name: 'Datasources',
+        component: () => import('@/views/datasource/index.vue'),
+        meta: { title: '数据源管理', icon: 'Connection' }
+      },
+      {
+        path: 'device-templates',
+        name: 'DeviceTemplates',
+        component: () => import('@/views/device-template/index.vue'),
+        meta: { title: '设备模板', icon: 'Files' }
+      },
+      {
         path: 'device-manage',
         name: 'DeviceManage',
         component: () => import('@/views/device-manage/index.vue'),
         meta: { title: '设备管理', icon: 'SetUp' }
+      },
+      {
+        path: 'device-manage/detail/:id',
+        name: 'DeviceDetail',
+        component: () => import('@/views/device-manage/detail.vue'),
+        meta: { title: '设备详情', icon: 'View', hidden: true }
+      },
+      {
+        path: 'device-status',
+        name: 'DeviceStatus',
+        component: () => import('@/views/device-status/index.vue'),
+        meta: { title: '设备状态看板', icon: 'Odometer' }
       },
 
       // ===== 华为6大域 =====
@@ -122,6 +146,30 @@ const routes: RouteRecordRaw[] = [
             name: 'CoolingOverview',
             component: () => import('@/views/cooling/overview.vue'),
             meta: { title: '制冷总览', icon: 'DataBoard' }
+          },
+          {
+            path: 'indoor',
+            name: 'CoolingIndoor',
+            component: () => import('@/views/cooling/indoor.vue'),
+            meta: { title: '精密空调', icon: 'IceCream' }
+          },
+          {
+            path: 'outdoor',
+            name: 'CoolingOutdoor',
+            component: () => import('@/views/cooling/outdoor.vue'),
+            meta: { title: '室外机', icon: 'Sunny' }
+          },
+          {
+            path: 'cold-aisle',
+            name: 'CoolingColdAisle',
+            component: () => import('@/views/cooling/cold-aisle.vue'),
+            meta: { title: '冷通道', icon: 'Box' }
+          },
+          {
+            path: 'group-control',
+            name: 'CoolingGroupControl',
+            component: () => import('@/views/cooling/group-control.vue'),
+            meta: { title: '群控状态', icon: 'Connection' }
           }
         ]
       },
@@ -182,6 +230,36 @@ const routes: RouteRecordRaw[] = [
             name: 'InfraCapacity',
             component: () => import('@/views/capacity/index.vue'),
             meta: { title: '容量管理', icon: 'DataAnalysis' }
+          },
+          {
+            path: 'spatial',
+            name: 'InfraSpatial',
+            component: () => import('@/views/topology/spatial.vue'),
+            meta: { title: '空间拓扑', icon: 'OfficeBuilding' }
+          },
+          {
+            path: 'power-topology',
+            name: 'InfraPowerTopology',
+            component: () => import('@/views/topology/power.vue'),
+            meta: { title: 'PDU 相位配置', icon: 'Connection' }
+          },
+          {
+            path: 'cooling-topology',
+            name: 'CoolingTopology',
+            component: () => import('@/views/topology/cooling.vue'),
+            meta: { title: '制冷区域配置', icon: 'WindPower' }
+          },
+          {
+            path: 'site-selection',
+            name: 'InfraSiteSelection',
+            component: () => import('@/views/topology/site-selection.vue'),
+            meta: { title: '智能选址', icon: 'MapLocation' }
+          },
+          {
+            path: 'fault-impact',
+            name: 'InfraFaultImpact',
+            component: () => import('@/views/topology/fault-impact.vue'),
+            meta: { title: '故障影响分析', icon: 'Warning' }
           }
         ]
       },
@@ -210,6 +288,12 @@ const routes: RouteRecordRaw[] = [
             name: 'SavingExecution',
             component: () => import('@/views/energy/execution.vue'),
             meta: { title: '执行管理', icon: 'VideoPlay' }
+          },
+          {
+            path: 'report',
+            name: 'EnergyReport',
+            component: () => import('@/views/energy/report.vue'),
+            meta: { title: '能效报告', icon: 'Document' }
           }
         ]
       },
@@ -270,6 +354,26 @@ const routes: RouteRecordRaw[] = [
             name: 'VPPAnalysis',
             component: () => import('@/views/vpp/VPPAnalysis.vue'),
             meta: { title: 'VPP方案分析', icon: 'DataAnalysis' }
+          }
+        ]
+      },
+      {
+        path: 'linkage',
+        name: 'Linkage',
+        redirect: '/linkage/policy',
+        meta: { title: '联动管理', icon: 'Connection' },
+        children: [
+          {
+            path: 'policy',
+            name: 'LinkagePolicy',
+            component: () => import('@/views/linkage/policy.vue'),
+            meta: { title: '联动策略', icon: 'SetUp' }
+          },
+          {
+            path: 'execution',
+            name: 'LinkageExecution',
+            component: () => import('@/views/linkage/execution.vue'),
+            meta: { title: '执行日志', icon: 'Document' }
           }
         ]
       },

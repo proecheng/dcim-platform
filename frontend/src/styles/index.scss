@@ -302,11 +302,33 @@ a {
 }
 
 // ============= 入场动画 =============
-// 卡片从下方淡入
+// 卡片淡入（opacity-only，不含 transform，避免覆盖 2.5D 效果）
 @keyframes fadeInUp {
   from {
     opacity: 0;
-    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+// 2.5D 入场动画 — 带透视的深度滑入
+@keyframes slideInDepth {
+  from {
+    opacity: 0;
+    transform: perspective(800px) rotateX(5deg) translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: perspective(800px) rotateX(0deg) translateY(0);
+  }
+}
+
+// 2.5D 入场动画 — 微妙的深度淡入
+@keyframes fadeInDepthSubtle {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
   }
   to {
     opacity: 1;
@@ -407,14 +429,10 @@ a {
 }
 
 // ============= 微交互增强 =============
-// 卡片悬停提升效果
+// 卡片悬停提升效果（2.5D 页面通过 mixin 自行管理 hover transform）
 .dark-card,
 .el-card {
   transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
-
-  &:hover {
-    transform: translateY(-2px);
-  }
 }
 
 // 按钮点击反馈
@@ -479,5 +497,16 @@ a {
     background: linear-gradient(90deg, transparent, var(--accent-color), transparent);
     opacity: 0.3;
     animation: scanline 4s linear infinite;
+  }
+}
+
+// ============= 无障碍：减少动画 =============
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
   }
 }

@@ -4,6 +4,13 @@
       <div class="header-left">
         <el-icon :size="20" color="#67C23A"><TrendCharts /></el-icon>
         <span class="title">PUE效率</span>
+        <el-tag
+          v-if="dataSource"
+          :type="dataSource === 'realtime' ? 'success' : 'info'"
+          size="small"
+        >
+          {{ dataSource === 'realtime' ? '实时' : '模拟' }}
+        </el-tag>
       </div>
       <el-tooltip content="Power Usage Effectiveness: 数据中心总能耗与IT设备能耗比值" placement="top">
         <el-icon :size="16" class="info-icon"><InfoFilled /></el-icon>
@@ -56,6 +63,7 @@ const props = defineProps<{
   trend?: 'up' | 'down' | 'stable'
   trendData?: number[]
   compareYesterday?: number
+  dataSource?: string
 }>()
 
 const target = computed(() => props.target || 1.4)

@@ -146,6 +146,71 @@
         </el-empty>
       </div>
     </el-card>
+
+    <!-- 自动识别的节能机会 -->
+    <el-card shadow="hover" class="suggestions-card">
+      <template #header>
+        <div class="card-header">
+          <span>自动识别的节能机会</span>
+          <div>
+            <el-button type="primary" size="small" :loading="detectLoading" @click="handleTriggerDetection">
+              <el-icon><Search /></el-icon> 立即检测
+            </el-button>
+          </div>
+        </div>
+      </template>
+      <div class="suggestions-list" v-loading="opportunityStore.dashboardLoading">
+        <div
+          v-for="item in opportunityStore.dashboard?.opportunities || []"
+          :key="item.id"
+          class="suggestion-item"
+          :class="'priority-' + item.priority"
+        >
+          <div class="suggestion-header">
+            <div class="priority-badge" :class="item.priority">
+              {{ priorityText[item.priority] || '中' }}优先级
+            </div>
+            <el-tag type="primary" size="small" v-if="item.source_plugin">自动识别</el-tag>
+            <el-tag type="info" size="small" v-else>手动创建</el-tag>
+            <el-tag size="small">
+              {{ getOpportunityCategoryName(item.category) }}
+            </el-tag>
+          </div>
+          <div class="suggestion-content">
+            <div class="rule-name">{{ item.title }}</div>
+            <div class="suggestion-text">{{ item.description || '暂无描述' }}</div>
+          </div>
+          <div class="suggestion-footer">
+            <div class="stats">
+              <span class="stat-item">
+                <el-icon><TrendCharts /></el-icon>
+                预计年节省: <strong>¥{{ formatNumber(item.potential_saving || 0) }}</strong>
+              </span>
+              <span class="stat-item">
+                <el-icon><Lightning /></el-icon>
+                置信度: <strong>{{ ((item.confidence || 0) * 100).toFixed(0) }}%</strong>
+              </span>
+            </div>
+            <div class="actions">
+              <el-button
+                v-if="item.status === 'discovered' || item.status === 'ready'"
+                type="primary" size="small"
+                @click="handleExecuteOpportunity(item)"
+              >
+                执行 <el-icon><VideoPlay /></el-icon>
+              </el-button>
+            </div>
+          </div>
+        </div>
+        <el-empty v-if="!(opportunityStore.dashboard?.opportunities?.length) && !opportunityStore.dashboardLoading" description="暂无自动识别的机会">
+          <template #extra>
+            <el-button type="primary" @click="handleTriggerDetection" :loading="detectLoading">
+              <el-icon><Search /></el-icon> 开始检测
+            </el-button>
+          </template>
+        </el-empty>
+      </div>
+    </el-card>
   </div>
 </template>
 
@@ -155,12 +220,14 @@ import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import {
   Lightning, Warning, Select, CircleCheck, DataAnalysis, MagicStick,
-  Management, Document, ArrowRight, TrendCharts, VideoPlay
+  Management, Document, ArrowRight, TrendCharts, VideoPlay, Search
 } from '@element-plus/icons-vue'
 import {
   getSuggestions, getSavingPotential, triggerSuggestionAnalysis,
   type EnergySuggestion, type SavingPotential
 } from '@/api/modules/energy'
+import { useOpportunityStore } from '@/stores/opportunity'
+import { triggerDetection, executeOpportunity } from '@/api/modules/opportunities'
 
 const props = defineProps<{ activeTab?: string }>()
 const emit = defineEmits<{ (e: 'update:activeTab', value: string): void }>()
@@ -171,6 +238,8 @@ const analyzing = ref(false)
 const potential = ref<Partial<SavingPotential>>({})
 const topSuggestions = ref<EnergySuggestion[]>([])
 
+const opportunityStore = useOpportunityStore()
+const detectLoading = ref(false)
 const priorityText: Record<string, string> = { high: '高', medium: '中', low: '低' }
 const statusText: Record<string, string> = { pending: '待处理', accepted: '执行中', rejected: '已拒绝', completed: '已完成' }
 
@@ -203,7 +272,7 @@ onMounted(() => loadData())
 async function loadData() {
   loading.value = true
   try {
-    await Promise.all([loadPotential(), loadTopSuggestions()])
+    await Promise.all([loadPotential(), loadTopSuggestions(), opportunityStore.loadDashboard()])
   } finally {
     loading.value = false
   }
@@ -242,6 +311,51 @@ async function runAnalysis() {
     ElMessage.error('分析失败')
   } finally {
     analyzing.value = false
+  }
+}
+
+const opportunityCategoryNames: Record<number, string> = {
+  1: '电费结构优化',
+  2: '设备运行优化',
+  3: '设备改造升级',
+  4: '综合能效提升'
+}
+function getOpportunityCategoryName(category: number): string {
+  return opportunityCategoryNames[category] || '未知分类'
+}
+
+async function handleTriggerDetection() {
+  detectLoading.value = true
+  try {
+    const res = await triggerDetection()
+    if (res.code === 0 && res.data) {
+      const count = res.data.new_opportunities
+      if (count > 0) {
+        ElMessage.success(`检测完成，发现 ${count} 个新节能机会`)
+        await opportunityStore.loadDashboard()
+      } else {
+        ElMessage.info('检测完成，暂无新机会')
+      }
+    }
+  } catch (e) {
+    ElMessage.error('检测失败')
+  } finally {
+    detectLoading.value = false
+  }
+}
+
+async function handleExecuteOpportunity(item: any) {
+  try {
+    const res = await executeOpportunity(item.id)
+    if (res.data?.plan_id) {
+      ElMessage.success('执行计划创建成功')
+      router.push({
+        path: '/energy-saving/execution',
+        query: { highlight: res.data.plan_id.toString() }
+      })
+    }
+  } catch (e: any) {
+    ElMessage.error(e?.response?.data?.detail || '创建执行计划失败')
   }
 }
 

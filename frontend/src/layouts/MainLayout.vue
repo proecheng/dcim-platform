@@ -231,6 +231,9 @@
         </div>
 
         <div class="header-right">
+          <!-- 告警声音开关 -->
+          <AlarmSoundToggle />
+
           <!-- 告警提示 -->
           <el-badge :value="alarmStore.alarmCount.total" :max="99" class="alarm-badge">
             <el-button :icon="Bell" circle @click="$router.push('/alarms')" />
@@ -255,6 +258,7 @@
 
       <!-- 主内容区 -->
       <el-main class="main">
+        <DegradationBanner />
         <router-view />
       </el-main>
     </el-container>
@@ -275,6 +279,11 @@ import {
 } from '@element-plus/icons-vue'
 import { useUserStore, useAlarmStore } from '@/stores'
 import { getAlarmCount } from '@/api/alarm'
+import DegradationBanner from '@/components/common/DegradationBanner.vue'
+import AlarmSoundToggle from '@/components/common/AlarmSoundToggle.vue'
+import { useDataQuality } from '@/composables/useDataQuality'
+
+useDataQuality()
 
 const router = useRouter()
 const route = useRoute()
