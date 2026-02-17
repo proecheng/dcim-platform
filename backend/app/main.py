@@ -4,6 +4,7 @@ V2.0 架构重构版
 """
 import os
 import asyncio
+from datetime import datetime
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Query
 from fastapi.middleware.cors import CORSMiddleware
@@ -18,6 +19,19 @@ from .api.v1 import api_router
 from .services.websocket import ws_manager
 from .services.simulator import simulator
 from .services.power_seed import seed_power_devices
+from .services.cooling_seed import seed_cooling_devices
+from .core.redis import redis_service
+from .engines.alarm_engine import alarm_engine
+from .engines.linkage_engine import linkage_engine
+from .engines.event_bus import get_event_bus
+from .services.communication_monitor import check_communication_status
+from .engines.escalation_engine import check_escalations
+from .services.pue_calculator import write_pue_history
+from .services.energy_aggregator import aggregate_hourly, aggregate_daily, aggregate_monthly
+
+import logging
+
+logger = logging.getLogger(__name__)
 
 settings = get_settings()
 
@@ -151,21 +165,189 @@ async def lifespan(app: FastAPI):
     await init_default_data()
     await init_default_configs()
     await seed_power_devices()
+    await seed_cooling_devices()
+
+    # 连接 Redis 缓存
+    if settings.redis_enabled:
+        await redis_service.connect(settings.redis_url)
+
+    # 加载告警引擎阈值缓存
+    await alarm_engine.load_thresholds()
+
+    # 同步消防策略 YAML 到数据库（Story 9-2）
+    try:
+        from .services.fire_protection import sync_to_database as fp_sync
+        async with async_session() as session:
+            await fp_sync(session)
+    except Exception as e:
+        logger.warning("消防策略同步失败: %s", e)
+
+    # 加载联动引擎策略缓存并订阅事件
+    await linkage_engine.load_policies()
+    event_bus = get_event_bus()
+
+    # 订阅交叉确认服务（Story 9-2）
+    from .engines.cross_confirmation import cross_confirmation_service
+    await event_bus.subscribe("linkage", cross_confirmation_service.on_alarm_event)
+
+    await event_bus.subscribe("linkage", linkage_engine.on_event)
 
     # 启动数据模拟器（后台任务）
     simulator_task = asyncio.create_task(simulator.start(interval=5))
+
+    # 启动告警引擎定时刷新（每 30 秒检查阈值版本）
+    async def _alarm_engine_refresh_loop():
+        while True:
+            await asyncio.sleep(30)
+            try:
+                await alarm_engine.check_version()
+            except Exception as e:
+                logger.warning("告警引擎刷新失败: %s", e)
+
+    refresh_task = asyncio.create_task(_alarm_engine_refresh_loop())
+
+    # 启动通信监控定时检查（每 30 秒）
+    async def _communication_monitor_loop():
+        while True:
+            await asyncio.sleep(30)
+            try:
+                async with async_session() as session:
+                    await check_communication_status(session)
+            except Exception as e:
+                logger.warning("通信监控检查失败: %s", e)
+
+    comm_monitor_task = asyncio.create_task(_communication_monitor_loop())
+
+    # 启动告警升级引擎（每 60 秒检查）
+    async def _escalation_engine_loop():
+        while True:
+            await asyncio.sleep(60)
+            try:
+                async with async_session() as session:
+                    await check_escalations(session)
+            except Exception as e:
+                logger.warning("告警升级检查失败: %s", e)
+
+    escalation_task = asyncio.create_task(_escalation_engine_loop())
+
+    # 启动 PUE 历史记录定时写入（每 15 分钟）
+    async def _pue_history_loop():
+        await asyncio.sleep(10)  # 启动后短暂等待
+        # 先执行一次
+        if not settings.simulation_enabled:
+            try:
+                async with async_session() as session:
+                    await write_pue_history(session)
+            except Exception as e:
+                logger.warning("PUE历史写入失败: %s", e)
+        while True:
+            await asyncio.sleep(900)  # 15分钟
+            if not settings.simulation_enabled:
+                try:
+                    async with async_session() as session:
+                        await write_pue_history(session)
+                except Exception as e:
+                    logger.warning("PUE历史写入失败: %s", e)
+
+    pue_history_task = asyncio.create_task(_pue_history_loop())
+
+    # 启动能耗数据聚合定时任务（仅在非模拟模式下）
+    async def _energy_aggregation_loop():
+        await asyncio.sleep(30)  # 启动后等待
+        _last_daily_date = None
+        _last_monthly_key = None
+        while True:
+            if not settings.simulation_enabled:
+                # 小时聚合（每次循环都执行）
+                try:
+                    async with async_session() as session:
+                        await aggregate_hourly(session)
+                except Exception as e:
+                    logger.warning("小时能耗聚合失败: %s", e)
+                # 日聚合（每天执行一次，聚合前一天）
+                today = datetime.now().date()
+                if _last_daily_date != today:
+                    try:
+                        async with async_session() as session:
+                            await aggregate_daily(session)
+                        _last_daily_date = today
+                    except Exception as e:
+                        logger.warning("日能耗聚合失败: %s", e)
+                # 月聚合（每月执行一次，聚合上月）
+                month_key = (today.year, today.month)
+                if _last_monthly_key != month_key:
+                    try:
+                        async with async_session() as session:
+                            await aggregate_monthly(session)
+                        _last_monthly_key = month_key
+                    except Exception as e:
+                        logger.warning("月能耗聚合失败: %s", e)
+            await asyncio.sleep(1800)  # 30分钟检查一次
+
+    energy_agg_task = asyncio.create_task(_energy_aggregation_loop())
+
+    # 启动节能机会自动检测定时任务（每小时执行）
+    async def _opportunity_detection_loop():
+        """节能机会自动检测定时任务 - 每小时执行"""
+        await asyncio.sleep(60)
+        while True:
+            try:
+                async with async_session() as db:
+                    from .services.opportunity_detector import OpportunityDetector
+                    detector = OpportunityDetector(db)
+                    result = await detector.run_detection()
+                    logger.info(f"节能机会自动检测完成: 新发现{result.get('new_opportunities', 0)}个机会")
+            except Exception as e:
+                logger.error(f"节能机会自动检测失败: {e}")
+            await asyncio.sleep(3600)
+
+    detection_task = asyncio.create_task(_opportunity_detection_loop())
+
+    # 启动效果追踪定时任务（每6小时执行）
+    async def _effect_tracking_loop():
+        """效果追踪定时任务 - 每6小时检查"""
+        await asyncio.sleep(300)  # 启动后延迟5分钟
+        while True:
+            try:
+                async with async_session() as db:
+                    from .services.effect_tracker import EffectTracker
+                    tracker = EffectTracker(db)
+                    result = await tracker.run_tracking()
+                    logger.info(f"效果追踪完成: 新追踪{result.get('new_tracking', 0)}个, 标记完成{result.get('marked_completed', 0)}个")
+            except Exception as e:
+                logger.error(f"效果追踪失败: {e}")
+            await asyncio.sleep(21600)  # 6小时
+
+    effect_tracking_task = asyncio.create_task(_effect_tracking_loop())
 
     print(f"{'='*50}")
     print(f"{settings.app_name} v{settings.app_version} 启动成功")
     print(f"{'='*50}")
     print("数据模拟器已启动，每5秒采集一次")
+    print("告警引擎已加载阈值缓存")
+    print("联动引擎已加载策略缓存")
+    print("通信监控已启动，每30秒检查一次")
+    print("告警升级引擎已启动，每60秒检查一次")
+    print("PUE历史记录任务已启动，每15分钟记录一次")
+    print("能耗聚合任务已启动，每30分钟检查一次")
+    print("节能机会自动检测已启动，每小时检查一次")
+    print("效果追踪任务已启动，每6小时检查一次")
     print(f"API文档: http://localhost:8000/docs")
 
     yield
 
-    # 停止模拟器
+    # 停止模拟器和刷新任务
     simulator.stop()
     simulator_task.cancel()
+    refresh_task.cancel()
+    comm_monitor_task.cancel()
+    escalation_task.cancel()
+    pue_history_task.cancel()
+    energy_agg_task.cancel()
+    detection_task.cancel()
+    effect_tracking_task.cancel()
+    # 关闭 Redis 连接
+    await redis_service.close()
     print("应用关闭")
 
 
@@ -187,6 +369,7 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
     allow_headers=["Authorization", "Content-Type", "X-Requested-With"],
+    expose_headers=["X-Degraded", "X-Degraded-Message"],
 )
 
 # 注册 API v1 路由

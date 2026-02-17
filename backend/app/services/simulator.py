@@ -2,16 +2,27 @@
 数据采集模拟服务 - 自动生成模拟数据
 """
 import asyncio
+import json as _json
 import random
 import uuid
 from datetime import datetime
 from typing import Dict, List
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, func
 
-from ..models import Point, PointRealtime, PointHistory, Alarm, AlarmThreshold
+import logging
+
+from ..models import Point, PointRealtime, PointHistory, Alarm
 from ..core.database import async_session
+from ..core.redis import redis_service
+from ..engines.alarm_engine import alarm_engine
 from .websocket import ws_manager
+from ..models.capacity import (
+    SpaceCapacity, PowerCapacity, CoolingCapacity, WeightCapacity,
+    CapacityHistory, CapacityType
+)
+
+logger = logging.getLogger(__name__)
 
 
 class DataSimulator:
@@ -114,49 +125,90 @@ class DataSimulator:
         # 更新缓存
         self.value_cache[point.id] = new_value
 
-        # 检查告警
+        # 检查告警（使用告警引擎替代内联检测）
         status = "normal"
         alarms_to_create = []
 
-        if point.point_type in ["AI", "DI"]:
-            result = await session.execute(
-                select(AlarmThreshold).where(
-                    AlarmThreshold.point_id == point.id,
-                    AlarmThreshold.is_enabled == True
-                )
-            )
-            thresholds = result.scalars().all()
+        point_quality = alarm_engine.get_point_quality(point.id)
 
-            for threshold in thresholds:
-                triggered = False
-                if threshold.threshold_type == "high" and new_value > threshold.threshold_value:
-                    triggered = True
-                elif threshold.threshold_type == "low" and new_value < threshold.threshold_value:
-                    triggered = True
-                elif threshold.threshold_type == "equal" and new_value == threshold.threshold_value:
-                    triggered = True
+        if point.point_type in ["AI", "DI"] and point_quality < 2:
+            triggered_list = alarm_engine.evaluate(point.id, new_value, point.point_type)
 
-                if triggered:
-                    status = "alarm"
-                    # 检查是否已有活动告警
+            if triggered_list:
+                status = "alarm"
+                # 大面积告警检测
+                device_type = point.device_type
+                is_comm_suspect = alarm_engine.check_mass_alarm(device_type) if device_type else False
+
+                for triggered in triggered_list:
+                    # 检查是否已有活动告警（同一点位+同一阈值）
                     existing = await session.execute(
+                        select(Alarm).where(
+                            Alarm.point_id == point.id,
+                            Alarm.threshold_id == triggered.threshold_id,
+                            Alarm.status == "active"
+                        )
+                    )
+                    if existing.scalar_one_or_none():
+                        continue  # 已有活动告警，跳过
+
+                    alarm_no = f"ALM{datetime.now().strftime('%Y%m%d%H%M%S')}{uuid.uuid4().hex[:6].upper()}"
+                    alarm_msg = triggered.alarm_message or f"{point.point_name} 告警"
+                    if is_comm_suspect:
+                        alarm_msg = f"[疑似通信异常] {alarm_msg}"
+
+                    alarm = Alarm(
+                        alarm_no=alarm_no,
+                        point_id=point.id,
+                        threshold_id=triggered.threshold_id,
+                        alarm_level=triggered.alarm_level,
+                        alarm_type="communication" if is_comm_suspect else "threshold",
+                        alarm_message=alarm_msg,
+                        trigger_value=new_value,
+                        threshold_value=triggered.threshold_value,
+                    )
+                    alarms_to_create.append(alarm)
+            else:
+                # 值在安全范围内 — 自动恢复活动告警
+                if alarm_engine.is_value_safe(point.id, new_value):
+                    active_result = await session.execute(
                         select(Alarm).where(
                             Alarm.point_id == point.id,
                             Alarm.status == "active"
                         )
                     )
-                    if not existing.scalar_one_or_none():
-                        message = threshold.alarm_message or f"{point.point_name} 告警"
-                        alarm_no = f"ALM{datetime.now().strftime('%Y%m%d%H%M%S')}{uuid.uuid4().hex[:6].upper()}"
-                        alarm = Alarm(
-                            alarm_no=alarm_no,
-                            point_id=point.id,
-                            alarm_level=threshold.alarm_level,
-                            alarm_message=message,
-                            trigger_value=new_value,
-                            threshold_value=threshold.threshold_value
-                        )
-                        alarms_to_create.append(alarm)
+                    active_alarms = active_result.scalars().all()
+                    for active_alarm in active_alarms:
+                        active_alarm.status = "resolved"
+                        active_alarm.resolve_type = "auto"
+                        active_alarm.resolved_at = datetime.now()
+                        if active_alarm.created_at:
+                            active_alarm.duration_seconds = int(
+                                (datetime.now() - active_alarm.created_at).total_seconds()
+                            )
+                        # 广播恢复消息
+                        try:
+                            await ws_manager.broadcast_alarm({
+                                "action": "resolve",
+                                "id": active_alarm.id,
+                                "alarm_no": active_alarm.alarm_no,
+                                "point_id": active_alarm.point_id,
+                                "alarm_level": active_alarm.alarm_level,
+                                "status": "resolved",
+                                "resolve_type": "auto",
+                                "resolved_at": datetime.now().isoformat(),
+                            })
+                        except Exception as e:
+                            logger.warning("WebSocket 告警恢复推送失败: %s", e)
+                        # Redis 告警统计递减
+                        try:
+                            if redis_service.is_available:
+                                key = f"alarm:stats:{active_alarm.alarm_level}"
+                                current = await redis_service.get(key)
+                                count = max(0, int(current or 0) - 1)
+                                await redis_service.set(key, str(count), ttl=86400)
+                        except Exception:
+                            pass
 
         # 更新实时值
         result = await session.execute(
@@ -186,9 +238,102 @@ class DataSimulator:
             )
             session.add(history)
 
-        # 创建告警
+        # 创建告警记录并广播
         for alarm in alarms_to_create:
             session.add(alarm)
+
+        if alarms_to_create:
+            await session.flush()  # flush 获取告警 ID
+
+            for alarm in alarms_to_create:
+                # WebSocket 广播告警到前端
+                try:
+                    await ws_manager.broadcast_alarm({
+                        "action": "new",
+                        "id": alarm.id,
+                        "alarm_no": alarm.alarm_no,
+                        "point_id": alarm.point_id,
+                        "point_code": point.point_code,
+                        "point_name": point.point_name,
+                        "alarm_level": alarm.alarm_level,
+                        "alarm_type": alarm.alarm_type,
+                        "alarm_message": alarm.alarm_message,
+                        "trigger_value": alarm.trigger_value,
+                        "threshold_value": alarm.threshold_value,
+                        "status": "active",
+                        "created_at": datetime.now().isoformat(),
+                    })
+                except Exception as e:
+                    logger.warning("WebSocket 告警推送失败: %s", e)
+
+                # 发布告警事件到联动引擎
+                try:
+                    from ..engines.event_bus import get_event_bus, Event, EventPriority
+                    _priority_map = {
+                        "critical": EventPriority.critical,
+                        "major": EventPriority.critical,
+                        "minor": EventPriority.normal,
+                        "info": EventPriority.normal,
+                    }
+                    _evt = Event(
+                        event_type="alarm.triggered",
+                        source="alarm_engine",
+                        priority=_priority_map.get(alarm.alarm_level, EventPriority.normal),
+                        payload={
+                            "alarm_id": alarm.id,
+                            "alarm_no": alarm.alarm_no,
+                            "alarm_level": alarm.alarm_level,
+                            "alarm_type": alarm.alarm_type,
+                            "alarm_message": alarm.alarm_message,
+                            "point_id": alarm.point_id,
+                            "trigger_value": alarm.trigger_value,
+                            "threshold_value": alarm.threshold_value,
+                            "device_type": point.device_type if point.device_type is not None else "",
+                            "zone": point.area_code if point.area_code is not None else "default",
+                        },
+                    )
+                    await get_event_bus().publish("linkage", _evt)
+                except Exception as e:
+                    logger.warning("联动事件发布失败: %s", e)
+
+                # Redis 告警统计递增
+                try:
+                    if redis_service.is_available:
+                        key = f"alarm:stats:{alarm.alarm_level}"
+                        current = await redis_service.get(key)
+                        count = int(current or 0) + 1
+                        await redis_service.set(key, str(count), ttl=86400)
+                except Exception:
+                    pass  # Redis 不可用时静默失败
+
+        # 写入 Redis 缓存 — Story 4.1
+        if redis_service.is_available:
+            try:
+                value_text = None
+                if point.point_type == "DI":
+                    value_text = "告警" if new_value == 1 else "正常"
+                cache_data = _json.dumps({
+                    "value": new_value if point.point_type == "AI" else int(new_value),
+                    "value_text": value_text,
+                    "quality": point_quality,
+                    "status": status,
+                    "alarm_level": None,
+                    "updated_at": datetime.utcnow().isoformat(),
+                })
+                await redis_service.set(f"point:{point.id}:latest", cache_data, ttl=60)
+            except Exception:
+                pass  # Redis 写入失败不影响主流程
+
+        # 写入设备在线状态到 Redis — Story 4.3
+        if redis_service.is_available and point.device_id:
+            try:
+                await redis_service.set(
+                    f"device:{point.device_id}:online",
+                    datetime.now().isoformat(),
+                    ttl=60
+                )
+            except Exception:
+                pass
 
         return {
             "point_id": point.id,
@@ -220,6 +365,42 @@ class DataSimulator:
 
             await session.commit()
 
+            # 本轮采集结束，重置大面积告警统计
+            alarm_engine.reset_cycle_stats()
+
+    async def _snapshot_capacity_history(self):
+        """容量历史快照 — 独立事务，使用 SQL SUM 聚合"""
+        try:
+            async with async_session() as session:
+                for cap_type, model, total_field, used_field in [
+                    (CapacityType.space, SpaceCapacity, 'total_u_positions', 'used_u_positions'),
+                    (CapacityType.power, PowerCapacity, 'total_capacity_kw', 'used_capacity_kw'),
+                    (CapacityType.cooling, CoolingCapacity, 'total_cooling_kw', 'used_cooling_kw'),
+                    (CapacityType.weight, WeightCapacity, 'total_weight_kg', 'used_weight_kg'),
+                ]:
+                    try:
+                        result = await session.execute(
+                            select(
+                                func.coalesce(func.sum(getattr(model, total_field)), 0),
+                                func.coalesce(func.sum(getattr(model, used_field)), 0),
+                            )
+                        )
+                        total_val, used_val = result.one()
+                        total_val = float(total_val)
+                        used_val = float(used_val)
+                        rate = round(used_val / total_val * 100, 2) if total_val > 0 else 0
+                        session.add(CapacityHistory(
+                            capacity_type=cap_type, reference_id=0,
+                            reference_name="全局聚合", total_value=total_val,
+                            used_value=used_val, usage_rate=rate,
+                        ))
+                    except Exception as e:
+                        logger.warning(f"容量快照 {cap_type} 失败: {e}")
+
+                await session.commit()
+        except Exception as e:
+            logger.warning(f"容量快照事务失败: {e}")
+
     async def start(self, interval: int = None):
         """启动数据采集"""
         from ..core.config import get_settings
@@ -239,11 +420,17 @@ class DataSimulator:
         self.running = True
         print(f"数据采集模拟器启动，采集间隔: {interval}秒")
 
+        cycle_count = 0
         while self.running:
             try:
                 await self.run_collection_cycle()
             except Exception as e:
                 print(f"采集周期执行失败: {e}")
+
+            cycle_count += 1
+            if cycle_count % 12 == 0:
+                await self._snapshot_capacity_history()
+                cycle_count = 0
 
             await asyncio.sleep(interval)
 
