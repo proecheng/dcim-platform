@@ -253,8 +253,8 @@ let timer: number | null = null
 const domainOverview = ref([
   { name: '供配电', icon: markRaw(Lightning), path: '/power/overview', color: '#409EFF', stat: '运行中' },
   { name: '制冷系统', icon: markRaw(IceCream), path: '/cooling/overview', color: '#67C23A', stat: '开发中' },
-  { name: '环境监控', icon: markRaw(Sunny), path: '/environment/overview', color: '#E6A23C', stat: '开发中' },
-  { name: '安防消防', icon: markRaw(Lock), path: '/security/overview', color: '#F56C6C', stat: '开发中' },
+  { name: '环境监控', icon: markRaw(Sunny), path: '/environment/overview', color: '#E6A23C', stat: '运行中' },
+  { name: '安防消防', icon: markRaw(Lock), path: '/security/overview', color: '#F56C6C', stat: '运行中' },
   { name: '基础设施', icon: markRaw(OfficeBuilding), path: '/infrastructure/asset', color: '#909399', stat: '运行中' },
   { name: '节能中心', icon: markRaw(Opportunity), path: '/energy-saving/analysis', color: '#00D1B2', stat: '运行中' }
 ])
@@ -347,13 +347,56 @@ function openBigscreen() {
 </script>
 
 <style scoped lang="scss">
+@use '@/styles/mixins-25d' as *;
+
 .dashboard {
+  // 使用 mixin 系统的基础设施
+  @include perspective-container;
+
+  // 统计卡片 — 使用 mixin 弧形倾斜
   .stat-cards {
+    @include stat-cards-arc(4, 2deg);
     margin-bottom: 20px;
   }
 
+  // 图表+告警行 — 使用 mixin 景深差
+  .chart-row {
+    @include chart-depth-split;
+
+    .el-card {
+      background: var(--bg-card);
+      border-color: var(--border-color);
+    }
+  }
+
+  // ============================================================
+  // 快捷操作栏 — 扁平浮起（dashboard 特有）
+  // ============================================================
   .quick-actions {
     margin-bottom: 20px;
+
+    :deep(.el-card) {
+      transform: translateZ(5px);
+      will-change: transform;
+      position: relative;
+      transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+
+      &::after {
+        content: '';
+        position: absolute;
+        bottom: 0;
+        left: 10%;
+        right: 10%;
+        height: 1px;
+        background: linear-gradient(90deg, transparent, rgba(0, 212, 255, 0.3), rgba(64, 158, 255, 0.5), rgba(0, 212, 255, 0.3), transparent);
+        border-radius: 1px;
+      }
+
+      &:hover {
+        transform: translateZ(8px) translateY(-2px);
+        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3), 0 0 12px rgba(0, 212, 255, 0.06);
+      }
+    }
 
     .actions-content {
       display: flex;
@@ -368,9 +411,13 @@ function openBigscreen() {
     }
   }
 
+  // ============================================================
+  // 统计卡片视觉样式（dashboard 特有增强）
+  // ============================================================
   .stat-card {
     background: var(--bg-card);
     border-color: var(--border-color);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4), 0 0 15px rgba(0, 212, 255, 0.08);
 
     :deep(.el-card__body) {
       display: flex;
@@ -388,16 +435,9 @@ function openBigscreen() {
       color: #fff;
       box-shadow: var(--shadow-sm);
 
-      // 科技风发光效果
-      &[style*="409eff"] {
-        box-shadow: 0 0 15px rgba(64, 158, 255, 0.4);
-      }
-      &[style*="67c23a"] {
-        box-shadow: 0 0 15px rgba(82, 196, 26, 0.4);
-      }
-      &[style*="f56c6c"] {
-        box-shadow: 0 0 15px rgba(245, 34, 45, 0.4);
-      }
+      &[style*="409eff"] { box-shadow: 0 0 15px rgba(64, 158, 255, 0.4); }
+      &[style*="67c23a"] { box-shadow: 0 0 15px rgba(82, 196, 26, 0.4); }
+      &[style*="f56c6c"] { box-shadow: 0 0 15px rgba(245, 34, 45, 0.4); }
     }
 
     .stat-info {
@@ -406,7 +446,6 @@ function openBigscreen() {
         font-weight: bold;
         color: var(--text-primary);
       }
-
       .stat-label {
         font-size: 14px;
         color: var(--text-secondary);
@@ -415,7 +454,7 @@ function openBigscreen() {
 
     &:hover {
       border-color: var(--border-active);
-      box-shadow: var(--shadow-glow);
+      box-shadow: var(--shadow-glow), 0 12px 32px rgba(0, 0, 0, 0.5), 0 0 20px rgba(0, 212, 255, 0.12);
     }
   }
 
@@ -426,13 +465,9 @@ function openBigscreen() {
     color: var(--text-primary);
   }
 
-  .chart-row {
-    .el-card {
-      background: var(--bg-card);
-      border-color: var(--border-color);
-    }
-  }
-
+  // ============================================================
+  // 告警卡片 + 6. 告警列表项层叠卡片效果
+  // ============================================================
   .alarm-card {
     background: var(--bg-card);
     border-color: var(--border-color);
@@ -448,10 +483,34 @@ function openBigscreen() {
       margin-bottom: 10px;
       background: var(--bg-tertiary);
       border-radius: var(--radius-base);
-      transition: all var(--transition-fast);
+      // 2.5D: 微倾斜 + 左侧发光
+      transform: perspective(400px) rotateX(0.5deg);
+      will-change: transform;
+      transition: all 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+      position: relative;
+
+      // 左侧发光边框效果
+      &::before {
+        content: '';
+        position: absolute;
+        left: 0;
+        top: 20%;
+        bottom: 20%;
+        width: 3px;
+        border-radius: 2px;
+        opacity: 0;
+        transition: opacity 0.35s ease;
+      }
 
       &:hover {
         background: var(--bg-hover);
+        // 2.5D: 弹出效果
+        transform: perspective(400px) rotateX(0deg) translateX(4px) scale(1.01);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+
+        &::before {
+          opacity: 1;
+        }
       }
 
       &.level-critical {
@@ -460,6 +519,11 @@ function openBigscreen() {
 
         .alarm-title .el-icon {
           color: var(--alarm-critical);
+        }
+
+        &::before {
+          background: var(--alarm-critical);
+          box-shadow: 0 0 8px var(--alarm-critical);
         }
       }
 
@@ -470,6 +534,11 @@ function openBigscreen() {
         .alarm-title .el-icon {
           color: var(--alarm-major);
         }
+
+        &::before {
+          background: var(--alarm-major);
+          box-shadow: 0 0 8px var(--alarm-major);
+        }
       }
 
       &.level-minor {
@@ -479,6 +548,11 @@ function openBigscreen() {
         .alarm-title .el-icon {
           color: var(--alarm-minor);
         }
+
+        &::before {
+          background: var(--alarm-minor);
+          box-shadow: 0 0 8px var(--alarm-minor);
+        }
       }
 
       &.level-info {
@@ -487,6 +561,11 @@ function openBigscreen() {
 
         .alarm-title .el-icon {
           color: var(--alarm-info);
+        }
+
+        &::before {
+          background: var(--alarm-info);
+          box-shadow: 0 0 8px var(--alarm-info);
         }
       }
 
@@ -512,20 +591,49 @@ function openBigscreen() {
     }
   }
 
-  // V2.3: 能源统计卡片样式
+  // ============================================================
+  // 4. 能源统计卡片行 — 层次化深度
+  // ============================================================
   .energy-cards {
     margin-bottom: 20px;
+    transform: perspective(1000px) rotateX(1deg);
+    transform-style: preserve-3d;
+    animation: slideInDepth 0.6s ease-out 0.3s both;
+
+    // 每个 el-col 内的卡片组件 hover 抬起
+    :deep(.el-col) {
+      > * {
+        transition: all 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+        will-change: transform;
+
+        &:hover {
+          transform: translateY(-4px) translateZ(8px);
+          box-shadow: 0 10px 28px rgba(0, 0, 0, 0.4), 0 0 12px rgba(0, 212, 255, 0.08);
+        }
+      }
+    }
   }
 
-  // V4.0: 6大域概览卡片
+  // ============================================================
+  // 3. 6大域概览卡片 — 等距排列 + 翻转效果
+  // ============================================================
   .domain-cards {
     margin-bottom: 20px;
+    animation: slideInDepth 0.6s ease-out 0.2s both;
 
     .domain-card {
       cursor: pointer;
       background: var(--bg-card);
       border-color: var(--border-color);
-      transition: all var(--transition-fast);
+      // 2.5D: 默认微倾斜
+      transform: perspective(600px) rotateX(2deg) translateZ(0);
+      transform-style: preserve-3d;
+      will-change: transform;
+      transition: all 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+      position: relative;
+
+      // 底部发光线
+      border-bottom: 2px solid color-mix(in srgb, var(--domain-color) 40%, transparent);
 
       :deep(.el-card__body) {
         display: flex;
@@ -567,8 +675,11 @@ function openBigscreen() {
 
       &:hover {
         border-color: var(--domain-color);
-        box-shadow: 0 0 12px color-mix(in srgb, var(--domain-color) 30%, transparent);
-        transform: translateY(-2px);
+        box-shadow: 0 0 12px color-mix(in srgb, var(--domain-color) 30%, transparent),
+                    0 8px 20px rgba(0, 0, 0, 0.3);
+        // 2.5D: 翻转 + 抬起 + 前移
+        transform: perspective(600px) rotateX(-2deg) translateY(-4px) translateZ(10px);
+        border-bottom-color: var(--domain-color);
       }
     }
   }
