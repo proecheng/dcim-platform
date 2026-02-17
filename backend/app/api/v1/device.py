@@ -10,11 +10,13 @@ from sqlalchemy import select, func, update, delete
 from ..deps import get_db, require_viewer, require_operator, require_admin
 from ...models.user import User
 from ...models.device import Device
-from ...models.point import Point
+from ...models.point import Point, PointRealtime
+from ...models.alarm import Alarm
 from ...schemas.device import (
     DeviceCreate, DeviceUpdate, DeviceInfo, DeviceTree, DeviceStatusSummary
 )
 from ...schemas.common import PageResponse
+from ...core.redis import redis_service
 
 router = APIRouter()
 
@@ -152,6 +154,70 @@ async def get_status_summary(
     )
 
 
+@router.get("/status-board", summary="获取设备状态看板")
+async def get_status_board(
+    area_code: Optional[str] = Query(None, description="区域代码"),
+    device_type: Optional[str] = Query(None, description="设备类型"),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_viewer)
+):
+    """
+    获取设备状态看板 — 按区域和设备类型分组，Redis 判断在线状态
+    """
+    query = select(Device).where(Device.is_enabled == True)
+    if area_code:
+        query = query.where(Device.area_code == area_code)
+    if device_type:
+        query = query.where(Device.device_type == device_type)
+
+    result = await db.execute(query.order_by(Device.area_code, Device.device_type))
+    devices = result.scalars().all()
+
+    # 批量检查 Redis 在线状态
+    online_map: dict = {}
+    if redis_service.is_available and devices:
+        try:
+            keys = [f"device:{d.id}:online" for d in devices]
+            values = await redis_service.mget(keys)
+            for i, d in enumerate(devices):
+                online_map[d.id] = values[i] is not None if i < len(values) else False
+        except Exception:
+            pass
+
+    # 分组统计
+    groups: dict = {}
+    summary = {"total": 0, "online": 0, "offline": 0, "alarm": 0, "maintenance": 0}
+    for d in devices:
+        if d.id in online_map:
+            effective_status = "online" if online_map[d.id] else d.status
+        else:
+            effective_status = d.status
+
+        summary["total"] += 1
+        summary[effective_status] = summary.get(effective_status, 0) + 1
+
+        key = f"{d.area_code}_{d.device_type}"
+        if key not in groups:
+            groups[key] = {
+                "area_code": d.area_code,
+                "device_type": d.device_type,
+                "devices": [],
+                "stats": {"online": 0, "offline": 0, "alarm": 0, "maintenance": 0}
+            }
+        groups[key]["devices"].append({
+            "id": d.id,
+            "device_code": d.device_code,
+            "device_name": d.device_name,
+            "status": effective_status,
+        })
+        groups[key]["stats"][effective_status] = groups[key]["stats"].get(effective_status, 0) + 1
+
+    return {
+        "summary": summary,
+        "groups": list(groups.values())
+    }
+
+
 @router.get("/{device_id}", response_model=DeviceInfo, summary="获取设备详情")
 async def get_device(
     device_id: int,
@@ -190,6 +256,75 @@ async def get_device_points(
     return {
         "device": DeviceInfo.model_validate(device),
         "points": [{"id": p.id, "code": p.point_code, "name": p.point_name, "type": p.point_type} for p in points]
+    }
+
+
+@router.get("/{device_id}/detail", summary="获取设备详情（聚合）")
+async def get_device_detail(
+    device_id: int,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_viewer)
+):
+    """
+    获取设备详情：基本信息 + 关联点位实时数据 + 当前活动告警
+    """
+    # 1. 设备基本信息
+    result = await db.execute(select(Device).where(Device.id == device_id))
+    device = result.scalar_one_or_none()
+    if not device:
+        raise HTTPException(status_code=404, detail="设备不存在")
+
+    # 2. 关联点位 + 实时数据
+    points_result = await db.execute(
+        select(Point, PointRealtime).outerjoin(
+            PointRealtime, Point.id == PointRealtime.point_id
+        ).where(Point.device_id == device_id).order_by(Point.point_code)
+    )
+    points_data = []
+    point_ids = []
+    for point, realtime in points_result.all():
+        point_ids.append(point.id)
+        points_data.append({
+            "id": point.id,
+            "point_code": point.point_code,
+            "point_name": point.point_name,
+            "point_type": point.point_type,
+            "device_type": point.device_type,
+            "unit": point.unit,
+            "value": realtime.value if realtime else None,
+            "value_text": realtime.value_text if realtime else None,
+            "status": realtime.status if realtime else "offline",
+            "alarm_level": realtime.alarm_level if realtime else None,
+            "quality": realtime.quality if realtime else None,
+            "updated_at": realtime.updated_at.isoformat() if realtime and realtime.updated_at else None,
+        })
+
+    # 3. 当前活动告警（通过点位 ID 关联）
+    alarms_data = []
+    if point_ids:
+        alarms_result = await db.execute(
+            select(Alarm).where(
+                Alarm.point_id.in_(point_ids),
+                Alarm.status.in_(["active", "acknowledged"])
+            ).order_by(Alarm.created_at.desc())
+        )
+        for alarm in alarms_result.scalars().all():
+            alarms_data.append({
+                "id": alarm.id,
+                "alarm_no": alarm.alarm_no,
+                "point_id": alarm.point_id,
+                "alarm_level": alarm.alarm_level,
+                "alarm_message": alarm.alarm_message,
+                "trigger_value": alarm.trigger_value,
+                "threshold_value": alarm.threshold_value,
+                "status": alarm.status,
+                "created_at": alarm.created_at.isoformat() if alarm.created_at else None,
+            })
+
+    return {
+        "device": DeviceInfo.model_validate(device),
+        "points": points_data,
+        "alarms": alarms_data,
     }
 
 

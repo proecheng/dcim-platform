@@ -1,10 +1,11 @@
 """
 实时数据 API - v1
 """
+import json
 import logging
 from datetime import datetime, timedelta
 from typing import Optional, List
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update
 
@@ -12,6 +13,7 @@ from ..deps import get_db, require_viewer, require_operator
 from ...models.user import User
 from ...models.point import Point, PointRealtime
 from ...schemas.realtime import RealtimeData, RealtimeSummary, ControlCommand
+from ...core.redis import redis_service
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -19,12 +21,88 @@ router = APIRouter()
 
 @router.get("", summary="获取所有点位实时数据")
 async def get_all_realtime(
+    response: Response,
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_viewer)
 ):
     """
-    获取所有启用点位的实时数据
+    获取所有启用点位的实时数据（Redis 优先，DB 兜底）
     """
+    degraded = False
+
+    # Redis 优先路径
+    if redis_service.is_available:
+        try:
+            # 查询所有启用点位的元数据
+            points_result = await db.execute(
+                select(Point).where(Point.is_enabled == True)
+            )
+            points = points_result.scalars().all()
+
+            if points:
+                keys = [f"point:{p.id}:latest" for p in points]
+                cached_values = await redis_service.mget(keys)
+
+                data = []
+                missing_point_ids = []
+                point_map = {p.id: p for p in points}
+
+                for point, cached in zip(points, cached_values):
+                    if cached is not None:
+                        try:
+                            val = json.loads(cached)
+                            data.append(RealtimeData(
+                                point_id=point.id,
+                                point_code=point.point_code,
+                                point_name=point.point_name,
+                                point_type=point.point_type,
+                                device_type=point.device_type,
+                                area_code=point.area_code,
+                                value=val.get("value"),
+                                value_text=val.get("value_text"),
+                                unit=point.unit,
+                                quality=val.get("quality", 0),
+                                status=val.get("status", "normal"),
+                                alarm_level=val.get("alarm_level"),
+                                updated_at=val.get("updated_at"),
+                            ))
+                        except (json.JSONDecodeError, TypeError):
+                            missing_point_ids.append(point.id)
+                    else:
+                        missing_point_ids.append(point.id)
+
+                # 对 Redis 缺失的点位回退到 DB
+                if missing_point_ids:
+                    db_query = select(Point, PointRealtime).join(
+                        PointRealtime, Point.id == PointRealtime.point_id
+                    ).where(Point.id.in_(missing_point_ids))
+                    db_result = await db.execute(db_query)
+                    for point, realtime in db_result.all():
+                        data.append(RealtimeData(
+                            point_id=point.id,
+                            point_code=point.point_code,
+                            point_name=point.point_name,
+                            point_type=point.point_type,
+                            device_type=point.device_type,
+                            area_code=point.area_code,
+                            value=realtime.value,
+                            value_text=realtime.value_text,
+                            unit=point.unit,
+                            quality=realtime.quality,
+                            status=realtime.status,
+                            alarm_level=realtime.alarm_level,
+                            updated_at=realtime.updated_at,
+                        ))
+
+                return data
+        except Exception as e:
+            logger.warning("Redis 读取失败，回退到 DB: %s", e)
+            degraded = True
+    else:
+        # Redis 不可用，标记降级
+        degraded = True
+
+    # DB 兜底路径
     query = select(Point, PointRealtime).join(
         PointRealtime, Point.id == PointRealtime.point_id
     ).where(Point.is_enabled == True)
@@ -50,11 +128,16 @@ async def get_all_realtime(
             updated_at=realtime.updated_at
         ))
 
+    if degraded:
+        response.headers["X-Degraded"] = "true"
+        response.headers["X-Degraded-Message"] = "realtime-data-delayed"
+
     return data
 
 
 @router.get("/summary", response_model=RealtimeSummary, summary="获取实时数据汇总")
 async def get_realtime_summary(
+    response: Response,
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_viewer)
 ):
@@ -62,6 +145,8 @@ async def get_realtime_summary(
     获取实时数据汇总信息
     """
     from sqlalchemy import func
+
+    degraded = False
 
     # 点位统计
     total_result = await db.execute(
@@ -83,24 +168,83 @@ async def get_realtime_summary(
     )
     alarm_counts = {row[0]: row[1] for row in alarm_result.all()}
 
-    # 关键指标（温湿度、电力）
+    # 关键指标（温湿度、电力）— Redis 优先
     key_points = {}
     key_point_codes = ["A1_TH_AI_001", "A1_TH_AI_002", "A1_PDU_AI_005", "A1_UPS_AI_001"]
-    for code in key_point_codes:
-        point_result = await db.execute(
-            select(Point, PointRealtime).join(
-                PointRealtime, Point.id == PointRealtime.point_id
-            ).where(Point.point_code == code)
-        )
-        row = point_result.first()
-        if row:
-            point, realtime = row
-            key_points[code] = {
-                "name": point.point_name,
-                "value": realtime.value,
-                "unit": point.unit,
-                "status": realtime.status
-            }
+
+    if redis_service.is_available:
+        try:
+            # 先查出 point_code -> point 映射
+            code_result = await db.execute(
+                select(Point).where(Point.point_code.in_(key_point_codes))
+            )
+            code_points = {p.point_code: p for p in code_result.scalars().all()}
+            redis_keys = [f"point:{code_points[c].id}:latest" for c in key_point_codes if c in code_points]
+            redis_ids = [code_points[c] for c in key_point_codes if c in code_points]
+
+            if redis_keys:
+                cached = await redis_service.mget(redis_keys)
+                resolved_codes = set()
+                for pt, val in zip(redis_ids, cached):
+                    if val is not None:
+                        try:
+                            parsed = json.loads(val)
+                            key_points[pt.point_code] = {
+                                "name": pt.point_name,
+                                "value": parsed.get("value"),
+                                "unit": pt.unit,
+                                "status": parsed.get("status", "normal"),
+                            }
+                            resolved_codes.add(pt.point_code)
+                        except (json.JSONDecodeError, TypeError):
+                            pass
+
+                # 对 Redis 缺失的 key points 回退 DB
+                missing_codes = [c for c in key_point_codes if c not in resolved_codes]
+                if missing_codes:
+                    for code in missing_codes:
+                        point_result = await db.execute(
+                            select(Point, PointRealtime).join(
+                                PointRealtime, Point.id == PointRealtime.point_id
+                            ).where(Point.point_code == code)
+                        )
+                        row = point_result.first()
+                        if row:
+                            point, realtime = row
+                            key_points[code] = {
+                                "name": point.point_name,
+                                "value": realtime.value,
+                                "unit": point.unit,
+                                "status": realtime.status,
+                            }
+        except Exception as e:
+            logger.warning("Redis 读取关键指标失败，回退 DB: %s", e)
+            key_points = {}
+            degraded = True
+    else:
+        degraded = True
+
+    # DB 兜底（如果 Redis 路径未填充）
+    if not key_points:
+        for code in key_point_codes:
+            point_result = await db.execute(
+                select(Point, PointRealtime).join(
+                    PointRealtime, Point.id == PointRealtime.point_id
+                ).where(Point.point_code == code)
+            )
+            row = point_result.first()
+            if row:
+                point, realtime = row
+                key_points[code] = {
+                    "name": point.point_name,
+                    "value": realtime.value,
+                    "unit": point.unit,
+                    "status": realtime.status
+                }
+
+    if degraded:
+        response.headers["X-Degraded"] = "true"
+        response.headers["X-Degraded-Message"] = "realtime-data-delayed"
 
     return RealtimeSummary(
         total_points=total_points,

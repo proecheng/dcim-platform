@@ -3,9 +3,13 @@
 """
 from datetime import datetime, timedelta, date
 from typing import Optional, List, Dict, Any
-from fastapi import APIRouter, Depends, HTTPException, Query
+from io import BytesIO
+from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, and_, or_, update
+from starlette.responses import StreamingResponse
+from pydantic import BaseModel as PydanticBaseModel
+import openpyxl
 
 from ..deps import get_db, require_viewer, require_operator
 from ...models.user import User
@@ -19,9 +23,105 @@ from ...schemas.asset import (
     LifecycleResponse,
     MaintenanceCreate, MaintenanceResponse,
     InventoryCreate, InventoryItemUpdate, InventoryResponse, InventoryItemResponse,
-    AssetStatistics
+    AssetStatistics,
+    WarrantyAlertItem, WarrantyAlertResponse
 )
 from ...schemas.common import PageResponse
+
+
+# ==================== 导入/导出映射 ====================
+
+IMPORT_COLUMN_MAP = {
+    "资产编码": "asset_code",
+    "资产名称": "asset_name",
+    "资产类型": "asset_type",
+    "品牌": "brand",
+    "型号": "model",
+    "序列号": "serial_number",
+    "机柜编码": "_cabinet_code",
+    "U位起始": "u_position",
+    "占用U数": "u_height",
+    "采购日期": "purchase_date",
+    "保修开始": "warranty_start",
+    "保修截止": "warranty_end",
+    "供应商": "supplier",
+    "负责人": "owner",
+    "部门": "department",
+    "采购价格": "purchase_price",
+    "备注": "remark",
+}
+
+ASSET_TYPE_MAP = {
+    "服务器": "server", "网络设备": "network", "存储设备": "storage",
+    "UPS": "ups", "PDU": "pdu", "空调": "ac", "机柜": "cabinet",
+    "传感器": "sensor", "其他": "other",
+    "server": "server", "network": "network", "storage": "storage",
+    "ups": "ups", "pdu": "pdu", "ac": "ac", "cabinet": "cabinet",
+    "sensor": "sensor", "other": "other",
+}
+
+EXPORT_COLUMNS = [
+    ("资产编码", "asset_code"),
+    ("资产名称", "asset_name"),
+    ("资产类型", "asset_type"),
+    ("品牌", "brand"),
+    ("型号", "model"),
+    ("序列号", "serial_number"),
+    ("机柜编码", "_cabinet_code"),
+    ("U位起始", "u_position"),
+    ("占用U数", "u_height"),
+    ("状态", "status"),
+    ("采购日期", "purchase_date"),
+    ("保修开始", "warranty_start"),
+    ("保修截止", "warranty_end"),
+    ("供应商", "supplier"),
+    ("负责人", "owner"),
+    ("部门", "department"),
+    ("采购价格", "purchase_price"),
+    ("备注", "remark"),
+]
+
+STATUS_CN_MAP = {
+    "in_stock": "库存中", "in_use": "使用中", "borrowed": "借出",
+    "maintenance": "维护中", "scrapped": "已报废",
+}
+
+
+# ==================== U 位冲突校验 ====================
+
+async def _check_u_position_conflict(
+    db: AsyncSession,
+    cabinet_id: int,
+    u_position: int,
+    u_height: int,
+    exclude_asset_id: Optional[int] = None
+) -> Optional[str]:
+    """检查 U 位是否冲突，返回冲突信息或 None"""
+    if cabinet_id is None or u_position is None or u_height is None:
+        return None
+
+    query = select(Asset).where(
+        Asset.cabinet_id == cabinet_id,
+        Asset.u_position.isnot(None),
+        Asset.u_height.isnot(None)
+    )
+    if exclude_asset_id:
+        query = query.where(Asset.id != exclude_asset_id)
+
+    result = await db.execute(query)
+    existing_assets = result.scalars().all()
+
+    new_start = u_position
+    new_end = u_position + u_height - 1
+
+    for existing in existing_assets:
+        ex_start = existing.u_position
+        ex_end = existing.u_position + existing.u_height - 1
+        if new_start <= ex_end and new_end >= ex_start:
+            return f"U位冲突: U{new_start}-U{new_end} 与资产 {existing.asset_code}({existing.asset_name}) 的 U{ex_start}-U{ex_end} 重叠"
+
+    return None
+
 
 router = APIRouter(prefix="/asset", tags=["资产管理"])
 
@@ -139,6 +239,22 @@ async def get_cabinet_usage(
     available_u = total_u - used_u
     usage_rate = round((used_u / total_u * 100), 2) if total_u > 0 else 0
 
+    # 构建资产列表（用于 U 位可视化）
+    assets_list = []
+    for asset in assets:
+        if asset.u_position is not None and asset.u_height is not None:
+            assets_list.append({
+                "asset_id": asset.id,
+                "asset_code": asset.asset_code,
+                "asset_name": asset.asset_name,
+                "asset_type": asset.asset_type.value if asset.asset_type else None,
+                "model": asset.model or "",
+                "brand": asset.brand or "",
+                "status": asset.status.value if asset.status else None,
+                "u_position": asset.u_position,
+                "u_height": asset.u_height,
+            })
+
     return {
         "cabinet_id": cabinet_id,
         "cabinet_name": cabinet.cabinet_name,
@@ -146,8 +262,73 @@ async def get_cabinet_usage(
         "used_u": used_u,
         "available_u": available_u,
         "usage_rate": usage_rate,
-        "u_map": u_map
+        "u_map": u_map,
+        "assets": assets_list
     }
+
+
+
+class MoveAssetRequest(PydanticBaseModel):
+    asset_id: int
+    new_u_position: int
+
+
+@router.put("/cabinets/{cabinet_id}/move-asset", summary="拖拽移动资产U位")
+async def move_asset_in_cabinet(
+    cabinet_id: int,
+    data: MoveAssetRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_operator)
+):
+    """在同一机柜内移动资产到新的U位位置"""
+    # 1. 校验机柜存在
+    cab_result = await db.execute(select(Cabinet).where(Cabinet.id == cabinet_id))
+    cabinet = cab_result.scalar_one_or_none()
+    if not cabinet:
+        raise HTTPException(status_code=404, detail="机柜不存在")
+
+    total_u = cabinet.total_u or 42
+
+    # 2. 校验资产存在且属于该机柜
+    asset_result = await db.execute(select(Asset).where(Asset.id == data.asset_id))
+    asset = asset_result.scalar_one_or_none()
+    if not asset:
+        raise HTTPException(status_code=404, detail="资产不存在")
+    if asset.cabinet_id != cabinet_id:
+        raise HTTPException(status_code=400, detail="资产不属于该机柜")
+
+    u_height = asset.u_height or 1
+
+    # 3. 校验范围
+    if data.new_u_position < 1:
+        raise HTTPException(status_code=400, detail="U位起始位置不能小于1")
+    if data.new_u_position + u_height - 1 > total_u:
+        raise HTTPException(status_code=400, detail=f"U位超出机柜范围（最大{total_u}U）")
+
+    # 4. U位冲突校验
+    conflict = await _check_u_position_conflict(db, cabinet_id, data.new_u_position, u_height, exclude_asset_id=asset.id)
+    if conflict:
+        raise HTTPException(status_code=400, detail=conflict)
+
+    # 5. 记录旧位置并更新
+    old_u_position = asset.u_position
+    asset.u_position = data.new_u_position
+
+    # 6. 创建生命周期记录
+    lifecycle = AssetLifecycle(
+        asset_id=asset.id,
+        action="move",
+        action_date=datetime.now(),
+        operator=current_user.username,
+        from_location=f"U{old_u_position}" if old_u_position else "",
+        to_location=f"U{data.new_u_position}",
+        remark="U位拖拽移动"
+    )
+    db.add(lifecycle)
+    await db.commit()
+
+    # 7. 返回更新后的 usage 数据
+    return await get_cabinet_usage(cabinet_id, db, current_user)
 
 
 @router.post("/cabinets", response_model=CabinetResponse, summary="创建机柜")
@@ -319,6 +500,295 @@ async def get_assets(
     return asset_list
 
 
+@router.post("/assets/import", summary="批量导入资产")
+async def import_assets(
+    file: UploadFile = File(..., description="Excel文件"),
+    mode: str = Query("preview", description="模式: preview(预校验) / confirm(确认导入)"),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_operator)
+):
+    """批量导入资产（预校验 / 确认导入）"""
+    # 读取 Excel
+    try:
+        content = await file.read()
+        wb = openpyxl.load_workbook(BytesIO(content))
+        ws = wb.active
+    except Exception:
+        raise HTTPException(status_code=400, detail="无法解析Excel文件")
+
+    rows = list(ws.iter_rows(values_only=True))
+    if len(rows) < 2:
+        raise HTTPException(status_code=400, detail="Excel文件无数据行")
+
+    # 解析表头
+    header = [str(c).strip() if c else "" for c in rows[0]]
+    col_map: Dict[int, str] = {}
+    for idx, col_name in enumerate(header):
+        if col_name in IMPORT_COLUMN_MAP:
+            col_map[idx] = IMPORT_COLUMN_MAP[col_name]
+
+    errors: List[Dict[str, Any]] = []
+    preview_data: List[Dict[str, Any]] = []
+    seen_codes: set = set()
+
+    # 预加载所有已有 asset_code
+    existing_codes_result = await db.execute(select(Asset.asset_code))
+    existing_codes = {r[0] for r in existing_codes_result.all()}
+
+    # 预加载所有机柜 code -> id 映射
+    cabinet_result = await db.execute(select(Cabinet))
+    cabinets = cabinet_result.scalars().all()
+    cabinet_map = {c.cabinet_code: c for c in cabinets}
+
+    # 同批次 U 位占用追踪: {cabinet_id: [(row_idx, start_u, end_u), ...]}
+    pending_u_ranges: Dict[int, List[tuple]] = {}
+
+    for row_idx, row in enumerate(rows[1:], start=2):
+        row_data: Dict[str, Any] = {}
+        for col_idx, field_name in col_map.items():
+            val = row[col_idx] if col_idx < len(row) else None
+            if val is not None:
+                val = str(val).strip() if not isinstance(val, (int, float, datetime, date)) else val
+            row_data[field_name] = val
+
+        row_errors: List[Dict[str, str]] = []
+
+        # 必填检查
+        if not row_data.get("asset_code"):
+            row_errors.append({"row": row_idx, "field": "asset_code", "message": "资产编码不能为空"})
+        if not row_data.get("asset_name"):
+            row_errors.append({"row": row_idx, "field": "asset_name", "message": "资产名称不能为空"})
+        if not row_data.get("asset_type"):
+            row_errors.append({"row": row_idx, "field": "asset_type", "message": "资产类型不能为空"})
+
+        # asset_code 唯一性
+        code = row_data.get("asset_code")
+        if code:
+            code = str(code)
+            if code in existing_codes:
+                row_errors.append({"row": row_idx, "field": "asset_code", "message": "编码已存在"})
+            elif code in seen_codes:
+                row_errors.append({"row": row_idx, "field": "asset_code", "message": "Excel内编码重复"})
+            else:
+                seen_codes.add(code)
+
+        # asset_type 枚举校验
+        raw_type = str(row_data.get("asset_type", "")) if row_data.get("asset_type") else ""
+        mapped_type = ASSET_TYPE_MAP.get(raw_type)
+        if raw_type and not mapped_type:
+            row_errors.append({"row": row_idx, "field": "asset_type", "message": f"无效的资产类型: {raw_type}"})
+        if mapped_type:
+            row_data["asset_type"] = mapped_type
+
+        # 机柜编码 -> cabinet_id
+        cabinet_code = row_data.pop("_cabinet_code", None)
+        cabinet_id = None
+        if cabinet_code:
+            cabinet_code = str(cabinet_code)
+            cab = cabinet_map.get(cabinet_code)
+            if not cab:
+                row_errors.append({"row": row_idx, "field": "_cabinet_code", "message": f"机柜编码不存在: {cabinet_code}"})
+            else:
+                cabinet_id = cab.id
+                row_data["cabinet_id"] = cabinet_id
+
+        # U 位数值转换
+        for int_field in ("u_position", "u_height"):
+            if row_data.get(int_field) is not None:
+                try:
+                    row_data[int_field] = int(row_data[int_field])
+                except (ValueError, TypeError):
+                    row_errors.append({"row": row_idx, "field": int_field, "message": f"{int_field} 必须为整数"})
+                    row_data[int_field] = None
+
+        # U 位冲突校验（含数据库已有 + 同批次 Excel 行间冲突）
+        u_pos = row_data.get("u_position")
+        u_h = row_data.get("u_height")
+        if cabinet_id and u_pos and u_h and not row_errors:
+            # 检查与数据库已有资产的冲突
+            conflict = await _check_u_position_conflict(db, cabinet_id, u_pos, u_h)
+            if conflict:
+                row_errors.append({"row": row_idx, "field": "u_position", "message": conflict})
+            else:
+                # 检查与同批次前面行的冲突
+                key = cabinet_id
+                new_start = u_pos
+                new_end = u_pos + u_h - 1
+                for prev_row, prev_start, prev_end in pending_u_ranges.get(key, []):
+                    if new_start <= prev_end and new_end >= prev_start:
+                        row_errors.append({
+                            "row": row_idx,
+                            "field": "u_position",
+                            "message": f"与第 {prev_row} 行 U 位冲突 (U{prev_start}-U{prev_end})"
+                        })
+                        break
+                else:
+                    # 无冲突，记录本行的 U 位范围
+                    pending_u_ranges.setdefault(key, []).append((row_idx, new_start, new_end))
+
+        # 日期字段转换
+        for date_field in ("purchase_date", "warranty_start", "warranty_end"):
+            val = row_data.get(date_field)
+            if val is not None and not isinstance(val, date):
+                try:
+                    row_data[date_field] = datetime.strptime(str(val), "%Y-%m-%d").date()
+                except (ValueError, TypeError):
+                    try:
+                        row_data[date_field] = datetime.strptime(str(val), "%Y/%m/%d").date()
+                    except (ValueError, TypeError):
+                        row_errors.append({"row": row_idx, "field": date_field, "message": f"日期格式无效: {val}"})
+                        row_data[date_field] = None
+            elif isinstance(val, datetime):
+                row_data[date_field] = val.date()
+
+        errors.extend(row_errors)
+        preview_data.append(row_data)
+
+    total = len(preview_data)
+    error_rows = {e["row"] for e in errors}
+    success_count = total - len(error_rows)
+    error_count = len(error_rows)
+
+    if mode == "preview":
+        return {
+            "total": total,
+            "success_count": success_count,
+            "error_count": error_count,
+            "errors": errors,
+            "preview_data": preview_data
+        }
+
+    # confirm 模式 — 只导入无错误的行
+    if error_count > 0:
+        raise HTTPException(status_code=400, detail={
+            "message": "存在校验错误，无法导入",
+            "errors": errors
+        })
+
+    created_ids = []
+    try:
+        for row_data in preview_data:
+            # 清理非模型字段
+            row_data.pop("_cabinet_code", None)
+            # 设置 asset_type 枚举
+            if "asset_type" in row_data and row_data["asset_type"]:
+                row_data["asset_type"] = AssetType(row_data["asset_type"])
+
+            asset = Asset(**{k: v for k, v in row_data.items() if v is not None})
+            db.add(asset)
+            await db.flush()
+
+            # 添加生命周期记录
+            lifecycle = AssetLifecycle(
+                asset_id=asset.id,
+                action="purchase",
+                action_date=datetime.now(),
+                operator=current_user.username,
+                remark="批量导入创建"
+            )
+            db.add(lifecycle)
+            created_ids.append(asset.id)
+
+        await db.commit()
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(status_code=400, detail=f"导入失败，已回滚: {str(e)}")
+
+    return {
+        "total": total,
+        "success_count": len(created_ids),
+        "error_count": 0,
+        "errors": [],
+        "created_ids": created_ids
+    }
+
+
+@router.get("/assets/export", summary="导出资产列表")
+async def export_assets(
+    asset_type: Optional[str] = Query(None),
+    status: Optional[str] = Query(None),
+    cabinet_id: Optional[int] = Query(None),
+    keyword: Optional[str] = Query(None),
+    template: bool = Query(False, description="是否只下载空模板"),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_viewer)
+):
+    """导出资产列表为 Excel，template=true 时只返回表头"""
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "资产列表"
+
+    # 写表头
+    headers = [col[0] for col in EXPORT_COLUMNS]
+    ws.append(headers)
+
+    if not template:
+        query = select(Asset)
+
+        conditions = []
+        if asset_type:
+            conditions.append(Asset.asset_type == asset_type)
+        if status:
+            conditions.append(Asset.status == status)
+        if cabinet_id:
+            conditions.append(Asset.cabinet_id == cabinet_id)
+        if keyword:
+            keyword_filter = or_(
+                Asset.asset_code.contains(keyword),
+                Asset.asset_name.contains(keyword),
+                Asset.brand.contains(keyword),
+                Asset.model.contains(keyword)
+            )
+            conditions.append(keyword_filter)
+
+        if conditions:
+            query = query.where(and_(*conditions))
+
+        query = query.order_by(Asset.created_at.desc())
+        result = await db.execute(query)
+        assets = result.scalars().all()
+
+        # 预加载机柜映射
+        cab_result = await db.execute(select(Cabinet))
+        cab_map = {c.id: c.cabinet_code for c in cab_result.scalars().all()}
+
+        # 资产类型反向映射
+        type_cn_map = {
+            "server": "服务器", "network": "网络设备", "storage": "存储设备",
+            "ups": "UPS", "pdu": "PDU", "ac": "空调", "cabinet": "机柜",
+            "sensor": "传感器", "other": "其他",
+        }
+
+        # 写数据
+        for asset in assets:
+            row = []
+            for _, field in EXPORT_COLUMNS:
+                if field == "_cabinet_code":
+                    row.append(cab_map.get(asset.cabinet_id, ""))
+                elif field == "asset_type":
+                    val = asset.asset_type.value if asset.asset_type else ""
+                    row.append(type_cn_map.get(val, val))
+                elif field == "status":
+                    val = asset.status.value if asset.status else ""
+                    row.append(STATUS_CN_MAP.get(val, val))
+                elif field in ("purchase_date", "warranty_start", "warranty_end"):
+                    val = getattr(asset, field, None)
+                    row.append(str(val) if val else "")
+                else:
+                    row.append(getattr(asset, field, "") or "")
+            ws.append(row)
+
+    buf = BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+
+    return StreamingResponse(
+        buf,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": "attachment; filename=assets_export.xlsx"}
+    )
+
+
 @router.get("/assets/{asset_id}", response_model=AssetResponse, summary="获取资产详情")
 async def get_asset(
     asset_id: int,
@@ -378,6 +848,12 @@ async def create_asset(
             raise HTTPException(status_code=400, detail="指定的机柜不存在")
         cabinet_name = cabinet.cabinet_name
 
+    # U 位冲突校验
+    if data.cabinet_id and data.u_position and data.u_height:
+        conflict = await _check_u_position_conflict(db, data.cabinet_id, data.u_position, data.u_height)
+        if conflict:
+            raise HTTPException(status_code=400, detail=conflict)
+
     asset = Asset(**data.model_dump())
     db.add(asset)
     await db.commit()
@@ -432,6 +908,15 @@ async def update_asset(
         )
         if existing.scalar_one_or_none():
             raise HTTPException(status_code=400, detail="资产编码已存在")
+
+    # U 位冲突校验
+    check_cabinet = update_data.get("cabinet_id", asset.cabinet_id)
+    check_u_pos = update_data.get("u_position", asset.u_position)
+    check_u_height = update_data.get("u_height", asset.u_height)
+    if check_cabinet and check_u_pos and check_u_height:
+        conflict = await _check_u_position_conflict(db, check_cabinet, check_u_pos, check_u_height, exclude_asset_id=asset_id)
+        if conflict:
+            raise HTTPException(status_code=400, detail=conflict)
 
     # 记录位置变更
     old_cabinet_id = asset.cabinet_id
@@ -919,6 +1404,50 @@ async def get_statistics(
         by_department=by_department,
         total_value=float(total_value),
         warranty_expiring_count=warranty_expiring_count
+    )
+
+
+@router.get("/warranty-alerts", response_model=WarrantyAlertResponse, summary="获取保修预警汇总")
+async def get_warranty_alerts(
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_viewer)
+):
+    """返回 30/60/90 天三个阈值的过保预警资产列表"""
+    today = date.today()
+    result = await db.execute(
+        select(Asset).where(
+            Asset.warranty_end.isnot(None),
+            Asset.warranty_end >= today,
+            Asset.warranty_end <= today + timedelta(days=90),
+            Asset.status != AssetStatus.scrapped
+        ).order_by(Asset.warranty_end.asc())
+    )
+    assets = result.scalars().all()
+
+    alerts_30, alerts_60, alerts_90 = [], [], []
+    for asset in assets:
+        days_remaining = (asset.warranty_end - today).days
+        item = WarrantyAlertItem(
+            asset_id=asset.id,
+            asset_code=asset.asset_code,
+            asset_name=asset.asset_name,
+            asset_type=asset.asset_type.value if asset.asset_type else None,
+            warranty_end=asset.warranty_end.isoformat(),
+            days_remaining=days_remaining,
+            status=asset.status.value if asset.status else None,
+        )
+        if days_remaining <= 30:
+            alerts_30.append(item)
+        elif days_remaining <= 60:
+            alerts_60.append(item)
+        else:
+            alerts_90.append(item)
+
+    return WarrantyAlertResponse(
+        within_30_days=alerts_30,
+        within_60_days=alerts_60,
+        within_90_days=alerts_90,
+        total_count=len(assets),
     )
 
 

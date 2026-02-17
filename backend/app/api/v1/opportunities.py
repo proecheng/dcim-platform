@@ -6,7 +6,7 @@ from typing import Optional, List
 from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, and_
+from sqlalchemy import select, func, and_, case
 
 from ..deps import get_db, require_viewer, require_admin
 from ...models.user import User
@@ -43,17 +43,18 @@ async def get_dashboard(
     - 机会列表按优先级排序
     - 按类别分组的机会
     """
-    # 获取机会统计
-    engine = OpportunityEngine(db)
-    summary = await engine.get_opportunity_summary()
-
     # 查询数据库中的机会
     result = await db.execute(
         select(EnergyOpportunity)
         .where(EnergyOpportunity.status.in_(["discovered", "simulating", "ready"]))
         .order_by(
-            # 优先级排序：high > medium > low
-            func.field(EnergyOpportunity.priority, "high", "medium", "low"),
+            # 优先级排序：high > medium > low（兼容 SQLite/PostgreSQL）
+            case(
+                (EnergyOpportunity.priority == "high", 1),
+                (EnergyOpportunity.priority == "medium", 2),
+                (EnergyOpportunity.priority == "low", 3),
+                else_=4
+            ),
             EnergyOpportunity.potential_saving.desc()
         )
     )
@@ -104,10 +105,13 @@ async def get_dashboard(
             by_category[cat_name] = []
         by_category[cat_name].append(o)
 
-    # 计算年度潜在节省
-    annual_saving = summary.get("total_potential_saving_annual", 0)
+    # 计算年度潜在节省 — DB 有数据时直接汇总，否则回退到引擎分析
     if db_opportunities:
-        annual_saving = max(annual_saving, sum(float(o.potential_saving or 0) for o in db_opportunities))
+        annual_saving = sum(float(o.potential_saving or 0) for o in db_opportunities)
+    else:
+        engine = OpportunityEngine(db)
+        summary = await engine.get_opportunity_summary()
+        annual_saving = summary.get("total_potential_saving_annual", 0)
 
     return DashboardResponse(
         summary_cards=DashboardSummaryCards(
@@ -120,6 +124,21 @@ async def get_dashboard(
         by_category=by_category,
         total_count=len(opportunities)
     )
+
+
+# ========== 自动检测 ==========
+
+@router.post("/detect", summary="手动触发节能机会检测")
+async def trigger_detection(
+    days: int = Query(30, ge=7, le=365),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_admin)
+):
+    """手动触发一轮节能机会自动检测"""
+    from ...services.opportunity_detector import OpportunityDetector
+    detector = OpportunityDetector(db)
+    result = await detector.run_detection(days=days)
+    return {"code": 0, "data": result, "message": "检测完成"}
 
 
 # ========== 机会详情 ==========
@@ -285,6 +304,91 @@ async def select_devices(
     )
 
 
+# ========== 执行辅助函数 ==========
+
+
+def _generate_tasks_from_analysis_data(
+    plan_id: int,
+    source_plugin: Optional[str],
+    analysis_data: dict
+) -> List[ExecutionTask]:
+    """从 analysis_data 生成执行任务 — 策略模式"""
+    if source_plugin == 'peak_valley_optimizer':
+        return _generate_load_shift_tasks(plan_id, analysis_data)
+    elif source_plugin == 'demand_controller':
+        return _generate_demand_tasks(plan_id, analysis_data)
+    else:
+        return _generate_generic_tasks(plan_id, source_plugin, analysis_data)
+
+
+def _generate_load_shift_tasks(plan_id: int, data: dict) -> List[ExecutionTask]:
+    """负荷转移类 — 按设备+规则生成任务"""
+    tasks = []
+    period_names = {
+        'sharp': '尖峰', 'peak': '峰时', 'flat': '平时',
+        'valley': '谷时', 'deep_valley': '深谷'
+    }
+    device_rules = data.get('device_rules', [])
+    idx = 0
+    for device_rule in device_rules:
+        device_name = device_rule.get('device_name', f'设备{idx+1}')
+        device_id = device_rule.get('device_id')
+        for rule in device_rule.get('rules', []):
+            source_name = period_names.get(rule.get('source_period', ''), '源')
+            target_name = period_names.get(rule.get('target_period', ''), '目标')
+            tasks.append(ExecutionTask(
+                plan_id=plan_id,
+                task_type='load_shift',
+                task_name=f"{device_name} - {source_name}转{target_name}",
+                target_object=f"device:{device_id}" if device_id else device_name,
+                execution_mode='manual',
+                parameters={
+                    'device_id': device_id,
+                    'device_name': device_name,
+                    'source_period': rule.get('source_period'),
+                    'target_period': rule.get('target_period'),
+                    'power': rule.get('power', 0),
+                    'hours': rule.get('hours', 0),
+                },
+                status='pending',
+                sort_order=idx
+            ))
+            idx += 1
+    return tasks
+
+
+def _generate_demand_tasks(plan_id: int, data: dict) -> List[ExecutionTask]:
+    """需量控制类"""
+    target_demand = data.get('target_demand') or data.get('recommended_demand')
+    current_demand = data.get('current_demand')
+    name = f"调整申报需量: {current_demand}kW → {target_demand}kW" if current_demand and target_demand else "调整申报需量"
+    return [ExecutionTask(
+        plan_id=plan_id,
+        task_type='demand_adjust',
+        task_name=name,
+        target_object="电力需量配置",
+        execution_mode='manual',
+        parameters={'current_demand': current_demand, 'target_demand': target_demand, 'analysis_data': data},
+        status='pending',
+        sort_order=0
+    )]
+
+
+def _generate_generic_tasks(plan_id: int, source_plugin: Optional[str], data: dict) -> List[ExecutionTask]:
+    """通用 fallback"""
+    desc = data.get('description', '') or data.get('suggestion', '') or '执行节能优化措施'
+    return [ExecutionTask(
+        plan_id=plan_id,
+        task_type='manual_operation',
+        task_name=f"执行优化措施 ({source_plugin or '通用'})",
+        target_object=str(desc)[:200],
+        execution_mode='manual',
+        parameters={'analysis_data': data},
+        status='pending',
+        sort_order=0
+    )]
+
+
 # ========== 执行 ==========
 
 @router.post("/{opportunity_id}/execute", summary="确认执行")
@@ -349,6 +453,17 @@ async def execute_opportunity(
         )
         db.add(task)
         tasks.append(task)
+
+    # === 自动识别机会的 fallback ===
+    # 如果没有 measures（自动识别的机会只有 analysis_data），从 analysis_data 生成任务
+    if not tasks and opportunity.analysis_data:
+        tasks = _generate_tasks_from_analysis_data(
+            plan_id=plan.id,
+            source_plugin=opportunity.source_plugin,
+            analysis_data=opportunity.analysis_data
+        )
+        for task in tasks:
+            db.add(task)
 
     # 更新机会状态
     opportunity.status = "executing"

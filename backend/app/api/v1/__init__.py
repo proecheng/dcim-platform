@@ -33,8 +33,17 @@ from .dispatch import router as dispatch_router
 from .monitoring import router as monitoring_router
 from .topology import router as topology_router
 from .trace import router as trace_router
-# TODO: Enable after installing numpy
-# from .optimization import router as optimization_router
+from .optimization import router as optimization_router
+from .cooling import router as cooling_router
+from .datasources import router as datasource_router
+from .gateways import router as gateway_router
+from .device_templates import router as device_template_router
+from .system_health import router as system_health_router
+from .data_quality import router as data_quality_router
+from .escalation import router as escalation_router
+from .spatial import router as spatial_router
+from .topology_config import router as topology_config_router
+from .linkage import router as linkage_router
 
 # 深度学习节能优化模块 (需要安装 torch)
 try:
@@ -75,8 +84,17 @@ api_router.include_router(dispatch_router, prefix="/dispatch", tags=["可调度�
 api_router.include_router(monitoring_router, prefix="/monitoring", tags=["电费监控"])
 api_router.include_router(topology_router, prefix="/topology", tags=["拓扑编辑"])
 api_router.include_router(trace_router, tags=["数据追溯链"])
-# TODO: Enable after installing numpy
-# api_router.include_router(optimization_router, prefix="/optimization", tags=["日前调度优化"])
+api_router.include_router(optimization_router, prefix="/optimization", tags=["日前调度优化"])
+api_router.include_router(cooling_router, prefix="/cooling", tags=["制冷系统"])
+api_router.include_router(datasource_router, prefix="/datasources", tags=["数据源管理"])
+api_router.include_router(gateway_router, prefix="/gateways", tags=["网关管理"])
+api_router.include_router(device_template_router, prefix="/device-templates", tags=["设备模板"])
+api_router.include_router(system_health_router, prefix="/system", tags=["系统"])
+api_router.include_router(data_quality_router, prefix="/data-quality", tags=["数据质量"])
+api_router.include_router(escalation_router, prefix="/escalations", tags=["告警升级"])
+api_router.include_router(spatial_router)
+api_router.include_router(topology_config_router, prefix="/topology-config", tags=["拓扑配置"])
+api_router.include_router(linkage_router, prefix="/linkage", tags=["联动管理"])
 
 # 深度学习节能优化API
 if _ml_available:

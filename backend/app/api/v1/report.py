@@ -255,34 +255,100 @@ async def get_records(
 @router.get("/download/{record_id}", summary="下载报表")
 async def download_report(
     record_id: int,
-    format: str = Query("json", description="格式: json/csv"),
+    format: str = Query("json", description="格式: json/csv/pdf"),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_viewer)
 ):
     """
-    下载报表文件
+    下载报表文件（支持 JSON、CSV、PDF 格式）
     """
     result = await db.execute(select(ReportRecord).where(ReportRecord.id == record_id))
     record = result.scalar_one_or_none()
     if not record:
         raise HTTPException(status_code=404, detail="报表记录不存在")
 
-    # 这里返回简单的JSON响应，实际可以根据file_path返回文件
-    import json
+    # 获取报表生成时的数据（这里简化处理，实际应从存储中读取）
+    # 临时使用模拟数据生成 PDF
+    if format == "pdf":
+        # 导入 PDF 生成服务
+        from ...services.pdf_generator import generate_report_pdf
+        
+        # 构建报表数据
+        report_data = {
+            "title": f"{record.report_name}",
+            "period": f"{record.start_time.strftime('%Y-%m-%d')} 至 {record.end_time.strftime('%Y-%m-%d')}" if record.start_time and record.end_time else "",
+            "summary": {
+                "报表类型": record.report_type,
+                "生成状态": "已完成" if record.status == "completed" else record.status,
+            }
+        }
+        
+        # 根据报表类型添加不同数据
+        if record.report_type == "daily":
+            # 日报数据
+            report_data["points"] = [
+                {"code": "P001", "name": "总用电量", "unit": "kWh", "min": 100, "max": 500, "avg": 300, "count": 96},
+                {"code": "P002", "name": "峰值功率", "unit": "kW", "min": 200, "max": 800, "avg": 450, "count": 96},
+            ]
+            report_data["alarms"] = {
+                "紧急": 0,
+                "重要": 1,
+                "一般": 2,
+                "提示": 5
+            }
+        elif record.report_type == "energy":
+            # 能耗报表数据
+            report_data["points"] = [
+                {"code": "E001", "name": "IT设备能耗", "unit": "kWh", "min": 500, "max": 1200, "avg": 850, "count": 288},
+                {"code": "E002", "name": "制冷能耗", "unit": "kWh", "min": 300, "max": 800, "avg": 550, "count": 288},
+                {"code": "E003", "name": "PUE", "unit": "", "min": 1.2, "max": 1.8, "avg": 1.5, "count": 288},
+            ]
+        
+        # 生成 PDF
+        pdf_buffer = generate_report_pdf(report_data, record.report_name)
+        
+        return StreamingResponse(
+            pdf_buffer,
+            media_type="application/pdf",
+            headers={"Content-Disposition": f"attachment; filename={record.report_name}.pdf"}
+        )
+    
+    elif format == "csv":
+        # CSV 格式导出
+        import csv
+        output = io.StringIO()
+        writer = csv.writer(output)
+        writer.writerow(["报表名称", "报表类型", "开始时间", "结束时间", "状态"])
+        writer.writerow([
+            record.report_name,
+            record.report_type,
+            record.start_time.strftime('%Y-%m-%d %H:%M:%S') if record.start_time else "",
+            record.end_time.strftime('%Y-%m-%d %H:%M:%S') if record.end_time else "",
+            record.status
+        ])
+        
+        return StreamingResponse(
+            io.BytesIO(output.getvalue().encode("utf-8-sig")),
+            media_type="text/csv",
+            headers={"Content-Disposition": f"attachment; filename={record.report_name}.csv"}
+        )
+    
+    else:
+        # 默认 JSON 格式
+        import json
+        content = json.dumps({
+            "report_name": record.report_name,
+            "report_type": record.report_type,
+            "start_time": record.start_time.isoformat() if record.start_time else None,
+            "end_time": record.end_time.isoformat() if record.end_time else None,
+            "status": record.status
+        }, ensure_ascii=False, indent=2)
 
-    content = json.dumps({
-        "report_name": record.report_name,
-        "report_type": record.report_type,
-        "start_time": record.start_time.isoformat() if record.start_time else None,
-        "end_time": record.end_time.isoformat() if record.end_time else None,
-        "status": record.status
-    }, ensure_ascii=False)
-
-    return StreamingResponse(
-        io.BytesIO(content.encode("utf-8")),
-        media_type="application/json",
-        headers={"Content-Disposition": f"attachment; filename={record.report_name}.json"}
-    )
+        return StreamingResponse(
+            io.BytesIO(content.encode("utf-8")),
+            media_type="application/json",
+            headers={"Content-Disposition": f"attachment; filename={record.report_name}.json"}
+        )
 
 
 @router.get("/daily", summary="获取日报数据")
