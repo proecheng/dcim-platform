@@ -95,57 +95,57 @@ development_status:
   epic-8-retrospective: done
 
   # Epic 9: 联动引擎 + 消防联动 (Phase 2)
-  epic-9: in-progress
+  epic-9: done
   9-1-linkage-engine-core-framework: done
   9-2-fire-protection-tiered-linkage-strategy: done
-  9-3-intelligent-fault-diagnosis: backlog
-  9-4-linkage-recovery-process: backlog
-  9-5-event-timeline-report: backlog
-  9-6-control-command-tiered-confirmation: backlog
-  9-7-sensor-data-drift-detection: backlog
-  epic-9-retrospective: optional
+  9-3-intelligent-fault-diagnosis: done
+  9-4-linkage-recovery-process: done
+  9-5-event-timeline-report: done
+  9-6-control-command-tiered-confirmation: done
+  9-7-sensor-data-drift-detection: done
+  epic-9-retrospective: done
 
   # Epic 10: 视频监控集成 (Phase 2)
-  epic-10: backlog
-  10-1-camera-metadata-management: backlog
-  10-2-alarm-linked-video-retrieval: backlog
-  10-3-zone-linked-recording-and-ptz-control: backlog
-  10-4-alarm-playback: backlog
+  epic-10: done
+  10-1-camera-metadata-management: done
+  10-2-alarm-linked-video-retrieval: done
+  10-3-zone-linked-recording-and-ptz-control: done
+  10-4-alarm-playback: done
   epic-10-retrospective: optional
 
   # Epic 11: 运维管理 (Phase 2)
-  epic-11: backlog
-  11-1-work-order-management: backlog
-  11-2-inspection-plan-and-task: backlog
-  11-3-knowledge-base: backlog
-  11-4-alarm-auto-create-work-order: backlog
-  11-5-work-order-approval-process: backlog
+  epic-11: done
+  11-1-work-order-management: done
+  11-2-inspection-plan-and-task: done
+  11-3-knowledge-base: done
+  11-4-alarm-auto-create-work-order: done
+  11-5-work-order-approval-process: done
   epic-11-retrospective: optional
 
   # Epic 12: 报表与决策支持 (Phase 2)
-  epic-12: backlog
-  12-1-auto-operation-report: backlog
-  12-2-intelligent-summary-panel: backlog
-  12-3-pdf-report-export: backlog
-  12-4-device-health-assessment: backlog
+  epic-12: done
+  12-1-auto-operation-report: done
+  12-2-intelligent-summary-panel: done
+  12-3-pdf-report-export: done
+  12-4-device-health-assessment: done
   epic-12-retrospective: optional
 
   # Epic 13: 用户与系统管理 (MVP)
-  epic-13: backlog
-  13-1-user-management-frontend-page: backlog
-  13-2-auth-and-session-management-enhancement: backlog
-  13-3-operation-audit-log: backlog
-  13-4-data-backup-and-system-health: backlog
-  13-5-site-level-data-isolation: backlog
-  13-6-password-policy-management: backlog
+  epic-13: done
+  13-1-user-management-frontend-page: done
+  13-2-auth-and-session-management-enhancement: done
+  13-3-operation-audit-log: done
+  13-4-data-backup-and-system-health: done
+  13-5-site-level-data-isolation: done
+  13-6-password-policy-management: done
   epic-13-retrospective: optional
 
   # Epic 14: 棕地改进 - 代码质量与测试 (MVP)
-  epic-14: backlog
-  14-1-backend-automated-test-suite: backlog
-  14-2-standalone-device-management-page: backlog
-  14-3-typescript-type-check-zero-errors: backlog
-  14-4-frontend-critical-component-tests: backlog
+  epic-14: in-progress
+  14-1-backend-automated-test-suite: done
+  14-2-standalone-device-management-page: done
+  14-3-typescript-type-check-zero-errors: done
+  14-4-frontend-critical-component-tests: done
   14-5-database-migration-and-timescaledb-config: backlog
   14-6-docker-compose-one-click-deploy: backlog
   epic-14-retrospective: optional
