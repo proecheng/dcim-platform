@@ -148,7 +148,7 @@ development_status:
   14-4-frontend-critical-component-tests: done
   14-5-database-migration-and-timescaledb-config: done
   14-6-docker-compose-one-click-deploy: done
-  epic-14-retrospective: optional
+  epic-14-retrospective: done
 
   # Epic 15: 协议扩展 (Phase 1.5 + Phase 2)
   epic-15: backlog
