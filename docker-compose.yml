@@ -1,7 +1,70 @@
 version: '3.8'
 
 services:
-  # 后端服务
+  # ─── PostgreSQL + TimescaleDB ───────────────────────────────
+  postgres:
+    image: timescale/timescaledb:latest-pg16
+    container_name: dcim-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-dcim}
+      POSTGRES_USER: ${POSTGRES_USER:-dcim}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-dcim_password}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-dcim} -d ${POSTGRES_DB:-dcim}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - dcim-network
+
+  # ─── Redis ──────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: dcim-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - dcim-network
+
+  # ─── EMQX MQTT Broker ──────────────────────────────────────
+  emqx:
+    image: emqx/emqx:5
+    container_name: dcim-emqx
+    restart: unless-stopped
+    environment:
+      EMQX_NAME: dcim-emqx
+      EMQX_HOST: 0.0.0.0
+    ports:
+      - "${MQTT_PORT:-1883}:1883"        # MQTT TCP
+      - "${MQTT_WS_PORT:-8083}:8083"     # MQTT WebSocket
+      - "${EMQX_DASHBOARD_PORT:-18083}:18083"  # EMQX Dashboard
+    volumes:
+      - emqx-data:/opt/emqx/data
+    healthcheck:
+      test: ["CMD", "emqx", "ping"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    networks:
+      - dcim-network
+
+  # ─── 后端 FastAPI ───────────────────────────────────────────
   backend:
     build:
       context: ./backend
@@ -9,41 +72,68 @@ services:
     container_name: dcim-backend
     restart: unless-stopped
     environment:
-      - APP_NAME=算力中心智能监控系统
-      - APP_VERSION=2.0.0
-      - DEBUG=false
-      - DATABASE_URL=sqlite+aiosqlite:///./data/dcim.db
-      - SECRET_KEY=${SECRET_KEY:-your-super-secret-key-change-in-production}
-      - MAX_POINTS=100
-    volumes:
-      - backend-data:/app/data
+      # 应用
+      APP_NAME: ${APP_NAME:-算力中心智能监控系统}
+      APP_VERSION: "2.0.0"
+      DEBUG: ${DEBUG:-false}
+      # 数据库 — PostgreSQL + TimescaleDB
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-dcim}:${POSTGRES_PASSWORD:-dcim_password}@postgres:5432/${POSTGRES_DB:-dcim}
+      TIMESCALEDB_ENABLED: ${TIMESCALEDB_ENABLED:-true}
+      # JWT
+      SECRET_KEY: ${SECRET_KEY:-change-this-to-a-secure-random-key}
+      ALGORITHM: ${ALGORITHM:-HS256}
+      ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES:-30}
+      REFRESH_TOKEN_EXPIRE_DAYS: ${REFRESH_TOKEN_EXPIRE_DAYS:-7}
+      # CORS — Nginx 在同一网络内，允许外部访问地址
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000}
+      # Redis
+      REDIS_ENABLED: "true"
+      REDIS_URL: redis://redis:6379/0
+      # MQTT
+      MQTT_ENABLED: "true"
+      MQTT_HOST: emqx
+      MQTT_PORT: "1883"
+      MQTT_USERNAME: ${MQTT_USERNAME:-}
+      MQTT_PASSWORD: ${MQTT_PASSWORD:-}
+      # 数据采集
+      SIMULATION_ENABLED: ${SIMULATION_ENABLED:-true}
+      COLLECT_INTERVAL: ${COLLECT_INTERVAL:-10}
+      DATA_RETENTION_DAYS: ${DATA_RETENTION_DAYS:-30}
+      MAX_POINTS: ${MAX_POINTS:-100}
     ports:
-      - "8000:8000"
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+      - "${BACKEND_PORT:-8080}:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      emqx:
+        condition: service_healthy
     networks:
       - dcim-network
 
-  # 前端服务
-  frontend:
+  # ─── 前端 Nginx ─────────────────────────────────────────────
+  nginx:
     build:
       context: ./frontend
       dockerfile: Dockerfile
-    container_name: dcim-frontend
+    container_name: dcim-nginx
     restart: unless-stopped
     ports:
-      - "80:80"
+      - "${NGINX_PORT:-3000}:80"
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
     networks:
       - dcim-network
 
 volumes:
-  backend-data:
-    name: dcim-backend-data
+  postgres-data:
+    name: dcim-postgres-data
+  redis-data:
+    name: dcim-redis-data
+  emqx-data:
+    name: dcim-emqx-data
 
 networks:
   dcim-network:

@@ -141,13 +141,13 @@ development_status:
   epic-13-retrospective: optional
 
   # Epic 14: 棕地改进 - 代码质量与测试 (MVP)
-  epic-14: in-progress
+  epic-14: done
   14-1-backend-automated-test-suite: done
   14-2-standalone-device-management-page: done
   14-3-typescript-type-check-zero-errors: done
   14-4-frontend-critical-component-tests: done
   14-5-database-migration-and-timescaledb-config: done
-  14-6-docker-compose-one-click-deploy: backlog
+  14-6-docker-compose-one-click-deploy: done
   epic-14-retrospective: optional
 
   # Epic 15: 协议扩展 (Phase 1.5 + Phase 2)

@@ -1,5 +1,5 @@
-# 前端构建阶段
-FROM node:18-alpine as build
+# 前端 Dockerfile — 多阶段构建
+FROM node:18-alpine AS build
 
 WORKDIR /app
 
@@ -11,7 +11,7 @@ RUN npm ci
 COPY . .
 RUN npm run build
 
-# 生产阶段 - Nginx
+# 生产阶段 — Nginx
 FROM nginx:alpine
 
 # 复制构建产物
@@ -22,5 +22,9 @@ COPY nginx.conf /etc/nginx/conf.d/default.conf
 
 # 暴露端口
 EXPOSE 80
+
+# 健康检查
+HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
+    CMD wget -qO- http://localhost:80/ || exit 1
 
 CMD ["nginx", "-g", "daemon off;"]
