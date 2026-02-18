@@ -1,4 +1,5 @@
 import sys
+import os
 from logging.config import fileConfig
 from pathlib import Path
 
@@ -14,8 +15,23 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 # access to the values within the .ini file in use.
 config = context.config
 
+# 从 Settings 读取 DATABASE_URL（支持环境变量切换）
+# Alembic 需要同步 URL，将 async driver 转换为同步 driver
+from app.core.config import get_settings
+_settings = get_settings()
+_db_url = _settings.database_url
+
+# 异步 driver → 同步 driver 转换
+if "+aiosqlite" in _db_url:
+    _sync_url = _db_url.replace("+aiosqlite", "")
+elif "+asyncpg" in _db_url:
+    _sync_url = _db_url.replace("+asyncpg", "+psycopg2")
+else:
+    _sync_url = _db_url
+
+config.set_main_option("sqlalchemy.url", _sync_url)
+
 # Interpret the config file for Python logging.
-# This line sets up loggers basically.
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 

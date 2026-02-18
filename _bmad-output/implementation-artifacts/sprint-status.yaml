@@ -146,7 +146,7 @@ development_status:
   14-2-standalone-device-management-page: done
   14-3-typescript-type-check-zero-errors: done
   14-4-frontend-critical-component-tests: done
-  14-5-database-migration-and-timescaledb-config: backlog
+  14-5-database-migration-and-timescaledb-config: done
   14-6-docker-compose-one-click-deploy: backlog
   epic-14-retrospective: optional
 

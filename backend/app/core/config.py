@@ -23,8 +23,13 @@ class Settings(BaseSettings):
     host: str = "0.0.0.0"
     port: int = 8080
 
-    # 数据库
+    # 数据库 — 通过环境变量 DATABASE_URL 切换
+    # SQLite:      sqlite+aiosqlite:///./dcim.db
+    # PostgreSQL:  postgresql+asyncpg://user:pass@localhost:5432/dcim
     database_url: str = "sqlite+aiosqlite:///./dcim.db"
+
+    # TimescaleDB（仅 PostgreSQL 生效）
+    timescaledb_enabled: bool = False
 
     # JWT 配置 - 必须通过环境变量设置，无默认值更安全
     secret_key: str = Field(default_factory=generate_secret_key)

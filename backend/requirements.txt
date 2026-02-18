@@ -7,6 +7,8 @@ python-multipart==0.0.6
 sqlalchemy==2.0.25
 aiosqlite==0.19.0
 alembic==1.13.1
+asyncpg==0.29.0          # PostgreSQL 异步驱动
+psycopg2-binary==2.9.9   # PostgreSQL 同步驱动（Alembic 迁移用）
 
 # Auth
 python-jose[cryptography]==3.3.0
@@ -38,3 +40,8 @@ httpx>=0.25.0
 
 # YAML 配置 (消防策略)
 PyYAML>=6.0
+
+# Testing
+pytest>=7.4.0
+pytest-asyncio>=0.23.0
+pytest-cov>=4.1.0
