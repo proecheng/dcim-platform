@@ -151,8 +151,8 @@ development_status:
   epic-14-retrospective: done
 
   # Epic 15: 协议扩展 (Phase 1.5 + Phase 2)
-  epic-15: backlog
-  15-1-mqtt-device-adapter: backlog
+  epic-15: in-progress
+  15-1-mqtt-device-adapter: done
   15-2-http-rest-adapter: backlog
   15-3-bacnet-ip-adapter: backlog
   15-4-opc-ua-adapter: backlog

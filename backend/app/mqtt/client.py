@@ -1,8 +1,9 @@
-"""后端 MQTT 客户端 — Story 2.1"""
+"""后端 MQTT 客户端 — Story 2.1 + Story 15.1 动态订阅"""
 import asyncio
+import fnmatch
 import json
 import logging
-from typing import Optional
+from typing import Callable, Optional
 
 from ..core.config import get_settings
 from ..core.database import async_session
@@ -11,15 +12,21 @@ from ..services.point_data import handle_point_data
 
 logger = logging.getLogger(__name__)
 
+# 动态订阅回调类型: async def handler(topic: str, payload: bytes) -> None
+MessageHandler = Callable[[str, bytes], object]
+
 
 class MqttService:
-    """后端 MQTT 客户端 — 订阅网关状态、数据上报"""
+    """后端 MQTT 客户端 — 订阅网关状态、数据上报 + 动态 Topic 订阅"""
 
     def __init__(self) -> None:
         self._task: Optional[asyncio.Task] = None
         self._heartbeat_task: Optional[asyncio.Task] = None
         self._running = False
         self._client = None
+        # 动态订阅: topic_pattern → handler
+        self._dynamic_subscriptions: dict[str, MessageHandler] = {}
+        self._pending_subscriptions: list[tuple[str, int]] = []
 
     async def start(self) -> None:
         """启动 MQTT 客户端（优雅降级：连接失败不阻塞）"""
@@ -52,6 +59,23 @@ class MqttService:
         await self._client.publish(topic, payload, qos=qos)
         logger.debug("MQTT 消息已发布: topic=%s, qos=%d", topic, qos)
 
+    def register_subscription(self, topic_pattern: str, handler: MessageHandler, qos: int = 1) -> None:
+        """注册动态 Topic 订阅 — 由 MqttDeviceAdapter 调用
+
+        Args:
+            topic_pattern: MQTT topic（支持 +/# 通配符）
+            handler: 消息回调 async def handler(topic, payload)
+            qos: 订阅 QoS
+        """
+        self._dynamic_subscriptions[topic_pattern] = handler
+        self._pending_subscriptions.append((topic_pattern, qos))
+        logger.info("注册动态订阅: %s", topic_pattern)
+
+    def unregister_subscription(self, topic_pattern: str) -> None:
+        """取消动态 Topic 订阅"""
+        self._dynamic_subscriptions.pop(topic_pattern, None)
+        logger.info("取消动态订阅: %s", topic_pattern)
+
     async def _connect_loop(self) -> None:
         """MQTT 连接循环（断线重连 + 指数退避）"""
         settings = get_settings()
@@ -77,7 +101,20 @@ class MqttService:
                     await client.subscribe("dcim/+/gw/+/data", qos=1)
                     logger.info("已订阅: dcim/+/gw/+/data")
 
+                    # 订阅已注册的动态 topic
+                    for topic_pattern, qos in list(self._pending_subscriptions):
+                        await client.subscribe(topic_pattern, qos=qos)
+                        logger.info("已订阅动态 topic: %s (qos=%d)", topic_pattern, qos)
+                    self._pending_subscriptions.clear()
+
                     async for message in client.messages:
+                        # 检查是否有新的待订阅 topic
+                        if self._pending_subscriptions:
+                            for tp, q in list(self._pending_subscriptions):
+                                await client.subscribe(tp, qos=q)
+                                logger.info("已订阅动态 topic: %s (qos=%d)", tp, q)
+                            self._pending_subscriptions.clear()
+
                         await self._handle_message(message)
 
             except asyncio.CancelledError:
@@ -94,13 +131,23 @@ class MqttService:
 
     async def _handle_message(self, message) -> None:  # type: ignore[no-untyped-def]
         """处理收到的 MQTT 消息"""
-        try:
-            topic = str(message.topic)
-            payload = json.loads(message.payload.decode())
+        topic = str(message.topic)
 
-            # 解析 topic: dcim/{site_id}/gw/{gw_id}/{type}
+        # 先检查动态订阅是否匹配
+        for pattern, handler in self._dynamic_subscriptions.items():
+            if self._topic_matches(topic, pattern):
+                try:
+                    result = handler(topic, message.payload)
+                    if asyncio.iscoroutine(result):
+                        await result
+                except Exception:
+                    logger.exception("动态订阅处理异常: topic=%s, pattern=%s", topic, pattern)
+
+        # 原有网关消息处理
+        try:
+            payload = json.loads(message.payload.decode())
             parts = topic.split("/")
-            if len(parts) == 5:
+            if len(parts) == 5 and parts[0] == "dcim":
                 msg_type = parts[4]
                 if msg_type == "status":
                     async with async_session() as db:
@@ -109,9 +156,33 @@ class MqttService:
                     async with async_session() as db:
                         await handle_point_data(payload, db)
         except json.JSONDecodeError:
-            logger.warning("MQTT 消息 JSON 解析失败: topic=%s", message.topic)
+            pass  # 非 JSON 消息可能是动态订阅的自定义格式，已在上面处理
         except Exception:
-            logger.exception("MQTT 消息处理异常: topic=%s", message.topic)
+            logger.exception("MQTT 消息处理异常: topic=%s", topic)
+
+    @staticmethod
+    def _topic_matches(topic: str, pattern: str) -> bool:
+        """检查 MQTT topic 是否匹配订阅 pattern
+
+        支持 MQTT 通配符:
+          + 匹配单层: sensor/+/data 匹配 sensor/room1/data
+          # 匹配多层: sensor/# 匹配 sensor/room1/data
+        """
+        # 将 MQTT 通配符转换为 fnmatch 模式
+        fn_pattern = pattern.replace("+", "*").replace("#", "**")
+        # fnmatch 不支持 **，手动处理 # 通配符
+        if "#" in pattern:
+            prefix = pattern.split("#")[0]
+            return topic.startswith(prefix)
+        # + 通配符: 逐层匹配
+        topic_parts = topic.split("/")
+        pattern_parts = pattern.split("/")
+        if len(topic_parts) != len(pattern_parts):
+            return False
+        return all(
+            pp == "+" or pp == tp
+            for tp, pp in zip(topic_parts, pattern_parts)
+        )
 
     async def _heartbeat_check_loop(self) -> None:
         """定时检查网关心跳超时"""
