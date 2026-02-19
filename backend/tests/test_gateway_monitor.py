@@ -218,7 +218,7 @@ class TestGatewayMonitorIntegration:
 async def api_client():
     """创建 API 测试客户端"""
     from app.main import app
-    from app.api.deps import get_db, require_viewer, require_operator, require_admin
+    from app.api.deps import get_db, require_viewer, require_operator, require_admin, get_current_user, get_user_site_ids
     from app.models.user import User
 
     engine = create_async_engine("sqlite+aiosqlite://", echo=True)
@@ -236,6 +236,8 @@ async def api_client():
     app.dependency_overrides[require_viewer] = lambda: mock_user
     app.dependency_overrides[require_operator] = lambda: mock_user
     app.dependency_overrides[require_admin] = lambda: mock_user
+    app.dependency_overrides[get_current_user] = lambda: mock_user
+    app.dependency_overrides[get_user_site_ids] = lambda: None
 
     # 预填测试数据
     async with session_factory() as session:

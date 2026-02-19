@@ -7,63 +7,45 @@ from sqlalchemy import select
 
 from app.core.database import Base
 from app.main import app
-from app.api.deps import get_db
+from app.api.deps import get_db, require_viewer, require_operator, require_admin, get_current_user, get_user_site_ids
 from app.models.gateway import DataSource, DataSourcePoint
 from app.models.point import Point, PointRealtime
+from app.models.user import User
 from app.services.communication_monitor import check_communication_status, mark_unreliable_points
-
-# 内存数据库
-engine = create_async_engine("sqlite+aiosqlite:///:memory:", echo=False)
-TestSession = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
-
-
-async def override_get_db():
-    async with TestSession() as session:
-        yield session
-
-
-app.dependency_overrides[get_db] = override_get_db
 
 
 @pytest.fixture(autouse=True)
 async def setup_db():
-    async with engine.begin() as conn:
+    """每个测试创建独立的内存数据库"""
+    _engine = create_async_engine("sqlite+aiosqlite://", echo=False)
+    async with _engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
-    yield
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.drop_all)
 
+    _session_factory = async_sessionmaker(_engine, class_=AsyncSession, expire_on_commit=False)
 
-async def _create_test_user(session: AsyncSession):
-    """创建测试用户用于 API 认证"""
-    from app.models.user import User
-    from app.core.security import get_password_hash
-    user = User(
-        username="admin",
-        password_hash=get_password_hash("admin123"),
-        role="admin",
-        is_active=True,
-    )
-    session.add(user)
-    await session.commit()
-    return user
+    async def override_get_db():
+        async with _session_factory() as session:
+            yield session
 
+    mock_user = User(id=1, username="test_admin", role="admin", is_active=True)
 
-async def _get_token() -> str:
-    """获取 JWT token"""
-    transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://test") as client:
-        resp = await client.post(
-            "/api/v1/auth/login",
-            data={"username": "admin", "password": "admin123"},
-        )
-        return resp.json()["access_token"]
+    app.dependency_overrides[get_db] = override_get_db
+    app.dependency_overrides[require_viewer] = lambda: mock_user
+    app.dependency_overrides[require_operator] = lambda: mock_user
+    app.dependency_overrides[require_admin] = lambda: mock_user
+    app.dependency_overrides[get_current_user] = lambda: mock_user
+    app.dependency_overrides[get_user_site_ids] = lambda: None
+
+    yield _session_factory
+
+    app.dependency_overrides.clear()
+    await _engine.dispose()
 
 
 @pytest.mark.asyncio
-async def test_check_communication_marks_interrupted():
+async def test_check_communication_marks_interrupted(setup_db):
     """连续失败达到阈值时标记 interrupted"""
-    async with TestSession() as session:
+    async with setup_db() as session:
         ds = DataSource(
             name="测试数据源",
             protocol_type="modbus_tcp",
@@ -85,9 +67,9 @@ async def test_check_communication_marks_interrupted():
 
 
 @pytest.mark.asyncio
-async def test_mark_unreliable_points():
+async def test_mark_unreliable_points(setup_db):
     """受影响点位 quality 更新为 2"""
-    async with TestSession() as session:
+    async with setup_db() as session:
         # 创建设备
         from app.models.device import Device
         device = Device(
@@ -145,11 +127,9 @@ async def test_mark_unreliable_points():
 
 
 @pytest.mark.asyncio
-async def test_communication_status_api():
+async def test_communication_status_api(setup_db):
     """通信状态 API 返回正确结构"""
-    async with TestSession() as session:
-        await _create_test_user(session)
-
+    async with setup_db() as session:
         ds1 = DataSource(
             name="数据源A",
             protocol_type="modbus_tcp",
@@ -170,13 +150,9 @@ async def test_communication_status_api():
         session.add_all([ds1, ds2])
         await session.commit()
 
-    token = await _get_token()
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
-        resp = await client.get(
-            "/api/v1/datasources/communication-status",
-            headers={"Authorization": f"Bearer {token}"},
-        )
+        resp = await client.get("/api/v1/datasources/communication-status")
         assert resp.status_code == 200
         data = resp.json()
         assert isinstance(data, list)
@@ -193,11 +169,9 @@ async def test_communication_status_api():
 
 
 @pytest.mark.asyncio
-async def test_communication_status_interruption_duration():
+async def test_communication_status_interruption_duration(setup_db):
     """中断时长计算正确"""
-    async with TestSession() as session:
-        await _create_test_user(session)
-
+    async with setup_db() as session:
         last_comm = datetime.now() - timedelta(hours=2, minutes=30)
         ds = DataSource(
             name="中断数据源",
@@ -211,13 +185,9 @@ async def test_communication_status_interruption_duration():
         session.add(ds)
         await session.commit()
 
-    token = await _get_token()
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
-        resp = await client.get(
-            "/api/v1/datasources/communication-status",
-            headers={"Authorization": f"Bearer {token}"},
-        )
+        resp = await client.get("/api/v1/datasources/communication-status")
         assert resp.status_code == 200
         data = resp.json()
         assert len(data) == 1

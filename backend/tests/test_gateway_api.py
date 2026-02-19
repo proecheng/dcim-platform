@@ -4,7 +4,8 @@ import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-from app.core.database import Base, get_db
+from app.core.database import Base
+from app.api.deps import get_db
 from app.main import app
 
 
@@ -40,7 +41,7 @@ async def async_db():
 async def client(async_db):
     """创建测试 HTTP 客户端（跳过认证）"""
     # 覆盖认证依赖
-    from app.api.deps import require_viewer, require_operator, require_admin
+    from app.api.deps import require_viewer, require_operator, require_admin, get_current_user, get_user_site_ids
     from app.models.user import User
 
     mock_user = User(id=1, username="test_admin", role="admin", is_active=True)
@@ -48,6 +49,8 @@ async def client(async_db):
     app.dependency_overrides[require_viewer] = lambda: mock_user
     app.dependency_overrides[require_operator] = lambda: mock_user
     app.dependency_overrides[require_admin] = lambda: mock_user
+    app.dependency_overrides[get_current_user] = lambda: mock_user
+    app.dependency_overrides[get_user_site_ids] = lambda: None
 
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:

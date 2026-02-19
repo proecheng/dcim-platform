@@ -11,7 +11,7 @@ from app.core.database import Base
 from app.models.spatial import Site, Floor, Room, Row, LayoutTemplate
 from app.models.asset import Cabinet
 from app.models.user import User
-from app.api.deps import get_db, require_viewer, require_operator
+from app.api.deps import get_db, require_viewer, require_operator, get_current_user, get_user_site_ids, require_site_access
 
 
 # ============================================================
@@ -77,6 +77,9 @@ async def app(db_session, mock_user):
     _app.dependency_overrides[get_db] = override_get_db
     _app.dependency_overrides[require_viewer] = override_require_viewer
     _app.dependency_overrides[require_operator] = override_require_operator
+    _app.dependency_overrides[get_current_user] = lambda: mock_user
+    _app.dependency_overrides[get_user_site_ids] = lambda: None
+    _app.dependency_overrides[require_site_access] = lambda site_id: site_id
 
     yield _app
 
