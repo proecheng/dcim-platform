@@ -370,164 +370,6 @@ async def batch_acknowledge(
     return {"message": f"已确认 {actual_count} 条告警", "count": actual_count}
 
 
-@router.get("/{alarm_id}", response_model=AlarmInfo, summary="获取告警详情")
-async def get_alarm(
-    alarm_id: int,
-    db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_viewer)
-):
-    """
-    获取告警详情
-    """
-    result = await db.execute(select(Alarm).where(Alarm.id == alarm_id))
-    alarm = result.scalar_one_or_none()
-    if not alarm:
-        raise HTTPException(status_code=404, detail="告警不存在")
-
-    point_result = await db.execute(select(Point).where(Point.id == alarm.point_id))
-    point = point_result.scalar_one_or_none()
-
-    alarm_info = AlarmInfo.model_validate(alarm)
-    if point:
-        alarm_info.point_code = point.point_code
-        alarm_info.point_name = point.point_name
-
-    return alarm_info
-
-
-@router.put("/{alarm_id}/acknowledge", summary="确认告警")
-async def acknowledge_alarm(
-    alarm_id: int,
-    data: AlarmAcknowledge,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_operator)
-):
-    """
-    确认告警
-    """
-    result = await db.execute(select(Alarm).where(Alarm.id == alarm_id))
-    alarm = result.scalar_one_or_none()
-
-    if not alarm:
-        raise HTTPException(status_code=404, detail="告警不存在")
-
-    if alarm.status != "active":
-        raise HTTPException(status_code=400, detail="告警状态不允许确认")
-
-    now = datetime.now()
-    await db.execute(
-        update(Alarm).where(Alarm.id == alarm_id).values(
-            status="acknowledged",
-            acknowledged_by=current_user.id,
-            acknowledged_at=now,
-            ack_remark=data.remark
-        )
-    )
-    await db.commit()
-
-    # WebSocket 广播确认消息
-    await ws_manager.broadcast_alarm({
-        "id": alarm_id,
-        "status": "acknowledged",
-        "acknowledged_by": current_user.id,
-        "acknowledged_at": now.isoformat(),
-        "ack_remark": data.remark,
-        "action": "ack",
-    })
-
-    return {"message": "告警已确认"}
-
-
-@router.put("/{alarm_id}/resolve", summary="解决告警")
-async def resolve_alarm(
-    alarm_id: int,
-    data: AlarmResolve,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_operator)
-):
-    """
-    解决告警
-    """
-    result = await db.execute(select(Alarm).where(Alarm.id == alarm_id))
-    alarm = result.scalar_one_or_none()
-
-    if not alarm:
-        raise HTTPException(status_code=404, detail="告警不存在")
-
-    if alarm.status == "resolved":
-        raise HTTPException(status_code=400, detail="告警已解决")
-
-    now = datetime.now()
-    duration = max(0, int((now - alarm.created_at).total_seconds()))
-
-    await db.execute(
-        update(Alarm).where(Alarm.id == alarm_id).values(
-            status="resolved",
-            resolved_by=current_user.id,
-            resolved_at=now,
-            resolve_remark=data.remark,
-            resolve_type=data.resolve_type or "manual",
-            duration_seconds=duration
-        )
-    )
-    await db.commit()
-
-    # WebSocket 广播解决消息
-    await ws_manager.broadcast_alarm({
-        "id": alarm_id,
-        "status": "resolved",
-        "resolved_by": current_user.id,
-        "resolved_at": now.isoformat(),
-        "resolve_remark": data.remark,
-        "resolve_type": data.resolve_type or "manual",
-        "duration_seconds": duration,
-        "action": "resolve",
-    })
-
-    return {"message": "告警已解决"}
-
-
-@router.put("/{alarm_id}/process", summary="处理告警")
-async def process_alarm(
-    alarm_id: int,
-    data: AlarmProcess,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_operator)
-):
-    """
-    记录告警处理过程（不改变状态）
-    """
-    result = await db.execute(select(Alarm).where(Alarm.id == alarm_id))
-    alarm = result.scalar_one_or_none()
-
-    if not alarm:
-        raise HTTPException(status_code=404, detail="告警不存在")
-
-    if alarm.status not in ("active", "acknowledged"):
-        raise HTTPException(status_code=400, detail="告警状态不允许处理")
-
-    now = datetime.now()
-    await db.execute(
-        update(Alarm).where(Alarm.id == alarm_id).values(
-            process_remark=data.process_remark,
-            processed_by=current_user.id,
-            processed_at=now
-        )
-    )
-    await db.commit()
-
-    # WebSocket 广播处理消息
-    await ws_manager.broadcast_alarm({
-        "id": alarm_id,
-        "process_remark": data.process_remark,
-        "processed_by": current_user.id,
-        "processed_at": now.isoformat(),
-        "action": "update",
-    })
-
-    return {"message": "告警处理记录已保存"}
-
-
 # ============== 告警规则管理 ==============
 
 @router.get("/rules", response_model=PageResponse[AlarmRuleInfo], summary="获取告警规则列表")
@@ -797,3 +639,163 @@ async def delete_alarm_shield(
     await db.commit()
 
     return {"message": "告警屏蔽已删除"}
+
+
+# ============== 单条告警操作（路径参数路由放在最后，避免与 /rules /shields 等静态路径冲突） ==============
+
+@router.get("/{alarm_id}", response_model=AlarmInfo, summary="获取告警详情")
+async def get_alarm(
+    alarm_id: int,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_viewer)
+):
+    """
+    获取告警详情
+    """
+    result = await db.execute(select(Alarm).where(Alarm.id == alarm_id))
+    alarm = result.scalar_one_or_none()
+    if not alarm:
+        raise HTTPException(status_code=404, detail="告警不存在")
+
+    point_result = await db.execute(select(Point).where(Point.id == alarm.point_id))
+    point = point_result.scalar_one_or_none()
+
+    alarm_info = AlarmInfo.model_validate(alarm)
+    if point:
+        alarm_info.point_code = point.point_code
+        alarm_info.point_name = point.point_name
+
+    return alarm_info
+
+
+@router.put("/{alarm_id}/acknowledge", summary="确认告警")
+async def acknowledge_alarm(
+    alarm_id: int,
+    data: AlarmAcknowledge,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_operator)
+):
+    """
+    确认告警
+    """
+    result = await db.execute(select(Alarm).where(Alarm.id == alarm_id))
+    alarm = result.scalar_one_or_none()
+
+    if not alarm:
+        raise HTTPException(status_code=404, detail="告警不存在")
+
+    if alarm.status != "active":
+        raise HTTPException(status_code=400, detail="告警状态不允许确认")
+
+    now = datetime.now()
+    await db.execute(
+        update(Alarm).where(Alarm.id == alarm_id).values(
+            status="acknowledged",
+            acknowledged_by=current_user.id,
+            acknowledged_at=now,
+            ack_remark=data.remark
+        )
+    )
+    await db.commit()
+
+    # WebSocket 广播确认消息
+    await ws_manager.broadcast_alarm({
+        "id": alarm_id,
+        "status": "acknowledged",
+        "acknowledged_by": current_user.id,
+        "acknowledged_at": now.isoformat(),
+        "ack_remark": data.remark,
+        "action": "ack",
+    })
+
+    return {"message": "告警已确认"}
+
+
+@router.put("/{alarm_id}/resolve", summary="解决告警")
+async def resolve_alarm(
+    alarm_id: int,
+    data: AlarmResolve,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_operator)
+):
+    """
+    解决告警
+    """
+    result = await db.execute(select(Alarm).where(Alarm.id == alarm_id))
+    alarm = result.scalar_one_or_none()
+
+    if not alarm:
+        raise HTTPException(status_code=404, detail="告警不存在")
+
+    if alarm.status == "resolved":
+        raise HTTPException(status_code=400, detail="告警已解决")
+
+    now = datetime.now()
+    duration = max(0, int((now - alarm.created_at).total_seconds()))
+
+    await db.execute(
+        update(Alarm).where(Alarm.id == alarm_id).values(
+            status="resolved",
+            resolved_by=current_user.id,
+            resolved_at=now,
+            resolve_remark=data.remark,
+            resolve_type=data.resolve_type or "manual",
+            duration_seconds=duration
+        )
+    )
+    await db.commit()
+
+    # WebSocket 广播解决消息
+    await ws_manager.broadcast_alarm({
+        "id": alarm_id,
+        "status": "resolved",
+        "resolved_by": current_user.id,
+        "resolved_at": now.isoformat(),
+        "resolve_remark": data.remark,
+        "resolve_type": data.resolve_type or "manual",
+        "duration_seconds": duration,
+        "action": "resolve",
+    })
+
+    return {"message": "告警已解决"}
+
+
+@router.put("/{alarm_id}/process", summary="处理告警")
+async def process_alarm(
+    alarm_id: int,
+    data: AlarmProcess,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_operator)
+):
+    """
+    记录告警处理过程（不改变状态）
+    """
+    result = await db.execute(select(Alarm).where(Alarm.id == alarm_id))
+    alarm = result.scalar_one_or_none()
+
+    if not alarm:
+        raise HTTPException(status_code=404, detail="告警不存在")
+
+    if alarm.status not in ("active", "acknowledged"):
+        raise HTTPException(status_code=400, detail="告警状态不允许处理")
+
+    now = datetime.now()
+    await db.execute(
+        update(Alarm).where(Alarm.id == alarm_id).values(
+            process_remark=data.process_remark,
+            processed_by=current_user.id,
+            processed_at=now
+        )
+    )
+    await db.commit()
+
+    # WebSocket 广播处理消息
+    await ws_manager.broadcast_alarm({
+        "id": alarm_id,
+        "process_remark": data.process_remark,
+        "processed_by": current_user.id,
+        "processed_at": now.isoformat(),
+        "action": "update",
+    })
+
+    return {"message": "告警处理记录已保存"}

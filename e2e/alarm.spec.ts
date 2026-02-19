@@ -5,76 +5,8 @@ import { test, expect, type Page } from '@playwright/test'
  * 认证状态由 auth.setup.ts 注入，无需重复登录
  */
 
-/**
- * 拦截告警页面中存在 FastAPI 尾斜杠 307 重定向问题的 API。
- * 307 重定向会丢失 Authorization header → 401 → 前端清除 token → 跳转登录页。
- * 对 escalations / alarms/rules / alarms/shields 返回空数据，避免副作用。
- */
-async function interceptProblematicApis(page: Page) {
-  // escalations — 307 重定向导致 401
-  await page.route('**/api/v1/escalations?**', async (route) => {
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({ items: [], total: 0 })
-    })
-  })
-  await page.route('**/api/v1/escalations', async (route) => {
-    if (route.request().method() === 'GET') {
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({ items: [], total: 0 })
-      })
-    } else {
-      await route.continue()
-    }
-  })
-
-  // alarms/rules — 307 → 422
-  await page.route('**/api/v1/alarms/rules?**', async (route) => {
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({ items: [], total: 0 })
-    })
-  })
-  await page.route('**/api/v1/alarms/rules', async (route) => {
-    if (route.request().method() === 'GET') {
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({ items: [], total: 0 })
-      })
-    } else {
-      await route.continue()
-    }
-  })
-
-  // alarms/shields — 307 → 422
-  await page.route('**/api/v1/alarms/shields?**', async (route) => {
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({ items: [], total: 0 })
-    })
-  })
-  await page.route('**/api/v1/alarms/shields', async (route) => {
-    if (route.request().method() === 'GET') {
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({ items: [], total: 0 })
-      })
-    } else {
-      await route.continue()
-    }
-  })
-}
-
-/** 导航到告警页并确认已登录 */
+/** 导航到告警页 */
 async function gotoAlarms(page: Page) {
-  await interceptProblematicApis(page)
   await page.goto('/alarms')
   await page.waitForLoadState('networkidle')
   await page.waitForTimeout(1000)

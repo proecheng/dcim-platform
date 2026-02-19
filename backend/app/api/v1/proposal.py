@@ -646,7 +646,7 @@ async def get_proposal(
 
 # ==================== 3. 获取方案列表 ====================
 
-@router.get("/", summary="获取方案列表")
+@router.get("", summary="获取方案列表")
 async def get_proposals(
     template_id: Optional[str] = None,
     status: Optional[str] = None,

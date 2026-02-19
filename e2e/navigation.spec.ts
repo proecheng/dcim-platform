@@ -33,20 +33,6 @@ test.describe('全局导航测试', () => {
   })
 
   test('导航到主要页面 - 告警管理', async ({ page }) => {
-    // Mock 存在 307 尾斜杠重定向问题的 API，避免 401 清除 token
-    for (const path of ['escalations', 'alarms/rules', 'alarms/shields']) {
-      await page.route(`**/api/v1/${path}?**`, async (route) => {
-        await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ items: [], total: 0 }) })
-      })
-      await page.route(`**/api/v1/${path}`, async (route) => {
-        if (route.request().method() === 'GET') {
-          await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ items: [], total: 0 }) })
-        } else {
-          await route.continue()
-        }
-      })
-    }
-
     await page.goto('/alarms')
     await page.waitForLoadState('networkidle')
 

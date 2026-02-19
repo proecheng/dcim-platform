@@ -14,7 +14,7 @@ from ...schemas.alarm import (
 router = APIRouter()
 
 
-@router.get("/", summary="获取升级规则列表")
+@router.get("", summary="获取升级规则列表")
 async def list_escalations(
     source_level: Optional[str] = Query(None, description="源告警级别"),
     is_enabled: Optional[bool] = Query(None, description="是否启用"),
@@ -47,7 +47,7 @@ async def list_escalations(
     }
 
 
-@router.post("/", summary="创建升级规则")
+@router.post("", summary="创建升级规则")
 async def create_escalation(
     data: AlarmEscalationCreate,
     db: AsyncSession = Depends(get_db),
