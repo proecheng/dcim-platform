@@ -151,17 +151,17 @@ development_status:
   epic-14-retrospective: done
 
   # Epic 15: 协议扩展 (Phase 1.5 + Phase 2)
-  epic-15: in-progress
+  epic-15: done
   15-1-mqtt-device-adapter: done
   15-2-http-rest-adapter: done
   15-3-bacnet-ip-adapter: done
-  15-4-opc-ua-adapter: backlog
-  15-5-ota-gateway-upgrade: backlog
+  15-4-opc-ua-adapter: done
+  15-5-ota-gateway-upgrade: done
   epic-15-retrospective: optional
 
   # Epic 16: 多站点集中管理 (推广阶段)
-  epic-16: backlog
-  16-1-site-management: backlog
-  16-2-site-switching-and-unified-view: backlog
+  epic-16: in-progress
+  16-1-site-management: done
+  16-2-site-switching-and-unified-view: in-progress
   16-3-multi-site-gateway-access: backlog
   epic-16-retrospective: optional

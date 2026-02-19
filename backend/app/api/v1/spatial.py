@@ -23,8 +23,10 @@ from ...models.spatial import Site, Floor, Room, Row, LayoutTemplate
 from ...models.asset import Cabinet
 from ...models.gateway import Gateway, DataSource, MqttAclRule
 from ...models.device import Device
+from ...models.alarm import Alarm
+from ...models.point import Point
 from ...schemas.spatial import (
-    SiteCreate, SiteUpdate, SiteResponse,
+    SiteCreate, SiteUpdate, SiteResponse, SiteSummaryResponse, SiteSummaryItem,
     FloorCreate, FloorUpdate, FloorResponse,
     RoomCreate, RoomUpdate, RoomResponse,
     RowCreate, RowUpdate, RowResponse,
@@ -144,6 +146,84 @@ async def list_sites(
         resp.device_count = dev_counts.get(s.id, 0)
         items.append(resp)
     return items
+
+
+@router.get("/sites/summary", response_model=SiteSummaryResponse)
+async def get_sites_summary(
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_viewer),
+    site_ids: Optional[List[int]] = Depends(get_user_site_ids),
+):
+    """跨站点汇总数据（非admin仅返回授权站点）"""
+    stmt = select(Site)
+    if site_ids is not None:
+        stmt = stmt.where(Site.id.in_(site_ids))
+    result = await db.execute(stmt)
+    sites = result.scalars().all()
+
+    all_site_ids = [s.id for s in sites]
+    gw_counts: dict = {}
+    dev_counts: dict = {}
+    alarm_counts: dict = {}
+
+    if all_site_ids:
+        # 网关统计
+        gw_result = await db.execute(
+            select(Gateway.site_id, func.count(Gateway.id))
+            .where(Gateway.site_id.in_(all_site_ids))
+            .group_by(Gateway.site_id)
+        )
+        gw_counts = dict(gw_result.all())
+
+        # 设备统计
+        dev_result = await db.execute(
+            select(Device.site_id, func.count(Device.id))
+            .where(Device.site_id.in_(all_site_ids))
+            .group_by(Device.site_id)
+        )
+        dev_counts = dict(dev_result.all())
+
+        # 活跃告警统计 (通过 Alarm → Point → Device 关联到 site_id)
+        alarm_result = await db.execute(
+            select(Device.site_id, func.count(Alarm.id))
+            .join(Point, Alarm.point_id == Point.id)
+            .join(Device, Point.device_id == Device.id)
+            .where(
+                Device.site_id.in_(all_site_ids),
+                Alarm.status.in_(["active", "acknowledged"]),
+            )
+            .group_by(Device.site_id)
+        )
+        alarm_counts = dict(alarm_result.all())
+
+    items = []
+    total_gw = 0
+    total_dev = 0
+    total_alarm = 0
+    for s in sites:
+        gw = gw_counts.get(s.id, 0)
+        dev = dev_counts.get(s.id, 0)
+        alm = alarm_counts.get(s.id, 0)
+        total_gw += gw
+        total_dev += dev
+        total_alarm += alm
+        items.append(SiteSummaryItem(
+            id=s.id,
+            site_code=s.site_code,
+            site_name=s.site_name,
+            status=s.status or "active",
+            gateway_count=gw,
+            device_count=dev,
+            active_alarm_count=alm,
+        ))
+
+    return SiteSummaryResponse(
+        total_sites=len(sites),
+        total_gateways=total_gw,
+        total_devices=total_dev,
+        total_alarms=total_alarm,
+        sites=items,
+    )
 
 
 @router.post("/sites", response_model=SiteResponse)

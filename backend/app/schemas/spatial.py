@@ -53,6 +53,26 @@ class SiteResponse(BaseModel):
         from_attributes = True
 
 
+class SiteSummaryItem(BaseModel):
+    """站点汇总项"""
+    id: int = Field(..., description="站点ID")
+    site_code: str = Field(..., description="站点编码")
+    site_name: str = Field(..., description="站点名称")
+    status: str = Field("active", description="状态")
+    gateway_count: int = Field(0, description="网关数量")
+    device_count: int = Field(0, description="设备数量")
+    active_alarm_count: int = Field(0, description="活跃告警数")
+
+
+class SiteSummaryResponse(BaseModel):
+    """跨站点汇总响应"""
+    total_sites: int = Field(0, description="站点总数")
+    total_gateways: int = Field(0, description="网关总数")
+    total_devices: int = Field(0, description="设备总数")
+    total_alarms: int = Field(0, description="活跃告警总数")
+    sites: List[SiteSummaryItem] = Field(default_factory=list, description="各站点摘要")
+
+
 # ==================== Floor Schemas ====================
 
 class FloorCreate(BaseModel):

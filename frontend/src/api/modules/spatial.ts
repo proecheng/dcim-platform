@@ -12,7 +12,14 @@ export interface Site {
   site_code: string
   site_name: string
   address?: string
+  contact_person?: string
+  contact_phone?: string
+  contact_email?: string
+  network_config?: Record<string, any>
+  status: string
   description?: string
+  gateway_count: number
+  device_count: number
   created_at: string
   updated_at: string
 }
@@ -160,6 +167,26 @@ export interface TemplateApplyResult {
   errors: string[]
 }
 
+/** 站点汇总项 */
+export interface SiteSummaryItem {
+  id: number
+  site_code: string
+  site_name: string
+  status: string
+  gateway_count: number
+  device_count: number
+  active_alarm_count: number
+}
+
+/** 跨站点汇总响应 */
+export interface SiteSummaryResponse {
+  total_sites: number
+  total_gateways: number
+  total_devices: number
+  total_alarms: number
+  sites: SiteSummaryItem[]
+}
+
 // ==================== 站点 API ====================
 
 /** 获取站点列表 */
@@ -288,4 +315,9 @@ export function getTemplates() {
 /** 应用布局模板 */
 export function applyTemplate(templateId: number, data: { room_id: number }) {
   return request.post<ResponseModel<TemplateApplyResult>>(`/v1/spatial/templates/${templateId}/apply`, data)
+}
+
+/** 获取跨站点汇总 */
+export function getSiteSummary() {
+  return request.get<SiteSummaryResponse>('/v1/spatial/sites/summary')
 }

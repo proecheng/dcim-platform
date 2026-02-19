@@ -231,6 +231,9 @@
         </div>
 
         <div class="header-right">
+          <!-- 站点切换 -->
+          <SiteSwitcher />
+
           <!-- 告警声音开关 -->
           <AlarmSoundToggle />
 
@@ -260,13 +263,14 @@
       <el-main class="main">
         <DegradationBanner />
         <router-view />
+        <VideoPopup ref="videoPopupRef" />
       </el-main>
     </el-container>
   </el-container>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, provide } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import {
   Monitor, Cpu, Bell, TrendCharts, Setting, Document,
@@ -281,6 +285,8 @@ import { useUserStore, useAlarmStore } from '@/stores'
 import { getAlarmCount } from '@/api/alarm'
 import DegradationBanner from '@/components/common/DegradationBanner.vue'
 import AlarmSoundToggle from '@/components/common/AlarmSoundToggle.vue'
+import VideoPopup from '@/components/video/VideoPopup.vue'
+import SiteSwitcher from '@/components/common/SiteSwitcher.vue'
 import { useDataQuality } from '@/composables/useDataQuality'
 
 useDataQuality()
@@ -290,6 +296,10 @@ const route = useRoute()
 const userStore = useUserStore()
 const alarmStore = useAlarmStore()
 const isCollapse = ref(false)
+const videoPopupRef = ref<InstanceType<typeof VideoPopup>>()
+
+// 提供视频弹窗引用给子组件
+provide('videoPopup', videoPopupRef)
 
 // 当前激活的菜单项
 const activeMenu = computed(() => route.path)

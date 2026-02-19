@@ -710,3 +710,65 @@ class TestEmqxAclService:
             site.id, f"gw-ACL-CHK-001", f"dcim/{site.id}/gw/001/data", "publish", async_db
         )
         assert allowed is True
+
+
+class TestSiteSummary:
+    """跨站点汇总 API 测试"""
+
+    @pytest.mark.asyncio
+    async def test_summary_empty(self, client, admin_user):
+        """无站点时汇总返回零值"""
+        _, token = admin_user
+        resp = await client.get("/api/v1/spatial/sites/summary", headers=auth_headers(token))
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["total_sites"] == 0
+        assert data["total_gateways"] == 0
+        assert data["total_devices"] == 0
+        assert data["total_alarms"] == 0
+        assert data["sites"] == []
+
+    @pytest.mark.asyncio
+    async def test_summary_with_sites(self, client, admin_user, async_db):
+        """有站点时汇总包含统计数据"""
+        _, token = admin_user
+        site1 = await create_site(client, token, site_code="SUM-S1", site_name="汇总站点1")
+        site2 = await create_site(client, token, site_code="SUM-S2", site_name="汇总站点2")
+
+        await create_gateway_for_site(async_db, site1["id"], "gw-sum-s1-001")
+        await create_gateway_for_site(async_db, site2["id"], "gw-sum-s2-001")
+        await create_gateway_for_site(async_db, site2["id"], "gw-sum-s2-002")
+        await create_device_for_site(async_db, site1["id"], "设备-sum-1")
+
+        resp = await client.get("/api/v1/spatial/sites/summary", headers=auth_headers(token))
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["total_sites"] >= 2
+        assert data["total_gateways"] >= 3
+        assert data["total_devices"] >= 1
+        # 验证各站点摘要
+        site_map = {s["site_code"]: s for s in data["sites"]}
+        assert site_map["SUM-S1"]["gateway_count"] == 1
+        assert site_map["SUM-S2"]["gateway_count"] == 2
+
+    @pytest.mark.asyncio
+    async def test_summary_viewer_filtered(self, client, viewer_user, admin_user, async_db):
+        """viewer 只能看到授权站点的汇总"""
+        _, admin_token = admin_user
+        viewer, viewer_token = viewer_user
+
+        site1 = await create_site(client, admin_token, site_code="SUMV-S1", site_name="汇总V站点1")
+        site2 = await create_site(client, admin_token, site_code="SUMV-S2", site_name="汇总V站点2")
+
+        # 给 viewer 分配站点1权限
+        from app.models.user import UserSite
+        us = UserSite(user_id=viewer.id, site_id=site1["id"])
+        async_db.add(us)
+        await async_db.flush()
+
+        resp = await client.get("/api/v1/spatial/sites/summary", headers=auth_headers(viewer_token))
+        assert resp.status_code == 200
+        data = resp.json()
+        site_codes = [s["site_code"] for s in data["sites"]]
+        assert "SUMV-S1" in site_codes
+        assert "SUMV-S2" not in site_codes
