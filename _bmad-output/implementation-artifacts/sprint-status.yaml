@@ -160,8 +160,8 @@ development_status:
   epic-15-retrospective: optional
 
   # Epic 16: 多站点集中管理 (推广阶段)
-  epic-16: in-progress
+  epic-16: done
   16-1-site-management: done
-  16-2-site-switching-and-unified-view: in-progress
-  16-3-multi-site-gateway-access: backlog
+  16-2-site-switching-and-unified-view: done
+  16-3-multi-site-gateway-access: done
   epic-16-retrospective: optional
