@@ -60,10 +60,22 @@ async def async_db():
 async def client(async_db):
     """创建测试 HTTP 客户端（跳过认证）"""
     from app.api.deps import require_viewer, require_operator, require_admin
+    from app.api.deps import get_db as deps_get_db
     from app.models.user import User
 
     mock_user = User(id=1, username="test_admin", role="admin", is_active=True)
 
+    async def override_get_db():
+        async with async_db() as session:
+            try:
+                yield session
+                await session.commit()
+            except Exception:
+                await session.rollback()
+                raise
+
+    app.dependency_overrides[get_db] = override_get_db
+    app.dependency_overrides[deps_get_db] = override_get_db
     app.dependency_overrides[require_viewer] = lambda: mock_user
     app.dependency_overrides[require_operator] = lambda: mock_user
     app.dependency_overrides[require_admin] = lambda: mock_user
