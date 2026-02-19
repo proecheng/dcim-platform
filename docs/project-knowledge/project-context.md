@@ -1,7 +1,7 @@
 # Project Context - 算力中心智能监控系统 (DCIM)
 
 > LLM-optimized context for AI-assisted development
-> Generated: 2026-02-03
+> Generated: 2026-02-03 | Updated: 2026-02-17
 
 ## System Identity
 
@@ -218,6 +218,49 @@ Interface: `AnalysisPlugin.analyze(context: AnalysisContext) -> List[SuggestionR
 
 Unified via `MLEnergySavingService` in `services/ml_service.py`.
 
+## Critical Implementation Rules
+
+### 依赖版本锁定（必须遵守）
+
+- **bcrypt 必须锁定 4.0.1** — `bcrypt>=5.0` 与 `passlib 1.7.4` 不兼容，会导致登录 500 错误
+- **不要升级 passlib** — 当前 `passlib[bcrypt]==1.7.4` 是最后稳定版本
+- **torch 是可选依赖** — 不要在非 ML 功能中引入 torch/numpy 依赖
+
+### TypeScript 配置（前端）
+
+- `strict: false` — 项目未启用严格模式，不要添加严格类型检查
+- 无 ESLint/Prettier — 项目未配置代码检查工具，遵循现有代码风格即可
+- `target: ES2020`, `module: ESNext`, `moduleResolution: bundler`
+- `skipLibCheck: true` — 跳过第三方库类型检查
+- `noUnusedLocals: false`, `noUnusedParameters: false` — 允许未使用变量
+
+### 前端构建注意事项
+
+- `start.bat` 使用 proxy + 静态文件模式，**不会自动热更新前端代码**
+- 修改前端代码后必须 `cd frontend && npm run build` 然后强制刷新浏览器
+- 开发时推荐使用 `npm run dev`（Vite 开发服务器，端口 5173，自动热更新）
+- Vite `allowedHosts` 包含 `powerlab.cn`（生产域名）
+
+### 测试规则
+
+- 后端测试：`pytest`，配置 `asyncio_mode = auto`（自动异步测试）
+- `pythonpath = . ..` — 测试可以从项目根目录和上级目录导入
+- 测试文件位于 `backend/tests/`，按 `api/` 和 `services/` 分组
+- 前端无测试框架配置
+
+### 安全规则（不可忽略）
+
+- `SECRET_KEY` 使用 `secrets.token_urlsafe(64)` 自动生成，生产环境必须通过环境变量设置
+- 开发环境 token 过期时间 480 分钟（8小时），生产环境应改为 30 分钟
+- CORS 仅允许 `localhost:5173` 和 `localhost:3000`
+- WebSocket 认证通过 query parameter 传递 JWT，不是 header
+
+### 端口管理
+
+- 启动前必须检查端口占用：`netstat -ano | findstr ":8080"` 和 `:3000`
+- 如果端口被占用，先 `taskkill /F /PID <pid>` 清理
+- 启动顺序：先后端(8080) → 等待就绪 → 再代理(3000)
+
 ## Conventions
 
 - **Language**: All code comments, commit messages, documentation in Chinese
@@ -266,3 +309,57 @@ Default login: `admin` / `admin123`
 - `optimization.py` route disabled (needs numpy install): day-ahead dispatch optimization
 - ML routes conditional (needs torch install)
 - Production: change `debug=False`, `access_token_expire_minutes=30`, set `SECRET_KEY` env var
+
+## Critical Don't-Miss Rules
+
+### 反模式（AI 代理必须避免）
+
+- **不要升级 bcrypt 到 5.x** — 会破坏登录功能
+- **不要在前端手动 import Vue/Pinia API** — 已配置自动导入，重复导入会报错
+- **不要使用 `datetime.utcnow()`** — 已在代码中使用但 Python 3.12+ 已弃用，新代码应使用 `datetime.now(timezone.utc)`
+- **不要在非 ML 路由中 import torch** — 必须使用 try/except 条件导入
+- **不要硬编码数据库 URL** — 必须通过 `get_settings()` 获取
+- **不要在路由函数中直接创建 DB session** — 必须通过 `Depends(get_db)` 注入
+- **不要忘记 `await`** — 所有数据库操作都是异步的
+- **不要在 `start.bat` 模式下期望前端热更新** — 必须手动 build
+
+### 边界情况
+
+- 模拟器每 5 秒生成数据，高频写入 `point_history` 表，注意性能
+- `max_points=100` 限制了监控点位数量，超出需要修改 license 配置
+- Element Plus 组件自动导入，但图标需要手动从 `@element-plus/icons-vue` 导入
+- Three.js 3D 场景在 `/bigscreen` 路由，不需要认证
+
+---
+
+## 项目文档参考
+
+完整项目文档位于 `docs/` 目录：
+
+| 文档 | 路径 | 内容 |
+|------|------|------|
+| 文档索引 | `docs/index.md` | 所有文档的入口 |
+| 前端架构 | `docs/architecture-frontend.md` | Vue 3 前端架构详解 |
+| 后端架构 | `docs/architecture-backend.md` | FastAPI 后端架构详解 |
+| API 契约 | `docs/api-contracts-backend.md` | 47 个 API 模块端点清单 |
+| 数据模型 | `docs/data-models-backend.md` | 100+ 模型类详解 |
+| 组件清单 | `docs/component-inventory-frontend.md` | 74 组件 + 8 Store + 60 页面 |
+| 集成架构 | `docs/integration-architecture.md` | 前端→代理→后端通信 |
+| 开发指南 | `docs/development-guide.md` | 环境搭建和常用命令 |
+
+---
+
+## Usage Guidelines
+
+**For AI Agents:**
+- 实现代码前必须阅读本文件
+- 严格遵守所有规则，尤其是依赖版本锁定和反模式
+- 不确定时选择更保守的方案
+- 发现新模式时更新本文件
+
+**For Humans:**
+- 保持本文件精简，聚焦于 AI 代理需要的信息
+- 技术栈变更时及时更新
+- 定期审查，移除过时规则
+
+Last Updated: 2026-02-17
