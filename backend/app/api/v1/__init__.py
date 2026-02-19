@@ -44,6 +44,11 @@ from .escalation import router as escalation_router
 from .spatial import router as spatial_router
 from .topology_config import router as topology_config_router
 from .linkage import router as linkage_router
+from .diagnosis import router as diagnosis_router
+from .command import router as command_router
+from .drift import router as drift_router
+from .video import router as video_router
+from .ota import router as ota_router
 
 # 深度学习节能优化模块 (需要安装 torch)
 try:
@@ -95,6 +100,11 @@ api_router.include_router(escalation_router, prefix="/escalations", tags=["告�
 api_router.include_router(spatial_router)
 api_router.include_router(topology_config_router, prefix="/topology-config", tags=["拓扑配置"])
 api_router.include_router(linkage_router, prefix="/linkage", tags=["联动管理"])
+api_router.include_router(diagnosis_router, prefix="/diagnosis", tags=["智能诊断"])
+api_router.include_router(command_router, prefix="/command", tags=["控制命令"])
+api_router.include_router(drift_router, prefix="/drift", tags=["漂移检测"])
+api_router.include_router(video_router, prefix="/video", tags=["视频监控"])
+api_router.include_router(ota_router, prefix="/ota", tags=["OTA升级"])
 
 # 深度学习节能优化API
 if _ml_available:

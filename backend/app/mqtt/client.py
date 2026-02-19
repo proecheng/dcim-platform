@@ -100,6 +100,8 @@ class MqttService:
                     logger.info("已订阅: dcim/+/gw/+/status")
                     await client.subscribe("dcim/+/gw/+/data", qos=1)
                     logger.info("已订阅: dcim/+/gw/+/data")
+                    await client.subscribe("dcim/+/gw/+/ota/status", qos=1)
+                    logger.info("已订阅: dcim/+/gw/+/ota/status")
 
                     # 订阅已注册的动态 topic
                     for topic_pattern, qos in list(self._pending_subscriptions):
@@ -147,7 +149,13 @@ class MqttService:
         try:
             payload = json.loads(message.payload.decode())
             parts = topic.split("/")
-            if len(parts) == 5 and parts[0] == "dcim":
+            # OTA 状态上报: dcim/{site_id}/gw/{gw_id}/ota/status (6段)
+            if len(parts) == 6 and parts[0] == "dcim" and parts[4] == "ota" and parts[5] == "status":
+                from ..services.ota_service import ota_service
+                async with async_session() as db:
+                    await ota_service.handle_ota_status(payload, db)
+            # 原有网关消息: dcim/{site_id}/gw/{gw_id}/{type} (5段)
+            elif len(parts) == 5 and parts[0] == "dcim":
                 msg_type = parts[4]
                 if msg_type == "status":
                     async with async_session() as db:

@@ -111,6 +111,64 @@ class PointDataLatest(Base):
     updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now, comment="更新时间")
 
 
+class FirmwarePackage(Base):
+    """固件包"""
+    __tablename__ = "firmware_packages"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    version = Column(String(50), unique=True, nullable=False, comment="版本号 (semver)")
+    filename = Column(String(200), nullable=False, comment="文件名")
+    file_size = Column(Integer, nullable=False, comment="文件大小(字节)")
+    checksum_sha256 = Column(String(64), nullable=False, comment="SHA-256 校验和")
+    download_url = Column(String(500), nullable=False, comment="下载地址")
+    release_notes = Column(String(2000), comment="更新说明")
+    min_version = Column(String(50), comment="最低兼容版本")
+    is_active = Column(Boolean, default=True, comment="是否可用")
+    created_at = Column(DateTime, default=datetime.now, comment="创建时间")
+
+
+class OtaTask(Base):
+    """OTA 升级任务"""
+    __tablename__ = "ota_tasks"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    task_id = Column(String(50), unique=True, nullable=False, comment="任务唯一标识(UUID)")
+    firmware_id = Column(Integer, nullable=False, comment="目标固件包 ID")
+    target_version = Column(String(50), nullable=False, comment="目标版本")
+    strategy = Column(String(20), default="immediate", comment="策略: immediate/batch/canary")
+    batch_size = Column(Integer, default=0, comment="分批大小(0=全部)")
+    batch_interval = Column(Integer, default=300, comment="批次间隔(秒)")
+    canary_percent = Column(Integer, default=10, comment="灰度百分比")
+    status = Column(String(20), default="pending", comment="pending/running/paused/completed/failed/cancelled")
+    total_gateways = Column(Integer, default=0, comment="总网关数")
+    success_count = Column(Integer, default=0, comment="成功数")
+    fail_count = Column(Integer, default=0, comment="失败数")
+    created_by = Column(String(50), comment="创建人")
+    created_at = Column(DateTime, default=datetime.now, comment="创建时间")
+    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now, comment="更新时间")
+
+
+class OtaTaskGateway(Base):
+    """OTA 任务-网关关联（每个网关的升级状态）"""
+    __tablename__ = "ota_task_gateways"
+    __table_args__ = (
+        UniqueConstraint("task_id", "gateway_id", name="uq_ota_task_gateway"),
+    )
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    task_id = Column(String(50), nullable=False, index=True, comment="任务 ID")
+    gateway_id = Column(String(50), nullable=False, index=True, comment="网关标识")
+    batch_index = Column(Integer, default=0, comment="所属批次")
+    status = Column(String(20), default="pending", comment="pending/downloading/installing/verifying/success/failed/rollback")
+    old_version = Column(String(50), comment="升级前版本")
+    progress = Column(Integer, default=0, comment="进度百分比 0-100")
+    error_message = Column(String(500), comment="错误信息")
+    started_at = Column(DateTime, comment="开始时间")
+    completed_at = Column(DateTime, comment="完成时间")
+    created_at = Column(DateTime, default=datetime.now, comment="创建时间")
+    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now, comment="更新时间")
+
+
 class DeviceTemplate(Base):
     """设备模板 — 预置点位配置"""
     __tablename__ = "device_templates"
