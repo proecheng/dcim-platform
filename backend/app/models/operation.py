@@ -15,6 +15,7 @@ class WorkOrderStatus(str, PyEnum):
     """工单状态枚举"""
     pending = "待处理"
     assigned = "已派单"
+    accepted = "已接单"
     processing = "处理中"
     completed = "已完成"
     closed = "已关闭"
@@ -36,6 +37,15 @@ class WorkOrderPriority(str, PyEnum):
     high = "高"
     medium = "中"
     low = "低"
+
+
+class ApprovalStatus(str, PyEnum):
+    """审批状态枚举"""
+    pending = "待审批"
+    approved = "已批准"
+    rejected = "已驳回"
+    timeout = "已超时"
+    escalated = "已升级"
 
 
 class InspectionStatus(str, PyEnum):
@@ -61,12 +71,15 @@ class WorkOrder(Base):
     status = Column(Enum(WorkOrderStatus), default=WorkOrderStatus.pending, comment="工单状态")
     device_id = Column(Integer, comment="关联设备ID")
     device_name = Column(String(100), comment="设备名称")
+    area_code = Column(String(50), nullable=True, comment="关联区域编码")
+    alarm_id = Column(Integer, nullable=True, comment="关联告警ID")
     location = Column(String(200), comment="位置")
     reporter = Column(String(100), comment="报修人")
     reporter_phone = Column(String(50), comment="报修人电话")
     assignee = Column(String(100), comment="处理人")
     created_at = Column(DateTime, default=datetime.now, comment="创建时间")
     assigned_at = Column(DateTime, comment="派单时间")
+    accepted_at = Column(DateTime, comment="接单时间")
     started_at = Column(DateTime, comment="开始处理时间")
     completed_at = Column(DateTime, comment="完成时间")
     closed_at = Column(DateTime, comment="关闭时间")
@@ -154,3 +167,38 @@ class KnowledgeBase(Base):
     author = Column(String(100), comment="作者")
     created_at = Column(DateTime, default=datetime.now, comment="创建时间")
     updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now, comment="更新时间")
+
+
+# ==================== 告警工单规则模型 ====================
+
+class AlarmWorkOrderRule(Base):
+    """告警自动创建工单规则表"""
+    __tablename__ = "alarm_workorder_rules"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    name = Column(String(100), nullable=False, comment="规则名称")
+    alarm_level = Column(String(20), nullable=False, comment="告警级别(critical/important)")
+    alarm_type = Column(String(20), comment="告警类型过滤(threshold/communication/system, 空=全部)")
+    order_type = Column(Enum(WorkOrderType), default=WorkOrderType.fault, comment="工单类型")
+    priority = Column(Enum(WorkOrderPriority), default=WorkOrderPriority.high, comment="工单优先级")
+    assignee = Column(String(100), comment="自动派单人")
+    is_enabled = Column(Boolean, default=True, comment="是否启用")
+    created_at = Column(DateTime, default=datetime.now, comment="创建时间")
+    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now, comment="更新时间")
+
+
+# ==================== 工单审批模型 ====================
+
+class WorkOrderApproval(Base):
+    """工单审批表"""
+    __tablename__ = "work_order_approvals"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    order_id = Column(Integer, ForeignKey("work_orders.id"), nullable=False, comment="工单ID")
+    approver = Column(String(100), nullable=False, comment="审批人")
+    status = Column(Enum(ApprovalStatus), default=ApprovalStatus.pending, comment="审批状态")
+    reason = Column(Text, comment="审批意见/驳回原因")
+    timeout_hours = Column(Integer, default=24, comment="超时时间(小时)")
+    escalate_to = Column(String(100), comment="超时升级审批人")
+    created_at = Column(DateTime, default=datetime.now, comment="创建时间")
+    resolved_at = Column(DateTime, comment="审批完成时间")

@@ -288,6 +288,7 @@ class DataSimulator:
                             "point_id": alarm.point_id,
                             "trigger_value": alarm.trigger_value,
                             "threshold_value": alarm.threshold_value,
+                            "threshold_type": triggered.threshold_type if triggered else "",
                             "device_type": point.device_type if point.device_type is not None else "",
                             "zone": point.area_code if point.area_code is not None else "default",
                         },

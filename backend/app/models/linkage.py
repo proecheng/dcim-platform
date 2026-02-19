@@ -76,3 +76,39 @@ class LinkageLog(Base):
     started_at = Column(DateTime, comment="开始时间")
     completed_at = Column(DateTime, nullable=True, comment="完成时间")
     duration_ms = Column(Integer, nullable=True, comment="耗时(毫秒)")
+
+
+class LinkageRecovery(Base):
+    """联动恢复记录表 — Story 9-4"""
+    __tablename__ = "linkage_recoveries"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    execution_id = Column(Integer, ForeignKey("linkage_executions.id"), nullable=False, comment="关联执行记录ID")
+    operator = Column(String(50), nullable=False, comment="操作人")
+    mode = Column(String(20), default="auto", comment="恢复模式: auto(一键)/manual(逐项)")
+    status = Column(String(20), default="executing", comment="状态: executing/completed/partial_recovery/failed")
+    started_at = Column(DateTime, default=datetime.now, comment="开始时间")
+    completed_at = Column(DateTime, nullable=True, comment="完成时间")
+    total_duration_ms = Column(Integer, nullable=True, comment="总耗时(毫秒)")
+
+    # 关系
+    logs = relationship("LinkageRecoveryLog", backref="recovery", lazy="selectin",
+                        cascade="all, delete-orphan")
+
+
+class LinkageRecoveryLog(Base):
+    """联动恢复步骤日志表 — Story 9-4"""
+    __tablename__ = "linkage_recovery_logs"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    recovery_id = Column(Integer, ForeignKey("linkage_recoveries.id"), nullable=False, comment="恢复记录ID")
+    step_order = Column(Integer, default=0, comment="恢复步骤顺序")
+    action_type = Column(String(50), comment="动作类型")
+    target_type = Column(String(50), comment="目标设备类型")
+    recovery_command = Column(String(50), comment="恢复命令")
+    action_config = Column(JSON, comment="恢复动作配置")
+    status = Column(String(20), default="pending", comment="状态: pending/executing/success/failed/skipped")
+    error_message = Column(Text, nullable=True, comment="错误信息")
+    started_at = Column(DateTime, nullable=True, comment="开始时间")
+    completed_at = Column(DateTime, nullable=True, comment="完成时间")
+    duration_ms = Column(Integer, nullable=True, comment="耗时(毫秒)")

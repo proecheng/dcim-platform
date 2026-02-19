@@ -1,0 +1,525 @@
+# 智能故障诊断规则 — Story 9-3
+# 覆盖 Top 20 高频数据中心故障场景
+# category 使用英文枚举: temperature/humidity/power/communication/security/cooling/environment/composite
+# device_type 使用系统枚举: TH/UPS/PDU/AC/DOOR/SMOKE/WATER/IR/FAN/LIGHT, ["*"] 表示通配
+
+rules:
+  # ==================== 温度类 (temperature) ====================
+  - rule_code: TEMP_HIGH_01
+    name: 温度过高
+    description: 机房温度超过告警阈值，可能由空调故障、负载过高或气流问题导致
+    category: temperature
+    trigger_condition:
+      alarm_type: [threshold]
+      device_type: [TH]
+      threshold_type: [high, high_high]
+    diagnosis_logic:
+      possible_causes:
+        - cause: 精密空调故障或停机
+          base_confidence: 70
+          suggested_actions:
+            - 检查空调运行状态和故障代码
+            - 确认空调送风温度是否正常
+            - 检查空调制冷剂压力
+          history_check:
+            time_window_hours: 24
+            min_occurrences: 3
+            confidence_boost: 15
+        - cause: IT负载突增导致发热量超出制冷能力
+          base_confidence: 50
+          suggested_actions:
+            - 检查机柜功率是否超出额定值
+            - 查看近期是否有新设备上架
+        - cause: 气流短路或冷热通道隔离失效
+          base_confidence: 40
+          suggested_actions:
+            - 检查冷热通道封闭是否完好
+            - 确认盲板是否安装到位
+        - cause: 温度传感器漂移或安装位置不当
+          base_confidence: 20
+          suggested_actions:
+            - 与相邻传感器数据交叉对比
+            - 使用手持温度计现场校验
+    priority: 10
+
+  - rule_code: TEMP_STORAGE_01
+    name: 存储区温度异常
+    description: 存储设备区域温度异常，可能影响硬盘寿命和数据安全
+    category: temperature
+    trigger_condition:
+      alarm_type: [threshold]
+      device_type: [TH]
+      threshold_type: [high, high_high, low, low_low]
+    diagnosis_logic:
+      possible_causes:
+        - cause: 存储区域制冷不足
+          base_confidence: 60
+          suggested_actions:
+            - 检查存储区域空调出风口是否被遮挡
+            - 确认存储机柜散热风扇运行状态
+        - cause: 存储设备负载过高导致发热
+          base_confidence: 45
+          suggested_actions:
+            - 检查存储设备IO负载和CPU使用率
+            - 确认是否有大规模数据迁移任务
+    priority: 8
+
+  # ==================== 湿度类 (humidity) ====================
+  - rule_code: HUMID_ABNORMAL_01
+    name: 湿度异常
+    description: 机房湿度超出正常范围，过高可能导致凝露，过低可能产生静电
+    category: humidity
+    trigger_condition:
+      alarm_type: [threshold]
+      device_type: [TH]
+      threshold_type: [high, high_high, low, low_low]
+    diagnosis_logic:
+      possible_causes:
+        - cause: 空调加湿/除湿功能异常
+          base_confidence: 65
+          suggested_actions:
+            - 检查空调加湿器水箱水位
+            - 确认除湿模式是否正常工作
+        - cause: 外部环境湿度变化（季节性）
+          base_confidence: 40
+          suggested_actions:
+            - 对比室外湿度数据
+            - 检查新风系统过滤器状态
+        - cause: 漏水导致局部湿度升高
+          base_confidence: 35
+          suggested_actions:
+            - 检查漏水检测传感器状态
+            - 巡检空调冷凝水管路
+    priority: 7
+
+  # ==================== 电力类 (power) ====================
+  - rule_code: UPS_FAULT_01
+    name: UPS故障
+    description: UPS设备告警，可能影响供电连续性
+    category: power
+    trigger_condition:
+      alarm_type: [threshold, system]
+      device_type: [UPS]
+    diagnosis_logic:
+      possible_causes:
+        - cause: UPS电池组老化或损坏
+          base_confidence: 55
+          suggested_actions:
+            - 检查电池组电压和内阻
+            - 查看电池使用年限和更换记录
+          history_check:
+            time_window_hours: 168
+            min_occurrences: 5
+            confidence_boost: 20
+        - cause: UPS整流器或逆变器模块故障
+          base_confidence: 45
+          suggested_actions:
+            - 查看UPS面板故障代码
+            - 联系厂商技术支持
+        - cause: 市电输入异常导致UPS频繁切换
+          base_confidence: 40
+          suggested_actions:
+            - 检查市电输入电压和频率
+            - 查看UPS输入端电能质量记录
+    priority: 10
+
+  - rule_code: PDU_FAULT_01
+    name: PDU故障
+    description: 配电柜告警，可能影响下游设备供电
+    category: power
+    trigger_condition:
+      alarm_type: [threshold]
+      device_type: [PDU]
+    diagnosis_logic:
+      possible_causes:
+        - cause: PDU支路过载
+          base_confidence: 60
+          suggested_actions:
+            - 检查告警支路电流是否超过额定值
+            - 确认是否有新设备接入该支路
+        - cause: PDU断路器跳闸
+          base_confidence: 50
+          suggested_actions:
+            - 现场检查断路器状态
+            - 排查是否存在短路或接地故障
+        - cause: PDU内部接线松动导致接触不良
+          base_confidence: 30
+          suggested_actions:
+            - 使用红外热像仪检查接线端子温度
+            - 安排停电检修紧固接线
+    priority: 9
+
+  - rule_code: POWER_OVERLOAD_01
+    name: 电力过载
+    description: 电力系统负载超出安全阈值
+    category: power
+    trigger_condition:
+      alarm_type: [threshold]
+      device_type: [PDU, UPS]
+      threshold_type: [high, high_high]
+    diagnosis_logic:
+      possible_causes:
+        - cause: 新增设备导致总负载超出容量规划
+          base_confidence: 55
+          suggested_actions:
+            - 核查近期设备上架记录
+            - 重新评估配电容量
+        - cause: 设备异常导致功耗突增
+          base_confidence: 45
+          suggested_actions:
+            - 排查各支路功耗变化
+            - 检查是否有设备处于异常高负载状态
+    priority: 9
+
+  - rule_code: BATTERY_AGING_01
+    name: 电池老化
+    description: UPS电池性能下降，可能影响后备时间
+    category: power
+    trigger_condition:
+      alarm_type: [threshold]
+      device_type: [UPS]
+      threshold_type: [low, low_low]
+    diagnosis_logic:
+      possible_causes:
+        - cause: 电池组到达使用寿命
+          base_confidence: 65
+          suggested_actions:
+            - 查看电池安装日期和设计寿命
+            - 安排电池放电测试
+          history_check:
+            time_window_hours: 720
+            min_occurrences: 10
+            confidence_boost: 20
+        - cause: 环境温度过高加速电池老化
+          base_confidence: 40
+          suggested_actions:
+            - 检查电池室温度是否在推荐范围内
+            - 优化电池室散热条件
+    priority: 8
+
+  - rule_code: PHASE_IMBALANCE_01
+    name: 三相不平衡
+    description: 三相电流/电压不平衡度超标
+    category: power
+    trigger_condition:
+      alarm_type: [threshold]
+      device_type: [PDU, UPS]
+    diagnosis_logic:
+      possible_causes:
+        - cause: 单相负载分配不均
+          base_confidence: 70
+          suggested_actions:
+            - 检查各相负载分布
+            - 调整设备接入相序实现均衡
+        - cause: 某相断路器跳闸或接触不良
+          base_confidence: 40
+          suggested_actions:
+            - 检查各相断路器状态
+            - 测量各相电压和电流
+    priority: 7
+
+  - rule_code: POWER_FACTOR_01
+    name: 功率因数低
+    description: 功率因数低于标准值，可能导致电费增加和设备效率下降
+    category: power
+    trigger_condition:
+      alarm_type: [threshold]
+      device_type: [PDU, UPS]
+      threshold_type: [low, low_low]
+    diagnosis_logic:
+      possible_causes:
+        - cause: 无功补偿装置故障或容量不足
+          base_confidence: 60
+          suggested_actions:
+            - 检查无功补偿柜运行状态
+            - 评估是否需要增加补偿容量
+        - cause: 大量非线性负载导致谐波污染
+          base_confidence: 45
+          suggested_actions:
+            - 测量电能质量和谐波含量
+            - 考虑加装有源滤波器
+    priority: 6
+
+  # ==================== 制冷类 (cooling) ====================
+  - rule_code: AC_FAULT_01
+    name: 空调故障
+    description: 精密空调设备告警
+    category: cooling
+    trigger_condition:
+      alarm_type: [threshold, system]
+      device_type: [AC]
+    diagnosis_logic:
+      possible_causes:
+        - cause: 压缩机故障
+          base_confidence: 50
+          suggested_actions:
+            - 检查压缩机运行电流和排气温度
+            - 查看空调故障代码
+        - cause: 制冷剂泄漏
+          base_confidence: 45
+          suggested_actions:
+            - 检查制冷剂压力是否偏低
+            - 安排专业人员检漏
+        - cause: 冷凝器/蒸发器脏堵
+          base_confidence: 40
+          suggested_actions:
+            - 检查滤网清洁状态
+            - 安排清洗维护
+          history_check:
+            time_window_hours: 168
+            min_occurrences: 3
+            confidence_boost: 15
+    priority: 9
+
+  - rule_code: COOLING_FAIL_01
+    name: 制冷失效
+    description: 制冷系统整体失效，多个温度点位同时告警
+    category: cooling
+    trigger_condition:
+      alarm_type: [threshold]
+      device_type: [TH, AC]
+      alarm_level: [critical, major]
+    diagnosis_logic:
+      possible_causes:
+        - cause: 冷冻水系统故障（水冷空调场景）
+          base_confidence: 55
+          suggested_actions:
+            - 检查冷冻水供回水温度和流量
+            - 确认冷水机组运行状态
+        - cause: 多台空调同时故障
+          base_confidence: 45
+          suggested_actions:
+            - 逐台检查空调运行状态
+            - 启动备用空调
+        - cause: 电力故障导致空调停机
+          base_confidence: 40
+          suggested_actions:
+            - 检查空调供电回路
+            - 确认UPS和配电系统状态
+    priority: 10
+
+  - rule_code: FAN_FAULT_01
+    name: 风机故障
+    description: 通风设备告警
+    category: cooling
+    trigger_condition:
+      alarm_type: [threshold, system]
+      device_type: [FAN]
+    diagnosis_logic:
+      possible_causes:
+        - cause: 风机电机故障或轴承磨损
+          base_confidence: 55
+          suggested_actions:
+            - 检查风机运行噪音和振动
+            - 测量电机电流是否异常
+        - cause: 风机皮带松弛或断裂
+          base_confidence: 40
+          suggested_actions:
+            - 检查传动皮带状态
+            - 安排更换维护
+    priority: 7
+
+  - rule_code: WATER_LEAK_01
+    name: 漏水检测
+    description: 漏水传感器触发告警
+    category: environment
+    trigger_condition:
+      alarm_type: [threshold]
+      device_type: [WATER]
+    diagnosis_logic:
+      possible_causes:
+        - cause: 空调冷凝水管路泄漏
+          base_confidence: 55
+          suggested_actions:
+            - 检查空调冷凝水排水管
+            - 确认集水盘是否溢出
+        - cause: 消防管道或给水管道泄漏
+          base_confidence: 40
+          suggested_actions:
+            - 巡检机房内管道接头
+            - 联系物业检查楼层管道
+        - cause: 外部渗水
+          base_confidence: 25
+          suggested_actions:
+            - 检查天花板和墙体是否有渗水痕迹
+            - 确认近期是否有降雨
+    priority: 8
+
+  - rule_code: SMOKE_DETECT_01
+    name: 烟雾检测
+    description: 烟雾传感器触发告警
+    category: environment
+    trigger_condition:
+      alarm_type: [threshold]
+      device_type: [SMOKE]
+    diagnosis_logic:
+      possible_causes:
+        - cause: 设备过热冒烟
+          base_confidence: 50
+          suggested_actions:
+            - 立即现场确认是否有明火或烟雾
+            - 检查告警区域设备温度
+            - 如确认火情立即启动应急预案
+        - cause: 烟感探测器误报
+          base_confidence: 35
+          suggested_actions:
+            - 检查烟感探测器清洁状态
+            - 确认环境湿度是否过高
+        - cause: 线缆过热或短路
+          base_confidence: 30
+          suggested_actions:
+            - 使用红外热像仪检查线缆温度
+            - 检查配电柜内接线状态
+    priority: 10
+
+  - rule_code: COMM_INTERRUPT_01
+    name: 通信中断
+    description: 采集设备通信中断
+    category: communication
+    trigger_condition:
+      alarm_type: [communication]
+      device_type: ["*"]
+    diagnosis_logic:
+      possible_causes:
+        - cause: 网络设备故障
+          base_confidence: 50
+          suggested_actions:
+            - 检查网络设备运行状态和端口指示灯
+            - 尝试ping测试网络连通性
+        - cause: 采集网关离线或死机
+          base_confidence: 45
+          suggested_actions:
+            - 检查网关设备电源和运行状态
+            - 尝试远程重启网关
+          history_check:
+            time_window_hours: 24
+            min_occurrences: 5
+            confidence_boost: 15
+        - cause: 通信线缆松动或损坏
+          base_confidence: 30
+          suggested_actions:
+            - 检查网线连接状态
+            - 更换线缆测试
+    priority: 8
+
+  - rule_code: NET_INTERRUPT_01
+    name: 网络中断
+    description: 大面积设备通信中断
+    category: communication
+    trigger_condition:
+      alarm_type: [communication]
+      device_type: ["*"]
+      alarm_level: [critical, major]
+    diagnosis_logic:
+      possible_causes:
+        - cause: 核心交换机故障
+          base_confidence: 60
+          suggested_actions:
+            - 检查核心交换机状态
+            - 确认是否有网络割接或维护操作
+        - cause: 上联链路中断
+          base_confidence: 45
+          suggested_actions:
+            - 检查上联光纤和端口状态
+            - 联系网络运维确认链路状态
+    priority: 9
+
+  - rule_code: DOOR_ALARM_01
+    name: 门禁异常
+    description: 门禁系统告警
+    category: security
+    trigger_condition:
+      alarm_type: [threshold]
+      device_type: [DOOR]
+    diagnosis_logic:
+      possible_causes:
+        - cause: 非授权人员尝试进入
+          base_confidence: 45
+          suggested_actions:
+            - 调取门禁刷卡记录
+            - 查看关联摄像头录像
+        - cause: 门禁设备故障
+          base_confidence: 40
+          suggested_actions:
+            - 检查门磁传感器安装状态
+            - 测试电锁开关功能
+        - cause: 门未关好或被强行打开
+          base_confidence: 35
+          suggested_actions:
+            - 现场确认门的关闭状态
+            - 检查门闭合器是否正常
+    priority: 7
+
+  - rule_code: FIRE_WARNING_01
+    name: 消防预警
+    description: 消防系统预警信号
+    category: security
+    trigger_condition:
+      alarm_type: [threshold, system]
+      device_type: [SMOKE, IR]
+      alarm_level: [critical, major]
+    diagnosis_logic:
+      possible_causes:
+        - cause: 真实火灾风险
+          base_confidence: 60
+          suggested_actions:
+            - 立即现场确认
+            - 如确认火情启动消防联动预案
+            - 通知消防值班人员
+        - cause: 传感器误报
+          base_confidence: 30
+          suggested_actions:
+            - 交叉确认多个传感器数据
+            - 检查传感器维护记录
+    priority: 10
+
+  - rule_code: PUE_ABNORMAL_01
+    name: PUE异常
+    description: PUE值偏离正常范围
+    category: composite
+    trigger_condition:
+      alarm_type: [threshold, system]
+      device_type: ["*"]
+    diagnosis_logic:
+      possible_causes:
+        - cause: 制冷系统效率下降
+          base_confidence: 50
+          suggested_actions:
+            - 检查空调COP值
+            - 确认冷冻水系统运行参数
+        - cause: IT负载大幅变化导致PUE波动
+          base_confidence: 40
+          suggested_actions:
+            - 对比IT负载变化趋势
+            - 确认是否有大规模设备上下架
+        - cause: 配电系统损耗增加
+          base_confidence: 30
+          suggested_actions:
+            - 检查变压器和UPS效率
+            - 测量配电线路损耗
+    priority: 6
+
+  - rule_code: SENSOR_DRIFT_01
+    name: 传感器漂移
+    description: 传感器数据偏离正常范围
+    category: composite
+    trigger_condition:
+      alarm_type: [threshold]
+      device_type: ["*"]
+    diagnosis_logic:
+      possible_causes:
+        - cause: 传感器老化导致测量偏差
+          base_confidence: 55
+          suggested_actions:
+            - 与相邻传感器数据交叉对比
+            - 使用标准仪器现场校验
+          history_check:
+            time_window_hours: 168
+            min_occurrences: 10
+            confidence_boost: 20
+        - cause: 传感器安装位置不当或被遮挡
+          base_confidence: 35
+          suggested_actions:
+            - 现场检查传感器安装位置
+            - 确认是否有新增遮挡物
+    priority: 5

@@ -2,24 +2,30 @@
 联动管理 API
 Story 9-1: 联动引擎核心框架
 """
+import asyncio
 import logging
 from datetime import datetime
 from typing import Optional, List
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, delete
 from sqlalchemy.orm import selectinload
 
 from ..deps import get_db, get_current_user, require_admin, require_operator, require_viewer
 from ...models.user import User
-from ...models.linkage import LinkagePolicy, LinkageAction, LinkageExecution, LinkageLog
+from ...models.linkage import LinkagePolicy, LinkageAction, LinkageExecution, LinkageLog, LinkageRecovery, LinkageRecoveryLog
 from ...schemas.linkage import (
     LinkagePolicyCreate, LinkagePolicyUpdate, LinkagePolicyResponse,
     LinkageExecutionResponse, LinkagePolicyTestRequest, ActionTypeInfo,
+    RecoveryCreate, RecoveryResponse, RecoveryLogResponse,
+    TimelineReportResponse,
 )
 from ...engines.linkage_engine import linkage_engine
 from ...engines.event_bus import Event, EventPriority, get_event_bus
+from ...engines.recovery_engine import recovery_engine
+from ...services.timeline_report import generate_timeline, generate_timeline_excel
 
 logger = logging.getLogger(__name__)
 
@@ -401,6 +407,103 @@ async def list_executions(
     return {"items": items, "total": total, "page": page, "page_size": page_size}
 
 
+# ==================== 事件时间线报告 (Story 9-5) ====================
+# 注意: timeline 静态路由必须在 executions/{execution_id} 参数化路由之前注册
+
+@router.get("/timeline/{execution_id}", response_model=TimelineReportResponse)
+async def get_event_timeline(
+    execution_id: int,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_viewer),
+):
+    """获取事件时间线报告"""
+    report = await generate_timeline(db, execution_id)
+    if report is None:
+        raise HTTPException(status_code=404, detail="执行记录不存在")
+    return report
+
+
+@router.get("/timeline/{execution_id}/export")
+async def export_event_timeline(
+    execution_id: int,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_operator),
+):
+    """导出事件时间线报告为 Excel"""
+    report = await generate_timeline(db, execution_id)
+    if report is None:
+        raise HTTPException(status_code=404, detail="执行记录不存在")
+
+    file_buffer = generate_timeline_excel(report)
+    filename = f"timeline_{report.event_id}.xlsx"
+
+    return StreamingResponse(
+        file_buffer,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename={filename}"},
+    )
+
+
+# ==================== 联动恢复: 可恢复列表 (Story 9-4) ====================
+# 注意: 静态路由必须在参数化路由之前注册
+
+@router.get("/executions/recoverable", response_model=dict)
+async def list_recoverable_executions(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_operator),
+):
+    """获取可恢复的执行记录列表"""
+    # 子查询: 已有活跃恢复的 execution_id
+    active_recovery_subq = (
+        select(LinkageRecovery.execution_id)
+        .where(LinkageRecovery.status.in_(["completed", "partial_recovery", "executing"]))
+        .subquery()
+    )
+
+    stmt = (
+        select(LinkageExecution)
+        .where(
+            LinkageExecution.status.in_(["completed", "partial_failure"]),
+            LinkageExecution.id.notin_(select(active_recovery_subq.c.execution_id)),
+        )
+    )
+
+    # 总数
+    count_stmt = select(func.count()).select_from(stmt.subquery())
+    total = (await db.execute(count_stmt)).scalar() or 0
+
+    # 分页
+    stmt = stmt.order_by(LinkageExecution.id.desc())
+    stmt = stmt.offset((page - 1) * page_size).limit(page_size)
+    result = await db.execute(stmt)
+    executions = result.scalars().all()
+
+    items = []
+    for e in executions:
+        policy_result = await db.execute(
+            select(LinkagePolicy.name).where(LinkagePolicy.id == e.policy_id)
+        )
+        policy_name = policy_result.scalar_one_or_none()
+
+        items.append({
+            "id": e.id,
+            "policy_id": e.policy_id,
+            "policy_name": policy_name,
+            "event_id": e.event_id,
+            "trigger_source": e.trigger_source,
+            "trigger_event": e.trigger_event,
+            "status": e.status,
+            "started_at": e.started_at.isoformat() if e.started_at is not None else None,
+            "completed_at": e.completed_at.isoformat() if e.completed_at is not None else None,
+            "total_duration_ms": e.total_duration_ms,
+            "logs": [],
+        })
+
+    return {"items": items, "total": total, "page": page, "page_size": page_size}
+
+
 @router.get("/executions/{execution_id}", response_model=dict)
 async def get_execution(
     execution_id: int,
@@ -454,6 +557,163 @@ async def get_execution(
             for log in logs
         ],
     }
+
+
+# ==================== 联动恢复 (Story 9-4) ====================
+
+@router.post("/executions/{execution_id}/recover", response_model=dict)
+async def create_recovery(
+    execution_id: int,
+    data: RecoveryCreate,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_operator),
+):
+    """发起联动恢复"""
+    # 查找执行记录
+    result = await db.execute(
+        select(LinkageExecution).where(LinkageExecution.id == execution_id)
+    )
+    execution = result.scalar_one_or_none()
+    if execution is None:
+        raise HTTPException(status_code=404, detail="执行记录不存在")
+
+    # 检查是否已有活跃恢复
+    active_result = await db.execute(
+        select(LinkageRecovery).where(
+            LinkageRecovery.execution_id == execution_id,
+            LinkageRecovery.status.in_(["completed", "partial_recovery", "executing"]),
+        )
+    )
+    if active_result.scalar_one_or_none() is not None:
+        raise HTTPException(status_code=400, detail="该执行记录已有活跃的恢复任务")
+
+    # 获取执行日志
+    logs_result = await db.execute(
+        select(LinkageLog).where(LinkageLog.execution_id == execution_id)
+    )
+    logs = logs_result.scalars().all()
+    log_dicts = [
+        {
+            "action_type": log.action_type,
+            "action_config": log.action_config,
+            "status": log.status,
+        }
+        for log in logs
+    ]
+
+    # 生成恢复步骤
+    steps = recovery_engine.generate_recovery_steps(log_dicts)
+    if not steps:
+        raise HTTPException(status_code=400, detail="无可恢复的动作")
+
+    # 创建恢复记录
+    recovery = LinkageRecovery(
+        execution_id=execution_id,
+        operator=user.username,
+        mode=data.mode,
+        status="executing",
+    )
+    db.add(recovery)
+    await db.flush()
+
+    # 创建恢复步骤日志
+    for step in steps:
+        recovery_log = LinkageRecoveryLog(
+            recovery_id=recovery.id,
+            step_order=step["step_order"],
+            action_type=step["action_type"],
+            target_type=step.get("target_type"),
+            recovery_command=step.get("recovery_command"),
+            action_config=step.get("action_config"),
+            status="pending",
+        )
+        db.add(recovery_log)
+
+    await db.commit()
+
+    # 自动模式: 后台执行
+    if data.mode == "auto":
+        asyncio.create_task(recovery_engine.start_recovery(recovery.id))
+
+    return {"recovery_id": recovery.id, "message": "恢复已发起", "steps_count": len(steps)}
+
+
+@router.get("/recoveries", response_model=dict)
+async def list_recoveries(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    status: Optional[str] = Query(None),
+    execution_id: Optional[int] = Query(None),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_viewer),
+):
+    """获取恢复记录列表"""
+    stmt = select(LinkageRecovery)
+
+    if status is not None:
+        stmt = stmt.where(LinkageRecovery.status == status)
+    if execution_id is not None:
+        stmt = stmt.where(LinkageRecovery.execution_id == execution_id)
+
+    # 总数
+    count_stmt = select(func.count()).select_from(stmt.subquery())
+    total = (await db.execute(count_stmt)).scalar() or 0
+
+    # 分页
+    stmt = stmt.order_by(LinkageRecovery.id.desc())
+    stmt = stmt.offset((page - 1) * page_size).limit(page_size)
+    stmt = stmt.options(selectinload(LinkageRecovery.logs))
+    result = await db.execute(stmt)
+    recoveries = result.scalars().all()
+
+    items = [RecoveryResponse.model_validate(r).model_dump() for r in recoveries]
+
+    return {"items": items, "total": total, "page": page, "page_size": page_size}
+
+
+@router.get("/recoveries/{recovery_id}", response_model=RecoveryResponse)
+async def get_recovery(
+    recovery_id: int,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_viewer),
+):
+    """获取恢复记录详情"""
+    result = await db.execute(
+        select(LinkageRecovery)
+        .where(LinkageRecovery.id == recovery_id)
+        .options(selectinload(LinkageRecovery.logs))
+    )
+    recovery = result.scalar_one_or_none()
+    if recovery is None:
+        raise HTTPException(status_code=404, detail="恢复记录不存在")
+
+    return RecoveryResponse.model_validate(recovery)
+
+
+@router.post("/recoveries/{recovery_id}/step/{step_order}/execute", response_model=dict)
+async def execute_recovery_step(
+    recovery_id: int,
+    step_order: int,
+    _: User = Depends(require_operator),
+):
+    """手动执行单个恢复步骤"""
+    ok = await recovery_engine.execute_single_step(recovery_id, step_order)
+    if not ok:
+        raise HTTPException(status_code=400, detail="步骤执行失败或不存在")
+    return {"message": "步骤执行完成"}
+
+
+@router.post("/recoveries/{recovery_id}/step/{step_order}/skip", response_model=dict)
+async def skip_recovery_step(
+    recovery_id: int,
+    step_order: int,
+    _: User = Depends(require_operator),
+):
+    """跳过单个恢复步骤"""
+    ok = await recovery_engine.skip_step(recovery_id, step_order)
+    if not ok:
+        raise HTTPException(status_code=400, detail="步骤跳过失败或不存在")
+    return {"message": "步骤已跳过"}
 
 
 # ==================== 动作类型 ====================

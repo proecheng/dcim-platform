@@ -9,7 +9,8 @@ from app.models.operation import (
     WorkOrderStatus,
     WorkOrderType,
     WorkOrderPriority,
-    InspectionStatus
+    InspectionStatus,
+    ApprovalStatus
 )
 
 
@@ -23,6 +24,8 @@ class WorkOrderBase(BaseModel):
     priority: Optional[WorkOrderPriority] = Field(WorkOrderPriority.medium, description="优先级")
     device_id: Optional[int] = Field(None, description="关联设备ID")
     device_name: Optional[str] = Field(None, description="设备名称")
+    area_code: Optional[str] = Field(None, description="关联区域编码")
+    alarm_id: Optional[int] = Field(None, description="关联告警ID")
     location: Optional[str] = Field(None, description="位置")
     reporter: Optional[str] = Field(None, description="报修人")
     reporter_phone: Optional[str] = Field(None, description="报修人电话")
@@ -42,11 +45,11 @@ class WorkOrderUpdate(BaseModel):
     priority: Optional[WorkOrderPriority] = Field(None, description="优先级")
     device_id: Optional[int] = Field(None, description="关联设备ID")
     device_name: Optional[str] = Field(None, description="设备名称")
+    area_code: Optional[str] = Field(None, description="关联区域编码")
     location: Optional[str] = Field(None, description="位置")
     reporter: Optional[str] = Field(None, description="报修人")
     reporter_phone: Optional[str] = Field(None, description="报修人电话")
     deadline: Optional[datetime] = Field(None, description="截止时间")
-    status: Optional[WorkOrderStatus] = Field(None, description="工单状态")
     assignee: Optional[str] = Field(None, description="处理人")
     solution: Optional[str] = Field(None, description="解决方案")
     root_cause: Optional[str] = Field(None, description="根本原因")
@@ -61,8 +64,10 @@ class WorkOrderResponse(WorkOrderBase):
     assignee: Optional[str] = Field(None, description="处理人")
     created_at: datetime = Field(..., description="创建时间")
     assigned_at: Optional[datetime] = Field(None, description="派单时间")
+    accepted_at: Optional[datetime] = Field(None, description="接单时间")
     started_at: Optional[datetime] = Field(None, description="开始处理时间")
     completed_at: Optional[datetime] = Field(None, description="完成时间")
+    closed_at: Optional[datetime] = Field(None, description="关闭时间")
     solution: Optional[str] = Field(None, description="解决方案")
     root_cause: Optional[str] = Field(None, description="根本原因")
 
@@ -152,6 +157,7 @@ class InspectionTaskResponse(InspectionTaskBase):
     id: int = Field(..., description="ID")
     task_no: str = Field(..., description="任务编号")
     status: InspectionStatus = Field(InspectionStatus.pending, description="任务状态")
+    plan_name: Optional[str] = Field(None, description="关联计划名称")
     started_at: Optional[datetime] = Field(None, description="开始时间")
     completed_at: Optional[datetime] = Field(None, description="完成时间")
     result: Optional[str] = Field(None, description="巡检结果(JSON)")
@@ -211,3 +217,85 @@ class OperationStatistics(BaseModel):
     completed_orders: int = Field(0, description="已完成工单数")
     overdue_inspections: int = Field(0, description="逾期巡检数")
     knowledge_count: int = Field(0, description="知识库条目数")
+
+
+# ==================== 告警工单规则 Schemas ====================
+
+class AlarmWorkOrderRuleBase(BaseModel):
+    """告警工单规则基础模型"""
+    name: str = Field(..., description="规则名称")
+    alarm_level: str = Field(..., description="告警级别(critical/important)")
+    alarm_type: Optional[str] = Field(None, description="告警类型过滤")
+    order_type: Optional[WorkOrderType] = Field(WorkOrderType.fault, description="工单类型")
+    priority: Optional[WorkOrderPriority] = Field(WorkOrderPriority.high, description="工单优先级")
+    assignee: Optional[str] = Field(None, description="自动派单人")
+    is_enabled: Optional[bool] = Field(True, description="是否启用")
+
+
+class AlarmWorkOrderRuleCreate(AlarmWorkOrderRuleBase):
+    """创建告警工单规则"""
+    pass
+
+
+class AlarmWorkOrderRuleUpdate(BaseModel):
+    """更新告警工单规则"""
+    name: Optional[str] = Field(None, description="规则名称")
+    alarm_level: Optional[str] = Field(None, description="告警级别")
+    alarm_type: Optional[str] = Field(None, description="告警类型过滤")
+    order_type: Optional[WorkOrderType] = Field(None, description="工单类型")
+    priority: Optional[WorkOrderPriority] = Field(None, description="工单优先级")
+    assignee: Optional[str] = Field(None, description="自动派单人")
+    is_enabled: Optional[bool] = Field(None, description="是否启用")
+
+
+class AlarmWorkOrderRuleResponse(AlarmWorkOrderRuleBase):
+    """告警工单规则响应"""
+    id: int = Field(..., description="ID")
+    created_at: datetime = Field(..., description="创建时间")
+    updated_at: datetime = Field(..., description="更新时间")
+
+    class Config:
+        from_attributes = True
+
+
+class AlarmCheckRequest(BaseModel):
+    """告警检查请求"""
+    alarm_id: int = Field(..., description="告警ID")
+    alarm_level: str = Field(..., description="告警级别")
+    alarm_type: Optional[str] = Field(None, description="告警类型")
+    alarm_message: str = Field(..., description="告警消息")
+
+
+# ==================== 工单审批 Schemas ====================
+
+class WorkOrderApprovalCreate(BaseModel):
+    """创建工单审批"""
+    approver: str = Field(..., description="审批人")
+    timeout_hours: Optional[int] = Field(24, description="超时时间(小时)")
+    escalate_to: Optional[str] = Field(None, description="超时升级审批人")
+
+
+class WorkOrderApprovalResponse(BaseModel):
+    """工单审批响应"""
+    id: int = Field(..., description="ID")
+    order_id: int = Field(..., description="工单ID")
+    approver: str = Field(..., description="审批人")
+    status: ApprovalStatus = Field(ApprovalStatus.pending, description="审批状态")
+    reason: Optional[str] = Field(None, description="审批意见/驳回原因")
+    timeout_hours: int = Field(24, description="超时时间(小时)")
+    escalate_to: Optional[str] = Field(None, description="超时升级审批人")
+    created_at: datetime = Field(..., description="创建时间")
+    resolved_at: Optional[datetime] = Field(None, description="审批完成时间")
+
+    class Config:
+        from_attributes = True
+
+
+class ApproveRequest(BaseModel):
+    """批准审批请求"""
+    reason: Optional[str] = Field(None, description="审批意见")
+
+
+class RejectRequest(BaseModel):
+    """驳回审批请求"""
+    reason: str = Field(..., description="驳回原因")

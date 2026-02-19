@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, update, delete
 
-from ..deps import get_db, require_viewer, require_operator, require_admin
+from ..deps import get_db, require_viewer, require_operator, require_admin, get_user_site_ids
 from ...models.user import User
 from ...models.device import Device
 from ...models.point import Point, PointRealtime
@@ -29,13 +29,23 @@ async def get_devices(
     device_type: Optional[str] = Query(None, description="设备类型"),
     area_code: Optional[str] = Query(None, description="区域代码"),
     status: Optional[str] = Query(None, description="状态"),
+    site_id: Optional[int] = Query(None, description="站点ID"),
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_viewer)
+    _: User = Depends(require_viewer),
+    user_site_ids: Optional[List[int]] = Depends(get_user_site_ids)
 ):
     """
-    获取设备列表（分页）
+    获取设备列表（分页），按用户站点权限过滤
     """
     query = select(Device)
+
+    # 站点权限过滤（非 admin 用户仅可见授权站点设备）
+    if user_site_ids is not None:
+        query = query.where(Device.site_id.in_(user_site_ids))
+
+    # 手动站点筛选
+    if site_id is not None:
+        query = query.where(Device.site_id == site_id)
 
     if keyword:
         query = query.where(

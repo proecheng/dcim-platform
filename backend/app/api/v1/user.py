@@ -9,10 +9,11 @@ from sqlalchemy import select, func, update, delete
 
 from ..deps import get_db, get_current_user, require_admin
 from ...core.security import get_password_hash
-from ...models.user import User, UserLoginHistory
+from ...models.user import User, UserLoginHistory, UserSite
+from ...models.spatial import Site
 from ...schemas.user import (
     UserCreate, UserUpdate, UserInfo, UserListResponse,
-    UserLoginHistoryResponse
+    UserLoginHistoryResponse, UserSiteUpdate, UserSiteInfo
 )
 from ...schemas.common import PageParams, PageResponse
 
@@ -62,6 +63,30 @@ async def get_users(
         page=page,
         page_size=page_size
     )
+
+
+@router.get("/sites/{site_id}/users", response_model=List[UserInfo], summary="获取站点下的用户列表")
+async def get_site_users(
+    site_id: int,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_admin)
+):
+    """
+    获取站点下关联的用户列表
+    """
+    result = await db.execute(select(Site).where(Site.id == site_id))
+    if not result.scalar_one_or_none():
+        raise HTTPException(status_code=404, detail="站点不存在")
+
+    stmt = (
+        select(User)
+        .join(UserSite, User.id == UserSite.user_id)
+        .where(UserSite.site_id == site_id)
+        .order_by(User.id)
+    )
+    result = await db.execute(stmt)
+    users = result.scalars().all()
+    return [UserInfo.model_validate(u) for u in users]
 
 
 @router.get("/{user_id}", response_model=UserInfo, summary="获取用户详情")
@@ -168,6 +193,31 @@ async def delete_user(
     return {"message": "用户已删除"}
 
 
+@router.post("/batch-delete", summary="批量删除用户")
+async def batch_delete_users(
+    user_ids: List[int],
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_admin)
+):
+    """
+    批量删除用户（不能删除自己）
+    """
+    if current_user.id in user_ids:
+        raise HTTPException(status_code=400, detail="不能删除自己")
+
+    result = await db.execute(
+        select(func.count(User.id)).where(User.id.in_(user_ids))
+    )
+    found = result.scalar()
+    if found == 0:
+        raise HTTPException(status_code=404, detail="未找到要删除的用户")
+
+    await db.execute(delete(User).where(User.id.in_(user_ids)))
+    await db.commit()
+
+    return {"message": f"已删除 {found} 个用户", "deleted_count": found}
+
+
 @router.put("/{user_id}/status", summary="启用/禁用用户")
 async def toggle_user_status(
     user_id: int,
@@ -252,3 +302,69 @@ async def get_login_history(
         "page": page,
         "page_size": page_size
     }
+
+
+# ==================== 用户站点管理 ====================
+
+
+@router.get("/{user_id}/sites", response_model=List[UserSiteInfo], summary="获取用户站点列表")
+async def get_user_sites(
+    user_id: int,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_admin)
+):
+    """
+    获取用户关联的站点列表
+    """
+    result = await db.execute(select(User).where(User.id == user_id))
+    if not result.scalar_one_or_none():
+        raise HTTPException(status_code=404, detail="用户不存在")
+
+    stmt = (
+        select(UserSite.site_id, Site.site_code, Site.site_name)
+        .join(Site, UserSite.site_id == Site.id)
+        .where(UserSite.user_id == user_id)
+        .order_by(Site.id)
+    )
+    result = await db.execute(stmt)
+    rows = result.fetchall()
+    return [
+        UserSiteInfo(site_id=r[0], site_code=r[1], site_name=r[2])
+        for r in rows
+    ]
+
+
+@router.put("/{user_id}/sites", summary="设置用户站点权限")
+async def update_user_sites(
+    user_id: int,
+    data: UserSiteUpdate,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_admin)
+):
+    """
+    设置用户的站点权限（全量替换）
+    """
+    result = await db.execute(select(User).where(User.id == user_id))
+    if not result.scalar_one_or_none():
+        raise HTTPException(status_code=404, detail="用户不存在")
+
+    # 验证站点存在
+    if data.site_ids:
+        site_count = await db.execute(
+            select(func.count(Site.id)).where(Site.id.in_(data.site_ids))
+        )
+        if site_count.scalar() != len(data.site_ids):
+            raise HTTPException(status_code=400, detail="部分站点不存在")
+
+    # 删除旧关联
+    await db.execute(delete(UserSite).where(UserSite.user_id == user_id))
+
+    # 创建新关联
+    for site_id in data.site_ids:
+        db.add(UserSite(user_id=user_id, site_id=site_id))
+
+    await db.commit()
+    return {"message": f"已为用户分配 {len(data.site_ids)} 个站点"}
+
+
+

@@ -7,18 +7,23 @@ from datetime import datetime
 from pydantic import BaseModel, EmailStr, Field, ConfigDict, field_validator
 
 
-def validate_password_complexity(password: str) -> str:
-    """验证密码复杂度"""
-    if len(password) < 8:
-        raise ValueError('密码长度至少8个字符')
-    if not re.search(r'[A-Z]', password):
-        raise ValueError('密码必须包含大写字母')
-    if not re.search(r'[a-z]', password):
-        raise ValueError('密码必须包含小写字母')
-    if not re.search(r'\d', password):
-        raise ValueError('密码必须包含数字')
-    if not re.search(r'[!@#$%^&*(),.?":{}|<>]', password):
-        raise ValueError('密码必须包含特殊字符')
+def validate_password_complexity(password: str, min_length: int = 8, min_categories: int = 3) -> str:
+    """验证密码复杂度：至少 min_length 位，包含至少 min_categories 类字符"""
+    if len(password) < min_length:
+        raise ValueError(f'密码长度至少{min_length}个字符')
+
+    categories = 0
+    if re.search(r'[A-Z]', password):
+        categories += 1
+    if re.search(r'[a-z]', password):
+        categories += 1
+    if re.search(r'\d', password):
+        categories += 1
+    if re.search(r'[!@#$%^&*(),.?":{}|<>]', password):
+        categories += 1
+
+    if categories < min_categories:
+        raise ValueError(f'密码必须包含大写字母、小写字母、数字、特殊字符中至少{min_categories}类')
     return password
 
 
@@ -27,6 +32,7 @@ class Token(BaseModel):
     access_token: str
     token_type: str = "bearer"
     expires_in: int = 3600
+    password_expired_warning: Optional[str] = None
 
 
 class TokenData(BaseModel):
@@ -117,3 +123,25 @@ class UserLoginHistoryResponse(BaseModel):
 # 保持向后兼容
 UserResponse = UserInfo
 UserBase = UserCreate
+
+
+class UserSiteUpdate(BaseModel):
+    """更新用户站点权限"""
+    site_ids: List[int]
+
+
+class UserSiteInfo(BaseModel):
+    """用户站点信息"""
+    model_config = ConfigDict(from_attributes=True)
+
+    site_id: int
+    site_code: str
+    site_name: str
+
+
+class PasswordPolicyConfig(BaseModel):
+    """密码策略配置"""
+    min_length: int = 8
+    min_categories: int = 3
+    history_count: int = 5
+    expire_days: int = 90

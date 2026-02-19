@@ -2,7 +2,7 @@
 报表模型
 """
 from datetime import datetime
-from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, Boolean
+from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, Boolean, Float
 
 from ..core.database import Base
 
@@ -36,5 +36,37 @@ class ReportRecord(Base):
     file_size = Column(Integer, comment="文件大小")
     status = Column(String(20), comment="状态: generating/completed/failed")
     error_message = Column(Text, comment="错误信息")
+    report_data = Column(Text, comment="报表数据(JSON)")
     generated_by = Column(Integer, ForeignKey("users.id"), comment="生成人")
     created_at = Column(DateTime, default=datetime.now, comment="创建时间")
+
+
+class ReportSchedule(Base):
+    """报表调度配置表"""
+    __tablename__ = "report_schedules"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    name = Column(String(100), nullable=False, comment="调度名称")
+    report_type = Column(String(20), nullable=False, comment="报表类型: daily/weekly/monthly")
+    is_enabled = Column(Boolean, default=True, comment="是否启用")
+    last_run_at = Column(DateTime, comment="上次运行时间")
+    next_run_at = Column(DateTime, comment="下次运行时间")
+    created_by = Column(Integer, ForeignKey("users.id"), comment="创建人")
+    created_at = Column(DateTime, default=datetime.now, comment="创建时间")
+    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now, comment="更新时间")
+
+
+class DeviceHealthScore(Base):
+    """设备健康度评分表"""
+    __tablename__ = "device_health_scores"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    device_id = Column(Integer, ForeignKey("devices.id"), nullable=False, comment="设备ID")
+    device_name = Column(String(100), comment="设备名称")
+    device_type = Column(String(50), comment="设备类型")
+    score = Column(Float, nullable=False, default=100, comment="健康度评分 0-100")
+    health_level = Column(String(20), nullable=False, default="健康", comment="健康等级: 健康/关注/预警/危险")
+    alarm_count = Column(Integer, default=0, comment="近期告警数")
+    maintenance_count = Column(Integer, default=0, comment="维保记录数")
+    last_maintenance_at = Column(DateTime, comment="最近维保时间")
+    calculated_at = Column(DateTime, default=datetime.now, comment="计算时间")

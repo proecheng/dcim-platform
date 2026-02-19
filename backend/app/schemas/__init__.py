@@ -29,7 +29,9 @@ from .threshold import ThresholdCreate, ThresholdUpdate, ThresholdInfo, Threshol
 from .history import HistoryQuery, HistoryData, TrendData, HistoryStatistics, CompareQuery
 from .report import (
     ReportTemplateCreate, ReportTemplateUpdate, ReportTemplateInfo,
-    ReportRecordInfo, ReportGenerate
+    ReportRecordInfo, ReportGenerate,
+    ReportScheduleCreate, ReportScheduleUpdate, ReportScheduleResponse,
+    AutoReportRequest, AutoReportData
 )
 from .log import OperationLogInfo, SystemLogInfo, CommunicationLogInfo
 from .config import SystemConfigInfo, SystemConfigUpdate, DictionaryInfo, LicenseInfo, LicenseActivate
@@ -87,6 +89,8 @@ __all__ = [
     # Report
     "ReportTemplateCreate", "ReportTemplateUpdate", "ReportTemplateInfo",
     "ReportRecordInfo", "ReportGenerate",
+    "ReportScheduleCreate", "ReportScheduleUpdate", "ReportScheduleResponse",
+    "AutoReportRequest", "AutoReportData",
     # Log
     "OperationLogInfo", "SystemLogInfo", "CommunicationLogInfo",
     # Config

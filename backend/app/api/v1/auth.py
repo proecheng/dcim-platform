@@ -2,6 +2,7 @@
 认证 API - v1
 """
 import time
+import uuid
 from datetime import datetime, timedelta
 from typing import Optional
 from collections import defaultdict
@@ -14,11 +15,33 @@ from jose import jwt
 from ..deps import get_db, get_current_user
 from ...core.config import get_settings
 from ...core.security import verify_password, get_password_hash
-from ...models.user import User, UserLoginHistory
-from ...schemas.user import Token, UserInfo, PasswordChange
+from ...models.user import User, UserLoginHistory, PasswordHistory
+from ...models.config import SystemConfig
+from ...schemas.user import Token, UserInfo, PasswordChange, PasswordPolicyConfig
 
 router = APIRouter()
 settings = get_settings()
+
+# 默认密码策略
+DEFAULT_PASSWORD_POLICY = {
+    "min_length": 8,
+    "min_categories": 3,
+    "history_count": 5,
+    "expire_days": 90,
+}
+
+
+async def _get_password_policy(db: AsyncSession) -> dict:
+    """从 SystemConfig 获取密码策略，不存在则返回默认值"""
+    result = await db.execute(
+        select(SystemConfig).where(SystemConfig.config_group == "password_policy")
+    )
+    configs = result.scalars().all()
+    policy = DEFAULT_PASSWORD_POLICY.copy()
+    for c in configs:
+        if c.config_key in policy:
+            policy[c.config_key] = int(c.config_value)
+    return policy
 
 # 简单的内存速率限制器
 class RateLimiter:
@@ -48,12 +71,14 @@ class RateLimiter:
 login_limiter = RateLimiter(max_attempts=5, window_seconds=60)
 
 
-def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
-    """创建访问令牌"""
+def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> tuple[str, str]:
+    """创建访问令牌，返回 (token, jti)"""
     to_encode = data.copy()
+    jti = uuid.uuid4().hex
     expire = datetime.utcnow() + (expires_delta or timedelta(minutes=settings.access_token_expire_minutes))
-    to_encode.update({"exp": expire})
-    return jwt.encode(to_encode, settings.secret_key, algorithm="HS256")
+    to_encode.update({"exp": expire, "jti": jti})
+    token = jwt.encode(to_encode, settings.secret_key, algorithm="HS256")
+    return token, jti
 
 
 @router.post("/login", response_model=Token, summary="用户登录")
@@ -127,14 +152,51 @@ async def login(
             login_count=User.login_count + 1
         )
     )
+
+    # 创建令牌（含 jti）
+    access_token, jti = create_access_token(data={"sub": user.username})
+
+    # 创建会话记录
+    from ...models.user import UserSession
+    session_record = UserSession(
+        user_id=user.id,
+        token_jti=jti
+    )
+    db.add(session_record)
+
+    # 并发会话限制：最多3个活跃会话，超限踢出最早的
+    MAX_SESSIONS = 3
+    active_sessions_result = await db.execute(
+        select(UserSession).where(
+            UserSession.user_id == user.id,
+            UserSession.is_active == True
+        ).order_by(UserSession.created_at.asc())
+    )
+    active_sessions = active_sessions_result.scalars().all()
+    # 加上刚创建的，如果超过限制则踢出最早的
+    if len(active_sessions) > MAX_SESSIONS:
+        sessions_to_kick = active_sessions[:len(active_sessions) - MAX_SESSIONS]
+        for s in sessions_to_kick:
+            s.is_active = False
+
     await db.commit()
 
-    # 创建令牌
-    access_token = create_access_token(data={"sub": user.username})
+    # 检查密码是否过期
+    password_warning = None
+    policy = await _get_password_policy(db)
+    expire_days = policy["expire_days"]
+    if expire_days > 0:
+        pwd_changed = user.password_changed_at or user.created_at
+        if pwd_changed:
+            days_since = (datetime.now() - pwd_changed).days
+            if days_since >= expire_days:
+                password_warning = f"您的密码已超过{expire_days}天未更换，建议尽快修改密码"
+
     return Token(
         access_token=access_token,
         token_type="bearer",
-        expires_in=settings.access_token_expire_minutes * 60
+        expires_in=settings.access_token_expire_minutes * 60,
+        password_expired_warning=password_warning
     )
 
 
@@ -151,7 +213,7 @@ async def refresh_token(current_user: User = Depends(get_current_user)):
     """
     刷新访问令牌
     """
-    access_token = create_access_token(data={"sub": current_user.username})
+    access_token, _jti = create_access_token(data={"sub": current_user.username})
     return Token(
         access_token=access_token,
         token_type="bearer",
@@ -186,7 +248,7 @@ async def change_password(
     current_user: User = Depends(get_current_user)
 ):
     """
-    修改当前用户密码
+    修改当前用户密码（含密码历史检查）
     """
     if not verify_password(data.old_password, current_user.password_hash):
         raise HTTPException(
@@ -200,9 +262,37 @@ async def change_password(
             detail="两次输入的新密码不一致"
         )
 
+    # 获取密码策略
+    policy = await _get_password_policy(db)
+    history_count = policy["history_count"]
+
+    # 检查密码历史：不能与最近 N 次相同
+    if history_count > 0:
+        history_result = await db.execute(
+            select(PasswordHistory)
+            .where(PasswordHistory.user_id == current_user.id)
+            .order_by(PasswordHistory.created_at.desc())
+            .limit(history_count)
+        )
+        history_records = history_result.scalars().all()
+        for record in history_records:
+            if verify_password(data.new_password, record.password_hash):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"新密码不能与最近{history_count}次使用的密码相同"
+                )
+
+    # 保存旧密码到历史
+    db.add(PasswordHistory(
+        user_id=current_user.id,
+        password_hash=current_user.password_hash
+    ))
+
+    # 更新密码
     await db.execute(
         update(User).where(User.id == current_user.id).values(
             password_hash=get_password_hash(data.new_password),
+            password_changed_at=datetime.now(),
             updated_at=datetime.now()
         )
     )
@@ -229,3 +319,62 @@ async def get_permissions(
         "role": current_user.role,
         "permissions": permissions
     }
+
+
+@router.get("/password-policy", response_model=PasswordPolicyConfig, summary="获取密码策略")
+async def get_password_policy(
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user)
+):
+    """
+    获取当前密码策略配置
+    """
+    policy = await _get_password_policy(db)
+    return PasswordPolicyConfig(**policy)
+
+
+@router.put("/password-policy", response_model=PasswordPolicyConfig, summary="更新密码策略")
+async def update_password_policy(
+    data: PasswordPolicyConfig,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    更新密码策略配置（仅管理员）
+    """
+    if current_user.role != "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="仅管理员可修改密码策略"
+        )
+
+    policy_items = {
+        "min_length": str(data.min_length),
+        "min_categories": str(data.min_categories),
+        "history_count": str(data.history_count),
+        "expire_days": str(data.expire_days),
+    }
+
+    for key, value in policy_items.items():
+        result = await db.execute(
+            select(SystemConfig).where(
+                SystemConfig.config_group == "password_policy",
+                SystemConfig.config_key == key
+            )
+        )
+        config = result.scalar_one_or_none()
+        if config:
+            config.config_value = value
+            config.updated_at = datetime.now()
+        else:
+            db.add(SystemConfig(
+                config_group="password_policy",
+                config_key=key,
+                config_value=value,
+                value_type="int",
+                description=f"密码策略-{key}",
+                is_editable=True
+            ))
+
+    await db.commit()
+    return data

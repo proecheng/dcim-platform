@@ -11,19 +11,67 @@ from pydantic import BaseModel, Field
 from ..deps import get_db, require_viewer, require_operator
 from ...models.user import User
 from ...models.operation import (
-    WorkOrder, WorkOrderLog, WorkOrderStatus, WorkOrderPriority,
+    WorkOrder, WorkOrderLog, WorkOrderStatus, WorkOrderPriority, WorkOrderType,
     InspectionPlan, InspectionTask, InspectionStatus,
-    KnowledgeBase
+    KnowledgeBase, AlarmWorkOrderRule,
+    WorkOrderApproval, ApprovalStatus
 )
 from ...schemas.operation import (
     WorkOrderCreate, WorkOrderUpdate, WorkOrderResponse, WorkOrderLogResponse,
     InspectionPlanCreate, InspectionPlanUpdate, InspectionPlanResponse,
     InspectionTaskCreate, InspectionTaskUpdate, InspectionTaskResponse,
     KnowledgeCreate, KnowledgeUpdate, KnowledgeResponse,
-    OperationStatistics
+    OperationStatistics,
+    AlarmWorkOrderRuleCreate, AlarmWorkOrderRuleUpdate, AlarmWorkOrderRuleResponse,
+    AlarmCheckRequest,
+    WorkOrderApprovalCreate, WorkOrderApprovalResponse,
+    ApproveRequest, RejectRequest
 )
 
 router = APIRouter(prefix="/operation", tags=["运维管理"])
+
+
+# ==================== 状态转换规则 ====================
+
+VALID_TRANSITIONS = {
+    WorkOrderStatus.pending: [WorkOrderStatus.assigned, WorkOrderStatus.cancelled],
+    WorkOrderStatus.assigned: [WorkOrderStatus.accepted, WorkOrderStatus.cancelled],
+    WorkOrderStatus.accepted: [WorkOrderStatus.processing, WorkOrderStatus.cancelled],
+    WorkOrderStatus.processing: [WorkOrderStatus.completed],
+    WorkOrderStatus.completed: [WorkOrderStatus.closed],
+    WorkOrderStatus.closed: [],
+    WorkOrderStatus.cancelled: [],
+}
+
+
+def _check_transition(current: WorkOrderStatus, target: WorkOrderStatus) -> None:
+    """校验状态转换是否合法"""
+    allowed = VALID_TRANSITIONS.get(current, [])
+    if target not in allowed:
+        raise HTTPException(
+            status_code=400,
+            detail=f"不允许从 {current.value} 转换到 {target.value}"
+        )
+
+
+# ==================== 巡检任务状态转换规则 ====================
+
+VALID_TASK_TRANSITIONS = {
+    InspectionStatus.pending: [InspectionStatus.in_progress],
+    InspectionStatus.in_progress: [InspectionStatus.completed],
+    InspectionStatus.completed: [],
+    InspectionStatus.overdue: [InspectionStatus.in_progress],
+}
+
+
+def _check_task_transition(current: InspectionStatus, target: InspectionStatus) -> None:
+    """校验巡检任务状态转换是否合法"""
+    allowed = VALID_TASK_TRANSITIONS.get(current, [])
+    if target not in allowed:
+        raise HTTPException(
+            status_code=400,
+            detail=f"不允许从 {current.value} 转换到 {target.value}"
+        )
 
 
 # ==================== 辅助函数 ====================
@@ -229,6 +277,8 @@ async def assign_work_order(
     if not order:
         raise HTTPException(status_code=404, detail="工单不存在")
 
+    _check_transition(order.status, WorkOrderStatus.assigned)
+
     order.assignee = data.assignee
     order.assigned_at = datetime.now()
     order.status = WorkOrderStatus.assigned
@@ -242,6 +292,42 @@ async def assign_work_order(
         action="派单",
         content=f"工单已派发给 {data.assignee}",
         operator="系统"
+    )
+    db.add(log)
+    await db.commit()
+
+    return WorkOrderResponse.model_validate(order)
+
+
+@router.post("/workorders/{id}/accept", response_model=WorkOrderResponse, summary="接单")
+async def accept_work_order(
+    id: int,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_operator)
+):
+    """
+    接单（处理人确认接受工单）
+    """
+    result = await db.execute(select(WorkOrder).where(WorkOrder.id == id))
+    order = result.scalar_one_or_none()
+
+    if not order:
+        raise HTTPException(status_code=404, detail="工单不存在")
+
+    _check_transition(order.status, WorkOrderStatus.accepted)
+
+    order.status = WorkOrderStatus.accepted
+    order.accepted_at = datetime.now()
+
+    await db.commit()
+    await db.refresh(order)
+
+    # 添加接单日志
+    log = WorkOrderLog(
+        order_id=id,
+        action="接单",
+        content="工单已接单",
+        operator=order.assignee or "系统"
     )
     db.add(log)
     await db.commit()
@@ -263,6 +349,8 @@ async def start_work_order(
 
     if not order:
         raise HTTPException(status_code=404, detail="工单不存在")
+
+    _check_transition(order.status, WorkOrderStatus.processing)
 
     order.status = WorkOrderStatus.processing
     order.started_at = datetime.now()
@@ -299,6 +387,8 @@ async def complete_work_order(
     if not order:
         raise HTTPException(status_code=404, detail="工单不存在")
 
+    _check_transition(order.status, WorkOrderStatus.completed)
+
     order.status = WorkOrderStatus.completed
     order.completed_at = datetime.now()
     if data.solution:
@@ -315,6 +405,42 @@ async def complete_work_order(
         action="完成",
         content="工单处理完成",
         operator=order.assignee or "系统"
+    )
+    db.add(log)
+    await db.commit()
+
+    return WorkOrderResponse.model_validate(order)
+
+
+@router.post("/workorders/{id}/close", response_model=WorkOrderResponse, summary="关闭工单")
+async def close_work_order(
+    id: int,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_operator)
+):
+    """
+    关闭工单（完成后确认关闭）
+    """
+    result = await db.execute(select(WorkOrder).where(WorkOrder.id == id))
+    order = result.scalar_one_or_none()
+
+    if not order:
+        raise HTTPException(status_code=404, detail="工单不存在")
+
+    _check_transition(order.status, WorkOrderStatus.closed)
+
+    order.status = WorkOrderStatus.closed
+    order.closed_at = datetime.now()
+
+    await db.commit()
+    await db.refresh(order)
+
+    # 添加关闭日志
+    log = WorkOrderLog(
+        order_id=id,
+        action="关闭",
+        content="工单已关闭",
+        operator="系统"
     )
     db.add(log)
     await db.commit()
@@ -379,19 +505,270 @@ async def add_work_order_log(
     return WorkOrderLogResponse.model_validate(log)
 
 
+# ==================== 工单审批管理 ====================
+
+async def _check_approval_timeout(approval: WorkOrderApproval, db: AsyncSession) -> bool:
+    """检查审批是否超时，如果超时则处理。返回 True 表示已超时。"""
+    from datetime import timedelta
+    if approval.status != ApprovalStatus.pending:
+        return False
+
+    deadline = approval.created_at + timedelta(hours=approval.timeout_hours or 24)
+    if datetime.now() <= deadline:
+        return False
+
+    # 超时处理
+    if approval.escalate_to:
+        # 升级到上级审批人
+        approval.status = ApprovalStatus.escalated
+        approval.resolved_at = datetime.now()
+
+        # 创建新审批记录给升级审批人
+        new_approval = WorkOrderApproval(
+            order_id=approval.order_id,
+            approver=approval.escalate_to,
+            timeout_hours=approval.timeout_hours,
+        )
+        db.add(new_approval)
+
+        # 添加工单日志
+        log = WorkOrderLog(
+            order_id=approval.order_id,
+            action="审批升级",
+            content=f"审批超时，已升级至 {approval.escalate_to}",
+            operator="系统"
+        )
+        db.add(log)
+    else:
+        approval.status = ApprovalStatus.timeout
+        approval.resolved_at = datetime.now()
+
+        log = WorkOrderLog(
+            order_id=approval.order_id,
+            action="审批超时",
+            content=f"审批人 {approval.approver} 审批超时",
+            operator="系统"
+        )
+        db.add(log)
+
+    await db.commit()
+    return True
+
+
+@router.post("/workorders/{id}/submit-approval", response_model=WorkOrderApprovalResponse, summary="提交工单审批")
+async def submit_work_order_approval(
+    id: int,
+    data: WorkOrderApprovalCreate,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_operator)
+):
+    """提交工单审批（仅变更请求类型、已接单状态的工单可提交）"""
+    result = await db.execute(select(WorkOrder).where(WorkOrder.id == id))
+    order = result.scalar_one_or_none()
+
+    if not order:
+        raise HTTPException(status_code=404, detail="工单不存在")
+
+    if order.order_type != WorkOrderType.change:
+        raise HTTPException(status_code=400, detail="仅变更请求类型的工单需要审批")
+
+    if order.status != WorkOrderStatus.accepted:
+        raise HTTPException(status_code=400, detail="仅已接单状态的工单可提交审批")
+
+    # 检查是否有进行中的审批
+    existing = await db.execute(
+        select(WorkOrderApproval).where(
+            WorkOrderApproval.order_id == id,
+            WorkOrderApproval.status == ApprovalStatus.pending
+        )
+    )
+    if existing.scalar_one_or_none():
+        raise HTTPException(status_code=400, detail="该工单已有进行中的审批")
+
+    approval = WorkOrderApproval(
+        order_id=id,
+        approver=data.approver,
+        timeout_hours=data.timeout_hours or 24,
+        escalate_to=data.escalate_to,
+    )
+    db.add(approval)
+    await db.commit()
+    await db.refresh(approval)
+
+    # 添加工单日志
+    log = WorkOrderLog(
+        order_id=id,
+        action="提交审批",
+        content=f"提交审批，审批人: {data.approver}",
+        operator=order.assignee or "系统"
+    )
+    db.add(log)
+    await db.commit()
+
+    return WorkOrderApprovalResponse.model_validate(approval)
+
+
+@router.get("/approvals", response_model=List[WorkOrderApprovalResponse], summary="获取审批列表")
+async def get_work_order_approvals(
+    skip: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=1000),
+    status: Optional[ApprovalStatus] = Query(None, description="审批状态过滤"),
+    order_id: Optional[int] = Query(None, description="工单ID过滤"),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_viewer)
+):
+    """获取工单审批列表（惰性检查超时）"""
+    # 惰性检查超时
+    pending_result = await db.execute(
+        select(WorkOrderApproval).where(WorkOrderApproval.status == ApprovalStatus.pending)
+    )
+    for appr in pending_result.scalars().all():
+        await _check_approval_timeout(appr, db)
+
+    query = select(WorkOrderApproval)
+    if status:
+        query = query.where(WorkOrderApproval.status == status)
+    if order_id is not None:
+        query = query.where(WorkOrderApproval.order_id == order_id)
+
+    query = query.order_by(WorkOrderApproval.created_at.desc()).offset(skip).limit(limit)
+    result = await db.execute(query)
+    approvals = result.scalars().all()
+
+    return [WorkOrderApprovalResponse.model_validate(a) for a in approvals]
+
+
+@router.get("/approvals/{id}", response_model=WorkOrderApprovalResponse, summary="获取审批详情")
+async def get_work_order_approval(
+    id: int,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_viewer)
+):
+    """获取工单审批详情"""
+    result = await db.execute(select(WorkOrderApproval).where(WorkOrderApproval.id == id))
+    approval = result.scalar_one_or_none()
+
+    if not approval:
+        raise HTTPException(status_code=404, detail="审批记录不存在")
+
+    # 惰性检查超时
+    await _check_approval_timeout(approval, db)
+    await db.refresh(approval)
+
+    return WorkOrderApprovalResponse.model_validate(approval)
+
+
+@router.post("/approvals/{id}/approve", response_model=WorkOrderApprovalResponse, summary="批准审批")
+async def approve_work_order_approval(
+    id: int,
+    data: ApproveRequest,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_operator)
+):
+    """批准工单审批，工单自动转为处理中"""
+    result = await db.execute(select(WorkOrderApproval).where(WorkOrderApproval.id == id))
+    approval = result.scalar_one_or_none()
+
+    if not approval:
+        raise HTTPException(status_code=404, detail="审批记录不存在")
+
+    if approval.status != ApprovalStatus.pending:
+        raise HTTPException(status_code=400, detail=f"审批状态为 {approval.status.value}，无法批准")
+
+    # 检查超时
+    timed_out = await _check_approval_timeout(approval, db)
+    if timed_out:
+        await db.refresh(approval)
+        raise HTTPException(status_code=400, detail="审批已超时")
+
+    # 批准
+    approval.status = ApprovalStatus.approved
+    approval.reason = data.reason
+    approval.resolved_at = datetime.now()
+
+    # 自动将工单转为处理中
+    order_result = await db.execute(select(WorkOrder).where(WorkOrder.id == approval.order_id))
+    order = order_result.scalar_one_or_none()
+    if order and order.status == WorkOrderStatus.accepted:
+        order.status = WorkOrderStatus.processing
+        order.started_at = datetime.now()
+
+    await db.commit()
+    await db.refresh(approval)
+
+    # 添加工单日志
+    reason_text = f"，意见: {data.reason}" if data.reason else ""
+    log = WorkOrderLog(
+        order_id=approval.order_id,
+        action="审批通过",
+        content=f"审批人 {approval.approver} 批准{reason_text}",
+        operator=approval.approver
+    )
+    db.add(log)
+    await db.commit()
+
+    return WorkOrderApprovalResponse.model_validate(approval)
+
+
+@router.post("/approvals/{id}/reject", response_model=WorkOrderApprovalResponse, summary="驳回审批")
+async def reject_work_order_approval(
+    id: int,
+    data: RejectRequest,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_operator)
+):
+    """驳回工单审批，工单保持已接单状态"""
+    result = await db.execute(select(WorkOrderApproval).where(WorkOrderApproval.id == id))
+    approval = result.scalar_one_or_none()
+
+    if not approval:
+        raise HTTPException(status_code=404, detail="审批记录不存在")
+
+    if approval.status != ApprovalStatus.pending:
+        raise HTTPException(status_code=400, detail=f"审批状态为 {approval.status.value}，无法驳回")
+
+    approval.status = ApprovalStatus.rejected
+    approval.reason = data.reason
+    approval.resolved_at = datetime.now()
+
+    await db.commit()
+    await db.refresh(approval)
+
+    # 添加工单日志
+    log = WorkOrderLog(
+        order_id=approval.order_id,
+        action="审批驳回",
+        content=f"审批人 {approval.approver} 驳回，原因: {data.reason}",
+        operator=approval.approver
+    )
+    db.add(log)
+    await db.commit()
+
+    return WorkOrderApprovalResponse.model_validate(approval)
+
+
 # ==================== 巡检计划管理 ====================
 
 @router.get("/plans", response_model=List[InspectionPlanResponse], summary="获取巡检计划列表")
 async def get_inspection_plans(
     skip: int = Query(0, ge=0, description="跳过记录数"),
     limit: int = Query(100, ge=1, le=1000, description="返回记录数"),
+    is_active: Optional[bool] = Query(None, description="是否启用过滤"),
+    name: Optional[str] = Query(None, description="计划名称搜索"),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_viewer)
 ):
     """
     获取巡检计划列表（分页）
     """
-    query = select(InspectionPlan).offset(skip).limit(limit)
+    query = select(InspectionPlan)
+
+    if is_active is not None:
+        query = query.where(InspectionPlan.is_active == is_active)
+    if name:
+        query = query.where(InspectionPlan.name.contains(name))
+
+    query = query.order_by(InspectionPlan.created_at.desc()).offset(skip).limit(limit)
     result = await db.execute(query)
     plans = result.scalars().all()
 
@@ -490,6 +867,8 @@ async def get_inspection_tasks(
     skip: int = Query(0, ge=0, description="跳过记录数"),
     limit: int = Query(100, ge=1, le=1000, description="返回记录数"),
     status: Optional[InspectionStatus] = Query(None, description="任务状态过滤"),
+    plan_id: Optional[int] = Query(None, description="巡检计划ID过滤"),
+    assignee: Optional[str] = Query(None, description="执行人过滤"),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_viewer)
 ):
@@ -500,12 +879,34 @@ async def get_inspection_tasks(
 
     if status:
         query = query.where(InspectionTask.status == status)
+    if plan_id is not None:
+        query = query.where(InspectionTask.plan_id == plan_id)
+    if assignee:
+        query = query.where(InspectionTask.assignee == assignee)
 
     query = query.order_by(InspectionTask.created_at.desc()).offset(skip).limit(limit)
     result = await db.execute(query)
     tasks = result.scalars().all()
 
-    return [InspectionTaskResponse.model_validate(task) for task in tasks]
+    # 批量获取关联计划名称
+    plan_ids = {t.plan_id for t in tasks if t.plan_id}
+    plan_names: Dict[int, str] = {}
+    if plan_ids:
+        plans_result = await db.execute(
+            select(InspectionPlan.id, InspectionPlan.name).where(
+                InspectionPlan.id.in_(plan_ids)
+            )
+        )
+        plan_names = {row[0]: row[1] for row in plans_result.all()}
+
+    responses = []
+    for task in tasks:
+        resp = InspectionTaskResponse.model_validate(task)
+        if task.plan_id and task.plan_id in plan_names:
+            resp.plan_name = plan_names[task.plan_id]
+        responses.append(resp)
+
+    return responses
 
 
 @router.post("/tasks", response_model=InspectionTaskResponse, summary="创建巡检任务")
@@ -545,7 +946,16 @@ async def get_inspection_task(
     if not task:
         raise HTTPException(status_code=404, detail="巡检任务不存在")
 
-    return InspectionTaskResponse.model_validate(task)
+    resp = InspectionTaskResponse.model_validate(task)
+    if task.plan_id:
+        plan_result = await db.execute(
+            select(InspectionPlan.name).where(InspectionPlan.id == task.plan_id)
+        )
+        plan_name = plan_result.scalar_one_or_none()
+        if plan_name:
+            resp.plan_name = plan_name
+
+    return resp
 
 
 @router.put("/tasks/{id}", response_model=InspectionTaskResponse, summary="更新巡检任务")
@@ -590,6 +1000,8 @@ async def start_inspection_task(
     if not task:
         raise HTTPException(status_code=404, detail="巡检任务不存在")
 
+    _check_task_transition(task.status, InspectionStatus.in_progress)
+
     task.status = InspectionStatus.in_progress
     task.started_at = datetime.now()
 
@@ -615,6 +1027,8 @@ async def complete_inspection_task(
     if not task:
         raise HTTPException(status_code=404, detail="巡检任务不存在")
 
+    _check_task_transition(task.status, InspectionStatus.completed)
+
     task.status = InspectionStatus.completed
     task.completed_at = datetime.now()
     if data.result:
@@ -626,6 +1040,202 @@ async def complete_inspection_task(
     await db.refresh(task)
 
     return InspectionTaskResponse.model_validate(task)
+
+
+@router.delete("/tasks/{id}", summary="删除巡检任务")
+async def delete_inspection_task(
+    id: int,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_operator)
+):
+    """
+    删除巡检任务
+    """
+    result = await db.execute(select(InspectionTask).where(InspectionTask.id == id))
+    task = result.scalar_one_or_none()
+
+    if not task:
+        raise HTTPException(status_code=404, detail="巡检任务不存在")
+
+    await db.delete(task)
+    await db.commit()
+
+    return {"message": "操作成功"}
+
+
+@router.post("/plans/{id}/generate-tasks", response_model=InspectionTaskResponse, summary="从计划生成巡检任务")
+async def generate_inspection_task(
+    id: int,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_operator)
+):
+    """
+    根据巡检计划生成一个巡检任务
+    """
+    result = await db.execute(select(InspectionPlan).where(InspectionPlan.id == id))
+    plan = result.scalar_one_or_none()
+
+    if not plan:
+        raise HTTPException(status_code=404, detail="巡检计划不存在")
+
+    if not plan.is_active:
+        raise HTTPException(status_code=400, detail="巡检计划未启用")
+
+    task_no = await _generate_order_no(db, "IT")
+    task = InspectionTask(
+        plan_id=plan.id,
+        task_no=task_no,
+        assignee=plan.assignee,
+        scheduled_date=datetime.now(),
+    )
+
+    db.add(task)
+    await db.commit()
+    await db.refresh(task)
+
+    resp = InspectionTaskResponse.model_validate(task)
+    resp.plan_name = plan.name
+
+    return resp
+
+
+# ==================== 告警工单规则管理 ====================
+
+@router.get("/alarm-rules", response_model=List[AlarmWorkOrderRuleResponse], summary="获取告警工单规则列表")
+async def get_alarm_workorder_rules(
+    skip: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=1000),
+    is_enabled: Optional[bool] = Query(None, description="是否启用过滤"),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_viewer)
+):
+    """获取告警工单规则列表"""
+    query = select(AlarmWorkOrderRule)
+    if is_enabled is not None:
+        query = query.where(AlarmWorkOrderRule.is_enabled == is_enabled)
+    query = query.order_by(AlarmWorkOrderRule.created_at.desc()).offset(skip).limit(limit)
+    result = await db.execute(query)
+    rules = result.scalars().all()
+    return [AlarmWorkOrderRuleResponse.model_validate(r) for r in rules]
+
+
+@router.post("/alarm-rules/check", summary="检查告警并自动创建工单")
+async def check_alarm_create_workorder(
+    data: AlarmCheckRequest,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_operator)
+):
+    """根据告警信息匹配规则，自动创建工单"""
+    query = select(AlarmWorkOrderRule).where(
+        AlarmWorkOrderRule.is_enabled == True,
+        AlarmWorkOrderRule.alarm_level == data.alarm_level
+    )
+    if data.alarm_type:
+        query = query.where(
+            (AlarmWorkOrderRule.alarm_type == None) |
+            (AlarmWorkOrderRule.alarm_type == data.alarm_type)
+        )
+    else:
+        query = query.where(AlarmWorkOrderRule.alarm_type == None)
+
+    result = await db.execute(query)
+    rule = result.scalars().first()
+
+    if not rule:
+        return {"matched": False, "work_order": None}
+
+    # 创建工单
+    order_no = await _generate_order_no(db, "WO")
+    order = WorkOrder(
+        order_no=order_no,
+        title=f"[自动] {data.alarm_message}",
+        description=f"由告警自动创建，告警ID: {data.alarm_id}",
+        order_type=rule.order_type,
+        priority=rule.priority,
+        alarm_id=data.alarm_id,
+    )
+    db.add(order)
+    await db.commit()
+    await db.refresh(order)
+
+    # 如果规则有 assignee，自动派单
+    if rule.assignee:
+        order.assignee = rule.assignee
+        order.assigned_at = datetime.now()
+        order.status = WorkOrderStatus.assigned
+        await db.commit()
+        await db.refresh(order)
+
+    # 添加日志
+    log = WorkOrderLog(
+        order_id=order.id,
+        action="自动创建",
+        content=f"由告警规则「{rule.name}」自动创建",
+        operator="系统"
+    )
+    db.add(log)
+    await db.commit()
+
+    return {
+        "matched": True,
+        "rule_name": rule.name,
+        "work_order": WorkOrderResponse.model_validate(order)
+    }
+
+
+@router.post("/alarm-rules", response_model=AlarmWorkOrderRuleResponse, summary="创建告警工单规则")
+async def create_alarm_workorder_rule(
+    data: AlarmWorkOrderRuleCreate,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_operator)
+):
+    """创建告警工单规则"""
+    rule = AlarmWorkOrderRule(**data.model_dump())
+    db.add(rule)
+    await db.commit()
+    await db.refresh(rule)
+    return AlarmWorkOrderRuleResponse.model_validate(rule)
+
+
+@router.put("/alarm-rules/{id}", response_model=AlarmWorkOrderRuleResponse, summary="更新告警工单规则")
+async def update_alarm_workorder_rule(
+    id: int,
+    data: AlarmWorkOrderRuleUpdate,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_operator)
+):
+    """更新告警工单规则"""
+    result = await db.execute(select(AlarmWorkOrderRule).where(AlarmWorkOrderRule.id == id))
+    rule = result.scalar_one_or_none()
+    if not rule:
+        raise HTTPException(status_code=404, detail="规则不存在")
+
+    update_data = data.model_dump(exclude_unset=True)
+    for key, value in update_data.items():
+        if value is not None:
+            setattr(rule, key, value)
+
+    rule.updated_at = datetime.now()
+    await db.commit()
+    await db.refresh(rule)
+    return AlarmWorkOrderRuleResponse.model_validate(rule)
+
+
+@router.delete("/alarm-rules/{id}", summary="删除告警工单规则")
+async def delete_alarm_workorder_rule(
+    id: int,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_operator)
+):
+    """删除告警工单规则"""
+    result = await db.execute(select(AlarmWorkOrderRule).where(AlarmWorkOrderRule.id == id))
+    rule = result.scalar_one_or_none()
+    if not rule:
+        raise HTTPException(status_code=404, detail="规则不存在")
+
+    await db.delete(rule)
+    await db.commit()
+    return {"message": "操作成功"}
 
 
 # ==================== 知识库管理 ====================

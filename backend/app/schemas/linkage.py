@@ -3,7 +3,7 @@
 Story 9-1: 联动引擎核心框架
 """
 from datetime import datetime
-from typing import Optional, List
+from typing import Literal, Optional, List
 
 from pydantic import BaseModel, ConfigDict
 
@@ -122,3 +122,70 @@ class ActionTypeInfo(BaseModel):
     action_type: str
     description: str
     is_implemented: bool
+
+
+# ==================== Recovery Schemas (Story 9-4) ====================
+
+class RecoveryCreate(BaseModel):
+    """创建恢复请求"""
+    mode: Literal["auto", "manual"] = "auto"
+
+
+class RecoveryLogResponse(BaseModel):
+    """恢复步骤日志响应"""
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    recovery_id: int
+    step_order: int
+    action_type: Optional[str] = None
+    target_type: Optional[str] = None
+    recovery_command: Optional[str] = None
+    action_config: Optional[dict] = None
+    status: str
+    error_message: Optional[str] = None
+    started_at: Optional[datetime] = None
+    completed_at: Optional[datetime] = None
+    duration_ms: Optional[int] = None
+
+
+class RecoveryResponse(BaseModel):
+    """恢复记录响应"""
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    execution_id: int
+    operator: str
+    mode: str
+    status: str
+    started_at: Optional[datetime] = None
+    completed_at: Optional[datetime] = None
+    total_duration_ms: Optional[int] = None
+    logs: List[RecoveryLogResponse] = []
+
+
+# ==================== Timeline Schemas (Story 9-5) ====================
+
+class TimelineEvent(BaseModel):
+    """时间线中的单个事件"""
+    timestamp: Optional[datetime] = None
+    phase: str  # trigger / action / recovery
+    event_type: str
+    detail: str
+    status: str  # success / failed / timeout / skipped / pending / executing
+    duration_ms: Optional[int] = None
+
+
+class TimelineReportResponse(BaseModel):
+    """完整时间线报告"""
+    execution_id: int
+    event_id: str
+    policy_name: str
+    trigger_source: Optional[str] = None
+    trigger_time: Optional[datetime] = None
+    level: str  # fire_signal / critical / normal
+    total_duration_ms: Optional[int] = None
+    recovery_time_ms: Optional[int] = None
+    operator: Optional[str] = None
+    status: str
+    events: List[TimelineEvent] = []
