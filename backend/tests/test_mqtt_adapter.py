@@ -25,6 +25,7 @@ def _load_module(name: str, filepath: str) -> types.ModuleType:
 _gw_dir = os.path.join(_root, "gateway", "adapters")
 _base = _load_module("gateway.adapters.base", os.path.join(_gw_dir, "base.py"))
 _registry = _load_module("gateway.adapters.registry", os.path.join(_gw_dir, "registry.py"))
+_utils = _load_module("gateway.adapters.utils", os.path.join(_gw_dir, "utils.py"))
 _mqtt = _load_module("gateway.adapters.mqtt_device", os.path.join(_gw_dir, "mqtt_device.py"))
 
 AdapterState = _base.AdapterState
@@ -34,7 +35,7 @@ PointConfig = _base.PointConfig
 PointValue = _base.PointValue
 ADAPTER_REGISTRY = _registry.ADAPTER_REGISTRY
 MqttDeviceAdapter = _mqtt.MqttDeviceAdapter
-_build_json_extractor = _mqtt._build_json_extractor
+_build_json_extractor = _utils.build_json_extractor
 _parse_custom_format = _mqtt._parse_custom_format
 
 

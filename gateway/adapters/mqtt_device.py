@@ -10,7 +10,6 @@
 import asyncio
 import json
 import logging
-import re
 import time
 from datetime import datetime, timezone
 from typing import Any, Callable, Optional
@@ -26,36 +25,9 @@ from .base import (
     PointValue,
 )
 from .registry import register_adapter
+from .utils import build_json_extractor as _build_json_extractor
 
 logger = logging.getLogger(__name__)
-
-
-def _build_json_extractor(path: str) -> Callable[[dict], Any]:
-    """构建 JSON 路径提取器
-
-    支持点分路径: "data.temperature" → payload["data"]["temperature"]
-    支持数组索引: "sensors[0].value" → payload["sensors"][0]["value"]
-    """
-    parts: list[str | int] = []
-    for segment in path.split("."):
-        # 处理数组索引: sensors[0]
-        match = re.match(r"^(\w+)\[(\d+)\]$", segment)
-        if match:
-            parts.append(match.group(1))
-            parts.append(int(match.group(2)))
-        else:
-            parts.append(segment)
-
-    def extract(payload: dict) -> Any:
-        current: Any = payload
-        for part in parts:
-            if isinstance(part, int):
-                current = current[part]
-            else:
-                current = current[part]
-        return current
-
-    return extract
 
 
 def _parse_custom_format(raw: str, delimiter: str, index: int) -> str:

@@ -21,6 +21,8 @@ from . import modbus_tcp  # 触发 @register_adapter 装饰器
 from . import modbus_rtu  # 触发 @register_adapter 装饰器
 from . import snmp  # 触发 @register_adapter 装饰器
 from . import mqtt_device  # 触发 @register_adapter 装饰器
+from . import http_rest  # 触发 @register_adapter 装饰器
+from . import bacnet_ip  # 触发 @register_adapter 装饰器
 
 __all__ = [
     "BaseProtocolAdapter",
