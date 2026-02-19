@@ -146,8 +146,9 @@ onMounted(async () => {
   try {
     const res = await getCoolingOverview()
     if (res && typeof res === 'object') {
-      overview.value = (res as Record<string, unknown>).data
-        ? ((res as Record<string, unknown>).data as CoolingOverviewSummary)
+      const resAny = res as unknown as Record<string, unknown>
+      overview.value = resAny.data
+        ? (resAny.data as CoolingOverviewSummary)
         : (res as CoolingOverviewSummary)
     }
   } catch {

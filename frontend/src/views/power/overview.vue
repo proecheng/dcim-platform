@@ -152,8 +152,9 @@ onMounted(async () => {
   try {
     const res = await getPowerOverview()
     if (res && typeof res === 'object') {
-      overview.value = (res as Record<string, unknown>).data
-        ? ((res as Record<string, unknown>).data as PowerOverviewSummary)
+      const resAny = res as unknown as Record<string, unknown>
+      overview.value = resAny.data
+        ? (resAny.data as PowerOverviewSummary)
         : (res as PowerOverviewSummary)
     }
   } catch {

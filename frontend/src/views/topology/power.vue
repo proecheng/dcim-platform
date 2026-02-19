@@ -217,8 +217,8 @@ async function loadPhaseMappings(pduDeviceId: number) {
   }
 }
 
-function phaseTagType(phase: string): '' | 'success' | 'warning' {
-  if (phase === 'A') return ''
+function phaseTagType(phase: string): 'info' | 'success' | 'warning' {
+  if (phase === 'A') return 'info'
   if (phase === 'B') return 'success'
   return 'warning'
 }
@@ -230,7 +230,7 @@ const gaugeChartRef = ref<HTMLElement>()
 let gaugeChart: echarts.ECharts | null = null
 
 const phaseLabels = [
-  { key: 'phase_a_cabinets' as const, label: 'A 相', type: '' as const },
+  { key: 'phase_a_cabinets' as const, label: 'A 相', type: 'info' as const },
   { key: 'phase_b_cabinets' as const, label: 'B 相', type: 'success' as const },
   { key: 'phase_c_cabinets' as const, label: 'C 相', type: 'warning' as const }
 ]
@@ -245,8 +245,7 @@ const imbalanceClass = computed(() => {
 async function loadPhaseBalance(pduDeviceId: number) {
   try {
     const res = await getPduPhaseBalance(pduDeviceId)
-    const data = (res as unknown as { data?: PhaseBalanceResponse })
-    balanceData.value = data.data || (res as PhaseBalanceResponse)
+    balanceData.value = res.data || (res as unknown as PhaseBalanceResponse)
     renderGaugeChart()
   } catch {
     balanceData.value = null

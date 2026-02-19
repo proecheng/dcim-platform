@@ -115,8 +115,9 @@ const normalCount = computed(() => sensorData.value.filter((d) => d.status === '
 const alarmCount = computed(() => sensorData.value.filter((d) => d.status === 'alarm').length)
 const offlineCount = computed(() => sensorData.value.filter((d) => d.status === 'offline').length)
 
-function statusTagType(status: string) {
-  const map: Record<string, string> = { normal: 'success', alarm: 'danger', offline: 'info' }
+type TagType = 'info' | 'warning' | 'success' | 'danger' | 'primary'
+function statusTagType(status: string): TagType {
+  const map: Record<string, TagType> = { normal: 'success', alarm: 'danger', offline: 'info' }
   return map[status] || 'info'
 }
 

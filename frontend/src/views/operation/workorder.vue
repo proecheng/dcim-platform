@@ -693,6 +693,7 @@ function getStatusType(status?: WorkOrderStatus): TagType {
   const map: Record<WorkOrderStatus, TagType> = {
     pending: 'warning',
     assigned: 'info',
+    accepted: 'primary',
     processing: 'primary',
     completed: 'success',
     closed: 'info',
@@ -705,6 +706,7 @@ function getStatusLabel(status?: WorkOrderStatus): string {
   const map: Record<WorkOrderStatus, string> = {
     pending: '待处理',
     assigned: '已分配',
+    accepted: '已接受',
     processing: '处理中',
     completed: '已完成',
     closed: '已关闭',

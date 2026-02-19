@@ -524,7 +524,7 @@ import {
   type MeterPoint
 } from '@/api/modules/energy'
 import { getLoadPeriodDistribution, type LoadPeriodData, type HourlyLoadPoint } from '@/api/modules/demand'
-import { createOpportunity, getExecutionPlanDetail } from '@/api/modules/opportunities'
+import { createOpportunity, getExecutionPlanDetail, type EnergyOpportunity, type OpportunityCategory } from '@/api/modules/opportunities'
 import LoadPeriodChart from '@/components/demand/LoadPeriodChart.vue'
 import ShiftPlanBuilder from '@/components/energy/ShiftPlanBuilder.vue'
 import ScheduleDashboard from '@/components/energy/ScheduleDashboard.vue'
@@ -770,8 +770,8 @@ const handleCreateShiftOpportunity = async (data: {
       sharp: '尖峰', peak: '峰时', flat: '平时', valley: '谷时', deep_valley: '深谷'
     }
 
-    const opportunityData = {
-      category: 1, // 电费结构优化
+    const opportunityData: Partial<EnergyOpportunity> = {
+      category: 1 as OpportunityCategory, // 电费结构优化
       title: `负荷转移优化 - ${deviceNames}${suffix}`,
       description: `将${data.shiftPower}kW负荷从${periodNames[data.sourcePeriod]}转移到${periodNames[data.targetPeriod]}，每天转移${data.shiftHours}小时`,
       source_plugin: 'peak_valley_optimizer',
@@ -924,7 +924,7 @@ async function restorePlanConfig(planId: number) {
     const res = await getExecutionPlanDetail(planId)
     if (res.code === 0 && res.data) {
       const plan = res.data.plan
-      // @ts-ignore - Backend returns full opportunity with analysis_data
+      // Backend returns full opportunity with analysis_data
       const opportunity = res.data.opportunity
       const analysisData = opportunity?.analysis_data
 

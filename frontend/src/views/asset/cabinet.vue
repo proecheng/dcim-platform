@@ -435,8 +435,8 @@ async function submitForm() {
       await updateCabinet(currentCabinetId.value, {
         cabinet_name: form.cabinet_name,
         location: form.location,
-        row_number: form.row_number,
-        column_number: form.column_number,
+        row_number: String(form.row_number),
+        column_number: String(form.column_number),
         total_u: form.total_u,
         max_power: form.max_power,
         max_weight: form.max_weight
@@ -447,8 +447,8 @@ async function submitForm() {
         cabinet_code: form.cabinet_code,
         cabinet_name: form.cabinet_name,
         location: form.location,
-        row_number: form.row_number,
-        column_number: form.column_number,
+        row_number: String(form.row_number),
+        column_number: String(form.column_number),
         total_u: form.total_u,
         max_power: form.max_power,
         max_weight: form.max_weight

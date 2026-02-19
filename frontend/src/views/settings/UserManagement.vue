@@ -292,7 +292,7 @@ const formRules = computed(() => ({
     { required: true, validator: validateConfirmPassword, trigger: 'blur' }
   ],
   email: [
-    { type: 'email', message: '请输入正确的邮箱格式', trigger: 'blur' }
+    { type: 'email' as const, message: '请输入正确的邮箱格式', trigger: 'blur' }
   ],
   phone: [
     { pattern: /^1[3-9]\d{9}$/, message: '请输入正确的手机号', trigger: 'blur' }

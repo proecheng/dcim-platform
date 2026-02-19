@@ -165,7 +165,7 @@ const alarms = ref<AlarmItem[]>([])
 const chartRefs: Record<number, HTMLElement | null> = {}
 const chartInstances: Record<number, echarts.ECharts> = {}
 const chartDurations: Record<number, number> = reactive({})
-const expandedRowKeys = ref<number[]>([])
+const expandedRowKeys = ref<string[]>([])
 
 function setChartRef(pointId: number, el: HTMLElement | null) {
   chartRefs[pointId] = el
@@ -249,7 +249,7 @@ async function loadDetail() {
 
 // ===== 展开行处理 =====
 function handleExpandChange(row: PointRealtimeItem, expandedRows: PointRealtimeItem[]) {
-  expandedRowKeys.value = expandedRows.map(r => r.id)
+  expandedRowKeys.value = expandedRows.map(r => String(r.id))
   if (row.point_type === 'AI' && expandedRows.some(r => r.id === row.id)) {
     if (!chartDurations[row.id]) {
       chartDurations[row.id] = 60

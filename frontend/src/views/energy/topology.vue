@@ -591,7 +591,8 @@ import {
   type TopologyNodeTypeEnum,
   type TopologyNodeCreateRequest,
   type TopologyNodeUpdateRequest,
-  type DeviceLinkedPoint
+  type DeviceLinkedPoint,
+  type DeviceLinkedPointsResponse
 } from '@/api/modules/energy'
 
 // 扩展节点类型，增加 grid 和 point
@@ -1575,7 +1576,7 @@ const loadDevicePoints = async () => {
   loadingDevicePoints.value = true
   try {
     const res = await getDeviceLinkedPoints(selectedNode.value.id)
-    const data = res.data || res
+    const data = (res.data || res) as DeviceLinkedPointsResponse
     devicePoints.value = data.points || []
   } catch (e: any) {
     console.error('加载设备点位失败:', e)

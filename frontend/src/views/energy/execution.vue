@@ -365,7 +365,7 @@ async function loadStats() {
         actual: stats.value?.results?.total_actual_saving,
         rate: stats.value?.results?.overall_achievement_rate
       })
-    } else if (res && res.plans) {
+    } else if (res && (res as any).plans) {
       // 直接返回data的情况
       stats.value = res as any
       console.log('[Execution] Stats loaded (direct format):', stats.value)

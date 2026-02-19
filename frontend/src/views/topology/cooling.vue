@@ -349,8 +349,7 @@ async function openCapacityDialog(row: CoolingZoneResponse) {
   capacityDialogVisible.value = true
   try {
     const res = await getCoolingZoneCapacity(row.id)
-    const data = (res as unknown as { data?: CoolingZoneCapacityResponse })
-    capacityData.value = data.data || (res as CoolingZoneCapacityResponse)
+    capacityData.value = res.data || (res as unknown as CoolingZoneCapacityResponse)
   } catch {
     ElMessage.error('获取容量数据失败')
   }

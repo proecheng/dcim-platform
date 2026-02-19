@@ -313,7 +313,7 @@ import {
   type DataSource,
   type CommunicationStatusItem
 } from '@/api/datasource'
-import { ElMessageBox, ElMessage } from 'element-plus'
+import { ElMessageBox, ElMessage, type UploadFile } from 'element-plus'
 
 const datasources = ref<DataSource[]>([])
 const dialogVisible = ref(false)
@@ -689,8 +689,8 @@ function resetImportState() {
   importing.value = false
 }
 
-function handleFileChange(uploadFile: { raw: File }) {
-  importFile.value = uploadFile.raw
+function handleFileChange(uploadFile: UploadFile) {
+  importFile.value = uploadFile.raw || null
   importReport.value = null
 }
 
