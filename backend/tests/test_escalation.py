@@ -107,7 +107,7 @@ class TestEscalationCRUD:
 
     async def test_create_escalation(self, client):
         """创建升级规则"""
-        resp = await client.post("/api/v1/escalations/", json={
+        resp = await client.post("/api/v1/escalations", json={
             "rule_name": "次要升重要",
             "source_level": "minor",
             "timeout_minutes": 30,
@@ -128,13 +128,13 @@ class TestEscalationCRUD:
     async def test_list_escalations(self, client):
         """列表查询"""
         # 先创建一条
-        await client.post("/api/v1/escalations/", json={
+        await client.post("/api/v1/escalations", json={
             "rule_name": "重要升紧急",
             "source_level": "major",
             "timeout_minutes": 15,
             "target_level": "critical",
         })
-        resp = await client.get("/api/v1/escalations/")
+        resp = await client.get("/api/v1/escalations")
         assert resp.status_code == 200
         data = resp.json()
         assert data["total"] >= 1
@@ -143,15 +143,15 @@ class TestEscalationCRUD:
     async def test_list_filter_source_level(self, client):
         """按源级别过滤"""
         # 创建两条不同级别
-        await client.post("/api/v1/escalations/", json={
+        await client.post("/api/v1/escalations", json={
             "rule_name": "r1", "source_level": "info",
             "timeout_minutes": 60, "target_level": "minor",
         })
-        await client.post("/api/v1/escalations/", json={
+        await client.post("/api/v1/escalations", json={
             "rule_name": "r2", "source_level": "minor",
             "timeout_minutes": 30, "target_level": "major",
         })
-        resp = await client.get("/api/v1/escalations/?source_level=info")
+        resp = await client.get("/api/v1/escalations?source_level=info")
         assert resp.status_code == 200
         data = resp.json()
         for item in data["items"]:
@@ -159,7 +159,7 @@ class TestEscalationCRUD:
 
     async def test_get_escalation(self, client):
         """获取详情"""
-        create_resp = await client.post("/api/v1/escalations/", json={
+        create_resp = await client.post("/api/v1/escalations", json={
             "rule_name": "详情测试",
             "source_level": "minor",
             "timeout_minutes": 20,
@@ -177,7 +177,7 @@ class TestEscalationCRUD:
 
     async def test_update_escalation(self, client):
         """更新规则"""
-        create_resp = await client.post("/api/v1/escalations/", json={
+        create_resp = await client.post("/api/v1/escalations", json={
             "rule_name": "待更新",
             "source_level": "minor",
             "timeout_minutes": 30,
@@ -197,7 +197,7 @@ class TestEscalationCRUD:
 
     async def test_delete_escalation(self, client):
         """删除规则"""
-        create_resp = await client.post("/api/v1/escalations/", json={
+        create_resp = await client.post("/api/v1/escalations", json={
             "rule_name": "待删除",
             "source_level": "minor",
             "timeout_minutes": 30,
@@ -212,7 +212,7 @@ class TestEscalationCRUD:
 
     async def test_toggle_escalation(self, client):
         """切换启用状态"""
-        create_resp = await client.post("/api/v1/escalations/", json={
+        create_resp = await client.post("/api/v1/escalations", json={
             "rule_name": "切换测试",
             "source_level": "minor",
             "timeout_minutes": 30,
