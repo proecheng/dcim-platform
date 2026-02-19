@@ -30,10 +30,8 @@ apscheduler==3.10.4
 # Data export
 openpyxl==3.1.2
 
-# Deep learning (optional)
-torch>=2.0.0
-numpy>=1.24.0
-reportlab>=4.0
+# Deep learning (optional) — 见 requirements-ml.txt
+# pip install -r requirements-ml.txt
 
 # HTTP client (联动引擎 Webhook)
 httpx>=0.25.0

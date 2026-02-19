@@ -1,0 +1,7 @@
+# 机器学习 & PDF 生成（可选依赖）
+# 安装: pip install -r requirements-ml.txt
+# 注意: torch 约 2GB，仅在需要 ML 推理功能时安装
+
+torch>=2.0.0
+numpy>=1.24.0
+reportlab>=4.0

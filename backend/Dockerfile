@@ -8,10 +8,9 @@ RUN apt-get update && \
     apt-get install -y --no-install-recommends curl libpq-dev && \
     rm -rf /var/lib/apt/lists/*
 
-# 安装 Python 依赖（排除 torch 等可选大包）
+# 安装 Python 依赖（不含 ML 可选包，见 requirements-ml.txt）
 COPY requirements.txt .
-RUN pip install --no-cache-dir \
-    $(grep -v -E '^\s*#|^torch|^numpy|^reportlab' requirements.txt | tr '\n' ' ')
+RUN pip install --no-cache-dir -r requirements.txt
 
 # 复制应用代码
 COPY . .
