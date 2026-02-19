@@ -96,6 +96,26 @@ class RedisService:
         """设置 JSON 值"""
         await self.set(key, json.dumps(value, ensure_ascii=False), ttl)
 
+    async def sismember(self, key: str, member: str) -> bool:
+        """检查 SET 中是否存在成员，Redis 不可用时返回 False"""
+        if not self.is_available:
+            return False
+        try:
+            return bool(await self._pool.sismember(key, member))
+        except Exception as e:
+            logger.warning("Redis SISMEMBER 失败 key=%s: %s", key, e)
+            return False
+
+    async def sadd_with_ttl(self, key: str, member: str, ttl: int = 3600) -> None:
+        """向 SET 添加成员并设置 TTL，Redis 不可用时静默失败"""
+        if not self.is_available:
+            return
+        try:
+            await self._pool.sadd(key, member)
+            await self._pool.expire(key, ttl)
+        except Exception as e:
+            logger.warning("Redis SADD 失败 key=%s: %s", key, e)
+
 
 # 全局单例
 redis_service = RedisService()

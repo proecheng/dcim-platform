@@ -1,4 +1,4 @@
-"""点位数据处理服务 — Story 2.5"""
+"""点位数据处理服务 — Story 2.5 + Story 16.3 断点续传去重"""
 import logging
 from datetime import datetime
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -6,17 +6,27 @@ from sqlalchemy import select, update
 
 from ..models.gateway import PointDataLatest
 from .cache_service import cache_point_data
+from .dedup_service import is_duplicate, mark_processed
 
 logger = logging.getLogger(__name__)
 
 
-async def handle_point_data(payload: dict, db: AsyncSession) -> int:
-    """处理网关上报的点位数据，返回处理条数"""
+async def handle_point_data(
+    payload: dict, db: AsyncSession, *, site_id: str | None = None
+) -> int:
+    """处理网关上报的点位数据，返回处理条数。支持断点续传去重。"""
     gw_id = payload.get("gw_id")
     points = payload.get("points")
     if not gw_id or not points:
         logger.warning("数据消息格式无效: 缺少 gw_id 或 points")
         return 0
+
+    # 断点续传去重: 如果 payload 包含 seq，检查是否已处理
+    seq = payload.get("seq")
+    if seq is not None:
+        if await is_duplicate(gw_id, seq):
+            logger.debug("重复消息跳过: gw=%s, seq=%s", gw_id, seq)
+            return 0
 
     count = 0
     for pt in points:
@@ -59,5 +69,10 @@ async def handle_point_data(payload: dict, db: AsyncSession) -> int:
         count += 1
 
     await db.commit()
-    logger.debug("点位数据处理: gw=%s, %d 条", gw_id, count)
+
+    # 标记序列号已处理
+    if seq is not None:
+        await mark_processed(gw_id, seq)
+
+    logger.debug("点位数据处理: site=%s, gw=%s, %d 条", site_id, gw_id, count)
     return count

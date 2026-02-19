@@ -11,7 +11,7 @@ class GatewayBase(BaseModel):
     ip_address: Optional[str] = None
     version: Optional[str] = None
     capabilities: Optional[dict] = None
-    site_id: int = 1
+    site_id: Optional[int] = None
     is_enabled: bool = True
 
 
@@ -55,7 +55,7 @@ class DataSourceBase(BaseModel):
     retry_base_delay: float = 1.0
     retry_max_delay: float = 60.0
     retry_max_failures: int = 5
-    site_id: int = 1
+    site_id: Optional[int] = None
     is_enabled: bool = True
 
 
@@ -203,3 +203,8 @@ class DeviceTemplateResponse(DeviceTemplateBase):
     id: int
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
+
+
+class GatewayAssignSite(BaseModel):
+    """网关站点分配请求"""
+    site_id: int = Field(..., description="目标站点ID")

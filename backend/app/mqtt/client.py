@@ -156,13 +156,14 @@ class MqttService:
                     await ota_service.handle_ota_status(payload, db)
             # 原有网关消息: dcim/{site_id}/gw/{gw_id}/{type} (5段)
             elif len(parts) == 5 and parts[0] == "dcim":
+                site_id_str = parts[1]  # 从 topic 提取 site_id
                 msg_type = parts[4]
                 if msg_type == "status":
                     async with async_session() as db:
-                        await handle_gateway_status(payload, db)
+                        await handle_gateway_status(payload, db, site_id=site_id_str)
                 elif msg_type == "data":
                     async with async_session() as db:
-                        await handle_point_data(payload, db)
+                        await handle_point_data(payload, db, site_id=site_id_str)
         except json.JSONDecodeError:
             pass  # 非 JSON 消息可能是动态订阅的自定义格式，已在上面处理
         except Exception:

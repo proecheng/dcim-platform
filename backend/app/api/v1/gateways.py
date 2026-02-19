@@ -11,7 +11,7 @@ from ...models.gateway import Gateway, DataSource, DataSourcePoint, GatewayEvent
 from ...schemas.gateway import (
     GatewayCreate, GatewayUpdate, GatewayResponse,
     GatewayStatusSummary, GatewayDetailResponse, GatewayEventResponse,
-    ConfigPushResponse, ConfigPushRecordResponse,
+    ConfigPushResponse, ConfigPushRecordResponse, GatewayAssignSite,
 )
 from ...schemas.common import PageResponse
 
@@ -251,6 +251,44 @@ async def update_gateway(
     update_data = data.model_dump(exclude_unset=True)
     update_data["updated_at"] = datetime.now()
     await db.execute(update(Gateway).where(Gateway.id == gateway_id).values(**update_data))
+    await db.commit()
+
+    result = await db.execute(select(Gateway).where(Gateway.id == gateway_id))
+    obj = result.scalar_one()
+    return GatewayResponse.model_validate(obj)
+
+
+@router.put("/{gateway_id}/site", response_model=GatewayResponse, summary="分配网关到站点")
+async def assign_gateway_site(
+    gateway_id: int,
+    data: GatewayAssignSite,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_admin),
+    user_site_ids: Optional[list[int]] = Depends(get_user_site_ids),
+):
+    """将网关分配到指定站点（仅管理员）"""
+    from ...models.spatial import Site
+
+    # 验证网关存在
+    result = await db.execute(select(Gateway).where(Gateway.id == gateway_id))
+    obj = result.scalar_one_or_none()
+    if not obj:
+        raise HTTPException(status_code=404, detail="网关不存在")
+
+    # 验证目标站点存在
+    site_result = await db.execute(select(Site).where(Site.id == data.site_id))
+    if not site_result.scalar_one_or_none():
+        raise HTTPException(status_code=404, detail="目标站点不存在")
+
+    # 验证用户有目标站点的访问权限
+    if user_site_ids is not None and data.site_id not in user_site_ids:
+        raise HTTPException(status_code=403, detail="无目标站点访问权限")
+
+    await db.execute(
+        update(Gateway).where(Gateway.id == gateway_id).values(
+            site_id=data.site_id, updated_at=datetime.now()
+        )
+    )
     await db.commit()
 
     result = await db.execute(select(Gateway).where(Gateway.id == gateway_id))
