@@ -200,7 +200,7 @@ class TemplateGenerator:
             )
             measure_traces = benefit.get("_traces", {})
         else:
-            benefit = await self.calculator.calc_peak_shift_benefit(
+            benefit = self.calculator.calc_peak_shift_benefit(
                 shiftable_power, shift_hours, sharp_price, valley_price
             )
             measure_traces = {}
@@ -263,7 +263,7 @@ class TemplateGenerator:
             )
             measure_traces = benefit.get("_traces", {})
         else:
-            benefit = await self.calculator.calc_peak_shift_benefit(
+            benefit = self.calculator.calc_peak_shift_benefit(
                 shiftable_power, shift_hours, peak_price, flat_price
             )
             measure_traces = {}
@@ -324,7 +324,7 @@ class TemplateGenerator:
             )
             measure_traces = benefit.get("_traces", {})
         else:
-            benefit = await self.calculator.calc_peak_shift_benefit(
+            benefit = self.calculator.calc_peak_shift_benefit(
                 shiftable_power, shift_hours, sharp_price, valley_price
             )
             measure_traces = {}

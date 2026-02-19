@@ -200,9 +200,9 @@ class TracedFormulaCalculator(FormulaCalculator):
 
     # ==================== 带追溯的计算方法 ====================
 
-    def traced_annual_energy(self, year: int) -> TracedValue:
+    async def traced_annual_energy(self, year: int) -> TracedValue:
         """带追溯的年用电量计算"""
-        value = self.calc_annual_energy(year)
+        value = await self.calc_annual_energy(year)
         trace = self._create_aggregate_trace(
             param_code="annual_energy",
             param_name="年用电量",
@@ -218,9 +218,9 @@ class TracedFormulaCalculator(FormulaCalculator):
         )
         return TracedValue(value, trace, "kWh")
 
-    def traced_max_demand(self, year: int, month: Optional[int] = None) -> TracedValue:
+    async def traced_max_demand(self, year: int, month: Optional[int] = None) -> TracedValue:
         """带追溯的最大需量计算"""
-        value = self.calc_max_demand(year, month)
+        value = await self.calc_max_demand(year, month)
         filter_cond = f"stat_year = {year}"
         sql = f"SELECT MAX(max_demand) FROM demand_history WHERE stat_year = {year}"
         if month:
@@ -242,10 +242,10 @@ class TracedFormulaCalculator(FormulaCalculator):
         )
         return TracedValue(value, trace, "kW")
 
-    def traced_average_load(self, year: int) -> TracedValue:
+    async def traced_average_load(self, year: int) -> TracedValue:
         """带追溯的平均负荷计算"""
-        energy_tv = self.traced_annual_energy(year)
-        value = self.calc_average_load(year)
+        energy_tv = await self.traced_annual_energy(year)
+        value = await self.calc_average_load(year)
 
         trace = self._create_composite_trace(
             param_code="avg_load",
@@ -273,9 +273,9 @@ class TracedFormulaCalculator(FormulaCalculator):
         )
         return TracedValue(value, trace, "%")
 
-    def traced_peak_valley_data(self, start_date: date, end_date: date) -> Dict[str, Any]:
+    async def traced_peak_valley_data(self, start_date: date, end_date: date) -> Dict[str, Any]:
         """带追溯的峰谷电量数据"""
-        data = self.calc_peak_valley_data(start_date, end_date)
+        data = await self.calc_peak_valley_data(start_date, end_date)
         traces = {}
 
         # 为每个数据项创建追溯记录
@@ -299,9 +299,9 @@ class TracedFormulaCalculator(FormulaCalculator):
         data["_traces"] = traces
         return data
 
-    def traced_demand_control_data(self, meter_point_id: Optional[int] = None) -> Dict[str, Any]:
+    async def traced_demand_control_data(self, meter_point_id: Optional[int] = None) -> Dict[str, Any]:
         """带追溯的需量控制数据"""
-        data = self.calc_demand_control_data(meter_point_id)
+        data = await self.calc_demand_control_data(meter_point_id)
         traces = {}
 
         # 当前申报需量 - 直接映射
@@ -372,7 +372,7 @@ class TracedFormulaCalculator(FormulaCalculator):
         data["_traces"] = traces
         return data
 
-    def traced_peak_shift_benefit(
+    async def traced_peak_shift_benefit(
         self,
         shiftable_power: Decimal,
         shift_hours: Decimal,
@@ -451,9 +451,9 @@ class TracedFormulaCalculator(FormulaCalculator):
         data["_traces"] = traces
         return data
 
-    def traced_vpp_response_potential(self) -> Dict[str, Any]:
+    async def traced_vpp_response_potential(self) -> Dict[str, Any]:
         """带追溯的VPP需求响应潜力计算"""
-        data = self.calc_vpp_response_potential()
+        data = await self.calc_vpp_response_potential()
         traces = {}
 
         # 为每个资源级别创建追溯记录
@@ -502,9 +502,9 @@ class TracedFormulaCalculator(FormulaCalculator):
         data["_traces"] = traces
         return data
 
-    def traced_load_curve_analysis(self, analysis_date: date) -> Dict[str, Any]:
+    async def traced_load_curve_analysis(self, analysis_date: date) -> Dict[str, Any]:
         """带追溯的负荷曲线分析"""
-        data = self.calc_load_curve_analysis(analysis_date)
+        data = await self.calc_load_curve_analysis(analysis_date)
         traces = {}
 
         # 最大负荷追溯
@@ -585,9 +585,9 @@ class TracedFormulaCalculator(FormulaCalculator):
         data["_traces"] = traces
         return data
 
-    def traced_equipment_load_rate(self, equipment_type: str, start_date: date, end_date: date) -> Dict[str, Any]:
+    async def traced_equipment_load_rate(self, equipment_type: str, start_date: date, end_date: date) -> Dict[str, Any]:
         """带追溯的设备负荷率计算"""
-        value = self.calc_equipment_load_rate(equipment_type, start_date, end_date)
+        value = await self.calc_equipment_load_rate(equipment_type, start_date, end_date)
 
         trace = self._create_aggregate_trace(
             param_code=f"equipment_{equipment_type.lower()}_load_rate",
@@ -607,9 +607,9 @@ class TracedFormulaCalculator(FormulaCalculator):
             "_traces": {"设备负荷率": trace}
         }
 
-    def traced_equipment_efficiency_benchmark(self, equipment_type: str) -> Dict[str, Any]:
+    async def traced_equipment_efficiency_benchmark(self, equipment_type: str) -> Dict[str, Any]:
         """带追溯的设备能效对标"""
-        data = self.calc_equipment_efficiency_benchmark(equipment_type)
+        data = await self.calc_equipment_efficiency_benchmark(equipment_type)
         traces = {}
 
         # 当前能效追溯
