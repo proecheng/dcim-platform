@@ -165,3 +165,11 @@ development_status:
   16-2-site-switching-and-unified-view: done
   16-3-multi-site-gateway-access: done
   epic-16-retrospective: optional
+
+  # Epic 17: 2.5D 视觉增强 (推广阶段)
+  epic-17: done
+  17-1-25d-scss-mixin-infrastructure: done
+  17-2-dashboard-overview-25d-enhancement: done
+  17-3-list-form-25d-enhancement: done
+  17-4-special-page-25d-enhancement: done
+  epic-17-retrospective: optional
