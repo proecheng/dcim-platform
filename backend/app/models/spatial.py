@@ -3,7 +3,7 @@
 """
 from datetime import datetime
 from sqlalchemy import (
-    Column, Integer, String, Float, Text, DateTime,
+    Column, Integer, String, Float, Text, DateTime, JSON,
     ForeignKey, UniqueConstraint,
 )
 from sqlalchemy.orm import relationship
@@ -19,6 +19,11 @@ class Site(Base):
     site_code = Column(String(50), unique=True, nullable=False, comment="站点编码")
     site_name = Column(String(100), nullable=False, comment="站点名称")
     address = Column(String(200), comment="地址")
+    contact_person = Column(String(50), comment="联系人")
+    contact_phone = Column(String(20), comment="联系电话")
+    contact_email = Column(String(100), comment="联系邮箱")
+    network_config = Column(JSON, comment="网络配置(VPN/专线信息)")
+    status = Column(String(20), default="active", comment="状态: active/inactive/maintenance")
     description = Column(Text, comment="描述")
     created_at = Column(DateTime, default=datetime.now, comment="创建时间")
     updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now, comment="更新时间")

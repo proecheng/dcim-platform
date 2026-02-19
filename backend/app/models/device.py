@@ -2,7 +2,7 @@
 设备模型
 """
 from datetime import datetime
-from sqlalchemy import Column, Integer, String, Boolean, Float, Text, DateTime, Date
+from sqlalchemy import Column, Integer, String, Boolean, Float, Text, DateTime, Date, ForeignKey
 
 from ..core.database import Base
 
@@ -24,6 +24,7 @@ class Device(Base):
     location_x = Column(Float, comment="平面图X坐标")
     location_y = Column(Float, comment="平面图Y坐标")
     description = Column(Text, comment="描述")
+    site_id = Column(Integer, ForeignKey("sites.id"), nullable=True, comment="所属站点ID")
     is_enabled = Column(Boolean, default=True, comment="是否启用")
     created_at = Column(DateTime, default=datetime.now, comment="创建时间")
     updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now, comment="更新时间")

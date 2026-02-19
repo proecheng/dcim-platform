@@ -26,6 +26,7 @@ from .engines.linkage_engine import linkage_engine
 from .engines.event_bus import get_event_bus
 from .services.communication_monitor import check_communication_status
 from .engines.escalation_engine import check_escalations
+from .engines.diagnosis_engine import diagnosis_engine
 from .services.pue_calculator import write_pue_history
 from .services.energy_aggregator import aggregate_hourly, aggregate_daily, aggregate_monthly
 
@@ -191,6 +192,17 @@ async def lifespan(app: FastAPI):
     await event_bus.subscribe("linkage", cross_confirmation_service.on_alarm_event)
 
     await event_bus.subscribe("linkage", linkage_engine.on_event)
+
+    # 同步诊断规则 YAML 到数据库并启动诊断引擎（Story 9-3）
+    try:
+        from .services.diagnosis_loader import sync_to_database as diag_sync
+        async with async_session() as session:
+            await diag_sync(session)
+    except Exception as e:
+        logger.warning("诊断规则同步失败: %s", e)
+
+    await diagnosis_engine.load_rules()
+    await event_bus.subscribe("linkage", diagnosis_engine.on_alarm_event)
 
     # 启动数据模拟器（后台任务）
     simulator_task = asyncio.create_task(simulator.start(interval=5))

@@ -1,6 +1,6 @@
 """网关和数据源模型"""
 from datetime import datetime
-from sqlalchemy import Column, Integer, String, Boolean, Float, DateTime, JSON, Index, UniqueConstraint
+from sqlalchemy import Column, Integer, String, Boolean, Float, DateTime, JSON, Index, UniqueConstraint, ForeignKey
 
 from ..core.database import Base
 
@@ -20,7 +20,7 @@ class Gateway(Base):
     memory_usage = Column(Float, comment="内存使用率 %")
     disk_usage = Column(Float, comment="磁盘使用率 %")
     last_heartbeat = Column(DateTime, comment="最后心跳时间")
-    site_id = Column(Integer, default=1, comment="站点 ID")
+    site_id = Column(Integer, ForeignKey("sites.id"), nullable=True, default=None, comment="站点 ID")
     is_enabled = Column(Boolean, default=True, comment="是否启用")
     created_at = Column(DateTime, default=datetime.now, comment="创建时间")
     updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now, comment="更新时间")
@@ -46,7 +46,7 @@ class DataSource(Base):
     retry_base_delay = Column(Float, default=1.0, comment="重试基础延迟（秒）")
     retry_max_delay = Column(Float, default=60.0, comment="重试最大延迟（秒）")
     retry_max_failures = Column(Integer, default=5, comment="连续失败阈值")
-    site_id = Column(Integer, default=1, comment="站点 ID")
+    site_id = Column(Integer, ForeignKey("sites.id"), nullable=True, default=None, comment="站点 ID")
     is_enabled = Column(Boolean, default=True, comment="是否启用")
     created_at = Column(DateTime, default=datetime.now, comment="创建时间")
     updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now, comment="更新时间")
@@ -182,3 +182,17 @@ class DeviceTemplate(Base):
     point_config = Column(JSON, nullable=False, comment="预置点位配置列表")
     created_at = Column(DateTime, default=datetime.now, comment="创建时间")
     updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now, comment="更新时间")
+
+
+class MqttAclRule(Base):
+    """MQTT ACL 规则表 — 按站点隔离 Topic 权限"""
+    __tablename__ = "mqtt_acl_rules"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    site_id = Column(Integer, ForeignKey("sites.id"), nullable=False, index=True, comment="站点ID")
+    client_id_pattern = Column(String(200), comment="客户端ID匹配模式")
+    topic_pattern = Column(String(200), nullable=False, comment="Topic 匹配模式")
+    action = Column(String(10), default="all", comment="动作: publish/subscribe/all")
+    permission = Column(String(10), default="allow", comment="权限: allow/deny")
+    description = Column(String(200), comment="描述")
+    created_at = Column(DateTime, default=datetime.now, comment="创建时间")

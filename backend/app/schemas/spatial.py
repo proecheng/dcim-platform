@@ -13,6 +13,10 @@ class SiteCreate(BaseModel):
     site_code: str = Field(..., description="站点编码")
     site_name: str = Field(..., description="站点名称")
     address: Optional[str] = Field(None, description="地址")
+    contact_person: Optional[str] = Field(None, description="联系人")
+    contact_phone: Optional[str] = Field(None, description="联系电话")
+    contact_email: Optional[str] = Field(None, description="联系邮箱")
+    network_config: Optional[dict] = Field(None, description="网络配置(VPN/专线信息)")
     description: Optional[str] = Field(None, description="描述")
 
 
@@ -21,6 +25,10 @@ class SiteUpdate(BaseModel):
     site_code: Optional[str] = Field(None, description="站点编码")
     site_name: Optional[str] = Field(None, description="站点名称")
     address: Optional[str] = Field(None, description="地址")
+    contact_person: Optional[str] = Field(None, description="联系人")
+    contact_phone: Optional[str] = Field(None, description="联系电话")
+    contact_email: Optional[str] = Field(None, description="联系邮箱")
+    network_config: Optional[dict] = Field(None, description="网络配置(VPN/专线信息)")
     description: Optional[str] = Field(None, description="描述")
 
 
@@ -30,7 +38,14 @@ class SiteResponse(BaseModel):
     site_code: str = Field(..., description="站点编码")
     site_name: str = Field(..., description="站点名称")
     address: Optional[str] = Field(None, description="地址")
+    contact_person: Optional[str] = Field(None, description="联系人")
+    contact_phone: Optional[str] = Field(None, description="联系电话")
+    contact_email: Optional[str] = Field(None, description="联系邮箱")
+    network_config: Optional[dict] = Field(None, description="网络配置")
+    status: str = Field("active", description="状态")
     description: Optional[str] = Field(None, description="描述")
+    gateway_count: int = Field(0, description="网关数量")
+    device_count: int = Field(0, description="设备数量")
     created_at: datetime = Field(..., description="创建时间")
     updated_at: datetime = Field(..., description="更新时间")
 

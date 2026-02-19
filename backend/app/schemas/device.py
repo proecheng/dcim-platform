@@ -19,6 +19,7 @@ class DeviceCreate(BaseModel):
     location_x: Optional[float] = None
     location_y: Optional[float] = None
     description: Optional[str] = None
+    site_id: Optional[int] = None
 
 
 class DeviceUpdate(BaseModel):
@@ -35,6 +36,7 @@ class DeviceUpdate(BaseModel):
     location_y: Optional[float] = None
     description: Optional[str] = None
     is_enabled: Optional[bool] = None
+    site_id: Optional[int] = None
 
 
 class DeviceInfo(BaseModel):
@@ -54,6 +56,7 @@ class DeviceInfo(BaseModel):
     location_x: Optional[float] = None
     location_y: Optional[float] = None
     description: Optional[str] = None
+    site_id: Optional[int] = None
     is_enabled: bool = True
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None

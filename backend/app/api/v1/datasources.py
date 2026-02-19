@@ -7,7 +7,7 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, update, delete
 
-from ..deps import get_db, require_viewer, require_operator, require_admin
+from ..deps import get_db, require_viewer, require_operator, require_admin, get_user_site_ids
 from ...models.user import User
 from ...models.gateway import DataSource
 from ...schemas.gateway import DataSourceCreate, DataSourceUpdate, DataSourceResponse, ConnectionTestRequest
@@ -76,11 +76,18 @@ async def list_datasources(
     page_size: int = Query(20, ge=1, le=100),
     protocol_type: Optional[str] = Query(None, description="协议类型"),
     gateway_id: Optional[int] = Query(None, description="网关 ID"),
+    site_id: Optional[int] = Query(None, description="站点ID"),
     status: Optional[str] = Query(None, description="状态"),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_viewer),
+    user_site_ids: Optional[list[int]] = Depends(get_user_site_ids),
 ):
     query = select(DataSource)
+    # 站点权限过滤
+    if user_site_ids is not None:
+        query = query.where(DataSource.site_id.in_(user_site_ids))
+    if site_id is not None:
+        query = query.where(DataSource.site_id == site_id)
     if protocol_type:
         query = query.where(DataSource.protocol_type == protocol_type)
     if gateway_id is not None:

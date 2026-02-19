@@ -1,13 +1,13 @@
 """
 数据模型
 """
-from .user import User, RolePermission, UserLoginHistory
+from .user import User, RolePermission, UserLoginHistory, UserSession, UserSite, PasswordHistory
 from .device import Device
 from .point import Point, PointRealtime, PointGroup, PointGroupMember
 from .alarm import AlarmThreshold, Alarm, AlarmRule, AlarmShield, AlarmDailyStats, AlarmEscalation
 from .history import PointHistory, PointHistoryArchive, PointChangeLog
 from .log import OperationLog, SystemLog, CommunicationLog
-from .report import ReportTemplate, ReportRecord
+from .report import ReportTemplate, ReportRecord, ReportSchedule, DeviceHealthScore
 from .config import SystemConfig, Dictionary, License
 from .energy import (
     PowerDevice, EnergyHourly, EnergyDaily, EnergyMonthly,
@@ -32,7 +32,9 @@ from .capacity import (
 )
 from .operation import (
     WorkOrderStatus, WorkOrderType, WorkOrderPriority, InspectionStatus,
-    WorkOrder, WorkOrderLog, InspectionPlan, InspectionTask, KnowledgeBase
+    ApprovalStatus,
+    WorkOrder, WorkOrderLog, InspectionPlan, InspectionTask, KnowledgeBase,
+    AlarmWorkOrderRule, WorkOrderApproval
 )
 from .floor_map import FloorMap
 from .power import UPSDevice, BatteryGroup
@@ -49,16 +51,23 @@ from .trace import (
     DataSourceMapping, TraceRecord, TraceTree, TemplateParameter,
     MappingType, AggregationType, MLModelType
 )
-from .gateway import Gateway, DataSource, DataSourcePoint
+from .gateway import Gateway, DataSource, DataSourcePoint, MqttAclRule
 from .spatial import Site, Floor, Room, Row, LayoutTemplate
 from .topology_config import PowerPhaseMapping, CoolingZone, CoolingZoneCabinet, CoolingZoneUnit
-from .linkage import LinkagePolicy, LinkageAction, LinkageExecution, LinkageLog
+from .linkage import LinkagePolicy, LinkageAction, LinkageExecution, LinkageLog, LinkageRecovery, LinkageRecoveryLog
+from .diagnosis import DiagnosisRule, DiagnosisResult
+from .command import CommandApproval, CommandAuditLog
+from .drift import DriftDetectionResult
+from .video import NVR, Camera, CameraPreset, VideoEvent
 
 __all__ = [
     # 用户
     "User",
     "RolePermission",
     "UserLoginHistory",
+    "UserSession",
+    "UserSite",
+    "PasswordHistory",
     # 设备
     "Device",
     # 点位
@@ -84,6 +93,8 @@ __all__ = [
     # 报表
     "ReportTemplate",
     "ReportRecord",
+    "ReportSchedule",
+    "DeviceHealthScore",
     # 配置
     "SystemConfig",
     "Dictionary",
@@ -139,6 +150,9 @@ __all__ = [
     "InspectionPlan",
     "InspectionTask",
     "KnowledgeBase",
+    "AlarmWorkOrderRule",
+    "ApprovalStatus",
+    "WorkOrderApproval",
     # 楼层图
     "FloorMap",
     # 供配电管理
@@ -176,6 +190,7 @@ __all__ = [
     "Gateway",
     "DataSource",
     "DataSourcePoint",
+    "MqttAclRule",
     # 空间拓扑
     "Site",
     "Floor",
@@ -192,4 +207,19 @@ __all__ = [
     "LinkageAction",
     "LinkageExecution",
     "LinkageLog",
+    "LinkageRecovery",
+    "LinkageRecoveryLog",
+    # 智能诊断
+    "DiagnosisRule",
+    "DiagnosisResult",
+    # 控制命令分级确认
+    "CommandApproval",
+    "CommandAuditLog",
+    # 传感器漂移检测
+    "DriftDetectionResult",
+    # 视频监控
+    "NVR",
+    "Camera",
+    "CameraPreset",
+    "VideoEvent",
 ]

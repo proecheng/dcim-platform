@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, update, delete
 
-from ..deps import get_db, require_viewer, require_operator, require_admin
+from ..deps import get_db, require_viewer, require_operator, require_admin, get_user_site_ids
 from ...models.user import User
 from ...models.gateway import Gateway, DataSource, DataSourcePoint, GatewayEvent, ConfigPushRecord
 from ...schemas.gateway import (
@@ -24,11 +24,18 @@ async def list_gateways(
     page_size: int = Query(20, ge=1, le=100),
     status: Optional[str] = Query(None, description="状态"),
     is_enabled: Optional[bool] = Query(None, description="是否启用"),
+    site_id: Optional[int] = Query(None, description="站点ID"),
     keyword: Optional[str] = Query(None, description="名称/IP 模糊搜索"),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_viewer),
+    user_site_ids: Optional[list[int]] = Depends(get_user_site_ids),
 ):
     query = select(Gateway)
+    # 站点权限过滤
+    if user_site_ids is not None:
+        query = query.where(Gateway.site_id.in_(user_site_ids))
+    if site_id is not None:
+        query = query.where(Gateway.site_id == site_id)
     if status:
         query = query.where(Gateway.status == status)
     if is_enabled is not None:
@@ -74,16 +81,22 @@ async def create_gateway(
 
 @router.get("/summary", response_model=GatewayStatusSummary, summary="网关状态汇总")
 async def gateway_summary(
+    site_id: Optional[int] = Query(None, description="站点ID"),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_viewer),
+    user_site_ids: Optional[list[int]] = Depends(get_user_site_ids),
 ):
-    total_result = await db.execute(select(func.count()).select_from(Gateway))
-    total = total_result.scalar() or 0
+    base_query = select(func.count()).select_from(Gateway)
+    # 站点权限过滤
+    if user_site_ids is not None:
+        base_query = base_query.where(Gateway.site_id.in_(user_site_ids))
+    if site_id is not None:
+        base_query = base_query.where(Gateway.site_id == site_id)
 
-    online_result = await db.execute(
-        select(func.count()).select_from(Gateway).where(Gateway.status == "online")
-    )
-    online = online_result.scalar() or 0
+    total = (await db.execute(base_query)).scalar() or 0
+
+    online_query = base_query.where(Gateway.status == "online")
+    online = (await db.execute(online_query)).scalar() or 0
 
     return GatewayStatusSummary(total=total, online=online, offline=total - online)
 

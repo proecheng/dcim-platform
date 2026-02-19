@@ -8,7 +8,7 @@ from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func
+from sqlalchemy import select, func, delete
 from sqlalchemy.orm import selectinload
 from sqlalchemy.exc import IntegrityError
 from starlette.responses import StreamingResponse
@@ -17,10 +17,12 @@ import openpyxl
 # Excel 导入文件大小限制 (10MB)
 MAX_IMPORT_SIZE = 10 * 1024 * 1024
 
-from ..deps import get_db, require_operator, require_viewer
+from ..deps import get_db, require_operator, require_viewer, require_site_access, get_user_site_ids
 from ...models.user import User
 from ...models.spatial import Site, Floor, Room, Row, LayoutTemplate
 from ...models.asset import Cabinet
+from ...models.gateway import Gateway, DataSource, MqttAclRule
+from ...models.device import Device
 from ...schemas.spatial import (
     SiteCreate, SiteUpdate, SiteResponse,
     FloorCreate, FloorUpdate, FloorResponse,
@@ -98,18 +100,50 @@ async def _ensure_preset_templates(db: AsyncSession):
 @router.get("/sites", response_model=List[SiteResponse])
 async def list_sites(
     keyword: Optional[str] = Query(None, description="搜索关键词"),
+    status: Optional[str] = Query(None, description="状态: active/inactive/maintenance"),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_viewer),
+    site_ids: Optional[List[int]] = Depends(get_user_site_ids),
 ):
-    """获取站点列表"""
+    """获取站点列表（含网关/设备统计，非admin仅返回授权站点）"""
     stmt = select(Site)
+    if site_ids is not None:
+        stmt = stmt.where(Site.id.in_(site_ids))
     if keyword:
         stmt = stmt.where(
             Site.site_name.contains(keyword) | Site.site_code.contains(keyword)
         )
+    if status:
+        stmt = stmt.where(Site.status == status)
     stmt = stmt.order_by(Site.id)
     result = await db.execute(stmt)
-    return result.scalars().all()
+    sites = result.scalars().all()
+
+    # 批量查询每个站点的网关和设备数量
+    site_ids = [s.id for s in sites]
+    gw_counts = {}
+    dev_counts = {}
+    if site_ids:
+        gw_result = await db.execute(
+            select(Gateway.site_id, func.count(Gateway.id))
+            .where(Gateway.site_id.in_(site_ids))
+            .group_by(Gateway.site_id)
+        )
+        gw_counts = dict(gw_result.all())
+        dev_result = await db.execute(
+            select(Device.site_id, func.count(Device.id))
+            .where(Device.site_id.in_(site_ids))
+            .group_by(Device.site_id)
+        )
+        dev_counts = dict(dev_result.all())
+
+    items = []
+    for s in sites:
+        resp = SiteResponse.model_validate(s)
+        resp.gateway_count = gw_counts.get(s.id, 0)
+        resp.device_count = dev_counts.get(s.id, 0)
+        items.append(resp)
+    return items
 
 
 @router.post("/sites", response_model=SiteResponse)
@@ -118,18 +152,28 @@ async def create_site(
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_operator),
 ):
-    """创建站点"""
+    """创建站点（自动生成 EMQX ACL 规则）"""
     site = Site(**data.model_dump())
     db.add(site)
+    await db.flush()  # 获取 site.id
+
+    # 自动创建 ACL 规则
+    from ...services.emqx_acl import emqx_acl_service
+    await emqx_acl_service.on_site_created(site.id, site.site_code, db)
+
     await db.commit()
     await db.refresh(site)
-    return site
+
+    resp = SiteResponse.model_validate(site)
+    resp.gateway_count = 0
+    resp.device_count = 0
+    return resp
 
 
 @router.put("/sites/{site_id}", response_model=SiteResponse)
 async def update_site(
-    site_id: int,
     data: SiteUpdate,
+    site_id: int = Depends(require_site_access),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_operator),
 ):
@@ -143,26 +187,115 @@ async def update_site(
     site.updated_at = datetime.now()
     await db.commit()
     await db.refresh(site)
-    return site
+
+    # 返回含统计信息的响应
+    gw_cnt = await db.execute(select(func.count(Gateway.id)).where(Gateway.site_id == site_id))
+    dev_cnt = await db.execute(select(func.count(Device.id)).where(Device.site_id == site_id))
+    resp = SiteResponse.model_validate(site)
+    resp.gateway_count = gw_cnt.scalar() or 0
+    resp.device_count = dev_cnt.scalar() or 0
+    return resp
 
 
 @router.delete("/sites/{site_id}")
 async def delete_site(
-    site_id: int,
+    site_id: int = Depends(require_site_access),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_operator),
 ):
-    """删除站点"""
+    """删除站点（检查所有关联数据）"""
     result = await db.execute(select(Site).where(Site.id == site_id))
     site = result.scalar_one_or_none()
     if not site:
         raise HTTPException(status_code=404, detail="站点不存在")
+
+    # 检查关联的楼层
     cnt = await db.execute(select(func.count(Floor.id)).where(Floor.site_id == site_id))
-    if (cnt.scalar() or 0) > 0:
-        raise HTTPException(status_code=400, detail="请先删除该站点下的所有楼层")
+    floor_count = cnt.scalar() or 0
+
+    # 检查关联的网关
+    gw_cnt = await db.execute(select(func.count(Gateway.id)).where(Gateway.site_id == site_id))
+    gw_count = gw_cnt.scalar() or 0
+
+    # 检查关联的设备
+    dev_cnt = await db.execute(select(func.count(Device.id)).where(Device.site_id == site_id))
+    dev_count = dev_cnt.scalar() or 0
+
+    # 检查关联的数据源
+    ds_cnt = await db.execute(select(func.count(DataSource.id)).where(DataSource.site_id == site_id))
+    ds_count = ds_cnt.scalar() or 0
+
+    deps = []
+    if floor_count > 0:
+        deps.append(f"楼层({floor_count})")
+    if gw_count > 0:
+        deps.append(f"网关({gw_count})")
+    if dev_count > 0:
+        deps.append(f"设备({dev_count})")
+    if ds_count > 0:
+        deps.append(f"数据源({ds_count})")
+
+    if deps:
+        raise HTTPException(
+            status_code=400,
+            detail=f"请先删除该站点下的关联数据: {', '.join(deps)}"
+        )
+
+    # 清理 ACL 规则
+    await db.execute(delete(MqttAclRule).where(MqttAclRule.site_id == site_id))
     await db.delete(site)
     await db.commit()
     return {"detail": "删除成功"}
+
+
+VALID_SITE_STATUSES = {"active", "inactive", "maintenance"}
+
+
+@router.put("/sites/{site_id}/status")
+async def update_site_status(
+    site_id: int = Depends(require_site_access),
+    status: str = Query(..., description="目标状态: active/inactive/maintenance"),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_operator),
+):
+    """更新站点状态"""
+    if status not in VALID_SITE_STATUSES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"无效状态，可选值: {', '.join(sorted(VALID_SITE_STATUSES))}"
+        )
+    result = await db.execute(select(Site).where(Site.id == site_id))
+    site = result.scalar_one_or_none()
+    if not site:
+        raise HTTPException(status_code=404, detail="站点不存在")
+    old_status = site.status
+    site.status = status
+    site.updated_at = datetime.now()
+    await db.commit()
+    return {"detail": f"站点状态已从 {old_status} 更新为 {status}"}
+
+
+@router.get("/sites/{site_id}/acl-rules")
+async def get_site_acl_rules(
+    site_id: int,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_viewer),
+):
+    """获取站点的 MQTT ACL 规则"""
+    from ...services.emqx_acl import emqx_acl_service
+    rules = await emqx_acl_service.get_site_rules(site_id, db)
+    return [
+        {
+            "id": r.id,
+            "site_id": r.site_id,
+            "client_id_pattern": r.client_id_pattern,
+            "topic_pattern": r.topic_pattern,
+            "action": r.action,
+            "permission": r.permission,
+            "description": r.description,
+        }
+        for r in rules
+    ]
 
 
 # ==================== Floor CRUD ====================
