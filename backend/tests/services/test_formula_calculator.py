@@ -80,45 +80,49 @@ class TestFormulaCalculator:
 class TestFormulaCalculatorIntegration:
     """FormulaCalculator 集成测试（需要数据库）"""
 
-    def test_calc_annual_energy(self, db_session):
+    @pytest.mark.asyncio
+    async def test_calc_annual_energy(self, async_db):
         """测试年用电量计算（需要数据库）"""
-        calc = FormulaCalculator(db_session)
+        calc = FormulaCalculator(async_db)
 
         # 需要测试数据
-        result = calc.calc_annual_energy(2026)
+        result = await calc.calc_annual_energy(2026)
         assert isinstance(result, Decimal)
         assert result >= Decimal('0')
 
-    def test_calc_max_demand(self, db_session):
+    @pytest.mark.asyncio
+    async def test_calc_max_demand(self, async_db):
         """测试最大需量计算（需要数据库）"""
-        calc = FormulaCalculator(db_session)
+        calc = FormulaCalculator(async_db)
 
         # 测试年度最大需量
-        result = calc.calc_max_demand(2026)
+        result = await calc.calc_max_demand(2026)
         assert isinstance(result, Decimal)
         assert result >= Decimal('0')
 
         # 测试月度最大需量
-        result = calc.calc_max_demand(2026, 1)
+        result = await calc.calc_max_demand(2026, 1)
         assert isinstance(result, Decimal)
         assert result >= Decimal('0')
 
-    def test_calc_average_load(self, db_session):
+    @pytest.mark.asyncio
+    async def test_calc_average_load(self, async_db):
         """测试平均负荷计算（需要数据库）"""
-        calc = FormulaCalculator(db_session)
+        calc = FormulaCalculator(async_db)
 
-        result = calc.calc_average_load(2026)
+        result = await calc.calc_average_load(2026)
         assert isinstance(result, Decimal)
         assert result >= Decimal('0')
 
-    def test_calc_peak_valley_data(self, db_session):
+    @pytest.mark.asyncio
+    async def test_calc_peak_valley_data(self, async_db):
         """测试峰谷电量数据计算（需要数据库）"""
-        calc = FormulaCalculator(db_session)
+        calc = FormulaCalculator(async_db)
 
         end_date = date.today()
         start_date = end_date - timedelta(days=30)
 
-        result = calc.calc_peak_valley_data(start_date, end_date)
+        result = await calc.calc_peak_valley_data(start_date, end_date)
 
         # 验证返回结构
         assert "尖峰电量" in result
@@ -132,19 +136,21 @@ class TestFormulaCalculatorIntegration:
         assert isinstance(result["总电量"], Decimal)
         assert isinstance(result["尖峰占比"], Decimal)
 
-    def test_calc_shiftable_load(self, db_session):
+    @pytest.mark.asyncio
+    async def test_calc_shiftable_load(self, async_db):
         """测试可转移负荷计算（需要数据库）"""
-        calc = FormulaCalculator(db_session)
+        calc = FormulaCalculator(async_db)
 
-        result = calc.calc_shiftable_load()
+        result = await calc.calc_shiftable_load()
         assert isinstance(result, Decimal)
         assert result >= Decimal('0')
 
-    def test_calc_demand_control_data(self, db_session):
+    @pytest.mark.asyncio
+    async def test_calc_demand_control_data(self, async_db):
         """测试需量控制数据计算（需要数据库）"""
-        calc = FormulaCalculator(db_session)
+        calc = FormulaCalculator(async_db)
 
-        result = calc.calc_demand_control_data()
+        result = await calc.calc_demand_control_data()
 
         # 验证返回结构
         assert "当前申报需量" in result
@@ -158,23 +164,25 @@ class TestFormulaCalculatorIntegration:
         assert isinstance(result["当前申报需量"], Decimal)
         assert isinstance(result["年节省"], Decimal)
 
-    def test_calc_equipment_load_rate(self, db_session):
+    @pytest.mark.asyncio
+    async def test_calc_equipment_load_rate(self, async_db):
         """测试设备负荷率计算（需要数据库）"""
-        calc = FormulaCalculator(db_session)
+        calc = FormulaCalculator(async_db)
 
         end_date = date.today()
         start_date = end_date - timedelta(days=30)
 
-        result = calc.calc_equipment_load_rate('HVAC', start_date, end_date)
+        result = await calc.calc_equipment_load_rate('HVAC', start_date, end_date)
         assert isinstance(result, Decimal)
         assert result >= Decimal('0')
         assert result <= Decimal('100')
 
-    def test_calc_equipment_optimization_potential(self, db_session):
+    @pytest.mark.asyncio
+    async def test_calc_equipment_optimization_potential(self, async_db):
         """测试设备优化潜力计算（需要数据库）"""
-        calc = FormulaCalculator(db_session)
+        calc = FormulaCalculator(async_db)
 
-        result = calc.calc_equipment_optimization_potential('HVAC')
+        result = await calc.calc_equipment_optimization_potential('HVAC')
 
         # 验证返回结构
         assert "当前功率" in result
@@ -184,11 +192,12 @@ class TestFormulaCalculatorIntegration:
         assert "年节省电量" in result
         assert "年节省金额" in result
 
-    def test_calc_vpp_response_potential(self, db_session):
+    @pytest.mark.asyncio
+    async def test_calc_vpp_response_potential(self, async_db):
         """测试VPP需求响应潜力计算（需要数据库）"""
-        calc = FormulaCalculator(db_session)
+        calc = FormulaCalculator(async_db)
 
-        result = calc.calc_vpp_response_potential()
+        result = await calc.calc_vpp_response_potential()
 
         # 验证返回结构
         assert "Ⅰ级资源" in result
@@ -202,12 +211,13 @@ class TestFormulaCalculatorIntegration:
         assert "年响应次数" in result["Ⅰ级资源"]
         assert "年收益" in result["Ⅰ级资源"]
 
-    def test_calc_load_curve_analysis(self, db_session):
+    @pytest.mark.asyncio
+    async def test_calc_load_curve_analysis(self, async_db):
         """测试负荷曲线分析（需要数据库）"""
-        calc = FormulaCalculator(db_session)
+        calc = FormulaCalculator(async_db)
 
         analysis_date = date.today() - timedelta(days=1)
-        result = calc.calc_load_curve_analysis(analysis_date)
+        result = await calc.calc_load_curve_analysis(analysis_date)
 
         # 验证返回结构
         assert "最大负荷" in result
@@ -217,11 +227,12 @@ class TestFormulaCalculatorIntegration:
         assert "负荷率" in result
         assert "峰谷比" in result
 
-    def test_calc_equipment_efficiency_benchmark(self, db_session):
+    @pytest.mark.asyncio
+    async def test_calc_equipment_efficiency_benchmark(self, async_db):
         """测试设备能效对标分析（需要数据库）"""
-        calc = FormulaCalculator(db_session)
+        calc = FormulaCalculator(async_db)
 
-        result = calc.calc_equipment_efficiency_benchmark('UPS')
+        result = await calc.calc_equipment_efficiency_benchmark('UPS')
 
         # 验证返回结构
         assert "当前能效" in result
