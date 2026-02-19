@@ -64,35 +64,35 @@ export interface PointRealtimeValue {
 
 /** 获取供配电总览 */
 export function getPowerOverview() {
-  return request.get<any, PowerOverviewSummary>('/v1/power/overview')
+  return request.get<PowerOverviewSummary>('/v1/power/overview')
 }
 
 /** 获取 UPS 列表 */
 export function getUPSList(params?: { page?: number; page_size?: number; status?: string }) {
-  return request.get<any, any>('/v1/power/ups', { params })
+  return request.get<any>('/v1/power/ups', { params })
 }
 
 /** 获取 UPS 详情（含实时点位数据） */
 export function getUPSDetail(id: number) {
-  return request.get<any, any>(`/v1/power/ups/${id}`)
+  return request.get<any>(`/v1/power/ups/${id}`)
 }
 
 /** 获取电池组列表 */
 export function getBatteryList(params?: { page?: number; page_size?: number }) {
-  return request.get<any, any>('/v1/power/batteries', { params })
+  return request.get<any>('/v1/power/batteries', { params })
 }
 
 /** 获取电池组详情 */
 export function getBatteryDetail(id: number) {
-  return request.get<any, any>(`/v1/power/batteries/${id}`)
+  return request.get<any>(`/v1/power/batteries/${id}`)
 }
 
 /** 获取配电柜列表 */
 export function getCabinetList(params?: { page?: number; page_size?: number }) {
-  return request.get<any, any>('/v1/power/cabinets', { params })
+  return request.get<any>('/v1/power/cabinets', { params })
 }
 
 /** 获取 PDU 列表 */
 export function getPDUList(params?: { page?: number; page_size?: number }) {
-  return request.get<any, any>('/v1/power/pdus', { params })
+  return request.get<any>('/v1/power/pdus', { params })
 }

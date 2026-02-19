@@ -73,11 +73,16 @@
               />
               <LoadComparisonChart
                 v-if="suggestionDetail.hourly_data"
-                :hourly-data="suggestionDetail.hourly_data"
-                :shift-power="suggestionDetail.shift_power || 0"
-                :shift-hours="suggestionDetail.shift_hours || 0"
-                :source-period="suggestionDetail.source_period || 'peak'"
-                :target-period="suggestionDetail.target_period || 'valley'"
+                :device-rules="[{
+                  deviceId: 0,
+                  deviceName: '负荷转移',
+                  rules: [{
+                    sourcePeriod: suggestionDetail.source_period || 'peak',
+                    targetPeriod: suggestionDetail.target_period || 'valley',
+                    power: suggestionDetail.shift_power || 0,
+                    hours: suggestionDetail.shift_hours || 0
+                  }]
+                }]"
                 class="embedded-chart"
               />
             </template>

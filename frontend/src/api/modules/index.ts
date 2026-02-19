@@ -121,8 +121,34 @@ export * from './dispatch'
 // 电费监控
 export * from './monitoring'
 
-// 日前调度优化
-export * from './optimization'
+// 日前调度优化 - 排除与monitoring重复的getPeriodColor/getPeriodName
+export {
+  type ForecastPoint,
+  type ForecastStatistics,
+  type PeriodSummary,
+  type ForecastResult,
+  type CostBreakdown,
+  type StorageSchedulePoint,
+  type DeviceAction,
+  type DeviceSchedule,
+  type OptimizationResult,
+  type DayAheadResult,
+  type OptimizationSummary,
+  type PlanActualComparison,
+  type OptimizationParams,
+  type LearningMetrics,
+  type OptimizationReport,
+  getLoadForecast,
+  runDayAheadOptimization,
+  getDayAheadSchedule,
+  updateScheduleStatus,
+  getOptimizationSummary,
+  getPlanActualComparison,
+  getLearningMetrics,
+  runParameterAdjustment,
+  getOptimizationReport,
+  submitFeedbackData,
+} from './optimization'
 
 // 数据质量
 export * from './dataQuality'

@@ -261,8 +261,8 @@ const disabledDate = (date: Date) => {
 const loadReport = async () => {
   try {
     const res = await getOptimizationReport(selectedMonth.value)
-    if (res.data.code === 0) {
-      report.value = res.data.data
+    if (res.code === 0) {
+      report.value = res.data
       updateDemandChart()
     }
   } catch (error) {
@@ -275,8 +275,8 @@ const loadComparison = async () => {
   if (!comparisonDate.value) return
   try {
     const res = await getPlanActualComparison(comparisonDate.value)
-    if (res.data.code === 0) {
-      comparison.value = res.data.data
+    if (res.code === 0) {
+      comparison.value = res.data
       updateComparisonChart()
     }
   } catch (error) {
@@ -480,7 +480,7 @@ const runAutoAdjust = async () => {
   adjusting.value = true
   try {
     const res = await runParameterAdjustment()
-    if (res.data.code === 0) {
+    if (res.code === 0) {
       ElMessage.success('参数已自动调整')
       loadReport()
     }

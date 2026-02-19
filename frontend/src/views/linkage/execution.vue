@@ -208,9 +208,9 @@ function statusText(status: string): string {
   return map[status] || status
 }
 
-function statusTag(status: string): '' | 'success' | 'warning' | 'info' | 'danger' {
-  const map: Record<string, '' | 'success' | 'warning' | 'info' | 'danger'> = {
-    executing: '',
+function statusTag(status: string): 'success' | 'warning' | 'info' | 'danger' {
+  const map: Record<string, 'success' | 'warning' | 'info' | 'danger'> = {
+    executing: 'info',
     completed: 'success',
     partial_failure: 'warning',
     failed: 'danger'
@@ -230,10 +230,10 @@ function logStatusText(status: string): string {
   return map[status] || status
 }
 
-function logStatusTag(status: string): '' | 'success' | 'warning' | 'info' | 'danger' {
-  const map: Record<string, '' | 'success' | 'warning' | 'info' | 'danger'> = {
+function logStatusTag(status: string): 'success' | 'warning' | 'info' | 'danger' {
+  const map: Record<string, 'success' | 'warning' | 'info' | 'danger'> = {
     pending: 'info',
-    running: '',
+    running: 'info',
     success: 'success',
     failed: 'danger',
     skipped: 'info',

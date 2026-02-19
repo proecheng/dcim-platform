@@ -31,6 +31,28 @@ const routes: RouteRecordRaw[] = [
         component: () => import('@/views/dashboard/index.vue'),
         meta: { title: '监控仪表盘', icon: 'Monitor' }
       },
+      // moved to AFTER linkage
+      // diagnosis block moved to AFTER linkage
+      {
+        path: 'diagnosis',
+        name: 'Diagnosis',
+        redirect: '/diagnosis/results',
+        meta: { title: '智能诊断', icon: 'FirstAidKit' },
+        children: [
+          {
+            path: 'results',
+            name: 'DiagnosisResults',
+            component: () => import('@/views/diagnosis/results.vue'),
+            meta: { title: '诊断结果', icon: 'DataAnalysis' }
+          },
+          {
+            path: 'rules',
+            name: 'DiagnosisRules',
+            component: () => import('@/views/diagnosis/rules.vue'),
+            meta: { title: '诊断规则', icon: 'SetUp' }
+          }
+        ]
+      },
       {
         path: 'devices',
         name: 'Devices',
@@ -358,6 +380,26 @@ const routes: RouteRecordRaw[] = [
         ]
       },
       {
+        path: 'diagnosis',
+        name: 'Diagnosis',
+        redirect: '/diagnosis/results',
+        meta: { title: '智能诊断', icon: 'FirstAidKit' },
+        children: [
+          {
+            path: 'results',
+            name: 'DiagnosisResults',
+            component: () => import('@/views/diagnosis/results.vue'),
+            meta: { title: '诊断结果', icon: 'DataAnalysis' }
+          },
+          {
+            path: 'rules',
+            name: 'DiagnosisRules',
+            component: () => import('@/views/diagnosis/rules.vue'),
+            meta: { title: '诊断规则', icon: 'SetUp' }
+          }
+        ]
+      },
+      {
         path: 'linkage',
         name: 'Linkage',
         redirect: '/linkage/policy',
@@ -374,6 +416,56 @@ const routes: RouteRecordRaw[] = [
             name: 'LinkageExecution',
             component: () => import('@/views/linkage/execution.vue'),
             meta: { title: '执行日志', icon: 'Document' }
+          },
+          {
+            path: 'recovery',
+            name: 'LinkageRecovery',
+            component: () => import('@/views/linkage/recovery.vue'),
+            meta: { title: '联动恢复', icon: 'RefreshRight' }
+          },
+          {
+            path: 'timeline',
+            name: 'LinkageTimeline',
+            component: () => import('@/views/linkage/timeline.vue'),
+            meta: { title: '事件时间线', icon: 'Timer' }
+          },
+          {
+            path: 'command',
+            name: 'LinkageCommand',
+            component: () => import('@/views/linkage/command.vue'),
+            meta: { title: '命令管理', icon: 'Operation' }
+          },
+          {
+            path: 'drift',
+            name: 'LinkageDrift',
+            component: () => import('@/views/linkage/drift.vue'),
+            meta: { title: '漂移检测', icon: 'TrendCharts' }
+          }
+        ]
+      },
+      {
+        path: 'video',
+        name: 'VideoManagement',
+        redirect: '/video/cameras',
+        meta: { title: '视频监控', icon: 'VideoCamera' },
+        children: [
+          {
+            path: 'cameras',
+            name: 'VideoCameras',
+            component: () => import('@/views/video/index.vue'),
+            meta: { title: '摄像头管理', icon: 'Camera' }
+          },
+          {
+            path: 'control',
+            name: 'VideoControl',
+            component: () => import('@/views/video/control.vue'),
+            meta: { title: '视频控制', icon: 'VideoPlay' }
+          },
+          {
+            path: 'playback',
+            name: 'VideoPlayback',
+            component: () => import('@/views/video/playback.vue'),
+            meta: { title: '告警回放', icon: 'Timer' }
           }
         ]
       },
@@ -382,6 +474,26 @@ const routes: RouteRecordRaw[] = [
         name: 'Settings',
         component: () => import('@/views/settings/index.vue'),
         meta: { title: '系统设置', icon: 'Setting' }
+      },
+      {
+        path: 'system',
+        name: 'System',
+        meta: { title: '系统管理', icon: 'Setting' },
+        redirect: '/system/users',
+        children: [
+          {
+            path: 'users',
+            name: 'UserManagement',
+            component: () => import('@/views/system/user.vue'),
+            meta: { title: '用户管理', icon: 'User' }
+          },
+          {
+            path: 'audit-log',
+            name: 'AuditLog',
+            component: () => import('@/views/system/audit-log.vue'),
+            meta: { title: '操作审计', icon: 'Document' }
+          }
+        ]
       },
 
       // ===== 旧路由重定向（向后兼容） =====

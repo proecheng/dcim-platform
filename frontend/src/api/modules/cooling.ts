@@ -61,30 +61,30 @@ export interface ColdAisleInfo {
 
 /** 获取制冷系统总览 */
 export function getCoolingOverview() {
-  return request.get<any, CoolingOverviewSummary>('/v1/cooling/overview')
+  return request.get<CoolingOverviewSummary>('/v1/cooling/overview')
 }
 
 /** 获取空调列表 */
 export function getCoolingUnitList(params?: { page?: number; page_size?: number; unit_type?: string; group_id?: number }) {
-  return request.get<any, any>('/v1/cooling/units', { params })
+  return request.get<any>('/v1/cooling/units', { params })
 }
 
 /** 获取空调详情（含实时点位数据） */
 export function getCoolingUnitDetail(id: number) {
-  return request.get<any, any>(`/v1/cooling/units/${id}`)
+  return request.get<any>(`/v1/cooling/units/${id}`)
 }
 
 /** 获取群控组列表 */
 export function getCoolingGroupList(params?: { page?: number; page_size?: number }) {
-  return request.get<any, any>('/v1/cooling/groups', { params })
+  return request.get<any>('/v1/cooling/groups', { params })
 }
 
 /** 获取冷通道列表 */
 export function getColdAisleList(params?: { page?: number; page_size?: number }) {
-  return request.get<any, any>('/v1/cooling/cold-aisles', { params })
+  return request.get<any>('/v1/cooling/cold-aisles', { params })
 }
 
 /** 获取冷通道详情 */
 export function getColdAisleDetail(id: number) {
-  return request.get<any, any>(`/v1/cooling/cold-aisles/${id}`)
+  return request.get<any>(`/v1/cooling/cold-aisles/${id}`)
 }

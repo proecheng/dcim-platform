@@ -108,3 +108,10 @@ export function resetPassword(id: number, new_password: string): Promise<void> {
 export function getLoginHistory(id: number, params?: PageParams): Promise<PageResponse<LoginHistory>> {
   return request.get(`/v1/users/${id}/login-history`, { params })
 }
+
+/**
+ * 批量删除用户
+ */
+export function batchDeleteUsers(userIds: number[]): Promise<{ message: string; deleted_count: number }> {
+  return request.post('/v1/users/batch-delete', userIds)
+}

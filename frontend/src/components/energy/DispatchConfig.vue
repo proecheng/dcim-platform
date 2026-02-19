@@ -252,7 +252,7 @@
         </template>
 
         <el-form-item label="描述">
-          <el-input v-model="deviceForm.description" type="textarea" rows="2" />
+          <el-input v-model="deviceForm.description" type="textarea" :rows="2" />
         </el-form-item>
       </el-form>
       <template #footer>
@@ -297,7 +297,7 @@
           <el-switch v-model="storageForm.is_active" />
         </el-form-item>
         <el-form-item label="描述">
-          <el-input v-model="storageForm.description" type="textarea" rows="2" />
+          <el-input v-model="storageForm.description" type="textarea" :rows="2" />
         </el-form-item>
       </el-form>
       <template #footer>
@@ -330,7 +330,7 @@
           <el-switch v-model="pvForm.is_active" />
         </el-form-item>
         <el-form-item label="描述">
-          <el-input v-model="pvForm.description" type="textarea" rows="2" />
+          <el-input v-model="pvForm.description" type="textarea" :rows="2" />
         </el-form-item>
       </el-form>
       <template #footer>
@@ -450,16 +450,17 @@ async function initDemo() {
   }
 }
 
-function getTypeTagColor(type: DeviceType): string {
-  const colors: Record<string, string> = {
+type TagType = 'info' | 'warning' | 'success' | 'danger' | 'primary'
+function getTypeTagColor(type: DeviceType): TagType {
+  const colors: Record<string, TagType> = {
     shiftable: 'primary',
     curtailable: 'warning',
     modulating: 'success',
-    generation: '',
+    generation: 'info',
     storage: 'info',
     rigid: 'danger'
   }
-  return colors[type] || ''
+  return colors[type] || 'info'
 }
 
 // ==================== 设备管理 ====================

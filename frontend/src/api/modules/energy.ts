@@ -1808,6 +1808,14 @@ export interface SuggestionDetail {
     pricing: any
     devices: any
   }
+  // V2.5 可视化分析字段
+  meter_point_id?: number
+  hourly_data?: Array<{ hour: number; power: number; period?: string }>
+  shift_power?: number
+  shift_hours?: number
+  source_period?: string
+  target_period?: string
+  current_declared?: number
 }
 
 /** 可调参数定义 */
@@ -2231,7 +2239,7 @@ export function createDevicePoints(data: { energy_device_id: number; points: Dev
 }
 
 /** 获取设备测点 */
-export function getDevicePoints(deviceId: number) {
+export function getTopologyDevicePoints(deviceId: number) {
   return request.get<ResponseModel<{ device_id: number; points: DevicePointConfigResponse[] }>>(`/v1/topology/device-points/${deviceId}`)
 }
 

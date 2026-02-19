@@ -89,6 +89,60 @@ export interface ActionTypeInfo {
   is_implemented: boolean
 }
 
+/** 联动恢复步骤日志 */
+export interface LinkageRecoveryLog {
+  id: number
+  recovery_id: number
+  step_order: number
+  action_type: string | null
+  target_type: string | null
+  recovery_command: string | null
+  action_config: Record<string, unknown> | null
+  status: string
+  error_message: string | null
+  started_at: string | null
+  completed_at: string | null
+  duration_ms: number | null
+}
+
+/** 联动恢复记录 */
+export interface LinkageRecovery {
+  id: number
+  execution_id: number
+  operator: string
+  mode: string
+  status: string
+  started_at: string | null
+  completed_at: string | null
+  total_duration_ms: number | null
+  logs: LinkageRecoveryLog[]
+}
+
+/** 时间线事件 (Story 9-5) */
+export interface TimelineEvent {
+  timestamp: string | null
+  phase: string
+  event_type: string
+  detail: string
+  status: string
+  duration_ms: number | null
+}
+
+/** 时间线报告 (Story 9-5) */
+export interface TimelineReport {
+  execution_id: number
+  event_id: string
+  policy_name: string
+  trigger_source: string | null
+  trigger_time: string | null
+  level: string
+  total_duration_ms: number | null
+  recovery_time_ms: number | null
+  operator: string | null
+  status: string
+  events: TimelineEvent[]
+}
+
 // ==================== API 函数 ====================
 
 /**
@@ -187,4 +241,69 @@ export function getFireProtectionStatus(): Promise<{
   yaml_exists: boolean
 }> {
   return request.get('/v1/linkage/fire-protection/status')
+}
+ 
+// ==================== 联动恢复 API (Story 9-4) ====================
+
+/**
+ * 获取可恢复的执行记录列表
+ */
+export function getRecoverableExecutions(params?: PageParams): Promise<PageResponse<LinkageExecution>> {
+  return request.get('/v1/linkage/executions/recoverable', { params })
+}
+
+/**
+ * 发起联动恢复
+ */
+export function createRecovery(executionId: number, mode: string = 'auto'): Promise<{ recovery_id: number; message: string; steps_count: number }> {
+  return request.post(`/v1/linkage/executions/${executionId}/recover`, { mode })
+}
+
+/**
+ * 获取恢复记录列表
+ */
+export function getRecoveries(params?: PageParams & {
+  status?: string
+  execution_id?: number
+}): Promise<PageResponse<LinkageRecovery>> {
+  return request.get('/v1/linkage/recoveries', { params })
+}
+
+/**
+ * 获取恢复记录详情
+ */
+export function getRecovery(id: number): Promise<LinkageRecovery> {
+  return request.get(`/v1/linkage/recoveries/${id}`)
+}
+
+/**
+ * 手动执行恢复步骤
+ */
+export function executeRecoveryStep(recoveryId: number, stepOrder: number): Promise<{ message: string }> {
+  return request.post(`/v1/linkage/recoveries/${recoveryId}/step/${stepOrder}/execute`)
+}
+
+/**
+ * 跳过恢复步骤
+ */
+export function skipRecoveryStep(recoveryId: number, stepOrder: number): Promise<{ message: string }> {
+  return request.post(`/v1/linkage/recoveries/${recoveryId}/step/${stepOrder}/skip`)
+}
+
+// ==================== 事件时间线 API (Story 9-5) ====================
+
+/**
+ * 获取事件时间线报告
+ */
+export function getEventTimeline(executionId: number): Promise<TimelineReport> {
+  return request.get(`/v1/linkage/timeline/${executionId}`)
+}
+
+/**
+ * 导出事件时间线报告为 Excel
+ */
+export function exportEventTimeline(executionId: number): Promise<Blob> {
+  return request.get(`/v1/linkage/timeline/${executionId}/export`, {
+    responseType: 'blob',
+  })
 }

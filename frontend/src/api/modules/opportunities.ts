@@ -229,6 +229,8 @@ export interface PlanDetail {
     title: string
     category: OpportunityCategory
     priority: OpportunityPriority
+    source_plugin?: string
+    analysis_data?: Record<string, any>
   }
   tasks: ExecutionTask[]
   task_stats: {

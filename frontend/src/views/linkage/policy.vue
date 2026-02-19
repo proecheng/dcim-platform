@@ -520,8 +520,8 @@ function triggerTypeText(type: string): string {
   return map[type] || type
 }
 
-function triggerTypeTag(type: string): '' | 'success' | 'warning' | 'info' | 'danger' {
-  const map: Record<string, '' | 'success' | 'warning' | 'info' | 'danger'> = { 'alarm.triggered': 'danger', 'alarm.resolved': 'success', 'device.offline': 'warning', manual: 'info' }
+function triggerTypeTag(type: string): 'success' | 'warning' | 'info' | 'danger' {
+  const map: Record<string, 'success' | 'warning' | 'info' | 'danger'> = { 'alarm.triggered': 'danger', 'alarm.resolved': 'success', 'device.offline': 'warning', manual: 'info' }
   return map[type] || 'info'
 }
 
@@ -530,8 +530,8 @@ function priorityText(p: string): string {
   return map[p] || p
 }
 
-function priorityTag(p: string): '' | 'success' | 'warning' | 'info' | 'danger' {
-  const map: Record<string, '' | 'success' | 'warning' | 'info' | 'danger'> = { fire_signal: 'danger', critical: 'warning', normal: 'info' }
+function priorityTag(p: string): 'success'|'warning'|'info'|'danger' {
+  const map: Record<string, 'success'|'warning'|'info'|'danger'> = { fire_signal: 'danger', critical: 'warning', normal: 'info' }
   return map[p] || 'info'
 }
 

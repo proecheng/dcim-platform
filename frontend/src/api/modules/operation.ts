@@ -7,7 +7,7 @@ import type { ResponseModel, PageParams } from './types'
 // ==================== 类型定义 ====================
 
 /** 工单状态 */
-export type WorkOrderStatus = 'pending' | 'assigned' | 'processing' | 'completed' | 'closed' | 'cancelled'
+export type WorkOrderStatus = 'pending' | 'assigned' | 'accepted' | 'processing' | 'completed' | 'closed' | 'cancelled'
 
 /** 工单类型 */
 export type WorkOrderType = 'fault' | 'maintenance' | 'inspection' | 'change' | 'other'
@@ -29,6 +29,8 @@ export interface WorkOrder {
   status: WorkOrderStatus
   device_id?: number
   device_name?: string
+  area_code?: string
+  alarm_id?: number
   location?: string
   reporter?: string
   reporter_phone?: string
@@ -36,8 +38,10 @@ export interface WorkOrder {
   deadline?: string
   created_at: string
   assigned_at?: string
+  accepted_at?: string
   started_at?: string
   completed_at?: string
+  closed_at?: string
   solution?: string
   root_cause?: string
 }
@@ -81,16 +85,12 @@ export interface WorkOrderLog {
 /** 巡检计划 */
 export interface InspectionPlan {
   id: number
-  plan_name: string
+  name: string
   description?: string
-  plan_type: string
-  frequency: string
-  start_date: string
-  end_date?: string
-  devices?: number[]
-  locations?: string[]
-  inspector?: string
-  checklist?: string[]
+  frequency?: string
+  location?: string
+  check_items?: string
+  assignee?: string
   is_active: boolean
   created_at: string
   updated_at: string
@@ -98,59 +98,49 @@ export interface InspectionPlan {
 
 /** 巡检计划创建参数 */
 export interface InspectionPlanCreate {
-  plan_name: string
+  name: string
   description?: string
-  plan_type: string
-  frequency: string
-  start_date: string
-  end_date?: string
-  devices?: number[]
-  locations?: string[]
-  inspector?: string
-  checklist?: string[]
+  frequency?: string
+  location?: string
+  check_items?: string
+  assignee?: string
   is_active?: boolean
 }
 
 /** 巡检任务 */
 export interface InspectionTask {
   id: number
-  plan_id: number
+  plan_id?: number
   plan_name?: string
   task_no: string
   status: InspectionStatus
-  inspector?: string
-  scheduled_time: string
+  assignee?: string
+  scheduled_date?: string
   started_at?: string
   completed_at?: string
-  devices?: number[]
-  locations?: string[]
-  checklist?: string[]
-  results?: Record<string, any>
+  result?: string
+  abnormal_count: number
   remarks?: string
   created_at: string
 }
 
 /** 巡检任务创建参数 */
 export interface InspectionTaskCreate {
-  plan_id: number
-  inspector?: string
-  scheduled_time: string
-  devices?: number[]
-  locations?: string[]
-  checklist?: string[]
+  plan_id?: number
+  assignee?: string
+  scheduled_date?: string
 }
 
 /** 知识库 */
 export interface Knowledge {
   id: number
   title: string
-  category: string
-  content: string
-  keywords?: string[]
-  author?: string
-  views: number
-  likes: number
+  category?: string
+  content?: string
+  tags?: string
   is_published: boolean
+  author?: string
+  view_count: number
   created_at: string
   updated_at: string
 }
@@ -158,9 +148,9 @@ export interface Knowledge {
 /** 知识库创建参数 */
 export interface KnowledgeCreate {
   title: string
-  category: string
-  content: string
-  keywords?: string[]
+  category?: string
+  content?: string
+  tags?: string
   author?: string
   is_published?: boolean
 }
@@ -219,6 +209,11 @@ export function assignWorkOrder(id: number, assignee: string) {
   return request.post<ResponseModel<WorkOrder>>(`/v1/operation/workorders/${id}/assign`, { assignee })
 }
 
+/** 接单 */
+export function acceptWorkOrder(id: number) {
+  return request.post<ResponseModel<WorkOrder>>(`/v1/operation/workorders/${id}/accept`)
+}
+
 /** 开始处理工单 */
 export function startWorkOrder(id: number) {
   return request.post<ResponseModel<WorkOrder>>(`/v1/operation/workorders/${id}/start`)
@@ -227,6 +222,11 @@ export function startWorkOrder(id: number) {
 /** 完成工单 */
 export function completeWorkOrder(id: number, solution: string, root_cause?: string) {
   return request.post<ResponseModel<WorkOrder>>(`/v1/operation/workorders/${id}/complete`, { solution, root_cause })
+}
+
+/** 关闭工单 */
+export function closeWorkOrder(id: number) {
+  return request.post<ResponseModel<WorkOrder>>(`/v1/operation/workorders/${id}/close`)
 }
 
 /** 获取工单日志 */
@@ -243,31 +243,35 @@ export function addWorkOrderLog(id: number, action: string, content: string, ope
 
 /** 获取巡检计划列表 */
 export function getInspectionPlans(params?: PageParams & {
-  plan_type?: string
   is_active?: boolean
-  keyword?: string
+  name?: string
 }) {
-  return request.get<ResponseModel<InspectionPlan[]>>('/v1/operation/inspection-plans', { params })
+  return request.get<ResponseModel<InspectionPlan[]>>('/v1/operation/plans', { params })
 }
 
 /** 获取巡检计划详情 */
 export function getInspectionPlan(id: number) {
-  return request.get<ResponseModel<InspectionPlan>>(`/v1/operation/inspection-plans/${id}`)
+  return request.get<ResponseModel<InspectionPlan>>(`/v1/operation/plans/${id}`)
 }
 
 /** 创建巡检计划 */
 export function createInspectionPlan(data: InspectionPlanCreate) {
-  return request.post<ResponseModel<InspectionPlan>>('/v1/operation/inspection-plans', data)
+  return request.post<ResponseModel<InspectionPlan>>('/v1/operation/plans', data)
 }
 
 /** 更新巡检计划 */
 export function updateInspectionPlan(id: number, data: Partial<InspectionPlanCreate>) {
-  return request.put<ResponseModel<InspectionPlan>>(`/v1/operation/inspection-plans/${id}`, data)
+  return request.put<ResponseModel<InspectionPlan>>(`/v1/operation/plans/${id}`, data)
 }
 
 /** 删除巡检计划 */
 export function deleteInspectionPlan(id: number) {
-  return request.delete<ResponseModel>(`/v1/operation/inspection-plans/${id}`)
+  return request.delete<ResponseModel>(`/v1/operation/plans/${id}`)
+}
+
+/** 从计划生成巡检任务 */
+export function generateInspectionTask(planId: number) {
+  return request.post<ResponseModel<InspectionTask>>(`/v1/operation/plans/${planId}/generate-tasks`)
 }
 
 // ==================== 巡检任务 API ====================
@@ -276,40 +280,39 @@ export function deleteInspectionPlan(id: number) {
 export function getInspectionTasks(params?: PageParams & {
   plan_id?: number
   status?: InspectionStatus
-  inspector?: string
-  keyword?: string
+  assignee?: string
 }) {
-  return request.get<ResponseModel<InspectionTask[]>>('/v1/operation/inspection-tasks', { params })
+  return request.get<ResponseModel<InspectionTask[]>>('/v1/operation/tasks', { params })
 }
 
 /** 获取巡检任务详情 */
 export function getInspectionTask(id: number) {
-  return request.get<ResponseModel<InspectionTask>>(`/v1/operation/inspection-tasks/${id}`)
+  return request.get<ResponseModel<InspectionTask>>(`/v1/operation/tasks/${id}`)
 }
 
 /** 创建巡检任务 */
 export function createInspectionTask(data: InspectionTaskCreate) {
-  return request.post<ResponseModel<InspectionTask>>('/v1/operation/inspection-tasks', data)
+  return request.post<ResponseModel<InspectionTask>>('/v1/operation/tasks', data)
 }
 
 /** 更新巡检任务 */
 export function updateInspectionTask(id: number, data: Partial<InspectionTaskCreate>) {
-  return request.put<ResponseModel<InspectionTask>>(`/v1/operation/inspection-tasks/${id}`, data)
+  return request.put<ResponseModel<InspectionTask>>(`/v1/operation/tasks/${id}`, data)
 }
 
 /** 删除巡检任务 */
 export function deleteInspectionTask(id: number) {
-  return request.delete<ResponseModel>(`/v1/operation/inspection-tasks/${id}`)
+  return request.delete<ResponseModel>(`/v1/operation/tasks/${id}`)
 }
 
 /** 开始巡检任务 */
 export function startInspectionTask(id: number) {
-  return request.post<ResponseModel<InspectionTask>>(`/v1/operation/inspection-tasks/${id}/start`)
+  return request.post<ResponseModel<InspectionTask>>(`/v1/operation/tasks/${id}/start`)
 }
 
 /** 完成巡检任务 */
-export function completeInspectionTask(id: number, results: Record<string, any>, remarks?: string) {
-  return request.post<ResponseModel<InspectionTask>>(`/v1/operation/inspection-tasks/${id}/complete`, { results, remarks })
+export function completeInspectionTask(id: number, result?: string, abnormal_count?: number) {
+  return request.post<ResponseModel<InspectionTask>>(`/v1/operation/tasks/${id}/complete`, { result, abnormal_count })
 }
 
 // ==================== 知识库 API ====================
@@ -348,4 +351,109 @@ export function deleteKnowledge(id: number) {
 /** 获取运维统计 */
 export function getOperationStatistics() {
   return request.get<ResponseModel<OperationStatistics>>('/v1/operation/statistics')
+}
+
+// ==================== 告警工单规则 ====================
+
+/** 告警工单规则 */
+export interface AlarmWorkOrderRule {
+  id: number
+  name: string
+  alarm_level: string
+  alarm_type?: string
+  order_type: WorkOrderType
+  priority: WorkOrderPriority
+  assignee?: string
+  is_enabled: boolean
+  created_at: string
+  updated_at: string
+}
+
+/** 告警工单规则创建参数 */
+export interface AlarmWorkOrderRuleCreate {
+  name: string
+  alarm_level: string
+  alarm_type?: string
+  order_type?: WorkOrderType
+  priority?: WorkOrderPriority
+  assignee?: string
+  is_enabled?: boolean
+}
+
+/** 获取告警工单规则列表 */
+export function getAlarmWorkOrderRules(params?: { is_enabled?: boolean }) {
+  return request.get<ResponseModel<AlarmWorkOrderRule[]>>('/v1/operation/alarm-rules', { params })
+}
+
+/** 创建告警工单规则 */
+export function createAlarmWorkOrderRule(data: AlarmWorkOrderRuleCreate) {
+  return request.post<ResponseModel<AlarmWorkOrderRule>>('/v1/operation/alarm-rules', data)
+}
+
+/** 更新告警工单规则 */
+export function updateAlarmWorkOrderRule(id: number, data: Partial<AlarmWorkOrderRuleCreate>) {
+  return request.put<ResponseModel<AlarmWorkOrderRule>>(`/v1/operation/alarm-rules/${id}`, data)
+}
+
+/** 删除告警工单规则 */
+export function deleteAlarmWorkOrderRule(id: number) {
+  return request.delete<ResponseModel>(`/v1/operation/alarm-rules/${id}`)
+}
+
+/** 检查告警并自动创建工单 */
+export function checkAlarmCreateWorkOrder(data: { alarm_id: number; alarm_level: string; alarm_type?: string; alarm_message: string }) {
+  return request.post<ResponseModel<{ matched: boolean; rule_name?: string; work_order?: WorkOrder }>>('/v1/operation/alarm-rules/check', data)
+}
+
+// ==================== 工单审批 ====================
+
+/** 审批状态 */
+export type ApprovalStatus = 'pending' | 'approved' | 'rejected' | 'timeout' | 'escalated'
+
+/** 工单审批 */
+export interface WorkOrderApproval {
+  id: number
+  order_id: number
+  approver: string
+  status: ApprovalStatus
+  reason?: string
+  timeout_hours: number
+  escalate_to?: string
+  created_at: string
+  resolved_at?: string
+}
+
+/** 工单审批创建参数 */
+export interface WorkOrderApprovalCreate {
+  approver: string
+  timeout_hours?: number
+  escalate_to?: string
+}
+
+/** 提交工单审批 */
+export function submitWorkOrderApproval(orderId: number, data: WorkOrderApprovalCreate) {
+  return request.post<ResponseModel<WorkOrderApproval>>(`/v1/operation/workorders/${orderId}/submit-approval`, data)
+}
+
+/** 获取审批列表 */
+export function getWorkOrderApprovals(params?: PageParams & {
+  status?: ApprovalStatus
+  order_id?: number
+}) {
+  return request.get<ResponseModel<WorkOrderApproval[]>>('/v1/operation/approvals', { params })
+}
+
+/** 获取审批详情 */
+export function getWorkOrderApproval(id: number) {
+  return request.get<ResponseModel<WorkOrderApproval>>(`/v1/operation/approvals/${id}`)
+}
+
+/** 批准审批 */
+export function approveWorkOrderApproval(id: number, reason?: string) {
+  return request.post<ResponseModel<WorkOrderApproval>>(`/v1/operation/approvals/${id}/approve`, { reason })
+}
+
+/** 驳回审批 */
+export function rejectWorkOrderApproval(id: number, reason: string) {
+  return request.post<ResponseModel<WorkOrderApproval>>(`/v1/operation/approvals/${id}/reject`, { reason })
 }
