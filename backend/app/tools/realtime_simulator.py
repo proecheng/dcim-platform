@@ -15,7 +15,6 @@ Realtime Data Simulator for Dynamic Display
 import sqlite3
 import random
 import time
-import threading
 from datetime import datetime
 from typing import Dict, Any
 

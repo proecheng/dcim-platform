@@ -17,11 +17,9 @@ Demo Data Generator for Typical Small-Medium Data Center
 - 目标PUE：1.5-1.8
 """
 
-import asyncio
 import random
 from datetime import datetime, timedelta, date
 from typing import List, Dict, Any
-import math
 
 # 典型中小型算力中心配置
 DATACENTER_CONFIG = {

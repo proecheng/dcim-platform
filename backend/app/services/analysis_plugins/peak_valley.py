@@ -7,7 +7,6 @@ Analyzes peak-valley pricing utilization and optimizes electricity usage distrib
 """
 
 from typing import List
-import statistics
 
 from .base import (
     AnalysisPlugin,

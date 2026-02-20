@@ -2,7 +2,6 @@
 算力中心智能监控系统 - 主入口
 V2.0 架构重构版
 """
-import os
 import asyncio
 from datetime import datetime
 from contextlib import asynccontextmanager
@@ -451,7 +450,7 @@ async def websocket_realtime(websocket: WebSocket, token: str = Query(None)):
     await ws_manager.connect(websocket, "realtime")
     try:
         while True:
-            data = await websocket.receive_text()
+            await websocket.receive_text()
             # 可以处理客户端发来的订阅请求
     except WebSocketDisconnect:
         ws_manager.disconnect(websocket, "realtime")
@@ -466,7 +465,7 @@ async def websocket_alarms(websocket: WebSocket, token: str = Query(None)):
     await ws_manager.connect(websocket, "alarms")
     try:
         while True:
-            data = await websocket.receive_text()
+            await websocket.receive_text()
     except WebSocketDisconnect:
         ws_manager.disconnect(websocket, "alarms")
 
@@ -480,7 +479,7 @@ async def websocket_system(websocket: WebSocket, token: str = Query(None)):
     await ws_manager.connect(websocket, "system")
     try:
         while True:
-            data = await websocket.receive_text()
+            await websocket.receive_text()
     except WebSocketDisconnect:
         ws_manager.disconnect(websocket, "system")
 

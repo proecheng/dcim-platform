@@ -10,7 +10,6 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.distributions import Normal, Categorical
 from typing import Tuple, Dict, Optional
-import numpy as np
 
 
 class ActorCriticNetwork(nn.Module):

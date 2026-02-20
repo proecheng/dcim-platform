@@ -527,7 +527,6 @@ class DeviceRegulationService:
                 hourly_profile.append(hourly_map[h])
             else:
                 # 无数据时使用基于额定功率的估算
-                import random
                 base = rated_power * 0.6 if rated_power > 0 else 10
                 hourly_profile.append({
                     "hour": h,

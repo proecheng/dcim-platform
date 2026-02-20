@@ -11,7 +11,6 @@ Enhanced: 支持设备级负荷转移分析、计量点关联、功率曲线分�
 from typing import List, Dict, Any, Optional
 from datetime import datetime, timedelta
 from collections import defaultdict
-import statistics
 
 from .base import (
     AnalysisPlugin,

@@ -2,7 +2,7 @@
 实时调度调整服务
 监控当前功率，预测需量超标风险，触发紧急调整
 """
-import asyncio
+
 from datetime import datetime, timedelta
 from typing import List, Dict, Optional, Callable, Any
 from dataclasses import dataclass, field

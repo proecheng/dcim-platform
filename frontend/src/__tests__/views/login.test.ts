@@ -4,7 +4,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
-import { defineComponent, h } from 'vue'
+import { defineComponent, h, ref, reactive } from 'vue'
 
 // Mock 依赖
 vi.mock('vue-router', () => ({
@@ -29,7 +29,6 @@ vi.mock('@element-plus/icons-vue', () => ({
 const LoginFormTestable = defineComponent({
   name: 'LoginFormTestable',
   setup() {
-    const { ref, reactive } = require('vue')
     const form = reactive({ username: '', password: '' })
     const loading = ref(false)
     const rules = {

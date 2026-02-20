@@ -1,5 +1,4 @@
 """楼层平面图生成服务"""
-import json
 from typing import Dict, List, Any
 
 # 楼层配置
