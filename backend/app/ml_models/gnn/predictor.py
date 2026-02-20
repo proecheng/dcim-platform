@@ -21,7 +21,7 @@ import torch.optim as optim
 
 from .model import ConflictGNN
 from .graph_builder import MeasureGraphBuilder
-from ..config import MLConfig, GNNConfig
+from ..config import MLConfig
 
 logger = logging.getLogger(__name__)
 
@@ -60,7 +60,7 @@ class ConflictPredictor:
         self.graph_builder = MeasureGraphBuilder(
             num_measure_types=self.gnn_config.num_measure_types,
             num_devices=self.gnn_config.num_devices,
-            embed_dim=self.gnn_config.hidden_dim
+            embed_dim=self.gnn_config.hidden_dim,
         )
 
         # 初始化GNN模型
@@ -71,7 +71,7 @@ class ConflictPredictor:
             hidden_dim=self.gnn_config.hidden_dim,
             num_rgcn_layers=self.gnn_config.num_layers,
             num_relations=self.gnn_config.num_edge_types,
-            dropout=self.gnn_config.dropout
+            dropout=self.gnn_config.dropout,
         ).to(self.device)
 
         self.is_trained = False
@@ -103,7 +103,7 @@ class ConflictPredictor:
             "model_state_dict": self.model.state_dict(),
             "loss": loss,
             "is_trained": self.is_trained,
-            "timestamp": datetime.now().isoformat()
+            "timestamp": datetime.now().isoformat(),
         }
         torch.save(checkpoint, self.config.gnn_checkpoint)
         logger.info(f"Saved GNN checkpoint to {self.config.gnn_checkpoint}")
@@ -139,7 +139,7 @@ class ConflictPredictor:
                 "conflict_matrix": [],
                 "coupling_coefficients": [],
                 "recommended_combination": [],
-                "combination_score": 0.0
+                "combination_score": 0.0,
             }
 
         n = len(measures)
@@ -149,11 +149,11 @@ class ConflictPredictor:
         converted_measures = []
         for m in measures:
             converted = {
-                'type': m.get('measure_type', 0),
-                'device': m.get('device_ids', ['unknown'])[0] if m.get('device_ids') else 'unknown',
-                'hours': m.get('execution_hours', []),
-                'power_direction': m.get('power_direction', 1),
-                'benefit': m.get('expected_benefit', 0)
+                "type": m.get("measure_type", 0),
+                "device": m.get("device_ids", ["unknown"])[0] if m.get("device_ids") else "unknown",
+                "hours": m.get("execution_hours", []),
+                "power_direction": m.get("power_direction", 1),
+                "benefit": m.get("expected_benefit", 0),
             }
             converted_measures.append(converted)
 
@@ -162,11 +162,9 @@ class ConflictPredictor:
             graph_data = self.graph_builder.build_graph(converted_measures)
 
             # 移动到设备
-            node_features = {
-                k: v.to(self.device) for k, v in graph_data['node_features'].items()
-            }
-            edge_index = graph_data['edge_index'].to(self.device)
-            edge_type = graph_data['edge_type'].to(self.device)
+            node_features = {k: v.to(self.device) for k, v in graph_data["node_features"].items()}
+            edge_index = graph_data["edge_index"].to(self.device)
+            edge_type = graph_data["edge_type"].to(self.device)
 
             # 前向传播
             outputs = self.model(node_features, edge_index, edge_type)
@@ -176,8 +174,8 @@ class ConflictPredictor:
             coupling_matrix = np.zeros((n, n))
 
             if edge_index.size(1) > 0:
-                conflict_scores = outputs['conflict_scores'].cpu().numpy().flatten()
-                coupling_coeffs = outputs['coupling_coeffs'].cpu().numpy().flatten()
+                conflict_scores = outputs["conflict_scores"].cpu().numpy().flatten()
+                coupling_coeffs = outputs["coupling_coeffs"].cpu().numpy().flatten()
 
                 edge_index_np = edge_index.cpu().numpy()
                 for idx in range(edge_index_np.shape[1]):
@@ -188,28 +186,23 @@ class ConflictPredictor:
                         # coupling_head 使用 Tanh，输出在 [-1, 1]，转换到 [0, 1]
                         coupling_matrix[i, j] = (coupling_coeffs[idx] + 1) / 2
 
-            combination_score = outputs['combination_score'].item()
+            combination_score = outputs["combination_score"].item()
 
         # 获取推荐组合
-        benefits = np.array([m.get('expected_benefit', 0) for m in measures])
+        benefits = np.array([m.get("expected_benefit", 0) for m in measures])
         recommended = self._resolve_conflicts(
-            conflict_matrix=conflict_matrix,
-            coupling_coefficients=coupling_matrix,
-            benefits=benefits,
-            threshold=0.5
+            conflict_matrix=conflict_matrix, coupling_coefficients=coupling_matrix, benefits=benefits, threshold=0.5
         )
 
         return {
             "conflict_matrix": conflict_matrix.tolist(),
             "coupling_coefficients": coupling_matrix.tolist(),
             "recommended_combination": recommended,
-            "combination_score": combination_score
+            "combination_score": combination_score,
         }
 
     def calculate_adjusted_benefit(
-        self,
-        benefits: List[float],
-        coupling_coefficients: List[List[float]]
+        self, benefits: List[float], coupling_coefficients: List[List[float]]
     ) -> Dict[str, Any]:
         """
         计算调整后的总效益
@@ -227,7 +220,9 @@ class ConflictPredictor:
             调整后效益详情
         """
         benefits_arr = np.array(benefits)
-        coupling_arr = np.array(coupling_coefficients) if coupling_coefficients else np.zeros((len(benefits), len(benefits)))
+        coupling_arr = (
+            np.array(coupling_coefficients) if coupling_coefficients else np.zeros((len(benefits), len(benefits)))
+        )
         n = len(benefits)
 
         # 原始总收益
@@ -247,7 +242,7 @@ class ConflictPredictor:
             "raw_total": round(total_raw, 2),
             "coupling_loss": round(coupling_loss, 2),
             "adjusted_total": round(adjusted_benefit, 2),
-            "efficiency_ratio": round(adjusted_benefit / total_raw, 4) if total_raw > 0 else 0
+            "efficiency_ratio": round(adjusted_benefit / total_raw, 4) if total_raw > 0 else 0,
         }
 
     def _resolve_conflicts(
@@ -255,7 +250,7 @@ class ConflictPredictor:
         conflict_matrix: np.ndarray,
         coupling_coefficients: np.ndarray,
         benefits: np.ndarray,
-        threshold: float = 0.5
+        threshold: float = 0.5,
     ) -> List[int]:
         """
         消解冲突并选择最优措施组合
@@ -285,10 +280,7 @@ class ConflictPredictor:
 
         for idx in sorted_indices:
             # 检查与已选措施是否有冲突
-            has_conflict = any(
-                (idx, s) in conflict_pairs or (s, idx) in conflict_pairs
-                for s in selected
-            )
+            has_conflict = any((idx, s) in conflict_pairs or (s, idx) in conflict_pairs for s in selected)
 
             if not has_conflict:
                 selected.append(idx)
@@ -322,29 +314,23 @@ class ConflictPredictor:
                 measures = sample["measures"]
                 graph_data = self.graph_builder.build_graph(measures)
 
-                node_features = {
-                    k: v.to(self.device) for k, v in graph_data['node_features'].items()
-                }
-                edge_index = graph_data['edge_index'].to(self.device)
-                edge_type = graph_data['edge_type'].to(self.device)
+                node_features = {k: v.to(self.device) for k, v in graph_data["node_features"].items()}
+                edge_index = graph_data["edge_index"].to(self.device)
+                edge_type = graph_data["edge_type"].to(self.device)
 
                 outputs = self.model(node_features, edge_index, edge_type)
 
                 # 构建目标
                 targets = {
-                    'conflict_labels': torch.tensor(
-                        sample['conflict_labels'], dtype=torch.float32
-                    ).to(self.device),
-                    'coupling_targets': torch.tensor(
-                        sample['coupling_labels'], dtype=torch.float32
-                    ).to(self.device),
-                    'combination_target': torch.tensor(
-                        sample['combination_score'], dtype=torch.float32
-                    ).to(self.device)
+                    "conflict_labels": torch.tensor(sample["conflict_labels"], dtype=torch.float32).to(self.device),
+                    "coupling_targets": torch.tensor(sample["coupling_labels"], dtype=torch.float32).to(self.device),
+                    "combination_target": torch.tensor(sample["combination_score"], dtype=torch.float32).to(
+                        self.device
+                    ),
                 }
 
                 losses = self.model.compute_loss(outputs, targets, edge_index)
-                total_loss = losses['total_loss']
+                total_loss = losses["total_loss"]
 
                 total_loss.backward()
                 optimizer.step()
@@ -372,14 +358,11 @@ class ConflictPredictor:
             measures = []
             for i in range(n):
                 measure = {
-                    'type': np.random.randint(0, 6),
-                    'device': f"device_{np.random.randint(0, 20)}",
-                    'hours': list(range(
-                        np.random.randint(0, 18),
-                        np.random.randint(6, 24)
-                    )),
-                    'power_direction': np.random.choice([-1, 1]),
-                    'benefit': np.random.uniform(100, 10000)
+                    "type": np.random.randint(0, 6),
+                    "device": f"device_{np.random.randint(0, 20)}",
+                    "hours": list(range(np.random.randint(0, 18), np.random.randint(6, 24))),
+                    "power_direction": np.random.choice([-1, 1]),
+                    "benefit": np.random.uniform(100, 10000),
                 }
                 measures.append(measure)
 
@@ -391,8 +374,8 @@ class ConflictPredictor:
                 for j in range(n):
                     if i != j:
                         # 相同设备或时间重叠更可能冲突
-                        same_device = measures[i]['device'] == measures[j]['device']
-                        time_overlap = bool(set(measures[i]['hours']) & set(measures[j]['hours']))
+                        same_device = measures[i]["device"] == measures[j]["device"]
+                        time_overlap = bool(set(measures[i]["hours"]) & set(measures[j]["hours"]))
 
                         if same_device and time_overlap:
                             conflict_labels.append(np.random.uniform(0.6, 1.0))
@@ -405,14 +388,16 @@ class ConflictPredictor:
                             coupling_labels.append(np.random.uniform(0.0, 0.2))
 
             # 组合得分
-            total_benefit = sum(m['benefit'] for m in measures)
+            total_benefit = sum(m["benefit"] for m in measures)
             combination_score = np.random.uniform(0.5, 1.0) * total_benefit / 10000
 
-            synthetic_data.append({
-                "measures": measures,
-                "conflict_labels": conflict_labels,
-                "coupling_labels": coupling_labels,
-                "combination_score": combination_score
-            })
+            synthetic_data.append(
+                {
+                    "measures": measures,
+                    "conflict_labels": conflict_labels,
+                    "coupling_labels": coupling_labels,
+                    "combination_score": combination_score,
+                }
+            )
 
         return synthetic_data

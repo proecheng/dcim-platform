@@ -6,8 +6,7 @@ GNN Model for Measure Conflict Detection
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from typing import Dict, List, Tuple, Optional
-
+from typing import Dict, Tuple, Optional
 
 
 class MeasureEmbedding(nn.Module):
@@ -29,7 +28,7 @@ class MeasureEmbedding(nn.Module):
         num_devices: int = 100,
         device_embed_dim: int = 32,
         hour_dim: int = 24,
-        output_dim: int = 64
+        output_dim: int = 64,
     ):
         super().__init__()
 
@@ -52,7 +51,7 @@ class MeasureEmbedding(nn.Module):
             nn.ReLU(),
             nn.Dropout(0.1),
             nn.Linear(output_dim * 2, output_dim),
-            nn.LayerNorm(output_dim)
+            nn.LayerNorm(output_dim),
         )
 
         self.output_dim = output_dim
@@ -72,23 +71,20 @@ class MeasureEmbedding(nn.Module):
         device_id: torch.Tensor,
         hour: torch.Tensor,
         power_direction: torch.Tensor,
-        benefit: torch.Tensor
+        benefit: torch.Tensor,
     ) -> torch.Tensor:
         """
         前向传播
         """
-        batch_size = measure_type.size(0)
+        measure_type.size(0)
 
         # 措施类型 one-hot 编码
         type_one_hot = F.one_hot(
-            measure_type.long().clamp(0, self.num_measure_types - 1),
-            num_classes=self.num_measure_types
+            measure_type.long().clamp(0, self.num_measure_types - 1), num_classes=self.num_measure_types
         ).float()
 
         # 设备嵌入
-        device_embed = self.device_embedding(
-            device_id.long().clamp(0, self.num_devices - 1)
-        )
+        device_embed = self.device_embedding(device_id.long().clamp(0, self.num_devices - 1))
 
         # 小时编码
         hour_encoding = self.encode_hour(hour)
@@ -100,13 +96,7 @@ class MeasureEmbedding(nn.Module):
             benefit = benefit.unsqueeze(-1)
 
         # 拼接所有特征
-        features = torch.cat([
-            type_one_hot,
-            device_embed,
-            hour_encoding,
-            power_direction,
-            benefit
-        ], dim=-1)
+        features = torch.cat([type_one_hot, device_embed, hour_encoding, power_direction, benefit], dim=-1)
 
         return self.projection(features)
 
@@ -124,7 +114,7 @@ class RelationalGraphConv(nn.Module):
         num_relations: int = 3,
         num_bases: Optional[int] = None,
         bias: bool = True,
-        aggr: str = 'mean'
+        aggr: str = "mean",
     ):
         super().__init__()
 
@@ -138,24 +128,18 @@ class RelationalGraphConv(nn.Module):
         self.num_bases = num_bases
 
         # 基权重矩阵
-        self.weight_bases = nn.Parameter(
-            torch.Tensor(num_bases, in_channels, out_channels)
-        )
+        self.weight_bases = nn.Parameter(torch.Tensor(num_bases, in_channels, out_channels))
 
         # 每种关系的基组合系数
-        self.weight_comp = nn.Parameter(
-            torch.Tensor(num_relations, num_bases)
-        )
+        self.weight_comp = nn.Parameter(torch.Tensor(num_relations, num_bases))
 
         # 自环变换
-        self.root_weight = nn.Parameter(
-            torch.Tensor(in_channels, out_channels)
-        )
+        self.root_weight = nn.Parameter(torch.Tensor(in_channels, out_channels))
 
         if bias:
             self.bias = nn.Parameter(torch.Tensor(out_channels))
         else:
-            self.register_parameter('bias', None)
+            self.register_parameter("bias", None)
 
         self.reset_parameters()
 
@@ -166,12 +150,7 @@ class RelationalGraphConv(nn.Module):
         if self.bias is not None:
             nn.init.zeros_(self.bias)
 
-    def forward(
-        self,
-        x: torch.Tensor,
-        edge_index: torch.Tensor,
-        edge_type: torch.Tensor
-    ) -> torch.Tensor:
+    def forward(self, x: torch.Tensor, edge_index: torch.Tensor, edge_type: torch.Tensor) -> torch.Tensor:
         """
         前向传播
 
@@ -186,11 +165,7 @@ class RelationalGraphConv(nn.Module):
         num_nodes = x.size(0)
 
         # 计算每种关系的权重矩阵
-        relation_weights = torch.einsum(
-            'rb,bio->rio',
-            self.weight_comp,
-            self.weight_bases
-        )
+        relation_weights = torch.einsum("rb,bio->rio", self.weight_comp, self.weight_bases)
 
         out = torch.zeros(num_nodes, self.out_channels, device=x.device)
 
@@ -206,7 +181,7 @@ class RelationalGraphConv(nn.Module):
             source_features = x[source_idx]
             messages = torch.matmul(source_features, relation_weights[rel])
 
-            if self.aggr == 'mean':
+            if self.aggr == "mean":
                 ones = torch.ones(target_idx.size(0), device=x.device)
                 degree = torch.zeros(num_nodes, device=x.device)
                 degree.scatter_add_(0, target_idx, ones)
@@ -224,7 +199,6 @@ class RelationalGraphConv(nn.Module):
             out = out + self.bias
 
         return out
-
 
 
 class ConflictGNN(nn.Module):
@@ -245,7 +219,7 @@ class ConflictGNN(nn.Module):
         hidden_dim: int = 64,
         num_rgcn_layers: int = 3,
         num_relations: int = 3,
-        dropout: float = 0.1
+        dropout: float = 0.1,
     ):
         super().__init__()
 
@@ -257,24 +231,18 @@ class ConflictGNN(nn.Module):
             num_measure_types=num_measure_types,
             num_devices=num_devices,
             device_embed_dim=device_embed_dim,
-            output_dim=hidden_dim
+            output_dim=hidden_dim,
         )
 
         # R-GCN层
         self.rgcn_layers = nn.ModuleList()
         for i in range(num_rgcn_layers):
             self.rgcn_layers.append(
-                RelationalGraphConv(
-                    in_channels=hidden_dim,
-                    out_channels=hidden_dim,
-                    num_relations=num_relations
-                )
+                RelationalGraphConv(in_channels=hidden_dim, out_channels=hidden_dim, num_relations=num_relations)
             )
 
         # 层归一化
-        self.layer_norms = nn.ModuleList([
-            nn.LayerNorm(hidden_dim) for _ in range(num_rgcn_layers)
-        ])
+        self.layer_norms = nn.ModuleList([nn.LayerNorm(hidden_dim) for _ in range(num_rgcn_layers)])
 
         self.dropout = nn.Dropout(dropout)
 
@@ -286,7 +254,7 @@ class ConflictGNN(nn.Module):
             nn.Linear(hidden_dim, hidden_dim // 2),
             nn.ReLU(),
             nn.Linear(hidden_dim // 2, 1),
-            nn.Sigmoid()
+            nn.Sigmoid(),
         )
 
         # 耦合系数预测头 (pairwise)
@@ -297,7 +265,7 @@ class ConflictGNN(nn.Module):
             nn.Linear(hidden_dim, hidden_dim // 2),
             nn.ReLU(),
             nn.Linear(hidden_dim // 2, 1),
-            nn.Tanh()
+            nn.Tanh(),
         )
 
         # 组合得分预测头 (graph-level)
@@ -307,14 +275,11 @@ class ConflictGNN(nn.Module):
             nn.Dropout(dropout),
             nn.Linear(hidden_dim, hidden_dim // 2),
             nn.ReLU(),
-            nn.Linear(hidden_dim // 2, 1)
+            nn.Linear(hidden_dim // 2, 1),
         )
 
     def forward(
-        self,
-        node_features: Dict[str, torch.Tensor],
-        edge_index: torch.Tensor,
-        edge_type: torch.Tensor
+        self, node_features: Dict[str, torch.Tensor], edge_index: torch.Tensor, edge_type: torch.Tensor
     ) -> Dict[str, torch.Tensor]:
         """
         前向传播
@@ -329,11 +294,11 @@ class ConflictGNN(nn.Module):
         """
         # 1. 计算初始节点嵌入
         x = self.measure_embedding(
-            measure_type=node_features['measure_type'],
-            device_id=node_features['device_id'],
-            hour=node_features['hour'],
-            power_direction=node_features['power_direction'],
-            benefit=node_features['benefit']
+            measure_type=node_features["measure_type"],
+            device_id=node_features["device_id"],
+            hour=node_features["hour"],
+            power_direction=node_features["power_direction"],
+            benefit=node_features["benefit"],
         )
 
         # 2. R-GCN消息传递 (带残差连接)
@@ -361,17 +326,14 @@ class ConflictGNN(nn.Module):
         combination_score = self.combination_head(graph_embed)
 
         return {
-            'node_embeddings': x,
-            'conflict_scores': conflict_scores,
-            'coupling_coeffs': coupling_coeffs,
-            'combination_score': combination_score.squeeze()
+            "node_embeddings": x,
+            "conflict_scores": conflict_scores,
+            "coupling_coeffs": coupling_coeffs,
+            "combination_score": combination_score.squeeze(),
         }
 
     def compute_loss(
-        self,
-        outputs: Dict[str, torch.Tensor],
-        targets: Dict[str, torch.Tensor],
-        edge_index: torch.Tensor
+        self, outputs: Dict[str, torch.Tensor], targets: Dict[str, torch.Tensor], edge_index: torch.Tensor
     ) -> Dict[str, torch.Tensor]:
         """
         计算多任务损失
@@ -388,33 +350,26 @@ class ConflictGNN(nn.Module):
         total_loss = torch.tensor(0.0, device=edge_index.device, requires_grad=True)
 
         # 冲突预测损失 (BCE)
-        if 'conflict_labels' in targets and outputs['conflict_scores'].size(0) > 0:
+        if "conflict_labels" in targets and outputs["conflict_scores"].size(0) > 0:
             conflict_loss = F.binary_cross_entropy(
-                outputs['conflict_scores'].squeeze(-1),
-                targets['conflict_labels'].float()
+                outputs["conflict_scores"].squeeze(-1), targets["conflict_labels"].float()
             )
-            losses['conflict_loss'] = conflict_loss
+            losses["conflict_loss"] = conflict_loss
             total_loss = total_loss + conflict_loss
 
         # 耦合系数损失 (MSE)
-        if 'coupling_targets' in targets and outputs['coupling_coeffs'].size(0) > 0:
-            coupling_loss = F.mse_loss(
-                outputs['coupling_coeffs'].squeeze(-1),
-                targets['coupling_targets']
-            )
-            losses['coupling_loss'] = coupling_loss
+        if "coupling_targets" in targets and outputs["coupling_coeffs"].size(0) > 0:
+            coupling_loss = F.mse_loss(outputs["coupling_coeffs"].squeeze(-1), targets["coupling_targets"])
+            losses["coupling_loss"] = coupling_loss
             total_loss = total_loss + coupling_loss
 
         # 组合得分损失 (MSE)
-        if 'combination_target' in targets:
-            combination_loss = F.mse_loss(
-                outputs['combination_score'],
-                targets['combination_target']
-            )
-            losses['combination_loss'] = combination_loss
+        if "combination_target" in targets:
+            combination_loss = F.mse_loss(outputs["combination_score"], targets["combination_target"])
+            losses["combination_loss"] = combination_loss
             total_loss = total_loss + combination_loss
 
-        losses['total_loss'] = total_loss
+        losses["total_loss"] = total_loss
         return losses
 
     def predict_conflicts(
@@ -422,7 +377,7 @@ class ConflictGNN(nn.Module):
         node_features: Dict[str, torch.Tensor],
         edge_index: torch.Tensor,
         edge_type: torch.Tensor,
-        threshold: float = 0.5
+        threshold: float = 0.5,
     ) -> Tuple[torch.Tensor, torch.Tensor]:
         """
         预测措施之间的冲突
@@ -434,7 +389,7 @@ class ConflictGNN(nn.Module):
         self.eval()
         with torch.no_grad():
             outputs = self.forward(node_features, edge_index, edge_type)
-            conflict_probs = outputs['conflict_scores'].squeeze(-1)
+            conflict_probs = outputs["conflict_scores"].squeeze(-1)
             conflict_mask = conflict_probs > threshold
             conflict_pairs = edge_index[:, conflict_mask]
             return conflict_pairs, conflict_probs[conflict_mask]

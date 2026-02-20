@@ -2,6 +2,7 @@
 PUE 计算服务
 基于 PowerDevice 关联的真实点位数据计算 PUE
 """
+
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Optional, Dict
@@ -26,6 +27,7 @@ DATA_EXPIRY_SECONDS = 300
 @dataclass
 class PUEResult:
     """PUE 计算结果"""
+
     current_pue: Optional[float]
     total_power: float
     it_power: float
@@ -42,18 +44,14 @@ async def calculate_realtime_pue(db: AsyncSession) -> PUEResult:
     批量查询所有 PowerDevice 的 power_point_id，一次性从 PointRealtime 加载（避免 N+1）
     """
     # 查询所有启用的 PowerDevice
-    result = await db.execute(
-        select(PowerDevice).where(PowerDevice.is_enabled == True)
-    )
+    result = await db.execute(select(PowerDevice).where(PowerDevice.is_enabled == True))
     devices = result.scalars().all()
 
     # 批量查询所有关联的 PointRealtime
     point_ids = [d.power_point_id for d in devices if d.power_point_id]
     realtime_map: Dict[int, PointRealtime] = {}
     if point_ids:
-        rt_result = await db.execute(
-            select(PointRealtime).where(PointRealtime.point_id.in_(point_ids))
-        )
+        rt_result = await db.execute(select(PointRealtime).where(PointRealtime.point_id.in_(point_ids)))
         realtime_map = {r.point_id: r for r in rt_result.scalars().all()}
 
     now = datetime.now()

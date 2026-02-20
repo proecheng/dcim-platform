@@ -2,6 +2,7 @@
 用电管理模型
 Enhanced with meter points, transformers, distribution panels for comprehensive energy analysis
 """
+
 from datetime import datetime
 from sqlalchemy import Column, Integer, String, Boolean, Float, Text, DateTime, Date, ForeignKey, JSON, func, Numeric
 from sqlalchemy.orm import relationship
@@ -11,8 +12,10 @@ from ..core.database import Base
 
 # ==================== 配电系统拓扑模型 ====================
 
+
 class Transformer(Base):
     """变压器配置表"""
+
     __tablename__ = "transformers"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -45,6 +48,7 @@ class Transformer(Base):
 
 class MeterPoint(Base):
     """计量点配置表"""
+
     __tablename__ = "meter_points"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -87,6 +91,7 @@ class MeterPoint(Base):
 
 class DistributionPanel(Base):
     """配电柜/开关柜表"""
+
     __tablename__ = "distribution_panels"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -117,6 +122,7 @@ class DistributionPanel(Base):
 
 class DistributionCircuit(Base):
     """配电回路表"""
+
     __tablename__ = "distribution_circuits"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -148,8 +154,10 @@ class DistributionCircuit(Base):
 
 # ==================== 功率曲线与需量数据 ====================
 
+
 class PowerCurveData(Base):
     """功率曲线数据表 (15分钟粒度)"""
+
     __tablename__ = "power_curve_data"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -179,6 +187,7 @@ class PowerCurveData(Base):
 
 class DemandHistory(Base):
     """需量历史记录表 (月度)"""
+
     __tablename__ = "demand_history"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -206,6 +215,7 @@ class DemandHistory(Base):
 
 class OverDemandEvent(Base):
     """需量超限事件表"""
+
     __tablename__ = "over_demand_events"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -227,8 +237,10 @@ class OverDemandEvent(Base):
 
 # ==================== 设备扩展属性 ====================
 
+
 class DeviceLoadProfile(Base):
     """设备负荷曲线配置表"""
+
     __tablename__ = "device_load_profiles"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -254,6 +266,7 @@ class DeviceLoadProfile(Base):
 
 class DeviceShiftConfig(Base):
     """设备负荷转移配置表"""
+
     __tablename__ = "device_shift_configs"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -284,12 +297,15 @@ class DeviceShiftConfig(Base):
 
 class PowerDevice(Base):
     """用电设备表"""
+
     __tablename__ = "power_devices"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     device_code = Column(String(50), unique=True, nullable=False, comment="设备编码")
     device_name = Column(String(100), nullable=False, comment="设备名称")
-    device_type = Column(String(20), nullable=False, comment="设备类型: UPS/HVAC/IT_SERVER/IT_STORAGE/LIGHTING/PUMP/OTHER")
+    device_type = Column(
+        String(20), nullable=False, comment="设备类型: UPS/HVAC/IT_SERVER/IT_STORAGE/LIGHTING/PUMP/OTHER"
+    )
     rated_power = Column(Float, comment="额定功率 kW")
     rated_voltage = Column(Float, comment="额定电压 V")
     rated_current = Column(Float, comment="额定电流 A")
@@ -337,6 +353,7 @@ class PowerDevice(Base):
 
 class EnergyHourly(Base):
     """小时能耗表"""
+
     __tablename__ = "energy_hourly"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -354,6 +371,7 @@ class EnergyHourly(Base):
 
 class EnergyDaily(Base):
     """日能耗表"""
+
     __tablename__ = "energy_daily"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -373,6 +391,7 @@ class EnergyDaily(Base):
 
 class EnergyMonthly(Base):
     """月能耗表"""
+
     __tablename__ = "energy_monthly"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -396,6 +415,7 @@ class EnergyMonthly(Base):
 
 class ElectricityPricing(Base):
     """电价配置表 - 时段电价（电度电费）"""
+
     __tablename__ = "electricity_pricing"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -418,6 +438,7 @@ class PricingConfig(Base):
     - ElectricityPricing 存储时段电价（电度电费），每个时段一行
     - PricingConfig 存储全局配置（基本电费、功率因数、固定费用），只有一行有效配置
     """
+
     __tablename__ = "pricing_configs"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -437,14 +458,17 @@ class PricingConfig(Base):
 
     # ========== 功率因数调整配置 ==========
     power_factor_baseline = Column(Float, default=0.90, comment="功率因数基准值")
-    power_factor_rules = Column(JSON, comment="""功率因数调整规则 JSON数组:
+    power_factor_rules = Column(
+        JSON,
+        comment="""功率因数调整规则 JSON数组:
         [
             {"min": 0.95, "max": 1.0, "adjustment": -0.75},  // 减少0.75%
             {"min": 0.90, "max": 0.95, "adjustment": 0},     // 不调整
             {"min": 0.85, "max": 0.90, "adjustment": 1.5},   // 增加1.5%
             {"min": 0, "max": 0.85, "adjustment": 3.0}       // 增加3.0%
         ]
-    """)
+    """,
+    )
 
     # ========== 固定费用配置（不参与优化，仅用于成本统计）==========
     transmission_fee = Column(Float, default=0.15, comment="输配电费 元/kWh")
@@ -463,6 +487,7 @@ class PricingConfig(Base):
 
 class EnergySuggestion(Base):
     """节能建议表"""
+
     __tablename__ = "energy_suggestions"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -499,6 +524,7 @@ class EnergySuggestion(Base):
 
 class PUEHistory(Base):
     """PUE历史记录表"""
+
     __tablename__ = "pue_history"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -515,8 +541,10 @@ class PUEHistory(Base):
 
 # ==================== V2.3 新增: 负荷调节模型 ====================
 
+
 class LoadRegulationConfig(Base):
     """负荷调节配置表"""
+
     __tablename__ = "load_regulation_configs"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -553,6 +581,7 @@ class LoadRegulationConfig(Base):
 
 class RegulationHistory(Base):
     """调节历史记录表"""
+
     __tablename__ = "regulation_history"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -585,8 +614,10 @@ class RegulationHistory(Base):
 
 # ==================== V2.3 新增: 需量分析模型 ====================
 
+
 class DemandAnalysisRecord(Base):
     """需量分析记录表"""
+
     __tablename__ = "demand_analysis_records"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -624,6 +655,7 @@ class DemandAnalysisRecord(Base):
 
 class Demand15MinData(Base):
     """15分钟需量数据表"""
+
     __tablename__ = "demand_15min_data"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -654,8 +686,10 @@ class Demand15MinData(Base):
 
 # ==================== V2.4 新增: 节能方案模型 ====================
 
+
 class EnergySavingProposal(Base):
     """节能方案表 (多措施方案)"""
+
     __tablename__ = "energy_saving_proposals"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -670,14 +704,17 @@ class EnergySavingProposal(Base):
     analysis_end_date = Column(Date, comment="分析结束日期")
 
     # ========== V3.1 数据追溯链 (专利S1) ==========
-    trace_summary = Column(JSON, comment="""追溯汇总信息 JSON:
+    trace_summary = Column(
+        JSON,
+        comment="""追溯汇总信息 JSON:
         {
             "total_traces": 15,
             "data_sources": ["energy_daily", "power_devices", ...],
             "time_range": {"start": "...", "end": "..."},
             "root_trace_ids": ["TR-001", "TR-002", ...]
         }
-    """)
+    """,
+    )
 
     created_at = Column(DateTime, default=func.now(), comment="创建时间")
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
@@ -689,6 +726,7 @@ class EnergySavingProposal(Base):
 
 class ProposalMeasure(Base):
     """方案措施表"""
+
     __tablename__ = "proposal_measures"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -706,7 +744,9 @@ class ProposalMeasure(Base):
     execution_status = Column(String(20), default="pending", comment="执行状态: pending/executing/completed/failed")
 
     # ========== V3.1 数据追溯链 (专利S1) ==========
-    trace_data = Column(JSON, comment="""数据追溯链信息 JSON:
+    trace_data = Column(
+        JSON,
+        comment="""数据追溯链信息 JSON:
         {
             "root_trace_id": "TR-20260201-001",
             "traces": {
@@ -718,7 +758,8 @@ class ProposalMeasure(Base):
                 ...
             ]
         }
-    """)
+    """,
+    )
 
     created_at = Column(DateTime, default=func.now())
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
@@ -730,6 +771,7 @@ class ProposalMeasure(Base):
 
 class MeasureExecutionLog(Base):
     """措施执行日志表"""
+
     __tablename__ = "measure_execution_logs"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -750,12 +792,14 @@ class MeasureExecutionLog(Base):
 
 # ==================== 效果监测模型 (专利 S4) ====================
 
+
 class MeasureBaseline(Base):
     """
     措施基准值表 (S4a)
 
     在措施执行前采集目标设备的运行参数作为基准值
     """
+
     __tablename__ = "measure_baselines"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -794,6 +838,7 @@ class MonitoringRecord(Base):
 
     在措施执行后按预设周期持续采集设备运行参数
     """
+
     __tablename__ = "monitoring_records"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -833,6 +878,7 @@ class EffectReport(Base):
 
     计算实际节能收益和效果达成率
     """
+
     __tablename__ = "effect_reports"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -884,6 +930,7 @@ class MonitoringSession(Base):
 
     管理措施的持续监测周期
     """
+
     __tablename__ = "monitoring_sessions"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -913,12 +960,14 @@ class MonitoringSession(Base):
 
 # ==================== V3.2 RL 自适应优化 (专利 S5) ====================
 
+
 class RLOptimizationHistory(Base):
     """
     RL 优化历史表
 
     记录每次 RL 优化的输入状态、输出动作和效果
     """
+
     __tablename__ = "rl_optimization_history"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -956,6 +1005,7 @@ class RLTrainingLog(Base):
 
     记录在线训练的每一步信息
     """
+
     __tablename__ = "rl_training_logs"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -991,6 +1041,7 @@ class RLModelState(Base):
 
     保存模型运行状态和探索率信息
     """
+
     __tablename__ = "rl_model_states"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -1022,8 +1073,10 @@ class RLModelState(Base):
 
 # ==================== 节能中心重构模型 V2.5 ====================
 
+
 class EnergyOpportunity(Base):
     """节能机会主表 - 整合后的4大类机会"""
+
     __tablename__ = "energy_opportunities"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -1035,7 +1088,9 @@ class EnergyOpportunity(Base):
 
     # 优先级和状态
     priority = Column(String(20), default="medium", comment="优先级: high/medium/low")
-    status = Column(String(30), default="discovered", comment="状态: discovered/simulating/ready/executing/completed/rejected")
+    status = Column(
+        String(30), default="discovered", comment="状态: discovered/simulating/ready/executing/completed/rejected"
+    )
 
     # 收益评估
     potential_saving = Column(Numeric(12, 2), comment="年度潜在节省(元)")
@@ -1060,13 +1115,18 @@ class EnergyOpportunity(Base):
 
 class OpportunityMeasure(Base):
     """机会措施表 - 一个机会可包含多个具体措施"""
+
     __tablename__ = "opportunity_measures"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     opportunity_id = Column(Integer, ForeignKey("energy_opportunities.id", ondelete="CASCADE"), nullable=False)
 
     # 措施类型
-    measure_type = Column(String(50), nullable=False, comment="措施类型: demand_adjust/peak_shift/temp_adjust/brightness_adjust/equipment_upgrade")
+    measure_type = Column(
+        String(50),
+        nullable=False,
+        comment="措施类型: demand_adjust/peak_shift/temp_adjust/brightness_adjust/equipment_upgrade",
+    )
     measure_name = Column(String(200), comment="措施名称")
 
     # 调节对象
@@ -1102,6 +1162,7 @@ class OpportunityMeasure(Base):
 
 class ExecutionPlan(Base):
     """执行计划表 - 确认执行后生成"""
+
     __tablename__ = "execution_plans"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -1132,6 +1193,7 @@ class ExecutionPlan(Base):
 
 class ExecutionTask(Base):
     """执行任务表 - 计划分解为具体任务"""
+
     __tablename__ = "execution_tasks"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -1172,6 +1234,7 @@ class ExecutionTask(Base):
 
 class ExecutionResult(Base):
     """效果追踪表 - 执行后效果跟踪"""
+
     __tablename__ = "execution_results"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -1208,8 +1271,10 @@ class ExecutionResult(Base):
 
 # ==================== V3.0 电费综合优化系统 ====================
 
+
 class DispatchableDevice(Base):
     """可调度设备表 - 支持6类通用负荷分类"""
+
     __tablename__ = "dispatchable_devices"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -1255,6 +1320,7 @@ class DispatchableDevice(Base):
 
 class StorageSystemConfig(Base):
     """储能系统配置表"""
+
     __tablename__ = "storage_system_configs"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -1277,6 +1343,7 @@ class StorageSystemConfig(Base):
 
 class PVSystemConfig(Base):
     """光伏系统配置表"""
+
     __tablename__ = "pv_system_configs"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -1294,6 +1361,7 @@ class PVSystemConfig(Base):
 
 class DispatchSchedule(Base):
     """调度计划表"""
+
     __tablename__ = "dispatch_schedules"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -1311,6 +1379,7 @@ class DispatchSchedule(Base):
 
 class RealtimeMonitoring(Base):
     """实时监控记录表 - 需量监控"""
+
     __tablename__ = "realtime_monitoring"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -1326,6 +1395,7 @@ class RealtimeMonitoring(Base):
 
 class MonthlyStatistics(Base):
     """月度统计表 - 电费统计"""
+
     __tablename__ = "monthly_statistics"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -1350,6 +1420,7 @@ class MonthlyStatistics(Base):
 
 class OptimizationResult(Base):
     """优化结果表"""
+
     __tablename__ = "optimization_results"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -1367,4 +1438,3 @@ class OptimizationResult(Base):
     result_data = Column(JSON, comment="详细结果 JSON")
 
     created_at = Column(DateTime, default=datetime.now, comment="创建时间")
-

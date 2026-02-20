@@ -2,11 +2,12 @@
 日前调度优化 API
 提供负荷预测、优化计算、调度计划管理
 """
+
 from datetime import datetime, timedelta
-from typing import List, Optional
+from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, and_
+from sqlalchemy import select
 from pydantic import BaseModel, Field
 
 from ..deps import get_db, get_current_user
@@ -14,8 +15,6 @@ from ...models.user import User
 from ...services.forecasting import LoadForecaster, generate_demo_forecast
 from ...services.optimizer import (
     run_day_ahead_optimization,
-    PricingConfig,
-    StorageConfig,
 )
 
 router = APIRouter()
@@ -23,8 +22,10 @@ router = APIRouter()
 
 # ==================== Pydantic 模型 ====================
 
+
 class ForecastRequest(BaseModel):
     """负荷预测请求"""
+
     target_date: Optional[str] = Field(None, description="目标日期 YYYY-MM-DD")
     meter_point_id: Optional[int] = Field(None, description="计量点ID")
     base_load: Optional[float] = Field(300.0, description="基础负荷 kW")
@@ -33,6 +34,7 @@ class ForecastRequest(BaseModel):
 
 class OptimizationRequest(BaseModel):
     """优化请求"""
+
     target_date: Optional[str] = Field(None, description="目标日期")
     demand_target: Optional[float] = Field(None, description="需量目标 kW")
 
@@ -51,11 +53,13 @@ class OptimizationRequest(BaseModel):
 
 class ScheduleUpdateRequest(BaseModel):
     """调度状态更新请求"""
+
     status: str = Field(..., description="状态: pending/executed/skipped")
     notes: Optional[str] = Field(None, description="备注")
 
 
 # ==================== API 端点 ====================
+
 
 @router.get("/forecast", summary="获取负荷预测")
 async def get_load_forecast(
@@ -64,7 +68,7 @@ async def get_load_forecast(
     base_load: float = Query(350.0, description="基础负荷 kW"),
     peak_load: float = Query(850.0, description="峰值负荷 kW"),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
 ):
     """
     获取指定日期的24小时负荷预测
@@ -78,7 +82,7 @@ async def get_load_forecast(
     # 解析目标日期
     if target_date:
         try:
-            date_obj = datetime.strptime(target_date, '%Y-%m-%d')
+            date_obj = datetime.strptime(target_date, "%Y-%m-%d")
         except ValueError:
             raise HTTPException(status_code=400, detail="日期格式错误，请使用 YYYY-MM-DD")
     else:
@@ -90,18 +94,12 @@ async def get_load_forecast(
     # 执行预测
     forecast = forecaster.forecast_day(date_obj, noise_level=0.03)
 
-    return {
-        'code': 0,
-        'message': 'success',
-        'data': forecast
-    }
+    return {"code": 0, "message": "success", "data": forecast}
 
 
 @router.post("/day-ahead", summary="执行日前优化")
 async def run_optimization(
-    request: OptimizationRequest,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    request: OptimizationRequest, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)
 ):
     """
     执行日前调度优化
@@ -115,7 +113,7 @@ async def run_optimization(
     # 解析目标日期
     if request.target_date:
         try:
-            date_obj = datetime.strptime(request.target_date, '%Y-%m-%d')
+            date_obj = datetime.strptime(request.target_date, "%Y-%m-%d")
         except ValueError:
             raise HTTPException(status_code=400, detail="日期格式错误")
     else:
@@ -126,45 +124,45 @@ async def run_optimization(
 
     # 2. 构建电价配置
     pricing_config = {
-        'demand_price': request.demand_price,
-        'declared_demand': request.declared_demand,
-        'period_prices': request.period_prices or {
-            'sharp': 1.20,
-            'peak': 0.95,
-            'flat': 0.65,
-            'valley': 0.35,
-            'deep_valley': 0.20,
-        }
+        "demand_price": request.demand_price,
+        "declared_demand": request.declared_demand,
+        "period_prices": request.period_prices
+        or {
+            "sharp": 1.20,
+            "peak": 0.95,
+            "flat": 0.65,
+            "valley": 0.35,
+            "deep_valley": 0.20,
+        },
     }
 
     # 3. 构建储能配置
     storage_config = None
     if request.use_storage:
         storage_config = {
-            'capacity': request.storage_capacity,
-            'max_charge_power': request.storage_charge_power,
-            'max_discharge_power': request.storage_discharge_power,
-            'initial_soc': request.storage_initial_soc,
-            'charge_efficiency': 0.95,
-            'discharge_efficiency': 0.95,
-            'min_soc': 0.10,
-            'max_soc': 0.90,
-            'cycle_cost': 0.10,
+            "capacity": request.storage_capacity,
+            "max_charge_power": request.storage_charge_power,
+            "max_discharge_power": request.storage_discharge_power,
+            "initial_soc": request.storage_initial_soc,
+            "charge_efficiency": 0.95,
+            "discharge_efficiency": 0.95,
+            "min_soc": 0.10,
+            "max_soc": 0.90,
+            "cycle_cost": 0.10,
         }
 
     # 4. 从数据库加载可调度设备
     # 使用 PowerDevice.is_enabled 过滤可调度设备
     from ...models.energy import PowerDevice
-    device_result = await db.execute(
-        select(PowerDevice).where(PowerDevice.is_enabled == True)
-    )
+
+    device_result = await db.execute(select(PowerDevice).where(PowerDevice.is_enabled == True))
     power_devices = device_result.scalars().all()
     devices = [
         {
-            'id': d.id,
-            'name': d.device_name,
-            'type': d.device_type,
-            'rated_power': d.rated_power,
+            "id": d.id,
+            "name": d.device_name,
+            "type": d.device_type,
+            "rated_power": d.rated_power,
         }
         for d in power_devices
     ]
@@ -181,45 +179,36 @@ async def run_optimization(
     # 6. 保存调度计划到数据库
     import json as _json
     from ...models.config import SystemConfig
+
     schedule_key = f"schedule_{request.target_date}"
-    schedule_result = await db.execute(
-        select(SystemConfig).where(
-            SystemConfig.config_key == schedule_key
-        )
-    )
+    schedule_result = await db.execute(select(SystemConfig).where(SystemConfig.config_key == schedule_key))
     existing = schedule_result.scalar_one_or_none()
     if existing:
         existing.config_value = _json.dumps(result, ensure_ascii=False, default=str)
     else:
-        db.add(SystemConfig(
-            config_group="day_ahead_schedule",
-            config_key=schedule_key,
-            config_value=_json.dumps(result, ensure_ascii=False, default=str),
-            value_type="json",
-            description=f"{request.target_date} 日前调度计划"
-        ))
+        db.add(
+            SystemConfig(
+                config_group="day_ahead_schedule",
+                config_key=schedule_key,
+                config_value=_json.dumps(result, ensure_ascii=False, default=str),
+                value_type="json",
+                description=f"{request.target_date} 日前调度计划",
+            )
+        )
     await db.commit()
 
-    return {
-        'code': 0,
-        'message': 'success',
-        'data': result
-    }
+    return {"code": 0, "message": "success", "data": result}
 
 
 @router.get("/day-ahead/{date}", summary="获取日前调度计划")
-async def get_schedule(
-    date: str,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
-):
+async def get_schedule(date: str, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     """
     获取指定日期的调度计划
 
     如果数据库中没有，则实时计算
     """
     try:
-        date_obj = datetime.strptime(date, '%Y-%m-%d')
+        date_obj = datetime.strptime(date, "%Y-%m-%d")
     except ValueError:
         raise HTTPException(status_code=400, detail="日期格式错误")
 
@@ -230,27 +219,27 @@ async def get_schedule(
     forecast_data = generate_demo_forecast(date_obj)
 
     pricing_config = {
-        'demand_price': 40.0,
-        'declared_demand': 800.0,
-        'period_prices': {
-            'sharp': 1.20,
-            'peak': 0.95,
-            'flat': 0.65,
-            'valley': 0.35,
-            'deep_valley': 0.20,
-        }
+        "demand_price": 40.0,
+        "declared_demand": 800.0,
+        "period_prices": {
+            "sharp": 1.20,
+            "peak": 0.95,
+            "flat": 0.65,
+            "valley": 0.35,
+            "deep_valley": 0.20,
+        },
     }
 
     storage_config = {
-        'capacity': 500.0,
-        'max_charge_power': 100.0,
-        'max_discharge_power': 100.0,
-        'initial_soc': 0.50,
-        'charge_efficiency': 0.95,
-        'discharge_efficiency': 0.95,
-        'min_soc': 0.10,
-        'max_soc': 0.90,
-        'cycle_cost': 0.10,
+        "capacity": 500.0,
+        "max_charge_power": 100.0,
+        "max_discharge_power": 100.0,
+        "initial_soc": 0.50,
+        "charge_efficiency": 0.95,
+        "discharge_efficiency": 0.95,
+        "min_soc": 0.10,
+        "max_soc": 0.90,
+        "cycle_cost": 0.10,
     }
 
     result = run_day_ahead_optimization(
@@ -262,14 +251,14 @@ async def get_schedule(
     )
 
     return {
-        'code': 0,
-        'message': 'success',
-        'data': {
-            'date': date,
-            'forecast': forecast_data,
-            'optimization': result,
-            'status': 'generated',  # 'saved' or 'generated'
-        }
+        "code": 0,
+        "message": "success",
+        "data": {
+            "date": date,
+            "forecast": forecast_data,
+            "optimization": result,
+            "status": "generated",  # 'saved' or 'generated'
+        },
     }
 
 
@@ -278,7 +267,7 @@ async def update_schedule_status(
     schedule_id: int,
     request: ScheduleUpdateRequest,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
 ):
     """
     更新调度项的执行状态
@@ -292,13 +281,13 @@ async def update_schedule_status(
     # 暂时返回模拟结果
 
     return {
-        'code': 0,
-        'message': 'success',
-        'data': {
-            'schedule_id': schedule_id,
-            'status': request.status,
-            'updated_at': datetime.now().isoformat(),
-        }
+        "code": 0,
+        "message": "success",
+        "data": {
+            "schedule_id": schedule_id,
+            "status": request.status,
+            "updated_at": datetime.now().isoformat(),
+        },
     }
 
 
@@ -306,7 +295,7 @@ async def update_schedule_status(
 async def get_optimization_summary(
     month: Optional[str] = Query(None, description="月份 YYYY-MM"),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
 ):
     """
     获取优化效果汇总
@@ -318,25 +307,25 @@ async def get_optimization_summary(
     - 执行成功率
     """
     if not month:
-        month = datetime.now().strftime('%Y-%m')
+        month = datetime.now().strftime("%Y-%m")
 
     # NOTE: 当前返回模拟数据，后续版本从数据库聚合统计
     # 暂时返回模拟数据
 
     return {
-        'code': 0,
-        'message': 'success',
-        'data': {
-            'month': month,
-            'total_saving': 12580.50,
-            'peak_valley_saving': 8420.30,
-            'demand_saving': 4160.20,
-            'storage_cycles': 45,
-            'execution_rate': 0.92,
-            'schedule_count': 30,
-            'executed_count': 28,
-            'skipped_count': 2,
-        }
+        "code": 0,
+        "message": "success",
+        "data": {
+            "month": month,
+            "total_saving": 12580.50,
+            "peak_valley_saving": 8420.30,
+            "demand_saving": 4160.20,
+            "storage_cycles": 45,
+            "execution_rate": 0.92,
+            "schedule_count": 30,
+            "executed_count": 28,
+            "skipped_count": 2,
+        },
     }
 
 
@@ -344,7 +333,7 @@ async def get_optimization_summary(
 async def get_plan_actual_comparison(
     date: str = Query(..., description="日期 YYYY-MM-DD"),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
 ):
     """
     获取计划与实际执行的对比数据
@@ -352,7 +341,7 @@ async def get_plan_actual_comparison(
     用于分析预测准确性和优化效果
     """
     try:
-        date_obj = datetime.strptime(date, '%Y-%m-%d')
+        date_obj = datetime.strptime(date, "%Y-%m-%d")
     except ValueError:
         raise HTTPException(status_code=400, detail="日期格式错误")
 
@@ -361,43 +350,44 @@ async def get_plan_actual_comparison(
 
     # 生成计划数据
     forecast_data = generate_demo_forecast(date_obj)
-    planned_load = [f['predicted_power'] for f in forecast_data['forecasts']]
+    planned_load = [f["predicted_power"] for f in forecast_data["forecasts"]]
 
     # 模拟实际数据（添加随机偏差）
     import numpy as np
-    actual_load = [
-        max(0, p + np.random.normal(0, p * 0.08))
-        for p in planned_load
-    ]
+
+    actual_load = [max(0, p + np.random.normal(0, p * 0.08)) for p in planned_load]
 
     return {
-        'code': 0,
-        'message': 'success',
-        'data': {
-            'date': date,
-            'planned_load': [round(p, 2) for p in planned_load],
-            'actual_load': [round(a, 2) for a in actual_load],
-            'deviation': {
-                'mean_absolute_error': round(np.mean(np.abs(np.array(planned_load) - np.array(actual_load))), 2),
-                'mean_percentage_error': round(np.mean(np.abs(np.array(planned_load) - np.array(actual_load)) / np.array(planned_load)) * 100, 2),
-                'max_deviation': round(max(np.abs(np.array(planned_load) - np.array(actual_load))), 2),
+        "code": 0,
+        "message": "success",
+        "data": {
+            "date": date,
+            "planned_load": [round(p, 2) for p in planned_load],
+            "actual_load": [round(a, 2) for a in actual_load],
+            "deviation": {
+                "mean_absolute_error": round(np.mean(np.abs(np.array(planned_load) - np.array(actual_load))), 2),
+                "mean_percentage_error": round(
+                    np.mean(np.abs(np.array(planned_load) - np.array(actual_load)) / np.array(planned_load)) * 100, 2
+                ),
+                "max_deviation": round(max(np.abs(np.array(planned_load) - np.array(actual_load))), 2),
             },
-            'cost_comparison': {
-                'planned_cost': round(sum(planned_load) * 0.25 * 0.65, 2),  # 简化计算
-                'actual_cost': round(sum(actual_load) * 0.25 * 0.65, 2),
-            }
-        }
+            "cost_comparison": {
+                "planned_cost": round(sum(planned_load) * 0.25 * 0.65, 2),  # 简化计算
+                "actual_cost": round(sum(actual_load) * 0.25 * 0.65, 2),
+            },
+        },
     }
 
 
 # ==================== 反馈学习 API ====================
+
 
 @router.get("/learning/metrics", summary="获取学习指标")
 async def get_learning_metrics(
     start_date: Optional[str] = Query(None, description="开始日期 YYYY-MM-DD"),
     end_date: Optional[str] = Query(None, description="结束日期 YYYY-MM-DD"),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
 ):
     """
     获取预测模型的学习指标
@@ -421,33 +411,30 @@ async def get_learning_metrics(
     start = None
     end = None
     if start_date:
-        start = datetime.strptime(start_date, '%Y-%m-%d')
+        start = datetime.strptime(start_date, "%Y-%m-%d")
     if end_date:
-        end = datetime.strptime(end_date, '%Y-%m-%d')
+        end = datetime.strptime(end_date, "%Y-%m-%d")
 
     metrics = learner.calculate_metrics(start, end)
 
     return {
-        'code': 0,
-        'message': 'success',
-        'data': {
-            'period': metrics.period,
-            'total_records': metrics.total_records,
-            'mae': metrics.mae,
-            'mape': metrics.mape,
-            'rmse': metrics.rmse,
-            'bias': metrics.bias,
-            'max_deviation': metrics.max_deviation,
-            'accuracy_rate': metrics.accuracy_rate,
-        }
+        "code": 0,
+        "message": "success",
+        "data": {
+            "period": metrics.period,
+            "total_records": metrics.total_records,
+            "mae": metrics.mae,
+            "mape": metrics.mape,
+            "rmse": metrics.rmse,
+            "bias": metrics.bias,
+            "max_deviation": metrics.max_deviation,
+            "accuracy_rate": metrics.accuracy_rate,
+        },
     }
 
 
 @router.post("/learning/adjust", summary="执行参数调整")
-async def run_parameter_adjustment(
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
-):
+async def run_parameter_adjustment(db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     """
     基于历史偏差执行参数自动调整
 
@@ -459,12 +446,12 @@ async def run_parameter_adjustment(
     new_params = learner.learn_and_adjust()
 
     return {
-        'code': 0,
-        'message': 'success',
-        'data': {
-            'adjusted_params': new_params,
-            'history_count': len(learner.deviation_history),
-        }
+        "code": 0,
+        "message": "success",
+        "data": {
+            "adjusted_params": new_params,
+            "history_count": len(learner.deviation_history),
+        },
     }
 
 
@@ -472,7 +459,7 @@ async def run_parameter_adjustment(
 async def get_optimization_report(
     month: Optional[str] = Query(None, description="月份 YYYY-MM"),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
 ):
     """
     获取指定月份的优化效果报告
@@ -494,7 +481,7 @@ async def get_optimization_report(
 
     # 解析月份
     if month:
-        year, mon = map(int, month.split('-'))
+        year, mon = map(int, month.split("-"))
         start_date = datetime(year, mon, 1)
         if mon == 12:
             end_date = datetime(year + 1, 1, 1) - timedelta(days=1)
@@ -508,36 +495,36 @@ async def get_optimization_report(
     report = learner.generate_report(start_date, end_date)
 
     return {
-        'code': 0,
-        'message': 'success',
-        'data': {
-            'period': report.period,
-            'start_date': report.start_date,
-            'end_date': report.end_date,
-            'cost_analysis': {
-                'planned_saving': report.planned_saving,
-                'actual_saving': report.actual_saving,
-                'saving_achievement': report.saving_achievement,
+        "code": 0,
+        "message": "success",
+        "data": {
+            "period": report.period,
+            "start_date": report.start_date,
+            "end_date": report.end_date,
+            "cost_analysis": {
+                "planned_saving": report.planned_saving,
+                "actual_saving": report.actual_saving,
+                "saving_achievement": report.saving_achievement,
             },
-            'execution_stats': {
-                'total_schedules': report.total_schedules,
-                'executed_schedules': report.executed_schedules,
-                'success_rate': report.success_rate,
+            "execution_stats": {
+                "total_schedules": report.total_schedules,
+                "executed_schedules": report.executed_schedules,
+                "success_rate": report.success_rate,
             },
-            'demand_control': {
-                'violations': report.demand_violations,
-                'max_reached': report.max_demand_reached,
-                'target': report.demand_target,
-                'utilization': report.demand_utilization,
+            "demand_control": {
+                "violations": report.demand_violations,
+                "max_reached": report.max_demand_reached,
+                "target": report.demand_target,
+                "utilization": report.demand_utilization,
             },
-            'forecast_quality': {
-                'mae': report.forecast_metrics.mae,
-                'mape': report.forecast_metrics.mape,
-                'accuracy_rate': report.forecast_metrics.accuracy_rate,
-                'bias': report.forecast_metrics.bias,
+            "forecast_quality": {
+                "mae": report.forecast_metrics.mae,
+                "mape": report.forecast_metrics.mape,
+                "accuracy_rate": report.forecast_metrics.accuracy_rate,
+                "bias": report.forecast_metrics.bias,
             },
-            'recommendations': report.recommendations,
-        }
+            "recommendations": report.recommendations,
+        },
     }
 
 
@@ -546,9 +533,9 @@ async def submit_feedback_data(
     planned: float = Query(..., description="计划值"),
     actual: float = Query(..., description="实际值"),
     timestamp: Optional[str] = Query(None, description="时间戳 ISO格式"),
-    source: str = Query('manual', description="数据来源"),
+    source: str = Query("manual", description="数据来源"),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
 ):
     """
     提交计划vs实际对比数据用于学习
@@ -564,35 +551,31 @@ async def submit_feedback_data(
     else:
         ts = datetime.now()
 
-    record = learner.add_comparison_data(
-        timestamp=ts,
-        planned=planned,
-        actual=actual,
-        source=source
-    )
+    record = learner.add_comparison_data(timestamp=ts, planned=planned, actual=actual, source=source)
 
     return {
-        'code': 0,
-        'message': 'success',
-        'data': {
-            'timestamp': record.timestamp.isoformat(),
-            'planned': record.planned_value,
-            'actual': record.actual_value,
-            'deviation': record.deviation,
-            'deviation_percent': record.deviation_percent,
-            'deviation_type': record.deviation_type.value,
-        }
+        "code": 0,
+        "message": "success",
+        "data": {
+            "timestamp": record.timestamp.isoformat(),
+            "planned": record.planned_value,
+            "actual": record.actual_value,
+            "deviation": record.deviation,
+            "deviation_percent": record.deviation_percent,
+            "deviation_type": record.deviation_type.value,
+        },
     }
 
 
 # ==================== 节能中心集成 API ====================
 
+
 @router.post("/integration/create-opportunity", summary="从优化结果创建节能机会")
 async def create_opportunity_from_optimization(
     target_date: Optional[str] = Query(None, description="目标日期 YYYY-MM-DD"),
-    optimization_type: str = Query('day_ahead', description="优化类型"),
+    optimization_type: str = Query("day_ahead", description="优化类型"),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
 ):
     """
     从优化结果创建节能机会
@@ -605,7 +588,7 @@ async def create_opportunity_from_optimization(
 
     # 解析日期
     if target_date:
-        date_obj = datetime.strptime(target_date, '%Y-%m-%d')
+        date_obj = datetime.strptime(target_date, "%Y-%m-%d")
     else:
         date_obj = datetime.now() + timedelta(days=1)
 
@@ -613,22 +596,22 @@ async def create_opportunity_from_optimization(
     forecast = generate_demo_forecast(date_obj)
 
     pricing_config = {
-        'demand_price': 40.0,
-        'declared_demand': 800.0,
-        'period_prices': {
-            'sharp': 1.20,
-            'peak': 0.95,
-            'flat': 0.65,
-            'valley': 0.35,
-            'deep_valley': 0.20,
-        }
+        "demand_price": 40.0,
+        "declared_demand": 800.0,
+        "period_prices": {
+            "sharp": 1.20,
+            "peak": 0.95,
+            "flat": 0.65,
+            "valley": 0.35,
+            "deep_valley": 0.20,
+        },
     }
 
     storage_config = {
-        'capacity': 500.0,
-        'max_charge_power': 100.0,
-        'max_discharge_power': 100.0,
-        'initial_soc': 0.50,
+        "capacity": 500.0,
+        "max_charge_power": 100.0,
+        "max_discharge_power": 100.0,
+        "initial_soc": 0.50,
     }
 
     result = run_day_ahead_optimization(
@@ -641,40 +624,34 @@ async def create_opportunity_from_optimization(
     # 创建机会
     service = OptimizationIntegrationService(db)
     opportunity = await service.create_opportunity_from_optimization(
-        optimization_result=result,
-        optimization_type=optimization_type,
-        target_date=date_obj.strftime('%Y-%m-%d')
+        optimization_result=result, optimization_type=optimization_type, target_date=date_obj.strftime("%Y-%m-%d")
     )
 
     if opportunity:
         return {
-            'code': 0,
-            'message': 'success',
-            'data': {
-                'opportunity_id': opportunity.id,
-                'title': opportunity.title,
-                'potential_saving': opportunity.potential_saving,
-                'priority': opportunity.priority,
-                'optimization_result': {
-                    'expected_saving': result.get('expected_saving'),
-                    'saving_ratio': result.get('saving_ratio'),
-                    'max_demand': result.get('max_demand'),
-                }
-            }
+            "code": 0,
+            "message": "success",
+            "data": {
+                "opportunity_id": opportunity.id,
+                "title": opportunity.title,
+                "potential_saving": opportunity.potential_saving,
+                "priority": opportunity.priority,
+                "optimization_result": {
+                    "expected_saving": result.get("expected_saving"),
+                    "saving_ratio": result.get("saving_ratio"),
+                    "max_demand": result.get("max_demand"),
+                },
+            },
         }
     else:
-        return {
-            'code': 400,
-            'message': '优化结果无节省潜力，未创建机会',
-            'data': None
-        }
+        return {"code": 400, "message": "优化结果无节省潜力，未创建机会", "data": None}
 
 
 @router.post("/integration/auto-generate", summary="自动生成节能机会")
 async def auto_generate_opportunities(
     days: int = Query(7, description="生成未来几天的机会", ge=1, le=30),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
 ):
     """
     自动为未来几天生成节能机会
@@ -686,20 +663,20 @@ async def auto_generate_opportunities(
     opportunities = await gen_opps(db, days)
 
     return {
-        'code': 0,
-        'message': 'success',
-        'data': {
-            'generated_count': len(opportunities),
-            'opportunities': [
+        "code": 0,
+        "message": "success",
+        "data": {
+            "generated_count": len(opportunities),
+            "opportunities": [
                 {
-                    'id': o.id,
-                    'title': o.title,
-                    'potential_saving': o.potential_saving,
-                    'priority': o.priority,
+                    "id": o.id,
+                    "title": o.title,
+                    "potential_saving": o.potential_saving,
+                    "priority": o.priority,
                 }
                 for o in opportunities
-            ]
-        }
+            ],
+        },
     }
 
 
@@ -708,7 +685,7 @@ async def get_optimization_statistics(
     start_date: Optional[str] = Query(None, description="开始日期 YYYY-MM-DD"),
     end_date: Optional[str] = Query(None, description="结束日期 YYYY-MM-DD"),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
 ):
     """
     获取优化相关的统计数据
@@ -719,13 +696,9 @@ async def get_optimization_statistics(
 
     service = OptimizationIntegrationService(db)
 
-    start = datetime.strptime(start_date, '%Y-%m-%d') if start_date else None
-    end = datetime.strptime(end_date, '%Y-%m-%d') if end_date else None
+    start = datetime.strptime(start_date, "%Y-%m-%d") if start_date else None
+    end = datetime.strptime(end_date, "%Y-%m-%d") if end_date else None
 
     stats = await service.get_optimization_statistics(start, end)
 
-    return {
-        'code': 0,
-        'message': 'success',
-        'data': stats
-    }
+    return {"code": 0, "message": "success", "data": stats}

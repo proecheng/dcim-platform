@@ -1,6 +1,7 @@
 """
 点位相关 Schema
 """
+
 from typing import Optional, Dict
 from datetime import datetime
 from pydantic import BaseModel, ConfigDict
@@ -8,6 +9,7 @@ from pydantic import BaseModel, ConfigDict
 
 class PointCreate(BaseModel):
     """创建点位"""
+
     point_code: str
     point_name: str
     point_type: str  # AI, DI, AO, DO
@@ -28,6 +30,7 @@ class PointCreate(BaseModel):
 
 class PointUpdate(BaseModel):
     """更新点位"""
+
     point_name: Optional[str] = None
     device_id: Optional[int] = None
     device_type: Optional[str] = None
@@ -45,6 +48,7 @@ class PointUpdate(BaseModel):
 
 class PointInfo(BaseModel):
     """点位信息"""
+
     model_config = ConfigDict(from_attributes=True)
 
     id: int
@@ -75,6 +79,7 @@ class PointInfo(BaseModel):
 
 class PointTypesSummary(BaseModel):
     """点位类型统计"""
+
     total: int
     enabled: int
     ai: int = 0
@@ -86,6 +91,7 @@ class PointTypesSummary(BaseModel):
 
 class PointGroupCreate(BaseModel):
     """创建点位分组"""
+
     group_name: str
     group_type: Optional[str] = None
     parent_id: Optional[int] = None
@@ -94,6 +100,7 @@ class PointGroupCreate(BaseModel):
 
 class PointGroupInfo(BaseModel):
     """点位分组信息"""
+
     model_config = ConfigDict(from_attributes=True)
 
     id: int
@@ -111,6 +118,7 @@ PointResponse = PointInfo
 
 class PointRealtimeResponse(BaseModel):
     """点位实时数据响应"""
+
     model_config = ConfigDict(from_attributes=True)
 
     point_id: int
@@ -127,6 +135,7 @@ class PointRealtimeResponse(BaseModel):
 
 class PointHistoryResponse(BaseModel):
     """点位历史数据响应"""
+
     model_config = ConfigDict(from_attributes=True)
 
     id: int
@@ -138,6 +147,7 @@ class PointHistoryResponse(BaseModel):
 
 class PointTypeStats(BaseModel):
     """点位类型统计"""
+
     point_type: str
     count: int
     enabled_count: int
@@ -145,6 +155,7 @@ class PointTypeStats(BaseModel):
 
 class RealtimeSummary(BaseModel):
     """实时数据汇总"""
+
     total: int
     normal: int
     alarm: int

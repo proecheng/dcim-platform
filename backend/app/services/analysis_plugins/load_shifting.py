@@ -8,22 +8,9 @@ Analyzes electricity load distribution and identifies loads that can be shifted 
 Enhanced: 支持设备级负荷转移分析、计量点关联、功率曲线分析
 """
 
-from typing import List, Dict, Any, Optional
-from datetime import datetime, timedelta
-from collections import defaultdict
+from typing import List
 
-from .base import (
-    AnalysisPlugin,
-    AnalysisContext,
-    SuggestionResult,
-    PluginConfig,
-    PluginPriority,
-    SuggestionType,
-    DeviceShiftInfo,
-    MeterPointData,
-    PowerCurvePoint,
-    EnergyData
-)
+from .base import AnalysisPlugin, AnalysisContext, SuggestionResult, PluginConfig, PluginPriority, SuggestionType
 
 
 class LoadShiftingPlugin(AnalysisPlugin):
@@ -62,12 +49,12 @@ class LoadShiftingPlugin(AnalysisPlugin):
             execution_order=10,
             min_data_days=7,
             thresholds={
-                'peak_ratio_threshold': 0.35,  # 峰时占比阈值
-                'min_shift_amount': 50,        # 最小转移电量 kWh
-                'shift_efficiency': 0.7,       # 转移效率（可实际转移的比例）
-                'device_min_power': 5,         # 设备最小功率阈值 kW
-                'min_device_shift_saving': 100 # 单设备最小年节省金额
-            }
+                "peak_ratio_threshold": 0.35,  # 峰时占比阈值
+                "min_shift_amount": 50,  # 最小转移电量 kWh
+                "shift_efficiency": 0.7,  # 转移效率（可实际转移的比例）
+                "device_min_power": 5,  # 设备最小功率阈值 kW
+                "min_device_shift_saving": 100,  # 单设备最小年节省金额
+            },
         )
 
     async def analyze(self, context: AnalysisContext) -> List[SuggestionResult]:
@@ -110,37 +97,44 @@ class LoadShiftingPlugin(AnalysisPlugin):
         valley_ratio = total_valley / total_energy
 
         thresholds = self._config.thresholds
-        peak_threshold = thresholds.get('peak_ratio_threshold', 0.35)
+        peak_threshold = thresholds.get("peak_ratio_threshold", 0.35)
 
         # 分析1: 峰时用电占比过高
         if peak_ratio > peak_threshold:
             # 计算可转移电量
             target_peak_ratio = 0.30  # 目标峰时占比
             shiftable_energy = (peak_ratio - target_peak_ratio) * total_energy / len(context.energy_data)
-            shift_efficiency = thresholds.get('shift_efficiency', 0.7)
+            shift_efficiency = thresholds.get("shift_efficiency", 0.7)
             actual_shift = shiftable_energy * shift_efficiency
 
             # 计算年化节省
-            peak_price = context.pricing_config.get('peak_price', 1.2)
-            sharp_price = context.pricing_config.get('sharp_price', 1.5)
-            valley_price = context.pricing_config.get('valley_price', 0.4)
+            peak_price = context.pricing_config.get("peak_price", 1.2)
+            sharp_price = context.pricing_config.get("sharp_price", 1.5)
+            valley_price = context.pricing_config.get("valley_price", 0.4)
             avg_peak_price = (peak_price + sharp_price) / 2
             price_diff = avg_peak_price - valley_price
             daily_saving = actual_shift * price_diff
             yearly_saving = daily_saving * 365
 
-            if actual_shift >= thresholds.get('min_shift_amount', 50):
+            if actual_shift >= thresholds.get("min_shift_amount", 50):
                 # 获取可转移设备列表
                 shiftable_devices = context.get_shiftable_devices()
-                device_list = "\n".join([
-                    f"- {d.device_name} ({d.device_type}): {d.rated_power:.1f}kW, 可转移{d.shiftable_power_ratio*100:.0f}%"
-                    for d in shiftable_devices[:5]
-                ]) if shiftable_devices else "暂无设备数据"
+                device_list = (
+                    "\n".join(
+                        [
+                            f"- {d.device_name} ({d.device_type}): {d.rated_power:.1f}kW, 可转移{d.shiftable_power_ratio*100:.0f}%"
+                            for d in shiftable_devices[:5]
+                        ]
+                    )
+                    if shiftable_devices
+                    else "暂无设备数据"
+                )
 
-                results.append(self.create_suggestion(
-                    title="优化峰时用电负荷",
-                    description=f"当前峰时用电占比 {peak_ratio:.1%}，高于建议值 {peak_threshold:.1%}",
-                    detail=f"""
+                results.append(
+                    self.create_suggestion(
+                        title="优化峰时用电负荷",
+                        description=f"当前峰时用电占比 {peak_ratio:.1%}，高于建议值 {peak_threshold:.1%}",
+                        detail=f"""
 ## 分析结果
 
 ### 当前状态
@@ -167,39 +161,41 @@ class LoadShiftingPlugin(AnalysisPlugin):
 - 制定详细的负荷转移计划表
 - 监控转移后的系统稳定性
                     """.strip(),
-                    estimated_saving=actual_shift * 365,
-                    estimated_cost_saving=yearly_saving,
-                    implementation_difficulty=2,
-                    priority=PluginPriority.HIGH if yearly_saving > 10000 else PluginPriority.MEDIUM,
-                    payback_period=0,  # 无需投资
-                    related_devices=[d.device_name for d in shiftable_devices[:5]],
-                    analysis_data={
-                        'peak_ratio': peak_ratio,
-                        'valley_ratio': valley_ratio,
-                        'target_peak_ratio': target_peak_ratio,
-                        'daily_shift_amount': actual_shift,
-                        'daily_saving': daily_saving,
-                        'price_diff': price_diff,
-                        'shiftable_device_count': len(shiftable_devices)
-                    },
-                    confidence=85
-                ))
+                        estimated_saving=actual_shift * 365,
+                        estimated_cost_saving=yearly_saving,
+                        implementation_difficulty=2,
+                        priority=PluginPriority.HIGH if yearly_saving > 10000 else PluginPriority.MEDIUM,
+                        payback_period=0,  # 无需投资
+                        related_devices=[d.device_name for d in shiftable_devices[:5]],
+                        analysis_data={
+                            "peak_ratio": peak_ratio,
+                            "valley_ratio": valley_ratio,
+                            "target_peak_ratio": target_peak_ratio,
+                            "daily_shift_amount": actual_shift,
+                            "daily_saving": daily_saving,
+                            "price_diff": price_diff,
+                            "shiftable_device_count": len(shiftable_devices),
+                        },
+                        confidence=85,
+                    )
+                )
 
         # 分析2: 谷时利用率低
         valley_target = 0.30  # 目标谷时占比
         if valley_ratio < valley_target * 0.8:  # 谷时利用率低于目标80%
             potential_shift = (valley_target - valley_ratio) * total_energy / len(context.energy_data)
-            peak_price = context.pricing_config.get('peak_price', 1.2)
-            valley_price = context.pricing_config.get('valley_price', 0.4)
+            peak_price = context.pricing_config.get("peak_price", 1.2)
+            valley_price = context.pricing_config.get("valley_price", 0.4)
             price_diff = peak_price - valley_price
             daily_saving = potential_shift * price_diff * 0.5  # 保守估计
             yearly_saving = daily_saving * 365
 
             if yearly_saving > 5000:
-                results.append(self.create_suggestion(
-                    title="提高谷时电力利用率",
-                    description=f"谷时用电占比仅 {valley_ratio:.1%}，存在优化空间",
-                    detail=f"""
+                results.append(
+                    self.create_suggestion(
+                        title="提高谷时电力利用率",
+                        description=f"谷时用电占比仅 {valley_ratio:.1%}，存在优化空间",
+                        detail=f"""
 ## 分析结果
 
 ### 当前状态
@@ -220,18 +216,19 @@ class LoadShiftingPlugin(AnalysisPlugin):
 - 确保转移后不影响业务系统可用性
 - 分阶段实施，逐步增加谷时负荷
                     """.strip(),
-                    estimated_saving=potential_shift * 365 * 0.5,
-                    estimated_cost_saving=yearly_saving,
-                    implementation_difficulty=2,
-                    priority=PluginPriority.MEDIUM,
-                    payback_period=0,
-                    analysis_data={
-                        'valley_ratio': valley_ratio,
-                        'target_valley_ratio': valley_target,
-                        'potential_shift': potential_shift
-                    },
-                    confidence=75
-                ))
+                        estimated_saving=potential_shift * 365 * 0.5,
+                        estimated_cost_saving=yearly_saving,
+                        implementation_difficulty=2,
+                        priority=PluginPriority.MEDIUM,
+                        payback_period=0,
+                        analysis_data={
+                            "valley_ratio": valley_ratio,
+                            "target_valley_ratio": valley_target,
+                            "potential_shift": potential_shift,
+                        },
+                        confidence=75,
+                    )
+                )
 
         return results
 
@@ -243,8 +240,8 @@ class LoadShiftingPlugin(AnalysisPlugin):
             return results
 
         thresholds = self._config.thresholds
-        min_device_power = thresholds.get('device_min_power', 5)
-        min_saving = thresholds.get('min_device_shift_saving', 100)
+        min_device_power = thresholds.get("device_min_power", 5)
+        min_saving = thresholds.get("min_device_shift_saving", 100)
 
         # 按设备分析转移潜力
         device_shift_analysis = []
@@ -261,36 +258,35 @@ class LoadShiftingPlugin(AnalysisPlugin):
             valley_capacity = device.rated_power * (1 - device.valley_energy_ratio) * 8  # 8小时谷时
 
             # 可转移电量 (取峰时电量和谷时容量的较小值)
-            shiftable_energy = min(
-                peak_energy_daily * device.shiftable_power_ratio,
-                valley_capacity
-            )
+            shiftable_energy = min(peak_energy_daily * device.shiftable_power_ratio, valley_capacity)
 
             if shiftable_energy < 10:  # 忽略太小的转移量
                 continue
 
             # 计算节省
-            peak_price = context.pricing_config.get('peak_price', 1.2)
-            valley_price = context.pricing_config.get('valley_price', 0.4)
+            peak_price = context.pricing_config.get("peak_price", 1.2)
+            valley_price = context.pricing_config.get("valley_price", 0.4)
             daily_saving = shiftable_energy * (peak_price - valley_price)
             yearly_saving = daily_saving * 365
 
             if yearly_saving >= min_saving:
-                device_shift_analysis.append({
-                    'device': device,
-                    'shiftable_energy': shiftable_energy,
-                    'daily_saving': daily_saving,
-                    'yearly_saving': yearly_saving
-                })
+                device_shift_analysis.append(
+                    {
+                        "device": device,
+                        "shiftable_energy": shiftable_energy,
+                        "daily_saving": daily_saving,
+                        "yearly_saving": yearly_saving,
+                    }
+                )
 
         # 按年节省金额排序
-        device_shift_analysis.sort(key=lambda x: x['yearly_saving'], reverse=True)
+        device_shift_analysis.sort(key=lambda x: x["yearly_saving"], reverse=True)
 
         # 生成设备级转移建议 (Top 5)
         for analysis in device_shift_analysis[:5]:
-            device = analysis['device']
-            yearly_saving = analysis['yearly_saving']
-            shiftable_energy = analysis['shiftable_energy']
+            device = analysis["device"]
+            yearly_saving = analysis["yearly_saving"]
+            shiftable_energy = analysis["shiftable_energy"]
 
             # 生成转移时段建议
             from_hours = [h for h in range(8, 22) if h not in device.forbidden_shift_hours]
@@ -299,10 +295,11 @@ class LoadShiftingPlugin(AnalysisPlugin):
             from_str = self._format_hours(from_hours[:4])
             to_str = self._format_hours(to_hours[:4])
 
-            results.append(self.create_suggestion(
-                title=f"转移{device.device_name}部分负荷至谷时",
-                description=f"{device.device_name}峰时用电占比{device.peak_energy_ratio:.1%}，建议将{device.shiftable_power_ratio*100:.0f}%负荷转移至谷时",
-                detail=f"""
+            results.append(
+                self.create_suggestion(
+                    title=f"转移{device.device_name}部分负荷至谷时",
+                    description=f"{device.device_name}峰时用电占比{device.peak_energy_ratio:.1%}，建议将{device.shiftable_power_ratio*100:.0f}%负荷转移至谷时",
+                    detail=f"""
 ## 设备负荷转移分析
 
 ### 设备信息
@@ -331,39 +328,43 @@ class LoadShiftingPlugin(AnalysisPlugin):
 3. 监控转移后的运行状态
 4. 验证节能效果
                 """.strip(),
-                estimated_saving=shiftable_energy * 365,
-                estimated_cost_saving=yearly_saving,
-                implementation_difficulty=2 if device.shiftable_power_ratio >= 0.5 else 3,
-                priority=PluginPriority.HIGH if yearly_saving > 2000 else PluginPriority.MEDIUM,
-                payback_period=0,
-                related_devices=[device.device_name],
-                analysis_data={
-                    'device_id': device.device_id,
-                    'device_type': device.device_type,
-                    'rated_power': device.rated_power,
-                    'peak_energy_ratio': device.peak_energy_ratio,
-                    'shiftable_power_ratio': device.shiftable_power_ratio,
-                    'shiftable_energy': shiftable_energy,
-                    'from_hours': from_hours[:4],
-                    'to_hours': to_hours[:4]
-                },
-                confidence=80
-            ))
+                    estimated_saving=shiftable_energy * 365,
+                    estimated_cost_saving=yearly_saving,
+                    implementation_difficulty=2 if device.shiftable_power_ratio >= 0.5 else 3,
+                    priority=PluginPriority.HIGH if yearly_saving > 2000 else PluginPriority.MEDIUM,
+                    payback_period=0,
+                    related_devices=[device.device_name],
+                    analysis_data={
+                        "device_id": device.device_id,
+                        "device_type": device.device_type,
+                        "rated_power": device.rated_power,
+                        "peak_energy_ratio": device.peak_energy_ratio,
+                        "shiftable_power_ratio": device.shiftable_power_ratio,
+                        "shiftable_energy": shiftable_energy,
+                        "from_hours": from_hours[:4],
+                        "to_hours": to_hours[:4],
+                    },
+                    confidence=80,
+                )
+            )
 
         # 生成设备转移汇总建议
         if len(device_shift_analysis) >= 3:
-            total_yearly_saving = sum(a['yearly_saving'] for a in device_shift_analysis)
-            total_shiftable = sum(a['shiftable_energy'] for a in device_shift_analysis)
+            total_yearly_saving = sum(a["yearly_saving"] for a in device_shift_analysis)
+            total_shiftable = sum(a["shiftable_energy"] for a in device_shift_analysis)
 
-            device_summary = "\n".join([
-                f"| {a['device'].device_name} | {a['device'].device_type} | {a['shiftable_energy']:.1f} | ¥{a['yearly_saving']:.0f} |"
-                for a in device_shift_analysis[:10]
-            ])
+            device_summary = "\n".join(
+                [
+                    f"| {a['device'].device_name} | {a['device'].device_type} | {a['shiftable_energy']:.1f} | ¥{a['yearly_saving']:.0f} |"
+                    for a in device_shift_analysis[:10]
+                ]
+            )
 
-            results.append(self.create_suggestion(
-                title="设备负荷转移综合优化方案",
-                description=f"识别出{len(device_shift_analysis)}台可转移设备，年节省潜力¥{total_yearly_saving:.0f}",
-                detail=f"""
+            results.append(
+                self.create_suggestion(
+                    title="设备负荷转移综合优化方案",
+                    description=f"识别出{len(device_shift_analysis)}台可转移设备，年节省潜力¥{total_yearly_saving:.0f}",
+                    detail=f"""
 ## 设备负荷转移综合分析
 
 ### 分析汇总
@@ -384,23 +385,24 @@ class LoadShiftingPlugin(AnalysisPlugin):
 - 分阶段实施，每次调整1-2台设备
 - 保留回退方案
                 """.strip(),
-                estimated_saving=total_shiftable * 365,
-                estimated_cost_saving=total_yearly_saving,
-                implementation_difficulty=3,
-                priority=PluginPriority.HIGH if total_yearly_saving > 10000 else PluginPriority.MEDIUM,
-                payback_period=0,
-                related_devices=[a['device'].device_name for a in device_shift_analysis[:10]],
-                analysis_data={
-                    'device_count': len(device_shift_analysis),
-                    'total_shiftable_energy': total_shiftable,
-                    'total_yearly_saving': total_yearly_saving,
-                    'top_devices': [
-                        {'name': a['device'].device_name, 'saving': a['yearly_saving']}
-                        for a in device_shift_analysis[:5]
-                    ]
-                },
-                confidence=85
-            ))
+                    estimated_saving=total_shiftable * 365,
+                    estimated_cost_saving=total_yearly_saving,
+                    implementation_difficulty=3,
+                    priority=PluginPriority.HIGH if total_yearly_saving > 10000 else PluginPriority.MEDIUM,
+                    payback_period=0,
+                    related_devices=[a["device"].device_name for a in device_shift_analysis[:10]],
+                    analysis_data={
+                        "device_count": len(device_shift_analysis),
+                        "total_shiftable_energy": total_shiftable,
+                        "total_yearly_saving": total_yearly_saving,
+                        "top_devices": [
+                            {"name": a["device"].device_name, "saving": a["yearly_saving"]}
+                            for a in device_shift_analysis[:5]
+                        ],
+                    },
+                    confidence=85,
+                )
+            )
 
         return results
 
@@ -440,8 +442,8 @@ class LoadShiftingPlugin(AnalysisPlugin):
                     shiftable_power = sum(d.rated_power for d in shiftable_devices if d.rated_power)
 
                     # 估算转移效益
-                    peak_price = context.pricing_config.get('peak_price', 1.2)
-                    valley_price = context.pricing_config.get('valley_price', 0.4)
+                    peak_price = context.pricing_config.get("peak_price", 1.2)
+                    valley_price = context.pricing_config.get("valley_price", 0.4)
                     price_diff = peak_price - valley_price
 
                     # 假设可转移30%的峰时电量
@@ -449,15 +451,15 @@ class LoadShiftingPlugin(AnalysisPlugin):
                     yearly_saving = daily_shift * price_diff * 365
 
                     if yearly_saving > 5000:
-                        device_list = "\n".join([
-                            f"- {d.device_name}: {d.rated_power or 0:.1f}kW"
-                            for d in shiftable_devices[:5]
-                        ])
+                        device_list = "\n".join(
+                            [f"- {d.device_name}: {d.rated_power or 0:.1f}kW" for d in shiftable_devices[:5]]
+                        )
 
-                        results.append(self.create_suggestion(
-                            title=f"优化计量点{meter_point.meter_code}的峰时负荷",
-                            description=f"计量点{meter_point.meter_name}峰时用电占比{peak_ratio:.1%}，可通过负荷转移降低电费",
-                            detail=f"""
+                        results.append(
+                            self.create_suggestion(
+                                title=f"优化计量点{meter_point.meter_code}的峰时负荷",
+                                description=f"计量点{meter_point.meter_name}峰时用电占比{peak_ratio:.1%}，可通过负荷转移降低电费",
+                                detail=f"""
 ## 计量点负荷分析
 
 ### 计量点信息
@@ -480,22 +482,23 @@ class LoadShiftingPlugin(AnalysisPlugin):
 ### 预期效果
 - 年节省电费: ¥{yearly_saving:.0f}
                             """.strip(),
-                            estimated_saving=daily_shift * 365,
-                            estimated_cost_saving=yearly_saving,
-                            implementation_difficulty=2,
-                            priority=PluginPriority.MEDIUM,
-                            payback_period=0,
-                            related_devices=[d.device_name for d in shiftable_devices[:5]],
-                            analysis_data={
-                                'meter_point_id': mp_id,
-                                'meter_code': meter_point.meter_code,
-                                'peak_ratio': peak_ratio,
-                                'valley_ratio': valley_ratio,
-                                'shiftable_device_count': len(shiftable_devices),
-                                'shiftable_power': shiftable_power
-                            },
-                            confidence=75
-                        ))
+                                estimated_saving=daily_shift * 365,
+                                estimated_cost_saving=yearly_saving,
+                                implementation_difficulty=2,
+                                priority=PluginPriority.MEDIUM,
+                                payback_period=0,
+                                related_devices=[d.device_name for d in shiftable_devices[:5]],
+                                analysis_data={
+                                    "meter_point_id": mp_id,
+                                    "meter_code": meter_point.meter_code,
+                                    "peak_ratio": peak_ratio,
+                                    "valley_ratio": valley_ratio,
+                                    "shiftable_device_count": len(shiftable_devices),
+                                    "shiftable_power": shiftable_power,
+                                },
+                                confidence=75,
+                            )
+                        )
 
         return results
 
@@ -518,7 +521,4 @@ class LoadShiftingPlugin(AnalysisPlugin):
                 end = h
         ranges.append((start, end))
 
-        return ", ".join([
-            f"{s}:00-{e+1}:00" if s != e else f"{s}:00"
-            for s, e in ranges
-        ])
+        return ", ".join([f"{s}:00-{e+1}:00" if s != e else f"{s}:00" for s, e in ranges])

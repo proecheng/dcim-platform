@@ -1,6 +1,7 @@
 """
 API v1 路由模块
 """
+
 from fastapi import APIRouter
 
 from .auth import router as auth_router
@@ -53,6 +54,7 @@ from .ota import router as ota_router
 # 深度学习节能优化模块 (需要安装 torch)
 try:
     from .ml import router as ml_router
+
     _ml_available = True
 except ImportError:
     _ml_available = False

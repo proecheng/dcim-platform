@@ -2,6 +2,7 @@
 控制命令分级确认模型
 Story 9-6: 控制命令分级确认
 """
+
 from datetime import datetime
 from sqlalchemy import Column, Integer, String, DateTime, Text, ForeignKey, JSON
 
@@ -10,6 +11,7 @@ from ..core.database import Base
 
 class CommandApproval(Base):
     """命令审批工单表"""
+
     __tablename__ = "command_approvals"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -33,6 +35,7 @@ class CommandApproval(Base):
 
 class CommandAuditLog(Base):
     """命令审计日志表"""
+
     __tablename__ = "command_audit_logs"
 
     id = Column(Integer, primary_key=True, autoincrement=True)

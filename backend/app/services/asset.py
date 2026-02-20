@@ -4,21 +4,31 @@ Asset Management Service
 
 提供资产、机柜、维护、盘点等管理功能
 """
+
 from typing import List, Optional, Dict, Any
 from datetime import datetime, timedelta, date
 from sqlalchemy.orm import Session
 from sqlalchemy import func, and_, or_
 
 from ..models.asset import (
-    Asset, Cabinet, AssetLifecycle, MaintenanceRecord,
-    AssetInventory, AssetInventoryItem, AssetStatus, AssetType
+    Asset,
+    Cabinet,
+    AssetLifecycle,
+    MaintenanceRecord,
+    AssetInventory,
+    AssetInventoryItem,
+    AssetStatus,
+    AssetType,
 )
 from ..schemas.asset import (
-    CabinetCreate, CabinetUpdate,
-    AssetCreate, AssetUpdate,
+    CabinetCreate,
+    CabinetUpdate,
+    AssetCreate,
+    AssetUpdate,
     MaintenanceCreate,
-    InventoryCreate, InventoryItemUpdate,
-    AssetStatistics
+    InventoryCreate,
+    InventoryItemUpdate,
+    AssetStatistics,
 )
 
 
@@ -129,9 +139,7 @@ class AssetService:
             return False
 
         # 检查是否有关联资产
-        asset_count = self.db.query(func.count(Asset.id)).filter(
-            Asset.cabinet_id == cabinet_id
-        ).scalar()
+        asset_count = self.db.query(func.count(Asset.id)).filter(Asset.cabinet_id == cabinet_id).scalar()
         if asset_count > 0:
             return False
 
@@ -151,22 +159,16 @@ class AssetService:
         """
         cabinet = self.get_cabinet(cabinet_id)
         if not cabinet:
-            return {
-                "total_u": 0,
-                "used_u": 0,
-                "available_u": 0,
-                "usage_rate": 0,
-                "u_map": {}
-            }
+            return {"total_u": 0, "used_u": 0, "available_u": 0, "usage_rate": 0, "u_map": {}}
 
         total_u = cabinet.total_u or 42
 
         # 获取该机柜中所有资产
-        assets = self.db.query(Asset).filter(
-            Asset.cabinet_id == cabinet_id,
-            Asset.u_position.isnot(None),
-            Asset.u_height.isnot(None)
-        ).all()
+        assets = (
+            self.db.query(Asset)
+            .filter(Asset.cabinet_id == cabinet_id, Asset.u_position.isnot(None), Asset.u_height.isnot(None))
+            .all()
+        )
 
         # 构建U位映射表
         u_map = {}
@@ -180,7 +182,7 @@ class AssetService:
                             "asset_id": asset.id,
                             "asset_code": asset.asset_code,
                             "asset_name": asset.asset_name,
-                            "asset_type": asset.asset_type.value if asset.asset_type else None
+                            "asset_type": asset.asset_type.value if asset.asset_type else None,
                         }
                 used_u += asset.u_height
 
@@ -192,7 +194,7 @@ class AssetService:
             "used_u": used_u,
             "available_u": available_u,
             "usage_rate": usage_rate,
-            "u_map": u_map
+            "u_map": u_map,
         }
 
     # ==================== 资产管理 ====================
@@ -204,7 +206,7 @@ class AssetService:
         asset_type: Optional[AssetType] = None,
         status: Optional[AssetStatus] = None,
         cabinet_id: Optional[int] = None,
-        keyword: Optional[str] = None
+        keyword: Optional[str] = None,
     ) -> List[Asset]:
         """
         获取资产列表
@@ -234,7 +236,7 @@ class AssetService:
                 Asset.asset_code.contains(keyword),
                 Asset.asset_name.contains(keyword),
                 Asset.brand.contains(keyword),
-                Asset.model.contains(keyword)
+                Asset.model.contains(keyword),
             )
             conditions.append(keyword_filter)
 
@@ -288,7 +290,9 @@ class AssetService:
         if asset.cabinet_id:
             cabinet = self.get_cabinet(asset.cabinet_id)
             if cabinet:
-                to_location = f"{cabinet.cabinet_name} U{asset.u_position}" if asset.u_position else cabinet.cabinet_name
+                to_location = (
+                    f"{cabinet.cabinet_name} U{asset.u_position}" if asset.u_position else cabinet.cabinet_name
+                )
 
         self._add_lifecycle(
             asset_id=asset.id,
@@ -296,17 +300,12 @@ class AssetService:
             operator=operator,
             from_location=None,
             to_location=to_location,
-            remark="资产创建入库"
+            remark="资产创建入库",
         )
 
         return asset
 
-    def update_asset(
-        self,
-        asset_id: int,
-        data: AssetUpdate,
-        operator: Optional[str] = None
-    ) -> Optional[Asset]:
+    def update_asset(self, asset_id: int, data: AssetUpdate, operator: Optional[str] = None) -> Optional[Asset]:
         """
         更新资产
 
@@ -354,12 +353,16 @@ class AssetService:
             if old_cabinet_id:
                 old_cabinet = self.get_cabinet(old_cabinet_id)
                 if old_cabinet:
-                    from_location = f"{old_cabinet.cabinet_name} U{old_u_position}" if old_u_position else old_cabinet.cabinet_name
+                    from_location = (
+                        f"{old_cabinet.cabinet_name} U{old_u_position}" if old_u_position else old_cabinet.cabinet_name
+                    )
 
             if new_cabinet_id:
                 new_cabinet = self.get_cabinet(new_cabinet_id)
                 if new_cabinet:
-                    to_location = f"{new_cabinet.cabinet_name} U{new_u_position}" if new_u_position else new_cabinet.cabinet_name
+                    to_location = (
+                        f"{new_cabinet.cabinet_name} U{new_u_position}" if new_u_position else new_cabinet.cabinet_name
+                    )
 
             self._add_lifecycle(
                 asset_id=asset_id,
@@ -367,7 +370,7 @@ class AssetService:
                 operator=operator,
                 from_location=from_location,
                 to_location=to_location,
-                remark="资产位置变更"
+                remark="资产位置变更",
             )
 
         # 添加状态变更生命周期记录
@@ -386,12 +389,7 @@ class AssetService:
                 remark = "资产部署上线"
 
             self._add_lifecycle(
-                asset_id=asset_id,
-                action=action,
-                operator=operator,
-                from_location=None,
-                to_location=None,
-                remark=remark
+                asset_id=asset_id, action=action, operator=operator, from_location=None, to_location=None, remark=remark
             )
 
         return asset
@@ -433,9 +431,12 @@ class AssetService:
         Returns:
             生命周期记录列表
         """
-        return self.db.query(AssetLifecycle).filter(
-            AssetLifecycle.asset_id == asset_id
-        ).order_by(AssetLifecycle.action_date.desc()).all()
+        return (
+            self.db.query(AssetLifecycle)
+            .filter(AssetLifecycle.asset_id == asset_id)
+            .order_by(AssetLifecycle.action_date.desc())
+            .all()
+        )
 
     def _add_lifecycle(
         self,
@@ -444,7 +445,7 @@ class AssetService:
         operator: Optional[str] = None,
         from_location: Optional[str] = None,
         to_location: Optional[str] = None,
-        remark: Optional[str] = None
+        remark: Optional[str] = None,
     ) -> AssetLifecycle:
         """
         添加生命周期记录（私有方法）
@@ -467,7 +468,7 @@ class AssetService:
             operator=operator,
             from_location=from_location,
             to_location=to_location,
-            remark=remark
+            remark=remark,
         )
         self.db.add(lifecycle)
         self.db.commit()
@@ -506,16 +507,12 @@ class AssetService:
                 operator=data.technician,
                 from_location=None,
                 to_location=None,
-                remark=f"开始维护: {data.maintenance_type} - {data.description or ''}"
+                remark=f"开始维护: {data.maintenance_type} - {data.description or ''}",
             )
 
         return record
 
-    def complete_maintenance(
-        self,
-        record_id: int,
-        result: Optional[str] = None
-    ) -> Optional[MaintenanceRecord]:
+    def complete_maintenance(self, record_id: int, result: Optional[str] = None) -> Optional[MaintenanceRecord]:
         """
         完成维护
 
@@ -526,9 +523,7 @@ class AssetService:
         Returns:
             更新后的维护记录或None
         """
-        record = self.db.query(MaintenanceRecord).filter(
-            MaintenanceRecord.id == record_id
-        ).first()
+        record = self.db.query(MaintenanceRecord).filter(MaintenanceRecord.id == record_id).first()
 
         if not record:
             return None
@@ -554,16 +549,13 @@ class AssetService:
                 operator=record.technician,
                 from_location=None,
                 to_location=None,
-                remark=f"维护完成: {result or '正常'}"
+                remark=f"维护完成: {result or '正常'}",
             )
 
         return record
 
     def get_maintenance_records(
-        self,
-        asset_id: Optional[int] = None,
-        skip: int = 0,
-        limit: int = 100
+        self, asset_id: Optional[int] = None, skip: int = 0, limit: int = 100
     ) -> List[MaintenanceRecord]:
         """
         获取维护记录列表
@@ -603,22 +595,19 @@ class AssetService:
         self.db.refresh(inventory)
 
         # 获取所有在用和借出的资产，创建盘点明细
-        assets = self.db.query(Asset).filter(
-            Asset.status.in_([AssetStatus.in_use, AssetStatus.borrowed])
-        ).all()
+        assets = self.db.query(Asset).filter(Asset.status.in_([AssetStatus.in_use, AssetStatus.borrowed])).all()
 
         for asset in assets:
             expected_location = None
             if asset.cabinet_id:
                 cabinet = self.get_cabinet(asset.cabinet_id)
                 if cabinet:
-                    expected_location = f"{cabinet.cabinet_name} U{asset.u_position}" if asset.u_position else cabinet.cabinet_name
+                    expected_location = (
+                        f"{cabinet.cabinet_name} U{asset.u_position}" if asset.u_position else cabinet.cabinet_name
+                    )
 
             item = AssetInventoryItem(
-                inventory_id=inventory.id,
-                asset_id=asset.id,
-                expected_location=expected_location,
-                is_matched=False
+                inventory_id=inventory.id, asset_id=asset.id, expected_location=expected_location, is_matched=False
             )
             self.db.add(item)
 
@@ -630,11 +619,7 @@ class AssetService:
         self.db.refresh(inventory)
         return inventory
 
-    def update_inventory_item(
-        self,
-        item_id: int,
-        data: InventoryItemUpdate
-    ) -> Optional[AssetInventoryItem]:
+    def update_inventory_item(self, item_id: int, data: InventoryItemUpdate) -> Optional[AssetInventoryItem]:
         """
         更新盘点明细
 
@@ -645,9 +630,7 @@ class AssetService:
         Returns:
             更新后的盘点明细或None
         """
-        item = self.db.query(AssetInventoryItem).filter(
-            AssetInventoryItem.id == item_id
-        ).first()
+        item = self.db.query(AssetInventoryItem).filter(AssetInventoryItem.id == item_id).first()
 
         if not item:
             return None
@@ -679,9 +662,7 @@ class AssetService:
         Returns:
             盘点列表
         """
-        return self.db.query(AssetInventory).order_by(
-            AssetInventory.created_at.desc()
-        ).offset(skip).limit(limit).all()
+        return self.db.query(AssetInventory).order_by(AssetInventory.created_at.desc()).offset(skip).limit(limit).all()
 
     def get_inventory_items(self, inventory_id: int) -> List[AssetInventoryItem]:
         """
@@ -693,9 +674,7 @@ class AssetService:
         Returns:
             盘点明细列表
         """
-        return self.db.query(AssetInventoryItem).filter(
-            AssetInventoryItem.inventory_id == inventory_id
-        ).all()
+        return self.db.query(AssetInventoryItem).filter(AssetInventoryItem.inventory_id == inventory_id).all()
 
     def _update_inventory_stats(self, inventory_id: int) -> None:
         """
@@ -704,9 +683,7 @@ class AssetService:
         Args:
             inventory_id: 盘点ID
         """
-        inventory = self.db.query(AssetInventory).filter(
-            AssetInventory.id == inventory_id
-        ).first()
+        inventory = self.db.query(AssetInventory).filter(AssetInventory.id == inventory_id).first()
 
         if not inventory:
             return
@@ -747,24 +724,20 @@ class AssetService:
         total_count = self.db.query(func.count(Asset.id)).scalar() or 0
 
         # 按状态统计
-        status_counts = self.db.query(
-            Asset.status,
-            func.count(Asset.id)
-        ).group_by(Asset.status).all()
+        status_counts = self.db.query(Asset.status, func.count(Asset.id)).group_by(Asset.status).all()
         by_status = {status.value if status else "unknown": count for status, count in status_counts}
 
         # 按类型统计
-        type_counts = self.db.query(
-            Asset.asset_type,
-            func.count(Asset.id)
-        ).group_by(Asset.asset_type).all()
+        type_counts = self.db.query(Asset.asset_type, func.count(Asset.id)).group_by(Asset.asset_type).all()
         by_type = {asset_type.value if asset_type else "unknown": count for asset_type, count in type_counts}
 
         # 按部门统计
-        dept_counts = self.db.query(
-            Asset.department,
-            func.count(Asset.id)
-        ).filter(Asset.department.isnot(None)).group_by(Asset.department).all()
+        dept_counts = (
+            self.db.query(Asset.department, func.count(Asset.id))
+            .filter(Asset.department.isnot(None))
+            .group_by(Asset.department)
+            .all()
+        )
         by_department = {dept or "未分配": count for dept, count in dept_counts}
 
         # 资产总价值
@@ -772,12 +745,17 @@ class AssetService:
 
         # 保修即将到期数量（30天内）
         expiring_date = date.today() + timedelta(days=30)
-        warranty_expiring_count = self.db.query(func.count(Asset.id)).filter(
-            Asset.warranty_end.isnot(None),
-            Asset.warranty_end <= expiring_date,
-            Asset.warranty_end >= date.today(),
-            Asset.status != AssetStatus.scrapped
-        ).scalar() or 0
+        warranty_expiring_count = (
+            self.db.query(func.count(Asset.id))
+            .filter(
+                Asset.warranty_end.isnot(None),
+                Asset.warranty_end <= expiring_date,
+                Asset.warranty_end >= date.today(),
+                Asset.status != AssetStatus.scrapped,
+            )
+            .scalar()
+            or 0
+        )
 
         return AssetStatistics(
             total_count=total_count,
@@ -785,7 +763,7 @@ class AssetService:
             by_type=by_type,
             by_department=by_department,
             total_value=float(total_value),
-            warranty_expiring_count=warranty_expiring_count
+            warranty_expiring_count=warranty_expiring_count,
         )
 
     def get_warranty_expiring_assets(self, days: int = 30) -> List[Asset]:
@@ -799,12 +777,17 @@ class AssetService:
             保修即将到期的资产列表
         """
         expiring_date = date.today() + timedelta(days=days)
-        return self.db.query(Asset).filter(
-            Asset.warranty_end.isnot(None),
-            Asset.warranty_end <= expiring_date,
-            Asset.warranty_end >= date.today(),
-            Asset.status != AssetStatus.scrapped
-        ).order_by(Asset.warranty_end.asc()).all()
+        return (
+            self.db.query(Asset)
+            .filter(
+                Asset.warranty_end.isnot(None),
+                Asset.warranty_end <= expiring_date,
+                Asset.warranty_end >= date.today(),
+                Asset.status != AssetStatus.scrapped,
+            )
+            .order_by(Asset.warranty_end.asc())
+            .all()
+        )
 
 
 # 辅助函数：创建服务实例

@@ -1,4 +1,5 @@
 """数据源管理 API"""
+
 import io
 from datetime import datetime
 from typing import Optional
@@ -23,8 +24,14 @@ MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB
 
 # 已知协议类型白名单（后续 Story 新增协议时扩展此列表）
 KNOWN_PROTOCOL_TYPES = {
-    "modbus_tcp", "modbus_rtu", "snmp_v2c", "snmp_v3",
-    "mqtt", "http_rest", "bacnet_ip", "opc_ua",
+    "modbus_tcp",
+    "modbus_rtu",
+    "snmp_v2c",
+    "snmp_v3",
+    "mqtt",
+    "http_rest",
+    "bacnet_ip",
+    "opc_ua",
 }
 
 
@@ -45,7 +52,9 @@ async def toggle_write_permission(
 
     # 更新写入权限
     await db.execute(
-        update(DataSource).where(DataSource.id == datasource_id).values(
+        update(DataSource)
+        .where(DataSource.id == datasource_id)
+        .values(
             write_enabled=new_value,
             updated_at=datetime.now(),
         )
@@ -173,31 +182,36 @@ async def export_report(
     for ds in ds_list:
         ds_ids.append(ds.id)
         ds_id_to_name[ds.id] = ds.name
-        datasources.append({
-            "name": ds.name,
-            "protocol_type": ds.protocol_type,
-            "connection_config": ds.connection_config,
-            "status": ds.status,
-            "last_communication": ds.last_communication,
-            "created_at": ds.created_at,
-            "is_enabled": ds.is_enabled,
-        })
+        datasources.append(
+            {
+                "name": ds.name,
+                "protocol_type": ds.protocol_type,
+                "connection_config": ds.connection_config,
+                "status": ds.status,
+                "last_communication": ds.last_communication,
+                "created_at": ds.created_at,
+                "is_enabled": ds.is_enabled,
+            }
+        )
 
     points = []
     if ds_ids:
         pt_result = await db.execute(
-            select(DataSourcePoint).where(DataSourcePoint.datasource_id.in_(ds_ids))
+            select(DataSourcePoint)
+            .where(DataSourcePoint.datasource_id.in_(ds_ids))
             .order_by(DataSourcePoint.datasource_id, DataSourcePoint.id)
         )
         for pt in pt_result.scalars().all():
-            points.append({
-                "datasource_name": ds_id_to_name.get(pt.datasource_id, ""),
-                "address": pt.address,
-                "data_type": pt.data_type,
-                "scale": pt.scale,
-                "offset": pt.offset,
-                "is_dry_contact": pt.is_dry_contact,
-            })
+            points.append(
+                {
+                    "datasource_name": ds_id_to_name.get(pt.datasource_id, ""),
+                    "address": pt.address,
+                    "data_type": pt.data_type,
+                    "scale": pt.scale,
+                    "offset": pt.offset,
+                    "is_dry_contact": pt.is_dry_contact,
+                }
+            )
 
     excel_bytes = generate_integration_report(datasources, points)
 
@@ -226,19 +240,16 @@ async def get_communication_status(
     for ds in datasources:
         # 统计受影响点位数
         points_result = await db.execute(
-            select(func.count(DataSourcePoint.id)).where(
-                DataSourcePoint.datasource_id == ds.id
-            )
+            select(func.count(DataSourcePoint.id)).where(DataSourcePoint.datasource_id == ds.id)
         )
         affected_points = points_result.scalar() or 0
 
         # 统计受影响设备数
         devices_result = await db.execute(
-            select(func.count(func.distinct(Point.device_id))).select_from(
-                DataSourcePoint
-            ).join(
-                Point, DataSourcePoint.point_id == Point.id
-            ).where(
+            select(func.count(func.distinct(Point.device_id)))
+            .select_from(DataSourcePoint)
+            .join(Point, DataSourcePoint.point_id == Point.id)
+            .where(
                 DataSourcePoint.datasource_id == ds.id,
                 DataSourcePoint.point_id.isnot(None),
                 Point.device_id.isnot(None),
@@ -251,18 +262,20 @@ async def get_communication_status(
         if ds.status == "interrupted" and ds.last_communication:
             interruption_seconds = int((datetime.now() - ds.last_communication).total_seconds())
 
-        status_list.append({
-            "id": ds.id,
-            "name": ds.name,
-            "protocol_type": ds.protocol_type,
-            "status": ds.status,
-            "last_communication": ds.last_communication.isoformat() if ds.last_communication else None,
-            "consecutive_failures": ds.consecutive_failures,
-            "retry_max_failures": ds.retry_max_failures,
-            "interruption_duration_seconds": interruption_seconds,
-            "affected_points": affected_points,
-            "affected_devices": affected_devices,
-        })
+        status_list.append(
+            {
+                "id": ds.id,
+                "name": ds.name,
+                "protocol_type": ds.protocol_type,
+                "status": ds.status,
+                "last_communication": ds.last_communication.isoformat() if ds.last_communication else None,
+                "consecutive_failures": ds.consecutive_failures,
+                "retry_max_failures": ds.retry_max_failures,
+                "interruption_duration_seconds": interruption_seconds,
+                "affected_points": affected_points,
+                "affected_devices": affected_devices,
+            }
+        )
 
     return status_list
 
@@ -342,6 +355,7 @@ async def validate_points_excel(
         raise HTTPException(status_code=404, detail="数据源不存在")
 
     from ...services.point_import import validate_points
+
     report = await validate_points(content, datasource_id, db)
     return report
 
@@ -365,6 +379,7 @@ async def import_points_excel(
         raise HTTPException(status_code=404, detail="数据源不存在")
 
     from ...services.point_import import import_points
+
     import_result = await import_points(content, datasource_id, db)
     if not import_result["success"]:
         raise HTTPException(status_code=400, detail={"message": "校验失败", "report": import_result["report"]})

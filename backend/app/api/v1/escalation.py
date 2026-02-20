@@ -1,5 +1,6 @@
 """告警升级规则 API"""
-from typing import Optional, List
+
+from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
@@ -8,7 +9,9 @@ from ..deps import get_db, require_viewer, require_operator
 from ...models.user import User
 from ...models.alarm import AlarmEscalation
 from ...schemas.alarm import (
-    AlarmEscalationCreate, AlarmEscalationUpdate, AlarmEscalationInfo,
+    AlarmEscalationCreate,
+    AlarmEscalationUpdate,
+    AlarmEscalationInfo,
 )
 
 router = APIRouter()
@@ -70,9 +73,7 @@ async def get_escalation(
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_viewer),
 ):
-    result = await db.execute(
-        select(AlarmEscalation).where(AlarmEscalation.id == escalation_id)
-    )
+    result = await db.execute(select(AlarmEscalation).where(AlarmEscalation.id == escalation_id))
     escalation = result.scalar_one_or_none()
     if not escalation:
         raise HTTPException(status_code=404, detail="升级规则不存在")
@@ -86,18 +87,14 @@ async def update_escalation(
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_operator),
 ):
-    result = await db.execute(
-        select(AlarmEscalation).where(AlarmEscalation.id == escalation_id)
-    )
+    result = await db.execute(select(AlarmEscalation).where(AlarmEscalation.id == escalation_id))
     escalation = result.scalar_one_or_none()
     if not escalation:
         raise HTTPException(status_code=404, detail="升级规则不存在")
 
     update_data = data.model_dump(exclude_unset=True)
     if "notify_user_ids" in update_data and update_data["notify_user_ids"] is not None:
-        update_data["notify_user_ids"] = ",".join(
-            str(x) for x in update_data["notify_user_ids"]
-        )
+        update_data["notify_user_ids"] = ",".join(str(x) for x in update_data["notify_user_ids"])
     for key, value in update_data.items():
         setattr(escalation, key, value)
 
@@ -112,9 +109,7 @@ async def delete_escalation(
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_operator),
 ):
-    result = await db.execute(
-        select(AlarmEscalation).where(AlarmEscalation.id == escalation_id)
-    )
+    result = await db.execute(select(AlarmEscalation).where(AlarmEscalation.id == escalation_id))
     escalation = result.scalar_one_or_none()
     if not escalation:
         raise HTTPException(status_code=404, detail="升级规则不存在")
@@ -130,9 +125,7 @@ async def toggle_escalation(
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_operator),
 ):
-    result = await db.execute(
-        select(AlarmEscalation).where(AlarmEscalation.id == escalation_id)
-    )
+    result = await db.execute(select(AlarmEscalation).where(AlarmEscalation.id == escalation_id))
     escalation = result.scalar_one_or_none()
     if not escalation:
         raise HTTPException(status_code=404, detail="升级规则不存在")

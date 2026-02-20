@@ -2,7 +2,8 @@
 设备配置自动生成服务
 当创建新设备时自动生成转移配置和调节配置
 """
-from typing import Dict, Any, Optional
+
+from typing import Dict, Any
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..models.energy import PowerDevice, DeviceShiftConfig, LoadRegulationConfig
@@ -23,7 +24,7 @@ class DeviceConfigAutoGenerator:
             "max_shift_duration": 4.0,
             "max_ramp_rate": 5.0,
             "shift_notice_time": 15,
-            "requires_manual_approval": False
+            "requires_manual_approval": False,
         },
         "HVAC": {
             "is_shiftable": True,
@@ -35,7 +36,7 @@ class DeviceConfigAutoGenerator:
             "max_shift_duration": 4.0,
             "max_ramp_rate": 10.0,
             "shift_notice_time": 15,
-            "requires_manual_approval": False
+            "requires_manual_approval": False,
         },
         "LIGHT": {
             "is_shiftable": True,
@@ -47,7 +48,7 @@ class DeviceConfigAutoGenerator:
             "max_shift_duration": 8.0,
             "max_ramp_rate": 100.0,
             "shift_notice_time": 5,
-            "requires_manual_approval": False
+            "requires_manual_approval": False,
         },
         "LIGHTING": {
             "is_shiftable": True,
@@ -59,7 +60,7 @@ class DeviceConfigAutoGenerator:
             "max_shift_duration": 8.0,
             "max_ramp_rate": 100.0,
             "shift_notice_time": 5,
-            "requires_manual_approval": False
+            "requires_manual_approval": False,
         },
         "PUMP": {
             "is_shiftable": True,
@@ -71,7 +72,7 @@ class DeviceConfigAutoGenerator:
             "max_shift_duration": 3.0,
             "max_ramp_rate": 3.0,
             "shift_notice_time": 30,
-            "requires_manual_approval": False
+            "requires_manual_approval": False,
         },
         "CHILLER": {
             "is_shiftable": True,
@@ -83,7 +84,7 @@ class DeviceConfigAutoGenerator:
             "max_shift_duration": 2.0,
             "max_ramp_rate": 2.0,
             "shift_notice_time": 60,
-            "requires_manual_approval": True
+            "requires_manual_approval": True,
         },
     }
 
@@ -105,8 +106,8 @@ class DeviceConfigAutoGenerator:
                 {"value": 22.0, "power_ratio": 1.0},
                 {"value": 24.0, "power_ratio": 0.85},
                 {"value": 26.0, "power_ratio": 0.7},
-                {"value": 28.0, "power_ratio": 0.55}
-            ]
+                {"value": 28.0, "power_ratio": 0.55},
+            ],
         },
         "HVAC": {
             "regulation_type": "temperature",
@@ -124,8 +125,8 @@ class DeviceConfigAutoGenerator:
                 {"value": 20.0, "power_ratio": 1.1},
                 {"value": 23.0, "power_ratio": 0.85},
                 {"value": 25.0, "power_ratio": 0.7},
-                {"value": 28.0, "power_ratio": 0.5}
-            ]
+                {"value": 28.0, "power_ratio": 0.5},
+            ],
         },
         "LIGHT": {
             "regulation_type": "brightness",
@@ -143,8 +144,8 @@ class DeviceConfigAutoGenerator:
                 {"value": 40, "power_ratio": 0.4},
                 {"value": 60, "power_ratio": 0.6},
                 {"value": 80, "power_ratio": 0.8},
-                {"value": 100, "power_ratio": 1.0}
-            ]
+                {"value": 100, "power_ratio": 1.0},
+            ],
         },
         "LIGHTING": {
             "regulation_type": "brightness",
@@ -162,8 +163,8 @@ class DeviceConfigAutoGenerator:
                 {"value": 40, "power_ratio": 0.4},
                 {"value": 60, "power_ratio": 0.6},
                 {"value": 80, "power_ratio": 0.8},
-                {"value": 100, "power_ratio": 1.0}
-            ]
+                {"value": 100, "power_ratio": 1.0},
+            ],
         },
         "PUMP": {
             "regulation_type": "load",
@@ -181,8 +182,8 @@ class DeviceConfigAutoGenerator:
                 {"value": 35, "power_ratio": 0.34},
                 {"value": 40, "power_ratio": 0.51},
                 {"value": 45, "power_ratio": 0.73},
-                {"value": 50, "power_ratio": 1.0}
-            ]
+                {"value": 50, "power_ratio": 1.0},
+            ],
         },
         "CHILLER": {
             "regulation_type": "temperature",
@@ -199,8 +200,8 @@ class DeviceConfigAutoGenerator:
                 {"value": 5.0, "power_ratio": 1.15},
                 {"value": 7.0, "power_ratio": 1.0},
                 {"value": 9.0, "power_ratio": 0.85},
-                {"value": 12.0, "power_ratio": 0.65}
-            ]
+                {"value": 12.0, "power_ratio": 0.65},
+            ],
         },
         "UPS": {
             "regulation_type": "mode",
@@ -215,19 +216,15 @@ class DeviceConfigAutoGenerator:
             "performance_impact": "high",
             "power_curve": [
                 {"value": 0, "power_ratio": 1.0, "label": "正常模式"},
-                {"value": 1, "power_ratio": 0.97, "label": "ECO模式"}
-            ]
+                {"value": 1, "power_ratio": 0.97, "label": "ECO模式"},
+            ],
         },
     }
 
     def __init__(self, db: AsyncSession):
         self.db = db
 
-    async def generate_configs_for_device(
-        self,
-        device: PowerDevice,
-        force: bool = False
-    ) -> Dict[str, Any]:
+    async def generate_configs_for_device(self, device: PowerDevice, force: bool = False) -> Dict[str, Any]:
         """
         为单个设备生成转移和调节配置
 
@@ -243,7 +240,7 @@ class DeviceConfigAutoGenerator:
             "device_name": device.device_name,
             "shift_config_created": False,
             "regulation_config_created": False,
-            "message": []
+            "message": [],
         }
 
         # 1. 生成转移配置
@@ -260,18 +257,12 @@ class DeviceConfigAutoGenerator:
 
         return result
 
-    async def _generate_shift_config(
-        self,
-        device: PowerDevice,
-        force: bool = False
-    ) -> bool:
+    async def _generate_shift_config(self, device: PowerDevice, force: bool = False) -> bool:
         """生成设备转移配置"""
         from sqlalchemy import select
 
         # 检查是否已存在配置
-        existing = await self.db.execute(
-            select(DeviceShiftConfig).where(DeviceShiftConfig.device_id == device.id)
-        )
+        existing = await self.db.execute(select(DeviceShiftConfig).where(DeviceShiftConfig.device_id == device.id))
         if existing.scalar_one_or_none() and not force:
             return False
 
@@ -282,11 +273,7 @@ class DeviceConfigAutoGenerator:
         if template:
             # 使用模板
             min_power = device.rated_power * 0.2 if device.rated_power and template["is_shiftable"] else None
-            config_data = {
-                "device_id": device.id,
-                **template,
-                "min_power": min_power
-            }
+            config_data = {"device_id": device.id, **template, "min_power": min_power}
         else:
             # 默认配置 - 不可转移
             config_data = {
@@ -301,16 +288,12 @@ class DeviceConfigAutoGenerator:
                 "min_power": None,
                 "max_ramp_rate": 0,
                 "shift_notice_time": 0,
-                "requires_manual_approval": True
+                "requires_manual_approval": True,
             }
 
         # 如果已存在则删除
         if force:
-            await self.db.execute(
-                DeviceShiftConfig.__table__.delete().where(
-                    DeviceShiftConfig.device_id == device.id
-                )
-            )
+            await self.db.execute(DeviceShiftConfig.__table__.delete().where(DeviceShiftConfig.device_id == device.id))
 
         # 创建配置
         config = DeviceShiftConfig(**config_data)
@@ -319,11 +302,7 @@ class DeviceConfigAutoGenerator:
 
         return True
 
-    async def _generate_regulation_config(
-        self,
-        device: PowerDevice,
-        force: bool = False
-    ) -> bool:
+    async def _generate_regulation_config(self, device: PowerDevice, force: bool = False) -> bool:
         """生成设备调节配置"""
         from sqlalchemy import select
 
@@ -364,15 +343,13 @@ class DeviceConfigAutoGenerator:
             "comfort_impact": template.get("comfort_impact", "none"),
             "performance_impact": template.get("performance_impact", "none"),
             "is_enabled": True,
-            "is_auto": False
+            "is_auto": False,
         }
 
         # 如果已存在则删除
         if force:
             await self.db.execute(
-                LoadRegulationConfig.__table__.delete().where(
-                    LoadRegulationConfig.device_id == device.id
-                )
+                LoadRegulationConfig.__table__.delete().where(LoadRegulationConfig.device_id == device.id)
             )
 
         # 创建配置
@@ -382,11 +359,7 @@ class DeviceConfigAutoGenerator:
 
         return True
 
-    async def batch_generate_configs(
-        self,
-        device_ids: list[int],
-        force: bool = False
-    ) -> Dict[str, Any]:
+    async def batch_generate_configs(self, device_ids: list[int], force: bool = False) -> Dict[str, Any]:
         """
         批量生成设备配置
 
@@ -405,9 +378,7 @@ class DeviceConfigAutoGenerator:
 
         for device_id in device_ids:
             # 查询设备
-            result = await self.db.execute(
-                select(PowerDevice).where(PowerDevice.id == device_id)
-            )
+            result = await self.db.execute(select(PowerDevice).where(PowerDevice.id == device_id))
             device = result.scalar_one_or_none()
 
             if not device:
@@ -428,5 +399,5 @@ class DeviceConfigAutoGenerator:
             "total_devices": len(device_ids),
             "shift_configs_created": shift_count,
             "regulation_configs_created": reg_count,
-            "details": results
+            "details": results,
         }

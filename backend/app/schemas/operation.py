@@ -1,23 +1,20 @@
 """
 运维管理数据模型
 """
-from typing import Optional, List
+
+from typing import Optional
 from pydantic import BaseModel, Field
 from datetime import datetime
 
-from app.models.operation import (
-    WorkOrderStatus,
-    WorkOrderType,
-    WorkOrderPriority,
-    InspectionStatus,
-    ApprovalStatus
-)
+from app.models.operation import WorkOrderStatus, WorkOrderType, WorkOrderPriority, InspectionStatus, ApprovalStatus
 
 
 # ==================== 工单 Schemas ====================
 
+
 class WorkOrderBase(BaseModel):
     """工单基础模型"""
+
     title: str = Field(..., description="工单标题")
     description: Optional[str] = Field(None, description="工单描述")
     order_type: Optional[WorkOrderType] = Field(WorkOrderType.other, description="工单类型")
@@ -34,11 +31,13 @@ class WorkOrderBase(BaseModel):
 
 class WorkOrderCreate(WorkOrderBase):
     """创建工单"""
+
     pass
 
 
 class WorkOrderUpdate(BaseModel):
     """更新工单"""
+
     title: Optional[str] = Field(None, description="工单标题")
     description: Optional[str] = Field(None, description="工单描述")
     order_type: Optional[WorkOrderType] = Field(None, description="工单类型")
@@ -58,6 +57,7 @@ class WorkOrderUpdate(BaseModel):
 
 class WorkOrderResponse(WorkOrderBase):
     """工单响应"""
+
     id: int = Field(..., description="ID")
     order_no: str = Field(..., description="工单编号")
     status: WorkOrderStatus = Field(WorkOrderStatus.pending, description="工单状态")
@@ -77,8 +77,10 @@ class WorkOrderResponse(WorkOrderBase):
 
 # ==================== 工单日志 Schemas ====================
 
+
 class WorkOrderLogResponse(BaseModel):
     """工单日志响应"""
+
     id: int = Field(..., description="ID")
     order_id: int = Field(..., description="工单ID")
     action: Optional[str] = Field(None, description="操作类型")
@@ -92,8 +94,10 @@ class WorkOrderLogResponse(BaseModel):
 
 # ==================== 巡检计划 Schemas ====================
 
+
 class InspectionPlanBase(BaseModel):
     """巡检计划基础模型"""
+
     name: str = Field(..., description="计划名称")
     description: Optional[str] = Field(None, description="计划描述")
     frequency: Optional[str] = Field(None, description="巡检频率(daily/weekly/monthly)")
@@ -105,11 +109,13 @@ class InspectionPlanBase(BaseModel):
 
 class InspectionPlanCreate(InspectionPlanBase):
     """创建巡检计划"""
+
     pass
 
 
 class InspectionPlanUpdate(BaseModel):
     """更新巡检计划"""
+
     name: Optional[str] = Field(None, description="计划名称")
     description: Optional[str] = Field(None, description="计划描述")
     frequency: Optional[str] = Field(None, description="巡检频率(daily/weekly/monthly)")
@@ -121,6 +127,7 @@ class InspectionPlanUpdate(BaseModel):
 
 class InspectionPlanResponse(InspectionPlanBase):
     """巡检计划响应"""
+
     id: int = Field(..., description="ID")
     created_at: datetime = Field(..., description="创建时间")
     updated_at: datetime = Field(..., description="更新时间")
@@ -131,8 +138,10 @@ class InspectionPlanResponse(InspectionPlanBase):
 
 # ==================== 巡检任务 Schemas ====================
 
+
 class InspectionTaskBase(BaseModel):
     """巡检任务基础模型"""
+
     plan_id: Optional[int] = Field(None, description="巡检计划ID")
     assignee: Optional[str] = Field(None, description="执行人")
     scheduled_date: Optional[datetime] = Field(None, description="计划执行日期")
@@ -140,11 +149,13 @@ class InspectionTaskBase(BaseModel):
 
 class InspectionTaskCreate(InspectionTaskBase):
     """创建巡检任务"""
+
     pass
 
 
 class InspectionTaskUpdate(BaseModel):
     """更新巡检任务"""
+
     status: Optional[InspectionStatus] = Field(None, description="任务状态")
     assignee: Optional[str] = Field(None, description="执行人")
     result: Optional[str] = Field(None, description="巡检结果(JSON)")
@@ -154,6 +165,7 @@ class InspectionTaskUpdate(BaseModel):
 
 class InspectionTaskResponse(InspectionTaskBase):
     """巡检任务响应"""
+
     id: int = Field(..., description="ID")
     task_no: str = Field(..., description="任务编号")
     status: InspectionStatus = Field(InspectionStatus.pending, description="任务状态")
@@ -171,8 +183,10 @@ class InspectionTaskResponse(InspectionTaskBase):
 
 # ==================== 知识库 Schemas ====================
 
+
 class KnowledgeBaseSchema(BaseModel):
     """知识库基础模型"""
+
     title: str = Field(..., description="标题")
     category: Optional[str] = Field(None, description="分类")
     content: Optional[str] = Field(None, description="内容")
@@ -183,11 +197,13 @@ class KnowledgeBaseSchema(BaseModel):
 
 class KnowledgeCreate(KnowledgeBaseSchema):
     """创建知识库条目"""
+
     pass
 
 
 class KnowledgeUpdate(BaseModel):
     """更新知识库条目"""
+
     title: Optional[str] = Field(None, description="标题")
     category: Optional[str] = Field(None, description="分类")
     content: Optional[str] = Field(None, description="内容")
@@ -198,6 +214,7 @@ class KnowledgeUpdate(BaseModel):
 
 class KnowledgeResponse(KnowledgeBaseSchema):
     """知识库条目响应"""
+
     id: int = Field(..., description="ID")
     view_count: int = Field(0, description="查看次数")
     created_at: datetime = Field(..., description="创建时间")
@@ -209,8 +226,10 @@ class KnowledgeResponse(KnowledgeBaseSchema):
 
 # ==================== 运维统计 Schemas ====================
 
+
 class OperationStatistics(BaseModel):
     """运维统计信息"""
+
     total_orders: int = Field(0, description="工单总数")
     pending_orders: int = Field(0, description="待处理工单数")
     processing_orders: int = Field(0, description="处理中工单数")
@@ -221,8 +240,10 @@ class OperationStatistics(BaseModel):
 
 # ==================== 告警工单规则 Schemas ====================
 
+
 class AlarmWorkOrderRuleBase(BaseModel):
     """告警工单规则基础模型"""
+
     name: str = Field(..., description="规则名称")
     alarm_level: str = Field(..., description="告警级别(critical/important)")
     alarm_type: Optional[str] = Field(None, description="告警类型过滤")
@@ -234,11 +255,13 @@ class AlarmWorkOrderRuleBase(BaseModel):
 
 class AlarmWorkOrderRuleCreate(AlarmWorkOrderRuleBase):
     """创建告警工单规则"""
+
     pass
 
 
 class AlarmWorkOrderRuleUpdate(BaseModel):
     """更新告警工单规则"""
+
     name: Optional[str] = Field(None, description="规则名称")
     alarm_level: Optional[str] = Field(None, description="告警级别")
     alarm_type: Optional[str] = Field(None, description="告警类型过滤")
@@ -250,6 +273,7 @@ class AlarmWorkOrderRuleUpdate(BaseModel):
 
 class AlarmWorkOrderRuleResponse(AlarmWorkOrderRuleBase):
     """告警工单规则响应"""
+
     id: int = Field(..., description="ID")
     created_at: datetime = Field(..., description="创建时间")
     updated_at: datetime = Field(..., description="更新时间")
@@ -260,6 +284,7 @@ class AlarmWorkOrderRuleResponse(AlarmWorkOrderRuleBase):
 
 class AlarmCheckRequest(BaseModel):
     """告警检查请求"""
+
     alarm_id: int = Field(..., description="告警ID")
     alarm_level: str = Field(..., description="告警级别")
     alarm_type: Optional[str] = Field(None, description="告警类型")
@@ -268,8 +293,10 @@ class AlarmCheckRequest(BaseModel):
 
 # ==================== 工单审批 Schemas ====================
 
+
 class WorkOrderApprovalCreate(BaseModel):
     """创建工单审批"""
+
     approver: str = Field(..., description="审批人")
     timeout_hours: Optional[int] = Field(24, description="超时时间(小时)")
     escalate_to: Optional[str] = Field(None, description="超时升级审批人")
@@ -277,6 +304,7 @@ class WorkOrderApprovalCreate(BaseModel):
 
 class WorkOrderApprovalResponse(BaseModel):
     """工单审批响应"""
+
     id: int = Field(..., description="ID")
     order_id: int = Field(..., description="工单ID")
     approver: str = Field(..., description="审批人")
@@ -293,9 +321,11 @@ class WorkOrderApprovalResponse(BaseModel):
 
 class ApproveRequest(BaseModel):
     """批准审批请求"""
+
     reason: Optional[str] = Field(None, description="审批意见")
 
 
 class RejectRequest(BaseModel):
     """驳回审批请求"""
+
     reason: str = Field(..., description="驳回原因")

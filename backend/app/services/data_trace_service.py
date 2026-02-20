@@ -8,6 +8,7 @@
 3. 构建追溯树结构
 4. 支持逐层展开查看完整计算路径
 """
+
 import uuid
 from datetime import datetime
 from decimal import Decimal
@@ -15,10 +16,7 @@ from typing import Optional, List, Dict, Any, Union
 from sqlalchemy import select, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..models.trace import (
-    DataSourceMapping, TraceRecord, TraceTree, TemplateParameter,
-    MappingType, AggregationType
-)
+from ..models.trace import DataSourceMapping, TraceRecord, TraceTree, TemplateParameter, MappingType, AggregationType
 
 
 class DataTraceService:
@@ -56,7 +54,7 @@ class DataTraceService:
         query_params: Dict = None,
         proposal_id: int = None,
         measure_id: int = None,
-        parent_trace_id: str = None
+        parent_trace_id: str = None,
     ) -> TraceRecord:
         """
         创建第一层直接映射追溯记录
@@ -82,7 +80,7 @@ class DataTraceService:
             depth=0 if parent_trace_id is None else 1,
             query_sql=query_sql,
             query_params=query_params,
-            calculated_at=datetime.now()
+            calculated_at=datetime.now(),
         )
 
         self.db.add(trace)
@@ -106,7 +104,7 @@ class DataTraceService:
         query_params: Dict = None,
         proposal_id: int = None,
         measure_id: int = None,
-        parent_trace_id: str = None
+        parent_trace_id: str = None,
     ) -> TraceRecord:
         """
         创建第二层聚合映射追溯记录
@@ -125,7 +123,9 @@ class DataTraceService:
             source_table=source_table,
             source_field=source_field,
             filter_condition=filter_condition,
-            aggregation_type=aggregation_type.value if isinstance(aggregation_type, AggregationType) else aggregation_type,
+            aggregation_type=aggregation_type.value
+            if isinstance(aggregation_type, AggregationType)
+            else aggregation_type,
             aggregation_params=aggregation_params,
             time_range_start=time_range_start,
             time_range_end=time_range_end,
@@ -136,7 +136,7 @@ class DataTraceService:
             depth=0 if parent_trace_id is None else 1,
             query_sql=query_sql,
             query_params=query_params,
-            calculated_at=datetime.now()
+            calculated_at=datetime.now(),
         )
 
         self.db.add(trace)
@@ -154,7 +154,7 @@ class DataTraceService:
         value_unit: str = "",
         proposal_id: int = None,
         measure_id: int = None,
-        parent_trace_id: str = None
+        parent_trace_id: str = None,
     ) -> TraceRecord:
         """
         创建第三层复合映射追溯记录
@@ -186,7 +186,7 @@ class DataTraceService:
             value_unit=value_unit,
             parent_trace_id=parent_trace_id,
             depth=depth,
-            calculated_at=datetime.now()
+            calculated_at=datetime.now(),
         )
 
         self.db.add(trace)
@@ -202,10 +202,7 @@ class DataTraceService:
     # ==================== 追溯树构建 ====================
 
     async def build_trace_tree(
-        self,
-        root_trace: TraceRecord,
-        proposal_id: int = None,
-        measure_id: int = None
+        self, root_trace: TraceRecord, proposal_id: int = None, measure_id: int = None
     ) -> List[TraceTree]:
         """
         构建追溯树索引
@@ -222,7 +219,7 @@ class DataTraceService:
                 path=path,
                 depth=depth,
                 proposal_id=proposal_id,
-                measure_id=measure_id
+                measure_id=measure_id,
             )
             tree_nodes.append(node)
             self.db.add(node)
@@ -247,9 +244,7 @@ class DataTraceService:
             return self._trace_cache[trace_id]
 
         # 查数据库
-        result = await self.db.execute(
-            select(TraceRecord).where(TraceRecord.trace_id == trace_id)
-        )
+        result = await self.db.execute(select(TraceRecord).where(TraceRecord.trace_id == trace_id))
         trace = result.scalar_one_or_none()
         if trace:
             self._trace_cache[trace_id] = trace
@@ -286,7 +281,7 @@ class DataTraceService:
             node["source"] = {
                 "table": trace.source_table,
                 "field": trace.source_field,
-                "filter": trace.filter_condition
+                "filter": trace.filter_condition,
             }
         elif trace.mapping_type == MappingType.AGGREGATE.value:
             node["source"] = {
@@ -297,8 +292,8 @@ class DataTraceService:
                 "filter": trace.filter_condition,
                 "time_range": {
                     "start": trace.time_range_start.isoformat() if trace.time_range_start else None,
-                    "end": trace.time_range_end.isoformat() if trace.time_range_end else None
-                }
+                    "end": trace.time_range_end.isoformat() if trace.time_range_end else None,
+                },
             }
             node["query_sql"] = trace.query_sql
         elif trace.mapping_type == MappingType.COMPOSITE.value:
@@ -318,16 +313,12 @@ class DataTraceService:
 
     async def get_traces_by_proposal(self, proposal_id: int) -> List[TraceRecord]:
         """获取方案的所有追溯记录"""
-        result = await self.db.execute(
-            select(TraceRecord).where(TraceRecord.proposal_id == proposal_id)
-        )
+        result = await self.db.execute(select(TraceRecord).where(TraceRecord.proposal_id == proposal_id))
         return result.scalars().all()
 
     async def get_traces_by_measure(self, measure_id: int) -> List[TraceRecord]:
         """获取措施的所有追溯记录"""
-        result = await self.db.execute(
-            select(TraceRecord).where(TraceRecord.measure_id == measure_id)
-        )
+        result = await self.db.execute(select(TraceRecord).where(TraceRecord.measure_id == measure_id))
         return result.scalars().all()
 
     # ==================== 数据源映射管理 ====================
@@ -336,10 +327,7 @@ class DataTraceService:
         """根据参数编码获取映射配置"""
         result = await self.db.execute(
             select(DataSourceMapping).where(
-                and_(
-                    DataSourceMapping.param_code == param_code,
-                    DataSourceMapping.is_enabled == True
-                )
+                and_(DataSourceMapping.param_code == param_code, DataSourceMapping.is_enabled == True)
             )
         )
         return result.scalar_one_or_none()
@@ -347,12 +335,9 @@ class DataTraceService:
     async def get_template_parameters(self, template_id: str) -> List[TemplateParameter]:
         """获取模板的所有参数配置"""
         result = await self.db.execute(
-            select(TemplateParameter).where(
-                and_(
-                    TemplateParameter.template_id == template_id,
-                    TemplateParameter.is_enabled == True
-                )
-            ).order_by(TemplateParameter.sort_order)
+            select(TemplateParameter)
+            .where(and_(TemplateParameter.template_id == template_id, TemplateParameter.is_enabled == True))
+            .order_by(TemplateParameter.sort_order)
         )
         return result.scalars().all()
 
@@ -395,12 +380,7 @@ class TracedValue:
     封装计算结果及其追溯记录，用于公式计算器返回
     """
 
-    def __init__(
-        self,
-        value: Union[Decimal, float, int],
-        trace: TraceRecord,
-        unit: str = ""
-    ):
+    def __init__(self, value: Union[Decimal, float, int], trace: TraceRecord, unit: str = ""):
         self.value = Decimal(str(value)) if not isinstance(value, Decimal) else value
         self.trace = trace
         self.unit = unit
@@ -416,8 +396,4 @@ class TracedValue:
         return self.trace.trace_id
 
     def to_dict(self) -> Dict[str, Any]:
-        return {
-            "value": float(self.value),
-            "trace_id": self.trace.trace_id,
-            "unit": self.unit
-        }
+        return {"value": float(self.value), "trace_id": self.trace.trace_id, "unit": self.unit}

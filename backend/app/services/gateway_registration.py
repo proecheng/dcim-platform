@@ -1,4 +1,5 @@
 """网关自动注册服务 — Story 2.1 + Story 16.3 多站点网关接入"""
+
 import logging
 from datetime import datetime, timedelta
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -30,9 +31,7 @@ async def _resolve_site_id(site_id_str: str | None, db: AsyncSession) -> int | N
     return site_id
 
 
-async def handle_gateway_status(
-    payload: dict, db: AsyncSession, *, site_id: str | None = None
-) -> None:
+async def handle_gateway_status(payload: dict, db: AsyncSession, *, site_id: str | None = None) -> None:
     """处理网关心跳消息 — 自动注册或更新，支持 site_id 绑定"""
     gw_id = payload.get("gw_id")
     if not gw_id:
@@ -65,7 +64,8 @@ async def handle_gateway_status(
         await check_resource_warnings(gw_id, payload, db)
         await db.commit()
         await cache_gateway_status(
-            gw_id, "online",
+            gw_id,
+            "online",
             cpu=payload.get("cpu"),
             mem=payload.get("mem"),
             disk=payload.get("disk"),
@@ -93,12 +93,12 @@ async def handle_gateway_status(
         elif resolved_site_id is not None and existing.site_id != resolved_site_id:
             logger.warning(
                 "网关 %s site_id 不一致: DB=%s, topic=%s（不覆盖）",
-                gw_id, existing.site_id, resolved_site_id,
+                gw_id,
+                existing.site_id,
+                resolved_site_id,
             )
 
-        await db.execute(
-            update(Gateway).where(Gateway.gateway_id == gw_id).values(**update_values)
-        )
+        await db.execute(update(Gateway).where(Gateway.gateway_id == gw_id).values(**update_values))
         # 状态变更记录
         if old_status != "online":
             await record_status_change(gw_id, old_status, "online", db)
@@ -106,7 +106,8 @@ async def handle_gateway_status(
         await check_resource_warnings(gw_id, payload, db)
         await db.commit()
         await cache_gateway_status(
-            gw_id, "online",
+            gw_id,
+            "online",
             cpu=payload.get("cpu"),
             mem=payload.get("mem"),
             disk=payload.get("disk"),
@@ -133,9 +134,7 @@ async def check_gateway_heartbeats(db: AsyncSession) -> int:
 
     stale_ids = [gw.gateway_id for gw in stale_gateways]
     await db.execute(
-        update(Gateway).where(
-            Gateway.gateway_id.in_(stale_ids)
-        ).values(status="offline", updated_at=datetime.now())
+        update(Gateway).where(Gateway.gateway_id.in_(stale_ids)).values(status="offline", updated_at=datetime.now())
     )
 
     for gw_id in stale_ids:

@@ -2,6 +2,7 @@
 消防分级联动策略 — YAML 加载服务
 Story 9-2: 消防分级联动策略
 """
+
 import logging
 from datetime import datetime
 from pathlib import Path
@@ -31,6 +32,7 @@ def load_yaml_policies() -> List[dict]:
 
     try:
         import yaml
+
         with open(_FIRE_POLICY_FILE, "r", encoding="utf-8") as f:
             data = yaml.safe_load(f)
 
@@ -61,9 +63,7 @@ async def sync_to_database(db: AsyncSession) -> int:
             continue
 
         # 检查是否已存在
-        result = await db.execute(
-            select(LinkagePolicy).where(LinkagePolicy.name == name)
-        )
+        result = await db.execute(select(LinkagePolicy).where(LinkagePolicy.name == name))
         existing = result.scalar_one_or_none()
         if existing is not None:
             logger.debug("消防策略已存在，跳过: %s", name)
@@ -124,9 +124,7 @@ async def reload(db: AsyncSession) -> int:
         condition = policy.trigger_condition
         if isinstance(condition, dict) and "fire_level" in condition:
             # 先删除动作
-            await db.execute(
-                delete(LinkageAction).where(LinkageAction.policy_id == policy.id)
-            )
+            await db.execute(delete(LinkageAction).where(LinkageAction.policy_id == policy.id))
             await db.delete(policy)
             deleted_count += 1
 

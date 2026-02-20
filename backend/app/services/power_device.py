@@ -4,16 +4,14 @@ Power Device Service
 
 提供用电设备管理、点位关联、负荷转移配置功能
 """
+
 from typing import List, Optional, Dict, Any
 from datetime import datetime
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, and_
 from sqlalchemy.orm import selectinload
 
-from ..models.energy import (
-    PowerDevice, DeviceShiftConfig, DeviceLoadProfile,
-    DistributionCircuit
-)
+from ..models.energy import PowerDevice, DeviceShiftConfig
 from ..models.point import Point, PointRealtime
 from ..models.device import Device
 
@@ -31,13 +29,13 @@ class PowerDeviceService:
         is_metered: Optional[bool] = None,
         is_it_load: Optional[bool] = None,
         is_critical: Optional[bool] = None,
-        is_enabled: Optional[bool] = None
+        is_enabled: Optional[bool] = None,
     ) -> tuple[List[PowerDevice], int]:
         """获取用电设备列表"""
         query = select(PowerDevice).options(
             selectinload(PowerDevice.circuit),
             selectinload(PowerDevice.load_profile),
-            selectinload(PowerDevice.shift_config)
+            selectinload(PowerDevice.shift_config),
         )
         count_query = select(func.count(PowerDevice.id))
 
@@ -78,7 +76,7 @@ class PowerDeviceService:
             .options(
                 selectinload(PowerDevice.circuit),
                 selectinload(PowerDevice.load_profile),
-                selectinload(PowerDevice.shift_config)
+                selectinload(PowerDevice.shift_config),
             )
             .where(PowerDevice.id == device_id)
         )
@@ -87,9 +85,7 @@ class PowerDeviceService:
     @staticmethod
     async def get_by_code(db: AsyncSession, code: str) -> Optional[PowerDevice]:
         """根据编码获取用电设备"""
-        result = await db.execute(
-            select(PowerDevice).where(PowerDevice.device_code == code)
-        )
+        result = await db.execute(select(PowerDevice).where(PowerDevice.device_code == code))
         return result.scalar_one_or_none()
 
     @staticmethod
@@ -102,11 +98,7 @@ class PowerDeviceService:
         return device
 
     @staticmethod
-    async def update(
-        db: AsyncSession,
-        device_id: int,
-        data: Dict[str, Any]
-    ) -> Optional[PowerDevice]:
+    async def update(db: AsyncSession, device_id: int, data: Dict[str, Any]) -> Optional[PowerDevice]:
         """更新用电设备"""
         device = await PowerDeviceService.get_by_id(db, device_id)
         if not device:
@@ -140,9 +132,7 @@ class PowerDeviceService:
 
     @staticmethod
     async def configure_points(
-        db: AsyncSession,
-        device_id: int,
-        point_config: Dict[str, Optional[int]]
+        db: AsyncSession, device_id: int, point_config: Dict[str, Optional[int]]
     ) -> Optional[PowerDevice]:
         """
         配置设备点位关联
@@ -164,9 +154,7 @@ class PowerDeviceService:
         # 验证点位是否存在
         for field, point_id in point_config.items():
             if point_id is not None and field.endswith("_point_id"):
-                point_result = await db.execute(
-                    select(Point).where(Point.id == point_id)
-                )
+                point_result = await db.execute(select(Point).where(Point.id == point_id))
                 if not point_result.scalar_one_or_none():
                     raise ValueError(f"点位ID {point_id} 不存在")
 
@@ -189,10 +177,7 @@ class PowerDeviceService:
         return device
 
     @staticmethod
-    async def get_points_config(
-        db: AsyncSession,
-        device_id: int
-    ) -> Optional[Dict[str, Any]]:
+    async def get_points_config(db: AsyncSession, device_id: int) -> Optional[Dict[str, Any]]:
         """获取设备点位关联配置"""
         device = await PowerDeviceService.get_by_id(db, device_id)
         if not device:
@@ -203,20 +188,12 @@ class PowerDeviceService:
             "device_code": device.device_code,
             "device_name": device.device_name,
             "monitor_device": None,
-            "points": {
-                "power": None,
-                "energy": None,
-                "voltage": None,
-                "current": None,
-                "power_factor": None
-            }
+            "points": {"power": None, "energy": None, "voltage": None, "current": None, "power_factor": None},
         }
 
         # 获取监控设备信息
         if device.monitor_device_id:
-            monitor_result = await db.execute(
-                select(Device).where(Device.id == device.monitor_device_id)
-            )
+            monitor_result = await db.execute(select(Device).where(Device.id == device.monitor_device_id))
             monitor_device = monitor_result.scalar_one_or_none()
             if monitor_device:
                 config["monitor_device"] = {
@@ -224,7 +201,7 @@ class PowerDeviceService:
                     "name": monitor_device.device_name,
                     "type": monitor_device.device_type,
                     "protocol": monitor_device.protocol,
-                    "status": monitor_device.status
+                    "status": monitor_device.status,
                 }
 
         # 获取各点位信息
@@ -233,21 +210,17 @@ class PowerDeviceService:
             ("energy_point_id", "energy"),
             ("voltage_point_id", "voltage"),
             ("current_point_id", "current"),
-            ("pf_point_id", "power_factor")
+            ("pf_point_id", "power_factor"),
         ]
 
         for db_field, config_key in point_fields:
             point_id = getattr(device, db_field, None)
             if point_id:
-                point_result = await db.execute(
-                    select(Point).where(Point.id == point_id)
-                )
+                point_result = await db.execute(select(Point).where(Point.id == point_id))
                 point = point_result.scalar_one_or_none()
                 if point:
                     # 获取实时值
-                    realtime_result = await db.execute(
-                        select(PointRealtime).where(PointRealtime.point_id == point_id)
-                    )
+                    realtime_result = await db.execute(select(PointRealtime).where(PointRealtime.point_id == point_id))
                     realtime = realtime_result.scalar_one_or_none()
 
                     config["points"][config_key] = {
@@ -258,16 +231,13 @@ class PowerDeviceService:
                         "unit": point.unit,
                         "coefficient": point.coefficient,
                         "current_value": realtime.value if realtime else None,
-                        "update_time": realtime.update_time.isoformat() if realtime and realtime.update_time else None
+                        "update_time": realtime.update_time.isoformat() if realtime and realtime.update_time else None,
                     }
 
         return config
 
     @staticmethod
-    async def get_realtime_data(
-        db: AsyncSession,
-        device_id: int
-    ) -> Optional[Dict[str, Any]]:
+    async def get_realtime_data(db: AsyncSession, device_id: int) -> Optional[Dict[str, Any]]:
         """获取设备实时电力数据"""
         device = await PowerDeviceService.get_by_id(db, device_id)
         if not device:
@@ -285,7 +255,7 @@ class PowerDeviceService:
             "current": None,
             "power_factor": None,
             "load_rate": None,
-            "update_time": None
+            "update_time": None,
         }
 
         # 获取各点位实时值
@@ -294,16 +264,14 @@ class PowerDeviceService:
             ("energy_point_id", "energy"),
             ("voltage_point_id", "voltage"),
             ("current_point_id", "current"),
-            ("pf_point_id", "power_factor")
+            ("pf_point_id", "power_factor"),
         ]
 
         latest_time = None
         for db_field, data_key in point_mapping:
             point_id = getattr(device, db_field, None)
             if point_id:
-                realtime_result = await db.execute(
-                    select(PointRealtime).where(PointRealtime.point_id == point_id)
-                )
+                realtime_result = await db.execute(select(PointRealtime).where(PointRealtime.point_id == point_id))
                 realtime = realtime_result.scalar_one_or_none()
                 if realtime:
                     data[data_key] = realtime.value
@@ -321,9 +289,7 @@ class PowerDeviceService:
 
     @staticmethod
     async def configure_shift(
-        db: AsyncSession,
-        device_id: int,
-        shift_config: Dict[str, Any]
+        db: AsyncSession, device_id: int, shift_config: Dict[str, Any]
     ) -> Optional[DeviceShiftConfig]:
         """
         配置设备负荷转移参数
@@ -348,9 +314,7 @@ class PowerDeviceService:
             return None
 
         # 查找或创建转移配置
-        config_result = await db.execute(
-            select(DeviceShiftConfig).where(DeviceShiftConfig.device_id == device_id)
-        )
+        config_result = await db.execute(select(DeviceShiftConfig).where(DeviceShiftConfig.device_id == device_id))
         config = config_result.scalar_one_or_none()
 
         if config:
@@ -369,18 +333,13 @@ class PowerDeviceService:
         return config
 
     @staticmethod
-    async def get_shift_config(
-        db: AsyncSession,
-        device_id: int
-    ) -> Optional[Dict[str, Any]]:
+    async def get_shift_config(db: AsyncSession, device_id: int) -> Optional[Dict[str, Any]]:
         """获取设备负荷转移配置"""
         device = await PowerDeviceService.get_by_id(db, device_id)
         if not device:
             return None
 
-        config_result = await db.execute(
-            select(DeviceShiftConfig).where(DeviceShiftConfig.device_id == device_id)
-        )
+        config_result = await db.execute(select(DeviceShiftConfig).where(DeviceShiftConfig.device_id == device_id))
         config = config_result.scalar_one_or_none()
 
         if not config:
@@ -397,7 +356,7 @@ class PowerDeviceService:
                 "min_power": None,
                 "max_ramp_rate": None,
                 "shift_notice_time": 30,
-                "requires_manual_approval": True
+                "requires_manual_approval": True,
             }
 
         return {
@@ -412,7 +371,7 @@ class PowerDeviceService:
             "min_power": config.min_power,
             "max_ramp_rate": config.max_ramp_rate,
             "shift_notice_time": config.shift_notice_time,
-            "requires_manual_approval": config.requires_manual_approval
+            "requires_manual_approval": config.requires_manual_approval,
         }
 
     @staticmethod
@@ -421,24 +380,19 @@ class PowerDeviceService:
         result = await db.execute(
             select(DeviceShiftConfig)
             .options(selectinload(DeviceShiftConfig.device))
-            .where(
-                DeviceShiftConfig.is_shiftable == True,
-                DeviceShiftConfig.is_critical == False
-            )
+            .where(DeviceShiftConfig.is_shiftable == True, DeviceShiftConfig.is_critical == False)
         )
         configs = result.scalars().all()
 
         devices = []
         for config in configs:
             if config.device and config.device.is_enabled:
-                device_data = await PowerDeviceService.get_realtime_data(
-                    db, config.device_id
-                )
+                device_data = await PowerDeviceService.get_realtime_data(db, config.device_id)
                 if device_data:
                     device_data["shift_config"] = {
                         "shiftable_power_ratio": config.shiftable_power_ratio,
                         "allowed_shift_hours": config.allowed_shift_hours or [],
-                        "forbidden_shift_hours": config.forbidden_shift_hours or []
+                        "forbidden_shift_hours": config.forbidden_shift_hours or [],
                     }
                     devices.append(device_data)
 

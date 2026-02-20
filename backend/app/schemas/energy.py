@@ -1,6 +1,7 @@
 """
 用电管理数据模型
 """
+
 from enum import Enum
 from typing import Optional, List, Dict, Any
 from pydantic import BaseModel, Field, field_validator
@@ -9,8 +10,10 @@ from datetime import datetime, date
 
 # ========== 用电设备 ==========
 
+
 class PowerDeviceBase(BaseModel):
     """用电设备基础模型"""
+
     device_code: str = Field(..., description="设备编码")
     device_name: str = Field(..., description="设备名称")
     device_type: str = Field(..., description="设备类型: MAIN/UPS/PDU/AC/IT")
@@ -38,11 +41,13 @@ class PowerDeviceBase(BaseModel):
 
 class PowerDeviceCreate(PowerDeviceBase):
     """创建用电设备"""
+
     pass
 
 
 class PowerDeviceUpdate(BaseModel):
     """更新用电设备"""
+
     device_name: Optional[str] = None
     device_type: Optional[str] = None
     rated_power: Optional[float] = None
@@ -70,6 +75,7 @@ class PowerDeviceUpdate(BaseModel):
 
 class PowerDeviceResponse(PowerDeviceBase):
     """用电设备响应"""
+
     id: int
     is_enabled: bool
     created_at: datetime
@@ -81,13 +87,16 @@ class PowerDeviceResponse(PowerDeviceBase):
 
 class PowerDeviceTree(PowerDeviceResponse):
     """用电设备树结构"""
+
     children: List["PowerDeviceTree"] = []
 
 
 # ========== 实时电力数据 ==========
 
+
 class RealtimePowerData(BaseModel):
     """实时电力数据"""
+
     device_id: int
     device_code: str
     device_name: str
@@ -112,6 +121,7 @@ class RealtimePowerData(BaseModel):
 
 class RealtimePowerSummary(BaseModel):
     """实时电力汇总"""
+
     total_power: float = Field(..., description="总功率 kW")
     it_power: float = Field(..., description="IT负载功率 kW")
     cooling_power: float = Field(..., description="制冷功率 kW")
@@ -127,8 +137,10 @@ class RealtimePowerSummary(BaseModel):
 
 # ========== PUE ==========
 
+
 class PUEData(BaseModel):
     """PUE数据"""
+
     current_pue: Optional[float] = None
     total_power: float = Field(..., description="总功率 kW")
     it_power: float = Field(..., description="IT功率 kW")
@@ -143,6 +155,7 @@ class PUEData(BaseModel):
 
 class PUEHistoryItem(BaseModel):
     """PUE历史记录"""
+
     record_time: datetime
     pue: float
     total_power: float
@@ -154,6 +167,7 @@ class PUEHistoryItem(BaseModel):
 
 class PUETrend(BaseModel):
     """PUE趋势"""
+
     period: str = Field(..., description="时间段: hour/day/week/month")
     data: List[PUEHistoryItem]
     avg_pue: float
@@ -163,8 +177,10 @@ class PUETrend(BaseModel):
 
 # ========== 能耗统计 ==========
 
+
 class EnergyHourlyData(BaseModel):
     """小时能耗数据"""
+
     id: int
     device_id: int
     stat_time: datetime
@@ -182,6 +198,7 @@ class EnergyHourlyData(BaseModel):
 
 class EnergyDailyData(BaseModel):
     """日能耗数据"""
+
     id: int
     device_id: int
     stat_date: date
@@ -201,6 +218,7 @@ class EnergyDailyData(BaseModel):
 
 class EnergyMonthlyData(BaseModel):
     """月能耗数据"""
+
     id: int
     device_id: int
     stat_year: int
@@ -224,6 +242,7 @@ class EnergyMonthlyData(BaseModel):
 
 class EnergyStatQuery(BaseModel):
     """能耗统计查询参数"""
+
     device_id: Optional[int] = None
     device_type: Optional[str] = None
     area_code: Optional[str] = None
@@ -234,6 +253,7 @@ class EnergyStatQuery(BaseModel):
 
 class EnergyStat(BaseModel):
     """能耗统计结果"""
+
     total_energy: float = Field(..., description="总电量 kWh")
     peak_energy: float = Field(..., description="尖峰+高峰电量 kWh")
     normal_energy: float = Field(..., description="平段电量 kWh")
@@ -250,6 +270,7 @@ class EnergyStat(BaseModel):
 
 class EnergyTrendItem(BaseModel):
     """能耗趋势项"""
+
     time_label: str
     energy: float
     cost: float
@@ -258,6 +279,7 @@ class EnergyTrendItem(BaseModel):
 
 class EnergyTrend(BaseModel):
     """能耗趋势"""
+
     granularity: str
     data: List[EnergyTrendItem]
     total_energy: float
@@ -267,6 +289,7 @@ class EnergyTrend(BaseModel):
 
 class EnergyComparison(BaseModel):
     """能耗对比"""
+
     current_period: EnergyStat
     previous_period: EnergyStat
     energy_change: float = Field(..., description="电量变化 kWh")
@@ -278,8 +301,10 @@ class EnergyComparison(BaseModel):
 
 # ========== 电价配置 ==========
 
+
 class ElectricityPricingBase(BaseModel):
     """电价配置基础模型"""
+
     pricing_name: str = Field(..., description="电价名称")
     period_type: str = Field(..., description="时段类型: sharp/peak/flat/valley/deep_valley")
     start_time: str = Field(..., description="开始时间 HH:MM")
@@ -291,11 +316,13 @@ class ElectricityPricingBase(BaseModel):
 
 class ElectricityPricingCreate(ElectricityPricingBase):
     """创建电价配置"""
+
     pass
 
 
 class ElectricityPricingUpdate(BaseModel):
     """更新电价配置"""
+
     pricing_name: Optional[str] = None
     period_type: Optional[str] = None
     start_time: Optional[str] = None
@@ -308,6 +335,7 @@ class ElectricityPricingUpdate(BaseModel):
 
 class ElectricityPricingResponse(ElectricityPricingBase):
     """电价配置响应"""
+
     id: int
     is_enabled: bool
     created_at: datetime
@@ -319,8 +347,10 @@ class ElectricityPricingResponse(ElectricityPricingBase):
 
 # ========== 电价全局配置 ==========
 
+
 class PowerFactorRule(BaseModel):
     """功率因数调整规则"""
+
     min: float = Field(..., description="功率因数下限")
     max: float = Field(..., description="功率因数上限")
     adjustment: float = Field(..., description="电费调整比例 %（正数增加，负数减少）")
@@ -328,6 +358,7 @@ class PowerFactorRule(BaseModel):
 
 class PricingConfigBase(BaseModel):
     """电价全局配置基础模型"""
+
     config_name: str = Field(default="默认配置", description="配置名称")
 
     # 基本电费配置（需量/容量二选一）
@@ -360,11 +391,13 @@ class PricingConfigBase(BaseModel):
 
 class PricingConfigCreate(PricingConfigBase):
     """创建电价全局配置"""
+
     pass
 
 
 class PricingConfigUpdate(BaseModel):
     """更新电价全局配置"""
+
     config_name: Optional[str] = None
     billing_mode: Optional[str] = None
     demand_price: Optional[float] = None
@@ -386,6 +419,7 @@ class PricingConfigUpdate(BaseModel):
 
 class PricingConfigResponse(PricingConfigBase):
     """电价全局配置响应"""
+
     id: int
     is_enabled: bool
     created_at: datetime
@@ -397,8 +431,10 @@ class PricingConfigResponse(PricingConfigBase):
 
 # ========== 节能建议 ==========
 
+
 class EnergySuggestionBase(BaseModel):
     """节能建议基础模型"""
+
     rule_id: str = Field(..., description="规则ID")
     rule_name: Optional[str] = Field(None, description="规则名称")
     device_id: Optional[int] = Field(None, description="相关设备ID")
@@ -412,11 +448,13 @@ class EnergySuggestionBase(BaseModel):
 
 class EnergySuggestionCreate(EnergySuggestionBase):
     """创建节能建议"""
+
     pass
 
 
 class EnergySuggestionResponse(EnergySuggestionBase):
     """节能建议响应"""
+
     id: int
     status: str
     accepted_by: Optional[int]
@@ -433,22 +471,26 @@ class EnergySuggestionResponse(EnergySuggestionBase):
 
 class AcceptSuggestion(BaseModel):
     """接受建议"""
+
     remark: Optional[str] = None
 
 
 class CompleteSuggestion(BaseModel):
     """完成建议"""
+
     actual_saving: Optional[float] = Field(None, description="实际节省 kWh")
     remark: Optional[str] = None
 
 
 class RejectSuggestion(BaseModel):
     """拒绝建议"""
+
     remark: str = Field(..., description="拒绝原因")
 
 
 class SavingPotential(BaseModel):
     """节能潜力分析"""
+
     total_potential_saving: float = Field(..., description="总节能潜力 kWh/月")
     total_cost_saving: float = Field(..., description="总节费潜力 元/月")
     high_priority_count: int = Field(..., description="高优先级建议数")
@@ -462,8 +504,10 @@ class SavingPotential(BaseModel):
 
 # ========== 配电图 ==========
 
+
 class DistributionNode(BaseModel):
     """配电节点"""
+
     device_id: int
     device_code: str
     device_name: str
@@ -476,6 +520,7 @@ class DistributionNode(BaseModel):
 
 class DistributionDiagram(BaseModel):
     """配电图数据"""
+
     root: DistributionNode
     total_power: float
     timestamp: datetime
@@ -483,8 +528,10 @@ class DistributionDiagram(BaseModel):
 
 # ========== 变压器及计量点层级展示（需量配置） ==========
 
+
 class MeterPointDemandInfo(BaseModel):
     """计量点需量信息（用于需量配置页面展示）"""
+
     id: int
     meter_name: str
     meter_code: str
@@ -498,6 +545,7 @@ class MeterPointDemandInfo(BaseModel):
 
 class TransformerWithMeterPointsResponse(BaseModel):
     """变压器及下属计量点（引用配电拓扑关系，用于需量配置展示）"""
+
     id: int
     transformer_code: str
     transformer_name: str
@@ -515,8 +563,10 @@ class TransformerWithMeterPointsResponse(BaseModel):
 
 # ========== 变压器 ==========
 
+
 class TransformerBase(BaseModel):
     """变压器基础模型"""
+
     transformer_code: str = Field(..., description="变压器编码")
     transformer_name: str = Field(..., description="变压器名称")
     rated_capacity: float = Field(..., description="额定容量 kVA")
@@ -535,11 +585,13 @@ class TransformerBase(BaseModel):
 
 class TransformerCreate(TransformerBase):
     """创建变压器"""
+
     pass
 
 
 class TransformerUpdate(BaseModel):
     """更新变压器"""
+
     transformer_name: Optional[str] = None
     rated_capacity: Optional[float] = None
     voltage_high: Optional[float] = None
@@ -557,6 +609,7 @@ class TransformerUpdate(BaseModel):
 
 class TransformerResponse(TransformerBase):
     """变压器响应"""
+
     id: int
     is_enabled: bool
     created_at: datetime
@@ -568,8 +621,10 @@ class TransformerResponse(TransformerBase):
 
 # ========== 计量点 ==========
 
+
 class MeterPointBase(BaseModel):
     """计量点基础模型"""
+
     meter_code: str = Field(..., description="计量点编码")
     meter_name: str = Field(..., description="计量点名称")
     meter_no: Optional[str] = Field(None, description="电表号")
@@ -586,11 +641,13 @@ class MeterPointBase(BaseModel):
 
 class MeterPointCreate(MeterPointBase):
     """创建计量点"""
+
     pass
 
 
 class MeterPointUpdate(BaseModel):
     """更新计量点"""
+
     meter_name: Optional[str] = None
     meter_no: Optional[str] = None
     transformer_id: Optional[int] = None
@@ -608,6 +665,7 @@ class MeterPointUpdate(BaseModel):
 
 class MeterPointResponse(MeterPointBase):
     """计量点响应"""
+
     id: int
     status: str
     is_enabled: bool
@@ -620,14 +678,17 @@ class MeterPointResponse(MeterPointBase):
 
 class MeterPointDetail(MeterPointResponse):
     """计量点详情(含变压器信息)"""
+
     transformer_name: Optional[str] = None
     transformer_capacity: Optional[float] = None
 
 
 # ========== 配电柜 ==========
 
+
 class DistributionPanelBase(BaseModel):
     """配电柜基础模型"""
+
     panel_code: str = Field(..., description="配电柜编码")
     panel_name: str = Field(..., description="配电柜名称")
     panel_type: str = Field(..., description="类型: main/sub/ups_input/ups_output")
@@ -641,11 +702,13 @@ class DistributionPanelBase(BaseModel):
 
 class DistributionPanelCreate(DistributionPanelBase):
     """创建配电柜"""
+
     pass
 
 
 class DistributionPanelUpdate(BaseModel):
     """更新配电柜"""
+
     panel_name: Optional[str] = None
     panel_type: Optional[str] = None
     rated_current: Optional[float] = None
@@ -660,6 +723,7 @@ class DistributionPanelUpdate(BaseModel):
 
 class DistributionPanelResponse(DistributionPanelBase):
     """配电柜响应"""
+
     id: int
     status: str
     is_enabled: bool
@@ -672,8 +736,10 @@ class DistributionPanelResponse(DistributionPanelBase):
 
 # ========== 配电回路 ==========
 
+
 class DistributionCircuitBase(BaseModel):
     """配电回路基础模型"""
+
     circuit_code: str = Field(..., description="回路编码")
     circuit_name: str = Field(..., description="回路名称")
     panel_id: int = Field(..., description="所属配电柜ID")
@@ -687,11 +753,13 @@ class DistributionCircuitBase(BaseModel):
 
 class DistributionCircuitCreate(DistributionCircuitBase):
     """创建配电回路"""
+
     pass
 
 
 class DistributionCircuitUpdate(BaseModel):
     """更新配电回路"""
+
     circuit_name: Optional[str] = None
     rated_current: Optional[float] = None
     breaker_type: Optional[str] = None
@@ -704,6 +772,7 @@ class DistributionCircuitUpdate(BaseModel):
 
 class DistributionCircuitResponse(DistributionCircuitBase):
     """配电回路响应"""
+
     id: int
     is_enabled: bool
     created_at: datetime
@@ -715,8 +784,10 @@ class DistributionCircuitResponse(DistributionCircuitBase):
 
 # ========== 功率曲线 ==========
 
+
 class PowerCurvePoint(BaseModel):
     """功率曲线数据点"""
+
     timestamp: datetime
     meter_point_id: Optional[int] = None
     device_id: Optional[int] = None
@@ -729,6 +800,7 @@ class PowerCurvePoint(BaseModel):
 
 class PowerCurveQuery(BaseModel):
     """功率曲线查询参数"""
+
     start_time: datetime
     end_time: datetime
     meter_point_id: Optional[int] = None
@@ -738,6 +810,7 @@ class PowerCurveQuery(BaseModel):
 
 class PowerCurveResponse(BaseModel):
     """功率曲线响应"""
+
     meter_point_id: Optional[int] = None
     device_id: Optional[int] = None
     device_name: Optional[str] = None
@@ -749,8 +822,10 @@ class PowerCurveResponse(BaseModel):
 
 # ========== 需量历史 ==========
 
+
 class DemandHistoryItem(BaseModel):
     """需量历史记录"""
+
     month: str = Field(..., description="月份 YYYY-MM")
     declared_demand: float = Field(..., description="申报需量 kW")
     max_demand: float = Field(..., description="最大需量 kW")
@@ -763,6 +838,7 @@ class DemandHistoryItem(BaseModel):
 
 class DemandHistoryResponse(BaseModel):
     """需量历史响应"""
+
     meter_point_id: int
     meter_name: str
     declared_demand: float
@@ -771,8 +847,10 @@ class DemandHistoryResponse(BaseModel):
 
 # ========== 设备负荷转移分析 ==========
 
+
 class DeviceShiftPotential(BaseModel):
     """设备负荷转移潜力"""
+
     device_id: int
     device_name: str
     device_type: str
@@ -794,6 +872,7 @@ class DeviceShiftPotential(BaseModel):
 
 class DeviceShiftAnalysisResult(BaseModel):
     """设备负荷转移分析结果"""
+
     analysis_time: datetime
     total_devices: int
     shiftable_devices: int
@@ -805,8 +884,10 @@ class DeviceShiftAnalysisResult(BaseModel):
 
 # ========== 需量配置分析 ==========
 
+
 class DemandConfigAnalysisItem(BaseModel):
     """单个计量点需量配置分析"""
+
     meter_point_id: int
     meter_name: str
     declared_demand: float = Field(..., description="当前申报需量 kW")
@@ -824,6 +905,7 @@ class DemandConfigAnalysisItem(BaseModel):
 
 class DemandConfigAnalysisResult(BaseModel):
     """需量配置分析结果"""
+
     analysis_time: datetime
     total_meter_points: int
     over_declared_count: int = Field(..., description="申报过高数量")
@@ -835,8 +917,10 @@ class DemandConfigAnalysisResult(BaseModel):
 
 # ========== 配电系统拓扑 ==========
 
+
 class TopologyCircuitNode(BaseModel):
     """拓扑回路节点"""
+
     circuit_id: int
     circuit_code: str
     circuit_name: str
@@ -847,6 +931,7 @@ class TopologyCircuitNode(BaseModel):
 
 class TopologyPanelNode(BaseModel):
     """拓扑配电柜节点"""
+
     panel_id: int
     panel_code: str
     panel_name: str
@@ -856,6 +941,7 @@ class TopologyPanelNode(BaseModel):
 
 class TopologyMeterNode(BaseModel):
     """拓扑计量点节点"""
+
     meter_point_id: int
     meter_code: str
     meter_name: str
@@ -866,6 +952,7 @@ class TopologyMeterNode(BaseModel):
 
 class TopologyTransformerNode(BaseModel):
     """拓扑变压器节点"""
+
     transformer_id: int
     transformer_code: str
     transformer_name: str
@@ -875,6 +962,7 @@ class TopologyTransformerNode(BaseModel):
 
 class DistributionTopologyResponse(BaseModel):
     """配电系统拓扑响应"""
+
     transformers: List[TopologyTransformerNode]
     total_capacity: float = Field(..., description="总变压器容量 kVA")
     total_meter_points: int
@@ -883,8 +971,10 @@ class DistributionTopologyResponse(BaseModel):
 
 # ========== 设备点位配置 ==========
 
+
 class DevicePointConfig(BaseModel):
     """设备点位配置"""
+
     monitor_device_id: Optional[int] = Field(None, description="监控设备ID")
     power_point_id: Optional[int] = Field(None, description="功率点位ID")
     energy_point_id: Optional[int] = Field(None, description="电量点位ID")
@@ -895,6 +985,7 @@ class DevicePointConfig(BaseModel):
 
 class DevicePointConfigResponse(BaseModel):
     """设备点位配置响应"""
+
     device_id: int
     device_code: str
     device_name: str
@@ -904,6 +995,7 @@ class DevicePointConfigResponse(BaseModel):
 
 class DeviceRealtimeData(BaseModel):
     """设备实时数据"""
+
     device_id: int
     device_code: str
     device_name: str
@@ -920,8 +1012,10 @@ class DeviceRealtimeData(BaseModel):
 
 # ========== 设备负荷转移配置 ==========
 
+
 class DeviceShiftConfigCreate(BaseModel):
     """设备负荷转移配置创建"""
+
     is_shiftable: bool = Field(False, description="是否可转移")
     shiftable_power_ratio: float = Field(0, description="可转移功率比例 0-1")
     is_critical: bool = Field(False, description="是否关键负荷")
@@ -937,13 +1031,16 @@ class DeviceShiftConfigCreate(BaseModel):
 
 class DeviceShiftConfigResponse(DeviceShiftConfigCreate):
     """设备负荷转移配置响应"""
+
     device_id: int
 
 
 # ========== 设备典型日功率 Profile ==========
 
+
 class HourlyProfilePoint(BaseModel):
     """24小时典型日功率数据点"""
+
     hour: int = Field(..., ge=0, le=23, description="小时 0-23")
     avg_power: float = Field(..., description="平均功率 kW")
     max_power: float = Field(..., description="最大功率 kW")
@@ -953,6 +1050,7 @@ class HourlyProfilePoint(BaseModel):
 
 class TypicalDayProfileResponse(BaseModel):
     """设备典型日功率 Profile 响应"""
+
     device_id: int
     device_name: str
     device_type: str
@@ -964,8 +1062,10 @@ class TypicalDayProfileResponse(BaseModel):
 
 # ========== shiftable_power_ratio 推荐值 ==========
 
+
 class RatioRecommendation(BaseModel):
     """单个设备的 ratio 推荐"""
+
     device_id: int
     device_code: str
     device_name: str
@@ -983,6 +1083,7 @@ class RatioRecommendation(BaseModel):
 
 class RatioRecommendationResponse(BaseModel):
     """ratio 推荐响应"""
+
     total_devices: int
     devices_with_change: int
     recommendations: List[RatioRecommendation]
@@ -991,11 +1092,12 @@ class RatioRecommendationResponse(BaseModel):
 
 class BatchUpdateRatioRequest(BaseModel):
     """批量更新 ratio 请求"""
+
     device_ids: List[int] = Field(..., min_length=1, description="要更新的设备ID列表")
     use_recommended: bool = Field(True, description="是否使用推荐值")
     custom_ratios: Optional[Dict[int, float]] = Field(None, description="自定义 ratio 值 {device_id: ratio}")
 
-    @field_validator('custom_ratios')
+    @field_validator("custom_ratios")
     @classmethod
     def validate_ratios(cls, v):
         if v is not None:
@@ -1007,13 +1109,16 @@ class BatchUpdateRatioRequest(BaseModel):
 
 class UpdateSingleRatioRequest(BaseModel):
     """单个设备更新 ratio 请求"""
+
     ratio: float = Field(..., ge=0, le=1, description="新的 shiftable_power_ratio")
 
 
 # ========== 需量分析结果 ==========
 
+
 class DemandAnalysisResponse(BaseModel):
     """需量分析响应"""
+
     meter_point_id: int
     meter_name: str
     declared_demand: float
@@ -1032,8 +1137,10 @@ class DemandAnalysisResponse(BaseModel):
 
 # ========== 负荷转移分析结果 ==========
 
+
 class LoadShiftAnalysisResponse(BaseModel):
     """负荷转移分析响应"""
+
     analysis_time: datetime
     peak_valley_distribution: dict
     device_potentials: List[dict]
@@ -1044,16 +1151,20 @@ class LoadShiftAnalysisResponse(BaseModel):
 
 # ========== ECharts拓扑数据 ==========
 
+
 class EChartsTopologyResponse(BaseModel):
     """ECharts拓扑数据响应"""
+
     name: str
     children: List[dict] = Field(default_factory=list)
 
 
 # ========== V2.3 负荷调节 ==========
 
+
 class LoadRegulationConfigBase(BaseModel):
     """负荷调节配置基础模型"""
+
     device_id: int = Field(..., description="设备ID")
     regulation_type: str = Field(..., description="调节类型: temperature/brightness/mode/load")
     min_value: float = Field(..., description="最小可调值")
@@ -1071,12 +1182,14 @@ class LoadRegulationConfigBase(BaseModel):
 
 class LoadRegulationConfigCreate(LoadRegulationConfigBase):
     """创建负荷调节配置"""
+
     power_curve: Optional[List[dict]] = Field(None, description="功率曲线")
     is_auto: bool = Field(False, description="是否自动调节")
 
 
 class LoadRegulationConfigUpdate(BaseModel):
     """更新负荷调节配置"""
+
     min_value: Optional[float] = None
     max_value: Optional[float] = None
     current_value: Optional[float] = None
@@ -1093,6 +1206,7 @@ class LoadRegulationConfigUpdate(BaseModel):
 
 class LoadRegulationConfigResponse(LoadRegulationConfigBase):
     """负荷调节配置响应"""
+
     id: int
     power_curve: Optional[List[dict]] = None
     is_enabled: bool
@@ -1110,12 +1224,14 @@ class LoadRegulationConfigResponse(LoadRegulationConfigBase):
 
 class RegulationSimulateRequest(BaseModel):
     """调节模拟请求"""
+
     config_id: int = Field(..., description="配置ID")
     target_value: float = Field(..., description="目标值")
 
 
 class RegulationSimulateResponse(BaseModel):
     """调节模拟响应"""
+
     config_id: int
     device_id: int
     device_name: str
@@ -1131,6 +1247,7 @@ class RegulationSimulateResponse(BaseModel):
 
 class RegulationApplyRequest(BaseModel):
     """应用调节请求"""
+
     config_id: int = Field(..., description="配置ID")
     target_value: float = Field(..., description="目标值")
     reason: str = Field("manual", description="调节原因")
@@ -1139,6 +1256,7 @@ class RegulationApplyRequest(BaseModel):
 
 class RegulationHistoryResponse(BaseModel):
     """调节历史响应"""
+
     id: int
     config_id: int
     device_id: int
@@ -1160,6 +1278,7 @@ class RegulationHistoryResponse(BaseModel):
 
 class RegulationRecommendation(BaseModel):
     """调节建议"""
+
     config_id: int
     device_id: int
     device_name: str
@@ -1173,8 +1292,10 @@ class RegulationRecommendation(BaseModel):
 
 # ========== V2.3 需量分析 ==========
 
+
 class Demand15MinDataPoint(BaseModel):
     """15分钟需量数据点"""
+
     timestamp: datetime
     average_power: float = Field(..., description="15分钟平均功率 kW")
     max_power: Optional[float] = None
@@ -1187,6 +1308,7 @@ class Demand15MinDataPoint(BaseModel):
 
 class Demand15MinCurveResponse(BaseModel):
     """15分钟需量曲线响应"""
+
     meter_point_id: int
     meter_name: str
     declared_demand: float
@@ -1201,6 +1323,7 @@ class Demand15MinCurveResponse(BaseModel):
 
 class DemandPeakAnalysisResponse(BaseModel):
     """需量峰值分析响应"""
+
     meter_point_id: int
     meter_name: str
     declared_demand: float
@@ -1213,6 +1336,7 @@ class DemandPeakAnalysisResponse(BaseModel):
 
 class DemandOptimizationPlan(BaseModel):
     """需量优化方案"""
+
     meter_point_id: int
     meter_name: str
     current_declared: float
@@ -1228,6 +1352,7 @@ class DemandOptimizationPlan(BaseModel):
 
 class DemandForecastRequest(BaseModel):
     """需量预测请求"""
+
     meter_point_id: int
     forecast_days: int = Field(7, description="预测天数")
     include_regulation: bool = Field(False, description="是否包含调节效果")
@@ -1235,6 +1360,7 @@ class DemandForecastRequest(BaseModel):
 
 class DemandForecastResponse(BaseModel):
     """需量预测响应"""
+
     meter_point_id: int
     meter_name: str
     declared_demand: float
@@ -1246,8 +1372,10 @@ class DemandForecastResponse(BaseModel):
 
 # ========== V2.3 增强节能建议 ==========
 
+
 class SuggestionTemplate(BaseModel):
     """节能建议模板"""
+
     template_id: str
     template_name: str
     category: str = Field(..., description="类别: pue/cost/demand/efficiency")
@@ -1263,6 +1391,7 @@ class SuggestionTemplate(BaseModel):
 
 class EnhancedSuggestionResponse(BaseModel):
     """增强节能建议响应"""
+
     id: int
     rule_id: str
     rule_name: Optional[str]
@@ -1289,6 +1418,7 @@ class EnhancedSuggestionResponse(BaseModel):
 
 class SuggestionAnalyzeRequest(BaseModel):
     """触发建议分析请求"""
+
     categories: Optional[List[str]] = Field(None, description="分析类别")
     device_ids: Optional[List[int]] = Field(None, description="设备ID列表")
     force_refresh: bool = Field(False, description="强制刷新")
@@ -1296,6 +1426,7 @@ class SuggestionAnalyzeRequest(BaseModel):
 
 class SuggestionAnalyzeResponse(BaseModel):
     """建议分析响应"""
+
     analyzed_count: int
     new_suggestions: int
     updated_suggestions: int
@@ -1305,8 +1436,10 @@ class SuggestionAnalyzeResponse(BaseModel):
 
 # ========== V2.3 能耗仪表盘 ==========
 
+
 class EnergyDashboardRealtime(BaseModel):
     """实时能耗数据"""
+
     total_power: float = Field(..., description="总功率 kW")
     it_load: float = Field(..., description="IT负载 kW")
     cooling_load: float = Field(..., description="制冷负载 kW")
@@ -1316,6 +1449,7 @@ class EnergyDashboardRealtime(BaseModel):
 
 class EnergyDashboardEfficiency(BaseModel):
     """效率指标"""
+
     current_pue: float
     target_pue: float = Field(1.5, description="目标PUE")
     pue_trend: str = Field(..., description="趋势: up/down/stable")
@@ -1325,6 +1459,7 @@ class EnergyDashboardEfficiency(BaseModel):
 
 class EnergyDashboardDemand(BaseModel):
     """需量状态"""
+
     current_demand: float = Field(..., description="当前需量 kW")
     declared_demand: float = Field(..., description="申报需量 kW")
     utilization_rate: float = Field(..., description="利用率 %")
@@ -1334,6 +1469,7 @@ class EnergyDashboardDemand(BaseModel):
 
 class EnergyDashboardCost(BaseModel):
     """成本信息"""
+
     today_cost: float = Field(..., description="今日电费 元")
     month_cost: float = Field(..., description="本月电费 元")
     forecast_month_cost: float = Field(..., description="预测月电费 元")
@@ -1342,6 +1478,7 @@ class EnergyDashboardCost(BaseModel):
 
 class EnergyDashboardSuggestions(BaseModel):
     """建议概览"""
+
     total_count: int
     urgent_count: int
     high_count: int
@@ -1351,6 +1488,7 @@ class EnergyDashboardSuggestions(BaseModel):
 
 class EnergyDashboardResponse(BaseModel):
     """能耗仪表盘响应"""
+
     realtime: EnergyDashboardRealtime
     efficiency: EnergyDashboardEfficiency
     demand: EnergyDashboardDemand
@@ -1361,8 +1499,10 @@ class EnergyDashboardResponse(BaseModel):
 
 # ========== V2.5 节能中心机会管理 ==========
 
+
 class OpportunityMeasureBase(BaseModel):
     """机会措施基础模型"""
+
     measure_type: str = Field(..., description="措施类型")
     measure_name: Optional[str] = Field(None, description="措施名称")
     regulation_object: Optional[str] = Field(None, description="调节对象")
@@ -1379,11 +1519,13 @@ class OpportunityMeasureBase(BaseModel):
 
 class OpportunityMeasureCreate(OpportunityMeasureBase):
     """创建机会措施"""
+
     opportunity_id: int
 
 
 class OpportunityMeasureResponse(OpportunityMeasureBase):
     """机会措施响应"""
+
     id: int
     opportunity_id: int
     created_at: datetime
@@ -1395,6 +1537,7 @@ class OpportunityMeasureResponse(OpportunityMeasureBase):
 
 class EnergyOpportunityBase(BaseModel):
     """节能机会基础模型"""
+
     category: int = Field(..., description="分类: 1-电费结构/2-设备运行/3-设备改造/4-综合能效")
     title: str = Field(..., description="机会标题")
     description: Optional[str] = Field(None, description="机会描述")
@@ -1409,11 +1552,13 @@ class EnergyOpportunityBase(BaseModel):
 
 class EnergyOpportunityCreate(EnergyOpportunityBase):
     """创建节能机会"""
+
     pass
 
 
 class EnergyOpportunityUpdate(BaseModel):
     """更新节能机会"""
+
     title: Optional[str] = None
     description: Optional[str] = None
     priority: Optional[str] = None
@@ -1425,6 +1570,7 @@ class EnergyOpportunityUpdate(BaseModel):
 
 class EnergyOpportunityResponse(EnergyOpportunityBase):
     """节能机会响应"""
+
     id: int
     discovered_at: datetime
     created_at: datetime
@@ -1437,6 +1583,7 @@ class EnergyOpportunityResponse(EnergyOpportunityBase):
 
 class ExecutionTaskBase(BaseModel):
     """执行任务基础模型"""
+
     task_type: str = Field(..., description="任务类型")
     task_name: Optional[str] = Field(None, description="任务名称")
     target_object: Optional[str] = Field(None, description="目标对象")
@@ -1450,11 +1597,13 @@ class ExecutionTaskBase(BaseModel):
 
 class ExecutionTaskCreate(ExecutionTaskBase):
     """创建执行任务"""
+
     plan_id: int
 
 
 class ExecutionTaskUpdate(BaseModel):
     """更新执行任务"""
+
     status: Optional[str] = None
     assigned_to: Optional[str] = None
     scheduled_at: Optional[datetime] = None
@@ -1465,6 +1614,7 @@ class ExecutionTaskUpdate(BaseModel):
 
 class ExecutionTaskResponse(ExecutionTaskBase):
     """执行任务响应"""
+
     id: int
     plan_id: int
     executed_at: Optional[datetime]
@@ -1479,6 +1629,7 @@ class ExecutionTaskResponse(ExecutionTaskBase):
 
 class ExecutionResultBase(BaseModel):
     """执行结果基础模型"""
+
     tracking_period: int = Field(default=7, description="追踪周期(天)")
     tracking_start: Optional[date] = Field(None, description="开始日期")
     tracking_end: Optional[date] = Field(None, description="结束日期")
@@ -1495,11 +1646,13 @@ class ExecutionResultBase(BaseModel):
 
 class ExecutionResultCreate(ExecutionResultBase):
     """创建执行结果"""
+
     plan_id: int
 
 
 class ExecutionResultResponse(ExecutionResultBase):
     """执行结果响应"""
+
     id: int
     plan_id: int
     created_at: datetime
@@ -1511,6 +1664,7 @@ class ExecutionResultResponse(ExecutionResultBase):
 
 class ExecutionPlanBase(BaseModel):
     """执行计划基础模型"""
+
     plan_name: Optional[str] = Field(None, description="计划名称")
     expected_saving: Optional[float] = Field(None, description="预期年节省(元)")
     status: str = Field(default="pending", description="状态")
@@ -1519,12 +1673,14 @@ class ExecutionPlanBase(BaseModel):
 
 class ExecutionPlanCreate(ExecutionPlanBase):
     """创建执行计划"""
+
     opportunity_id: int
     created_by: Optional[int] = None
 
 
 class ExecutionPlanResponse(ExecutionPlanBase):
     """执行计划响应"""
+
     id: int
     opportunity_id: int
     started_at: Optional[datetime]
@@ -1541,8 +1697,10 @@ class ExecutionPlanResponse(ExecutionPlanBase):
 
 # ========== 仪表盘数据模型 ==========
 
+
 class OpportunitySummary(BaseModel):
     """机会概览"""
+
     id: int
     category: int
     title: str
@@ -1557,6 +1715,7 @@ class OpportunitySummary(BaseModel):
 
 class DashboardSummaryCards(BaseModel):
     """仪表盘概览卡片"""
+
     annual_potential_saving: float = Field(..., description="年度可节省(元)")
     pending_opportunities: int = Field(..., description="待处理机会数")
     executing_plans: int = Field(..., description="执行中任务数")
@@ -1565,6 +1724,7 @@ class DashboardSummaryCards(BaseModel):
 
 class DashboardResponse(BaseModel):
     """机会仪表盘响应"""
+
     summary_cards: DashboardSummaryCards
     opportunities: List[OpportunitySummary]
     by_category: Dict[str, List[OpportunitySummary]]
@@ -1573,14 +1733,17 @@ class DashboardResponse(BaseModel):
 
 # ========== 模拟请求/响应 ==========
 
+
 class SimulationRequest(BaseModel):
     """模拟请求"""
+
     simulation_type: str = Field(..., description="模拟类型")
     parameters: Dict = Field(..., description="模拟参数")
 
 
 class SimulationResponse(BaseModel):
     """模拟响应"""
+
     is_feasible: bool
     current_state: Dict
     simulated_state: Dict
@@ -1592,6 +1755,7 @@ class SimulationResponse(BaseModel):
 
 class DeviceCapability(BaseModel):
     """设备能力"""
+
     device_id: int
     device_name: str
     device_type: str
@@ -1609,6 +1773,7 @@ class DeviceCapability(BaseModel):
 
 class DeviceSelectionRequest(BaseModel):
     """设备选择请求"""
+
     selected_device_ids: List[int] = Field(..., description="选中的设备ID列表")
     target_power: Optional[float] = Field(None, description="目标功率 kW")
     target_hours: Optional[List[int]] = Field(None, description="目标时段")
@@ -1616,6 +1781,7 @@ class DeviceSelectionRequest(BaseModel):
 
 class DeviceSelectionResponse(BaseModel):
     """设备选择响应"""
+
     selected_count: int
     total_adjustable_power: float
     time_intersection: List[int] = Field(..., description="时段交集")
@@ -1625,8 +1791,10 @@ class DeviceSelectionResponse(BaseModel):
 
 # ========== V2.6 负荷转移执行计划 ==========
 
+
 class ShiftRule(BaseModel):
     """负荷转移规则"""
+
     source_period: str = Field(..., description="源时段: sharp/peak/flat")
     target_period: str = Field(..., description="目标时段: flat/valley/deep_valley")
     power: float = Field(..., description="转移功率 kW")
@@ -1635,6 +1803,7 @@ class ShiftRule(BaseModel):
 
 class DeviceShiftRule(BaseModel):
     """设备转移规则"""
+
     device_id: int = Field(..., description="设备ID")
     device_name: str = Field(..., description="设备名称")
     rules: List[ShiftRule] = Field(..., description="转移规则列表")
@@ -1642,6 +1811,7 @@ class DeviceShiftRule(BaseModel):
 
 class CreateLoadShiftPlanRequest(BaseModel):
     """创建负荷转移执行计划请求"""
+
     plan_name: str = Field(..., min_length=2, max_length=50, description="计划名称")
     strategy: str = Field(..., description="优化策略: max_benefit/min_cost")
     daily_saving: float = Field(..., description="预期日节省(元)")
@@ -1653,6 +1823,7 @@ class CreateLoadShiftPlanRequest(BaseModel):
 
 class CreateLoadShiftPlanResponse(BaseModel):
     """创建执行计划响应"""
+
     plan_id: int = Field(..., description="计划ID")
     opportunity_id: int = Field(..., description="机会ID")
     plan_name: str = Field(..., description="计划名称")
@@ -1662,8 +1833,10 @@ class CreateLoadShiftPlanResponse(BaseModel):
 
 # ========== V2.7 拓扑编辑功能 ==========
 
+
 class TopologyNodeType(str, Enum):
     """拓扑节点类型"""
+
     TRANSFORMER = "transformer"
     METER_POINT = "meter_point"
     PANEL = "panel"
@@ -1674,12 +1847,14 @@ class TopologyNodeType(str, Enum):
 
 class TopologyNodePosition(BaseModel):
     """拓扑节点位置"""
+
     x: float = Field(..., description="X坐标")
     y: float = Field(..., description="Y坐标")
 
 
 class TopologyNodeCreate(BaseModel):
     """创建拓扑节点"""
+
     node_type: TopologyNodeType = Field(..., description="节点类型")
     parent_id: Optional[int] = Field(None, description="父节点ID")
     parent_type: Optional[TopologyNodeType] = Field(None, description="父节点类型")
@@ -1727,6 +1902,7 @@ class TopologyNodeCreate(BaseModel):
 
 class TopologyNodeUpdate(BaseModel):
     """更新拓扑节点"""
+
     node_id: int = Field(..., description="节点ID")
     node_type: TopologyNodeType = Field(..., description="节点类型")
     position: Optional[TopologyNodePosition] = Field(None, description="节点位置")
@@ -1754,6 +1930,7 @@ class TopologyNodeUpdate(BaseModel):
 
 class TopologyNodeDelete(BaseModel):
     """删除拓扑节点"""
+
     node_id: int = Field(..., description="节点ID")
     node_type: TopologyNodeType = Field(..., description="节点类型")
     cascade: bool = Field(False, description="是否级联删除子节点")
@@ -1761,6 +1938,7 @@ class TopologyNodeDelete(BaseModel):
 
 class TopologyConnectionCreate(BaseModel):
     """创建拓扑连接"""
+
     source_id: int = Field(..., description="源节点ID")
     source_type: TopologyNodeType = Field(..., description="源节点类型")
     target_id: int = Field(..., description="目标节点ID")
@@ -1769,6 +1947,7 @@ class TopologyConnectionCreate(BaseModel):
 
 class TopologyConnectionDelete(BaseModel):
     """删除拓扑连接"""
+
     source_id: int = Field(..., description="源节点ID")
     source_type: TopologyNodeType = Field(..., description="源节点类型")
     target_id: int = Field(..., description="目标节点ID")
@@ -1777,6 +1956,7 @@ class TopologyConnectionDelete(BaseModel):
 
 class TopologyBatchOperation(BaseModel):
     """批量拓扑操作"""
+
     creates: List[TopologyNodeCreate] = Field(default_factory=list, description="创建操作列表")
     updates: List[TopologyNodeUpdate] = Field(default_factory=list, description="更新操作列表")
     deletes: List[TopologyNodeDelete] = Field(default_factory=list, description="删除操作列表")
@@ -1786,6 +1966,7 @@ class TopologyBatchOperation(BaseModel):
 
 class TopologyBatchResult(BaseModel):
     """批量操作结果"""
+
     success: bool = Field(..., description="是否全部成功")
     created_count: int = Field(0, description="创建数量")
     updated_count: int = Field(0, description="更新数量")
@@ -1798,6 +1979,7 @@ class TopologyBatchResult(BaseModel):
 
 class TopologyExport(BaseModel):
     """拓扑导出数据"""
+
     version: str = Field("1.0", description="导出版本")
     export_time: datetime = Field(..., description="导出时间")
     transformers: List[Dict] = Field(default_factory=list)
@@ -1810,6 +1992,7 @@ class TopologyExport(BaseModel):
 
 class TopologyImport(BaseModel):
     """拓扑导入数据"""
+
     version: str = Field(..., description="导入版本")
     clear_existing: bool = Field(False, description="是否清除现有数据")
     transformers: List[Dict] = Field(default_factory=list)
@@ -1822,8 +2005,10 @@ class TopologyImport(BaseModel):
 
 # ========== V2.7 设备测点配置 ==========
 
+
 class DevicePointType(str, Enum):
     """设备测点类型"""
+
     MEASUREMENT = "measurement"  # 测量点
     CONTROL = "control"  # 控制点
     STATUS = "status"  # 状态点
@@ -1832,6 +2017,7 @@ class DevicePointType(str, Enum):
 
 class DevicePointConfig(BaseModel):
     """设备测点配置"""
+
     point_code: str = Field(..., max_length=50, description="点位编码")
     point_name: str = Field(..., max_length=100, description="点位名称")
     point_type: str = Field("AI", description="点位类型: AI/DI/AO/DO")
@@ -1859,12 +2045,14 @@ class DevicePointConfig(BaseModel):
 
 class DevicePointConfigCreate(BaseModel):
     """创建设备测点"""
+
     energy_device_id: int = Field(..., description="用能设备ID")
     points: List[DevicePointConfig] = Field(..., description="测点列表")
 
 
 class DevicePointConfigUpdate(BaseModel):
     """更新设备测点"""
+
     point_id: Optional[int] = Field(None, description="测点ID")
     point_name: Optional[str] = Field(None, max_length=100)
     unit: Optional[str] = Field(None)
@@ -1884,6 +2072,7 @@ class DevicePointConfigUpdate(BaseModel):
 
 class DevicePointConfigResponse(BaseModel):
     """设备测点响应"""
+
     id: int
     energy_device_id: int
     point_code: str
@@ -1909,6 +2098,7 @@ class DevicePointConfigResponse(BaseModel):
 
 class TopologyNodeResponse(BaseModel):
     """拓扑节点响应"""
+
     id: int
     node_type: str
     code: str
@@ -1924,4 +2114,3 @@ class TopologyNodeResponse(BaseModel):
 
     class Config:
         from_attributes = True
-

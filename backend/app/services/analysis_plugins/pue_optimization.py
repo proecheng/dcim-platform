@@ -9,14 +9,7 @@ Analyzes data center PUE and provides energy efficiency optimization suggestions
 from typing import List
 import statistics
 
-from .base import (
-    AnalysisPlugin,
-    AnalysisContext,
-    SuggestionResult,
-    PluginConfig,
-    PluginPriority,
-    SuggestionType
-)
+from .base import AnalysisPlugin, AnalysisContext, SuggestionResult, PluginConfig, PluginPriority, SuggestionType
 
 
 class PUEOptimizationPlugin(AnalysisPlugin):
@@ -53,11 +46,11 @@ class PUEOptimizationPlugin(AnalysisPlugin):
             execution_order=50,
             min_data_days=7,
             thresholds={
-                'target_pue': 1.4,              # 目标PUE
-                'excellent_pue': 1.2,           # 优秀PUE
-                'poor_pue': 1.8,                # 较差PUE
-                'cooling_efficiency_threshold': 0.4  # 制冷占比阈值
-            }
+                "target_pue": 1.4,  # 目标PUE
+                "excellent_pue": 1.2,  # 优秀PUE
+                "poor_pue": 1.8,  # 较差PUE
+                "cooling_efficiency_threshold": 0.4,  # 制冷占比阈值
+            },
         )
 
     async def analyze(self, context: AnalysisContext) -> List[SuggestionResult]:
@@ -90,9 +83,9 @@ class PUEOptimizationPlugin(AnalysisPlugin):
         cooling_ratio = avg_cooling_power / avg_total_power if avg_total_power > 0 else 0.3
 
         thresholds = self._config.thresholds
-        target_pue = thresholds.get('target_pue', 1.4)
-        excellent_pue = thresholds.get('excellent_pue', 1.2)
-        poor_pue = thresholds.get('poor_pue', 1.8)
+        target_pue = thresholds.get("target_pue", 1.4)
+        excellent_pue = thresholds.get("excellent_pue", 1.2)
+        poor_pue = thresholds.get("poor_pue", 1.8)
 
         # 分析1: PUE水平评估
         if avg_pue > target_pue:
@@ -108,10 +101,11 @@ class PUEOptimizationPlugin(AnalysisPlugin):
 
             pue_level = "较差" if avg_pue > poor_pue else "一般" if avg_pue > target_pue else "良好"
 
-            results.append(self.create_suggestion(
-                title="降低数据中心PUE",
-                description=f"当前PUE {avg_pue:.2f} ({pue_level})，建议优化至 {target_pue:.1f}",
-                detail=f"""
+            results.append(
+                self.create_suggestion(
+                    title="降低数据中心PUE",
+                    description=f"当前PUE {avg_pue:.2f} ({pue_level})，建议优化至 {target_pue:.1f}",
+                    detail=f"""
 ## PUE分析报告
 
 ### 当前PUE状态
@@ -159,34 +153,36 @@ class PUEOptimizationPlugin(AnalysisPlugin):
 - 日节省电量: {daily_saving_kwh:.1f} kWh
 - 年节省电费: ¥{yearly_saving:.0f}
                 """.strip(),
-                estimated_saving=daily_saving_kwh * 365,
-                estimated_cost_saving=yearly_saving,
-                implementation_difficulty=3,
-                priority=PluginPriority.HIGH if avg_pue > poor_pue else PluginPriority.MEDIUM,
-                payback_period=6,  # 大部分措施6个月内见效
-                analysis_data={
-                    'avg_pue': avg_pue,
-                    'min_pue': min_pue,
-                    'max_pue': max_pue,
-                    'target_pue': target_pue,
-                    'pue_reduction': pue_reduction,
-                    'cooling_ratio': cooling_ratio,
-                    'daily_saving_kwh': daily_saving_kwh
-                },
-                confidence=85
-            ))
+                    estimated_saving=daily_saving_kwh * 365,
+                    estimated_cost_saving=yearly_saving,
+                    implementation_difficulty=3,
+                    priority=PluginPriority.HIGH if avg_pue > poor_pue else PluginPriority.MEDIUM,
+                    payback_period=6,  # 大部分措施6个月内见效
+                    analysis_data={
+                        "avg_pue": avg_pue,
+                        "min_pue": min_pue,
+                        "max_pue": max_pue,
+                        "target_pue": target_pue,
+                        "pue_reduction": pue_reduction,
+                        "cooling_ratio": cooling_ratio,
+                        "daily_saving_kwh": daily_saving_kwh,
+                    },
+                    confidence=85,
+                )
+            )
 
         # 分析2: 制冷效率分析
-        cooling_threshold = thresholds.get('cooling_efficiency_threshold', 0.4)
+        cooling_threshold = thresholds.get("cooling_efficiency_threshold", 0.4)
         if cooling_ratio > cooling_threshold:
             excess_cooling_ratio = cooling_ratio - cooling_threshold
             potential_saving = avg_cooling_power * excess_cooling_ratio / cooling_ratio
             yearly_saving = potential_saving * 24 * 365 * 0.8
 
-            results.append(self.create_suggestion(
-                title="优化制冷系统能耗",
-                description=f"制冷占比 {cooling_ratio:.1%}，高于建议值 {cooling_threshold:.1%}",
-                detail=f"""
+            results.append(
+                self.create_suggestion(
+                    title="优化制冷系统能耗",
+                    description=f"制冷占比 {cooling_ratio:.1%}，高于建议值 {cooling_threshold:.1%}",
+                    detail=f"""
 ## 制冷系统分析
 
 ### 当前状态
@@ -224,26 +220,28 @@ class PUEOptimizationPlugin(AnalysisPlugin):
 - 可节省制冷功率: {potential_saving:.1f} kW
 - 年节省电费: ¥{yearly_saving:.0f}
                 """.strip(),
-                estimated_saving=potential_saving * 24 * 365,
-                estimated_cost_saving=yearly_saving,
-                implementation_difficulty=3,
-                priority=PluginPriority.MEDIUM,
-                analysis_data={
-                    'cooling_power': avg_cooling_power,
-                    'it_power': avg_it_power,
-                    'cooling_ratio': cooling_ratio,
-                    'target_ratio': cooling_threshold,
-                    'potential_saving': potential_saving
-                },
-                confidence=80
-            ))
+                    estimated_saving=potential_saving * 24 * 365,
+                    estimated_cost_saving=yearly_saving,
+                    implementation_difficulty=3,
+                    priority=PluginPriority.MEDIUM,
+                    analysis_data={
+                        "cooling_power": avg_cooling_power,
+                        "it_power": avg_it_power,
+                        "cooling_ratio": cooling_ratio,
+                        "target_ratio": cooling_threshold,
+                        "potential_saving": potential_saving,
+                    },
+                    confidence=80,
+                )
+            )
 
         # 分析3: PUE波动分析
         if pue_std > 0.15:
-            results.append(self.create_suggestion(
-                title="改善PUE稳定性",
-                description=f"PUE波动较大 (标准差 {pue_std:.2f})，建议优化控制",
-                detail=f"""
+            results.append(
+                self.create_suggestion(
+                    title="改善PUE稳定性",
+                    description=f"PUE波动较大 (标准差 {pue_std:.2f})，建议优化控制",
+                    detail=f"""
 ## PUE波动分析
 
 ### 当前状态
@@ -275,15 +273,13 @@ class PUEOptimizationPlugin(AnalysisPlugin):
 - 提升运行稳定性
 - 间接节能约5%
                 """.strip(),
-                estimated_saving=avg_total_power * 24 * 0.05 * 365,
-                estimated_cost_saving=avg_total_power * 24 * 0.05 * 365 * 0.8,
-                implementation_difficulty=3,
-                priority=PluginPriority.LOW,
-                analysis_data={
-                    'pue_std': pue_std,
-                    'pue_range': max_pue - min_pue
-                },
-                confidence=70
-            ))
+                    estimated_saving=avg_total_power * 24 * 0.05 * 365,
+                    estimated_cost_saving=avg_total_power * 24 * 0.05 * 365 * 0.8,
+                    implementation_difficulty=3,
+                    priority=PluginPriority.LOW,
+                    analysis_data={"pue_std": pue_std, "pue_range": max_pue - min_pue},
+                    confidence=70,
+                )
+            )
 
         return results

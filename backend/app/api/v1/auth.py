@@ -1,6 +1,7 @@
 """
 认证 API - v1
 """
+
 import time
 import uuid
 from datetime import datetime, timedelta
@@ -33,15 +34,14 @@ DEFAULT_PASSWORD_POLICY = {
 
 async def _get_password_policy(db: AsyncSession) -> dict:
     """从 SystemConfig 获取密码策略，不存在则返回默认值"""
-    result = await db.execute(
-        select(SystemConfig).where(SystemConfig.config_group == "password_policy")
-    )
+    result = await db.execute(select(SystemConfig).where(SystemConfig.config_group == "password_policy"))
     configs = result.scalars().all()
     policy = DEFAULT_PASSWORD_POLICY.copy()
     for c in configs:
         if c.config_key in policy:
             policy[c.config_key] = int(c.config_value)
     return policy
+
 
 # 简单的内存速率限制器
 class RateLimiter:
@@ -67,6 +67,7 @@ class RateLimiter:
         remaining = self.window_seconds - (time.time() - oldest)
         return max(0, int(remaining))
 
+
 # 登录速率限制：每分钟最多5次尝试
 login_limiter = RateLimiter(max_attempts=5, window_seconds=60)
 
@@ -82,11 +83,7 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
 
 
 @router.post("/login", response_model=Token, summary="用户登录")
-async def login(
-    request: Request,
-    form_data: OAuth2PasswordRequestForm = Depends(),
-    db: AsyncSession = Depends(get_db)
-):
+async def login(request: Request, form_data: OAuth2PasswordRequestForm = Depends(), db: AsyncSession = Depends(get_db)):
     """
     用户登录获取访问令牌
     """
@@ -99,7 +96,7 @@ async def login(
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             detail=f"登录尝试过于频繁，请在{remaining}秒后重试",
-            headers={"Retry-After": str(remaining)}
+            headers={"Retry-After": str(remaining)},
         )
 
     # 查询用户
@@ -112,9 +109,7 @@ async def login(
 
     # 记录登录历史
     login_history = UserLoginHistory(
-        user_id=user.id if user else 0,
-        login_ip=client_ip,
-        user_agent=user_agent[:255] if user_agent else ""
+        user_id=user.id if user else 0, login_ip=client_ip, user_agent=user_agent[:255] if user_agent else ""
     )
 
     if not user or not verify_password(form_data.password, user.password_hash):
@@ -135,10 +130,7 @@ async def login(
         login_history.fail_reason = "用户已被禁用"
         db.add(login_history)
         await db.commit()
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="用户已被禁用"
-        )
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="用户已被禁用")
 
     # 登录成功
     login_history.status = "success"
@@ -146,11 +138,9 @@ async def login(
 
     # 更新用户登录信息
     await db.execute(
-        update(User).where(User.id == user.id).values(
-            last_login_at=datetime.now(),
-            last_login_ip=client_ip,
-            login_count=User.login_count + 1
-        )
+        update(User)
+        .where(User.id == user.id)
+        .values(last_login_at=datetime.now(), last_login_ip=client_ip, login_count=User.login_count + 1)
     )
 
     # 创建令牌（含 jti）
@@ -158,24 +148,21 @@ async def login(
 
     # 创建会话记录
     from ...models.user import UserSession
-    session_record = UserSession(
-        user_id=user.id,
-        token_jti=jti
-    )
+
+    session_record = UserSession(user_id=user.id, token_jti=jti)
     db.add(session_record)
 
     # 并发会话限制：最多3个活跃会话，超限踢出最早的
     MAX_SESSIONS = 3
     active_sessions_result = await db.execute(
-        select(UserSession).where(
-            UserSession.user_id == user.id,
-            UserSession.is_active == True
-        ).order_by(UserSession.created_at.asc())
+        select(UserSession)
+        .where(UserSession.user_id == user.id, UserSession.is_active == True)
+        .order_by(UserSession.created_at.asc())
     )
     active_sessions = active_sessions_result.scalars().all()
     # 加上刚创建的，如果超过限制则踢出最早的
     if len(active_sessions) > MAX_SESSIONS:
-        sessions_to_kick = active_sessions[:len(active_sessions) - MAX_SESSIONS]
+        sessions_to_kick = active_sessions[: len(active_sessions) - MAX_SESSIONS]
         for s in sessions_to_kick:
             s.is_active = False
 
@@ -196,7 +183,7 @@ async def login(
         access_token=access_token,
         token_type="bearer",
         expires_in=settings.access_token_expire_minutes * 60,
-        password_expired_warning=password_warning
+        password_expired_warning=password_warning,
     )
 
 
@@ -214,11 +201,7 @@ async def refresh_token(current_user: User = Depends(get_current_user)):
     刷新访问令牌
     """
     access_token, _jti = create_access_token(data={"sub": current_user.username})
-    return Token(
-        access_token=access_token,
-        token_type="bearer",
-        expires_in=settings.access_token_expire_minutes * 60
-    )
+    return Token(access_token=access_token, token_type="bearer", expires_in=settings.access_token_expire_minutes * 60)
 
 
 @router.get("/me", response_model=UserInfo, summary="获取当前用户信息")
@@ -237,30 +220,22 @@ async def get_me(current_user: User = Depends(get_current_user)):
         avatar=current_user.avatar,
         is_active=current_user.is_active,
         last_login_at=current_user.last_login_at,
-        created_at=current_user.created_at
+        created_at=current_user.created_at,
     )
 
 
 @router.put("/password", summary="修改密码")
 async def change_password(
-    data: PasswordChange,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    data: PasswordChange, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)
 ):
     """
     修改当前用户密码（含密码历史检查）
     """
     if not verify_password(data.old_password, current_user.password_hash):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="原密码错误"
-        )
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="原密码错误")
 
     if data.new_password != data.confirm_password:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="两次输入的新密码不一致"
-        )
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="两次输入的新密码不一致")
 
     # 获取密码策略
     policy = await _get_password_policy(db)
@@ -278,22 +253,20 @@ async def change_password(
         for record in history_records:
             if verify_password(data.new_password, record.password_hash):
                 raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=f"新密码不能与最近{history_count}次使用的密码相同"
+                    status_code=status.HTTP_400_BAD_REQUEST, detail=f"新密码不能与最近{history_count}次使用的密码相同"
                 )
 
     # 保存旧密码到历史
-    db.add(PasswordHistory(
-        user_id=current_user.id,
-        password_hash=current_user.password_hash
-    ))
+    db.add(PasswordHistory(user_id=current_user.id, password_hash=current_user.password_hash))
 
     # 更新密码
     await db.execute(
-        update(User).where(User.id == current_user.id).values(
+        update(User)
+        .where(User.id == current_user.id)
+        .values(
             password_hash=get_password_hash(data.new_password),
             password_changed_at=datetime.now(),
-            updated_at=datetime.now()
+            updated_at=datetime.now(),
         )
     )
     await db.commit()
@@ -302,30 +275,20 @@ async def change_password(
 
 
 @router.get("/permissions", summary="获取当前用户权限")
-async def get_permissions(
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
-):
+async def get_permissions(db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     """
     获取当前用户的权限列表
     """
     from ...models.user import RolePermission
-    result = await db.execute(
-        select(RolePermission.permission).where(RolePermission.role == current_user.role)
-    )
+
+    result = await db.execute(select(RolePermission.permission).where(RolePermission.role == current_user.role))
     permissions = [row[0] for row in result.all()]
 
-    return {
-        "role": current_user.role,
-        "permissions": permissions
-    }
+    return {"role": current_user.role, "permissions": permissions}
 
 
 @router.get("/password-policy", response_model=PasswordPolicyConfig, summary="获取密码策略")
-async def get_password_policy(
-    db: AsyncSession = Depends(get_db),
-    _: User = Depends(get_current_user)
-):
+async def get_password_policy(db: AsyncSession = Depends(get_db), _: User = Depends(get_current_user)):
     """
     获取当前密码策略配置
     """
@@ -335,18 +298,13 @@ async def get_password_policy(
 
 @router.put("/password-policy", response_model=PasswordPolicyConfig, summary="更新密码策略")
 async def update_password_policy(
-    data: PasswordPolicyConfig,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    data: PasswordPolicyConfig, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)
 ):
     """
     更新密码策略配置（仅管理员）
     """
     if current_user.role != "admin":
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="仅管理员可修改密码策略"
-        )
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="仅管理员可修改密码策略")
 
     policy_items = {
         "min_length": str(data.min_length),
@@ -357,24 +315,23 @@ async def update_password_policy(
 
     for key, value in policy_items.items():
         result = await db.execute(
-            select(SystemConfig).where(
-                SystemConfig.config_group == "password_policy",
-                SystemConfig.config_key == key
-            )
+            select(SystemConfig).where(SystemConfig.config_group == "password_policy", SystemConfig.config_key == key)
         )
         config = result.scalar_one_or_none()
         if config:
             config.config_value = value
             config.updated_at = datetime.now()
         else:
-            db.add(SystemConfig(
-                config_group="password_policy",
-                config_key=key,
-                config_value=value,
-                value_type="int",
-                description=f"密码策略-{key}",
-                is_editable=True
-            ))
+            db.add(
+                SystemConfig(
+                    config_group="password_policy",
+                    config_key=key,
+                    config_value=value,
+                    value_type="int",
+                    description=f"密码策略-{key}",
+                    is_editable=True,
+                )
+            )
 
     await db.commit()
     return data

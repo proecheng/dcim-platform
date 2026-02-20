@@ -1,6 +1,7 @@
 """
 阈值配置相关 Schema
 """
+
 from typing import Optional, List
 from datetime import datetime
 from pydantic import BaseModel, ConfigDict
@@ -8,6 +9,7 @@ from pydantic import BaseModel, ConfigDict
 
 class ThresholdCreate(BaseModel):
     """创建阈值配置"""
+
     point_id: int
     threshold_type: str  # high_high, high, low, low_low, equal, change
     threshold_value: Optional[float] = None
@@ -20,6 +22,7 @@ class ThresholdCreate(BaseModel):
 
 class ThresholdUpdate(BaseModel):
     """更新阈值配置"""
+
     threshold_type: Optional[str] = None
     threshold_value: Optional[float] = None
     alarm_level: Optional[str] = None
@@ -32,6 +35,7 @@ class ThresholdUpdate(BaseModel):
 
 class ThresholdInfo(BaseModel):
     """阈值配置信息"""
+
     model_config = ConfigDict(from_attributes=True)
 
     id: int
@@ -53,6 +57,7 @@ class ThresholdInfo(BaseModel):
 
 class ThresholdBatchCreate(BaseModel):
     """批量创建阈值配置"""
+
     point_ids: List[int]
     threshold_type: str
     threshold_value: Optional[float] = None
@@ -64,6 +69,7 @@ class ThresholdBatchCreate(BaseModel):
 
 class FourLevelThresholdItem(BaseModel):
     """单级阈值配置"""
+
     value: Optional[float] = None
     message: Optional[str] = None
     enabled: Optional[bool] = True
@@ -71,6 +77,7 @@ class FourLevelThresholdItem(BaseModel):
 
 class FourLevelThresholdCreate(BaseModel):
     """4级阈值一体化配置"""
+
     high_high: Optional[FourLevelThresholdItem] = None
     high: Optional[FourLevelThresholdItem] = None
     low: Optional[FourLevelThresholdItem] = None
@@ -81,5 +88,6 @@ class FourLevelThresholdCreate(BaseModel):
 
 class BatchByDeviceTypeCreate(BaseModel):
     """按设备类型批量配置阈值"""
+
     device_type: str
     thresholds: FourLevelThresholdCreate

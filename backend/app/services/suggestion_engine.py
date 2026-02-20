@@ -2,15 +2,13 @@
 节能建议引擎 V2.4
 数据驱动版本 - 从数据库查询真实电价和设备配置
 """
+
 from datetime import datetime
 from typing import List, Optional, Dict, Any
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..models.energy import (
-    EnergySuggestion, PowerDevice, PUEHistory,
-    EnergyDaily, MeterPoint
-)
+from ..models.energy import EnergySuggestion, PUEHistory, MeterPoint
 from .pricing_service import PricingService
 from .device_regulation_service import DeviceRegulationService
 
@@ -29,12 +27,8 @@ class SuggestionTemplate:
             "title": "机房PUE偏高，建议优化制冷系统",
             "problem": "当前PUE为{pue:.2f}，高于行业标准1.5",
             "analysis": "制冷功率占总功率{cooling_ratio:.1f}%，建议值应低于30%",
-            "measures": [
-                "提高空调设定温度至24-26℃",
-                "优化机房气流组织，消除热点",
-                "采用冷热通道封闭方案"
-            ],
-            "effect": "PUE可降至{target_pue:.2f}，年节电{saving_kwh:.0f}kWh"
+            "measures": ["提高空调设定温度至24-26℃", "优化机房气流组织，消除热点", "采用冷热通道封闭方案"],
+            "effect": "PUE可降至{target_pue:.2f}，年节电{saving_kwh:.0f}kWh",
         },
         "ac_temp_low": {
             "template_id": "ac_temp_low",
@@ -46,11 +40,8 @@ class SuggestionTemplate:
             "title": "空调温度设定过低，存在节能空间",
             "problem": "当前空调设定温度{ac_temp}℃，低于推荐值24℃",
             "analysis": "温度每升高1℃，制冷功率降低约6%",
-            "measures": [
-                "将空调温度调高至24℃",
-                "监测设备温度，确保安全"
-            ],
-            "effect": "制冷功率可降低{power_reduction:.1f}kW，月节省{monthly_saving:.0f}元"
+            "measures": ["将空调温度调高至24℃", "监测设备温度，确保安全"],
+            "effect": "制冷功率可降低{power_reduction:.1f}kW，月节省{monthly_saving:.0f}元",
         },
         "peak_ratio_high": {
             "template_id": "peak_ratio_high",
@@ -62,12 +53,8 @@ class SuggestionTemplate:
             "title": "峰时用电占比过高，建议错峰用电",
             "problem": "峰时用电占比{peak_ratio:.1f}%，电费成本高",
             "analysis": "峰谷电价差为{price_diff:.3f}元/kWh（数据来源：系统电价配置）",
-            "measures": [
-                "将非关键任务调整至谷时",
-                "优化设备启停时间",
-                "使用储能设备削峰填谷"
-            ],
-            "effect": "月电费可节省{cost_saving:.0f}元"
+            "measures": ["将非关键任务调整至谷时", "优化设备启停时间", "使用储能设备削峰填谷"],
+            "effect": "月电费可节省{cost_saving:.0f}元",
         },
         "demand_over": {
             "template_id": "demand_over",
@@ -79,11 +66,8 @@ class SuggestionTemplate:
             "title": "需量申报{status}，建议调整",
             "problem": "申报需量{declared}kW，实际最大需量{actual}kW，利用率{utilization:.1f}%",
             "analysis": "申报过高导致容量电费浪费；申报过低面临超需量罚款风险",
-            "measures": [
-                "建议申报需量调整为{recommended}kW",
-                "月容量电费差额{fee_diff:.0f}元"
-            ],
-            "effect": "年节省容量电费{annual_saving:.0f}元"
+            "measures": ["建议申报需量调整为{recommended}kW", "月容量电费差额{fee_diff:.0f}元"],
+            "effect": "年节省容量电费{annual_saving:.0f}元",
         },
         "device_idle": {
             "template_id": "device_idle",
@@ -95,13 +79,9 @@ class SuggestionTemplate:
             "title": "{device_name}长时间低负载运行",
             "problem": "设备负载率仅{load_rate:.1f}%，持续{duration}小时",
             "analysis": "空载功耗约为满载功耗的{idle_ratio:.0f}%，存在浪费",
-            "measures": [
-                "评估是否可关闭该设备",
-                "合并负载，提高设备利用率",
-                "启用设备节能模式"
-            ],
-            "effect": "可节省功耗{power_saving:.1f}kW，月节省{cost_saving:.0f}元"
-        }
+            "measures": ["评估是否可关闭该设备", "合并负载，提高设备利用率", "启用设备节能模式"],
+            "effect": "可节省功耗{power_saving:.1f}kW，月节省{cost_saving:.0f}元",
+        },
     }
 
 
@@ -123,15 +103,13 @@ class SuggestionEngineService:
                 "name": t["name"],
                 "category": t["category"],
                 "priority": t["priority"],
-                "difficulty": t["difficulty"]
+                "difficulty": t["difficulty"],
             }
             for t in self.templates.values()
         ]
 
     async def analyze_and_generate(
-        self,
-        categories: Optional[List[str]] = None,
-        force_refresh: bool = False
+        self, categories: Optional[List[str]] = None, force_refresh: bool = False
     ) -> Dict[str, Any]:
         """分析数据并生成建议"""
         # 收集分析数据 - 从数据库查询真实数据
@@ -170,7 +148,7 @@ class SuggestionEngineService:
             "new_suggestions": new_count,
             "updated_suggestions": updated_count,
             "categories_analyzed": list(set(analyzed_categories)),
-            "analysis_time": datetime.now()
+            "analysis_time": datetime.now(),
         }
 
     async def _collect_analysis_data(self) -> Dict[str, Any]:
@@ -214,15 +192,10 @@ class SuggestionEngineService:
         # 5. 获取数据来源信息
         pricing_source = await self.pricing_service.get_pricing_data_source()
         device_source = await self.device_service.get_regulation_data_source()
-        data["data_sources"] = {
-            "pricing": pricing_source,
-            "devices": device_source
-        }
+        data["data_sources"] = {"pricing": pricing_source, "devices": device_source}
 
         # 6. 获取最新PUE数据
-        pue_result = await self.db.execute(
-            select(PUEHistory).order_by(PUEHistory.record_time.desc()).limit(1)
-        )
+        pue_result = await self.db.execute(select(PUEHistory).order_by(PUEHistory.record_time.desc()).limit(1))
         pue_record = pue_result.scalar_one_or_none()
         if pue_record:
             data["pue"] = pue_record.pue
@@ -241,9 +214,7 @@ class SuggestionEngineService:
             data["cooling_power"] = 25
 
         # 7. 获取需量数据
-        meter_result = await self.db.execute(
-            select(MeterPoint).where(MeterPoint.is_enabled == True).limit(1)
-        )
+        meter_result = await self.db.execute(select(MeterPoint).where(MeterPoint.is_enabled == True).limit(1))
         meter = meter_result.scalar_one_or_none()
         if meter:
             data["declared"] = meter.declared_demand or 150
@@ -267,11 +238,7 @@ class SuggestionEngineService:
 
         return data
 
-    async def _generate_suggestion(
-        self,
-        template: Dict,
-        data: Dict[str, Any]
-    ) -> Optional[Dict]:
+    async def _generate_suggestion(self, template: Dict, data: Dict[str, Any]) -> Optional[Dict]:
         """根据模板生成建议 - 使用真实数据填充"""
         try:
             # 计算节能潜力
@@ -282,7 +249,7 @@ class SuggestionEngineService:
             if template["template_id"] == "pue_high":
                 target_pue = 1.5
                 current_pue = data.get("pue", 1.8)
-                total_power = data.get("total_power", 100)
+                data.get("total_power", 100)
                 it_power = data.get("it_power", 60)
                 if current_pue > target_pue:
                     current_total = it_power * current_pue
@@ -341,31 +308,23 @@ class SuggestionEngineService:
                 "problem_description": problem,
                 "analysis_detail": analysis,
                 "implementation_steps": [
-                    {"step": i + 1, "description": m, "duration": "1-2天"}
-                    for i, m in enumerate(template["measures"])
+                    {"step": i + 1, "description": m, "duration": "1-2天"} for i, m in enumerate(template["measures"])
                 ],
-                "expected_effect": {
-                    "description": effect,
-                    "saving_kwh": saving_kwh,
-                    "saving_cost": saving_cost
-                },
+                "expected_effect": {"description": effect, "saving_kwh": saving_kwh, "saving_cost": saving_cost},
                 "priority": template["priority"],
                 "difficulty": template["difficulty"],
                 "potential_saving": saving_kwh,
                 "potential_cost_saving": saving_cost,
-                "parameters": self._build_parameters(template["template_id"], data)
+                "parameters": self._build_parameters(template["template_id"], data),
             }
         except Exception as e:
             print(f"生成建议失败: {e}")
             import traceback
+
             traceback.print_exc()
             return None
 
-    async def _generate_peak_valley_suggestion(
-        self,
-        template: Dict,
-        data: Dict[str, Any]
-    ) -> Optional[Dict]:
+    async def _generate_peak_valley_suggestion(self, template: Dict, data: Dict[str, Any]) -> Optional[Dict]:
         """生成峰谷套利建议 - 使用真实数据"""
         pricing = data.get("pricing", {})
         shiftable_devices = data.get("shiftable_devices", [])
@@ -402,7 +361,7 @@ class SuggestionEngineService:
                 "min": 0.5,
                 "max": 8,
                 "step": 0.5,
-                "unit": "小时"
+                "unit": "小时",
             },
             {
                 "key": "selected_devices",
@@ -416,26 +375,26 @@ class SuggestionEngineService:
                         "shiftable_power": d["shiftable_power"],
                         "constraints": {
                             "allowed_hours": d.get("allowed_shift_hours", []),
-                            "max_duration": d.get("max_shift_duration")
-                        }
+                            "max_duration": d.get("max_shift_duration"),
+                        },
                     }
                     for d in shiftable_devices
-                ]
+                ],
             },
             {
                 "key": "source_period",
                 "name": "转出时段",
                 "type": "period_select",
                 "current_value": "sharp" if sharp_price > 0 else "peak",
-                "options": [p for p in time_periods if p["type"] in ["sharp", "peak"]]
+                "options": [p for p in time_periods if p["type"] in ["sharp", "peak"]],
             },
             {
                 "key": "target_period",
                 "name": "转入时段",
                 "type": "period_select",
                 "current_value": "valley",
-                "options": [p for p in time_periods if p["type"] in ["valley", "deep_valley", "normal"]]
-            }
+                "options": [p for p in time_periods if p["type"] in ["valley", "deep_valley", "normal"]],
+            },
         ]
 
         # 设备列表 - 使用真实数据
@@ -451,8 +410,8 @@ class SuggestionEngineService:
                 "constraints": {
                     "allowed_hours": d.get("allowed_shift_hours", []),
                     "forbidden_hours": d.get("forbidden_shift_hours", []),
-                    "min_runtime": d.get("min_continuous_runtime")
-                }
+                    "min_runtime": d.get("min_continuous_runtime"),
+                },
             }
             for d in shiftable_devices
         ]
@@ -461,7 +420,7 @@ class SuggestionEngineService:
         time_config = {
             "source_periods": pricing.get("sharp", []) + pricing.get("peak", []),
             "target_periods": pricing.get("valley", []) + pricing.get("deep_valley", []),
-            "all_periods": time_periods
+            "all_periods": time_periods,
         }
 
         # 计算公式 - 使用真实电价
@@ -471,14 +430,20 @@ class SuggestionEngineService:
                 "尖峰电价": f"{sharp_price} 元/kWh（来自系统设置-电价配置）" if sharp_price > 0 else "未配置",
                 "高峰电价": f"{peak_price} 元/kWh（来自系统设置-电价配置）",
                 "低谷电价": f"{valley_price} 元/kWh（来自系统设置-电价配置）",
-                "峰谷价差": f"{price_diff:.3f} 元/kWh"
+                "峰谷价差": f"{price_diff:.3f} 元/kWh",
             },
             "steps": [
-                {"step": 1, "desc": f"日转移电量 = {total_shiftable_power:.1f} kW × {default_shift_hours} h = {daily_energy:.1f} kWh"},
-                {"step": 2, "desc": f"价差 = {sharp_price if sharp_price > 0 else peak_price:.3f} - {valley_price:.3f} = {price_diff:.3f} 元/kWh"},
+                {
+                    "step": 1,
+                    "desc": f"日转移电量 = {total_shiftable_power:.1f} kW × {default_shift_hours} h = {daily_energy:.1f} kWh",
+                },
+                {
+                    "step": 2,
+                    "desc": f"价差 = {sharp_price if sharp_price > 0 else peak_price:.3f} - {valley_price:.3f} = {price_diff:.3f} 元/kWh",
+                },
                 {"step": 3, "desc": f"日收益 = {daily_energy:.1f} × {price_diff:.3f} = {daily_saving:.2f} 元"},
-                {"step": 4, "desc": f"年收益 = {daily_saving:.2f} × 300天 = {annual_saving:.2f} 元"}
-            ]
+                {"step": 4, "desc": f"年收益 = {daily_saving:.2f} × 300天 = {annual_saving:.2f} 元"},
+            ],
         }
 
         # 格式化模板
@@ -497,13 +462,12 @@ class SuggestionEngineService:
             "problem_description": problem,
             "analysis_detail": analysis,
             "implementation_steps": [
-                {"step": i + 1, "description": m, "duration": "1-2天"}
-                for i, m in enumerate(template["measures"])
+                {"step": i + 1, "description": m, "duration": "1-2天"} for i, m in enumerate(template["measures"])
             ],
             "expected_effect": {
                 "description": effect,
                 "saving_kwh": daily_energy * 30,
-                "saving_cost": annual_saving / 12
+                "saving_cost": annual_saving / 12,
             },
             "priority": template["priority"],
             "difficulty": template["difficulty"],
@@ -523,49 +487,48 @@ class SuggestionEngineService:
                 "calculation_formula": calculation_formula,
                 "default_shift_hours": default_shift_hours,
                 "daily_saving": daily_saving,
-                "annual_saving": annual_saving
-            }
+                "annual_saving": annual_saving,
+            },
         }
 
     def _build_parameters(self, template_id: str, data: Dict[str, Any]) -> Dict[str, Any]:
         """构建建议参数"""
         # 基础参数
-        params = {
-            "data_sources": data.get("data_sources", {}),
-            "analysis_time": datetime.now().isoformat()
-        }
+        params = {"data_sources": data.get("data_sources", {}), "analysis_time": datetime.now().isoformat()}
 
         # 根据模板类型添加特定参数
         if template_id == "pue_high":
-            params.update({
-                "current_pue": data.get("pue"),
-                "target_pue": data.get("target_pue", 1.5),
-                "cooling_ratio": data.get("cooling_ratio"),
-                "cooling_power": data.get("cooling_power"),
-                "it_power": data.get("it_power"),
-                "total_power": data.get("total_power")
-            })
+            params.update(
+                {
+                    "current_pue": data.get("pue"),
+                    "target_pue": data.get("target_pue", 1.5),
+                    "cooling_ratio": data.get("cooling_ratio"),
+                    "cooling_power": data.get("cooling_power"),
+                    "it_power": data.get("it_power"),
+                    "total_power": data.get("total_power"),
+                }
+            )
         elif template_id == "ac_temp_low":
-            params.update({
-                "current_temp": data.get("ac_temp"),
-                "target_temp": 24,
-                "adjustable_devices": data.get("adjustable_devices", [])
-            })
+            params.update(
+                {
+                    "current_temp": data.get("ac_temp"),
+                    "target_temp": 24,
+                    "adjustable_devices": data.get("adjustable_devices", []),
+                }
+            )
         elif template_id == "demand_over":
-            params.update({
-                "declared": data.get("declared"),
-                "actual": data.get("actual"),
-                "utilization": data.get("utilization"),
-                "recommended": data.get("recommended")
-            })
+            params.update(
+                {
+                    "declared": data.get("declared"),
+                    "actual": data.get("actual"),
+                    "utilization": data.get("utilization"),
+                    "recommended": data.get("recommended"),
+                }
+            )
 
         return params
 
-    async def recalculate_suggestion(
-        self,
-        suggestion_id: int,
-        params: Dict[str, Any]
-    ) -> Dict[str, Any]:
+    async def recalculate_suggestion(self, suggestion_id: int, params: Dict[str, Any]) -> Dict[str, Any]:
         """
         根据用户调整的参数重新计算节能效果
 
@@ -604,27 +567,26 @@ class SuggestionEngineService:
                 f"2. 日转移电量: {total_power:.1f} kW × {shift_hours} h = {daily_energy:.1f} kWh",
                 f"3. 电价差: {source_price:.3f} - {target_price:.3f} = {price_diff:.3f} 元/kWh",
                 f"4. 日收益: {daily_energy:.1f} × {price_diff:.3f} = {daily_saving:.2f} 元",
-                f"5. 年收益: {daily_saving:.2f} × 300天 = {annual_saving:.2f} 元"
+                f"5. 年收益: {daily_saving:.2f} × 300天 = {annual_saving:.2f} 元",
             ],
             "effects": {
                 "daily_energy_kwh": round(daily_energy, 2),
                 "daily_saving_yuan": round(daily_saving, 2),
                 "annual_saving_yuan": round(annual_saving, 2),
-                "annual_saving_wan": round(annual_saving / 10000, 4)
+                "annual_saving_wan": round(annual_saving / 10000, 4),
             },
             "pricing_used": {
                 "source": {"period": params.get("source_period"), "price": source_price},
-                "target": {"period": params.get("target_period"), "price": target_price}
+                "target": {"period": params.get("target_period"), "price": target_price},
             },
-            "devices_used": selected_devices
+            "devices_used": selected_devices,
         }
 
     async def _find_existing_suggestion(self, template_id: str) -> Optional[EnergySuggestion]:
         """查找已存在的建议"""
         result = await self.db.execute(
             select(EnergySuggestion).where(
-                EnergySuggestion.template_id == template_id,
-                EnergySuggestion.status == "pending"
+                EnergySuggestion.template_id == template_id, EnergySuggestion.status == "pending"
             )
         )
         return result.scalar_one_or_none()
@@ -646,7 +608,7 @@ class SuggestionEngineService:
             potential_saving=data["potential_saving"],
             potential_cost_saving=data["potential_cost_saving"],
             parameters=data["parameters"],
-            status="pending"
+            status="pending",
         )
         self.db.add(suggestion)
         return suggestion
@@ -664,11 +626,7 @@ class SuggestionEngineService:
         existing.updated_at = datetime.now()
 
     async def get_suggestions(
-        self,
-        category: Optional[str] = None,
-        priority: Optional[str] = None,
-        status: str = "pending",
-        limit: int = 50
+        self, category: Optional[str] = None, priority: Optional[str] = None, status: str = "pending", limit: int = 50
     ) -> List[EnergySuggestion]:
         """获取建议列表"""
         query = select(EnergySuggestion)
@@ -683,6 +641,7 @@ class SuggestionEngineService:
 
         if conditions:
             from sqlalchemy import and_
+
             query = query.where(and_(*conditions))
 
         query = query.order_by(EnergySuggestion.created_at.desc()).limit(limit)
@@ -691,9 +650,7 @@ class SuggestionEngineService:
 
     async def get_suggestion_detail(self, suggestion_id: int) -> Optional[Dict[str, Any]]:
         """获取建议详情 - 包含完整的调整参数和设备信息"""
-        result = await self.db.execute(
-            select(EnergySuggestion).where(EnergySuggestion.id == suggestion_id)
-        )
+        result = await self.db.execute(select(EnergySuggestion).where(EnergySuggestion.id == suggestion_id))
         suggestion = result.scalar_one_or_none()
 
         if not suggestion:
@@ -723,7 +680,7 @@ class SuggestionEngineService:
                     "min": 0.5,
                     "max": 8,
                     "step": 0.5,
-                    "unit": "小时"
+                    "unit": "小时",
                 },
                 {
                     "key": "selected_devices",
@@ -737,26 +694,26 @@ class SuggestionEngineService:
                             "shiftable_power": d["shiftable_power"],
                             "constraints": {
                                 "allowed_hours": d.get("allowed_shift_hours", []),
-                                "max_duration": d.get("max_shift_duration")
-                            }
+                                "max_duration": d.get("max_shift_duration"),
+                            },
                         }
                         for d in shiftable_devices
-                    ]
+                    ],
                 },
                 {
                     "key": "source_period",
                     "name": "转出时段",
                     "type": "period_select",
                     "current_value": "sharp" if sharp_price > 0 else "peak",
-                    "options": [p for p in time_periods if p.get("type") in ["sharp", "peak"]]
+                    "options": [p for p in time_periods if p.get("type") in ["sharp", "peak"]],
                 },
                 {
                     "key": "target_period",
                     "name": "转入时段",
                     "type": "period_select",
                     "current_value": "valley",
-                    "options": [p for p in time_periods if p.get("type") in ["valley", "deep_valley", "normal"]]
-                }
+                    "options": [p for p in time_periods if p.get("type") in ["valley", "deep_valley", "normal"]],
+                },
             ]
 
         # 如果数据库参数中没有 devices，从实时数据生成
@@ -773,8 +730,8 @@ class SuggestionEngineService:
                     "constraints": {
                         "allowed_hours": d.get("allowed_shift_hours", []),
                         "forbidden_hours": d.get("forbidden_shift_hours", []),
-                        "min_runtime": d.get("min_continuous_runtime")
-                    }
+                        "min_runtime": d.get("min_continuous_runtime"),
+                    },
                 }
                 for d in shiftable_devices
             ]
@@ -798,14 +755,20 @@ class SuggestionEngineService:
                     "尖峰电价": f"{sharp_price} 元/kWh（来自系统设置-电价配置）" if sharp_price > 0 else "未配置",
                     "高峰电价": f"{peak_price} 元/kWh（来自系统设置-电价配置）",
                     "低谷电价": f"{valley_price} 元/kWh（来自系统设置-电价配置）",
-                    "峰谷价差": f"{price_diff:.3f} 元/kWh"
+                    "峰谷价差": f"{price_diff:.3f} 元/kWh",
                 },
                 "steps": [
-                    {"step": 1, "desc": f"日转移电量 = {total_shiftable_power:.1f} kW × {default_shift_hours} h = {daily_energy:.1f} kWh"},
-                    {"step": 2, "desc": f"价差 = {sharp_price if sharp_price > 0 else peak_price:.3f} - {valley_price:.3f} = {price_diff:.3f} 元/kWh"},
+                    {
+                        "step": 1,
+                        "desc": f"日转移电量 = {total_shiftable_power:.1f} kW × {default_shift_hours} h = {daily_energy:.1f} kWh",
+                    },
+                    {
+                        "step": 2,
+                        "desc": f"价差 = {sharp_price if sharp_price > 0 else peak_price:.3f} - {valley_price:.3f} = {price_diff:.3f} 元/kWh",
+                    },
                     {"step": 3, "desc": f"日收益 = {daily_energy:.1f} × {price_diff:.3f} = {daily_saving:.2f} 元"},
-                    {"step": 4, "desc": f"年收益 = {daily_saving:.2f} × 300天 = {annual_saving:.2f} 元"}
-                ]
+                    {"step": 4, "desc": f"年收益 = {daily_saving:.2f} × 300天 = {annual_saving:.2f} 元"},
+                ],
             }
 
         # 填充缺失的电价信息
@@ -822,7 +785,9 @@ class SuggestionEngineService:
             enhanced_parameters["price_diff"] = (sharp if sharp > 0 else peak) - valley
 
         if not enhanced_parameters.get("total_shiftable_power"):
-            enhanced_parameters["total_shiftable_power"] = sum(d["shiftable_power"] for d in shiftable_devices) if shiftable_devices else 0
+            enhanced_parameters["total_shiftable_power"] = (
+                sum(d["shiftable_power"] for d in shiftable_devices) if shiftable_devices else 0
+            )
 
         # 构建详情响应
         detail = {
@@ -833,17 +798,20 @@ class SuggestionEngineService:
             "category": suggestion.category,
             "suggestion": suggestion.suggestion,
             "problem_description": suggestion.problem_description or "当前系统存在节能优化空间",
-            "analysis_detail": suggestion.analysis_detail or "通过分析系统运行数据，发现可通过优化用电策略降低能耗成本。",
-            "implementation_steps": suggestion.implementation_steps or [
+            "analysis_detail": suggestion.analysis_detail
+            or "通过分析系统运行数据，发现可通过优化用电策略降低能耗成本。",
+            "implementation_steps": suggestion.implementation_steps
+            or [
                 {"step": 1, "description": "分析当前用电模式", "duration": "1天"},
                 {"step": 2, "description": "制定优化方案", "duration": "1-2天"},
                 {"step": 3, "description": "实施优化措施", "duration": "1-3天"},
-                {"step": 4, "description": "监控效果并调整", "duration": "持续"}
+                {"step": 4, "description": "监控效果并调整", "duration": "持续"},
             ],
-            "expected_effect": suggestion.expected_effect or {
-                "description": f"预计可节省用电成本",
+            "expected_effect": suggestion.expected_effect
+            or {
+                "description": "预计可节省用电成本",
                 "saving_kwh": suggestion.potential_saving or 0,
-                "saving_cost": suggestion.potential_cost_saving or 0
+                "saving_cost": suggestion.potential_cost_saving or 0,
             },
             "priority": suggestion.priority,
             "difficulty": suggestion.difficulty,
@@ -858,8 +826,8 @@ class SuggestionEngineService:
             "shiftable_devices": shiftable_devices,
             "data_sources": {
                 "pricing": await self.pricing_service.get_pricing_data_source(),
-                "devices": await self.device_service.get_regulation_data_source()
-            }
+                "devices": await self.device_service.get_regulation_data_source(),
+            },
         }
 
         return detail
@@ -868,29 +836,23 @@ class SuggestionEngineService:
         """获取建议汇总"""
         # 统计各状态数量
         result = await self.db.execute(
-            select(
-                EnergySuggestion.status,
-                func.count(EnergySuggestion.id)
-            ).group_by(EnergySuggestion.status)
+            select(EnergySuggestion.status, func.count(EnergySuggestion.id)).group_by(EnergySuggestion.status)
         )
         status_counts = {row[0]: row[1] for row in result.all()}
 
         # 统计各优先级数量
         result = await self.db.execute(
-            select(
-                EnergySuggestion.priority,
-                func.count(EnergySuggestion.id)
-            ).where(EnergySuggestion.status == "pending"
-            ).group_by(EnergySuggestion.priority)
+            select(EnergySuggestion.priority, func.count(EnergySuggestion.id))
+            .where(EnergySuggestion.status == "pending")
+            .group_by(EnergySuggestion.priority)
         )
         priority_counts = {row[0]: row[1] for row in result.all()}
 
         # 计算潜在节能量
         result = await self.db.execute(
-            select(
-                func.sum(EnergySuggestion.potential_saving),
-                func.sum(EnergySuggestion.potential_cost_saving)
-            ).where(EnergySuggestion.status == "pending")
+            select(func.sum(EnergySuggestion.potential_saving), func.sum(EnergySuggestion.potential_cost_saving)).where(
+                EnergySuggestion.status == "pending"
+            )
         )
         row = result.first()
         potential_saving = row[0] or 0
@@ -906,13 +868,11 @@ class SuggestionEngineService:
             "medium_count": priority_counts.get("medium", 0),
             "low_count": priority_counts.get("low", 0),
             "potential_saving_kwh": potential_saving,
-            "potential_saving_cost": potential_cost
+            "potential_saving_cost": potential_cost,
         }
 
     async def accept_suggestion_with_params(
-        self,
-        suggestion_id: int,
-        adjusted_params: Optional[Dict[str, Any]] = None
+        self, suggestion_id: int, adjusted_params: Optional[Dict[str, Any]] = None
     ) -> Optional[EnergySuggestion]:
         """
         接受建议并保存调整后的参数
@@ -924,9 +884,7 @@ class SuggestionEngineService:
         Returns:
             EnergySuggestion: 更新后的建议
         """
-        result = await self.db.execute(
-            select(EnergySuggestion).where(EnergySuggestion.id == suggestion_id)
-        )
+        result = await self.db.execute(select(EnergySuggestion).where(EnergySuggestion.id == suggestion_id))
         suggestion = result.scalar_one_or_none()
 
         if not suggestion:

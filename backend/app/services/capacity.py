@@ -4,21 +4,29 @@ Capacity Management Service
 
 提供空间、电力、制冷、承重容量管理及容量规划功能
 """
+
 from typing import List, Optional, Dict, Any, Tuple
 from datetime import datetime
 from sqlalchemy.orm import Session
-from sqlalchemy import func
 
 from ..models.capacity import (
-    SpaceCapacity, PowerCapacity, CoolingCapacity, WeightCapacity,
-    CapacityPlan, CapacityStatus
+    SpaceCapacity,
+    PowerCapacity,
+    CoolingCapacity,
+    WeightCapacity,
+    CapacityPlan,
+    CapacityStatus,
 )
 from ..schemas.capacity import (
-    SpaceCapacityCreate, SpaceCapacityUpdate,
-    PowerCapacityCreate, PowerCapacityUpdate,
-    CoolingCapacityCreate, CoolingCapacityUpdate,
-    WeightCapacityCreate, WeightCapacityUpdate,
-    CapacityPlanCreate
+    SpaceCapacityCreate,
+    SpaceCapacityUpdate,
+    PowerCapacityCreate,
+    PowerCapacityUpdate,
+    CoolingCapacityCreate,
+    CoolingCapacityUpdate,
+    WeightCapacityCreate,
+    WeightCapacityUpdate,
+    CapacityPlanCreate,
 )
 
 
@@ -27,13 +35,7 @@ class CapacityService:
 
     # ==================== 辅助方法 ====================
 
-    def _calculate_status(
-        self,
-        used: float,
-        total: float,
-        warning: float,
-        critical: float
-    ) -> CapacityStatus:
+    def _calculate_status(self, used: float, total: float, warning: float, critical: float) -> CapacityStatus:
         """
         根据使用率计算容量状态
 
@@ -60,11 +62,7 @@ class CapacityService:
 
         return CapacityStatus.normal
 
-    def _evaluate_feasibility(
-        self,
-        db: Session,
-        plan: CapacityPlan
-    ) -> Tuple[bool, str]:
+    def _evaluate_feasibility(self, db: Session, plan: CapacityPlan) -> Tuple[bool, str]:
         """
         评估容量规划的可行性
 
@@ -81,10 +79,7 @@ class CapacityService:
         # 检查空间容量（U位）
         if plan.required_u:
             space_capacities = db.query(SpaceCapacity).all()
-            total_available_u = sum(
-                (sc.total_u_positions or 0) - (sc.used_u_positions or 0)
-                for sc in space_capacities
-            )
+            total_available_u = sum((sc.total_u_positions or 0) - (sc.used_u_positions or 0) for sc in space_capacities)
             if total_available_u >= plan.required_u:
                 notes.append(f"空间容量检查通过: 可用U位 {total_available_u}U >= 所需 {plan.required_u}U")
             else:
@@ -95,39 +90,48 @@ class CapacityService:
         if plan.required_power_kw:
             power_capacities = db.query(PowerCapacity).all()
             total_available_power = sum(
-                (pc.total_capacity_kw or 0) - (pc.used_capacity_kw or 0)
-                for pc in power_capacities
+                (pc.total_capacity_kw or 0) - (pc.used_capacity_kw or 0) for pc in power_capacities
             )
             if total_available_power >= plan.required_power_kw:
-                notes.append(f"电力容量检查通过: 可用电力 {total_available_power:.2f}kW >= 所需 {plan.required_power_kw:.2f}kW")
+                notes.append(
+                    f"电力容量检查通过: 可用电力 {total_available_power:.2f}kW >= 所需 {plan.required_power_kw:.2f}kW"
+                )
             else:
-                notes.append(f"电力容量不足: 可用电力 {total_available_power:.2f}kW < 所需 {plan.required_power_kw:.2f}kW")
+                notes.append(
+                    f"电力容量不足: 可用电力 {total_available_power:.2f}kW < 所需 {plan.required_power_kw:.2f}kW"
+                )
                 is_feasible = False
 
         # 检查制冷容量
         if plan.required_cooling_kw:
             cooling_capacities = db.query(CoolingCapacity).all()
             total_available_cooling = sum(
-                (cc.total_cooling_kw or 0) - (cc.used_cooling_kw or 0)
-                for cc in cooling_capacities
+                (cc.total_cooling_kw or 0) - (cc.used_cooling_kw or 0) for cc in cooling_capacities
             )
             if total_available_cooling >= plan.required_cooling_kw:
-                notes.append(f"制冷容量检查通过: 可用制冷 {total_available_cooling:.2f}kW >= 所需 {plan.required_cooling_kw:.2f}kW")
+                notes.append(
+                    f"制冷容量检查通过: 可用制冷 {total_available_cooling:.2f}kW >= 所需 {plan.required_cooling_kw:.2f}kW"
+                )
             else:
-                notes.append(f"制冷容量不足: 可用制冷 {total_available_cooling:.2f}kW < 所需 {plan.required_cooling_kw:.2f}kW")
+                notes.append(
+                    f"制冷容量不足: 可用制冷 {total_available_cooling:.2f}kW < 所需 {plan.required_cooling_kw:.2f}kW"
+                )
                 is_feasible = False
 
         # 检查承重容量
         if plan.required_weight_kg:
             weight_capacities = db.query(WeightCapacity).all()
             total_available_weight = sum(
-                (wc.total_weight_kg or 0) - (wc.used_weight_kg or 0)
-                for wc in weight_capacities
+                (wc.total_weight_kg or 0) - (wc.used_weight_kg or 0) for wc in weight_capacities
             )
             if total_available_weight >= plan.required_weight_kg:
-                notes.append(f"承重容量检查通过: 可用承重 {total_available_weight:.2f}kg >= 所需 {plan.required_weight_kg:.2f}kg")
+                notes.append(
+                    f"承重容量检查通过: 可用承重 {total_available_weight:.2f}kg >= 所需 {plan.required_weight_kg:.2f}kg"
+                )
             else:
-                notes.append(f"承重容量不足: 可用承重 {total_available_weight:.2f}kg < 所需 {plan.required_weight_kg:.2f}kg")
+                notes.append(
+                    f"承重容量不足: 可用承重 {total_available_weight:.2f}kg < 所需 {plan.required_weight_kg:.2f}kg"
+                )
                 is_feasible = False
 
         if not notes:
@@ -137,12 +141,7 @@ class CapacityService:
 
     # ==================== 空间容量管理 ====================
 
-    def get_space_capacities(
-        self,
-        db: Session,
-        skip: int = 0,
-        limit: int = 100
-    ) -> List[SpaceCapacity]:
+    def get_space_capacities(self, db: Session, skip: int = 0, limit: int = 100) -> List[SpaceCapacity]:
         """
         获取空间容量列表
 
@@ -156,11 +155,7 @@ class CapacityService:
         """
         return db.query(SpaceCapacity).offset(skip).limit(limit).all()
 
-    def get_space_capacity(
-        self,
-        db: Session,
-        capacity_id: int
-    ) -> Optional[SpaceCapacity]:
+    def get_space_capacity(self, db: Session, capacity_id: int) -> Optional[SpaceCapacity]:
         """
         根据ID获取空间容量
 
@@ -173,11 +168,7 @@ class CapacityService:
         """
         return db.query(SpaceCapacity).filter(SpaceCapacity.id == capacity_id).first()
 
-    def create_space_capacity(
-        self,
-        db: Session,
-        data: SpaceCapacityCreate
-    ) -> SpaceCapacity:
+    def create_space_capacity(self, db: Session, data: SpaceCapacityCreate) -> SpaceCapacity:
         """
         创建空间容量
 
@@ -203,10 +194,7 @@ class CapacityService:
         return capacity
 
     def update_space_capacity(
-        self,
-        db: Session,
-        capacity_id: int,
-        data: SpaceCapacityUpdate
+        self, db: Session, capacity_id: int, data: SpaceCapacityUpdate
     ) -> Optional[SpaceCapacity]:
         """
         更新空间容量
@@ -240,11 +228,7 @@ class CapacityService:
         db.refresh(capacity)
         return capacity
 
-    def delete_space_capacity(
-        self,
-        db: Session,
-        capacity_id: int
-    ) -> bool:
+    def delete_space_capacity(self, db: Session, capacity_id: int) -> bool:
         """
         删除空间容量
 
@@ -265,12 +249,7 @@ class CapacityService:
 
     # ==================== 电力容量管理 ====================
 
-    def get_power_capacities(
-        self,
-        db: Session,
-        skip: int = 0,
-        limit: int = 100
-    ) -> List[PowerCapacity]:
+    def get_power_capacities(self, db: Session, skip: int = 0, limit: int = 100) -> List[PowerCapacity]:
         """
         获取电力容量列表
 
@@ -284,11 +263,7 @@ class CapacityService:
         """
         return db.query(PowerCapacity).offset(skip).limit(limit).all()
 
-    def get_power_capacity(
-        self,
-        db: Session,
-        capacity_id: int
-    ) -> Optional[PowerCapacity]:
+    def get_power_capacity(self, db: Session, capacity_id: int) -> Optional[PowerCapacity]:
         """
         根据ID获取电力容量
 
@@ -301,11 +276,7 @@ class CapacityService:
         """
         return db.query(PowerCapacity).filter(PowerCapacity.id == capacity_id).first()
 
-    def create_power_capacity(
-        self,
-        db: Session,
-        data: PowerCapacityCreate
-    ) -> PowerCapacity:
+    def create_power_capacity(self, db: Session, data: PowerCapacityCreate) -> PowerCapacity:
         """
         创建电力容量
 
@@ -331,10 +302,7 @@ class CapacityService:
         return capacity
 
     def update_power_capacity(
-        self,
-        db: Session,
-        capacity_id: int,
-        data: PowerCapacityUpdate
+        self, db: Session, capacity_id: int, data: PowerCapacityUpdate
     ) -> Optional[PowerCapacity]:
         """
         更新电力容量
@@ -368,11 +336,7 @@ class CapacityService:
         db.refresh(capacity)
         return capacity
 
-    def delete_power_capacity(
-        self,
-        db: Session,
-        capacity_id: int
-    ) -> bool:
+    def delete_power_capacity(self, db: Session, capacity_id: int) -> bool:
         """
         删除电力容量
 
@@ -393,12 +357,7 @@ class CapacityService:
 
     # ==================== 制冷容量管理 ====================
 
-    def get_cooling_capacities(
-        self,
-        db: Session,
-        skip: int = 0,
-        limit: int = 100
-    ) -> List[CoolingCapacity]:
+    def get_cooling_capacities(self, db: Session, skip: int = 0, limit: int = 100) -> List[CoolingCapacity]:
         """
         获取制冷容量列表
 
@@ -412,11 +371,7 @@ class CapacityService:
         """
         return db.query(CoolingCapacity).offset(skip).limit(limit).all()
 
-    def get_cooling_capacity(
-        self,
-        db: Session,
-        capacity_id: int
-    ) -> Optional[CoolingCapacity]:
+    def get_cooling_capacity(self, db: Session, capacity_id: int) -> Optional[CoolingCapacity]:
         """
         根据ID获取制冷容量
 
@@ -429,11 +384,7 @@ class CapacityService:
         """
         return db.query(CoolingCapacity).filter(CoolingCapacity.id == capacity_id).first()
 
-    def create_cooling_capacity(
-        self,
-        db: Session,
-        data: CoolingCapacityCreate
-    ) -> CoolingCapacity:
+    def create_cooling_capacity(self, db: Session, data: CoolingCapacityCreate) -> CoolingCapacity:
         """
         创建制冷容量
 
@@ -459,10 +410,7 @@ class CapacityService:
         return capacity
 
     def update_cooling_capacity(
-        self,
-        db: Session,
-        capacity_id: int,
-        data: CoolingCapacityUpdate
+        self, db: Session, capacity_id: int, data: CoolingCapacityUpdate
     ) -> Optional[CoolingCapacity]:
         """
         更新制冷容量
@@ -496,11 +444,7 @@ class CapacityService:
         db.refresh(capacity)
         return capacity
 
-    def delete_cooling_capacity(
-        self,
-        db: Session,
-        capacity_id: int
-    ) -> bool:
+    def delete_cooling_capacity(self, db: Session, capacity_id: int) -> bool:
         """
         删除制冷容量
 
@@ -521,12 +465,7 @@ class CapacityService:
 
     # ==================== 承重容量管理 ====================
 
-    def get_weight_capacities(
-        self,
-        db: Session,
-        skip: int = 0,
-        limit: int = 100
-    ) -> List[WeightCapacity]:
+    def get_weight_capacities(self, db: Session, skip: int = 0, limit: int = 100) -> List[WeightCapacity]:
         """
         获取承重容量列表
 
@@ -540,11 +479,7 @@ class CapacityService:
         """
         return db.query(WeightCapacity).offset(skip).limit(limit).all()
 
-    def get_weight_capacity(
-        self,
-        db: Session,
-        capacity_id: int
-    ) -> Optional[WeightCapacity]:
+    def get_weight_capacity(self, db: Session, capacity_id: int) -> Optional[WeightCapacity]:
         """
         根据ID获取承重容量
 
@@ -557,11 +492,7 @@ class CapacityService:
         """
         return db.query(WeightCapacity).filter(WeightCapacity.id == capacity_id).first()
 
-    def create_weight_capacity(
-        self,
-        db: Session,
-        data: WeightCapacityCreate
-    ) -> WeightCapacity:
+    def create_weight_capacity(self, db: Session, data: WeightCapacityCreate) -> WeightCapacity:
         """
         创建承重容量
 
@@ -587,10 +518,7 @@ class CapacityService:
         return capacity
 
     def update_weight_capacity(
-        self,
-        db: Session,
-        capacity_id: int,
-        data: WeightCapacityUpdate
+        self, db: Session, capacity_id: int, data: WeightCapacityUpdate
     ) -> Optional[WeightCapacity]:
         """
         更新承重容量
@@ -624,11 +552,7 @@ class CapacityService:
         db.refresh(capacity)
         return capacity
 
-    def delete_weight_capacity(
-        self,
-        db: Session,
-        capacity_id: int
-    ) -> bool:
+    def delete_weight_capacity(self, db: Session, capacity_id: int) -> bool:
         """
         删除承重容量
 
@@ -649,12 +573,7 @@ class CapacityService:
 
     # ==================== 容量规划管理 ====================
 
-    def get_capacity_plans(
-        self,
-        db: Session,
-        skip: int = 0,
-        limit: int = 100
-    ) -> List[CapacityPlan]:
+    def get_capacity_plans(self, db: Session, skip: int = 0, limit: int = 100) -> List[CapacityPlan]:
         """
         获取容量规划列表
 
@@ -668,11 +587,7 @@ class CapacityService:
         """
         return db.query(CapacityPlan).offset(skip).limit(limit).all()
 
-    def get_capacity_plan(
-        self,
-        db: Session,
-        plan_id: int
-    ) -> Optional[CapacityPlan]:
+    def get_capacity_plan(self, db: Session, plan_id: int) -> Optional[CapacityPlan]:
         """
         根据ID获取容量规划
 
@@ -685,11 +600,7 @@ class CapacityService:
         """
         return db.query(CapacityPlan).filter(CapacityPlan.id == plan_id).first()
 
-    def create_capacity_plan(
-        self,
-        db: Session,
-        data: CapacityPlanCreate
-    ) -> CapacityPlan:
+    def create_capacity_plan(self, db: Session, data: CapacityPlanCreate) -> CapacityPlan:
         """
         创建容量规划
 
@@ -713,11 +624,7 @@ class CapacityService:
         db.refresh(plan)
         return plan
 
-    def delete_capacity_plan(
-        self,
-        db: Session,
-        plan_id: int
-    ) -> bool:
+    def delete_capacity_plan(self, db: Session, plan_id: int) -> bool:
         """
         删除容量规划
 
@@ -757,7 +664,7 @@ class CapacityService:
             "used_u_positions": used_u,
             "available_u_positions": total_u - used_u,
             "usage_rate": round(used_u / total_u * 100, 2) if total_u > 0 else 0,
-            "count": len(space_capacities)
+            "count": len(space_capacities),
         }
 
         # 电力容量统计
@@ -769,7 +676,7 @@ class CapacityService:
             "used_capacity_kw": used_power,
             "available_capacity_kw": total_power - used_power,
             "usage_rate": round(used_power / total_power * 100, 2) if total_power > 0 else 0,
-            "count": len(power_capacities)
+            "count": len(power_capacities),
         }
 
         # 制冷容量统计
@@ -781,7 +688,7 @@ class CapacityService:
             "used_cooling_kw": used_cooling,
             "available_cooling_kw": total_cooling - used_cooling,
             "usage_rate": round(used_cooling / total_cooling * 100, 2) if total_cooling > 0 else 0,
-            "count": len(cooling_capacities)
+            "count": len(cooling_capacities),
         }
 
         # 承重容量统计
@@ -793,16 +700,11 @@ class CapacityService:
             "used_weight_kg": used_weight,
             "available_weight_kg": total_weight - used_weight,
             "usage_rate": round(used_weight / total_weight * 100, 2) if total_weight > 0 else 0,
-            "count": len(weight_capacities)
+            "count": len(weight_capacities),
         }
 
         # 状态统计
-        status_counts = {
-            "normal": 0,
-            "warning": 0,
-            "critical": 0,
-            "full": 0
-        }
+        status_counts = {"normal": 0, "warning": 0, "critical": 0, "full": 0}
 
         for sc in space_capacities:
             if sc.status:
@@ -824,9 +726,8 @@ class CapacityService:
             "weight": weight_stats,
             "status_summary": status_counts,
             "total_capacity_records": (
-                len(space_capacities) + len(power_capacities) +
-                len(cooling_capacities) + len(weight_capacities)
-            )
+                len(space_capacities) + len(power_capacities) + len(cooling_capacities) + len(weight_capacities)
+            ),
         }
 
 

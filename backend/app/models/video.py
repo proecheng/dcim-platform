@@ -2,6 +2,7 @@
 视频监控模型
 Story 10-1: 摄像头元数据管理
 """
+
 from datetime import datetime
 from sqlalchemy import Column, Integer, String, DateTime, Text, Boolean, ForeignKey
 
@@ -10,6 +11,7 @@ from ..core.database import Base
 
 class NVR(Base):
     """NVR 设备表"""
+
     __tablename__ = "nvrs"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -29,6 +31,7 @@ class NVR(Base):
 
 class Camera(Base):
     """摄像头表"""
+
     __tablename__ = "cameras"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -52,6 +55,7 @@ class Camera(Base):
 
 class CameraPreset(Base):
     """摄像头预置位表"""
+
     __tablename__ = "camera_presets"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -63,11 +67,14 @@ class CameraPreset(Base):
 
 class VideoEvent(Base):
     """视频事件表"""
+
     __tablename__ = "video_events"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     camera_id = Column(Integer, ForeignKey("cameras.id"), nullable=False, comment="关联摄像头")
-    event_type = Column(String(30), nullable=False, comment="事件类型: recording_start/recording_stop/ptz_control/preset_call")
+    event_type = Column(
+        String(30), nullable=False, comment="事件类型: recording_start/recording_stop/ptz_control/preset_call"
+    )
     trigger_source = Column(String(50), nullable=False, comment="触发来源: linkage/manual")
     alarm_id = Column(Integer, nullable=True, comment="关联告警ID")
     linkage_execution_id = Column(Integer, nullable=True, comment="关联联动执行ID")

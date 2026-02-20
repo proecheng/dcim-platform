@@ -2,6 +2,7 @@
 联动管理 API
 Story 9-1: 联动引擎核心框架
 """
+
 import asyncio
 import logging
 from datetime import datetime
@@ -13,13 +14,23 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, delete
 from sqlalchemy.orm import selectinload
 
-from ..deps import get_db, get_current_user, require_admin, require_operator, require_viewer
+from ..deps import get_db, require_admin, require_operator, require_viewer
 from ...models.user import User
-from ...models.linkage import LinkagePolicy, LinkageAction, LinkageExecution, LinkageLog, LinkageRecovery, LinkageRecoveryLog
+from ...models.linkage import (
+    LinkagePolicy,
+    LinkageAction,
+    LinkageExecution,
+    LinkageLog,
+    LinkageRecovery,
+    LinkageRecoveryLog,
+)
 from ...schemas.linkage import (
-    LinkagePolicyCreate, LinkagePolicyUpdate, LinkagePolicyResponse,
-    LinkageExecutionResponse, LinkagePolicyTestRequest, ActionTypeInfo,
-    RecoveryCreate, RecoveryResponse, RecoveryLogResponse,
+    LinkagePolicyCreate,
+    LinkagePolicyUpdate,
+    LinkagePolicyTestRequest,
+    ActionTypeInfo,
+    RecoveryCreate,
+    RecoveryResponse,
     TimelineReportResponse,
 )
 from ...engines.linkage_engine import linkage_engine
@@ -34,6 +45,7 @@ router = APIRouter()
 
 # ==================== 消防策略管理（静态路由必须在参数化路由之前）====================
 
+
 @router.post("/fire-protection/reload", response_model=dict)
 async def reload_fire_protection(
     db: AsyncSession = Depends(get_db),
@@ -41,6 +53,7 @@ async def reload_fire_protection(
 ):
     """重载 YAML 消防策略"""
     from ...services.fire_protection import reload as fp_reload
+
     count = await fp_reload(db)
     await linkage_engine.reload_policies()
     return {"message": f"消防策略重载完成，共 {count} 条", "count": count}
@@ -52,10 +65,12 @@ async def get_fire_protection_status(
 ):
     """获取消防策略加载状态"""
     from ...services.fire_protection import get_status
+
     return get_status()
 
 
 # ==================== 策略管理 ====================
+
 
 @router.get("/policies", response_model=dict)
 async def list_policies(
@@ -92,31 +107,33 @@ async def list_policies(
     for p in policies:
         actions = sorted(p.actions, key=lambda a: a.sort_order if a.sort_order is not None else 0) if p.actions else []
 
-        items.append({
-            "id": p.id,
-            "name": p.name,
-            "description": p.description,
-            "trigger_type": p.trigger_type,
-            "trigger_condition": p.trigger_condition,
-            "priority": p.priority,
-            "is_enabled": p.is_enabled,
-            "is_system": p.is_system,
-            "actions": [
-                {
-                    "id": a.id,
-                    "policy_id": a.policy_id,
-                    "action_type": a.action_type,
-                    "action_config": a.action_config,
-                    "sort_order": a.sort_order,
-                    "timeout_seconds": a.timeout_seconds,
-                    "retry_count": a.retry_count,
-                    "created_at": a.created_at.isoformat() if a.created_at is not None else None,
-                }
-                for a in actions
-            ],
-            "created_at": p.created_at.isoformat() if p.created_at is not None else None,
-            "updated_at": p.updated_at.isoformat() if p.updated_at is not None else None,
-        })
+        items.append(
+            {
+                "id": p.id,
+                "name": p.name,
+                "description": p.description,
+                "trigger_type": p.trigger_type,
+                "trigger_condition": p.trigger_condition,
+                "priority": p.priority,
+                "is_enabled": p.is_enabled,
+                "is_system": p.is_system,
+                "actions": [
+                    {
+                        "id": a.id,
+                        "policy_id": a.policy_id,
+                        "action_type": a.action_type,
+                        "action_config": a.action_config,
+                        "sort_order": a.sort_order,
+                        "timeout_seconds": a.timeout_seconds,
+                        "retry_count": a.retry_count,
+                        "created_at": a.created_at.isoformat() if a.created_at is not None else None,
+                    }
+                    for a in actions
+                ],
+                "created_at": p.created_at.isoformat() if p.created_at is not None else None,
+                "updated_at": p.updated_at.isoformat() if p.updated_at is not None else None,
+            }
+        )
 
     return {"items": items, "total": total, "page": page, "page_size": page_size}
 
@@ -128,9 +145,7 @@ async def get_policy(
     _: User = Depends(require_viewer),
 ):
     """获取联动策略详情"""
-    result = await db.execute(
-        select(LinkagePolicy).where(LinkagePolicy.id == policy_id)
-    )
+    result = await db.execute(select(LinkagePolicy).where(LinkagePolicy.id == policy_id))
     policy = result.scalar_one_or_none()
     if policy is None:
         raise HTTPException(status_code=404, detail="策略不存在")
@@ -211,9 +226,7 @@ async def update_policy(
     _: User = Depends(require_admin),
 ):
     """更新联动策略"""
-    result = await db.execute(
-        select(LinkagePolicy).where(LinkagePolicy.id == policy_id)
-    )
+    result = await db.execute(select(LinkagePolicy).where(LinkagePolicy.id == policy_id))
     policy = result.scalar_one_or_none()
     if policy is None:
         raise HTTPException(status_code=404, detail="策略不存在")
@@ -239,9 +252,7 @@ async def update_policy(
 
     # 如果提供了 actions，替换所有动作
     if data.actions is not None:
-        await db.execute(
-            delete(LinkageAction).where(LinkageAction.policy_id == policy_id)
-        )
+        await db.execute(delete(LinkageAction).where(LinkageAction.policy_id == policy_id))
         for action_data in data.actions:
             action = LinkageAction(
                 policy_id=policy_id,
@@ -266,9 +277,7 @@ async def delete_policy(
     _: User = Depends(require_admin),
 ):
     """删除联动策略"""
-    result = await db.execute(
-        select(LinkagePolicy).where(LinkagePolicy.id == policy_id)
-    )
+    result = await db.execute(select(LinkagePolicy).where(LinkagePolicy.id == policy_id))
     policy = result.scalar_one_or_none()
     if policy is None:
         raise HTTPException(status_code=404, detail="策略不存在")
@@ -277,9 +286,7 @@ async def delete_policy(
         raise HTTPException(status_code=403, detail="系统策略不允许删除")
 
     # 先删除动作
-    await db.execute(
-        delete(LinkageAction).where(LinkageAction.policy_id == policy_id)
-    )
+    await db.execute(delete(LinkageAction).where(LinkageAction.policy_id == policy_id))
     await db.delete(policy)
     await db.commit()
     await linkage_engine.reload_policies()
@@ -294,9 +301,7 @@ async def toggle_policy(
     _: User = Depends(require_operator),
 ):
     """切换策略启用状态"""
-    result = await db.execute(
-        select(LinkagePolicy).where(LinkagePolicy.id == policy_id)
-    )
+    result = await db.execute(select(LinkagePolicy).where(LinkagePolicy.id == policy_id))
     policy = result.scalar_one_or_none()
     if policy is None:
         raise HTTPException(status_code=404, detail="策略不存在")
@@ -316,9 +321,7 @@ async def test_policy(
     _: User = Depends(require_operator),
 ):
     """测试联动策略"""
-    result = await db.execute(
-        select(LinkagePolicy).where(LinkagePolicy.id == policy_id)
-    )
+    result = await db.execute(select(LinkagePolicy).where(LinkagePolicy.id == policy_id))
     policy = result.scalar_one_or_none()
     if policy is None:
         raise HTTPException(status_code=404, detail="策略不存在")
@@ -340,6 +343,7 @@ async def test_policy(
 
 
 # ==================== 执行记录 ====================
+
 
 @router.get("/executions", response_model=dict)
 async def list_executions(
@@ -385,30 +389,31 @@ async def list_executions(
     items = []
     for e in executions:
         # 获取策略名称
-        policy_result = await db.execute(
-            select(LinkagePolicy.name).where(LinkagePolicy.id == e.policy_id)
-        )
+        policy_result = await db.execute(select(LinkagePolicy.name).where(LinkagePolicy.id == e.policy_id))
         policy_name = policy_result.scalar_one_or_none()
 
-        items.append({
-            "id": e.id,
-            "policy_id": e.policy_id,
-            "policy_name": policy_name,
-            "event_id": e.event_id,
-            "trigger_source": e.trigger_source,
-            "trigger_event": e.trigger_event,
-            "status": e.status,
-            "started_at": e.started_at.isoformat() if e.started_at is not None else None,
-            "completed_at": e.completed_at.isoformat() if e.completed_at is not None else None,
-            "total_duration_ms": e.total_duration_ms,
-            "logs": [],
-        })
+        items.append(
+            {
+                "id": e.id,
+                "policy_id": e.policy_id,
+                "policy_name": policy_name,
+                "event_id": e.event_id,
+                "trigger_source": e.trigger_source,
+                "trigger_event": e.trigger_event,
+                "status": e.status,
+                "started_at": e.started_at.isoformat() if e.started_at is not None else None,
+                "completed_at": e.completed_at.isoformat() if e.completed_at is not None else None,
+                "total_duration_ms": e.total_duration_ms,
+                "logs": [],
+            }
+        )
 
     return {"items": items, "total": total, "page": page, "page_size": page_size}
 
 
 # ==================== 事件时间线报告 (Story 9-5) ====================
 # 注意: timeline 静态路由必须在 executions/{execution_id} 参数化路由之前注册
+
 
 @router.get("/timeline/{execution_id}", response_model=TimelineReportResponse)
 async def get_event_timeline(
@@ -447,6 +452,7 @@ async def export_event_timeline(
 # ==================== 联动恢复: 可恢复列表 (Story 9-4) ====================
 # 注意: 静态路由必须在参数化路由之前注册
 
+
 @router.get("/executions/recoverable", response_model=dict)
 async def list_recoverable_executions(
     page: int = Query(1, ge=1),
@@ -462,12 +468,9 @@ async def list_recoverable_executions(
         .subquery()
     )
 
-    stmt = (
-        select(LinkageExecution)
-        .where(
-            LinkageExecution.status.in_(["completed", "partial_failure"]),
-            LinkageExecution.id.notin_(select(active_recovery_subq.c.execution_id)),
-        )
+    stmt = select(LinkageExecution).where(
+        LinkageExecution.status.in_(["completed", "partial_failure"]),
+        LinkageExecution.id.notin_(select(active_recovery_subq.c.execution_id)),
     )
 
     # 总数
@@ -482,24 +485,24 @@ async def list_recoverable_executions(
 
     items = []
     for e in executions:
-        policy_result = await db.execute(
-            select(LinkagePolicy.name).where(LinkagePolicy.id == e.policy_id)
-        )
+        policy_result = await db.execute(select(LinkagePolicy.name).where(LinkagePolicy.id == e.policy_id))
         policy_name = policy_result.scalar_one_or_none()
 
-        items.append({
-            "id": e.id,
-            "policy_id": e.policy_id,
-            "policy_name": policy_name,
-            "event_id": e.event_id,
-            "trigger_source": e.trigger_source,
-            "trigger_event": e.trigger_event,
-            "status": e.status,
-            "started_at": e.started_at.isoformat() if e.started_at is not None else None,
-            "completed_at": e.completed_at.isoformat() if e.completed_at is not None else None,
-            "total_duration_ms": e.total_duration_ms,
-            "logs": [],
-        })
+        items.append(
+            {
+                "id": e.id,
+                "policy_id": e.policy_id,
+                "policy_name": policy_name,
+                "event_id": e.event_id,
+                "trigger_source": e.trigger_source,
+                "trigger_event": e.trigger_event,
+                "status": e.status,
+                "started_at": e.started_at.isoformat() if e.started_at is not None else None,
+                "completed_at": e.completed_at.isoformat() if e.completed_at is not None else None,
+                "total_duration_ms": e.total_duration_ms,
+                "logs": [],
+            }
+        )
 
     return {"items": items, "total": total, "page": page, "page_size": page_size}
 
@@ -511,17 +514,13 @@ async def get_execution(
     _: User = Depends(require_viewer),
 ):
     """获取联动执行记录详情（含日志）"""
-    result = await db.execute(
-        select(LinkageExecution).where(LinkageExecution.id == execution_id)
-    )
+    result = await db.execute(select(LinkageExecution).where(LinkageExecution.id == execution_id))
     execution = result.scalar_one_or_none()
     if execution is None:
         raise HTTPException(status_code=404, detail="执行记录不存在")
 
     # 获取策略名称
-    policy_result = await db.execute(
-        select(LinkagePolicy.name).where(LinkagePolicy.id == execution.policy_id)
-    )
+    policy_result = await db.execute(select(LinkagePolicy.name).where(LinkagePolicy.id == execution.policy_id))
     policy_name = policy_result.scalar_one_or_none()
 
     # 获取日志
@@ -561,6 +560,7 @@ async def get_execution(
 
 # ==================== 联动恢复 (Story 9-4) ====================
 
+
 @router.post("/executions/{execution_id}/recover", response_model=dict)
 async def create_recovery(
     execution_id: int,
@@ -570,9 +570,7 @@ async def create_recovery(
 ):
     """发起联动恢复"""
     # 查找执行记录
-    result = await db.execute(
-        select(LinkageExecution).where(LinkageExecution.id == execution_id)
-    )
+    result = await db.execute(select(LinkageExecution).where(LinkageExecution.id == execution_id))
     execution = result.scalar_one_or_none()
     if execution is None:
         raise HTTPException(status_code=404, detail="执行记录不存在")
@@ -588,9 +586,7 @@ async def create_recovery(
         raise HTTPException(status_code=400, detail="该执行记录已有活跃的恢复任务")
 
     # 获取执行日志
-    logs_result = await db.execute(
-        select(LinkageLog).where(LinkageLog.execution_id == execution_id)
-    )
+    logs_result = await db.execute(select(LinkageLog).where(LinkageLog.execution_id == execution_id))
     logs = logs_result.scalars().all()
     log_dicts = [
         {
@@ -679,9 +675,7 @@ async def get_recovery(
 ):
     """获取恢复记录详情"""
     result = await db.execute(
-        select(LinkageRecovery)
-        .where(LinkageRecovery.id == recovery_id)
-        .options(selectinload(LinkageRecovery.logs))
+        select(LinkageRecovery).where(LinkageRecovery.id == recovery_id).options(selectinload(LinkageRecovery.logs))
     )
     recovery = result.scalar_one_or_none()
     if recovery is None:
@@ -718,6 +712,7 @@ async def skip_recovery_step(
 
 # ==================== 动作类型 ====================
 
+
 @router.get("/action-types", response_model=List[ActionTypeInfo])
 async def get_action_types(
     _: User = Depends(require_viewer),
@@ -739,10 +734,12 @@ async def get_action_types(
     result = []
     for info in registry.list_types():
         action_type = info["action_type"]
-        result.append(ActionTypeInfo(
-            action_type=action_type,
-            description=descriptions.get(action_type, action_type),
-            is_implemented=action_type in implemented,
-        ))
+        result.append(
+            ActionTypeInfo(
+                action_type=action_type,
+                description=descriptions.get(action_type, action_type),
+                is_implemented=action_type in implemented,
+            )
+        )
 
     return result

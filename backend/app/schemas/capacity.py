@@ -1,6 +1,7 @@
 """
 容量管理数据模型
 """
+
 from typing import Optional, List, Dict
 from pydantic import BaseModel, Field
 from datetime import datetime
@@ -10,8 +11,10 @@ from app.models.capacity import CapacityType, CapacityStatus
 
 # ==================== 空间容量 Schemas ====================
 
+
 class SpaceCapacityBase(BaseModel):
     """空间容量基础模型"""
+
     name: str = Field(..., description="名称")
     location: Optional[str] = Field(None, description="位置")
     total_area: Optional[float] = Field(None, description="总面积(平方米)")
@@ -26,11 +29,13 @@ class SpaceCapacityBase(BaseModel):
 
 class SpaceCapacityCreate(SpaceCapacityBase):
     """创建空间容量"""
+
     pass
 
 
 class SpaceCapacityUpdate(BaseModel):
     """更新空间容量"""
+
     name: Optional[str] = Field(None, description="名称")
     location: Optional[str] = Field(None, description="位置")
     total_area: Optional[float] = Field(None, description="总面积(平方米)")
@@ -45,6 +50,7 @@ class SpaceCapacityUpdate(BaseModel):
 
 class SpaceCapacityResponse(SpaceCapacityBase):
     """空间容量响应"""
+
     id: int = Field(..., description="ID")
     status: CapacityStatus = Field(CapacityStatus.normal, description="容量状态")
     usage_rate: Optional[float] = Field(None, description="使用率(%)")
@@ -57,8 +63,10 @@ class SpaceCapacityResponse(SpaceCapacityBase):
 
 # ==================== 电力容量 Schemas ====================
 
+
 class PowerCapacityBase(BaseModel):
     """电力容量基础模型"""
+
     name: str = Field(..., description="名称")
     location: Optional[str] = Field(None, description="位置")
     capacity_type: Optional[str] = Field(None, description="容量类型")
@@ -74,11 +82,13 @@ class PowerCapacityBase(BaseModel):
 
 class PowerCapacityCreate(PowerCapacityBase):
     """创建电力容量"""
+
     pass
 
 
 class PowerCapacityUpdate(BaseModel):
     """更新电力容量"""
+
     name: Optional[str] = Field(None, description="名称")
     location: Optional[str] = Field(None, description="位置")
     capacity_type: Optional[str] = Field(None, description="容量类型")
@@ -94,6 +104,7 @@ class PowerCapacityUpdate(BaseModel):
 
 class PowerCapacityResponse(PowerCapacityBase):
     """电力容量响应"""
+
     id: int = Field(..., description="ID")
     status: CapacityStatus = Field(CapacityStatus.normal, description="容量状态")
     usage_rate: Optional[float] = Field(None, description="使用率(%)")
@@ -106,8 +117,10 @@ class PowerCapacityResponse(PowerCapacityBase):
 
 # ==================== 制冷容量 Schemas ====================
 
+
 class CoolingCapacityBase(BaseModel):
     """制冷容量基础模型"""
+
     name: str = Field(..., description="名称")
     location: Optional[str] = Field(None, description="位置")
     total_cooling_kw: Optional[float] = Field(None, description="总制冷量(kW)")
@@ -122,11 +135,13 @@ class CoolingCapacityBase(BaseModel):
 
 class CoolingCapacityCreate(CoolingCapacityBase):
     """创建制冷容量"""
+
     pass
 
 
 class CoolingCapacityUpdate(BaseModel):
     """更新制冷容量"""
+
     name: Optional[str] = Field(None, description="名称")
     location: Optional[str] = Field(None, description="位置")
     total_cooling_kw: Optional[float] = Field(None, description="总制冷量(kW)")
@@ -141,6 +156,7 @@ class CoolingCapacityUpdate(BaseModel):
 
 class CoolingCapacityResponse(CoolingCapacityBase):
     """制冷容量响应"""
+
     id: int = Field(..., description="ID")
     status: CapacityStatus = Field(CapacityStatus.normal, description="容量状态")
     usage_rate: Optional[float] = Field(None, description="使用率(%)")
@@ -153,8 +169,10 @@ class CoolingCapacityResponse(CoolingCapacityBase):
 
 # ==================== 承重容量 Schemas ====================
 
+
 class WeightCapacityBase(BaseModel):
     """承重容量基础模型"""
+
     name: str = Field(..., description="名称")
     location: Optional[str] = Field(None, description="位置")
     capacity_type: Optional[str] = Field(None, description="容量类型")
@@ -166,11 +184,13 @@ class WeightCapacityBase(BaseModel):
 
 class WeightCapacityCreate(WeightCapacityBase):
     """创建承重容量"""
+
     pass
 
 
 class WeightCapacityUpdate(BaseModel):
     """更新承重容量"""
+
     name: Optional[str] = Field(None, description="名称")
     location: Optional[str] = Field(None, description="位置")
     capacity_type: Optional[str] = Field(None, description="容量类型")
@@ -182,6 +202,7 @@ class WeightCapacityUpdate(BaseModel):
 
 class WeightCapacityResponse(WeightCapacityBase):
     """承重容量响应"""
+
     id: int = Field(..., description="ID")
     status: CapacityStatus = Field(CapacityStatus.normal, description="容量状态")
     usage_rate: Optional[float] = Field(None, description="使用率(%)")
@@ -194,8 +215,10 @@ class WeightCapacityResponse(WeightCapacityBase):
 
 # ==================== 容量规划 Schemas ====================
 
+
 class CapacityPlanBase(BaseModel):
     """容量规划基础模型"""
+
     name: str = Field(..., description="规划名称")
     description: Optional[str] = Field(None, description="规划描述")
     device_count: Optional[int] = Field(None, description="设备数量")
@@ -208,11 +231,13 @@ class CapacityPlanBase(BaseModel):
 
 class CapacityPlanCreate(CapacityPlanBase):
     """创建容量规划"""
+
     created_by: Optional[str] = Field(None, description="创建人")
 
 
 class CapacityPlanResponse(CapacityPlanBase):
     """容量规划响应"""
+
     id: int = Field(..., description="ID")
     is_feasible: Optional[bool] = Field(None, description="是否可行")
     feasibility_notes: Optional[str] = Field(None, description="可行性说明")
@@ -226,8 +251,10 @@ class CapacityPlanResponse(CapacityPlanBase):
 
 # ==================== 容量统计 Schemas ====================
 
+
 class CapacityStatistics(BaseModel):
     """容量统计信息"""
+
     space: Dict[str, float] = Field(default_factory=dict, description="空间容量统计")
     power: Dict[str, float] = Field(default_factory=dict, description="电力容量统计")
     cooling: Dict[str, float] = Field(default_factory=dict, description="制冷容量统计")
@@ -236,6 +263,7 @@ class CapacityStatistics(BaseModel):
 
 class CapacityTrend(BaseModel):
     """容量趋势"""
+
     timestamps: List[datetime] = Field(default_factory=list, description="时间戳列表")
     values: List[float] = Field(default_factory=list, description="数值列表")
     capacity_type: CapacityType = Field(..., description="容量类型")
@@ -243,8 +271,10 @@ class CapacityTrend(BaseModel):
 
 # ==================== 智能上架推荐 Schemas ====================
 
+
 class RackingRecommendationRequest(BaseModel):
     """上架推荐请求"""
+
     required_u: int = Field(..., ge=1, description="所需U位数")
     required_power_kw: Optional[float] = Field(None, ge=0, description="所需电力(kW)")
     required_cooling_kw: Optional[float] = Field(None, ge=0, description="所需制冷量(kW)")
@@ -254,6 +284,7 @@ class RackingRecommendationRequest(BaseModel):
 
 class CabinetScore(BaseModel):
     """机柜评分"""
+
     cabinet_id: int = Field(..., description="机柜ID")
     cabinet_code: str = Field(..., description="机柜编码")
     cabinet_name: str = Field(..., description="机柜名称")
@@ -271,6 +302,7 @@ class CabinetScore(BaseModel):
 
 class RackingRecommendationResponse(BaseModel):
     """上架推荐响应"""
+
     request: RackingRecommendationRequest = Field(..., description="请求参数")
     candidates: List[CabinetScore] = Field(default_factory=list, description="候选机柜列表")
     total_cabinets_evaluated: int = Field(0, description="评估机柜总数")
@@ -279,8 +311,10 @@ class RackingRecommendationResponse(BaseModel):
 
 # ==================== 容量趋势预测 Schemas ====================
 
+
 class ExpansionSuggestion(BaseModel):
     """扩容建议"""
+
     capacity_type: str = Field(..., description="容量类型")
     current_usage_rate: float = Field(..., description="当前使用率(%)")
     predicted_exceed_date: str = Field(..., description="预计超阈值日期")
@@ -291,6 +325,7 @@ class ExpansionSuggestion(BaseModel):
 
 class CapacityTrendResponse(BaseModel):
     """容量趋势响应 — 对齐前端 getCapacityTrend 期望"""
+
     timestamps: List[str] = Field(default_factory=list, description="时间戳列表")
     total: List[float] = Field(default_factory=list, description="总量列表")
     used: List[float] = Field(default_factory=list, description="已用量列表")
@@ -299,6 +334,7 @@ class CapacityTrendResponse(BaseModel):
 
 class CapacityForecastResponse(BaseModel):
     """容量预测响应 — 对齐前端 getCapacityForecast 期望"""
+
     timestamps: List[str] = Field(default_factory=list, description="时间戳列表")
     predicted_usage: List[float] = Field(default_factory=list, description="预测使用率(%)")
     confidence_upper: List[float] = Field(default_factory=list, description="置信区间上界(%)")

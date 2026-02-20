@@ -2,7 +2,7 @@
 
 import json
 import logging
-from typing import Any, Optional
+from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -18,6 +18,7 @@ class RedisService:
         """创建 Redis 连接池"""
         try:
             import redis.asyncio as aioredis
+
             self._pool = aioredis.from_url(
                 redis_url,
                 decode_responses=True,

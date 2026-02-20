@@ -2,6 +2,7 @@
 控制命令分级确认 Schema
 Story 9-6: 控制命令分级确认
 """
+
 from datetime import datetime
 from typing import Optional, List
 
@@ -10,8 +11,10 @@ from pydantic import BaseModel, ConfigDict
 
 # ==================== 命令提交 ====================
 
+
 class CommandSubmitRequest(BaseModel):
     """提交控制命令请求"""
+
     command_type: str  # 命令类型标识: ac_temp_set, power_off 等
     target_device_id: int
     target_device_name: str
@@ -20,6 +23,7 @@ class CommandSubmitRequest(BaseModel):
 
 class CommandSubmitResponse(BaseModel):
     """提交控制命令响应"""
+
     status: str  # executed / pending_approval
     message: str
     approval_id: Optional[int] = None
@@ -28,8 +32,10 @@ class CommandSubmitResponse(BaseModel):
 
 # ==================== 审批工单 ====================
 
+
 class CommandApprovalResponse(BaseModel):
     """审批工单响应"""
+
     model_config = ConfigDict(from_attributes=True)
 
     id: int
@@ -53,13 +59,16 @@ class CommandApprovalResponse(BaseModel):
 
 class ApprovalRejectRequest(BaseModel):
     """驳回审批请求"""
+
     reason: str
 
 
 # ==================== 审计日志 ====================
 
+
 class CommandAuditLogResponse(BaseModel):
     """命令审计日志响应"""
+
     model_config = ConfigDict(from_attributes=True)
 
     id: int
@@ -78,8 +87,10 @@ class CommandAuditLogResponse(BaseModel):
 
 # ==================== 风险配置 ====================
 
+
 class RiskConfigItem(BaseModel):
     """单条风险配置"""
+
     command_type: str
     risk_level: str  # normal / critical
     description: Optional[str] = None
@@ -87,4 +98,5 @@ class RiskConfigItem(BaseModel):
 
 class RiskConfigUpdateRequest(BaseModel):
     """批量更新风险配置请求"""
+
     configs: List[RiskConfigItem]

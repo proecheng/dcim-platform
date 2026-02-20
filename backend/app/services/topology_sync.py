@@ -2,18 +2,15 @@
 拓扑同步服务
 负责拓扑变更时的数据同步、测点创建、数据模拟器更新等
 """
+
 from typing import List, Dict, Optional, Any
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, delete
 from datetime import datetime
 
-from app.models.energy import (
-    Transformer, MeterPoint, DistributionPanel, DistributionCircuit, PowerDevice
-)
+from app.models.energy import Transformer, MeterPoint, DistributionPanel, DistributionCircuit, PowerDevice
 from app.models.point import Point, PointRealtime
-from app.schemas.energy import (
-    TopologyNodeType, DevicePointConfig, DevicePointConfigCreate
-)
+from app.schemas.energy import TopologyNodeType, DevicePointConfig
 
 
 class TopologySyncService:
@@ -23,10 +20,7 @@ class TopologySyncService:
         self.db = db
 
     async def sync_device_points(
-        self,
-        device_id: int,
-        device_code: str,
-        points_config: List[DevicePointConfig]
+        self, device_id: int, device_code: str, points_config: List[DevicePointConfig]
     ) -> List[int]:
         """
         同步设备测点到点位管理模块
@@ -40,9 +34,7 @@ class TopologySyncService:
             创建的点位ID列表
         """
         # 获取设备信息以获取 device_type
-        device_result = await self.db.execute(
-            select(PowerDevice).where(PowerDevice.id == device_id)
-        )
+        device_result = await self.db.execute(select(PowerDevice).where(PowerDevice.id == device_id))
         device = device_result.scalar_one_or_none()
         device_type = device.device_type if device else "OTHER"
         area_code = device.area_code if device and device.area_code else "A1"
@@ -55,22 +47,20 @@ class TopologySyncService:
             if not point_code.startswith(device_code):
                 point_code = f"{device_code}_{point_config.point_code}"
 
-            result = await self.db.execute(
-                select(Point).where(Point.point_code == point_code)
-            )
+            result = await self.db.execute(select(Point).where(Point.point_code == point_code))
             existing_point = result.scalar_one_or_none()
 
             # 点位类型处理：支持字符串或枚举
             point_type_value = point_config.point_type
-            if hasattr(point_type_value, 'value'):
+            if hasattr(point_type_value, "value"):
                 point_type_value = point_type_value.value
 
             # 使用配置中的 device_type 和 area_code，如果没有则使用设备默认值
-            config_device_type = getattr(point_config, 'device_type', None) or device_type
-            config_area_code = getattr(point_config, 'area_code', None) or area_code
-            config_min_range = getattr(point_config, 'min_range', None)
-            config_max_range = getattr(point_config, 'max_range', None)
-            config_collect_interval = getattr(point_config, 'collect_interval', 10)
+            config_device_type = getattr(point_config, "device_type", None) or device_type
+            config_area_code = getattr(point_config, "area_code", None) or area_code
+            config_min_range = getattr(point_config, "min_range", None)
+            config_max_range = getattr(point_config, "max_range", None)
+            config_collect_interval = getattr(point_config, "collect_interval", 10)
 
             if existing_point:
                 # 更新现有点位
@@ -111,7 +101,7 @@ class TopologySyncService:
                     is_enabled=True,
                     energy_device_id=device_id,
                     created_at=datetime.now(),
-                    updated_at=datetime.now()
+                    updated_at=datetime.now(),
                 )
                 self.db.add(new_point)
                 await self.db.flush()
@@ -119,11 +109,7 @@ class TopologySyncService:
 
                 # 创建实时数据记录
                 realtime = PointRealtime(
-                    point_id=new_point.id,
-                    value=0.0,
-                    quality=0,
-                    status="normal",
-                    updated_at=datetime.now()
+                    point_id=new_point.id, value=0.0, quality=0, status="normal", updated_at=datetime.now()
                 )
                 self.db.add(realtime)
 
@@ -141,9 +127,7 @@ class TopologySyncService:
             删除的点位数量
         """
         # 查找所有关联点位
-        result = await self.db.execute(
-            select(Point).where(Point.energy_device_id == device_id)
-        )
+        result = await self.db.execute(select(Point).where(Point.energy_device_id == device_id))
         points = result.scalars().all()
 
         if not points:
@@ -152,23 +136,15 @@ class TopologySyncService:
         point_ids = [p.id for p in points]
 
         # 删除实时数据
-        await self.db.execute(
-            delete(PointRealtime).where(PointRealtime.point_id.in_(point_ids))
-        )
+        await self.db.execute(delete(PointRealtime).where(PointRealtime.point_id.in_(point_ids)))
 
         # 删除点位
-        await self.db.execute(
-            delete(Point).where(Point.id.in_(point_ids))
-        )
+        await self.db.execute(delete(Point).where(Point.id.in_(point_ids)))
 
         await self.db.commit()
         return len(point_ids)
 
-    async def update_meter_point_hierarchy(
-        self,
-        meter_point_id: int,
-        new_transformer_id: Optional[int]
-    ) -> bool:
+    async def update_meter_point_hierarchy(self, meter_point_id: int, new_transformer_id: Optional[int]) -> bool:
         """
         更新计量点的变压器归属关系
 
@@ -179,9 +155,7 @@ class TopologySyncService:
         Returns:
             是否成功
         """
-        result = await self.db.execute(
-            select(MeterPoint).where(MeterPoint.id == meter_point_id)
-        )
+        result = await self.db.execute(select(MeterPoint).where(MeterPoint.id == meter_point_id))
         meter_point = result.scalar_one_or_none()
 
         if not meter_point:
@@ -192,11 +166,7 @@ class TopologySyncService:
         await self.db.commit()
         return True
 
-    async def update_panel_hierarchy(
-        self,
-        panel_id: int,
-        new_meter_point_id: Optional[int]
-    ) -> bool:
+    async def update_panel_hierarchy(self, panel_id: int, new_meter_point_id: Optional[int]) -> bool:
         """
         更新配电柜的计量点归属关系
 
@@ -207,9 +177,7 @@ class TopologySyncService:
         Returns:
             是否成功
         """
-        result = await self.db.execute(
-            select(DistributionPanel).where(DistributionPanel.id == panel_id)
-        )
+        result = await self.db.execute(select(DistributionPanel).where(DistributionPanel.id == panel_id))
         panel = result.scalar_one_or_none()
 
         if not panel:
@@ -220,11 +188,7 @@ class TopologySyncService:
         await self.db.commit()
         return True
 
-    async def update_circuit_hierarchy(
-        self,
-        circuit_id: int,
-        new_panel_id: Optional[int]
-    ) -> bool:
+    async def update_circuit_hierarchy(self, circuit_id: int, new_panel_id: Optional[int]) -> bool:
         """
         更新回路的配电柜归属关系
 
@@ -235,9 +199,7 @@ class TopologySyncService:
         Returns:
             是否成功
         """
-        result = await self.db.execute(
-            select(DistributionCircuit).where(DistributionCircuit.id == circuit_id)
-        )
+        result = await self.db.execute(select(DistributionCircuit).where(DistributionCircuit.id == circuit_id))
         circuit = result.scalar_one_or_none()
 
         if not circuit:
@@ -248,11 +210,7 @@ class TopologySyncService:
         await self.db.commit()
         return True
 
-    async def update_device_hierarchy(
-        self,
-        device_id: int,
-        new_circuit_id: Optional[int]
-    ) -> bool:
+    async def update_device_hierarchy(self, device_id: int, new_circuit_id: Optional[int]) -> bool:
         """
         更新设备的回路归属关系
 
@@ -263,9 +221,7 @@ class TopologySyncService:
         Returns:
             是否成功
         """
-        result = await self.db.execute(
-            select(PowerDevice).where(PowerDevice.id == device_id)
-        )
+        result = await self.db.execute(select(PowerDevice).where(PowerDevice.id == device_id))
         device = result.scalar_one_or_none()
 
         if not device:
@@ -276,11 +232,7 @@ class TopologySyncService:
         await self.db.commit()
         return True
 
-    async def cascade_delete_check(
-        self,
-        node_id: int,
-        node_type: TopologyNodeType
-    ) -> Dict[str, int]:
+    async def cascade_delete_check(self, node_id: int, node_type: TopologyNodeType) -> Dict[str, int]:
         """
         检查级联删除影响范围
 
@@ -295,9 +247,7 @@ class TopologySyncService:
 
         if node_type == TopologyNodeType.TRANSFORMER:
             # 统计下级计量点
-            result = await self.db.execute(
-                select(MeterPoint).where(MeterPoint.transformer_id == node_id)
-            )
+            result = await self.db.execute(select(MeterPoint).where(MeterPoint.transformer_id == node_id))
             meter_points = result.scalars().all()
             impact["meter_points"] = len(meter_points)
 
@@ -329,9 +279,7 @@ class TopologySyncService:
                         impact["devices"] = len(devices)
 
         elif node_type == TopologyNodeType.METER_POINT:
-            result = await self.db.execute(
-                select(DistributionPanel).where(DistributionPanel.meter_point_id == node_id)
-            )
+            result = await self.db.execute(select(DistributionPanel).where(DistributionPanel.meter_point_id == node_id))
             panels = result.scalars().all()
             impact["panels"] = len(panels)
 
@@ -345,41 +293,29 @@ class TopologySyncService:
 
                 circuit_ids = [c.id for c in circuits]
                 if circuit_ids:
-                    result = await self.db.execute(
-                        select(PowerDevice).where(PowerDevice.circuit_id.in_(circuit_ids))
-                    )
+                    result = await self.db.execute(select(PowerDevice).where(PowerDevice.circuit_id.in_(circuit_ids)))
                     devices = result.scalars().all()
                     impact["devices"] = len(devices)
 
         elif node_type == TopologyNodeType.PANEL:
-            result = await self.db.execute(
-                select(DistributionCircuit).where(DistributionCircuit.panel_id == node_id)
-            )
+            result = await self.db.execute(select(DistributionCircuit).where(DistributionCircuit.panel_id == node_id))
             circuits = result.scalars().all()
             impact["circuits"] = len(circuits)
 
             circuit_ids = [c.id for c in circuits]
             if circuit_ids:
-                result = await self.db.execute(
-                    select(PowerDevice).where(PowerDevice.circuit_id.in_(circuit_ids))
-                )
+                result = await self.db.execute(select(PowerDevice).where(PowerDevice.circuit_id.in_(circuit_ids)))
                 devices = result.scalars().all()
                 impact["devices"] = len(devices)
 
         elif node_type == TopologyNodeType.CIRCUIT:
-            result = await self.db.execute(
-                select(PowerDevice).where(PowerDevice.circuit_id == node_id)
-            )
+            result = await self.db.execute(select(PowerDevice).where(PowerDevice.circuit_id == node_id))
             devices = result.scalars().all()
             impact["devices"] = len(devices)
 
         return impact
 
-    async def cascade_delete(
-        self,
-        node_id: int,
-        node_type: TopologyNodeType
-    ) -> Dict[str, int]:
+    async def cascade_delete(self, node_id: int, node_type: TopologyNodeType) -> Dict[str, int]:
         """
         执行级联删除
 
@@ -394,9 +330,7 @@ class TopologySyncService:
 
         if node_type == TopologyNodeType.TRANSFORMER:
             # 查找下级计量点
-            result = await self.db.execute(
-                select(MeterPoint).where(MeterPoint.transformer_id == node_id)
-            )
+            result = await self.db.execute(select(MeterPoint).where(MeterPoint.transformer_id == node_id))
             meter_points = result.scalars().all()
 
             for mp in meter_points:
@@ -405,22 +339,16 @@ class TopologySyncService:
                     deleted[k] = deleted.get(k, 0) + v
 
             # 删除计量点
-            await self.db.execute(
-                delete(MeterPoint).where(MeterPoint.transformer_id == node_id)
-            )
+            await self.db.execute(delete(MeterPoint).where(MeterPoint.transformer_id == node_id))
             deleted["meter_points"] = len(meter_points)
 
             # 删除变压器
-            await self.db.execute(
-                delete(Transformer).where(Transformer.id == node_id)
-            )
+            await self.db.execute(delete(Transformer).where(Transformer.id == node_id))
             deleted["transformers"] = 1
 
         elif node_type == TopologyNodeType.METER_POINT:
             # 查找下级配电柜
-            result = await self.db.execute(
-                select(DistributionPanel).where(DistributionPanel.meter_point_id == node_id)
-            )
+            result = await self.db.execute(select(DistributionPanel).where(DistributionPanel.meter_point_id == node_id))
             panels = result.scalars().all()
 
             for panel in panels:
@@ -429,22 +357,16 @@ class TopologySyncService:
                     deleted[k] = deleted.get(k, 0) + v
 
             # 删除配电柜
-            await self.db.execute(
-                delete(DistributionPanel).where(DistributionPanel.meter_point_id == node_id)
-            )
+            await self.db.execute(delete(DistributionPanel).where(DistributionPanel.meter_point_id == node_id))
             deleted["panels"] = len(panels)
 
             # 删除计量点
-            await self.db.execute(
-                delete(MeterPoint).where(MeterPoint.id == node_id)
-            )
+            await self.db.execute(delete(MeterPoint).where(MeterPoint.id == node_id))
             deleted["meter_points"] = 1
 
         elif node_type == TopologyNodeType.PANEL:
             # 查找下级回路
-            result = await self.db.execute(
-                select(DistributionCircuit).where(DistributionCircuit.panel_id == node_id)
-            )
+            result = await self.db.execute(select(DistributionCircuit).where(DistributionCircuit.panel_id == node_id))
             circuits = result.scalars().all()
 
             for circuit in circuits:
@@ -453,22 +375,16 @@ class TopologySyncService:
                     deleted[k] = deleted.get(k, 0) + v
 
             # 删除回路
-            await self.db.execute(
-                delete(DistributionCircuit).where(DistributionCircuit.panel_id == node_id)
-            )
+            await self.db.execute(delete(DistributionCircuit).where(DistributionCircuit.panel_id == node_id))
             deleted["circuits"] = len(circuits)
 
             # 删除配电柜
-            await self.db.execute(
-                delete(DistributionPanel).where(DistributionPanel.id == node_id)
-            )
+            await self.db.execute(delete(DistributionPanel).where(DistributionPanel.id == node_id))
             deleted["panels"] = 1
 
         elif node_type == TopologyNodeType.CIRCUIT:
             # 查找下级设备
-            result = await self.db.execute(
-                select(PowerDevice).where(PowerDevice.circuit_id == node_id)
-            )
+            result = await self.db.execute(select(PowerDevice).where(PowerDevice.circuit_id == node_id))
             devices = result.scalars().all()
 
             # 删除设备的测点
@@ -476,15 +392,11 @@ class TopologySyncService:
                 await self.remove_device_points(device.id)
 
             # 删除设备
-            await self.db.execute(
-                delete(PowerDevice).where(PowerDevice.circuit_id == node_id)
-            )
+            await self.db.execute(delete(PowerDevice).where(PowerDevice.circuit_id == node_id))
             deleted["devices"] = len(devices)
 
             # 删除回路
-            await self.db.execute(
-                delete(DistributionCircuit).where(DistributionCircuit.id == node_id)
-            )
+            await self.db.execute(delete(DistributionCircuit).where(DistributionCircuit.id == node_id))
             deleted["circuits"] = 1
 
         elif node_type == TopologyNodeType.DEVICE:
@@ -492,20 +404,14 @@ class TopologySyncService:
             await self.remove_device_points(node_id)
 
             # 删除设备
-            await self.db.execute(
-                delete(PowerDevice).where(PowerDevice.id == node_id)
-            )
+            await self.db.execute(delete(PowerDevice).where(PowerDevice.id == node_id))
             deleted["devices"] = 1
 
         await self.db.commit()
         return deleted
 
     async def notify_data_simulator(
-        self,
-        operation: str,
-        node_type: str,
-        node_id: int,
-        data: Optional[Dict[str, Any]] = None
+        self, operation: str, node_type: str, node_id: int, data: Optional[Dict[str, Any]] = None
     ) -> bool:
         """
         通知数据模拟器更新

@@ -1,6 +1,7 @@
 """
 供配电管理 Schema
 """
+
 from typing import Optional
 from datetime import datetime, date
 from pydantic import BaseModel, ConfigDict
@@ -8,8 +9,10 @@ from pydantic import BaseModel, ConfigDict
 
 # ========== UPS设备 ==========
 
+
 class UPSDeviceCreate(BaseModel):
     """创建UPS设备"""
+
     device_id: int
     ups_type: Optional[str] = "standalone"
     rated_capacity: Optional[float] = None
@@ -22,6 +25,7 @@ class UPSDeviceCreate(BaseModel):
 
 class UPSDeviceUpdate(BaseModel):
     """更新UPS设备"""
+
     ups_type: Optional[str] = None
     rated_capacity: Optional[float] = None
     rated_voltage: Optional[float] = None
@@ -33,6 +37,7 @@ class UPSDeviceUpdate(BaseModel):
 
 class UPSDeviceInfo(BaseModel):
     """UPS设备信息"""
+
     model_config = ConfigDict(from_attributes=True)
 
     id: int
@@ -50,8 +55,10 @@ class UPSDeviceInfo(BaseModel):
 
 # ========== 电池组 ==========
 
+
 class BatteryGroupCreate(BaseModel):
     """创建电池组"""
+
     ups_device_id: int
     group_name: str
     battery_type: Optional[str] = "lead_acid"
@@ -64,6 +71,7 @@ class BatteryGroupCreate(BaseModel):
 
 class BatteryGroupUpdate(BaseModel):
     """更新电池组"""
+
     group_name: Optional[str] = None
     battery_type: Optional[str] = None
     rated_capacity: Optional[float] = None
@@ -75,6 +83,7 @@ class BatteryGroupUpdate(BaseModel):
 
 class BatteryGroupInfo(BaseModel):
     """电池组信息"""
+
     model_config = ConfigDict(from_attributes=True)
 
     id: int
@@ -92,8 +101,10 @@ class BatteryGroupInfo(BaseModel):
 
 # ========== 供配电总览 ==========
 
+
 class PowerOverviewSummary(BaseModel):
     """供配电总览统计"""
+
     ups_total: int = 0
     ups_online: int = 0
     ups_offline: int = 0

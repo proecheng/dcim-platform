@@ -38,14 +38,28 @@ def subtract_months(dt: datetime, months: int) -> datetime:
         year -= 1
 
     # 处理月末日期（如1月31日减1个月应该是12月31日，而不是报错）
-    day = min(dt.day, [31, 29 if year % 4 == 0 and (year % 100 != 0 or year % 400 == 0) else 28,
-                       31, 30, 31, 30, 31, 31, 30, 31, 30, 31][month - 1])
+    day = min(
+        dt.day,
+        [
+            31,
+            29 if year % 4 == 0 and (year % 100 != 0 or year % 400 == 0) else 28,
+            31,
+            30,
+            31,
+            30,
+            31,
+            31,
+            30,
+            31,
+            30,
+            31,
+        ][month - 1],
+    )
 
     return dt.replace(year=year, month=month, day=day)
 
-from ..models.energy import (
-    MeterPoint, DemandHistory, PricingConfig, Transformer
-)
+
+from ..models.energy import MeterPoint, DemandHistory, PricingConfig, Transformer
 
 logger = logging.getLogger(__name__)
 
@@ -53,41 +67,44 @@ logger = logging.getLogger(__name__)
 @dataclass
 class DemandThresholds:
     """需量分析阈值配置"""
-    low_utilization: float = 0.80       # 低利用率阈值 (80%)
-    high_utilization: float = 1.05      # 高利用率阈值 (105%)
-    optimal_utilization: float = 0.90   # 最优利用率 (90%)
-    safety_margin: float = 0.10         # 安全裕度 (10%)
-    min_saving: float = 5000            # 最小年节省金额 (元)
+
+    low_utilization: float = 0.80  # 低利用率阈值 (80%)
+    high_utilization: float = 1.05  # 高利用率阈值 (105%)
+    optimal_utilization: float = 0.90  # 最优利用率 (90%)
+    safety_margin: float = 0.10  # 安全裕度 (10%)
+    min_saving: float = 5000  # 最小年节省金额 (元)
 
 
 @dataclass
 class DemandStatistics:
     """需量统计数据"""
+
     meter_point_id: Optional[int]
     meter_code: str
     meter_name: str
-    declared_demand: float          # 申报需量 (kW)
-    demand_type: str                # 需量类型 (kW/kVA)
-    max_demand_12m: float           # 12月最大需量
-    avg_demand_12m: float           # 12月平均需量
-    demand_95th: float              # 95分位数需量
-    std_dev: float                  # 标准差
-    utilization_rate: float         # 利用率
-    over_declared_count: int        # 超申报次数
-    transformer_name: Optional[str] # 变压器名称
+    declared_demand: float  # 申报需量 (kW)
+    demand_type: str  # 需量类型 (kW/kVA)
+    max_demand_12m: float  # 12月最大需量
+    avg_demand_12m: float  # 12月平均需量
+    demand_95th: float  # 95分位数需量
+    std_dev: float  # 标准差
+    utilization_rate: float  # 利用率
+    over_declared_count: int  # 超申报次数
+    transformer_name: Optional[str]  # 变压器名称
 
 
 @dataclass
 class DemandRecommendation:
     """需量优化建议"""
-    recommendation_type: str        # reduce/increase/shave/none
-    suggested_demand: float         # 建议需量
-    demand_reduction: float         # 需量调整量
-    monthly_saving: float           # 月节省 (元)
-    annual_saving: float            # 年节省 (元)
-    risk_level: str                 # low/medium/high
-    confidence: float               # 置信度 (0-1)
-    description: str                # 描述
+
+    recommendation_type: str  # reduce/increase/shave/none
+    suggested_demand: float  # 建议需量
+    demand_reduction: float  # 需量调整量
+    monthly_saving: float  # 月节省 (元)
+    annual_saving: float  # 年节省 (元)
+    risk_level: str  # low/medium/high
+    confidence: float  # 置信度 (0-1)
+    description: str  # 描述
 
 
 class DemandAnalysisService:
@@ -103,9 +120,9 @@ class DemandAnalysisService:
     """
 
     # 默认值常量
-    DEFAULT_DEMAND_PRICE = 38.0         # 默认需量电价 (元/kW·月)
-    DEFAULT_DECLARED_DEMAND = 800.0     # 默认申报需量 (kW)
-    DEFAULT_OVER_MULTIPLIER = 2.0       # 默认超需量加价倍数
+    DEFAULT_DEMAND_PRICE = 38.0  # 默认需量电价 (元/kW·月)
+    DEFAULT_DECLARED_DEMAND = 800.0  # 默认申报需量 (kW)
+    DEFAULT_OVER_MULTIPLIER = 2.0  # 默认超需量加价倍数
 
     def __init__(self, db: AsyncSession):
         self.db = db
@@ -122,10 +139,7 @@ class DemandAnalysisService:
         """
         try:
             result = await self.db.execute(
-                select(PricingConfig)
-                .where(PricingConfig.is_active == True)
-                .order_by(PricingConfig.id.desc())
-                .limit(1)
+                select(PricingConfig).where(PricingConfig.is_active == True).order_by(PricingConfig.id.desc()).limit(1)
             )
             config = result.scalar_one_or_none()
             if config and config.demand_price:
@@ -139,10 +153,7 @@ class DemandAnalysisService:
         """获取超需量加价倍数"""
         try:
             result = await self.db.execute(
-                select(PricingConfig)
-                .where(PricingConfig.is_active == True)
-                .order_by(PricingConfig.id.desc())
-                .limit(1)
+                select(PricingConfig).where(PricingConfig.is_active == True).order_by(PricingConfig.id.desc()).limit(1)
             )
             config = result.scalar_one_or_none()
             if config and config.over_demand_multiplier:
@@ -152,10 +163,7 @@ class DemandAnalysisService:
 
         return self.DEFAULT_OVER_MULTIPLIER
 
-    async def get_declared_demand(
-        self,
-        meter_point_id: Optional[int] = None
-    ) -> float:
+    async def get_declared_demand(self, meter_point_id: Optional[int] = None) -> float:
         """
         统一获取申报需量
 
@@ -164,18 +172,14 @@ class DemandAnalysisService:
         """
         try:
             if meter_point_id:
-                result = await self.db.execute(
-                    select(MeterPoint)
-                    .where(MeterPoint.id == meter_point_id)
-                )
+                result = await self.db.execute(select(MeterPoint).where(MeterPoint.id == meter_point_id))
                 mp = result.scalar_one_or_none()
                 if mp and mp.declared_demand:
                     return float(mp.declared_demand)
             else:
                 # 全站：返回所有计量点申报需量之和
                 result = await self.db.execute(
-                    select(func.sum(MeterPoint.declared_demand))
-                    .where(MeterPoint.is_enabled == True)
+                    select(func.sum(MeterPoint.declared_demand)).where(MeterPoint.is_enabled == True)
                 )
                 total = result.scalar()
                 if total:
@@ -185,10 +189,7 @@ class DemandAnalysisService:
 
         return self.DEFAULT_DECLARED_DEMAND
 
-    async def get_meter_point_info(
-        self,
-        meter_point_id: int
-    ) -> Optional[Dict[str, Any]]:
+    async def get_meter_point_info(self, meter_point_id: int) -> Optional[Dict[str, Any]]:
         """获取计量点信息"""
         try:
             result = await self.db.execute(
@@ -204,19 +205,15 @@ class DemandAnalysisService:
                     "meter_code": mp.meter_code,
                     "meter_name": mp.meter_name or mp.meter_code,
                     "declared_demand": float(mp.declared_demand or 0),
-                    "demand_type": getattr(mp, 'demand_type', 'kW') or 'kW',
-                    "transformer_name": transformer.transformer_name if transformer else None
+                    "demand_type": getattr(mp, "demand_type", "kW") or "kW",
+                    "transformer_name": transformer.transformer_name if transformer else None,
                 }
         except Exception as e:
             logger.warning(f"获取计量点信息失败: {e}")
 
         return None
 
-    async def get_demand_history(
-        self,
-        meter_point_id: Optional[int] = None,
-        months: int = 12
-    ) -> List[DemandHistory]:
+    async def get_demand_history(self, meter_point_id: Optional[int] = None, months: int = 12) -> List[DemandHistory]:
         """
         统一获取需量历史数据
 
@@ -231,14 +228,17 @@ class DemandAnalysisService:
         end_date = datetime.now()
         start_date = subtract_months(end_date, months)  # 精确月份计算
 
-        query = select(DemandHistory).where(
-            and_(
-                DemandHistory.stat_year * 100 + DemandHistory.stat_month >=
-                    start_date.year * 100 + start_date.month,
-                DemandHistory.stat_year * 100 + DemandHistory.stat_month <=
-                    end_date.year * 100 + end_date.month
+        query = (
+            select(DemandHistory)
+            .where(
+                and_(
+                    DemandHistory.stat_year * 100 + DemandHistory.stat_month
+                    >= start_date.year * 100 + start_date.month,
+                    DemandHistory.stat_year * 100 + DemandHistory.stat_month <= end_date.year * 100 + end_date.month,
+                )
             )
-        ).order_by(DemandHistory.stat_year, DemandHistory.stat_month)
+            .order_by(DemandHistory.stat_year, DemandHistory.stat_month)
+        )
 
         if meter_point_id:
             query = query.where(DemandHistory.meter_point_id == meter_point_id)
@@ -247,9 +247,7 @@ class DemandAnalysisService:
         return list(result.scalars().all())
 
     async def get_demand_statistics(
-        self,
-        meter_point_id: Optional[int] = None,
-        months: int = 12
+        self, meter_point_id: Optional[int] = None, months: int = 12
     ) -> Optional[DemandStatistics]:
         """
         获取需量统计数据
@@ -302,9 +300,7 @@ class DemandAnalysisService:
         utilization_rate = max_demand_12m / declared_demand
 
         # 计算超申报次数
-        over_declared_count = sum(
-            h.over_declared_times or 0 for h in history
-        )
+        over_declared_count = sum(h.over_declared_times or 0 for h in history)
 
         return DemandStatistics(
             meter_point_id=meter_point_id,
@@ -318,16 +314,13 @@ class DemandAnalysisService:
             std_dev=std_dev,
             utilization_rate=utilization_rate,
             over_declared_count=over_declared_count,
-            transformer_name=transformer_name
+            transformer_name=transformer_name,
         )
 
     # ==================== 计算方法 ====================
 
     def calculate_optimal_demand(
-        self,
-        reference_demand: float,
-        safety_margin: Optional[float] = None,
-        demand_type: str = "kW"
+        self, reference_demand: float, safety_margin: Optional[float] = None, demand_type: str = "kW"
     ) -> float:
         """
         统一的建议需量计算方法
@@ -351,7 +344,7 @@ class DemandAnalysisService:
         optimal = reference_demand * (1 + safety_margin)
 
         # 按照供电局要求取整
-        if demand_type.upper() == 'KVA':
+        if demand_type.upper() == "KVA":
             # kVA通常按10取整
             optimal = math.ceil(optimal / 10) * 10
         else:
@@ -360,10 +353,7 @@ class DemandAnalysisService:
 
         return optimal
 
-    async def generate_recommendation(
-        self,
-        stats: DemandStatistics
-    ) -> DemandRecommendation:
+    async def generate_recommendation(self, stats: DemandStatistics) -> DemandRecommendation:
         """
         生成需量优化建议
 
@@ -378,20 +368,18 @@ class DemandAnalysisService:
         if stats.utilization_rate < low_threshold:
             # 使用95分位数作为参考
             suggested_demand = self.calculate_optimal_demand(
-                stats.demand_95th,
-                self.thresholds.safety_margin,
-                stats.demand_type
+                stats.demand_95th, self.thresholds.safety_margin, stats.demand_type
             )
 
             demand_reduction = stats.declared_demand - suggested_demand
             monthly_saving = demand_reduction * demand_price
             annual_saving = monthly_saving * 12
 
-            risk_level = 'low' if stats.utilization_rate < 0.70 else 'medium'
-            confidence = 0.90 if risk_level == 'low' else 0.80
+            risk_level = "low" if stats.utilization_rate < 0.70 else "medium"
+            confidence = 0.90 if risk_level == "low" else 0.80
 
             return DemandRecommendation(
-                recommendation_type='reduce',
+                recommendation_type="reduce",
                 suggested_demand=suggested_demand,
                 demand_reduction=demand_reduction,
                 monthly_saving=monthly_saving,
@@ -399,8 +387,8 @@ class DemandAnalysisService:
                 risk_level=risk_level,
                 confidence=confidence,
                 description=f"当前申报需量{stats.declared_demand:.0f}kW，"
-                           f"实际利用率仅{stats.utilization_rate:.1%}，"
-                           f"建议降至{suggested_demand:.0f}kW"
+                f"实际利用率仅{stats.utilization_rate:.1%}，"
+                f"建议降至{suggested_demand:.0f}kW",
             )
 
         # 情况2: 需量配置过低 (超申报风险)
@@ -409,7 +397,7 @@ class DemandAnalysisService:
             suggested_demand = self.calculate_optimal_demand(
                 stats.max_demand_12m,
                 self.thresholds.safety_margin * 1.5,  # 更大裕度
-                stats.demand_type
+                stats.demand_type,
             )
 
             over_multiplier = await self.get_over_demand_multiplier()
@@ -417,16 +405,16 @@ class DemandAnalysisService:
             penalty_estimate = over_amount * demand_price * over_multiplier * 12
 
             return DemandRecommendation(
-                recommendation_type='increase',
+                recommendation_type="increase",
                 suggested_demand=suggested_demand,
                 demand_reduction=suggested_demand - stats.declared_demand,
                 monthly_saving=-penalty_estimate / 12,  # 负数表示避免损失
                 annual_saving=-penalty_estimate,
-                risk_level='high',
+                risk_level="high",
                 confidence=0.95,
                 description=f"当前申报需量{stats.declared_demand:.0f}kW，"
-                           f"实际已超{(stats.utilization_rate-1)*100:.1f}%，"
-                           f"存在超需量罚款风险"
+                f"实际已超{(stats.utilization_rate-1)*100:.1f}%，"
+                f"存在超需量罚款风险",
             )
 
         # 情况3: 需量配置合理但波动大，可削峰
@@ -435,35 +423,31 @@ class DemandAnalysisService:
             potential_saving = peak_shave_target * demand_price * 12
 
             return DemandRecommendation(
-                recommendation_type='shave',
+                recommendation_type="shave",
                 suggested_demand=stats.demand_95th,
                 demand_reduction=peak_shave_target,
                 monthly_saving=potential_saving / 12,
                 annual_saving=potential_saving,
-                risk_level='medium',
+                risk_level="medium",
                 confidence=0.75,
-                description=f"需量波动较大，通过削峰可降低{peak_shave_target:.1f}kW需量"
+                description=f"需量波动较大，通过削峰可降低{peak_shave_target:.1f}kW需量",
             )
 
         # 情况4: 配置合理，无需调整
         return DemandRecommendation(
-            recommendation_type='none',
+            recommendation_type="none",
             suggested_demand=stats.declared_demand,
             demand_reduction=0,
             monthly_saving=0,
             annual_saving=0,
-            risk_level='low',
+            risk_level="low",
             confidence=1.0,
-            description=f"需量配置合理，利用率{stats.utilization_rate:.1%}"
+            description=f"需量配置合理，利用率{stats.utilization_rate:.1%}",
         )
 
     # ==================== 完整分析入口 ====================
 
-    async def analyze(
-        self,
-        meter_point_id: Optional[int] = None,
-        months: int = 12
-    ) -> Dict[str, Any]:
+    async def analyze(self, meter_point_id: Optional[int] = None, months: int = 12) -> Dict[str, Any]:
         """
         统一的需量分析入口
 
@@ -485,15 +469,15 @@ class DemandAnalysisService:
                 "has_opportunity": False,
                 "message": "需量历史数据不足，无法进行分析",
                 "statistics": None,
-                "recommendation": None
+                "recommendation": None,
             }
 
         recommendation = await self.generate_recommendation(stats)
         demand_price = await self.get_demand_price()
 
         has_opportunity = (
-            recommendation.recommendation_type != 'none' and
-            abs(recommendation.annual_saving) >= self.thresholds.min_saving
+            recommendation.recommendation_type != "none"
+            and abs(recommendation.annual_saving) >= self.thresholds.min_saving
         )
 
         return {
@@ -509,7 +493,7 @@ class DemandAnalysisService:
                 "demand_95th": round(stats.demand_95th, 1),
                 "utilization_rate": round(stats.utilization_rate, 3),
                 "over_declared_count": stats.over_declared_count,
-                "transformer_name": stats.transformer_name
+                "transformer_name": stats.transformer_name,
             },
             "recommendation": {
                 "type": recommendation.recommendation_type,
@@ -519,20 +503,17 @@ class DemandAnalysisService:
                 "annual_saving": round(recommendation.annual_saving, 2),
                 "risk_level": recommendation.risk_level,
                 "confidence": recommendation.confidence,
-                "description": recommendation.description
+                "description": recommendation.description,
             },
             "demand_price": demand_price,
             "thresholds": {
                 "low_utilization": self.thresholds.low_utilization,
                 "high_utilization": self.thresholds.high_utilization,
-                "safety_margin": self.thresholds.safety_margin
-            }
+                "safety_margin": self.thresholds.safety_margin,
+            },
         }
 
-    async def get_comparison_data(
-        self,
-        meter_point_id: Optional[int] = None
-    ) -> Dict[str, Any]:
+    async def get_comparison_data(self, meter_point_id: Optional[int] = None) -> Dict[str, Any]:
         """
         获取需量配置对比数据
 
@@ -555,8 +536,8 @@ class DemandAnalysisService:
                     "suggested_demand": 0,
                     "reduce_amount": 0,
                     "monthly_saving": 0,
-                    "risk_level": "unknown"
-                }
+                    "risk_level": "unknown",
+                },
             }
 
         stats = result["statistics"]
@@ -574,18 +555,15 @@ class DemandAnalysisService:
                 "suggested_demand": rec["suggested_demand"],
                 "reduce_amount": abs(rec["demand_reduction"]),
                 "monthly_saving": abs(rec["monthly_saving"]),
-                "risk_level": rec["risk_level"]
-            }
+                "risk_level": rec["risk_level"],
+            },
         }
 
     # ==================== 统一模拟数据生成方法 ====================
 
     @staticmethod
     def generate_mock_demand_curve(
-        meter_point_id: Optional[int],
-        months: int,
-        base_demand: float = 650.0,
-        declared_demand: float = 800.0
+        meter_point_id: Optional[int], months: int, base_demand: float = 650.0, declared_demand: float = 800.0
     ) -> List[Dict[str, Any]]:
         """
         生成确定性的需量曲线模拟数据
@@ -601,7 +579,7 @@ class DemandAnalysisService:
         Returns:
             月度需量数据列表
         """
-        from datetime import datetime, timedelta
+        from datetime import datetime
 
         end_date = datetime.now()
         data = []
@@ -625,20 +603,20 @@ class DemandAnalysisService:
             max_demand = base_demand * base_ratio * month_factor
             avg_demand = max_demand * 0.72
 
-            data.append({
-                "month": month_str,
-                "max_demand": round(max_demand, 1),
-                "avg_demand": round(avg_demand, 1),
-                "declared_demand": declared_demand
-            })
+            data.append(
+                {
+                    "month": month_str,
+                    "max_demand": round(max_demand, 1),
+                    "avg_demand": round(avg_demand, 1),
+                    "declared_demand": declared_demand,
+                }
+            )
 
         return data
 
     @staticmethod
     def generate_mock_hourly_load(
-        meter_point_id: Optional[int],
-        target_date: 'date',
-        period_map: Dict[int, str]
+        meter_point_id: Optional[int], target_date: "date", period_map: Dict[int, str]
     ) -> List[Dict[str, Any]]:
         """
         生成确定性的24小时负荷模拟数据
@@ -651,36 +629,24 @@ class DemandAnalysisService:
         Returns:
             24小时负荷数据列表
         """
-        base_powers = {
-            'deep_valley': 380,
-            'valley': 450,
-            'flat': 550,
-            'peak': 680,
-            'sharp': 750
-        }
+        base_powers = {"deep_valley": 380, "valley": 450, "flat": 550, "peak": 680, "sharp": 750}
 
         seed = ((meter_point_id or 0) + target_date.day) % 20
         hourly_data = []
 
         for hour in range(24):
-            period = period_map.get(hour, 'flat')
+            period = period_map.get(hour, "flat")
             # 确定性的小时波动
             hour_offset = ((hour * 7 + seed) % 41) - 20  # -20 到 +20
             power = base_powers.get(period, 550) + hour_offset
 
-            hourly_data.append({
-                "hour": hour,
-                "power": round(power, 1),
-                "period": period
-            })
+            hourly_data.append({"hour": hour, "power": round(power, 1), "period": period})
 
         return hourly_data
 
     @staticmethod
     def generate_mock_power_factor(
-        meter_point_id: Optional[int],
-        days: int,
-        baseline: float = 0.90
+        meter_point_id: Optional[int], days: int, baseline: float = 0.90
     ) -> List[Dict[str, Any]]:
         """
         生成确定性的功率因数趋势模拟数据
@@ -693,7 +659,7 @@ class DemandAnalysisService:
         Returns:
             功率因数趋势数据列表
         """
-        from datetime import datetime, timedelta
+        from datetime import datetime
 
         end_date = datetime.now()
         data = []
@@ -705,10 +671,12 @@ class DemandAnalysisService:
             day_offset = (day.day * 7 + seed + i) % 100
             pf = 0.87 + day_offset * 0.001  # 0.87-0.97之间
 
-            data.append({
-                "date": day.strftime("%Y-%m-%d"),
-                "power_factor": round(pf, 3),
-                "status": "good" if pf >= baseline else ("warning" if pf >= 0.85 else "bad")
-            })
+            data.append(
+                {
+                    "date": day.strftime("%Y-%m-%d"),
+                    "power_factor": round(pf, 3),
+                    "status": "good" if pf >= baseline else ("warning" if pf >= 0.85 else "bad"),
+                }
+            )
 
         return data

@@ -1,6 +1,7 @@
 """
 容量管理 API - v1
 """
+
 import re
 import numpy as np
 from typing import Optional, List, Dict, Any
@@ -8,30 +9,48 @@ from datetime import datetime, timedelta
 from collections import defaultdict
 from fastapi import APIRouter, Depends, HTTPException, Query, Body
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, delete, update
+from sqlalchemy import select, func
 
 from ..deps import get_db, require_viewer, require_operator
 from ...models.user import User
 from ...models.asset import Cabinet, Asset
 from ...models.capacity import (
-    SpaceCapacity, PowerCapacity, CoolingCapacity, WeightCapacity,
-    CapacityPlan, CapacityStatus, CapacityHistory, CapacityType
+    SpaceCapacity,
+    PowerCapacity,
+    CoolingCapacity,
+    WeightCapacity,
+    CapacityPlan,
+    CapacityStatus,
+    CapacityHistory,
 )
 from ...schemas.capacity import (
-    SpaceCapacityCreate, SpaceCapacityUpdate, SpaceCapacityResponse,
-    PowerCapacityCreate, PowerCapacityUpdate, PowerCapacityResponse,
-    CoolingCapacityCreate, CoolingCapacityUpdate, CoolingCapacityResponse,
-    WeightCapacityCreate, WeightCapacityUpdate, WeightCapacityResponse,
-    CapacityPlanCreate, CapacityPlanResponse,
-    CapacityStatistics,
-    RackingRecommendationRequest, CabinetScore, RackingRecommendationResponse,
-    CapacityTrendResponse, CapacityForecastResponse, ExpansionSuggestion
+    SpaceCapacityCreate,
+    SpaceCapacityUpdate,
+    SpaceCapacityResponse,
+    PowerCapacityCreate,
+    PowerCapacityUpdate,
+    PowerCapacityResponse,
+    CoolingCapacityCreate,
+    CoolingCapacityUpdate,
+    CoolingCapacityResponse,
+    WeightCapacityCreate,
+    WeightCapacityUpdate,
+    WeightCapacityResponse,
+    CapacityPlanCreate,
+    CapacityPlanResponse,
+    RackingRecommendationRequest,
+    CabinetScore,
+    RackingRecommendationResponse,
+    CapacityTrendResponse,
+    CapacityForecastResponse,
+    ExpansionSuggestion,
 )
 
 router = APIRouter(prefix="/capacity", tags=["容量管理"])
 
 
 # ==================== 辅助函数 ====================
+
 
 def _calculate_usage_rate(used: Optional[float], total: Optional[float]) -> Optional[float]:
     """
@@ -51,12 +70,7 @@ def _calculate_usage_rate(used: Optional[float], total: Optional[float]) -> Opti
     return round(used / total * 100, 2)
 
 
-def _calculate_status(
-    used: float,
-    total: float,
-    warning: float,
-    critical: float
-) -> CapacityStatus:
+def _calculate_status(used: float, total: float, warning: float, critical: float) -> CapacityStatus:
     """
     根据使用率计算容量状态
 
@@ -86,12 +100,13 @@ def _calculate_status(
 
 # ==================== 空间容量管理 ====================
 
+
 @router.get("/space", response_model=List[SpaceCapacityResponse], summary="获取空间容量列表")
 async def get_space_capacities(
     skip: int = Query(0, ge=0, description="跳过记录数"),
     limit: int = Query(100, ge=1, le=1000, description="返回记录数"),
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_viewer)
+    _: User = Depends(require_viewer),
 ):
     """
     获取空间容量列表（分页）
@@ -104,10 +119,7 @@ async def get_space_capacities(
     for capacity in capacities:
         capacity_data = SpaceCapacityResponse.model_validate(capacity)
         # 计算使用率
-        capacity_data.usage_rate = _calculate_usage_rate(
-            capacity.used_u_positions,
-            capacity.total_u_positions
-        )
+        capacity_data.usage_rate = _calculate_usage_rate(capacity.used_u_positions, capacity.total_u_positions)
         response_list.append(capacity_data)
 
     return response_list
@@ -115,9 +127,7 @@ async def get_space_capacities(
 
 @router.post("/space", response_model=SpaceCapacityResponse, summary="创建空间容量")
 async def create_space_capacity(
-    data: SpaceCapacityCreate,
-    db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_operator)
+    data: SpaceCapacityCreate, db: AsyncSession = Depends(get_db), _: User = Depends(require_operator)
 ):
     """
     创建空间容量
@@ -136,19 +146,12 @@ async def create_space_capacity(
     await db.refresh(capacity)
 
     capacity_data = SpaceCapacityResponse.model_validate(capacity)
-    capacity_data.usage_rate = _calculate_usage_rate(
-        capacity.used_u_positions,
-        capacity.total_u_positions
-    )
+    capacity_data.usage_rate = _calculate_usage_rate(capacity.used_u_positions, capacity.total_u_positions)
     return capacity_data
 
 
 @router.get("/space/{id}", response_model=SpaceCapacityResponse, summary="获取空间容量详情")
-async def get_space_capacity(
-    id: int,
-    db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_viewer)
-):
+async def get_space_capacity(id: int, db: AsyncSession = Depends(get_db), _: User = Depends(require_viewer)):
     """
     根据ID获取空间容量详情
     """
@@ -159,19 +162,13 @@ async def get_space_capacity(
         raise HTTPException(status_code=404, detail="空间容量不存在")
 
     capacity_data = SpaceCapacityResponse.model_validate(capacity)
-    capacity_data.usage_rate = _calculate_usage_rate(
-        capacity.used_u_positions,
-        capacity.total_u_positions
-    )
+    capacity_data.usage_rate = _calculate_usage_rate(capacity.used_u_positions, capacity.total_u_positions)
     return capacity_data
 
 
 @router.put("/space/{id}", response_model=SpaceCapacityResponse, summary="更新空间容量")
 async def update_space_capacity(
-    id: int,
-    data: SpaceCapacityUpdate,
-    db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_operator)
+    id: int, data: SpaceCapacityUpdate, db: AsyncSession = Depends(get_db), _: User = Depends(require_operator)
 ):
     """
     更新空间容量信息
@@ -199,19 +196,12 @@ async def update_space_capacity(
     await db.refresh(capacity)
 
     capacity_data = SpaceCapacityResponse.model_validate(capacity)
-    capacity_data.usage_rate = _calculate_usage_rate(
-        capacity.used_u_positions,
-        capacity.total_u_positions
-    )
+    capacity_data.usage_rate = _calculate_usage_rate(capacity.used_u_positions, capacity.total_u_positions)
     return capacity_data
 
 
 @router.delete("/space/{id}", summary="删除空间容量")
-async def delete_space_capacity(
-    id: int,
-    db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_operator)
-):
+async def delete_space_capacity(id: int, db: AsyncSession = Depends(get_db), _: User = Depends(require_operator)):
     """
     删除空间容量
     """
@@ -229,12 +219,13 @@ async def delete_space_capacity(
 
 # ==================== 电力容量管理 ====================
 
+
 @router.get("/power", response_model=List[PowerCapacityResponse], summary="获取电力容量列表")
 async def get_power_capacities(
     skip: int = Query(0, ge=0, description="跳过记录数"),
     limit: int = Query(100, ge=1, le=1000, description="返回记录数"),
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_viewer)
+    _: User = Depends(require_viewer),
 ):
     """
     获取电力容量列表（分页）
@@ -247,10 +238,7 @@ async def get_power_capacities(
     for capacity in capacities:
         capacity_data = PowerCapacityResponse.model_validate(capacity)
         # 计算使用率
-        capacity_data.usage_rate = _calculate_usage_rate(
-            capacity.used_capacity_kw,
-            capacity.total_capacity_kw
-        )
+        capacity_data.usage_rate = _calculate_usage_rate(capacity.used_capacity_kw, capacity.total_capacity_kw)
         response_list.append(capacity_data)
 
     return response_list
@@ -258,9 +246,7 @@ async def get_power_capacities(
 
 @router.post("/power", response_model=PowerCapacityResponse, summary="创建电力容量")
 async def create_power_capacity(
-    data: PowerCapacityCreate,
-    db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_operator)
+    data: PowerCapacityCreate, db: AsyncSession = Depends(get_db), _: User = Depends(require_operator)
 ):
     """
     创建电力容量
@@ -279,19 +265,12 @@ async def create_power_capacity(
     await db.refresh(capacity)
 
     capacity_data = PowerCapacityResponse.model_validate(capacity)
-    capacity_data.usage_rate = _calculate_usage_rate(
-        capacity.used_capacity_kw,
-        capacity.total_capacity_kw
-    )
+    capacity_data.usage_rate = _calculate_usage_rate(capacity.used_capacity_kw, capacity.total_capacity_kw)
     return capacity_data
 
 
 @router.get("/power/{id}", response_model=PowerCapacityResponse, summary="获取电力容量详情")
-async def get_power_capacity(
-    id: int,
-    db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_viewer)
-):
+async def get_power_capacity(id: int, db: AsyncSession = Depends(get_db), _: User = Depends(require_viewer)):
     """
     根据ID获取电力容量详情
     """
@@ -302,19 +281,13 @@ async def get_power_capacity(
         raise HTTPException(status_code=404, detail="电力容量不存在")
 
     capacity_data = PowerCapacityResponse.model_validate(capacity)
-    capacity_data.usage_rate = _calculate_usage_rate(
-        capacity.used_capacity_kw,
-        capacity.total_capacity_kw
-    )
+    capacity_data.usage_rate = _calculate_usage_rate(capacity.used_capacity_kw, capacity.total_capacity_kw)
     return capacity_data
 
 
 @router.put("/power/{id}", response_model=PowerCapacityResponse, summary="更新电力容量")
 async def update_power_capacity(
-    id: int,
-    data: PowerCapacityUpdate,
-    db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_operator)
+    id: int, data: PowerCapacityUpdate, db: AsyncSession = Depends(get_db), _: User = Depends(require_operator)
 ):
     """
     更新电力容量信息
@@ -342,19 +315,12 @@ async def update_power_capacity(
     await db.refresh(capacity)
 
     capacity_data = PowerCapacityResponse.model_validate(capacity)
-    capacity_data.usage_rate = _calculate_usage_rate(
-        capacity.used_capacity_kw,
-        capacity.total_capacity_kw
-    )
+    capacity_data.usage_rate = _calculate_usage_rate(capacity.used_capacity_kw, capacity.total_capacity_kw)
     return capacity_data
 
 
 @router.delete("/power/{id}", summary="删除电力容量")
-async def delete_power_capacity(
-    id: int,
-    db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_operator)
-):
+async def delete_power_capacity(id: int, db: AsyncSession = Depends(get_db), _: User = Depends(require_operator)):
     """
     删除电力容量
     """
@@ -372,12 +338,13 @@ async def delete_power_capacity(
 
 # ==================== 制冷容量管理 ====================
 
+
 @router.get("/cooling", response_model=List[CoolingCapacityResponse], summary="获取制冷容量列表")
 async def get_cooling_capacities(
     skip: int = Query(0, ge=0, description="跳过记录数"),
     limit: int = Query(100, ge=1, le=1000, description="返回记录数"),
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_viewer)
+    _: User = Depends(require_viewer),
 ):
     """
     获取制冷容量列表（分页）
@@ -390,10 +357,7 @@ async def get_cooling_capacities(
     for capacity in capacities:
         capacity_data = CoolingCapacityResponse.model_validate(capacity)
         # 计算使用率
-        capacity_data.usage_rate = _calculate_usage_rate(
-            capacity.used_cooling_kw,
-            capacity.total_cooling_kw
-        )
+        capacity_data.usage_rate = _calculate_usage_rate(capacity.used_cooling_kw, capacity.total_cooling_kw)
         response_list.append(capacity_data)
 
     return response_list
@@ -401,9 +365,7 @@ async def get_cooling_capacities(
 
 @router.post("/cooling", response_model=CoolingCapacityResponse, summary="创建制冷容量")
 async def create_cooling_capacity(
-    data: CoolingCapacityCreate,
-    db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_operator)
+    data: CoolingCapacityCreate, db: AsyncSession = Depends(get_db), _: User = Depends(require_operator)
 ):
     """
     创建制冷容量
@@ -422,19 +384,12 @@ async def create_cooling_capacity(
     await db.refresh(capacity)
 
     capacity_data = CoolingCapacityResponse.model_validate(capacity)
-    capacity_data.usage_rate = _calculate_usage_rate(
-        capacity.used_cooling_kw,
-        capacity.total_cooling_kw
-    )
+    capacity_data.usage_rate = _calculate_usage_rate(capacity.used_cooling_kw, capacity.total_cooling_kw)
     return capacity_data
 
 
 @router.get("/cooling/{id}", response_model=CoolingCapacityResponse, summary="获取制冷容量详情")
-async def get_cooling_capacity(
-    id: int,
-    db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_viewer)
-):
+async def get_cooling_capacity(id: int, db: AsyncSession = Depends(get_db), _: User = Depends(require_viewer)):
     """
     根据ID获取制冷容量详情
     """
@@ -445,19 +400,13 @@ async def get_cooling_capacity(
         raise HTTPException(status_code=404, detail="制冷容量不存在")
 
     capacity_data = CoolingCapacityResponse.model_validate(capacity)
-    capacity_data.usage_rate = _calculate_usage_rate(
-        capacity.used_cooling_kw,
-        capacity.total_cooling_kw
-    )
+    capacity_data.usage_rate = _calculate_usage_rate(capacity.used_cooling_kw, capacity.total_cooling_kw)
     return capacity_data
 
 
 @router.put("/cooling/{id}", response_model=CoolingCapacityResponse, summary="更新制冷容量")
 async def update_cooling_capacity(
-    id: int,
-    data: CoolingCapacityUpdate,
-    db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_operator)
+    id: int, data: CoolingCapacityUpdate, db: AsyncSession = Depends(get_db), _: User = Depends(require_operator)
 ):
     """
     更新制冷容量信息
@@ -485,19 +434,12 @@ async def update_cooling_capacity(
     await db.refresh(capacity)
 
     capacity_data = CoolingCapacityResponse.model_validate(capacity)
-    capacity_data.usage_rate = _calculate_usage_rate(
-        capacity.used_cooling_kw,
-        capacity.total_cooling_kw
-    )
+    capacity_data.usage_rate = _calculate_usage_rate(capacity.used_cooling_kw, capacity.total_cooling_kw)
     return capacity_data
 
 
 @router.delete("/cooling/{id}", summary="删除制冷容量")
-async def delete_cooling_capacity(
-    id: int,
-    db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_operator)
-):
+async def delete_cooling_capacity(id: int, db: AsyncSession = Depends(get_db), _: User = Depends(require_operator)):
     """
     删除制冷容量
     """
@@ -515,12 +457,13 @@ async def delete_cooling_capacity(
 
 # ==================== 承重容量管理 ====================
 
+
 @router.get("/weight", response_model=List[WeightCapacityResponse], summary="获取承重容量列表")
 async def get_weight_capacities(
     skip: int = Query(0, ge=0, description="跳过记录数"),
     limit: int = Query(100, ge=1, le=1000, description="返回记录数"),
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_viewer)
+    _: User = Depends(require_viewer),
 ):
     """
     获取承重容量列表（分页）
@@ -533,10 +476,7 @@ async def get_weight_capacities(
     for capacity in capacities:
         capacity_data = WeightCapacityResponse.model_validate(capacity)
         # 计算使用率
-        capacity_data.usage_rate = _calculate_usage_rate(
-            capacity.used_weight_kg,
-            capacity.total_weight_kg
-        )
+        capacity_data.usage_rate = _calculate_usage_rate(capacity.used_weight_kg, capacity.total_weight_kg)
         response_list.append(capacity_data)
 
     return response_list
@@ -544,9 +484,7 @@ async def get_weight_capacities(
 
 @router.post("/weight", response_model=WeightCapacityResponse, summary="创建承重容量")
 async def create_weight_capacity(
-    data: WeightCapacityCreate,
-    db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_operator)
+    data: WeightCapacityCreate, db: AsyncSession = Depends(get_db), _: User = Depends(require_operator)
 ):
     """
     创建承重容量
@@ -565,19 +503,12 @@ async def create_weight_capacity(
     await db.refresh(capacity)
 
     capacity_data = WeightCapacityResponse.model_validate(capacity)
-    capacity_data.usage_rate = _calculate_usage_rate(
-        capacity.used_weight_kg,
-        capacity.total_weight_kg
-    )
+    capacity_data.usage_rate = _calculate_usage_rate(capacity.used_weight_kg, capacity.total_weight_kg)
     return capacity_data
 
 
 @router.get("/weight/{id}", response_model=WeightCapacityResponse, summary="获取承重容量详情")
-async def get_weight_capacity(
-    id: int,
-    db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_viewer)
-):
+async def get_weight_capacity(id: int, db: AsyncSession = Depends(get_db), _: User = Depends(require_viewer)):
     """
     根据ID获取承重容量详情
     """
@@ -588,19 +519,13 @@ async def get_weight_capacity(
         raise HTTPException(status_code=404, detail="承重容量不存在")
 
     capacity_data = WeightCapacityResponse.model_validate(capacity)
-    capacity_data.usage_rate = _calculate_usage_rate(
-        capacity.used_weight_kg,
-        capacity.total_weight_kg
-    )
+    capacity_data.usage_rate = _calculate_usage_rate(capacity.used_weight_kg, capacity.total_weight_kg)
     return capacity_data
 
 
 @router.put("/weight/{id}", response_model=WeightCapacityResponse, summary="更新承重容量")
 async def update_weight_capacity(
-    id: int,
-    data: WeightCapacityUpdate,
-    db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_operator)
+    id: int, data: WeightCapacityUpdate, db: AsyncSession = Depends(get_db), _: User = Depends(require_operator)
 ):
     """
     更新承重容量信息
@@ -628,19 +553,12 @@ async def update_weight_capacity(
     await db.refresh(capacity)
 
     capacity_data = WeightCapacityResponse.model_validate(capacity)
-    capacity_data.usage_rate = _calculate_usage_rate(
-        capacity.used_weight_kg,
-        capacity.total_weight_kg
-    )
+    capacity_data.usage_rate = _calculate_usage_rate(capacity.used_weight_kg, capacity.total_weight_kg)
     return capacity_data
 
 
 @router.delete("/weight/{id}", summary="删除承重容量")
-async def delete_weight_capacity(
-    id: int,
-    db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_operator)
-):
+async def delete_weight_capacity(id: int, db: AsyncSession = Depends(get_db), _: User = Depends(require_operator)):
     """
     删除承重容量
     """
@@ -658,20 +576,20 @@ async def delete_weight_capacity(
 
 # ==================== 容量规划管理 ====================
 
+
 @router.post("/recommend", response_model=RackingRecommendationResponse, summary="智能上架推荐")
 async def get_racking_recommendation(
-    data: RackingRecommendationRequest,
-    db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_viewer)
+    data: RackingRecommendationRequest, db: AsyncSession = Depends(get_db), _: User = Depends(require_viewer)
 ):
     """
     基于设备需求推荐最优上架位置（FR60简化版）
     """
     # 1. 单次聚合查询所有机柜的 used_u（避免 N+1）
-    used_u_query = select(
-        Asset.cabinet_id,
-        func.coalesce(func.sum(Asset.u_height), 0).label("used_u")
-    ).where(Asset.u_height.isnot(None)).group_by(Asset.cabinet_id)
+    used_u_query = (
+        select(Asset.cabinet_id, func.coalesce(func.sum(Asset.u_height), 0).label("used_u"))
+        .where(Asset.u_height.isnot(None))
+        .group_by(Asset.cabinet_id)
+    )
     used_u_result = await db.execute(used_u_query)
     used_u_map = {row.cabinet_id: int(row.used_u) for row in used_u_result}
 
@@ -697,7 +615,9 @@ async def get_racking_recommendation(
         else:
             if strict and cabinet.max_power < data.required_power_kw:
                 return None  # 严格模式下排除
-            power_score = min(100, (cabinet.max_power / data.required_power_kw) * 50) if data.required_power_kw > 0 else 100.0
+            power_score = (
+                min(100, (cabinet.max_power / data.required_power_kw) * 50) if data.required_power_kw > 0 else 100.0
+            )
 
         # 制冷评分
         best_match = None
@@ -726,7 +646,9 @@ async def get_racking_recommendation(
         else:
             if strict and cabinet.max_weight < data.required_weight_kg:
                 return None  # 严格模式下排除
-            weight_score = min(100, (cabinet.max_weight / data.required_weight_kg) * 50) if data.required_weight_kg > 0 else 100.0
+            weight_score = (
+                min(100, (cabinet.max_weight / data.required_weight_kg) * 50) if data.required_weight_kg > 0 else 100.0
+            )
 
         # 综合评分
         total_score = space_score * 0.4 + power_score * 0.2 + cooling_score * 0.2 + weight_score * 0.2
@@ -784,7 +706,7 @@ async def get_racking_recommendation(
             available_u=available_u,
             max_power=cabinet.max_power,
             max_weight=cabinet.max_weight,
-            notes="，".join(notes_parts)
+            notes="，".join(notes_parts),
         )
 
     # 5. 第一轮：严格筛选
@@ -816,9 +738,9 @@ async def get_racking_recommendation(
 
     return RackingRecommendationResponse(
         request=data,
-        candidates=candidates[:data.limit],
+        candidates=candidates[: data.limit],
         total_cabinets_evaluated=total_evaluated,
-        qualified_count=qualified_count
+        qualified_count=qualified_count,
     )
 
 
@@ -827,7 +749,7 @@ async def get_capacity_plans(
     skip: int = Query(0, ge=0, description="跳过记录数"),
     limit: int = Query(100, ge=1, le=1000, description="返回记录数"),
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_viewer)
+    _: User = Depends(require_viewer),
 ):
     """
     获取容量规划列表（分页）
@@ -841,9 +763,7 @@ async def get_capacity_plans(
 
 @router.post("/plans", response_model=CapacityPlanResponse, summary="创建容量规划")
 async def create_capacity_plan(
-    data: CapacityPlanCreate,
-    db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_operator)
+    data: CapacityPlanCreate, db: AsyncSession = Depends(get_db), _: User = Depends(require_operator)
 ):
     """
     创建容量规划（自动评估可行性）
@@ -860,10 +780,7 @@ async def create_capacity_plan(
     if plan.required_u:
         space_result = await db.execute(select(SpaceCapacity))
         space_capacities = space_result.scalars().all()
-        total_available_u = sum(
-            (sc.total_u_positions or 0) - (sc.used_u_positions or 0)
-            for sc in space_capacities
-        )
+        total_available_u = sum((sc.total_u_positions or 0) - (sc.used_u_positions or 0) for sc in space_capacities)
         if total_available_u >= plan.required_u:
             notes.append(f"空间容量检查通过: 可用U位 {total_available_u}U >= 所需 {plan.required_u}U")
         else:
@@ -874,12 +791,11 @@ async def create_capacity_plan(
     if plan.required_power_kw:
         power_result = await db.execute(select(PowerCapacity))
         power_capacities = power_result.scalars().all()
-        total_available_power = sum(
-            (pc.total_capacity_kw or 0) - (pc.used_capacity_kw or 0)
-            for pc in power_capacities
-        )
+        total_available_power = sum((pc.total_capacity_kw or 0) - (pc.used_capacity_kw or 0) for pc in power_capacities)
         if total_available_power >= plan.required_power_kw:
-            notes.append(f"电力容量检查通过: 可用电力 {total_available_power:.2f}kW >= 所需 {plan.required_power_kw:.2f}kW")
+            notes.append(
+                f"电力容量检查通过: 可用电力 {total_available_power:.2f}kW >= 所需 {plan.required_power_kw:.2f}kW"
+            )
         else:
             notes.append(f"电力容量不足: 可用电力 {total_available_power:.2f}kW < 所需 {plan.required_power_kw:.2f}kW")
             is_feasible = False
@@ -889,27 +805,31 @@ async def create_capacity_plan(
         cooling_result = await db.execute(select(CoolingCapacity))
         cooling_capacities = cooling_result.scalars().all()
         total_available_cooling = sum(
-            (cc.total_cooling_kw or 0) - (cc.used_cooling_kw or 0)
-            for cc in cooling_capacities
+            (cc.total_cooling_kw or 0) - (cc.used_cooling_kw or 0) for cc in cooling_capacities
         )
         if total_available_cooling >= plan.required_cooling_kw:
-            notes.append(f"制冷容量检查通过: 可用制冷 {total_available_cooling:.2f}kW >= 所需 {plan.required_cooling_kw:.2f}kW")
+            notes.append(
+                f"制冷容量检查通过: 可用制冷 {total_available_cooling:.2f}kW >= 所需 {plan.required_cooling_kw:.2f}kW"
+            )
         else:
-            notes.append(f"制冷容量不足: 可用制冷 {total_available_cooling:.2f}kW < 所需 {plan.required_cooling_kw:.2f}kW")
+            notes.append(
+                f"制冷容量不足: 可用制冷 {total_available_cooling:.2f}kW < 所需 {plan.required_cooling_kw:.2f}kW"
+            )
             is_feasible = False
 
     # 检查承重容量
     if plan.required_weight_kg:
         weight_result = await db.execute(select(WeightCapacity))
         weight_capacities = weight_result.scalars().all()
-        total_available_weight = sum(
-            (wc.total_weight_kg or 0) - (wc.used_weight_kg or 0)
-            for wc in weight_capacities
-        )
+        total_available_weight = sum((wc.total_weight_kg or 0) - (wc.used_weight_kg or 0) for wc in weight_capacities)
         if total_available_weight >= plan.required_weight_kg:
-            notes.append(f"承重容量检查通过: 可用承重 {total_available_weight:.2f}kg >= 所需 {plan.required_weight_kg:.2f}kg")
+            notes.append(
+                f"承重容量检查通过: 可用承重 {total_available_weight:.2f}kg >= 所需 {plan.required_weight_kg:.2f}kg"
+            )
         else:
-            notes.append(f"承重容量不足: 可用承重 {total_available_weight:.2f}kg < 所需 {plan.required_weight_kg:.2f}kg")
+            notes.append(
+                f"承重容量不足: 可用承重 {total_available_weight:.2f}kg < 所需 {plan.required_weight_kg:.2f}kg"
+            )
             is_feasible = False
 
     if not notes:
@@ -925,11 +845,7 @@ async def create_capacity_plan(
 
 
 @router.get("/plans/{id}", response_model=CapacityPlanResponse, summary="获取容量规划详情")
-async def get_capacity_plan(
-    id: int,
-    db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_viewer)
-):
+async def get_capacity_plan(id: int, db: AsyncSession = Depends(get_db), _: User = Depends(require_viewer)):
     """
     根据ID获取容量规划详情
     """
@@ -947,7 +863,7 @@ async def override_plan_cabinet(
     id: int,
     cabinet_id: int = Body(..., embed=True, alias="target_cabinet_id"),
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_operator)
+    _: User = Depends(require_operator),
 ):
     """
     人工覆盖推荐机柜（基于目标机柜重新评估可行性）
@@ -967,8 +883,7 @@ async def override_plan_cabinet(
     # 计算该机柜的 used_u
     used_u_result = await db.execute(
         select(func.coalesce(func.sum(Asset.u_height), 0)).where(
-            Asset.cabinet_id == cabinet_id,
-            Asset.u_height.isnot(None)
+            Asset.cabinet_id == cabinet_id, Asset.u_height.isnot(None)
         )
     )
     used_u = int(used_u_result.scalar() or 0)
@@ -1017,11 +932,7 @@ async def override_plan_cabinet(
 
 
 @router.delete("/plans/{id}", summary="删除容量规划")
-async def delete_capacity_plan(
-    id: int,
-    db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_operator)
-):
+async def delete_capacity_plan(id: int, db: AsyncSession = Depends(get_db), _: User = Depends(require_operator)):
     """
     删除容量规划
     """
@@ -1057,14 +968,14 @@ def _auto_interval(start: datetime, end: datetime) -> str:
 def _bucket_key(dt: datetime, interval: str) -> str:
     """根据聚合粒度生成时间桶 key"""
     if interval == "hour":
-        return dt.strftime('%Y-%m-%d %H:00')
+        return dt.strftime("%Y-%m-%d %H:00")
     elif interval == "day":
-        return dt.strftime('%Y-%m-%d')
+        return dt.strftime("%Y-%m-%d")
     elif interval == "week":
         iso = dt.isocalendar()
         return f"{iso[0]}-W{iso[1]:02d}"
     else:  # month
-        return dt.strftime('%Y-%m')
+        return dt.strftime("%Y-%m")
 
 
 @router.get("/trend", response_model=CapacityTrendResponse, summary="获取容量趋势数据")
@@ -1074,7 +985,7 @@ async def get_capacity_trend(
     end_time: Optional[str] = Query(None, description="结束时间 ISO格式"),
     interval: Optional[str] = Query(None, description="聚合粒度: hour/day/week/month"),
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_viewer)
+    _: User = Depends(require_viewer),
 ):
     """获取容量趋势数据"""
     if cap_type not in _VALID_CAP_TYPES:
@@ -1140,7 +1051,7 @@ async def get_capacity_forecast(
     cap_type: Optional[str] = Query("space", alias="type", description="容量类型"),
     days: int = Query(90, ge=30, le=365, description="预测天数(30-365)"),
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_viewer)
+    _: User = Depends(require_viewer),
 ):
     """获取容量预测数据"""
     if cap_type not in _VALID_CAP_TYPES:
@@ -1163,7 +1074,7 @@ async def get_capacity_forecast(
     # 按日聚合
     daily: Dict[str, list] = defaultdict(list)
     for r in rows:
-        day_key = r.recorded_at.strftime('%Y-%m-%d')
+        day_key = r.recorded_at.strftime("%Y-%m-%d")
         daily[day_key].append(r.usage_rate or 0)
 
     day_keys = sorted(daily.keys())
@@ -1188,7 +1099,7 @@ async def get_capacity_forecast(
 
         for i in range(days):
             future_day = now + timedelta(days=i + 1)
-            ts = future_day.strftime('%Y-%m-%d')
+            ts = future_day.strftime("%Y-%m-%d")
             pred = float(slope * (base_idx + i) + intercept)
             pred_clamped = min(100.0, max(0.0, round(pred, 2)))
             upper = min(100.0, round(pred_clamped + 1.96 * residual_std, 2))
@@ -1204,25 +1115,29 @@ async def get_capacity_forecast(
 
         # 扩容建议
         if current_rate > 80:
-            suggestions.append(ExpansionSuggestion(
-                capacity_type=cap_type,
-                current_usage_rate=round(current_rate, 2),
-                predicted_exceed_date="当前",
-                predicted_usage_rate=round(current_rate, 2),
-                resource_gap=f"当前使用率已达 {round(current_rate, 2)}%",
-                suggestion=f"{cap_type} 容量当前已超过80%阈值，建议立即扩容",
-            ))
+            suggestions.append(
+                ExpansionSuggestion(
+                    capacity_type=cap_type,
+                    current_usage_rate=round(current_rate, 2),
+                    predicted_exceed_date="当前",
+                    predicted_usage_rate=round(current_rate, 2),
+                    resource_gap=f"当前使用率已达 {round(current_rate, 2)}%",
+                    suggestion=f"{cap_type} 容量当前已超过80%阈值，建议立即扩容",
+                )
+            )
         elif first_exceed_idx is not None:
-            exceed_date = (now + timedelta(days=first_exceed_idx + 1)).strftime('%Y-%m-%d')
+            exceed_date = (now + timedelta(days=first_exceed_idx + 1)).strftime("%Y-%m-%d")
             exceed_rate = predicted_usage[first_exceed_idx]
-            suggestions.append(ExpansionSuggestion(
-                capacity_type=cap_type,
-                current_usage_rate=round(current_rate, 2),
-                predicted_exceed_date=exceed_date,
-                predicted_usage_rate=exceed_rate,
-                resource_gap=f"预计 {exceed_date} 使用率将达 {exceed_rate}%",
-                suggestion=f"{cap_type} 容量预计在 {exceed_date} 超过80%阈值，建议提前规划扩容",
-            ))
+            suggestions.append(
+                ExpansionSuggestion(
+                    capacity_type=cap_type,
+                    current_usage_rate=round(current_rate, 2),
+                    predicted_exceed_date=exceed_date,
+                    predicted_usage_rate=exceed_rate,
+                    resource_gap=f"预计 {exceed_date} 使用率将达 {exceed_rate}%",
+                    suggestion=f"{cap_type} 容量预计在 {exceed_date} 超过80%阈值，建议提前规划扩容",
+                )
+            )
 
         return CapacityForecastResponse(
             timestamps=timestamps,
@@ -1272,7 +1187,7 @@ async def get_capacity_forecast(
 
         for i in range(days):
             future_day = now + timedelta(days=i + 1)
-            ts = future_day.strftime('%Y-%m-%d')
+            ts = future_day.strftime("%Y-%m-%d")
             pred = min(100.0, max(0.0, round(base_rate + daily_growth * i, 2)))
             upper = min(100.0, round(pred + 5.0, 2))
             lower = max(0.0, round(pred - 5.0, 2))
@@ -1290,25 +1205,29 @@ async def get_capacity_forecast(
                 break
 
         if base_rate > 80:
-            suggestions.append(ExpansionSuggestion(
-                capacity_type=cap_type,
-                current_usage_rate=round(base_rate, 2),
-                predicted_exceed_date="当前",
-                predicted_usage_rate=round(base_rate, 2),
-                resource_gap=f"当前使用率已达 {round(base_rate, 2)}%",
-                suggestion=f"{cap_type} 容量当前已超过80%阈值，建议立即扩容",
-            ))
+            suggestions.append(
+                ExpansionSuggestion(
+                    capacity_type=cap_type,
+                    current_usage_rate=round(base_rate, 2),
+                    predicted_exceed_date="当前",
+                    predicted_usage_rate=round(base_rate, 2),
+                    resource_gap=f"当前使用率已达 {round(base_rate, 2)}%",
+                    suggestion=f"{cap_type} 容量当前已超过80%阈值，建议立即扩容",
+                )
+            )
         elif first_exceed_idx is not None:
-            exceed_date = (now + timedelta(days=first_exceed_idx + 1)).strftime('%Y-%m-%d')
+            exceed_date = (now + timedelta(days=first_exceed_idx + 1)).strftime("%Y-%m-%d")
             exceed_rate = predicted_usage[first_exceed_idx]
-            suggestions.append(ExpansionSuggestion(
-                capacity_type=cap_type,
-                current_usage_rate=round(base_rate, 2),
-                predicted_exceed_date=exceed_date,
-                predicted_usage_rate=exceed_rate,
-                resource_gap=f"预计 {exceed_date} 使用率将达 {exceed_rate}%",
-                suggestion=f"{cap_type} 容量预计在 {exceed_date} 超过80%阈值，建议提前规划扩容",
-            ))
+            suggestions.append(
+                ExpansionSuggestion(
+                    capacity_type=cap_type,
+                    current_usage_rate=round(base_rate, 2),
+                    predicted_exceed_date=exceed_date,
+                    predicted_usage_rate=exceed_rate,
+                    resource_gap=f"预计 {exceed_date} 使用率将达 {exceed_rate}%",
+                    suggestion=f"{cap_type} 容量预计在 {exceed_date} 超过80%阈值，建议提前规划扩容",
+                )
+            )
 
         return CapacityForecastResponse(
             timestamps=timestamps,
@@ -1322,11 +1241,9 @@ async def get_capacity_forecast(
 
 # ==================== 容量统计 ====================
 
+
 @router.get("/statistics", response_model=Dict[str, Any], summary="获取容量统计信息")
-async def get_capacity_statistics(
-    db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_viewer)
-):
+async def get_capacity_statistics(db: AsyncSession = Depends(get_db), _: User = Depends(require_viewer)):
     """
     获取所有类型容量的统计信息
     """
@@ -1340,7 +1257,7 @@ async def get_capacity_statistics(
         "used_u_positions": used_u,
         "available_u_positions": total_u - used_u,
         "usage_rate": round(used_u / total_u * 100, 2) if total_u > 0 else 0,
-        "count": len(space_capacities)
+        "count": len(space_capacities),
     }
 
     # 电力容量统计
@@ -1353,7 +1270,7 @@ async def get_capacity_statistics(
         "used_capacity_kw": used_power,
         "available_capacity_kw": total_power - used_power,
         "usage_rate": round(used_power / total_power * 100, 2) if total_power > 0 else 0,
-        "count": len(power_capacities)
+        "count": len(power_capacities),
     }
 
     # 制冷容量统计
@@ -1366,7 +1283,7 @@ async def get_capacity_statistics(
         "used_cooling_kw": used_cooling,
         "available_cooling_kw": total_cooling - used_cooling,
         "usage_rate": round(used_cooling / total_cooling * 100, 2) if total_cooling > 0 else 0,
-        "count": len(cooling_capacities)
+        "count": len(cooling_capacities),
     }
 
     # 承重容量统计
@@ -1379,16 +1296,11 @@ async def get_capacity_statistics(
         "used_weight_kg": used_weight,
         "available_weight_kg": total_weight - used_weight,
         "usage_rate": round(used_weight / total_weight * 100, 2) if total_weight > 0 else 0,
-        "count": len(weight_capacities)
+        "count": len(weight_capacities),
     }
 
     # 状态统计
-    status_counts = {
-        "normal": 0,
-        "warning": 0,
-        "critical": 0,
-        "full": 0
-    }
+    status_counts = {"normal": 0, "warning": 0, "critical": 0, "full": 0}
 
     for sc in space_capacities:
         if sc.status:
@@ -1410,9 +1322,8 @@ async def get_capacity_statistics(
         "weight": weight_stats,
         "status_summary": status_counts,
         "total_capacity_records": (
-            len(space_capacities) + len(power_capacities) +
-            len(cooling_capacities) + len(weight_capacities)
-        )
+            len(space_capacities) + len(power_capacities) + len(cooling_capacities) + len(weight_capacities)
+        ),
     }
 
 
@@ -1420,7 +1331,7 @@ def _parse_location_key(location: Optional[str], dimension: str) -> str:
     """根据维度解析 location 分组键"""
     if not location or not location.strip():
         return "未分类"
-    parts = re.split(r'[/\-\s]+', location.strip())
+    parts = re.split(r"[/\-\s]+", location.strip())
     parts = [p for p in parts if p]
     if not parts:
         return "未分类"
@@ -1436,7 +1347,7 @@ def _parse_location_key(location: Optional[str], dimension: str) -> str:
 async def get_capacity_statistics_by_location(
     dimension: str = Query("area", description="聚合维度: area/floor/room"),
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_viewer)
+    _: User = Depends(require_viewer),
 ):
     """按区域维度聚合四维容量统计"""
     # 查询四维容量表
@@ -1489,9 +1400,7 @@ async def get_capacity_statistics_by_location(
             ("cooling", "used_cooling_kw", "total_cooling_kw"),
             ("weight", "used_weight_kg", "total_weight_kg"),
         ]:
-            g[dim_key]["usage_rate"] = _calculate_usage_rate(
-                g[dim_key][used_field], g[dim_key][total_field]
-            ) or 0.0
+            g[dim_key]["usage_rate"] = _calculate_usage_rate(g[dim_key][used_field], g[dim_key][total_field]) or 0.0
 
     return {"items": list(groups.values())}
 
@@ -1501,7 +1410,7 @@ async def get_capacity_alerts(
     cap_type: Optional[str] = Query(None, alias="type", description="容量类型: space/power/cooling/weight"),
     status: Optional[str] = Query(None, description="状态: warning/critical/full"),
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_viewer)
+    _: User = Depends(require_viewer),
 ):
     """获取容量预警列表（status 为 warning/critical/full 的记录）"""
     alert_statuses = [CapacityStatus.warning, CapacityStatus.critical, CapacityStatus.full]
@@ -1538,14 +1447,16 @@ async def get_capacity_alerts(
         rows = (await db.execute(query)).scalars().all()
         for record in rows:
             used, total = _get_used_total(cap_type, record)
-            alerts.append({
-                "type": cap_type,
-                "name": record.name,
-                "location": record.location or "",
-                "status": record.status.value if record.status else "warning",
-                "usage_rate": _calculate_usage_rate(used, total) or 0.0,
-                "threshold": record.warning_threshold,
-                "created_at": record.created_at.isoformat() if record.created_at else None,
-            })
+            alerts.append(
+                {
+                    "type": cap_type,
+                    "name": record.name,
+                    "location": record.location or "",
+                    "status": record.status.value if record.status else "warning",
+                    "usage_rate": _calculate_usage_rate(used, total) or 0.0,
+                    "threshold": record.warning_threshold,
+                    "created_at": record.created_at.isoformat() if record.created_at else None,
+                }
+            )
 
     return alerts

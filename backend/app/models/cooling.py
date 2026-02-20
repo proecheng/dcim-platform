@@ -1,14 +1,16 @@
 """
 制冷系统模型 - 精密空调、群控组、冷通道
 """
+
 from datetime import datetime
-from sqlalchemy import Column, Integer, String, Boolean, Float, Text, DateTime, ForeignKey
+from sqlalchemy import Column, Integer, String, Float, Text, DateTime, ForeignKey
 
 from ..core.database import Base
 
 
 class CoolingGroup(Base):
     """空调群控组"""
+
     __tablename__ = "cooling_groups"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -21,6 +23,7 @@ class CoolingGroup(Base):
 
 class CoolingUnit(Base):
     """精密空调扩展表"""
+
     __tablename__ = "cooling_units"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -38,6 +41,7 @@ class CoolingUnit(Base):
 
 class ColdAisle(Base):
     """冷通道（天窗系统）"""
+
     __tablename__ = "cold_aisles"
 
     id = Column(Integer, primary_key=True, autoincrement=True)

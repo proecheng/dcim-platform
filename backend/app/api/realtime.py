@@ -1,6 +1,7 @@
 """
 实时数据路由
 """
+
 from typing import List, Optional
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -18,12 +19,14 @@ async def get_realtime_data(
     point_type: Optional[str] = Query(None, description="点位类型"),
     area_code: Optional[str] = Query(None, description="区域代码"),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
 ):
     """获取所有点位实时数据"""
-    query = select(Point, PointRealtime).outerjoin(
-        PointRealtime, Point.id == PointRealtime.point_id
-    ).where(Point.is_enabled == True)
+    query = (
+        select(Point, PointRealtime)
+        .outerjoin(PointRealtime, Point.id == PointRealtime.point_id)
+        .where(Point.is_enabled == True)
+    )
 
     if point_type:
         query = query.where(Point.point_type == point_type)
@@ -44,29 +47,26 @@ async def get_realtime_data(
             unit=point.unit,
             quality=realtime.quality if realtime else 0,
             status=realtime.status if realtime else "offline",
-            updated_at=realtime.updated_at if realtime else None
+            updated_at=realtime.updated_at if realtime else None,
         )
         for point, realtime in rows
     ]
 
 
 @router.get("/summary", response_model=RealtimeSummary)
-async def get_realtime_summary(
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
-):
+async def get_realtime_summary(db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     """获取实时数据汇总"""
     # 总点位数
-    total_result = await db.execute(
-        select(func.count(Point.id)).where(Point.is_enabled == True)
-    )
+    total_result = await db.execute(select(func.count(Point.id)).where(Point.is_enabled == True))
     total = total_result.scalar() or 0
 
     # 各状态统计
-    query = select(
-        PointRealtime.status,
-        func.count(PointRealtime.point_id)
-    ).join(Point).where(Point.is_enabled == True).group_by(PointRealtime.status)
+    query = (
+        select(PointRealtime.status, func.count(PointRealtime.point_id))
+        .join(Point)
+        .where(Point.is_enabled == True)
+        .group_by(PointRealtime.status)
+    )
 
     result = await db.execute(query)
     status_counts = {row[0]: row[1] for row in result.all()}
@@ -75,26 +75,27 @@ async def get_realtime_summary(
         total=total,
         normal=status_counts.get("normal", 0),
         alarm=status_counts.get("alarm", 0),
-        offline=status_counts.get("offline", 0)
+        offline=status_counts.get("offline", 0),
     )
 
 
 @router.get("/{point_id}", response_model=PointRealtimeResponse)
 async def get_point_realtime(
-    point_id: int,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    point_id: int, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)
 ):
     """获取单个点位实时数据"""
-    query = select(Point, PointRealtime).outerjoin(
-        PointRealtime, Point.id == PointRealtime.point_id
-    ).where(Point.id == point_id)
+    query = (
+        select(Point, PointRealtime)
+        .outerjoin(PointRealtime, Point.id == PointRealtime.point_id)
+        .where(Point.id == point_id)
+    )
 
     result = await db.execute(query)
     row = result.first()
 
     if not row:
         from fastapi import HTTPException
+
         raise HTTPException(status_code=404, detail="点位不存在")
 
     point, realtime = row
@@ -108,5 +109,5 @@ async def get_point_realtime(
         unit=point.unit,
         quality=realtime.quality if realtime else 0,
         status=realtime.status if realtime else "offline",
-        updated_at=realtime.updated_at if realtime else None
+        updated_at=realtime.updated_at if realtime else None,
     )

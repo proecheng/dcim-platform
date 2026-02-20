@@ -6,7 +6,6 @@ Plugin Manager
 Responsible for plugin registration, configuration and execution
 """
 
-import asyncio
 import logging
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Type
@@ -22,17 +21,9 @@ from .base import (
     PowerData,
     BillData,
     DeviceData,
-    EnvironmentData
+    EnvironmentData,
 )
-from app.models.energy import (
-    PowerDevice,
-    EnergyDaily,
-    EnergyMonthly,
-    ElectricityPricing,
-    EnergySuggestion,
-    PUEHistory
-)
-from app.models.point import Point, PointRealtime
+from app.models.energy import PowerDevice, EnergyDaily, EnergyMonthly, ElectricityPricing, EnergySuggestion, PUEHistory
 
 logger = logging.getLogger(__name__)
 
@@ -48,7 +39,7 @@ class PluginManager:
     - 保存分析结果
     """
 
-    _instance: Optional['PluginManager'] = None
+    _instance: Optional["PluginManager"] = None
     _plugins: Dict[str, AnalysisPlugin] = {}
     _plugin_classes: Dict[str, Type[AnalysisPlugin]] = {}
 
@@ -61,7 +52,7 @@ class PluginManager:
         return cls._instance
 
     @classmethod
-    def get_instance(cls) -> 'PluginManager':
+    def get_instance(cls) -> "PluginManager":
         """获取单例实例"""
         return cls()
 
@@ -169,11 +160,7 @@ class PluginManager:
             return True
         return False
 
-    async def build_context(
-        self,
-        db: AsyncSession,
-        days: int = 30
-    ) -> AnalysisContext:
+    async def build_context(self, db: AsyncSession, days: int = 30) -> AnalysisContext:
         """
         构建分析上下文
 
@@ -187,10 +174,7 @@ class PluginManager:
         now = datetime.now()
         start_date = now - timedelta(days=days)
 
-        context = AnalysisContext(
-            analysis_start=start_date,
-            analysis_end=now
-        )
+        context = AnalysisContext(analysis_start=start_date, analysis_end=now)
 
         # 1. 获取能耗数据
         context.energy_data = await self._load_energy_data(db, start_date, now)
@@ -219,38 +203,32 @@ class PluginManager:
 
         return context
 
-    async def _load_energy_data(
-        self,
-        db: AsyncSession,
-        start_date: datetime,
-        end_date: datetime
-    ) -> List[EnergyData]:
+    async def _load_energy_data(self, db: AsyncSession, start_date: datetime, end_date: datetime) -> List[EnergyData]:
         """加载能耗数据"""
         energy_data = []
 
         try:
             result = await db.execute(
-                select(EnergyDaily).where(
-                    and_(
-                        EnergyDaily.date >= start_date.date(),
-                        EnergyDaily.date <= end_date.date()
-                    )
-                ).order_by(EnergyDaily.date)
+                select(EnergyDaily)
+                .where(and_(EnergyDaily.date >= start_date.date(), EnergyDaily.date <= end_date.date()))
+                .order_by(EnergyDaily.date)
             )
             records = result.scalars().all()
 
             for record in records:
-                energy_data.append(EnergyData(
-                    date=datetime.combine(record.date, datetime.min.time()),
-                    total_energy=record.total_energy or 0,
-                    peak_energy=record.peak_energy or 0,
-                    valley_energy=record.valley_energy or 0,
-                    flat_energy=record.flat_energy or 0,
-                    peak_cost=record.peak_cost or 0,
-                    valley_cost=record.valley_cost or 0,
-                    flat_cost=record.flat_cost or 0,
-                    total_cost=record.total_cost or 0
-                ))
+                energy_data.append(
+                    EnergyData(
+                        date=datetime.combine(record.date, datetime.min.time()),
+                        total_energy=record.total_energy or 0,
+                        peak_energy=record.peak_energy or 0,
+                        valley_energy=record.valley_energy or 0,
+                        flat_energy=record.flat_energy or 0,
+                        peak_cost=record.peak_cost or 0,
+                        valley_cost=record.valley_cost or 0,
+                        flat_cost=record.flat_cost or 0,
+                        total_cost=record.total_cost or 0,
+                    )
+                )
         except Exception as e:
             logger.error(f"加载能耗数据失败: {e}")
             # 生成模拟数据用于演示
@@ -258,11 +236,7 @@ class PluginManager:
 
         return energy_data
 
-    def _generate_mock_energy_data(
-        self,
-        start_date: datetime,
-        end_date: datetime
-    ) -> List[EnergyData]:
+    def _generate_mock_energy_data(self, start_date: datetime, end_date: datetime) -> List[EnergyData]:
         """
         生成确定性的模拟能耗数据
 
@@ -287,17 +261,19 @@ class PluginManager:
             valley_energy = base_energy * valley_ratio
             flat_energy = base_energy * flat_ratio
 
-            energy_data.append(EnergyData(
-                date=current,
-                total_energy=base_energy,
-                peak_energy=peak_energy,
-                valley_energy=valley_energy,
-                flat_energy=flat_energy,
-                peak_cost=peak_energy * 1.2,
-                valley_cost=valley_energy * 0.4,
-                flat_cost=flat_energy * 0.8,
-                total_cost=peak_energy * 1.2 + valley_energy * 0.4 + flat_energy * 0.8
-            ))
+            energy_data.append(
+                EnergyData(
+                    date=current,
+                    total_energy=base_energy,
+                    peak_energy=peak_energy,
+                    valley_energy=valley_energy,
+                    flat_energy=flat_energy,
+                    peak_cost=peak_energy * 1.2,
+                    valley_cost=valley_energy * 0.4,
+                    flat_cost=flat_energy * 0.8,
+                    total_cost=peak_energy * 1.2 + valley_energy * 0.4 + flat_energy * 0.8,
+                )
+            )
             current += timedelta(days=1)
 
         return energy_data
@@ -308,26 +284,26 @@ class PluginManager:
 
         try:
             # 从 PowerDevice 和 PointRealtime 获取实时功率数据
-            result = await db.execute(
-                select(PowerDevice).where(PowerDevice.status == 'online')
-            )
+            result = await db.execute(select(PowerDevice).where(PowerDevice.status == "online"))
             devices = result.scalars().all()
 
             for device in devices:
-                power_data.append(PowerData(
-                    timestamp=datetime.now(),
-                    device_id=str(device.id),
-                    device_name=device.name,
-                    device_type=device.device_type,
-                    voltage=device.voltage or 380,
-                    current=device.current or 0,
-                    active_power=device.active_power or 0,
-                    reactive_power=device.reactive_power or 0,
-                    apparent_power=device.apparent_power or 0,
-                    power_factor=device.power_factor or 0.95,
-                    frequency=device.frequency or 50,
-                    load_rate=device.load_rate or 0
-                ))
+                power_data.append(
+                    PowerData(
+                        timestamp=datetime.now(),
+                        device_id=str(device.id),
+                        device_name=device.name,
+                        device_type=device.device_type,
+                        voltage=device.voltage or 380,
+                        current=device.current or 0,
+                        active_power=device.active_power or 0,
+                        reactive_power=device.reactive_power or 0,
+                        apparent_power=device.apparent_power or 0,
+                        power_factor=device.power_factor or 0.95,
+                        frequency=device.frequency or 50,
+                        load_rate=device.load_rate or 0,
+                    )
+                )
         except Exception as e:
             logger.error(f"加载功率数据失败: {e}")
             # 生成模拟数据
@@ -344,16 +320,16 @@ class PluginManager:
         power_data = []
 
         device_types = [
-            ('UPS-1', 'UPS', 100),
-            ('UPS-2', 'UPS', 100),
-            ('PDU-A1', 'PDU', 30),
-            ('PDU-A2', 'PDU', 30),
-            ('PDU-B1', 'PDU', 30),
-            ('AC-1', 'AIR_CONDITIONER', 20),
-            ('AC-2', 'AIR_CONDITIONER', 20),
-            ('Server-Rack-1', 'IT_EQUIPMENT', 15),
-            ('Server-Rack-2', 'IT_EQUIPMENT', 15),
-            ('Server-Rack-3', 'IT_EQUIPMENT', 15),
+            ("UPS-1", "UPS", 100),
+            ("UPS-2", "UPS", 100),
+            ("PDU-A1", "PDU", 30),
+            ("PDU-A2", "PDU", 30),
+            ("PDU-B1", "PDU", 30),
+            ("AC-1", "AIR_CONDITIONER", 20),
+            ("AC-2", "AIR_CONDITIONER", 20),
+            ("Server-Rack-1", "IT_EQUIPMENT", 15),
+            ("Server-Rack-2", "IT_EQUIPMENT", 15),
+            ("Server-Rack-3", "IT_EQUIPMENT", 15),
         ]
 
         for i, (name, dtype, rated_power) in enumerate(device_types):
@@ -363,57 +339,57 @@ class PluginManager:
             # 确定性的功率因数
             power_factor = 0.88 + (i % 10) * 0.01  # 0.88-0.97
             apparent_power = active_power / power_factor
-            reactive_power = (apparent_power**2 - active_power**2)**0.5
+            reactive_power = (apparent_power**2 - active_power**2) ** 0.5
 
-            power_data.append(PowerData(
-                timestamp=datetime.now(),
-                device_id=str(i + 1),
-                device_name=name,
-                device_type=dtype,
-                voltage=380 + (i % 5) - 2,  # 378-382
-                current=active_power * 1000 / (380 * 1.732),
-                active_power=active_power,
-                reactive_power=reactive_power,
-                apparent_power=apparent_power,
-                power_factor=power_factor,
-                frequency=50.0,
-                load_rate=load_rate * 100
-            ))
+            power_data.append(
+                PowerData(
+                    timestamp=datetime.now(),
+                    device_id=str(i + 1),
+                    device_name=name,
+                    device_type=dtype,
+                    voltage=380 + (i % 5) - 2,  # 378-382
+                    current=active_power * 1000 / (380 * 1.732),
+                    active_power=active_power,
+                    reactive_power=reactive_power,
+                    apparent_power=apparent_power,
+                    power_factor=power_factor,
+                    frequency=50.0,
+                    load_rate=load_rate * 100,
+                )
+            )
 
         return power_data
 
-    async def _load_bill_data(
-        self,
-        db: AsyncSession,
-        days: int = 365
-    ) -> List[BillData]:
+    async def _load_bill_data(self, db: AsyncSession, days: int = 365) -> List[BillData]:
         """加载账单数据"""
         bill_data = []
 
         try:
             start_date = datetime.now() - timedelta(days=days)
             result = await db.execute(
-                select(EnergyMonthly).where(
-                    EnergyMonthly.month >= start_date.strftime('%Y-%m')
-                ).order_by(EnergyMonthly.month)
+                select(EnergyMonthly)
+                .where(EnergyMonthly.month >= start_date.strftime("%Y-%m"))
+                .order_by(EnergyMonthly.month)
             )
             records = result.scalars().all()
 
             for record in records:
                 total_energy = (record.peak_energy or 0) + (record.valley_energy or 0) + (record.flat_energy or 0)
                 if total_energy > 0:
-                    bill_data.append(BillData(
-                        period_start=datetime.strptime(record.month + '-01', '%Y-%m-%d'),
-                        period_end=datetime.strptime(record.month + '-01', '%Y-%m-%d') + timedelta(days=30),
-                        total_energy=total_energy,
-                        total_cost=record.total_cost or 0,
-                        peak_ratio=(record.peak_energy or 0) / total_energy,
-                        valley_ratio=(record.valley_energy or 0) / total_energy,
-                        flat_ratio=(record.flat_energy or 0) / total_energy,
-                        demand_cost=0,
-                        basic_cost=0,
-                        max_demand=record.max_power or 0
-                    ))
+                    bill_data.append(
+                        BillData(
+                            period_start=datetime.strptime(record.month + "-01", "%Y-%m-%d"),
+                            period_end=datetime.strptime(record.month + "-01", "%Y-%m-%d") + timedelta(days=30),
+                            total_energy=total_energy,
+                            total_cost=record.total_cost or 0,
+                            peak_ratio=(record.peak_energy or 0) / total_energy,
+                            valley_ratio=(record.valley_energy or 0) / total_energy,
+                            flat_ratio=(record.flat_energy or 0) / total_energy,
+                            demand_cost=0,
+                            basic_cost=0,
+                            max_demand=record.max_power or 0,
+                        )
+                    )
         except Exception as e:
             logger.error(f"加载账单数据失败: {e}")
             # 生成模拟数据
@@ -468,26 +444,26 @@ class PluginManager:
             flat_ratio = 1 - peak_ratio - valley_ratio
 
             total_cost = (
-                total_energy * peak_ratio * 1.2 +
-                total_energy * valley_ratio * 0.4 +
-                total_energy * flat_ratio * 0.8
+                total_energy * peak_ratio * 1.2 + total_energy * valley_ratio * 0.4 + total_energy * flat_ratio * 0.8
             )
 
             # 需量费用 = 申报需量 * 需量电价
             demand_cost = declared_demand * demand_price
 
-            bill_data.append(BillData(
-                period_start=current,
-                period_end=current + timedelta(days=30),
-                total_energy=total_energy,
-                total_cost=total_cost,
-                peak_ratio=peak_ratio,
-                valley_ratio=valley_ratio,
-                flat_ratio=flat_ratio,
-                demand_cost=demand_cost,
-                basic_cost=200,
-                max_demand=round(max_demand, 1)  # 关键：使用确定性的 max_demand
-            ))
+            bill_data.append(
+                BillData(
+                    period_start=current,
+                    period_end=current + timedelta(days=30),
+                    total_energy=total_energy,
+                    total_cost=total_cost,
+                    peak_ratio=peak_ratio,
+                    valley_ratio=valley_ratio,
+                    flat_ratio=flat_ratio,
+                    demand_cost=demand_cost,
+                    basic_cost=200,
+                    max_demand=round(max_demand, 1),  # 关键：使用确定性的 max_demand
+                )
+            )
             current += timedelta(days=30)
 
         return bill_data
@@ -501,16 +477,18 @@ class PluginManager:
             devices = result.scalars().all()
 
             for device in devices:
-                device_data.append(DeviceData(
-                    device_id=str(device.id),
-                    device_name=device.name,
-                    device_type=device.device_type,
-                    rated_power=device.rated_power or 0,
-                    current_power=device.active_power or 0,
-                    efficiency=device.efficiency or 95,
-                    running_hours=24 * 30,  # 假设持续运行
-                    location=device.location or ''
-                ))
+                device_data.append(
+                    DeviceData(
+                        device_id=str(device.id),
+                        device_name=device.name,
+                        device_type=device.device_type,
+                        rated_power=device.rated_power or 0,
+                        current_power=device.active_power or 0,
+                        efficiency=device.efficiency or 95,
+                        running_hours=24 * 30,  # 假设持续运行
+                        location=device.location or "",
+                    )
+                )
         except Exception as e:
             logger.error(f"加载设备数据失败: {e}")
             device_data = self._generate_mock_device_data()
@@ -526,67 +504,65 @@ class PluginManager:
         device_data = []
 
         devices = [
-            ('UPS-1', 'UPS', 100, 'A区'),
-            ('UPS-2', 'UPS', 100, 'B区'),
-            ('PDU-A1', 'PDU', 30, 'A区'),
-            ('PDU-A2', 'PDU', 30, 'A区'),
-            ('PDU-B1', 'PDU', 30, 'B区'),
-            ('AC-1', 'AIR_CONDITIONER', 20, 'A区'),
-            ('AC-2', 'AIR_CONDITIONER', 20, 'B区'),
-            ('Rack-1', 'IT_EQUIPMENT', 15, 'A区'),
-            ('Rack-2', 'IT_EQUIPMENT', 15, 'A区'),
-            ('Rack-3', 'IT_EQUIPMENT', 15, 'B区'),
+            ("UPS-1", "UPS", 100, "A区"),
+            ("UPS-2", "UPS", 100, "B区"),
+            ("PDU-A1", "PDU", 30, "A区"),
+            ("PDU-A2", "PDU", 30, "A区"),
+            ("PDU-B1", "PDU", 30, "B区"),
+            ("AC-1", "AIR_CONDITIONER", 20, "A区"),
+            ("AC-2", "AIR_CONDITIONER", 20, "B区"),
+            ("Rack-1", "IT_EQUIPMENT", 15, "A区"),
+            ("Rack-2", "IT_EQUIPMENT", 15, "A区"),
+            ("Rack-3", "IT_EQUIPMENT", 15, "B区"),
         ]
 
         for i, (name, dtype, rated_power, location) in enumerate(devices):
             # 确定性的负载率
             load_rate = 0.5 + (i % 5) * 0.08  # 0.50-0.82
             # 确定性的效率值
-            if dtype in ['UPS', 'PDU']:
+            if dtype in ["UPS", "PDU"]:
                 efficiency = 92.0 + (i % 5) * 1.2  # 92.0-96.8
             else:
                 efficiency = 84.0 + (i % 8) * 1.5  # 84.0-94.5
 
-            device_data.append(DeviceData(
-                device_id=str(i + 1),
-                device_name=name,
-                device_type=dtype,
-                rated_power=rated_power,
-                current_power=rated_power * load_rate,
-                efficiency=efficiency,
-                running_hours=24 * 30,
-                location=location
-            ))
+            device_data.append(
+                DeviceData(
+                    device_id=str(i + 1),
+                    device_name=name,
+                    device_type=dtype,
+                    rated_power=rated_power,
+                    current_power=rated_power * load_rate,
+                    efficiency=efficiency,
+                    running_hours=24 * 30,
+                    location=location,
+                )
+            )
 
         return device_data
 
-    async def _load_environment_data(
-        self,
-        db: AsyncSession,
-        days: int = 7
-    ) -> List[EnvironmentData]:
+    async def _load_environment_data(self, db: AsyncSession, days: int = 7) -> List[EnvironmentData]:
         """加载环境数据"""
         environment_data = []
 
         try:
             start_date = datetime.now() - timedelta(days=days)
             result = await db.execute(
-                select(PUEHistory).where(
-                    PUEHistory.recorded_at >= start_date
-                ).order_by(PUEHistory.recorded_at)
+                select(PUEHistory).where(PUEHistory.recorded_at >= start_date).order_by(PUEHistory.recorded_at)
             )
             records = result.scalars().all()
 
             for record in records:
-                environment_data.append(EnvironmentData(
-                    timestamp=record.recorded_at,
-                    temperature=25,  # 假设值
-                    humidity=50,
-                    pue=record.pue or 1.5,
-                    it_power=record.it_power or 50,
-                    cooling_power=record.cooling_power or 15,
-                    total_power=record.total_power or 75
-                ))
+                environment_data.append(
+                    EnvironmentData(
+                        timestamp=record.recorded_at,
+                        temperature=25,  # 假设值
+                        humidity=50,
+                        pue=record.pue or 1.5,
+                        it_power=record.it_power or 50,
+                        cooling_power=record.cooling_power or 15,
+                        total_power=record.total_power or 75,
+                    )
+                )
         except Exception as e:
             logger.error(f"加载环境数据失败: {e}")
             environment_data = self._generate_mock_environment_data(days)
@@ -618,15 +594,17 @@ class PluginManager:
             temp_offset = (hour_of_day - 12) * 0.15  # 日间偏暖
             humidity_offset = ((hour_idx * 3) % 20) - 10  # -10 到 +10
 
-            environment_data.append(EnvironmentData(
-                timestamp=current,
-                temperature=24 + temp_offset,
-                humidity=50 + humidity_offset,
-                pue=total_power / it_power if it_power > 0 else 1.5,
-                it_power=it_power,
-                cooling_power=cooling_power,
-                total_power=total_power
-            ))
+            environment_data.append(
+                EnvironmentData(
+                    timestamp=current,
+                    temperature=24 + temp_offset,
+                    humidity=50 + humidity_offset,
+                    pue=total_power / it_power if it_power > 0 else 1.5,
+                    it_power=it_power,
+                    cooling_power=cooling_power,
+                    total_power=total_power,
+                )
+            )
             current += timedelta(hours=1)
             hour_idx += 1
 
@@ -634,39 +612,26 @@ class PluginManager:
 
     async def _load_pricing_config(self, db: AsyncSession) -> Dict[str, float]:
         """加载电价配置"""
-        pricing_config = {
-            'peak_price': 1.2,
-            'valley_price': 0.4,
-            'flat_price': 0.8,
-            'demand_price': 38.0
-        }
+        pricing_config = {"peak_price": 1.2, "valley_price": 0.4, "flat_price": 0.8, "demand_price": 38.0}
 
         try:
-            result = await db.execute(
-                select(ElectricityPricing).where(
-                    ElectricityPricing.is_active == True
-                )
-            )
+            result = await db.execute(select(ElectricityPricing).where(ElectricityPricing.is_active == True))
             records = result.scalars().all()
 
             for record in records:
-                if record.period_type == 'peak':
-                    pricing_config['peak_price'] = record.price
-                elif record.period_type == 'valley':
-                    pricing_config['valley_price'] = record.price
-                elif record.period_type == 'flat':
-                    pricing_config['flat_price'] = record.price
+                if record.period_type == "peak":
+                    pricing_config["peak_price"] = record.price
+                elif record.period_type == "valley":
+                    pricing_config["valley_price"] = record.price
+                elif record.period_type == "flat":
+                    pricing_config["flat_price"] = record.price
         except Exception as e:
             logger.error(f"加载电价配置失败: {e}")
 
         return pricing_config
 
     async def run_analysis(
-        self,
-        db: AsyncSession,
-        plugin_ids: Optional[List[str]] = None,
-        days: int = 30,
-        save_results: bool = True
+        self, db: AsyncSession, plugin_ids: Optional[List[str]] = None, days: int = 30, save_results: bool = True
     ) -> List[SuggestionResult]:
         """
         执行分析
@@ -720,11 +685,7 @@ class PluginManager:
         return all_results
 
     async def run_single_plugin(
-        self,
-        db: AsyncSession,
-        plugin_id: str,
-        days: int = 30,
-        save_results: bool = True
+        self, db: AsyncSession, plugin_id: str, days: int = 30, save_results: bool = True
     ) -> List[SuggestionResult]:
         """
         执行单个插件
@@ -740,11 +701,7 @@ class PluginManager:
         """
         return await self.run_analysis(db, [plugin_id], days, save_results)
 
-    async def _save_suggestions(
-        self,
-        db: AsyncSession,
-        results: List[SuggestionResult]
-    ) -> None:
+    async def _save_suggestions(self, db: AsyncSession, results: List[SuggestionResult]) -> None:
         """保存建议到数据库"""
         for result in results:
             try:
@@ -758,8 +715,8 @@ class PluginManager:
                     estimated_cost_saving=result.estimated_cost_saving,
                     implementation_difficulty=result.implementation_difficulty,
                     payback_period=result.payback_period,
-                    status='pending',
-                    created_at=result.created_at
+                    status="pending",
+                    created_at=result.created_at,
                 )
                 db.add(suggestion)
             except Exception as e:
@@ -776,12 +733,12 @@ class PluginManager:
         """获取所有插件信息"""
         return [
             {
-                'plugin_id': p.plugin_id,
-                'name': p.plugin_name,
-                'description': p.plugin_description,
-                'suggestion_type': p.suggestion_type.value,
-                'enabled': p.config.enabled,
-                'execution_order': p.config.execution_order
+                "plugin_id": p.plugin_id,
+                "name": p.plugin_name,
+                "description": p.plugin_description,
+                "suggestion_type": p.suggestion_type.value,
+                "enabled": p.config.enabled,
+                "execution_order": p.config.execution_order,
             }
             for p in self._plugins.values()
         ]

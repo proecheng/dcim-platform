@@ -1,4 +1,5 @@
 """网关管理 API"""
+
 from datetime import datetime
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -9,9 +10,15 @@ from ..deps import get_db, require_viewer, require_operator, require_admin, get_
 from ...models.user import User
 from ...models.gateway import Gateway, DataSource, DataSourcePoint, GatewayEvent, ConfigPushRecord
 from ...schemas.gateway import (
-    GatewayCreate, GatewayUpdate, GatewayResponse,
-    GatewayStatusSummary, GatewayDetailResponse, GatewayEventResponse,
-    ConfigPushResponse, ConfigPushRecordResponse, GatewayAssignSite,
+    GatewayCreate,
+    GatewayUpdate,
+    GatewayResponse,
+    GatewayStatusSummary,
+    GatewayDetailResponse,
+    GatewayEventResponse,
+    ConfigPushResponse,
+    ConfigPushRecordResponse,
+    GatewayAssignSite,
 )
 from ...schemas.common import PageResponse
 
@@ -41,9 +48,7 @@ async def list_gateways(
     if is_enabled is not None:
         query = query.where(Gateway.is_enabled == is_enabled)
     if keyword:
-        query = query.where(
-            (Gateway.name.contains(keyword)) | (Gateway.ip_address.contains(keyword))
-        )
+        query = query.where((Gateway.name.contains(keyword)) | (Gateway.ip_address.contains(keyword)))
 
     count_query = select(func.count()).select_from(query.subquery())
     total = (await db.execute(count_query)).scalar()
@@ -121,15 +126,11 @@ async def get_gateway(
     # 查询关联点位数量
     point_count = 0
     if datasource_count > 0:
-        ds_ids_result = await db.execute(
-            select(DataSource.id).where(DataSource.gateway_id == obj.id)
-        )
+        ds_ids_result = await db.execute(select(DataSource.id).where(DataSource.gateway_id == obj.id))
         ds_ids = [row[0] for row in ds_ids_result.all()]
         if ds_ids:
             pt_count_result = await db.execute(
-                select(func.count()).select_from(DataSourcePoint).where(
-                    DataSourcePoint.datasource_id.in_(ds_ids)
-                )
+                select(func.count()).select_from(DataSourcePoint).where(DataSourcePoint.datasource_id.in_(ds_ids))
             )
             point_count = pt_count_result.scalar() or 0
 
@@ -204,7 +205,9 @@ async def push_config(
     return ConfigPushResponse.model_validate(record)
 
 
-@router.get("/{gateway_id}/config-history", response_model=PageResponse[ConfigPushRecordResponse], summary="配置下发历史")
+@router.get(
+    "/{gateway_id}/config-history", response_model=PageResponse[ConfigPushRecordResponse], summary="配置下发历史"
+)
 async def config_history(
     gateway_id: int,
     page: int = Query(1, ge=1),
@@ -285,9 +288,7 @@ async def assign_gateway_site(
         raise HTTPException(status_code=403, detail="无目标站点访问权限")
 
     await db.execute(
-        update(Gateway).where(Gateway.id == gateway_id).values(
-            site_id=data.site_id, updated_at=datetime.now()
-        )
+        update(Gateway).where(Gateway.id == gateway_id).values(site_id=data.site_id, updated_at=datetime.now())
     )
     await db.commit()
 

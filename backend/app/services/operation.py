@@ -4,22 +4,31 @@ Operation Management Service
 
 提供工单管理、巡检计划、巡检任务、知识库管理功能
 """
+
 from typing import List, Optional
 from datetime import datetime
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 
 from ..models.operation import (
-    WorkOrder, WorkOrderLog, WorkOrderStatus,
-    InspectionPlan, InspectionTask, InspectionStatus,
-    KnowledgeBase
+    WorkOrder,
+    WorkOrderLog,
+    WorkOrderStatus,
+    InspectionPlan,
+    InspectionTask,
+    InspectionStatus,
+    KnowledgeBase,
 )
 from ..schemas.operation import (
-    WorkOrderCreate, WorkOrderUpdate,
-    InspectionPlanCreate, InspectionPlanUpdate,
-    InspectionTaskCreate, InspectionTaskUpdate,
-    KnowledgeCreate, KnowledgeUpdate,
-    OperationStatistics
+    WorkOrderCreate,
+    WorkOrderUpdate,
+    InspectionPlanCreate,
+    InspectionPlanUpdate,
+    InspectionTaskCreate,
+    InspectionTaskUpdate,
+    KnowledgeCreate,
+    KnowledgeUpdate,
+    OperationStatistics,
 )
 
 
@@ -43,14 +52,13 @@ class OperationService:
 
         if prefix == "WO":
             # 统计今天创建的工单数量
-            count = db.query(func.count(WorkOrder.id)).filter(
-                WorkOrder.order_no.like(f"WO-{today}-%")
-            ).scalar() or 0
+            count = db.query(func.count(WorkOrder.id)).filter(WorkOrder.order_no.like(f"WO-{today}-%")).scalar() or 0
         elif prefix == "IT":
             # 统计今天创建的巡检任务数量
-            count = db.query(func.count(InspectionTask.id)).filter(
-                InspectionTask.task_no.like(f"IT-{today}-%")
-            ).scalar() or 0
+            count = (
+                db.query(func.count(InspectionTask.id)).filter(InspectionTask.task_no.like(f"IT-{today}-%")).scalar()
+                or 0
+            )
         else:
             count = 0
 
@@ -64,7 +72,7 @@ class OperationService:
         skip: int = 0,
         limit: int = 100,
         status: Optional[WorkOrderStatus] = None,
-        priority: Optional[str] = None
+        priority: Optional[str] = None,
     ) -> List[WorkOrder]:
         """
         获取工单列表
@@ -88,11 +96,7 @@ class OperationService:
 
         return query.order_by(WorkOrder.created_at.desc()).offset(skip).limit(limit).all()
 
-    def get_work_order(
-        self,
-        db: Session,
-        order_id: int
-    ) -> Optional[WorkOrder]:
+    def get_work_order(self, db: Session, order_id: int) -> Optional[WorkOrder]:
         """
         根据ID获取工单
 
@@ -105,11 +109,7 @@ class OperationService:
         """
         return db.query(WorkOrder).filter(WorkOrder.id == order_id).first()
 
-    def create_work_order(
-        self,
-        db: Session,
-        data: WorkOrderCreate
-    ) -> WorkOrder:
+    def create_work_order(self, db: Session, data: WorkOrderCreate) -> WorkOrder:
         """
         创建工单
 
@@ -121,10 +121,7 @@ class OperationService:
             创建的工单对象
         """
         order_no = self._generate_order_no(db, "WO")
-        order = WorkOrder(
-            order_no=order_no,
-            **data.model_dump()
-        )
+        order = WorkOrder(order_no=order_no, **data.model_dump())
 
         db.add(order)
         db.commit()
@@ -135,12 +132,7 @@ class OperationService:
 
         return order
 
-    def update_work_order(
-        self,
-        db: Session,
-        order_id: int,
-        data: WorkOrderUpdate
-    ) -> Optional[WorkOrder]:
+    def update_work_order(self, db: Session, order_id: int, data: WorkOrderUpdate) -> Optional[WorkOrder]:
         """
         更新工单
 
@@ -165,11 +157,7 @@ class OperationService:
         db.refresh(order)
         return order
 
-    def delete_work_order(
-        self,
-        db: Session,
-        order_id: int
-    ) -> bool:
+    def delete_work_order(self, db: Session, order_id: int) -> bool:
         """
         删除工单
 
@@ -188,12 +176,7 @@ class OperationService:
         db.commit()
         return True
 
-    def assign_work_order(
-        self,
-        db: Session,
-        order_id: int,
-        assignee: str
-    ) -> Optional[WorkOrder]:
+    def assign_work_order(self, db: Session, order_id: int, assignee: str) -> Optional[WorkOrder]:
         """
         派单给指定处理人
 
@@ -221,11 +204,7 @@ class OperationService:
 
         return order
 
-    def start_work_order(
-        self,
-        db: Session,
-        order_id: int
-    ) -> Optional[WorkOrder]:
+    def start_work_order(self, db: Session, order_id: int) -> Optional[WorkOrder]:
         """
         开始处理工单
 
@@ -252,11 +231,7 @@ class OperationService:
         return order
 
     def complete_work_order(
-        self,
-        db: Session,
-        order_id: int,
-        solution: Optional[str] = None,
-        root_cause: Optional[str] = None
+        self, db: Session, order_id: int, solution: Optional[str] = None, root_cause: Optional[str] = None
     ) -> Optional[WorkOrder]:
         """
         完成工单
@@ -289,14 +264,7 @@ class OperationService:
 
         return order
 
-    def add_work_order_log(
-        self,
-        db: Session,
-        order_id: int,
-        action: str,
-        content: str,
-        operator: str
-    ) -> WorkOrderLog:
+    def add_work_order_log(self, db: Session, order_id: int, action: str, content: str, operator: str) -> WorkOrderLog:
         """
         添加工单日志
 
@@ -310,23 +278,14 @@ class OperationService:
         Returns:
             创建的日志对象
         """
-        log = WorkOrderLog(
-            order_id=order_id,
-            action=action,
-            content=content,
-            operator=operator
-        )
+        log = WorkOrderLog(order_id=order_id, action=action, content=content, operator=operator)
 
         db.add(log)
         db.commit()
         db.refresh(log)
         return log
 
-    def get_work_order_logs(
-        self,
-        db: Session,
-        order_id: int
-    ) -> List[WorkOrderLog]:
+    def get_work_order_logs(self, db: Session, order_id: int) -> List[WorkOrderLog]:
         """
         获取工单日志
 
@@ -337,18 +296,16 @@ class OperationService:
         Returns:
             日志列表
         """
-        return db.query(WorkOrderLog).filter(
-            WorkOrderLog.order_id == order_id
-        ).order_by(WorkOrderLog.created_at.desc()).all()
+        return (
+            db.query(WorkOrderLog)
+            .filter(WorkOrderLog.order_id == order_id)
+            .order_by(WorkOrderLog.created_at.desc())
+            .all()
+        )
 
     # ==================== 巡检计划管理 ====================
 
-    def get_inspection_plans(
-        self,
-        db: Session,
-        skip: int = 0,
-        limit: int = 100
-    ) -> List[InspectionPlan]:
+    def get_inspection_plans(self, db: Session, skip: int = 0, limit: int = 100) -> List[InspectionPlan]:
         """
         获取巡检计划列表
 
@@ -362,11 +319,7 @@ class OperationService:
         """
         return db.query(InspectionPlan).offset(skip).limit(limit).all()
 
-    def get_inspection_plan(
-        self,
-        db: Session,
-        plan_id: int
-    ) -> Optional[InspectionPlan]:
+    def get_inspection_plan(self, db: Session, plan_id: int) -> Optional[InspectionPlan]:
         """
         根据ID获取巡检计划
 
@@ -379,11 +332,7 @@ class OperationService:
         """
         return db.query(InspectionPlan).filter(InspectionPlan.id == plan_id).first()
 
-    def create_inspection_plan(
-        self,
-        db: Session,
-        data: InspectionPlanCreate
-    ) -> InspectionPlan:
+    def create_inspection_plan(self, db: Session, data: InspectionPlanCreate) -> InspectionPlan:
         """
         创建巡检计划
 
@@ -401,12 +350,7 @@ class OperationService:
         db.refresh(plan)
         return plan
 
-    def update_inspection_plan(
-        self,
-        db: Session,
-        plan_id: int,
-        data: InspectionPlanUpdate
-    ) -> Optional[InspectionPlan]:
+    def update_inspection_plan(self, db: Session, plan_id: int, data: InspectionPlanUpdate) -> Optional[InspectionPlan]:
         """
         更新巡检计划
 
@@ -432,11 +376,7 @@ class OperationService:
         db.refresh(plan)
         return plan
 
-    def delete_inspection_plan(
-        self,
-        db: Session,
-        plan_id: int
-    ) -> bool:
+    def delete_inspection_plan(self, db: Session, plan_id: int) -> bool:
         """
         删除巡检计划
 
@@ -458,11 +398,7 @@ class OperationService:
     # ==================== 巡检任务管理 ====================
 
     def get_inspection_tasks(
-        self,
-        db: Session,
-        skip: int = 0,
-        limit: int = 100,
-        status: Optional[InspectionStatus] = None
+        self, db: Session, skip: int = 0, limit: int = 100, status: Optional[InspectionStatus] = None
     ) -> List[InspectionTask]:
         """
         获取巡检任务列表
@@ -483,11 +419,7 @@ class OperationService:
 
         return query.order_by(InspectionTask.created_at.desc()).offset(skip).limit(limit).all()
 
-    def get_inspection_task(
-        self,
-        db: Session,
-        task_id: int
-    ) -> Optional[InspectionTask]:
+    def get_inspection_task(self, db: Session, task_id: int) -> Optional[InspectionTask]:
         """
         根据ID获取巡检任务
 
@@ -500,11 +432,7 @@ class OperationService:
         """
         return db.query(InspectionTask).filter(InspectionTask.id == task_id).first()
 
-    def create_inspection_task(
-        self,
-        db: Session,
-        data: InspectionTaskCreate
-    ) -> InspectionTask:
+    def create_inspection_task(self, db: Session, data: InspectionTaskCreate) -> InspectionTask:
         """
         创建巡检任务
 
@@ -516,22 +444,14 @@ class OperationService:
             创建的巡检任务对象
         """
         task_no = self._generate_order_no(db, "IT")
-        task = InspectionTask(
-            task_no=task_no,
-            **data.model_dump()
-        )
+        task = InspectionTask(task_no=task_no, **data.model_dump())
 
         db.add(task)
         db.commit()
         db.refresh(task)
         return task
 
-    def update_inspection_task(
-        self,
-        db: Session,
-        task_id: int,
-        data: InspectionTaskUpdate
-    ) -> Optional[InspectionTask]:
+    def update_inspection_task(self, db: Session, task_id: int, data: InspectionTaskUpdate) -> Optional[InspectionTask]:
         """
         更新巡检任务
 
@@ -556,11 +476,7 @@ class OperationService:
         db.refresh(task)
         return task
 
-    def start_inspection_task(
-        self,
-        db: Session,
-        task_id: int
-    ) -> Optional[InspectionTask]:
+    def start_inspection_task(self, db: Session, task_id: int) -> Optional[InspectionTask]:
         """
         开始巡检任务
 
@@ -583,11 +499,7 @@ class OperationService:
         return task
 
     def complete_inspection_task(
-        self,
-        db: Session,
-        task_id: int,
-        result: Optional[str] = None,
-        abnormal_count: Optional[int] = None
+        self, db: Session, task_id: int, result: Optional[str] = None, abnormal_count: Optional[int] = None
     ) -> Optional[InspectionTask]:
         """
         完成巡检任务
@@ -619,11 +531,7 @@ class OperationService:
     # ==================== 知识库管理 ====================
 
     def get_knowledge_list(
-        self,
-        db: Session,
-        skip: int = 0,
-        limit: int = 100,
-        category: Optional[str] = None
+        self, db: Session, skip: int = 0, limit: int = 100, category: Optional[str] = None
     ) -> List[KnowledgeBase]:
         """
         获取知识库列表
@@ -644,11 +552,7 @@ class OperationService:
 
         return query.order_by(KnowledgeBase.created_at.desc()).offset(skip).limit(limit).all()
 
-    def get_knowledge(
-        self,
-        db: Session,
-        knowledge_id: int
-    ) -> Optional[KnowledgeBase]:
+    def get_knowledge(self, db: Session, knowledge_id: int) -> Optional[KnowledgeBase]:
         """
         根据ID获取知识库条目，并增加查看次数
 
@@ -666,11 +570,7 @@ class OperationService:
             db.refresh(knowledge)
         return knowledge
 
-    def create_knowledge(
-        self,
-        db: Session,
-        data: KnowledgeCreate
-    ) -> KnowledgeBase:
+    def create_knowledge(self, db: Session, data: KnowledgeCreate) -> KnowledgeBase:
         """
         创建知识库条目
 
@@ -688,12 +588,7 @@ class OperationService:
         db.refresh(knowledge)
         return knowledge
 
-    def update_knowledge(
-        self,
-        db: Session,
-        knowledge_id: int,
-        data: KnowledgeUpdate
-    ) -> Optional[KnowledgeBase]:
+    def update_knowledge(self, db: Session, knowledge_id: int, data: KnowledgeUpdate) -> Optional[KnowledgeBase]:
         """
         更新知识库条目
 
@@ -719,11 +614,7 @@ class OperationService:
         db.refresh(knowledge)
         return knowledge
 
-    def delete_knowledge(
-        self,
-        db: Session,
-        knowledge_id: int
-    ) -> bool:
+    def delete_knowledge(self, db: Session, knowledge_id: int) -> bool:
         """
         删除知识库条目
 
@@ -756,20 +647,21 @@ class OperationService:
         """
         # 工单统计
         total_orders = db.query(func.count(WorkOrder.id)).scalar() or 0
-        pending_orders = db.query(func.count(WorkOrder.id)).filter(
-            WorkOrder.status == WorkOrderStatus.pending
-        ).scalar() or 0
-        processing_orders = db.query(func.count(WorkOrder.id)).filter(
-            WorkOrder.status == WorkOrderStatus.processing
-        ).scalar() or 0
-        completed_orders = db.query(func.count(WorkOrder.id)).filter(
-            WorkOrder.status == WorkOrderStatus.completed
-        ).scalar() or 0
+        pending_orders = (
+            db.query(func.count(WorkOrder.id)).filter(WorkOrder.status == WorkOrderStatus.pending).scalar() or 0
+        )
+        processing_orders = (
+            db.query(func.count(WorkOrder.id)).filter(WorkOrder.status == WorkOrderStatus.processing).scalar() or 0
+        )
+        completed_orders = (
+            db.query(func.count(WorkOrder.id)).filter(WorkOrder.status == WorkOrderStatus.completed).scalar() or 0
+        )
 
         # 逾期巡检统计
-        overdue_inspections = db.query(func.count(InspectionTask.id)).filter(
-            InspectionTask.status == InspectionStatus.overdue
-        ).scalar() or 0
+        overdue_inspections = (
+            db.query(func.count(InspectionTask.id)).filter(InspectionTask.status == InspectionStatus.overdue).scalar()
+            or 0
+        )
 
         # 知识库统计
         knowledge_count = db.query(func.count(KnowledgeBase.id)).scalar() or 0
@@ -780,7 +672,7 @@ class OperationService:
             processing_orders=processing_orders,
             completed_orders=completed_orders,
             overdue_inspections=overdue_inspections,
-            knowledge_count=knowledge_count
+            knowledge_count=knowledge_count,
         )
 
 

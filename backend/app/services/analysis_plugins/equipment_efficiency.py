@@ -9,14 +9,7 @@ Analyzes equipment operating efficiency and identifies inefficient devices
 from typing import List
 import statistics
 
-from .base import (
-    AnalysisPlugin,
-    AnalysisContext,
-    SuggestionResult,
-    PluginConfig,
-    PluginPriority,
-    SuggestionType
-)
+from .base import AnalysisPlugin, AnalysisContext, SuggestionResult, PluginConfig, PluginPriority, SuggestionType
 
 
 class EquipmentEfficiencyPlugin(AnalysisPlugin):
@@ -53,13 +46,13 @@ class EquipmentEfficiencyPlugin(AnalysisPlugin):
             execution_order=60,
             min_data_days=7,
             thresholds={
-                'min_load_rate': 0.30,          # 最低负载率
-                'optimal_load_rate_min': 0.40,  # 最佳负载率下限
-                'optimal_load_rate_max': 0.80,  # 最佳负载率上限
-                'min_efficiency': 0.85,         # 最低效率阈值
-                'ups_target_efficiency': 0.95,  # UPS目标效率
-                'old_equipment_years': 8        # 老旧设备年限
-            }
+                "min_load_rate": 0.30,  # 最低负载率
+                "optimal_load_rate_min": 0.40,  # 最佳负载率下限
+                "optimal_load_rate_max": 0.80,  # 最佳负载率上限
+                "min_efficiency": 0.85,  # 最低效率阈值
+                "ups_target_efficiency": 0.95,  # UPS目标效率
+                "old_equipment_years": 8,  # 老旧设备年限
+            },
         )
 
     async def analyze(self, context: AnalysisContext) -> List[SuggestionResult]:
@@ -71,71 +64,78 @@ class EquipmentEfficiencyPlugin(AnalysisPlugin):
             return results
 
         thresholds = self._config.thresholds
-        min_load_rate = thresholds.get('min_load_rate', 0.30)
-        optimal_min = thresholds.get('optimal_load_rate_min', 0.40)
-        optimal_max = thresholds.get('optimal_load_rate_max', 0.80)
-        min_efficiency = thresholds.get('min_efficiency', 0.85)
+        min_load_rate = thresholds.get("min_load_rate", 0.30)
+        optimal_min = thresholds.get("optimal_load_rate_min", 0.40)
+        optimal_max = thresholds.get("optimal_load_rate_max", 0.80)
+        min_efficiency = thresholds.get("min_efficiency", 0.85)
 
         # 使用power_data获取负载率信息
         devices_with_load = []
         for p in context.power_data:
-            devices_with_load.append({
-                'name': p.device_name,
-                'type': p.device_type,
-                'load_rate': p.load_rate / 100 if p.load_rate > 1 else p.load_rate,
-                'power': p.active_power,
-                'power_factor': p.power_factor
-            })
+            devices_with_load.append(
+                {
+                    "name": p.device_name,
+                    "type": p.device_type,
+                    "load_rate": p.load_rate / 100 if p.load_rate > 1 else p.load_rate,
+                    "power": p.active_power,
+                    "power_factor": p.power_factor,
+                }
+            )
 
         # 补充device_data中的信息
         for d in context.device_data:
             found = False
             for item in devices_with_load:
-                if item['name'] == d.device_name:
-                    item['efficiency'] = d.efficiency / 100 if d.efficiency > 1 else d.efficiency
-                    item['rated_power'] = d.rated_power
+                if item["name"] == d.device_name:
+                    item["efficiency"] = d.efficiency / 100 if d.efficiency > 1 else d.efficiency
+                    item["rated_power"] = d.rated_power
                     found = True
                     break
             if not found:
                 load_rate = d.current_power / d.rated_power if d.rated_power > 0 else 0
-                devices_with_load.append({
-                    'name': d.device_name,
-                    'type': d.device_type,
-                    'load_rate': load_rate,
-                    'power': d.current_power,
-                    'rated_power': d.rated_power,
-                    'efficiency': d.efficiency / 100 if d.efficiency > 1 else d.efficiency
-                })
+                devices_with_load.append(
+                    {
+                        "name": d.device_name,
+                        "type": d.device_type,
+                        "load_rate": load_rate,
+                        "power": d.current_power,
+                        "rated_power": d.rated_power,
+                        "efficiency": d.efficiency / 100 if d.efficiency > 1 else d.efficiency,
+                    }
+                )
 
         if not devices_with_load:
             return results
 
         # 分析1: 低负载率设备
-        low_load_devices = [d for d in devices_with_load
-                          if d.get('load_rate', 0) < min_load_rate and d.get('load_rate', 0) > 0]
+        low_load_devices = [
+            d for d in devices_with_load if d.get("load_rate", 0) < min_load_rate and d.get("load_rate", 0) > 0
+        ]
 
         if low_load_devices:
             total_wasted_capacity = sum(
-                (d.get('rated_power', 0) * (min_load_rate - d['load_rate']))
-                for d in low_load_devices if d.get('rated_power', 0) > 0
+                (d.get("rated_power", 0) * (min_load_rate - d["load_rate"]))
+                for d in low_load_devices
+                if d.get("rated_power", 0) > 0
             )
 
             # 低负载运行的效率损失
             efficiency_loss = 0
             for d in low_load_devices:
                 # UPS在低负载时效率下降
-                if d['type'] == 'UPS':
+                if d["type"] == "UPS":
                     # 假设UPS在30%负载时效率为90%，在10%负载时效率为80%
-                    actual_efficiency = 0.8 + 0.2 * (d['load_rate'] / 0.5) if d['load_rate'] < 0.5 else 0.92
+                    actual_efficiency = 0.8 + 0.2 * (d["load_rate"] / 0.5) if d["load_rate"] < 0.5 else 0.92
                     target_efficiency = 0.92
-                    efficiency_loss += d.get('power', 0) * (target_efficiency - actual_efficiency) / actual_efficiency
+                    efficiency_loss += d.get("power", 0) * (target_efficiency - actual_efficiency) / actual_efficiency
 
             yearly_loss = efficiency_loss * 24 * 365 * 0.8
 
-            results.append(self.create_suggestion(
-                title="优化低负载率设备",
-                description=f"发现 {len(low_load_devices)} 台设备负载率低于 {min_load_rate:.0%}",
-                detail=f"""
+            results.append(
+                self.create_suggestion(
+                    title="优化低负载率设备",
+                    description=f"发现 {len(low_load_devices)} 台设备负载率低于 {min_load_rate:.0%}",
+                    detail=f"""
 ## 低负载率设备分析
 
 ### 低负载设备清单
@@ -166,30 +166,31 @@ class EquipmentEfficiencyPlugin(AnalysisPlugin):
 - 减少闲置容量: {total_wasted_capacity:.1f} kW
 - 年节省电费: ¥{yearly_loss:.0f}
                 """.strip(),
-                estimated_saving=efficiency_loss * 24 * 365,
-                estimated_cost_saving=yearly_loss,
-                implementation_difficulty=3,
-                priority=PluginPriority.MEDIUM,
-                related_devices=[d['name'] for d in low_load_devices[:5]],
-                analysis_data={
-                    'low_load_count': len(low_load_devices),
-                    'wasted_capacity': total_wasted_capacity,
-                    'efficiency_loss': efficiency_loss
-                },
-                confidence=80
-            ))
+                    estimated_saving=efficiency_loss * 24 * 365,
+                    estimated_cost_saving=yearly_loss,
+                    implementation_difficulty=3,
+                    priority=PluginPriority.MEDIUM,
+                    related_devices=[d["name"] for d in low_load_devices[:5]],
+                    analysis_data={
+                        "low_load_count": len(low_load_devices),
+                        "wasted_capacity": total_wasted_capacity,
+                        "efficiency_loss": efficiency_loss,
+                    },
+                    confidence=80,
+                )
+            )
 
         # 分析2: 高负载率设备（过载风险）
-        high_load_devices = [d for d in devices_with_load
-                           if d.get('load_rate', 0) > optimal_max]
+        high_load_devices = [d for d in devices_with_load if d.get("load_rate", 0) > optimal_max]
 
         if high_load_devices:
-            overload_risk_devices = [d for d in high_load_devices if d['load_rate'] > 0.90]
+            overload_risk_devices = [d for d in high_load_devices if d["load_rate"] > 0.90]
 
-            results.append(self.create_suggestion(
-                title="关注高负载率设备",
-                description=f"发现 {len(high_load_devices)} 台设备负载率超过 {optimal_max:.0%}",
-                detail=f"""
+            results.append(
+                self.create_suggestion(
+                    title="关注高负载率设备",
+                    description=f"发现 {len(high_load_devices)} 台设备负载率超过 {optimal_max:.0%}",
+                    detail=f"""
 ## 高负载率设备分析
 
 ### 高负载设备清单
@@ -218,33 +219,35 @@ class EquipmentEfficiencyPlugin(AnalysisPlugin):
 ### 优先处理
 {chr(10).join([f"- ⚠️ {d['name']}: 负载率 {d['load_rate']:.1%}" for d in overload_risk_devices[:3]])}
                 """.strip(),
-                estimated_saving=0,
-                estimated_cost_saving=0,
-                implementation_difficulty=3,
-                priority=PluginPriority.HIGH if overload_risk_devices else PluginPriority.MEDIUM,
-                related_devices=[d['name'] for d in high_load_devices[:5]],
-                analysis_data={
-                    'high_load_count': len(high_load_devices),
-                    'overload_risk_count': len(overload_risk_devices)
-                },
-                confidence=90
-            ))
+                    estimated_saving=0,
+                    estimated_cost_saving=0,
+                    implementation_difficulty=3,
+                    priority=PluginPriority.HIGH if overload_risk_devices else PluginPriority.MEDIUM,
+                    related_devices=[d["name"] for d in high_load_devices[:5]],
+                    analysis_data={
+                        "high_load_count": len(high_load_devices),
+                        "overload_risk_count": len(overload_risk_devices),
+                    },
+                    confidence=90,
+                )
+            )
 
         # 分析3: 低效率设备
-        low_efficiency_devices = [d for d in devices_with_load
-                                 if d.get('efficiency', 1) < min_efficiency and d.get('efficiency', 0) > 0]
+        low_efficiency_devices = [
+            d for d in devices_with_load if d.get("efficiency", 1) < min_efficiency and d.get("efficiency", 0) > 0
+        ]
 
         if low_efficiency_devices:
             total_loss = sum(
-                d.get('power', 0) * (min_efficiency - d['efficiency']) / d['efficiency']
-                for d in low_efficiency_devices
+                d.get("power", 0) * (min_efficiency - d["efficiency"]) / d["efficiency"] for d in low_efficiency_devices
             )
             yearly_loss = total_loss * 24 * 365 * 0.8
 
-            results.append(self.create_suggestion(
-                title="更换低效率设备",
-                description=f"发现 {len(low_efficiency_devices)} 台设备效率低于 {min_efficiency:.0%}",
-                detail=f"""
+            results.append(
+                self.create_suggestion(
+                    title="更换低效率设备",
+                    description=f"发现 {len(low_efficiency_devices)} 台设备效率低于 {min_efficiency:.0%}",
+                    detail=f"""
 ## 低效率设备分析
 
 ### 低效率设备清单
@@ -277,31 +280,34 @@ class EquipmentEfficiencyPlugin(AnalysisPlugin):
 | 精密空调 | COP > 4.0 | 4-6年 |
 | 变压器 | 99% | 8-10年 |
                 """.strip(),
-                estimated_saving=total_loss * 24 * 365,
-                estimated_cost_saving=yearly_loss,
-                implementation_difficulty=4,
-                priority=PluginPriority.MEDIUM if yearly_loss > 10000 else PluginPriority.LOW,
-                related_devices=[d['name'] for d in low_efficiency_devices[:5]],
-                analysis_data={
-                    'low_efficiency_count': len(low_efficiency_devices),
-                    'total_power_loss': total_loss,
-                    'yearly_loss': yearly_loss
-                },
-                confidence=75
-            ))
+                    estimated_saving=total_loss * 24 * 365,
+                    estimated_cost_saving=yearly_loss,
+                    implementation_difficulty=4,
+                    priority=PluginPriority.MEDIUM if yearly_loss > 10000 else PluginPriority.LOW,
+                    related_devices=[d["name"] for d in low_efficiency_devices[:5]],
+                    analysis_data={
+                        "low_efficiency_count": len(low_efficiency_devices),
+                        "total_power_loss": total_loss,
+                        "yearly_loss": yearly_loss,
+                    },
+                    confidence=75,
+                )
+            )
 
         # 分析4: 设备整体健康度评估
         if devices_with_load:
-            avg_load_rate = statistics.mean([d.get('load_rate', 0) for d in devices_with_load if d.get('load_rate', 0) > 0])
-            optimal_devices = [d for d in devices_with_load
-                             if optimal_min <= d.get('load_rate', 0) <= optimal_max]
+            avg_load_rate = statistics.mean(
+                [d.get("load_rate", 0) for d in devices_with_load if d.get("load_rate", 0) > 0]
+            )
+            optimal_devices = [d for d in devices_with_load if optimal_min <= d.get("load_rate", 0) <= optimal_max]
             optimal_ratio = len(optimal_devices) / len(devices_with_load)
 
             if optimal_ratio < 0.5:
-                results.append(self.create_suggestion(
-                    title="改善设备整体负载分布",
-                    description=f"仅 {optimal_ratio:.0%} 设备在最佳负载区间运行",
-                    detail=f"""
+                results.append(
+                    self.create_suggestion(
+                        title="改善设备整体负载分布",
+                        description=f"仅 {optimal_ratio:.0%} 设备在最佳负载区间运行",
+                        detail=f"""
 ## 设备负载分布分析
 
 ### 负载分布统计
@@ -322,16 +328,17 @@ class EquipmentEfficiencyPlugin(AnalysisPlugin):
 2. 分散高负载设备的负载
 3. 合理规划容量配置
                     """.strip(),
-                    estimated_saving=0,
-                    estimated_cost_saving=0,
-                    implementation_difficulty=3,
-                    priority=PluginPriority.LOW,
-                    analysis_data={
-                        'avg_load_rate': avg_load_rate,
-                        'optimal_ratio': optimal_ratio,
-                        'device_count': len(devices_with_load)
-                    },
-                    confidence=85
-                ))
+                        estimated_saving=0,
+                        estimated_cost_saving=0,
+                        implementation_difficulty=3,
+                        priority=PluginPriority.LOW,
+                        analysis_data={
+                            "avg_load_rate": avg_load_rate,
+                            "optimal_ratio": optimal_ratio,
+                            "device_count": len(devices_with_load),
+                        },
+                        confidence=85,
+                    )
+                )
 
         return results

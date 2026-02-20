@@ -2,6 +2,7 @@
 控制命令分级确认服务
 Story 9-6: 控制命令分级确认
 """
+
 import logging
 from datetime import datetime, timedelta
 from typing import Optional
@@ -133,9 +134,7 @@ async def approve_command(
     approver_name: str,
 ) -> Optional[CommandApproval]:
     """批准审批工单，执行命令"""
-    result = await db.execute(
-        select(CommandApproval).where(CommandApproval.id == approval_id)
-    )
+    result = await db.execute(select(CommandApproval).where(CommandApproval.id == approval_id))
     approval = result.scalar_one_or_none()
     if not approval:
         return None
@@ -173,9 +172,7 @@ async def reject_command(
     reason: str,
 ) -> Optional[CommandApproval]:
     """驳回审批工单"""
-    result = await db.execute(
-        select(CommandApproval).where(CommandApproval.id == approval_id)
-    )
+    result = await db.execute(select(CommandApproval).where(CommandApproval.id == approval_id))
     approval = result.scalar_one_or_none()
     if not approval:
         return None
@@ -224,9 +221,7 @@ async def check_expired_approvals(db: AsyncSession) -> int:
 async def get_risk_configs(db: AsyncSession) -> list[dict]:
     """获取所有风险等级配置"""
     result = await db.execute(
-        select(SystemConfig).where(
-            SystemConfig.config_group == "command_risk"
-        ).order_by(SystemConfig.config_key)
+        select(SystemConfig).where(SystemConfig.config_group == "command_risk").order_by(SystemConfig.config_key)
     )
     configs = result.scalars().all()
 
@@ -306,9 +301,9 @@ async def _update_audit_log_result(
 ) -> None:
     """更新审计日志中关联审批的结果"""
     await db.execute(
-        update(CommandAuditLog).where(
-            CommandAuditLog.approval_id == approval_id
-        ).values(
+        update(CommandAuditLog)
+        .where(CommandAuditLog.approval_id == approval_id)
+        .values(
             result=result,
             result_message=result_message,
         )

@@ -2,16 +2,18 @@
 数据追溯链 Pydantic Schema
 用于 API 请求/响应的数据验证和序列化
 """
+
 from datetime import datetime
-from decimal import Decimal
-from typing import Optional, List, Dict, Any, Union
+from typing import Optional, List, Dict, Any
 from pydantic import BaseModel, Field
 
 
 # ==================== 数据源映射 Schema ====================
 
+
 class DataSourceMappingBase(BaseModel):
     """数据源映射基础Schema"""
+
     param_code: str = Field(..., description="参数编码")
     param_name: str = Field(..., description="参数名称")
     param_unit: Optional[str] = Field(None, description="参数单位")
@@ -21,6 +23,7 @@ class DataSourceMappingBase(BaseModel):
 
 class DataSourceMappingCreate(DataSourceMappingBase):
     """创建数据源映射"""
+
     # 直接映射字段
     source_table: Optional[str] = Field(None, description="源表名称")
     source_field: Optional[str] = Field(None, description="源字段名称")
@@ -40,6 +43,7 @@ class DataSourceMappingCreate(DataSourceMappingBase):
 
 class DataSourceMappingResponse(DataSourceMappingBase):
     """数据源映射响应"""
+
     id: int
     source_table: Optional[str] = None
     source_field: Optional[str] = None
@@ -60,8 +64,10 @@ class DataSourceMappingResponse(DataSourceMappingBase):
 
 # ==================== 追溯记录 Schema ====================
 
+
 class TraceSourceInfo(BaseModel):
     """追溯数据源信息"""
+
     table: Optional[str] = Field(None, description="源表名称")
     field: Optional[str] = Field(None, description="源字段名称")
     filter: Optional[str] = Field(None, description="筛选条件")
@@ -72,6 +78,7 @@ class TraceSourceInfo(BaseModel):
 
 class TraceRecordBase(BaseModel):
     """追溯记录基础Schema"""
+
     trace_id: str = Field(..., description="追溯标识")
     param_code: str = Field(..., description="参数编码")
     param_name: Optional[str] = Field(None, description="参数名称")
@@ -84,6 +91,7 @@ class TraceRecordBase(BaseModel):
 
 class TraceRecordResponse(TraceRecordBase):
     """追溯记录响应"""
+
     id: int
     proposal_id: Optional[int] = None
     measure_id: Optional[int] = None
@@ -100,6 +108,7 @@ class TraceRecordResponse(TraceRecordBase):
 
 class TraceTreeNode(BaseModel):
     """追溯树节点"""
+
     trace_id: str = Field(..., description="追溯标识")
     param_code: str = Field(..., description="参数编码")
     param_name: Optional[str] = Field(None, description="参数名称")
@@ -128,6 +137,7 @@ TraceTreeNode.model_rebuild()
 
 class TraceTreeResponse(BaseModel):
     """追溯树响应"""
+
     root_trace_id: str = Field(..., description="根追溯ID")
     tree: TraceTreeNode = Field(..., description="追溯树")
     total_nodes: int = Field(..., description="总节点数")
@@ -137,8 +147,10 @@ class TraceTreeResponse(BaseModel):
 
 # ==================== 措施追溯数据 Schema ====================
 
+
 class MeasureTraceStep(BaseModel):
     """措施计算步骤"""
+
     step: int = Field(..., description="步骤序号")
     description: str = Field(..., description="步骤描述")
     trace_id: str = Field(..., description="关联追溯ID")
@@ -149,6 +161,7 @@ class MeasureTraceStep(BaseModel):
 
 class MeasureTraceData(BaseModel):
     """措施追溯数据"""
+
     root_trace_id: str = Field(..., description="根追溯ID")
     traces: Dict[str, str] = Field(..., description="参数编码到追溯ID的映射")
     calculation_steps: List[MeasureTraceStep] = Field(..., description="计算步骤列表")
@@ -156,6 +169,7 @@ class MeasureTraceData(BaseModel):
 
 class ProposalTraceSummary(BaseModel):
     """方案追溯汇总"""
+
     total_traces: int = Field(..., description="追溯记录总数")
     data_sources: List[str] = Field(..., description="涉及的数据源表")
     time_range: Dict[str, str] = Field(..., description="数据时间范围")
@@ -165,8 +179,10 @@ class ProposalTraceSummary(BaseModel):
 
 # ==================== API 请求 Schema ====================
 
+
 class TraceQueryRequest(BaseModel):
     """追溯查询请求"""
+
     trace_id: str = Field(..., description="追溯ID")
     expand_depth: int = Field(10, description="展开深度, -1表示全部展开")
     include_sql: bool = Field(False, description="是否包含SQL语句")
@@ -174,14 +190,17 @@ class TraceQueryRequest(BaseModel):
 
 class ProposalTraceRequest(BaseModel):
     """方案追溯请求"""
+
     proposal_id: int = Field(..., description="方案ID")
     include_measures: bool = Field(True, description="是否包含措施追溯")
 
 
 # ==================== 模板参数 Schema ====================
 
+
 class TemplateParameterBase(BaseModel):
     """模板参数基础Schema"""
+
     template_id: str = Field(..., description="模板ID")
     param_code: str = Field(..., description="参数编码")
     param_name: str = Field(..., description="参数显示名称")
@@ -190,6 +209,7 @@ class TemplateParameterBase(BaseModel):
 
 class TemplateParameterCreate(TemplateParameterBase):
     """创建模板参数"""
+
     mapping_id: Optional[int] = Field(None, description="关联映射配置ID")
     default_value: Optional[float] = Field(None, description="默认值")
     min_value: Optional[float] = Field(None, description="最小值")
@@ -200,6 +220,7 @@ class TemplateParameterCreate(TemplateParameterBase):
 
 class TemplateParameterResponse(TemplateParameterBase):
     """模板参数响应"""
+
     id: int
     template_name: Optional[str] = None
     mapping_id: Optional[int] = None
@@ -218,8 +239,10 @@ class TemplateParameterResponse(TemplateParameterBase):
 
 # ==================== 通用响应 Schema ====================
 
+
 class TraceListResponse(BaseModel):
     """追溯记录列表响应"""
+
     items: List[TraceRecordResponse]
     total: int
     page: int = 1
@@ -228,5 +251,6 @@ class TraceListResponse(BaseModel):
 
 class MappingListResponse(BaseModel):
     """数据源映射列表响应"""
+
     items: List[DataSourceMappingResponse]
     total: int

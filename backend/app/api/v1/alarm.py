@@ -1,9 +1,10 @@
 """
 告警管理 API - v1
 """
+
 import logging
 from datetime import datetime, timedelta
-from typing import Optional, List
+from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -13,13 +14,21 @@ import io
 
 from ..deps import get_db, require_viewer, require_operator
 from ...models.user import User
-from ...models.alarm import Alarm, AlarmThreshold, AlarmShield
+from ...models.alarm import Alarm, AlarmShield
 from ...models.point import Point
 from ...schemas.alarm import (
-    AlarmInfo, AlarmAcknowledge, AlarmResolve, AlarmCount,
-    AlarmStatistics, AlarmTrend, AlarmRuleCreate, AlarmRuleUpdate, AlarmRuleInfo,
-    AlarmShieldCreate, AlarmShieldInfo,
-    AlarmProcess, BatchAcknowledgeRequest
+    AlarmInfo,
+    AlarmAcknowledge,
+    AlarmResolve,
+    AlarmCount,
+    AlarmStatistics,
+    AlarmRuleCreate,
+    AlarmRuleUpdate,
+    AlarmRuleInfo,
+    AlarmShieldCreate,
+    AlarmShieldInfo,
+    AlarmProcess,
+    BatchAcknowledgeRequest,
 )
 from ...schemas.common import PageResponse
 from ...services.websocket import ws_manager
@@ -41,7 +50,7 @@ async def get_alarms(
     end_time: Optional[datetime] = Query(None, description="结束时间"),
     keyword: Optional[str] = Query(None, description="关键词"),
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_viewer)
+    _: User = Depends(require_viewer),
 ):
     """
     获取告警列表（多条件筛选、分页）
@@ -82,26 +91,18 @@ async def get_alarms(
             alarm_info.point_name = point.point_name
         alarm_list.append(alarm_info)
 
-    return PageResponse(
-        items=alarm_list,
-        total=total,
-        page=page,
-        page_size=page_size
-    )
+    return PageResponse(items=alarm_list, total=total, page=page, page_size=page_size)
 
 
 @router.get("/active", summary="获取活动告警")
-async def get_active_alarms(
-    db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_viewer)
-):
+async def get_active_alarms(db: AsyncSession = Depends(get_db), _: User = Depends(require_viewer)):
     """
     获取所有未解决的告警
     """
-    query = select(Alarm).where(
-        Alarm.status.in_(["active", "acknowledged"])
-    ).order_by(
-        Alarm.alarm_level.desc(), Alarm.created_at.desc()
+    query = (
+        select(Alarm)
+        .where(Alarm.status.in_(["active", "acknowledged"]))
+        .order_by(Alarm.alarm_level.desc(), Alarm.created_at.desc())
     )
 
     result = await db.execute(query)
@@ -121,17 +122,14 @@ async def get_active_alarms(
 
 
 @router.get("/count", response_model=AlarmCount, summary="获取各级别告警数量")
-async def get_alarm_count(
-    db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_viewer)
-):
+async def get_alarm_count(db: AsyncSession = Depends(get_db), _: User = Depends(require_viewer)):
     """
     获取各级别的活动告警数量
     """
     result = await db.execute(
-        select(Alarm.alarm_level, func.count(Alarm.id)).where(
-            Alarm.status.in_(["active", "acknowledged"])
-        ).group_by(Alarm.alarm_level)
+        select(Alarm.alarm_level, func.count(Alarm.id))
+        .where(Alarm.status.in_(["active", "acknowledged"]))
+        .group_by(Alarm.alarm_level)
     )
     counts = {row[0]: row[1] for row in result.all()}
 
@@ -140,7 +138,7 @@ async def get_alarm_count(
         major=counts.get("major", 0),
         minor=counts.get("minor", 0),
         info=counts.get("info", 0),
-        total=sum(counts.values())
+        total=sum(counts.values()),
     )
 
 
@@ -151,7 +149,7 @@ async def get_alarm_statistics(
     device_type: Optional[str] = Query(None, description="设备类型: TH/UPS/PDU/AC等"),
     alarm_level: Optional[str] = Query(None, description="告警级别: critical/major/minor/info"),
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_viewer)
+    _: User = Depends(require_viewer),
 ):
     """
     获取告警统计信息（支持按设备类型和告警级别筛选）
@@ -173,9 +171,7 @@ async def get_alarm_statistics(
     base_filter = and_(*conditions)
 
     # 总数
-    total_result = await db.execute(
-        select(func.count(Alarm.id)).where(base_filter)
-    )
+    total_result = await db.execute(select(func.count(Alarm.id)).where(base_filter))
     total = total_result.scalar() or 0
 
     # 按级别统计
@@ -192,17 +188,16 @@ async def get_alarm_statistics(
 
     # 按设备类型统计（JOIN Point 表）
     device_type_result = await db.execute(
-        select(Point.device_type, func.count(Alarm.id)).join(
-            Point, Alarm.point_id == Point.id
-        ).where(base_filter).group_by(Point.device_type)
+        select(Point.device_type, func.count(Alarm.id))
+        .join(Point, Alarm.point_id == Point.id)
+        .where(base_filter)
+        .group_by(Point.device_type)
     )
     by_device_type = {row[0]: row[1] for row in device_type_result.all() if row[0]}
 
     # 平均处理时间
     avg_conditions = conditions + [Alarm.status == "resolved"]
-    avg_duration_result = await db.execute(
-        select(func.avg(Alarm.duration_seconds)).where(and_(*avg_conditions))
-    )
+    avg_duration_result = await db.execute(select(func.avg(Alarm.duration_seconds)).where(and_(*avg_conditions)))
     avg_duration = avg_duration_result.scalar() or 0
 
     return AlarmStatistics(
@@ -212,7 +207,7 @@ async def get_alarm_statistics(
         by_device_type=by_device_type,
         avg_duration_seconds=int(avg_duration),
         start_time=start_time,
-        end_time=end_time
+        end_time=end_time,
     )
 
 
@@ -220,7 +215,7 @@ async def get_alarm_statistics(
 async def get_alarm_trend(
     days: int = Query(7, ge=1, le=90, description="天数"),
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_viewer)
+    _: User = Depends(require_viewer),
 ):
     """
     获取告警趋势数据（按天统计）
@@ -228,15 +223,10 @@ async def get_alarm_trend(
     start_time = datetime.now() - timedelta(days=days)
 
     result = await db.execute(
-        select(
-            func.date(Alarm.created_at).label("date"),
-            Alarm.alarm_level,
-            func.count(Alarm.id).label("count")
-        ).where(
-            Alarm.created_at >= start_time
-        ).group_by(
-            func.date(Alarm.created_at), Alarm.alarm_level
-        ).order_by("date")
+        select(func.date(Alarm.created_at).label("date"), Alarm.alarm_level, func.count(Alarm.id).label("count"))
+        .where(Alarm.created_at >= start_time)
+        .group_by(func.date(Alarm.created_at), Alarm.alarm_level)
+        .order_by("date")
     )
 
     # 整理数据
@@ -255,7 +245,7 @@ async def get_top_alarm_points(
     days: int = Query(7, ge=1, le=90),
     limit: int = Query(10, ge=1, le=50),
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_viewer)
+    _: User = Depends(require_viewer),
 ):
     """
     获取告警最多的点位
@@ -263,16 +253,11 @@ async def get_top_alarm_points(
     start_time = datetime.now() - timedelta(days=days)
 
     result = await db.execute(
-        select(
-            Alarm.point_id,
-            func.count(Alarm.id).label("alarm_count")
-        ).where(
-            Alarm.created_at >= start_time
-        ).group_by(
-            Alarm.point_id
-        ).order_by(
-            func.count(Alarm.id).desc()
-        ).limit(limit)
+        select(Alarm.point_id, func.count(Alarm.id).label("alarm_count"))
+        .where(Alarm.created_at >= start_time)
+        .group_by(Alarm.point_id)
+        .order_by(func.count(Alarm.id).desc())
+        .limit(limit)
     )
 
     top_points = []
@@ -280,12 +265,14 @@ async def get_top_alarm_points(
         point_result = await db.execute(select(Point).where(Point.id == row[0]))
         point = point_result.scalar_one_or_none()
         if point:
-            top_points.append({
-                "point_id": point.id,
-                "point_code": point.point_code,
-                "point_name": point.point_name,
-                "alarm_count": row[1]
-            })
+            top_points.append(
+                {
+                    "point_id": point.id,
+                    "point_code": point.point_code,
+                    "point_name": point.point_name,
+                    "alarm_count": row[1],
+                }
+            )
 
     return top_points
 
@@ -296,7 +283,7 @@ async def export_alarms(
     end_time: Optional[datetime] = Query(None),
     status: Optional[str] = Query(None),
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_operator)
+    _: User = Depends(require_operator),
 ):
     """
     导出告警记录为CSV
@@ -315,62 +302,63 @@ async def export_alarms(
 
     output = io.StringIO()
     writer = csv.writer(output)
-    writer.writerow([
-        "告警编号", "告警级别", "告警消息", "触发值", "阈值",
-        "状态", "确认时间", "解决时间", "创建时间"
-    ])
+    writer.writerow(["告警编号", "告警级别", "告警消息", "触发值", "阈值", "状态", "确认时间", "解决时间", "创建时间"])
 
     for alarm in alarms:
-        writer.writerow([
-            alarm.alarm_no, alarm.alarm_level, alarm.alarm_message,
-            alarm.trigger_value, alarm.threshold_value, alarm.status,
-            alarm.acknowledged_at, alarm.resolved_at, alarm.created_at
-        ])
+        writer.writerow(
+            [
+                alarm.alarm_no,
+                alarm.alarm_level,
+                alarm.alarm_message,
+                alarm.trigger_value,
+                alarm.threshold_value,
+                alarm.status,
+                alarm.acknowledged_at,
+                alarm.resolved_at,
+                alarm.created_at,
+            ]
+        )
 
     output.seek(0)
     return StreamingResponse(
         io.BytesIO(output.getvalue().encode("utf-8-sig")),
         media_type="text/csv",
-        headers={"Content-Disposition": "attachment; filename=alarms.csv"}
+        headers={"Content-Disposition": "attachment; filename=alarms.csv"},
     )
 
 
 @router.put("/batch-acknowledge", summary="批量确认告警")
 async def batch_acknowledge(
-    data: BatchAcknowledgeRequest,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_operator)
+    data: BatchAcknowledgeRequest, db: AsyncSession = Depends(get_db), current_user: User = Depends(require_operator)
 ):
     """
     批量确认告警
     """
     now = datetime.now()
     result = await db.execute(
-        update(Alarm).where(
-            and_(Alarm.id.in_(data.alarm_ids), Alarm.status == "active")
-        ).values(
-            status="acknowledged",
-            acknowledged_by=current_user.id,
-            acknowledged_at=now,
-            ack_remark=data.remark
-        )
+        update(Alarm)
+        .where(and_(Alarm.id.in_(data.alarm_ids), Alarm.status == "active"))
+        .values(status="acknowledged", acknowledged_by=current_user.id, acknowledged_at=now, ack_remark=data.remark)
     )
     await db.commit()
 
     actual_count = result.rowcount
 
     # WebSocket 广播批量确认消息
-    await ws_manager.broadcast_alarm({
-        "alarm_ids": data.alarm_ids,
-        "acknowledged_by": current_user.id,
-        "acknowledged_at": now.isoformat(),
-        "action": "batch_ack",
-    })
+    await ws_manager.broadcast_alarm(
+        {
+            "alarm_ids": data.alarm_ids,
+            "acknowledged_by": current_user.id,
+            "acknowledged_at": now.isoformat(),
+            "action": "batch_ack",
+        }
+    )
 
     return {"message": f"已确认 {actual_count} 条告警", "count": actual_count}
 
 
 # ============== 告警规则管理 ==============
+
 
 @router.get("/rules", response_model=PageResponse[AlarmRuleInfo], summary="获取告警规则列表")
 async def get_alarm_rules(
@@ -380,7 +368,7 @@ async def get_alarm_rules(
     alarm_level: Optional[str] = Query(None, description="告警级别: critical/major/minor/info"),
     is_enabled: Optional[bool] = Query(None, description="是否启用"),
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_viewer)
+    _: User = Depends(require_viewer),
 ):
     """
     获取告警规则列表（分页、筛选）
@@ -405,18 +393,13 @@ async def get_alarm_rules(
     rules = result.scalars().all()
 
     return PageResponse(
-        items=[AlarmRuleInfo.model_validate(rule) for rule in rules],
-        total=total,
-        page=page,
-        page_size=page_size
+        items=[AlarmRuleInfo.model_validate(rule) for rule in rules], total=total, page=page, page_size=page_size
     )
 
 
 @router.post("/rules", response_model=AlarmRuleInfo, summary="创建告警规则")
 async def create_alarm_rule(
-    data: AlarmRuleCreate,
-    db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_operator)
+    data: AlarmRuleCreate, db: AsyncSession = Depends(get_db), _: User = Depends(require_operator)
 ):
     """
     创建告警规则
@@ -432,11 +415,7 @@ async def create_alarm_rule(
 
 
 @router.get("/rules/{rule_id}", response_model=AlarmRuleInfo, summary="获取告警规则详情")
-async def get_alarm_rule(
-    rule_id: int,
-    db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_viewer)
-):
+async def get_alarm_rule(rule_id: int, db: AsyncSession = Depends(get_db), _: User = Depends(require_viewer)):
     """
     获取告警规则详情
     """
@@ -453,10 +432,7 @@ async def get_alarm_rule(
 
 @router.put("/rules/{rule_id}", response_model=AlarmRuleInfo, summary="更新告警规则")
 async def update_alarm_rule(
-    rule_id: int,
-    data: AlarmRuleUpdate,
-    db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_operator)
+    rule_id: int, data: AlarmRuleUpdate, db: AsyncSession = Depends(get_db), _: User = Depends(require_operator)
 ):
     """
     更新告警规则
@@ -481,11 +457,7 @@ async def update_alarm_rule(
 
 
 @router.delete("/rules/{rule_id}", summary="删除告警规则")
-async def delete_alarm_rule(
-    rule_id: int,
-    db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_operator)
-):
+async def delete_alarm_rule(rule_id: int, db: AsyncSession = Depends(get_db), _: User = Depends(require_operator)):
     """
     删除告警规则
     """
@@ -504,11 +476,7 @@ async def delete_alarm_rule(
 
 
 @router.put("/rules/{rule_id}/toggle", summary="切换告警规则启用状态")
-async def toggle_alarm_rule(
-    rule_id: int,
-    db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_operator)
-):
+async def toggle_alarm_rule(rule_id: int, db: AsyncSession = Depends(get_db), _: User = Depends(require_operator)):
     """
     切换告警规则的启用/禁用状态
     """
@@ -524,13 +492,11 @@ async def toggle_alarm_rule(
     await db.commit()
     await db.refresh(rule)
 
-    return {
-        "message": f"告警规则已{'启用' if rule.is_enabled else '禁用'}",
-        "is_enabled": rule.is_enabled
-    }
+    return {"message": f"告警规则已{'启用' if rule.is_enabled else '禁用'}", "is_enabled": rule.is_enabled}
 
 
 # ============== 告警屏蔽管理 ==============
+
 
 @router.get("/shields", response_model=PageResponse[AlarmShieldInfo], summary="获取告警屏蔽列表")
 async def get_alarm_shields(
@@ -539,12 +505,11 @@ async def get_alarm_shields(
     point_id: Optional[int] = Query(None, description="点位ID"),
     alarm_level: Optional[str] = Query(None, description="告警级别"),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_viewer)
+    current_user: User = Depends(require_viewer),
 ):
     """
     获取告警屏蔽列表（分页、筛选）
     """
-    from ...models.alarm import AlarmShield
     from ...models.point import Point
 
     query = select(AlarmShield)
@@ -584,29 +549,18 @@ async def get_alarm_shields(
 
         shield_list.append(shield_info)
 
-    return PageResponse(
-        items=shield_list,
-        total=total,
-        page=page,
-        page_size=page_size
-    )
+    return PageResponse(items=shield_list, total=total, page=page, page_size=page_size)
 
 
 @router.post("/shields", response_model=AlarmShieldInfo, summary="创建告警屏蔽")
 async def create_alarm_shield(
-    data: AlarmShieldCreate,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_operator)
+    data: AlarmShieldCreate, db: AsyncSession = Depends(get_db), current_user: User = Depends(require_operator)
 ):
     """
     创建告警屏蔽
     """
-    from ...models.alarm import AlarmShield
 
-    shield = AlarmShield(
-        **data.model_dump(),
-        created_by=current_user.id
-    )
+    shield = AlarmShield(**data.model_dump(), created_by=current_user.id)
     db.add(shield)
     await db.commit()
     await db.refresh(shield)
@@ -619,15 +573,10 @@ async def create_alarm_shield(
 
 
 @router.delete("/shields/{shield_id}", summary="删除告警屏蔽")
-async def delete_alarm_shield(
-    shield_id: int,
-    db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_operator)
-):
+async def delete_alarm_shield(shield_id: int, db: AsyncSession = Depends(get_db), _: User = Depends(require_operator)):
     """
     删除告警屏蔽
     """
-    from ...models.alarm import AlarmShield
 
     result = await db.execute(select(AlarmShield).where(AlarmShield.id == shield_id))
     shield = result.scalar_one_or_none()
@@ -643,12 +592,9 @@ async def delete_alarm_shield(
 
 # ============== 单条告警操作（路径参数路由放在最后，避免与 /rules /shields 等静态路径冲突） ==============
 
+
 @router.get("/{alarm_id}", response_model=AlarmInfo, summary="获取告警详情")
-async def get_alarm(
-    alarm_id: int,
-    db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_viewer)
-):
+async def get_alarm(alarm_id: int, db: AsyncSession = Depends(get_db), _: User = Depends(require_viewer)):
     """
     获取告警详情
     """
@@ -673,7 +619,7 @@ async def acknowledge_alarm(
     alarm_id: int,
     data: AlarmAcknowledge,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_operator)
+    current_user: User = Depends(require_operator),
 ):
     """
     确认告警
@@ -689,24 +635,23 @@ async def acknowledge_alarm(
 
     now = datetime.now()
     await db.execute(
-        update(Alarm).where(Alarm.id == alarm_id).values(
-            status="acknowledged",
-            acknowledged_by=current_user.id,
-            acknowledged_at=now,
-            ack_remark=data.remark
-        )
+        update(Alarm)
+        .where(Alarm.id == alarm_id)
+        .values(status="acknowledged", acknowledged_by=current_user.id, acknowledged_at=now, ack_remark=data.remark)
     )
     await db.commit()
 
     # WebSocket 广播确认消息
-    await ws_manager.broadcast_alarm({
-        "id": alarm_id,
-        "status": "acknowledged",
-        "acknowledged_by": current_user.id,
-        "acknowledged_at": now.isoformat(),
-        "ack_remark": data.remark,
-        "action": "ack",
-    })
+    await ws_manager.broadcast_alarm(
+        {
+            "id": alarm_id,
+            "status": "acknowledged",
+            "acknowledged_by": current_user.id,
+            "acknowledged_at": now.isoformat(),
+            "ack_remark": data.remark,
+            "action": "ack",
+        }
+    )
 
     return {"message": "告警已确认"}
 
@@ -716,7 +661,7 @@ async def resolve_alarm(
     alarm_id: int,
     data: AlarmResolve,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_operator)
+    current_user: User = Depends(require_operator),
 ):
     """
     解决告警
@@ -734,28 +679,32 @@ async def resolve_alarm(
     duration = max(0, int((now - alarm.created_at).total_seconds()))
 
     await db.execute(
-        update(Alarm).where(Alarm.id == alarm_id).values(
+        update(Alarm)
+        .where(Alarm.id == alarm_id)
+        .values(
             status="resolved",
             resolved_by=current_user.id,
             resolved_at=now,
             resolve_remark=data.remark,
             resolve_type=data.resolve_type or "manual",
-            duration_seconds=duration
+            duration_seconds=duration,
         )
     )
     await db.commit()
 
     # WebSocket 广播解决消息
-    await ws_manager.broadcast_alarm({
-        "id": alarm_id,
-        "status": "resolved",
-        "resolved_by": current_user.id,
-        "resolved_at": now.isoformat(),
-        "resolve_remark": data.remark,
-        "resolve_type": data.resolve_type or "manual",
-        "duration_seconds": duration,
-        "action": "resolve",
-    })
+    await ws_manager.broadcast_alarm(
+        {
+            "id": alarm_id,
+            "status": "resolved",
+            "resolved_by": current_user.id,
+            "resolved_at": now.isoformat(),
+            "resolve_remark": data.remark,
+            "resolve_type": data.resolve_type or "manual",
+            "duration_seconds": duration,
+            "action": "resolve",
+        }
+    )
 
     return {"message": "告警已解决"}
 
@@ -765,7 +714,7 @@ async def process_alarm(
     alarm_id: int,
     data: AlarmProcess,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_operator)
+    current_user: User = Depends(require_operator),
 ):
     """
     记录告警处理过程（不改变状态）
@@ -781,21 +730,21 @@ async def process_alarm(
 
     now = datetime.now()
     await db.execute(
-        update(Alarm).where(Alarm.id == alarm_id).values(
-            process_remark=data.process_remark,
-            processed_by=current_user.id,
-            processed_at=now
-        )
+        update(Alarm)
+        .where(Alarm.id == alarm_id)
+        .values(process_remark=data.process_remark, processed_by=current_user.id, processed_at=now)
     )
     await db.commit()
 
     # WebSocket 广播处理消息
-    await ws_manager.broadcast_alarm({
-        "id": alarm_id,
-        "process_remark": data.process_remark,
-        "processed_by": current_user.id,
-        "processed_at": now.isoformat(),
-        "action": "update",
-    })
+    await ws_manager.broadcast_alarm(
+        {
+            "id": alarm_id,
+            "process_remark": data.process_remark,
+            "processed_by": current_user.id,
+            "processed_at": now.isoformat(),
+            "action": "update",
+        }
+    )
 
     return {"message": "告警处理记录已保存"}

@@ -1,4 +1,5 @@
 """OTA 升级 API — Story 15.5"""
+
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -8,8 +9,12 @@ from ..deps import get_db, require_operator, require_admin
 from ...models.user import User
 from ...models.gateway import FirmwarePackage, OtaTask, OtaTaskGateway
 from ...schemas.ota import (
-    FirmwareCreate, FirmwareResponse,
-    OtaTaskCreate, OtaTaskResponse, OtaTaskDetailResponse, OtaGatewayStatus,
+    FirmwareCreate,
+    FirmwareResponse,
+    OtaTaskCreate,
+    OtaTaskResponse,
+    OtaTaskDetailResponse,
+    OtaGatewayStatus,
 )
 from ...schemas.common import PageResponse
 from ...services.ota_service import ota_service
@@ -19,6 +24,7 @@ router = APIRouter()
 
 # ---- 固件包管理 ----
 
+
 @router.post("/firmware", response_model=FirmwareResponse, summary="注册固件包")
 async def create_firmware(
     data: FirmwareCreate,
@@ -27,9 +33,7 @@ async def create_firmware(
 ):
     """注册新固件包（仅记录元数据，不上传文件）"""
     # 检查版本唯一性
-    existing = await db.execute(
-        select(FirmwarePackage).where(FirmwarePackage.version == data.version)
-    )
+    existing = await db.execute(select(FirmwarePackage).where(FirmwarePackage.version == data.version))
     if existing.scalar_one_or_none():
         raise HTTPException(400, f"固件版本已存在: {data.version}")
 
@@ -61,14 +65,14 @@ async def delete_firmware(
     db: AsyncSession = Depends(get_db),
     _user: User = Depends(require_admin),
 ):
-    result = await db.execute(
-        select(FirmwarePackage).where(FirmwarePackage.id == firmware_id)
-    )
+    result = await db.execute(select(FirmwarePackage).where(FirmwarePackage.id == firmware_id))
     if not result.scalar_one_or_none():
         raise HTTPException(404, "固件包不存在")
     # 检查是否有活跃任务引用该固件
     active_result = await db.execute(
-        select(func.count()).select_from(OtaTask).where(
+        select(func.count())
+        .select_from(OtaTask)
+        .where(
             OtaTask.firmware_id == firmware_id,
             OtaTask.status.in_(["pending", "running", "paused"]),
         )
@@ -81,6 +85,7 @@ async def delete_firmware(
 
 
 # ---- OTA 任务管理 ----
+
 
 @router.post("/tasks", response_model=OtaTaskResponse, summary="创建升级任务")
 async def create_task(
@@ -116,9 +121,7 @@ async def list_tasks(
     if status:
         query = query.where(OtaTask.status == status)
 
-    count_result = await db.execute(
-        select(func.count()).select_from(query.subquery())
-    )
+    count_result = await db.execute(select(func.count()).select_from(query.subquery()))
     total = count_result.scalar() or 0
 
     query = query.order_by(OtaTask.id.desc())
@@ -147,7 +150,8 @@ async def get_task(
 
     # 获取各网关状态
     gw_result = await db.execute(
-        select(OtaTaskGateway).where(OtaTaskGateway.task_id == task_id)
+        select(OtaTaskGateway)
+        .where(OtaTaskGateway.task_id == task_id)
         .order_by(OtaTaskGateway.batch_index, OtaTaskGateway.id)
     )
     gateways = gw_result.scalars().all()
@@ -164,6 +168,7 @@ async def start_task(
     _user: User = Depends(require_operator),
 ):
     from ...mqtt import mqtt_service
+
     try:
         await ota_service.start_task(task_id, mqtt_service.publish, db)
         return {"detail": "任务已启动"}
@@ -180,6 +185,7 @@ async def cancel_task(
     _user: User = Depends(require_operator),
 ):
     from ...mqtt import mqtt_service
+
     try:
         await ota_service.cancel_task(task_id, mqtt_service.publish, db)
         return {"detail": "任务已取消"}
@@ -207,6 +213,7 @@ async def resume_task(
     _user: User = Depends(require_operator),
 ):
     from ...mqtt import mqtt_service
+
     try:
         await ota_service.resume_task(task_id, mqtt_service.publish, db)
         return {"detail": "任务已恢复"}

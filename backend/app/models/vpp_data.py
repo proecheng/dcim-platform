@@ -2,7 +2,7 @@
 虚拟电厂(VPP)数据模型
 VPP Data Models for Virtual Power Plant solution
 """
-from datetime import datetime, date, time
+
 from sqlalchemy import Column, Integer, String, Float, DateTime, Boolean, Date, Time, Enum
 from sqlalchemy.sql import func
 from app.core.database import Base
@@ -11,13 +11,15 @@ import enum
 
 class TimePeriodType(str, enum.Enum):
     """时段类型枚举"""
-    PEAK = "peak"      # 峰时
+
+    PEAK = "peak"  # 峰时
     VALLEY = "valley"  # 谷时
-    FLAT = "flat"      # 平时
+    FLAT = "flat"  # 平时
 
 
 class ElectricityBill(Base):
     """电费清单表"""
+
     __tablename__ = "electricity_bills"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -47,6 +49,7 @@ class ElectricityBill(Base):
 
 class LoadCurve(Base):
     """负荷曲线数据表 (15分钟间隔)"""
+
     __tablename__ = "load_curves"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -61,6 +64,7 @@ class LoadCurve(Base):
 
 class ElectricityPrice(Base):
     """电价配置表"""
+
     __tablename__ = "electricity_prices"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -75,6 +79,7 @@ class ElectricityPrice(Base):
 
 class AdjustableLoad(Base):
     """可调节负荷资源表"""
+
     __tablename__ = "adjustable_loads"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -92,6 +97,7 @@ class AdjustableLoad(Base):
 
 class VPPConfig(Base):
     """VPP配置参数表"""
+
     __tablename__ = "vpp_configs"
 
     id = Column(Integer, primary_key=True, autoincrement=True)

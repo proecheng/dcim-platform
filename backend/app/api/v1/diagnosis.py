@@ -2,20 +2,24 @@
 智能诊断 API
 Story 9-3: 智能故障诊断
 """
+
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 
-from ..deps import get_db, get_current_user, require_admin, require_operator, require_viewer
+from ..deps import get_db, require_admin, require_operator, require_viewer
 from ...models.user import User
 from ...models.diagnosis import DiagnosisRule, DiagnosisResult
 from ...schemas.diagnosis import (
-    DiagnosisRuleCreate, DiagnosisRuleUpdate, DiagnosisRuleResponse,
-    DiagnosisResultResponse, DiagnosisCategoryItem,
+    DiagnosisRuleCreate,
+    DiagnosisRuleUpdate,
+    DiagnosisRuleResponse,
+    DiagnosisResultResponse,
+    DiagnosisCategoryItem,
 )
 from ...engines.diagnosis_engine import diagnosis_engine
 
@@ -38,6 +42,7 @@ CATEGORY_MAP = {
 
 # ==================== 静态路由（必须在参数化路由之前）====================
 
+
 @router.get("/categories", response_model=list)
 async def get_categories(
     db: AsyncSession = Depends(get_db),
@@ -45,8 +50,7 @@ async def get_categories(
 ):
     """获取诊断规则分类列表"""
     result = await db.execute(
-        select(DiagnosisRule.category, func.count(DiagnosisRule.id))
-        .group_by(DiagnosisRule.category)
+        select(DiagnosisRule.category, func.count(DiagnosisRule.id)).group_by(DiagnosisRule.category)
     )
     rows = result.all()
     return [
@@ -61,6 +65,7 @@ async def get_categories(
 
 # ==================== 规则管理 ====================
 
+
 @router.get("/rules/reload", response_model=dict)
 async def reload_rules_from_yaml(
     db: AsyncSession = Depends(get_db),
@@ -68,6 +73,7 @@ async def reload_rules_from_yaml(
 ):
     """重载 YAML 诊断规则"""
     from ...services.diagnosis_loader import reload
+
     count = await reload(db)
     await diagnosis_engine.reload_rules()
     return {"message": f"诊断规则重载完成，共 {count} 条", "count": count}
@@ -117,9 +123,7 @@ async def get_rule(
     _: User = Depends(require_viewer),
 ):
     """诊断规则详情"""
-    result = await db.execute(
-        select(DiagnosisRule).where(DiagnosisRule.id == rule_id)
-    )
+    result = await db.execute(select(DiagnosisRule).where(DiagnosisRule.id == rule_id))
     rule = result.scalar_one_or_none()
     if rule is None:
         raise HTTPException(status_code=404, detail="规则不存在")
@@ -134,9 +138,7 @@ async def create_rule(
 ):
     """创建自定义诊断规则"""
     # 检查 rule_code 唯一性
-    existing = await db.execute(
-        select(DiagnosisRule).where(DiagnosisRule.rule_code == data.rule_code)
-    )
+    existing = await db.execute(select(DiagnosisRule).where(DiagnosisRule.rule_code == data.rule_code))
     if existing.scalar_one_or_none() is not None:
         raise HTTPException(status_code=400, detail=f"规则编码 {data.rule_code} 已存在")
 
@@ -166,9 +168,7 @@ async def update_rule(
     _: User = Depends(require_admin),
 ):
     """更新诊断规则"""
-    result = await db.execute(
-        select(DiagnosisRule).where(DiagnosisRule.id == rule_id)
-    )
+    result = await db.execute(select(DiagnosisRule).where(DiagnosisRule.id == rule_id))
     rule = result.scalar_one_or_none()
     if rule is None:
         raise HTTPException(status_code=404, detail="规则不存在")
@@ -193,9 +193,7 @@ async def delete_rule(
     _: User = Depends(require_admin),
 ):
     """删除诊断规则（系统规则禁止删除）"""
-    result = await db.execute(
-        select(DiagnosisRule).where(DiagnosisRule.id == rule_id)
-    )
+    result = await db.execute(select(DiagnosisRule).where(DiagnosisRule.id == rule_id))
     rule = result.scalar_one_or_none()
     if rule is None:
         raise HTTPException(status_code=404, detail="规则不存在")
@@ -215,9 +213,7 @@ async def toggle_rule(
     _: User = Depends(require_operator),
 ):
     """启用/禁用诊断规则"""
-    result = await db.execute(
-        select(DiagnosisRule).where(DiagnosisRule.id == rule_id)
-    )
+    result = await db.execute(select(DiagnosisRule).where(DiagnosisRule.id == rule_id))
     rule = result.scalar_one_or_none()
     if rule is None:
         raise HTTPException(status_code=404, detail="规则不存在")
@@ -231,6 +227,7 @@ async def toggle_rule(
 
 # ==================== 诊断结果 ====================
 
+
 @router.get("/results/by-alarm/{alarm_id}", response_model=list)
 async def get_results_by_alarm(
     alarm_id: int,
@@ -239,9 +236,7 @@ async def get_results_by_alarm(
 ):
     """按告警ID查询诊断结果"""
     result = await db.execute(
-        select(DiagnosisResult)
-        .where(DiagnosisResult.alarm_id == alarm_id)
-        .order_by(DiagnosisResult.created_at.desc())
+        select(DiagnosisResult).where(DiagnosisResult.alarm_id == alarm_id).order_by(DiagnosisResult.created_at.desc())
     )
     results = result.scalars().all()
     return [DiagnosisResultResponse.model_validate(r) for r in results]
@@ -300,9 +295,7 @@ async def get_result(
     _: User = Depends(require_viewer),
 ):
     """诊断结果详情"""
-    result = await db.execute(
-        select(DiagnosisResult).where(DiagnosisResult.id == result_id)
-    )
+    result = await db.execute(select(DiagnosisResult).where(DiagnosisResult.id == result_id))
     item = result.scalar_one_or_none()
     if item is None:
         raise HTTPException(status_code=404, detail="诊断结果不存在")

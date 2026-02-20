@@ -2,6 +2,7 @@
 视频监控 Schema
 Story 10-1: 摄像头元数据管理
 """
+
 from datetime import datetime
 from typing import Optional, List
 
@@ -10,8 +11,10 @@ from pydantic import BaseModel, ConfigDict
 
 # ========== NVR ==========
 
+
 class NVRCreate(BaseModel):
     """创建 NVR"""
+
     name: str
     ip_address: str
     port: int = 554
@@ -25,6 +28,7 @@ class NVRCreate(BaseModel):
 
 class NVRUpdate(BaseModel):
     """更新 NVR"""
+
     name: Optional[str] = None
     ip_address: Optional[str] = None
     port: Optional[int] = None
@@ -39,6 +43,7 @@ class NVRUpdate(BaseModel):
 
 class NVRResponse(BaseModel):
     """NVR 响应"""
+
     model_config = ConfigDict(from_attributes=True)
 
     id: int
@@ -59,8 +64,10 @@ class NVRResponse(BaseModel):
 
 # ========== CameraPreset ==========
 
+
 class CameraPresetCreate(BaseModel):
     """创建预置位"""
+
     preset_index: int
     name: str
     description: Optional[str] = None
@@ -68,6 +75,7 @@ class CameraPresetCreate(BaseModel):
 
 class CameraPresetResponse(BaseModel):
     """预置位响应"""
+
     model_config = ConfigDict(from_attributes=True)
 
     id: int
@@ -79,8 +87,10 @@ class CameraPresetResponse(BaseModel):
 
 # ========== Camera ==========
 
+
 class CameraCreate(BaseModel):
     """创建摄像头"""
+
     name: str
     code: str
     rtsp_url: Optional[str] = None
@@ -98,6 +108,7 @@ class CameraCreate(BaseModel):
 
 class CameraUpdate(BaseModel):
     """更新摄像头"""
+
     name: Optional[str] = None
     code: Optional[str] = None
     rtsp_url: Optional[str] = None
@@ -117,6 +128,7 @@ class CameraUpdate(BaseModel):
 
 class CameraResponse(BaseModel):
     """摄像头响应"""
+
     model_config = ConfigDict(from_attributes=True)
 
     id: int
@@ -142,8 +154,10 @@ class CameraResponse(BaseModel):
 
 # ========== VideoEvent ==========
 
+
 class PTZControlRequest(BaseModel):
     """云台控制请求"""
+
     camera_id: int
     action: str  # up/down/left/right/zoom_in/zoom_out/stop
     speed: int = 5  # 1-10
@@ -151,12 +165,14 @@ class PTZControlRequest(BaseModel):
 
 class PresetCallRequest(BaseModel):
     """预置位调用请求"""
+
     camera_id: int
     preset_index: int
 
 
 class RecordingRequest(BaseModel):
     """录像控制请求"""
+
     camera_id: int
     alarm_id: Optional[int] = None
     linkage_execution_id: Optional[int] = None
@@ -164,6 +180,7 @@ class RecordingRequest(BaseModel):
 
 class VideoEventResponse(BaseModel):
     """视频事件响应"""
+
     model_config = ConfigDict(from_attributes=True)
 
     id: int
@@ -180,8 +197,10 @@ class VideoEventResponse(BaseModel):
 
 # ========== Playback (Story 10-4) ==========
 
+
 class AlarmBrief(BaseModel):
     """告警摘要"""
+
     id: int
     alarm_level: str
     alarm_message: str
@@ -190,6 +209,7 @@ class AlarmBrief(BaseModel):
 
 class CameraBrief(BaseModel):
     """摄像头摘要（回放用）"""
+
     id: int
     name: str
     code: str
@@ -200,6 +220,7 @@ class CameraBrief(BaseModel):
 
 class RecordingSegmentResponse(BaseModel):
     """录像片段"""
+
     id: int
     camera_id: int
     camera_name: Optional[str] = None
@@ -211,6 +232,7 @@ class RecordingSegmentResponse(BaseModel):
 
 class PlaybackInfoResponse(BaseModel):
     """告警回放信息"""
+
     alarm_info: AlarmBrief
     cameras: List[CameraBrief]
     recording_events: List[VideoEventResponse]

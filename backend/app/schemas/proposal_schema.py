@@ -1,6 +1,7 @@
 """
 节能方案相关的 Pydantic 模型
 """
+
 from pydantic import BaseModel, Field
 from typing import Optional, List, Dict, Any
 from datetime import datetime
@@ -9,8 +10,10 @@ from decimal import Decimal
 
 # ========== 措施相关模型 ==========
 
+
 class MeasureResponse(BaseModel):
     """措施响应模型"""
+
     id: int
     measure_code: str = Field(..., description="措施编号")
     regulation_object: str = Field(..., description="调节对象")
@@ -32,8 +35,10 @@ class MeasureResponse(BaseModel):
 
 # ========== 方案相关模型 ==========
 
+
 class ProposalResponse(BaseModel):
     """方案响应模型"""
+
     id: int
     proposal_code: str = Field(..., description="方案编号")
     proposal_type: str = Field(..., description="方案类型 A/B")
@@ -53,19 +58,23 @@ class ProposalResponse(BaseModel):
 
 class ProposalCreate(BaseModel):
     """创建方案请求模型"""
+
     template_id: str = Field(..., description="模板ID: A1/A2/A3/A4/A5/B1")
     analysis_days: int = Field(30, description="分析天数", ge=1, le=365)
 
 
 class MeasureAcceptRequest(BaseModel):
     """接受方案请求模型"""
+
     selected_measure_ids: List[int] = Field(..., description="选中的措施ID列表")
 
 
 # ========== 监控相关模型 ==========
 
+
 class ExecutionLogResponse(BaseModel):
     """执行日志响应"""
+
     id: int
     execution_time: datetime
     power_before: Optional[Decimal]
@@ -81,6 +90,7 @@ class ExecutionLogResponse(BaseModel):
 
 class MeasureMonitoringResponse(BaseModel):
     """措施监控响应"""
+
     measure_id: int
     measure_code: str
     regulation_object: str
@@ -96,6 +106,7 @@ class MeasureMonitoringResponse(BaseModel):
 
 class ProposalMonitoringResponse(BaseModel):
     """方案监控响应"""
+
     proposal_id: int
     proposal_code: str
     template_name: str
@@ -106,8 +117,10 @@ class ProposalMonitoringResponse(BaseModel):
 
 # ========== ML 增强相关模型 (专利 S2) ==========
 
+
 class DevicePowerData(BaseModel):
     """设备功率数据 (用于 Transformer 分析)"""
+
     power: List[float] = Field(..., description="功率时序数据")
     period_types: List[int] = Field(default_factory=list, description="时段类型 0-4: 深谷/谷/平/峰/尖峰")
     is_weekday: List[int] = Field(default_factory=list, description="是否工作日 0/1")
@@ -116,6 +129,7 @@ class DevicePowerData(BaseModel):
 
 class MLProposalCreate(BaseModel):
     """ML 增强方案生成请求"""
+
     template_id: str = Field(..., description="模板ID: A1/A2/A3/A4/A5/B1")
     analysis_days: int = Field(30, description="分析天数", ge=1, le=365)
     device_power_data: Optional[Dict[int, DevicePowerData]] = Field(
@@ -125,6 +139,7 @@ class MLProposalCreate(BaseModel):
 
 class MLTransferableLoadResult(BaseModel):
     """可转移负荷分析结果"""
+
     device_id: int
     is_transferable: bool = Field(..., description="是否可转移")
     transferability_prob: float = Field(..., description="可转移概率")
@@ -135,6 +150,7 @@ class MLTransferableLoadResult(BaseModel):
 
 class MLConflictAnalysisResult(BaseModel):
     """措施冲突分析结果"""
+
     measures_analyzed: int = Field(..., description="分析措施数量")
     recommended_count: int = Field(..., description="推荐措施数量")
     original_benefit: float = Field(..., description="原始收益")
@@ -145,6 +161,7 @@ class MLConflictAnalysisResult(BaseModel):
 
 class MLAnalysisResponse(BaseModel):
     """ML 分析响应"""
+
     proposal_id: int
     ml_enabled: bool = Field(..., description="是否启用 ML")
     ml_available: bool = Field(..., description="ML 模块是否可用")
@@ -156,8 +173,10 @@ class MLAnalysisResponse(BaseModel):
 
 # ========== RL 自适应优化相关模型 (专利 S5) ==========
 
+
 class RLStateInput(BaseModel):
     """RL 状态输入"""
+
     load_data: List[float] = Field(default_factory=list, description="负荷数据向量")
     price_period: int = Field(2, description="电价时段 0-4", ge=0, le=4)
     measure_states: List[int] = Field(default_factory=list, description="措施状态 0=未执行/1=执行中/2=完成")
@@ -169,6 +188,7 @@ class RLStateInput(BaseModel):
 
 class RLAdjustment(BaseModel):
     """RL 调整建议"""
+
     value: Any = Field(..., description="调整值")
     description: str = Field(..., description="调整说明")
     unit: Optional[str] = Field(None, description="单位")
@@ -177,11 +197,13 @@ class RLAdjustment(BaseModel):
 
 class RLOptimizationRequest(BaseModel):
     """RL 优化请求"""
+
     current_state: Optional[RLStateInput] = Field(None, description="当前状态 (可选, 不提供则使用默认)")
 
 
 class RLOptimizationResponse(BaseModel):
     """RL 优化响应"""
+
     proposal_id: int
     success: bool = Field(..., description="是否成功")
     adjustments: Dict[str, RLAdjustment] = Field(default_factory=dict, description="调整建议")
@@ -195,6 +217,7 @@ class RLOptimizationResponse(BaseModel):
 
 class RLTrainingRequest(BaseModel):
     """RL 在线训练请求"""
+
     proposal_id: Optional[int] = Field(None, description="关联方案ID")
     actual_saving: float = Field(..., description="实际节能收益")
     expected_saving: float = Field(..., description="预期节能收益")
@@ -205,6 +228,7 @@ class RLTrainingRequest(BaseModel):
 
 class RLTrainingResponse(BaseModel):
     """RL 训练响应"""
+
     success: bool = Field(..., description="是否成功")
     reward: float = Field(..., description="计算奖励")
     achievement_rate: float = Field(..., description="达成率")
@@ -217,6 +241,7 @@ class RLTrainingResponse(BaseModel):
 
 class RLModelInfoResponse(BaseModel):
     """RL 模型信息响应"""
+
     model_name: str = Field("adaptive_optimizer", description="模型名称")
     is_trained: bool = Field(False, description="是否已训练")
     is_available: bool = Field(False, description="模型是否可用")
@@ -234,6 +259,7 @@ class RLModelInfoResponse(BaseModel):
 
 class RLOptimizationHistoryItem(BaseModel):
     """RL 优化历史项"""
+
     id: int
     proposal_id: int
     created_at: datetime
@@ -251,11 +277,13 @@ class RLOptimizationHistoryItem(BaseModel):
 
 class RLOptimizationHistoryResponse(BaseModel):
     """RL 优化历史响应"""
+
     total: int = Field(..., description="总记录数")
     items: List[RLOptimizationHistoryItem] = Field(default_factory=list, description="历史记录")
 
 
 class RLExplorationRateUpdateRequest(BaseModel):
     """探索率更新请求"""
+
     exploration_rate: float = Field(..., description="新探索率", ge=0.0, le=1.0)
     phase: Optional[str] = Field(None, description="阶段: initial/stable/fluctuating/decaying")

@@ -2,13 +2,14 @@
 传感器数据漂移检测服务
 Story 9-7: 传感器数据漂移检测
 """
+
 import logging
 import statistics
 from datetime import datetime, timedelta
 from typing import Optional
 
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, update
+from sqlalchemy import select, update
 
 from ..models.drift import DriftDetectionResult
 from ..models.point import Point, PointRealtime
@@ -85,9 +86,7 @@ async def run_drift_detection(db: AsyncSession) -> dict:
             std_val = 0.0
 
         # Step 4: 获取当前值
-        rt_result = await db.execute(
-            select(PointRealtime).where(PointRealtime.point_id == point.id)
-        )
+        rt_result = await db.execute(select(PointRealtime).where(PointRealtime.point_id == point.id))
         realtime = rt_result.scalar_one_or_none()
         if not realtime or realtime.value is None:
             skipped += 1
@@ -127,9 +126,7 @@ async def run_drift_detection(db: AsyncSession) -> dict:
             continue
 
         # Step 6-7: 超过 3σ → 执行交叉验证
-        cross_result = await _cross_validate(
-            db, point.id, point.area_code, point.device_type, mean_val, std_val
-        )
+        cross_result = await _cross_validate(db, point.id, point.area_code, point.device_type, mean_val, std_val)
 
         if cross_result == "fail":
             status = "confirmed"
@@ -206,9 +203,9 @@ async def _cross_validate(
 
     # 查询同区域同类型的其他点位当前值
     neighbor_result = await db.execute(
-        select(PointRealtime.value).join(
-            Point, Point.id == PointRealtime.point_id
-        ).where(
+        select(PointRealtime.value)
+        .join(Point, Point.id == PointRealtime.point_id)
+        .where(
             Point.area_code == area_code,
             Point.device_type == device_type,
             Point.id != point_id,
@@ -237,9 +234,7 @@ async def _cross_validate(
 
 async def resolve_drift(db: AsyncSession, result_id: int) -> Optional[DriftDetectionResult]:
     """手动解除漂移标记"""
-    result = await db.execute(
-        select(DriftDetectionResult).where(DriftDetectionResult.id == result_id)
-    )
+    result = await db.execute(select(DriftDetectionResult).where(DriftDetectionResult.id == result_id))
     record = result.scalar_one_or_none()
     if not record:
         return None
@@ -251,11 +246,7 @@ async def resolve_drift(db: AsyncSession, result_id: int) -> Optional[DriftDetec
     record.resolved_at = datetime.now()
 
     # 恢复 PointRealtime.quality
-    await db.execute(
-        update(PointRealtime).where(
-            PointRealtime.point_id == record.point_id
-        ).values(quality=0)
-    )
+    await db.execute(update(PointRealtime).where(PointRealtime.point_id == record.point_id).values(quality=0))
 
     await db.commit()
     return record

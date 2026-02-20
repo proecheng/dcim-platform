@@ -1,13 +1,13 @@
 """
 历史数据生成器 - 生成30天的模拟历史数据
 """
+
 import asyncio
 import random
 import math
 from datetime import datetime, timedelta
 from typing import List, Dict
 from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..core.database import async_session
 from ..models import Point, PointHistory, PUEHistory
@@ -70,7 +70,7 @@ class HistoryGenerator:
             variation = 0
 
         for h in range(hours):
-            record_time = self.base_time - timedelta(hours=hours-h)
+            record_time = self.base_time - timedelta(hours=hours - h)
             day_offset = (self.base_time - record_time).days
             hour = record_time.hour
 
@@ -84,12 +84,14 @@ class HistoryGenerator:
                 # 开关量：极低概率为1
                 value = 1 if random.random() < 0.001 else 0
 
-            records.append({
-                "point_id": point.id,
-                "value": value,
-                "quality": 0,
-                "recorded_at": record_time,
-            })
+            records.append(
+                {
+                    "point_id": point.id,
+                    "value": value,
+                    "quality": 0,
+                    "recorded_at": record_time,
+                }
+            )
 
         return records
 

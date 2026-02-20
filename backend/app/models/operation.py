@@ -1,6 +1,7 @@
 """
 运维管理模型
 """
+
 from datetime import datetime
 from enum import Enum as PyEnum
 from sqlalchemy import Column, Integer, String, Boolean, Text, DateTime, ForeignKey, Enum
@@ -11,8 +12,10 @@ from ..core.database import Base
 
 # ==================== 枚举定义 ====================
 
+
 class WorkOrderStatus(str, PyEnum):
     """工单状态枚举"""
+
     pending = "待处理"
     assigned = "已派单"
     accepted = "已接单"
@@ -24,6 +27,7 @@ class WorkOrderStatus(str, PyEnum):
 
 class WorkOrderType(str, PyEnum):
     """工单类型枚举"""
+
     fault = "故障报修"
     maintenance = "日常维护"
     inspection = "巡检任务"
@@ -33,6 +37,7 @@ class WorkOrderType(str, PyEnum):
 
 class WorkOrderPriority(str, PyEnum):
     """工单优先级枚举"""
+
     critical = "紧急"
     high = "高"
     medium = "中"
@@ -41,6 +46,7 @@ class WorkOrderPriority(str, PyEnum):
 
 class ApprovalStatus(str, PyEnum):
     """审批状态枚举"""
+
     pending = "待审批"
     approved = "已批准"
     rejected = "已驳回"
@@ -50,6 +56,7 @@ class ApprovalStatus(str, PyEnum):
 
 class InspectionStatus(str, PyEnum):
     """巡检状态枚举"""
+
     pending = "待巡检"
     in_progress = "巡检中"
     completed = "已完成"
@@ -58,8 +65,10 @@ class InspectionStatus(str, PyEnum):
 
 # ==================== 工单模型 ====================
 
+
 class WorkOrder(Base):
     """工单表"""
+
     __tablename__ = "work_orders"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -96,6 +105,7 @@ class WorkOrder(Base):
 
 class WorkOrderLog(Base):
     """工单日志表"""
+
     __tablename__ = "work_order_logs"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -111,8 +121,10 @@ class WorkOrderLog(Base):
 
 # ==================== 巡检计划模型 ====================
 
+
 class InspectionPlan(Base):
     """巡检计划表"""
+
     __tablename__ = "inspection_plans"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -132,6 +144,7 @@ class InspectionPlan(Base):
 
 class InspectionTask(Base):
     """巡检任务表"""
+
     __tablename__ = "inspection_tasks"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -153,8 +166,10 @@ class InspectionTask(Base):
 
 # ==================== 知识库模型 ====================
 
+
 class KnowledgeBase(Base):
     """知识库表"""
+
     __tablename__ = "knowledge_base"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -171,8 +186,10 @@ class KnowledgeBase(Base):
 
 # ==================== 告警工单规则模型 ====================
 
+
 class AlarmWorkOrderRule(Base):
     """告警自动创建工单规则表"""
+
     __tablename__ = "alarm_workorder_rules"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -189,8 +206,10 @@ class AlarmWorkOrderRule(Base):
 
 # ==================== 工单审批模型 ====================
 
+
 class WorkOrderApproval(Base):
     """工单审批表"""
+
     __tablename__ = "work_order_approvals"
 
     id = Column(Integer, primary_key=True, autoincrement=True)

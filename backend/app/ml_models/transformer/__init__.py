@@ -8,8 +8,4 @@ from .model import LoadTransferabilityTransformer
 from .dataset import LoadTimeSeriesDataset
 from .predictor import TransferabilityPredictor
 
-__all__ = [
-    'LoadTransferabilityTransformer',
-    'LoadTimeSeriesDataset', 
-    'TransferabilityPredictor'
-]
+__all__ = ["LoadTransferabilityTransformer", "LoadTimeSeriesDataset", "TransferabilityPredictor"]

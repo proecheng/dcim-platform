@@ -2,8 +2,8 @@
 可调度资源配置 API - v1
 包括：可调度设备、储能系统、光伏系统的配置管理
 """
+
 from typing import List, Optional
-from datetime import date
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -11,18 +11,17 @@ from sqlalchemy import select, func
 
 from ..deps import get_db, require_viewer, require_admin
 from ...models.user import User
-from ...models.energy import (
-    DispatchableDevice, StorageSystemConfig, PVSystemConfig,
-    DispatchSchedule
-)
+from ...models.energy import DispatchableDevice, StorageSystemConfig, PVSystemConfig
 
 router = APIRouter()
 
 
 # ==================== Pydantic 模型 ====================
 
+
 class DispatchableDeviceBase(BaseModel):
     """可调度设备基础字段"""
+
     name: str = Field(..., description="设备名称")
     device_type: str = Field(..., description="设备类型: shiftable/curtailable/modulating/generation/storage/rigid")
     rated_power: float = Field(..., description="额定功率 kW")
@@ -57,12 +56,14 @@ class DispatchableDeviceBase(BaseModel):
 
 class DispatchableDeviceCreate(DispatchableDeviceBase):
     """创建可调度设备"""
+
     meter_point_id: Optional[int] = None
     power_device_id: Optional[int] = None
 
 
 class DispatchableDeviceUpdate(BaseModel):
     """更新可调度设备"""
+
     name: Optional[str] = None
     device_type: Optional[str] = None
     rated_power: Optional[float] = None
@@ -87,6 +88,7 @@ class DispatchableDeviceUpdate(BaseModel):
 
 class DispatchableDeviceResponse(DispatchableDeviceBase):
     """可调度设备响应"""
+
     id: int
     meter_point_id: Optional[int] = None
     power_device_id: Optional[int] = None
@@ -97,6 +99,7 @@ class DispatchableDeviceResponse(DispatchableDeviceBase):
 
 class StorageConfigBase(BaseModel):
     """储能配置基础字段"""
+
     name: str = Field(..., description="储能系统名称")
     capacity: float = Field(..., description="容量 kWh")
     max_charge_power: float = Field(..., description="最大充电功率 kW")
@@ -112,11 +115,13 @@ class StorageConfigBase(BaseModel):
 
 class StorageConfigCreate(StorageConfigBase):
     """创建储能配置"""
+
     meter_point_id: Optional[int] = None
 
 
 class StorageConfigUpdate(BaseModel):
     """更新储能配置"""
+
     name: Optional[str] = None
     capacity: Optional[float] = None
     max_charge_power: Optional[float] = None
@@ -132,6 +137,7 @@ class StorageConfigUpdate(BaseModel):
 
 class StorageConfigResponse(StorageConfigBase):
     """储能配置响应"""
+
     id: int
     meter_point_id: Optional[int] = None
 
@@ -141,6 +147,7 @@ class StorageConfigResponse(StorageConfigBase):
 
 class PVConfigBase(BaseModel):
     """光伏配置基础字段"""
+
     name: str = Field(..., description="光伏系统名称")
     rated_capacity: float = Field(..., description="额定容量 kWp")
     efficiency: float = Field(0.85, description="系统效率")
@@ -151,11 +158,13 @@ class PVConfigBase(BaseModel):
 
 class PVConfigCreate(PVConfigBase):
     """创建光伏配置"""
+
     meter_point_id: Optional[int] = None
 
 
 class PVConfigUpdate(BaseModel):
     """更新光伏配置"""
+
     name: Optional[str] = None
     rated_capacity: Optional[float] = None
     efficiency: Optional[float] = None
@@ -166,6 +175,7 @@ class PVConfigUpdate(BaseModel):
 
 class PVConfigResponse(PVConfigBase):
     """光伏配置响应"""
+
     id: int
     meter_point_id: Optional[int] = None
 
@@ -175,12 +185,13 @@ class PVConfigResponse(PVConfigBase):
 
 # ==================== 可调度设备 API ====================
 
+
 @router.get("/devices", response_model=List[DispatchableDeviceResponse], summary="获取可调度设备列表")
 async def get_dispatchable_devices(
     device_type: Optional[str] = Query(None, description="设备类型筛选"),
     is_active: Optional[bool] = Query(None, description="是否启用"),
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_viewer)
+    _: User = Depends(require_viewer),
 ):
     """获取可调度设备列表"""
     query = select(DispatchableDevice)
@@ -199,14 +210,10 @@ async def get_dispatchable_devices(
 
 @router.get("/devices/{device_id}", response_model=DispatchableDeviceResponse, summary="获取单个可调度设备")
 async def get_dispatchable_device(
-    device_id: int,
-    db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_viewer)
+    device_id: int, db: AsyncSession = Depends(get_db), _: User = Depends(require_viewer)
 ):
     """获取单个可调度设备详情"""
-    result = await db.execute(
-        select(DispatchableDevice).where(DispatchableDevice.id == device_id)
-    )
+    result = await db.execute(select(DispatchableDevice).where(DispatchableDevice.id == device_id))
     device = result.scalar_one_or_none()
 
     if not device:
@@ -217,9 +224,7 @@ async def get_dispatchable_device(
 
 @router.post("/devices", response_model=DispatchableDeviceResponse, summary="创建可调度设备")
 async def create_dispatchable_device(
-    data: DispatchableDeviceCreate,
-    db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_admin)
+    data: DispatchableDeviceCreate, db: AsyncSession = Depends(get_db), _: User = Depends(require_admin)
 ):
     """创建可调度设备"""
     device = DispatchableDevice(**data.model_dump())
@@ -232,15 +237,10 @@ async def create_dispatchable_device(
 
 @router.put("/devices/{device_id}", response_model=DispatchableDeviceResponse, summary="更新可调度设备")
 async def update_dispatchable_device(
-    device_id: int,
-    data: DispatchableDeviceUpdate,
-    db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_admin)
+    device_id: int, data: DispatchableDeviceUpdate, db: AsyncSession = Depends(get_db), _: User = Depends(require_admin)
 ):
     """更新可调度设备"""
-    result = await db.execute(
-        select(DispatchableDevice).where(DispatchableDevice.id == device_id)
-    )
+    result = await db.execute(select(DispatchableDevice).where(DispatchableDevice.id == device_id))
     device = result.scalar_one_or_none()
 
     if not device:
@@ -258,14 +258,10 @@ async def update_dispatchable_device(
 
 @router.delete("/devices/{device_id}", summary="删除可调度设备")
 async def delete_dispatchable_device(
-    device_id: int,
-    db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_admin)
+    device_id: int, db: AsyncSession = Depends(get_db), _: User = Depends(require_admin)
 ):
     """删除可调度设备"""
-    result = await db.execute(
-        select(DispatchableDevice).where(DispatchableDevice.id == device_id)
-    )
+    result = await db.execute(select(DispatchableDevice).where(DispatchableDevice.id == device_id))
     device = result.scalar_one_or_none()
 
     if not device:
@@ -278,10 +274,7 @@ async def delete_dispatchable_device(
 
 
 @router.get("/devices/summary/stats", summary="获取设备统计")
-async def get_device_stats(
-    db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_viewer)
-):
+async def get_device_stats(db: AsyncSession = Depends(get_db), _: User = Depends(require_viewer)):
     """获取可调度设备统计"""
     # 总数
     total_result = await db.execute(select(func.count(DispatchableDevice.id)))
@@ -291,13 +284,12 @@ async def get_device_stats(
     type_result = await db.execute(
         select(
             DispatchableDevice.device_type,
-            func.count(DispatchableDevice.id).label('count'),
-            func.sum(DispatchableDevice.rated_power).label('total_power')
+            func.count(DispatchableDevice.id).label("count"),
+            func.sum(DispatchableDevice.rated_power).label("total_power"),
         ).group_by(DispatchableDevice.device_type)
     )
     by_type = [
-        {"type": row.device_type, "count": row.count, "total_power": float(row.total_power or 0)}
-        for row in type_result
+        {"type": row.device_type, "count": row.count, "total_power": float(row.total_power or 0)} for row in type_result
     ]
 
     # 活跃设备
@@ -306,20 +298,17 @@ async def get_device_stats(
     )
     active_count = active_result.scalar()
 
-    return {
-        "total": total,
-        "active_count": active_count,
-        "by_type": by_type
-    }
+    return {"total": total, "active_count": active_count, "by_type": by_type}
 
 
 # ==================== 储能系统 API ====================
+
 
 @router.get("/storage", response_model=List[StorageConfigResponse], summary="获取储能系统列表")
 async def get_storage_systems(
     is_active: Optional[bool] = Query(None, description="是否启用"),
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_viewer)
+    _: User = Depends(require_viewer),
 ):
     """获取储能系统列表"""
     query = select(StorageSystemConfig)
@@ -335,15 +324,9 @@ async def get_storage_systems(
 
 
 @router.get("/storage/{storage_id}", response_model=StorageConfigResponse, summary="获取单个储能系统")
-async def get_storage_system(
-    storage_id: int,
-    db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_viewer)
-):
+async def get_storage_system(storage_id: int, db: AsyncSession = Depends(get_db), _: User = Depends(require_viewer)):
     """获取单个储能系统详情"""
-    result = await db.execute(
-        select(StorageSystemConfig).where(StorageSystemConfig.id == storage_id)
-    )
+    result = await db.execute(select(StorageSystemConfig).where(StorageSystemConfig.id == storage_id))
     system = result.scalar_one_or_none()
 
     if not system:
@@ -354,9 +337,7 @@ async def get_storage_system(
 
 @router.post("/storage", response_model=StorageConfigResponse, summary="创建储能系统")
 async def create_storage_system(
-    data: StorageConfigCreate,
-    db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_admin)
+    data: StorageConfigCreate, db: AsyncSession = Depends(get_db), _: User = Depends(require_admin)
 ):
     """创建储能系统"""
     system = StorageSystemConfig(**data.model_dump())
@@ -369,15 +350,10 @@ async def create_storage_system(
 
 @router.put("/storage/{storage_id}", response_model=StorageConfigResponse, summary="更新储能系统")
 async def update_storage_system(
-    storage_id: int,
-    data: StorageConfigUpdate,
-    db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_admin)
+    storage_id: int, data: StorageConfigUpdate, db: AsyncSession = Depends(get_db), _: User = Depends(require_admin)
 ):
     """更新储能系统"""
-    result = await db.execute(
-        select(StorageSystemConfig).where(StorageSystemConfig.id == storage_id)
-    )
+    result = await db.execute(select(StorageSystemConfig).where(StorageSystemConfig.id == storage_id))
     system = result.scalar_one_or_none()
 
     if not system:
@@ -394,15 +370,9 @@ async def update_storage_system(
 
 
 @router.delete("/storage/{storage_id}", summary="删除储能系统")
-async def delete_storage_system(
-    storage_id: int,
-    db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_admin)
-):
+async def delete_storage_system(storage_id: int, db: AsyncSession = Depends(get_db), _: User = Depends(require_admin)):
     """删除储能系统"""
-    result = await db.execute(
-        select(StorageSystemConfig).where(StorageSystemConfig.id == storage_id)
-    )
+    result = await db.execute(select(StorageSystemConfig).where(StorageSystemConfig.id == storage_id))
     system = result.scalar_one_or_none()
 
     if not system:
@@ -416,11 +386,12 @@ async def delete_storage_system(
 
 # ==================== 光伏系统 API ====================
 
+
 @router.get("/pv", response_model=List[PVConfigResponse], summary="获取光伏系统列表")
 async def get_pv_systems(
     is_active: Optional[bool] = Query(None, description="是否启用"),
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_viewer)
+    _: User = Depends(require_viewer),
 ):
     """获取光伏系统列表"""
     query = select(PVSystemConfig)
@@ -436,15 +407,9 @@ async def get_pv_systems(
 
 
 @router.get("/pv/{pv_id}", response_model=PVConfigResponse, summary="获取单个光伏系统")
-async def get_pv_system(
-    pv_id: int,
-    db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_viewer)
-):
+async def get_pv_system(pv_id: int, db: AsyncSession = Depends(get_db), _: User = Depends(require_viewer)):
     """获取单个光伏系统详情"""
-    result = await db.execute(
-        select(PVSystemConfig).where(PVSystemConfig.id == pv_id)
-    )
+    result = await db.execute(select(PVSystemConfig).where(PVSystemConfig.id == pv_id))
     system = result.scalar_one_or_none()
 
     if not system:
@@ -454,11 +419,7 @@ async def get_pv_system(
 
 
 @router.post("/pv", response_model=PVConfigResponse, summary="创建光伏系统")
-async def create_pv_system(
-    data: PVConfigCreate,
-    db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_admin)
-):
+async def create_pv_system(data: PVConfigCreate, db: AsyncSession = Depends(get_db), _: User = Depends(require_admin)):
     """创建光伏系统"""
     system = PVSystemConfig(**data.model_dump())
     db.add(system)
@@ -470,15 +431,10 @@ async def create_pv_system(
 
 @router.put("/pv/{pv_id}", response_model=PVConfigResponse, summary="更新光伏系统")
 async def update_pv_system(
-    pv_id: int,
-    data: PVConfigUpdate,
-    db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_admin)
+    pv_id: int, data: PVConfigUpdate, db: AsyncSession = Depends(get_db), _: User = Depends(require_admin)
 ):
     """更新光伏系统"""
-    result = await db.execute(
-        select(PVSystemConfig).where(PVSystemConfig.id == pv_id)
-    )
+    result = await db.execute(select(PVSystemConfig).where(PVSystemConfig.id == pv_id))
     system = result.scalar_one_or_none()
 
     if not system:
@@ -495,15 +451,9 @@ async def update_pv_system(
 
 
 @router.delete("/pv/{pv_id}", summary="删除光伏系统")
-async def delete_pv_system(
-    pv_id: int,
-    db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_admin)
-):
+async def delete_pv_system(pv_id: int, db: AsyncSession = Depends(get_db), _: User = Depends(require_admin)):
     """删除光伏系统"""
-    result = await db.execute(
-        select(PVSystemConfig).where(PVSystemConfig.id == pv_id)
-    )
+    result = await db.execute(select(PVSystemConfig).where(PVSystemConfig.id == pv_id))
     system = result.scalar_one_or_none()
 
     if not system:
@@ -517,18 +467,16 @@ async def delete_pv_system(
 
 # ==================== 资源汇总 API ====================
 
+
 @router.get("/summary", summary="获取所有可调度资源汇总")
-async def get_dispatch_summary(
-    db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_viewer)
-):
+async def get_dispatch_summary(db: AsyncSession = Depends(get_db), _: User = Depends(require_viewer)):
     """获取所有可调度资源汇总信息"""
 
     # 可调度设备统计
     device_result = await db.execute(
         select(
-            func.count(DispatchableDevice.id).label('count'),
-            func.sum(DispatchableDevice.rated_power).label('total_power')
+            func.count(DispatchableDevice.id).label("count"),
+            func.sum(DispatchableDevice.rated_power).label("total_power"),
         ).where(DispatchableDevice.is_active == True)
     )
     device_row = device_result.first()
@@ -536,10 +484,10 @@ async def get_dispatch_summary(
     # 储能统计
     storage_result = await db.execute(
         select(
-            func.count(StorageSystemConfig.id).label('count'),
-            func.sum(StorageSystemConfig.capacity).label('total_capacity'),
-            func.sum(StorageSystemConfig.max_charge_power).label('total_charge_power'),
-            func.sum(StorageSystemConfig.max_discharge_power).label('total_discharge_power')
+            func.count(StorageSystemConfig.id).label("count"),
+            func.sum(StorageSystemConfig.capacity).label("total_capacity"),
+            func.sum(StorageSystemConfig.max_charge_power).label("total_charge_power"),
+            func.sum(StorageSystemConfig.max_discharge_power).label("total_discharge_power"),
         ).where(StorageSystemConfig.is_active == True)
     )
     storage_row = storage_result.first()
@@ -547,37 +495,29 @@ async def get_dispatch_summary(
     # 光伏统计
     pv_result = await db.execute(
         select(
-            func.count(PVSystemConfig.id).label('count'),
-            func.sum(PVSystemConfig.rated_capacity).label('total_capacity')
+            func.count(PVSystemConfig.id).label("count"),
+            func.sum(PVSystemConfig.rated_capacity).label("total_capacity"),
         ).where(PVSystemConfig.is_active == True)
     )
     pv_row = pv_result.first()
 
     return {
-        "dispatchable_devices": {
-            "count": device_row.count or 0,
-            "total_power": float(device_row.total_power or 0)
-        },
+        "dispatchable_devices": {"count": device_row.count or 0, "total_power": float(device_row.total_power or 0)},
         "storage_systems": {
             "count": storage_row.count or 0,
             "total_capacity": float(storage_row.total_capacity or 0),
             "total_charge_power": float(storage_row.total_charge_power or 0),
-            "total_discharge_power": float(storage_row.total_discharge_power or 0)
+            "total_discharge_power": float(storage_row.total_discharge_power or 0),
         },
-        "pv_systems": {
-            "count": pv_row.count or 0,
-            "total_capacity": float(pv_row.total_capacity or 0)
-        }
+        "pv_systems": {"count": pv_row.count or 0, "total_capacity": float(pv_row.total_capacity or 0)},
     }
 
 
 # ==================== 演示数据初始化 ====================
 
+
 @router.post("/init-demo-data", summary="初始化演示数据")
-async def init_demo_data(
-    db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_admin)
-):
+async def init_demo_data(db: AsyncSession = Depends(get_db), _: User = Depends(require_admin)):
     """初始化可调度资源演示数据"""
 
     # 检查是否已有数据
@@ -598,7 +538,7 @@ async def init_demo_data(
             forbidden_periods=[10, 11, 12, 17, 18, 19],
             priority=3,
             is_active=True,
-            description="可在谷时运行的空压机组，提供全天气源储备"
+            description="可在谷时运行的空压机组，提供全天气源储备",
         ),
         DispatchableDevice(
             name="冷冻水蓄冷系统",
@@ -609,7 +549,7 @@ async def init_demo_data(
             allowed_periods=[0, 1, 2, 3, 4, 5, 6],
             priority=2,
             is_active=True,
-            description="夜间蓄冷，白天释放，峰谷套利"
+            description="夜间蓄冷，白天释放，峰谷套利",
         ),
         DispatchableDevice(
             name="电动叉车充电站",
@@ -620,7 +560,7 @@ async def init_demo_data(
             allowed_periods=[22, 23, 0, 1, 2, 3, 4, 5, 6, 7],
             priority=5,
             is_active=True,
-            description="生产结束后充电，避开峰时"
+            description="生产结束后充电，避开峰时",
         ),
         # 削减型设备
         DispatchableDevice(
@@ -633,7 +573,7 @@ async def init_demo_data(
             recovery_time=0.25,
             priority=7,
             is_active=True,
-            description="需量超标时可临时降低亮度"
+            description="需量超标时可临时降低亮度",
         ),
         DispatchableDevice(
             name="办公区空调",
@@ -645,7 +585,7 @@ async def init_demo_data(
             recovery_time=0.5,
             priority=6,
             is_active=True,
-            description="高峰时段提升设定温度2-3度"
+            description="高峰时段提升设定温度2-3度",
         ),
         # 调节型设备
         DispatchableDevice(
@@ -658,7 +598,7 @@ async def init_demo_data(
             response_delay=5,
             priority=4,
             is_active=True,
-            description="变频调节，可根据需量实时调整"
+            description="变频调节，可根据需量实时调整",
         ),
         DispatchableDevice(
             name="冷冻水泵",
@@ -670,7 +610,7 @@ async def init_demo_data(
             response_delay=3,
             priority=4,
             is_active=True,
-            description="变频泵，功率可连续调节"
+            description="变频泵，功率可连续调节",
         ),
         # 刚性负荷（作为参考）
         DispatchableDevice(
@@ -679,7 +619,7 @@ async def init_demo_data(
             rated_power=500,
             priority=1,
             is_active=True,
-            description="核心生产设备，不可调度，仅用于预测"
+            description="核心生产设备，不可调度，仅用于预测",
         ),
     ]
 
@@ -699,7 +639,7 @@ async def init_demo_data(
             max_soc=0.90,
             cycle_cost=0.08,
             is_active=True,
-            description="500kWh/125kW 锂电池储能系统"
+            description="500kWh/125kW 锂电池储能系统",
         ),
         StorageSystemConfig(
             name="UPS电池组",
@@ -712,7 +652,7 @@ async def init_demo_data(
             max_soc=0.95,
             cycle_cost=0.15,
             is_active=False,
-            description="UPS电池可参与削峰（备用，暂未启用）"
+            description="UPS电池可参与削峰（备用，暂未启用）",
         ),
     ]
 
@@ -727,7 +667,7 @@ async def init_demo_data(
             efficiency=0.82,
             is_controllable=False,
             is_active=True,
-            description="300kWp屋顶分布式光伏"
+            description="300kWp屋顶分布式光伏",
         ),
         PVSystemConfig(
             name="车棚光伏",
@@ -735,7 +675,7 @@ async def init_demo_data(
             efficiency=0.85,
             is_controllable=False,
             is_active=True,
-            description="停车场车棚光伏"
+            description="停车场车棚光伏",
         ),
     ]
 
@@ -747,9 +687,5 @@ async def init_demo_data(
     return {
         "message": "演示数据初始化成功",
         "created": True,
-        "data": {
-            "devices": len(demo_devices),
-            "storage": len(demo_storage),
-            "pv": len(demo_pv)
-        }
+        "data": {"devices": len(demo_devices), "storage": len(demo_storage), "pv": len(demo_pv)},
     }

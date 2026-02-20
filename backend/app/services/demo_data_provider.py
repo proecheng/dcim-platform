@@ -10,11 +10,10 @@ Demo 数据提供服务 - 统一的模拟数据生成入口
     # 获取实时需量状态（自动判断是否使用模拟数据）
     status = await demo_provider.get_realtime_demand_status(db, declared_demand)
 """
+
 import math
 from datetime import datetime, timedelta
 from typing import Optional, Dict, Any, List
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, desc
 
 from ..core.config import get_settings
 
@@ -43,8 +42,9 @@ class DemoDataProvider:
         """是否处于 Demo 模式"""
         return self.settings.simulation_enabled
 
-    def _get_deterministic_value(self, seed_value: float, min_val: float, max_val: float,
-                                  variation: float = 0.1) -> float:
+    def _get_deterministic_value(
+        self, seed_value: float, min_val: float, max_val: float, variation: float = 0.1
+    ) -> float:
         """基于种子值生成确定性数值（避免使用 random）
 
         使用正弦函数产生周期性波动，确保相同输入产生相同输出
@@ -80,8 +80,8 @@ class DemoDataProvider:
 
         # 日间高峰（中心在12点和17点）
         day_peak = 0.25 * (
-            math.exp(-((hour_decimal - 11) ** 2) / 8) +  # 午间高峰
-            math.exp(-((hour_decimal - 17) ** 2) / 6)    # 傍晚高峰
+            math.exp(-((hour_decimal - 11) ** 2) / 8)  # 午间高峰
+            + math.exp(-((hour_decimal - 17) ** 2) / 6)  # 傍晚高峰
         )
 
         # 夜间低谷
@@ -91,8 +91,7 @@ class DemoDataProvider:
 
         return min(0.98, base_factor + day_peak)
 
-    def get_demo_demand_status(self, declared_demand: float,
-                                timestamp: Optional[datetime] = None) -> Dict[str, Any]:
+    def get_demo_demand_status(self, declared_demand: float, timestamp: Optional[datetime] = None) -> Dict[str, Any]:
         """生成 Demo 模式下的需量状态数据
 
         Args:
@@ -144,7 +143,9 @@ class DemoDataProvider:
 
         # 最大需量时间（月内某一天）
         day_offset = int(self._get_deterministic_value(month_seed + 1, 1, min(15, timestamp.day), 1.0))
-        month_max_time = (timestamp.replace(day=max(1, timestamp.day - day_offset), hour=11, minute=30)).strftime("%Y-%m-%d %H:%M")
+        month_max_time = (timestamp.replace(day=max(1, timestamp.day - day_offset), hour=11, minute=30)).strftime(
+            "%Y-%m-%d %H:%M"
+        )
 
         return {
             "current_power": round(current_power, 1),
@@ -158,11 +159,12 @@ class DemoDataProvider:
             "month_max_time": month_max_time,
             "trend": trend,
             "timestamp": timestamp.strftime("%Y-%m-%d %H:%M:%S"),
-            "is_demo_data": True
+            "is_demo_data": True,
         }
 
-    def get_demo_realtime_curve(self, declared_demand: float, hours: int = 4,
-                                  end_time: Optional[datetime] = None) -> List[Dict[str, Any]]:
+    def get_demo_realtime_curve(
+        self, declared_demand: float, hours: int = 4, end_time: Optional[datetime] = None
+    ) -> List[Dict[str, Any]]:
         """生成 Demo 模式下的实时功率曲线数据
 
         Args:
@@ -198,22 +200,25 @@ class DemoDataProvider:
             else:
                 alert = "normal"
 
-            data_points.append({
-                "timestamp": ts.strftime("%H:%M"),
-                "full_timestamp": ts.strftime("%Y-%m-%d %H:%M:%S"),
-                "power": round(power, 1),
-                "demand_target": declared_demand,
-                "utilization": round(utilization, 1),
-                "alert_level": alert,
-                "is_demo_data": True
-            })
+            data_points.append(
+                {
+                    "timestamp": ts.strftime("%H:%M"),
+                    "full_timestamp": ts.strftime("%Y-%m-%d %H:%M:%S"),
+                    "power": round(power, 1),
+                    "demand_target": declared_demand,
+                    "utilization": round(utilization, 1),
+                    "alert_level": alert,
+                    "is_demo_data": True,
+                }
+            )
 
         # 按时间正序排列
         data_points.reverse()
         return data_points
 
-    def get_demo_monthly_summary(self, declared_demand: float, demand_price: float,
-                                   target_date: Optional[datetime] = None) -> Dict[str, Any]:
+    def get_demo_monthly_summary(
+        self, declared_demand: float, demand_price: float, target_date: Optional[datetime] = None
+    ) -> Dict[str, Any]:
         """生成 Demo 模式下的月度电费汇总
 
         Args:
@@ -248,21 +253,15 @@ class DemoDataProvider:
         deep_valley_ratio = 0.07
 
         # 电价
-        prices = {
-            "sharp": 1.20,
-            "peak": 0.95,
-            "flat": 0.65,
-            "valley": 0.35,
-            "deep_valley": 0.20
-        }
+        prices = {"sharp": 1.20, "peak": 0.95, "flat": 0.65, "valley": 0.35, "deep_valley": 0.20}
 
         # 计算电量电费
         energy_cost = (
-            total_energy * sharp_ratio * prices["sharp"] +
-            total_energy * peak_ratio * prices["peak"] +
-            total_energy * flat_ratio * prices["flat"] +
-            total_energy * valley_ratio * prices["valley"] +
-            total_energy * deep_valley_ratio * prices["deep_valley"]
+            total_energy * sharp_ratio * prices["sharp"]
+            + total_energy * peak_ratio * prices["peak"]
+            + total_energy * flat_ratio * prices["flat"]
+            + total_energy * valley_ratio * prices["valley"]
+            + total_energy * deep_valley_ratio * prices["deep_valley"]
         )
 
         # 计算需量电费
@@ -298,21 +297,22 @@ class DemoDataProvider:
                     "peak": round(total_energy * peak_ratio, 1),
                     "flat": round(total_energy * flat_ratio, 1),
                     "valley": round(total_energy * valley_ratio, 1),
-                    "deep_valley": round(total_energy * deep_valley_ratio, 1)
+                    "deep_valley": round(total_energy * deep_valley_ratio, 1),
                 },
                 "cost_by_period": {
                     "sharp": round(total_energy * sharp_ratio * prices["sharp"], 2),
                     "peak": round(total_energy * peak_ratio * prices["peak"], 2),
                     "flat": round(total_energy * flat_ratio * prices["flat"], 2),
                     "valley": round(total_energy * valley_ratio * prices["valley"], 2),
-                    "deep_valley": round(total_energy * deep_valley_ratio * prices["deep_valley"], 2)
-                }
+                    "deep_valley": round(total_energy * deep_valley_ratio * prices["deep_valley"], 2),
+                },
             },
-            "is_demo_data": True
+            "is_demo_data": True,
         }
 
-    def get_demo_daily_demand_trend(self, declared_demand: float,
-                                      target_date: Optional[datetime] = None) -> Dict[str, Any]:
+    def get_demo_daily_demand_trend(
+        self, declared_demand: float, target_date: Optional[datetime] = None
+    ) -> Dict[str, Any]:
         """生成 Demo 模式下的日需量趋势数据
 
         Args:
@@ -334,7 +334,7 @@ class DemoDataProvider:
         for hour in range(24):
             for quarter in range(4):
                 time_str = f"{hour:02d}:{quarter*15:02d}"
-                ts = target_date.replace(hour=hour, minute=quarter*15, second=0, microsecond=0)
+                ts = target_date.replace(hour=hour, minute=quarter * 15, second=0, microsecond=0)
 
                 # 使用时间因子生成功率
                 time_factor = self._get_time_factor(ts)
@@ -359,11 +359,7 @@ class DemoDataProvider:
                 else:
                     period = "flat"
 
-                data_points.append({
-                    "time": time_str,
-                    "demand": round(demand, 1),
-                    "period": period
-                })
+                data_points.append({"time": time_str, "demand": round(demand, 1), "period": period})
 
         return {
             "date": target_date.strftime("%Y-%m-%d"),
@@ -372,11 +368,12 @@ class DemoDataProvider:
             "max_demand_time": max_demand_time,
             "avg_demand": round(sum(p["demand"] for p in data_points) / len(data_points), 1),
             "data": data_points,
-            "is_demo_data": True
+            "is_demo_data": True,
         }
 
-    def get_demo_monthly_history(self, declared_demand: float, months: int = 12,
-                                   end_date: Optional[datetime] = None) -> List[Dict[str, Any]]:
+    def get_demo_monthly_history(
+        self, declared_demand: float, months: int = 12, end_date: Optional[datetime] = None
+    ) -> List[Dict[str, Any]]:
         """生成 Demo 模式下的历史月度电费数据
 
         Args:
@@ -419,16 +416,18 @@ class DemoDataProvider:
             max_demand_factor = 0.85 + self._get_deterministic_value(month_seed + 1, 0, 0.13, 1.0)
             max_demand = declared_demand * max_demand_factor * season_factor
 
-            history.append({
-                "year_month": year_month,
-                "total_energy": round(total_energy, 1),
-                "total_cost": round(total_cost, 2),
-                "energy_cost": round(total_cost * 0.65, 2),
-                "demand_cost": round(total_cost * 0.30, 2),
-                "other_cost": round(total_cost * 0.05, 2),
-                "max_demand": round(max_demand, 1),
-                "is_demo_data": True
-            })
+            history.append(
+                {
+                    "year_month": year_month,
+                    "total_energy": round(total_energy, 1),
+                    "total_cost": round(total_cost, 2),
+                    "energy_cost": round(total_cost * 0.65, 2),
+                    "demand_cost": round(total_cost * 0.30, 2),
+                    "other_cost": round(total_cost * 0.05, 2),
+                    "max_demand": round(max_demand, 1),
+                    "is_demo_data": True,
+                }
+            )
 
         return history
 

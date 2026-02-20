@@ -7,31 +7,18 @@ Opportunity Analysis Engine
 
 注: 需量分析统一使用 DemandAnalysisService 确保数据源一致
 """
+
 import logging
 from typing import Dict, List, Optional, Any
-from datetime import datetime, date
+from datetime import datetime
 from enum import Enum
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, and_, or_, func
+from sqlalchemy import select, and_, func
 
-from .analysis_plugins import (
-    plugin_manager,
-    register_all_plugins,
-    AnalysisContext,
-    SuggestionResult,
-    LoadShiftingPlugin,
-    DemandOptimizationPlugin,
-    PeakValleyOptimizationPlugin,
-    EquipmentEfficiencyPlugin,
-    PUEOptimizationPlugin,
-    PowerFactorPlugin
-)
+from .analysis_plugins import plugin_manager, register_all_plugins, SuggestionResult
 from .pricing_service import PricingService
 from .demand_analysis_service import DemandAnalysisService
-from ..models.energy import (
-    PowerDevice, EnergySuggestion, ElectricityPricing,
-    EnergyDaily, PUEHistory
-)
+from ..models.energy import PowerDevice, PUEHistory
 
 logger = logging.getLogger(__name__)
 
@@ -42,10 +29,11 @@ DEFAULT_AVG_DEMAND_KW = 350  # 默认平均需量 (kW)
 
 class OpportunityCategory(str, Enum):
     """机会类别（整合后的4大类）"""
+
     BILL_OPTIMIZATION = "bill_optimization"  # 电费结构优化（原A1+A2+A4）
-    DEVICE_OPERATION = "device_operation"    # 设备运行优化（原A3+A5）
+    DEVICE_OPERATION = "device_operation"  # 设备运行优化（原A3+A5）
     EQUIPMENT_UPGRADE = "equipment_upgrade"  # 设备改造升级（原B1）
-    COMPREHENSIVE = "comprehensive"          # 综合能效提升（新增）
+    COMPREHENSIVE = "comprehensive"  # 综合能效提升（新增）
 
 
 # 插件到类别的映射
@@ -80,7 +68,7 @@ class OpportunityEngine:
         self,
         categories: Optional[List[OpportunityCategory]] = None,
         device_ids: Optional[List[int]] = None,
-        days: int = 30
+        days: int = 30,
     ) -> Dict[str, Any]:
         """
         生成节能机会分析
@@ -105,7 +93,7 @@ class OpportunityEngine:
             db=self.db,
             plugin_ids=plugin_ids,
             days=days,
-            save_results=False  # 不自动保存，由调用方决定
+            save_results=False,  # 不自动保存，由调用方决定
         )
 
         # 处理结果
@@ -129,13 +117,10 @@ class OpportunityEngine:
             "summary": summary,
             "by_category": by_category,
             "analysis_time": datetime.now().isoformat(),
-            "analysis_days": days
+            "analysis_days": days,
         }
 
-    async def analyze_demand_opportunity(
-        self,
-        meter_point_id: Optional[int] = None
-    ) -> Dict[str, Any]:
+    async def analyze_demand_opportunity(self, meter_point_id: Optional[int] = None) -> Dict[str, Any]:
         """
         分析需量优化机会
 
@@ -148,11 +133,7 @@ class OpportunityEngine:
         result = await demand_service.analyze(meter_point_id)
 
         if not result.get("has_opportunity"):
-            return {
-                "has_opportunity": False,
-                "message": result.get("message", "未发现需量优化机会"),
-                "suggestions": []
-            }
+            return {"has_opportunity": False, "message": result.get("message", "未发现需量优化机会"), "suggestions": []}
 
         stats = result["statistics"]
         rec = result["recommendation"]
@@ -162,35 +143,41 @@ class OpportunityEngine:
         suggestions = []
 
         if rec["type"] == "reduce":
-            suggestions.append({
-                "type": "reduce_declared_demand",
-                "title": "降低申报需量",
-                "description": rec["description"],
-                "recommendation": f"建议将申报需量调整为{rec['suggested_demand']:.0f}kW",
-                "potential_saving_monthly": rec["monthly_saving"],
-                "potential_saving_annual": rec["annual_saving"],
-                "confidence": rec["confidence"]
-            })
+            suggestions.append(
+                {
+                    "type": "reduce_declared_demand",
+                    "title": "降低申报需量",
+                    "description": rec["description"],
+                    "recommendation": f"建议将申报需量调整为{rec['suggested_demand']:.0f}kW",
+                    "potential_saving_monthly": rec["monthly_saving"],
+                    "potential_saving_annual": rec["annual_saving"],
+                    "confidence": rec["confidence"],
+                }
+            )
 
         elif rec["type"] == "increase":
-            suggestions.append({
-                "type": "increase_declared_demand",
-                "title": "提高申报需量或控制峰值",
-                "description": rec["description"],
-                "recommendation": "建议提高申报需量或采取需量控制措施",
-                "over_risk_cost": abs(rec["annual_saving"]),
-                "confidence": rec["confidence"]
-            })
+            suggestions.append(
+                {
+                    "type": "increase_declared_demand",
+                    "title": "提高申报需量或控制峰值",
+                    "description": rec["description"],
+                    "recommendation": "建议提高申报需量或采取需量控制措施",
+                    "over_risk_cost": abs(rec["annual_saving"]),
+                    "confidence": rec["confidence"],
+                }
+            )
 
         elif rec["type"] == "shave":
-            suggestions.append({
-                "type": "peak_shaving",
-                "title": "实施需量削峰",
-                "description": rec["description"],
-                "recommendation": "建议安装需量控制系统或优化设备启动策略",
-                "potential_saving_annual": rec["annual_saving"],
-                "confidence": rec["confidence"]
-            })
+            suggestions.append(
+                {
+                    "type": "peak_shaving",
+                    "title": "实施需量削峰",
+                    "description": rec["description"],
+                    "recommendation": "建议安装需量控制系统或优化设备启动策略",
+                    "potential_saving_annual": rec["annual_saving"],
+                    "confidence": rec["confidence"],
+                }
+            )
 
         return {
             "has_opportunity": True,
@@ -199,10 +186,10 @@ class OpportunityEngine:
                 "max_demand": stats["max_demand_12m"],
                 "avg_demand": stats["avg_demand_12m"],
                 "utilization_rate": stats["utilization_rate"] * 100,  # 转换为百分比
-                "demand_price": demand_price
+                "demand_price": demand_price,
             },
             "suggestions": suggestions,
-            "potential_saving_annual": abs(rec["annual_saving"])
+            "potential_saving_annual": abs(rec["annual_saving"]),
         }
 
     async def analyze_peak_valley_opportunity(self) -> Dict[str, Any]:
@@ -228,16 +215,18 @@ class OpportunityEngine:
 
         suggestions = []
         if peak_valley_diff > 0.3 and total_shiftable_power > 10:
-            suggestions.append({
-                "type": "peak_to_valley_shift",
-                "title": "峰谷负荷转移",
-                "description": f"峰谷电价差{peak_valley_diff:.3f}元/kWh，可转移功率{total_shiftable_power:.1f}kW",
-                "recommendation": "建议将部分峰时负荷转移至谷时运行",
-                "potential_saving_daily": daily_saving,
-                "potential_saving_annual": annual_saving,
-                "confidence": 0.8,
-                "shiftable_devices": shiftable_devices[:5]  # 显示前5个
-            })
+            suggestions.append(
+                {
+                    "type": "peak_to_valley_shift",
+                    "title": "峰谷负荷转移",
+                    "description": f"峰谷电价差{peak_valley_diff:.3f}元/kWh，可转移功率{total_shiftable_power:.1f}kW",
+                    "recommendation": "建议将部分峰时负荷转移至谷时运行",
+                    "potential_saving_daily": daily_saving,
+                    "potential_saving_annual": annual_saving,
+                    "confidence": 0.8,
+                    "shiftable_devices": shiftable_devices[:5],  # 显示前5个
+                }
+            )
 
         return {
             "has_opportunity": len(suggestions) > 0,
@@ -245,13 +234,10 @@ class OpportunityEngine:
             "shiftable_power": total_shiftable_power,
             "shiftable_device_count": len(shiftable_devices),
             "suggestions": suggestions,
-            "potential_saving_annual": annual_saving
+            "potential_saving_annual": annual_saving,
         }
 
-    async def analyze_device_efficiency(
-        self,
-        device_ids: Optional[List[int]] = None
-    ) -> Dict[str, Any]:
+    async def analyze_device_efficiency(self, device_ids: Optional[List[int]] = None) -> Dict[str, Any]:
         """
         分析设备效率提升机会
 
@@ -271,14 +257,16 @@ class OpportunityEngine:
             # 简化分析：基于设备类型判断效率
             efficiency_score = self._estimate_device_efficiency(device)
             if efficiency_score < 0.7:
-                inefficient_devices.append({
-                    "device_id": device.id,
-                    "device_name": device.device_name,
-                    "device_type": device.device_type,
-                    "rated_power": device.rated_power,
-                    "efficiency_score": efficiency_score,
-                    "improvement_potential": f"{(0.85 - efficiency_score) * 100:.1f}%"
-                })
+                inefficient_devices.append(
+                    {
+                        "device_id": device.id,
+                        "device_name": device.device_name,
+                        "device_type": device.device_type,
+                        "rated_power": device.rated_power,
+                        "efficiency_score": efficiency_score,
+                        "improvement_potential": f"{(0.85 - efficiency_score) * 100:.1f}%",
+                    }
+                )
 
         # 估算改造收益
         total_potential_saving = 0
@@ -294,15 +282,17 @@ class OpportunityEngine:
                 dev["potential_saving_annual"] = cost_saving
 
         if inefficient_devices:
-            suggestions.append({
-                "type": "equipment_upgrade",
-                "title": "低效设备改造",
-                "description": f"发现{len(inefficient_devices)}台设备效率偏低",
-                "recommendation": "建议对低效设备进行改造或更换",
-                "inefficient_count": len(inefficient_devices),
-                "potential_saving_annual": total_potential_saving,
-                "confidence": 0.7
-            })
+            suggestions.append(
+                {
+                    "type": "equipment_upgrade",
+                    "title": "低效设备改造",
+                    "description": f"发现{len(inefficient_devices)}台设备效率偏低",
+                    "recommendation": "建议对低效设备进行改造或更换",
+                    "inefficient_count": len(inefficient_devices),
+                    "potential_saving_annual": total_potential_saving,
+                    "confidence": 0.7,
+                }
+            )
 
         return {
             "has_opportunity": len(inefficient_devices) > 0,
@@ -310,7 +300,7 @@ class OpportunityEngine:
             "total_device_count": len(devices),
             "inefficient_count": len(inefficient_devices),
             "suggestions": suggestions,
-            "potential_saving_annual": total_potential_saving
+            "potential_saving_annual": total_potential_saving,
         }
 
     async def get_opportunity_summary(self) -> Dict[str, Any]:
@@ -324,15 +314,15 @@ class OpportunityEngine:
 
         # 汇总
         total_opportunities = (
-            len(demand_result.get("suggestions", [])) +
-            len(peak_valley_result.get("suggestions", [])) +
-            len(efficiency_result.get("suggestions", []))
+            len(demand_result.get("suggestions", []))
+            + len(peak_valley_result.get("suggestions", []))
+            + len(efficiency_result.get("suggestions", []))
         )
 
         total_potential_saving = (
-            demand_result.get("potential_saving_annual", 0) +
-            peak_valley_result.get("potential_saving_annual", 0) +
-            efficiency_result.get("potential_saving_annual", 0)
+            demand_result.get("potential_saving_annual", 0)
+            + peak_valley_result.get("potential_saving_annual", 0)
+            + efficiency_result.get("potential_saving_annual", 0)
         )
 
         return {
@@ -341,31 +331,25 @@ class OpportunityEngine:
             "by_category": {
                 OpportunityCategory.BILL_OPTIMIZATION: {
                     "count": len(demand_result.get("suggestions", [])) + len(peak_valley_result.get("suggestions", [])),
-                    "saving": demand_result.get("potential_saving_annual", 0) + peak_valley_result.get("potential_saving_annual", 0)
+                    "saving": demand_result.get("potential_saving_annual", 0)
+                    + peak_valley_result.get("potential_saving_annual", 0),
                 },
                 OpportunityCategory.DEVICE_OPERATION: {
                     "count": 0,  # 待实现
-                    "saving": 0
+                    "saving": 0,
                 },
                 OpportunityCategory.EQUIPMENT_UPGRADE: {
                     "count": len(efficiency_result.get("suggestions", [])),
-                    "saving": efficiency_result.get("potential_saving_annual", 0)
-                }
+                    "saving": efficiency_result.get("potential_saving_annual", 0),
+                },
             },
-            "top_opportunities": self._get_top_opportunities([
-                demand_result,
-                peak_valley_result,
-                efficiency_result
-            ]),
-            "analysis_time": datetime.now().isoformat()
+            "top_opportunities": self._get_top_opportunities([demand_result, peak_valley_result, efficiency_result]),
+            "analysis_time": datetime.now().isoformat(),
         }
 
     # ========== 私有方法 ==========
 
-    def _get_plugin_ids_for_categories(
-        self,
-        categories: Optional[List[OpportunityCategory]]
-    ) -> Optional[List[str]]:
+    def _get_plugin_ids_for_categories(self, categories: Optional[List[OpportunityCategory]]) -> Optional[List[str]]:
         """根据类别获取要执行的插件ID"""
         if not categories:
             return None  # 执行全部
@@ -378,21 +362,21 @@ class OpportunityEngine:
 
     def _convert_to_opportunity(self, result: SuggestionResult) -> Dict[str, Any]:
         """将插件结果转换为统一的机会格式"""
-        plugin_id = result.plugin_id if hasattr(result, 'plugin_id') else 'unknown'
+        plugin_id = result.plugin_id if hasattr(result, "plugin_id") else "unknown"
         category = PLUGIN_CATEGORY_MAPPING.get(plugin_id, OpportunityCategory.COMPREHENSIVE)
 
         return {
             "id": f"{plugin_id}_{datetime.now().timestamp()}",
             "category": category,
             "plugin_id": plugin_id,
-            "title": result.title if hasattr(result, 'title') else str(result),
-            "description": result.description if hasattr(result, 'description') else "",
-            "priority": result.priority.value if hasattr(result, 'priority') else 3,
-            "potential_saving": result.potential_saving if hasattr(result, 'potential_saving') else 0,
-            "confidence": result.confidence if hasattr(result, 'confidence') else 0.5,
-            "device_id": result.device_id if hasattr(result, 'device_id') else None,
-            "implementation_steps": result.implementation_steps if hasattr(result, 'implementation_steps') else [],
-            "created_at": datetime.now().isoformat()
+            "title": result.title if hasattr(result, "title") else str(result),
+            "description": result.description if hasattr(result, "description") else "",
+            "priority": result.priority.value if hasattr(result, "priority") else 3,
+            "potential_saving": result.potential_saving if hasattr(result, "potential_saving") else 0,
+            "confidence": result.confidence if hasattr(result, "confidence") else 0.5,
+            "device_id": result.device_id if hasattr(result, "device_id") else None,
+            "implementation_steps": result.implementation_steps if hasattr(result, "implementation_steps") else [],
+            "created_at": datetime.now().isoformat(),
         }
 
     def _group_by_category(self, opportunities: List[Dict]) -> Dict[str, List[Dict]]:
@@ -415,18 +399,18 @@ class OpportunityEngine:
             "high_priority_count": high_priority,
             "total_potential_saving": round(total_saving, 2),
             "avg_confidence": round(
-                sum(o.get("confidence", 0.5) for o in opportunities) / len(opportunities)
-                if opportunities else 0,
-                2
-            )
+                sum(o.get("confidence", 0.5) for o in opportunities) / len(opportunities) if opportunities else 0, 2
+            ),
         }
 
     async def _get_max_demand_from_history(self, days: int = 30) -> float:
         """从历史数据获取最大需量估算"""
         try:
             result = await self.db.execute(
-                select(func.max(PUEHistory.total_power))
-                .where(PUEHistory.record_time >= datetime.now().replace(hour=0, minute=0, second=0) - __import__('datetime').timedelta(days=days))
+                select(func.max(PUEHistory.total_power)).where(
+                    PUEHistory.record_time
+                    >= datetime.now().replace(hour=0, minute=0, second=0) - __import__("datetime").timedelta(days=days)
+                )
             )
             max_power = result.scalar()
             return max_power or 0
@@ -438,8 +422,10 @@ class OpportunityEngine:
         """从历史数据获取平均需量"""
         try:
             result = await self.db.execute(
-                select(func.avg(PUEHistory.total_power))
-                .where(PUEHistory.record_time >= datetime.now().replace(hour=0, minute=0, second=0) - __import__('datetime').timedelta(days=days))
+                select(func.avg(PUEHistory.total_power)).where(
+                    PUEHistory.record_time
+                    >= datetime.now().replace(hour=0, minute=0, second=0) - __import__("datetime").timedelta(days=days)
+                )
             )
             avg_power = result.scalar()
             return avg_power or 0
@@ -454,26 +440,23 @@ class OpportunityEngine:
         result = await self.db.execute(
             select(PowerDevice, DeviceShiftConfig)
             .join(DeviceShiftConfig, PowerDevice.id == DeviceShiftConfig.device_id)
-            .where(
-                and_(
-                    DeviceShiftConfig.is_shiftable == True,
-                    PowerDevice.is_enabled == True
-                )
-            )
+            .where(and_(DeviceShiftConfig.is_shiftable == True, PowerDevice.is_enabled == True))
         )
         rows = result.all()
 
         devices = []
         for device, config in rows:
             shiftable_power = (device.rated_power or 0) * (config.shiftable_power_ratio or 0)
-            devices.append({
-                "device_id": device.id,
-                "device_name": device.device_name,
-                "device_type": device.device_type,
-                "rated_power": device.rated_power,
-                "shiftable_power": shiftable_power,
-                "allowed_shift_hours": config.allowed_shift_hours or []
-            })
+            devices.append(
+                {
+                    "device_id": device.id,
+                    "device_name": device.device_name,
+                    "device_type": device.device_type,
+                    "rated_power": device.rated_power,
+                    "shiftable_power": shiftable_power,
+                    "allowed_shift_hours": config.allowed_shift_hours or [],
+                }
+            )
 
         return devices
 
@@ -483,13 +466,7 @@ class OpportunityEngine:
         device_type = (device.device_type or "").upper()
 
         # 基于设备类型的基础效率
-        base_efficiency = {
-            "AC": 0.75,
-            "LIGHTING": 0.65,
-            "UPS": 0.92,
-            "IT": 0.85,
-            "PDU": 0.95
-        }.get(device_type, 0.8)
+        base_efficiency = {"AC": 0.75, "LIGHTING": 0.65, "UPS": 0.92, "IT": 0.85, "PDU": 0.95}.get(device_type, 0.8)
 
         return base_efficiency
 
@@ -501,9 +478,6 @@ class OpportunityEngine:
                 all_suggestions.append(s)
 
         # 按节省金额排序
-        all_suggestions.sort(
-            key=lambda x: x.get("potential_saving_annual", 0),
-            reverse=True
-        )
+        all_suggestions.sort(key=lambda x: x.get("potential_saving_annual", 0), reverse=True)
 
         return all_suggestions[:5]

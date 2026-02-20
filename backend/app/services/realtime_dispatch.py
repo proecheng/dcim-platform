@@ -4,61 +4,66 @@
 """
 
 from datetime import datetime, timedelta
-from typing import List, Dict, Optional, Callable, Any
+from typing import List, Dict, Optional, Callable
 from dataclasses import dataclass, field
 from enum import Enum
 
 
 class AlertLevel(Enum):
     """预警级别"""
-    NORMAL = 'normal'      # 正常 < 85%
-    ATTENTION = 'attention'  # 关注 85-90%
-    WARNING = 'warning'    # 预警 90-95%
-    CRITICAL = 'critical'  # 临界 95-100%
-    EXCEEDED = 'exceeded'  # 超标 > 100%
+
+    NORMAL = "normal"  # 正常 < 85%
+    ATTENTION = "attention"  # 关注 85-90%
+    WARNING = "warning"  # 预警 90-95%
+    CRITICAL = "critical"  # 临界 95-100%
+    EXCEEDED = "exceeded"  # 超标 > 100%
 
 
 class AdjustmentAction(Enum):
     """调整动作类型"""
-    CURTAIL = 'curtail'        # 削减负荷
-    DISCHARGE = 'discharge'    # 储能放电
-    SHIFT = 'shift'            # 延迟启动
-    RESTORE = 'restore'        # 恢复运行
+
+    CURTAIL = "curtail"  # 削减负荷
+    DISCHARGE = "discharge"  # 储能放电
+    SHIFT = "shift"  # 延迟启动
+    RESTORE = "restore"  # 恢复运行
 
 
 @dataclass
 class PowerReading:
     """功率读数"""
+
     timestamp: datetime
     power: float  # kW
-    source: str = 'meter'
+    source: str = "meter"
 
 
 @dataclass
 class DemandPrediction:
     """需量预测结果"""
-    current_window_avg: float      # 当前窗口平均功率
-    predicted_window_avg: float    # 预测窗口结束时平均功率
-    time_remaining: int            # 窗口剩余秒数
-    demand_target: float           # 需量目标
-    utilization_ratio: float       # 利用率
-    alert_level: AlertLevel        # 预警级别
-    trend: str                     # 趋势: up/down/stable
-    risk_score: float              # 风险评分 0-100
+
+    current_window_avg: float  # 当前窗口平均功率
+    predicted_window_avg: float  # 预测窗口结束时平均功率
+    time_remaining: int  # 窗口剩余秒数
+    demand_target: float  # 需量目标
+    utilization_ratio: float  # 利用率
+    alert_level: AlertLevel  # 预警级别
+    trend: str  # 趋势: up/down/stable
+    risk_score: float  # 风险评分 0-100
 
 
 @dataclass
 class AdjustmentCommand:
     """调整指令"""
+
     id: str
     action: AdjustmentAction
     device_id: Optional[int]
     device_name: str
-    power_change: float           # 功率变化量 (kW, 正数表示减少)
-    duration: int                 # 持续时间 (秒)
-    priority: int                 # 优先级 1-10
+    power_change: float  # 功率变化量 (kW, 正数表示减少)
+    duration: int  # 持续时间 (秒)
+    priority: int  # 优先级 1-10
     reason: str
-    status: str = 'pending'       # pending/executing/completed/failed
+    status: str = "pending"  # pending/executing/completed/failed
     created_at: datetime = field(default_factory=datetime.now)
     executed_at: Optional[datetime] = None
 
@@ -81,7 +86,7 @@ class RealtimeDispatchController:
         self,
         demand_target: float = 800.0,
         on_alert: Optional[Callable[[DemandPrediction], None]] = None,
-        on_command: Optional[Callable[[AdjustmentCommand], None]] = None
+        on_command: Optional[Callable[[AdjustmentCommand], None]] = None,
     ):
         """
         初始化控制器
@@ -160,8 +165,8 @@ class RealtimeDispatchController:
                 demand_target=self.demand_target,
                 utilization_ratio=0,
                 alert_level=AlertLevel.NORMAL,
-                trend='stable',
-                risk_score=0
+                trend="stable",
+                risk_score=0,
             )
 
         # 计算当前窗口平均
@@ -187,25 +192,23 @@ class RealtimeDispatchController:
         if len(self.power_readings) >= 3:
             recent_powers = [r.power for r in self.power_readings[-3:]]
             if recent_powers[-1] > recent_powers[0] * 1.02:
-                trend = 'up'
+                trend = "up"
             elif recent_powers[-1] < recent_powers[0] * 0.98:
-                trend = 'down'
+                trend = "down"
             else:
-                trend = 'stable'
+                trend = "stable"
         else:
-            trend = 'stable'
+            trend = "stable"
 
         # 预测值：加权平均（已有数据 + 预测保持当前功率）
         elapsed_seconds = self.WINDOW_SIZE - time_remaining
         if elapsed_seconds > 0:
-            predicted_avg = (
-                current_avg * elapsed_seconds + current_power * time_remaining
-            ) / self.WINDOW_SIZE
+            predicted_avg = (current_avg * elapsed_seconds + current_power * time_remaining) / self.WINDOW_SIZE
         else:
             predicted_avg = current_power
 
         # 如果趋势上升，增加预测值
-        if trend == 'up':
+        if trend == "up":
             predicted_avg *= 1.02
 
         # 计算利用率
@@ -220,7 +223,7 @@ class RealtimeDispatchController:
 
         # 计算风险评分
         risk_score = min(100, utilization * 100)
-        if trend == 'up':
+        if trend == "up":
             risk_score += 5
         if time_remaining < 300:  # 最后5分钟风险更高
             risk_score += 10
@@ -233,7 +236,7 @@ class RealtimeDispatchController:
             utilization_ratio=round(utilization * 100, 2),
             alert_level=alert_level,
             trend=trend,
-            risk_score=min(100, round(risk_score, 1))
+            risk_score=min(100, round(risk_score, 1)),
         )
 
     def _trigger_automatic_adjustment(self, prediction: DemandPrediction):
@@ -257,31 +260,28 @@ class RealtimeDispatchController:
                 power_change=discharge_power,
                 duration=prediction.time_remaining + 60,  # 持续到窗口结束后1分钟
                 priority=1,
-                reason=f"需量预警，储能放电削减 {discharge_power:.1f} kW"
+                reason=f"需量预警，储能放电削减 {discharge_power:.1f} kW",
             )
             commands.append(cmd)
             excess_power -= discharge_power
 
         # 其次削减可削减设备
-        for device in sorted(self.curtailable_devices, key=lambda x: x.get('priority', 5)):
+        for device in sorted(self.curtailable_devices, key=lambda x: x.get("priority", 5)):
             if excess_power <= 0:
                 break
 
-            curtail_power = min(
-                device.get('rated_power', 0) * device.get('curtail_ratio', 0.5),
-                excess_power
-            )
+            curtail_power = min(device.get("rated_power", 0) * device.get("curtail_ratio", 0.5), excess_power)
 
             if curtail_power > 0:
                 cmd = AdjustmentCommand(
                     id=f"cmd_{datetime.now().strftime('%Y%m%d%H%M%S')}_{device.get('id', 0)}",
                     action=AdjustmentAction.CURTAIL,
-                    device_id=device.get('id'),
-                    device_name=device.get('name', 'Unknown'),
+                    device_id=device.get("id"),
+                    device_name=device.get("name", "Unknown"),
                     power_change=curtail_power,
                     duration=prediction.time_remaining + 60,
-                    priority=device.get('priority', 5),
-                    reason=f"需量预警，削减 {curtail_power:.1f} kW"
+                    priority=device.get("priority", 5),
+                    reason=f"需量预警，削减 {curtail_power:.1f} kW",
                 )
                 commands.append(cmd)
                 excess_power -= curtail_power
@@ -308,7 +308,7 @@ class RealtimeDispatchController:
         device_name: str,
         power_change: float,
         duration: int,
-        reason: str = "手动调整"
+        reason: str = "手动调整",
     ) -> AdjustmentCommand:
         """创建手动调整指令"""
         cmd = AdjustmentCommand(
@@ -319,7 +319,7 @@ class RealtimeDispatchController:
             power_change=power_change,
             duration=duration,
             priority=1,
-            reason=reason
+            reason=reason,
         )
         self.active_commands.append(cmd)
         if self.on_command:
@@ -330,7 +330,7 @@ class RealtimeDispatchController:
         """完成指令"""
         for cmd in self.active_commands:
             if cmd.id == command_id:
-                cmd.status = 'completed' if success else 'failed'
+                cmd.status = "completed" if success else "failed"
                 cmd.executed_at = datetime.now()
                 self.command_history.append(cmd)
                 self.active_commands.remove(cmd)
@@ -339,30 +339,32 @@ class RealtimeDispatchController:
     def get_status(self) -> Dict:
         """获取当前状态"""
         return {
-            'demand_target': self.demand_target,
-            'last_prediction': {
-                'current_window_avg': self.last_prediction.current_window_avg if self.last_prediction else 0,
-                'predicted_window_avg': self.last_prediction.predicted_window_avg if self.last_prediction else 0,
-                'utilization_ratio': self.last_prediction.utilization_ratio if self.last_prediction else 0,
-                'alert_level': self.last_prediction.alert_level.value if self.last_prediction else 'normal',
-                'time_remaining': self.last_prediction.time_remaining if self.last_prediction else 0,
-                'trend': self.last_prediction.trend if self.last_prediction else 'stable',
-                'risk_score': self.last_prediction.risk_score if self.last_prediction else 0,
-            } if self.last_prediction else None,
-            'active_commands': [
+            "demand_target": self.demand_target,
+            "last_prediction": {
+                "current_window_avg": self.last_prediction.current_window_avg if self.last_prediction else 0,
+                "predicted_window_avg": self.last_prediction.predicted_window_avg if self.last_prediction else 0,
+                "utilization_ratio": self.last_prediction.utilization_ratio if self.last_prediction else 0,
+                "alert_level": self.last_prediction.alert_level.value if self.last_prediction else "normal",
+                "time_remaining": self.last_prediction.time_remaining if self.last_prediction else 0,
+                "trend": self.last_prediction.trend if self.last_prediction else "stable",
+                "risk_score": self.last_prediction.risk_score if self.last_prediction else 0,
+            }
+            if self.last_prediction
+            else None,
+            "active_commands": [
                 {
-                    'id': cmd.id,
-                    'action': cmd.action.value,
-                    'device_name': cmd.device_name,
-                    'power_change': cmd.power_change,
-                    'status': cmd.status,
-                    'reason': cmd.reason,
+                    "id": cmd.id,
+                    "action": cmd.action.value,
+                    "device_name": cmd.device_name,
+                    "power_change": cmd.power_change,
+                    "status": cmd.status,
+                    "reason": cmd.reason,
                 }
                 for cmd in self.active_commands
             ],
-            'storage_available': self.storage_available,
-            'storage_soc': self.storage_soc,
-            'curtailable_devices_count': len(self.curtailable_devices),
+            "storage_available": self.storage_available,
+            "storage_soc": self.storage_soc,
+            "curtailable_devices_count": len(self.curtailable_devices),
         }
 
 
@@ -396,11 +398,13 @@ def simulate_realtime_monitoring(duration_minutes: int = 5) -> List[Dict]:
     controller = get_dispatch_controller(demand_target=800.0)
 
     # 设置可削减设备
-    controller.set_curtailable_devices([
-        {'id': 1, 'name': '空调系统-1', 'rated_power': 50, 'curtail_ratio': 0.3, 'priority': 3},
-        {'id': 2, 'name': '照明系统-2', 'rated_power': 30, 'curtail_ratio': 0.5, 'priority': 5},
-        {'id': 3, 'name': '通风设备-3', 'rated_power': 40, 'curtail_ratio': 0.4, 'priority': 4},
-    ])
+    controller.set_curtailable_devices(
+        [
+            {"id": 1, "name": "空调系统-1", "rated_power": 50, "curtail_ratio": 0.3, "priority": 3},
+            {"id": 2, "name": "照明系统-2", "rated_power": 30, "curtail_ratio": 0.5, "priority": 5},
+            {"id": 3, "name": "通风设备-3", "rated_power": 40, "curtail_ratio": 0.4, "priority": 4},
+        ]
+    )
     controller.set_storage_status(available_power=100, soc=0.6)
 
     results = []
@@ -416,16 +420,18 @@ def simulate_realtime_monitoring(duration_minutes: int = 5) -> List[Dict]:
         timestamp = datetime.now() + timedelta(seconds=i * 15)
         prediction = controller.add_power_reading(power, timestamp)
 
-        results.append({
-            'timestamp': timestamp.isoformat(),
-            'power': round(power, 2),
-            'prediction': {
-                'current_window_avg': prediction.current_window_avg,
-                'predicted_window_avg': prediction.predicted_window_avg,
-                'utilization_ratio': prediction.utilization_ratio,
-                'alert_level': prediction.alert_level.value,
-                'risk_score': prediction.risk_score,
+        results.append(
+            {
+                "timestamp": timestamp.isoformat(),
+                "power": round(power, 2),
+                "prediction": {
+                    "current_window_avg": prediction.current_window_avg,
+                    "predicted_window_avg": prediction.predicted_window_avg,
+                    "utilization_ratio": prediction.utilization_ratio,
+                    "alert_level": prediction.alert_level.value,
+                    "risk_score": prediction.risk_score,
+                },
             }
-        })
+        )
 
     return results

@@ -2,12 +2,12 @@
 告警引擎 — 内存阈值缓存 + 实时越限检测
 Story 5.2: 实时告警触发与通知
 """
+
 import logging
 import time
 from collections import defaultdict
 from dataclasses import dataclass
-from datetime import datetime
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Tuple
 
 from sqlalchemy import select
 
@@ -21,11 +21,12 @@ logger = logging.getLogger(__name__)
 @dataclass
 class ThresholdCache:
     """单条阈值缓存"""
+
     id: int
     point_id: int
-    threshold_type: str       # high_high/high/low/low_low/equal/change
+    threshold_type: str  # high_high/high/low/low_low/equal/change
     threshold_value: float
-    alarm_level: str          # critical/major/minor/info
+    alarm_level: str  # critical/major/minor/info
     alarm_message: str
     delay_seconds: int
     dead_band: float
@@ -35,6 +36,7 @@ class ThresholdCache:
 @dataclass
 class EvaluateResult:
     """单次越限检测结果"""
+
     threshold_id: int
     threshold_type: str
     threshold_value: float
@@ -46,7 +48,7 @@ class EvaluateResult:
 class AlarmEngine:
     """告警引擎 — 核心类"""
 
-    STORM_WINDOW = 60       # 告警风暴抑制窗口（秒）
+    STORM_WINDOW = 60  # 告警风暴抑制窗口（秒）
     MASS_ALARM_RATIO = 0.5  # 大面积告警阈值比例
 
     def __init__(self) -> None:
@@ -89,7 +91,8 @@ class AlarmEngine:
             new_cache: Dict[int, List[ThresholdCache]] = defaultdict(list)
             for t in thresholds:
                 cache_item = ThresholdCache(
-                    id=t.id, point_id=t.point_id,
+                    id=t.id,
+                    point_id=t.point_id,
                     threshold_type=t.threshold_type,
                     threshold_value=t.threshold_value or 0,
                     alarm_level=t.alarm_level or "minor",
@@ -115,9 +118,7 @@ class AlarmEngine:
                     self._device_type_points[device_type].add(point_id)
 
             # 加载点位数据质量缓存
-            quality_result = await session.execute(
-                select(PointRealtime.point_id, PointRealtime.quality)
-            )
+            quality_result = await session.execute(select(PointRealtime.point_id, PointRealtime.quality))
             self._point_quality = {row[0]: (row[1] or 0) for row in quality_result.all()}
 
             self._loaded = True
@@ -142,6 +143,7 @@ class AlarmEngine:
         """检查阈值版本号，版本变化时重新加载"""
         try:
             from ..api.v1.threshold import _threshold_version
+
             # 先捕获版本快照，避免加载期间版本再次变化导致遗漏
             snapshot_version = _threshold_version
             if snapshot_version != self._known_version:
@@ -194,13 +196,15 @@ class AlarmEngine:
 
             triggered = self._check_threshold(point_id, value, tc, now)
             if triggered:
-                results.append(EvaluateResult(
-                    threshold_id=tc.id,
-                    threshold_type=tc.threshold_type,
-                    threshold_value=tc.threshold_value,
-                    alarm_level=tc.alarm_level,
-                    alarm_message=tc.alarm_message or f"点位 {point_id} {tc.threshold_type} 告警",
-                ))
+                results.append(
+                    EvaluateResult(
+                        threshold_id=tc.id,
+                        threshold_type=tc.threshold_type,
+                        threshold_value=tc.threshold_value,
+                        alarm_level=tc.alarm_level,
+                        alarm_message=tc.alarm_message or f"点位 {point_id} {tc.threshold_type} 告警",
+                    )
+                )
                 # 更新风暴防护时间戳
                 self._last_alarm_time[storm_key] = now
 
@@ -289,7 +293,10 @@ class AlarmEngine:
         if ratio > self.MASS_ALARM_RATIO:
             logger.warning(
                 "大面积告警: device_type=%s, 越限 %d/%d (%.1f%%), 疑似通信异常",
-                device_type, len(triggered_points), len(total_points), ratio * 100
+                device_type,
+                len(triggered_points),
+                len(total_points),
+                ratio * 100,
             )
             return True
         return False

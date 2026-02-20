@@ -2,6 +2,7 @@
 日志配置模块
 Centralized logging configuration for the application.
 """
+
 import logging
 import sys
 from typing import Optional
@@ -43,8 +44,7 @@ def setup_logging(name: Optional[str] = None) -> logging.Logger:
 
         # 设置日志格式
         formatter = logging.Formatter(
-            fmt='[%(asctime)s] %(levelname)s [%(name)s:%(lineno)d] %(message)s',
-            datefmt='%Y-%m-%d %H:%M:%S'
+            fmt="[%(asctime)s] %(levelname)s [%(name)s:%(lineno)d] %(message)s", datefmt="%Y-%m-%d %H:%M:%S"
         )
         handler.setFormatter(formatter)
         logger.addHandler(handler)

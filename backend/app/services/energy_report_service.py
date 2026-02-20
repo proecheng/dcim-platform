@@ -1,6 +1,7 @@
 """
 能效报告数据聚合服务 — Story 6-5
 """
+
 import json
 from datetime import datetime, date
 from typing import Optional
@@ -9,8 +10,13 @@ from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..models.energy import (
-    PUEHistory, EnergyMonthly, EnergyDaily, ElectricityPricing,
-    EnergyOpportunity, ExecutionPlan, ExecutionResult,
+    PUEHistory,
+    EnergyMonthly,
+    EnergyDaily,
+    ElectricityPricing,
+    EnergyOpportunity,
+    ExecutionPlan,
+    ExecutionResult,
 )
 
 
@@ -47,7 +53,6 @@ def _change_rate(current: Optional[float], previous: Optional[float]) -> Optiona
 
 
 class EnergyReportService:
-
     @staticmethod
     async def generate_report_data(db: AsyncSession, year: int, month: int) -> dict:
         period_start, period_end = _period_range(year, month)
@@ -70,8 +75,7 @@ class EnergyReportService:
 
     # ------------------------------------------------------------------ PUE
     @staticmethod
-    async def _pue_trend(db: AsyncSession, year: int, month: int,
-                         period_start: datetime, period_end: datetime) -> dict:
+    async def _pue_trend(db: AsyncSession, year: int, month: int, period_start: datetime, period_end: datetime) -> dict:
         stmt = (
             select(
                 func.date(PUEHistory.record_time).label("day"),
@@ -95,7 +99,9 @@ class EnergyReportService:
             for r in rows
         ]
 
-        month_avg_pue = round(float(sum(v["avg_pue"] for v in daily_values) / len(daily_values)), 4) if daily_values else 0
+        month_avg_pue = (
+            round(float(sum(v["avg_pue"] for v in daily_values) / len(daily_values)), 4) if daily_values else 0
+        )
 
         # YoY — same month last year
         ly_start, ly_end = _period_range(year - 1, month)
@@ -117,16 +123,13 @@ class EnergyReportService:
 
     @staticmethod
     async def _avg_pue(db: AsyncSession, start: datetime, end: datetime) -> Optional[float]:
-        stmt = select(func.avg(PUEHistory.pue)).where(
-            PUEHistory.record_time >= start, PUEHistory.record_time < end
-        )
+        stmt = select(func.avg(PUEHistory.pue)).where(PUEHistory.record_time >= start, PUEHistory.record_time < end)
         val = (await db.execute(stmt)).scalar()
         return round(float(val), 4) if val else None
 
     # ------------------------------------------------------------------ COST
     @staticmethod
-    async def _cost_comparison(db: AsyncSession, year: int, month: int,
-                               date_start: date, date_end: date) -> dict:
+    async def _cost_comparison(db: AsyncSession, year: int, month: int, date_start: date, date_end: date) -> dict:
         current = await EnergyReportService._cost_from_monthly(db, year, month)
         if current["total_energy"] == 0:
             current = await EnergyReportService._cost_from_daily(db, date_start, date_end)
@@ -235,13 +238,10 @@ class EnergyReportService:
     @staticmethod
     async def _energy_saving(db: AsyncSession, period_start: datetime, period_end: datetime) -> dict:
         # Count all opportunities in period
-        count_stmt = (
-            select(func.count(EnergyOpportunity.id))
-            .where(
-                EnergyOpportunity.status.in_(["completed", "executing"]),
-                EnergyOpportunity.created_at >= period_start,
-                EnergyOpportunity.created_at < period_end,
-            )
+        count_stmt = select(func.count(EnergyOpportunity.id)).where(
+            EnergyOpportunity.status.in_(["completed", "executing"]),
+            EnergyOpportunity.created_at >= period_start,
+            EnergyOpportunity.created_at < period_end,
         )
         opportunities_count = (await db.execute(count_stmt)).scalar() or 0
 
@@ -274,13 +274,15 @@ class EnergyReportService:
             saving_cost = float(r.actual_saving or 0)
             total_saving_kwh += saving_kwh
             total_saving_cost += saving_cost
-            details.append({
-                "title": r.title,
-                "category": r.category,
-                "saving_kwh": round(saving_kwh, 2),
-                "saving_cost": round(saving_cost, 2),
-                "achievement_rate": float(r.achievement_rate) if r.achievement_rate else None,
-            })
+            details.append(
+                {
+                    "title": r.title,
+                    "category": r.category,
+                    "saving_kwh": round(saving_kwh, 2),
+                    "saving_cost": round(saving_cost, 2),
+                    "achievement_rate": float(r.achievement_rate) if r.achievement_rate else None,
+                }
+            )
 
         avg_rate = 0.0
         rated = [d["achievement_rate"] for d in details if d["achievement_rate"] is not None]
@@ -317,8 +319,7 @@ class EnergyReportService:
 
     # ------------------------------------------------------------------ OVERVIEW
     @staticmethod
-    async def _energy_overview(db: AsyncSession, date_start: date, date_end: date,
-                               year: int, month: int) -> dict:
+    async def _energy_overview(db: AsyncSession, date_start: date, date_end: date, year: int, month: int) -> dict:
         stmt = (
             select(
                 EnergyDaily.stat_date,

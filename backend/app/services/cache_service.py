@@ -13,13 +13,11 @@ from ..models.gateway import PointDataLatest, Gateway
 
 logger = logging.getLogger(__name__)
 
-POINT_CACHE_TTL = 60   # 点位缓存 60s
+POINT_CACHE_TTL = 60  # 点位缓存 60s
 GATEWAY_CACHE_TTL = 30  # 网关状态缓存 30s
 
 
-async def cache_point_data(
-    point_id: str, value: str, quality: int, timestamp: datetime, gateway_id: str
-) -> None:
+async def cache_point_data(point_id: str, value: str, quality: int, timestamp: datetime, gateway_id: str) -> None:
     """写入点位数据到 Redis 缓存"""
     key = f"point:{point_id}:latest"
     data = {
@@ -41,9 +39,7 @@ async def get_point_latest(point_id: str, db: AsyncSession) -> Optional[dict]:
         return cached
 
     # 2. 查 DB
-    result = await db.execute(
-        select(PointDataLatest).where(PointDataLatest.point_id == point_id)
-    )
+    result = await db.execute(select(PointDataLatest).where(PointDataLatest.point_id == point_id))
     record = result.scalar_one_or_none()
     if record is None:
         return None
@@ -59,9 +55,7 @@ async def get_point_latest(point_id: str, db: AsyncSession) -> Optional[dict]:
     return data
 
 
-async def batch_get_point_latest(
-    point_ids: list[str], db: AsyncSession
-) -> dict[str, Optional[dict]]:
+async def batch_get_point_latest(point_ids: list[str], db: AsyncSession) -> dict[str, Optional[dict]]:
     """批量获取点位最新值"""
     results: dict[str, Optional[dict]] = {}
     miss_ids: list[str] = []
@@ -80,9 +74,7 @@ async def batch_get_point_latest(
 
     # 2. miss 的查 DB
     if miss_ids:
-        db_result = await db.execute(
-            select(PointDataLatest).where(PointDataLatest.point_id.in_(miss_ids))
-        )
+        db_result = await db.execute(select(PointDataLatest).where(PointDataLatest.point_id.in_(miss_ids)))
         for record in db_result.scalars().all():
             data = {
                 "v": record.value,
@@ -92,9 +84,7 @@ async def batch_get_point_latest(
             }
             results[record.point_id] = data
             # 回填缓存
-            await redis_service.set_json(
-                f"point:{record.point_id}:latest", data, ttl=POINT_CACHE_TTL
-            )
+            await redis_service.set_json(f"point:{record.point_id}:latest", data, ttl=POINT_CACHE_TTL)
 
     # 3. 仍然 miss 的设为 None
     for pid in point_ids:
@@ -105,8 +95,7 @@ async def batch_get_point_latest(
 
 
 async def cache_gateway_status(
-    gateway_id: str, status: str,
-    cpu: Optional[float] = None, mem: Optional[float] = None, disk: Optional[float] = None
+    gateway_id: str, status: str, cpu: Optional[float] = None, mem: Optional[float] = None, disk: Optional[float] = None
 ) -> None:
     """写入网关状态到 Redis 缓存"""
     key = f"gateway:{gateway_id}:status"
@@ -130,9 +119,7 @@ async def get_gateway_status(gateway_id: str, db: AsyncSession) -> Optional[dict
         return cached
 
     # 2. 查 DB
-    result = await db.execute(
-        select(Gateway).where(Gateway.gateway_id == gateway_id)
-    )
+    result = await db.execute(select(Gateway).where(Gateway.gateway_id == gateway_id))
     gw = result.scalar_one_or_none()
     if gw is None:
         return None

@@ -62,7 +62,7 @@ class MLEnergySavingService:
         power_data: List[List[float]],
         period_types: List[List[int]],
         is_weekday: List[List[int]],
-        temperature: List[List[float]]
+        temperature: List[List[float]],
     ) -> Dict[str, Any]:
         """
         分析可转移负荷 (S2-TF)
@@ -81,39 +81,29 @@ class MLEnergySavingService:
         results = []
         for i in range(len(power_data)):
             result = self._transformer.predict(
-                np.array(power_data[i]),
-                np.array(period_types[i]),
-                np.array(is_weekday[i]),
-                np.array(temperature[i])
+                np.array(power_data[i]), np.array(period_types[i]), np.array(is_weekday[i]), np.array(temperature[i])
             )
-            result['load_index'] = i
+            result["load_index"] = i
             results.append(result)
 
         # 统计汇总
-        transferable_count = sum(1 for r in results if r.get('is_transferable', False))
-        total_capacity = sum(r.get('capacity_kw', 0) for r in results if r.get('is_transferable', False))
+        transferable_count = sum(1 for r in results if r.get("is_transferable", False))
+        total_capacity = sum(r.get("capacity_kw", 0) for r in results if r.get("is_transferable", False))
 
         return {
-            'predictions': results,
-            'summary': {
-                'total_loads': len(results),
-                'transferable_count': transferable_count,
-                'transferable_ratio': transferable_count / len(results) if results else 0,
-                'total_transferable_capacity_kw': round(total_capacity, 2)
+            "predictions": results,
+            "summary": {
+                "total_loads": len(results),
+                "transferable_count": transferable_count,
+                "transferable_ratio": transferable_count / len(results) if results else 0,
+                "total_transferable_capacity_kw": round(total_capacity, 2),
             },
-            'model_info': {
-                'model_type': 'TimeSeriesTransformer',
-                'is_trained': self._transformer.is_trained
-            },
-            'analysis_time': datetime.now().isoformat()
+            "model_info": {"model_type": "TimeSeriesTransformer", "is_trained": self._transformer.is_trained},
+            "analysis_time": datetime.now().isoformat(),
         }
 
     def calculate_peak_valley_saving(
-        self,
-        predictions: List[Dict[str, Any]],
-        price_diff: float,
-        shift_hours: float = 2.0,
-        working_days: int = 250
+        self, predictions: List[Dict[str, Any]], price_diff: float, shift_hours: float = 2.0, working_days: int = 250
     ) -> Dict[str, Any]:
         """
         计算峰谷套利收益 (S2-TF-f)
@@ -128,14 +118,9 @@ class MLEnergySavingService:
             收益计算详情
         """
         self._ensure_initialized()
-        return self._transformer.calculate_peak_valley_saving(
-            predictions, price_diff, shift_hours, working_days
-        )
+        return self._transformer.calculate_peak_valley_saving(predictions, price_diff, shift_hours, working_days)
 
-    def analyze_measure_conflicts(
-        self,
-        measures: List[Dict[str, Any]]
-    ) -> Dict[str, Any]:
+    def analyze_measure_conflicts(self, measures: List[Dict[str, Any]]) -> Dict[str, Any]:
         """
         分析措施间的冲突和耦合关系 (S2-GNN)
 
@@ -154,9 +139,7 @@ class MLEnergySavingService:
         return self._gnn.predict(measures)
 
     def calculate_adjusted_benefit(
-        self,
-        measures: List[Dict[str, Any]],
-        conflict_result: Dict[str, Any]
+        self, measures: List[Dict[str, Any]], conflict_result: Dict[str, Any]
     ) -> Dict[str, Any]:
         """
         计算调整后的总收益 (S2-GNN-f)
@@ -171,16 +154,10 @@ class MLEnergySavingService:
             调整后的收益详情
         """
         self._ensure_initialized()
-        benefits = [m.get('expected_benefit', 0) for m in measures]
-        return self._gnn.calculate_adjusted_benefit(
-            benefits,
-            conflict_result.get('coupling_coefficients', [])
-        )
+        benefits = [m.get("expected_benefit", 0) for m in measures]
+        return self._gnn.calculate_adjusted_benefit(benefits, conflict_result.get("coupling_coefficients", []))
 
-    def get_optimization_actions(
-        self,
-        current_state: Optional[Dict[str, Any]] = None
-    ) -> Dict[str, Any]:
+    def get_optimization_actions(self, current_state: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """
         获取优化动作建议 (S5)
 
@@ -199,7 +176,7 @@ class MLEnergySavingService:
         expected_saving: float,
         comfort_violation: float = 0.0,
         safety_violation: float = 0.0,
-        current_state: Optional[Dict[str, Any]] = None
+        current_state: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         """
         更新强化学习代理 (S5)
@@ -216,11 +193,7 @@ class MLEnergySavingService:
             训练信息
         """
         self._ensure_initialized()
-        return self._rl.train_step(
-            actual_saving, expected_saving,
-            comfort_violation, safety_violation,
-            current_state
-        )
+        return self._rl.train_step(actual_saving, expected_saving, comfort_violation, safety_violation, current_state)
 
     def generate_intelligent_scheme(
         self,
@@ -230,7 +203,7 @@ class MLEnergySavingService:
         temperature: List[List[float]],
         candidate_measures: List[Dict[str, Any]],
         price_diff: float,
-        current_state: Optional[Dict[str, Any]] = None
+        current_state: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         """
         智能生成节能方案 (完整流程)
@@ -243,66 +216,50 @@ class MLEnergySavingService:
         self._ensure_initialized()
 
         # Step 1: 可转移负荷识别
-        load_analysis = self.analyze_transferable_loads(
-            power_data, period_types, is_weekday, temperature
-        )
+        load_analysis = self.analyze_transferable_loads(power_data, period_types, is_weekday, temperature)
 
         # Step 2: 计算峰谷套利潜力
-        saving_calculation = self.calculate_peak_valley_saving(
-            load_analysis['predictions'], price_diff
-        )
+        saving_calculation = self.calculate_peak_valley_saving(load_analysis["predictions"], price_diff)
 
         # Step 3: 措施冲突分析
         conflict_analysis = self.analyze_measure_conflicts(candidate_measures)
 
         # Step 4: 计算调整后收益
-        adjusted_benefit = self.calculate_adjusted_benefit(
-            candidate_measures, conflict_analysis
-        )
+        adjusted_benefit = self.calculate_adjusted_benefit(candidate_measures, conflict_analysis)
 
         # Step 5: 获取RL优化建议
         optimization_actions = self.get_optimization_actions(current_state)
 
         # 组装完整方案
         return {
-            'scheme_id': f"SCHEME_{datetime.now().strftime('%Y%m%d%H%M%S')}",
-            'generation_time': datetime.now().isoformat(),
-
+            "scheme_id": f"SCHEME_{datetime.now().strftime('%Y%m%d%H%M%S')}",
+            "generation_time": datetime.now().isoformat(),
             # 负荷分析结果
-            'load_analysis': load_analysis,
-
+            "load_analysis": load_analysis,
             # 峰谷套利计算
-            'peak_valley_saving': saving_calculation,
-
+            "peak_valley_saving": saving_calculation,
             # 措施协同分析
-            'measure_analysis': {
-                'conflicts': conflict_analysis,
-                'adjusted_benefit': adjusted_benefit,
-                'recommended_measures': conflict_analysis.get('recommended_combination', [])
+            "measure_analysis": {
+                "conflicts": conflict_analysis,
+                "adjusted_benefit": adjusted_benefit,
+                "recommended_measures": conflict_analysis.get("recommended_combination", []),
             },
-
             # RL优化建议
-            'optimization_advice': optimization_actions,
-
+            "optimization_advice": optimization_actions,
             # 数据追溯
-            'data_trace': {
-                'transformer_model': 'LoadTransferabilityTransformer',
-                'gnn_model': 'MeasureConflictGNN',
-                'rl_model': 'PPO_ActorCritic',
-                'models_trained': {
-                    'transformer': self._transformer.is_trained,
-                    'gnn': self._gnn.is_trained if hasattr(self._gnn, 'is_trained') else False,
-                    'rl': self._rl.is_trained
-                }
-            }
+            "data_trace": {
+                "transformer_model": "LoadTransferabilityTransformer",
+                "gnn_model": "MeasureConflictGNN",
+                "rl_model": "PPO_ActorCritic",
+                "models_trained": {
+                    "transformer": self._transformer.is_trained,
+                    "gnn": self._gnn.is_trained if hasattr(self._gnn, "is_trained") else False,
+                    "rl": self._rl.is_trained,
+                },
+            },
         }
 
-    def train_models(
-        self,
-        transformer_epochs: int = 50,
-        gnn_epochs: int = 30,
-        rl_steps: int = 1000
-    ) -> Dict[str, Any]:
+    def train_models(self, transformer_epochs: int = 50, gnn_epochs: int = 30, rl_steps: int = 1000) -> Dict[str, Any]:
         """
         训练所有模型
 
@@ -318,47 +275,41 @@ class MLEnergySavingService:
         # 训练Transformer
         logger.info("开始训练Transformer模型...")
         tf_history = self._transformer.train(epochs=transformer_epochs)
-        results['transformer'] = {
-            'final_train_loss': tf_history['train_loss'][-1] if tf_history['train_loss'] else None,
-            'final_val_loss': tf_history['val_loss'][-1] if tf_history.get('val_loss') else None,
-            'epochs': transformer_epochs
+        results["transformer"] = {
+            "final_train_loss": tf_history["train_loss"][-1] if tf_history["train_loss"] else None,
+            "final_val_loss": tf_history["val_loss"][-1] if tf_history.get("val_loss") else None,
+            "epochs": transformer_epochs,
         }
 
         # 训练GNN
         logger.info("开始训练GNN模型...")
-        if hasattr(self._gnn, 'train'):
+        if hasattr(self._gnn, "train"):
             gnn_history = self._gnn.train(epochs=gnn_epochs)
-            results['gnn'] = gnn_history
+            results["gnn"] = gnn_history
         else:
-            results['gnn'] = {'status': 'skipped', 'reason': 'no train method'}
+            results["gnn"] = {"status": "skipped", "reason": "no train method"}
 
         # RL不需要预训练，在线学习
 
-        return {
-            'training_results': results,
-            'training_time': datetime.now().isoformat()
-        }
+        return {"training_results": results, "training_time": datetime.now().isoformat()}
 
     def get_model_status(self) -> Dict[str, Any]:
         """获取模型状态"""
         if not self._initialized:
-            return {'initialized': False}
+            return {"initialized": False}
 
         return {
-            'initialized': True,
-            'transformer': {
-                'loaded': self._transformer is not None,
-                'trained': self._transformer.is_trained if self._transformer else False
+            "initialized": True,
+            "transformer": {
+                "loaded": self._transformer is not None,
+                "trained": self._transformer.is_trained if self._transformer else False,
             },
-            'gnn': {
-                'loaded': self._gnn is not None,
-                'trained': getattr(self._gnn, 'is_trained', False) if self._gnn else False
+            "gnn": {
+                "loaded": self._gnn is not None,
+                "trained": getattr(self._gnn, "is_trained", False) if self._gnn else False,
             },
-            'rl': {
-                'loaded': self._rl is not None,
-                'trained': self._rl.is_trained if self._rl else False
-            },
-            'device': self.config.device
+            "rl": {"loaded": self._rl is not None, "trained": self._rl.is_trained if self._rl else False},
+            "device": self.config.device,
         }
 
 

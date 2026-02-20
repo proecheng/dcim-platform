@@ -2,6 +2,7 @@
 传感器数据漂移检测模型
 Story 9-7: 传感器数据漂移检测
 """
+
 from datetime import datetime
 from sqlalchemy import Column, Integer, Float, String, DateTime, Text, ForeignKey
 
@@ -10,6 +11,7 @@ from ..core.database import Base
 
 class DriftDetectionResult(Base):
     """漂移检测结果表"""
+
     __tablename__ = "drift_detection_results"
 
     id = Column(Integer, primary_key=True, autoincrement=True)

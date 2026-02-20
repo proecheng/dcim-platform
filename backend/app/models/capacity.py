@@ -1,6 +1,7 @@
 """
 容量管理模型
 """
+
 from datetime import datetime
 from enum import Enum as PyEnum
 from sqlalchemy import Column, Integer, String, Boolean, Float, Text, DateTime, ForeignKey, Enum, Index
@@ -11,27 +12,32 @@ from ..core.database import Base
 
 # ==================== 枚举定义 ====================
 
+
 class CapacityType(str, PyEnum):
     """容量类型枚举"""
-    space = "space"         # 空间
-    power = "power"         # 电力
-    cooling = "cooling"     # 制冷
-    weight = "weight"       # 承重
-    network = "network"     # 网络
+
+    space = "space"  # 空间
+    power = "power"  # 电力
+    cooling = "cooling"  # 制冷
+    weight = "weight"  # 承重
+    network = "network"  # 网络
 
 
 class CapacityStatus(str, PyEnum):
     """容量状态枚举"""
-    normal = "normal"       # 正常
-    warning = "warning"     # 警告
-    critical = "critical"   # 严重
-    full = "full"           # 已满
+
+    normal = "normal"  # 正常
+    warning = "warning"  # 警告
+    critical = "critical"  # 严重
+    full = "full"  # 已满
 
 
 # ==================== 空间容量模型 ====================
 
+
 class SpaceCapacity(Base):
     """空间容量表"""
+
     __tablename__ = "space_capacities"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -52,8 +58,10 @@ class SpaceCapacity(Base):
 
 # ==================== 电力容量模型 ====================
 
+
 class PowerCapacity(Base):
     """电力容量表"""
+
     __tablename__ = "power_capacities"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -78,8 +86,10 @@ class PowerCapacity(Base):
 
 # ==================== 制冷容量模型 ====================
 
+
 class CoolingCapacity(Base):
     """制冷容量表"""
+
     __tablename__ = "cooling_capacities"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -100,8 +110,10 @@ class CoolingCapacity(Base):
 
 # ==================== 承重容量模型 ====================
 
+
 class WeightCapacity(Base):
     """承重容量表"""
+
     __tablename__ = "weight_capacities"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -119,8 +131,10 @@ class WeightCapacity(Base):
 
 # ==================== 容量规划模型 ====================
 
+
 class CapacityPlan(Base):
     """容量规划表"""
+
     __tablename__ = "capacity_plans"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -144,12 +158,12 @@ class CapacityPlan(Base):
 
 # ==================== 容量历史模型 ====================
 
+
 class CapacityHistory(Base):
     """容量历史记录表"""
+
     __tablename__ = "capacity_histories"
-    __table_args__ = (
-        Index('ix_capacity_history_type_time', 'capacity_type', 'recorded_at'),
-    )
+    __table_args__ = (Index("ix_capacity_history_type_time", "capacity_type", "recorded_at"),)
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     capacity_type = Column(Enum(CapacityType), nullable=False, comment="容量类型")

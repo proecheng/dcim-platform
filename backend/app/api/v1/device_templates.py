@@ -1,4 +1,5 @@
 """设备模板管理 API"""
+
 from datetime import datetime
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -9,8 +10,11 @@ from ..deps import get_db, require_viewer, require_operator, require_admin
 from ...models.user import User
 from ...models.gateway import DeviceTemplate, DataSource, DataSourcePoint
 from ...schemas.gateway import (
-    DeviceTemplateCreate, DeviceTemplateUpdate, DeviceTemplateResponse,
-    DataSourceCreate, DataSourceResponse,
+    DeviceTemplateCreate,
+    DeviceTemplateUpdate,
+    DeviceTemplateResponse,
+    DataSourceCreate,
+    DataSourceResponse,
 )
 from ...schemas.common import PageResponse
 
@@ -36,11 +40,13 @@ async def list_templates(
     if protocol_type:
         query = query.where(DeviceTemplate.protocol_type == protocol_type)
     if keyword:
-        query = query.where(or_(
-            DeviceTemplate.name.contains(keyword),
-            DeviceTemplate.manufacturer.contains(keyword),
-            DeviceTemplate.model.contains(keyword),
-        ))
+        query = query.where(
+            or_(
+                DeviceTemplate.name.contains(keyword),
+                DeviceTemplate.manufacturer.contains(keyword),
+                DeviceTemplate.model.contains(keyword),
+            )
+        )
 
     count_query = select(func.count()).select_from(query.subquery())
     total = (await db.execute(count_query)).scalar()
@@ -140,7 +146,7 @@ async def create_datasource_from_template(
     await db.flush()  # 获取 ds.id
 
     # 从模板填充点位
-    for pt_cfg in (template.point_config or []):
+    for pt_cfg in template.point_config or []:
         point = DataSourcePoint(
             datasource_id=ds.id,
             address=str(pt_cfg.get("address", "")),

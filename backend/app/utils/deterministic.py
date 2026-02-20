@@ -3,6 +3,7 @@
 [V2.11] 替换 random 模块，使用基于种子的确定性计算
 从 energy.py 提取，供多模块复用
 """
+
 from datetime import date, datetime
 
 

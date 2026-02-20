@@ -1,6 +1,7 @@
 """
 供配电管理模型 - UPS设备、电池组
 """
+
 from datetime import datetime
 from sqlalchemy import Column, Integer, String, Boolean, Float, Text, DateTime, Date, ForeignKey
 
@@ -9,6 +10,7 @@ from ..core.database import Base
 
 class UPSDevice(Base):
     """UPS设备扩展表"""
+
     __tablename__ = "ups_devices"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -26,6 +28,7 @@ class UPSDevice(Base):
 
 class BatteryGroup(Base):
     """电池组表"""
+
     __tablename__ = "battery_groups"
 
     id = Column(Integer, primary_key=True, autoincrement=True)

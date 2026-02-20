@@ -1,14 +1,16 @@
 """
 用户模型
 """
+
 from datetime import datetime
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey, Text, UniqueConstraint
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey, UniqueConstraint
 
 from ..core.database import Base
 
 
 class User(Base):
     """用户表"""
+
     __tablename__ = "users"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -31,6 +33,7 @@ class User(Base):
 
 class RolePermission(Base):
     """角色权限表"""
+
     __tablename__ = "role_permissions"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -41,6 +44,7 @@ class RolePermission(Base):
 
 class UserLoginHistory(Base):
     """用户登录历史"""
+
     __tablename__ = "user_login_history"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -54,6 +58,7 @@ class UserLoginHistory(Base):
 
 class UserSession(Base):
     """用户会话表 — 并发会话控制"""
+
     __tablename__ = "user_sessions"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -65,10 +70,9 @@ class UserSession(Base):
 
 class UserSite(Base):
     """用户-站点关联表"""
+
     __tablename__ = "user_sites"
-    __table_args__ = (
-        UniqueConstraint("user_id", "site_id", name="uq_user_site"),
-    )
+    __table_args__ = (UniqueConstraint("user_id", "site_id", name="uq_user_site"),)
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False, comment="用户ID")
@@ -78,6 +82,7 @@ class UserSite(Base):
 
 class PasswordHistory(Base):
     """密码历史记录表"""
+
     __tablename__ = "password_history"
 
     id = Column(Integer, primary_key=True, autoincrement=True)

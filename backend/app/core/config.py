@@ -1,6 +1,7 @@
 """
 应用配置模块
 """
+
 import secrets
 from pydantic_settings import BaseSettings
 from pydantic import Field
@@ -14,6 +15,7 @@ def generate_secret_key() -> str:
 
 class Settings(BaseSettings):
     """应用配置"""
+
     # 应用信息
     app_name: str = "算力中心智能监控系统"
     app_version: str = "1.0.0"
@@ -46,7 +48,7 @@ class Settings(BaseSettings):
 
     # 模拟模式配置
     simulation_enabled: bool = True  # 是否启用模拟数据
-    simulation_interval: int = 5     # 模拟数据生成间隔(秒)
+    simulation_interval: int = 5  # 模拟数据生成间隔(秒)
 
     # 授权配置
     license_key: str = "DEMO-0000-0000-0000"

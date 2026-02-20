@@ -8,6 +8,7 @@
 - 中间结果
 - 追溯树结构
 """
+
 import uuid
 from datetime import datetime, date
 from typing import Optional, Dict, Any, List
@@ -15,7 +16,7 @@ from decimal import Decimal
 from sqlalchemy.orm import Session
 
 from .formula_calculator import FormulaCalculator
-from ..models.trace import TraceRecord, MappingType, AggregationType
+from ..models.trace import TraceRecord, MappingType
 
 
 class TracedValue:
@@ -82,7 +83,7 @@ class TracedFormulaCalculator(FormulaCalculator):
         value_unit: str = "",
         filter_condition: str = None,
         query_sql: str = None,
-        parent_trace_id: str = None
+        parent_trace_id: str = None,
     ) -> TraceRecord:
         """创建直接映射追溯记录"""
         trace_id = self._gen_trace_id()
@@ -102,7 +103,7 @@ class TracedFormulaCalculator(FormulaCalculator):
             parent_trace_id=parent_trace_id,
             depth=0 if parent_trace_id is None else 1,
             query_sql=query_sql,
-            calculated_at=datetime.now()
+            calculated_at=datetime.now(),
         )
         self.db.add(trace)
         self._traces.append(trace)
@@ -123,7 +124,7 @@ class TracedFormulaCalculator(FormulaCalculator):
         time_range_start: datetime = None,
         time_range_end: datetime = None,
         query_sql: str = None,
-        parent_trace_id: str = None
+        parent_trace_id: str = None,
     ) -> TraceRecord:
         """创建聚合映射追溯记录"""
         trace_id = self._gen_trace_id()
@@ -147,7 +148,7 @@ class TracedFormulaCalculator(FormulaCalculator):
             parent_trace_id=parent_trace_id,
             depth=0 if parent_trace_id is None else 1,
             query_sql=query_sql,
-            calculated_at=datetime.now()
+            calculated_at=datetime.now(),
         )
         self.db.add(trace)
         self._traces.append(trace)
@@ -163,7 +164,7 @@ class TracedFormulaCalculator(FormulaCalculator):
         child_traces: List[TraceRecord],
         value: Decimal,
         value_unit: str = "",
-        parent_trace_id: str = None
+        parent_trace_id: str = None,
     ) -> TraceRecord:
         """创建复合映射追溯记录"""
         trace_id = self._gen_trace_id()
@@ -185,7 +186,7 @@ class TracedFormulaCalculator(FormulaCalculator):
             value_unit=value_unit,
             parent_trace_id=parent_trace_id,
             depth=max_child_depth + 1,
-            calculated_at=datetime.now()
+            calculated_at=datetime.now(),
         )
 
         # 设置子节点的父ID
@@ -214,7 +215,7 @@ class TracedFormulaCalculator(FormulaCalculator):
             filter_condition=f"stat_year = {year}",
             query_sql=f"SELECT SUM(total_energy) FROM energy_monthly WHERE stat_year = {year}",
             time_range_start=datetime(year, 1, 1),
-            time_range_end=datetime(year, 12, 31)
+            time_range_end=datetime(year, 12, 31),
         )
         return TracedValue(value, trace, "kWh")
 
@@ -238,7 +239,7 @@ class TracedFormulaCalculator(FormulaCalculator):
             filter_condition=filter_cond,
             query_sql=sql,
             time_range_start=datetime(year, month or 1, 1),
-            time_range_end=datetime(year, month or 12, 28)
+            time_range_end=datetime(year, month or 12, 28),
         )
         return TracedValue(value, trace, "kW")
 
@@ -254,7 +255,7 @@ class TracedFormulaCalculator(FormulaCalculator):
             formula_display=f"{energy_tv.value} / 8760 = {value}",
             child_traces=[energy_tv.trace],
             value=value,
-            value_unit="kW"
+            value_unit="kW",
         )
         return TracedValue(value, trace, "kW")
 
@@ -269,7 +270,7 @@ class TracedFormulaCalculator(FormulaCalculator):
             formula_display=f"({avg_load_tv.value} / {max_demand_tv.value}) × 100 = {value}%",
             child_traces=[avg_load_tv.trace, max_demand_tv.trace],
             value=value,
-            value_unit="%"
+            value_unit="%",
         )
         return TracedValue(value, trace, "%")
 
@@ -292,7 +293,7 @@ class TracedFormulaCalculator(FormulaCalculator):
                     value_unit="kWh",
                     filter_condition=f"stat_date BETWEEN '{start_date}' AND '{end_date}'",
                     time_range_start=datetime.combine(start_date, datetime.min.time()),
-                    time_range_end=datetime.combine(end_date, datetime.max.time())
+                    time_range_end=datetime.combine(end_date, datetime.max.time()),
                 )
                 traces[key] = trace
 
@@ -312,7 +313,7 @@ class TracedFormulaCalculator(FormulaCalculator):
             source_field="declared_demand",
             value=data["当前申报需量"],
             value_unit="kW",
-            filter_condition=f"meter_point_id = {meter_point_id}" if meter_point_id else "first enabled"
+            filter_condition=f"meter_point_id = {meter_point_id}" if meter_point_id else "first enabled",
         )
         traces["当前申报需量"] = t_declared
 
@@ -325,7 +326,7 @@ class TracedFormulaCalculator(FormulaCalculator):
             aggregation_type="percentile",
             aggregation_params={"percentile": 95},
             value=data["历史95分位"],
-            value_unit="kW"
+            value_unit="kW",
         )
         traces["历史95分位"] = t_95th
 
@@ -336,7 +337,7 @@ class TracedFormulaCalculator(FormulaCalculator):
             source_table="pricing_configs",
             source_field="demand_price",
             value=data["需量电价"],
-            value_unit="元/kW·月"
+            value_unit="元/kW·月",
         )
         traces["需量电价"] = t_price
 
@@ -349,7 +350,7 @@ class TracedFormulaCalculator(FormulaCalculator):
             formula_display=f"{data['历史95分位']} × {safety_factor} = {data['建议申报需量']}",
             child_traces=[t_95th],
             value=data["建议申报需量"],
-            value_unit="kW"
+            value_unit="kW",
         )
         traces["建议申报需量"] = t_recommended
 
@@ -365,7 +366,7 @@ class TracedFormulaCalculator(FormulaCalculator):
                 ),
                 child_traces=[t_declared, t_recommended, t_price],
                 value=data["年节省"],
-                value_unit="万元/年"
+                value_unit="万元/年",
             )
             traces["年节省"] = t_saving
 
@@ -379,12 +380,10 @@ class TracedFormulaCalculator(FormulaCalculator):
         sharp_price: Decimal,
         valley_price: Decimal,
         working_days: int = 300,
-        shiftable_power_trace: TraceRecord = None
+        shiftable_power_trace: TraceRecord = None,
     ) -> Dict[str, Any]:
         """带追溯的峰谷转移收益计算"""
-        data = self.calc_peak_shift_benefit(
-            shiftable_power, shift_hours, sharp_price, valley_price, working_days
-        )
+        data = self.calc_peak_shift_benefit(shiftable_power, shift_hours, sharp_price, valley_price, working_days)
         traces = {}
 
         # 可转移功率追溯 (如果未传入，则创建新追溯)
@@ -396,7 +395,7 @@ class TracedFormulaCalculator(FormulaCalculator):
                 source_field="shiftable_power_ratio × rated_power",
                 aggregation_type="sum",
                 value=shiftable_power,
-                value_unit="kW"
+                value_unit="kW",
             )
         traces["可转移功率"] = shiftable_power_trace
 
@@ -408,7 +407,7 @@ class TracedFormulaCalculator(FormulaCalculator):
             source_field="price",
             value=sharp_price,
             value_unit="元/kWh",
-            filter_condition="period_type = 'sharp'"
+            filter_condition="period_type = 'sharp'",
         )
         t_valley = self._create_direct_trace(
             param_code="valley_price",
@@ -417,7 +416,7 @@ class TracedFormulaCalculator(FormulaCalculator):
             source_field="price",
             value=valley_price,
             value_unit="元/kWh",
-            filter_condition="period_type = 'valley'"
+            filter_condition="period_type = 'valley'",
         )
 
         # 价差 - 复合
@@ -429,7 +428,7 @@ class TracedFormulaCalculator(FormulaCalculator):
             formula_display=f"{sharp_price} - {valley_price} = {price_diff}",
             child_traces=[t_sharp, t_valley],
             value=price_diff,
-            value_unit="元/kWh"
+            value_unit="元/kWh",
         )
         traces["峰谷价差"] = t_price_diff
 
@@ -439,12 +438,11 @@ class TracedFormulaCalculator(FormulaCalculator):
             param_name="峰谷套利年收益",
             formula="{shiftable_power} × {shift_hours} × {price_diff} × {working_days} / 10000",
             formula_display=(
-                f"{shiftable_power} × {shift_hours} × {price_diff} × "
-                f"{working_days} / 10000 = {data['年收益']} 万元"
+                f"{shiftable_power} × {shift_hours} × {price_diff} × " f"{working_days} / 10000 = {data['年收益']} 万元"
             ),
             child_traces=[shiftable_power_trace, t_price_diff],
             value=data["年收益"],
-            value_unit="万元/年"
+            value_unit="万元/年",
         )
         traces["年收益"] = t_annual
 
@@ -470,17 +468,17 @@ class TracedFormulaCalculator(FormulaCalculator):
                 aggregation_type="sum",
                 value=capacity,
                 value_unit="kW",
-                filter_condition=f"vpp_level = '{level_key[:2]}'"
+                filter_condition=f"vpp_level = '{level_key[:2]}'",
             )
 
             t_benefit = self._create_composite_trace(
                 param_code=f"vpp_{level_key}_benefit",
                 param_name=f"VPP{level_name}年收益",
-                formula=f"{{capacity}} × {{rate}} × {{times}} / 10000",
+                formula="{capacity} × {rate} × {times} / 10000",
                 formula_display=f"{capacity}kW × 补贴标准 × 年响应次数 = {annual_benefit}万元",
                 child_traces=[t_capacity],
                 value=annual_benefit,
-                value_unit="万元/年"
+                value_unit="万元/年",
             )
             traces[f"{level_key}_容量"] = t_capacity
             traces[f"{level_key}_收益"] = t_benefit
@@ -495,7 +493,7 @@ class TracedFormulaCalculator(FormulaCalculator):
             formula_display=f"{data['Ⅰ级资源']['年收益']} + {data['Ⅱ级资源']['年收益']} + {data['Ⅲ级资源']['年收益']} = {total_benefit}万元",
             child_traces=child_benefit_traces,
             value=total_benefit,
-            value_unit="万元/年"
+            value_unit="万元/年",
         )
         traces["总收益"] = t_total
 
@@ -516,7 +514,7 @@ class TracedFormulaCalculator(FormulaCalculator):
             aggregation_type="max",
             value=data["最大负荷"],
             value_unit="kW",
-            filter_condition=f"curve_date = '{analysis_date}'"
+            filter_condition=f"curve_date = '{analysis_date}'",
         )
         traces["最大负荷"] = t_max
 
@@ -529,7 +527,7 @@ class TracedFormulaCalculator(FormulaCalculator):
             aggregation_type="min",
             value=data["最小负荷"],
             value_unit="kW",
-            filter_condition=f"curve_date = '{analysis_date}'"
+            filter_condition=f"curve_date = '{analysis_date}'",
         )
         traces["最小负荷"] = t_min
 
@@ -542,7 +540,7 @@ class TracedFormulaCalculator(FormulaCalculator):
             aggregation_type="avg",
             value=data["平均负荷"],
             value_unit="kW",
-            filter_condition=f"curve_date = '{analysis_date}'"
+            filter_condition=f"curve_date = '{analysis_date}'",
         )
         traces["平均负荷"] = t_avg
 
@@ -554,7 +552,7 @@ class TracedFormulaCalculator(FormulaCalculator):
             formula_display=f"{data['最大负荷']} - {data['最小负荷']} = {data['峰谷差']}",
             child_traces=[t_max, t_min],
             value=data["峰谷差"],
-            value_unit="kW"
+            value_unit="kW",
         )
         traces["峰谷差"] = t_diff
 
@@ -566,7 +564,7 @@ class TracedFormulaCalculator(FormulaCalculator):
             formula_display=f"({data['平均负荷']} / {data['最大负荷']}) × 100 = {data['负荷率']}%",
             child_traces=[t_avg, t_max],
             value=data["负荷率"],
-            value_unit="%"
+            value_unit="%",
         )
         traces["负荷率"] = t_load_rate
 
@@ -578,7 +576,7 @@ class TracedFormulaCalculator(FormulaCalculator):
             formula_display=f"{data['最大负荷']} / {data['最小负荷']} = {data['峰谷比']}",
             child_traces=[t_max, t_min],
             value=data["峰谷比"],
-            value_unit=""
+            value_unit="",
         )
         traces["峰谷比"] = t_ratio
 
@@ -599,13 +597,10 @@ class TracedFormulaCalculator(FormulaCalculator):
             value_unit="%",
             filter_condition=f"device_type = '{equipment_type}'",
             time_range_start=datetime.combine(start_date, datetime.min.time()),
-            time_range_end=datetime.combine(end_date, datetime.max.time())
+            time_range_end=datetime.combine(end_date, datetime.max.time()),
         )
 
-        return {
-            "负荷率": value,
-            "_traces": {"设备负荷率": trace}
-        }
+        return {"负荷率": value, "_traces": {"设备负荷率": trace}}
 
     async def traced_equipment_efficiency_benchmark(self, equipment_type: str) -> Dict[str, Any]:
         """带追溯的设备能效对标"""
@@ -621,7 +616,7 @@ class TracedFormulaCalculator(FormulaCalculator):
             aggregation_type="avg",
             value=data["当前能效"],
             value_unit="%",
-            filter_condition=f"device_type = '{equipment_type}'"
+            filter_condition=f"device_type = '{equipment_type}'",
         )
         traces["当前能效"] = t_current
 
@@ -633,7 +628,7 @@ class TracedFormulaCalculator(FormulaCalculator):
             source_field="benchmark_value",
             value=data["行业先进能效"],
             value_unit="%",
-            filter_condition=f"device_type = '{equipment_type}'"
+            filter_condition=f"device_type = '{equipment_type}'",
         )
         traces["行业先进能效"] = t_benchmark
 
@@ -645,7 +640,7 @@ class TracedFormulaCalculator(FormulaCalculator):
             formula_display=f"{data['行业先进能效']} - {data['当前能效']} = {data['能效差距']}",
             child_traces=[t_benchmark, t_current],
             value=data["能效差距"],
-            value_unit="%"
+            value_unit="%",
         )
         traces["能效差距"] = t_gap
 
@@ -674,7 +669,7 @@ class TracedFormulaCalculator(FormulaCalculator):
                 "start": min(time_starts).isoformat() if time_starts else None,
                 "end": max(time_ends).isoformat() if time_ends else None,
             },
-            "root_trace_ids": root_trace_ids
+            "root_trace_ids": root_trace_ids,
         }
 
     def get_measure_trace_data(self, traces_dict: Dict[str, TraceRecord]) -> Dict[str, Any]:
@@ -706,11 +701,7 @@ class TracedFormulaCalculator(FormulaCalculator):
             step["unit"] = trace.value_unit or ""
             steps.append(step)
 
-        return {
-            "root_trace_id": root_trace_id,
-            "traces": trace_ids,
-            "calculation_steps": steps
-        }
+        return {"root_trace_id": root_trace_id, "traces": trace_ids, "calculation_steps": steps}
 
     @property
     def all_traces(self) -> List[TraceRecord]:

@@ -1,6 +1,7 @@
 """
 设备模型
 """
+
 from datetime import datetime
 from sqlalchemy import Column, Integer, String, Boolean, Float, Text, DateTime, Date, ForeignKey
 
@@ -9,6 +10,7 @@ from ..core.database import Base
 
 class Device(Base):
     """设备表"""
+
     __tablename__ = "devices"
 
     id = Column(Integer, primary_key=True, autoincrement=True)

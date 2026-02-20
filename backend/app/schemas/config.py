@@ -1,6 +1,7 @@
 """
 配置相关 Schema
 """
+
 from typing import Optional, List
 from datetime import datetime, date
 from pydantic import BaseModel, ConfigDict
@@ -8,6 +9,7 @@ from pydantic import BaseModel, ConfigDict
 
 class SystemConfigInfo(BaseModel):
     """系统配置信息"""
+
     model_config = ConfigDict(from_attributes=True)
 
     id: int
@@ -22,6 +24,7 @@ class SystemConfigInfo(BaseModel):
 
 class SystemConfigUpdate(BaseModel):
     """更新系统配置"""
+
     config_group: str
     config_key: str
     config_value: Optional[str] = None
@@ -31,6 +34,7 @@ class SystemConfigUpdate(BaseModel):
 
 class DictionaryInfo(BaseModel):
     """数据字典信息"""
+
     model_config = ConfigDict(from_attributes=True)
 
     id: int
@@ -44,6 +48,7 @@ class DictionaryInfo(BaseModel):
 
 class LicenseInfo(BaseModel):
     """授权信息"""
+
     id: int
     license_key: str
     license_type: str
@@ -58,5 +63,6 @@ class LicenseInfo(BaseModel):
 
 class LicenseActivate(BaseModel):
     """激活授权"""
+
     license_key: str
     hardware_id: Optional[str] = None

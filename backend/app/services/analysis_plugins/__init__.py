@@ -12,7 +12,7 @@ from .base import (
     PowerData,
     BillData,
     DeviceData,
-    EnvironmentData
+    EnvironmentData,
 )
 from .manager import PluginManager, plugin_manager
 from .registry import register_all_plugins
@@ -27,26 +27,26 @@ from .equipment_efficiency import EquipmentEfficiencyPlugin
 
 __all__ = [
     # 基础类
-    'AnalysisPlugin',
-    'AnalysisContext',
-    'SuggestionResult',
-    'PluginConfig',
-    'PluginPriority',
-    'SuggestionType',
-    'EnergyData',
-    'PowerData',
-    'BillData',
-    'DeviceData',
-    'EnvironmentData',
+    "AnalysisPlugin",
+    "AnalysisContext",
+    "SuggestionResult",
+    "PluginConfig",
+    "PluginPriority",
+    "SuggestionType",
+    "EnergyData",
+    "PowerData",
+    "BillData",
+    "DeviceData",
+    "EnvironmentData",
     # 管理器
-    'PluginManager',
-    'plugin_manager',
-    'register_all_plugins',
+    "PluginManager",
+    "plugin_manager",
+    "register_all_plugins",
     # 插件
-    'LoadShiftingPlugin',
-    'DemandOptimizationPlugin',
-    'PowerFactorPlugin',
-    'PeakValleyOptimizationPlugin',
-    'PUEOptimizationPlugin',
-    'EquipmentEfficiencyPlugin',
+    "LoadShiftingPlugin",
+    "DemandOptimizationPlugin",
+    "PowerFactorPlugin",
+    "PeakValleyOptimizationPlugin",
+    "PUEOptimizationPlugin",
+    "EquipmentEfficiencyPlugin",
 ]

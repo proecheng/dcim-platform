@@ -6,6 +6,7 @@ Opportunity Auto-Detection Service
 将 SuggestionResult 映射为 EnergyOpportunity 并写入数据库。
 不使用 OpportunityEngine.generate_opportunities() 以保留 plugin_id。
 """
+
 import logging
 from datetime import date, datetime
 from typing import Any, Dict, List
@@ -86,9 +87,7 @@ class OpportunityDetector:
 
                 # 逐条处理结果
                 for result in results:
-                    category_enum = PLUGIN_CATEGORY_MAPPING.get(
-                        plugin_id, OpportunityCategory.COMPREHENSIVE
-                    )
+                    category_enum = PLUGIN_CATEGORY_MAPPING.get(plugin_id, OpportunityCategory.COMPREHENSIVE)
                     category_int = CATEGORY_TO_INT.get(category_enum, 4)
 
                     # 去重检查（含 title 避免同插件多结果被误去重）
@@ -99,9 +98,7 @@ class OpportunityDetector:
                         continue
 
                     # 创建 EnergyOpportunity
-                    opportunity = self._build_opportunity(
-                        result, plugin_id, plugin.plugin_name, category_int
-                    )
+                    opportunity = self._build_opportunity(result, plugin_id, plugin.plugin_name, category_int)
                     self.db.add(opportunity)
                     await self.db.flush()
                     new_opportunities += 1

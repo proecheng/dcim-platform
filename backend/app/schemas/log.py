@@ -1,6 +1,7 @@
 """
 日志相关 Schema
 """
+
 from typing import Optional
 from datetime import datetime
 from pydantic import BaseModel, ConfigDict
@@ -8,6 +9,7 @@ from pydantic import BaseModel, ConfigDict
 
 class OperationLogInfo(BaseModel):
     """操作日志信息"""
+
     model_config = ConfigDict(from_attributes=True)
 
     id: int
@@ -29,6 +31,7 @@ class OperationLogInfo(BaseModel):
 
 class SystemLogInfo(BaseModel):
     """系统日志信息"""
+
     model_config = ConfigDict(from_attributes=True)
 
     id: int
@@ -42,6 +45,7 @@ class SystemLogInfo(BaseModel):
 
 class CommunicationLogInfo(BaseModel):
     """通讯日志信息"""
+
     model_config = ConfigDict(from_attributes=True)
 
     id: int

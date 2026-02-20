@@ -2,6 +2,7 @@
 联动策略模型
 Story 9-1: 联动引擎核心框架
 """
+
 from datetime import datetime
 from sqlalchemy import Column, Integer, String, Boolean, DateTime, Text, ForeignKey, JSON
 from sqlalchemy.orm import relationship
@@ -11,6 +12,7 @@ from ..core.database import Base
 
 class LinkagePolicy(Base):
     """联动策略表"""
+
     __tablename__ = "linkage_policies"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -25,12 +27,12 @@ class LinkagePolicy(Base):
     updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now, comment="更新时间")
 
     # 关系
-    actions = relationship("LinkageAction", backref="policy", lazy="selectin",
-                           cascade="all, delete-orphan")
+    actions = relationship("LinkageAction", backref="policy", lazy="selectin", cascade="all, delete-orphan")
 
 
 class LinkageAction(Base):
     """联动动作表"""
+
     __tablename__ = "linkage_actions"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -45,6 +47,7 @@ class LinkageAction(Base):
 
 class LinkageExecution(Base):
     """联动执行记录表"""
+
     __tablename__ = "linkage_executions"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -58,12 +61,12 @@ class LinkageExecution(Base):
     total_duration_ms = Column(Integer, nullable=True, comment="总耗时(毫秒)")
 
     # 关系
-    logs = relationship("LinkageLog", backref="execution", lazy="selectin",
-                        cascade="all, delete-orphan")
+    logs = relationship("LinkageLog", backref="execution", lazy="selectin", cascade="all, delete-orphan")
 
 
 class LinkageLog(Base):
     """联动执行日志表"""
+
     __tablename__ = "linkage_logs"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -80,6 +83,7 @@ class LinkageLog(Base):
 
 class LinkageRecovery(Base):
     """联动恢复记录表 — Story 9-4"""
+
     __tablename__ = "linkage_recoveries"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -92,12 +96,12 @@ class LinkageRecovery(Base):
     total_duration_ms = Column(Integer, nullable=True, comment="总耗时(毫秒)")
 
     # 关系
-    logs = relationship("LinkageRecoveryLog", backref="recovery", lazy="selectin",
-                        cascade="all, delete-orphan")
+    logs = relationship("LinkageRecoveryLog", backref="recovery", lazy="selectin", cascade="all, delete-orphan")
 
 
 class LinkageRecoveryLog(Base):
     """联动恢复步骤日志表 — Story 9-4"""
+
     __tablename__ = "linkage_recovery_logs"
 
     id = Column(Integer, primary_key=True, autoincrement=True)

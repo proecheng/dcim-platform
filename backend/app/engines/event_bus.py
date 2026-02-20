@@ -2,6 +2,7 @@
 事件总线 — 联动引擎核心消息通道
 Story 9-1: 联动引擎核心框架
 """
+
 import asyncio
 import logging
 from abc import ABC, abstractmethod
@@ -15,20 +16,22 @@ logger = logging.getLogger(__name__)
 
 class EventPriority(str, Enum):
     """事件优先级"""
-    fire_signal = "fire_signal"   # 消防信号（最高优先级）
-    critical = "critical"         # 紧急
-    normal = "normal"             # 普通
+
+    fire_signal = "fire_signal"  # 消防信号（最高优先级）
+    critical = "critical"  # 紧急
+    normal = "normal"  # 普通
 
 
 @dataclass
 class Event:
     """事件数据"""
-    event_type: str                          # 事件类型，如 alarm.triggered
-    source: str                              # 事件来源，如 alarm_engine
-    priority: EventPriority                  # 优先级
-    payload: dict                            # 事件载荷
+
+    event_type: str  # 事件类型，如 alarm.triggered
+    source: str  # 事件来源，如 alarm_engine
+    priority: EventPriority  # 优先级
+    payload: dict  # 事件载荷
     timestamp: datetime = field(default_factory=datetime.now)
-    is_test: bool = False                    # 是否为测试事件
+    is_test: bool = False  # 是否为测试事件
 
 
 class EventBus(ABC):
@@ -64,7 +67,9 @@ class InMemoryEventBus(EventBus):
             return
         logger.info(
             "事件总线: 发布事件 channel=%s type=%s priority=%s",
-            channel, event.event_type, event.priority.value,
+            channel,
+            event.event_type,
+            event.priority.value,
         )
         await asyncio.gather(*[h(event) for h in handlers], return_exceptions=True)
 

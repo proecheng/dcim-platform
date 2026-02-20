@@ -1,4 +1,5 @@
 """数据质量 API"""
+
 from typing import Optional, List
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -46,21 +47,24 @@ async def get_data_quality_status(
                 PointRealtime.quality,
                 PointRealtime.status,
                 PointRealtime.updated_at,
-            ).join(Point, Point.id == PointRealtime.point_id)
+            )
+            .join(Point, Point.id == PointRealtime.point_id)
             .where(PointRealtime.quality == 2)
         )
         for row in detail_result.all():
             q = row[4] or 0
-            unreliable_points.append(DataQualityPointInfo(
-                point_id=row[0],
-                point_code=row[1],
-                point_name=row[2],
-                device_type=row[3],
-                quality=q,
-                quality_text=QUALITY_TEXT_MAP.get(q, "未知"),
-                status=row[5],
-                updated_at=row[6],
-            ))
+            unreliable_points.append(
+                DataQualityPointInfo(
+                    point_id=row[0],
+                    point_code=row[1],
+                    point_name=row[2],
+                    device_type=row[3],
+                    quality=q,
+                    quality_text=QUALITY_TEXT_MAP.get(q, "未知"),
+                    status=row[5],
+                    updated_at=row[6],
+                )
+            )
 
     return DataQualityStatus(
         total=total,
@@ -78,17 +82,15 @@ async def get_data_quality_points(
     _: User = Depends(require_viewer),
 ):
     """查询点位数据质量列表，可按 quality 过滤"""
-    query = (
-        select(
-            PointRealtime.point_id,
-            Point.point_code,
-            Point.point_name,
-            Point.device_type,
-            PointRealtime.quality,
-            PointRealtime.status,
-            PointRealtime.updated_at,
-        ).join(Point, Point.id == PointRealtime.point_id)
-    )
+    query = select(
+        PointRealtime.point_id,
+        Point.point_code,
+        Point.point_name,
+        Point.device_type,
+        PointRealtime.quality,
+        PointRealtime.status,
+        PointRealtime.updated_at,
+    ).join(Point, Point.id == PointRealtime.point_id)
 
     if quality is not None:
         query = query.where(PointRealtime.quality == quality)
@@ -97,15 +99,17 @@ async def get_data_quality_points(
     items = []
     for row in result.all():
         q = row[4] or 0
-        items.append(DataQualityPointInfo(
-            point_id=row[0],
-            point_code=row[1],
-            point_name=row[2],
-            device_type=row[3],
-            quality=q,
-            quality_text=QUALITY_TEXT_MAP.get(q, "未知"),
-            status=row[5],
-            updated_at=row[6],
-        ))
+        items.append(
+            DataQualityPointInfo(
+                point_id=row[0],
+                point_code=row[1],
+                point_name=row[2],
+                device_type=row[3],
+                quality=q,
+                quality_text=QUALITY_TEXT_MAP.get(q, "未知"),
+                status=row[5],
+                updated_at=row[6],
+            )
+        )
 
     return items

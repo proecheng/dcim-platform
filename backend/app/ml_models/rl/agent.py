@@ -11,13 +11,12 @@
 import logging
 import torch
 import numpy as np
-from pathlib import Path
-from typing import Dict, Optional, Any, List
+from typing import Dict, Optional, Any
 
 from .environment import EnergySavingEnv
 from .actor_critic import ActorCriticNetwork
 from .ppo import PPOAgent
-from ..config import MLConfig, RLConfig
+from ..config import MLConfig
 
 logger = logging.getLogger(__name__)
 
@@ -42,17 +41,14 @@ class AdaptiveOptimizer:
 
         # 创建环境
         self.env = EnergySavingEnv(
-            lambda_comfort=self.rl_config.lambda_comfort,
-            lambda_safety=self.rl_config.lambda_safety
+            lambda_comfort=self.rl_config.lambda_comfort, lambda_safety=self.rl_config.lambda_safety
         )
 
         state_dim = self.env.get_state_dim()
 
         # 创建网络
         self.network = ActorCriticNetwork(
-            state_dim=state_dim,
-            hidden_dim=self.rl_config.actor_hidden_dims[0],
-            num_periods=5
+            state_dim=state_dim, hidden_dim=self.rl_config.actor_hidden_dims[0], num_periods=5
         ).to(self.device)
 
         # 创建PPO代理
@@ -63,7 +59,7 @@ class AdaptiveOptimizer:
             gae_lambda=self.rl_config.gae_lambda,
             clip_epsilon=self.rl_config.clip_epsilon,
             buffer_size=self.rl_config.buffer_size,
-            update_epochs=self.rl_config.update_epochs
+            update_epochs=self.rl_config.update_epochs,
         )
 
         # 探索率调度 (S5f)
@@ -75,10 +71,7 @@ class AdaptiveOptimizer:
         # 加载检查点
         self._load_checkpoint()
 
-    def optimize_scheme(
-        self,
-        current_state: Optional[Dict[str, Any]] = None
-    ) -> Dict[str, Any]:
+    def optimize_scheme(self, current_state: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """
         基于当前状态输出方案参数调整建议 (S5e)
 
@@ -108,12 +101,12 @@ class AdaptiveOptimizer:
         adjustments = self._translate_action(actions)
 
         return {
-            'adjustments': adjustments,
-            'raw_actions': actions,
-            'exploration': explore,
-            'exploration_rate': self._exploration_rate,
-            'confidence': 1 - self._exploration_rate,
-            'state_value': value
+            "adjustments": adjustments,
+            "raw_actions": actions,
+            "exploration": explore,
+            "exploration_rate": self._exploration_rate,
+            "confidence": 1 - self._exploration_rate,
+            "state_value": value,
         }
 
     def _translate_action(self, actions: Dict[str, float]) -> Dict[str, Any]:
@@ -125,28 +118,25 @@ class AdaptiveOptimizer:
         - 安全系数 -> 需量控制参数
         - 温度设定 -> 空调控制指令
         """
-        period_names = ['sharp_peak', 'peak', 'normal', 'valley', 'deep_valley']
-        target_period_idx = int(actions.get('target_period', 3))
+        period_names = ["sharp_peak", "peak", "normal", "valley", "deep_valley"]
+        target_period_idx = int(actions.get("target_period", 3))
 
         return {
-            'priority_weight': {
-                'value': round(actions.get('priority_weight', 1.0), 3),
-                'description': '措施优先级权重调整'
+            "priority_weight": {
+                "value": round(actions.get("priority_weight", 1.0), 3),
+                "description": "措施优先级权重调整",
             },
-            'target_period': {
-                'value': period_names[target_period_idx],
-                'index': target_period_idx,
-                'description': '建议转移至该时段'
+            "target_period": {
+                "value": period_names[target_period_idx],
+                "index": target_period_idx,
+                "description": "建议转移至该时段",
             },
-            'safety_coefficient': {
-                'value': round(actions.get('safety_coeff', 1.05), 3),
-                'description': '需量安全系数'
+            "safety_coefficient": {"value": round(actions.get("safety_coeff", 1.05), 3), "description": "需量安全系数"},
+            "temperature_setpoint": {
+                "value": round(actions.get("temperature", 26.0), 1),
+                "unit": "celsius",
+                "description": "建议空调温度设定值",
             },
-            'temperature_setpoint': {
-                'value': round(actions.get('temperature', 26.0), 1),
-                'unit': 'celsius',
-                'description': '建议空调温度设定值'
-            }
         }
 
     def train_step(
@@ -155,7 +145,7 @@ class AdaptiveOptimizer:
         expected_saving: float,
         comfort_violation: float = 0.0,
         safety_violation: float = 0.0,
-        current_state: Optional[Dict[str, Any]] = None
+        current_state: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         """
         执行一步在线训练
@@ -180,22 +170,19 @@ class AdaptiveOptimizer:
 
         # 计算奖励
         achievement_rate = actual_saving / expected_saving if expected_saving > 0 else 1.0
-        reward = (achievement_rate
-                  - self.rl_config.lambda_comfort * comfort_violation
-                  - self.rl_config.lambda_safety * safety_violation)
+        reward = (
+            achievement_rate
+            - self.rl_config.lambda_comfort * comfort_violation
+            - self.rl_config.lambda_safety * safety_violation
+        )
 
         # 获取下一状态
         next_state, _, _, _ = self.env.step(actions)
 
         # 存储经验
-        continuous_actions = np.array([
-            actions['priority_weight'],
-            actions['safety_coeff'],
-            actions['temperature']
-        ])
+        continuous_actions = np.array([actions["priority_weight"], actions["safety_coeff"], actions["temperature"]])
         self.ppo.buffer.store(
-            state, continuous_actions, int(actions['target_period']),
-            reward, next_state, False, log_prob, value
+            state, continuous_actions, int(actions["target_period"]), reward, next_state, False, log_prob, value
         )
 
         # 记录达成率
@@ -213,11 +200,11 @@ class AdaptiveOptimizer:
             self._is_trained = True
 
         return {
-            'reward': reward,
-            'achievement_rate': achievement_rate,
-            'exploration_rate': self._exploration_rate,
-            'step': self._step_count,
-            'update_info': update_info
+            "reward": reward,
+            "achievement_rate": achievement_rate,
+            "exploration_rate": self._exploration_rate,
+            "step": self._step_count,
+            "update_info": update_info,
         }
 
     def _update_exploration_rate(self):
@@ -232,7 +219,9 @@ class AdaptiveOptimizer:
             self._exploration_rate = 0.3
             return
 
-        recent = self._recent_achievements[-100:] if len(self._recent_achievements) >= 100 else self._recent_achievements
+        recent = (
+            self._recent_achievements[-100:] if len(self._recent_achievements) >= 100 else self._recent_achievements
+        )
 
         if len(recent) >= 100 and all(r > 0.9 for r in recent):
             # 稳定阶段
@@ -249,36 +238,36 @@ class AdaptiveOptimizer:
         parts = []
 
         # 负荷数据 (填充到16维)
-        load_data = np.array(state_dict.get('load_data', [100.0] * 16), dtype=np.float32)[:16]
+        load_data = np.array(state_dict.get("load_data", [100.0] * 16), dtype=np.float32)[:16]
         if len(load_data) < 16:
             load_data = np.pad(load_data, (0, 16 - len(load_data)))
         parts.append(load_data)
 
         # 电价时段 (one-hot, 5维)
-        period = state_dict.get('price_period', 2)
+        period = state_dict.get("price_period", 2)
         period_onehot = np.zeros(5, dtype=np.float32)
         period_onehot[min(period, 4)] = 1.0
         parts.append(period_onehot)
 
         # 措施状态 (10维)
-        measures = np.array(state_dict.get('measure_states', [0] * 10), dtype=np.float32)[:10]
+        measures = np.array(state_dict.get("measure_states", [0] * 10), dtype=np.float32)[:10]
         if len(measures) < 10:
             measures = np.pad(measures, (0, 10 - len(measures)))
         parts.append(measures / 2.0)  # 归一化
 
         # 设备参数 (8维)
-        device_params = np.array(state_dict.get('device_params', [0.5] * 8), dtype=np.float32)[:8]
+        device_params = np.array(state_dict.get("device_params", [0.5] * 8), dtype=np.float32)[:8]
         if len(device_params) < 8:
             device_params = np.pad(device_params, (0, 8 - len(device_params)), constant_values=0.5)
         parts.append(device_params)
 
         # 累计收益和达成率 (2维)
-        saving = state_dict.get('cumulative_saving', 0) / 1000.0
-        rate = state_dict.get('achievement_rate', 0.9)
+        saving = state_dict.get("cumulative_saving", 0) / 1000.0
+        rate = state_dict.get("achievement_rate", 0.9)
         parts.append(np.array([saving, rate], dtype=np.float32))
 
         # 达成率历史 (10维)
-        history = np.array(state_dict.get('achievement_history', [0.9] * 10), dtype=np.float32)[-10:]
+        history = np.array(state_dict.get("achievement_history", [0.9] * 10), dtype=np.float32)[-10:]
         if len(history) < 10:
             history = np.pad(history, (0, 10 - len(history)), constant_values=0.9)
         parts.append(history)

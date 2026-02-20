@@ -2,6 +2,7 @@
 事件时间线报告服务 — Story 9-5
 聚合联动执行 + 恢复数据，生成完整时间线报告；支持 Excel 导出。
 """
+
 import io
 import logging
 from datetime import datetime
@@ -13,8 +14,11 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..models.linkage import (
-    LinkageExecution, LinkageLog, LinkagePolicy,
-    LinkageRecovery, LinkageRecoveryLog,
+    LinkageExecution,
+    LinkageLog,
+    LinkagePolicy,
+    LinkageRecovery,
+    LinkageRecoveryLog,
 )
 from ..schemas.linkage import TimelineEvent, TimelineReportResponse
 
@@ -85,34 +89,26 @@ async def generate_timeline(
     """聚合联动执行 + 恢复数据，生成完整时间线报告"""
 
     # 1. 查询执行记录
-    result = await db.execute(
-        select(LinkageExecution).where(LinkageExecution.id == execution_id)
-    )
+    result = await db.execute(select(LinkageExecution).where(LinkageExecution.id == execution_id))
     execution = result.scalar_one_or_none()
     if execution is None:
         return None
 
     # 2. 查询策略信息
-    policy_result = await db.execute(
-        select(LinkagePolicy).where(LinkagePolicy.id == execution.policy_id)
-    )
+    policy_result = await db.execute(select(LinkagePolicy).where(LinkagePolicy.id == execution.policy_id))
     policy = policy_result.scalar_one_or_none()
     policy_name = policy.name if policy else f"策略#{execution.policy_id}"
     level = policy.priority if policy else "normal"
 
     # 3. 查询执行日志
     logs_result = await db.execute(
-        select(LinkageLog)
-        .where(LinkageLog.execution_id == execution_id)
-        .order_by(LinkageLog.id)
+        select(LinkageLog).where(LinkageLog.execution_id == execution_id).order_by(LinkageLog.id)
     )
     logs = logs_result.scalars().all()
 
     # 4. 查询恢复记录
     recovery_result = await db.execute(
-        select(LinkageRecovery)
-        .where(LinkageRecovery.execution_id == execution_id)
-        .order_by(LinkageRecovery.id.desc())
+        select(LinkageRecovery).where(LinkageRecovery.execution_id == execution_id).order_by(LinkageRecovery.id.desc())
     )
     recovery = recovery_result.scalars().first()
 
@@ -134,14 +130,16 @@ async def generate_timeline(
         alarm_level = execution.trigger_event.get("alarm_level", "")
         if alarm_level:
             trigger_detail += f", 告警级别: {alarm_level}"
-    events.append(TimelineEvent(
-        timestamp=execution.started_at,
-        phase="trigger",
-        event_type="联动触发",
-        detail=trigger_detail,
-        status="success",
-        duration_ms=None,
-    ))
+    events.append(
+        TimelineEvent(
+            timestamp=execution.started_at,
+            phase="trigger",
+            event_type="联动触发",
+            detail=trigger_detail,
+            status="success",
+            duration_ms=None,
+        )
+    )
 
     # 5b. 联动动作
     for log in logs:
@@ -157,25 +155,29 @@ async def generate_timeline(
         if log.error_message:
             detail += f" [错误: {log.error_message}]"
 
-        events.append(TimelineEvent(
-            timestamp=log.started_at or execution.started_at,
-            phase="action",
-            event_type=action_label,
-            detail=detail,
-            status=log.status or "pending",
-            duration_ms=log.duration_ms,
-        ))
+        events.append(
+            TimelineEvent(
+                timestamp=log.started_at or execution.started_at,
+                phase="action",
+                event_type=action_label,
+                detail=detail,
+                status=log.status or "pending",
+                duration_ms=log.duration_ms,
+            )
+        )
 
     # 5c. 恢复事件
     if recovery is not None:
-        events.append(TimelineEvent(
-            timestamp=recovery.started_at,
-            phase="recovery",
-            event_type="恢复开始",
-            detail=f"模式: {'一键恢复' if recovery.mode == 'auto' else '手动恢复'}, 操作人: {recovery.operator}",
-            status="success",
-            duration_ms=None,
-        ))
+        events.append(
+            TimelineEvent(
+                timestamp=recovery.started_at,
+                phase="recovery",
+                event_type="恢复开始",
+                detail=f"模式: {'一键恢复' if recovery.mode == 'auto' else '手动恢复'}, 操作人: {recovery.operator}",
+                status="success",
+                duration_ms=None,
+            )
+        )
 
         for rlog in recovery_logs:
             action_label = _ACTION_TYPE_LABELS.get(rlog.action_type, rlog.action_type or "未知")
@@ -187,24 +189,28 @@ async def generate_timeline(
             if rlog.error_message:
                 detail += f" [错误: {rlog.error_message}]"
 
-            events.append(TimelineEvent(
-                timestamp=rlog.started_at or recovery.started_at,
-                phase="recovery",
-                event_type=f"恢复步骤#{rlog.step_order}",
-                detail=detail,
-                status=rlog.status or "pending",
-                duration_ms=rlog.duration_ms,
-            ))
+            events.append(
+                TimelineEvent(
+                    timestamp=rlog.started_at or recovery.started_at,
+                    phase="recovery",
+                    event_type=f"恢复步骤#{rlog.step_order}",
+                    detail=detail,
+                    status=rlog.status or "pending",
+                    duration_ms=rlog.duration_ms,
+                )
+            )
 
         if recovery.completed_at:
-            events.append(TimelineEvent(
-                timestamp=recovery.completed_at,
-                phase="recovery",
-                event_type="恢复完成",
-                detail=f"最终状态: {_STATUS_LABELS.get(recovery.status, recovery.status)}",
-                status=recovery.status or "completed",
-                duration_ms=recovery.total_duration_ms,
-            ))
+            events.append(
+                TimelineEvent(
+                    timestamp=recovery.completed_at,
+                    phase="recovery",
+                    event_type="恢复完成",
+                    detail=f"最终状态: {_STATUS_LABELS.get(recovery.status, recovery.status)}",
+                    status=recovery.status or "completed",
+                    duration_ms=recovery.total_duration_ms,
+                )
+            )
 
     # 6. 按时间排序（None 排最后）
     events.sort(key=lambda e: e.timestamp or datetime.max)
@@ -226,6 +232,7 @@ async def generate_timeline(
 
 
 # ==================== Excel 导出 ====================
+
 
 def _fmt_dt(dt: Optional[datetime]) -> str:
     if dt is None:
@@ -264,15 +271,17 @@ def generate_timeline_excel(report: TimelineReportResponse) -> io.BytesIO:
     _style_header(ws2, len(headers))
 
     for idx, evt in enumerate(report.events, 1):
-        ws2.append([
-            idx,
-            _fmt_dt(evt.timestamp),
-            _PHASE_LABELS.get(evt.phase, evt.phase),
-            evt.event_type,
-            evt.detail,
-            _STATUS_LABELS.get(evt.status, evt.status),
-            evt.duration_ms,
-        ])
+        ws2.append(
+            [
+                idx,
+                _fmt_dt(evt.timestamp),
+                _PHASE_LABELS.get(evt.phase, evt.phase),
+                evt.event_type,
+                evt.detail,
+                _STATUS_LABELS.get(evt.status, evt.status),
+                evt.duration_ms,
+            ]
+        )
 
     _auto_width(ws2)
 

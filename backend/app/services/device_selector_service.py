@@ -5,14 +5,12 @@ Device Selector Service
 提供参与优化的设备选择、能力查询、时段交集计算等功能
 对应设计文档第五节"设备选择器设计"
 """
+
 from typing import Dict, List, Optional, Any, Set
-from datetime import datetime
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_
 
-from ..models.energy import (
-    PowerDevice, DeviceShiftConfig, LoadRegulationConfig
-)
+from ..models.energy import PowerDevice, DeviceShiftConfig, LoadRegulationConfig
 
 
 class DeviceSelectorService:
@@ -30,10 +28,7 @@ class DeviceSelectorService:
         self.db = db
 
     async def get_available_devices(
-        self,
-        regulation_type: Optional[str] = None,
-        execution_mode: Optional[str] = None,
-        only_shiftable: bool = False
+        self, regulation_type: Optional[str] = None, execution_mode: Optional[str] = None, only_shiftable: bool = False
     ) -> List[Dict[str, Any]]:
         """
         获取可参与优化的设备列表
@@ -52,17 +47,10 @@ class DeviceSelectorService:
         reg_query = (
             select(PowerDevice, LoadRegulationConfig)
             .join(LoadRegulationConfig, PowerDevice.id == LoadRegulationConfig.device_id)
-            .where(
-                and_(
-                    PowerDevice.is_enabled == True,
-                    LoadRegulationConfig.is_enabled == True
-                )
-            )
+            .where(and_(PowerDevice.is_enabled == True, LoadRegulationConfig.is_enabled == True))
         )
         if regulation_type:
-            reg_query = reg_query.where(
-                LoadRegulationConfig.regulation_type == regulation_type
-            )
+            reg_query = reg_query.where(LoadRegulationConfig.regulation_type == regulation_type)
 
         result = await self.db.execute(reg_query)
         reg_rows = result.all()
@@ -71,12 +59,7 @@ class DeviceSelectorService:
         shift_query = (
             select(PowerDevice, DeviceShiftConfig)
             .join(DeviceShiftConfig, PowerDevice.id == DeviceShiftConfig.device_id)
-            .where(
-                and_(
-                    PowerDevice.is_enabled == True,
-                    DeviceShiftConfig.is_shiftable == True
-                )
-            )
+            .where(and_(PowerDevice.is_enabled == True, DeviceShiftConfig.is_shiftable == True))
         )
         result = await self.db.execute(shift_query)
         shift_rows = result.all()
@@ -103,24 +86,26 @@ class DeviceSelectorService:
                     "regulations": [],
                     "shift_config": None,
                     "allowed_hours": [],
-                    "is_shiftable": False
+                    "is_shiftable": False,
                 }
 
-            device_map[dev_id]["regulations"].append({
-                "config_id": reg_config.id,
-                "regulation_type": reg_config.regulation_type,
-                "adjustable_power": adjustable_power,
-                "execution_mode": exec_mode,
-                "current_value": reg_config.current_value,
-                "min_value": reg_config.min_value,
-                "max_value": reg_config.max_value,
-                "default_value": reg_config.default_value,
-                "step_size": reg_config.step_size,
-                "unit": reg_config.unit,
-                "comfort_impact": reg_config.comfort_impact,
-                "performance_impact": reg_config.performance_impact,
-                "is_auto": reg_config.is_auto
-            })
+            device_map[dev_id]["regulations"].append(
+                {
+                    "config_id": reg_config.id,
+                    "regulation_type": reg_config.regulation_type,
+                    "adjustable_power": adjustable_power,
+                    "execution_mode": exec_mode,
+                    "current_value": reg_config.current_value,
+                    "min_value": reg_config.min_value,
+                    "max_value": reg_config.max_value,
+                    "default_value": reg_config.default_value,
+                    "step_size": reg_config.step_size,
+                    "unit": reg_config.unit,
+                    "comfort_impact": reg_config.comfort_impact,
+                    "performance_impact": reg_config.performance_impact,
+                    "is_auto": reg_config.is_auto,
+                }
+            )
 
         # 处理转移配置
         for device, shift_config in shift_rows:
@@ -137,7 +122,7 @@ class DeviceSelectorService:
                     "regulations": [],
                     "shift_config": None,
                     "allowed_hours": [],
-                    "is_shiftable": False
+                    "is_shiftable": False,
                 }
 
             shiftable_power = (device.rated_power or 0) * (shift_config.shiftable_power_ratio or 0)
@@ -148,7 +133,7 @@ class DeviceSelectorService:
                 "is_critical": shift_config.is_critical,
                 "requires_manual_approval": shift_config.requires_manual_approval,
                 "min_continuous_runtime": shift_config.min_continuous_runtime,
-                "max_shift_duration": shift_config.max_shift_duration
+                "max_shift_duration": shift_config.max_shift_duration,
             }
             device_map[dev_id]["is_shiftable"] = shift_config.is_shiftable
             device_map[dev_id]["allowed_hours"] = shift_config.allowed_shift_hours or []
@@ -164,10 +149,7 @@ class DeviceSelectorService:
 
         return devices
 
-    async def get_device_capabilities(
-        self,
-        device_id: int
-    ) -> Optional[Dict[str, Any]]:
+    async def get_device_capabilities(self, device_id: int) -> Optional[Dict[str, Any]]:
         """获取单个设备的完整能力信息"""
         devices = await self.get_available_devices()
         for dev in devices:
@@ -175,10 +157,7 @@ class DeviceSelectorService:
                 return dev
         return None
 
-    def calculate_time_intersection(
-        self,
-        devices: List[Dict[str, Any]]
-    ) -> Dict[str, Any]:
+    def calculate_time_intersection(self, devices: List[Dict[str, Any]]) -> Dict[str, Any]:
         """
         计算多设备可调时段交集
 
@@ -198,7 +177,7 @@ class DeviceSelectorService:
                 "intersection_hours": [],
                 "intersection_count": 0,
                 "per_device_hours": {},
-                "has_intersection": False
+                "has_intersection": False,
             }
 
         # 收集每个设备的可调时段
@@ -229,14 +208,11 @@ class DeviceSelectorService:
             "intersection_count": len(sorted_hours),
             "per_device_hours": per_device_hours,
             "has_intersection": len(sorted_hours) > 0,
-            "display": self._format_hour_range(sorted_hours)
+            "display": self._format_hour_range(sorted_hours),
         }
 
     async def select_optimal_devices(
-        self,
-        target_power: float,
-        regulation_type: Optional[str] = None,
-        prefer_auto: bool = True
+        self, target_power: float, regulation_type: Optional[str] = None, prefer_auto: bool = True
     ) -> Dict[str, Any]:
         """
         自动选择最优设备组合
@@ -258,10 +234,9 @@ class DeviceSelectorService:
 
         # 排序策略
         if prefer_auto:
-            devices.sort(key=lambda d: (
-                0 if d["primary_execution_mode"] == "auto" else 1,
-                -d["total_adjustable_power"]
-            ))
+            devices.sort(
+                key=lambda d: (0 if d["primary_execution_mode"] == "auto" else 1, -d["total_adjustable_power"])
+            )
         else:
             devices.sort(key=lambda d: -d["total_adjustable_power"])
 
@@ -286,14 +261,11 @@ class DeviceSelectorService:
             "surplus_power": round(max(0, accumulated_power - target_power), 2),
             "time_intersection": time_intersection,
             "auto_count": sum(1 for d in selected if d["primary_execution_mode"] == "auto"),
-            "manual_count": sum(1 for d in selected if d["primary_execution_mode"] == "manual")
+            "manual_count": sum(1 for d in selected if d["primary_execution_mode"] == "manual"),
         }
 
     async def validate_device_selection(
-        self,
-        device_ids: List[int],
-        target_power: Optional[float] = None,
-        target_hours: Optional[List[int]] = None
+        self, device_ids: List[int], target_power: Optional[float] = None, target_hours: Optional[List[int]] = None
     ) -> Dict[str, Any]:
         """
         验证设备选择是否可行
@@ -320,9 +292,7 @@ class DeviceSelectorService:
         # 检查总功率
         total_power = sum(d["total_adjustable_power"] for d in selected)
         if target_power and total_power < target_power:
-            warnings.append(
-                f"可调总功率({total_power:.1f}kW)不足目标({target_power:.1f}kW)"
-            )
+            warnings.append(f"可调总功率({total_power:.1f}kW)不足目标({target_power:.1f}kW)")
             is_valid = False
 
         # 检查时段交集
@@ -352,16 +322,12 @@ class DeviceSelectorService:
             "time_intersection": time_result,
             "warnings": warnings,
             "auto_devices": [d["device_name"] for d in selected if d["primary_execution_mode"] == "auto"],
-            "manual_devices": [d["device_name"] for d in selected if d["primary_execution_mode"] == "manual"]
+            "manual_devices": [d["device_name"] for d in selected if d["primary_execution_mode"] == "manual"],
         }
 
     # ========== 私有方法 ==========
 
-    def _calc_adjustable_power(
-        self,
-        device: PowerDevice,
-        reg_config: LoadRegulationConfig
-    ) -> float:
+    def _calc_adjustable_power(self, device: PowerDevice, reg_config: LoadRegulationConfig) -> float:
         """计算设备可调功率"""
         if reg_config.power_factor and reg_config.base_power:
             # 基于功率系数计算

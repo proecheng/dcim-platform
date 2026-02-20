@@ -1,6 +1,7 @@
 """
 安全认证模块
 """
+
 from datetime import datetime, timedelta
 from typing import Optional
 from jose import JWTError, jwt
@@ -44,10 +45,7 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
     return encoded_jwt
 
 
-async def get_current_user(
-    token: str = Depends(oauth2_scheme),
-    db: AsyncSession = Depends(get_db)
-):
+async def get_current_user(token: str = Depends(oauth2_scheme), db: AsyncSession = Depends(get_db)):
     """获取当前用户"""
     from ..models.user import User
 
@@ -74,7 +72,7 @@ async def get_current_user(
     return user
 
 
-async def get_current_admin_user(current_user = Depends(get_current_user)):
+async def get_current_admin_user(current_user=Depends(get_current_user)):
     """获取当前管理员用户"""
     if current_user.role != "admin":
         raise HTTPException(status_code=403, detail="权限不足")

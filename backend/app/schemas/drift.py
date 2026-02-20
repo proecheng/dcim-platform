@@ -2,6 +2,7 @@
 传感器数据漂移检测 Schema
 Story 9-7: 传感器数据漂移检测
 """
+
 from datetime import datetime
 from typing import Optional
 
@@ -10,6 +11,7 @@ from pydantic import BaseModel, ConfigDict
 
 class DriftDetectionResultResponse(BaseModel):
     """漂移检测结果响应"""
+
     model_config = ConfigDict(from_attributes=True)
 
     id: int
@@ -31,6 +33,7 @@ class DriftDetectionResultResponse(BaseModel):
 
 class DriftDetectionSummary(BaseModel):
     """漂移检测概览"""
+
     total_checked: int
     suspected_count: int
     confirmed_count: int
@@ -40,6 +43,7 @@ class DriftDetectionSummary(BaseModel):
 
 class DriftDetectResponse(BaseModel):
     """触发漂移检测响应"""
+
     message: str
     total_checked: int
     new_suspected: int

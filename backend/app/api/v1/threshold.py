@@ -1,6 +1,7 @@
 """
 阈值配置 API - v1
 """
+
 from datetime import datetime
 from typing import Optional, List
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -12,8 +13,12 @@ from ...models.user import User
 from ...models.alarm import AlarmThreshold
 from ...models.point import Point
 from ...schemas.threshold import (
-    ThresholdCreate, ThresholdUpdate, ThresholdInfo, ThresholdBatchCreate,
-    FourLevelThresholdCreate, BatchByDeviceTypeCreate
+    ThresholdCreate,
+    ThresholdUpdate,
+    ThresholdInfo,
+    ThresholdBatchCreate,
+    FourLevelThresholdCreate,
+    BatchByDeviceTypeCreate,
 )
 from ...schemas.common import PageResponse
 
@@ -39,7 +44,7 @@ async def get_thresholds(
     is_enabled: Optional[bool] = Query(None),
     device_type: Optional[str] = Query(None, description="设备类型"),
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_viewer)
+    _: User = Depends(require_viewer),
 ):
     """
     获取阈值配置列表
@@ -53,9 +58,7 @@ async def get_thresholds(
     if is_enabled is not None:
         query = query.where(AlarmThreshold.is_enabled == is_enabled)
     if device_type:
-        query = query.join(Point, AlarmThreshold.point_id == Point.id).where(
-            Point.device_type == device_type
-        )
+        query = query.join(Point, AlarmThreshold.point_id == Point.id).where(Point.device_type == device_type)
 
     count_query = select(func.count()).select_from(query.subquery())
     total = (await db.execute(count_query)).scalar()
@@ -77,27 +80,16 @@ async def get_thresholds(
             info.device_type = point.device_type
         threshold_list.append(info)
 
-    return PageResponse(
-        items=threshold_list,
-        total=total,
-        page=page,
-        page_size=page_size
-    )
+    return PageResponse(items=threshold_list, total=total, page=page, page_size=page_size)
 
 
 @router.get("/point/{point_id}", summary="获取点位阈值配置")
-async def get_point_thresholds(
-    point_id: int,
-    db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_viewer)
-):
+async def get_point_thresholds(point_id: int, db: AsyncSession = Depends(get_db), _: User = Depends(require_viewer)):
     """
     获取指定点位的所有阈值配置
     """
     result = await db.execute(
-        select(AlarmThreshold).where(AlarmThreshold.point_id == point_id).order_by(
-            AlarmThreshold.priority.desc()
-        )
+        select(AlarmThreshold).where(AlarmThreshold.point_id == point_id).order_by(AlarmThreshold.priority.desc())
     )
     thresholds = result.scalars().all()
 
@@ -106,9 +98,7 @@ async def get_point_thresholds(
 
 @router.post("", response_model=ThresholdInfo, summary="创建阈值配置")
 async def create_threshold(
-    data: ThresholdCreate,
-    db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_operator)
+    data: ThresholdCreate, db: AsyncSession = Depends(get_db), _: User = Depends(require_operator)
 ):
     """
     创建阈值配置
@@ -134,9 +124,7 @@ async def create_threshold(
 
 @router.post("/batch", summary="批量配置阈值")
 async def batch_create_thresholds(
-    data: ThresholdBatchCreate,
-    db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_operator)
+    data: ThresholdBatchCreate, db: AsyncSession = Depends(get_db), _: User = Depends(require_operator)
 ):
     """
     为多个点位批量创建相同的阈值配置
@@ -162,7 +150,7 @@ async def batch_create_thresholds(
                 alarm_message=data.alarm_message or f"{point.point_name} 超过阈值",
                 delay_seconds=data.delay_seconds,
                 dead_band=data.dead_band,
-                is_enabled=True
+                is_enabled=True,
             )
             db.add(threshold)
             success_count += 1
@@ -172,11 +160,7 @@ async def batch_create_thresholds(
     await db.commit()
     _increment_version()
 
-    return {
-        "success_count": success_count,
-        "error_count": len(error_list),
-        "errors": error_list
-    }
+    return {"success_count": success_count, "error_count": len(error_list), "errors": error_list}
 
 
 @router.post("/copy", summary="复制阈值配置到其他点位")
@@ -184,15 +168,13 @@ async def copy_thresholds(
     source_point_id: int,
     target_point_ids: List[int],
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_operator)
+    _: User = Depends(require_operator),
 ):
     """
     将一个点位的阈值配置复制到其他点位
     """
     # 获取源点位的阈值配置
-    source_result = await db.execute(
-        select(AlarmThreshold).where(AlarmThreshold.point_id == source_point_id)
-    )
+    source_result = await db.execute(select(AlarmThreshold).where(AlarmThreshold.point_id == source_point_id))
     source_thresholds = source_result.scalars().all()
 
     if not source_thresholds:
@@ -209,9 +191,7 @@ async def copy_thresholds(
             continue
 
         # 删除目标点位现有阈值
-        await db.execute(
-            delete(AlarmThreshold).where(AlarmThreshold.point_id == target_id)
-        )
+        await db.execute(delete(AlarmThreshold).where(AlarmThreshold.point_id == target_id))
 
         # 复制阈值
         for src in source_thresholds:
@@ -224,7 +204,7 @@ async def copy_thresholds(
                 delay_seconds=src.delay_seconds,
                 dead_band=src.dead_band,
                 is_enabled=src.is_enabled,
-                priority=src.priority
+                priority=src.priority,
             )
             db.add(new_threshold)
 
@@ -257,8 +237,7 @@ async def _upsert_four_level(db: AsyncSession, point, data):
         mapping = level_mapping[threshold_type]
         existing = await db.execute(
             select(AlarmThreshold).where(
-                AlarmThreshold.point_id == point.id,
-                AlarmThreshold.threshold_type == threshold_type
+                AlarmThreshold.point_id == point.id, AlarmThreshold.threshold_type == threshold_type
             )
         )
         threshold = existing.scalar_one_or_none()
@@ -290,10 +269,7 @@ async def _upsert_four_level(db: AsyncSession, point, data):
 @router.get("/version", summary="获取阈值配置版本号")
 async def get_threshold_version():
     """返回阈值配置版本号，用于告警引擎缓存失效判断"""
-    return {
-        "version": _threshold_version,
-        "updated_at": _threshold_version_time.isoformat()
-    }
+    return {"version": _threshold_version, "updated_at": _threshold_version_time.isoformat()}
 
 
 @router.put("/point/{point_id}/four-level", summary="4级阈值一体化配置")
@@ -301,7 +277,7 @@ async def set_four_level_thresholds(
     point_id: int,
     data: FourLevelThresholdCreate,
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_operator)
+    _: User = Depends(require_operator),
 ):
     """为指定点位一次性配置4级告警阈值（高高限/高限/低限/低低限）"""
     point_result = await db.execute(select(Point).where(Point.id == point_id))
@@ -314,24 +290,18 @@ async def set_four_level_thresholds(
     _increment_version()
 
     all_thresholds = await db.execute(
-        select(AlarmThreshold).where(AlarmThreshold.point_id == point_id)
-            .order_by(AlarmThreshold.priority.desc())
+        select(AlarmThreshold).where(AlarmThreshold.point_id == point_id).order_by(AlarmThreshold.priority.desc())
     )
     return [ThresholdInfo.model_validate(t) for t in all_thresholds.scalars().all()]
 
 
 @router.post("/batch-by-device-type", summary="按设备类型批量配置阈值")
 async def batch_set_by_device_type(
-    data: BatchByDeviceTypeCreate,
-    db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_operator)
+    data: BatchByDeviceTypeCreate, db: AsyncSession = Depends(get_db), _: User = Depends(require_operator)
 ):
     """为指定设备类型下所有AI点位批量配置4级阈值"""
     points_result = await db.execute(
-        select(Point).where(
-            Point.device_type == data.device_type,
-            Point.point_type == "AI"
-        )
+        select(Point).where(Point.device_type == data.device_type, Point.point_type == "AI")
     )
     points = points_result.scalars().all()
 
@@ -341,7 +311,7 @@ async def batch_set_by_device_type(
             "error_count": 0,
             "errors": [],
             "total_points": 0,
-            "message": f"设备类型 {data.device_type} 下没有 AI 类型点位"
+            "message": f"设备类型 {data.device_type} 下没有 AI 类型点位",
         }
 
     success_count = 0
@@ -362,16 +332,13 @@ async def batch_set_by_device_type(
         "success_count": success_count,
         "error_count": len(error_list),
         "errors": error_list,
-        "total_points": len(points)
+        "total_points": len(points),
     }
 
 
 @router.put("/{threshold_id}", response_model=ThresholdInfo, summary="更新阈值配置")
 async def update_threshold(
-    threshold_id: int,
-    data: ThresholdUpdate,
-    db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_operator)
+    threshold_id: int, data: ThresholdUpdate, db: AsyncSession = Depends(get_db), _: User = Depends(require_operator)
 ):
     """
     更新阈值配置
@@ -384,9 +351,7 @@ async def update_threshold(
     update_data = data.model_dump(exclude_unset=True)
     update_data["updated_at"] = datetime.now()
 
-    await db.execute(
-        update(AlarmThreshold).where(AlarmThreshold.id == threshold_id).values(**update_data)
-    )
+    await db.execute(update(AlarmThreshold).where(AlarmThreshold.id == threshold_id).values(**update_data))
     await db.commit()
     _increment_version()
 
@@ -397,11 +362,7 @@ async def update_threshold(
 
 
 @router.delete("/{threshold_id}", summary="删除阈值配置")
-async def delete_threshold(
-    threshold_id: int,
-    db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_operator)
-):
+async def delete_threshold(threshold_id: int, db: AsyncSession = Depends(get_db), _: User = Depends(require_operator)):
     """
     删除阈值配置
     """

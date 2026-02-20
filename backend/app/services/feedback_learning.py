@@ -2,68 +2,73 @@
 反馈学习服务模块
 分析计划与实际执行偏差，自动调整预测参数，生成优化效果报告
 """
+
 from datetime import datetime, timedelta
-from typing import List, Dict, Optional, Tuple
-from dataclasses import dataclass, field
+from typing import List, Dict, Optional
+from dataclasses import dataclass
 import numpy as np
 from enum import Enum
 
 
 class DeviationType(Enum):
     """偏差类型"""
-    UNDER_FORECAST = 'under_forecast'    # 预测偏低
-    OVER_FORECAST = 'over_forecast'      # 预测偏高
-    TIMING_ERROR = 'timing_error'        # 时间偏差
-    EXECUTION_FAILURE = 'execution_failure'  # 执行失败
+
+    UNDER_FORECAST = "under_forecast"  # 预测偏低
+    OVER_FORECAST = "over_forecast"  # 预测偏高
+    TIMING_ERROR = "timing_error"  # 时间偏差
+    EXECUTION_FAILURE = "execution_failure"  # 执行失败
 
 
 @dataclass
 class DeviationRecord:
     """偏差记录"""
+
     timestamp: datetime
     planned_value: float
     actual_value: float
-    deviation: float              # 绝对偏差
-    deviation_percent: float      # 百分比偏差
+    deviation: float  # 绝对偏差
+    deviation_percent: float  # 百分比偏差
     deviation_type: DeviationType
-    source: str                   # 来源：forecast/schedule/storage
+    source: str  # 来源：forecast/schedule/storage
 
 
 @dataclass
 class LearningMetrics:
     """学习指标"""
-    period: str                   # 统计周期
+
+    period: str  # 统计周期
     total_records: int
-    mae: float                    # 平均绝对误差
-    mape: float                   # 平均百分比误差
-    rmse: float                   # 均方根误差
-    bias: float                   # 偏差（正=预测偏高，负=预测偏低）
-    max_deviation: float          # 最大偏差
-    accuracy_rate: float          # 准确率（偏差<10%的比例）
+    mae: float  # 平均绝对误差
+    mape: float  # 平均百分比误差
+    rmse: float  # 均方根误差
+    bias: float  # 偏差（正=预测偏高，负=预测偏低）
+    max_deviation: float  # 最大偏差
+    accuracy_rate: float  # 准确率（偏差<10%的比例）
 
 
 @dataclass
 class OptimizationReport:
     """优化效果报告"""
-    period: str                   # 报告周期
+
+    period: str  # 报告周期
     start_date: str
     end_date: str
 
     # 成本节省
-    planned_saving: float         # 计划节省
-    actual_saving: float          # 实际节省
-    saving_achievement: float     # 节省达成率
+    planned_saving: float  # 计划节省
+    actual_saving: float  # 实际节省
+    saving_achievement: float  # 节省达成率
 
     # 调度执行
-    total_schedules: int          # 总调度数
-    executed_schedules: int       # 已执行数
-    success_rate: float           # 成功率
+    total_schedules: int  # 总调度数
+    executed_schedules: int  # 已执行数
+    success_rate: float  # 成功率
 
     # 需量控制
-    demand_violations: int        # 超需量次数
-    max_demand_reached: float     # 达到的最大需量
-    demand_target: float          # 需量目标
-    demand_utilization: float     # 需量利用率
+    demand_violations: int  # 超需量次数
+    max_demand_reached: float  # 达到的最大需量
+    demand_target: float  # 需量目标
+    demand_utilization: float  # 需量利用率
 
     # 预测质量
     forecast_metrics: LearningMetrics
@@ -77,19 +82,19 @@ class FeedbackLearner:
 
     # 预测调整参数边界
     ADJUSTMENT_BOUNDS = {
-        'base_load': (0.8, 1.2),      # 基础负荷调整系数
-        'peak_factor': (0.8, 1.2),     # 峰值因子调整
-        'seasonal_factor': (0.9, 1.1), # 季节因子调整
+        "base_load": (0.8, 1.2),  # 基础负荷调整系数
+        "peak_factor": (0.8, 1.2),  # 峰值因子调整
+        "seasonal_factor": (0.9, 1.1),  # 季节因子调整
     }
 
     def __init__(self):
         # 学习参数
         self.adjustment_params = {
-            'base_load_factor': 1.0,
-            'peak_factor': 1.0,
-            'seasonal_factor': 1.0,
-            'workday_factor': 1.0,
-            'weekend_factor': 1.0,
+            "base_load_factor": 1.0,
+            "peak_factor": 1.0,
+            "seasonal_factor": 1.0,
+            "workday_factor": 1.0,
+            "weekend_factor": 1.0,
         }
 
         # 历史偏差记录
@@ -99,11 +104,7 @@ class FeedbackLearner:
         self.learning_rate = 0.1
 
     def add_comparison_data(
-        self,
-        timestamp: datetime,
-        planned: float,
-        actual: float,
-        source: str = 'forecast'
+        self, timestamp: datetime, planned: float, actual: float, source: str = "forecast"
     ) -> DeviationRecord:
         """
         添加计划vs实际对比数据
@@ -135,16 +136,14 @@ class FeedbackLearner:
             deviation=deviation,
             deviation_percent=deviation_percent,
             deviation_type=deviation_type,
-            source=source
+            source=source,
         )
 
         self.deviation_history.append(record)
         return record
 
     def calculate_metrics(
-        self,
-        start_date: Optional[datetime] = None,
-        end_date: Optional[datetime] = None
+        self, start_date: Optional[datetime] = None, end_date: Optional[datetime] = None
     ) -> LearningMetrics:
         """
         计算学习指标
@@ -165,16 +164,13 @@ class FeedbackLearner:
 
         if not records:
             return LearningMetrics(
-                period="N/A",
-                total_records=0,
-                mae=0, mape=0, rmse=0, bias=0,
-                max_deviation=0, accuracy_rate=0
+                period="N/A", total_records=0, mae=0, mape=0, rmse=0, bias=0, max_deviation=0, accuracy_rate=0
             )
 
         # 计算各项指标
         deviations = [r.deviation for r in records]
-        planned = [r.planned_value for r in records]
-        actual = [r.actual_value for r in records]
+        [r.planned_value for r in records]
+        [r.actual_value for r in records]
 
         mae = np.mean(np.abs(deviations))
         mape = np.mean([abs(r.deviation_percent) for r in records])
@@ -198,7 +194,7 @@ class FeedbackLearner:
             rmse=round(rmse, 2),
             bias=round(bias, 2),
             max_deviation=round(max_deviation, 2),
-            accuracy_rate=round(accuracy_rate, 2)
+            accuracy_rate=round(accuracy_rate, 2),
         )
 
     def learn_and_adjust(self) -> Dict[str, float]:
@@ -220,12 +216,12 @@ class FeedbackLearner:
         # 根据偏差方向调整参数
         if avg_deviation_percent > 5:  # 预测偏低
             adjustment = 1 + self.learning_rate * (avg_deviation_percent / 100)
-            adjustment = min(adjustment, self.ADJUSTMENT_BOUNDS['base_load'][1])
-            self.adjustment_params['base_load_factor'] *= adjustment
+            adjustment = min(adjustment, self.ADJUSTMENT_BOUNDS["base_load"][1])
+            self.adjustment_params["base_load_factor"] *= adjustment
         elif avg_deviation_percent < -5:  # 预测偏高
             adjustment = 1 + self.learning_rate * (avg_deviation_percent / 100)
-            adjustment = max(adjustment, self.ADJUSTMENT_BOUNDS['base_load'][0])
-            self.adjustment_params['base_load_factor'] *= adjustment
+            adjustment = max(adjustment, self.ADJUSTMENT_BOUNDS["base_load"][0])
+            self.adjustment_params["base_load_factor"] *= adjustment
 
         # 分析不同时段的偏差
         workday_records = [r for r in recent_records if r.timestamp.weekday() < 5]
@@ -234,12 +230,12 @@ class FeedbackLearner:
         if workday_records:
             workday_bias = np.mean([r.deviation_percent for r in workday_records])
             if abs(workday_bias) > 5:
-                self.adjustment_params['workday_factor'] *= (1 + self.learning_rate * workday_bias / 100)
+                self.adjustment_params["workday_factor"] *= 1 + self.learning_rate * workday_bias / 100
 
         if weekend_records:
             weekend_bias = np.mean([r.deviation_percent for r in weekend_records])
             if abs(weekend_bias) > 5:
-                self.adjustment_params['weekend_factor'] *= (1 + self.learning_rate * weekend_bias / 100)
+                self.adjustment_params["weekend_factor"] *= 1 + self.learning_rate * weekend_bias / 100
 
         # 限制参数范围
         for key in self.adjustment_params:
@@ -248,10 +244,7 @@ class FeedbackLearner:
         return self.adjustment_params
 
     def generate_report(
-        self,
-        start_date: datetime,
-        end_date: datetime,
-        execution_data: Optional[Dict] = None
+        self, start_date: datetime, end_date: datetime, execution_data: Optional[Dict] = None
     ) -> OptimizationReport:
         """
         生成优化效果报告
@@ -276,27 +269,23 @@ class FeedbackLearner:
 
         return OptimizationReport(
             period=f"{start_date.strftime('%Y-%m')}",
-            start_date=start_date.strftime('%Y-%m-%d'),
-            end_date=end_date.strftime('%Y-%m-%d'),
-            planned_saving=execution_data.get('planned_saving', 0),
-            actual_saving=execution_data.get('actual_saving', 0),
-            saving_achievement=execution_data.get('saving_achievement', 0),
-            total_schedules=execution_data.get('total_schedules', 0),
-            executed_schedules=execution_data.get('executed_schedules', 0),
-            success_rate=execution_data.get('success_rate', 0),
-            demand_violations=execution_data.get('demand_violations', 0),
-            max_demand_reached=execution_data.get('max_demand_reached', 0),
-            demand_target=execution_data.get('demand_target', 800),
-            demand_utilization=execution_data.get('demand_utilization', 0),
+            start_date=start_date.strftime("%Y-%m-%d"),
+            end_date=end_date.strftime("%Y-%m-%d"),
+            planned_saving=execution_data.get("planned_saving", 0),
+            actual_saving=execution_data.get("actual_saving", 0),
+            saving_achievement=execution_data.get("saving_achievement", 0),
+            total_schedules=execution_data.get("total_schedules", 0),
+            executed_schedules=execution_data.get("executed_schedules", 0),
+            success_rate=execution_data.get("success_rate", 0),
+            demand_violations=execution_data.get("demand_violations", 0),
+            max_demand_reached=execution_data.get("max_demand_reached", 0),
+            demand_target=execution_data.get("demand_target", 800),
+            demand_utilization=execution_data.get("demand_utilization", 0),
             forecast_metrics=metrics,
-            recommendations=recommendations
+            recommendations=recommendations,
         )
 
-    def _generate_mock_execution_data(
-        self,
-        start_date: datetime,
-        end_date: datetime
-    ) -> Dict:
+    def _generate_mock_execution_data(self, start_date: datetime, end_date: datetime) -> Dict:
         """生成模拟执行数据（仅在 Demo 模式下使用）
 
         使用确定性算法基于日期生成可预测的模拟数据，避免使用随机数。
@@ -308,17 +297,17 @@ class FeedbackLearner:
         if not settings.simulation_enabled:
             # 非模拟模式返回空数据
             return {
-                'planned_saving': 0,
-                'actual_saving': 0,
-                'saving_achievement': 0,
-                'total_schedules': 0,
-                'executed_schedules': 0,
-                'success_rate': 0,
-                'demand_violations': 0,
-                'max_demand_reached': 0,
-                'demand_target': 800.0,
-                'demand_utilization': 0,
-                'is_demo_data': False
+                "planned_saving": 0,
+                "actual_saving": 0,
+                "saving_achievement": 0,
+                "total_schedules": 0,
+                "executed_schedules": 0,
+                "success_rate": 0,
+                "demand_violations": 0,
+                "max_demand_reached": 0,
+                "demand_target": 800.0,
+                "demand_utilization": 0,
+                "is_demo_data": False,
             }
 
         days = (end_date - start_date).days
@@ -339,72 +328,54 @@ class FeedbackLearner:
         executed_schedules = int(days * deterministic_value(4, 2, 7))
 
         return {
-            'planned_saving': planned_saving,
-            'actual_saving': actual_saving,
-            'saving_achievement': round(deterministic_value(5, 75, 95), 1),
-            'total_schedules': total_schedules,
-            'executed_schedules': min(executed_schedules, total_schedules),
-            'success_rate': round(deterministic_value(6, 85, 98), 1),
-            'demand_violations': int(deterministic_value(7, 0, 3)),
-            'max_demand_reached': round(demand_target * deterministic_value(8, 0.88, 1.02), 1),
-            'demand_target': demand_target,
-            'demand_utilization': round(deterministic_value(9, 85, 98), 1),
-            'is_demo_data': True
+            "planned_saving": planned_saving,
+            "actual_saving": actual_saving,
+            "saving_achievement": round(deterministic_value(5, 75, 95), 1),
+            "total_schedules": total_schedules,
+            "executed_schedules": min(executed_schedules, total_schedules),
+            "success_rate": round(deterministic_value(6, 85, 98), 1),
+            "demand_violations": int(deterministic_value(7, 0, 3)),
+            "max_demand_reached": round(demand_target * deterministic_value(8, 0.88, 1.02), 1),
+            "demand_target": demand_target,
+            "demand_utilization": round(deterministic_value(9, 85, 98), 1),
+            "is_demo_data": True,
         }
 
-    def _generate_recommendations(
-        self,
-        metrics: LearningMetrics,
-        execution_data: Dict
-    ) -> List[str]:
+    def _generate_recommendations(self, metrics: LearningMetrics, execution_data: Dict) -> List[str]:
         """生成改进建议"""
         recommendations = []
 
         # 预测准确性建议
         if metrics.mape > 15:
-            recommendations.append(
-                f"预测准确率较低(MAPE={metrics.mape}%)，建议增加历史数据训练样本或调整预测模型参数"
-            )
+            recommendations.append(f"预测准确率较低(MAPE={metrics.mape}%)，建议增加历史数据训练样本或调整预测模型参数")
 
         if metrics.bias > 20:
-            recommendations.append(
-                f"预测存在系统性偏低(偏差={metrics.bias}kW)，建议上调基础负荷预测系数"
-            )
+            recommendations.append(f"预测存在系统性偏低(偏差={metrics.bias}kW)，建议上调基础负荷预测系数")
         elif metrics.bias < -20:
-            recommendations.append(
-                f"预测存在系统性偏高(偏差={metrics.bias}kW)，建议下调基础负荷预测系数"
-            )
+            recommendations.append(f"预测存在系统性偏高(偏差={metrics.bias}kW)，建议下调基础负荷预测系数")
 
         # 执行效率建议
-        if execution_data.get('success_rate', 100) < 90:
+        if execution_data.get("success_rate", 100) < 90:
             recommendations.append(
-                f"调度执行成功率较低({execution_data['success_rate']}%)，"
-                "建议检查设备通讯状态或优化调度时间安排"
+                f"调度执行成功率较低({execution_data['success_rate']}%)，" "建议检查设备通讯状态或优化调度时间安排"
             )
 
         # 需量控制建议
-        violations = execution_data.get('demand_violations', 0)
+        violations = execution_data.get("demand_violations", 0)
         if violations > 0:
-            recommendations.append(
-                f"本期发生{violations}次需量超标，建议增加削减型设备或提高储能放电功率"
-            )
+            recommendations.append(f"本期发生{violations}次需量超标，建议增加削减型设备或提高储能放电功率")
 
-        utilization = execution_data.get('demand_utilization', 0)
+        utilization = execution_data.get("demand_utilization", 0)
         if utilization < 80:
-            recommendations.append(
-                f"需量利用率较低({utilization}%)，可考虑降低申报需量以节省基本电费"
-            )
+            recommendations.append(f"需量利用率较低({utilization}%)，可考虑降低申报需量以节省基本电费")
         elif utilization > 95:
-            recommendations.append(
-                f"需量利用率较高({utilization}%)，超标风险大，建议增加需量控制裕度"
-            )
+            recommendations.append(f"需量利用率较高({utilization}%)，超标风险大，建议增加需量控制裕度")
 
         # 节省达成建议
-        achievement = execution_data.get('saving_achievement', 0)
+        achievement = execution_data.get("saving_achievement", 0)
         if achievement < 80:
             recommendations.append(
-                f"节省达成率较低({achievement}%)，"
-                "建议分析未达成原因，可能是设备可调度性受限或预测偏差导致"
+                f"节省达成率较低({achievement}%)，" "建议分析未达成原因，可能是设备可调度性受限或预测偏差导致"
             )
 
         if not recommendations:
@@ -479,10 +450,7 @@ def generate_sample_history(days: int = 30) -> List[DeviationRecord]:
             actual = planned + bias
 
             record = learner.add_comparison_data(
-                timestamp=timestamp,
-                planned=round(planned, 1),
-                actual=round(actual, 1),
-                source='forecast'
+                timestamp=timestamp, planned=round(planned, 1), actual=round(actual, 1), source="forecast"
             )
             records.append(record)
 

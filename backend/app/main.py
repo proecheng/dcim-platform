@@ -2,6 +2,7 @@
 算力中心智能监控系统 - 主入口
 V2.0 架构重构版
 """
+
 import asyncio
 from datetime import datetime
 from contextlib import asynccontextmanager
@@ -65,7 +66,7 @@ async def init_default_data():
                 password_hash=get_password_hash("admin123"),
                 real_name="系统管理员",
                 email="admin@dcim.local",
-                role="admin"
+                role="admin",
             )
             session.add(admin)
             await session.commit()
@@ -73,21 +74,36 @@ async def init_default_data():
 
         # 初始化角色权限
         from .models import RolePermission
+
         permissions_result = await session.execute(select(RolePermission))
         if not permissions_result.scalars().all():
             default_permissions = [
                 # admin 权限
-                ("admin", "user:read"), ("admin", "user:write"), ("admin", "user:delete"),
-                ("admin", "point:read"), ("admin", "point:write"), ("admin", "point:delete"),
-                ("admin", "alarm:read"), ("admin", "alarm:write"), ("admin", "alarm:ack"),
-                ("admin", "config:read"), ("admin", "config:write"),
-                ("admin", "log:read"), ("admin", "report:read"), ("admin", "report:write"),
+                ("admin", "user:read"),
+                ("admin", "user:write"),
+                ("admin", "user:delete"),
+                ("admin", "point:read"),
+                ("admin", "point:write"),
+                ("admin", "point:delete"),
+                ("admin", "alarm:read"),
+                ("admin", "alarm:write"),
+                ("admin", "alarm:ack"),
+                ("admin", "config:read"),
+                ("admin", "config:write"),
+                ("admin", "log:read"),
+                ("admin", "report:read"),
+                ("admin", "report:write"),
                 # operator 权限
-                ("operator", "point:read"), ("operator", "point:write"),
-                ("operator", "alarm:read"), ("operator", "alarm:ack"),
-                ("operator", "report:read"), ("operator", "report:write"),
+                ("operator", "point:read"),
+                ("operator", "point:write"),
+                ("operator", "alarm:read"),
+                ("operator", "alarm:ack"),
+                ("operator", "report:read"),
+                ("operator", "report:write"),
                 # viewer 权限
-                ("viewer", "point:read"), ("viewer", "alarm:read"), ("viewer", "report:read"),
+                ("viewer", "point:read"),
+                ("viewer", "alarm:read"),
+                ("viewer", "report:read"),
             ]
             for role, permission in default_permissions:
                 perm = RolePermission(role=role, permission=permission)
@@ -114,11 +130,7 @@ async def init_default_configs():
             ]
             for group, key, value, vtype, desc in default_configs:
                 config = SystemConfig(
-                    config_group=group,
-                    config_key=key,
-                    config_value=value,
-                    value_type=vtype,
-                    description=desc
+                    config_group=group, config_key=key, config_value=value, value_type=vtype, description=desc
                 )
                 session.add(config)
             await session.commit()
@@ -145,13 +157,7 @@ async def init_default_configs():
                 ("alarm_level", "info", "提示", "#8c8c8c", 4),
             ]
             for dtype, code, name, value, sort in default_dicts:
-                d = Dictionary(
-                    dict_type=dtype,
-                    dict_code=code,
-                    dict_name=name,
-                    dict_value=value,
-                    sort_order=sort
-                )
+                d = Dictionary(dict_type=dtype, dict_code=code, dict_name=name, dict_value=value, sort_order=sort)
                 session.add(d)
             await session.commit()
             print("初始化数据字典")
@@ -177,6 +183,7 @@ async def lifespan(app: FastAPI):
     # 同步消防策略 YAML 到数据库（Story 9-2）
     try:
         from .services.fire_protection import sync_to_database as fp_sync
+
         async with async_session() as session:
             await fp_sync(session)
     except Exception as e:
@@ -188,6 +195,7 @@ async def lifespan(app: FastAPI):
 
     # 订阅交叉确认服务（Story 9-2）
     from .engines.cross_confirmation import cross_confirmation_service
+
     await event_bus.subscribe("linkage", cross_confirmation_service.on_alarm_event)
 
     await event_bus.subscribe("linkage", linkage_engine.on_event)
@@ -195,6 +203,7 @@ async def lifespan(app: FastAPI):
     # 同步诊断规则 YAML 到数据库并启动诊断引擎（Story 9-3）
     try:
         from .services.diagnosis_loader import sync_to_database as diag_sync
+
         async with async_session() as session:
             await diag_sync(session)
     except Exception as e:
@@ -305,6 +314,7 @@ async def lifespan(app: FastAPI):
             try:
                 async with async_session() as db:
                     from .services.opportunity_detector import OpportunityDetector
+
                     detector = OpportunityDetector(db)
                     result = await detector.run_detection()
                     logger.info(f"节能机会自动检测完成: 新发现{result.get('new_opportunities', 0)}个机会")
@@ -322,9 +332,12 @@ async def lifespan(app: FastAPI):
             try:
                 async with async_session() as db:
                     from .services.effect_tracker import EffectTracker
+
                     tracker = EffectTracker(db)
                     result = await tracker.run_tracking()
-                    logger.info(f"效果追踪完成: 新追踪{result.get('new_tracking', 0)}个, 标记完成{result.get('marked_completed', 0)}个")
+                    logger.info(
+                        f"效果追踪完成: 新追踪{result.get('new_tracking', 0)}个, 标记完成{result.get('marked_completed', 0)}个"
+                    )
             except Exception as e:
                 logger.error(f"效果追踪失败: {e}")
             await asyncio.sleep(21600)  # 6小时
@@ -343,7 +356,7 @@ async def lifespan(app: FastAPI):
     print("能耗聚合任务已启动，每30分钟检查一次")
     print("节能机会自动检测已启动，每小时检查一次")
     print("效果追踪任务已启动，每6小时检查一次")
-    print(f"API文档: http://localhost:8000/docs")
+    print("API文档: http://localhost:8000/docs")
 
     yield
 
@@ -369,7 +382,7 @@ app = FastAPI(
     description="机房动力环境监测系统 API - V2.0",
     lifespan=lifespan,
     docs_url="/docs",
-    redoc_url="/redoc"
+    redoc_url="/redoc",
 )
 
 # CORS 配置 - 只允许配置的前端地址
@@ -390,12 +403,7 @@ app.include_router(api_router, prefix="/api/v1")
 @app.get("/", tags=["系统"])
 async def root():
     """根路径 - 返回系统信息"""
-    return {
-        "name": settings.app_name,
-        "version": settings.app_version,
-        "api_version": "v1",
-        "status": "running"
-    }
+    return {"name": settings.app_name, "version": settings.app_version, "api_version": "v1", "status": "running"}
 
 
 @app.get("/api/health", tags=["系统"])
@@ -413,30 +421,17 @@ async def get_stats():
     async with async_session() as session:
         # 点位统计
         point_result = await session.execute(
-            select(
-                func.count(Point.id).label("total"),
-                func.sum(func.cast(Point.is_enabled, Integer)).label("enabled")
-            )
+            select(func.count(Point.id).label("total"), func.sum(func.cast(Point.is_enabled, Integer)).label("enabled"))
         )
         point_row = point_result.first()
 
         # 按类型统计
-        type_result = await session.execute(
-            select(Point.point_type, func.count(Point.id)).group_by(Point.point_type)
-        )
+        type_result = await session.execute(select(Point.point_type, func.count(Point.id)).group_by(Point.point_type))
         type_counts = {row[0]: row[1] for row in type_result.all()}
 
         return {
-            "points": {
-                "total": point_row[0] or 0,
-                "enabled": point_row[1] or 0,
-                "by_type": type_counts
-            },
-            "license": {
-                "type": "standard",
-                "max_points": settings.max_points,
-                "used_points": point_row[0] or 0
-            }
+            "points": {"total": point_row[0] or 0, "enabled": point_row[1] or 0, "by_type": type_counts},
+            "license": {"type": "standard", "max_points": settings.max_points, "used_points": point_row[0] or 0},
         }
 
 
@@ -484,8 +479,7 @@ async def websocket_system(websocket: WebSocket, token: str = Query(None)):
         ws_manager.disconnect(websocket, "system")
 
 
-
-
 if __name__ == "__main__":
     import uvicorn
+
     uvicorn.run(app, host="0.0.0.0", port=8000)

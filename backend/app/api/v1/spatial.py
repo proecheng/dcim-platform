@@ -1,6 +1,7 @@
 """
 空间拓扑管理 API
 """
+
 import json
 from io import BytesIO
 from typing import Optional, List
@@ -26,15 +27,26 @@ from ...models.device import Device
 from ...models.alarm import Alarm
 from ...models.point import Point
 from ...schemas.spatial import (
-    SiteCreate, SiteUpdate, SiteResponse, SiteSummaryResponse, SiteSummaryItem,
-    FloorCreate, FloorUpdate, FloorResponse,
-    RoomCreate, RoomUpdate, RoomResponse,
-    RowCreate, RowUpdate, RowResponse,
+    SiteCreate,
+    SiteUpdate,
+    SiteResponse,
+    SiteSummaryResponse,
+    SiteSummaryItem,
+    FloorCreate,
+    FloorUpdate,
+    FloorResponse,
+    RoomCreate,
+    RoomUpdate,
+    RoomResponse,
+    RowCreate,
+    RowUpdate,
+    RowResponse,
     LayoutTemplateResponse,
     CabinetPositionUpdate,
     SpatialTreeResponse,
     ImportResultResponse,
-    TemplateApplyRequest, TemplateApplyResponse,
+    TemplateApplyRequest,
+    TemplateApplyResponse,
 )
 
 router = APIRouter(prefix="/spatial", tags=["空间拓扑"])
@@ -47,39 +59,45 @@ PRESET_TEMPLATES = [
         "template_code": "2n_cold_aisle",
         "template_name": "2N冷通道",
         "description": "双排面对面，中间冷通道",
-        "template_data": json.dumps({
-            "name": "2N冷通道",
-            "rows": [
-                {"row_code": "R1", "aisle_type": "cold", "cabinets": 10},
-                {"row_code": "R2", "aisle_type": "cold", "cabinets": 10},
-            ],
-            "description": "双排面对面，中间冷通道",
-        }),
+        "template_data": json.dumps(
+            {
+                "name": "2N冷通道",
+                "rows": [
+                    {"row_code": "R1", "aisle_type": "cold", "cabinets": 10},
+                    {"row_code": "R2", "aisle_type": "cold", "cabinets": 10},
+                ],
+                "description": "双排面对面，中间冷通道",
+            }
+        ),
     },
     {
         "template_code": "single_row",
         "template_name": "单排布局",
         "description": "单排机柜布局",
-        "template_data": json.dumps({
-            "name": "单排布局",
-            "rows": [
-                {"row_code": "R1", "aisle_type": "none", "cabinets": 10},
-            ],
-            "description": "单排机柜布局",
-        }),
+        "template_data": json.dumps(
+            {
+                "name": "单排布局",
+                "rows": [
+                    {"row_code": "R1", "aisle_type": "none", "cabinets": 10},
+                ],
+                "description": "单排机柜布局",
+            }
+        ),
     },
     {
         "template_code": "double_row",
         "template_name": "双排背靠背",
         "description": "双排背靠背，中间热通道",
-        "template_data": json.dumps({
-            "name": "双排背靠背",
-            "rows": [
-                {"row_code": "R1", "aisle_type": "hot", "cabinets": 10},
-                {"row_code": "R2", "aisle_type": "hot", "cabinets": 10},
-            ],
-            "description": "双排背靠背，中间热通道",
-        }),
+        "template_data": json.dumps(
+            {
+                "name": "双排背靠背",
+                "rows": [
+                    {"row_code": "R1", "aisle_type": "hot", "cabinets": 10},
+                    {"row_code": "R2", "aisle_type": "hot", "cabinets": 10},
+                ],
+                "description": "双排背靠背，中间热通道",
+            }
+        ),
     },
 ]
 
@@ -99,6 +117,7 @@ async def _ensure_preset_templates(db: AsyncSession):
 
 # ==================== Site CRUD ====================
 
+
 @router.get("/sites", response_model=List[SiteResponse])
 async def list_sites(
     keyword: Optional[str] = Query(None, description="搜索关键词"),
@@ -112,9 +131,7 @@ async def list_sites(
     if site_ids is not None:
         stmt = stmt.where(Site.id.in_(site_ids))
     if keyword:
-        stmt = stmt.where(
-            Site.site_name.contains(keyword) | Site.site_code.contains(keyword)
-        )
+        stmt = stmt.where(Site.site_name.contains(keyword) | Site.site_code.contains(keyword))
     if status:
         stmt = stmt.where(Site.status == status)
     stmt = stmt.order_by(Site.id)
@@ -133,9 +150,7 @@ async def list_sites(
         )
         gw_counts = dict(gw_result.all())
         dev_result = await db.execute(
-            select(Device.site_id, func.count(Device.id))
-            .where(Device.site_id.in_(site_ids))
-            .group_by(Device.site_id)
+            select(Device.site_id, func.count(Device.id)).where(Device.site_id.in_(site_ids)).group_by(Device.site_id)
         )
         dev_counts = dict(dev_result.all())
 
@@ -207,15 +222,17 @@ async def get_sites_summary(
         total_gw += gw
         total_dev += dev
         total_alarm += alm
-        items.append(SiteSummaryItem(
-            id=s.id,
-            site_code=s.site_code,
-            site_name=s.site_name,
-            status=s.status or "active",
-            gateway_count=gw,
-            device_count=dev,
-            active_alarm_count=alm,
-        ))
+        items.append(
+            SiteSummaryItem(
+                id=s.id,
+                site_code=s.site_code,
+                site_name=s.site_name,
+                status=s.status or "active",
+                gateway_count=gw,
+                device_count=dev,
+                active_alarm_count=alm,
+            )
+        )
 
     return SiteSummaryResponse(
         total_sites=len(sites),
@@ -239,6 +256,7 @@ async def create_site(
 
     # 自动创建 ACL 规则
     from ...services.emqx_acl import emqx_acl_service
+
     await emqx_acl_service.on_site_created(site.id, site.site_code, db)
 
     await db.commit()
@@ -316,10 +334,7 @@ async def delete_site(
         deps.append(f"数据源({ds_count})")
 
     if deps:
-        raise HTTPException(
-            status_code=400,
-            detail=f"请先删除该站点下的关联数据: {', '.join(deps)}"
-        )
+        raise HTTPException(status_code=400, detail=f"请先删除该站点下的关联数据: {', '.join(deps)}")
 
     # 清理 ACL 规则
     await db.execute(delete(MqttAclRule).where(MqttAclRule.site_id == site_id))
@@ -340,10 +355,7 @@ async def update_site_status(
 ):
     """更新站点状态"""
     if status not in VALID_SITE_STATUSES:
-        raise HTTPException(
-            status_code=400,
-            detail=f"无效状态，可选值: {', '.join(sorted(VALID_SITE_STATUSES))}"
-        )
+        raise HTTPException(status_code=400, detail=f"无效状态，可选值: {', '.join(sorted(VALID_SITE_STATUSES))}")
     result = await db.execute(select(Site).where(Site.id == site_id))
     site = result.scalar_one_or_none()
     if not site:
@@ -363,6 +375,7 @@ async def get_site_acl_rules(
 ):
     """获取站点的 MQTT ACL 规则"""
     from ...services.emqx_acl import emqx_acl_service
+
     rules = await emqx_acl_service.get_site_rules(site_id, db)
     return [
         {
@@ -379,6 +392,7 @@ async def get_site_acl_rules(
 
 
 # ==================== Floor CRUD ====================
+
 
 @router.get("/floors", response_model=List[FloorResponse])
 async def list_floors(
@@ -449,6 +463,7 @@ async def delete_floor(
 
 
 # ==================== Room CRUD ====================
+
 
 @router.get("/rooms", response_model=List[RoomResponse])
 async def list_rooms(
@@ -527,6 +542,7 @@ async def delete_room(
 
 # ==================== Row CRUD ====================
 
+
 @router.get("/rows", response_model=List[RowResponse])
 async def list_rows(
     room_id: Optional[int] = Query(None, description="房间ID"),
@@ -587,9 +603,7 @@ async def delete_row(
     row = result.scalar_one_or_none()
     if not row:
         raise HTTPException(status_code=404, detail="行不存在")
-    cnt = await db.execute(
-        select(func.count(Cabinet.id)).where(Cabinet.row_id == row_id)
-    )
+    cnt = await db.execute(select(func.count(Cabinet.id)).where(Cabinet.row_id == row_id))
     if (cnt.scalar() or 0) > 0:
         raise HTTPException(status_code=400, detail="请先移除该行下的所有机柜")
     await db.delete(row)
@@ -599,6 +613,7 @@ async def delete_row(
 
 # ==================== Tree ====================
 
+
 @router.get("/tree", response_model=List[SpatialTreeResponse])
 async def get_spatial_tree(
     db: AsyncSession = Depends(get_db),
@@ -607,12 +622,7 @@ async def get_spatial_tree(
     """获取完整空间拓扑树"""
     stmt = (
         select(Site)
-        .options(
-            selectinload(Site.floors)
-            .selectinload(Floor.rooms)
-            .selectinload(Room.rows)
-            .selectinload(Row.cabinets)
-        )
+        .options(selectinload(Site.floors).selectinload(Floor.rooms).selectinload(Room.rows).selectinload(Row.cabinets))
         .order_by(Site.id)
     )
     result = await db.execute(stmt)
@@ -620,6 +630,7 @@ async def get_spatial_tree(
 
 
 # ==================== Cabinet Position ====================
+
 
 @router.put("/cabinets/{cabinet_id}/position")
 async def update_cabinet_position(
@@ -674,6 +685,7 @@ async def update_cabinet_position(
 
 # ==================== Excel Import/Export ====================
 
+
 @router.post("/import", response_model=ImportResultResponse)
 async def import_spatial(
     file: UploadFile = File(...),
@@ -696,11 +708,17 @@ async def import_spatial(
     headers = [str(cell.value or "").strip() for cell in next(ws.iter_rows(min_row=1, max_row=1))]
     col_map = {}
     header_mapping = {
-        "站点编码": "site_code", "楼层编码": "floor_code",
-        "房间编码": "room_code", "行编码": "row_code",
-        "通道类型": "aisle_type", "机柜编码": "cabinet_code",
-        "机柜名称": "cabinet_name", "列号": "column_number",
-        "总U数": "total_u", "最大功率": "max_power", "最大承重": "max_weight",
+        "站点编码": "site_code",
+        "楼层编码": "floor_code",
+        "房间编码": "room_code",
+        "行编码": "row_code",
+        "通道类型": "aisle_type",
+        "机柜编码": "cabinet_code",
+        "机柜名称": "cabinet_name",
+        "列号": "column_number",
+        "总U数": "total_u",
+        "最大功率": "max_power",
+        "最大承重": "max_weight",
     }
     for idx, h in enumerate(headers):
         if h in header_mapping:
@@ -769,9 +787,7 @@ async def import_spatial(
         site_obj = existing_sites.get(s_code)
         if not site_obj:
             continue
-        res = await db.execute(
-            select(Floor).where(Floor.site_id == site_obj.id, Floor.floor_code == f_code)
-        )
+        res = await db.execute(select(Floor).where(Floor.site_id == site_obj.id, Floor.floor_code == f_code))
         f = res.scalar_one_or_none()
         if f:
             existing_floors[(s_code, f_code)] = f
@@ -786,9 +802,7 @@ async def import_spatial(
         floor_obj = existing_floors.get((s_code, f_code))
         if not floor_obj:
             continue
-        res = await db.execute(
-            select(Room).where(Room.floor_id == floor_obj.id, Room.room_code == r_code)
-        )
+        res = await db.execute(select(Room).where(Room.floor_id == floor_obj.id, Room.room_code == r_code))
         r = res.scalar_one_or_none()
         if r:
             existing_rooms[(s_code, f_code, r_code)] = r
@@ -803,9 +817,7 @@ async def import_spatial(
         room_obj = existing_rooms.get((s_code, f_code, r_code))
         if not room_obj:
             continue
-        res = await db.execute(
-            select(Row).where(Row.room_id == room_obj.id, Row.row_code == rw_code)
-        )
+        res = await db.execute(select(Row).where(Row.room_id == room_obj.id, Row.row_code == rw_code))
         rw = res.scalar_one_or_none()
         if rw:
             existing_rows[(s_code, f_code, r_code, rw_code)] = rw
@@ -869,9 +881,7 @@ async def import_spatial(
 
     await db.commit()
     wb.close()
-    return ImportResultResponse(
-        total=total, success=success, failed=failed, skipped=skipped, errors=errors
-    )
+    return ImportResultResponse(total=total, success=success, failed=failed, skipped=skipped, errors=errors)
 
 
 @router.get("/export")
@@ -884,20 +894,22 @@ async def export_spatial(
     ws = wb.active
     ws.title = "空间拓扑"
     headers = [
-        "站点编码", "楼层编码", "房间编码", "行编码",
-        "通道类型", "机柜编码", "机柜名称", "列号",
-        "总U数", "最大功率", "最大承重",
+        "站点编码",
+        "楼层编码",
+        "房间编码",
+        "行编码",
+        "通道类型",
+        "机柜编码",
+        "机柜名称",
+        "列号",
+        "总U数",
+        "最大功率",
+        "最大承重",
     ]
     ws.append(headers)
 
-    stmt = (
-        select(Site)
-        .options(
-            selectinload(Site.floors)
-            .selectinload(Floor.rooms)
-            .selectinload(Room.rows)
-            .selectinload(Row.cabinets)
-        )
+    stmt = select(Site).options(
+        selectinload(Site.floors).selectinload(Floor.rooms).selectinload(Room.rows).selectinload(Row.cabinets)
     )
     result = await db.execute(stmt)
     sites = result.scalars().unique().all()
@@ -908,19 +920,37 @@ async def export_spatial(
                 for row_obj in room_obj.rows:
                     if row_obj.cabinets:
                         for cab in row_obj.cabinets:
-                            ws.append([
-                                site.site_code, floor_obj.floor_code,
-                                room_obj.room_code, row_obj.row_code,
-                                row_obj.aisle_type, cab.cabinet_code,
-                                cab.cabinet_name, cab.column_number,
-                                cab.total_u, cab.max_power, cab.max_weight,
-                            ])
+                            ws.append(
+                                [
+                                    site.site_code,
+                                    floor_obj.floor_code,
+                                    room_obj.room_code,
+                                    row_obj.row_code,
+                                    row_obj.aisle_type,
+                                    cab.cabinet_code,
+                                    cab.cabinet_name,
+                                    cab.column_number,
+                                    cab.total_u,
+                                    cab.max_power,
+                                    cab.max_weight,
+                                ]
+                            )
                     else:
-                        ws.append([
-                            site.site_code, floor_obj.floor_code,
-                            room_obj.room_code, row_obj.row_code,
-                            row_obj.aisle_type, "", "", "", "", "", "",
-                        ])
+                        ws.append(
+                            [
+                                site.site_code,
+                                floor_obj.floor_code,
+                                room_obj.room_code,
+                                row_obj.row_code,
+                                row_obj.aisle_type,
+                                "",
+                                "",
+                                "",
+                                "",
+                                "",
+                                "",
+                            ]
+                        )
 
     output = BytesIO()
     wb.save(output)
@@ -933,6 +963,7 @@ async def export_spatial(
 
 
 # ==================== Templates ====================
+
 
 @router.get("/templates", response_model=List[LayoutTemplateResponse])
 async def list_templates(
@@ -976,9 +1007,7 @@ async def apply_template(
         aisle_type = tpl_row.get("aisle_type", "none")
         cab_count = tpl_row.get("cabinets", 0)
 
-        res = await db.execute(
-            select(Row).where(Row.room_id == room.id, Row.row_code == row_code)
-        )
+        res = await db.execute(select(Row).where(Row.room_id == room.id, Row.row_code == row_code))
         row_obj = res.scalar_one_or_none()
         if not row_obj:
             row_obj = Row(
@@ -994,9 +1023,7 @@ async def apply_template(
         prefix = data.cabinet_prefix or room.room_code
         for seq in range(1, cab_count + 1):
             cab_code = f"{prefix}-{row_code}-C{seq:02d}"
-            res = await db.execute(
-                select(Cabinet).where(Cabinet.cabinet_code == cab_code)
-            )
+            res = await db.execute(select(Cabinet).where(Cabinet.cabinet_code == cab_code))
             if res.scalar_one_or_none():
                 skipped_cabinets += 1
                 continue

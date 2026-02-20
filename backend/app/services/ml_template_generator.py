@@ -7,8 +7,8 @@ ML 增强的模板生成器
 - 使用 GNN 分析措施冲突，优化多措施组合
 - 将 ML 分析结果写入追溯链
 """
+
 import logging
-from datetime import datetime, timedelta
 from typing import Dict, Any, List, Optional
 from decimal import Decimal
 from sqlalchemy.orm import Session
@@ -16,7 +16,7 @@ from sqlalchemy.orm import Session
 from .template_generator import TemplateGenerator
 from .ml_traced_calculator import MLTracedFormulaCalculator
 from .ml_service import MLEnergySavingService
-from ..models.energy import EnergySavingProposal, ProposalMeasure
+from ..models.energy import EnergySavingProposal
 from ..ml_models.config import MLConfig
 
 logger = logging.getLogger(__name__)
@@ -32,12 +32,7 @@ class MLTemplateGenerator(TemplateGenerator):
     3. 自适应优化: 使用 RL 根据历史效果调整方案参数
     """
 
-    def __init__(
-        self,
-        db: Session,
-        enable_trace: bool = True,
-        enable_ml: bool = True
-    ):
+    def __init__(self, db: Session, enable_trace: bool = True, enable_ml: bool = True):
         super().__init__(db, enable_trace)
         self.enable_ml = enable_ml
         self._ml_service: Optional[MLEnergySavingService] = None
@@ -57,18 +52,11 @@ class MLTemplateGenerator(TemplateGenerator):
             logger.warning(f"ML 模块初始化失败，将使用传统方法: {e}")
             self._ml_available = False
 
-    def _get_ml_traced_calculator(
-        self,
-        proposal_id: int = None,
-        measure_id: int = None
-    ) -> MLTracedFormulaCalculator:
+    def _get_ml_traced_calculator(self, proposal_id: int = None, measure_id: int = None) -> MLTracedFormulaCalculator:
         """获取 ML 增强的追溯计算器"""
         if self._ml_calculator is None or self._ml_calculator.proposal_id != proposal_id:
             self._ml_calculator = MLTracedFormulaCalculator(
-                self.db,
-                proposal_id=proposal_id,
-                measure_id=measure_id,
-                enable_ml=self.enable_ml
+                self.db, proposal_id=proposal_id, measure_id=measure_id, enable_ml=self.enable_ml
             )
         else:
             self._ml_calculator.measure_id = measure_id
@@ -77,10 +65,7 @@ class MLTemplateGenerator(TemplateGenerator):
     # ==================== 主入口 ====================
 
     def generate_ml_enhanced_proposal(
-        self,
-        template_id: str,
-        analysis_days: int = 30,
-        device_power_data: Dict[int, Dict[str, List]] = None
+        self, template_id: str, analysis_days: int = 30, device_power_data: Dict[int, Dict[str, List]] = None
     ) -> EnergySavingProposal:
         """
         生成 ML 增强的节能方案
@@ -120,9 +105,7 @@ class MLTemplateGenerator(TemplateGenerator):
     # ==================== Transformer 增强 (A1 峰谷套利) ====================
 
     def _enhance_with_transformer(
-        self,
-        proposal: EnergySavingProposal,
-        device_power_data: Dict[int, Dict[str, List]]
+        self, proposal: EnergySavingProposal, device_power_data: Dict[int, Dict[str, List]]
     ) -> EnergySavingProposal:
         """
         使用 Transformer 增强 A1 峰谷套利方案
@@ -142,28 +125,30 @@ class MLTemplateGenerator(TemplateGenerator):
             for device_id, data in device_power_data.items():
                 result = ml_calc.ml_analyze_transferable_load(
                     device_id=device_id,
-                    power_data=data.get('power', []),
-                    period_types=data.get('period_types', []),
-                    is_weekday=data.get('is_weekday', []),
-                    temperature=data.get('temperature', [])
+                    power_data=data.get("power", []),
+                    period_types=data.get("period_types", []),
+                    is_weekday=data.get("is_weekday", []),
+                    temperature=data.get("temperature", []),
                 )
                 ml_analysis_results.append(result)
 
             # 汇总可转移负荷
             total_transferable = sum(
-                r.get('capacity_kw', Decimal("0"))
-                for r in ml_analysis_results
-                if r.get('is_transferable', False)
+                r.get("capacity_kw", Decimal("0")) for r in ml_analysis_results if r.get("is_transferable", False)
             )
-            avg_confidence = sum(r.get('confidence', 0) for r in ml_analysis_results) / len(ml_analysis_results) if ml_analysis_results else 0
+            avg_confidence = (
+                sum(r.get("confidence", 0) for r in ml_analysis_results) / len(ml_analysis_results)
+                if ml_analysis_results
+                else 0
+            )
 
             # 更新方案的 ML 分析信息
             ml_summary = {
                 "transformer_analysis": {
                     "devices_analyzed": len(ml_analysis_results),
-                    "transferable_devices": sum(1 for r in ml_analysis_results if r.get('is_transferable')),
+                    "transferable_devices": sum(1 for r in ml_analysis_results if r.get("is_transferable")),
                     "total_transferable_kw": float(total_transferable),
-                    "avg_confidence": avg_confidence
+                    "avg_confidence": avg_confidence,
                 }
             }
 
@@ -182,10 +167,7 @@ class MLTemplateGenerator(TemplateGenerator):
 
     # ==================== GNN 优化 (措施冲突分析) ====================
 
-    def _optimize_with_gnn(
-        self,
-        proposal: EnergySavingProposal
-    ) -> EnergySavingProposal:
+    def _optimize_with_gnn(self, proposal: EnergySavingProposal) -> EnergySavingProposal:
         """
         使用 GNN 优化措施组合
 
@@ -202,20 +184,22 @@ class MLTemplateGenerator(TemplateGenerator):
             # 构建措施列表
             measures_for_gnn = []
             for m in proposal.measures:
-                measures_for_gnn.append({
-                    "measure_id": m.id,
-                    "measure_type": m.measure_code.split("-")[0] if m.measure_code else "unknown",
-                    "device_ids": [],  # 从 current_state 提取
-                    "time_periods": [],  # 从 target_state 提取
-                    "expected_benefit": float(m.annual_benefit or 0)
-                })
+                measures_for_gnn.append(
+                    {
+                        "measure_id": m.id,
+                        "measure_type": m.measure_code.split("-")[0] if m.measure_code else "unknown",
+                        "device_ids": [],  # 从 current_state 提取
+                        "time_periods": [],  # 从 target_state 提取
+                        "expected_benefit": float(m.annual_benefit or 0),
+                    }
+                )
 
             # GNN 分析
             gnn_result = ml_calc.ml_analyze_measure_conflicts(measures_for_gnn)
 
-            conflict_matrix = gnn_result.get('conflict_matrix', [])
-            recommended = gnn_result.get('recommended_combination', [])
-            adjusted_benefit = gnn_result.get('adjusted_total_benefit', proposal.total_benefit)
+            conflict_matrix = gnn_result.get("conflict_matrix", [])
+            recommended = gnn_result.get("recommended_combination", [])
+            adjusted_benefit = gnn_result.get("adjusted_total_benefit", proposal.total_benefit)
 
             # 更新方案
             original_benefit = proposal.total_benefit
@@ -233,7 +217,9 @@ class MLTemplateGenerator(TemplateGenerator):
                         conflict_matrix[i][j] > 0.5
                         for i in range(len(conflict_matrix))
                         for j in range(i + 1, len(conflict_matrix))
-                    ) if conflict_matrix else False
+                    )
+                    if conflict_matrix
+                    else False,
                 }
             }
 
@@ -251,10 +237,7 @@ class MLTemplateGenerator(TemplateGenerator):
 
     # ==================== RL 自适应调整 (Phase 5) ====================
 
-    def _adjust_with_rl(
-        self,
-        proposal: EnergySavingProposal
-    ) -> EnergySavingProposal:
+    def _adjust_with_rl(self, proposal: EnergySavingProposal) -> EnergySavingProposal:
         """
         使用 RL 根据历史效果调整方案参数
 
@@ -268,12 +251,7 @@ class MLTemplateGenerator(TemplateGenerator):
             # optimization_actions = self._ml_service.get_optimization_actions(current_state)
             # 应用调整...
 
-            rl_summary = {
-                "rl_adjustment": {
-                    "enabled": False,
-                    "reason": "Phase 5 - 待后续扩展"
-                }
-            }
+            rl_summary = {"rl_adjustment": {"enabled": False, "reason": "Phase 5 - 待后续扩展"}}
 
             if proposal.trace_summary:
                 proposal.trace_summary.update(rl_summary)
@@ -292,10 +270,6 @@ class MLTemplateGenerator(TemplateGenerator):
         return {
             "ml_enabled": self.enable_ml,
             "ml_available": self._ml_available,
-            "modules": {
-                "transformer": self._ml_available,
-                "gnn": self._ml_available,
-                "rl": self._ml_available
-            },
-            "calculator_initialized": self._ml_calculator is not None
+            "modules": {"transformer": self._ml_available, "gnn": self._ml_available, "rl": self._ml_available},
+            "calculator_initialized": self._ml_calculator is not None,
         }

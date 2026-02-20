@@ -3,17 +3,15 @@
 从 PointHistory 聚合到 EnergyHourly / EnergyDaily / EnergyMonthly
 仅在 simulation_enabled == False 时由定时任务调用
 """
+
 import logging
 from datetime import datetime, date, timedelta
 from typing import Optional
 
-from sqlalchemy import select, func, and_
+from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..models.energy import (
-    PowerDevice, EnergyHourly, EnergyDaily, EnergyMonthly,
-    ElectricityPricing
-)
+from ..models.energy import PowerDevice, EnergyHourly, EnergyDaily, EnergyMonthly, ElectricityPricing
 from ..models.history import PointHistory
 
 logger = logging.getLogger(__name__)
@@ -64,10 +62,7 @@ async def aggregate_hourly(db: AsyncSession, target_time: Optional[datetime] = N
 
     # 获取所有有 power_point_id 的设备
     result = await db.execute(
-        select(PowerDevice).where(
-            PowerDevice.is_enabled == True,
-            PowerDevice.power_point_id != None
-        )
+        select(PowerDevice).where(PowerDevice.is_enabled == True, PowerDevice.power_point_id != None)
     )
     devices = result.scalars().all()
 
@@ -76,10 +71,7 @@ async def aggregate_hourly(db: AsyncSession, target_time: Optional[datetime] = N
         try:
             # 幂等检查
             existing = await db.execute(
-                select(EnergyHourly).where(
-                    EnergyHourly.device_id == device.id,
-                    EnergyHourly.stat_time == hour_start
-                )
+                select(EnergyHourly).where(EnergyHourly.device_id == device.id, EnergyHourly.stat_time == hour_start)
             )
             if existing.scalar_one_or_none():
                 continue
@@ -90,12 +82,12 @@ async def aggregate_hourly(db: AsyncSession, target_time: Optional[datetime] = N
                     func.avg(PointHistory.value),
                     func.max(PointHistory.value),
                     func.min(PointHistory.value),
-                    func.count(PointHistory.id)
+                    func.count(PointHistory.id),
                 ).where(
                     PointHistory.point_id == device.power_point_id,
                     PointHistory.recorded_at >= hour_start,
                     PointHistory.recorded_at < hour_end,
-                    PointHistory.quality == 0  # 仅好数据
+                    PointHistory.quality == 0,  # 仅好数据
                 )
             )
             row = ph_result.first()
@@ -114,7 +106,7 @@ async def aggregate_hourly(db: AsyncSession, target_time: Optional[datetime] = N
                 total_energy=round(total_energy, 4),
                 avg_power=round(avg_power, 4),
                 max_power=round(max_power, 4),
-                min_power=round(min_power, 4)
+                min_power=round(min_power, 4),
             )
             db.add(hourly)
             await db.commit()
@@ -138,19 +130,15 @@ async def aggregate_daily(db: AsyncSession, target_date: Optional[date] = None):
     # 获取电价配置（用于五时段分类：尖峰/高峰/平段/低谷/深谷）
     today = date.today()
     pricing_result = await db.execute(
-        select(ElectricityPricing).where(
-            ElectricityPricing.is_enabled == True,
-            ElectricityPricing.effective_date <= today
-        ).order_by(ElectricityPricing.start_time)
+        select(ElectricityPricing)
+        .where(ElectricityPricing.is_enabled == True, ElectricityPricing.effective_date <= today)
+        .order_by(ElectricityPricing.start_time)
     )
     pricing_records = pricing_result.scalars().all()
 
     # 获取所有有 power_point_id 的设备
     result = await db.execute(
-        select(PowerDevice).where(
-            PowerDevice.is_enabled == True,
-            PowerDevice.power_point_id != None
-        )
+        select(PowerDevice).where(PowerDevice.is_enabled == True, PowerDevice.power_point_id != None)
     )
     devices = result.scalars().all()
 
@@ -159,10 +147,7 @@ async def aggregate_daily(db: AsyncSession, target_date: Optional[date] = None):
         try:
             # 幂等检查
             existing = await db.execute(
-                select(EnergyDaily).where(
-                    EnergyDaily.device_id == device.id,
-                    EnergyDaily.stat_date == target_date
-                )
+                select(EnergyDaily).where(EnergyDaily.device_id == device.id, EnergyDaily.stat_date == target_date)
             )
             if existing.scalar_one_or_none():
                 continue
@@ -171,11 +156,13 @@ async def aggregate_daily(db: AsyncSession, target_date: Optional[date] = None):
             day_start = datetime.combine(target_date, datetime.min.time())
             day_end = day_start + timedelta(days=1)
             hourly_result = await db.execute(
-                select(EnergyHourly).where(
+                select(EnergyHourly)
+                .where(
                     EnergyHourly.device_id == device.id,
                     EnergyHourly.stat_time >= day_start,
-                    EnergyHourly.stat_time < day_end
-                ).order_by(EnergyHourly.stat_time)
+                    EnergyHourly.stat_time < day_end,
+                )
+                .order_by(EnergyHourly.stat_time)
             )
             hourly_records = hourly_result.scalars().all()
 
@@ -193,7 +180,7 @@ async def aggregate_daily(db: AsyncSession, target_date: Optional[date] = None):
             for h in hourly_records:
                 energy = h.total_energy or 0
                 total_energy += energy
-                power_sum += (h.avg_power or 0)
+                power_sum += h.avg_power or 0
 
                 if (h.max_power or 0) > max_power:
                     max_power = h.max_power or 0
@@ -237,7 +224,7 @@ async def aggregate_daily(db: AsyncSession, target_date: Optional[date] = None):
                 max_power=round(max_power, 4),
                 avg_power=round(avg_power, 4),
                 max_power_time=max_power_time,
-                energy_cost=energy_cost
+                energy_cost=energy_cost,
             )
             db.add(daily)
             await db.commit()
@@ -262,18 +249,16 @@ async def aggregate_monthly(db: AsyncSession, target_year: Optional[int] = None,
 
     # 获取电价
     from ..services.pricing_service import PricingService
+
     pricing_service = PricingService(db)
     prices = await pricing_service.get_all_prices()
-    peak_price = prices.get('peak_price', 0.0)
-    normal_price = prices.get('normal_price', 0.0)
-    valley_price = prices.get('valley_price', 0.0)
+    peak_price = prices.get("peak_price", 0.0)
+    normal_price = prices.get("normal_price", 0.0)
+    valley_price = prices.get("valley_price", 0.0)
 
     # 获取所有有 power_point_id 的设备
     result = await db.execute(
-        select(PowerDevice).where(
-            PowerDevice.is_enabled == True,
-            PowerDevice.power_point_id != None
-        )
+        select(PowerDevice).where(PowerDevice.is_enabled == True, PowerDevice.power_point_id != None)
     )
     devices = result.scalars().all()
 
@@ -291,7 +276,7 @@ async def aggregate_monthly(db: AsyncSession, target_year: Optional[int] = None,
                 select(EnergyMonthly).where(
                     EnergyMonthly.device_id == device.id,
                     EnergyMonthly.stat_year == target_year,
-                    EnergyMonthly.stat_month == target_month
+                    EnergyMonthly.stat_month == target_month,
                 )
             )
             if existing.scalar_one_or_none():
@@ -306,11 +291,11 @@ async def aggregate_monthly(db: AsyncSession, target_year: Optional[int] = None,
                     func.sum(EnergyDaily.valley_energy),
                     func.max(EnergyDaily.max_power),
                     func.avg(EnergyDaily.avg_power),
-                    func.avg(EnergyDaily.pue)
+                    func.avg(EnergyDaily.pue),
                 ).where(
                     EnergyDaily.device_id == device.id,
                     EnergyDaily.stat_date >= month_start,
-                    EnergyDaily.stat_date <= month_end
+                    EnergyDaily.stat_date <= month_end,
                 )
             )
             row = daily_result.first()
@@ -329,11 +314,14 @@ async def aggregate_monthly(db: AsyncSession, target_year: Optional[int] = None,
 
             # 查找最大功率日期
             max_power_row = await db.execute(
-                select(EnergyDaily.stat_date).where(
+                select(EnergyDaily.stat_date)
+                .where(
                     EnergyDaily.device_id == device.id,
                     EnergyDaily.stat_date >= month_start,
-                    EnergyDaily.stat_date <= month_end
-                ).order_by(EnergyDaily.max_power.desc()).limit(1)
+                    EnergyDaily.stat_date <= month_end,
+                )
+                .order_by(EnergyDaily.max_power.desc())
+                .limit(1)
             )
             max_power_date = max_power_row.scalar_one_or_none()
 
@@ -352,7 +340,7 @@ async def aggregate_monthly(db: AsyncSession, target_year: Optional[int] = None,
                 peak_cost=peak_cost,
                 normal_cost=normal_cost,
                 valley_cost=valley_cost,
-                avg_pue=round(row[6] or 0, 2) if row[6] else None
+                avg_pue=round(row[6] or 0, 2) if row[6] else None,
             )
             db.add(monthly)
             await db.commit()

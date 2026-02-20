@@ -1,6 +1,7 @@
 """
 历史数据模型
 """
+
 from datetime import datetime
 from sqlalchemy import Column, Integer, Float, String, DateTime, ForeignKey, Index
 
@@ -9,6 +10,7 @@ from ..core.database import Base
 
 class PointHistory(Base):
     """点位历史数据表"""
+
     __tablename__ = "point_history"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -28,6 +30,7 @@ class PointHistory(Base):
 
 class PointHistoryArchive(Base):
     """历史数据归档表（聚合数据）"""
+
     __tablename__ = "point_history_archive"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -44,6 +47,7 @@ class PointHistoryArchive(Base):
 
 class PointChangeLog(Base):
     """点位变化记录表（DI点位）"""
+
     __tablename__ = "point_change_log"
 
     id = Column(Integer, primary_key=True, autoincrement=True)

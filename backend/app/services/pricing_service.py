@@ -2,6 +2,7 @@
 电价配置服务 - 完整电价体系支持
 V2.5 扩展版本 - 新增基本电费、功率因数调整、固定费用支持
 """
+
 from datetime import date
 from typing import Dict, List, Optional, Any
 from sqlalchemy import select, and_, or_
@@ -14,13 +15,7 @@ class PricingService:
     """电价配置服务 - 从数据库查询真实电价配置"""
 
     # 时段类型标签映射
-    PERIOD_LABELS = {
-        "sharp": "尖峰",
-        "peak": "高峰",
-        "normal": "平段",
-        "valley": "低谷",
-        "deep_valley": "深谷"
-    }
+    PERIOD_LABELS = {"sharp": "尖峰", "peak": "高峰", "normal": "平段", "valley": "低谷", "deep_valley": "深谷"}
 
     def __init__(self, db: AsyncSession):
         self.db = db
@@ -43,27 +38,20 @@ class PricingService:
 
         # 查询当前有效的电价配置
         result = await self.db.execute(
-            select(ElectricityPricing).where(
+            select(ElectricityPricing)
+            .where(
                 and_(
                     ElectricityPricing.is_enabled == True,
                     ElectricityPricing.effective_date <= today,
-                    or_(
-                        ElectricityPricing.expire_date >= today,
-                        ElectricityPricing.expire_date == None
-                    )
+                    or_(ElectricityPricing.expire_date >= today, ElectricityPricing.expire_date == None),
                 )
-            ).order_by(ElectricityPricing.start_time)
+            )
+            .order_by(ElectricityPricing.start_time)
         )
         pricing_records = result.scalars().all()
 
         # 按时段类型分组
-        pricing_map: Dict[str, List[Dict]] = {
-            "sharp": [],
-            "peak": [],
-            "normal": [],
-            "valley": [],
-            "deep_valley": []
-        }
+        pricing_map: Dict[str, List[Dict]] = {"sharp": [], "peak": [], "normal": [], "valley": [], "deep_valley": []}
 
         for p in pricing_records:
             period_type = p.period_type.lower()
@@ -78,13 +66,15 @@ class PricingService:
                 else:
                     period_type = "normal"  # 默认归类
 
-            pricing_map[period_type].append({
-                "id": p.id,
-                "start_time": p.start_time,
-                "end_time": p.end_time,
-                "price": float(p.price),
-                "name": p.pricing_name
-            })
+            pricing_map[period_type].append(
+                {
+                    "id": p.id,
+                    "start_time": p.start_time,
+                    "end_time": p.end_time,
+                    "price": float(p.price),
+                    "name": p.pricing_name,
+                }
+            )
 
         return pricing_map
 
@@ -152,17 +142,16 @@ class PricingService:
         for period_type, periods in pricing.items():
             if periods:
                 # 合并时间段显示
-                time_ranges = ", ".join([
-                    f"{p['start_time']}-{p['end_time']}"
-                    for p in periods
-                ])
-                result.append({
-                    "type": period_type,
-                    "label": f"{self._get_period_label(period_type)}({time_ranges})",
-                    "display_name": self._get_period_label(period_type),
-                    "price": periods[0]["price"],
-                    "time_ranges": periods
-                })
+                time_ranges = ", ".join([f"{p['start_time']}-{p['end_time']}" for p in periods])
+                result.append(
+                    {
+                        "type": period_type,
+                        "label": f"{self._get_period_label(period_type)}({time_ranges})",
+                        "display_name": self._get_period_label(period_type),
+                        "price": periods[0]["price"],
+                        "time_ranges": periods,
+                    }
+                )
 
         # 按电价从高到低排序
         result.sort(key=lambda x: x["price"], reverse=True)
@@ -210,7 +199,7 @@ class PricingService:
             "sharp_deep_valley_diff": sharp - deep_valley if sharp and deep_valley else 0,
             "has_sharp": sharp > 0,
             "has_deep_valley": deep_valley > 0,
-            "avg_price": (peak + normal + valley) / 3 if (peak and normal and valley) else 0
+            "avg_price": (peak + normal + valley) / 3 if (peak and normal and valley) else 0,
         }
 
     async def get_pricing_data_source(self) -> Dict[str, Any]:
@@ -228,10 +217,7 @@ class PricingService:
                 and_(
                     ElectricityPricing.is_enabled == True,
                     ElectricityPricing.effective_date <= today,
-                    or_(
-                        ElectricityPricing.expire_date >= today,
-                        ElectricityPricing.expire_date == None
-                    )
+                    or_(ElectricityPricing.expire_date >= today, ElectricityPricing.expire_date == None),
                 )
             )
         )
@@ -243,7 +229,7 @@ class PricingService:
                 "status": "empty",
                 "message": "未配置电价数据，请在系统设置中配置电价",
                 "config_count": 0,
-                "effective_date": None
+                "effective_date": None,
             }
 
         # 获取最早生效日期
@@ -255,18 +241,14 @@ class PricingService:
             "message": "数据来源：系统设置 → 电价配置",
             "config_count": len(records),
             "effective_date": earliest_date.isoformat(),
-            "period_types": list(set(r.period_type for r in records))
+            "period_types": list(set(r.period_type for r in records)),
         }
 
     def _get_period_label(self, period_type: str) -> str:
         """获取时段类型的中文标签"""
         return self.PERIOD_LABELS.get(period_type, period_type)
 
-    async def calculate_cost_for_energy(
-        self,
-        energy_kwh: float,
-        period_type: str
-    ) -> float:
+    async def calculate_cost_for_energy(self, energy_kwh: float, period_type: str) -> float:
         """
         计算指定时段的电费
 
@@ -281,12 +263,7 @@ class PricingService:
         return energy_kwh * price
 
     async def calculate_savings(
-        self,
-        power_kw: float,
-        hours: float,
-        source_period: str,
-        target_period: str,
-        working_days: int = 300
+        self, power_kw: float, hours: float, source_period: str, target_period: str, working_days: int = 300
     ) -> Dict[str, float]:
         """
         计算负荷转移的节省金额
@@ -316,7 +293,7 @@ class PricingService:
             "daily_energy_kwh": daily_energy,
             "daily_saving_yuan": round(daily_saving, 2),
             "annual_saving_yuan": round(annual_saving, 2),
-            "annual_saving_wan": round(annual_saving / 10000, 4)
+            "annual_saving_wan": round(annual_saving / 10000, 4),
         }
 
     # ========== V2.5 完整电价配置（新增）==========
@@ -330,10 +307,7 @@ class PricingService:
                 and_(
                     PricingConfig.is_enabled == True,
                     PricingConfig.effective_date <= today,
-                    or_(
-                        PricingConfig.expire_date == None,
-                        PricingConfig.expire_date >= today
-                    )
+                    or_(PricingConfig.expire_date == None, PricingConfig.expire_date >= today),
                 )
             )
             .order_by(PricingConfig.effective_date.desc())
@@ -363,14 +337,10 @@ class PricingService:
             "has_time_prices": any(len(v) > 0 for v in time_prices.values()),
             "has_global_config": global_config is not None,
             "billing_mode": global_config.billing_mode if global_config else None,
-            "time_periods_count": sum(len(v) for v in time_prices.values())
+            "time_periods_count": sum(len(v) for v in time_prices.values()),
         }
 
-        result = {
-            "time_period_prices": time_prices,
-            "global_config": None,
-            "summary": summary
-        }
+        result = {"time_period_prices": time_prices, "global_config": None, "summary": summary}
 
         if global_config:
             result["global_config"] = {
@@ -390,15 +360,13 @@ class PricingService:
                 "other_fee": global_config.other_fee,
                 "effective_date": global_config.effective_date.isoformat() if global_config.effective_date else None,
                 "expire_date": global_config.expire_date.isoformat() if global_config.expire_date else None,
-                "description": global_config.description
+                "description": global_config.description,
             }
 
         return result
 
     async def update_pricing_config(
-        self,
-        config_id: Optional[int] = None,
-        config_data: Optional[Dict[str, Any]] = None
+        self, config_id: Optional[int] = None, config_data: Optional[Dict[str, Any]] = None
     ) -> PricingConfig:
         """
         更新或创建全局电价配置
@@ -412,9 +380,7 @@ class PricingService:
         """
         if config_id:
             # 更新现有配置
-            result = await self.db.execute(
-                select(PricingConfig).where(PricingConfig.id == config_id)
-            )
+            result = await self.db.execute(select(PricingConfig).where(PricingConfig.id == config_id))
             config = result.scalar_one_or_none()
             if not config:
                 raise ValueError(f"配置ID {config_id} 不存在")
@@ -440,7 +406,7 @@ class PricingService:
         energy_by_period: Dict[str, float],
         max_demand: float = 0.0,
         avg_power_factor: float = 0.9,
-        include_fixed_fees: bool = True
+        include_fixed_fees: bool = True,
     ) -> Dict[str, Any]:
         """
         计算完整电费账单
@@ -471,25 +437,21 @@ class PricingService:
             "peak": "peak_price",
             "normal": "normal_price",
             "valley": "valley_price",
-            "deep_valley": "deep_valley_price"
+            "deep_valley": "deep_valley_price",
         }
 
         for period, energy in energy_by_period.items():
             price_key = period_mapping.get(period, f"{period}_price")
             price = prices.get(price_key, 0.0)
             charge = energy * price
-            energy_charge_detail[period] = {
-                "energy_kwh": round(energy, 2),
-                "price": price,
-                "charge": round(charge, 2)
-            }
+            energy_charge_detail[period] = {"energy_kwh": round(energy, 2), "price": price, "charge": round(charge, 2)}
             total_energy += energy
             total_energy_charge += charge
 
         energy_charge = {
             "detail": energy_charge_detail,
             "total_energy_kwh": round(total_energy, 2),
-            "total_charge": round(total_energy_charge, 2)
+            "total_charge": round(total_energy_charge, 2),
         }
 
         # 2. 获取全局配置
@@ -513,7 +475,7 @@ class PricingService:
                         "actual_demand": round(max_demand, 2),
                         "demand_price": demand_price,
                         "over_demand": 0,
-                        "over_charge": 0
+                        "over_charge": 0,
                     }
                 else:
                     # 超需量
@@ -529,7 +491,7 @@ class PricingService:
                         "over_demand": round(over_demand, 2),
                         "over_multiplier": over_multiplier,
                         "normal_charge": round(normal_charge, 2),
-                        "over_charge": round(over_charge, 2)
+                        "over_charge": round(over_charge, 2),
                     }
                 basic_charge["charge"] = round(basic_charge_amount, 2)
 
@@ -542,7 +504,7 @@ class PricingService:
                 basic_charge["detail"] = {
                     "mode": "capacity",
                     "transformer_capacity": capacity,
-                    "capacity_price": capacity_price
+                    "capacity_price": capacity_price,
                 }
 
         # 4. 计算功率因数调整
@@ -568,7 +530,7 @@ class PricingService:
                 "baseline": global_config.power_factor_baseline,
                 "adjustment_rate": adjustment_rate,
                 "adjustment_base": round(adjustment_base, 2),
-                "adjustment_amount": round(adjustment_amount, 2)
+                "adjustment_amount": round(adjustment_amount, 2),
             }
 
         # 5. 计算固定费用
@@ -586,23 +548,19 @@ class PricingService:
                     "transmission_fee": round(transmission, 2),
                     "government_fund": round(government, 2),
                     "auxiliary_fee": round(auxiliary, 2),
-                    "other_fee": round(other, 2)
+                    "other_fee": round(other, 2),
                 },
                 "rates": {
                     "transmission_fee": global_config.transmission_fee or 0,
                     "government_fund": global_config.government_fund or 0,
                     "auxiliary_fee": global_config.auxiliary_fee or 0,
-                    "other_fee": global_config.other_fee or 0
+                    "other_fee": global_config.other_fee or 0,
                 },
-                "note": "固定费用不参与优化，仅用于成本统计"
+                "note": "固定费用不参与优化，仅用于成本统计",
             }
 
         # 6. 汇总
-        optimizable_total = (
-            total_energy_charge +
-            basic_charge["charge"] +
-            pf_adjustment.get("adjustment_amount", 0)
-        )
+        optimizable_total = total_energy_charge + basic_charge["charge"] + pf_adjustment.get("adjustment_amount", 0)
         grand_total = optimizable_total + fixed_fees["total"]
 
         total = {
@@ -612,7 +570,7 @@ class PricingService:
             "fixed_fees": round(fixed_fees["total"], 2),
             "optimizable_total": round(optimizable_total, 2),
             "grand_total": round(grand_total, 2),
-            "unit_price": round(grand_total / total_energy, 4) if total_energy > 0 else 0
+            "unit_price": round(grand_total / total_energy, 4) if total_energy > 0 else 0,
         }
 
         return {
@@ -620,7 +578,7 @@ class PricingService:
             "basic_charge": basic_charge,
             "power_factor_adjustment": pf_adjustment,
             "fixed_fees": fixed_fees,
-            "total": total
+            "total": total,
         }
 
     async def estimate_savings(
@@ -629,7 +587,7 @@ class PricingService:
         current_max_demand: float,
         optimized_energy_by_period: Dict[str, float],
         optimized_max_demand: float,
-        avg_power_factor: float = 0.9
+        avg_power_factor: float = 0.9,
     ) -> Dict[str, Any]:
         """
         估算优化后的节省金额
@@ -646,51 +604,34 @@ class PricingService:
         """
         # 计算当前电费（不含固定费用）
         current_bill = await self.calculate_electricity_bill(
-            current_energy_by_period,
-            current_max_demand,
-            avg_power_factor,
-            include_fixed_fees=False
+            current_energy_by_period, current_max_demand, avg_power_factor, include_fixed_fees=False
         )
 
         # 计算优化后电费
         optimized_bill = await self.calculate_electricity_bill(
-            optimized_energy_by_period,
-            optimized_max_demand,
-            avg_power_factor,
-            include_fixed_fees=False
+            optimized_energy_by_period, optimized_max_demand, avg_power_factor, include_fixed_fees=False
         )
 
         # 计算节省
         savings = {
             "energy_charge": round(
-                current_bill["total"]["energy_charge"] - optimized_bill["total"]["energy_charge"],
-                2
+                current_bill["total"]["energy_charge"] - optimized_bill["total"]["energy_charge"], 2
             ),
-            "basic_charge": round(
-                current_bill["total"]["basic_charge"] - optimized_bill["total"]["basic_charge"],
-                2
-            ),
+            "basic_charge": round(current_bill["total"]["basic_charge"] - optimized_bill["total"]["basic_charge"], 2),
             "power_factor_adjustment": round(
-                current_bill["total"]["power_factor_adjustment"] -
-                optimized_bill["total"]["power_factor_adjustment"],
-                2
+                current_bill["total"]["power_factor_adjustment"] - optimized_bill["total"]["power_factor_adjustment"], 2
             ),
             "total": round(
-                current_bill["total"]["optimizable_total"] - optimized_bill["total"]["optimizable_total"],
-                2
-            )
+                current_bill["total"]["optimizable_total"] - optimized_bill["total"]["optimizable_total"], 2
+            ),
         }
 
         # 计算节省比例
         savings["percentage"] = round(
             (savings["total"] / current_bill["total"]["optimizable_total"] * 100)
-            if current_bill["total"]["optimizable_total"] > 0 else 0,
-            2
+            if current_bill["total"]["optimizable_total"] > 0
+            else 0,
+            2,
         )
 
-        return {
-            "current_bill": current_bill["total"],
-            "optimized_bill": optimized_bill["total"],
-            "savings": savings
-        }
-
+        return {"current_bill": current_bill["total"], "optimized_bill": optimized_bill["total"], "savings": savings}

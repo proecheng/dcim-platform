@@ -2,9 +2,10 @@
 交叉确认服务 — 多传感器交叉确认升级为消防联动
 Story 9-2: 消防分级联动策略
 """
+
 import logging
 import time
-from typing import Dict, List, Optional
+from typing import Dict, List
 
 from .event_bus import Event, EventPriority, get_event_bus
 
@@ -55,11 +56,13 @@ class CrossConfirmationService:
         if zone not in self._recent_alarms:
             self._recent_alarms[zone] = []
 
-        self._recent_alarms[zone].append({
-            "device_type": device_type,
-            "timestamp": now,
-            "event": event,
-        })
+        self._recent_alarms[zone].append(
+            {
+                "device_type": device_type,
+                "timestamp": now,
+                "event": event,
+            }
+        )
 
         # 清理过期记录
         self._cleanup_expired(now)
@@ -94,10 +97,12 @@ class CrossConfirmationService:
         details = []
         for record in records:
             if now - record["timestamp"] <= CROSS_CONFIRM_WINDOW:
-                details.append({
-                    "device_type": record["device_type"],
-                    "timestamp": record["timestamp"],
-                })
+                details.append(
+                    {
+                        "device_type": record["device_type"],
+                        "timestamp": record["timestamp"],
+                    }
+                )
 
         fire_event = Event(
             event_type="alarm.triggered",
@@ -123,8 +128,7 @@ class CrossConfirmationService:
         """清理超过阈值的过期记录"""
         for zone in list(self._recent_alarms.keys()):
             self._recent_alarms[zone] = [
-                r for r in self._recent_alarms[zone]
-                if now - r["timestamp"] <= EXPIRE_THRESHOLD
+                r for r in self._recent_alarms[zone] if now - r["timestamp"] <= EXPIRE_THRESHOLD
             ]
             if not self._recent_alarms[zone]:
                 del self._recent_alarms[zone]

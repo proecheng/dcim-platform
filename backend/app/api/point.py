@@ -1,17 +1,15 @@
 """
 点位路由
 """
+
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func
+from sqlalchemy import select, func, Integer
 
 from ..core import get_db, get_current_user
 from ..models import User, Point, PointRealtime
-from ..schemas import (
-    PointCreate, PointUpdate, PointResponse,
-    PointRealtimeResponse, PointTypeStats, RealtimeSummary
-)
+from ..schemas import PointCreate, PointUpdate, PointResponse, PointTypeStats
 
 router = APIRouter(prefix="/points", tags=["点位管理"])
 
@@ -25,7 +23,7 @@ async def get_points(
     skip: int = 0,
     limit: int = 100,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
 ):
     """获取点位列表"""
     query = select(Point)
@@ -45,37 +43,22 @@ async def get_points(
 
 
 @router.get("/types", response_model=List[PointTypeStats])
-async def get_point_types(
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
-):
+async def get_point_types(db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     """获取点位类型统计"""
     query = select(
         Point.point_type,
         func.count(Point.id).label("count"),
-        func.sum(func.cast(Point.is_enabled, Integer)).label("enabled_count")
+        func.sum(func.cast(Point.is_enabled, Integer)).label("enabled_count"),
     ).group_by(Point.point_type)
 
-    from sqlalchemy import Integer
     result = await db.execute(query)
     rows = result.all()
 
-    return [
-        PointTypeStats(
-            point_type=row[0],
-            count=row[1],
-            enabled_count=row[2] or 0
-        )
-        for row in rows
-    ]
+    return [PointTypeStats(point_type=row[0], count=row[1], enabled_count=row[2] or 0) for row in rows]
 
 
 @router.get("/{point_id}", response_model=PointResponse)
-async def get_point(
-    point_id: int,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
-):
+async def get_point(point_id: int, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     """获取点位详情"""
     result = await db.execute(select(Point).where(Point.id == point_id))
     point = result.scalar_one_or_none()
@@ -86,9 +69,7 @@ async def get_point(
 
 @router.post("", response_model=PointResponse)
 async def create_point(
-    point_data: PointCreate,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    point_data: PointCreate, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)
 ):
     """创建点位"""
     # 检查编码是否重复
@@ -114,7 +95,7 @@ async def update_point(
     point_id: int,
     point_data: PointUpdate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
 ):
     """更新点位"""
     result = await db.execute(select(Point).where(Point.id == point_id))
@@ -132,9 +113,7 @@ async def update_point(
 
 @router.delete("/{point_id}")
 async def delete_point(
-    point_id: int,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    point_id: int, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)
 ):
     """删除点位"""
     result = await db.execute(select(Point).where(Point.id == point_id))
@@ -149,9 +128,7 @@ async def delete_point(
 
 @router.put("/{point_id}/enable")
 async def enable_point(
-    point_id: int,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    point_id: int, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)
 ):
     """启用点位"""
     result = await db.execute(select(Point).where(Point.id == point_id))
@@ -166,9 +143,7 @@ async def enable_point(
 
 @router.put("/{point_id}/disable")
 async def disable_point(
-    point_id: int,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    point_id: int, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)
 ):
     """禁用点位"""
     result = await db.execute(select(Point).where(Point.id == point_id))

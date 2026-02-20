@@ -11,4 +11,4 @@
 
 from .config import MLConfig
 
-__all__ = ['MLConfig']
+__all__ = ["MLConfig"]

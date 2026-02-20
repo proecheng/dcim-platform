@@ -2,6 +2,7 @@
 数据追溯链相关的 Pydantic 模型
 实现专利 S1/S3 - 数据追溯链展示和用户交互
 """
+
 from pydantic import BaseModel, Field
 from typing import Optional, List, Dict, Any
 from datetime import datetime
@@ -10,8 +11,10 @@ from decimal import Decimal
 
 # ========== 追溯记录模型 ==========
 
+
 class TraceRecordResponse(BaseModel):
     """追溯记录响应模型"""
+
     id: int
     trace_id: str = Field(..., description="全局唯一追溯标识")
 
@@ -64,6 +67,7 @@ class TraceRecordResponse(BaseModel):
 
 class TraceNodeResponse(BaseModel):
     """追溯树节点响应模型"""
+
     trace_id: str = Field(..., description="追溯标识")
     param_name: str = Field(..., description="参数名称")
     mapping_type: str = Field(..., description="映射类型")
@@ -89,6 +93,7 @@ TraceNodeResponse.model_rebuild()
 
 class TraceTreeResponse(BaseModel):
     """追溯树响应模型"""
+
     root_trace_id: str = Field(..., description="根追溯ID")
     proposal_id: Optional[int] = Field(None, description="关联方案ID")
     measure_id: Optional[int] = Field(None, description="关联措施ID")
@@ -99,6 +104,7 @@ class TraceTreeResponse(BaseModel):
 
 class TraceSummaryResponse(BaseModel):
     """追溯汇总响应"""
+
     proposal_id: int
     total_traces: int = Field(0, description="追溯记录总数")
     direct_count: int = Field(0, description="直接映射数量")
@@ -115,8 +121,10 @@ class TraceSummaryResponse(BaseModel):
 
 # ========== 措施详情模型 (含追溯) ==========
 
+
 class MeasureTraceInfo(BaseModel):
     """措施追溯信息"""
+
     trace_count: int = Field(0, description="追溯记录数")
     key_traces: List[TraceRecordResponse] = Field(default_factory=list, description="关键追溯记录")
     trace_tree_available: bool = Field(False, description="是否有追溯树")
@@ -124,6 +132,7 @@ class MeasureTraceInfo(BaseModel):
 
 class MLPredictionInfo(BaseModel):
     """ML 预测信息"""
+
     has_ml_prediction: bool = Field(False, description="是否有ML预测")
     model_type: Optional[str] = Field(None, description="模型类型")
     confidence: Optional[float] = Field(None, description="置信度")
@@ -132,6 +141,7 @@ class MLPredictionInfo(BaseModel):
 
 class MeasureDetailResponse(BaseModel):
     """措施详情响应 (含追溯和ML信息)"""
+
     # 基本信息
     id: int
     measure_code: str = Field(..., description="措施编号")
@@ -170,22 +180,25 @@ class MeasureDetailResponse(BaseModel):
 
 # ========== 措施状态更新模型 ==========
 
+
 class MeasureStatusUpdate(BaseModel):
     """措施状态更新请求"""
+
     status: str = Field(..., description="新状态: accepted/rejected/deferred")
     reason: Optional[str] = Field(None, description="状态变更原因")
 
 
 class BatchMeasureStatusUpdate(BaseModel):
     """批量措施状态更新请求"""
+
     measure_updates: List[Dict[str, Any]] = Field(
-        ...,
-        description="措施状态更新列表 [{measure_id: 1, status: 'accepted'}, ...]"
+        ..., description="措施状态更新列表 [{measure_id: 1, status: 'accepted'}, ...]"
     )
 
 
 class MeasureStatusResponse(BaseModel):
     """措施状态更新响应"""
+
     measure_id: int
     old_status: str
     new_status: str

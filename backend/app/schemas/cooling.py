@@ -1,6 +1,7 @@
 """
 制冷系统 Schema - Pydantic v2
 """
+
 from datetime import datetime
 from typing import Optional, List
 from pydantic import BaseModel, ConfigDict
@@ -8,8 +9,10 @@ from pydantic import BaseModel, ConfigDict
 
 # ==================== CoolingGroup Schemas ====================
 
+
 class CoolingGroupBase(BaseModel):
     """群控组基础"""
+
     group_name: str
     group_mode: str = "independent"  # independent/linked
     description: Optional[str] = None
@@ -17,11 +20,13 @@ class CoolingGroupBase(BaseModel):
 
 class CoolingGroupCreate(CoolingGroupBase):
     """创建群控组"""
+
     pass
 
 
 class CoolingGroupUpdate(BaseModel):
     """更新群控组"""
+
     group_name: Optional[str] = None
     group_mode: Optional[str] = None
     description: Optional[str] = None
@@ -29,6 +34,7 @@ class CoolingGroupUpdate(BaseModel):
 
 class CoolingGroupInfo(CoolingGroupBase):
     """群控组信息"""
+
     model_config = ConfigDict(from_attributes=True)
 
     id: int
@@ -38,8 +44,10 @@ class CoolingGroupInfo(CoolingGroupBase):
 
 # ==================== CoolingUnit Schemas ====================
 
+
 class CoolingUnitBase(BaseModel):
     """精密空调基础"""
+
     device_id: int
     unit_type: str = "indoor"  # indoor/outdoor
     cooling_capacity_kw: Optional[float] = None
@@ -52,11 +60,13 @@ class CoolingUnitBase(BaseModel):
 
 class CoolingUnitCreate(CoolingUnitBase):
     """创建精密空调"""
+
     pass
 
 
 class CoolingUnitUpdate(BaseModel):
     """更新精密空调"""
+
     device_id: Optional[int] = None
     unit_type: Optional[str] = None
     cooling_capacity_kw: Optional[float] = None
@@ -69,6 +79,7 @@ class CoolingUnitUpdate(BaseModel):
 
 class CoolingUnitInfo(CoolingUnitBase):
     """精密空调信息"""
+
     model_config = ConfigDict(from_attributes=True)
 
     id: int
@@ -83,8 +94,10 @@ class CoolingUnitInfo(CoolingUnitBase):
 
 # ==================== ColdAisle Schemas ====================
 
+
 class ColdAisleBase(BaseModel):
     """冷通道基础"""
+
     device_id: int
     aisle_code: Optional[str] = None
     aisle_name: Optional[str] = None
@@ -95,11 +108,13 @@ class ColdAisleBase(BaseModel):
 
 class ColdAisleCreate(ColdAisleBase):
     """创建冷通道"""
+
     pass
 
 
 class ColdAisleUpdate(BaseModel):
     """更新冷通道"""
+
     device_id: Optional[int] = None
     aisle_code: Optional[str] = None
     aisle_name: Optional[str] = None
@@ -110,6 +125,7 @@ class ColdAisleUpdate(BaseModel):
 
 class ColdAisleInfo(ColdAisleBase):
     """冷通道信息"""
+
     model_config = ConfigDict(from_attributes=True)
 
     id: int
@@ -123,28 +139,32 @@ class ColdAisleInfo(ColdAisleBase):
 
 # ==================== Overview & Detail Schemas ====================
 
+
 class CoolingOverviewSummary(BaseModel):
     """制冷系统总览统计"""
-    ac_total: int = 0           # 空调总数
-    ac_running: int = 0         # 运行中
-    ac_stopped: int = 0         # 已停止
-    ac_alarm: int = 0           # 告警中
+
+    ac_total: int = 0  # 空调总数
+    ac_running: int = 0  # 运行中
+    ac_stopped: int = 0  # 已停止
+    ac_alarm: int = 0  # 告警中
     avg_supply_temp: float = 0.0  # 平均送风温度
     avg_return_temp: float = 0.0  # 平均回风温度
-    cold_aisle_total: int = 0   # 冷通道总数
-    group_total: int = 0        # 群控组总数
-    group_linked: int = 0       # 联动模式组数
+    cold_aisle_total: int = 0  # 冷通道总数
+    group_total: int = 0  # 群控组总数
+    group_linked: int = 0  # 联动模式组数
 
 
 class CoolingUnitDetail(BaseModel):
     """空调详情（含关联信息）"""
+
     unit: CoolingUnitInfo
     device: Optional[dict] = None  # DeviceInfo
-    points: List[dict] = []        # Point realtime values
+    points: List[dict] = []  # Point realtime values
 
 
 class ColdAisleDetail(BaseModel):
     """冷通道详情（含关联信息）"""
+
     aisle: ColdAisleInfo
     device: Optional[dict] = None
     points: List[dict] = []

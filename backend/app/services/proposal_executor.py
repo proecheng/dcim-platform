@@ -1,8 +1,8 @@
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func
+from sqlalchemy import select
 from datetime import datetime
 from decimal import Decimal
-from typing import Dict, Any, Optional
+from typing import Dict, Any
 from app.models.energy import EnergySavingProposal, ProposalMeasure, MeasureExecutionLog
 
 
@@ -26,6 +26,7 @@ class ProposalExecutor:
         if self._monitoring_service is None and self.enable_monitoring:
             try:
                 from app.services.effect_monitoring_service import EffectMonitoringService
+
                 self._monitoring_service = EffectMonitoringService(self.db)
             except Exception as e:
                 print(f"监测服务初始化失败: {e}")
@@ -81,7 +82,7 @@ class ProposalExecutor:
         monitoring_started = False
         if monitoring_service and success_count > 0:
             try:
-                session = await monitoring_service.start_monitoring(proposal)
+                await monitoring_service.start_monitoring(proposal)
                 monitoring_started = True
             except Exception as e:
                 print(f"启动监测失败: {e}")
@@ -92,7 +93,7 @@ class ProposalExecutor:
             "success_count": success_count,
             "results": results,
             "monitoring_started": monitoring_started,
-            "baselines_captured": len(baselines)
+            "baselines_captured": len(baselines),
         }
 
     async def execute_measure(self, measure: ProposalMeasure, baseline=None) -> Dict[str, Any]:
@@ -131,10 +132,7 @@ class ProposalExecutor:
                 expected_power_saved=expected_power_saved,
                 result="success" if success else "failed",
                 result_message="执行成功" if success else "执行失败",
-                execution_data={
-                    "regulation_object": measure.regulation_object,
-                    "target_state": measure.target_state
-                }
+                execution_data={"regulation_object": measure.regulation_object, "target_state": measure.target_state},
             )
             self.db.add(log)
 
@@ -147,27 +145,19 @@ class ProposalExecutor:
                 "measure_code": measure.measure_code,
                 "success": success,
                 "power_saved": float(power_saved),
-                "expected_power_saved": float(expected_power_saved)
+                "expected_power_saved": float(expected_power_saved),
             }
 
         except Exception as e:
             # 记录失败日志
             log = MeasureExecutionLog(
-                measure_id=measure.id,
-                execution_time=datetime.now(),
-                result="failed",
-                result_message=str(e)
+                measure_id=measure.id, execution_time=datetime.now(), result="failed", result_message=str(e)
             )
             self.db.add(log)
             measure.execution_status = "failed"
             await self.db.commit()
 
-            return {
-                "measure_id": measure.id,
-                "measure_code": measure.measure_code,
-                "success": False,
-                "error": str(e)
-            }
+            return {"measure_id": measure.id, "measure_code": measure.measure_code, "success": False, "error": str(e)}
 
     def _get_current_power(self, measure: ProposalMeasure) -> Decimal:
         """获取当前功率（模拟）"""
@@ -190,13 +180,12 @@ class ProposalExecutor:
         # 实际应发送控制指令到设备
         # 这里模拟 95% 成功率
         import random
+
         return random.random() < 0.95
 
     async def get_execution_summary(self, proposal_id: int) -> Dict[str, Any]:
         """获取执行摘要"""
-        stmt = select(EnergySavingProposal).where(
-            EnergySavingProposal.id == proposal_id
-        )
+        stmt = select(EnergySavingProposal).where(EnergySavingProposal.id == proposal_id)
         result = await self.db.execute(stmt)
         proposal = result.scalar_one_or_none()
 
@@ -208,9 +197,7 @@ class ProposalExecutor:
         total_power_saved = Decimal("0")
 
         for measure in proposal.measures:
-            logs_stmt = select(MeasureExecutionLog).where(
-                MeasureExecutionLog.measure_id == measure.id
-            )
+            logs_stmt = select(MeasureExecutionLog).where(MeasureExecutionLog.measure_id == measure.id)
             logs_result = await self.db.execute(logs_stmt)
             logs = logs_result.scalars().all()
 
@@ -224,7 +211,7 @@ class ProposalExecutor:
             "success_count": success_logs,
             "success_rate": success_logs / total_logs if total_logs > 0 else 0,
             "total_power_saved_kwh": float(total_power_saved),
-            "estimated_annual_savings": float(total_power_saved * Decimal("0.5") / Decimal("10000"))
+            "estimated_annual_savings": float(total_power_saved * Decimal("0.5") / Decimal("10000")),
         }
 
     async def trigger_rl_feedback(self, proposal_id: int) -> Dict[str, Any]:
@@ -248,7 +235,7 @@ class ProposalExecutor:
                 "success": True,
                 "report_id": report.id,
                 "achievement_rate": float(report.achievement_rate or 0),
-                "rl_feedback": result
+                "rl_feedback": result,
             }
         except Exception as e:
             return {"success": False, "error": str(e)}

@@ -1,6 +1,7 @@
 """
 控制与日志模型
 """
+
 from datetime import datetime, date
 from sqlalchemy import String, DateTime, Float, Integer, Text, ForeignKey, Boolean, Date
 from sqlalchemy.orm import Mapped, mapped_column
@@ -9,6 +10,7 @@ from ..core.database import Base
 
 class ControlCommand(Base):
     """控制指令表"""
+
     __tablename__ = "control_commands"
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
@@ -23,6 +25,7 @@ class ControlCommand(Base):
 
 class License(Base):
     """系统授权表"""
+
     __tablename__ = "license"
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
@@ -36,6 +39,7 @@ class License(Base):
 
 class OperationLog(Base):
     """操作日志表"""
+
     __tablename__ = "operation_logs"
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)

@@ -5,9 +5,10 @@ VPP Analysis API Endpoints
 This module exposes the VPP calculator service through REST API endpoints.
 All endpoints return data with formulas and data sources for transparency.
 """
-from fastapi import APIRouter, Depends, HTTPException, Query, Path
+
+from fastapi import APIRouter, Depends, Query, Path
 from sqlalchemy.ext.asyncio import AsyncSession
-from typing import List, Optional
+from typing import List
 from datetime import date
 from pydantic import BaseModel, Field
 
@@ -23,6 +24,7 @@ router = APIRouter()
 
 class AnalysisRequest(BaseModel):
     """完整分析请求模型"""
+
     months: List[str] = Field(..., description="月份列表")
     start_date: date = Field(..., description="负荷数据开始日期")
     end_date: date = Field(..., description="负荷数据结束日期")
@@ -32,10 +34,7 @@ class AnalysisRequest(BaseModel):
 
 
 @router.post("/analysis", summary="生成VPP方案完整分析")
-async def generate_analysis(
-    request: AnalysisRequest,
-    db: AsyncSession = Depends(get_db)
-):
+async def generate_analysis(request: AnalysisRequest, db: AsyncSession = Depends(get_db)):
     """
     生成完整的VPP方案分析报告
 
@@ -81,9 +80,7 @@ async def generate_analysis(
     """
     calculator = VPPCalculator(db)
     result = await calculator.generate_full_analysis(
-        months=request.months,
-        start_date=request.start_date,
-        end_date=request.end_date
+        months=request.months, start_date=request.start_date, end_date=request.end_date
     )
     return {"code": 0, "message": "success", "data": result}
 
@@ -92,7 +89,7 @@ async def generate_analysis(
 async def get_load_metrics(
     start_date: date = Query(..., description="开始日期"),
     end_date: date = Query(..., description="结束日期"),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
 ):
     """
     获取负荷特性指标 (B1-B6)
@@ -141,8 +138,7 @@ async def get_load_metrics(
 
 @router.get("/cost-structure/{month}", summary="获取电费结构分析")
 async def get_cost_structure(
-    month: str = Path(..., description="月份 (YYYY-MM格式)"),
-    db: AsyncSession = Depends(get_db)
+    month: str = Path(..., description="月份 (YYYY-MM格式)"), db: AsyncSession = Depends(get_db)
 ):
     """
     获取指定月份的电费结构分析 (C1-C3)
@@ -192,9 +188,7 @@ async def get_cost_structure(
 
 
 @router.get("/transfer-potential", summary="获取峰谷转移潜力")
-async def get_transfer_potential(
-    db: AsyncSession = Depends(get_db)
-):
+async def get_transfer_potential(db: AsyncSession = Depends(get_db)):
     """
     获取峰谷转移潜力分析 (D1-D3)
 
@@ -256,8 +250,7 @@ async def get_transfer_potential(
 
 @router.get("/vpp-revenue", summary="获取VPP收益测算")
 async def get_vpp_revenue(
-    adjustable_capacity: float = Query(..., description="可调节容量(kW)"),
-    db: AsyncSession = Depends(get_db)
+    adjustable_capacity: float = Query(..., description="可调节容量(kW)"), db: AsyncSession = Depends(get_db)
 ):
     """
     获取VPP各类收益测算 (F1-F4)
@@ -318,10 +311,7 @@ async def get_vpp_revenue(
 
 
 @router.get("/roi", summary="获取投资回报分析")
-async def get_roi(
-    annual_benefit: float = Query(..., description="年总收益(元)"),
-    db: AsyncSession = Depends(get_db)
-):
+async def get_roi(annual_benefit: float = Query(..., description="年总收益(元)"), db: AsyncSession = Depends(get_db)):
     """
     获取投资回报分析 (G1-G4)
 
@@ -418,133 +408,95 @@ async def get_formula_reference():
                 "A1_平均电价": {
                     "formula": "total_cost / total_consumption",
                     "unit": "元/kWh",
-                    "source_table": "electricity_bills"
+                    "source_table": "electricity_bills",
                 },
-                "A2_波动率": {
-                    "formula": "(max - min) / avg * 100",
-                    "unit": "%",
-                    "source_table": "electricity_bills"
-                },
+                "A2_波动率": {"formula": "(max - min) / avg * 100", "unit": "%", "source_table": "electricity_bills"},
                 "A3_峰段占比": {
                     "formula": "peak_consumption / total_consumption * 100",
                     "unit": "%",
-                    "source_table": "electricity_bills"
+                    "source_table": "electricity_bills",
                 },
                 "A4_谷段占比": {
                     "formula": "valley_consumption / total_consumption * 100",
                     "unit": "%",
-                    "source_table": "electricity_bills"
-                }
+                    "source_table": "electricity_bills",
+                },
             },
             "负荷特性指标": {
-                "B1_最大负荷": {
-                    "formula": "max(load_value)",
-                    "unit": "kW",
-                    "source_table": "load_curves"
-                },
-                "B2_平均负荷": {
-                    "formula": "sum(load_value) / count",
-                    "unit": "kW",
-                    "source_table": "load_curves"
-                },
-                "B3_最小负荷": {
-                    "formula": "min(load_value)",
-                    "unit": "kW",
-                    "source_table": "load_curves"
-                },
-                "B4_日负荷率": {
-                    "formula": "P_avg / P_max",
-                    "unit": "-",
-                    "typical_range": "0.65-0.85"
-                },
-                "B5_峰谷差": {
-                    "formula": "P_max - P_min",
-                    "unit": "kW"
-                },
-                "B6_负荷标准差": {
-                    "formula": "sqrt(sum((load - avg)^2) / n)",
-                    "unit": "kW"
-                }
+                "B1_最大负荷": {"formula": "max(load_value)", "unit": "kW", "source_table": "load_curves"},
+                "B2_平均负荷": {"formula": "sum(load_value) / count", "unit": "kW", "source_table": "load_curves"},
+                "B3_最小负荷": {"formula": "min(load_value)", "unit": "kW", "source_table": "load_curves"},
+                "B4_日负荷率": {"formula": "P_avg / P_max", "unit": "-", "typical_range": "0.65-0.85"},
+                "B5_峰谷差": {"formula": "P_max - P_min", "unit": "kW"},
+                "B6_负荷标准差": {"formula": "sqrt(sum((load - avg)^2) / n)", "unit": "kW"},
             },
             "电费结构指标": {
                 "C1_市场化购电占比": {
                     "formula": "market_purchase_fee / total_cost * 100",
                     "unit": "%",
                     "typical_range": "65%-72%",
-                    "source_table": "electricity_bills"
+                    "source_table": "electricity_bills",
                 },
                 "C2_输配电费占比": {
                     "formula": "transmission_fee / total_cost * 100",
                     "unit": "%",
                     "typical_range": "22%-25%",
-                    "source_table": "electricity_bills"
+                    "source_table": "electricity_bills",
                 },
                 "C3_基本电费占比": {
                     "formula": "basic_fee / total_cost * 100",
                     "unit": "%",
-                    "source_table": "electricity_bills"
-                }
+                    "source_table": "electricity_bills",
+                },
             },
             "峰谷转移指标": {
                 "D1_可转移负荷": {
                     "formula": "sum(rated_power * adjustable_ratio / 100)",
                     "unit": "kW",
-                    "source_table": "adjustable_loads"
+                    "source_table": "adjustable_loads",
                 },
                 "D2_峰谷电价差": {
                     "formula": "peak_price - valley_price",
                     "unit": "元/kWh",
-                    "source_table": "electricity_prices"
+                    "source_table": "electricity_prices",
                 },
                 "D3_年收益潜力": {
                     "formula": "transferable_load * daily_shift_hours * 365 * price_spread",
                     "unit": "元/年",
                     "source_table": "vpp_configs",
-                    "parameters": "daily_shift_hours (默认4小时)"
-                }
+                    "parameters": "daily_shift_hours (默认4小时)",
+                },
             },
             "VPP收益指标": {
                 "F1_需求响应收益": {
                     "formula": "capacity * response_count * response_price",
                     "unit": "元/年",
                     "source_table": "vpp_configs",
-                    "parameters": "response_count (默认20次), response_price (默认4元/kW)"
+                    "parameters": "response_count (默认20次), response_price (默认4元/kW)",
                 },
                 "F2_辅助服务收益": {
                     "formula": "capacity * service_hours * service_price",
                     "unit": "元/年",
                     "source_table": "vpp_configs",
-                    "parameters": "service_hours (默认200小时), service_price (默认0.75元/kW·h)"
+                    "parameters": "service_hours (默认200小时), service_price (默认0.75元/kW·h)",
                 },
                 "F3_现货套利收益": {
                     "formula": "capacity * arbitrage_hours * price_spread",
                     "unit": "元/年",
                     "source_table": "vpp_configs",
-                    "parameters": "arbitrage_hours (默认500小时), price_spread_spot (默认0.3元/kWh)"
+                    "parameters": "arbitrage_hours (默认500小时), price_spread_spot (默认0.3元/kWh)",
                 },
-                "F4_VPP总收益": {
-                    "formula": "F1 + F2 + F3",
-                    "unit": "元/年"
-                }
+                "F4_VPP总收益": {"formula": "F1 + F2 + F3", "unit": "元/年"},
             },
             "投资回报指标": {
                 "G1_总投资": {
                     "formula": "monitoring + control + platform + other",
                     "unit": "元",
-                    "source_table": "vpp_configs"
+                    "source_table": "vpp_configs",
                 },
-                "G2_年总收益": {
-                    "formula": "transfer_benefit + demand_benefit + vpp_revenue",
-                    "unit": "元/年"
-                },
-                "G3_回收期": {
-                    "formula": "total_investment / annual_benefit",
-                    "unit": "年"
-                },
-                "G4_ROI": {
-                    "formula": "annual_benefit / total_investment * 100",
-                    "unit": "%"
-                }
-            }
-        }
+                "G2_年总收益": {"formula": "transfer_benefit + demand_benefit + vpp_revenue", "unit": "元/年"},
+                "G3_回收期": {"formula": "total_investment / annual_benefit", "unit": "年"},
+                "G4_ROI": {"formula": "annual_benefit / total_investment * 100", "unit": "%"},
+            },
+        },
     }

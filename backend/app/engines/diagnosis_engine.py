@@ -2,15 +2,15 @@
 诊断引擎 — 规则匹配与置信度计算
 Story 9-3: 智能故障诊断
 """
+
 import asyncio
 import logging
 import time
 from collections import defaultdict
 from datetime import datetime, timedelta
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional
 
 from sqlalchemy import select, func
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..core.database import async_session
 from ..models.alarm import Alarm
@@ -75,8 +75,7 @@ class DiagnosisEngine:
             self._rule_cache = dict(new_cache)
             self._loaded = True
             count = sum(len(v) for v in self._rule_cache.values())
-            logger.info("诊断引擎: 已加载 %d 条规则索引（%d 个 device_type 分组）",
-                        count, len(self._rule_cache))
+            logger.info("诊断引擎: 已加载 %d 条规则索引（%d 个 device_type 分组）", count, len(self._rule_cache))
             return len(rules)
 
     async def reload_rules(self) -> int:
@@ -179,15 +178,15 @@ class DiagnosisEngine:
             possible_causes = logic.get("possible_causes", [])
 
             for cause_data in possible_causes:
-                confidence = await self._calculate_confidence(
-                    cause_data, alarm_level, payload
+                confidence = await self._calculate_confidence(cause_data, alarm_level, payload)
+                all_causes.append(
+                    {
+                        "cause": cause_data.get("cause", ""),
+                        "confidence": confidence,
+                        "suggested_actions": cause_data.get("suggested_actions", []),
+                        "rule_code": rule["rule_code"],
+                    }
                 )
-                all_causes.append({
-                    "cause": cause_data.get("cause", ""),
-                    "confidence": confidence,
-                    "suggested_actions": cause_data.get("suggested_actions", []),
-                    "rule_code": rule["rule_code"],
-                })
 
         if not all_causes:
             return
@@ -215,20 +214,20 @@ class DiagnosisEngine:
         # WebSocket 推送
         try:
             top = all_causes[0] if all_causes else {}
-            await ws_manager.broadcast_alarm({
-                "action": "diagnosis_completed",
-                "alarm_id": alarm_id,
-                "alarm_no": payload.get("alarm_no", ""),
-                "causes_count": len(all_causes),
-                "top_cause": top.get("cause", ""),
-                "top_confidence": top.get("confidence", 0),
-            })
+            await ws_manager.broadcast_alarm(
+                {
+                    "action": "diagnosis_completed",
+                    "alarm_id": alarm_id,
+                    "alarm_no": payload.get("alarm_no", ""),
+                    "causes_count": len(all_causes),
+                    "top_cause": top.get("cause", ""),
+                    "top_confidence": top.get("confidence", 0),
+                }
+            )
         except Exception as e:
             logger.warning("诊断结果 WebSocket 推送失败: %s", e)
 
-    async def _calculate_confidence(
-        self, cause_data: dict, alarm_level: str, payload: dict
-    ) -> int:
+    async def _calculate_confidence(self, cause_data: dict, alarm_level: str, payload: dict) -> int:
         """计算置信度"""
         base = cause_data.get("base_confidence", 50)
 
@@ -291,18 +290,15 @@ class DiagnosisEngine:
     async def manual_diagnose(self, alarm_id: int) -> Optional[dict]:
         """手动触发诊断（从 Alarm 表读取数据）"""
         async with async_session() as session:
-            result = await session.execute(
-                select(Alarm).where(Alarm.id == alarm_id)
-            )
+            result = await session.execute(select(Alarm).where(Alarm.id == alarm_id))
             alarm = result.scalar_one_or_none()
             if alarm is None:
                 return None
 
             # 获取点位信息
             from ..models.point import Point
-            point_result = await session.execute(
-                select(Point).where(Point.id == alarm.point_id)
-            )
+
+            point_result = await session.execute(select(Point).where(Point.id == alarm.point_id))
             point = point_result.scalar_one_or_none()
 
             payload = {

@@ -1,63 +1,102 @@
 """
 用电管理 API
 """
+
 from typing import Optional, List, Dict, Any
 from datetime import date, datetime, timedelta
 from io import BytesIO
-from fastapi import APIRouter, Depends, Query, HTTPException, status
+from fastapi import APIRouter, Depends, Query, HTTPException
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, update, delete, and_, or_
+from sqlalchemy import select, func, update, delete
 
 from ..deps import get_db, get_current_user, require_admin, require_operator, require_viewer
 from ...models.user import User
 from ...models.energy import (
-    PowerDevice, EnergyHourly, EnergyDaily, EnergyMonthly,
-    ElectricityPricing, EnergySuggestion, PUEHistory,
-    Transformer, MeterPoint, DistributionPanel, DistributionCircuit,
-    PowerCurveData, DemandHistory, DeviceShiftConfig, DeviceLoadProfile
+    PowerDevice,
+    EnergyHourly,
+    EnergyDaily,
+    EnergyMonthly,
+    ElectricityPricing,
+    EnergySuggestion,
+    PUEHistory,
+    Transformer,
+    MeterPoint,
+    DistributionPanel,
+    DistributionCircuit,
+    PowerCurveData,
+    DemandHistory,
+    DeviceShiftConfig,
 )
-from ...models.point import PointRealtime
-from ...models.device import Device
-from ...schemas.common import ResponseModel, PageResponse
-from ...services.energy_topology import topology_service
-from ...services.power_device import power_device_service
-from ...services.energy_analysis import demand_analysis_service, load_shift_analysis_service
+from ...schemas.common import ResponseModel
 from ...services.pue_calculator import calculate_realtime_pue
 from ...core.config import get_settings as _get_energy_settings
 from ...schemas.energy import (
-    PowerDeviceCreate, PowerDeviceUpdate, PowerDeviceResponse, PowerDeviceTree,
-    RealtimePowerData, RealtimePowerSummary,
-    PUEData, PUETrend, PUEHistoryItem,
-    EnergyStatQuery, EnergyStat, EnergyTrend, EnergyTrendItem, EnergyComparison,
-    EnergyDailyData, EnergyMonthlyData,
-    ElectricityPricingCreate, ElectricityPricingUpdate, ElectricityPricingResponse,
-    EnergySuggestionResponse, AcceptSuggestion, CompleteSuggestion, RejectSuggestion, SavingPotential,
-    DistributionDiagram, DistributionNode,
+    PowerDeviceCreate,
+    PowerDeviceUpdate,
+    PowerDeviceResponse,
+    PowerDeviceTree,
+    RealtimePowerData,
+    RealtimePowerSummary,
+    PUEData,
+    PUETrend,
+    PUEHistoryItem,
+    EnergyStat,
+    EnergyTrend,
+    EnergyTrendItem,
+    EnergyComparison,
+    EnergyDailyData,
+    EnergyMonthlyData,
+    ElectricityPricingCreate,
+    ElectricityPricingUpdate,
+    ElectricityPricingResponse,
+    EnergySuggestionResponse,
+    AcceptSuggestion,
+    CompleteSuggestion,
+    RejectSuggestion,
+    SavingPotential,
+    DistributionDiagram,
+    DistributionNode,
     # New imports for meter points and topology
-    TransformerCreate, TransformerUpdate, TransformerResponse,
-    MeterPointCreate, MeterPointUpdate, MeterPointResponse, MeterPointDetail,
-    DistributionPanelCreate, DistributionPanelUpdate, DistributionPanelResponse,
-    DistributionCircuitCreate, DistributionCircuitUpdate, DistributionCircuitResponse,
-    PowerCurvePoint, PowerCurveResponse,
-    DemandHistoryItem, DemandHistoryResponse,
-    DeviceShiftPotential, DeviceShiftAnalysisResult,
-    DemandConfigAnalysisItem, DemandConfigAnalysisResult,
-    TopologyCircuitNode, TopologyPanelNode, TopologyMeterNode, TopologyTransformerNode,
+    TransformerCreate,
+    TransformerUpdate,
+    TransformerResponse,
+    MeterPointCreate,
+    MeterPointUpdate,
+    MeterPointResponse,
+    MeterPointDetail,
+    DistributionPanelCreate,
+    DistributionPanelUpdate,
+    DistributionPanelResponse,
+    DistributionCircuitCreate,
+    DistributionCircuitUpdate,
+    DistributionCircuitResponse,
+    PowerCurvePoint,
+    PowerCurveResponse,
+    DemandHistoryItem,
+    DemandHistoryResponse,
+    DeviceShiftPotential,
+    DeviceShiftAnalysisResult,
+    DemandConfigAnalysisItem,
+    DemandConfigAnalysisResult,
+    TopologyCircuitNode,
+    TopologyPanelNode,
+    TopologyMeterNode,
+    TopologyTransformerNode,
     DistributionTopologyResponse,
     # 需量配置层级展示
-    MeterPointDemandInfo, TransformerWithMeterPointsResponse
+    MeterPointDemandInfo,
+    TransformerWithMeterPointsResponse,
 )
 
-from ...utils.deterministic import (
-    _deterministic_ratio, _deterministic_offset, _device_seed, _time_seed, _date_seed
-)
+from ...utils.deterministic import _deterministic_ratio, _deterministic_offset, _device_seed, _time_seed, _date_seed
 from ...services.pricing_service import PricingService
 
 router = APIRouter()
 
 
 # ==================== 用电设备管理 ====================
+
 
 @router.get("/devices", response_model=ResponseModel[List[PowerDeviceResponse]], summary="获取用电设备列表")
 async def get_power_devices(
@@ -66,7 +105,7 @@ async def get_power_devices(
     is_enabled: Optional[bool] = Query(None, description="是否启用"),
     keyword: Optional[str] = Query(None, description="关键词搜索(编码/名称)"),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
 ):
     """获取用电设备列表"""
     query = select(PowerDevice)
@@ -78,10 +117,7 @@ async def get_power_devices(
     if is_enabled is not None:
         query = query.where(PowerDevice.is_enabled == is_enabled)
     if keyword:
-        query = query.where(
-            (PowerDevice.device_code.contains(keyword)) |
-            (PowerDevice.device_name.contains(keyword))
-        )
+        query = query.where((PowerDevice.device_code.contains(keyword)) | (PowerDevice.device_name.contains(keyword)))
 
     query = query.order_by(PowerDevice.device_type, PowerDevice.device_code)
     result = await db.execute(query)
@@ -91,10 +127,7 @@ async def get_power_devices(
 
 
 @router.get("/devices/tree", response_model=ResponseModel[List[PowerDeviceTree]], summary="获取用电设备树")
-async def get_power_device_tree(
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
-):
+async def get_power_device_tree(db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     """获取用电设备树结构（配电层级）"""
     result = await db.execute(
         select(PowerDevice).where(PowerDevice.is_enabled == True).order_by(PowerDevice.device_type)
@@ -118,9 +151,7 @@ async def get_power_device_tree(
 
 @router.post("/devices", response_model=ResponseModel[PowerDeviceResponse], summary="创建用电设备")
 async def create_power_device(
-    device: PowerDeviceCreate,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_admin)
+    device: PowerDeviceCreate, db: AsyncSession = Depends(get_db), current_user: User = Depends(require_admin)
 ):
     """
     创建用电设备
@@ -130,17 +161,13 @@ async def create_power_device(
     - 设备参数调节配置 (load_regulation_configs)
     """
     # 检查设备编码是否已存在
-    existing = await db.execute(
-        select(PowerDevice).where(PowerDevice.device_code == device.device_code)
-    )
+    existing = await db.execute(select(PowerDevice).where(PowerDevice.device_code == device.device_code))
     if existing.scalar_one_or_none():
         raise HTTPException(status_code=400, detail="设备编码已存在")
 
     # 如果有上级设备，检查是否存在
     if device.parent_device_id:
-        parent = await db.execute(
-            select(PowerDevice).where(PowerDevice.id == device.parent_device_id)
-        )
+        parent = await db.execute(select(PowerDevice).where(PowerDevice.id == device.parent_device_id))
         if not parent.scalar_one_or_none():
             raise HTTPException(status_code=400, detail="上级设备不存在")
 
@@ -168,7 +195,7 @@ async def create_power_device(
 async def get_shift_ratio_recommendations(
     days: int = Query(30, ge=7, le=90, description="分析历史数据天数"),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
 ):
     """
     基于历史用电数据智能计算每个设备的推荐可转移功率比例
@@ -190,7 +217,7 @@ async def get_shift_ratio_recommendations(
 async def accept_all_recommendations(
     days: int = Query(30, ge=7, le=90, description="分析历史数据天数"),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
 ):
     """
     批量更新所有有变更建议的设备转移比例为推荐值
@@ -204,9 +231,7 @@ async def accept_all_recommendations(
 
 @router.post("/devices/shift-ratio/batch-update", response_model=ResponseModel, summary="批量更新设备转移比例")
 async def batch_update_shift_ratios(
-    updates: Dict[int, float],
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    updates: Dict[int, float], db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)
 ):
     """
     批量更新多个设备的转移功率比例
@@ -221,10 +246,7 @@ async def batch_update_shift_ratios(
 
 
 @router.get("/devices/shiftable", response_model=ResponseModel, summary="获取可转移负荷设备列表")
-async def get_shiftable_devices(
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
-):
+async def get_shiftable_devices(db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     """
     获取所有配置了负荷转移能力的设备
 
@@ -236,19 +258,18 @@ async def get_shiftable_devices(
     devices = await device_service.get_shiftable_devices()
     data_source = await device_service.get_regulation_data_source()
 
-    return ResponseModel(data={
-        "devices": devices,
-        "total_count": len(devices),
-        "total_shiftable_power": sum(d["shiftable_power"] for d in devices),
-        "data_source": data_source
-    })
+    return ResponseModel(
+        data={
+            "devices": devices,
+            "total_count": len(devices),
+            "total_shiftable_power": sum(d["shiftable_power"] for d in devices),
+            "data_source": data_source,
+        }
+    )
 
 
 @router.get("/devices/adjustable", response_model=ResponseModel, summary="获取可调节参数设备列表")
-async def get_adjustable_devices(
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
-):
+async def get_adjustable_devices(db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     """
     获取所有配置了调节能力的设备（温度/频率/亮度等）
 
@@ -260,15 +281,17 @@ async def get_adjustable_devices(
     devices = await device_service.get_adjustable_devices()
     data_source = await device_service.get_regulation_data_source()
 
-    return ResponseModel(data={
-        "devices": devices,
-        "total_count": len(devices),
-        "by_regulation_type": {
-            reg_type: len([d for d in devices if d["regulation_type"] == reg_type])
-            for reg_type in set(d["regulation_type"] for d in devices)
-        },
-        "data_source": data_source
-    })
+    return ResponseModel(
+        data={
+            "devices": devices,
+            "total_count": len(devices),
+            "by_regulation_type": {
+                reg_type: len([d for d in devices if d["regulation_type"] == reg_type])
+                for reg_type in set(d["regulation_type"] for d in devices)
+            },
+            "data_source": data_source,
+        }
+    )
 
 
 @router.post("/devices/generate-configs", response_model=ResponseModel, summary="批量生成设备配置")
@@ -276,7 +299,7 @@ async def batch_generate_device_configs(
     device_ids: Optional[List[int]] = None,
     force: bool = False,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_admin)
+    current_user: User = Depends(require_admin),
 ):
     """
     批量为设备生成转移配置和调节配置
@@ -287,34 +310,33 @@ async def batch_generate_device_configs(
     from ...services.device_config_generator import DeviceConfigAutoGenerator
 
     if device_ids is None:
-        result = await db.execute(
-            select(PowerDevice.id).where(PowerDevice.is_enabled == True)
-        )
+        result = await db.execute(select(PowerDevice.id).where(PowerDevice.is_enabled == True))
         device_ids = [row[0] for row in result.all()]
 
     if not device_ids:
-        return ResponseModel(data={
-            "message": "没有找到需要生成配置的设备",
-            "total_devices": 0,
-            "shift_configs_created": 0,
-            "regulation_configs_created": 0
-        })
+        return ResponseModel(
+            data={
+                "message": "没有找到需要生成配置的设备",
+                "total_devices": 0,
+                "shift_configs_created": 0,
+                "regulation_configs_created": 0,
+            }
+        )
 
     generator = DeviceConfigAutoGenerator(db)
     result = await generator.batch_generate_configs(device_ids, force)
 
-    return ResponseModel(data={
-        "message": f"已为 {result['total_devices']} 个设备生成配置",
-        **result
-    })
+    return ResponseModel(data={"message": f"已为 {result['total_devices']} 个设备生成配置", **result})
 
 
-@router.get("/devices/{device_id}/typical-day-profile", response_model=ResponseModel, summary="获取设备典型日功率Profile")
+@router.get(
+    "/devices/{device_id}/typical-day-profile", response_model=ResponseModel, summary="获取设备典型日功率Profile"
+)
 async def get_device_typical_day_profile(
     device_id: int,
     days: int = Query(30, ge=7, le=90, description="分析历史数据天数"),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
 ):
     """
     获取指定设备的24小时典型日功率曲线数据
@@ -335,7 +357,7 @@ async def update_device_shift_ratio(
     device_id: int,
     ratio: float = Query(..., ge=0, le=1, description="新的转移功率比例(0-1)"),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
 ):
     """
     更新指定设备的可转移功率比例
@@ -351,9 +373,7 @@ async def update_device_shift_ratio(
 
 @router.get("/devices/{device_id}", response_model=ResponseModel[PowerDeviceResponse], summary="获取用电设备详情")
 async def get_power_device(
-    device_id: int,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    device_id: int, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)
 ):
     """获取用电设备详情"""
     result = await db.execute(select(PowerDevice).where(PowerDevice.id == device_id))
@@ -370,7 +390,7 @@ async def update_power_device(
     device_id: int,
     device: PowerDeviceUpdate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_admin)
+    current_user: User = Depends(require_admin),
 ):
     """更新用电设备"""
     result = await db.execute(select(PowerDevice).where(PowerDevice.id == device_id))
@@ -382,9 +402,7 @@ async def update_power_device(
     update_data = device.model_dump(exclude_unset=True)
     update_data["updated_at"] = datetime.now()
 
-    await db.execute(
-        update(PowerDevice).where(PowerDevice.id == device_id).values(**update_data)
-    )
+    await db.execute(update(PowerDevice).where(PowerDevice.id == device_id).values(**update_data))
     await db.commit()
 
     result = await db.execute(select(PowerDevice).where(PowerDevice.id == device_id))
@@ -395,9 +413,7 @@ async def update_power_device(
 
 @router.delete("/devices/{device_id}", response_model=ResponseModel, summary="删除用电设备")
 async def delete_power_device(
-    device_id: int,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_admin)
+    device_id: int, db: AsyncSession = Depends(get_db), current_user: User = Depends(require_admin)
 ):
     """删除用电设备"""
     result = await db.execute(select(PowerDevice).where(PowerDevice.id == device_id))
@@ -405,9 +421,7 @@ async def delete_power_device(
         raise HTTPException(status_code=404, detail="设备不存在")
 
     # 检查是否有下级设备
-    children = await db.execute(
-        select(PowerDevice).where(PowerDevice.parent_device_id == device_id)
-    )
+    children = await db.execute(select(PowerDevice).where(PowerDevice.parent_device_id == device_id))
     if children.scalars().first():
         raise HTTPException(status_code=400, detail="该设备有下级设备，无法删除")
 
@@ -419,12 +433,13 @@ async def delete_power_device(
 
 # ==================== 实时电力数据 ====================
 
+
 @router.get("/realtime", response_model=ResponseModel[List[RealtimePowerData]], summary="获取实时电力数据")
 async def get_realtime_power(
     device_type: Optional[str] = Query(None, description="设备类型"),
     area_code: Optional[str] = Query(None, description="区域代码"),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
 ):
     """获取所有用电设备的实时电力数据"""
     query = select(PowerDevice).where(PowerDevice.is_enabled == True)
@@ -453,8 +468,12 @@ async def get_realtime_power(
             voltage_b=380 + _deterministic_offset(seed + 1, 5) if device.phase_type == "3P" else None,
             voltage_c=380 + _deterministic_offset(seed + 2, 5) if device.phase_type == "3P" else None,
             current_a=base_power * 1.52 * _deterministic_ratio(seed + 3, 0.5, 0.9),
-            current_b=base_power * 1.52 * _deterministic_ratio(seed + 4, 0.5, 0.9) if device.phase_type == "3P" else None,
-            current_c=base_power * 1.52 * _deterministic_ratio(seed + 5, 0.5, 0.9) if device.phase_type == "3P" else None,
+            current_b=base_power * 1.52 * _deterministic_ratio(seed + 4, 0.5, 0.9)
+            if device.phase_type == "3P"
+            else None,
+            current_c=base_power * 1.52 * _deterministic_ratio(seed + 5, 0.5, 0.9)
+            if device.phase_type == "3P"
+            else None,
             active_power=base_power * _deterministic_ratio(seed + 6, 0.5, 0.9),
             reactive_power=base_power * 0.2 * _deterministic_ratio(seed + 7, 0.5, 1.0),
             apparent_power=base_power * 1.1 * _deterministic_ratio(seed + 8, 0.5, 0.9),
@@ -463,7 +482,7 @@ async def get_realtime_power(
             total_energy=base_power * 24 * 30 * _deterministic_ratio(seed + 11, 0.5, 1.0),
             load_rate=_deterministic_ratio(seed + 12, 0.4, 0.85) if device.rated_power else None,
             status="normal",
-            update_time=datetime.now()
+            update_time=datetime.now(),
         )
         power_data.append(data)
 
@@ -471,10 +490,7 @@ async def get_realtime_power(
 
 
 @router.get("/realtime/summary", response_model=ResponseModel[RealtimePowerSummary], summary="获取电力汇总")
-async def get_power_summary(
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
-):
+async def get_power_summary(db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     """获取实时电力汇总（总功率、IT功率、制冷功率、PUE等）"""
     settings = _get_energy_settings()
 
@@ -485,8 +501,9 @@ async def get_power_summary(
         # 获取今日能耗
         today = date.today()
         today_result = await db.execute(
-            select(func.sum(EnergyDaily.total_energy), func.sum(EnergyDaily.energy_cost))
-            .where(EnergyDaily.stat_date == today)
+            select(func.sum(EnergyDaily.total_energy), func.sum(EnergyDaily.energy_cost)).where(
+                EnergyDaily.stat_date == today
+            )
         )
         today_stats = today_result.first()
         today_energy = today_stats[0] if (today_stats and today_stats[0] is not None) else 0.0
@@ -494,10 +511,8 @@ async def get_power_summary(
 
         # 获取本月能耗
         month_result = await db.execute(
-            select(func.sum(EnergyDaily.total_energy), func.sum(EnergyDaily.energy_cost))
-            .where(
-                EnergyDaily.stat_date >= date(today.year, today.month, 1),
-                EnergyDaily.stat_date <= today
+            select(func.sum(EnergyDaily.total_energy), func.sum(EnergyDaily.energy_cost)).where(
+                EnergyDaily.stat_date >= date(today.year, today.month, 1), EnergyDaily.stat_date <= today
             )
         )
         month_stats = month_result.first()
@@ -509,7 +524,9 @@ async def get_power_summary(
             it_power=pue_result.it_power,
             cooling_power=pue_result.cooling_power,
             ups_power=round(pue_result.ups_loss, 2),
-            other_power=round(max(0, pue_result.total_power - pue_result.it_power - pue_result.cooling_power - pue_result.ups_loss), 2),
+            other_power=round(
+                max(0, pue_result.total_power - pue_result.it_power - pue_result.cooling_power - pue_result.ups_loss), 2
+            ),
             current_pue=pue_result.current_pue,
             today_energy=round(today_energy, 2),
             today_cost=round(today_cost, 2),
@@ -520,9 +537,7 @@ async def get_power_summary(
         return ResponseModel(data=summary)
 
     # 模拟数据模式（保留现有逻辑）
-    result = await db.execute(
-        select(PowerDevice).where(PowerDevice.is_enabled == True)
-    )
+    result = await db.execute(select(PowerDevice).where(PowerDevice.is_enabled == True))
     devices = result.scalars().all()
 
     # [V2.11] 使用确定性计算替代 random
@@ -555,8 +570,9 @@ async def get_power_summary(
     # 获取今日能耗
     today = date.today()
     today_result = await db.execute(
-        select(func.sum(EnergyDaily.total_energy), func.sum(EnergyDaily.energy_cost))
-        .where(EnergyDaily.stat_date == today)
+        select(func.sum(EnergyDaily.total_energy), func.sum(EnergyDaily.energy_cost)).where(
+            EnergyDaily.stat_date == today
+        )
     )
     today_stats = today_result.first()
     today_energy = today_stats[0] or total_power * datetime.now().hour
@@ -564,10 +580,8 @@ async def get_power_summary(
 
     # 获取本月能耗
     month_result = await db.execute(
-        select(func.sum(EnergyDaily.total_energy), func.sum(EnergyDaily.energy_cost))
-        .where(
-            EnergyDaily.stat_date >= date(today.year, today.month, 1),
-            EnergyDaily.stat_date <= today
+        select(func.sum(EnergyDaily.total_energy), func.sum(EnergyDaily.energy_cost)).where(
+            EnergyDaily.stat_date >= date(today.year, today.month, 1), EnergyDaily.stat_date <= today
         )
     )
     month_stats = month_result.first()
@@ -593,9 +607,7 @@ async def get_power_summary(
 
 @router.get("/realtime/{device_id}", response_model=ResponseModel[RealtimePowerData], summary="获取设备实时电力")
 async def get_device_realtime_power(
-    device_id: int,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    device_id: int, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)
 ):
     """获取指定设备的实时电力数据"""
     result = await db.execute(select(PowerDevice).where(PowerDevice.id == device_id))
@@ -627,7 +639,7 @@ async def get_device_realtime_power(
         total_energy=base_power * 24 * 30 * _deterministic_ratio(seed + 11, 0.5, 1.0),
         load_rate=_deterministic_ratio(seed + 12, 0.4, 0.85) if device.rated_power else None,
         status="normal",
-        update_time=datetime.now()
+        update_time=datetime.now(),
     )
 
     return ResponseModel(data=data)
@@ -635,11 +647,9 @@ async def get_device_realtime_power(
 
 # ==================== PUE ====================
 
+
 @router.get("/pue", response_model=ResponseModel[PUEData], summary="获取当前PUE")
-async def get_current_pue(
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
-):
+async def get_current_pue(db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     """获取当前PUE值及功率分布"""
     settings = _get_energy_settings()
 
@@ -653,7 +663,9 @@ async def get_current_pue(
             cooling_power=pue_result.cooling_power,
             ups_loss=pue_result.ups_loss,
             lighting_power=0.0,
-            other_power=round(max(0, pue_result.total_power - pue_result.it_power - pue_result.cooling_power - pue_result.ups_loss), 2),
+            other_power=round(
+                max(0, pue_result.total_power - pue_result.it_power - pue_result.cooling_power - pue_result.ups_loss), 2
+            ),
             update_time=datetime.now(),
             data_source=pue_result.data_source,
             unreliable_count=pue_result.unreliable_count,
@@ -661,9 +673,7 @@ async def get_current_pue(
         return ResponseModel(data=pue_data)
 
     # 模拟数据模式（保留现有逻辑）
-    result = await db.execute(
-        select(PowerDevice).where(PowerDevice.is_enabled == True)
-    )
+    result = await db.execute(select(PowerDevice).where(PowerDevice.is_enabled == True))
     devices = result.scalars().all()
 
     # [V2.11] 使用确定性计算替代 random
@@ -718,7 +728,7 @@ async def get_pue_trend(
     start_time: Optional[datetime] = Query(None, description="开始时间"),
     end_time: Optional[datetime] = Query(None, description="结束时间"),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
 ):
     """获取PUE历史趋势"""
     now = datetime.now()
@@ -763,12 +773,11 @@ async def get_pue_trend(
             pue = 1.4 + _deterministic_offset(seed, 0.25)  # 1.15-1.65
             total = 500 + _deterministic_offset(seed + 1, 50)  # 450-550
             it = total / pue
-            data_list.append(PUEHistoryItem(
-                record_time=current,
-                pue=round(pue, 3),
-                total_power=round(total, 2),
-                it_power=round(it, 2)
-            ))
+            data_list.append(
+                PUEHistoryItem(
+                    record_time=current, pue=round(pue, 3), total_power=round(total, 2), it_power=round(it, 2)
+                )
+            )
             if period == "hour":
                 current += timedelta(hours=1)
             elif period == "day":
@@ -787,17 +796,14 @@ async def get_pue_trend(
     max_pue = max(pue_values) if pue_values else 0
 
     trend = PUETrend(
-        period=period,
-        data=data_list,
-        avg_pue=round(avg_pue, 3),
-        min_pue=round(min_pue, 3),
-        max_pue=round(max_pue, 3)
+        period=period, data=data_list, avg_pue=round(avg_pue, 3), min_pue=round(min_pue, 3), max_pue=round(max_pue, 3)
     )
 
     return ResponseModel(data=trend)
 
 
 # ==================== 能耗统计 ====================
+
 
 @router.get("/statistics/daily", response_model=ResponseModel[List[EnergyDailyData]], summary="获取日能耗统计")
 async def get_daily_statistics(
@@ -806,14 +812,11 @@ async def get_daily_statistics(
     start_date: date = Query(..., description="开始日期"),
     end_date: date = Query(..., description="结束日期"),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
 ):
     """获取日能耗统计数据"""
     settings = _get_energy_settings()
-    query = select(EnergyDaily).where(
-        EnergyDaily.stat_date >= start_date,
-        EnergyDaily.stat_date <= end_date
-    )
+    query = select(EnergyDaily).where(EnergyDaily.stat_date >= start_date, EnergyDaily.stat_date <= end_date)
 
     if device_id:
         query = query.where(EnergyDaily.device_id == device_id)
@@ -854,7 +857,7 @@ async def get_daily_statistics(
             avg_power=round(total / 24, 2),
             max_power_time=datetime.combine(current_date, datetime.min.time()) + timedelta(hours=14),
             energy_cost=round(peak * 1.2 + normal * 0.8 + valley * 0.4, 2),
-            pue=round(1.4 + _deterministic_offset(seed + 1, 0.15), 2)
+            pue=round(1.4 + _deterministic_offset(seed + 1, 0.15), 2),
         )
         data_list.append(data)
         current_date += timedelta(days=1)
@@ -867,7 +870,7 @@ async def get_monthly_statistics(
     device_type: Optional[str] = Query(None, description="设备类型"),
     year: int = Query(..., description="年份"),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
 ):
     """获取月能耗统计数据"""
     settings = _get_energy_settings()
@@ -918,7 +921,7 @@ async def get_monthly_statistics(
             peak_cost=round(peak_cost, 2),
             normal_cost=round(normal_cost, 2),
             valley_cost=round(valley_cost, 2),
-            avg_pue=round(1.45 + _deterministic_offset(seed + 1, 0.125), 2)
+            avg_pue=round(1.45 + _deterministic_offset(seed + 1, 0.125), 2),
         )
         data_list.append(data)
     return ResponseModel(data=data_list)
@@ -932,10 +935,10 @@ async def get_energy_summary(
     start_date: date = Query(..., description="开始日期"),
     end_date: date = Query(..., description="结束日期"),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
 ):
     """获取能耗汇总统计"""
-    settings = _get_energy_settings()
+    _get_energy_settings()
     query = select(
         func.sum(EnergyDaily.total_energy),
         func.sum(EnergyDaily.peak_energy),
@@ -944,11 +947,8 @@ async def get_energy_summary(
         func.sum(EnergyDaily.energy_cost),
         func.avg(EnergyDaily.avg_power),
         func.max(EnergyDaily.max_power),
-        func.avg(EnergyDaily.pue)
-    ).where(
-        EnergyDaily.stat_date >= start_date,
-        EnergyDaily.stat_date <= end_date
-    )
+        func.avg(EnergyDaily.pue),
+    ).where(EnergyDaily.stat_date >= start_date, EnergyDaily.stat_date <= end_date)
 
     if device_id:
         query = query.where(EnergyDaily.device_id == device_id)
@@ -980,7 +980,7 @@ async def get_energy_summary(
             valley_cost=round(valley_cost, 2),
             avg_power=round(total / (days * 24), 2),
             max_power=round(total / (days * 20), 2),
-            avg_pue=1.45
+            avg_pue=1.45,
         )
     else:
         total = stats[0] or 0
@@ -992,9 +992,9 @@ async def get_energy_summary(
         # 使用 PricingService 获取真实电价计算分段电费
         pricing_service = PricingService(db)
         prices = await pricing_service.get_all_prices()
-        peak_price = prices.get('peak_price', 1.2)
-        normal_price = prices.get('normal_price', 0.8)
-        valley_price = prices.get('valley_price', 0.4)
+        peak_price = prices.get("peak_price", 1.2)
+        normal_price = prices.get("normal_price", 0.8)
+        valley_price = prices.get("valley_price", 0.4)
 
         summary = EnergyStat(
             total_energy=round(total, 2),
@@ -1008,7 +1008,7 @@ async def get_energy_summary(
             avg_power=round(stats[5] or 0, 2),
             max_power=round(stats[6] or 0, 2),
             avg_pue=round(stats[7] or 1.5, 2),
-            data_source="realtime"
+            data_source="realtime",
         )
 
     return ResponseModel(data=summary)
@@ -1022,7 +1022,7 @@ async def get_energy_trend(
     end_date: date = Query(..., description="结束日期"),
     granularity: str = Query("daily", description="粒度: hourly/daily/monthly"),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
 ):
     """获取能耗趋势数据"""
     settings = _get_energy_settings()
@@ -1035,10 +1035,7 @@ async def get_energy_trend(
         has_data = False
 
         if granularity == "daily":
-            query = select(EnergyDaily).where(
-                EnergyDaily.stat_date >= start_date,
-                EnergyDaily.stat_date <= end_date
-            )
+            query = select(EnergyDaily).where(EnergyDaily.stat_date >= start_date, EnergyDaily.stat_date <= end_date)
             if device_id:
                 query = query.where(EnergyDaily.device_id == device_id)
             query = query.order_by(EnergyDaily.stat_date)
@@ -1051,17 +1048,17 @@ async def get_energy_trend(
                     cost = r.energy_cost or 0
                     total_energy += energy
                     total_cost += cost
-                    data_list.append(EnergyTrendItem(
-                        time_label=r.stat_date.strftime("%Y-%m-%d"),
-                        energy=round(energy, 2),
-                        cost=round(cost, 2),
-                        power=round(r.avg_power or 0, 2)
-                    ))
+                    data_list.append(
+                        EnergyTrendItem(
+                            time_label=r.stat_date.strftime("%Y-%m-%d"),
+                            energy=round(energy, 2),
+                            cost=round(cost, 2),
+                            power=round(r.avg_power or 0, 2),
+                        )
+                    )
 
         elif granularity == "monthly":
-            query = select(EnergyMonthly).where(
-                EnergyMonthly.stat_year == start_date.year
-            )
+            query = select(EnergyMonthly).where(EnergyMonthly.stat_year == start_date.year)
             if device_id:
                 query = query.where(EnergyMonthly.device_id == device_id)
             query = query.order_by(EnergyMonthly.stat_month)
@@ -1074,20 +1071,19 @@ async def get_energy_trend(
                     cost = r.energy_cost or 0
                     total_energy += energy
                     total_cost += cost
-                    data_list.append(EnergyTrendItem(
-                        time_label=f"{r.stat_year}-{r.stat_month:02d}",
-                        energy=round(energy, 2),
-                        cost=round(cost, 2),
-                        power=round(r.avg_power or 0, 2)
-                    ))
+                    data_list.append(
+                        EnergyTrendItem(
+                            time_label=f"{r.stat_year}-{r.stat_month:02d}",
+                            energy=round(energy, 2),
+                            cost=round(cost, 2),
+                            power=round(r.avg_power or 0, 2),
+                        )
+                    )
 
         else:  # hourly
             start_dt = datetime.combine(start_date, datetime.min.time())
             end_dt = datetime.combine(end_date, datetime.max.time())
-            query = select(EnergyHourly).where(
-                EnergyHourly.stat_time >= start_dt,
-                EnergyHourly.stat_time <= end_dt
-            )
+            query = select(EnergyHourly).where(EnergyHourly.stat_time >= start_dt, EnergyHourly.stat_time <= end_dt)
             if device_id:
                 query = query.where(EnergyHourly.device_id == device_id)
             query = query.order_by(EnergyHourly.stat_time).limit(168)
@@ -1100,12 +1096,14 @@ async def get_energy_trend(
                     cost = energy * 0.8  # hourly 表无 cost 字段，用估算
                     total_energy += energy
                     total_cost += cost
-                    data_list.append(EnergyTrendItem(
-                        time_label=r.stat_time.strftime("%Y-%m-%d %H:00"),
-                        energy=round(energy, 2),
-                        cost=round(cost, 2),
-                        power=round(r.avg_power or 0, 2)
-                    ))
+                    data_list.append(
+                        EnergyTrendItem(
+                            time_label=r.stat_time.strftime("%Y-%m-%d %H:00"),
+                            energy=round(energy, 2),
+                            cost=round(cost, 2),
+                            power=round(r.avg_power or 0, 2),
+                        )
+                    )
 
         if has_data:
             trend = EnergyTrend(
@@ -1113,7 +1111,7 @@ async def get_energy_trend(
                 data=data_list,
                 total_energy=round(total_energy, 2),
                 total_cost=round(total_cost, 2),
-                data_source="realtime"
+                data_source="realtime",
             )
             return ResponseModel(data=trend)
         # 无数据时 fallback 到模拟逻辑
@@ -1133,12 +1131,14 @@ async def get_energy_trend(
             cost = energy * 0.8
             total_energy += energy
             total_cost += cost
-            data_list.append(EnergyTrendItem(
-                time_label=current.strftime("%Y-%m-%d"),
-                energy=round(energy, 2),
-                cost=round(cost, 2),
-                power=round(energy / 24, 2)
-            ))
+            data_list.append(
+                EnergyTrendItem(
+                    time_label=current.strftime("%Y-%m-%d"),
+                    energy=round(energy, 2),
+                    cost=round(cost, 2),
+                    power=round(energy / 24, 2),
+                )
+            )
             current += timedelta(days=1)
             idx += 1
     elif granularity == "monthly":
@@ -1149,12 +1149,14 @@ async def get_energy_trend(
             cost = energy * 0.8
             total_energy += energy
             total_cost += cost
-            data_list.append(EnergyTrendItem(
-                time_label=f"{year}-{month:02d}",
-                energy=round(energy, 2),
-                cost=round(cost, 2),
-                power=round(energy / 720, 2)
-            ))
+            data_list.append(
+                EnergyTrendItem(
+                    time_label=f"{year}-{month:02d}",
+                    energy=round(energy, 2),
+                    cost=round(cost, 2),
+                    power=round(energy / 720, 2),
+                )
+            )
     else:  # hourly
         current = datetime.combine(start_date, datetime.min.time())
         end = datetime.combine(end_date, datetime.max.time())
@@ -1165,22 +1167,21 @@ async def get_energy_trend(
             cost = energy * 0.8
             total_energy += energy
             total_cost += cost
-            data_list.append(EnergyTrendItem(
-                time_label=current.strftime("%Y-%m-%d %H:00"),
-                energy=round(energy, 2),
-                cost=round(cost, 2),
-                power=round(energy, 2)
-            ))
+            data_list.append(
+                EnergyTrendItem(
+                    time_label=current.strftime("%Y-%m-%d %H:00"),
+                    energy=round(energy, 2),
+                    cost=round(cost, 2),
+                    power=round(energy, 2),
+                )
+            )
             current += timedelta(hours=1)
             idx += 1
             if len(data_list) > 168:  # 最多一周的小时数据
                 break
 
     trend = EnergyTrend(
-        granularity=granularity,
-        data=data_list,
-        total_energy=round(total_energy, 2),
-        total_cost=round(total_cost, 2)
+        granularity=granularity, data=data_list, total_energy=round(total_energy, 2), total_cost=round(total_cost, 2)
     )
 
     return ResponseModel(data=trend)
@@ -1192,7 +1193,7 @@ async def get_energy_comparison(
     comparison_type: str = Query("mom", description="对比类型: mom(环比)/yoy(同比)"),
     period: str = Query("month", description="对比周期: day/week/month"),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
 ):
     """获取能耗环比/同比对比"""
     settings = _get_energy_settings()
@@ -1235,11 +1236,8 @@ async def get_energy_comparison(
                 func.sum(EnergyDaily.energy_cost),
                 func.avg(EnergyDaily.avg_power),
                 func.max(EnergyDaily.max_power),
-                func.avg(EnergyDaily.pue)
-            ).where(
-                EnergyDaily.stat_date >= s_date,
-                EnergyDaily.stat_date <= e_date
-            )
+                func.avg(EnergyDaily.pue),
+            ).where(EnergyDaily.stat_date >= s_date, EnergyDaily.stat_date <= e_date)
             if device_id:
                 q = q.where(EnergyDaily.device_id == device_id)
             r = await db.execute(q)
@@ -1251,16 +1249,16 @@ async def get_energy_comparison(
         if cur_stats[0] is not None and prev_stats[0] is not None:
             pricing_service = PricingService(db)
             prices = await pricing_service.get_all_prices()
-            pp = prices.get('peak_price', 1.2)
-            np_ = prices.get('normal_price', 0.8)
-            vp = prices.get('valley_price', 0.4)
+            pp = prices.get("peak_price", 1.2)
+            np_ = prices.get("normal_price", 0.8)
+            vp = prices.get("valley_price", 0.4)
 
             def _build_stat(s):
                 t = s[0] or 0
                 pk = s[1] or 0
                 nm = s[2] or 0
                 vl = s[3] or 0
-                days_count = max((cur_end - cur_start).days + 1, 1)
+                max((cur_end - cur_start).days + 1, 1)
                 return EnergyStat(
                     total_energy=round(t, 2),
                     peak_energy=round(pk, 2),
@@ -1273,7 +1271,7 @@ async def get_energy_comparison(
                     avg_power=round(s[5] or 0, 2),
                     max_power=round(s[6] or 0, 2),
                     avg_pue=round(s[7] or 1.5, 2),
-                    data_source="realtime"
+                    data_source="realtime",
                 )
 
             c_stat = _build_stat(cur_stats)
@@ -1290,7 +1288,7 @@ async def get_energy_comparison(
                 energy_change_rate=round(e_rate, 4),
                 cost_change=round(cost_change, 2),
                 cost_change_rate=round(cost_rate, 4),
-                data_source="realtime"
+                data_source="realtime",
             )
             return ResponseModel(data=comparison)
         # 无数据 fallback 到模拟
@@ -1328,7 +1326,7 @@ async def get_energy_comparison(
         valley_cost=round(current_valley * 0.4, 2),
         avg_power=round(current_total / 720, 2),
         max_power=round(current_total / 500, 2),
-        avg_pue=1.45
+        avg_pue=1.45,
     )
 
     prev_stat = EnergyStat(
@@ -1342,7 +1340,7 @@ async def get_energy_comparison(
         valley_cost=round(prev_valley * 0.4, 2),
         avg_power=round(prev_total / 720, 2),
         max_power=round(prev_total / 500, 2),
-        avg_pue=1.48
+        avg_pue=1.48,
     )
 
     comparison = EnergyComparison(
@@ -1351,7 +1349,7 @@ async def get_energy_comparison(
         energy_change=round(current_total - prev_total, 2),
         energy_change_rate=round(change_rate, 4),
         cost_change=round(current_cost - prev_cost, 2),
-        cost_change_rate=round((current_cost - prev_cost) / prev_cost if prev_cost > 0 else 0, 4)
+        cost_change_rate=round((current_cost - prev_cost) / prev_cost if prev_cost > 0 else 0, 4),
     )
 
     return ResponseModel(data=comparison)
@@ -1359,12 +1357,13 @@ async def get_energy_comparison(
 
 # ==================== 电费分析 ====================
 
+
 @router.get("/cost/daily", response_model=ResponseModel, summary="获取日电费统计")
 async def get_daily_cost(
     start_date: date = Query(..., description="开始日期"),
     end_date: date = Query(..., description="结束日期"),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
 ):
     """获取日电费统计（尖峰/高峰/平段/低谷/深谷五时段电费）"""
     settings = _get_energy_settings()
@@ -1378,9 +1377,9 @@ async def get_daily_cost(
     # 获取真实电价
     pricing_service = PricingService(db)
     prices = await pricing_service.get_all_prices()
-    pp = prices.get('peak_price', 1.2)
-    np_ = prices.get('normal_price', 0.8)
-    vp = prices.get('valley_price', 0.4)
+    pp = prices.get("peak_price", 1.2)
+    np_ = prices.get("normal_price", 0.8)
+    vp = prices.get("valley_price", 0.4)
 
     # [V2.11] 使用确定性模拟数据
     if not daily_data:
@@ -1396,33 +1395,37 @@ async def get_daily_cost(
             peak = total * 0.4
             normal = total * 0.35
             valley = total * 0.25
-            data_list.append({
-                "date": current.isoformat(),
-                "total_energy": round(total, 2),
-                "peak_energy": round(peak, 2),
-                "normal_energy": round(normal, 2),
-                "valley_energy": round(valley, 2),
-                "peak_cost": round(peak * 1.2, 2),
-                "normal_cost": round(normal * 0.8, 2),
-                "valley_cost": round(valley * 0.4, 2),
-                "total_cost": round(peak * 1.2 + normal * 0.8 + valley * 0.4, 2)
-            })
+            data_list.append(
+                {
+                    "date": current.isoformat(),
+                    "total_energy": round(total, 2),
+                    "peak_energy": round(peak, 2),
+                    "normal_energy": round(normal, 2),
+                    "valley_energy": round(valley, 2),
+                    "peak_cost": round(peak * 1.2, 2),
+                    "normal_cost": round(normal * 0.8, 2),
+                    "valley_cost": round(valley * 0.4, 2),
+                    "total_cost": round(peak * 1.2 + normal * 0.8 + valley * 0.4, 2),
+                }
+            )
             current += timedelta(days=1)
         return ResponseModel(data={"items": data_list})
 
     data_list = []
     for d in daily_data:
-        data_list.append({
-            "date": d.stat_date.isoformat(),
-            "total_energy": d.total_energy,
-            "peak_energy": d.peak_energy,
-            "normal_energy": d.normal_energy,
-            "valley_energy": d.valley_energy,
-            "peak_cost": round(d.peak_energy * pp, 2),
-            "normal_cost": round(d.normal_energy * np_, 2),
-            "valley_cost": round(d.valley_energy * vp, 2),
-            "total_cost": d.energy_cost
-        })
+        data_list.append(
+            {
+                "date": d.stat_date.isoformat(),
+                "total_energy": d.total_energy,
+                "peak_energy": d.peak_energy,
+                "normal_energy": d.normal_energy,
+                "valley_energy": d.valley_energy,
+                "peak_cost": round(d.peak_energy * pp, 2),
+                "normal_cost": round(d.normal_energy * np_, 2),
+                "valley_cost": round(d.valley_energy * vp, 2),
+                "total_cost": d.energy_cost,
+            }
+        )
 
     return ResponseModel(data={"items": data_list})
 
@@ -1432,7 +1435,7 @@ async def get_monthly_cost(
     year: int = Query(..., description="年份"),
     month: Optional[int] = Query(None, description="月份"),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
 ):
     """获取月电费统计"""
     settings = _get_energy_settings()
@@ -1458,45 +1461,50 @@ async def get_monthly_cost(
             peak = total * 0.4
             normal = total * 0.35
             valley = total * 0.25
-            data_list.append({
-                "year": year,
-                "month": m,
-                "total_energy": round(total, 2),
-                "peak_energy": round(peak, 2),
-                "normal_energy": round(normal, 2),
-                "valley_energy": round(valley, 2),
-                "peak_cost": round(peak * 1.2, 2),
-                "normal_cost": round(normal * 0.8, 2),
-                "valley_cost": round(valley * 0.4, 2),
-                "total_cost": round(peak * 1.2 + normal * 0.8 + valley * 0.4, 2)
-            })
+            data_list.append(
+                {
+                    "year": year,
+                    "month": m,
+                    "total_energy": round(total, 2),
+                    "peak_energy": round(peak, 2),
+                    "normal_energy": round(normal, 2),
+                    "valley_energy": round(valley, 2),
+                    "peak_cost": round(peak * 1.2, 2),
+                    "normal_cost": round(normal * 0.8, 2),
+                    "valley_cost": round(valley * 0.4, 2),
+                    "total_cost": round(peak * 1.2 + normal * 0.8 + valley * 0.4, 2),
+                }
+            )
         return ResponseModel(data={"items": data_list})
 
     data_list = []
     for d in monthly_data:
-        data_list.append({
-            "year": d.stat_year,
-            "month": d.stat_month,
-            "total_energy": d.total_energy,
-            "peak_energy": d.peak_energy,
-            "normal_energy": d.normal_energy,
-            "valley_energy": d.valley_energy,
-            "peak_cost": d.peak_cost,
-            "normal_cost": d.normal_cost,
-            "valley_cost": d.valley_cost,
-            "total_cost": d.energy_cost
-        })
+        data_list.append(
+            {
+                "year": d.stat_year,
+                "month": d.stat_month,
+                "total_energy": d.total_energy,
+                "peak_energy": d.peak_energy,
+                "normal_energy": d.normal_energy,
+                "valley_energy": d.valley_energy,
+                "peak_cost": d.peak_cost,
+                "normal_cost": d.normal_cost,
+                "valley_cost": d.valley_cost,
+                "total_cost": d.energy_cost,
+            }
+        )
 
     return ResponseModel(data={"items": data_list})
 
 
 # ==================== 电价配置 ====================
 
+
 @router.get("/pricing", response_model=ResponseModel[List[ElectricityPricingResponse]], summary="获取电价配置")
 async def get_pricing_list(
     is_enabled: Optional[bool] = Query(None, description="是否启用"),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
 ):
     """获取电价配置列表"""
     query = select(ElectricityPricing)
@@ -1512,9 +1520,7 @@ async def get_pricing_list(
 
 @router.post("/pricing", response_model=ResponseModel[ElectricityPricingResponse], summary="创建电价配置")
 async def create_pricing(
-    pricing: ElectricityPricingCreate,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_admin)
+    pricing: ElectricityPricingCreate, db: AsyncSession = Depends(get_db), current_user: User = Depends(require_admin)
 ):
     """创建电价配置"""
     new_pricing = ElectricityPricing(**pricing.model_dump())
@@ -1530,7 +1536,7 @@ async def update_pricing(
     pricing_id: int,
     pricing: ElectricityPricingUpdate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_admin)
+    current_user: User = Depends(require_admin),
 ):
     """更新电价配置"""
     result = await db.execute(select(ElectricityPricing).where(ElectricityPricing.id == pricing_id))
@@ -1542,9 +1548,7 @@ async def update_pricing(
     update_data = pricing.model_dump(exclude_unset=True)
     update_data["updated_at"] = datetime.now()
 
-    await db.execute(
-        update(ElectricityPricing).where(ElectricityPricing.id == pricing_id).values(**update_data)
-    )
+    await db.execute(update(ElectricityPricing).where(ElectricityPricing.id == pricing_id).values(**update_data))
     await db.commit()
 
     result = await db.execute(select(ElectricityPricing).where(ElectricityPricing.id == pricing_id))
@@ -1555,9 +1559,7 @@ async def update_pricing(
 
 @router.delete("/pricing/{pricing_id}", response_model=ResponseModel, summary="删除电价配置")
 async def delete_pricing(
-    pricing_id: int,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_admin)
+    pricing_id: int, db: AsyncSession = Depends(get_db), current_user: User = Depends(require_admin)
 ):
     """删除电价配置"""
     result = await db.execute(select(ElectricityPricing).where(ElectricityPricing.id == pricing_id))
@@ -1572,6 +1574,7 @@ async def delete_pricing(
 
 # ==================== 节能建议 ====================
 
+
 @router.get("/suggestions", response_model=ResponseModel[List[EnergySuggestionResponse]], summary="获取节能建议")
 async def get_suggestions(
     status: Optional[str] = Query(None, description="状态: pending/accepted/rejected/completed"),
@@ -1579,7 +1582,7 @@ async def get_suggestions(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
 ):
     """获取节能建议列表"""
     query = select(EnergySuggestion)
@@ -1589,10 +1592,7 @@ async def get_suggestions(
     if priority:
         query = query.where(EnergySuggestion.priority == priority)
 
-    query = query.order_by(
-        EnergySuggestion.priority.desc(),
-        EnergySuggestion.created_at.desc()
-    )
+    query = query.order_by(EnergySuggestion.priority.desc(), EnergySuggestion.created_at.desc())
     query = query.offset((page - 1) * page_size).limit(page_size)
 
     result = await db.execute(query)
@@ -1603,11 +1603,9 @@ async def get_suggestions(
 
 # ==================== V2.3 节能建议引擎（必须在 /suggestions/{suggestion_id} 之前定义）====================
 
+
 @router.get("/suggestions/templates", response_model=ResponseModel, summary="获取建议模板列表")
-async def get_suggestion_templates(
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
-):
+async def get_suggestion_templates(db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     """
     获取所有节能建议模板
     """
@@ -1616,10 +1614,7 @@ async def get_suggestion_templates(
     service = SuggestionEngineService(db)
     templates = service.get_templates()
 
-    return ResponseModel(data={
-        "total": len(templates),
-        "templates": templates
-    })
+    return ResponseModel(data={"total": len(templates), "templates": templates})
 
 
 @router.post("/suggestions/analyze", response_model=ResponseModel, summary="触发建议分析")
@@ -1627,7 +1622,7 @@ async def trigger_suggestion_analysis(
     categories: Optional[List[str]] = Query(None, description="分析类别"),
     force_refresh: bool = Query(False, description="强制刷新已有建议"),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
 ):
     """
     触发节能建议分析引擎
@@ -1649,7 +1644,7 @@ async def get_enhanced_suggestions(
     status: str = Query("pending", description="状态"),
     limit: int = Query(50, le=200),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
 ):
     """
     获取增强版节能建议列表
@@ -1663,35 +1658,31 @@ async def get_enhanced_suggestions(
 
     result = []
     for s in suggestions:
-        result.append({
-            "id": s.id,
-            "template_id": s.template_id,
-            "category": s.category,
-            "rule_name": s.rule_name,
-            "suggestion": s.suggestion,
-            "problem_description": s.problem_description,
-            "analysis_detail": s.analysis_detail,
-            "implementation_steps": s.implementation_steps,
-            "expected_effect": s.expected_effect,
-            "priority": s.priority,
-            "difficulty": s.difficulty,
-            "potential_saving": s.potential_saving,
-            "potential_cost_saving": s.potential_cost_saving,
-            "status": s.status,
-            "created_at": s.created_at.isoformat() if s.created_at else None
-        })
+        result.append(
+            {
+                "id": s.id,
+                "template_id": s.template_id,
+                "category": s.category,
+                "rule_name": s.rule_name,
+                "suggestion": s.suggestion,
+                "problem_description": s.problem_description,
+                "analysis_detail": s.analysis_detail,
+                "implementation_steps": s.implementation_steps,
+                "expected_effect": s.expected_effect,
+                "priority": s.priority,
+                "difficulty": s.difficulty,
+                "potential_saving": s.potential_saving,
+                "potential_cost_saving": s.potential_cost_saving,
+                "status": s.status,
+                "created_at": s.created_at.isoformat() if s.created_at else None,
+            }
+        )
 
-    return ResponseModel(data={
-        "total": len(result),
-        "suggestions": result
-    })
+    return ResponseModel(data={"total": len(result), "suggestions": result})
 
 
 @router.get("/suggestions/summary", response_model=ResponseModel, summary="获取建议汇总统计")
-async def get_suggestions_summary(
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
-):
+async def get_suggestions_summary(db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     """
     获取节能建议汇总统计
     """
@@ -1705,9 +1696,7 @@ async def get_suggestions_summary(
 
 @router.get("/suggestions/enhanced/{suggestion_id}", response_model=ResponseModel, summary="获取增强建议详情")
 async def get_enhanced_suggestion_detail(
-    suggestion_id: int,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    suggestion_id: int, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)
 ):
     """
     获取单个节能建议的详细信息（包含完整的调整参数和设备信息）
@@ -1725,11 +1714,10 @@ async def get_enhanced_suggestion_detail(
 
 # ==================== 节能建议详情路由（具体路径必须在参数路径之前）====================
 
+
 @router.get("/suggestions/detail/{suggestion_id}", response_model=ResponseModel, summary="获取建议完整详情")
 async def get_suggestion_full_detail(
-    suggestion_id: int,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    suggestion_id: int, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)
 ):
     """
     获取建议的完整详情，包含：
@@ -1757,11 +1745,12 @@ async def get_suggestion_full_detail(
 
 # ==================== 节能建议详情路由（带参数，必须在具体路径之后）====================
 
-@router.get("/suggestions/{suggestion_id}", response_model=ResponseModel[EnergySuggestionResponse], summary="获取建议详情")
+
+@router.get(
+    "/suggestions/{suggestion_id}", response_model=ResponseModel[EnergySuggestionResponse], summary="获取建议详情"
+)
 async def get_suggestion(
-    suggestion_id: int,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    suggestion_id: int, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)
 ):
     """获取节能建议详情"""
     result = await db.execute(select(EnergySuggestion).where(EnergySuggestion.id == suggestion_id))
@@ -1773,12 +1762,14 @@ async def get_suggestion(
     return ResponseModel(data=EnergySuggestionResponse.model_validate(suggestion))
 
 
-@router.put("/suggestions/{suggestion_id}/accept", response_model=ResponseModel[EnergySuggestionResponse], summary="接受建议")
+@router.put(
+    "/suggestions/{suggestion_id}/accept", response_model=ResponseModel[EnergySuggestionResponse], summary="接受建议"
+)
 async def accept_suggestion(
     suggestion_id: int,
     data: AcceptSuggestion,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_operator)
+    current_user: User = Depends(require_operator),
 ):
     """接受节能建议"""
     result = await db.execute(select(EnergySuggestion).where(EnergySuggestion.id == suggestion_id))
@@ -1791,12 +1782,14 @@ async def accept_suggestion(
         raise HTTPException(status_code=400, detail="只能接受待处理的建议")
 
     await db.execute(
-        update(EnergySuggestion).where(EnergySuggestion.id == suggestion_id).values(
+        update(EnergySuggestion)
+        .where(EnergySuggestion.id == suggestion_id)
+        .values(
             status="accepted",
             accepted_by=current_user.id,
             accepted_at=datetime.now(),
             remark=data.remark,
-            updated_at=datetime.now()
+            updated_at=datetime.now(),
         )
     )
     await db.commit()
@@ -1807,12 +1800,14 @@ async def accept_suggestion(
     return ResponseModel(data=EnergySuggestionResponse.model_validate(updated))
 
 
-@router.put("/suggestions/{suggestion_id}/reject", response_model=ResponseModel[EnergySuggestionResponse], summary="拒绝建议")
+@router.put(
+    "/suggestions/{suggestion_id}/reject", response_model=ResponseModel[EnergySuggestionResponse], summary="拒绝建议"
+)
 async def reject_suggestion(
     suggestion_id: int,
     data: RejectSuggestion,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_operator)
+    current_user: User = Depends(require_operator),
 ):
     """拒绝节能建议"""
     result = await db.execute(select(EnergySuggestion).where(EnergySuggestion.id == suggestion_id))
@@ -1825,11 +1820,9 @@ async def reject_suggestion(
         raise HTTPException(status_code=400, detail="只能拒绝待处理的建议")
 
     await db.execute(
-        update(EnergySuggestion).where(EnergySuggestion.id == suggestion_id).values(
-            status="rejected",
-            remark=data.remark,
-            updated_at=datetime.now()
-        )
+        update(EnergySuggestion)
+        .where(EnergySuggestion.id == suggestion_id)
+        .values(status="rejected", remark=data.remark, updated_at=datetime.now())
     )
     await db.commit()
 
@@ -1839,12 +1832,14 @@ async def reject_suggestion(
     return ResponseModel(data=EnergySuggestionResponse.model_validate(updated))
 
 
-@router.put("/suggestions/{suggestion_id}/complete", response_model=ResponseModel[EnergySuggestionResponse], summary="完成建议")
+@router.put(
+    "/suggestions/{suggestion_id}/complete", response_model=ResponseModel[EnergySuggestionResponse], summary="完成建议"
+)
 async def complete_suggestion(
     suggestion_id: int,
     data: CompleteSuggestion,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_operator)
+    current_user: User = Depends(require_operator),
 ):
     """标记建议为已完成"""
     result = await db.execute(select(EnergySuggestion).where(EnergySuggestion.id == suggestion_id))
@@ -1857,12 +1852,14 @@ async def complete_suggestion(
         raise HTTPException(status_code=400, detail="只能完成已接受的建议")
 
     await db.execute(
-        update(EnergySuggestion).where(EnergySuggestion.id == suggestion_id).values(
+        update(EnergySuggestion)
+        .where(EnergySuggestion.id == suggestion_id)
+        .values(
             status="completed",
             completed_at=datetime.now(),
             actual_saving=data.actual_saving,
             remark=data.remark if data.remark else suggestion.remark,
-            updated_at=datetime.now()
+            updated_at=datetime.now(),
         )
     )
     await db.commit()
@@ -1874,52 +1871,46 @@ async def complete_suggestion(
 
 
 @router.get("/saving/potential", response_model=ResponseModel[SavingPotential], summary="获取节能潜力")
-async def get_saving_potential(
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
-):
+async def get_saving_potential(db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     """获取节能潜力分析"""
     # 统计各类建议数量
     high_count = await db.execute(
-        select(func.count()).select_from(EnergySuggestion)
+        select(func.count())
+        .select_from(EnergySuggestion)
         .where(EnergySuggestion.priority == "high", EnergySuggestion.status == "pending")
     )
     medium_count = await db.execute(
-        select(func.count()).select_from(EnergySuggestion)
+        select(func.count())
+        .select_from(EnergySuggestion)
         .where(EnergySuggestion.priority == "medium", EnergySuggestion.status == "pending")
     )
     low_count = await db.execute(
-        select(func.count()).select_from(EnergySuggestion)
+        select(func.count())
+        .select_from(EnergySuggestion)
         .where(EnergySuggestion.priority == "low", EnergySuggestion.status == "pending")
     )
     pending_count = await db.execute(
-        select(func.count()).select_from(EnergySuggestion)
-        .where(EnergySuggestion.status == "pending")
+        select(func.count()).select_from(EnergySuggestion).where(EnergySuggestion.status == "pending")
     )
     accepted_count = await db.execute(
-        select(func.count()).select_from(EnergySuggestion)
-        .where(EnergySuggestion.status == "accepted")
+        select(func.count()).select_from(EnergySuggestion).where(EnergySuggestion.status == "accepted")
     )
     completed_count = await db.execute(
-        select(func.count()).select_from(EnergySuggestion)
-        .where(EnergySuggestion.status == "completed")
+        select(func.count()).select_from(EnergySuggestion).where(EnergySuggestion.status == "completed")
     )
 
     # 计算潜在节能
     potential_result = await db.execute(
-        select(
-            func.sum(EnergySuggestion.potential_saving),
-            func.sum(EnergySuggestion.potential_cost_saving)
-        ).where(EnergySuggestion.status == "pending")
+        select(func.sum(EnergySuggestion.potential_saving), func.sum(EnergySuggestion.potential_cost_saving)).where(
+            EnergySuggestion.status == "pending"
+        )
     )
     potential = potential_result.first()
 
     # 计算实际节能
     actual_result = await db.execute(
-        select(func.sum(EnergySuggestion.actual_saving))
-        .where(
-            EnergySuggestion.status == "completed",
-            EnergySuggestion.completed_at >= date(date.today().year, 1, 1)
+        select(func.sum(EnergySuggestion.actual_saving)).where(
+            EnergySuggestion.status == "completed", EnergySuggestion.completed_at >= date(date.today().year, 1, 1)
         )
     )
     actual_saving = actual_result.scalar() or 0
@@ -1933,7 +1924,7 @@ async def get_saving_potential(
         pending_count=pending_count.scalar() or 0,
         accepted_count=accepted_count.scalar() or 0,
         completed_count=completed_count.scalar() or 0,
-        actual_saving_ytd=actual_saving
+        actual_saving_ytd=actual_saving,
     )
 
     return ResponseModel(data=saving)
@@ -1941,11 +1932,9 @@ async def get_saving_potential(
 
 # ==================== V2.4 数据驱动 - 电价和设备能力查询 ====================
 
+
 @router.get("/pricing/current", response_model=ResponseModel, summary="获取当前电价配置")
-async def get_current_pricing(
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
-):
+async def get_current_pricing(db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     """
     获取当前有效的电价配置，用于前端展示
 
@@ -1958,11 +1947,7 @@ async def get_current_pricing(
     time_periods = await pricing_service.get_time_periods_for_display()
     data_source = await pricing_service.get_pricing_data_source()
 
-    return ResponseModel(data={
-        "pricing": pricing,
-        "time_periods": time_periods,
-        "data_source": data_source
-    })
+    return ResponseModel(data={"pricing": pricing, "time_periods": time_periods, "data_source": data_source})
 
 
 @router.post("/suggestions/{suggestion_id}/recalculate", response_model=ResponseModel, summary="调整参数并重算")
@@ -1970,7 +1955,7 @@ async def recalculate_suggestion(
     suggestion_id: int,
     params: Dict[str, Any],
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
 ):
     """
     根据用户调整的参数重新计算节能效果
@@ -1997,9 +1982,7 @@ async def recalculate_suggestion(
         target_period: str = Field(..., description="转入时段（valley/deep_valley/normal）")
 
     # 验证建议是否存在
-    result = await db.execute(
-        select(EnergySuggestion).where(EnergySuggestion.id == suggestion_id)
-    )
+    result = await db.execute(select(EnergySuggestion).where(EnergySuggestion.id == suggestion_id))
     suggestion = result.scalar_one_or_none()
     if not suggestion:
         raise HTTPException(status_code=404, detail="建议不存在")
@@ -2013,15 +1996,11 @@ async def recalculate_suggestion(
 
 # ==================== 配电图 ====================
 
+
 @router.get("/distribution", response_model=ResponseModel[DistributionDiagram], summary="获取配电图数据")
-async def get_distribution_diagram(
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
-):
+async def get_distribution_diagram(db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     """获取配电图数据（含实时功率和负载率）"""
-    result = await db.execute(
-        select(PowerDevice).where(PowerDevice.is_enabled == True)
-    )
+    result = await db.execute(select(PowerDevice).where(PowerDevice.is_enabled == True))
     devices = result.scalars().all()
 
     if not devices:
@@ -2044,7 +2023,7 @@ async def get_distribution_diagram(
             power=round(base_power, 2),
             load_rate=round(load_rate, 2) if load_rate else None,
             status="normal" if (load_rate or 0) < 0.8 else "warning",
-            children=[]
+            children=[],
         )
         node_dict[device.id] = node
 
@@ -2073,16 +2052,13 @@ async def get_distribution_diagram(
         root = list(node_dict.values())[0]
         total_power = root.power or 0
 
-    diagram = DistributionDiagram(
-        root=root,
-        total_power=round(total_power, 2),
-        timestamp=datetime.now()
-    )
+    diagram = DistributionDiagram(root=root, total_power=round(total_power, 2), timestamp=datetime.now())
 
     return ResponseModel(data=diagram)
 
 
 # ==================== 数据导出 ====================
+
 
 @router.get("/export/daily", summary="导出日能耗数据")
 async def export_daily_data(
@@ -2090,7 +2066,7 @@ async def export_daily_data(
     end_date: date = Query(..., description="结束日期"),
     format: str = Query("excel", description="格式: excel/csv"),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
 ):
     """导出日能耗数据"""
     result = await db.execute(
@@ -2112,56 +2088,62 @@ async def export_daily_data(
             peak = total * 0.4
             normal = total * 0.35
             valley = total * 0.25
-            data_list.append({
-                "日期": current.isoformat(),
-                "总电量(kWh)": round(total, 2),
-                "峰时电量(kWh)": round(peak, 2),
-                "平时电量(kWh)": round(normal, 2),
-                "谷时电量(kWh)": round(valley, 2),
-                "最大功率(kW)": round(total / 20, 2),
-                "平均功率(kW)": round(total / 24, 2),
-                "电费(元)": round(peak * 1.2 + normal * 0.8 + valley * 0.4, 2),
-                "PUE": round(1.4 + _deterministic_offset(seed + 1, 0.15), 2)
-            })
+            data_list.append(
+                {
+                    "日期": current.isoformat(),
+                    "总电量(kWh)": round(total, 2),
+                    "峰时电量(kWh)": round(peak, 2),
+                    "平时电量(kWh)": round(normal, 2),
+                    "谷时电量(kWh)": round(valley, 2),
+                    "最大功率(kW)": round(total / 20, 2),
+                    "平均功率(kW)": round(total / 24, 2),
+                    "电费(元)": round(peak * 1.2 + normal * 0.8 + valley * 0.4, 2),
+                    "PUE": round(1.4 + _deterministic_offset(seed + 1, 0.15), 2),
+                }
+            )
             current += timedelta(days=1)
     else:
         data_list = []
         for d in daily_data:
-            data_list.append({
-                "日期": d.stat_date.isoformat(),
-                "总电量(kWh)": d.total_energy,
-                "峰时电量(kWh)": d.peak_energy,
-                "平时电量(kWh)": d.normal_energy,
-                "谷时电量(kWh)": d.valley_energy,
-                "最大功率(kW)": d.max_power,
-                "平均功率(kW)": d.avg_power,
-                "电费(元)": d.energy_cost,
-                "PUE": d.pue
-            })
+            data_list.append(
+                {
+                    "日期": d.stat_date.isoformat(),
+                    "总电量(kWh)": d.total_energy,
+                    "峰时电量(kWh)": d.peak_energy,
+                    "平时电量(kWh)": d.normal_energy,
+                    "谷时电量(kWh)": d.valley_energy,
+                    "最大功率(kW)": d.max_power,
+                    "平均功率(kW)": d.avg_power,
+                    "电费(元)": d.energy_cost,
+                    "PUE": d.pue,
+                }
+            )
 
     if format == "csv":
         import csv
+
         output = BytesIO()
         import codecs
+
         output.write(codecs.BOM_UTF8)
 
         if data_list:
-            writer = csv.DictWriter(output, fieldnames=data_list[0].keys())
-            output.write(','.join(data_list[0].keys()).encode('utf-8'))
-            output.write(b'\n')
+            csv.DictWriter(output, fieldnames=data_list[0].keys())
+            output.write(",".join(data_list[0].keys()).encode("utf-8"))
+            output.write(b"\n")
             for row in data_list:
-                output.write(','.join(str(v) for v in row.values()).encode('utf-8'))
-                output.write(b'\n')
+                output.write(",".join(str(v) for v in row.values()).encode("utf-8"))
+                output.write(b"\n")
 
         output.seek(0)
         return StreamingResponse(
             output,
             media_type="text/csv",
-            headers={"Content-Disposition": f"attachment; filename=energy_daily_{start_date}_{end_date}.csv"}
+            headers={"Content-Disposition": f"attachment; filename=energy_daily_{start_date}_{end_date}.csv"},
         )
     else:
         try:
-            import openpyxl
+            import openpyxl  # noqa: F401
             from openpyxl import Workbook
 
             wb = Workbook()
@@ -2184,7 +2166,7 @@ async def export_daily_data(
             return StreamingResponse(
                 output,
                 media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                headers={"Content-Disposition": f"attachment; filename=energy_daily_{start_date}_{end_date}.xlsx"}
+                headers={"Content-Disposition": f"attachment; filename=energy_daily_{start_date}_{end_date}.xlsx"},
             )
         except ImportError:
             raise HTTPException(status_code=500, detail="Excel导出功能需要安装openpyxl库")
@@ -2195,13 +2177,11 @@ async def export_monthly_data(
     year: int = Query(..., description="年份"),
     format: str = Query("excel", description="格式: excel/csv"),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
 ):
     """导出月能耗数据"""
     result = await db.execute(
-        select(EnergyMonthly)
-        .where(EnergyMonthly.stat_year == year)
-        .order_by(EnergyMonthly.stat_month)
+        select(EnergyMonthly).where(EnergyMonthly.stat_year == year).order_by(EnergyMonthly.stat_month)
     )
     monthly_data = result.scalars().all()
 
@@ -2215,62 +2195,66 @@ async def export_monthly_data(
             peak = total * 0.4
             normal = total * 0.35
             valley = total * 0.25
-            data_list.append({
-                "年份": year,
-                "月份": month,
-                "总电量(kWh)": round(total, 2),
-                "峰时电量(kWh)": round(peak, 2),
-                "平时电量(kWh)": round(normal, 2),
-                "谷时电量(kWh)": round(valley, 2),
-                "最大功率(kW)": round(total / 500, 2),
-                "平均功率(kW)": round(total / 720, 2),
-                "峰时电费(元)": round(peak * 1.2, 2),
-                "平时电费(元)": round(normal * 0.8, 2),
-                "谷时电费(元)": round(valley * 0.4, 2),
-                "总电费(元)": round(peak * 1.2 + normal * 0.8 + valley * 0.4, 2),
-                "平均PUE": round(1.45 + _deterministic_offset(seed + 1, 0.125), 2)
-            })
+            data_list.append(
+                {
+                    "年份": year,
+                    "月份": month,
+                    "总电量(kWh)": round(total, 2),
+                    "峰时电量(kWh)": round(peak, 2),
+                    "平时电量(kWh)": round(normal, 2),
+                    "谷时电量(kWh)": round(valley, 2),
+                    "最大功率(kW)": round(total / 500, 2),
+                    "平均功率(kW)": round(total / 720, 2),
+                    "峰时电费(元)": round(peak * 1.2, 2),
+                    "平时电费(元)": round(normal * 0.8, 2),
+                    "谷时电费(元)": round(valley * 0.4, 2),
+                    "总电费(元)": round(peak * 1.2 + normal * 0.8 + valley * 0.4, 2),
+                    "平均PUE": round(1.45 + _deterministic_offset(seed + 1, 0.125), 2),
+                }
+            )
     else:
         data_list = []
         for d in monthly_data:
-            data_list.append({
-                "年份": d.stat_year,
-                "月份": d.stat_month,
-                "总电量(kWh)": d.total_energy,
-                "峰时电量(kWh)": d.peak_energy,
-                "平时电量(kWh)": d.normal_energy,
-                "谷时电量(kWh)": d.valley_energy,
-                "最大功率(kW)": d.max_power,
-                "平均功率(kW)": d.avg_power,
-                "峰时电费(元)": d.peak_cost,
-                "平时电费(元)": d.normal_cost,
-                "谷时电费(元)": d.valley_cost,
-                "总电费(元)": d.energy_cost,
-                "平均PUE": d.avg_pue
-            })
+            data_list.append(
+                {
+                    "年份": d.stat_year,
+                    "月份": d.stat_month,
+                    "总电量(kWh)": d.total_energy,
+                    "峰时电量(kWh)": d.peak_energy,
+                    "平时电量(kWh)": d.normal_energy,
+                    "谷时电量(kWh)": d.valley_energy,
+                    "最大功率(kW)": d.max_power,
+                    "平均功率(kW)": d.avg_power,
+                    "峰时电费(元)": d.peak_cost,
+                    "平时电费(元)": d.normal_cost,
+                    "谷时电费(元)": d.valley_cost,
+                    "总电费(元)": d.energy_cost,
+                    "平均PUE": d.avg_pue,
+                }
+            )
 
     if format == "csv":
-        import csv
         output = BytesIO()
         import codecs
+
         output.write(codecs.BOM_UTF8)
 
         if data_list:
-            output.write(','.join(data_list[0].keys()).encode('utf-8'))
-            output.write(b'\n')
+            output.write(",".join(data_list[0].keys()).encode("utf-8"))
+            output.write(b"\n")
             for row in data_list:
-                output.write(','.join(str(v) for v in row.values()).encode('utf-8'))
-                output.write(b'\n')
+                output.write(",".join(str(v) for v in row.values()).encode("utf-8"))
+                output.write(b"\n")
 
         output.seek(0)
         return StreamingResponse(
             output,
             media_type="text/csv",
-            headers={"Content-Disposition": f"attachment; filename=energy_monthly_{year}.csv"}
+            headers={"Content-Disposition": f"attachment; filename=energy_monthly_{year}.csv"},
         )
     else:
         try:
-            import openpyxl
+            import openpyxl  # noqa: F401
             from openpyxl import Workbook
 
             wb = Workbook()
@@ -2293,7 +2277,7 @@ async def export_monthly_data(
             return StreamingResponse(
                 output,
                 media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                headers={"Content-Disposition": f"attachment; filename=energy_monthly_{year}.xlsx"}
+                headers={"Content-Disposition": f"attachment; filename=energy_monthly_{year}.xlsx"},
             )
         except ImportError:
             raise HTTPException(status_code=500, detail="Excel导出功能需要安装openpyxl库")
@@ -2301,10 +2285,14 @@ async def export_monthly_data(
 
 # ==================== 变压器管理 ====================
 
-@router.get("/transformers/with-meters", response_model=ResponseModel[List[TransformerWithMeterPointsResponse]], summary="获取变压器及其计量点")
+
+@router.get(
+    "/transformers/with-meters",
+    response_model=ResponseModel[List[TransformerWithMeterPointsResponse]],
+    summary="获取变压器及其计量点",
+)
 async def get_transformers_with_meters(
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)
 ):
     """
     获取变压器及其下属计量点（基于配电拓扑关系）
@@ -2327,31 +2315,35 @@ async def get_transformers_with_meters(
         # 构建计量点需量信息列表
         meter_infos = []
         for m in enabled_meters:
-            meter_infos.append(MeterPointDemandInfo(
-                id=m.id,
-                meter_name=m.meter_name,
-                meter_code=m.meter_code,
-                declared_demand=m.declared_demand,
-                demand_type=m.demand_type,
-                demand_period=m.demand_period
-            ))
+            meter_infos.append(
+                MeterPointDemandInfo(
+                    id=m.id,
+                    meter_name=m.meter_name,
+                    meter_code=m.meter_code,
+                    declared_demand=m.declared_demand,
+                    demand_type=m.demand_type,
+                    demand_period=m.demand_period,
+                )
+            )
 
         # 计算汇总数据
         total_declared = sum(m.declared_demand or 0 for m in enabled_meters)
         configured_count = len([m for m in enabled_meters if m.declared_demand])
 
-        response_data.append(TransformerWithMeterPointsResponse(
-            id=t.id,
-            transformer_code=t.transformer_code,
-            transformer_name=t.transformer_name,
-            rated_capacity=t.rated_capacity,
-            status=t.status or "running",
-            is_enabled=t.is_enabled,
-            meter_points=meter_infos,
-            total_declared_demand=total_declared,
-            meter_point_count=len(enabled_meters),
-            configured_count=configured_count
-        ))
+        response_data.append(
+            TransformerWithMeterPointsResponse(
+                id=t.id,
+                transformer_code=t.transformer_code,
+                transformer_name=t.transformer_name,
+                rated_capacity=t.rated_capacity,
+                status=t.status or "running",
+                is_enabled=t.is_enabled,
+                meter_points=meter_infos,
+                total_declared_demand=total_declared,
+                meter_point_count=len(enabled_meters),
+                configured_count=configured_count,
+            )
+        )
 
     return ResponseModel(data=response_data)
 
@@ -2361,7 +2353,7 @@ async def get_transformers(
     status: Optional[str] = Query(None, description="状态"),
     is_enabled: Optional[bool] = Query(None, description="是否启用"),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
 ):
     """获取变压器列表"""
     query = select(Transformer)
@@ -2378,14 +2370,10 @@ async def get_transformers(
 
 @router.post("/transformers", response_model=ResponseModel[TransformerResponse], summary="创建变压器")
 async def create_transformer(
-    transformer: TransformerCreate,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_admin)
+    transformer: TransformerCreate, db: AsyncSession = Depends(get_db), current_user: User = Depends(require_admin)
 ):
     """创建变压器"""
-    existing = await db.execute(
-        select(Transformer).where(Transformer.transformer_code == transformer.transformer_code)
-    )
+    existing = await db.execute(select(Transformer).where(Transformer.transformer_code == transformer.transformer_code))
     if existing.scalar_one_or_none():
         raise HTTPException(status_code=400, detail="变压器编码已存在")
 
@@ -2399,11 +2387,11 @@ async def create_transformer(
     return ResponseModel(data=TransformerResponse.model_validate(new_transformer))
 
 
-@router.get("/transformers/{transformer_id}", response_model=ResponseModel[TransformerResponse], summary="获取变压器详情")
+@router.get(
+    "/transformers/{transformer_id}", response_model=ResponseModel[TransformerResponse], summary="获取变压器详情"
+)
 async def get_transformer(
-    transformer_id: int,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    transformer_id: int, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)
 ):
     """获取变压器详情"""
     result = await db.execute(select(Transformer).where(Transformer.id == transformer_id))
@@ -2418,7 +2406,7 @@ async def update_transformer(
     transformer_id: int,
     data: TransformerUpdate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_admin)
+    current_user: User = Depends(require_admin),
 ):
     """更新变压器"""
     result = await db.execute(select(Transformer).where(Transformer.id == transformer_id))
@@ -2444,9 +2432,7 @@ async def update_transformer(
 
 @router.delete("/transformers/{transformer_id}", response_model=ResponseModel, summary="删除变压器")
 async def delete_transformer(
-    transformer_id: int,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_admin)
+    transformer_id: int, db: AsyncSession = Depends(get_db), current_user: User = Depends(require_admin)
 ):
     """删除变压器"""
     result = await db.execute(select(Transformer).where(Transformer.id == transformer_id))
@@ -2465,12 +2451,13 @@ async def delete_transformer(
 
 # ==================== 计量点管理 ====================
 
+
 @router.get("/meter-points", response_model=ResponseModel[List[MeterPointResponse]], summary="获取计量点列表")
 async def get_meter_points(
     transformer_id: Optional[int] = Query(None, description="变压器ID"),
     is_enabled: Optional[bool] = Query(None, description="是否启用"),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
 ):
     """获取计量点列表"""
     query = select(MeterPoint)
@@ -2487,21 +2474,15 @@ async def get_meter_points(
 
 @router.post("/meter-points", response_model=ResponseModel[MeterPointResponse], summary="创建计量点")
 async def create_meter_point(
-    meter_point: MeterPointCreate,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_admin)
+    meter_point: MeterPointCreate, db: AsyncSession = Depends(get_db), current_user: User = Depends(require_admin)
 ):
     """创建计量点"""
-    existing = await db.execute(
-        select(MeterPoint).where(MeterPoint.meter_code == meter_point.meter_code)
-    )
+    existing = await db.execute(select(MeterPoint).where(MeterPoint.meter_code == meter_point.meter_code))
     if existing.scalar_one_or_none():
         raise HTTPException(status_code=400, detail="计量点编码已存在")
 
     if meter_point.transformer_id:
-        transformer = await db.execute(
-            select(Transformer).where(Transformer.id == meter_point.transformer_id)
-        )
+        transformer = await db.execute(select(Transformer).where(Transformer.id == meter_point.transformer_id))
         if not transformer.scalar_one_or_none():
             raise HTTPException(status_code=400, detail="关联的变压器不存在")
 
@@ -2514,9 +2495,7 @@ async def create_meter_point(
 
 @router.get("/meter-points/{meter_point_id}", response_model=ResponseModel[MeterPointDetail], summary="获取计量点详情")
 async def get_meter_point(
-    meter_point_id: int,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    meter_point_id: int, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)
 ):
     """获取计量点详情（含变压器信息）"""
     result = await db.execute(select(MeterPoint).where(MeterPoint.id == meter_point_id))
@@ -2528,9 +2507,7 @@ async def get_meter_point(
 
     # 获取变压器信息
     if meter_point.transformer_id:
-        transformer_result = await db.execute(
-            select(Transformer).where(Transformer.id == meter_point.transformer_id)
-        )
+        transformer_result = await db.execute(select(Transformer).where(Transformer.id == meter_point.transformer_id))
         transformer = transformer_result.scalar_one_or_none()
         if transformer:
             response_data["transformer_name"] = transformer.transformer_name
@@ -2544,7 +2521,7 @@ async def update_meter_point(
     meter_point_id: int,
     data: MeterPointUpdate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_admin)
+    current_user: User = Depends(require_admin),
 ):
     """更新计量点"""
     result = await db.execute(select(MeterPoint).where(MeterPoint.id == meter_point_id))
@@ -2562,9 +2539,7 @@ async def update_meter_point(
 
 @router.delete("/meter-points/{meter_point_id}", response_model=ResponseModel, summary="删除计量点")
 async def delete_meter_point(
-    meter_point_id: int,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_admin)
+    meter_point_id: int, db: AsyncSession = Depends(get_db), current_user: User = Depends(require_admin)
 ):
     """删除计量点"""
     result = await db.execute(select(MeterPoint).where(MeterPoint.id == meter_point_id))
@@ -2583,13 +2558,14 @@ async def delete_meter_point(
 
 # ==================== 配电柜管理 ====================
 
+
 @router.get("/panels", response_model=ResponseModel[List[DistributionPanelResponse]], summary="获取配电柜列表")
 async def get_distribution_panels(
     panel_type: Optional[str] = Query(None, description="配电柜类型"),
     meter_point_id: Optional[int] = Query(None, description="计量点ID"),
     is_enabled: Optional[bool] = Query(None, description="是否启用"),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
 ):
     """获取配电柜列表"""
     query = select(DistributionPanel)
@@ -2608,9 +2584,7 @@ async def get_distribution_panels(
 
 @router.get("/panels/{panel_id}", response_model=ResponseModel[DistributionPanelResponse], summary="获取配电柜详情")
 async def get_distribution_panel(
-    panel_id: int,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    panel_id: int, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)
 ):
     """获取配电柜详情"""
     result = await db.execute(select(DistributionPanel).where(DistributionPanel.id == panel_id))
@@ -2622,14 +2596,10 @@ async def get_distribution_panel(
 
 @router.post("/panels", response_model=ResponseModel[DistributionPanelResponse], summary="创建配电柜")
 async def create_distribution_panel(
-    panel: DistributionPanelCreate,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_admin)
+    panel: DistributionPanelCreate, db: AsyncSession = Depends(get_db), current_user: User = Depends(require_admin)
 ):
     """创建配电柜"""
-    existing = await db.execute(
-        select(DistributionPanel).where(DistributionPanel.panel_code == panel.panel_code)
-    )
+    existing = await db.execute(select(DistributionPanel).where(DistributionPanel.panel_code == panel.panel_code))
     if existing.scalar_one_or_none():
         raise HTTPException(status_code=400, detail="配电柜编码已存在")
 
@@ -2645,7 +2615,7 @@ async def update_distribution_panel(
     panel_id: int,
     data: DistributionPanelUpdate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_admin)
+    current_user: User = Depends(require_admin),
 ):
     """更新配电柜"""
     result = await db.execute(select(DistributionPanel).where(DistributionPanel.id == panel_id))
@@ -2663,9 +2633,7 @@ async def update_distribution_panel(
 
 @router.delete("/panels/{panel_id}", response_model=ResponseModel, summary="删除配电柜")
 async def delete_distribution_panel(
-    panel_id: int,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_admin)
+    panel_id: int, db: AsyncSession = Depends(get_db), current_user: User = Depends(require_admin)
 ):
     """删除配电柜"""
     result = await db.execute(select(DistributionPanel).where(DistributionPanel.id == panel_id))
@@ -2684,13 +2652,14 @@ async def delete_distribution_panel(
 
 # ==================== 配电回路管理 ====================
 
+
 @router.get("/circuits", response_model=ResponseModel[List[DistributionCircuitResponse]], summary="获取配电回路列表")
 async def get_distribution_circuits(
     panel_id: Optional[int] = Query(None, description="配电柜ID"),
     load_type: Optional[str] = Query(None, description="负载类型"),
     is_shiftable: Optional[bool] = Query(None, description="是否可转移"),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
 ):
     """获取配电回路列表"""
     query = select(DistributionCircuit)
@@ -2707,11 +2676,11 @@ async def get_distribution_circuits(
     return ResponseModel(data=[DistributionCircuitResponse.model_validate(c) for c in circuits])
 
 
-@router.get("/circuits/{circuit_id}", response_model=ResponseModel[DistributionCircuitResponse], summary="获取配电回路详情")
+@router.get(
+    "/circuits/{circuit_id}", response_model=ResponseModel[DistributionCircuitResponse], summary="获取配电回路详情"
+)
 async def get_distribution_circuit(
-    circuit_id: int,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    circuit_id: int, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)
 ):
     """获取配电回路详情"""
     result = await db.execute(select(DistributionCircuit).where(DistributionCircuit.id == circuit_id))
@@ -2723,9 +2692,7 @@ async def get_distribution_circuit(
 
 @router.post("/circuits", response_model=ResponseModel[DistributionCircuitResponse], summary="创建配电回路")
 async def create_distribution_circuit(
-    circuit: DistributionCircuitCreate,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_admin)
+    circuit: DistributionCircuitCreate, db: AsyncSession = Depends(get_db), current_user: User = Depends(require_admin)
 ):
     """创建配电回路"""
     existing = await db.execute(
@@ -2751,7 +2718,7 @@ async def update_distribution_circuit(
     circuit_id: int,
     data: DistributionCircuitUpdate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_admin)
+    current_user: User = Depends(require_admin),
 ):
     """更新配电回路"""
     result = await db.execute(select(DistributionCircuit).where(DistributionCircuit.id == circuit_id))
@@ -2769,9 +2736,7 @@ async def update_distribution_circuit(
 
 @router.delete("/circuits/{circuit_id}", response_model=ResponseModel, summary="删除配电回路")
 async def delete_distribution_circuit(
-    circuit_id: int,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_admin)
+    circuit_id: int, db: AsyncSession = Depends(get_db), current_user: User = Depends(require_admin)
 ):
     """删除配电回路"""
     result = await db.execute(select(DistributionCircuit).where(DistributionCircuit.id == circuit_id))
@@ -2790,11 +2755,9 @@ async def delete_distribution_circuit(
 
 # ==================== 配电系统拓扑 ====================
 
+
 @router.get("/topology", response_model=ResponseModel[DistributionTopologyResponse], summary="获取配电系统拓扑")
-async def get_distribution_topology(
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
-):
+async def get_distribution_topology(db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     """
     获取完整的配电系统拓扑结构
     变压器 → 计量点 → 配电柜 → 回路 → 设备
@@ -2806,27 +2769,19 @@ async def get_distribution_topology(
     transformers = transformers_result.scalars().all()
 
     # 获取所有计量点
-    meters_result = await db.execute(
-        select(MeterPoint).where(MeterPoint.is_enabled == True)
-    )
+    meters_result = await db.execute(select(MeterPoint).where(MeterPoint.is_enabled == True))
     meters = meters_result.scalars().all()
 
     # 获取所有配电柜
-    panels_result = await db.execute(
-        select(DistributionPanel).where(DistributionPanel.is_enabled == True)
-    )
+    panels_result = await db.execute(select(DistributionPanel).where(DistributionPanel.is_enabled == True))
     panels = panels_result.scalars().all()
 
     # 获取所有回路
-    circuits_result = await db.execute(
-        select(DistributionCircuit).where(DistributionCircuit.is_enabled == True)
-    )
+    circuits_result = await db.execute(select(DistributionCircuit).where(DistributionCircuit.is_enabled == True))
     circuits = circuits_result.scalars().all()
 
     # 获取所有设备
-    devices_result = await db.execute(
-        select(PowerDevice).where(PowerDevice.is_enabled == True)
-    )
+    devices_result = await db.execute(select(PowerDevice).where(PowerDevice.is_enabled == True))
     devices = devices_result.scalars().all()
 
     # 构建拓扑结构
@@ -2836,23 +2791,23 @@ async def get_distribution_topology(
         if device.circuit_id:
             if device.circuit_id not in circuit_devices:
                 circuit_devices[device.circuit_id] = []
-            circuit_devices[device.circuit_id].append(
-                PowerDeviceResponse.model_validate(device)
-            )
+            circuit_devices[device.circuit_id].append(PowerDeviceResponse.model_validate(device))
 
     # 回路按配电柜分组
     panel_circuits = {}
     for circuit in circuits:
         if circuit.panel_id not in panel_circuits:
             panel_circuits[circuit.panel_id] = []
-        panel_circuits[circuit.panel_id].append(TopologyCircuitNode(
-            circuit_id=circuit.id,
-            circuit_code=circuit.circuit_code,
-            circuit_name=circuit.circuit_name,
-            load_type=circuit.load_type,
-            is_shiftable=circuit.is_shiftable,
-            devices=circuit_devices.get(circuit.id, [])
-        ))
+        panel_circuits[circuit.panel_id].append(
+            TopologyCircuitNode(
+                circuit_id=circuit.id,
+                circuit_code=circuit.circuit_code,
+                circuit_name=circuit.circuit_name,
+                load_type=circuit.load_type,
+                is_shiftable=circuit.is_shiftable,
+                devices=circuit_devices.get(circuit.id, []),
+            )
+        )
 
     # 配电柜按计量点分组
     meter_panels = {}
@@ -2860,13 +2815,15 @@ async def get_distribution_topology(
         if panel.meter_point_id:
             if panel.meter_point_id not in meter_panels:
                 meter_panels[panel.meter_point_id] = []
-            meter_panels[panel.meter_point_id].append(TopologyPanelNode(
-                panel_id=panel.id,
-                panel_code=panel.panel_code,
-                panel_name=panel.panel_name,
-                panel_type=panel.panel_type,
-                circuits=panel_circuits.get(panel.id, [])
-            ))
+            meter_panels[panel.meter_point_id].append(
+                TopologyPanelNode(
+                    panel_id=panel.id,
+                    panel_code=panel.panel_code,
+                    panel_name=panel.panel_name,
+                    panel_type=panel.panel_type,
+                    circuits=panel_circuits.get(panel.id, []),
+                )
+            )
 
     # 计量点按变压器分组
     transformer_meters = {}
@@ -2874,37 +2831,44 @@ async def get_distribution_topology(
         if meter.transformer_id:
             if meter.transformer_id not in transformer_meters:
                 transformer_meters[meter.transformer_id] = []
-            transformer_meters[meter.transformer_id].append(TopologyMeterNode(
-                meter_point_id=meter.id,
-                meter_code=meter.meter_code,
-                meter_name=meter.meter_name,
-                declared_demand=meter.declared_demand,
-                demand_type=meter.demand_type,
-                panels=meter_panels.get(meter.id, [])
-            ))
+            transformer_meters[meter.transformer_id].append(
+                TopologyMeterNode(
+                    meter_point_id=meter.id,
+                    meter_code=meter.meter_code,
+                    meter_name=meter.meter_name,
+                    declared_demand=meter.declared_demand,
+                    demand_type=meter.demand_type,
+                    panels=meter_panels.get(meter.id, []),
+                )
+            )
 
     # 构建变压器节点
     transformer_nodes = []
     total_capacity = 0
     for transformer in transformers:
         total_capacity += transformer.rated_capacity
-        transformer_nodes.append(TopologyTransformerNode(
-            transformer_id=transformer.id,
-            transformer_code=transformer.transformer_code,
-            transformer_name=transformer.transformer_name,
-            rated_capacity=transformer.rated_capacity,
-            meter_points=transformer_meters.get(transformer.id, [])
-        ))
+        transformer_nodes.append(
+            TopologyTransformerNode(
+                transformer_id=transformer.id,
+                transformer_code=transformer.transformer_code,
+                transformer_name=transformer.transformer_name,
+                rated_capacity=transformer.rated_capacity,
+                meter_points=transformer_meters.get(transformer.id, []),
+            )
+        )
 
-    return ResponseModel(data=DistributionTopologyResponse(
-        transformers=transformer_nodes,
-        total_capacity=total_capacity,
-        total_meter_points=len(meters),
-        total_devices=len(devices)
-    ))
+    return ResponseModel(
+        data=DistributionTopologyResponse(
+            transformers=transformer_nodes,
+            total_capacity=total_capacity,
+            total_meter_points=len(meters),
+            total_devices=len(devices),
+        )
+    )
 
 
 # ==================== 功率曲线 ====================
+
 
 @router.get("/power-curve", response_model=ResponseModel[PowerCurveResponse], summary="获取功率曲线")
 async def get_power_curve(
@@ -2913,16 +2877,13 @@ async def get_power_curve(
     meter_point_id: Optional[int] = Query(None, description="计量点ID"),
     device_id: Optional[int] = Query(None, description="设备ID"),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
 ):
     """
     获取功率曲线数据
     支持按计量点或设备查询
     """
-    query = select(PowerCurveData).where(
-        PowerCurveData.timestamp >= start_time,
-        PowerCurveData.timestamp <= end_time
-    )
+    query = select(PowerCurveData).where(PowerCurveData.timestamp >= start_time, PowerCurveData.timestamp <= end_time)
 
     if meter_point_id:
         query = query.where(PowerCurveData.meter_point_id == meter_point_id)
@@ -2971,29 +2932,33 @@ async def get_power_curve(
             total_power += power
             count += 1
 
-            data_list.append(PowerCurvePoint(
-                timestamp=current,
-                meter_point_id=meter_point_id,
-                device_id=device_id,
-                active_power=round(power, 2),
-                reactive_power=round(power * 0.2, 2),
-                power_factor=round(_deterministic_ratio(seed + 2, 0.85, 0.95), 3),
-                demand_15min=round(demand, 2),
-                time_period=time_period
-            ))
+            data_list.append(
+                PowerCurvePoint(
+                    timestamp=current,
+                    meter_point_id=meter_point_id,
+                    device_id=device_id,
+                    active_power=round(power, 2),
+                    reactive_power=round(power * 0.2, 2),
+                    power_factor=round(_deterministic_ratio(seed + 2, 0.85, 0.95), 3),
+                    demand_15min=round(demand, 2),
+                    time_period=time_period,
+                )
+            )
             current += timedelta(minutes=15)
             idx += 1
 
         avg_power = total_power / count if count > 0 else 0
 
-        return ResponseModel(data=PowerCurveResponse(
-            meter_point_id=meter_point_id,
-            device_id=device_id,
-            data=data_list,
-            max_power=round(max_power, 2),
-            avg_power=round(avg_power, 2),
-            max_demand=round(max_demand, 2)
-        ))
+        return ResponseModel(
+            data=PowerCurveResponse(
+                meter_point_id=meter_point_id,
+                device_id=device_id,
+                data=data_list,
+                max_power=round(max_power, 2),
+                avg_power=round(avg_power, 2),
+                max_demand=round(max_demand, 2),
+            )
+        )
 
     # 有真实数据时
     data_list = []
@@ -3006,37 +2971,44 @@ async def get_power_curve(
         max_demand = max(max_demand, d.demand_15min or 0)
         total_power += d.active_power or 0
 
-        data_list.append(PowerCurvePoint(
-            timestamp=d.timestamp,
-            meter_point_id=d.meter_point_id,
-            device_id=d.device_id,
-            active_power=d.active_power or 0,
-            reactive_power=d.reactive_power or 0,
-            power_factor=d.power_factor or 0.9,
-            demand_15min=d.demand_15min or 0,
-            time_period=d.time_period or "flat"
-        ))
+        data_list.append(
+            PowerCurvePoint(
+                timestamp=d.timestamp,
+                meter_point_id=d.meter_point_id,
+                device_id=d.device_id,
+                active_power=d.active_power or 0,
+                reactive_power=d.reactive_power or 0,
+                power_factor=d.power_factor or 0.9,
+                demand_15min=d.demand_15min or 0,
+                time_period=d.time_period or "flat",
+            )
+        )
 
     avg_power = total_power / len(curve_data) if curve_data else 0
 
-    return ResponseModel(data=PowerCurveResponse(
-        meter_point_id=meter_point_id,
-        device_id=device_id,
-        data=data_list,
-        max_power=round(max_power, 2),
-        avg_power=round(avg_power, 2),
-        max_demand=round(max_demand, 2)
-    ))
+    return ResponseModel(
+        data=PowerCurveResponse(
+            meter_point_id=meter_point_id,
+            device_id=device_id,
+            data=data_list,
+            max_power=round(max_power, 2),
+            avg_power=round(avg_power, 2),
+            max_demand=round(max_demand, 2),
+        )
+    )
 
 
 # ==================== 需量历史 ====================
 
-@router.get("/demand-history/{meter_point_id}", response_model=ResponseModel[DemandHistoryResponse], summary="获取需量历史")
+
+@router.get(
+    "/demand-history/{meter_point_id}", response_model=ResponseModel[DemandHistoryResponse], summary="获取需量历史"
+)
 async def get_demand_history(
     meter_point_id: int,
     months: int = Query(12, description="历史月数", ge=1, le=36),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
 ):
     """获取指定计量点的需量历史数据"""
     # 获取计量点信息
@@ -3047,12 +3019,14 @@ async def get_demand_history(
 
     # 获取需量历史
     now = datetime.now()
-    start_year = now.year if now.month > months else now.year - 1
-    start_month = (now.month - months) % 12 or 12
+    now.year if now.month > months else now.year - 1
+    (now.month - months) % 12 or 12
 
-    query = select(DemandHistory).where(
-        DemandHistory.meter_point_id == meter_point_id
-    ).order_by(DemandHistory.stat_year.desc(), DemandHistory.stat_month.desc())
+    query = (
+        select(DemandHistory)
+        .where(DemandHistory.meter_point_id == meter_point_id)
+        .order_by(DemandHistory.stat_year.desc(), DemandHistory.stat_month.desc())
+    )
 
     result = await db.execute(query)
     history_data = result.scalars().all()
@@ -3079,62 +3053,68 @@ async def get_demand_history(
             d_95th = max_d * 0.94
             utilization = max_d / declared if declared > 0 else 0
 
-            history_list.append(DemandHistoryItem(
-                month=f"{year}-{month:02d}",
-                declared_demand=declared,
-                max_demand=round(max_d, 2),
-                avg_demand=round(avg_d, 2),
-                demand_95th=round(d_95th, 2),
-                over_declared_times=1 if max_d > declared else 0,
-                demand_cost=round(declared * 38, 2),
-                utilization_rate=round(utilization * 100, 1)
-            ))
+            history_list.append(
+                DemandHistoryItem(
+                    month=f"{year}-{month:02d}",
+                    declared_demand=declared,
+                    max_demand=round(max_d, 2),
+                    avg_demand=round(avg_d, 2),
+                    demand_95th=round(d_95th, 2),
+                    over_declared_times=1 if max_d > declared else 0,
+                    demand_cost=round(declared * 38, 2),
+                    utilization_rate=round(utilization * 100, 1),
+                )
+            )
 
-        return ResponseModel(data=DemandHistoryResponse(
-            meter_point_id=meter_point_id,
-            meter_name=meter.meter_name,
-            declared_demand=meter.declared_demand or 0,
-            history=history_list
-        ))
+        return ResponseModel(
+            data=DemandHistoryResponse(
+                meter_point_id=meter_point_id,
+                meter_name=meter.meter_name,
+                declared_demand=meter.declared_demand or 0,
+                history=history_list,
+            )
+        )
 
     # 转换真实数据
     history_list = []
     for h in history_data[:months]:
         utilization = h.max_demand / h.declared_demand if h.declared_demand and h.declared_demand > 0 else 0
-        history_list.append(DemandHistoryItem(
-            month=f"{h.stat_year}-{h.stat_month:02d}",
-            declared_demand=h.declared_demand or 0,
-            max_demand=h.max_demand or 0,
-            avg_demand=h.avg_demand or 0,
-            demand_95th=h.demand_95th or 0,
-            over_declared_times=h.over_declared_times or 0,
-            demand_cost=h.demand_cost or 0,
-            utilization_rate=round(utilization * 100, 1)
-        ))
+        history_list.append(
+            DemandHistoryItem(
+                month=f"{h.stat_year}-{h.stat_month:02d}",
+                declared_demand=h.declared_demand or 0,
+                max_demand=h.max_demand or 0,
+                avg_demand=h.avg_demand or 0,
+                demand_95th=h.demand_95th or 0,
+                over_declared_times=h.over_declared_times or 0,
+                demand_cost=h.demand_cost or 0,
+                utilization_rate=round(utilization * 100, 1),
+            )
+        )
 
-    return ResponseModel(data=DemandHistoryResponse(
-        meter_point_id=meter_point_id,
-        meter_name=meter.meter_name,
-        declared_demand=meter.declared_demand or 0,
-        history=history_list
-    ))
+    return ResponseModel(
+        data=DemandHistoryResponse(
+            meter_point_id=meter_point_id,
+            meter_name=meter.meter_name,
+            declared_demand=meter.declared_demand or 0,
+            history=history_list,
+        )
+    )
 
 
 # ==================== 设备负荷转移分析 ====================
 
-@router.get("/analysis/device-shift", response_model=ResponseModel[DeviceShiftAnalysisResult], summary="设备负荷转移分析")
-async def analyze_device_shift(
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
-):
+
+@router.get(
+    "/analysis/device-shift", response_model=ResponseModel[DeviceShiftAnalysisResult], summary="设备负荷转移分析"
+)
+async def analyze_device_shift(db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     """
     分析设备负荷转移潜力
     识别哪些设备可以从峰时转移到谷时运行
     """
     # 获取所有设备及其转移配置
-    devices_result = await db.execute(
-        select(PowerDevice).where(PowerDevice.is_enabled == True)
-    )
+    devices_result = await db.execute(select(PowerDevice).where(PowerDevice.is_enabled == True))
     devices = devices_result.scalars().all()
 
     # 获取设备转移配置
@@ -3153,8 +3133,10 @@ async def analyze_device_shift(
         seed = _device_seed(device.id)
 
         # 判断是否可转移
-        is_shiftable = config.is_shiftable if config else (
-            device.device_type in ["HVAC", "PUMP", "LIGHTING"] and not device.is_critical
+        is_shiftable = (
+            config.is_shiftable
+            if config
+            else (device.device_type in ["HVAC", "PUMP", "LIGHTING"] and not device.is_critical)
         )
         is_critical = config.is_critical if config else device.is_critical
 
@@ -3194,31 +3176,39 @@ async def analyze_device_shift(
         price_diff = avg_high_price - avg_low_price
 
         monthly_hours = 30 * 24
-        shift_saving = shiftable_power * (high_cost_ratio - low_cost_ratio) * monthly_hours * price_diff if is_shiftable else 0
+        shift_saving = (
+            shiftable_power * (high_cost_ratio - low_cost_ratio) * monthly_hours * price_diff if is_shiftable else 0
+        )
 
         if is_shiftable:
             shiftable_count += 1
             total_shiftable_power += shiftable_power
             total_potential_saving += shift_saving
 
-        device_potentials.append(DeviceShiftPotential(
-            device_id=device.id,
-            device_name=device.device_name,
-            device_type=device.device_type,
-            rated_power=round(rated_power, 2),
-            current_power=round(current_power, 2),
-            is_shiftable=is_shiftable,
-            shiftable_power=round(shiftable_power, 2),
-            sharp_energy_ratio=round(sharp_ratio * 100, 1),
-            peak_energy_ratio=round(peak_ratio * 100, 1),
-            flat_energy_ratio=round(flat_ratio * 100, 1),
-            valley_energy_ratio=round(valley_ratio * 100, 1),
-            deep_valley_energy_ratio=round(deep_valley_ratio * 100, 1),
-            shift_potential_saving=round(shift_saving, 2),
-            allowed_shift_hours=config.allowed_shift_hours if config and config.allowed_shift_hours else [0, 1, 2, 3, 4, 5, 6],
-            forbidden_shift_hours=config.forbidden_shift_hours if config and config.forbidden_shift_hours else [10, 11, 14, 15],
-            is_critical=is_critical
-        ))
+        device_potentials.append(
+            DeviceShiftPotential(
+                device_id=device.id,
+                device_name=device.device_name,
+                device_type=device.device_type,
+                rated_power=round(rated_power, 2),
+                current_power=round(current_power, 2),
+                is_shiftable=is_shiftable,
+                shiftable_power=round(shiftable_power, 2),
+                sharp_energy_ratio=round(sharp_ratio * 100, 1),
+                peak_energy_ratio=round(peak_ratio * 100, 1),
+                flat_energy_ratio=round(flat_ratio * 100, 1),
+                valley_energy_ratio=round(valley_ratio * 100, 1),
+                deep_valley_energy_ratio=round(deep_valley_ratio * 100, 1),
+                shift_potential_saving=round(shift_saving, 2),
+                allowed_shift_hours=config.allowed_shift_hours
+                if config and config.allowed_shift_hours
+                else [0, 1, 2, 3, 4, 5, 6],
+                forbidden_shift_hours=config.forbidden_shift_hours
+                if config and config.forbidden_shift_hours
+                else [10, 11, 14, 15],
+                is_critical=is_critical,
+            )
+        )
 
     # 生成建议
     recommendations = []
@@ -3233,24 +3223,26 @@ async def analyze_device_shift(
                 f"预计每月可节省 {d.shift_potential_saving:.0f} 元"
             )
 
-    return ResponseModel(data=DeviceShiftAnalysisResult(
-        analysis_time=datetime.now(),
-        total_devices=len(devices),
-        shiftable_devices=shiftable_count,
-        total_shiftable_power=round(total_shiftable_power, 2),
-        total_potential_saving=round(total_potential_saving, 2),
-        devices=device_potentials,
-        recommendations=recommendations
-    ))
+    return ResponseModel(
+        data=DeviceShiftAnalysisResult(
+            analysis_time=datetime.now(),
+            total_devices=len(devices),
+            shiftable_devices=shiftable_count,
+            total_shiftable_power=round(total_shiftable_power, 2),
+            total_potential_saving=round(total_potential_saving, 2),
+            devices=device_potentials,
+            recommendations=recommendations,
+        )
+    )
 
 
 # ==================== 需量配置分析 ====================
 
-@router.get("/analysis/demand-config", response_model=ResponseModel[DemandConfigAnalysisResult], summary="需量配置合理性分析")
-async def analyze_demand_config(
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
-):
+
+@router.get(
+    "/analysis/demand-config", response_model=ResponseModel[DemandConfigAnalysisResult], summary="需量配置合理性分析"
+)
+async def analyze_demand_config(db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     """
     分析各计量点的需量配置是否合理
     识别申报过高或过低的计量点
@@ -3268,9 +3260,7 @@ async def analyze_demand_config(
     _demand_price = DemandAnalysisService.DEFAULT_DEMAND_PRICE  # 38.0 元/kW·月
 
     # 获取所有计量点
-    meters_result = await db.execute(
-        select(MeterPoint).where(MeterPoint.is_enabled == True)
-    )
+    meters_result = await db.execute(select(MeterPoint).where(MeterPoint.is_enabled == True))
     meters = meters_result.scalars().all()
 
     # [V2.8] 移除 import random，使用确定性计算
@@ -3319,7 +3309,7 @@ async def analyze_demand_config(
                 select(Demand15MinData.rolling_demand).where(
                     Demand15MinData.meter_point_id == meter.id,
                     Demand15MinData.timestamp >= start_date,
-                    Demand15MinData.rolling_demand.isnot(None)
+                    Demand15MinData.rolling_demand.isnot(None),
                 )
             )
             demands = [r[0] for r in demand_15min_result.all()]
@@ -3336,7 +3326,7 @@ async def analyze_demand_config(
                 # 无实际数据时使用确定性模拟数据
                 # 基于计量点ID生成确定性的模拟数据
                 seed_factor = (meter.id % 10 + 1) / 10  # 0.1-1.0 基于ID
-                base_ratio = 0.75 + seed_factor * 0.2    # 0.77-0.95 利用率范围
+                base_ratio = 0.75 + seed_factor * 0.2  # 0.77-0.95 利用率范围
                 max_demand_12m = declared * base_ratio
                 avg_demand_12m = max_demand_12m * 0.72
                 demand_95th = max_demand_12m * 0.94
@@ -3344,7 +3334,7 @@ async def analyze_demand_config(
         utilization = max_demand_12m / declared if declared > 0 else 0
 
         # 使用统一阈值判断配置状态 (low=80%, high=105%)
-        is_over_declared = utilization < _thresholds.low_utilization   # 利用率低于80%视为申报过高
+        is_over_declared = utilization < _thresholds.low_utilization  # 利用率低于80%视为申报过高
         is_under_declared = utilization > _thresholds.high_utilization  # 利用率超过105%视为申报过低
 
         # [V2.10-FIX] 根据不同情况计算最优需量
@@ -3382,33 +3372,38 @@ async def analyze_demand_config(
         # 计算超需量风险概率
         over_risk = min(100, max(0, (max_demand_12m / declared - 0.9) * 100 * 5)) if declared > 0 else 0
 
-        analysis_items.append(DemandConfigAnalysisItem(
-            meter_point_id=meter.id,
-            meter_name=meter.meter_name,
-            declared_demand=round(declared, 2),
-            max_demand_12m=round(max_demand_12m, 2),
-            avg_demand_12m=round(avg_demand_12m, 2),
-            demand_95th=round(demand_95th, 2),
-            utilization_rate=round(utilization * 100, 1),
-            optimal_demand=round(optimal_demand, 2),
-            is_over_declared=is_over_declared,
-            is_under_declared=is_under_declared,
-            potential_saving=round(max(saving, 0), 2),
-            over_demand_risk=round(over_risk, 1),
-            recommendation=recommendation
-        ))
+        analysis_items.append(
+            DemandConfigAnalysisItem(
+                meter_point_id=meter.id,
+                meter_name=meter.meter_name,
+                declared_demand=round(declared, 2),
+                max_demand_12m=round(max_demand_12m, 2),
+                avg_demand_12m=round(avg_demand_12m, 2),
+                demand_95th=round(demand_95th, 2),
+                utilization_rate=round(utilization * 100, 1),
+                optimal_demand=round(optimal_demand, 2),
+                is_over_declared=is_over_declared,
+                is_under_declared=is_under_declared,
+                potential_saving=round(max(saving, 0), 2),
+                over_demand_risk=round(over_risk, 1),
+                recommendation=recommendation,
+            )
+        )
 
-    return ResponseModel(data=DemandConfigAnalysisResult(
-        analysis_time=datetime.now(),
-        total_meter_points=len(meters),
-        over_declared_count=over_declared_count,
-        under_declared_count=under_declared_count,
-        optimal_count=optimal_count,
-        total_potential_saving=round(total_saving, 2),
-        items=analysis_items
-    ))
+    return ResponseModel(
+        data=DemandConfigAnalysisResult(
+            analysis_time=datetime.now(),
+            total_meter_points=len(meters),
+            over_declared_count=over_declared_count,
+            under_declared_count=under_declared_count,
+            optimal_count=optimal_count,
+            total_potential_saving=round(total_saving, 2),
+            items=analysis_items,
+        )
+    )
 
-from ...services.analysis_plugins import plugin_manager, register_all_plugins, SuggestionType, PluginPriority
+
+from ...services.analysis_plugins import plugin_manager, register_all_plugins
 
 # 初始化插件
 _plugins_registered = False
@@ -3423,9 +3418,7 @@ def ensure_plugins_registered():
 
 
 @router.get("/analysis/plugins", response_model=ResponseModel, summary="获取分析插件列表")
-async def get_analysis_plugins(
-    current_user: User = Depends(get_current_user)
-):
+async def get_analysis_plugins(current_user: User = Depends(get_current_user)):
     """获取所有可用的分析插件"""
     ensure_plugins_registered()
     plugins_info = plugin_manager.get_plugin_info()
@@ -3433,10 +3426,7 @@ async def get_analysis_plugins(
 
 
 @router.post("/analysis/plugins/{plugin_id}/enable", response_model=ResponseModel, summary="启用插件")
-async def enable_analysis_plugin(
-    plugin_id: str,
-    current_user: User = Depends(require_admin)
-):
+async def enable_analysis_plugin(plugin_id: str, current_user: User = Depends(require_admin)):
     """启用指定分析插件"""
     ensure_plugins_registered()
     if plugin_manager.enable_plugin(plugin_id):
@@ -3445,10 +3435,7 @@ async def enable_analysis_plugin(
 
 
 @router.post("/analysis/plugins/{plugin_id}/disable", response_model=ResponseModel, summary="禁用插件")
-async def disable_analysis_plugin(
-    plugin_id: str,
-    current_user: User = Depends(require_admin)
-):
+async def disable_analysis_plugin(plugin_id: str, current_user: User = Depends(require_admin)):
     """禁用指定分析插件"""
     ensure_plugins_registered()
     if plugin_manager.disable_plugin(plugin_id):
@@ -3462,7 +3449,7 @@ async def run_energy_analysis(
     days: int = Query(30, description="分析数据天数", ge=7, le=365),
     save_results: bool = Query(True, description="是否保存分析结果到数据库"),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_operator)
+    current_user: User = Depends(require_operator),
 ):
     """
     执行节能分析
@@ -3476,35 +3463,29 @@ async def run_energy_analysis(
     ensure_plugins_registered()
 
     try:
-        results = await plugin_manager.run_analysis(
-            db=db,
-            plugin_ids=plugin_ids,
-            days=days,
-            save_results=save_results
-        )
+        results = await plugin_manager.run_analysis(db=db, plugin_ids=plugin_ids, days=days, save_results=save_results)
 
         # 转换结果格式
         suggestions = []
         for r in results:
-            suggestions.append({
-                "suggestion_type": r.suggestion_type.value,
-                "priority": r.priority.name,
-                "title": r.title,
-                "description": r.description,
-                "detail": r.detail,
-                "estimated_saving": r.estimated_saving,
-                "estimated_cost_saving": r.estimated_cost_saving,
-                "implementation_difficulty": r.implementation_difficulty,
-                "payback_period": r.payback_period,
-                "related_devices": r.related_devices,
-                "confidence": r.confidence,
-                "created_at": r.created_at.isoformat()
-            })
+            suggestions.append(
+                {
+                    "suggestion_type": r.suggestion_type.value,
+                    "priority": r.priority.name,
+                    "title": r.title,
+                    "description": r.description,
+                    "detail": r.detail,
+                    "estimated_saving": r.estimated_saving,
+                    "estimated_cost_saving": r.estimated_cost_saving,
+                    "implementation_difficulty": r.implementation_difficulty,
+                    "payback_period": r.payback_period,
+                    "related_devices": r.related_devices,
+                    "confidence": r.confidence,
+                    "created_at": r.created_at.isoformat(),
+                }
+            )
 
-        return ResponseModel(data={
-            "total": len(suggestions),
-            "suggestions": suggestions
-        })
+        return ResponseModel(data={"total": len(suggestions), "suggestions": suggestions})
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"分析执行失败: {str(e)}")
@@ -3516,7 +3497,7 @@ async def run_single_analysis(
     days: int = Query(30, description="分析数据天数", ge=7, le=365),
     save_results: bool = Query(True, description="是否保存结果"),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_operator)
+    current_user: User = Depends(require_operator),
 ):
     """执行单个分析插件"""
     ensure_plugins_registered()
@@ -3527,45 +3508,43 @@ async def run_single_analysis(
 
     try:
         results = await plugin_manager.run_single_plugin(
-            db=db,
-            plugin_id=plugin_id,
-            days=days,
-            save_results=save_results
+            db=db, plugin_id=plugin_id, days=days, save_results=save_results
         )
 
         suggestions = []
         for r in results:
-            suggestions.append({
-                "suggestion_type": r.suggestion_type.value,
-                "priority": r.priority.name,
-                "title": r.title,
-                "description": r.description,
-                "detail": r.detail,
-                "estimated_saving": r.estimated_saving,
-                "estimated_cost_saving": r.estimated_cost_saving,
-                "implementation_difficulty": r.implementation_difficulty,
-                "payback_period": r.payback_period,
-                "related_devices": r.related_devices,
-                "confidence": r.confidence,
-                "created_at": r.created_at.isoformat()
-            })
+            suggestions.append(
+                {
+                    "suggestion_type": r.suggestion_type.value,
+                    "priority": r.priority.name,
+                    "title": r.title,
+                    "description": r.description,
+                    "detail": r.detail,
+                    "estimated_saving": r.estimated_saving,
+                    "estimated_cost_saving": r.estimated_cost_saving,
+                    "implementation_difficulty": r.implementation_difficulty,
+                    "payback_period": r.payback_period,
+                    "related_devices": r.related_devices,
+                    "confidence": r.confidence,
+                    "created_at": r.created_at.isoformat(),
+                }
+            )
 
-        return ResponseModel(data={
-            "plugin_id": plugin_id,
-            "plugin_name": plugin.plugin_name,
-            "total": len(suggestions),
-            "suggestions": suggestions
-        })
+        return ResponseModel(
+            data={
+                "plugin_id": plugin_id,
+                "plugin_name": plugin.plugin_name,
+                "total": len(suggestions),
+                "suggestions": suggestions,
+            }
+        )
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"分析执行失败: {str(e)}")
 
 
 @router.get("/analysis/summary", response_model=ResponseModel, summary="获取分析汇总")
-async def get_analysis_summary(
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
-):
+async def get_analysis_summary(db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     """
     获取节能分析汇总
 
@@ -3573,36 +3552,34 @@ async def get_analysis_summary(
     """
     # 统计各状态建议数量
     status_result = await db.execute(
-        select(
-            EnergySuggestion.status,
-            func.count(EnergySuggestion.id).label('count')
-        ).group_by(EnergySuggestion.status)
+        select(EnergySuggestion.status, func.count(EnergySuggestion.id).label("count")).group_by(
+            EnergySuggestion.status
+        )
     )
     status_counts = {row[0]: row[1] for row in status_result.all()}
 
     # 统计各类型建议数量 (按category分组)
     type_result = await db.execute(
-        select(
-            EnergySuggestion.category,
-            func.count(EnergySuggestion.id).label('count')
-        ).group_by(EnergySuggestion.category)
+        select(EnergySuggestion.category, func.count(EnergySuggestion.id).label("count")).group_by(
+            EnergySuggestion.category
+        )
     )
-    type_counts = {row[0] or 'unknown': row[1] for row in type_result.all()}
+    type_counts = {row[0] or "unknown": row[1] for row in type_result.all()}
 
     # 统计潜在节能量
     saving_result = await db.execute(
         select(
-            func.sum(EnergySuggestion.potential_saving).label('total_saving'),
-            func.sum(EnergySuggestion.potential_cost_saving).label('total_cost_saving')
-        ).where(EnergySuggestion.status == 'pending')
+            func.sum(EnergySuggestion.potential_saving).label("total_saving"),
+            func.sum(EnergySuggestion.potential_cost_saving).label("total_cost_saving"),
+        ).where(EnergySuggestion.status == "pending")
     )
     saving_row = saving_result.one()
 
     # 统计已实现节能量
     completed_result = await db.execute(
-        select(
-            func.sum(EnergySuggestion.actual_saving).label('actual_saving')
-        ).where(EnergySuggestion.status == 'completed')
+        select(func.sum(EnergySuggestion.actual_saving).label("actual_saving")).where(
+            EnergySuggestion.status == "completed"
+        )
     )
     completed_row = completed_result.one()
 
@@ -3610,37 +3587,37 @@ async def get_analysis_summary(
     ensure_plugins_registered()
     plugins = plugin_manager.get_plugin_info()
 
-    return ResponseModel(data={
-        "status_summary": {
-            "pending": status_counts.get('pending', 0),
-            "accepted": status_counts.get('accepted', 0),
-            "rejected": status_counts.get('rejected', 0),
-            "completed": status_counts.get('completed', 0)
-        },
-        "type_summary": type_counts,
-        "potential_saving": {
-            "energy_kwh": saving_row.total_saving or 0,
-            "cost_yuan": saving_row.total_cost_saving or 0
-        },
-        "actual_saving": {
-            "energy_kwh": completed_row.actual_saving or 0,
-            "cost_yuan": 0  # No actual_cost_saving field in model
-        },
-        "plugins": {
-            "total": len(plugins),
-            "enabled": len([p for p in plugins if p['enabled']])
+    return ResponseModel(
+        data={
+            "status_summary": {
+                "pending": status_counts.get("pending", 0),
+                "accepted": status_counts.get("accepted", 0),
+                "rejected": status_counts.get("rejected", 0),
+                "completed": status_counts.get("completed", 0),
+            },
+            "type_summary": type_counts,
+            "potential_saving": {
+                "energy_kwh": saving_row.total_saving or 0,
+                "cost_yuan": saving_row.total_cost_saving or 0,
+            },
+            "actual_saving": {
+                "energy_kwh": completed_row.actual_saving or 0,
+                "cost_yuan": 0,  # No actual_cost_saving field in model
+            },
+            "plugins": {"total": len(plugins), "enabled": len([p for p in plugins if p["enabled"]])},
         }
-    })
+    )
 
 
 # ==================== V2.3 需量分析增强 ====================
+
 
 @router.get("/demand/15min-curve", response_model=ResponseModel, summary="获取15分钟需量曲线")
 async def get_demand_15min_curve(
     meter_point_id: int = Query(..., description="计量点ID"),
     date: Optional[date] = Query(None, description="日期，默认今天"),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
 ):
     """
     获取15分钟滑动窗口需量曲线
@@ -3655,18 +3632,18 @@ async def get_demand_15min_curve(
 
     # 查询15分钟数据
     result = await db.execute(
-        select(Demand15MinData).where(
+        select(Demand15MinData)
+        .where(
             Demand15MinData.meter_point_id == meter_point_id,
             Demand15MinData.timestamp >= start_time,
-            Demand15MinData.timestamp < end_time
-        ).order_by(Demand15MinData.timestamp)
+            Demand15MinData.timestamp < end_time,
+        )
+        .order_by(Demand15MinData.timestamp)
     )
     records = result.scalars().all()
 
     # 获取计量点信息
-    meter_result = await db.execute(
-        select(MeterPoint).where(MeterPoint.id == meter_point_id)
-    )
+    meter_result = await db.execute(select(MeterPoint).where(MeterPoint.id == meter_point_id))
     meter = meter_result.scalar_one_or_none()
     declared_demand = meter.declared_demand if meter else None
 
@@ -3675,26 +3652,30 @@ async def get_demand_15min_curve(
     over_declared_count = 0
 
     for r in records:
-        data_points.append({
-            "timestamp": r.timestamp.isoformat(),
-            "average_power": r.average_power,
-            "rolling_demand": r.rolling_demand,
-            "is_over_declared": r.is_over_declared
-        })
+        data_points.append(
+            {
+                "timestamp": r.timestamp.isoformat(),
+                "average_power": r.average_power,
+                "rolling_demand": r.rolling_demand,
+                "is_over_declared": r.is_over_declared,
+            }
+        )
         if r.rolling_demand and r.rolling_demand > max_demand:
             max_demand = r.rolling_demand
         if r.is_over_declared:
             over_declared_count += 1
 
-    return ResponseModel(data={
-        "meter_point_id": meter_point_id,
-        "date": target_date.isoformat(),
-        "declared_demand": declared_demand,
-        "max_demand": max_demand,
-        "over_declared_count": over_declared_count,
-        "data_points": data_points,
-        "total_points": len(data_points)
-    })
+    return ResponseModel(
+        data={
+            "meter_point_id": meter_point_id,
+            "date": target_date.isoformat(),
+            "declared_demand": declared_demand,
+            "max_demand": max_demand,
+            "over_declared_count": over_declared_count,
+            "data_points": data_points,
+            "total_points": len(data_points),
+        }
+    )
 
 
 @router.get("/demand/aggregated-curve", response_model=ResponseModel, summary="获取聚合需量曲线")
@@ -3702,7 +3683,7 @@ async def get_demand_aggregated_curve(
     meter_point_id: int = Query(..., description="计量点ID"),
     days: int = Query(30, ge=7, le=90, description="分析天数(7-90天)"),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
 ):
     """
     获取聚合需量曲线
@@ -3716,9 +3697,7 @@ async def get_demand_aggregated_curve(
     start_date = end_date - timedelta(days=days)
 
     # 获取计量点信息
-    meter_result = await db.execute(
-        select(MeterPoint).where(MeterPoint.id == meter_point_id)
-    )
+    meter_result = await db.execute(select(MeterPoint).where(MeterPoint.id == meter_point_id))
     meter = meter_result.scalar_one_or_none()
     if not meter:
         raise HTTPException(status_code=404, detail="计量点不存在")
@@ -3727,11 +3706,13 @@ async def get_demand_aggregated_curve(
 
     # 查询历史需量数据
     result = await db.execute(
-        select(Demand15MinData).where(
+        select(Demand15MinData)
+        .where(
             Demand15MinData.meter_point_id == meter_point_id,
             Demand15MinData.timestamp >= start_date,
-            Demand15MinData.timestamp <= end_date
-        ).order_by(Demand15MinData.timestamp)
+            Demand15MinData.timestamp <= end_date,
+        )
+        .order_by(Demand15MinData.timestamp)
     )
     records = result.scalars().all()
 
@@ -3774,15 +3755,17 @@ async def get_demand_aggregated_curve(
             min_demand = avg_demand * 0.9
             over_count = 0
 
-        aggregated_points.append({
-            "slot": slot,
-            "time": f"{hour:02d}:{minute:02d}",
-            "avg_demand": round(avg_demand, 2),
-            "max_demand": round(max_demand, 2),
-            "min_demand": round(min_demand, 2),
-            "over_declared_ratio": round(over_count / len(slot_demands) * 100, 1) if slot_demands else 0,
-            "data_count": len(slot_demands)
-        })
+        aggregated_points.append(
+            {
+                "slot": slot,
+                "time": f"{hour:02d}:{minute:02d}",
+                "avg_demand": round(avg_demand, 2),
+                "max_demand": round(max_demand, 2),
+                "min_demand": round(min_demand, 2),
+                "over_declared_ratio": round(over_count / len(slot_demands) * 100, 1) if slot_demands else 0,
+                "data_count": len(slot_demands),
+            }
+        )
 
     # 计算整体统计
     if all_demands:
@@ -3796,26 +3779,28 @@ async def get_demand_aggregated_curve(
         utilization = 0
         over_declared_ratio = 0
 
-    return ResponseModel(data={
-        "meter_point_id": meter_point_id,
-        "meter_name": meter.meter_name,
-        "declared_demand": declared_demand,
-        "analysis_period": {
-            "start": start_date.isoformat(),
-            "end": end_date.isoformat(),
-            "requested_days": days,
-            "actual_days": len(actual_days)
-        },
-        "statistics": {
-            "max_demand": round(overall_max, 2),
-            "avg_demand": round(overall_avg, 2),
-            "utilization_rate": round(utilization, 1),
-            "over_declared_count": total_over_declared,
-            "over_declared_ratio": round(over_declared_ratio, 2),
-            "total_data_points": total_points_count
-        },
-        "aggregated_points": aggregated_points
-    })
+    return ResponseModel(
+        data={
+            "meter_point_id": meter_point_id,
+            "meter_name": meter.meter_name,
+            "declared_demand": declared_demand,
+            "analysis_period": {
+                "start": start_date.isoformat(),
+                "end": end_date.isoformat(),
+                "requested_days": days,
+                "actual_days": len(actual_days),
+            },
+            "statistics": {
+                "max_demand": round(overall_max, 2),
+                "avg_demand": round(overall_avg, 2),
+                "utilization_rate": round(utilization, 1),
+                "over_declared_count": total_over_declared,
+                "over_declared_ratio": round(over_declared_ratio, 2),
+                "total_data_points": total_points_count,
+            },
+            "aggregated_points": aggregated_points,
+        }
+    )
 
 
 @router.get("/demand/peak-analysis", response_model=ResponseModel, summary="需量峰值分析")
@@ -3823,22 +3808,20 @@ async def get_demand_peak_analysis(
     meter_point_id: int = Query(..., description="计量点ID"),
     days: int = Query(30, description="分析天数"),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
 ):
     """
     分析需量峰值分布
 
     统计峰值出现的时段分布、超需量次数等
     """
-    from ...models.energy import Demand15MinData, DemandAnalysisRecord
+    from ...models.energy import Demand15MinData
 
     end_date = datetime.now()
     start_date = end_date - timedelta(days=days)
 
     # 获取计量点信息
-    meter_result = await db.execute(
-        select(MeterPoint).where(MeterPoint.id == meter_point_id)
-    )
+    meter_result = await db.execute(select(MeterPoint).where(MeterPoint.id == meter_point_id))
     meter = meter_result.scalar_one_or_none()
     if not meter:
         raise HTTPException(status_code=404, detail="计量点不存在")
@@ -3847,11 +3830,13 @@ async def get_demand_peak_analysis(
 
     # 查询历史需量数据
     result = await db.execute(
-        select(Demand15MinData).where(
+        select(Demand15MinData)
+        .where(
             Demand15MinData.meter_point_id == meter_point_id,
             Demand15MinData.timestamp >= start_date,
-            Demand15MinData.timestamp <= end_date
-        ).order_by(Demand15MinData.timestamp)
+            Demand15MinData.timestamp <= end_date,
+        )
+        .order_by(Demand15MinData.timestamp)
     )
     records = result.scalars().all()
 
@@ -3866,11 +3851,13 @@ async def get_demand_peak_analysis(
             hourly_peaks[hour].append(r.rolling_demand)
             all_demands.append(r.rolling_demand)
             if r.is_over_declared:
-                over_declared_records.append({
-                    "timestamp": r.timestamp.isoformat(),
-                    "demand": r.rolling_demand,
-                    "over_ratio": (r.rolling_demand - declared_demand) / declared_demand * 100
-                })
+                over_declared_records.append(
+                    {
+                        "timestamp": r.timestamp.isoformat(),
+                        "demand": r.rolling_demand,
+                        "over_ratio": (r.rolling_demand - declared_demand) / declared_demand * 100,
+                    }
+                )
 
     # 计算各时段平均峰值
     hourly_avg = {}
@@ -3887,33 +3874,33 @@ async def get_demand_peak_analysis(
     avg_demand = sum(all_demands) / len(all_demands) if all_demands else 0
     utilization = (max_demand / declared_demand * 100) if declared_demand > 0 else 0
 
-    return ResponseModel(data={
-        "meter_point_id": meter_point_id,
-        "meter_name": meter.meter_name,
-        "declared_demand": declared_demand,
-        "analysis_period": {
-            "start": start_date.isoformat(),
-            "end": end_date.isoformat(),
-            "days": days
-        },
-        "statistics": {
-            "max_demand": round(max_demand, 2),
-            "avg_demand": round(avg_demand, 2),
-            "utilization_rate": round(utilization, 1),
-            "over_declared_count": len(over_declared_records),
-            "over_declared_ratio": round(len(over_declared_records) / len(all_demands) * 100, 2) if all_demands else 0
-        },
-        "hourly_distribution": hourly_avg,
-        "peak_hours": peak_hours,
-        "over_declared_records": over_declared_records[:20]  # 最近20条超需量记录
-    })
+    return ResponseModel(
+        data={
+            "meter_point_id": meter_point_id,
+            "meter_name": meter.meter_name,
+            "declared_demand": declared_demand,
+            "analysis_period": {"start": start_date.isoformat(), "end": end_date.isoformat(), "days": days},
+            "statistics": {
+                "max_demand": round(max_demand, 2),
+                "avg_demand": round(avg_demand, 2),
+                "utilization_rate": round(utilization, 1),
+                "over_declared_count": len(over_declared_records),
+                "over_declared_ratio": round(len(over_declared_records) / len(all_demands) * 100, 2)
+                if all_demands
+                else 0,
+            },
+            "hourly_distribution": hourly_avg,
+            "peak_hours": peak_hours,
+            "over_declared_records": over_declared_records[:20],  # 最近20条超需量记录
+        }
+    )
 
 
 @router.get("/demand/optimization-plan", response_model=ResponseModel, summary="需量优化方案")
 async def get_demand_optimization_plan(
     meter_point_id: int = Query(..., description="计量点ID"),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
 ):
     """
     生成需量优化方案
@@ -3926,9 +3913,7 @@ async def get_demand_optimization_plan(
     from ...services.demand_analysis_service import DemandAnalysisService, DemandThresholds
 
     # 获取计量点信息
-    meter_result = await db.execute(
-        select(MeterPoint).where(MeterPoint.id == meter_point_id)
-    )
+    meter_result = await db.execute(select(MeterPoint).where(MeterPoint.id == meter_point_id))
     meter = meter_result.scalar_one_or_none()
     if not meter:
         raise HTTPException(status_code=404, detail="计量点不存在")
@@ -3943,15 +3928,13 @@ async def get_demand_optimization_plan(
         select(Demand15MinData.rolling_demand).where(
             Demand15MinData.meter_point_id == meter_point_id,
             Demand15MinData.timestamp >= start_date,
-            Demand15MinData.rolling_demand.isnot(None)
+            Demand15MinData.rolling_demand.isnot(None),
         )
     )
     demands = [r[0] for r in result.all()]
 
     # [V2.10-FIX] 无实际数据时使用确定性模拟数据
-    use_mock_data = False
     if not demands or len(demands) < 10:
-        use_mock_data = True
         # 使用与 analyze_demand_config 相同的确定性算法
         seed_factor = (meter_point_id % 10 + 1) / 10  # 0.1-1.0 基于ID
         base_ratio = 0.75 + seed_factor * 0.2  # 0.77-0.95 利用率范围
@@ -3982,64 +3965,76 @@ async def get_demand_optimization_plan(
     if utilization_decimal < _thresholds.low_utilization:  # < 80%
         # 申报过高
         import math as _math
+
         recommended_demand = _math.ceil(p95_demand * (1 + _thresholds.safety_margin) / 5) * 5
         fee_diff = (declared_demand - recommended_demand) * _demand_price
         annual_saving = fee_diff * 12
-        recommendations.append({
-            "type": "reduce_declared",
-            "title": "建议降低申报需量",
-            "description": f"当前申报{declared_demand}kW，实际最大需量{max_demand:.0f}kW，利用率仅{utilization:.1f}%",
-            "action": f"建议将申报需量调整为{recommended_demand:.0f}kW",
-            "saving": f"年节省容量电费约{annual_saving:.0f}元"
-        })
+        recommendations.append(
+            {
+                "type": "reduce_declared",
+                "title": "建议降低申报需量",
+                "description": f"当前申报{declared_demand}kW，实际最大需量{max_demand:.0f}kW，利用率仅{utilization:.1f}%",
+                "action": f"建议将申报需量调整为{recommended_demand:.0f}kW",
+                "saving": f"年节省容量电费约{annual_saving:.0f}元",
+            }
+        )
     elif utilization_decimal > _thresholds.high_utilization:  # > 105%
         # 申报偏低，有超需量风险
         import math as _math
+
         recommended_demand = _math.ceil(max_demand * (1 + _thresholds.safety_margin * 1.5) / 5) * 5
         over_amount = max_demand - declared_demand
         penalty_risk = over_amount * _demand_price * 2  # 超需量罚款风险（月）
-        recommendations.append({
-            "type": "increase_declared",
-            "title": "建议提高申报需量",
-            "description": f"当前申报{declared_demand}kW，实际最大需量{max_demand:.0f}kW，存在超需量风险",
-            "action": f"建议将申报需量调整为{recommended_demand:.0f}kW",
-            "saving": f"可避免超需量罚款风险约{penalty_risk:.0f}元/月"
-        })
+        recommendations.append(
+            {
+                "type": "increase_declared",
+                "title": "建议提高申报需量",
+                "description": f"当前申报{declared_demand}kW，实际最大需量{max_demand:.0f}kW，存在超需量风险",
+                "action": f"建议将申报需量调整为{recommended_demand:.0f}kW",
+                "saving": f"可避免超需量罚款风险约{penalty_risk:.0f}元/月",
+            }
+        )
     else:
-        recommendations.append({
-            "type": "maintain",
-            "title": "当前申报需量合理",
-            "description": f"当前申报{declared_demand}kW，利用率{utilization:.1f}%，处于合理区间",
-            "action": "建议维持当前申报需量",
-            "saving": "无需调整"
-        })
+        recommendations.append(
+            {
+                "type": "maintain",
+                "title": "当前申报需量合理",
+                "description": f"当前申报{declared_demand}kW，利用率{utilization:.1f}%，处于合理区间",
+                "action": "建议维持当前申报需量",
+                "saving": "无需调整",
+            }
+        )
 
     # 负荷调节建议
     if max_demand > declared_demand * 0.85:
-        recommendations.append({
-            "type": "load_shift",
-            "title": "建议错峰用电",
-            "description": "高峰时段需量接近申报值，建议将部分负荷转移至低谷时段",
-            "action": "识别可调节负荷，制定错峰用电计划",
-            "saving": "可降低峰值需量10-20%"
-        })
+        recommendations.append(
+            {
+                "type": "load_shift",
+                "title": "建议错峰用电",
+                "description": "高峰时段需量接近申报值，建议将部分负荷转移至低谷时段",
+                "action": "识别可调节负荷，制定错峰用电计划",
+                "saving": "可降低峰值需量10-20%",
+            }
+        )
 
-    return ResponseModel(data={
-        "meter_point_id": meter_point_id,
-        "meter_name": meter.meter_name,
-        "current_declared": declared_demand,
-        "statistics": {
-            "max_demand": round(max_demand, 2),
-            "avg_demand": round(avg_demand, 2),
-            "p95_demand": round(p95_demand, 2),
-            "utilization_rate": round(utilization, 1)
-        },
-        "optimization": {
-            "recommended_demand": recommended_demand,
-            "annual_saving": annual_saving,
-            "recommendations": recommendations
+    return ResponseModel(
+        data={
+            "meter_point_id": meter_point_id,
+            "meter_name": meter.meter_name,
+            "current_declared": declared_demand,
+            "statistics": {
+                "max_demand": round(max_demand, 2),
+                "avg_demand": round(avg_demand, 2),
+                "p95_demand": round(p95_demand, 2),
+                "utilization_rate": round(utilization, 1),
+            },
+            "optimization": {
+                "recommended_demand": recommended_demand,
+                "annual_saving": annual_saving,
+                "recommendations": recommendations,
+            },
         }
-    })
+    )
 
 
 @router.post("/demand/forecast", response_model=ResponseModel, summary="需量预测")
@@ -4047,7 +4042,7 @@ async def forecast_demand(
     meter_point_id: int = Query(..., description="计量点ID"),
     forecast_hours: int = Query(24, description="预测小时数"),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
 ):
     """
     预测未来需量趋势
@@ -4057,9 +4052,7 @@ async def forecast_demand(
     from ...models.energy import Demand15MinData
 
     # 获取计量点信息
-    meter_result = await db.execute(
-        select(MeterPoint).where(MeterPoint.id == meter_point_id)
-    )
+    meter_result = await db.execute(select(MeterPoint).where(MeterPoint.id == meter_point_id))
     meter = meter_result.scalar_one_or_none()
     if not meter:
         raise HTTPException(status_code=404, detail="计量点不存在")
@@ -4072,8 +4065,7 @@ async def forecast_demand(
 
     for i in range(forecast_hours * 4):  # 每15分钟一个点
         forecast_time = now + timedelta(minutes=15 * i)
-        hour = forecast_time.hour
-        minute = (forecast_time.minute // 15) * 15
+        (forecast_time.minute // 15) * 15
 
         # 查询历史同时段数据
         historical_demands = []
@@ -4087,7 +4079,7 @@ async def forecast_demand(
                     Demand15MinData.meter_point_id == meter_point_id,
                     Demand15MinData.timestamp >= start,
                     Demand15MinData.timestamp <= end,
-                    Demand15MinData.rolling_demand.isnot(None)
+                    Demand15MinData.rolling_demand.isnot(None),
                 )
             )
             for r in result.all():
@@ -4102,36 +4094,37 @@ async def forecast_demand(
             predicted = declared_demand * 0.7  # 默认70%利用率
             confidence = 0.3
 
-        forecast_points.append({
-            "timestamp": forecast_time.isoformat(),
-            "predicted_demand": round(predicted, 2),
-            "confidence": round(confidence, 2),
-            "is_peak_risk": predicted > declared_demand * 0.9
-        })
+        forecast_points.append(
+            {
+                "timestamp": forecast_time.isoformat(),
+                "predicted_demand": round(predicted, 2),
+                "confidence": round(confidence, 2),
+                "is_peak_risk": predicted > declared_demand * 0.9,
+            }
+        )
 
     # 统计预测结果
     peak_risk_count = sum(1 for p in forecast_points if p["is_peak_risk"])
     max_predicted = max(p["predicted_demand"] for p in forecast_points)
 
-    return ResponseModel(data={
-        "meter_point_id": meter_point_id,
-        "meter_name": meter.meter_name,
-        "declared_demand": declared_demand,
-        "forecast_period": {
-            "start": now.isoformat(),
-            "hours": forecast_hours,
-            "points": len(forecast_points)
-        },
-        "summary": {
-            "max_predicted": max_predicted,
-            "peak_risk_count": peak_risk_count,
-            "peak_risk_ratio": round(peak_risk_count / len(forecast_points) * 100, 1)
-        },
-        "forecast_points": forecast_points
-    })
+    return ResponseModel(
+        data={
+            "meter_point_id": meter_point_id,
+            "meter_name": meter.meter_name,
+            "declared_demand": declared_demand,
+            "forecast_period": {"start": now.isoformat(), "hours": forecast_hours, "points": len(forecast_points)},
+            "summary": {
+                "max_predicted": max_predicted,
+                "peak_risk_count": peak_risk_count,
+                "peak_risk_ratio": round(peak_risk_count / len(forecast_points) * 100, 1),
+            },
+            "forecast_points": forecast_points,
+        }
+    )
 
 
 # ==================== 能效报告导出 ====================
+
 
 @router.get("/report/preview", summary="能效报告预览")
 async def get_energy_report_preview(
@@ -4199,4 +4192,3 @@ async def export_energy_report(
         media_type=media_type,
         headers={"Content-Disposition": f"attachment; filename={filename}"},
     )
-

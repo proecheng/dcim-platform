@@ -9,7 +9,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.distributions import Normal, Categorical
-from typing import Tuple, Dict, Optional
+from typing import Tuple, Dict
 
 
 class ActorCriticNetwork(nn.Module):
@@ -24,13 +24,7 @@ class ActorCriticNetwork(nn.Module):
     - 状态价值 V(s)
     """
 
-    def __init__(
-        self,
-        state_dim: int = 51,
-        hidden_dim: int = 256,
-        num_periods: int = 5,
-        device: str = "cpu"
-    ):
+    def __init__(self, state_dim: int = 51, hidden_dim: int = 256, num_periods: int = 5, device: str = "cpu"):
         super().__init__()
         self.state_dim = state_dim
         self.hidden_dim = hidden_dim
@@ -47,7 +41,7 @@ class ActorCriticNetwork(nn.Module):
             nn.ReLU(),
             nn.Linear(hidden_dim // 2, hidden_dim // 4),
             nn.LayerNorm(hidden_dim // 4),
-            nn.ReLU()
+            nn.ReLU(),
         )
 
         encoder_out_dim = hidden_dim // 4
@@ -55,32 +49,22 @@ class ActorCriticNetwork(nn.Module):
         # Actor - 连续动作头 (priority, safety_coeff, temperature)
         # 输出均值和标准差
         self.continuous_mean = nn.Sequential(
-            nn.Linear(encoder_out_dim, hidden_dim // 4),
-            nn.ReLU(),
-            nn.Linear(hidden_dim // 4, 3)
+            nn.Linear(encoder_out_dim, hidden_dim // 4), nn.ReLU(), nn.Linear(hidden_dim // 4, 3)
         )
         self.continuous_log_std = nn.Parameter(torch.zeros(3))
 
         # Actor - 离散动作头 (目标时段选择)
         self.discrete_head = nn.Sequential(
-            nn.Linear(encoder_out_dim, hidden_dim // 4),
-            nn.ReLU(),
-            nn.Linear(hidden_dim // 4, num_periods)
+            nn.Linear(encoder_out_dim, hidden_dim // 4), nn.ReLU(), nn.Linear(hidden_dim // 4, num_periods)
         )
 
         # Critic - 状态价值头
         self.value_head = nn.Sequential(
-            nn.Linear(encoder_out_dim, hidden_dim // 4),
-            nn.ReLU(),
-            nn.Linear(hidden_dim // 4, 1)
+            nn.Linear(encoder_out_dim, hidden_dim // 4), nn.ReLU(), nn.Linear(hidden_dim // 4, 1)
         )
 
         # 动作范围
-        self.action_bounds = {
-            'priority': (0.5, 2.0),
-            'safety_coeff': (1.0, 1.2),
-            'temperature': (24.0, 28.0)
-        }
+        self.action_bounds = {"priority": (0.5, 2.0), "safety_coeff": (1.0, 1.2), "temperature": (24.0, 28.0)}
 
         self.to(self.device)
 
@@ -116,9 +100,7 @@ class ActorCriticNetwork(nn.Module):
         return continuous_mean, continuous_std, discrete_logits, value
 
     def get_action(
-        self,
-        state: torch.Tensor,
-        deterministic: bool = False
+        self, state: torch.Tensor, deterministic: bool = False
     ) -> Tuple[Dict[str, float], torch.Tensor, torch.Tensor]:
         """
         获取动作
@@ -165,19 +147,16 @@ class ActorCriticNetwork(nn.Module):
 
         # 构建动作字典
         actions = {
-            'priority': float(priority[0].item()),
-            'safety_coeff': float(safety_coeff[0].item()),
-            'temperature': float(temperature[0].item()),
-            'target_period': int(target_period[0].item())
+            "priority": float(priority[0].item()),
+            "safety_coeff": float(safety_coeff[0].item()),
+            "temperature": float(temperature[0].item()),
+            "target_period": int(target_period[0].item()),
         }
 
         return actions, total_log_prob, value.squeeze(-1)
 
     def evaluate_action(
-        self,
-        state: torch.Tensor,
-        actions: torch.Tensor,
-        target_periods: torch.Tensor
+        self, state: torch.Tensor, actions: torch.Tensor, target_periods: torch.Tensor
     ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """
         评估给定状态-动作对
@@ -229,22 +208,25 @@ class ActorCriticNetwork(nn.Module):
 
     def save(self, path: str) -> None:
         """保存模型"""
-        torch.save({
-            'state_dict': self.state_dict(),
-            'state_dim': self.state_dim,
-            'hidden_dim': self.hidden_dim,
-            'num_periods': self.num_periods
-        }, path)
+        torch.save(
+            {
+                "state_dict": self.state_dict(),
+                "state_dim": self.state_dim,
+                "hidden_dim": self.hidden_dim,
+                "num_periods": self.num_periods,
+            },
+            path,
+        )
 
     @classmethod
     def load(cls, path: str, device: str = "cpu") -> "ActorCriticNetwork":
         """加载模型"""
         checkpoint = torch.load(path, map_location=device)
         model = cls(
-            state_dim=checkpoint['state_dim'],
-            hidden_dim=checkpoint['hidden_dim'],
-            num_periods=checkpoint['num_periods'],
-            device=device
+            state_dim=checkpoint["state_dim"],
+            hidden_dim=checkpoint["hidden_dim"],
+            num_periods=checkpoint["num_periods"],
+            device=device,
         )
-        model.load_state_dict(checkpoint['state_dict'])
+        model.load_state_dict(checkpoint["state_dict"])
         return model

@@ -1,6 +1,7 @@
 """
 系统健康状态 API — Story 4.5 优雅降级 + Story 13.4 数据备份
 """
+
 import logging
 import os
 import shutil
@@ -8,7 +9,7 @@ from datetime import datetime
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import text, select, update
+from sqlalchemy import text, select
 
 from ..deps import get_db, require_viewer, require_admin
 from ...models.user import User
@@ -93,11 +94,7 @@ async def get_backup_config(
     _: User = Depends(require_admin),
 ):
     """获取自动备份策略配置"""
-    result = await db.execute(
-        select(SystemConfig).where(
-            SystemConfig.config_group == "backup"
-        )
-    )
+    result = await db.execute(select(SystemConfig).where(SystemConfig.config_group == "backup"))
     configs = result.scalars().all()
     config_dict = {c.config_key: c.config_value for c in configs}
 
@@ -128,21 +125,15 @@ async def update_backup_config(
 
     for key, value in updates.items():
         result = await db.execute(
-            select(SystemConfig).where(
-                SystemConfig.config_group == "backup",
-                SystemConfig.config_key == key
-            )
+            select(SystemConfig).where(SystemConfig.config_group == "backup", SystemConfig.config_key == key)
         )
         existing = result.scalar_one_or_none()
         if existing:
             existing.config_value = value
         else:
-            db.add(SystemConfig(
-                config_group="backup",
-                config_key=key,
-                config_value=value,
-                description=f"备份配置: {key}"
-            ))
+            db.add(
+                SystemConfig(config_group="backup", config_key=key, config_value=value, description=f"备份配置: {key}")
+            )
 
     await db.commit()
     return {"message": "备份配置已更新"}
@@ -189,11 +180,13 @@ async def list_backups(
     for f in sorted(os.listdir(BACKUP_DIR), reverse=True):
         if f.endswith(".db"):
             fpath = os.path.join(BACKUP_DIR, f)
-            backups.append({
-                "name": f,
-                "size_mb": round(os.path.getsize(fpath) / (1024 * 1024), 2),
-                "created_at": datetime.fromtimestamp(os.path.getmtime(fpath)).isoformat(),
-            })
+            backups.append(
+                {
+                    "name": f,
+                    "size_mb": round(os.path.getsize(fpath) / (1024 * 1024), 2),
+                    "created_at": datetime.fromtimestamp(os.path.getmtime(fpath)).isoformat(),
+                }
+            )
 
     return {"backups": backups}
 

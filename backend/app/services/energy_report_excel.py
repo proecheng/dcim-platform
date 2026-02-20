@@ -1,9 +1,10 @@
 """
 能效报告 Excel 导出 — Story 6-5
 """
+
 import io
 from openpyxl import Workbook
-from openpyxl.styles import Font, PatternFill, Alignment, numbers
+from openpyxl.styles import Font, PatternFill, Alignment
 
 
 _HEADER_FONT = Font(bold=True, color="FFFFFF")

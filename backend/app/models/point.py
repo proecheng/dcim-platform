@@ -1,6 +1,7 @@
 """
 点位模型
 """
+
 from datetime import datetime
 from sqlalchemy import Column, Integer, String, Boolean, DateTime, Float, Text, ForeignKey
 
@@ -9,6 +10,7 @@ from ..core.database import Base
 
 class Point(Base):
     """点位表 - 核心表"""
+
     __tablename__ = "points"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -46,6 +48,7 @@ class Point(Base):
 
 class PointRealtime(Base):
     """点位实时值表"""
+
     __tablename__ = "point_realtime"
 
     point_id = Column(Integer, ForeignKey("points.id"), primary_key=True, comment="点位ID")
@@ -62,6 +65,7 @@ class PointRealtime(Base):
 
 class PointGroup(Base):
     """点位分组表"""
+
     __tablename__ = "point_groups"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -74,6 +78,7 @@ class PointGroup(Base):
 
 class PointGroupMember(Base):
     """点位分组关系表"""
+
     __tablename__ = "point_group_members"
 
     group_id = Column(Integer, ForeignKey("point_groups.id"), primary_key=True, comment="分组ID")

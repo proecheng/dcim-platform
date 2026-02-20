@@ -5,8 +5,8 @@
 """
 
 from .environment import EnergySavingEnv
-from .actor_critic import ActorCriticNetwork  
+from .actor_critic import ActorCriticNetwork
 from .ppo import PPOAgent
 from .agent import AdaptiveOptimizer
 
-__all__ = ['EnergySavingEnv', 'ActorCriticNetwork', 'PPOAgent', 'AdaptiveOptimizer']
+__all__ = ["EnergySavingEnv", "ActorCriticNetwork", "PPOAgent", "AdaptiveOptimizer"]

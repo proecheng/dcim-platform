@@ -7,20 +7,17 @@
 2. 若无真实数据且 SIMULATION_ENABLED=True，使用 demo_provider 提供的模拟数据
 3. 若无真实数据且 SIMULATION_ENABLED=False，返回空数据或默认值
 """
+
 from typing import Optional, List
-from datetime import datetime, date, timedelta
-from decimal import Decimal
+from datetime import datetime, timedelta
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, desc
+from sqlalchemy import select, desc
 
 from ..deps import get_db, require_viewer
 from ...models.user import User
-from ...models.energy import (
-    RealtimeMonitoring, MonthlyStatistics, PricingConfig,
-    Demand15MinData, MeterPoint
-)
+from ...models.energy import RealtimeMonitoring, MonthlyStatistics, PricingConfig, Demand15MinData
 from ...services.demo_data_provider import demo_provider
 from ...core.config import get_settings
 
@@ -29,8 +26,10 @@ router = APIRouter()
 
 # ==================== Pydantic 模型 ====================
 
+
 class DemandStatus(BaseModel):
     """需量状态"""
+
     current_power: float = Field(..., description="当前功率 kW")
     window_avg_power: float = Field(..., description="15分钟窗口平均功率 kW")
     demand_target: float = Field(..., description="需量目标 kW")
@@ -47,6 +46,7 @@ class DemandStatus(BaseModel):
 
 class DemandAlert(BaseModel):
     """需量预警"""
+
     level: str = Field(..., description="预警级别")
     message: str = Field(..., description="预警信息")
     current_value: float = Field(..., description="当前值")
@@ -56,6 +56,7 @@ class DemandAlert(BaseModel):
 
 class MonthlyBillSummary(BaseModel):
     """月度电费汇总"""
+
     year_month: str
     total_energy: float = Field(0, description="总用电量 kWh")
     max_demand: float = Field(0, description="最大需量 kW")
@@ -71,6 +72,7 @@ class MonthlyBillSummary(BaseModel):
 
 class RealtimeDataPoint(BaseModel):
     """实时数据点"""
+
     timestamp: str
     power: float
     demand_target: float
@@ -78,6 +80,7 @@ class RealtimeDataPoint(BaseModel):
 
 
 # ==================== 辅助函数 ====================
+
 
 async def _get_declared_demand(db: AsyncSession) -> tuple[float, float]:
     """获取申报需量和需量单价配置
@@ -98,9 +101,7 @@ async def _get_declared_demand(db: AsyncSession) -> tuple[float, float]:
 
 async def _get_latest_realtime_data(db: AsyncSession) -> Optional[RealtimeMonitoring]:
     """从数据库获取最新的实时监控数据"""
-    result = await db.execute(
-        select(RealtimeMonitoring).order_by(desc(RealtimeMonitoring.timestamp)).limit(1)
-    )
+    result = await db.execute(select(RealtimeMonitoring).order_by(desc(RealtimeMonitoring.timestamp)).limit(1))
     return result.scalar_one_or_none()
 
 
@@ -119,10 +120,7 @@ async def _get_month_max_demand(db: AsyncSession, year_month: str) -> tuple[Opti
     # 从 15 分钟需量数据表查询
     result = await db.execute(
         select(Demand15MinData)
-        .where(
-            Demand15MinData.timestamp >= start_date,
-            Demand15MinData.timestamp < end_date
-        )
+        .where(Demand15MinData.timestamp >= start_date, Demand15MinData.timestamp < end_date)
         .order_by(desc(Demand15MinData.average_power))
         .limit(1)
     )
@@ -131,18 +129,16 @@ async def _get_month_max_demand(db: AsyncSession, year_month: str) -> tuple[Opti
     if max_record:
         return (
             float(max_record.average_power) if max_record.average_power else None,
-            max_record.timestamp.strftime("%Y-%m-%d %H:%M") if max_record.timestamp else None
+            max_record.timestamp.strftime("%Y-%m-%d %H:%M") if max_record.timestamp else None,
         )
     return None, None
 
 
 # ==================== 实时监控 API ====================
 
+
 @router.get("/realtime/status", response_model=DemandStatus, summary="获取实时需量状态")
-async def get_realtime_status(
-    db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_viewer)
-):
+async def get_realtime_status(db: AsyncSession = Depends(get_db), _: User = Depends(require_viewer)):
     """获取当前实时需量状态，包括预警级别
 
     数据来源:
@@ -162,17 +158,19 @@ async def get_realtime_status(
 
     # 检查数据是否过期（超过 5 分钟视为过期）
     data_is_fresh = (
-        latest_data is not None and
-        latest_data.timestamp is not None and
-        (now - latest_data.timestamp).total_seconds() < 300
+        latest_data is not None
+        and latest_data.timestamp is not None
+        and (now - latest_data.timestamp).total_seconds() < 300
     )
 
     if data_is_fresh and latest_data:
         # 使用真实数据
         current_power = float(latest_data.current_power) if latest_data.current_power else 0
         window_avg_power = float(latest_data.window_avg_power) if latest_data.window_avg_power else current_power
-        utilization_ratio = float(latest_data.utilization_ratio) if latest_data.utilization_ratio else (
-            (window_avg_power / demand_target) * 100 if demand_target > 0 else 0
+        utilization_ratio = (
+            float(latest_data.utilization_ratio)
+            if latest_data.utilization_ratio
+            else ((window_avg_power / demand_target) * 100 if demand_target > 0 else 0)
         )
         alert_level = latest_data.alert_level or "normal"
 
@@ -202,7 +200,7 @@ async def get_realtime_status(
             month_max_time=month_max_time,
             trend=trend,
             timestamp=latest_data.timestamp.strftime("%Y-%m-%d %H:%M:%S"),
-            is_demo_data=False
+            is_demo_data=False,
         )
 
     # 无真实数据，检查是否启用模拟模式
@@ -224,15 +222,12 @@ async def get_realtime_status(
             month_max_time=None,
             trend="stable",
             timestamp=now.strftime("%Y-%m-%d %H:%M:%S"),
-            is_demo_data=False
+            is_demo_data=False,
         )
 
 
 @router.get("/realtime/alerts", response_model=List[DemandAlert], summary="获取当前预警列表")
-async def get_realtime_alerts(
-    db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_viewer)
-):
+async def get_realtime_alerts(db: AsyncSession = Depends(get_db), _: User = Depends(require_viewer)):
     """获取当前所有活跃的需量预警"""
 
     # 获取实时状态（自动使用真实数据或模拟数据）
@@ -241,31 +236,37 @@ async def get_realtime_alerts(
     alerts = []
 
     if status.alert_level == "critical":
-        alerts.append(DemandAlert(
-            level="critical",
-            message=f"需量超标！当前15分钟平均功率 {status.window_avg_power}kW 已超过目标值 {status.demand_target}kW",
-            current_value=status.window_avg_power,
-            threshold=status.demand_target,
-            suggestion="立即启动削减措施：1)降低非关键空调负荷 2)暂停可延迟设备 3)启用储能放电"
-        ))
+        alerts.append(
+            DemandAlert(
+                level="critical",
+                message=f"需量超标！当前15分钟平均功率 {status.window_avg_power}kW 已超过目标值 {status.demand_target}kW",
+                current_value=status.window_avg_power,
+                threshold=status.demand_target,
+                suggestion="立即启动削减措施：1)降低非关键空调负荷 2)暂停可延迟设备 3)启用储能放电",
+            )
+        )
     elif status.alert_level == "warning":
-        alerts.append(DemandAlert(
-            level="warning",
-            message=f"需量接近上限！当前利用率 {status.utilization_ratio:.1f}%，剩余容量仅 {status.remaining_capacity}kW",
-            current_value=status.window_avg_power,
-            threshold=status.demand_target * 0.9,
-            suggestion="建议预防性措施：1)检查可削减负荷 2)准备储能系统 3)通知相关部门"
-        ))
+        alerts.append(
+            DemandAlert(
+                level="warning",
+                message=f"需量接近上限！当前利用率 {status.utilization_ratio:.1f}%，剩余容量仅 {status.remaining_capacity}kW",
+                current_value=status.window_avg_power,
+                threshold=status.demand_target * 0.9,
+                suggestion="建议预防性措施：1)检查可削减负荷 2)准备储能系统 3)通知相关部门",
+            )
+        )
 
     # 检查趋势预警
     if status.trend == "up" and status.utilization_ratio > 80:
-        alerts.append(DemandAlert(
-            level="warning",
-            message=f"功率上升趋势，预计可能突破目标值",
-            current_value=status.current_power,
-            threshold=status.demand_target,
-            suggestion="持续关注，做好削峰准备"
-        ))
+        alerts.append(
+            DemandAlert(
+                level="warning",
+                message="功率上升趋势，预计可能突破目标值",
+                current_value=status.current_power,
+                threshold=status.demand_target,
+                suggestion="持续关注，做好削峰准备",
+            )
+        )
 
     return alerts
 
@@ -274,7 +275,7 @@ async def get_realtime_alerts(
 async def get_realtime_curve(
     hours: int = Query(4, description="获取最近几小时数据", ge=1, le=24),
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_viewer)
+    _: User = Depends(require_viewer),
 ):
     """获取最近N小时的功率曲线数据（用于实时图表）
 
@@ -291,9 +292,7 @@ async def get_realtime_curve(
 
     # 尝试从数据库获取真实数据
     result = await db.execute(
-        select(Demand15MinData)
-        .where(Demand15MinData.timestamp >= start_time)
-        .order_by(Demand15MinData.timestamp)
+        select(Demand15MinData).where(Demand15MinData.timestamp >= start_time).order_by(Demand15MinData.timestamp)
     )
     records = result.scalars().all()
 
@@ -311,21 +310,23 @@ async def get_realtime_curve(
             else:
                 alert = "normal"
 
-            data_points.append({
-                "timestamp": record.timestamp.strftime("%H:%M"),
-                "full_timestamp": record.timestamp.strftime("%Y-%m-%d %H:%M:%S"),
-                "power": round(power, 1),
-                "demand_target": declared_demand,
-                "utilization": round(utilization, 1),
-                "alert_level": alert,
-                "is_demo_data": False
-            })
+            data_points.append(
+                {
+                    "timestamp": record.timestamp.strftime("%H:%M"),
+                    "full_timestamp": record.timestamp.strftime("%Y-%m-%d %H:%M:%S"),
+                    "power": round(power, 1),
+                    "demand_target": declared_demand,
+                    "utilization": round(utilization, 1),
+                    "alert_level": alert,
+                    "is_demo_data": False,
+                }
+            )
 
         return {
             "data": data_points,
             "demand_target": declared_demand,
             "time_range": f"最近{hours}小时",
-            "is_demo_data": False
+            "is_demo_data": False,
         }
 
     # 无真实数据，检查是否启用模拟模式
@@ -335,25 +336,18 @@ async def get_realtime_curve(
             "data": data_points,
             "demand_target": declared_demand,
             "time_range": f"最近{hours}小时",
-            "is_demo_data": True
+            "is_demo_data": True,
         }
     else:
         # 返回空数据
-        return {
-            "data": [],
-            "demand_target": declared_demand,
-            "time_range": f"最近{hours}小时",
-            "is_demo_data": False
-        }
+        return {"data": [], "demand_target": declared_demand, "time_range": f"最近{hours}小时", "is_demo_data": False}
 
 
 # ==================== 月度统计 API ====================
 
+
 @router.get("/monthly/current", response_model=MonthlyBillSummary, summary="获取当月电费汇总")
-async def get_current_month_summary(
-    db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_viewer)
-):
+async def get_current_month_summary(db: AsyncSession = Depends(get_db), _: User = Depends(require_viewer)):
     """获取当月电费汇总统计
 
     数据来源:
@@ -368,9 +362,7 @@ async def get_current_month_summary(
     declared_demand, demand_price = await _get_declared_demand(db)
 
     # 尝试从数据库获取真实数据
-    result = await db.execute(
-        select(MonthlyStatistics).where(MonthlyStatistics.year_month == year_month)
-    )
+    result = await db.execute(select(MonthlyStatistics).where(MonthlyStatistics.year_month == year_month))
     stats = result.scalar_one_or_none()
 
     if stats:
@@ -386,7 +378,7 @@ async def get_current_month_summary(
             total_cost=float(stats.total_cost) if stats.total_cost else 0,
             optimized_saving=float(stats.optimized_saving) if stats.optimized_saving else 0,
             cost_breakdown={},
-            is_demo_data=False
+            is_demo_data=False,
         )
 
     # 无真实数据，检查是否启用模拟模式
@@ -406,7 +398,7 @@ async def get_current_month_summary(
             total_cost=0,
             optimized_saving=0,
             cost_breakdown={},
-            is_demo_data=False
+            is_demo_data=False,
         )
 
 
@@ -414,7 +406,7 @@ async def get_current_month_summary(
 async def get_monthly_history(
     months: int = Query(12, description="获取最近几个月", ge=1, le=24),
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_viewer)
+    _: User = Depends(require_viewer),
 ):
     """获取历史月度电费统计
 
@@ -429,55 +421,44 @@ async def get_monthly_history(
     declared_demand, _ = await _get_declared_demand(db)
 
     # 尝试从数据库获取真实数据
-    result = await db.execute(
-        select(MonthlyStatistics).order_by(desc(MonthlyStatistics.year_month)).limit(months)
-    )
+    result = await db.execute(select(MonthlyStatistics).order_by(desc(MonthlyStatistics.year_month)).limit(months))
     records = result.scalars().all()
 
     if records:
         # 使用真实数据
         history = []
         for record in records:
-            history.append({
-                "year_month": record.year_month,
-                "total_energy": float(record.total_energy) if record.total_energy else 0,
-                "total_cost": float(record.total_cost) if record.total_cost else 0,
-                "energy_cost": float(record.energy_cost) if record.energy_cost else 0,
-                "demand_cost": float(record.demand_cost) if record.demand_cost else 0,
-                "other_cost": float(record.power_factor_adjustment) if record.power_factor_adjustment else 0,
-                "max_demand": float(record.max_demand) if record.max_demand else 0,
-                "is_demo_data": False
-            })
+            history.append(
+                {
+                    "year_month": record.year_month,
+                    "total_energy": float(record.total_energy) if record.total_energy else 0,
+                    "total_cost": float(record.total_cost) if record.total_cost else 0,
+                    "energy_cost": float(record.energy_cost) if record.energy_cost else 0,
+                    "demand_cost": float(record.demand_cost) if record.demand_cost else 0,
+                    "other_cost": float(record.power_factor_adjustment) if record.power_factor_adjustment else 0,
+                    "max_demand": float(record.max_demand) if record.max_demand else 0,
+                    "is_demo_data": False,
+                }
+            )
 
-        return {
-            "data": history,
-            "months": len(history),
-            "is_demo_data": False
-        }
+        return {"data": history, "months": len(history), "is_demo_data": False}
 
     # 无真实数据，检查是否启用模拟模式
     if settings.simulation_enabled:
         history = demo_provider.get_demo_monthly_history(declared_demand, months, now)
-        return {
-            "data": history,
-            "months": months,
-            "is_demo_data": True
-        }
+        return {"data": history, "months": months, "is_demo_data": True}
     else:
-        return {
-            "data": [],
-            "months": 0,
-            "is_demo_data": False
-        }
+        return {"data": [], "months": 0, "is_demo_data": False}
 
 
 # ==================== 需量趋势分析 ====================
+
 
 @router.get("/demand/daily-trend", summary="获取日需量趋势")
 async def get_daily_demand_trend(
     date_str: Optional[str] = Query(None, description="日期 YYYY-MM-DD"),
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_viewer)
+    _: User = Depends(require_viewer),
 ):
     """获取指定日期的24小时需量趋势
 
@@ -501,10 +482,7 @@ async def get_daily_demand_trend(
 
     result = await db.execute(
         select(Demand15MinData)
-        .where(
-            Demand15MinData.timestamp >= day_start,
-            Demand15MinData.timestamp < day_end
-        )
+        .where(Demand15MinData.timestamp >= day_start, Demand15MinData.timestamp < day_end)
         .order_by(Demand15MinData.timestamp)
     )
     records = result.scalars().all()
@@ -523,11 +501,7 @@ async def get_daily_demand_trend(
                 max_demand = demand
                 max_demand_time = time_str
 
-            data_points.append({
-                "time": time_str,
-                "demand": round(demand, 1),
-                "period": record.time_period or "flat"
-            })
+            data_points.append({"time": time_str, "demand": round(demand, 1), "period": record.time_period or "flat"})
 
         return {
             "date": target_date.strftime("%Y-%m-%d"),
@@ -536,7 +510,7 @@ async def get_daily_demand_trend(
             "max_demand_time": max_demand_time,
             "avg_demand": round(sum(p["demand"] for p in data_points) / len(data_points), 1) if data_points else 0,
             "data": data_points,
-            "is_demo_data": False
+            "is_demo_data": False,
         }
 
     # 无真实数据，检查是否启用模拟模式
@@ -551,14 +525,16 @@ async def get_daily_demand_trend(
             "max_demand_time": None,
             "avg_demand": 0,
             "data": [],
-            "is_demo_data": False
+            "is_demo_data": False,
         }
 
 
 # ==================== 实时调度控制 API ====================
 
+
 class DispatchCommandRequest(BaseModel):
     """调度指令请求"""
+
     action: str = Field(..., description="动作: curtail/discharge/shift/restore")
     device_id: Optional[int] = Field(None, description="设备ID")
     device_name: str = Field(..., description="设备名称")
@@ -569,6 +545,7 @@ class DispatchCommandRequest(BaseModel):
 
 class DispatchStatus(BaseModel):
     """调度状态"""
+
     demand_target: float
     current_power: float
     predicted_power: float
@@ -583,10 +560,7 @@ class DispatchStatus(BaseModel):
 
 
 @router.get("/dispatch/status", summary="获取实时调度状态")
-async def get_dispatch_status(
-    db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_viewer)
-):
+async def get_dispatch_status(db: AsyncSession = Depends(get_db), _: User = Depends(require_viewer)):
     """
     获取实时调度控制器状态
 
@@ -602,7 +576,7 @@ async def get_dispatch_status(
     """
     from app.services.realtime_dispatch import get_dispatch_controller
 
-    settings = get_settings()
+    get_settings()
 
     # 获取配置
     declared_demand, _ = await _get_declared_demand(db)
@@ -635,16 +609,14 @@ async def get_dispatch_status(
             "storage_available": ctrl_status["storage_available"],
             "storage_soc": ctrl_status["storage_soc"],
             "curtailable_devices_count": ctrl_status["curtailable_devices_count"],
-            "is_demo_data": status.is_demo_data
-        }
+            "is_demo_data": status.is_demo_data,
+        },
     }
 
 
 @router.post("/dispatch/command", summary="发送调度指令")
 async def send_dispatch_command(
-    request: DispatchCommandRequest,
-    db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_viewer)
+    request: DispatchCommandRequest, db: AsyncSession = Depends(get_db), _: User = Depends(require_viewer)
 ):
     """
     发送手动调度指令
@@ -655,28 +627,21 @@ async def send_dispatch_command(
     - shift: 延迟启动
     - restore: 恢复运行
     """
-    from app.services.realtime_dispatch import (
-        get_dispatch_controller,
-        AdjustmentAction
-    )
+    from app.services.realtime_dispatch import get_dispatch_controller, AdjustmentAction
 
     controller = get_dispatch_controller()
 
     # 转换动作类型
     action_map = {
-        'curtail': AdjustmentAction.CURTAIL,
-        'discharge': AdjustmentAction.DISCHARGE,
-        'shift': AdjustmentAction.SHIFT,
-        'restore': AdjustmentAction.RESTORE,
+        "curtail": AdjustmentAction.CURTAIL,
+        "discharge": AdjustmentAction.DISCHARGE,
+        "shift": AdjustmentAction.SHIFT,
+        "restore": AdjustmentAction.RESTORE,
     }
 
     action = action_map.get(request.action)
     if not action:
-        return {
-            "code": 400,
-            "message": f"无效的动作类型: {request.action}",
-            "data": None
-        }
+        return {"code": 400, "message": f"无效的动作类型: {request.action}", "data": None}
 
     cmd = controller.create_manual_command(
         action=action,
@@ -684,7 +649,7 @@ async def send_dispatch_command(
         device_name=request.device_name,
         power_change=request.power_change,
         duration=request.duration,
-        reason=request.reason
+        reason=request.reason,
     )
 
     return {
@@ -697,8 +662,8 @@ async def send_dispatch_command(
             "power_change": cmd.power_change,
             "duration": cmd.duration,
             "status": cmd.status,
-            "created_at": cmd.created_at.isoformat()
-        }
+            "created_at": cmd.created_at.isoformat(),
+        },
     }
 
 
@@ -707,7 +672,7 @@ async def complete_dispatch_command(
     command_id: str,
     success: bool = Query(True, description="是否成功"),
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_viewer)
+    _: User = Depends(require_viewer),
 ):
     """标记调度指令为已完成"""
     from app.services.realtime_dispatch import get_dispatch_controller
@@ -718,10 +683,7 @@ async def complete_dispatch_command(
     return {
         "code": 0,
         "message": "success",
-        "data": {
-            "command_id": command_id,
-            "status": "completed" if success else "failed"
-        }
+        "data": {"command_id": command_id, "status": "completed" if success else "failed"},
     }
 
 
@@ -729,7 +691,7 @@ async def complete_dispatch_command(
 async def simulate_monitoring(
     minutes: int = Query(5, description="模拟分钟数", ge=1, le=30),
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_viewer)
+    _: User = Depends(require_viewer),
 ):
     """
     运行实时监控模拟
@@ -748,6 +710,6 @@ async def simulate_monitoring(
             "duration_minutes": minutes,
             "data_points": len(results),
             "results": results,
-            "is_demo_data": True  # 此 API 始终使用模拟数据
-        }
+            "is_demo_data": True,  # 此 API 始终使用模拟数据
+        },
     }

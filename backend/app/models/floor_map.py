@@ -1,4 +1,5 @@
 """楼层平面图模型"""
+
 from sqlalchemy import Column, Integer, String, Text, Boolean, DateTime
 from sqlalchemy.sql import func
 from ..core.database import Base
@@ -6,6 +7,7 @@ from ..core.database import Base
 
 class FloorMap(Base):
     """楼层平面图"""
+
     __tablename__ = "floor_maps"
 
     id = Column(Integer, primary_key=True, autoincrement=True)

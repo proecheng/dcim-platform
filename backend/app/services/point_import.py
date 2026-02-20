@@ -12,8 +12,14 @@ from ..models.gateway import DataSourcePoint
 logger = logging.getLogger(__name__)
 
 VALID_DATA_TYPES = {
-    "int16", "uint16", "int32", "uint32",
-    "float32", "float64", "bool", "string",
+    "int16",
+    "uint16",
+    "int32",
+    "uint32",
+    "float32",
+    "float64",
+    "bool",
+    "string",
 }
 
 REQUIRED_COLUMNS = {"address", "data_type"}
@@ -55,13 +61,20 @@ async def validate_points(
     headers, rows = parse_excel(file_bytes)
 
     if not rows:
-        return {"total": 0, "passed": 0, "failed": 0, "errors": [{"row": 0, "field": "", "message": "Excel 文件无数据行"}]}
+        return {
+            "total": 0,
+            "passed": 0,
+            "failed": 0,
+            "errors": [{"row": 0, "field": "", "message": "Excel 文件无数据行"}],
+        }
 
     # 检查必填列是否存在
     missing_cols = REQUIRED_COLUMNS - set(headers)
     if missing_cols:
         return {
-            "total": 0, "passed": 0, "failed": 0,
+            "total": 0,
+            "passed": 0,
+            "failed": 0,
             "errors": [{"row": 0, "field": "", "message": f"缺少必填列: {', '.join(sorted(missing_cols))}"}],
         }
 
@@ -69,9 +82,7 @@ async def validate_points(
     seen_addresses: set[str] = set()
 
     # 查询数据库已有地址
-    result = await db.execute(
-        select(DataSourcePoint.address).where(DataSourcePoint.datasource_id == datasource_id)
-    )
+    result = await db.execute(select(DataSourcePoint.address).where(DataSourcePoint.datasource_id == datasource_id))
     existing_addresses = {r[0] for r in result.fetchall()}
 
     for row in rows:
@@ -92,10 +103,13 @@ async def validate_points(
 
         # 数据类型校验
         if data_type not in VALID_DATA_TYPES:
-            errors.append({
-                "row": row_num, "field": "data_type",
-                "message": f"无效数据类型: {data_type}，允许: {', '.join(sorted(VALID_DATA_TYPES))}",
-            })
+            errors.append(
+                {
+                    "row": row_num,
+                    "field": "data_type",
+                    "message": f"无效数据类型: {data_type}，允许: {', '.join(sorted(VALID_DATA_TYPES))}",
+                }
+            )
 
         # Excel 内部地址重复
         if address in seen_addresses:

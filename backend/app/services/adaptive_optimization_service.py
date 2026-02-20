@@ -8,17 +8,15 @@
 - 在线学习接口
 - 优化历史记录
 """
+
 import logging
 from datetime import datetime
 from decimal import Decimal
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, desc
 
-from app.models.energy import (
-    EnergySavingProposal, RLOptimizationHistory,
-    RLTrainingLog, RLModelState
-)
+from app.models.energy import EnergySavingProposal, RLOptimizationHistory, RLTrainingLog, RLModelState
 
 logger = logging.getLogger(__name__)
 
@@ -45,6 +43,7 @@ class AdaptiveOptimizationService:
             try:
                 from app.ml_models.rl.agent import AdaptiveOptimizer
                 from app.ml_models.config import MLConfig
+
                 self._optimizer = AdaptiveOptimizer(MLConfig())
                 logger.info("AdaptiveOptimizer 初始化成功")
             except Exception as e:
@@ -57,6 +56,7 @@ class AdaptiveOptimizationService:
             try:
                 from app.services.ml_service import MLEnergySavingService
                 from app.ml_models.config import MLConfig
+
                 self._ml_service = MLEnergySavingService(MLConfig())
             except Exception as e:
                 logger.warning(f"MLEnergySavingService 初始化失败: {e}")
@@ -64,11 +64,7 @@ class AdaptiveOptimizationService:
 
     # ==================== 优化接口 ====================
 
-    async def optimize(
-        self,
-        proposal_id: int,
-        current_state: Optional[Dict[str, Any]] = None
-    ) -> Dict[str, Any]:
+    async def optimize(self, proposal_id: int, current_state: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """
         为方案执行 RL 优化 (S5e)
 
@@ -84,9 +80,7 @@ class AdaptiveOptimizationService:
             return {"success": False, "error": "RL 优化器不可用"}
 
         # 验证方案存在
-        stmt = select(EnergySavingProposal).where(
-            EnergySavingProposal.id == proposal_id
-        )
+        stmt = select(EnergySavingProposal).where(EnergySavingProposal.id == proposal_id)
         result = await self.db.execute(stmt)
         proposal = result.scalar_one_or_none()
         if not proposal:
@@ -141,7 +135,7 @@ class AdaptiveOptimizationService:
         comfort_violation: float = 0.0,
         safety_violation: float = 0.0,
         current_state: Optional[Dict[str, Any]] = None,
-        proposal_id: Optional[int] = None
+        proposal_id: Optional[int] = None,
     ) -> Dict[str, Any]:
         """
         执行一步在线训练
@@ -169,7 +163,7 @@ class AdaptiveOptimizationService:
                 expected_saving=expected_saving,
                 comfort_violation=comfort_violation,
                 safety_violation=safety_violation,
-                current_state=current_state
+                current_state=current_state,
             )
 
             # 记录训练日志
@@ -222,6 +216,7 @@ class AdaptiveOptimizationService:
         """
         try:
             from app.services.effect_monitoring_service import EffectMonitoringService
+
             monitoring = EffectMonitoringService(self.db)
 
             # 获取效果汇总
@@ -233,9 +228,7 @@ class AdaptiveOptimizationService:
             achievement = latest.get("achievement_rate", 0)
 
             # 获取方案预期收益
-            stmt = select(EnergySavingProposal).where(
-                EnergySavingProposal.id == proposal_id
-            )
+            stmt = select(EnergySavingProposal).where(EnergySavingProposal.id == proposal_id)
             result = await self.db.execute(stmt)
             proposal = result.scalar_one_or_none()
             if not proposal:
@@ -245,11 +238,7 @@ class AdaptiveOptimizationService:
             actual = expected * achievement / 100 if achievement > 0 else 0
 
             # 执行训练
-            return await self.train_step(
-                actual_saving=actual,
-                expected_saving=expected,
-                proposal_id=proposal_id
-            )
+            return await self.train_step(actual_saving=actual, expected_saving=expected, proposal_id=proposal_id)
 
         except Exception as e:
             logger.error(f"从监测数据训练失败: {e}")
@@ -263,9 +252,11 @@ class AdaptiveOptimizationService:
         is_available = optimizer is not None
 
         # 从数据库获取持久化状态
-        stmt = select(RLModelState).where(
-            RLModelState.model_name == "adaptive_optimizer"
-        ).order_by(desc(RLModelState.updated_at))
+        stmt = (
+            select(RLModelState)
+            .where(RLModelState.model_name == "adaptive_optimizer")
+            .order_by(desc(RLModelState.updated_at))
+        )
         result = await self.db.execute(stmt)
         model_state = result.scalar_one_or_none()
 
@@ -304,7 +295,9 @@ class AdaptiveOptimizationService:
 
         if model_state:
             info["avg_reward"] = float(model_state.avg_reward) if model_state.avg_reward else None
-            info["avg_achievement_rate"] = float(model_state.avg_achievement_rate) if model_state.avg_achievement_rate else None
+            info["avg_achievement_rate"] = (
+                float(model_state.avg_achievement_rate) if model_state.avg_achievement_rate else None
+            )
             info["best_reward"] = float(model_state.best_reward) if model_state.best_reward else None
             info["checkpoint_saved_at"] = model_state.checkpoint_saved_at
 
@@ -329,12 +322,7 @@ class AdaptiveOptimizationService:
 
     # ==================== 优化历史 ====================
 
-    async def get_optimization_history(
-        self,
-        proposal_id: int,
-        limit: int = 20,
-        offset: int = 0
-    ) -> Dict[str, Any]:
+    async def get_optimization_history(self, proposal_id: int, limit: int = 20, offset: int = 0) -> Dict[str, Any]:
         """获取方案的 RL 优化历史"""
         count_stmt = select(func.count(RLOptimizationHistory.id)).where(
             RLOptimizationHistory.proposal_id == proposal_id
@@ -342,9 +330,13 @@ class AdaptiveOptimizationService:
         count_result = await self.db.execute(count_stmt)
         total = count_result.scalar() or 0
 
-        items_stmt = select(RLOptimizationHistory).where(
-            RLOptimizationHistory.proposal_id == proposal_id
-        ).order_by(desc(RLOptimizationHistory.created_at)).offset(offset).limit(limit)
+        items_stmt = (
+            select(RLOptimizationHistory)
+            .where(RLOptimizationHistory.proposal_id == proposal_id)
+            .order_by(desc(RLOptimizationHistory.created_at))
+            .offset(offset)
+            .limit(limit)
+        )
         items_result = await self.db.execute(items_stmt)
         items = items_result.scalars().all()
 
@@ -355,9 +347,7 @@ class AdaptiveOptimizationService:
 
     async def apply_optimization(self, optimization_id: int) -> Dict[str, Any]:
         """标记优化建议为已应用"""
-        stmt = select(RLOptimizationHistory).where(
-            RLOptimizationHistory.id == optimization_id
-        )
+        stmt = select(RLOptimizationHistory).where(RLOptimizationHistory.id == optimization_id)
         result = await self.db.execute(stmt)
         history = result.scalar_one_or_none()
 
@@ -372,11 +362,7 @@ class AdaptiveOptimizationService:
 
     # ==================== 探索率管理 ====================
 
-    async def update_exploration_rate(
-        self,
-        exploration_rate: float,
-        phase: Optional[str] = None
-    ) -> Dict[str, Any]:
+    async def update_exploration_rate(self, exploration_rate: float, phase: Optional[str] = None) -> Dict[str, Any]:
         """手动更新探索率"""
         optimizer = self._get_optimizer()
         if optimizer is None:
@@ -386,10 +372,13 @@ class AdaptiveOptimizationService:
         optimizer._exploration_rate = exploration_rate
 
         # 更新数据库
-        await self._update_model_state(optimizer, {
-            "exploration_rate": exploration_rate,
-            "step": optimizer._step_count,
-        })
+        await self._update_model_state(
+            optimizer,
+            {
+                "exploration_rate": exploration_rate,
+                "step": optimizer._step_count,
+            },
+        )
         await self.db.commit()
 
         return {
@@ -467,7 +456,9 @@ class AdaptiveOptimizationService:
 
         model_state.is_trained = optimizer.is_trained
         model_state.total_steps = optimizer._step_count
-        model_state.exploration_rate = Decimal(str(round(result.get("exploration_rate", optimizer._exploration_rate), 4)))
+        model_state.exploration_rate = Decimal(
+            str(round(result.get("exploration_rate", optimizer._exploration_rate), 4))
+        )
 
         # 确定探索阶段
         if optimizer._step_count < 1000:
@@ -482,9 +473,7 @@ class AdaptiveOptimizationService:
         # 更新统计
         achievements = optimizer._recent_achievements
         if achievements:
-            model_state.avg_achievement_rate = Decimal(str(round(
-                sum(achievements) / len(achievements) * 100, 2
-            )))
+            model_state.avg_achievement_rate = Decimal(str(round(sum(achievements) / len(achievements) * 100, 2)))
             model_state.recent_achievements = achievements[-100:]
 
         reward = result.get("reward")
@@ -495,9 +484,7 @@ class AdaptiveOptimizationService:
 
     async def _get_or_create_model_state(self) -> RLModelState:
         """获取或创建模型状态记录"""
-        stmt = select(RLModelState).where(
-            RLModelState.model_name == "adaptive_optimizer"
-        )
+        stmt = select(RLModelState).where(RLModelState.model_name == "adaptive_optimizer")
         result = await self.db.execute(stmt)
         model_state = result.scalar_one_or_none()
 

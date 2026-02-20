@@ -1,4 +1,5 @@
 """OTA 升级 Schema — Story 15.5"""
+
 from typing import Optional
 from datetime import datetime
 from pydantic import BaseModel, ConfigDict, Field
@@ -75,4 +76,5 @@ class OtaTaskResponse(BaseModel):
 
 class OtaTaskDetailResponse(OtaTaskResponse):
     """任务详情（含各网关状态）"""
+
     gateways: list[OtaGatewayStatus] = []

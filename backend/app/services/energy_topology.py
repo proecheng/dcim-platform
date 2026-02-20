@@ -4,21 +4,24 @@ Energy Topology Service
 
 提供配电系统拓扑树构建、查询和编辑功能
 """
-from typing import List, Optional, Dict, Any, Tuple
+
+from typing import Optional, Dict, Any, Tuple
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, delete
 from sqlalchemy.orm import selectinload
 from datetime import datetime
 
-from ..models.energy import (
-    Transformer, MeterPoint, DistributionPanel,
-    DistributionCircuit, PowerDevice
-)
+from ..models.energy import Transformer, MeterPoint, DistributionPanel, DistributionCircuit, PowerDevice
 from ..models.point import Point, PointRealtime
 from ..schemas.energy import (
-    TopologyNodeType, TopologyNodeCreate, TopologyNodeUpdate,
-    TopologyNodeDelete, TopologyBatchOperation, TopologyBatchResult,
-    TopologyExport, TopologyImport
+    TopologyNodeType,
+    TopologyNodeCreate,
+    TopologyNodeUpdate,
+    TopologyNodeDelete,
+    TopologyBatchOperation,
+    TopologyBatchResult,
+    TopologyExport,
+    TopologyImport,
 )
 
 
@@ -32,16 +35,12 @@ class EnergyTopologyService:
         返回树形结构数据
         """
         # 批量加载所有 PowerDevice 的 PointRealtime 数据（避免 N+1）
-        all_devices_result = await db.execute(
-            select(PowerDevice).where(PowerDevice.is_enabled == True)
-        )
+        all_devices_result = await db.execute(select(PowerDevice).where(PowerDevice.is_enabled == True))
         all_devices = all_devices_result.scalars().all()
         power_point_ids = [d.power_point_id for d in all_devices if d.power_point_id]
         realtime_map: Dict[int, PointRealtime] = {}
         if power_point_ids:
-            rt_result = await db.execute(
-                select(PointRealtime).where(PointRealtime.point_id.in_(power_point_ids))
-            )
+            rt_result = await db.execute(select(PointRealtime).where(PointRealtime.point_id.in_(power_point_ids)))
             realtime_map = {r.point_id: r for r in rt_result.scalars().all()}
 
         # 获取所有变压器及其关联数据
@@ -53,23 +52,17 @@ class EnergyTopologyService:
         )
         transformers = result.scalars().all()
 
-        topology = {
-            "transformers": []
-        }
+        topology = {"transformers": []}
 
         for transformer in transformers:
-            transformer_node = await EnergyTopologyService._build_transformer_node(
-                db, transformer, realtime_map
-            )
+            transformer_node = await EnergyTopologyService._build_transformer_node(db, transformer, realtime_map)
             topology["transformers"].append(transformer_node)
 
         return topology
 
     @staticmethod
     async def _build_transformer_node(
-        db: AsyncSession,
-        transformer: Transformer,
-        realtime_map: Dict[int, PointRealtime] = None
+        db: AsyncSession, transformer: Transformer, realtime_map: Dict[int, PointRealtime] = None
     ) -> Dict[str, Any]:
         """构建变压器节点"""
         if realtime_map is None:
@@ -93,10 +86,7 @@ class EnergyTopologyService:
         # 获取计量点
         meter_points_result = await db.execute(
             select(MeterPoint)
-            .where(
-                MeterPoint.transformer_id == transformer.id,
-                MeterPoint.is_enabled == True
-            )
+            .where(MeterPoint.transformer_id == transformer.id, MeterPoint.is_enabled == True)
             .order_by(MeterPoint.meter_code)
         )
         meter_points = meter_points_result.scalars().all()
@@ -119,9 +109,7 @@ class EnergyTopologyService:
 
     @staticmethod
     async def _build_meter_point_node(
-        db: AsyncSession,
-        meter_point: MeterPoint,
-        realtime_map: Dict[int, PointRealtime] = None
+        db: AsyncSession, meter_point: MeterPoint, realtime_map: Dict[int, PointRealtime] = None
     ) -> Dict[str, Any]:
         """构建计量点节点"""
         node = {
@@ -139,7 +127,7 @@ class EnergyTopologyService:
             "measurement_types": meter_point.measurement_types,
             "status": meter_point.status,
             "remark": meter_point.remark,
-            "panels": []
+            "panels": [],
         }
 
         # 获取配电柜（顶级配电柜，即没有上级的）
@@ -148,7 +136,7 @@ class EnergyTopologyService:
             .where(
                 DistributionPanel.meter_point_id == meter_point.id,
                 DistributionPanel.parent_panel_id.is_(None),
-                DistributionPanel.is_enabled == True
+                DistributionPanel.is_enabled == True,
             )
             .order_by(DistributionPanel.panel_code)
         )
@@ -165,10 +153,7 @@ class EnergyTopologyService:
 
     @staticmethod
     async def _build_panel_node(
-        db: AsyncSession,
-        panel: DistributionPanel,
-        depth: int = 0,
-        realtime_map: Dict[int, PointRealtime] = None
+        db: AsyncSession, panel: DistributionPanel, depth: int = 0, realtime_map: Dict[int, PointRealtime] = None
     ) -> Dict[str, Any]:
         """构建配电柜节点（递归处理子配电柜）"""
         if realtime_map is None:
@@ -195,10 +180,7 @@ class EnergyTopologyService:
         # 获取配电回路
         circuits_result = await db.execute(
             select(DistributionCircuit)
-            .where(
-                DistributionCircuit.panel_id == panel.id,
-                DistributionCircuit.is_enabled == True
-            )
+            .where(DistributionCircuit.panel_id == panel.id, DistributionCircuit.is_enabled == True)
             .order_by(DistributionCircuit.circuit_code)
         )
         circuits = circuits_result.scalars().all()
@@ -210,10 +192,7 @@ class EnergyTopologyService:
         # 获取子配电柜
         sub_panels_result = await db.execute(
             select(DistributionPanel)
-            .where(
-                DistributionPanel.parent_panel_id == panel.id,
-                DistributionPanel.is_enabled == True
-            )
+            .where(DistributionPanel.parent_panel_id == panel.id, DistributionPanel.is_enabled == True)
             .order_by(DistributionPanel.panel_code)
         )
         sub_panels = sub_panels_result.scalars().all()
@@ -241,9 +220,7 @@ class EnergyTopologyService:
 
     @staticmethod
     async def _build_circuit_node(
-        db: AsyncSession,
-        circuit: DistributionCircuit,
-        realtime_map: Dict[int, PointRealtime] = None
+        db: AsyncSession, circuit: DistributionCircuit, realtime_map: Dict[int, PointRealtime] = None
     ) -> Dict[str, Any]:
         """构建配电回路节点"""
         if realtime_map is None:
@@ -266,10 +243,7 @@ class EnergyTopologyService:
         # 获取用电设备
         devices_result = await db.execute(
             select(PowerDevice)
-            .where(
-                PowerDevice.circuit_id == circuit.id,
-                PowerDevice.is_enabled == True
-            )
+            .where(PowerDevice.circuit_id == circuit.id, PowerDevice.is_enabled == True)
             .order_by(PowerDevice.device_code)
         )
         devices = devices_result.scalars().all()
@@ -292,9 +266,7 @@ class EnergyTopologyService:
 
     @staticmethod
     async def _build_device_node(
-        db: AsyncSession,
-        device: PowerDevice,
-        power_realtime_map: Dict[int, PointRealtime] = None
+        db: AsyncSession, device: PowerDevice, power_realtime_map: Dict[int, PointRealtime] = None
     ) -> Dict[str, Any]:
         """构建用电设备节点"""
         if power_realtime_map is None:
@@ -312,14 +284,12 @@ class EnergyTopologyService:
             "is_metered": device.is_metered,
             "remark": device.remark,
             "realtime_data": None,
-            "points": []
+            "points": [],
         }
 
         # 获取关联的采集点
         points_result = await db.execute(
-            select(Point)
-            .where(Point.energy_device_id == device.id)
-            .order_by(Point.point_code)
+            select(Point).where(Point.energy_device_id == device.id).order_by(Point.point_code)
         )
         points = points_result.scalars().all()
 
@@ -327,9 +297,7 @@ class EnergyTopologyService:
         point_realtime_map: Dict[int, PointRealtime] = {}
         if points:
             point_ids = [pt.id for pt in points]
-            realtime_result = await db.execute(
-                select(PointRealtime).where(PointRealtime.point_id.in_(point_ids))
-            )
+            realtime_result = await db.execute(select(PointRealtime).where(PointRealtime.point_id.in_(point_ids)))
             point_realtime_map = {r.point_id: r for r in realtime_result.scalars().all()}
 
         for pt in points:
@@ -339,18 +307,20 @@ class EnergyTopologyService:
                 realtime = {
                     "value": rt.value,
                     "status": rt.status,
-                    "updated_at": rt.updated_at.isoformat() if rt.updated_at else None
+                    "updated_at": rt.updated_at.isoformat() if rt.updated_at else None,
                 }
 
-            node["points"].append({
-                "id": pt.id,
-                "code": pt.point_code,
-                "name": pt.point_name,
-                "type": "point",
-                "point_type": pt.point_type,
-                "unit": pt.unit,
-                "realtime": realtime
-            })
+            node["points"].append(
+                {
+                    "id": pt.id,
+                    "code": pt.point_code,
+                    "name": pt.point_name,
+                    "type": "point",
+                    "point_type": pt.point_type,
+                    "unit": pt.unit,
+                    "realtime": realtime,
+                }
+            )
 
         # 如果设备关联了功率点位，从传入的 map 读取实时数据（避免单独查询）
         if device.power_point_id:
@@ -365,11 +335,7 @@ class EnergyTopologyService:
         return node
 
     @staticmethod
-    async def get_node_detail(
-        db: AsyncSession,
-        node_type: str,
-        node_id: int
-    ) -> Optional[Dict[str, Any]]:
+    async def get_node_detail(db: AsyncSession, node_type: str, node_id: int) -> Optional[Dict[str, Any]]:
         """
         获取指定节点的详细信息
 
@@ -378,41 +344,31 @@ class EnergyTopologyService:
             node_id: 节点ID
         """
         if node_type == "transformer":
-            result = await db.execute(
-                select(Transformer).where(Transformer.id == node_id)
-            )
+            result = await db.execute(select(Transformer).where(Transformer.id == node_id))
             item = result.scalar_one_or_none()
             if item:
                 return await EnergyTopologyService._build_transformer_node(db, item)
 
         elif node_type == "meter_point":
-            result = await db.execute(
-                select(MeterPoint).where(MeterPoint.id == node_id)
-            )
+            result = await db.execute(select(MeterPoint).where(MeterPoint.id == node_id))
             item = result.scalar_one_or_none()
             if item:
                 return await EnergyTopologyService._build_meter_point_node(db, item)
 
         elif node_type == "panel":
-            result = await db.execute(
-                select(DistributionPanel).where(DistributionPanel.id == node_id)
-            )
+            result = await db.execute(select(DistributionPanel).where(DistributionPanel.id == node_id))
             item = result.scalar_one_or_none()
             if item:
                 return await EnergyTopologyService._build_panel_node(db, item)
 
         elif node_type == "circuit":
-            result = await db.execute(
-                select(DistributionCircuit).where(DistributionCircuit.id == node_id)
-            )
+            result = await db.execute(select(DistributionCircuit).where(DistributionCircuit.id == node_id))
             item = result.scalar_one_or_none()
             if item:
                 return await EnergyTopologyService._build_circuit_node(db, item)
 
         elif node_type == "device":
-            result = await db.execute(
-                select(PowerDevice).where(PowerDevice.id == node_id)
-            )
+            result = await db.execute(select(PowerDevice).where(PowerDevice.id == node_id))
             item = result.scalar_one_or_none()
             if item:
                 return await EnergyTopologyService._build_device_node(db, item)
@@ -431,15 +387,9 @@ class EnergyTopologyService:
             echarts_node = {
                 "name": node.get("name", ""),
                 "value": node.get("id"),
-                "itemStyle": {
-                    "color": EnergyTopologyService._get_node_color(node.get("type"))
-                },
-                "data": {
-                    "type": node.get("type"),
-                    "code": node.get("code"),
-                    "status": node.get("status")
-                },
-                "children": []
+                "itemStyle": {"color": EnergyTopologyService._get_node_color(node.get("type"))},
+                "data": {"type": node.get("type"), "code": node.get("code"), "status": node.get("status")},
+                "children": [],
             }
 
             # 处理子节点
@@ -465,10 +415,7 @@ class EnergyTopologyService:
             return echarts_node
 
         # 构建根节点
-        root = {
-            "name": "配电系统",
-            "children": []
-        }
+        root = {"name": "配电系统", "children": []}
 
         for transformer in topology.get("transformers", []):
             root["children"].append(convert_to_echarts_node(transformer))
@@ -479,22 +426,19 @@ class EnergyTopologyService:
     def _get_node_color(node_type: str) -> str:
         """获取节点颜色"""
         colors = {
-            "transformer": "#f5222d",    # 红色 - 变压器
-            "meter_point": "#fa8c16",    # 橙色 - 计量点
-            "panel": "#1890ff",          # 蓝色 - 配电柜
-            "circuit": "#52c41a",        # 绿色 - 回路
-            "device": "#722ed1",         # 紫色 - 设备
-            "point": "#13c2c2"           # 青色 - 采集点
+            "transformer": "#f5222d",  # 红色 - 变压器
+            "meter_point": "#fa8c16",  # 橙色 - 计量点
+            "panel": "#1890ff",  # 蓝色 - 配电柜
+            "circuit": "#52c41a",  # 绿色 - 回路
+            "device": "#722ed1",  # 紫色 - 设备
+            "point": "#13c2c2",  # 青色 - 采集点
         }
         return colors.get(node_type, "#8c8c8c")
 
     # ==================== CRUD 操作 ====================
 
     @staticmethod
-    async def _ensure_unique_device_code(
-        db: AsyncSession,
-        device_code: str
-    ) -> str:
+    async def _ensure_unique_device_code(db: AsyncSession, device_code: str) -> str:
         """
         确保设备编码唯一，如果已存在则自动生成新编码
 
@@ -508,31 +452,25 @@ class EnergyTopologyService:
         import re
 
         # 检查原始编码是否已存在
-        result = await db.execute(
-            select(PowerDevice).where(PowerDevice.device_code == device_code)
-        )
+        result = await db.execute(select(PowerDevice).where(PowerDevice.device_code == device_code))
         if not result.scalar_one_or_none():
             # 编码不存在，直接返回
             return device_code
 
         # 编码已存在，解析前缀和序号
         # 支持格式如 AC-004, SRV-001, DEV-123 等
-        match = re.match(r'^([A-Za-z]+-?)(\d+)$', device_code)
+        match = re.match(r"^([A-Za-z]+-?)(\d+)$", device_code)
         if match:
             prefix = match.group(1)
             # 查找该前缀下的最大序号
             like_pattern = f"{prefix}%"
-            result = await db.execute(
-                select(PowerDevice.device_code).where(
-                    PowerDevice.device_code.like(like_pattern)
-                )
-            )
+            result = await db.execute(select(PowerDevice.device_code).where(PowerDevice.device_code.like(like_pattern)))
             existing_codes = [row[0] for row in result.fetchall()]
 
             # 提取最大序号
             max_seq = 0
             for code in existing_codes:
-                code_match = re.match(r'^([A-Za-z]+-?)(\d+)$', code)
+                code_match = re.match(r"^([A-Za-z]+-?)(\d+)$", code)
                 if code_match and code_match.group(1) == prefix:
                     seq = int(code_match.group(2))
                     if seq > max_seq:
@@ -545,14 +483,11 @@ class EnergyTopologyService:
             return f"{prefix}{str(new_seq).zfill(num_digits)}"
         else:
             # 无法解析格式，添加时间戳后缀
-            timestamp = datetime.now().strftime('%H%M%S')
+            timestamp = datetime.now().strftime("%H%M%S")
             return f"{device_code}_{timestamp}"
 
     @staticmethod
-    async def create_node(
-        db: AsyncSession,
-        data: TopologyNodeCreate
-    ) -> Tuple[int, str]:
+    async def create_node(db: AsyncSession, data: TopologyNodeCreate) -> Tuple[int, str]:
         """
         创建拓扑节点
 
@@ -583,7 +518,7 @@ class EnergyTopologyService:
                 status="normal",
                 is_enabled=True,
                 created_at=now,
-                updated_at=now
+                updated_at=now,
             )
             db.add(node)
             await db.flush()
@@ -605,7 +540,7 @@ class EnergyTopologyService:
                 status="normal",
                 is_enabled=True,
                 created_at=now,
-                updated_at=now
+                updated_at=now,
             )
             db.add(node)
             await db.flush()
@@ -627,7 +562,7 @@ class EnergyTopologyService:
                 status="normal",
                 is_enabled=True,
                 created_at=now,
-                updated_at=now
+                updated_at=now,
             )
             db.add(node)
             await db.flush()
@@ -643,9 +578,7 @@ class EnergyTopologyService:
             if data.parent_id is None:
                 raise ValueError("创建回路必须指定所属配电柜(parent_id)")
             # 验证配电柜是否存在
-            panel_result = await db.execute(
-                select(DistributionPanel).where(DistributionPanel.id == data.parent_id)
-            )
+            panel_result = await db.execute(select(DistributionPanel).where(DistributionPanel.id == data.parent_id))
             if not panel_result.scalar_one_or_none():
                 raise ValueError(f"配电柜不存在: ID={data.parent_id}")
 
@@ -659,7 +592,7 @@ class EnergyTopologyService:
                 shift_priority=99,
                 is_enabled=True,
                 created_at=now,
-                updated_at=now
+                updated_at=now,
             )
             db.add(node)
             await db.flush()
@@ -673,9 +606,7 @@ class EnergyTopologyService:
                 raise ValueError("设备名称不能为空")
 
             # 检查编码是否已存在，如果存在则自动生成唯一编码
-            device_code = await EnergyTopologyService._ensure_unique_device_code(
-                db, data.device_code
-            )
+            device_code = await EnergyTopologyService._ensure_unique_device_code(db, data.device_code)
 
             node = PowerDevice(
                 device_code=device_code,
@@ -690,7 +621,7 @@ class EnergyTopologyService:
                 is_critical=False,
                 is_enabled=True,
                 created_at=now,
-                updated_at=now
+                updated_at=now,
             )
             db.add(node)
             await db.flush()
@@ -707,9 +638,7 @@ class EnergyTopologyService:
             device_type = "IT"  # 默认为IT设备
             area_code = ""  # 默认空区域
             if data.parent_id:
-                parent_device = await db.execute(
-                    select(PowerDevice).where(PowerDevice.id == data.parent_id)
-                )
+                parent_device = await db.execute(select(PowerDevice).where(PowerDevice.id == data.parent_id))
                 parent = parent_device.scalar_one_or_none()
                 if parent:
                     if parent.device_type:
@@ -730,7 +659,7 @@ class EnergyTopologyService:
                 unit=data.measurement_type or "",
                 is_enabled=True,
                 created_at=now,
-                updated_at=now
+                updated_at=now,
             )
             db.add(node)
             await db.flush()
@@ -739,10 +668,7 @@ class EnergyTopologyService:
         raise ValueError(f"不支持的节点类型: {data.node_type}")
 
     @staticmethod
-    async def update_node(
-        db: AsyncSession,
-        data: TopologyNodeUpdate
-    ) -> bool:
+    async def update_node(db: AsyncSession, data: TopologyNodeUpdate) -> bool:
         """
         更新拓扑节点
 
@@ -756,9 +682,7 @@ class EnergyTopologyService:
         now = datetime.now()
 
         if data.node_type == TopologyNodeType.TRANSFORMER:
-            result = await db.execute(
-                select(Transformer).where(Transformer.id == data.node_id)
-            )
+            result = await db.execute(select(Transformer).where(Transformer.id == data.node_id))
             node = result.scalar_one_or_none()
             if not node:
                 return False
@@ -784,9 +708,7 @@ class EnergyTopologyService:
             node.updated_at = now
 
         elif data.node_type == TopologyNodeType.METER_POINT:
-            result = await db.execute(
-                select(MeterPoint).where(MeterPoint.id == data.node_id)
-            )
+            result = await db.execute(select(MeterPoint).where(MeterPoint.id == data.node_id))
             node = result.scalar_one_or_none()
             if not node:
                 return False
@@ -814,9 +736,7 @@ class EnergyTopologyService:
             node.updated_at = now
 
         elif data.node_type == TopologyNodeType.PANEL:
-            result = await db.execute(
-                select(DistributionPanel).where(DistributionPanel.id == data.node_id)
-            )
+            result = await db.execute(select(DistributionPanel).where(DistributionPanel.id == data.node_id))
             node = result.scalar_one_or_none()
             if not node:
                 return False
@@ -836,9 +756,7 @@ class EnergyTopologyService:
             node.updated_at = now
 
         elif data.node_type == TopologyNodeType.CIRCUIT:
-            result = await db.execute(
-                select(DistributionCircuit).where(DistributionCircuit.id == data.node_id)
-            )
+            result = await db.execute(select(DistributionCircuit).where(DistributionCircuit.id == data.node_id))
             node = result.scalar_one_or_none()
             if not node:
                 return False
@@ -856,9 +774,7 @@ class EnergyTopologyService:
             node.updated_at = now
 
         elif data.node_type == TopologyNodeType.DEVICE:
-            result = await db.execute(
-                select(PowerDevice).where(PowerDevice.id == data.node_id)
-            )
+            result = await db.execute(select(PowerDevice).where(PowerDevice.id == data.node_id))
             node = result.scalar_one_or_none()
             if not node:
                 return False
@@ -876,9 +792,7 @@ class EnergyTopologyService:
             node.updated_at = now
 
         elif data.node_type == TopologyNodeType.POINT:
-            result = await db.execute(
-                select(Point).where(Point.id == data.node_id)
-            )
+            result = await db.execute(select(Point).where(Point.id == data.node_id))
             node = result.scalar_one_or_none()
             if not node:
                 return False
@@ -908,27 +822,17 @@ class EnergyTopologyService:
         Returns:
             删除的点位数量
         """
-        point_ids_result = await db.execute(
-            select(Point.id).where(Point.energy_device_id == device_id)
-        )
+        point_ids_result = await db.execute(select(Point.id).where(Point.energy_device_id == device_id))
         point_ids = [pid for (pid,) in point_ids_result.all()]
 
         if point_ids:
-            await db.execute(
-                delete(PointRealtime).where(PointRealtime.point_id.in_(point_ids))
-            )
-            await db.execute(
-                delete(Point).where(Point.id.in_(point_ids))
-            )
+            await db.execute(delete(PointRealtime).where(PointRealtime.point_id.in_(point_ids)))
+            await db.execute(delete(Point).where(Point.id.in_(point_ids)))
             return len(point_ids)
         return 0
 
     @staticmethod
-    async def delete_node(
-        db: AsyncSession,
-        data: TopologyNodeDelete,
-        cascade: bool = False
-    ) -> Dict[str, int]:
+    async def delete_node(db: AsyncSession, data: TopologyNodeDelete, cascade: bool = False) -> Dict[str, int]:
         """
         删除拓扑节点
 
@@ -945,30 +849,20 @@ class EnergyTopologyService:
         if data.node_type == TopologyNodeType.TRANSFORMER:
             if cascade:
                 # 获取下级计量点并级联删除
-                result = await db.execute(
-                    select(MeterPoint).where(MeterPoint.transformer_id == data.node_id)
-                )
+                result = await db.execute(select(MeterPoint).where(MeterPoint.transformer_id == data.node_id))
                 meter_points = result.scalars().all()
                 for mp in meter_points:
                     sub_deleted = await EnergyTopologyService.delete_node(
                         db,
-                        TopologyNodeDelete(
-                            node_id=mp.id,
-                            node_type=TopologyNodeType.METER_POINT,
-                            cascade=True
-                        ),
-                        cascade=True
+                        TopologyNodeDelete(node_id=mp.id, node_type=TopologyNodeType.METER_POINT, cascade=True),
+                        cascade=True,
                     )
                     for k, v in sub_deleted.items():
                         deleted[k] = deleted.get(k, 0) + v
                 deleted["meter_points"] = len(meter_points)
-                await db.execute(
-                    delete(MeterPoint).where(MeterPoint.transformer_id == data.node_id)
-                )
+                await db.execute(delete(MeterPoint).where(MeterPoint.transformer_id == data.node_id))
 
-            await db.execute(
-                delete(Transformer).where(Transformer.id == data.node_id)
-            )
+            await db.execute(delete(Transformer).where(Transformer.id == data.node_id))
             deleted["transformers"] = 1
 
         elif data.node_type == TopologyNodeType.METER_POINT:
@@ -980,23 +874,15 @@ class EnergyTopologyService:
                 for panel in panels:
                     sub_deleted = await EnergyTopologyService.delete_node(
                         db,
-                        TopologyNodeDelete(
-                            node_id=panel.id,
-                            node_type=TopologyNodeType.PANEL,
-                            cascade=True
-                        ),
-                        cascade=True
+                        TopologyNodeDelete(node_id=panel.id, node_type=TopologyNodeType.PANEL, cascade=True),
+                        cascade=True,
                     )
                     for k, v in sub_deleted.items():
                         deleted[k] = deleted.get(k, 0) + v
                 deleted["panels"] = deleted.get("panels", 0) + len(panels)
-                await db.execute(
-                    delete(DistributionPanel).where(DistributionPanel.meter_point_id == data.node_id)
-                )
+                await db.execute(delete(DistributionPanel).where(DistributionPanel.meter_point_id == data.node_id))
 
-            await db.execute(
-                delete(MeterPoint).where(MeterPoint.id == data.node_id)
-            )
+            await db.execute(delete(MeterPoint).where(MeterPoint.id == data.node_id))
             deleted["meter_points"] = deleted.get("meter_points", 0) + 1
 
         elif data.node_type == TopologyNodeType.PANEL:
@@ -1009,12 +895,8 @@ class EnergyTopologyService:
                 for sub_panel in sub_panels:
                     sub_deleted = await EnergyTopologyService.delete_node(
                         db,
-                        TopologyNodeDelete(
-                            node_id=sub_panel.id,
-                            node_type=TopologyNodeType.PANEL,
-                            cascade=True
-                        ),
-                        cascade=True
+                        TopologyNodeDelete(node_id=sub_panel.id, node_type=TopologyNodeType.PANEL, cascade=True),
+                        cascade=True,
                     )
                     for k, v in sub_deleted.items():
                         deleted[k] = deleted.get(k, 0) + v
@@ -1027,30 +909,20 @@ class EnergyTopologyService:
                 for circuit in circuits:
                     sub_deleted = await EnergyTopologyService.delete_node(
                         db,
-                        TopologyNodeDelete(
-                            node_id=circuit.id,
-                            node_type=TopologyNodeType.CIRCUIT,
-                            cascade=True
-                        ),
-                        cascade=True
+                        TopologyNodeDelete(node_id=circuit.id, node_type=TopologyNodeType.CIRCUIT, cascade=True),
+                        cascade=True,
                     )
                     for k, v in sub_deleted.items():
                         deleted[k] = deleted.get(k, 0) + v
                 deleted["circuits"] = deleted.get("circuits", 0) + len(circuits)
-                await db.execute(
-                    delete(DistributionCircuit).where(DistributionCircuit.panel_id == data.node_id)
-                )
+                await db.execute(delete(DistributionCircuit).where(DistributionCircuit.panel_id == data.node_id))
 
-            await db.execute(
-                delete(DistributionPanel).where(DistributionPanel.id == data.node_id)
-            )
+            await db.execute(delete(DistributionPanel).where(DistributionPanel.id == data.node_id))
             deleted["panels"] = deleted.get("panels", 0) + 1
 
         elif data.node_type == TopologyNodeType.CIRCUIT:
             if cascade:
-                result = await db.execute(
-                    select(PowerDevice).where(PowerDevice.circuit_id == data.node_id)
-                )
+                result = await db.execute(select(PowerDevice).where(PowerDevice.circuit_id == data.node_id))
                 devices = result.scalars().all()
 
                 # 先删除设备下的关联点位
@@ -1060,13 +932,9 @@ class EnergyTopologyService:
                         deleted["points"] = deleted.get("points", 0) + pts_deleted
 
                 deleted["devices"] = len(devices)
-                await db.execute(
-                    delete(PowerDevice).where(PowerDevice.circuit_id == data.node_id)
-                )
+                await db.execute(delete(PowerDevice).where(PowerDevice.circuit_id == data.node_id))
 
-            await db.execute(
-                delete(DistributionCircuit).where(DistributionCircuit.id == data.node_id)
-            )
+            await db.execute(delete(DistributionCircuit).where(DistributionCircuit.id == data.node_id))
             deleted["circuits"] = deleted.get("circuits", 0) + 1
 
         elif data.node_type == TopologyNodeType.DEVICE:
@@ -1076,28 +944,19 @@ class EnergyTopologyService:
                 deleted["points"] = pts_deleted
 
             # 删除设备
-            await db.execute(
-                delete(PowerDevice).where(PowerDevice.id == data.node_id)
-            )
+            await db.execute(delete(PowerDevice).where(PowerDevice.id == data.node_id))
             deleted["devices"] = deleted.get("devices", 0) + 1
 
         elif data.node_type == TopologyNodeType.POINT:
             # 先删除点位实时数据
-            await db.execute(
-                delete(PointRealtime).where(PointRealtime.point_id == data.node_id)
-            )
-            await db.execute(
-                delete(Point).where(Point.id == data.node_id)
-            )
+            await db.execute(delete(PointRealtime).where(PointRealtime.point_id == data.node_id))
+            await db.execute(delete(Point).where(Point.id == data.node_id))
             deleted["points"] = deleted.get("points", 0) + 1
 
         return deleted
 
     @staticmethod
-    async def batch_operation(
-        db: AsyncSession,
-        data: TopologyBatchOperation
-    ) -> TopologyBatchResult:
+    async def batch_operation(db: AsyncSession, data: TopologyBatchOperation) -> TopologyBatchResult:
         """
         批量拓扑操作
 
@@ -1109,12 +968,7 @@ class EnergyTopologyService:
             操作结果
         """
         result = TopologyBatchResult(
-            success=True,
-            created_count=0,
-            updated_count=0,
-            deleted_count=0,
-            errors=[],
-            created_ids={}
+            success=True, created_count=0, updated_count=0, deleted_count=0, errors=[], created_ids={}
         )
 
         # 执行创建操作
@@ -1142,9 +996,7 @@ class EnergyTopologyService:
         # 执行删除操作
         for i, delete_data in enumerate(data.deletes):
             try:
-                deleted = await EnergyTopologyService.delete_node(
-                    db, delete_data, cascade=delete_data.cascade
-                )
+                deleted = await EnergyTopologyService.delete_node(db, delete_data, cascade=delete_data.cascade)
                 result.deleted_count += sum(deleted.values())
             except Exception as e:
                 result.errors.append(f"删除节点失败 [{i}]: {str(e)}")
@@ -1189,65 +1041,77 @@ class EnergyTopologyService:
         export_data = TopologyExport(
             version="1.0",
             export_time=datetime.now(),
-            transformers=[{
-                "id": t.id,
-                "code": t.transformer_code,
-                "name": t.transformer_name,
-                "rated_capacity": t.rated_capacity,
-                "voltage_high": t.voltage_high,
-                "voltage_low": t.voltage_low,
-                "location": t.location,
-                "status": t.status,
-                "is_enabled": t.is_enabled
-            } for t in transformers],
-            meter_points=[{
-                "id": mp.id,
-                "code": mp.meter_code,
-                "name": mp.meter_name,
-                "transformer_id": mp.transformer_id,
-                "ct_ratio": mp.ct_ratio,
-                "pt_ratio": mp.pt_ratio,
-                "status": mp.status,
-                "is_enabled": mp.is_enabled
-            } for mp in meter_points],
-            panels=[{
-                "id": p.id,
-                "code": p.panel_code,
-                "name": p.panel_name,
-                "panel_type": p.panel_type,
-                "meter_point_id": p.meter_point_id,
-                "parent_panel_id": p.parent_panel_id,
-                "status": p.status,
-                "is_enabled": p.is_enabled
-            } for p in panels],
-            circuits=[{
-                "id": c.id,
-                "code": c.circuit_code,
-                "name": c.circuit_name,
-                "load_type": c.load_type,
-                "panel_id": c.panel_id,
-                "rated_current": c.rated_current,
-                "is_enabled": c.is_enabled
-            } for c in circuits],
-            devices=[{
-                "id": d.id,
-                "code": d.device_code,
-                "name": d.device_name,
-                "device_type": d.device_type,
-                "circuit_id": d.circuit_id,
-                "rated_power": d.rated_power,
-                "is_enabled": d.is_enabled
-            } for d in devices],
-            connections=[]  # 连接关系通过外键体现
+            transformers=[
+                {
+                    "id": t.id,
+                    "code": t.transformer_code,
+                    "name": t.transformer_name,
+                    "rated_capacity": t.rated_capacity,
+                    "voltage_high": t.voltage_high,
+                    "voltage_low": t.voltage_low,
+                    "location": t.location,
+                    "status": t.status,
+                    "is_enabled": t.is_enabled,
+                }
+                for t in transformers
+            ],
+            meter_points=[
+                {
+                    "id": mp.id,
+                    "code": mp.meter_code,
+                    "name": mp.meter_name,
+                    "transformer_id": mp.transformer_id,
+                    "ct_ratio": mp.ct_ratio,
+                    "pt_ratio": mp.pt_ratio,
+                    "status": mp.status,
+                    "is_enabled": mp.is_enabled,
+                }
+                for mp in meter_points
+            ],
+            panels=[
+                {
+                    "id": p.id,
+                    "code": p.panel_code,
+                    "name": p.panel_name,
+                    "panel_type": p.panel_type,
+                    "meter_point_id": p.meter_point_id,
+                    "parent_panel_id": p.parent_panel_id,
+                    "status": p.status,
+                    "is_enabled": p.is_enabled,
+                }
+                for p in panels
+            ],
+            circuits=[
+                {
+                    "id": c.id,
+                    "code": c.circuit_code,
+                    "name": c.circuit_name,
+                    "load_type": c.load_type,
+                    "panel_id": c.panel_id,
+                    "rated_current": c.rated_current,
+                    "is_enabled": c.is_enabled,
+                }
+                for c in circuits
+            ],
+            devices=[
+                {
+                    "id": d.id,
+                    "code": d.device_code,
+                    "name": d.device_name,
+                    "device_type": d.device_type,
+                    "circuit_id": d.circuit_id,
+                    "rated_power": d.rated_power,
+                    "is_enabled": d.is_enabled,
+                }
+                for d in devices
+            ],
+            connections=[],  # 连接关系通过外键体现
         )
 
         return export_data
 
     @staticmethod
-    async def import_topology(
-        db: AsyncSession,
-        data: TopologyImport
-    ) -> TopologyBatchResult:
+    async def import_topology(db: AsyncSession, data: TopologyImport) -> TopologyBatchResult:
         """
         导入拓扑数据
 
@@ -1258,21 +1122,10 @@ class EnergyTopologyService:
         Returns:
             导入结果
         """
-        result = TopologyBatchResult(
-            success=True,
-            created_count=0,
-            errors=[],
-            created_ids={}
-        )
+        result = TopologyBatchResult(success=True, created_count=0, errors=[], created_ids={})
 
         # ID映射（旧ID -> 新ID）
-        id_map = {
-            "transformer": {},
-            "meter_point": {},
-            "panel": {},
-            "circuit": {},
-            "device": {}
-        }
+        id_map = {"transformer": {}, "meter_point": {}, "panel": {}, "circuit": {}, "device": {}}
 
         try:
             if data.clear_existing:
@@ -1297,7 +1150,7 @@ class EnergyTopologyService:
                     status=t.get("status", "normal"),
                     is_enabled=t.get("is_enabled", True),
                     created_at=now,
-                    updated_at=now
+                    updated_at=now,
                 )
                 db.add(node)
                 await db.flush()
@@ -1317,7 +1170,7 @@ class EnergyTopologyService:
                     status=mp.get("status", "normal"),
                     is_enabled=mp.get("is_enabled", True),
                     created_at=now,
-                    updated_at=now
+                    updated_at=now,
                 )
                 db.add(node)
                 await db.flush()
@@ -1337,7 +1190,7 @@ class EnergyTopologyService:
                     status=p.get("status", "normal"),
                     is_enabled=p.get("is_enabled", True),
                     created_at=now,
-                    updated_at=now
+                    updated_at=now,
                 )
                 db.add(node)
                 await db.flush()
@@ -1351,9 +1204,7 @@ class EnergyTopologyService:
                     new_parent_id = id_map["panel"].get(old_parent_id)
                     new_id = id_map["panel"].get(p.get("id"))
                     if new_id and new_parent_id:
-                        panel_result = await db.execute(
-                            select(DistributionPanel).where(DistributionPanel.id == new_id)
-                        )
+                        panel_result = await db.execute(select(DistributionPanel).where(DistributionPanel.id == new_id))
                         panel = panel_result.scalar_one_or_none()
                         if panel:
                             panel.parent_panel_id = new_parent_id
@@ -1370,7 +1221,7 @@ class EnergyTopologyService:
                     rated_current=c.get("rated_current"),
                     is_enabled=c.get("is_enabled", True),
                     created_at=now,
-                    updated_at=now
+                    updated_at=now,
                 )
                 db.add(node)
                 await db.flush()
@@ -1389,7 +1240,7 @@ class EnergyTopologyService:
                     rated_power=d.get("rated_power"),
                     is_enabled=d.get("is_enabled", True),
                     created_at=now,
-                    updated_at=now
+                    updated_at=now,
                 )
                 db.add(node)
                 await db.flush()
@@ -1397,9 +1248,7 @@ class EnergyTopologyService:
                 result.created_count += 1
 
             await db.commit()
-            result.created_ids = {
-                f"{k}_map": v for k, v in id_map.items()
-            }
+            result.created_ids = {f"{k}_map": v for k, v in id_map.items()}
 
         except Exception as e:
             await db.rollback()
@@ -1409,11 +1258,7 @@ class EnergyTopologyService:
         return result
 
     @staticmethod
-    async def get_node_by_id(
-        db: AsyncSession,
-        node_type: TopologyNodeType,
-        node_id: int
-    ) -> Optional[Any]:
+    async def get_node_by_id(db: AsyncSession, node_type: TopologyNodeType, node_id: int) -> Optional[Any]:
         """
         根据类型和ID获取节点
 
@@ -1430,16 +1275,14 @@ class EnergyTopologyService:
             TopologyNodeType.METER_POINT: MeterPoint,
             TopologyNodeType.PANEL: DistributionPanel,
             TopologyNodeType.CIRCUIT: DistributionCircuit,
-            TopologyNodeType.DEVICE: PowerDevice
+            TopologyNodeType.DEVICE: PowerDevice,
         }
 
         model = model_map.get(node_type)
         if not model:
             return None
 
-        result = await db.execute(
-            select(model).where(model.id == node_id)
-        )
+        result = await db.execute(select(model).where(model.id == node_id))
         return result.scalar_one_or_none()
 
 

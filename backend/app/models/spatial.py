@@ -1,10 +1,18 @@
 """
 空间拓扑模型 — 站点/楼层/房间/行/布局模板
 """
+
 from datetime import datetime
 from sqlalchemy import (
-    Column, Integer, String, Float, Text, DateTime, JSON,
-    ForeignKey, UniqueConstraint,
+    Column,
+    Integer,
+    String,
+    Float,
+    Text,
+    DateTime,
+    JSON,
+    ForeignKey,
+    UniqueConstraint,
 )
 from sqlalchemy.orm import relationship
 
@@ -13,6 +21,7 @@ from ..core.database import Base
 
 class Site(Base):
     """站点表"""
+
     __tablename__ = "sites"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -34,10 +43,9 @@ class Site(Base):
 
 class Floor(Base):
     """楼层表"""
+
     __tablename__ = "floors"
-    __table_args__ = (
-        UniqueConstraint("site_id", "floor_code", name="uq_floor_site_code"),
-    )
+    __table_args__ = (UniqueConstraint("site_id", "floor_code", name="uq_floor_site_code"),)
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     floor_code = Column(String(50), nullable=False, comment="楼层编码")
@@ -54,10 +62,9 @@ class Floor(Base):
 
 class Room(Base):
     """房间表"""
+
     __tablename__ = "rooms"
-    __table_args__ = (
-        UniqueConstraint("floor_id", "room_code", name="uq_room_floor_code"),
-    )
+    __table_args__ = (UniqueConstraint("floor_id", "room_code", name="uq_room_floor_code"),)
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     room_code = Column(String(50), nullable=False, comment="房间编码")
@@ -77,10 +84,9 @@ class Room(Base):
 
 class Row(Base):
     """行表（机柜排）"""
+
     __tablename__ = "rows"
-    __table_args__ = (
-        UniqueConstraint("room_id", "row_code", name="uq_row_room_code"),
-    )
+    __table_args__ = (UniqueConstraint("room_id", "row_code", name="uq_row_room_code"),)
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     row_code = Column(String(50), nullable=False, comment="行编码")
@@ -98,6 +104,7 @@ class Row(Base):
 
 class LayoutTemplate(Base):
     """布局模板表"""
+
     __tablename__ = "layout_templates"
 
     id = Column(Integer, primary_key=True, autoincrement=True)

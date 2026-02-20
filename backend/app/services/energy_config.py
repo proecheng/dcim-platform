@@ -4,16 +4,14 @@ Energy Configuration Service
 
 提供变压器、计量点、配电柜、配电回路的CRUD操作
 """
+
 from typing import List, Optional, Dict, Any
 from datetime import datetime
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, and_, or_
+from sqlalchemy import select, func, and_
 from sqlalchemy.orm import selectinload
 
-from ..models.energy import (
-    Transformer, MeterPoint, DistributionPanel,
-    DistributionCircuit, PowerDevice
-)
+from ..models.energy import Transformer, MeterPoint, DistributionPanel, DistributionCircuit
 
 
 class TransformerService:
@@ -25,7 +23,7 @@ class TransformerService:
         skip: int = 0,
         limit: int = 100,
         status: Optional[str] = None,
-        is_enabled: Optional[bool] = None
+        is_enabled: Optional[bool] = None,
     ) -> tuple[List[Transformer], int]:
         """获取变压器列表"""
         query = select(Transformer)
@@ -53,18 +51,14 @@ class TransformerService:
     async def get_by_id(db: AsyncSession, transformer_id: int) -> Optional[Transformer]:
         """根据ID获取变压器"""
         result = await db.execute(
-            select(Transformer)
-            .options(selectinload(Transformer.meter_points))
-            .where(Transformer.id == transformer_id)
+            select(Transformer).options(selectinload(Transformer.meter_points)).where(Transformer.id == transformer_id)
         )
         return result.scalar_one_or_none()
 
     @staticmethod
     async def get_by_code(db: AsyncSession, code: str) -> Optional[Transformer]:
         """根据编码获取变压器"""
-        result = await db.execute(
-            select(Transformer).where(Transformer.transformer_code == code)
-        )
+        result = await db.execute(select(Transformer).where(Transformer.transformer_code == code))
         return result.scalar_one_or_none()
 
     @staticmethod
@@ -77,11 +71,7 @@ class TransformerService:
         return transformer
 
     @staticmethod
-    async def update(
-        db: AsyncSession,
-        transformer_id: int,
-        data: Dict[str, Any]
-    ) -> Optional[Transformer]:
+    async def update(db: AsyncSession, transformer_id: int, data: Dict[str, Any]) -> Optional[Transformer]:
         """更新变压器"""
         transformer = await TransformerService.get_by_id(db, transformer_id)
         if not transformer:
@@ -122,7 +112,7 @@ class MeterPointService:
         limit: int = 100,
         transformer_id: Optional[int] = None,
         status: Optional[str] = None,
-        is_enabled: Optional[bool] = None
+        is_enabled: Optional[bool] = None,
     ) -> tuple[List[MeterPoint], int]:
         """获取计量点列表"""
         query = select(MeterPoint).options(selectinload(MeterPoint.transformer))
@@ -156,10 +146,7 @@ class MeterPointService:
         """根据ID获取计量点"""
         result = await db.execute(
             select(MeterPoint)
-            .options(
-                selectinload(MeterPoint.transformer),
-                selectinload(MeterPoint.panels)
-            )
+            .options(selectinload(MeterPoint.transformer), selectinload(MeterPoint.panels))
             .where(MeterPoint.id == meter_point_id)
         )
         return result.scalar_one_or_none()
@@ -167,9 +154,7 @@ class MeterPointService:
     @staticmethod
     async def get_by_code(db: AsyncSession, code: str) -> Optional[MeterPoint]:
         """根据编码获取计量点"""
-        result = await db.execute(
-            select(MeterPoint).where(MeterPoint.meter_code == code)
-        )
+        result = await db.execute(select(MeterPoint).where(MeterPoint.meter_code == code))
         return result.scalar_one_or_none()
 
     @staticmethod
@@ -182,11 +167,7 @@ class MeterPointService:
         return meter_point
 
     @staticmethod
-    async def update(
-        db: AsyncSession,
-        meter_point_id: int,
-        data: Dict[str, Any]
-    ) -> Optional[MeterPoint]:
+    async def update(db: AsyncSession, meter_point_id: int, data: Dict[str, Any]) -> Optional[MeterPoint]:
         """更新计量点"""
         meter_point = await MeterPointService.get_by_id(db, meter_point_id)
         if not meter_point:
@@ -230,7 +211,7 @@ class DistributionPanelService:
         transformer_id: Optional[int] = None,
         parent_panel_id: Optional[int] = None,
         status: Optional[str] = None,
-        is_enabled: Optional[bool] = None
+        is_enabled: Optional[bool] = None,
     ) -> tuple[List[DistributionPanel], int]:
         """获取配电柜列表"""
         query = select(DistributionPanel).options(selectinload(DistributionPanel.meter_point))
@@ -273,10 +254,7 @@ class DistributionPanelService:
         """根据ID获取配电柜"""
         result = await db.execute(
             select(DistributionPanel)
-            .options(
-                selectinload(DistributionPanel.meter_point),
-                selectinload(DistributionPanel.circuits)
-            )
+            .options(selectinload(DistributionPanel.meter_point), selectinload(DistributionPanel.circuits))
             .where(DistributionPanel.id == panel_id)
         )
         return result.scalar_one_or_none()
@@ -284,9 +262,7 @@ class DistributionPanelService:
     @staticmethod
     async def get_by_code(db: AsyncSession, code: str) -> Optional[DistributionPanel]:
         """根据编码获取配电柜"""
-        result = await db.execute(
-            select(DistributionPanel).where(DistributionPanel.panel_code == code)
-        )
+        result = await db.execute(select(DistributionPanel).where(DistributionPanel.panel_code == code))
         return result.scalar_one_or_none()
 
     @staticmethod
@@ -299,11 +275,7 @@ class DistributionPanelService:
         return panel
 
     @staticmethod
-    async def update(
-        db: AsyncSession,
-        panel_id: int,
-        data: Dict[str, Any]
-    ) -> Optional[DistributionPanel]:
+    async def update(db: AsyncSession, panel_id: int, data: Dict[str, Any]) -> Optional[DistributionPanel]:
         """更新配电柜"""
         panel = await DistributionPanelService.get_by_id(db, panel_id)
         if not panel:
@@ -331,8 +303,7 @@ class DistributionPanelService:
 
         # 检查是否有下级配电柜
         sub_panels_result = await db.execute(
-            select(func.count(DistributionPanel.id))
-            .where(DistributionPanel.parent_panel_id == panel_id)
+            select(func.count(DistributionPanel.id)).where(DistributionPanel.parent_panel_id == panel_id)
         )
         sub_count = sub_panels_result.scalar() or 0
         if sub_count > 0:
@@ -354,7 +325,7 @@ class DistributionCircuitService:
         panel_id: Optional[int] = None,
         load_type: Optional[str] = None,
         is_shiftable: Optional[bool] = None,
-        is_enabled: Optional[bool] = None
+        is_enabled: Optional[bool] = None,
     ) -> tuple[List[DistributionCircuit], int]:
         """获取配电回路列表"""
         query = select(DistributionCircuit).options(selectinload(DistributionCircuit.panel))
@@ -390,10 +361,7 @@ class DistributionCircuitService:
         """根据ID获取配电回路"""
         result = await db.execute(
             select(DistributionCircuit)
-            .options(
-                selectinload(DistributionCircuit.panel),
-                selectinload(DistributionCircuit.devices)
-            )
+            .options(selectinload(DistributionCircuit.panel), selectinload(DistributionCircuit.devices))
             .where(DistributionCircuit.id == circuit_id)
         )
         return result.scalar_one_or_none()
@@ -401,9 +369,7 @@ class DistributionCircuitService:
     @staticmethod
     async def get_by_code(db: AsyncSession, code: str) -> Optional[DistributionCircuit]:
         """根据编码获取配电回路"""
-        result = await db.execute(
-            select(DistributionCircuit).where(DistributionCircuit.circuit_code == code)
-        )
+        result = await db.execute(select(DistributionCircuit).where(DistributionCircuit.circuit_code == code))
         return result.scalar_one_or_none()
 
     @staticmethod
@@ -416,11 +382,7 @@ class DistributionCircuitService:
         return circuit
 
     @staticmethod
-    async def update(
-        db: AsyncSession,
-        circuit_id: int,
-        data: Dict[str, Any]
-    ) -> Optional[DistributionCircuit]:
+    async def update(db: AsyncSession, circuit_id: int, data: Dict[str, Any]) -> Optional[DistributionCircuit]:
         """更新配电回路"""
         circuit = await DistributionCircuitService.get_by_id(db, circuit_id)
         if not circuit:

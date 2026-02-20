@@ -1,6 +1,7 @@
 """
 系统配置 API - v1
 """
+
 from datetime import datetime
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -13,10 +14,7 @@ import io
 from ..deps import get_db, require_viewer, require_admin
 from ...models.user import User
 from ...models.config import SystemConfig, Dictionary, License
-from ...schemas.config import (
-    SystemConfigInfo, SystemConfigUpdate,
-    DictionaryInfo, LicenseInfo, LicenseActivate
-)
+from ...schemas.config import SystemConfigInfo, SystemConfigUpdate, DictionaryInfo, LicenseInfo, LicenseActivate
 
 router = APIRouter()
 
@@ -25,7 +23,7 @@ router = APIRouter()
 async def get_configs(
     group: Optional[str] = Query(None, description="配置分组"),
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_admin)
+    _: User = Depends(require_admin),
 ):
     """
     获取系统配置列表
@@ -49,9 +47,7 @@ async def get_configs(
 
 @router.put("", summary="更新系统配置")
 async def update_configs(
-    data: list[SystemConfigUpdate],
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_admin)
+    data: list[SystemConfigUpdate], db: AsyncSession = Depends(get_db), current_user: User = Depends(require_admin)
 ):
     """
     批量更新系统配置
@@ -60,8 +56,7 @@ async def update_configs(
     for item in data:
         result = await db.execute(
             select(SystemConfig).where(
-                SystemConfig.config_group == item.config_group,
-                SystemConfig.config_key == item.config_key
+                SystemConfig.config_group == item.config_group, SystemConfig.config_key == item.config_key
             )
         )
         config = result.scalar_one_or_none()
@@ -71,11 +66,9 @@ async def update_configs(
                 continue
 
             await db.execute(
-                update(SystemConfig).where(SystemConfig.id == config.id).values(
-                    config_value=item.config_value,
-                    updated_by=current_user.id,
-                    updated_at=datetime.now()
-                )
+                update(SystemConfig)
+                .where(SystemConfig.id == config.id)
+                .values(config_value=item.config_value, updated_by=current_user.id, updated_at=datetime.now())
             )
             updated_count += 1
         else:
@@ -86,7 +79,7 @@ async def update_configs(
                 config_value=item.config_value,
                 value_type=item.value_type or "string",
                 description=item.description,
-                updated_by=current_user.id
+                updated_by=current_user.id,
             )
             db.add(new_config)
             updated_count += 1
@@ -99,7 +92,7 @@ async def update_configs(
 async def get_dictionaries(
     dict_type: Optional[str] = Query(None, description="字典类型"),
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_viewer)
+    _: User = Depends(require_viewer),
 ):
     """
     获取数据字典
@@ -122,16 +115,11 @@ async def get_dictionaries(
 
 
 @router.get("/license", response_model=LicenseInfo, summary="获取授权信息")
-async def get_license(
-    db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_viewer)
-):
+async def get_license(db: AsyncSession = Depends(get_db), _: User = Depends(require_viewer)):
     """
     获取当前授权信息
     """
-    result = await db.execute(
-        select(License).where(License.is_active == True).order_by(License.activated_at.desc())
-    )
+    result = await db.execute(select(License).where(License.is_active == True).order_by(License.activated_at.desc()))
     license = result.scalars().first()
 
     if not license:
@@ -145,7 +133,7 @@ async def get_license(
             issue_date=None,
             expire_date=None,
             is_active=True,
-            status="trial"
+            status="trial",
         )
 
     # 检查是否过期
@@ -163,16 +151,12 @@ async def get_license(
         expire_date=license.expire_date,
         is_active=license.is_active,
         activated_at=license.activated_at,
-        status=status
+        status=status,
     )
 
 
 @router.post("/license/activate", summary="激活授权")
-async def activate_license(
-    data: LicenseActivate,
-    db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_admin)
-):
+async def activate_license(data: LicenseActivate, db: AsyncSession = Depends(get_db), _: User = Depends(require_admin)):
     """
     激活授权许可
     """
@@ -184,9 +168,7 @@ async def activate_license(
         raise HTTPException(status_code=400, detail="无效的许可证密钥")
 
     # 检查是否已使用
-    result = await db.execute(
-        select(License).where(License.license_key == license_key)
-    )
+    result = await db.execute(select(License).where(License.license_key == license_key))
     existing = result.scalar_one_or_none()
     if existing:
         if existing.is_active:
@@ -194,10 +176,7 @@ async def activate_license(
         else:
             # 重新激活
             await db.execute(
-                update(License).where(License.id == existing.id).values(
-                    is_active=True,
-                    activated_at=datetime.now()
-                )
+                update(License).where(License.id == existing.id).values(is_active=True, activated_at=datetime.now())
             )
             await db.commit()
             return {"message": "许可证已重新激活", "license_type": existing.license_type}
@@ -221,12 +200,11 @@ async def activate_license(
         features = ["all"]
 
     # 禁用旧的许可证
-    await db.execute(
-        update(License).values(is_active=False)
-    )
+    await db.execute(update(License).values(is_active=False))
 
     # 创建新许可证
     from datetime import date
+
     new_license = License(
         license_key=license_key,
         license_type=license_type,
@@ -236,7 +214,7 @@ async def activate_license(
         expire_date=date(date.today().year + 1, date.today().month, date.today().day),  # 一年有效期
         hardware_id=data.hardware_id,
         is_active=True,
-        activated_at=datetime.now()
+        activated_at=datetime.now(),
     )
     db.add(new_license)
     await db.commit()
@@ -245,15 +223,12 @@ async def activate_license(
         "message": "许可证激活成功",
         "license_type": license_type,
         "max_points": max_points,
-        "expire_date": new_license.expire_date.isoformat()
+        "expire_date": new_license.expire_date.isoformat(),
     }
 
 
 @router.get("/backup", summary="导出系统配置")
-async def backup_configs(
-    db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_admin)
-):
+async def backup_configs(db: AsyncSession = Depends(get_db), _: User = Depends(require_admin)):
     """
     导出系统配置备份
     """
@@ -274,33 +249,27 @@ async def backup_configs(
                 "key": c.config_key,
                 "value": c.config_value,
                 "type": c.value_type,
-                "description": c.description
-            } for c in configs
+                "description": c.description,
+            }
+            for c in configs
         ],
         "dictionaries": [
-            {
-                "type": d.dict_type,
-                "code": d.dict_code,
-                "name": d.dict_name,
-                "value": d.dict_value,
-                "sort": d.sort_order
-            } for d in dicts
-        ]
+            {"type": d.dict_type, "code": d.dict_code, "name": d.dict_name, "value": d.dict_value, "sort": d.sort_order}
+            for d in dicts
+        ],
     }
 
     content = json.dumps(backup_data, ensure_ascii=False, indent=2)
     return StreamingResponse(
         io.BytesIO(content.encode("utf-8")),
         media_type="application/json",
-        headers={"Content-Disposition": "attachment; filename=system_backup.json"}
+        headers={"Content-Disposition": "attachment; filename=system_backup.json"},
     )
 
 
 @router.post("/restore", summary="导入系统配置")
 async def restore_configs(
-    backup_data: dict,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_admin)
+    backup_data: dict, db: AsyncSession = Depends(get_db), current_user: User = Depends(require_admin)
 ):
     """
     从备份恢复系统配置
@@ -312,19 +281,16 @@ async def restore_configs(
     for config in backup_data.get("configs", []):
         result = await db.execute(
             select(SystemConfig).where(
-                SystemConfig.config_group == config["group"],
-                SystemConfig.config_key == config["key"]
+                SystemConfig.config_group == config["group"], SystemConfig.config_key == config["key"]
             )
         )
         existing = result.scalar_one_or_none()
 
         if existing:
             await db.execute(
-                update(SystemConfig).where(SystemConfig.id == existing.id).values(
-                    config_value=config["value"],
-                    updated_by=current_user.id,
-                    updated_at=datetime.now()
-                )
+                update(SystemConfig)
+                .where(SystemConfig.id == existing.id)
+                .values(config_value=config["value"], updated_by=current_user.id, updated_at=datetime.now())
             )
         else:
             new_config = SystemConfig(
@@ -333,7 +299,7 @@ async def restore_configs(
                 config_value=config["value"],
                 value_type=config.get("type", "string"),
                 description=config.get("description"),
-                updated_by=current_user.id
+                updated_by=current_user.id,
             )
             db.add(new_config)
         restored_configs += 1
@@ -341,10 +307,7 @@ async def restore_configs(
     # 恢复字典
     for d in backup_data.get("dictionaries", []):
         result = await db.execute(
-            select(Dictionary).where(
-                Dictionary.dict_type == d["type"],
-                Dictionary.dict_code == d["code"]
-            )
+            select(Dictionary).where(Dictionary.dict_type == d["type"], Dictionary.dict_code == d["code"])
         )
         existing = result.scalar_one_or_none()
 
@@ -354,15 +317,11 @@ async def restore_configs(
                 dict_code=d["code"],
                 dict_name=d["name"],
                 dict_value=d.get("value"),
-                sort_order=d.get("sort", 0)
+                sort_order=d.get("sort", 0),
             )
             db.add(new_dict)
             restored_dicts += 1
 
     await db.commit()
 
-    return {
-        "message": "配置恢复成功",
-        "restored_configs": restored_configs,
-        "restored_dictionaries": restored_dicts
-    }
+    return {"message": "配置恢复成功", "restored_configs": restored_configs, "restored_dictionaries": restored_dicts}

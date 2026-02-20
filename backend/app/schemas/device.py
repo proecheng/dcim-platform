@@ -1,6 +1,7 @@
 """
 设备相关 Schema
 """
+
 from typing import Optional, Dict
 from datetime import datetime, date
 from pydantic import BaseModel, ConfigDict
@@ -8,6 +9,7 @@ from pydantic import BaseModel, ConfigDict
 
 class DeviceCreate(BaseModel):
     """创建设备"""
+
     device_code: str
     device_name: str
     device_type: str
@@ -24,6 +26,7 @@ class DeviceCreate(BaseModel):
 
 class DeviceUpdate(BaseModel):
     """更新设备"""
+
     device_name: Optional[str] = None
     device_type: Optional[str] = None
     area_code: Optional[str] = None
@@ -41,6 +44,7 @@ class DeviceUpdate(BaseModel):
 
 class DeviceInfo(BaseModel):
     """设备信息"""
+
     model_config = ConfigDict(from_attributes=True)
 
     id: int
@@ -64,6 +68,7 @@ class DeviceInfo(BaseModel):
 
 class DeviceTree(BaseModel):
     """设备树节点"""
+
     id: Optional[int] = None
     label: str
     code: Optional[str] = None
@@ -73,6 +78,7 @@ class DeviceTree(BaseModel):
 
 class DeviceStatusSummary(BaseModel):
     """设备状态汇总"""
+
     total: int
     enabled: int
     online: int

@@ -1,21 +1,19 @@
 """
 用户管理 API - v1
 """
+
 from datetime import datetime
 from typing import Optional, List
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, update, delete
 
-from ..deps import get_db, get_current_user, require_admin
+from ..deps import get_db, require_admin
 from ...core.security import get_password_hash
 from ...models.user import User, UserLoginHistory, UserSite
 from ...models.spatial import Site
-from ...schemas.user import (
-    UserCreate, UserUpdate, UserInfo, UserListResponse,
-    UserLoginHistoryResponse, UserSiteUpdate, UserSiteInfo
-)
-from ...schemas.common import PageParams, PageResponse
+from ...schemas.user import UserCreate, UserUpdate, UserInfo, UserLoginHistoryResponse, UserSiteUpdate, UserSiteInfo
+from ...schemas.common import PageResponse
 
 router = APIRouter()
 
@@ -28,7 +26,7 @@ async def get_users(
     role: Optional[str] = Query(None, description="角色筛选"),
     is_active: Optional[bool] = Query(None, description="启用状态"),
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_admin)
+    _: User = Depends(require_admin),
 ):
     """
     获取用户列表（分页）
@@ -38,9 +36,7 @@ async def get_users(
     # 筛选条件
     if keyword:
         query = query.where(
-            (User.username.contains(keyword)) |
-            (User.real_name.contains(keyword)) |
-            (User.email.contains(keyword))
+            (User.username.contains(keyword)) | (User.real_name.contains(keyword)) | (User.email.contains(keyword))
         )
     if role:
         query = query.where(User.role == role)
@@ -57,20 +53,11 @@ async def get_users(
     result = await db.execute(query)
     users = result.scalars().all()
 
-    return PageResponse(
-        items=[UserInfo.model_validate(u) for u in users],
-        total=total,
-        page=page,
-        page_size=page_size
-    )
+    return PageResponse(items=[UserInfo.model_validate(u) for u in users], total=total, page=page, page_size=page_size)
 
 
 @router.get("/sites/{site_id}/users", response_model=List[UserInfo], summary="获取站点下的用户列表")
-async def get_site_users(
-    site_id: int,
-    db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_admin)
-):
+async def get_site_users(site_id: int, db: AsyncSession = Depends(get_db), _: User = Depends(require_admin)):
     """
     获取站点下关联的用户列表
     """
@@ -78,23 +65,14 @@ async def get_site_users(
     if not result.scalar_one_or_none():
         raise HTTPException(status_code=404, detail="站点不存在")
 
-    stmt = (
-        select(User)
-        .join(UserSite, User.id == UserSite.user_id)
-        .where(UserSite.site_id == site_id)
-        .order_by(User.id)
-    )
+    stmt = select(User).join(UserSite, User.id == UserSite.user_id).where(UserSite.site_id == site_id).order_by(User.id)
     result = await db.execute(stmt)
     users = result.scalars().all()
     return [UserInfo.model_validate(u) for u in users]
 
 
 @router.get("/{user_id}", response_model=UserInfo, summary="获取用户详情")
-async def get_user(
-    user_id: int,
-    db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_admin)
-):
+async def get_user(user_id: int, db: AsyncSession = Depends(get_db), _: User = Depends(require_admin)):
     """
     获取用户详情
     """
@@ -106,11 +84,7 @@ async def get_user(
 
 
 @router.post("", response_model=UserInfo, summary="创建用户")
-async def create_user(
-    data: UserCreate,
-    db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_admin)
-):
+async def create_user(data: UserCreate, db: AsyncSession = Depends(get_db), _: User = Depends(require_admin)):
     """
     创建新用户
     """
@@ -132,7 +106,7 @@ async def create_user(
         email=data.email,
         phone=data.phone,
         role=data.role,
-        department=data.department
+        department=data.department,
     )
     db.add(user)
     await db.commit()
@@ -143,10 +117,7 @@ async def create_user(
 
 @router.put("/{user_id}", response_model=UserInfo, summary="更新用户")
 async def update_user(
-    user_id: int,
-    data: UserUpdate,
-    db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_admin)
+    user_id: int, data: UserUpdate, db: AsyncSession = Depends(get_db), _: User = Depends(require_admin)
 ):
     """
     更新用户信息
@@ -171,11 +142,7 @@ async def update_user(
 
 
 @router.delete("/{user_id}", summary="删除用户")
-async def delete_user(
-    user_id: int,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_admin)
-):
+async def delete_user(user_id: int, db: AsyncSession = Depends(get_db), current_user: User = Depends(require_admin)):
     """
     删除用户
     """
@@ -195,9 +162,7 @@ async def delete_user(
 
 @router.post("/batch-delete", summary="批量删除用户")
 async def batch_delete_users(
-    user_ids: List[int],
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_admin)
+    user_ids: List[int], db: AsyncSession = Depends(get_db), current_user: User = Depends(require_admin)
 ):
     """
     批量删除用户（不能删除自己）
@@ -205,9 +170,7 @@ async def batch_delete_users(
     if current_user.id in user_ids:
         raise HTTPException(status_code=400, detail="不能删除自己")
 
-    result = await db.execute(
-        select(func.count(User.id)).where(User.id.in_(user_ids))
-    )
+    result = await db.execute(select(func.count(User.id)).where(User.id.in_(user_ids)))
     found = result.scalar()
     if found == 0:
         raise HTTPException(status_code=404, detail="未找到要删除的用户")
@@ -220,10 +183,7 @@ async def batch_delete_users(
 
 @router.put("/{user_id}/status", summary="启用/禁用用户")
 async def toggle_user_status(
-    user_id: int,
-    is_active: bool,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_admin)
+    user_id: int, is_active: bool, db: AsyncSession = Depends(get_db), current_user: User = Depends(require_admin)
 ):
     """
     启用或禁用用户
@@ -236,12 +196,7 @@ async def toggle_user_status(
     if not user:
         raise HTTPException(status_code=404, detail="用户不存在")
 
-    await db.execute(
-        update(User).where(User.id == user_id).values(
-            is_active=is_active,
-            updated_at=datetime.now()
-        )
-    )
+    await db.execute(update(User).where(User.id == user_id).values(is_active=is_active, updated_at=datetime.now()))
     await db.commit()
 
     return {"message": f"用户已{'启用' if is_active else '禁用'}"}
@@ -252,7 +207,7 @@ async def reset_password(
     user_id: int,
     new_password: str = Query(..., min_length=8, description="新密码（必填，至少8位）"),
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_admin)
+    _: User = Depends(require_admin),
 ):
     """
     重置用户密码（必须提供新密码）
@@ -263,10 +218,9 @@ async def reset_password(
         raise HTTPException(status_code=404, detail="用户不存在")
 
     await db.execute(
-        update(User).where(User.id == user_id).values(
-            password_hash=get_password_hash(new_password),
-            updated_at=datetime.now()
-        )
+        update(User)
+        .where(User.id == user_id)
+        .values(password_hash=get_password_hash(new_password), updated_at=datetime.now())
     )
     await db.commit()
 
@@ -279,7 +233,7 @@ async def get_login_history(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_admin)
+    _: User = Depends(require_admin),
 ):
     """
     获取用户登录历史
@@ -300,7 +254,7 @@ async def get_login_history(
         "items": [UserLoginHistoryResponse.model_validate(h) for h in history],
         "total": total,
         "page": page,
-        "page_size": page_size
+        "page_size": page_size,
     }
 
 
@@ -308,11 +262,7 @@ async def get_login_history(
 
 
 @router.get("/{user_id}/sites", response_model=List[UserSiteInfo], summary="获取用户站点列表")
-async def get_user_sites(
-    user_id: int,
-    db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_admin)
-):
+async def get_user_sites(user_id: int, db: AsyncSession = Depends(get_db), _: User = Depends(require_admin)):
     """
     获取用户关联的站点列表
     """
@@ -328,18 +278,12 @@ async def get_user_sites(
     )
     result = await db.execute(stmt)
     rows = result.fetchall()
-    return [
-        UserSiteInfo(site_id=r[0], site_code=r[1], site_name=r[2])
-        for r in rows
-    ]
+    return [UserSiteInfo(site_id=r[0], site_code=r[1], site_name=r[2]) for r in rows]
 
 
 @router.put("/{user_id}/sites", summary="设置用户站点权限")
 async def update_user_sites(
-    user_id: int,
-    data: UserSiteUpdate,
-    db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_admin)
+    user_id: int, data: UserSiteUpdate, db: AsyncSession = Depends(get_db), _: User = Depends(require_admin)
 ):
     """
     设置用户的站点权限（全量替换）
@@ -350,9 +294,7 @@ async def update_user_sites(
 
     # 验证站点存在
     if data.site_ids:
-        site_count = await db.execute(
-            select(func.count(Site.id)).where(Site.id.in_(data.site_ids))
-        )
+        site_count = await db.execute(select(func.count(Site.id)).where(Site.id.in_(data.site_ids)))
         if site_count.scalar() != len(data.site_ids):
             raise HTTPException(status_code=400, detail="部分站点不存在")
 
@@ -365,6 +307,3 @@ async def update_user_sites(
 
     await db.commit()
     return {"message": f"已为用户分配 {len(data.site_ids)} 个站点"}
-
-
-

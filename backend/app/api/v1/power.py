@@ -1,6 +1,7 @@
 """
 供配电管理 API - v1
 """
+
 from datetime import datetime
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -13,8 +14,12 @@ from ...models.device import Device
 from ...models.point import Point, PointRealtime
 from ...models.power import UPSDevice, BatteryGroup
 from ...schemas.power import (
-    UPSDeviceCreate, UPSDeviceUpdate, UPSDeviceInfo,
-    BatteryGroupCreate, BatteryGroupUpdate, BatteryGroupInfo,
+    UPSDeviceCreate,
+    UPSDeviceUpdate,
+    UPSDeviceInfo,
+    BatteryGroupCreate,
+    BatteryGroupUpdate,
+    BatteryGroupInfo,
     PowerOverviewSummary,
 )
 from ...schemas.device import DeviceInfo
@@ -25,6 +30,7 @@ router = APIRouter()
 
 # ==================== 供配电总览 ====================
 
+
 @router.get("/overview", response_model=PowerOverviewSummary, summary="供配电总览")
 async def get_power_overview(
     db: AsyncSession = Depends(get_db),
@@ -32,29 +38,21 @@ async def get_power_overview(
 ):
     """获取供配电系统总览统计"""
     # UPS统计
-    ups_total_r = await db.execute(
-        select(func.count(Device.id)).where(Device.device_type == "UPS")
-    )
+    ups_total_r = await db.execute(select(func.count(Device.id)).where(Device.device_type == "UPS"))
     ups_total = ups_total_r.scalar() or 0
 
     ups_online_r = await db.execute(
-        select(func.count(Device.id)).where(
-            Device.device_type == "UPS", Device.status == "online"
-        )
+        select(func.count(Device.id)).where(Device.device_type == "UPS", Device.status == "online")
     )
     ups_online = ups_online_r.scalar() or 0
 
     ups_offline_r = await db.execute(
-        select(func.count(Device.id)).where(
-            Device.device_type == "UPS", Device.status == "offline"
-        )
+        select(func.count(Device.id)).where(Device.device_type == "UPS", Device.status == "offline")
     )
     ups_offline = ups_offline_r.scalar() or 0
 
     ups_alarm_r = await db.execute(
-        select(func.count(Device.id)).where(
-            Device.device_type == "UPS", Device.status == "alarm"
-        )
+        select(func.count(Device.id)).where(Device.device_type == "UPS", Device.status == "alarm")
     )
     ups_alarm = ups_alarm_r.scalar() or 0
 
@@ -67,36 +65,28 @@ async def get_power_overview(
     battery_lowest_soc = 0.0
 
     soh_r = await db.execute(
-        select(func.avg(PointRealtime.value)).select_from(
-            PointRealtime.__table__.join(
-                Point.__table__, PointRealtime.point_id == Point.id
-            )
-        ).where(Point.point_code.like("%_soh"))
+        select(func.avg(PointRealtime.value))
+        .select_from(PointRealtime.__table__.join(Point.__table__, PointRealtime.point_id == Point.id))
+        .where(Point.point_code.like("%_soh"))
     )
     soh_val = soh_r.scalar()
     if soh_val is not None:
         battery_avg_soh = round(float(soh_val), 1)
 
     soc_r = await db.execute(
-        select(func.min(PointRealtime.value)).select_from(
-            PointRealtime.__table__.join(
-                Point.__table__, PointRealtime.point_id == Point.id
-            )
-        ).where(Point.point_code.like("%_soc"))
+        select(func.min(PointRealtime.value))
+        .select_from(PointRealtime.__table__.join(Point.__table__, PointRealtime.point_id == Point.id))
+        .where(Point.point_code.like("%_soc"))
     )
     soc_val = soc_r.scalar()
     if soc_val is not None:
         battery_lowest_soc = round(float(soc_val), 1)
 
     # 配电柜 / PDU 统计
-    cabinet_total_r = await db.execute(
-        select(func.count(Device.id)).where(Device.device_type == "CABINET")
-    )
+    cabinet_total_r = await db.execute(select(func.count(Device.id)).where(Device.device_type == "CABINET"))
     cabinet_total = cabinet_total_r.scalar() or 0
 
-    pdu_total_r = await db.execute(
-        select(func.count(Device.id)).where(Device.device_type == "PDU")
-    )
+    pdu_total_r = await db.execute(select(func.count(Device.id)).where(Device.device_type == "PDU"))
     pdu_total = pdu_total_r.scalar() or 0
 
     # 总负载 / 平均负载率 — 从UPS负载率点位获取
@@ -104,11 +94,9 @@ async def get_power_overview(
         select(
             func.sum(PointRealtime.value),
             func.avg(PointRealtime.value),
-        ).select_from(
-            PointRealtime.__table__.join(
-                Point.__table__, PointRealtime.point_id == Point.id
-            )
-        ).where(Point.point_code.like("%_load_rate"))
+        )
+        .select_from(PointRealtime.__table__.join(Point.__table__, PointRealtime.point_id == Point.id))
+        .where(Point.point_code.like("%_load_rate"))
     )
     load_row = load_r.first()
     total_load_kw = 0.0
@@ -118,11 +106,9 @@ async def get_power_overview(
 
     # total_load_kw 从 total_power 点位获取
     power_r = await db.execute(
-        select(func.sum(PointRealtime.value)).select_from(
-            PointRealtime.__table__.join(
-                Point.__table__, PointRealtime.point_id == Point.id
-            )
-        ).where(Point.point_code.like("%_total_power"))
+        select(func.sum(PointRealtime.value))
+        .select_from(PointRealtime.__table__.join(Point.__table__, PointRealtime.point_id == Point.id))
+        .where(Point.point_code.like("%_total_power"))
     )
     power_val = power_r.scalar()
     if power_val is not None:
@@ -144,6 +130,7 @@ async def get_power_overview(
 
 
 # ==================== UPS设备 CRUD ====================
+
 
 @router.get("/ups", response_model=PageResponse[UPSDeviceInfo], summary="UPS设备列表")
 async def list_ups_devices(
@@ -192,22 +179,25 @@ async def get_ups_device(
 
     # 获取关联点位及实时值
     points_r = await db.execute(
-        select(Point, PointRealtime).outerjoin(
-            PointRealtime, PointRealtime.point_id == Point.id
-        ).where(Point.device_id == ups.device_id).order_by(Point.sort_order)
+        select(Point, PointRealtime)
+        .outerjoin(PointRealtime, PointRealtime.point_id == Point.id)
+        .where(Point.device_id == ups.device_id)
+        .order_by(Point.sort_order)
     )
     points_data = []
     for p, pr in points_r.all():
-        points_data.append({
-            "id": p.id,
-            "code": p.point_code,
-            "name": p.point_name,
-            "type": p.point_type,
-            "unit": p.unit,
-            "value": pr.value if pr else None,
-            "status": pr.status if pr else "offline",
-            "updated_at": pr.updated_at.isoformat() if pr and pr.updated_at else None,
-        })
+        points_data.append(
+            {
+                "id": p.id,
+                "code": p.point_code,
+                "name": p.point_name,
+                "type": p.point_type,
+                "unit": p.unit,
+                "value": pr.value if pr else None,
+                "status": pr.status if pr else "offline",
+                "updated_at": pr.updated_at.isoformat() if pr and pr.updated_at else None,
+            }
+        )
 
     return {
         "ups": UPSDeviceInfo.model_validate(ups),
@@ -230,9 +220,7 @@ async def create_ups_device(
         raise HTTPException(status_code=400, detail="关联设备不存在")
 
     # 检查是否已有UPS扩展记录
-    exist_r = await db.execute(
-        select(UPSDevice).where(UPSDevice.device_id == data.device_id)
-    )
+    exist_r = await db.execute(select(UPSDevice).where(UPSDevice.device_id == data.device_id))
     if exist_r.scalar_one_or_none():
         raise HTTPException(status_code=400, detail="该设备已有UPS扩展记录")
 
@@ -283,6 +271,7 @@ async def delete_ups_device(
 
 
 # ==================== 电池组 CRUD ====================
+
 
 @router.get("/batteries", response_model=PageResponse[BatteryGroupInfo], summary="电池组列表")
 async def list_battery_groups(
@@ -337,23 +326,26 @@ async def get_battery_group(
         # 查找该UPS设备下以电池组名称前缀匹配的点位
         group_prefix = (bg.group_name or "").replace(" ", "")
         points_r = await db.execute(
-            select(Point, PointRealtime).outerjoin(
-                PointRealtime, PointRealtime.point_id == Point.id
-            ).where(
+            select(Point, PointRealtime)
+            .outerjoin(PointRealtime, PointRealtime.point_id == Point.id)
+            .where(
                 Point.device_id == ups.device_id,
                 Point.point_code.like(f"%{group_prefix}%"),
-            ).order_by(Point.sort_order)
+            )
+            .order_by(Point.sort_order)
         )
         for p, pr in points_r.all():
-            points_data.append({
-                "id": p.id,
-                "code": p.point_code,
-                "name": p.point_name,
-                "type": p.point_type,
-                "unit": p.unit,
-                "value": pr.value if pr else None,
-                "status": pr.status if pr else "offline",
-            })
+            points_data.append(
+                {
+                    "id": p.id,
+                    "code": p.point_code,
+                    "name": p.point_name,
+                    "type": p.point_type,
+                    "unit": p.unit,
+                    "value": pr.value if pr else None,
+                    "status": pr.status if pr else "offline",
+                }
+            )
 
     return {
         "battery_group": BatteryGroupInfo.model_validate(bg),
@@ -419,6 +411,7 @@ async def delete_battery_group(
 
 # ==================== 配电柜 / PDU ====================
 
+
 @router.get("/cabinets", summary="配电柜列表")
 async def list_cabinets(
     page: int = Query(1, ge=1),
@@ -441,15 +434,17 @@ async def list_cabinets(
     for dev in devices:
         # 获取该设备的点位实时值
         pr = await db.execute(
-            select(Point.point_code, Point.point_name, Point.unit, PointRealtime.value).outerjoin(
-                PointRealtime, PointRealtime.point_id == Point.id
-            ).where(Point.device_id == dev.id)
+            select(Point.point_code, Point.point_name, Point.unit, PointRealtime.value)
+            .outerjoin(PointRealtime, PointRealtime.point_id == Point.id)
+            .where(Point.device_id == dev.id)
         )
         point_values = {row[0]: {"name": row[1], "unit": row[2], "value": row[3]} for row in pr.all()}
-        items.append({
-            "device": DeviceInfo.model_validate(dev),
-            "points": point_values,
-        })
+        items.append(
+            {
+                "device": DeviceInfo.model_validate(dev),
+                "points": point_values,
+            }
+        )
 
     return PageResponse(
         items=items,
@@ -480,15 +475,17 @@ async def list_pdus(
     items = []
     for dev in devices:
         pr = await db.execute(
-            select(Point.point_code, Point.point_name, Point.unit, PointRealtime.value).outerjoin(
-                PointRealtime, PointRealtime.point_id == Point.id
-            ).where(Point.device_id == dev.id)
+            select(Point.point_code, Point.point_name, Point.unit, PointRealtime.value)
+            .outerjoin(PointRealtime, PointRealtime.point_id == Point.id)
+            .where(Point.device_id == dev.id)
         )
         point_values = {row[0]: {"name": row[1], "unit": row[2], "value": row[3]} for row in pr.all()}
-        items.append({
-            "device": DeviceInfo.model_validate(dev),
-            "points": point_values,
-        })
+        items.append(
+            {
+                "device": DeviceInfo.model_validate(dev),
+                "points": point_values,
+            }
+        )
 
     return PageResponse(
         items=items,

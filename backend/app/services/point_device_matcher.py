@@ -4,9 +4,10 @@ Point-Device Smart Matching Engine
 
 用通用规则替代硬编码映射，实现双向关联
 """
+
 import re
 import logging
-from typing import Dict, List, Optional, Tuple, Any
+from typing import Dict, Optional, Any
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update
 
@@ -99,7 +100,7 @@ class PointDeviceMatcher:
             return None
 
         # 从设备编码中提取前缀部分（如 CH-001 -> CH）
-        match = re.match(r'^([A-Z]+)', device_code.upper())
+        match = re.match(r"^([A-Z]+)", device_code.upper())
         if match:
             device_prefix = match.group(1)
             return f"{area_code}_{device_prefix}_AI_"
@@ -131,11 +132,7 @@ class PointDeviceMatcher:
 
     @classmethod
     def find_matching_points(
-        cls,
-        device_code: str,
-        device_name: str,
-        area_code: str,
-        point_map: Dict[str, Dict[str, Any]]
+        cls, device_code: str, device_name: str, area_code: str, point_map: Dict[str, Dict[str, Any]]
     ) -> Dict[str, Optional[int]]:
         """
         根据设备编码和名称查找匹配的点位
@@ -159,7 +156,11 @@ class PointDeviceMatcher:
         legacy_rule = cls.LEGACY_MAPPING_RULES.get(device_code)
         if legacy_rule:
             prefix = legacy_rule["prefix"]
-            for field, suffix in [("power", "power_point_id"), ("current", "current_point_id"), ("energy", "energy_point_id")]:
+            for field, suffix in [
+                ("power", "power_point_id"),
+                ("current", "current_point_id"),
+                ("energy", "energy_point_id"),
+            ]:
                 if field in legacy_rule:
                     point_code = f"{prefix}{legacy_rule[field]}"
                     if point_code in point_map:
@@ -185,11 +186,13 @@ class PointDeviceMatcher:
             if point_code.startswith(prefix):
                 usage = cls.identify_point_usage(point_info.get("name", ""))
                 if usage and usage in matching_points:
-                    matching_points[usage].append({
-                        "code": point_code,
-                        "id": point_info["id"],
-                        "name": point_info.get("name", ""),
-                    })
+                    matching_points[usage].append(
+                        {
+                            "code": point_code,
+                            "id": point_info["id"],
+                            "name": point_info.get("name", ""),
+                        }
+                    )
 
         # 从匹配结果中选择最合适的（取第一个）
         if matching_points["power"]:
@@ -224,11 +227,7 @@ class PointDeviceMatcher:
 
         if point_ids:
             # 批量更新点位的 energy_device_id
-            await session.execute(
-                update(Point)
-                .where(Point.id.in_(point_ids))
-                .values(energy_device_id=device_id)
-            )
+            await session.execute(update(Point).where(Point.id.in_(point_ids)).values(energy_device_id=device_id))
             updated_count = len(point_ids)
 
         return updated_count
@@ -247,16 +246,12 @@ class PointDeviceMatcher:
         Returns:
             清除关联的点位数量
         """
-        result = await session.execute(
-            select(Point).where(Point.energy_device_id == device_id)
-        )
+        result = await session.execute(select(Point).where(Point.energy_device_id == device_id))
         points = result.scalars().all()
 
         if points:
             await session.execute(
-                update(Point)
-                .where(Point.energy_device_id == device_id)
-                .values(energy_device_id=None)
+                update(Point).where(Point.energy_device_id == device_id).values(energy_device_id=None)
             )
 
         return len(points)
@@ -277,9 +272,7 @@ class PointDeviceMatcher:
 
         # 已关联点位的设备数
         linked_devices_result = await session.execute(
-            select(func.count(PowerDevice.id)).where(
-                PowerDevice.power_point_id.isnot(None)
-            )
+            select(func.count(PowerDevice.id)).where(PowerDevice.power_point_id.isnot(None))
         )
         linked_devices = linked_devices_result.scalar() or 0
 
@@ -289,9 +282,7 @@ class PointDeviceMatcher:
 
         # 已关联设备的点位数
         linked_points_result = await session.execute(
-            select(func.count(Point.id)).where(
-                Point.energy_device_id.isnot(None)
-            )
+            select(func.count(Point.id)).where(Point.energy_device_id.isnot(None))
         )
         linked_points = linked_points_result.scalar() or 0
 
@@ -355,10 +346,7 @@ class PointDeviceMatcher:
         for device in devices:
             # 查找匹配点位
             point_ids = cls.find_matching_points(
-                device.device_code,
-                device.device_name,
-                device.area_code or "",
-                point_map
+                device.device_code, device.device_name, device.area_code or "", point_map
             )
 
             # 更新设备端关联
@@ -387,13 +375,15 @@ class PointDeviceMatcher:
             updated_points += point_count
 
             if any(point_ids.values()):
-                matched_relations.append({
-                    "device_code": device.device_code,
-                    "device_name": device.device_name,
-                    "power_point_id": point_ids["power_point_id"],
-                    "current_point_id": point_ids["current_point_id"],
-                    "energy_point_id": point_ids["energy_point_id"],
-                })
+                matched_relations.append(
+                    {
+                        "device_code": device.device_code,
+                        "device_name": device.device_name,
+                        "power_point_id": point_ids["power_point_id"],
+                        "current_point_id": point_ids["current_point_id"],
+                        "energy_point_id": point_ids["energy_point_id"],
+                    }
+                )
 
         await session.commit()
 

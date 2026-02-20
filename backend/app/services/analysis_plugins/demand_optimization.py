@@ -10,24 +10,13 @@ Enhanced: 支持需量配置合理性分析、设备需量贡献分析、削峰�
 注: 核心计算逻辑已统一到 DemandAnalysisService，本插件调用该服务
 """
 
-from typing import List, Dict, Any, Optional
-from datetime import datetime, timedelta
+from typing import List
 import statistics
 import math
 
-from .base import (
-    AnalysisPlugin,
-    AnalysisContext,
-    SuggestionResult,
-    PluginConfig,
-    PluginPriority,
-    SuggestionType,
-    DemandHistoryData,
-    MeterPointData
-)
+from .base import AnalysisPlugin, AnalysisContext, SuggestionResult, PluginConfig, PluginPriority, SuggestionType
 
 # 导入统一的阈值配置
-from ..demand_analysis_service import DemandThresholds
 
 
 class DemandOptimizationPlugin(AnalysisPlugin):
@@ -66,13 +55,13 @@ class DemandOptimizationPlugin(AnalysisPlugin):
             execution_order=20,
             min_data_days=30,
             thresholds={
-                'low_utilization': 0.80,       # 低利用率阈值
-                'high_utilization': 1.05,      # 高利用率阈值 (超申报)
-                'optimal_utilization': 0.90,   # 最优利用率
-                'safety_margin': 0.10,         # 安全裕度
-                'demand_price': 38.0,          # 需量电价 元/kW·月
-                'min_saving': 5000             # 最小年节省金额
-            }
+                "low_utilization": 0.80,  # 低利用率阈值
+                "high_utilization": 1.05,  # 高利用率阈值 (超申报)
+                "optimal_utilization": 0.90,  # 最优利用率
+                "safety_margin": 0.10,  # 安全裕度
+                "demand_price": 38.0,  # 需量电价 元/kW·月
+                "min_saving": 5000,  # 最小年节省金额
+            },
         )
 
     async def analyze(self, context: AnalysisContext) -> List[SuggestionResult]:
@@ -99,7 +88,7 @@ class DemandOptimizationPlugin(AnalysisPlugin):
         """需量配置合理性分析 (按计量点)"""
         results = []
         thresholds = self._config.thresholds
-        demand_price = context.pricing_config.get('demand_price', thresholds.get('demand_price', 38.0))
+        demand_price = context.pricing_config.get("demand_price", thresholds.get("demand_price", 38.0))
 
         for meter_point in context.meter_points:
             mp_id = meter_point.meter_point_id
@@ -135,29 +124,28 @@ class DemandOptimizationPlugin(AnalysisPlugin):
 
             # ==================== 评估需量配置 ====================
 
-            low_threshold = thresholds.get('low_utilization', 0.80)
-            high_threshold = thresholds.get('high_utilization', 1.05)
-            safety_margin = thresholds.get('safety_margin', 0.10)
+            low_threshold = thresholds.get("low_utilization", 0.80)
+            high_threshold = thresholds.get("high_utilization", 1.05)
+            safety_margin = thresholds.get("safety_margin", 0.10)
 
             # 情况1: 需量配置过高 (利用率低)
             if utilization_rate < low_threshold:
                 # 计算建议需量
-                recommended_demand = self._calculate_optimal_demand(
-                    demand_95th, safety_margin, meter_point.demand_type
-                )
+                recommended_demand = self._calculate_optimal_demand(demand_95th, safety_margin, meter_point.demand_type)
 
                 # 计算节省
                 demand_reduction = declared_demand - recommended_demand
                 monthly_saving = demand_reduction * demand_price
                 yearly_saving = monthly_saving * 12
 
-                if yearly_saving >= thresholds.get('min_saving', 5000):
-                    risk_level = 'low' if utilization_rate < 0.70 else 'medium'
+                if yearly_saving >= thresholds.get("min_saving", 5000):
+                    risk_level = "low" if utilization_rate < 0.70 else "medium"
 
-                    results.append(self.create_suggestion(
-                        title=f"降低计量点{meter_point.meter_code}申报需量",
-                        description=f"当前申报需量{declared_demand:.0f}kW，实际利用率仅{utilization_rate:.1%}，建议降至{recommended_demand:.0f}kW",
-                        detail=f"""
+                    results.append(
+                        self.create_suggestion(
+                            title=f"降低计量点{meter_point.meter_code}申报需量",
+                            description=f"当前申报需量{declared_demand:.0f}kW，实际利用率仅{utilization_rate:.1%}，建议降至{recommended_demand:.0f}kW",
+                            detail=f"""
 ## 需量配置合理性分析
 
 ### 计量点信息
@@ -193,41 +181,45 @@ class DemandOptimizationPlugin(AnalysisPlugin):
 3. 等待审批通过（通常1-2周）
 4. 新需量从下月生效
                         """.strip(),
-                        estimated_saving=0,
-                        estimated_cost_saving=yearly_saving,
-                        implementation_difficulty=1,
-                        priority=PluginPriority.HIGH if yearly_saving > 20000 else PluginPriority.MEDIUM,
-                        payback_period=0,
-                        analysis_data={
-                            'meter_point_id': mp_id,
-                            'meter_code': meter_point.meter_code,
-                            'declared_demand': declared_demand,
-                            'recommended_demand': recommended_demand,
-                            'max_demand_12m': max_demand_12m,
-                            'demand_95th': demand_95th,
-                            'utilization_rate': utilization_rate,
-                            'yearly_saving': yearly_saving,
-                            'risk_level': risk_level,
-                            'optimization_type': 'reduce'
-                        },
-                        confidence=90 if risk_level == 'low' else 80
-                    ))
+                            estimated_saving=0,
+                            estimated_cost_saving=yearly_saving,
+                            implementation_difficulty=1,
+                            priority=PluginPriority.HIGH if yearly_saving > 20000 else PluginPriority.MEDIUM,
+                            payback_period=0,
+                            analysis_data={
+                                "meter_point_id": mp_id,
+                                "meter_code": meter_point.meter_code,
+                                "declared_demand": declared_demand,
+                                "recommended_demand": recommended_demand,
+                                "max_demand_12m": max_demand_12m,
+                                "demand_95th": demand_95th,
+                                "utilization_rate": utilization_rate,
+                                "yearly_saving": yearly_saving,
+                                "risk_level": risk_level,
+                                "optimization_type": "reduce",
+                            },
+                            confidence=90 if risk_level == "low" else 80,
+                        )
+                    )
 
             # 情况2: 需量配置过低 (超申报风险)
             elif utilization_rate > high_threshold:
                 # 计算建议需量
                 recommended_demand = self._calculate_optimal_demand(
-                    max_demand_12m, safety_margin * 1.5, meter_point.demand_type  # 更大裕度
+                    max_demand_12m,
+                    safety_margin * 1.5,
+                    meter_point.demand_type,  # 更大裕度
                 )
 
                 # 计算超需量罚款风险
                 over_amount = max_demand_12m - declared_demand
                 penalty_estimate = over_amount * demand_price * 2 * 12  # 假设超出部分按2倍计费
 
-                results.append(self.create_suggestion(
-                    title=f"提高计量点{meter_point.meter_code}申报需量",
-                    description=f"当前申报需量{declared_demand:.0f}kW，实际已超{(utilization_rate-1)*100:.1f}%，存在超需量罚款风险",
-                    detail=f"""
+                results.append(
+                    self.create_suggestion(
+                        title=f"提高计量点{meter_point.meter_code}申报需量",
+                        description=f"当前申报需量{declared_demand:.0f}kW，实际已超{(utilization_rate-1)*100:.1f}%，存在超需量罚款风险",
+                        detail=f"""
 ## 需量超限预警
 
 ### 计量点信息
@@ -253,24 +245,25 @@ class DemandOptimizationPlugin(AnalysisPlugin):
 2. 优化大功率设备启动顺序
 3. 实施负荷错峰调度
                     """.strip(),
-                    estimated_saving=0,
-                    estimated_cost_saving=-penalty_estimate,  # 负数表示避免损失
-                    implementation_difficulty=1,
-                    priority=PluginPriority.CRITICAL,
-                    payback_period=0,
-                    analysis_data={
-                        'meter_point_id': mp_id,
-                        'meter_code': meter_point.meter_code,
-                        'declared_demand': declared_demand,
-                        'recommended_demand': recommended_demand,
-                        'max_demand_12m': max_demand_12m,
-                        'utilization_rate': utilization_rate,
-                        'over_amount': over_amount,
-                        'over_declared_count': over_declared_count,
-                        'optimization_type': 'increase_or_shave'
-                    },
-                    confidence=95
-                ))
+                        estimated_saving=0,
+                        estimated_cost_saving=-penalty_estimate,  # 负数表示避免损失
+                        implementation_difficulty=1,
+                        priority=PluginPriority.CRITICAL,
+                        payback_period=0,
+                        analysis_data={
+                            "meter_point_id": mp_id,
+                            "meter_code": meter_point.meter_code,
+                            "declared_demand": declared_demand,
+                            "recommended_demand": recommended_demand,
+                            "max_demand_12m": max_demand_12m,
+                            "utilization_rate": utilization_rate,
+                            "over_amount": over_amount,
+                            "over_declared_count": over_declared_count,
+                            "optimization_type": "increase_or_shave",
+                        },
+                        confidence=95,
+                    )
+                )
 
             # 情况3: 需量配置合理但有优化空间
             elif low_threshold <= utilization_rate <= 0.95:
@@ -280,10 +273,11 @@ class DemandOptimizationPlugin(AnalysisPlugin):
                     potential_saving = peak_shave_target * demand_price * 12
 
                     if potential_saving > 5000:
-                        results.append(self.create_suggestion(
-                            title=f"实施计量点{meter_point.meter_code}需量削峰",
-                            description=f"需量波动较大，通过削峰可降低{peak_shave_target:.1f}kW需量，年节省¥{potential_saving:.0f}",
-                            detail=f"""
+                        results.append(
+                            self.create_suggestion(
+                                title=f"实施计量点{meter_point.meter_code}需量削峰",
+                                description=f"需量波动较大，通过削峰可降低{peak_shave_target:.1f}kW需量，年节省¥{potential_saving:.0f}",
+                                detail=f"""
 ## 需量削峰分析
 
 ### 计量点信息
@@ -305,19 +299,20 @@ class DemandOptimizationPlugin(AnalysisPlugin):
 2. **设备启动优化**: 大功率设备分时启动
 3. **储能削峰**: 考虑安装储能系统
                             """.strip(),
-                            estimated_saving=0,
-                            estimated_cost_saving=potential_saving,
-                            implementation_difficulty=3,
-                            priority=PluginPriority.MEDIUM,
-                            payback_period=36,  # 约3年
-                            analysis_data={
-                                'meter_point_id': mp_id,
-                                'peak_shave_target': peak_shave_target,
-                                'demand_variation': std_dev / avg_max_demand,
-                                'optimization_type': 'peak_shaving'
-                            },
-                            confidence=75
-                        ))
+                                estimated_saving=0,
+                                estimated_cost_saving=potential_saving,
+                                implementation_difficulty=3,
+                                priority=PluginPriority.MEDIUM,
+                                payback_period=36,  # 约3年
+                                analysis_data={
+                                    "meter_point_id": mp_id,
+                                    "peak_shave_target": peak_shave_target,
+                                    "demand_variation": std_dev / avg_max_demand,
+                                    "optimization_type": "peak_shaving",
+                                },
+                                confidence=75,
+                            )
+                        )
 
         return results
 
@@ -345,7 +340,7 @@ class DemandOptimizationPlugin(AnalysisPlugin):
         min_demand = min(demands)
 
         thresholds = self._config.thresholds
-        demand_price = context.pricing_config.get('demand_price', thresholds.get('demand_price', 38.0))
+        demand_price = context.pricing_config.get("demand_price", thresholds.get("demand_price", 38.0))
 
         # 分析需量波动
         if len(demands) >= 3:
@@ -359,10 +354,11 @@ class DemandOptimizationPlugin(AnalysisPlugin):
                 yearly_saving = monthly_saving * 12
 
                 if yearly_saving > 5000:
-                    results.append(self.create_suggestion(
-                        title="降低需量峰值波动",
-                        description=f"需量波动率 {demand_variation:.1%}，建议实施削峰措施",
-                        detail=f"""
+                    results.append(
+                        self.create_suggestion(
+                            title="降低需量峰值波动",
+                            description=f"需量波动率 {demand_variation:.1%}，建议实施削峰措施",
+                            detail=f"""
 ## 分析结果
 
 ### 当前状态
@@ -385,20 +381,21 @@ class DemandOptimizationPlugin(AnalysisPlugin):
 - 月节省: ¥{monthly_saving:.0f}
 - 年节省: ¥{yearly_saving:.0f}
                         """.strip(),
-                        estimated_saving=demand_reduction * 12,
-                        estimated_cost_saving=yearly_saving,
-                        implementation_difficulty=3,
-                        priority=PluginPriority.HIGH if yearly_saving > 20000 else PluginPriority.MEDIUM,
-                        payback_period=50000 / monthly_saving if monthly_saving > 0 else None,
-                        analysis_data={
-                            'max_demand': max_demand,
-                            'avg_demand': avg_demand,
-                            'demand_variation': demand_variation,
-                            'target_demand': target_demand,
-                            'demand_reduction': demand_reduction
-                        },
-                        confidence=80
-                    ))
+                            estimated_saving=demand_reduction * 12,
+                            estimated_cost_saving=yearly_saving,
+                            implementation_difficulty=3,
+                            priority=PluginPriority.HIGH if yearly_saving > 20000 else PluginPriority.MEDIUM,
+                            payback_period=50000 / monthly_saving if monthly_saving > 0 else None,
+                            analysis_data={
+                                "max_demand": max_demand,
+                                "avg_demand": avg_demand,
+                                "demand_variation": demand_variation,
+                                "target_demand": target_demand,
+                                "demand_reduction": demand_reduction,
+                            },
+                            confidence=80,
+                        )
+                    )
 
         return results
 
@@ -407,10 +404,7 @@ class DemandOptimizationPlugin(AnalysisPlugin):
         results = []
 
         # 获取高功率设备
-        high_power_devices = [
-            d for d in context.device_data
-            if d.rated_power and d.rated_power > 10
-        ]
+        high_power_devices = [d for d in context.device_data if d.rated_power and d.rated_power > 10]
 
         if len(high_power_devices) < 3:
             return results
@@ -428,30 +422,33 @@ class DemandOptimizationPlugin(AnalysisPlugin):
             max_demand = total_rated * 0.7
 
         if concurrent_start_power > max_demand * 1.2:
-            demand_price = context.pricing_config.get('demand_price', 38.0)
+            demand_price = context.pricing_config.get("demand_price", 38.0)
             potential_saving = (concurrent_start_power - max_demand) * demand_price * 12 * 0.3
 
             # 生成设备贡献表
-            device_table = "\n".join([
-                f"| {d.device_name} | {d.device_type} | {d.rated_power:.1f} | {(d.rated_power/total_rated*100):.1f}% |"
-                for d in high_power_devices[:8]
-            ])
+            device_table = "\n".join(
+                [
+                    f"| {d.device_name} | {d.device_type} | {d.rated_power:.1f} | {(d.rated_power/total_rated*100):.1f}% |"
+                    for d in high_power_devices[:8]
+                ]
+            )
 
             # 分析可控设备
             controllable_devices = [
-                d for d in high_power_devices
-                if d.is_shiftable or d.device_type in ['HVAC', 'PUMP', 'LIGHTING']
+                d for d in high_power_devices if d.is_shiftable or d.device_type in ["HVAC", "PUMP", "LIGHTING"]
             ]
 
-            controllable_list = "\n".join([
-                f"- {d.device_name}: {d.rated_power:.1f}kW"
-                for d in controllable_devices[:5]
-            ]) if controllable_devices else "暂无可控设备数据"
+            controllable_list = (
+                "\n".join([f"- {d.device_name}: {d.rated_power:.1f}kW" for d in controllable_devices[:5]])
+                if controllable_devices
+                else "暂无可控设备数据"
+            )
 
-            results.append(self.create_suggestion(
-                title="优化大功率设备启动策略",
-                description=f"检测到{len(high_power_devices)}台大功率设备，建议错峰启动避免需量峰值",
-                detail=f"""
+            results.append(
+                self.create_suggestion(
+                    title="优化大功率设备启动策略",
+                    description=f"检测到{len(high_power_devices)}台大功率设备，建议错峰启动避免需量峰值",
+                    detail=f"""
 ## 设备需量贡献分析
 
 ### 大功率设备清单
@@ -476,39 +473,35 @@ class DemandOptimizationPlugin(AnalysisPlugin):
 - 避免需量突增
 - 潜在年节省: ¥{potential_saving:.0f}
                 """.strip(),
-                estimated_saving=0,
-                estimated_cost_saving=potential_saving,
-                implementation_difficulty=2,
-                priority=PluginPriority.MEDIUM,
-                related_devices=[d.device_name for d in high_power_devices[:5]],
-                analysis_data={
-                    'high_power_devices': len(high_power_devices),
-                    'total_rated_power': total_rated,
-                    'concurrent_start_power': concurrent_start_power,
-                    'max_demand': max_demand,
-                    'controllable_devices': len(controllable_devices),
-                    'top_devices': [
-                        {'name': d.device_name, 'power': d.rated_power, 'type': d.device_type}
-                        for d in high_power_devices[:5]
-                    ]
-                },
-                confidence=70
-            ))
+                    estimated_saving=0,
+                    estimated_cost_saving=potential_saving,
+                    implementation_difficulty=2,
+                    priority=PluginPriority.MEDIUM,
+                    related_devices=[d.device_name for d in high_power_devices[:5]],
+                    analysis_data={
+                        "high_power_devices": len(high_power_devices),
+                        "total_rated_power": total_rated,
+                        "concurrent_start_power": concurrent_start_power,
+                        "max_demand": max_demand,
+                        "controllable_devices": len(controllable_devices),
+                        "top_devices": [
+                            {"name": d.device_name, "power": d.rated_power, "type": d.device_type}
+                            for d in high_power_devices[:5]
+                        ],
+                    },
+                    confidence=70,
+                )
+            )
 
         return results
 
-    def _calculate_optimal_demand(
-        self,
-        reference_demand: float,
-        safety_margin: float,
-        demand_type: str
-    ) -> float:
+    def _calculate_optimal_demand(self, reference_demand: float, safety_margin: float, demand_type: str) -> float:
         """计算最优申报需量"""
         # 添加安全裕度
         optimal = reference_demand * (1 + safety_margin)
 
         # 按照供电局要求取整 (通常5或10的倍数)
-        if demand_type == 'kVA':
+        if demand_type == "kVA":
             # kVA通常按10取整
             optimal = math.ceil(optimal / 10) * 10
         else:

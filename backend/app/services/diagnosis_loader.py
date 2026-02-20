@@ -2,8 +2,8 @@
 诊断规则 YAML 加载服务
 Story 9-3: 智能故障诊断
 """
+
 import logging
-import os
 from pathlib import Path
 from typing import List
 
@@ -48,9 +48,7 @@ async def sync_to_database(db: AsyncSession) -> int:
             continue
 
         # 检查是否已存在
-        result = await db.execute(
-            select(DiagnosisRule).where(DiagnosisRule.rule_code == rule_code)
-        )
+        result = await db.execute(select(DiagnosisRule).where(DiagnosisRule.rule_code == rule_code))
         existing = result.scalar_one_or_none()
         if existing is not None:
             continue

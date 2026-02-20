@@ -1,6 +1,7 @@
 """
 演示数据API
 """
+
 from fastapi import APIRouter, BackgroundTasks
 from pydantic import BaseModel
 from typing import Optional
@@ -34,20 +35,13 @@ async def load_demo_data(request: LoadDemoDataRequest, background_tasks: Backgro
         return {
             "code": 1,
             "message": "正在加载中，请稍候",
-            "data": {
-                "progress": demo_data_service.progress,
-                "progress_message": demo_data_service.progress_message
-            }
+            "data": {"progress": demo_data_service.progress, "progress_message": demo_data_service.progress_message},
         }
 
     # 启动后台任务
     background_tasks.add_task(demo_data_service.load_demo_data, request.days)
 
-    return {
-        "code": 0,
-        "message": "开始加载演示数据",
-        "data": {"days": request.days}
-    }
+    return {"code": 0, "message": "开始加载演示数据", "data": {"days": request.days}}
 
 
 @router.get("/progress")
@@ -59,8 +53,8 @@ async def get_load_progress():
             "loading": demo_data_service.loading,
             "progress": demo_data_service.progress,
             "progress_message": demo_data_service.progress_message,
-            "is_loaded": demo_data_service.is_loaded
-        }
+            "is_loaded": demo_data_service.is_loaded,
+        },
     }
 
 
@@ -78,16 +72,10 @@ async def refresh_dates(background_tasks: BackgroundTasks):
         return {
             "code": 1,
             "message": "正在操作中，请稍候",
-            "data": {
-                "progress": demo_data_service.progress,
-                "progress_message": demo_data_service.progress_message
-            }
+            "data": {"progress": demo_data_service.progress, "progress_message": demo_data_service.progress_message},
         }
 
     # 启动后台任务
     background_tasks.add_task(demo_data_service.refresh_dates)
 
-    return {
-        "code": 0,
-        "message": "开始刷新日期"
-    }
+    return {"code": 0, "message": "开始刷新日期"}

@@ -2,8 +2,9 @@
 负荷调节服务 V2.3
 实现温度、亮度、运行模式等负荷调节功能
 """
+
 from datetime import datetime
-from typing import List, Optional, Dict, Any
+from typing import List, Optional
 from sqlalchemy import select, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -12,11 +13,9 @@ from ..schemas.energy import (
     LoadRegulationConfigCreate,
     LoadRegulationConfigUpdate,
     LoadRegulationConfigResponse,
-    RegulationSimulateRequest,
     RegulationSimulateResponse,
-    RegulationApplyRequest,
     RegulationHistoryResponse,
-    RegulationRecommendation
+    RegulationRecommendation,
 )
 
 
@@ -33,7 +32,7 @@ class LoadRegulationService:
             "default_step": 1,
             "power_factor": -0.06,  # 每升高1℃，功率降低6%
             "comfort_impact": "medium",
-            "performance_impact": "low"
+            "performance_impact": "low",
         },
         "brightness": {
             "name": "亮度调节",
@@ -43,7 +42,7 @@ class LoadRegulationService:
             "default_step": 10,
             "power_factor": 0.01,  # 每降低1%，功率降低1%
             "comfort_impact": "low",
-            "performance_impact": "none"
+            "performance_impact": "none",
         },
         "mode": {
             "name": "运行模式",
@@ -53,7 +52,7 @@ class LoadRegulationService:
             "default_step": 1,
             "power_factor": 0.15,  # 每降低一档，功率降低15%
             "comfort_impact": "none",
-            "performance_impact": "medium"
+            "performance_impact": "medium",
         },
         "load": {
             "name": "负载优先级",
@@ -63,18 +62,15 @@ class LoadRegulationService:
             "default_step": 1,
             "power_factor": 0.3,  # 每降低一级，可调功率30%
             "comfort_impact": "none",
-            "performance_impact": "high"
-        }
+            "performance_impact": "high",
+        },
     }
 
     def __init__(self, db: AsyncSession):
         self.db = db
 
     async def get_configs(
-        self,
-        device_id: Optional[int] = None,
-        regulation_type: Optional[str] = None,
-        is_enabled: bool = True
+        self, device_id: Optional[int] = None, regulation_type: Optional[str] = None, is_enabled: bool = True
     ) -> List[LoadRegulationConfigResponse]:
         """获取负荷调节配置列表"""
         query = select(LoadRegulationConfig, PowerDevice).join(
@@ -119,7 +115,7 @@ class LoadRegulationService:
                 "updated_at": config.updated_at,
                 "device_name": device.device_name,
                 "device_type": device.device_type,
-                "rated_power": device.rated_power
+                "rated_power": device.rated_power,
             }
             configs.append(LoadRegulationConfigResponse(**config_dict))
 
@@ -127,9 +123,11 @@ class LoadRegulationService:
 
     async def get_config_by_id(self, config_id: int) -> Optional[LoadRegulationConfigResponse]:
         """根据ID获取配置"""
-        query = select(LoadRegulationConfig, PowerDevice).join(
-            PowerDevice, LoadRegulationConfig.device_id == PowerDevice.id
-        ).where(LoadRegulationConfig.id == config_id)
+        query = (
+            select(LoadRegulationConfig, PowerDevice)
+            .join(PowerDevice, LoadRegulationConfig.device_id == PowerDevice.id)
+            .where(LoadRegulationConfig.id == config_id)
+        )
 
         result = await self.db.execute(query)
         row = result.first()
@@ -160,7 +158,7 @@ class LoadRegulationService:
             updated_at=config.updated_at,
             device_name=device.device_name,
             device_type=device.device_type,
-            rated_power=device.rated_power
+            rated_power=device.rated_power,
         )
 
     async def create_config(self, data: LoadRegulationConfigCreate) -> LoadRegulationConfig:
@@ -183,7 +181,7 @@ class LoadRegulationService:
             comfort_impact=data.comfort_impact or type_config.get("comfort_impact", "low"),
             performance_impact=data.performance_impact or type_config.get("performance_impact", "none"),
             power_curve=data.power_curve,
-            is_auto=data.is_auto
+            is_auto=data.is_auto,
         )
 
         self.db.add(config)
@@ -193,9 +191,7 @@ class LoadRegulationService:
 
     async def update_config(self, config_id: int, data: LoadRegulationConfigUpdate) -> Optional[LoadRegulationConfig]:
         """更新负荷调节配置"""
-        result = await self.db.execute(
-            select(LoadRegulationConfig).where(LoadRegulationConfig.id == config_id)
-        )
+        result = await self.db.execute(select(LoadRegulationConfig).where(LoadRegulationConfig.id == config_id))
         config = result.scalar_one_or_none()
 
         if not config:
@@ -212,9 +208,7 @@ class LoadRegulationService:
 
     async def delete_config(self, config_id: int) -> bool:
         """删除负荷调节配置"""
-        result = await self.db.execute(
-            select(LoadRegulationConfig).where(LoadRegulationConfig.id == config_id)
-        )
+        result = await self.db.execute(select(LoadRegulationConfig).where(LoadRegulationConfig.id == config_id))
         config = result.scalar_one_or_none()
 
         if not config:
@@ -224,11 +218,7 @@ class LoadRegulationService:
         await self.db.commit()
         return True
 
-    async def simulate_regulation(
-        self,
-        config_id: int,
-        target_value: float
-    ) -> Optional[RegulationSimulateResponse]:
+    async def simulate_regulation(self, config_id: int, target_value: float) -> Optional[RegulationSimulateResponse]:
         """模拟调节效果"""
         config_resp = await self.get_config_by_id(config_id)
         if not config_resp:
@@ -265,7 +255,7 @@ class LoadRegulationService:
             estimated_power=estimated_power,
             power_change=power_change,
             comfort_impact=config_resp.comfort_impact,
-            performance_impact=config_resp.performance_impact
+            performance_impact=config_resp.performance_impact,
         )
 
     async def apply_regulation(
@@ -274,14 +264,14 @@ class LoadRegulationService:
         target_value: float,
         reason: str = "manual",
         operator_id: Optional[int] = None,
-        remark: Optional[str] = None
+        remark: Optional[str] = None,
     ) -> Optional[RegulationHistoryResponse]:
         """应用调节方案"""
         # 获取配置
         result = await self.db.execute(
-            select(LoadRegulationConfig, PowerDevice).join(
-                PowerDevice, LoadRegulationConfig.device_id == PowerDevice.id
-            ).where(LoadRegulationConfig.id == config_id)
+            select(LoadRegulationConfig, PowerDevice)
+            .join(PowerDevice, LoadRegulationConfig.device_id == PowerDevice.id)
+            .where(LoadRegulationConfig.id == config_id)
         )
         row = result.first()
         if not row:
@@ -308,7 +298,7 @@ class LoadRegulationService:
             trigger_detail=remark,
             status="completed",
             executed_at=datetime.now(),
-            operator_id=operator_id
+            operator_id=operator_id,
         )
         self.db.add(history)
 
@@ -333,19 +323,14 @@ class LoadRegulationService:
             trigger_reason=history.trigger_reason,
             status=history.status,
             executed_at=history.executed_at,
-            created_at=history.created_at
+            created_at=history.created_at,
         )
 
     async def get_history(
-        self,
-        device_id: Optional[int] = None,
-        config_id: Optional[int] = None,
-        limit: int = 50
+        self, device_id: Optional[int] = None, config_id: Optional[int] = None, limit: int = 50
     ) -> List[RegulationHistoryResponse]:
         """获取调节历史"""
-        query = select(RegulationHistory, PowerDevice).join(
-            PowerDevice, RegulationHistory.device_id == PowerDevice.id
-        )
+        query = select(RegulationHistory, PowerDevice).join(PowerDevice, RegulationHistory.device_id == PowerDevice.id)
 
         if device_id:
             query = query.where(RegulationHistory.device_id == device_id)
@@ -371,15 +356,13 @@ class LoadRegulationService:
                 trigger_reason=h.trigger_reason,
                 status=h.status,
                 executed_at=h.executed_at,
-                created_at=h.created_at
+                created_at=h.created_at,
             )
             for h, d in rows
         ]
 
     async def get_recommendations(
-        self,
-        current_demand: Optional[float] = None,
-        declared_demand: Optional[float] = None
+        self, current_demand: Optional[float] = None, declared_demand: Optional[float] = None
     ) -> List[RegulationRecommendation]:
         """获取调节建议"""
         configs = await self.get_configs(is_enabled=True)
@@ -393,17 +376,19 @@ class LoadRegulationService:
                 if current < 26:
                     recommended = min(config.max_value, current + 2)
                     power_saving = (config.base_power or 10) * 0.12
-                    recommendations.append(RegulationRecommendation(
-                        config_id=config.id,
-                        device_id=config.device_id,
-                        device_name=config.device_name or "Unknown",
-                        regulation_type=config.regulation_type,
-                        current_value=current,
-                        recommended_value=recommended,
-                        power_saving=power_saving,
-                        reason=f"将温度从{current}℃调高至{recommended}℃可节省约{power_saving:.1f}kW",
-                        priority="medium"
-                    ))
+                    recommendations.append(
+                        RegulationRecommendation(
+                            config_id=config.id,
+                            device_id=config.device_id,
+                            device_name=config.device_name or "Unknown",
+                            regulation_type=config.regulation_type,
+                            current_value=current,
+                            recommended_value=recommended,
+                            power_saving=power_saving,
+                            reason=f"将温度从{current}℃调高至{recommended}℃可节省约{power_saving:.1f}kW",
+                            priority="medium",
+                        )
+                    )
 
             elif config.regulation_type == "brightness":
                 # 亮度调节建议
@@ -411,17 +396,19 @@ class LoadRegulationService:
                 if current > 70:
                     recommended = 70
                     power_saving = (config.base_power or 5) * 0.3
-                    recommendations.append(RegulationRecommendation(
-                        config_id=config.id,
-                        device_id=config.device_id,
-                        device_name=config.device_name or "Unknown",
-                        regulation_type=config.regulation_type,
-                        current_value=current,
-                        recommended_value=recommended,
-                        power_saving=power_saving,
-                        reason=f"将亮度从{current}%降至{recommended}%可节省约{power_saving:.1f}kW",
-                        priority="low"
-                    ))
+                    recommendations.append(
+                        RegulationRecommendation(
+                            config_id=config.id,
+                            device_id=config.device_id,
+                            device_name=config.device_name or "Unknown",
+                            regulation_type=config.regulation_type,
+                            current_value=current,
+                            recommended_value=recommended,
+                            power_saving=power_saving,
+                            reason=f"将亮度从{current}%降至{recommended}%可节省约{power_saving:.1f}kW",
+                            priority="low",
+                        )
+                    )
 
         # 按节省功率排序
         recommendations.sort(key=lambda x: x.power_saving, reverse=True)

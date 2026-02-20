@@ -1,6 +1,7 @@
 """
 告警路由
 """
+
 from typing import List, Optional
 from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -8,11 +9,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 
 from ..core import get_db, get_current_user
-from ..models import User, Point, Alarm, AlarmThreshold
-from ..schemas import (
-    AlarmResponse, AlarmAcknowledge, AlarmStats,
-    AlarmThresholdCreate, AlarmThresholdUpdate, AlarmThresholdResponse
-)
+from ..models import User, Point, Alarm
+from ..schemas import AlarmResponse, AlarmAcknowledge
 
 router = APIRouter(prefix="/alarms", tags=["告警管理"])
 
@@ -25,7 +23,7 @@ async def get_alarms(
     skip: int = 0,
     limit: int = 100,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
 ):
     """获取告警列表"""
     query = select(Alarm, Point).join(Point, Alarm.point_id == Point.id)
@@ -55,23 +53,21 @@ async def get_alarms(
             acknowledged_by=alarm.acknowledged_by,
             acknowledged_at=alarm.acknowledged_at,
             resolved_at=alarm.resolved_at,
-            created_at=alarm.created_at
+            created_at=alarm.created_at,
         )
         for alarm, point in rows
     ]
 
 
 @router.get("/active", response_model=List[AlarmResponse])
-async def get_active_alarms(
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
-):
+async def get_active_alarms(db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     """获取活动告警"""
-    query = select(Alarm, Point).join(
-        Point, Alarm.point_id == Point.id
-    ).where(
-        Alarm.status == "active"
-    ).order_by(Alarm.created_at.desc())
+    query = (
+        select(Alarm, Point)
+        .join(Point, Alarm.point_id == Point.id)
+        .where(Alarm.status == "active")
+        .order_by(Alarm.created_at.desc())
+    )
 
     result = await db.execute(query)
     rows = result.all()
@@ -90,22 +86,16 @@ async def get_active_alarms(
             acknowledged_by=alarm.acknowledged_by,
             acknowledged_at=alarm.acknowledged_at,
             resolved_at=alarm.resolved_at,
-            created_at=alarm.created_at
+            created_at=alarm.created_at,
         )
         for alarm, point in rows
     ]
 
 
 @router.get("/count")
-async def get_alarm_count(
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
-):
+async def get_alarm_count(db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     """获取各级别告警数量"""
-    query = select(
-        Alarm.alarm_level,
-        func.count(Alarm.id)
-    ).where(Alarm.status == "active").group_by(Alarm.alarm_level)
+    query = select(Alarm.alarm_level, func.count(Alarm.id)).where(Alarm.status == "active").group_by(Alarm.alarm_level)
 
     result = await db.execute(query)
     counts = {row[0]: row[1] for row in result.all()}
@@ -115,15 +105,13 @@ async def get_alarm_count(
         "major": counts.get("major", 0),
         "minor": counts.get("minor", 0),
         "info": counts.get("info", 0),
-        "total": sum(counts.values())
+        "total": sum(counts.values()),
     }
 
 
 @router.put("/{alarm_id}/acknowledge")
 async def acknowledge_alarm(
-    alarm_id: int,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    alarm_id: int, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)
 ):
     """确认告警"""
     result = await db.execute(select(Alarm).where(Alarm.id == alarm_id))
@@ -142,9 +130,7 @@ async def acknowledge_alarm(
 
 @router.put("/{alarm_id}/resolve")
 async def resolve_alarm(
-    alarm_id: int,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    alarm_id: int, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)
 ):
     """解决告警"""
     result = await db.execute(select(Alarm).where(Alarm.id == alarm_id))
@@ -162,14 +148,10 @@ async def resolve_alarm(
 
 @router.put("/batch-acknowledge")
 async def batch_acknowledge(
-    data: AlarmAcknowledge,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    data: AlarmAcknowledge, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)
 ):
     """批量确认告警"""
-    result = await db.execute(
-        select(Alarm).where(Alarm.id.in_(data.alarm_ids))
-    )
+    result = await db.execute(select(Alarm).where(Alarm.id.in_(data.alarm_ids)))
     alarms = result.scalars().all()
 
     for alarm in alarms:

@@ -8,20 +8,13 @@ This service implements all VPP calculation methods with:
 - Proper async/await patterns
 - Comprehensive docstrings
 """
-from typing import List, Dict, Optional
-from datetime import date, datetime
-from decimal import Decimal
+
+from typing import List, Dict
+from datetime import date
 import statistics
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func
-from app.models.vpp_data import (
-    ElectricityBill,
-    LoadCurve,
-    ElectricityPrice,
-    AdjustableLoad,
-    VPPConfig,
-    TimePeriodType
-)
+from sqlalchemy import select
+from app.models.vpp_data import ElectricityBill, LoadCurve, ElectricityPrice, AdjustableLoad, VPPConfig
 
 
 class VPPCalculator:
@@ -49,16 +42,14 @@ class VPPCalculator:
                 "data_source": {源数据字典}
             }
         """
-        result = await self.db.execute(
-            select(ElectricityBill).where(ElectricityBill.month == month)
-        )
+        result = await self.db.execute(select(ElectricityBill).where(ElectricityBill.month == month))
         bill = result.scalar_one_or_none()
         if not bill:
             return {
                 "value": 0,
                 "unit": "元/kWh",
                 "formula": "total_cost / total_consumption",
-                "data_source": {"error": "无数据", "month": month}
+                "data_source": {"error": "无数据", "month": month},
             }
 
         value = bill.total_cost / bill.total_consumption if bill.total_consumption > 0 else 0
@@ -66,11 +57,7 @@ class VPPCalculator:
             "value": round(value, 4),
             "unit": "元/kWh",
             "formula": "total_cost / total_consumption",
-            "data_source": {
-                "total_cost": bill.total_cost,
-                "total_consumption": bill.total_consumption,
-                "month": month
-            }
+            "data_source": {"total_cost": bill.total_cost, "total_consumption": bill.total_consumption, "month": month},
         }
 
     async def calc_fluctuation_rate(self, months: List[str]) -> Dict:
@@ -86,8 +73,7 @@ class VPPCalculator:
             波动率指标字典
         """
         result = await self.db.execute(
-            select(ElectricityBill.total_consumption)
-            .where(ElectricityBill.month.in_(months))
+            select(ElectricityBill.total_consumption).where(ElectricityBill.month.in_(months))
         )
         consumptions = [r[0] for r in result.fetchall()]
 
@@ -96,7 +82,7 @@ class VPPCalculator:
                 "value": 0,
                 "unit": "%",
                 "formula": "(max - min) / avg * 100",
-                "data_source": {"error": "数据不足", "months_count": len(consumptions)}
+                "data_source": {"error": "数据不足", "months_count": len(consumptions)},
             }
 
         max_val = max(consumptions)
@@ -113,8 +99,8 @@ class VPPCalculator:
                 "min_consumption": min_val,
                 "avg_consumption": round(avg_val, 2),
                 "months_count": len(consumptions),
-                "months": months
-            }
+                "months": months,
+            },
         }
 
     async def calc_peak_ratio(self, month: str) -> Dict:
@@ -129,16 +115,14 @@ class VPPCalculator:
         Returns:
             峰段占比指标字典
         """
-        result = await self.db.execute(
-            select(ElectricityBill).where(ElectricityBill.month == month)
-        )
+        result = await self.db.execute(select(ElectricityBill).where(ElectricityBill.month == month))
         bill = result.scalar_one_or_none()
         if not bill:
             return {
                 "value": 0,
                 "unit": "%",
                 "formula": "peak_consumption / total_consumption * 100",
-                "data_source": {"error": "无数据", "month": month}
+                "data_source": {"error": "无数据", "month": month},
             }
 
         ratio = bill.peak_consumption / bill.total_consumption * 100 if bill.total_consumption > 0 else 0
@@ -149,8 +133,8 @@ class VPPCalculator:
             "data_source": {
                 "peak_consumption": bill.peak_consumption,
                 "total_consumption": bill.total_consumption,
-                "month": month
-            }
+                "month": month,
+            },
         }
 
     async def calc_valley_ratio(self, month: str) -> Dict:
@@ -165,16 +149,14 @@ class VPPCalculator:
         Returns:
             谷段占比指标字典
         """
-        result = await self.db.execute(
-            select(ElectricityBill).where(ElectricityBill.month == month)
-        )
+        result = await self.db.execute(select(ElectricityBill).where(ElectricityBill.month == month))
         bill = result.scalar_one_or_none()
         if not bill:
             return {
                 "value": 0,
                 "unit": "%",
                 "formula": "valley_consumption / total_consumption * 100",
-                "data_source": {"error": "无数据", "month": month}
+                "data_source": {"error": "无数据", "month": month},
             }
 
         ratio = bill.valley_consumption / bill.total_consumption * 100 if bill.total_consumption > 0 else 0
@@ -185,8 +167,8 @@ class VPPCalculator:
             "data_source": {
                 "valley_consumption": bill.valley_consumption,
                 "total_consumption": bill.total_consumption,
-                "month": month
-            }
+                "month": month,
+            },
         }
 
     # ==================== B. 负荷特性指标 ====================
@@ -212,19 +194,14 @@ class VPPCalculator:
             负荷特性指标字典
         """
         result = await self.db.execute(
-            select(LoadCurve.load_value)
-            .where(LoadCurve.date >= start_date)
-            .where(LoadCurve.date <= end_date)
+            select(LoadCurve.load_value).where(LoadCurve.date >= start_date).where(LoadCurve.date <= end_date)
         )
         loads = [r[0] for r in result.fetchall() if r[0] is not None]
 
         if not loads:
             return {
                 "error": "无负荷数据",
-                "data_source": {
-                    "date_range": f"{start_date} to {end_date}",
-                    "data_points": 0
-                }
+                "data_source": {"date_range": f"{start_date} to {end_date}", "data_points": 0},
             }
 
         P_max = max(loads)
@@ -235,48 +212,38 @@ class VPPCalculator:
         load_std = statistics.stdev(loads) if len(loads) > 1 else 0
 
         return {
-            "P_max": {
-                "value": round(P_max, 2),
-                "unit": "kW",
-                "formula": "max(load_value)",
-                "description": "最大负荷"
-            },
+            "P_max": {"value": round(P_max, 2), "unit": "kW", "formula": "max(load_value)", "description": "最大负荷"},
             "P_avg": {
                 "value": round(P_avg, 2),
                 "unit": "kW",
                 "formula": "sum(load_value) / count(load_value)",
-                "description": "平均负荷"
+                "description": "平均负荷",
             },
-            "P_min": {
-                "value": round(P_min, 2),
-                "unit": "kW",
-                "formula": "min(load_value)",
-                "description": "最小负荷"
-            },
+            "P_min": {"value": round(P_min, 2), "unit": "kW", "formula": "min(load_value)", "description": "最小负荷"},
             "load_rate": {
                 "value": round(load_rate, 4),
                 "unit": "-",
                 "formula": "P_avg / P_max",
                 "description": "日负荷率",
-                "typical_range": "0.65-0.85"
+                "typical_range": "0.65-0.85",
             },
             "peak_valley_diff": {
                 "value": round(peak_valley_diff, 2),
                 "unit": "kW",
                 "formula": "P_max - P_min",
-                "description": "峰谷差"
+                "description": "峰谷差",
             },
             "load_std": {
                 "value": round(load_std, 2),
                 "unit": "kW",
                 "formula": "sqrt(sum((load - P_avg)^2) / n)",
-                "description": "负荷标准差"
+                "description": "负荷标准差",
             },
             "data_source": {
                 "table": "load_curves",
                 "date_range": f"{start_date} to {end_date}",
-                "data_points": len(loads)
-            }
+                "data_points": len(loads),
+            },
         }
 
     # ==================== C. 电费结构指标 ====================
@@ -299,15 +266,10 @@ class VPPCalculator:
         Returns:
             电费结构指标字典
         """
-        result = await self.db.execute(
-            select(ElectricityBill).where(ElectricityBill.month == month)
-        )
+        result = await self.db.execute(select(ElectricityBill).where(ElectricityBill.month == month))
         bill = result.scalar_one_or_none()
         if not bill:
-            return {
-                "error": "无电费数据",
-                "data_source": {"month": month}
-            }
+            return {"error": "无电费数据", "data_source": {"month": month}}
 
         total = bill.total_cost
         return {
@@ -315,36 +277,32 @@ class VPPCalculator:
                 "value": round(bill.market_purchase_fee / total * 100, 2) if total > 0 else 0,
                 "unit": "%",
                 "formula": "market_purchase_fee / total_cost * 100",
-                "typical_range": "65%-72%"
+                "typical_range": "65%-72%",
             },
             "transmission_ratio": {
                 "value": round(bill.transmission_fee / total * 100, 2) if total > 0 else 0,
                 "unit": "%",
                 "formula": "transmission_fee / total_cost * 100",
-                "typical_range": "22%-25%"
+                "typical_range": "22%-25%",
             },
             "basic_fee_ratio": {
                 "value": round(bill.basic_fee / total * 100, 2) if total > 0 else 0,
                 "unit": "%",
-                "formula": "basic_fee / total_cost * 100"
+                "formula": "basic_fee / total_cost * 100",
             },
             "system_operation_ratio": {
                 "value": round(bill.system_operation_fee / total * 100, 2) if total > 0 else 0,
                 "unit": "%",
                 "formula": "system_operation_fee / total_cost * 100",
-                "typical_range": "3%-5%"
+                "typical_range": "3%-5%",
             },
             "government_fund_ratio": {
                 "value": round(bill.government_fund / total * 100, 2) if total > 0 else 0,
                 "unit": "%",
                 "formula": "government_fund / total_cost * 100",
-                "typical_range": "3%-4%"
+                "typical_range": "3%-4%",
             },
-            "data_source": {
-                "table": "electricity_bills",
-                "month": month,
-                "total_cost": total
-            }
+            "data_source": {"table": "electricity_bills", "month": month, "total_cost": total},
         }
 
     # ==================== D. 峰谷转移潜力指标 ====================
@@ -363,15 +321,10 @@ class VPPCalculator:
             峰谷转移潜力指标字典
         """
         # D1. 获取可调节负荷
-        result = await self.db.execute(
-            select(AdjustableLoad).where(AdjustableLoad.is_active == True)
-        )
+        result = await self.db.execute(select(AdjustableLoad).where(AdjustableLoad.is_active == True))
         loads = result.scalars().all()
 
-        transferable_load = sum(
-            load.rated_power * load.adjustable_ratio / 100
-            for load in loads
-        )
+        transferable_load = sum(load.rated_power * load.adjustable_ratio / 100 for load in loads)
 
         # D2. 获取峰谷电价差
         price_result = await self.db.execute(select(ElectricityPrice))
@@ -382,9 +335,7 @@ class VPPCalculator:
         price_spread = peak_price - valley_price
 
         # 获取配置参数
-        config_result = await self.db.execute(
-            select(VPPConfig).where(VPPConfig.config_key == "daily_shift_hours")
-        )
+        config_result = await self.db.execute(select(VPPConfig).where(VPPConfig.config_key == "daily_shift_hours"))
         config = config_result.scalar_one_or_none()
         daily_shift_hours = config.config_value if config else 4  # 默认4小时
 
@@ -396,29 +347,21 @@ class VPPCalculator:
                 "value": round(transferable_load, 2),
                 "unit": "kW",
                 "formula": "sum(rated_power * adjustable_ratio / 100)",
-                "description": "可转移负荷量"
+                "description": "可转移负荷量",
             },
             "price_spread": {
                 "value": round(price_spread, 4),
                 "unit": "元/kWh",
                 "formula": "peak_price - valley_price",
-                "data_source": {
-                    "peak_price": peak_price,
-                    "valley_price": valley_price
-                }
+                "data_source": {"peak_price": peak_price, "valley_price": valley_price},
             },
             "annual_transfer_benefit": {
                 "value": round(annual_benefit, 2),
                 "unit": "元/年",
                 "formula": "transferable_load * daily_shift_hours * 365 * price_spread",
-                "parameters": {
-                    "daily_shift_hours": daily_shift_hours
-                }
+                "parameters": {"daily_shift_hours": daily_shift_hours},
             },
-            "data_source": {
-                "adjustable_loads_count": len(loads),
-                "price_table": "electricity_prices"
-            }
+            "data_source": {"adjustable_loads_count": len(loads), "price_table": "electricity_prices"},
         }
 
     # ==================== E. 需量优化指标 ====================
@@ -456,20 +399,20 @@ class VPPCalculator:
                 "value": round(peak_reduction, 2),
                 "unit": "kW",
                 "formula": "P_max - target_demand",
-                "description": "削峰空间"
+                "description": "削峰空间",
             },
             "demand_optimization_benefit": {
                 "value": round(annual_benefit, 2),
                 "unit": "元/年",
                 "formula": "peak_reduction * demand_price * 12",
-                "description": "需量优化年收益"
+                "description": "需量优化年收益",
             },
             "parameters": {
                 "P_max": P_max,
                 "target_demand": round(target_demand, 2),
                 "target_ratio": target_ratio,
-                "demand_price": demand_price
-            }
+                "demand_price": demand_price,
+            },
         }
 
     # ==================== F. 虚拟电厂收益指标 ====================
@@ -521,32 +464,26 @@ class VPPCalculator:
                 "parameters": {
                     "adjustable_capacity": adjustable_capacity,
                     "response_count": response_count,
-                    "response_price": response_price
-                }
+                    "response_price": response_price,
+                },
             },
             "ancillary_service_revenue": {
                 "value": round(ancillary_service_revenue, 2),
                 "unit": "元/年",
                 "formula": "adjustable_capacity * service_hours * service_price",
-                "parameters": {
-                    "service_hours": service_hours,
-                    "service_price": service_price
-                }
+                "parameters": {"service_hours": service_hours, "service_price": service_price},
             },
             "spot_arbitrage_revenue": {
                 "value": round(spot_arbitrage_revenue, 2),
                 "unit": "元/年",
                 "formula": "adjustable_capacity * arbitrage_hours * price_spread_spot",
-                "parameters": {
-                    "arbitrage_hours": arbitrage_hours,
-                    "price_spread_spot": price_spread_spot
-                }
+                "parameters": {"arbitrage_hours": arbitrage_hours, "price_spread_spot": price_spread_spot},
             },
             "total_vpp_revenue": {
                 "value": round(total_vpp_revenue, 2),
                 "unit": "元/年",
-                "formula": "demand_response + ancillary_service + spot_arbitrage"
-            }
+                "formula": "demand_response + ancillary_service + spot_arbitrage",
+            },
         }
 
     # ==================== G. 投资回报指标 ====================
@@ -569,10 +506,11 @@ class VPPCalculator:
             投资回报指标字典
         """
         config_result = await self.db.execute(
-            select(VPPConfig).where(VPPConfig.config_key.in_([
-                "monitoring_system_cost", "control_system_cost",
-                "platform_cost", "other_cost"
-            ]))
+            select(VPPConfig).where(
+                VPPConfig.config_key.in_(
+                    ["monitoring_system_cost", "control_system_cost", "platform_cost", "other_cost"]
+                )
+            )
         )
         configs = {c.config_key: c.config_value for c in config_result.scalars().all()}
 
@@ -582,7 +520,7 @@ class VPPCalculator:
         other_cost = configs.get("other_cost", 100000)
 
         total_investment = monitoring_cost + control_cost + platform_cost + other_cost
-        payback_period = total_investment / annual_benefit if annual_benefit > 0 else float('inf')
+        payback_period = total_investment / annual_benefit if annual_benefit > 0 else float("inf")
         roi = annual_benefit / total_investment * 100 if total_investment > 0 else 0
 
         return {
@@ -594,33 +532,21 @@ class VPPCalculator:
                     "monitoring_system": monitoring_cost,
                     "control_system": control_cost,
                     "platform": platform_cost,
-                    "other": other_cost
-                }
+                    "other": other_cost,
+                },
             },
-            "annual_total_benefit": {
-                "value": round(annual_benefit, 2),
-                "unit": "元/年"
-            },
+            "annual_total_benefit": {"value": round(annual_benefit, 2), "unit": "元/年"},
             "payback_period": {
-                "value": round(payback_period, 2) if payback_period != float('inf') else 0,
+                "value": round(payback_period, 2) if payback_period != float("inf") else 0,
                 "unit": "年",
-                "formula": "total_investment / annual_benefit"
+                "formula": "total_investment / annual_benefit",
             },
-            "roi": {
-                "value": round(roi, 2),
-                "unit": "%",
-                "formula": "annual_benefit / total_investment * 100"
-            }
+            "roi": {"value": round(roi, 2), "unit": "%", "formula": "annual_benefit / total_investment * 100"},
         }
 
     # ==================== H. 综合分析报告 ====================
 
-    async def generate_full_analysis(
-        self,
-        months: List[str],
-        start_date: date,
-        end_date: date
-    ) -> Dict:
+    async def generate_full_analysis(self, months: List[str], start_date: date, end_date: date) -> Dict:
         """生成完整的VPP方案分析报告
 
         汇总所有指标及其数据来源和计算公式
@@ -660,15 +586,12 @@ class VPPCalculator:
         cost_structure = await self.calc_cost_structure(months[-1]) if months else {}
 
         return {
-            "analysis_period": {
-                "months": months,
-                "load_data_range": f"{start_date} to {end_date}"
-            },
+            "analysis_period": {"months": months, "load_data_range": f"{start_date} to {end_date}"},
             "electricity_usage": {
                 "average_price": await self.calc_average_price(months[-1]) if months else {},
                 "fluctuation_rate": await self.calc_fluctuation_rate(months),
                 "peak_ratio": await self.calc_peak_ratio(months[-1]) if months else {},
-                "valley_ratio": await self.calc_valley_ratio(months[-1]) if months else {}
+                "valley_ratio": await self.calc_valley_ratio(months[-1]) if months else {},
             },
             "load_characteristics": load_metrics,
             "cost_structure": cost_structure,
@@ -684,10 +607,10 @@ class VPPCalculator:
                     "breakdown": {
                         "峰谷转移收益": annual_transfer_benefit,
                         "需量优化收益": demand_benefit,
-                        "VPP参与收益": total_vpp
-                    }
+                        "VPP参与收益": total_vpp,
+                    },
                 },
                 "payback_period": roi.get("payback_period"),
-                "roi": roi.get("roi")
-            }
+                "roi": roi.get("roi"),
+            },
         }

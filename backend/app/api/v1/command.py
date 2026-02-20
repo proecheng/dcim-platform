@@ -2,6 +2,7 @@
 控制命令分级确认 API
 Story 9-6: 控制命令分级确认
 """
+
 import logging
 from typing import Optional
 
@@ -13,10 +14,12 @@ from ..deps import get_db, require_operator, require_admin, require_viewer
 from ...models.user import User
 from ...models.command import CommandApproval, CommandAuditLog
 from ...schemas.command import (
-    CommandSubmitRequest, CommandSubmitResponse,
-    CommandApprovalResponse, ApprovalRejectRequest,
+    CommandSubmitRequest,
+    CommandSubmitResponse,
+    CommandApprovalResponse,
+    ApprovalRejectRequest,
     CommandAuditLogResponse,
-    RiskConfigItem, RiskConfigUpdateRequest,
+    RiskConfigUpdateRequest,
 )
 from ...services import command_service
 
@@ -26,6 +29,7 @@ router = APIRouter()
 
 
 # ==================== 命令提交 ====================
+
 
 @router.post("/submit", response_model=CommandSubmitResponse, summary="提交控制命令")
 async def submit_command(
@@ -51,6 +55,7 @@ async def submit_command(
 
 
 # ==================== 审批管理 ====================
+
 
 @router.get("/approvals", summary="审批工单列表")
 async def list_approvals(
@@ -100,9 +105,7 @@ async def get_approval(
     _: User = Depends(require_viewer),
 ):
     """获取审批工单详情"""
-    result = await db.execute(
-        select(CommandApproval).where(CommandApproval.id == approval_id)
-    )
+    result = await db.execute(select(CommandApproval).where(CommandApproval.id == approval_id))
     approval = result.scalar_one_or_none()
     if not approval:
         raise HTTPException(status_code=404, detail="审批工单不存在")
@@ -157,6 +160,7 @@ async def reject(
 
 # ==================== 审计日志 ====================
 
+
 @router.get("/audit-logs", summary="审计日志列表")
 async def list_audit_logs(
     command_type: Optional[str] = Query(None, description="命令类型筛选"),
@@ -200,6 +204,7 @@ async def list_audit_logs(
 
 
 # ==================== 风险配置 ====================
+
 
 @router.get("/risk-configs", summary="获取风险等级配置")
 async def get_risk_configs(

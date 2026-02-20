@@ -2,7 +2,8 @@
 节能方案 API 端点
 提供方案生成、查询、接受、执行和监控功能
 """
-from fastapi import APIRouter, Depends, HTTPException, status
+
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
@@ -36,6 +37,7 @@ router = APIRouter(prefix="/proposals", tags=["节能方案"])
 
 # ==================== 0. 获取模板列表 ====================
 
+
 @router.get("/templates", summary="获取模板列表")
 async def get_templates():
     """
@@ -52,32 +54,26 @@ async def get_templates():
     category_map = {"A1": "peak_valley", "A2": "demand", "A3": "device", "A4": "vpp", "A5": "device", "B1": "device"}
 
     for template_id, config in TemplateGenerator.TEMPLATE_CONFIGS.items():
-        templates.append({
-            "id": template_id,
-            "name": config["name"],
-            "type": config["type"],
-            "description": config["description"],
-            "category": category_map.get(template_id, "other"),
-            "priority": priority_map.get(template_id, "medium"),
-            "is_enabled": True
-        })
+        templates.append(
+            {
+                "id": template_id,
+                "name": config["name"],
+                "type": config["type"],
+                "description": config["description"],
+                "category": category_map.get(template_id, "other"),
+                "priority": priority_map.get(template_id, "medium"),
+                "is_enabled": True,
+            }
+        )
 
-    return {
-        "code": 0,
-        "message": "success",
-        "data": {
-            "total": len(templates),
-            "templates": templates
-        }
-    }
+    return {"code": 0, "message": "success", "data": {"total": len(templates), "templates": templates}}
 
 
 # ==================== 0.1 批量分析生成方案 ====================
 
+
 @router.post("/analyze", summary="智能分析并生成方案")
-async def analyze_and_generate(
-    db: AsyncSession = Depends(get_db)
-):
+async def analyze_and_generate(db: AsyncSession = Depends(get_db)):
     """
     智能分析并批量生成节能方案
 
@@ -91,8 +87,7 @@ async def analyze_and_generate(
         try:
             # 检查是否已存在相同模板的待处理方案
             query = select(EnergySavingProposal).where(
-                EnergySavingProposal.template_id == template_id,
-                EnergySavingProposal.status == "pending"
+                EnergySavingProposal.template_id == template_id, EnergySavingProposal.status == "pending"
             )
             result = await db.execute(query)
             existing = result.scalar_one_or_none()
@@ -110,20 +105,15 @@ async def analyze_and_generate(
     return {
         "code": 0,
         "message": "success",
-        "data": {
-            "new_suggestions": len(new_proposals),
-            "total": len(new_proposals)
-        }
+        "data": {"new_suggestions": len(new_proposals), "total": len(new_proposals)},
     }
 
 
 # ==================== 0.2 兼容旧前端的建议格式API ====================
 
+
 @router.get("/as-suggestions", summary="获取方案列表（建议格式）")
-async def get_proposals_as_suggestions(
-    status: Optional[str] = None,
-    db: AsyncSession = Depends(get_db)
-):
+async def get_proposals_as_suggestions(status: Optional[str] = None, db: AsyncSession = Depends(get_db)):
     """
     将方案转换为前端期望的建议格式
 
@@ -148,11 +138,17 @@ async def get_proposals_as_suggestions(
             "id": proposal.id,
             "rule_id": proposal.template_id,
             "rule_name": proposal.template_name,
-            "suggestion": f"预计年度收益: {proposal.total_benefit:.2f}万元" if proposal.total_benefit else "点击查看详情",
+            "suggestion": f"预计年度收益: {proposal.total_benefit:.2f}万元"
+            if proposal.total_benefit
+            else "点击查看详情",
             "priority": priority_map.get(proposal.template_id, "medium"),
             "status": proposal.status or "pending",
-            "potential_saving": float(proposal.total_benefit * 10000 / 12) if proposal.total_benefit else 0,  # 换算为kWh/月
-            "potential_cost_saving": float(proposal.total_benefit * 10000 / 12) if proposal.total_benefit else 0,  # 元/月
+            "potential_saving": float(proposal.total_benefit * 10000 / 12)
+            if proposal.total_benefit
+            else 0,  # 换算为kWh/月
+            "potential_cost_saving": float(proposal.total_benefit * 10000 / 12)
+            if proposal.total_benefit
+            else 0,  # 元/月
             "created_at": proposal.created_at.isoformat() if proposal.created_at else None,
             "updated_at": proposal.updated_at.isoformat() if proposal.updated_at else None,
             "completed_at": None,
@@ -160,23 +156,18 @@ async def get_proposals_as_suggestions(
             "remark": None,
             # 额外字段供详情查看
             "proposal_code": proposal.proposal_code,
-            "measures_count": len(proposal.measures) if proposal.measures else 0
+            "measures_count": len(proposal.measures) if proposal.measures else 0,
         }
         suggestions.append(suggestion)
 
-    return {
-        "code": 0,
-        "message": "success",
-        "data": suggestions
-    }
+    return {"code": 0, "message": "success", "data": suggestions}
 
 
 # ==================== 0.3 获取节能潜力统计 ====================
 
+
 @router.get("/saving-potential", summary="获取节能潜力统计")
-async def get_saving_potential(
-    db: AsyncSession = Depends(get_db)
-):
+async def get_saving_potential(db: AsyncSession = Depends(get_db)):
     """
     获取节能潜力统计数据
 
@@ -212,18 +203,16 @@ async def get_saving_potential(
             "high_priority_count": high_count,
             "medium_priority_count": medium_count,
             "low_priority_count": low_count,
-            "actual_saving_ytd": 0  # 年度实际节能，需要从执行日志统计
-        }
+            "actual_saving_ytd": 0,  # 年度实际节能，需要从执行日志统计
+        },
     }
 
 
 # ==================== 1. 生成方案 ====================
 
+
 @router.post("/generate", response_model=ProposalResponse, summary="生成节能方案")
-async def generate_proposal(
-    request: ProposalCreate,
-    db: AsyncSession = Depends(get_db)
-):
+async def generate_proposal(request: ProposalCreate, db: AsyncSession = Depends(get_db)):
     """
     根据模板ID生成节能方案
 
@@ -234,10 +223,7 @@ async def generate_proposal(
     """
     try:
         generator = TemplateGenerator(db)
-        proposal = generator.generate_proposal(
-            request.template_id,
-            request.analysis_days
-        )
+        proposal = generator.generate_proposal(request.template_id, request.analysis_days)
 
         # 保存到数据库
         db.add(proposal)
@@ -254,11 +240,9 @@ async def generate_proposal(
 
 # ==================== 1.1 ML 增强方案生成 (专利 S2) ====================
 
+
 @router.post("/generate-ml-enhanced", response_model=ProposalResponse, summary="ML增强方案生成")
-async def generate_ml_enhanced_proposal(
-    request: MLProposalCreate,
-    db: AsyncSession = Depends(get_db)
-):
+async def generate_ml_enhanced_proposal(request: MLProposalCreate, db: AsyncSession = Depends(get_db)):
     """
     使用深度学习增强的方案生成 (专利 S2)
 
@@ -286,15 +270,13 @@ async def generate_ml_enhanced_proposal(
                     "power": data.power,
                     "period_types": data.period_types,
                     "is_weekday": data.is_weekday,
-                    "temperature": data.temperature
+                    "temperature": data.temperature,
                 }
                 for device_id, data in request.device_power_data.items()
             }
 
         proposal = generator.generate_ml_enhanced_proposal(
-            template_id=request.template_id,
-            analysis_days=request.analysis_days,
-            device_power_data=device_data
+            template_id=request.template_id, analysis_days=request.analysis_days, device_power_data=device_data
         )
 
         # 保存到数据库
@@ -312,11 +294,9 @@ async def generate_ml_enhanced_proposal(
 
 # ==================== 1.2 获取 ML 分析详情 ====================
 
+
 @router.get("/{proposal_id}/ml-analysis", response_model=MLAnalysisResponse, summary="获取ML分析详情")
-async def get_ml_analysis(
-    proposal_id: int,
-    db: AsyncSession = Depends(get_db)
-):
+async def get_ml_analysis(proposal_id: int, db: AsyncSession = Depends(get_db)):
     """
     获取方案的 ML 分析详情
 
@@ -349,18 +329,16 @@ async def get_ml_analysis(
         transformer_analysis=trace_summary.get("transformer_analysis"),
         gnn_analysis=trace_summary.get("gnn_analysis"),
         rl_adjustment=trace_summary.get("rl_adjustment"),
-        trace_summary=trace_summary
+        trace_summary=trace_summary,
     )
 
 
 # ==================== 2. 获取方案详情 ====================
 
+
 # 注意: enhanced 路由必须在 {proposal_id} 之前定义，否则 FastAPI 会把 "enhanced" 当成 proposal_id
 @router.get("/{proposal_id}/enhanced", summary="获取方案增强详情（包含电价和设备数据）")
-async def get_proposal_enhanced(
-    proposal_id: int,
-    db: AsyncSession = Depends(get_db)
-):
+async def get_proposal_enhanced(proposal_id: int, db: AsyncSession = Depends(get_db)):
     """
     获取方案详情并附加实时电价和设备数据
     用于前端详情抽屉展示
@@ -369,8 +347,11 @@ async def get_proposal_enhanced(
     from app.services.device_regulation_service import DeviceRegulationService
 
     # 获取方案基础信息
-    query = select(EnergySavingProposal).options(selectinload(EnergySavingProposal.measures))\
+    query = (
+        select(EnergySavingProposal)
+        .options(selectinload(EnergySavingProposal.measures))
         .where(EnergySavingProposal.id == proposal_id)
+    )
     result = await db.execute(query)
     proposal = result.scalar_one_or_none()
 
@@ -402,13 +383,15 @@ async def get_proposal_enhanced(
         "problem_description": f"方案编号: {proposal.proposal_code}\n方案类型: {'峰谷优化' if proposal.proposal_type == 'A' else '其他优化'}",
         "analysis_detail": None,  # 可根据 current_situation 生成
         "implementation_steps": [
-            {"step": i+1, "description": m.regulation_description or m.regulation_object, "duration": None}
+            {"step": i + 1, "description": m.regulation_description or m.regulation_object, "duration": None}
             for i, m in enumerate(proposal.measures or [])
-        ] if proposal.measures else [],
+        ]
+        if proposal.measures
+        else [],
         "expected_effect": {
             "description": f"年度收益: {proposal.total_benefit}万元" if proposal.total_benefit else "",
             "saving_kwh": float(proposal.total_benefit or 0) * 10000 / 0.6,  # 假设电价0.6元/kWh
-            "saving_cost": float(proposal.total_benefit or 0) * 10000
+            "saving_cost": float(proposal.total_benefit or 0) * 10000,
         },
         "priority": priority_map.get(proposal.template_id, "medium"),
         "difficulty": None,
@@ -416,7 +399,6 @@ async def get_proposal_enhanced(
         "potential_cost_saving": float(proposal.total_benefit or 0) * 10000 / 12,  # 月度节省
         "status": proposal.status or "pending",
         "created_at": proposal.created_at.isoformat() if proposal.created_at else None,
-
         # 参数字段 - 包含可调整参数、设备列表、计算公式等
         "parameters": {
             "pricing_source": "electricity_pricing表",
@@ -426,7 +408,6 @@ async def get_proposal_enhanced(
             "valley_price": prices.get("valley_price", 0),
             "price_diff": prices.get("sharp_price", 0) - prices.get("valley_price", 0),
             "total_shiftable_power": total_shiftable_power,
-
             # 可调整参数
             "adjustable_params": [
                 {
@@ -437,24 +418,23 @@ async def get_proposal_enhanced(
                     "min": 0.5,
                     "max": 8,
                     "step": 0.5,
-                    "unit": "小时"
+                    "unit": "小时",
                 },
                 {
                     "key": "source_period",
                     "name": "转出时段",
                     "type": "period_select",
                     "current_value": "sharp",
-                    "options": [p for p in time_periods if p["type"] in ["sharp", "peak"]]
+                    "options": [p for p in time_periods if p["type"] in ["sharp", "peak"]],
                 },
                 {
                     "key": "target_period",
                     "name": "转入时段",
                     "type": "period_select",
                     "current_value": "valley",
-                    "options": [p for p in time_periods if p["type"] in ["valley", "deep_valley", "normal"]]
-                }
+                    "options": [p for p in time_periods if p["type"] in ["valley", "deep_valley", "normal"]],
+                },
             ],
-
             # 设备列表
             "devices": [
                 {
@@ -468,54 +448,43 @@ async def get_proposal_enhanced(
                     "constraints": {
                         "allowed_hours": d.get("allowed_shift_hours", []),
                         "forbidden_hours": d.get("forbidden_shift_hours", []),
-                        "min_runtime": d.get("min_continuous_runtime")
-                    }
+                        "min_runtime": d.get("min_continuous_runtime"),
+                    },
                 }
                 for d in shiftable_devices_data[:5]  # 取前5个设备
             ],
-
             # 计算公式
             "calculation_formula": {
                 "formula": "日收益 = 转移功率 × 转移时长 × (转出电价 - 转入电价)",
                 "variables_from_db": {
                     "尖峰电价": f"{prices.get('sharp_price', 0)} 元/kWh（来自系统设置-电价配置）",
                     "低谷电价": f"{prices.get('valley_price', 0)} 元/kWh（来自系统设置-电价配置）",
-                    "峰谷价差": f"{prices.get('sharp_price', 0) - prices.get('valley_price', 0)} 元/kWh"
+                    "峰谷价差": f"{prices.get('sharp_price', 0) - prices.get('valley_price', 0)} 元/kWh",
                 },
                 "steps": [
                     {"step": 1, "desc": "日转移电量 = 转移功率 × 转移时长"},
                     {"step": 2, "desc": "价差 = 转出电价 - 转入电价"},
                     {"step": 3, "desc": "日收益 = 日转移电量 × 价差"},
-                    {"step": 4, "desc": "年收益 = 日收益 × 工作日数"}
-                ]
-            }
+                    {"step": 4, "desc": "年收益 = 日收益 × 工作日数"},
+                ],
+            },
         },
-
         # 实时数据
         "current_pricing": pricing,
         "time_periods": time_periods,
         "shiftable_devices": shiftable_devices_data,
-        "data_sources": {
-            "pricing": "electricity_pricing表",
-            "devices": "device_shift_configs表"
-        }
+        "data_sources": {"pricing": "electricity_pricing表", "devices": "device_shift_configs表"},
     }
 
-    return {
-        "code": 0,
-        "message": "success",
-        "data": enhanced_data
-    }
+    return {"code": 0, "message": "success", "data": enhanced_data}
 
 
 # ==================== RL 模型管理 (全局端点，无 proposal_id) ====================
 # 重要：这些路由必须定义在 /{proposal_id} 路由之前，否则会被参数路由拦截
 
+
 @router.post("/rl/train", response_model=RLTrainingResponse, summary="执行RL在线训练")
-async def rl_train_step(
-    request: RLTrainingRequest,
-    db: AsyncSession = Depends(get_db)
-):
+async def rl_train_step(request: RLTrainingRequest, db: AsyncSession = Depends(get_db)):
     """
     执行一步在线训练
 
@@ -539,7 +508,7 @@ async def rl_train_step(
         comfort_violation=request.comfort_violation,
         safety_violation=request.safety_violation,
         current_state=current_state,
-        proposal_id=request.proposal_id
+        proposal_id=request.proposal_id,
     )
 
     if not result.get("success"):
@@ -558,9 +527,7 @@ async def rl_train_step(
 
 
 @router.get("/rl/model-info", response_model=RLModelInfoResponse, summary="获取RL模型信息")
-async def get_rl_model_info(
-    db: AsyncSession = Depends(get_db)
-):
+async def get_rl_model_info(db: AsyncSession = Depends(get_db)):
     """
     获取 RL 模型信息
 
@@ -575,10 +542,7 @@ async def get_rl_model_info(
 
 
 @router.put("/rl/exploration-rate", summary="更新探索率")
-async def update_exploration_rate(
-    request: RLExplorationRateUpdateRequest,
-    db: AsyncSession = Depends(get_db)
-):
+async def update_exploration_rate(request: RLExplorationRateUpdateRequest, db: AsyncSession = Depends(get_db)):
     """
     手动更新 RL 探索率 (S5f)
 
@@ -588,24 +552,17 @@ async def update_exploration_rate(
 
     optimization_service = AdaptiveOptimizationService(db)
     result = optimization_service.update_exploration_rate(
-        exploration_rate=request.exploration_rate,
-        phase=request.phase
+        exploration_rate=request.exploration_rate, phase=request.phase
     )
 
     if not result.get("success"):
         raise HTTPException(status_code=500, detail=result.get("error", "更新失败"))
 
-    return {
-        "code": 0,
-        "message": "探索率已更新",
-        "data": result
-    }
+    return {"code": 0, "message": "探索率已更新", "data": result}
 
 
 @router.post("/rl/save-checkpoint", summary="保存模型检查点")
-async def save_rl_checkpoint(
-    db: AsyncSession = Depends(get_db)
-):
+async def save_rl_checkpoint(db: AsyncSession = Depends(get_db)):
     """
     保存 RL 模型检查点
 
@@ -619,20 +576,14 @@ async def save_rl_checkpoint(
     if not result.get("success"):
         raise HTTPException(status_code=500, detail=result.get("error", "保存失败"))
 
-    return {
-        "code": 0,
-        "message": "检查点已保存",
-        "data": result
-    }
+    return {"code": 0, "message": "检查点已保存", "data": result}
 
 
 # ==================== 2. 获取方案详情 ====================
 
+
 @router.get("/{proposal_id}", response_model=ProposalResponse, summary="获取方案详情")
-async def get_proposal(
-    proposal_id: int,
-    db: AsyncSession = Depends(get_db)
-):
+async def get_proposal(proposal_id: int, db: AsyncSession = Depends(get_db)):
     """获取指定方案的详细信息"""
     query = select(EnergySavingProposal).where(EnergySavingProposal.id == proposal_id)
     result = await db.execute(query)
@@ -646,13 +597,14 @@ async def get_proposal(
 
 # ==================== 3. 获取方案列表 ====================
 
+
 @router.get("", summary="获取方案列表")
 async def get_proposals(
     template_id: Optional[str] = None,
     status: Optional[str] = None,
     skip: int = 0,
     limit: int = 100,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
 ):
     """
     获取方案列表，支持过滤和分页
@@ -681,19 +633,16 @@ async def get_proposals(
             "items": [ProposalResponse.model_validate(p) for p in proposals],
             "total": len(proposals),
             "skip": skip,
-            "limit": limit
-        }
+            "limit": limit,
+        },
     }
 
 
 # ==================== 4. 接受方案（选择措施）====================
 
+
 @router.post("/{proposal_id}/accept", response_model=ProposalResponse, summary="接受方案")
-async def accept_proposal(
-    proposal_id: int,
-    request: MeasureAcceptRequest,
-    db: AsyncSession = Depends(get_db)
-):
+async def accept_proposal(proposal_id: int, request: MeasureAcceptRequest, db: AsyncSession = Depends(get_db)):
     """
     接受方案并选择要实施的措施
 
@@ -701,8 +650,10 @@ async def accept_proposal(
 
     会更新措施的 is_selected 状态，并将方案状态改为 accepted
     """
-    query = select(EnergySavingProposal).options(selectinload(EnergySavingProposal.measures)).where(
-        EnergySavingProposal.id == proposal_id
+    query = (
+        select(EnergySavingProposal)
+        .options(selectinload(EnergySavingProposal.measures))
+        .where(EnergySavingProposal.id == proposal_id)
     )
     result = await db.execute(query)
     proposal = result.scalar_one_or_none()
@@ -718,9 +669,7 @@ async def accept_proposal(
     proposal.status = "accepted"
 
     # 重新计算总收益（仅计算选中的措施）
-    proposal.total_benefit = sum(
-        m.annual_benefit for m in proposal.measures if m.is_selected
-    )
+    proposal.total_benefit = sum(m.annual_benefit for m in proposal.measures if m.is_selected)
 
     await db.commit()
     await db.refresh(proposal)
@@ -730,11 +679,9 @@ async def accept_proposal(
 
 # ==================== 5. 执行方案 ====================
 
+
 @router.post("/{proposal_id}/execute", summary="执行方案")
-async def execute_proposal(
-    proposal_id: int,
-    db: AsyncSession = Depends(get_db)
-):
+async def execute_proposal(proposal_id: int, db: AsyncSession = Depends(get_db)):
     """
     执行已接受的方案（启动自动控制）
 
@@ -765,8 +712,8 @@ async def execute_proposal(
                 "success_count": result["success_count"],
                 "monitoring_started": result.get("monitoring_started", False),
                 "baselines_captured": result.get("baselines_captured", 0),
-                "results": result["results"]
-            }
+                "results": result["results"],
+            },
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"执行方案失败: {str(e)}")
@@ -774,11 +721,9 @@ async def execute_proposal(
 
 # ==================== 5.1 获取执行摘要 ====================
 
+
 @router.get("/{proposal_id}/execution-summary", summary="获取执行摘要")
-async def get_execution_summary(
-    proposal_id: int,
-    db: AsyncSession = Depends(get_db)
-):
+async def get_execution_summary(proposal_id: int, db: AsyncSession = Depends(get_db)):
     """
     获取方案执行的摘要统计
 
@@ -795,20 +740,14 @@ async def get_execution_summary(
         raise HTTPException(status_code=404, detail="方案不存在")
 
     # 统一响应格式
-    return {
-        "code": 0,
-        "message": "success",
-        "data": summary
-    }
+    return {"code": 0, "message": "success", "data": summary}
 
 
 # ==================== 6. 获取方案监控数据 ====================
 
+
 @router.get("/{proposal_id}/monitoring", response_model=ProposalMonitoringResponse, summary="获取监控数据")
-async def get_proposal_monitoring(
-    proposal_id: int,
-    db: AsyncSession = Depends(get_db)
-):
+async def get_proposal_monitoring(proposal_id: int, db: AsyncSession = Depends(get_db)):
     """
     获取方案执行的监控数据
 
@@ -817,8 +756,10 @@ async def get_proposal_monitoring(
     - 实际收益 vs 预期收益
     - 最新执行日志
     """
-    query = select(EnergySavingProposal).options(selectinload(EnergySavingProposal.measures)).where(
-        EnergySavingProposal.id == proposal_id
+    query = (
+        select(EnergySavingProposal)
+        .options(selectinload(EnergySavingProposal.measures))
+        .where(EnergySavingProposal.id == proposal_id)
     )
     result = await db.execute(query)
     proposal = result.scalar_one_or_none()
@@ -835,9 +776,7 @@ async def get_proposal_monitoring(
             continue
 
         # 统计执行日志
-        logs_query = select(MeasureExecutionLog).where(
-            MeasureExecutionLog.measure_id == measure.id
-        )
+        logs_query = select(MeasureExecutionLog).where(MeasureExecutionLog.measure_id == measure.id)
         logs_result = await db.execute(logs_query)
         logs = logs_result.scalars().all()
 
@@ -862,7 +801,7 @@ async def get_proposal_monitoring(
             actual_benefit=actual_benefit,
             execution_count=execution_count,
             success_count=success_count,
-            latest_execution=latest_execution
+            latest_execution=latest_execution,
         )
         measure_monitorings.append(measure_monitoring)
 
@@ -872,17 +811,15 @@ async def get_proposal_monitoring(
         template_name=proposal.template_name,
         total_expected_benefit=proposal.total_benefit,
         total_actual_benefit=total_actual_benefit,
-        measures=measure_monitorings
+        measures=measure_monitorings,
     )
 
 
 # ==================== 7. 删除方案 ====================
 
+
 @router.delete("/{proposal_id}", summary="删除方案")
-async def delete_proposal(
-    proposal_id: int,
-    db: AsyncSession = Depends(get_db)
-):
+async def delete_proposal(proposal_id: int, db: AsyncSession = Depends(get_db)):
     """删除指定方案"""
     query = select(EnergySavingProposal).where(EnergySavingProposal.id == proposal_id)
     result = await db.execute(query)
@@ -895,21 +832,15 @@ async def delete_proposal(
     await db.commit()
 
     # 统一响应格式
-    return {
-        "code": 0,
-        "message": "方案已删除",
-        "data": {"proposal_id": proposal_id}
-    }
+    return {"code": 0, "message": "方案已删除", "data": {"proposal_id": proposal_id}}
 
 
 # ==================== 8. 措施详情增强 (专利 S3) ====================
 
+
 @router.get("/{proposal_id}/measures/{measure_id}/detail", summary="获取措施详情（含ML和追溯）")
 async def get_measure_detail(
-    proposal_id: int,
-    measure_id: int,
-    include_trace: bool = True,
-    db: AsyncSession = Depends(get_db)
+    proposal_id: int, measure_id: int, include_trace: bool = True, db: AsyncSession = Depends(get_db)
 ):
     """
     获取措施详情，包含 ML 预测置信度和数据追溯链
@@ -924,10 +855,7 @@ async def get_measure_detail(
     from app.models.trace import TraceRecord
 
     # 查询措施
-    query = select(ProposalMeasure).where(
-        ProposalMeasure.id == measure_id,
-        ProposalMeasure.proposal_id == proposal_id
-    )
+    query = select(ProposalMeasure).where(ProposalMeasure.id == measure_id, ProposalMeasure.proposal_id == proposal_id)
     result = await db.execute(query)
     measure = result.scalar_one_or_none()
 
@@ -955,8 +883,7 @@ async def get_measure_detail(
 
     # 查询 ML 预测信息
     ml_query = select(TraceRecord).where(
-        TraceRecord.measure_id == measure_id,
-        TraceRecord.mapping_type == "ml_prediction"
+        TraceRecord.measure_id == measure_id, TraceRecord.mapping_type == "ml_prediction"
     )
     ml_result = await db.execute(ml_query)
     ml_traces = ml_result.scalars().all()
@@ -973,15 +900,15 @@ async def get_measure_detail(
                 "value": float(best_trace.raw_value) if best_trace.raw_value else None,
                 "unit": best_trace.value_unit,
                 "input_features": best_trace.ml_input_features,
-                "output_raw": best_trace.ml_output_raw
-            }
+                "output_raw": best_trace.ml_output_raw,
+            },
         }
     else:
         detail["ml_prediction"] = {
             "has_ml_prediction": False,
             "model_type": None,
             "confidence": None,
-            "prediction_details": None
+            "prediction_details": None,
         }
 
     # 查询追溯信息
@@ -998,28 +925,21 @@ async def get_measure_detail(
                     "mapping_type": t.mapping_type,
                     "value": float(t.raw_value) if t.raw_value else None,
                     "unit": t.value_unit,
-                    "formula_display": t.formula_display
+                    "formula_display": t.formula_display,
                 }
                 for t in traces[:5]  # 只返回前5个关键追溯
-            ]
+            ],
         }
 
-    return {
-        "code": 0,
-        "message": "success",
-        "data": detail
-    }
+    return {"code": 0, "message": "success", "data": detail}
 
 
 # ==================== 9. 措施状态更新 (专利 S3) ====================
 
+
 @router.patch("/{proposal_id}/measures/{measure_id}/status", summary="更新措施状态")
 async def update_measure_status(
-    proposal_id: int,
-    measure_id: int,
-    status: str,
-    reason: Optional[str] = None,
-    db: AsyncSession = Depends(get_db)
+    proposal_id: int, measure_id: int, status: str, reason: Optional[str] = None, db: AsyncSession = Depends(get_db)
 ):
     """
     更新单个措施的选择状态
@@ -1031,16 +951,10 @@ async def update_measure_status(
     """
     valid_statuses = ["accepted", "rejected", "deferred", "pending"]
     if status not in valid_statuses:
-        raise HTTPException(
-            status_code=400,
-            detail=f"无效状态，可选值: {valid_statuses}"
-        )
+        raise HTTPException(status_code=400, detail=f"无效状态，可选值: {valid_statuses}")
 
     # 查询措施
-    query = select(ProposalMeasure).where(
-        ProposalMeasure.id == measure_id,
-        ProposalMeasure.proposal_id == proposal_id
-    )
+    query = select(ProposalMeasure).where(ProposalMeasure.id == measure_id, ProposalMeasure.proposal_id == proposal_id)
     result = await db.execute(query)
     measure = result.scalar_one_or_none()
 
@@ -1050,21 +964,19 @@ async def update_measure_status(
     old_status = "accepted" if measure.is_selected else "pending"
 
     # 更新状态
-    measure.is_selected = (status == "accepted")
+    measure.is_selected = status == "accepted"
 
     # 重新计算方案总收益
-    proposal_query = select(EnergySavingProposal).options(
-        selectinload(EnergySavingProposal.measures)
-    ).where(EnergySavingProposal.id == proposal_id)
+    proposal_query = (
+        select(EnergySavingProposal)
+        .options(selectinload(EnergySavingProposal.measures))
+        .where(EnergySavingProposal.id == proposal_id)
+    )
     proposal_result = await db.execute(proposal_query)
     proposal = proposal_result.scalar_one_or_none()
 
     if proposal:
-        proposal.total_benefit = sum(
-            m.annual_benefit or Decimal("0")
-            for m in proposal.measures
-            if m.is_selected
-        )
+        proposal.total_benefit = sum(m.annual_benefit or Decimal("0") for m in proposal.measures if m.is_selected)
 
     await db.commit()
 
@@ -1075,17 +987,13 @@ async def update_measure_status(
             "measure_id": measure_id,
             "old_status": old_status,
             "new_status": status,
-            "proposal_total_benefit": float(proposal.total_benefit) if proposal else None
-        }
+            "proposal_total_benefit": float(proposal.total_benefit) if proposal else None,
+        },
     }
 
 
 @router.post("/{proposal_id}/measures/batch-status", summary="批量更新措施状态")
-async def batch_update_measure_status(
-    proposal_id: int,
-    updates: List[dict],
-    db: AsyncSession = Depends(get_db)
-):
+async def batch_update_measure_status(proposal_id: int, updates: List[dict], db: AsyncSession = Depends(get_db)):
     """
     批量更新措施状态
 
@@ -1098,9 +1006,11 @@ async def batch_update_measure_status(
     valid_statuses = ["accepted", "rejected", "deferred", "pending"]
 
     # 获取方案和所有措施
-    proposal_query = select(EnergySavingProposal).options(
-        selectinload(EnergySavingProposal.measures)
-    ).where(EnergySavingProposal.id == proposal_id)
+    proposal_query = (
+        select(EnergySavingProposal)
+        .options(selectinload(EnergySavingProposal.measures))
+        .where(EnergySavingProposal.id == proposal_id)
+    )
     result = await db.execute(proposal_query)
     proposal = result.scalar_one_or_none()
 
@@ -1116,35 +1026,19 @@ async def batch_update_measure_status(
         new_status = update.get("status")
 
         if measure_id not in measure_map:
-            results.append({
-                "measure_id": measure_id,
-                "success": False,
-                "message": "措施不存在"
-            })
+            results.append({"measure_id": measure_id, "success": False, "message": "措施不存在"})
             continue
 
         if new_status not in valid_statuses:
-            results.append({
-                "measure_id": measure_id,
-                "success": False,
-                "message": f"无效状态: {new_status}"
-            })
+            results.append({"measure_id": measure_id, "success": False, "message": f"无效状态: {new_status}"})
             continue
 
         measure = measure_map[measure_id]
-        measure.is_selected = (new_status == "accepted")
-        results.append({
-            "measure_id": measure_id,
-            "success": True,
-            "new_status": new_status
-        })
+        measure.is_selected = new_status == "accepted"
+        results.append({"measure_id": measure_id, "success": True, "new_status": new_status})
 
     # 重新计算总收益
-    proposal.total_benefit = sum(
-        m.annual_benefit or Decimal("0")
-        for m in proposal.measures
-        if m.is_selected
-    )
+    proposal.total_benefit = sum(m.annual_benefit or Decimal("0") for m in proposal.measures if m.is_selected)
 
     await db.commit()
 
@@ -1154,19 +1048,17 @@ async def batch_update_measure_status(
         "data": {
             "updated_count": sum(1 for r in results if r.get("success")),
             "results": results,
-            "proposal_total_benefit": float(proposal.total_benefit)
-        }
+            "proposal_total_benefit": float(proposal.total_benefit),
+        },
     }
 
 
 # ==================== 10. 效果监测 (专利 S4) ====================
 
+
 @router.post("/{proposal_id}/monitoring/start", summary="启动效果监测")
 async def start_monitoring(
-    proposal_id: int,
-    interval_minutes: int = 15,
-    report_interval: str = "daily",
-    db: AsyncSession = Depends(get_db)
+    proposal_id: int, interval_minutes: int = 15, report_interval: str = "daily", db: AsyncSession = Depends(get_db)
 ):
     """
     启动方案的持续效果监测 (S4b)
@@ -1188,9 +1080,7 @@ async def start_monitoring(
 
     monitoring_service = EffectMonitoringService(db)
     session = monitoring_service.start_monitoring(
-        proposal,
-        interval_minutes=interval_minutes,
-        report_interval=report_interval
+        proposal, interval_minutes=interval_minutes, report_interval=report_interval
     )
 
     return {
@@ -1201,24 +1091,20 @@ async def start_monitoring(
             "proposal_id": proposal_id,
             "interval_minutes": interval_minutes,
             "report_interval": report_interval,
-            "started_at": session.started_at.isoformat()
-        }
+            "started_at": session.started_at.isoformat(),
+        },
     }
 
 
 @router.post("/{proposal_id}/monitoring/stop", summary="停止效果监测")
-async def stop_monitoring(
-    proposal_id: int,
-    db: AsyncSession = Depends(get_db)
-):
+async def stop_monitoring(proposal_id: int, db: AsyncSession = Depends(get_db)):
     """停止方案的效果监测"""
     from app.services.effect_monitoring_service import EffectMonitoringService
     from app.models.energy import MonitoringSession
 
     # 查找活跃会话
     query = select(MonitoringSession).where(
-        MonitoringSession.proposal_id == proposal_id,
-        MonitoringSession.status == "active"
+        MonitoringSession.proposal_id == proposal_id, MonitoringSession.status == "active"
     )
     result = await db.execute(query)
     session = result.scalar_one_or_none()
@@ -1232,37 +1118,23 @@ async def stop_monitoring(
     return {
         "code": 0,
         "message": "监测已停止",
-        "data": {
-            "session_id": session.id,
-            "ended_at": session.ended_at.isoformat() if session.ended_at else None
-        }
+        "data": {"session_id": session.id, "ended_at": session.ended_at.isoformat() if session.ended_at else None},
     }
 
 
 @router.get("/{proposal_id}/monitoring/status", summary="获取监测状态")
-async def get_monitoring_status(
-    proposal_id: int,
-    db: AsyncSession = Depends(get_db)
-):
+async def get_monitoring_status(proposal_id: int, db: AsyncSession = Depends(get_db)):
     """获取方案的监测状态"""
     from app.services.effect_monitoring_service import EffectMonitoringService
 
     monitoring_service = EffectMonitoringService(db)
     status = monitoring_service.get_monitoring_status(proposal_id)
 
-    return {
-        "code": 0,
-        "message": "success",
-        "data": status
-    }
+    return {"code": 0, "message": "success", "data": status}
 
 
 @router.get("/{proposal_id}/effect-report", summary="获取效果达成率报告")
-async def get_effect_report(
-    proposal_id: int,
-    report_type: str = "daily",
-    db: AsyncSession = Depends(get_db)
-):
+async def get_effect_report(proposal_id: int, report_type: str = "daily", db: AsyncSession = Depends(get_db)):
     """
     获取效果达成率报告 (S4d)
 
@@ -1287,6 +1159,7 @@ async def get_effect_report(
         report = monitoring_service.generate_daily_report(proposal_id)
     else:
         from datetime import datetime, timedelta
+
         now = datetime.now()
         if report_type == "weekly":
             start = now - timedelta(days=7)
@@ -1301,52 +1174,39 @@ async def get_effect_report(
             "report_id": report.id,
             "proposal_id": proposal_id,
             "report_type": report.report_type,
-            "period": {
-                "start": report.period_start.isoformat(),
-                "end": report.period_end.isoformat()
-            },
+            "period": {"start": report.period_start.isoformat(), "end": report.period_end.isoformat()},
             "expected": {
                 "energy_saved": float(report.expected_energy_saved or 0),
-                "cost_saved": float(report.expected_cost_saved or 0)
+                "cost_saved": float(report.expected_cost_saved or 0),
             },
             "actual": {
                 "energy_saved": float(report.actual_energy_saved or 0),
-                "cost_saved": float(report.actual_cost_saved or 0)
+                "cost_saved": float(report.actual_cost_saved or 0),
             },
             "achievement_rate": float(report.achievement_rate or 0),
             "rl_feedback": {
                 "sent": report.rl_feedback_sent,
                 "sent_at": report.rl_feedback_at.isoformat() if report.rl_feedback_at else None,
-                "action": report.rl_adjustment_action
+                "action": report.rl_adjustment_action,
             },
-            "data_quality": float(report.data_quality or 0)
-        }
+            "data_quality": float(report.data_quality or 0),
+        },
     }
 
 
 @router.get("/{proposal_id}/effect-summary", summary="获取效果汇总")
-async def get_effect_summary(
-    proposal_id: int,
-    db: AsyncSession = Depends(get_db)
-):
+async def get_effect_summary(proposal_id: int, db: AsyncSession = Depends(get_db)):
     """获取方案的效果汇总统计"""
     from app.services.effect_monitoring_service import EffectMonitoringService
 
     monitoring_service = EffectMonitoringService(db)
     summary = monitoring_service.get_effect_summary(proposal_id)
 
-    return {
-        "code": 0,
-        "message": "success",
-        "data": summary
-    }
+    return {"code": 0, "message": "success", "data": summary}
 
 
 @router.post("/{proposal_id}/rl-feedback", summary="触发RL反馈")
-async def trigger_rl_feedback(
-    proposal_id: int,
-    db: AsyncSession = Depends(get_db)
-):
+async def trigger_rl_feedback(proposal_id: int, db: AsyncSession = Depends(get_db)):
     """
     手动触发 RL 反馈 (S4e)
 
@@ -1373,19 +1233,16 @@ async def trigger_rl_feedback(
         "data": {
             "report_id": report.id,
             "achievement_rate": float(report.achievement_rate or 0),
-            "rl_feedback": rl_result
-        }
+            "rl_feedback": rl_result,
+        },
     }
 
 
 # ==================== 11. RL 自适应优化 (专利 S5) ====================
 
+
 @router.post("/{proposal_id}/rl/optimize", response_model=RLOptimizationResponse, summary="执行RL优化")
-async def rl_optimize(
-    proposal_id: int,
-    request: RLOptimizationRequest = None,
-    db: AsyncSession = Depends(get_db)
-):
+async def rl_optimize(proposal_id: int, request: RLOptimizationRequest = None, db: AsyncSession = Depends(get_db)):
     """
     执行 RL 优化 (S5e)
 
@@ -1412,8 +1269,15 @@ async def rl_optimize(
     return RLOptimizationResponse(
         proposal_id=proposal_id,
         success=True,
-        adjustments={k: {"value": v.get("value"), "description": v.get("description", ""), "unit": v.get("unit"), "index": v.get("index")}
-                     for k, v in result.get("adjustments", {}).items()},
+        adjustments={
+            k: {
+                "value": v.get("value"),
+                "description": v.get("description", ""),
+                "unit": v.get("unit"),
+                "index": v.get("index"),
+            }
+            for k, v in result.get("adjustments", {}).items()
+        },
         raw_actions=result.get("raw_actions"),
         exploration=result.get("exploration", False),
         exploration_rate=result.get("exploration_rate", 0),
@@ -1424,10 +1288,7 @@ async def rl_optimize(
 
 
 @router.get("/{proposal_id}/rl/status", summary="获取方案RL优化状态")
-async def get_rl_optimization_status(
-    proposal_id: int,
-    db: AsyncSession = Depends(get_db)
-):
+async def get_rl_optimization_status(proposal_id: int, db: AsyncSession = Depends(get_db)):
     """
     获取方案的 RL 优化状态
 
@@ -1452,16 +1313,13 @@ async def get_rl_optimization_status(
             "proposal_id": proposal_id,
             "total_optimizations": history.get("total", 0),
             "latest_optimization": history.get("items", [None])[0],
-        }
+        },
     }
 
 
 @router.get("/{proposal_id}/rl/history", response_model=RLOptimizationHistoryResponse, summary="获取RL优化历史")
 async def get_rl_optimization_history(
-    proposal_id: int,
-    limit: int = 20,
-    offset: int = 0,
-    db: AsyncSession = Depends(get_db)
+    proposal_id: int, limit: int = 20, offset: int = 0, db: AsyncSession = Depends(get_db)
 ):
     """
     获取方案的 RL 优化历史记录
@@ -1479,18 +1337,11 @@ async def get_rl_optimization_history(
     optimization_service = AdaptiveOptimizationService(db)
     history = optimization_service.get_optimization_history(proposal_id, limit=limit, offset=offset)
 
-    return RLOptimizationHistoryResponse(
-        total=history.get("total", 0),
-        items=history.get("items", [])
-    )
+    return RLOptimizationHistoryResponse(total=history.get("total", 0), items=history.get("items", []))
 
 
 @router.post("/{proposal_id}/rl/apply/{optimization_id}", summary="应用RL优化建议")
-async def apply_rl_optimization(
-    proposal_id: int,
-    optimization_id: int,
-    db: AsyncSession = Depends(get_db)
-):
+async def apply_rl_optimization(proposal_id: int, optimization_id: int, db: AsyncSession = Depends(get_db)):
     """
     标记 RL 优化建议为已应用
 
@@ -1504,20 +1355,14 @@ async def apply_rl_optimization(
     if not result.get("success"):
         raise HTTPException(status_code=400, detail=result.get("error", "应用失败"))
 
-    return {
-        "code": 0,
-        "message": "优化建议已标记为已应用",
-        "data": result
-    }
+    return {"code": 0, "message": "优化建议已标记为已应用", "data": result}
 
 
 # ==================== 12. 从监测数据训练 ====================
 
+
 @router.post("/{proposal_id}/rl/train-from-monitoring", summary="从监测数据训练")
-async def rl_train_from_monitoring(
-    proposal_id: int,
-    db: AsyncSession = Depends(get_db)
-):
+async def rl_train_from_monitoring(proposal_id: int, db: AsyncSession = Depends(get_db)):
     """
     从监测数据自动训练 (S4e → S5 闭环)
 
@@ -1539,40 +1384,27 @@ async def rl_train_from_monitoring(
     if not train_result.get("success"):
         raise HTTPException(status_code=400, detail=train_result.get("error", "训练失败"))
 
-    return {
-        "code": 0,
-        "message": "从监测数据训练成功",
-        "data": train_result
-    }
+    return {"code": 0, "message": "从监测数据训练成功", "data": train_result}
 
 
 # ==================== 辅助函数 ====================
+
 
 def _build_state_comparison(current_state: dict, target_state: dict) -> dict:
     """构建当前状态和目标状态的对比"""
     if not current_state or not target_state:
         return None
 
-    comparison = {
-        "changes": [],
-        "summary": ""
-    }
+    comparison = {"changes": [], "summary": ""}
 
     all_keys = set(current_state.keys()) | set(target_state.keys())
     for key in all_keys:
         current_val = current_state.get(key)
         target_val = target_state.get(key)
         if current_val != target_val:
-            comparison["changes"].append({
-                "field": key,
-                "from": current_val,
-                "to": target_val
-            })
+            comparison["changes"].append({"field": key, "from": current_val, "to": target_val})
 
     if comparison["changes"]:
         comparison["summary"] = f"共 {len(comparison['changes'])} 项参数变更"
 
     return comparison
-
-
-

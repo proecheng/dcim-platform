@@ -1,4 +1,5 @@
 """配置构建与下发服务 — Story 2.3"""
+
 import json
 import logging
 from typing import Callable, Coroutine
@@ -28,9 +29,7 @@ async def build_gateway_config(gateway_id: int, db: AsyncSession) -> dict:
 
     ds_configs = []
     for ds in datasources:
-        pt_result = await db.execute(
-            select(DataSourcePoint).where(DataSourcePoint.datasource_id == ds.id)
-        )
+        pt_result = await db.execute(select(DataSourcePoint).where(DataSourcePoint.datasource_id == ds.id))
         points = pt_result.scalars().all()
 
         ds_config = {

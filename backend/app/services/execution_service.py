@@ -4,18 +4,15 @@ Execution Service
 
 提供执行计划管理、任务执行、效果追踪等功能
 """
+
 import logging
-from typing import Dict, List, Optional, Any
+from typing import Dict, Optional, Any
 from datetime import datetime, date, timedelta
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_, func
 from sqlalchemy.orm import selectinload
 
-from ..models.energy import (
-    ExecutionPlan, ExecutionTask, ExecutionResult,
-    EnergyOpportunity, OpportunityMeasure,
-    PowerDevice, PUEHistory, EnergyDaily
-)
+from ..models.energy import ExecutionPlan, ExecutionTask, ExecutionResult, EnergyOpportunity, EnergyDaily
 from .device_control_service import DeviceControlService, ControlResult
 
 logger = logging.getLogger(__name__)
@@ -38,10 +35,7 @@ class ExecutionService:
         self.db = db
         self.device_control = DeviceControlService(db)
 
-    async def get_plan_with_tasks(
-        self,
-        plan_id: int
-    ) -> Optional[Dict[str, Any]]:
+    async def get_plan_with_tasks(self, plan_id: int) -> Optional[Dict[str, Any]]:
         """
         获取执行计划及任务详情
 
@@ -53,7 +47,7 @@ class ExecutionService:
             .options(
                 selectinload(ExecutionPlan.tasks),
                 selectinload(ExecutionPlan.results),
-                selectinload(ExecutionPlan.opportunity)
+                selectinload(ExecutionPlan.opportunity),
             )
             .where(ExecutionPlan.id == plan_id)
         )
@@ -63,13 +57,7 @@ class ExecutionService:
             return None
 
         # 统计任务状态
-        task_stats = {
-            "total": len(plan.tasks),
-            "pending": 0,
-            "executing": 0,
-            "completed": 0,
-            "failed": 0
-        }
+        task_stats = {"total": len(plan.tasks), "pending": 0, "executing": 0, "completed": 0, "failed": 0}
         for task in plan.tasks:
             if task.status in task_stats:
                 task_stats[task.status] += 1
@@ -87,7 +75,7 @@ class ExecutionService:
                 "status": plan.status,
                 "started_at": plan.started_at.isoformat() if plan.started_at else None,
                 "completed_at": plan.completed_at.isoformat() if plan.completed_at else None,
-                "created_at": plan.created_at.isoformat()
+                "created_at": plan.created_at.isoformat(),
             },
             "opportunity": {
                 "id": plan.opportunity.id,
@@ -95,8 +83,10 @@ class ExecutionService:
                 "category": plan.opportunity.category,
                 "priority": plan.opportunity.priority,
                 "source_plugin": plan.opportunity.source_plugin,
-                "analysis_data": plan.opportunity.analysis_data
-            } if plan.opportunity else None,
+                "analysis_data": plan.opportunity.analysis_data,
+            }
+            if plan.opportunity
+            else None,
             "tasks": [
                 {
                     "id": t.id,
@@ -111,7 +101,7 @@ class ExecutionService:
                     "executed_at": t.executed_at.isoformat() if t.executed_at else None,
                     "result": t.result,
                     "error_message": t.error_message,
-                    "sort_order": t.sort_order
+                    "sort_order": t.sort_order,
                 }
                 for t in sorted(plan.tasks, key=lambda x: x.sort_order)
             ],
@@ -127,22 +117,16 @@ class ExecutionService:
                     "actual_saving": float(r.actual_saving or 0),
                     "achievement_rate": float(r.achievement_rate or 0),
                     "status": r.status,
-                    "analysis_conclusion": r.analysis_conclusion
+                    "analysis_conclusion": r.analysis_conclusion,
                 }
                 for r in plan.results
             ],
             "progress_percentage": round(
-                task_stats["completed"] / task_stats["total"] * 100
-                if task_stats["total"] > 0 else 0,
-                1
-            )
+                task_stats["completed"] / task_stats["total"] * 100 if task_stats["total"] > 0 else 0, 1
+            ),
         }
 
-    async def execute_auto_task(
-        self,
-        task_id: int,
-        force: bool = False
-    ) -> Dict[str, Any]:
+    async def execute_auto_task(self, task_id: int, force: bool = False) -> Dict[str, Any]:
         """
         执行自动控制任务
 
@@ -154,9 +138,7 @@ class ExecutionService:
             执行结果
         """
         # 获取任务
-        result = await self.db.execute(
-            select(ExecutionTask).where(ExecutionTask.id == task_id)
-        )
+        result = await self.db.execute(select(ExecutionTask).where(ExecutionTask.id == task_id))
         task = result.scalar_one_or_none()
 
         if not task:
@@ -195,23 +177,18 @@ class ExecutionService:
                         device_id=int(device_id),
                         regulation_type=reg_type,
                         target_value=float(target_value),
-                        force=force
+                        force=force,
                     )
-                    control_results.append({
-                        "device_id": device_id,
-                        "result": action.result.value,
-                        "message": action.message
-                    })
+                    control_results.append(
+                        {"device_id": device_id, "result": action.result.value, "message": action.message}
+                    )
 
                     if action.result not in [ControlResult.SUCCESS, ControlResult.SIMULATED]:
                         all_success = False
 
         # 更新任务结果
         task.executed_at = datetime.now()
-        task.result = {
-            "control_results": control_results,
-            "all_success": all_success
-        }
+        task.result = {"control_results": control_results, "all_success": all_success}
 
         if all_success:
             task.status = "completed"
@@ -229,14 +206,11 @@ class ExecutionService:
             "task_id": task_id,
             "status": task.status,
             "control_results": control_results,
-            "executed_at": task.executed_at.isoformat()
+            "executed_at": task.executed_at.isoformat(),
         }
 
     async def complete_manual_task(
-        self,
-        task_id: int,
-        completed_by: Optional[str] = None,
-        notes: Optional[str] = None
+        self, task_id: int, completed_by: Optional[str] = None, notes: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         标记手动任务完成
@@ -249,9 +223,7 @@ class ExecutionService:
         Returns:
             更新结果
         """
-        result = await self.db.execute(
-            select(ExecutionTask).where(ExecutionTask.id == task_id)
-        )
+        result = await self.db.execute(select(ExecutionTask).where(ExecutionTask.id == task_id))
         task = result.scalar_one_or_none()
 
         if not task:
@@ -263,11 +235,7 @@ class ExecutionService:
         # 更新任务
         task.status = "completed"
         task.executed_at = datetime.now()
-        task.result = {
-            "completed_by": completed_by,
-            "notes": notes,
-            "completed_manually": True
-        }
+        task.result = {"completed_by": completed_by, "notes": notes, "completed_manually": True}
         if completed_by:
             task.assigned_to = completed_by
 
@@ -276,17 +244,9 @@ class ExecutionService:
         # 检查是否需要更新计划状态
         await self.update_plan_status(task.plan_id)
 
-        return {
-            "success": True,
-            "task_id": task_id,
-            "status": task.status,
-            "executed_at": task.executed_at.isoformat()
-        }
+        return {"success": True, "task_id": task_id, "status": task.status, "executed_at": task.executed_at.isoformat()}
 
-    async def update_plan_status(
-        self,
-        plan_id: int
-    ) -> str:
+    async def update_plan_status(self, plan_id: int) -> str:
         """
         更新计划状态（根据任务完成情况自动判断）
 
@@ -294,9 +254,7 @@ class ExecutionService:
             新状态
         """
         result = await self.db.execute(
-            select(ExecutionPlan)
-            .options(selectinload(ExecutionPlan.tasks))
-            .where(ExecutionPlan.id == plan_id)
+            select(ExecutionPlan).options(selectinload(ExecutionPlan.tasks)).where(ExecutionPlan.id == plan_id)
         )
         plan = result.scalar_one_or_none()
 
@@ -340,10 +298,7 @@ class ExecutionService:
 
         return new_status
 
-    async def generate_task_checklist(
-        self,
-        plan_id: int
-    ) -> Dict[str, Any]:
+    async def generate_task_checklist(self, plan_id: int) -> Dict[str, Any]:
         """
         生成执行清单（用于导出PDF或创建工单）
 
@@ -358,7 +313,7 @@ class ExecutionService:
             "title": plan_data["plan"]["plan_name"],
             "expected_saving": plan_data["plan"]["expected_saving"],
             "created_at": plan_data["plan"]["created_at"],
-            "sections": []
+            "sections": [],
         }
 
         # 按执行方式分组
@@ -366,53 +321,53 @@ class ExecutionService:
         manual_tasks = [t for t in plan_data["tasks"] if t["execution_mode"] == "manual"]
 
         if auto_tasks:
-            checklist["sections"].append({
-                "title": "自动执行任务",
-                "description": "以下任务可通过系统自动执行",
-                "tasks": [
-                    {
-                        "序号": i + 1,
-                        "任务名称": t["task_name"],
-                        "目标对象": t["target_object"],
-                        "状态": self._get_status_text(t["status"]),
-                        "执行时间": t["executed_at"] or "-"
-                    }
-                    for i, t in enumerate(auto_tasks)
-                ]
-            })
+            checklist["sections"].append(
+                {
+                    "title": "自动执行任务",
+                    "description": "以下任务可通过系统自动执行",
+                    "tasks": [
+                        {
+                            "序号": i + 1,
+                            "任务名称": t["task_name"],
+                            "目标对象": t["target_object"],
+                            "状态": self._get_status_text(t["status"]),
+                            "执行时间": t["executed_at"] or "-",
+                        }
+                        for i, t in enumerate(auto_tasks)
+                    ],
+                }
+            )
 
         if manual_tasks:
-            checklist["sections"].append({
-                "title": "人工执行任务",
-                "description": "以下任务需要人工操作完成",
-                "tasks": [
-                    {
-                        "序号": i + 1,
-                        "任务名称": t["task_name"],
-                        "目标对象": t["target_object"],
-                        "负责人": t["assigned_to"] or "待分配",
-                        "状态": self._get_status_text(t["status"]),
-                        "完成时间": t["executed_at"] or "-"
-                    }
-                    for i, t in enumerate(manual_tasks)
-                ]
-            })
+            checklist["sections"].append(
+                {
+                    "title": "人工执行任务",
+                    "description": "以下任务需要人工操作完成",
+                    "tasks": [
+                        {
+                            "序号": i + 1,
+                            "任务名称": t["task_name"],
+                            "目标对象": t["target_object"],
+                            "负责人": t["assigned_to"] or "待分配",
+                            "状态": self._get_status_text(t["status"]),
+                            "完成时间": t["executed_at"] or "-",
+                        }
+                        for i, t in enumerate(manual_tasks)
+                    ],
+                }
+            )
 
         checklist["summary"] = {
             "total_tasks": len(plan_data["tasks"]),
             "auto_tasks": len(auto_tasks),
             "manual_tasks": len(manual_tasks),
             "completed": plan_data["task_stats"]["completed"],
-            "progress": plan_data["progress_percentage"]
+            "progress": plan_data["progress_percentage"],
         }
 
         return checklist
 
-    async def track_execution_effect(
-        self,
-        plan_id: int,
-        tracking_days: int = 7
-    ) -> Dict[str, Any]:
+    async def track_execution_effect(self, plan_id: int, tracking_days: int = 7) -> Dict[str, Any]:
         """
         效果追踪分析
 
@@ -434,9 +389,7 @@ class ExecutionService:
         """
         # 获取计划和关联的机会
         result = await self.db.execute(
-            select(ExecutionPlan)
-            .options(selectinload(ExecutionPlan.opportunity))
-            .where(ExecutionPlan.id == plan_id)
+            select(ExecutionPlan).options(selectinload(ExecutionPlan.opportunity)).where(ExecutionPlan.id == plan_id)
         )
         plan = result.scalar_one_or_none()
 
@@ -444,10 +397,7 @@ class ExecutionService:
             return {"error": f"计划ID {plan_id} 不存在"}
 
         if plan.status != "completed":
-            return {
-                "error": "计划尚未完成执行",
-                "current_status": plan.status
-            }
+            return {"error": "计划尚未完成执行", "current_status": plan.status}
 
         # 计算追踪周期
         tracking_start = plan.completed_at.date() if plan.completed_at else date.today()
@@ -458,14 +408,12 @@ class ExecutionService:
         analysis_data = plan.opportunity.analysis_data if plan.opportunity else {}
 
         # 根据方案类型计算实际节省
-        if source_plugin == 'peak_valley_optimizer' and analysis_data:
+        if source_plugin == "peak_valley_optimizer" and analysis_data:
             # 负荷转移方案：基于配置参数计算
-            actual_saving_result = await self._calculate_load_shift_saving(
-                analysis_data, tracking_days
-            )
-            cost_saved = actual_saving_result['cost_saved']
-            actual_annual = actual_saving_result['annual_saving']
-            energy_saved = actual_saving_result.get('energy_shifted', 0)
+            actual_saving_result = await self._calculate_load_shift_saving(analysis_data, tracking_days)
+            cost_saved = actual_saving_result["cost_saved"]
+            actual_annual = actual_saving_result["annual_saving"]
+            energy_saved = actual_saving_result.get("energy_shifted", 0)
             before_data = None
             after_data = None
         else:
@@ -477,30 +425,16 @@ class ExecutionService:
             # 查询执行前数据
             before_result = await self.db.execute(
                 select(
-                    func.sum(EnergyDaily.total_energy),
-                    func.avg(EnergyDaily.avg_power),
-                    func.max(EnergyDaily.max_power)
-                ).where(
-                    and_(
-                        EnergyDaily.stat_date >= before_start,
-                        EnergyDaily.stat_date <= before_end
-                    )
-                )
+                    func.sum(EnergyDaily.total_energy), func.avg(EnergyDaily.avg_power), func.max(EnergyDaily.max_power)
+                ).where(and_(EnergyDaily.stat_date >= before_start, EnergyDaily.stat_date <= before_end))
             )
             before_data = before_result.one_or_none()
 
             # 查询执行后数据
             after_result = await self.db.execute(
                 select(
-                    func.sum(EnergyDaily.total_energy),
-                    func.avg(EnergyDaily.avg_power),
-                    func.max(EnergyDaily.max_power)
-                ).where(
-                    and_(
-                        EnergyDaily.stat_date >= tracking_start,
-                        EnergyDaily.stat_date <= tracking_end
-                    )
-                )
+                    func.sum(EnergyDaily.total_energy), func.avg(EnergyDaily.avg_power), func.max(EnergyDaily.max_power)
+                ).where(and_(EnergyDaily.stat_date >= tracking_start, EnergyDaily.stat_date <= tracking_end))
             )
             after_data = after_result.one_or_none()
 
@@ -527,10 +461,14 @@ class ExecutionService:
             tracking_end=tracking_end,
             actual_saving=actual_annual,  # 保存年化节省值
             achievement_rate=achievement_rate,
-            energy_before={"total_energy": before_data[0] if before_data else 0} if not source_plugin == 'peak_valley_optimizer' else {},
-            energy_after={"total_energy": after_data[0] if after_data else 0} if not source_plugin == 'peak_valley_optimizer' else {},
+            energy_before={"total_energy": before_data[0] if before_data else 0}
+            if not source_plugin == "peak_valley_optimizer"
+            else {},
+            energy_after={"total_energy": after_data[0] if after_data else 0}
+            if not source_plugin == "peak_valley_optimizer"
+            else {},
             status="completed" if date.today() > tracking_end else "tracking",
-            analysis_conclusion=self._generate_conclusion(achievement_rate)
+            analysis_conclusion=self._generate_conclusion(achievement_rate),
         )
         self.db.add(tracking_result)
         await self.db.commit()
@@ -540,39 +478,39 @@ class ExecutionService:
             "tracking_period": {
                 "days": tracking_days,
                 "start": tracking_start.isoformat(),
-                "end": tracking_end.isoformat()
+                "end": tracking_end.isoformat(),
             },
             "before_execution": {
                 "period": f"{tracking_start - timedelta(days=tracking_days)} ~ {tracking_start - timedelta(days=1)}",
                 "total_energy_kwh": round(before_data[0] or 0, 2) if before_data else 0,
                 "avg_power_kw": round(before_data[1] or 0, 2) if before_data else 0,
-                "max_power_kw": round(before_data[2] or 0, 2) if before_data else 0
-            } if before_data else None,
+                "max_power_kw": round(before_data[2] or 0, 2) if before_data else 0,
+            }
+            if before_data
+            else None,
             "after_execution": {
                 "period": f"{tracking_start} ~ {tracking_end}",
                 "total_energy_kwh": round(after_data[0] or 0, 2) if after_data else 0,
                 "avg_power_kw": round(after_data[1] or 0, 2) if after_data else 0,
-                "max_power_kw": round(after_data[2] or 0, 2) if after_data else 0
-            } if after_data else None,
+                "max_power_kw": round(after_data[2] or 0, 2) if after_data else 0,
+            }
+            if after_data
+            else None,
             "effect": {
                 "energy_saved_kwh": round(energy_saved, 2),
                 "cost_saved_yuan": round(cost_saved, 2),
                 "expected_annual_saving": expected_saving,
                 "actual_annual_saving": round(actual_annual, 2),
-                "achievement_rate": round(achievement_rate, 1)
+                "achievement_rate": round(achievement_rate, 1),
             },
-            "calculation_method": "load_shift" if source_plugin == 'peak_valley_optimizer' else "energy_comparison",
+            "calculation_method": "load_shift" if source_plugin == "peak_valley_optimizer" else "energy_comparison",
             "conclusion": self._generate_conclusion(achievement_rate),
-            "status": "tracking" if date.today() <= tracking_end else "completed"
+            "status": "tracking" if date.today() <= tracking_end else "completed",
         }
 
     # ========== 私有方法 ==========
 
-    async def _calculate_load_shift_saving(
-        self,
-        analysis_data: dict,
-        tracking_days: int
-    ) -> Dict[str, float]:
+    async def _calculate_load_shift_saving(self, analysis_data: dict, tracking_days: int) -> Dict[str, float]:
         """
         计算负荷转移方案的实际节省
 
@@ -590,11 +528,11 @@ class ExecutionService:
         """
         # 默认分时电价（元/kWh）
         default_prices = {
-            'sharp': 1.20,      # 尖峰
-            'peak': 0.95,       # 峰时
-            'flat': 0.65,       # 平时
-            'valley': 0.35,     # 谷时
-            'deep_valley': 0.20 # 深谷
+            "sharp": 1.20,  # 尖峰
+            "peak": 0.95,  # 峰时
+            "flat": 0.65,  # 平时
+            "valley": 0.35,  # 谷时
+            "deep_valley": 0.20,  # 深谷
         }
 
         # 尝试从电价配置获取实际电价
@@ -606,14 +544,14 @@ class ExecutionService:
         daily_saving = 0.0
         energy_shifted = 0.0  # 转移的电量（kWh）
 
-        device_rules = analysis_data.get('device_rules', [])
+        device_rules = analysis_data.get("device_rules", [])
         for device_rule in device_rules:
-            rules = device_rule.get('rules', [])
+            rules = device_rule.get("rules", [])
             for rule in rules:
-                source_period = rule.get('source_period', 'peak')
-                target_period = rule.get('target_period', 'valley')
-                power = float(rule.get('power', 0))  # kW
-                hours = float(rule.get('hours', 0))  # 小时
+                source_period = rule.get("source_period", "peak")
+                target_period = rule.get("target_period", "valley")
+                power = float(rule.get("power", 0))  # kW
+                hours = float(rule.get("hours", 0))  # 小时
 
                 source_price = period_prices.get(source_period, 0.95)
                 target_price = period_prices.get(target_period, 0.35)
@@ -635,10 +573,10 @@ class ExecutionService:
         annual_saving = daily_saving * 250
 
         return {
-            'cost_saved': cost_saved,
-            'annual_saving': annual_saving,
-            'daily_saving': daily_saving,
-            'energy_shifted': energy_shifted
+            "cost_saved": cost_saved,
+            "annual_saving": annual_saving,
+            "daily_saving": daily_saving,
+            "energy_shifted": energy_shifted,
         }
 
     async def _get_period_prices(self) -> Optional[Dict[str, float]]:
@@ -650,11 +588,9 @@ class ExecutionService:
         """
         try:
             from ..models.energy import PricingConfig
+
             result = await self.db.execute(
-                select(PricingConfig)
-                .where(PricingConfig.is_active == True)
-                .order_by(PricingConfig.id.desc())
-                .limit(1)
+                select(PricingConfig).where(PricingConfig.is_active == True).order_by(PricingConfig.id.desc()).limit(1)
             )
             config = result.scalar_one_or_none()
             if config and config.period_prices:
@@ -672,17 +608,8 @@ class ExecutionService:
         period_prices = await self._get_period_prices()
         if period_prices:
             # 假设各时段占比：尖峰5%、峰时25%、平时40%、谷时25%、深谷5%
-            weights = {
-                'sharp': 0.05,
-                'peak': 0.25,
-                'flat': 0.40,
-                'valley': 0.25,
-                'deep_valley': 0.05
-            }
-            weighted_avg = sum(
-                period_prices.get(period, 0.6) * weight
-                for period, weight in weights.items()
-            )
+            weights = {"sharp": 0.05, "peak": 0.25, "flat": 0.40, "valley": 0.25, "deep_valley": 0.05}
+            weighted_avg = sum(period_prices.get(period, 0.6) * weight for period, weight in weights.items())
             return weighted_avg
         return 0.6  # 默认平均电价
 
@@ -693,7 +620,7 @@ class ExecutionService:
             "temperature_adjust": "temperature",
             "brightness_adjust": "brightness",
             "load_adjust": "load",
-            "device_control": "temperature"  # 默认
+            "device_control": "temperature",  # 默认
         }
         return mapping.get(task_type, "temperature")
 
@@ -704,7 +631,7 @@ class ExecutionService:
             "executing": "🔄 执行中",
             "completed": "✅ 已完成",
             "failed": "❌ 失败",
-            "skipped": "⏭️ 已跳过"
+            "skipped": "⏭️ 已跳过",
         }
         return texts.get(status, status)
 
@@ -721,15 +648,9 @@ class ExecutionService:
         else:
             return "暂无效果数据，请等待追踪周期结束"
 
-    async def _update_opportunity_status(
-        self,
-        opportunity_id: int,
-        status: str
-    ) -> None:
+    async def _update_opportunity_status(self, opportunity_id: int, status: str) -> None:
         """更新机会状态"""
-        result = await self.db.execute(
-            select(EnergyOpportunity).where(EnergyOpportunity.id == opportunity_id)
-        )
+        result = await self.db.execute(select(EnergyOpportunity).where(EnergyOpportunity.id == opportunity_id))
         opportunity = result.scalar_one_or_none()
         if opportunity:
             opportunity.status = status

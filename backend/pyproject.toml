@@ -12,6 +12,9 @@ ignore = [
     "E501",  # line too long (handled by formatter)
     "E711",  # comparison to None (SQLAlchemy uses == None)
     "E712",  # comparison to True/False (SQLAlchemy filter patterns)
+    "E402",  # module level import not at top (intentional in large modules)
+    "E741",  # ambiguous variable name (false positive on list comprehensions)
+    "F811",  # redefinition of unused name (intentional schema overrides)
 ]
 
 [tool.ruff.lint.isort]

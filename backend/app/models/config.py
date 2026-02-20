@@ -1,7 +1,8 @@
 """
 配置模型
 """
-from datetime import datetime, date
+
+from datetime import datetime
 from sqlalchemy import Column, Integer, String, Text, DateTime, Boolean, Date, ForeignKey
 
 from ..core.database import Base
@@ -9,6 +10,7 @@ from ..core.database import Base
 
 class SystemConfig(Base):
     """系统配置表"""
+
     __tablename__ = "system_configs"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -25,6 +27,7 @@ class SystemConfig(Base):
 
 class Dictionary(Base):
     """数据字典表"""
+
     __tablename__ = "dictionaries"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -40,6 +43,7 @@ class Dictionary(Base):
 
 class License(Base):
     """授权许可表"""
+
     __tablename__ = "licenses"
 
     id = Column(Integer, primary_key=True, autoincrement=True)

@@ -1,7 +1,7 @@
 """
 数据模拟采集服务
 """
-import asyncio
+
 import random
 import uuid
 from datetime import datetime
@@ -34,9 +34,7 @@ class DataCollector:
 
         elif point.point_type == "AO":
             # 模拟量输出: 返回当前设定值
-            result = await session.execute(
-                select(PointRealtime).where(PointRealtime.point_id == point.id)
-            )
+            result = await session.execute(select(PointRealtime).where(PointRealtime.point_id == point.id))
             realtime = result.scalar_one_or_none()
             if realtime and realtime.value is not None:
                 return realtime.value
@@ -44,23 +42,16 @@ class DataCollector:
 
         elif point.point_type == "DO":
             # 开关量输出: 返回当前状态
-            result = await session.execute(
-                select(PointRealtime).where(PointRealtime.point_id == point.id)
-            )
+            result = await session.execute(select(PointRealtime).where(PointRealtime.point_id == point.id))
             realtime = result.scalar_one_or_none()
             return realtime.value if realtime and realtime.value is not None else 0
 
         return 0
 
-    async def check_thresholds(
-        self, session: AsyncSession, point: Point, value: float
-    ) -> list:
+    async def check_thresholds(self, session: AsyncSession, point: Point, value: float) -> list:
         """检查阈值并生成告警"""
         result = await session.execute(
-            select(AlarmThreshold).where(
-                AlarmThreshold.point_id == point.id,
-                AlarmThreshold.is_enabled == True
-            )
+            select(AlarmThreshold).where(AlarmThreshold.point_id == point.id, AlarmThreshold.is_enabled == True)
         )
         thresholds = result.scalars().all()
         alarms = []
@@ -85,19 +76,15 @@ class DataCollector:
                     alarm_level=threshold.alarm_level,
                     alarm_message=threshold.alarm_message or message,
                     trigger_value=value,
-                    threshold_value=threshold.threshold_value
+                    threshold_value=threshold.threshold_value,
                 )
                 alarms.append(alarm)
 
         return alarms
 
-    async def update_realtime(
-        self, session: AsyncSession, point_id: int, value: float, status: str = "normal"
-    ):
+    async def update_realtime(self, session: AsyncSession, point_id: int, value: float, status: str = "normal"):
         """更新实时值"""
-        result = await session.execute(
-            select(PointRealtime).where(PointRealtime.point_id == point_id)
-        )
+        result = await session.execute(select(PointRealtime).where(PointRealtime.point_id == point_id))
         realtime = result.scalar_one_or_none()
 
         if realtime:
@@ -105,19 +92,12 @@ class DataCollector:
             realtime.status = status
             realtime.updated_at = datetime.utcnow()
         else:
-            realtime = PointRealtime(
-                point_id=point_id,
-                value=value,
-                status=status
-            )
+            realtime = PointRealtime(point_id=point_id, value=value, status=status)
             session.add(realtime)
 
     async def save_history(self, session: AsyncSession, point_id: int, value: float):
         """保存历史数据"""
-        history = PointHistory(
-            point_id=point_id,
-            value=value
-        )
+        history = PointHistory(point_id=point_id, value=value)
         session.add(history)
 
 

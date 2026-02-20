@@ -1,4 +1,5 @@
 """告警升级引擎"""
+
 import logging
 from datetime import datetime, timedelta
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -13,9 +14,7 @@ logger = logging.getLogger(__name__)
 async def check_escalations(session: AsyncSession):
     """检查超时未处理的告警并执行升级"""
     # 1. 查询所有启用的升级规则
-    rules_result = await session.execute(
-        select(AlarmEscalation).where(AlarmEscalation.is_enabled == True)
-    )
+    rules_result = await session.execute(select(AlarmEscalation).where(AlarmEscalation.is_enabled == True))
     rules = rules_result.scalars().all()
 
     pending_broadcasts = []
@@ -29,9 +28,7 @@ async def check_escalations(session: AsyncSession):
         time_ref = func.coalesce(Alarm.last_escalated_at, Alarm.created_at)
         alarms_result = await session.execute(
             select(Alarm).where(
-                Alarm.status == "active",
-                Alarm.alarm_level == rule.source_level,
-                time_ref <= cutoff_time
+                Alarm.status == "active", Alarm.alarm_level == rule.source_level, time_ref <= cutoff_time
             )
         )
         alarms = alarms_result.scalars().all()
@@ -45,22 +42,26 @@ async def check_escalations(session: AsyncSession):
 
             # 4. Update alarm
             await session.execute(
-                update(Alarm).where(Alarm.id == alarm_id).values(
+                update(Alarm)
+                .where(Alarm.id == alarm_id)
+                .values(
                     alarm_level=target_level,
                     escalated_from=source_level,
                     escalation_count=Alarm.escalation_count + 1,
                     escalation_remark=remark,
-                    last_escalated_at=now
+                    last_escalated_at=now,
                 )
             )
 
-            pending_broadcasts.append({
-                "action": "escalate",
-                "id": alarm_id,
-                "alarm_level": target_level,
-                "previous_level": source_level,
-                "escalation_remark": remark
-            })
+            pending_broadcasts.append(
+                {
+                    "action": "escalate",
+                    "id": alarm_id,
+                    "alarm_level": target_level,
+                    "previous_level": source_level,
+                    "escalation_remark": remark,
+                }
+            )
 
     # 5. Commit FIRST, then broadcast
     if pending_broadcasts:

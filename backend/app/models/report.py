@@ -1,6 +1,7 @@
 """
 报表模型
 """
+
 from datetime import datetime
 from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, Boolean, Float
 
@@ -9,6 +10,7 @@ from ..core.database import Base
 
 class ReportTemplate(Base):
     """报表模板表"""
+
     __tablename__ = "report_templates"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -24,6 +26,7 @@ class ReportTemplate(Base):
 
 class ReportRecord(Base):
     """报表生成记录表"""
+
     __tablename__ = "report_records"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -43,6 +46,7 @@ class ReportRecord(Base):
 
 class ReportSchedule(Base):
     """报表调度配置表"""
+
     __tablename__ = "report_schedules"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -58,6 +62,7 @@ class ReportSchedule(Base):
 
 class DeviceHealthScore(Base):
     """设备健康度评分表"""
+
     __tablename__ = "device_health_scores"
 
     id = Column(Integer, primary_key=True, autoincrement=True)

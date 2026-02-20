@@ -1,4 +1,5 @@
 """网关状态监控服务 — Story 2.2"""
+
 import logging
 from datetime import datetime, timedelta
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -50,11 +51,13 @@ async def check_resource_warnings(
     # 去重：检查冷却期内是否已有 resource_warning
     cooldown_cutoff = datetime.now() - timedelta(seconds=RESOURCE_WARNING_COOLDOWN)
     result = await db.execute(
-        select(GatewayEvent).where(
+        select(GatewayEvent)
+        .where(
             GatewayEvent.gateway_id == gateway_id,
             GatewayEvent.event_type == "resource_warning",
             GatewayEvent.created_at > cooldown_cutoff,
-        ).limit(1)
+        )
+        .limit(1)
     )
     if result.scalar_one_or_none() is not None:
         return  # 冷却期内已有告警，跳过

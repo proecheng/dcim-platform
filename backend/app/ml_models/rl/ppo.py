@@ -12,8 +12,7 @@ L^CLIP(theta) = E_t[min(r_t(theta)*A_t, clip(r_t(theta), 1-eps, 1+eps)*A_t)]
 import torch
 import torch.nn as nn
 import numpy as np
-from typing import Dict, List, Tuple, Optional
-from collections import deque
+from typing import Dict, List, Tuple
 
 
 class ExperienceBuffer:
@@ -43,7 +42,7 @@ class ExperienceBuffer:
         next_state: np.ndarray,
         done: bool,
         log_prob: float,
-        value: float
+        value: float,
     ):
         """存储一步经验"""
         self.states.append(state)
@@ -69,14 +68,14 @@ class ExperienceBuffer:
     def get_batch(self, device: torch.device) -> Dict[str, torch.Tensor]:
         """获取全部数据作为batch"""
         return {
-            'states': torch.FloatTensor(np.array(self.states)).to(device),
-            'continuous_actions': torch.FloatTensor(np.array(self.continuous_actions)).to(device),
-            'discrete_actions': torch.LongTensor(self.discrete_actions).to(device),
-            'rewards': torch.FloatTensor(self.rewards).to(device),
-            'next_states': torch.FloatTensor(np.array(self.next_states)).to(device),
-            'dones': torch.FloatTensor([float(d) for d in self.dones]).to(device),
-            'old_log_probs': torch.FloatTensor(self.log_probs).to(device),
-            'values': torch.FloatTensor(self.values).to(device)
+            "states": torch.FloatTensor(np.array(self.states)).to(device),
+            "continuous_actions": torch.FloatTensor(np.array(self.continuous_actions)).to(device),
+            "discrete_actions": torch.LongTensor(self.discrete_actions).to(device),
+            "rewards": torch.FloatTensor(self.rewards).to(device),
+            "next_states": torch.FloatTensor(np.array(self.next_states)).to(device),
+            "dones": torch.FloatTensor([float(d) for d in self.dones]).to(device),
+            "old_log_probs": torch.FloatTensor(self.log_probs).to(device),
+            "values": torch.FloatTensor(self.values).to(device),
         }
 
     def clear(self):
@@ -115,7 +114,7 @@ class PPOAgent:
         entropy_coeff: float = 0.01,
         max_grad_norm: float = 0.5,
         update_epochs: int = 10,
-        buffer_size: int = 10000
+        buffer_size: int = 10000,
     ):
         self.network = network
         self.gamma = gamma
@@ -131,11 +130,7 @@ class PPOAgent:
         self.device = next(network.parameters()).device
 
     def compute_gae(
-        self,
-        rewards: torch.Tensor,
-        values: torch.Tensor,
-        next_values: torch.Tensor,
-        dones: torch.Tensor
+        self, rewards: torch.Tensor, values: torch.Tensor, next_values: torch.Tensor, dones: torch.Tensor
     ) -> Tuple[torch.Tensor, torch.Tensor]:
         """
         计算广义优势估计 GAE (S5c)
@@ -179,19 +174,16 @@ class PPOAgent:
             Dict包含各项损失值
         """
         if len(self.buffer) < 2:
-            return {'policy_loss': 0, 'value_loss': 0, 'entropy': 0}
+            return {"policy_loss": 0, "value_loss": 0, "entropy": 0}
 
         batch = self.buffer.get_batch(self.device)
 
         # 计算next_state的value
         with torch.no_grad():
-            next_values = self.network.get_value(batch['next_states'])
+            next_values = self.network.get_value(batch["next_states"])
 
         # 计算GAE
-        advantages, returns = self.compute_gae(
-            batch['rewards'], batch['values'],
-            next_values, batch['dones']
-        )
+        advantages, returns = self.compute_gae(batch["rewards"], batch["values"], next_values, batch["dones"])
 
         # 标准化优势
         advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-8)
@@ -204,13 +196,11 @@ class PPOAgent:
         for _ in range(self.update_epochs):
             # 评估当前策略下的动作
             log_probs, entropy, values = self.network.evaluate_action(
-                batch['states'],
-                batch['continuous_actions'],
-                batch['discrete_actions']
+                batch["states"], batch["continuous_actions"], batch["discrete_actions"]
             )
 
             # 概率比
-            ratio = torch.exp(log_probs - batch['old_log_probs'])
+            ratio = torch.exp(log_probs - batch["old_log_probs"])
 
             # 裁剪目标
             surr1 = ratio * advantages
@@ -221,9 +211,7 @@ class PPOAgent:
             value_loss = F.mse_loss(values, returns)
 
             # 总损失
-            loss = (policy_loss
-                    + self.value_coeff * value_loss
-                    - self.entropy_coeff * entropy.mean())
+            loss = policy_loss + self.value_coeff * value_loss - self.entropy_coeff * entropy.mean()
 
             self.optimizer.zero_grad()
             loss.backward()
@@ -238,18 +226,10 @@ class PPOAgent:
         self.buffer.clear()
 
         n = self.update_epochs
-        return {
-            'policy_loss': total_policy_loss / n,
-            'value_loss': total_value_loss / n,
-            'entropy': total_entropy / n
-        }
+        return {"policy_loss": total_policy_loss / n, "value_loss": total_value_loss / n, "entropy": total_entropy / n}
 
     @torch.no_grad()
-    def select_action(
-        self,
-        state: np.ndarray,
-        explore: bool = True
-    ) -> Tuple[Dict[str, float], float, float]:
+    def select_action(self, state: np.ndarray, explore: bool = True) -> Tuple[Dict[str, float], float, float]:
         """
         选择动作
 
@@ -266,13 +246,13 @@ class PPOAgent:
         value = self.network.get_value(state_tensor)
 
         actions_dict = {
-            'priority_weight': actions['priority_weight'].item(),
-            'safety_coeff': actions['safety_coeff'].item(),
-            'temperature': actions['temperature'].item(),
-            'target_period': actions['target_period'].item()
+            "priority_weight": actions["priority_weight"].item(),
+            "safety_coeff": actions["safety_coeff"].item(),
+            "temperature": actions["temperature"].item(),
+            "target_period": actions["target_period"].item(),
         }
 
-        total_log_prob = log_probs['continuous'].item() + log_probs['discrete'].item()
+        total_log_prob = log_probs["continuous"].item() + log_probs["discrete"].item()
 
         return actions_dict, total_log_prob, value.item()
 

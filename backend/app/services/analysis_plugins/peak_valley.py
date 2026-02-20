@@ -8,14 +8,7 @@ Analyzes peak-valley pricing utilization and optimizes electricity usage distrib
 
 from typing import List
 
-from .base import (
-    AnalysisPlugin,
-    AnalysisContext,
-    SuggestionResult,
-    PluginConfig,
-    PluginPriority,
-    SuggestionType
-)
+from .base import AnalysisPlugin, AnalysisContext, SuggestionResult, PluginConfig, PluginPriority, SuggestionType
 
 
 class PeakValleyOptimizationPlugin(AnalysisPlugin):
@@ -52,11 +45,11 @@ class PeakValleyOptimizationPlugin(AnalysisPlugin):
             execution_order=40,
             min_data_days=30,
             thresholds={
-                'ideal_peak_ratio': 0.30,       # 理想峰时占比
-                'ideal_valley_ratio': 0.35,     # 理想谷时占比
-                'storage_threshold': 100,        # 储能建议阈值 kWh/日
-                'storage_cost_per_kwh': 1500    # 储能系统单价 元/kWh
-            }
+                "ideal_peak_ratio": 0.30,  # 理想峰时占比
+                "ideal_valley_ratio": 0.35,  # 理想谷时占比
+                "storage_threshold": 100,  # 储能建议阈值 kWh/日
+                "storage_cost_per_kwh": 1500,  # 储能系统单价 元/kWh
+            },
         )
 
     async def analyze(self, context: AnalysisContext) -> List[SuggestionResult]:
@@ -86,29 +79,32 @@ class PeakValleyOptimizationPlugin(AnalysisPlugin):
         daily_avg_cost = total_cost / days
 
         thresholds = self._config.thresholds
-        ideal_peak = thresholds.get('ideal_peak_ratio', 0.30)
-        ideal_valley = thresholds.get('ideal_valley_ratio', 0.35)
+        ideal_peak = thresholds.get("ideal_peak_ratio", 0.30)
+        ideal_valley = thresholds.get("ideal_valley_ratio", 0.35)
 
         pricing = context.pricing_config
-        peak_price = pricing.get('peak_price', 1.2)
-        valley_price = pricing.get('valley_price', 0.4)
-        flat_price = pricing.get('flat_price', 0.8)
+        peak_price = pricing.get("peak_price", 1.2)
+        valley_price = pricing.get("valley_price", 0.4)
+        flat_price = pricing.get("flat_price", 0.8)
         price_diff = peak_price - valley_price
 
         # 计算当前平均电价
         avg_price = total_cost / total_energy if total_energy > 0 else 0.8
 
         # 计算理想情况下的平均电价
-        ideal_avg_price = ideal_peak * peak_price + ideal_valley * valley_price + (1 - ideal_peak - ideal_valley) * flat_price
+        ideal_avg_price = (
+            ideal_peak * peak_price + ideal_valley * valley_price + (1 - ideal_peak - ideal_valley) * flat_price
+        )
 
         # 分析1: 综合峰谷优化建议
         price_saving_potential = (avg_price - ideal_avg_price) * daily_avg_energy * 365
 
         if price_saving_potential > 5000:
-            results.append(self.create_suggestion(
-                title="优化峰谷时段用电分布",
-                description=f"当前电价利用效率可提升，年节省潜力 ¥{price_saving_potential:.0f}",
-                detail=f"""
+            results.append(
+                self.create_suggestion(
+                    title="优化峰谷时段用电分布",
+                    description=f"当前电价利用效率可提升，年节省潜力 ¥{price_saving_potential:.0f}",
+                    detail=f"""
 ## 分析结果
 
 ### 当前用电分布
@@ -143,25 +139,26 @@ class PeakValleyOptimizationPlugin(AnalysisPlugin):
 ### 预期效果
 - 年节省电费: ¥{price_saving_potential:.0f}
                 """.strip(),
-                estimated_saving=(avg_price - ideal_avg_price) * daily_avg_energy * 365 / price_diff,  # 转换为kWh
-                estimated_cost_saving=price_saving_potential,
-                implementation_difficulty=2,
-                priority=PluginPriority.HIGH if price_saving_potential > 20000 else PluginPriority.MEDIUM,
-                payback_period=0,
-                analysis_data={
-                    'peak_ratio': peak_ratio,
-                    'valley_ratio': valley_ratio,
-                    'flat_ratio': flat_ratio,
-                    'avg_price': avg_price,
-                    'ideal_avg_price': ideal_avg_price,
-                    'price_diff': price_diff
-                },
-                confidence=85
-            ))
+                    estimated_saving=(avg_price - ideal_avg_price) * daily_avg_energy * 365 / price_diff,  # 转换为kWh
+                    estimated_cost_saving=price_saving_potential,
+                    implementation_difficulty=2,
+                    priority=PluginPriority.HIGH if price_saving_potential > 20000 else PluginPriority.MEDIUM,
+                    payback_period=0,
+                    analysis_data={
+                        "peak_ratio": peak_ratio,
+                        "valley_ratio": valley_ratio,
+                        "flat_ratio": flat_ratio,
+                        "avg_price": avg_price,
+                        "ideal_avg_price": ideal_avg_price,
+                        "price_diff": price_diff,
+                    },
+                    confidence=85,
+                )
+            )
 
         # 分析2: 储能系统可行性
         daily_peak_energy = daily_avg_energy * peak_ratio
-        storage_threshold = thresholds.get('storage_threshold', 100)
+        storage_threshold = thresholds.get("storage_threshold", 100)
 
         if daily_peak_energy > storage_threshold:
             # 计算储能容量需求 (转移30%峰时电量)
@@ -173,17 +170,18 @@ class PeakValleyOptimizationPlugin(AnalysisPlugin):
             yearly_saving = daily_saving * 365
 
             # 计算投资
-            storage_cost = thresholds.get('storage_cost_per_kwh', 1500)
+            storage_cost = thresholds.get("storage_cost_per_kwh", 1500)
             investment = storage_capacity * storage_cost
 
             # 回报期
             payback_years = investment / yearly_saving if yearly_saving > 0 else 999
 
             if payback_years < 8:  # 8年内回本才建议
-                results.append(self.create_suggestion(
-                    title="储能系统投资分析",
-                    description=f"建议配置 {storage_capacity:.0f}kWh 储能系统实现峰谷套利",
-                    detail=f"""
+                results.append(
+                    self.create_suggestion(
+                        title="储能系统投资分析",
+                        description=f"建议配置 {storage_capacity:.0f}kWh 储能系统实现峰谷套利",
+                        detail=f"""
 ## 储能系统可行性分析
 
 ### 需求分析
@@ -219,19 +217,20 @@ class PeakValleyOptimizationPlugin(AnalysisPlugin):
 - 运维成本: 约投资额的2%/年
 - 政策变化: 峰谷电价政策可能调整
                     """.strip(),
-                    estimated_saving=storage_capacity * 365 * 0.85,
-                    estimated_cost_saving=yearly_saving,
-                    implementation_difficulty=4,
-                    priority=PluginPriority.MEDIUM,
-                    payback_period=payback_years * 12,
-                    analysis_data={
-                        'storage_capacity': storage_capacity,
-                        'investment': investment,
-                        'yearly_saving': yearly_saving,
-                        'payback_years': payback_years,
-                        'daily_peak_energy': daily_peak_energy
-                    },
-                    confidence=75
-                ))
+                        estimated_saving=storage_capacity * 365 * 0.85,
+                        estimated_cost_saving=yearly_saving,
+                        implementation_difficulty=4,
+                        priority=PluginPriority.MEDIUM,
+                        payback_period=payback_years * 12,
+                        analysis_data={
+                            "storage_capacity": storage_capacity,
+                            "investment": investment,
+                            "yearly_saving": yearly_saving,
+                            "payback_years": payback_years,
+                            "daily_peak_energy": daily_peak_energy,
+                        },
+                        confidence=75,
+                    )
+                )
 
         return results

@@ -9,8 +9,9 @@
 
 V3.2: 增加 ML 预测追溯支持 (专利 S2)
 """
+
 from datetime import datetime
-from sqlalchemy import Column, Integer, String, Boolean, Float, Text, DateTime, JSON, ForeignKey, Numeric, Enum
+from sqlalchemy import Column, Integer, String, Boolean, Float, Text, DateTime, JSON, ForeignKey, Numeric
 from sqlalchemy.orm import relationship
 import enum
 
@@ -19,28 +20,31 @@ from ..core.database import Base
 
 class MappingType(str, enum.Enum):
     """映射类型枚举"""
-    DIRECT = "direct"           # 直接映射 - 单一字段
-    AGGREGATE = "aggregate"     # 聚合映射 - 聚合函数
-    COMPOSITE = "composite"     # 复合映射 - 多源组合
+
+    DIRECT = "direct"  # 直接映射 - 单一字段
+    AGGREGATE = "aggregate"  # 聚合映射 - 聚合函数
+    COMPOSITE = "composite"  # 复合映射 - 多源组合
     ML_PREDICTION = "ml_prediction"  # ML预测映射 - 深度学习模型输出
 
 
 class AggregationType(str, enum.Enum):
     """聚合函数类型"""
-    SUM = "sum"                 # 求和
-    AVG = "avg"                 # 平均
-    MAX = "max"                 # 最大值
-    MIN = "min"                 # 最小值
-    COUNT = "count"             # 计数
-    PERCENTILE = "percentile"   # 分位数
-    STDDEV = "stddev"           # 标准差
+
+    SUM = "sum"  # 求和
+    AVG = "avg"  # 平均
+    MAX = "max"  # 最大值
+    MIN = "min"  # 最小值
+    COUNT = "count"  # 计数
+    PERCENTILE = "percentile"  # 分位数
+    STDDEV = "stddev"  # 标准差
 
 
 class MLModelType(str, enum.Enum):
     """ML模型类型枚举"""
+
     TRANSFORMER = "transformer"  # 时序Transformer (S2-TF)
-    GNN = "gnn"                  # 图神经网络 (S2-GNN)
-    RL = "rl"                    # 深度强化学习 (S5)
+    GNN = "gnn"  # 图神经网络 (S2-GNN)
+    RL = "rl"  # 深度强化学习 (S5)
 
 
 class DataSourceMapping(Base):
@@ -49,6 +53,7 @@ class DataSourceMapping(Base):
 
     定义占位符参数与数据源的映射关系，支持三层映射结构
     """
+
     __tablename__ = "data_source_mappings"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -91,6 +96,7 @@ class TraceRecord(Base):
     为每个计算值生成追溯记录，支持树状追溯结构
     记录数据来源、计算公式和中间结果
     """
+
     __tablename__ = "trace_records"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -156,6 +162,7 @@ class TraceTree(Base):
 
     用于快速查询追溯树结构，支持从任意节点展开查看完整计算路径
     """
+
     __tablename__ = "trace_trees"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -183,6 +190,7 @@ class TemplateParameter(Base):
 
     定义每个模板使用的占位符参数及其映射关系
     """
+
     __tablename__ = "template_parameters"
 
     id = Column(Integer, primary_key=True, autoincrement=True)

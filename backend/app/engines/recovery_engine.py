@@ -2,6 +2,7 @@
 恢复引擎 — 联动恢复流程
 Story 9-4: 联动恢复流程
 """
+
 import asyncio
 import logging
 import time
@@ -9,11 +10,11 @@ from datetime import datetime
 from typing import Dict, List, Optional, Tuple
 
 from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..core.database import async_session
 from ..models.linkage import (
-    LinkageExecution, LinkageLog, LinkageRecovery, LinkageRecoveryLog,
+    LinkageRecovery,
+    LinkageRecoveryLog,
 )
 from .action_handlers import default_registry, ActionHandlerRegistry
 from .event_bus import Event, EventPriority
@@ -96,13 +97,15 @@ class RecoveryEngine:
 
             order = RECOVERY_ORDER.get(target_type, _DEFAULT_ORDER)
 
-            steps.append({
-                "step_order": order,
-                "action_type": action_type,
-                "target_type": target_type,
-                "recovery_command": recovery_cmd,
-                "action_config": recovery_config,
-            })
+            steps.append(
+                {
+                    "step_order": order,
+                    "action_type": action_type,
+                    "target_type": target_type,
+                    "recovery_command": recovery_cmd,
+                    "action_config": recovery_config,
+                }
+            )
 
         # 按恢复顺序排序
         steps.sort(key=lambda s: s["step_order"])
@@ -121,9 +124,7 @@ class RecoveryEngine:
             logger.error("恢复引擎异常: recovery_id=%d, %s", recovery_id, e, exc_info=True)
             # 标记失败
             async with async_session() as session:
-                result = await session.execute(
-                    select(LinkageRecovery).where(LinkageRecovery.id == recovery_id)
-                )
+                result = await session.execute(select(LinkageRecovery).where(LinkageRecovery.id == recovery_id))
                 recovery = result.scalar_one_or_none()
                 if recovery is not None:
                     recovery.status = "failed"
@@ -135,9 +136,7 @@ class RecoveryEngine:
         start_time = time.time()
 
         async with async_session() as session:
-            result = await session.execute(
-                select(LinkageRecovery).where(LinkageRecovery.id == recovery_id)
-            )
+            result = await session.execute(select(LinkageRecovery).where(LinkageRecovery.id == recovery_id))
             recovery = result.scalar_one_or_none()
             if recovery is None:
                 return
@@ -174,9 +173,7 @@ class RecoveryEngine:
             status = "partial_recovery"
 
         async with async_session() as session:
-            result = await session.execute(
-                select(LinkageRecovery).where(LinkageRecovery.id == recovery_id)
-            )
+            result = await session.execute(select(LinkageRecovery).where(LinkageRecovery.id == recovery_id))
             recovery = result.scalar_one_or_none()
             if recovery is not None:
                 recovery.status = status
@@ -187,12 +184,15 @@ class RecoveryEngine:
         # WebSocket 广播恢复完成
         try:
             from ..services.websocket import ws_manager
-            await ws_manager.broadcast_linkage({
-                "action": "recovery_completed",
-                "recovery_id": recovery_id,
-                "status": status,
-                "duration_ms": elapsed_ms,
-            })
+
+            await ws_manager.broadcast_linkage(
+                {
+                    "action": "recovery_completed",
+                    "recovery_id": recovery_id,
+                    "status": status,
+                    "duration_ms": elapsed_ms,
+                }
+            )
         except Exception as e:
             logger.warning("恢复引擎: WebSocket 广播失败: %s", e)
 
@@ -244,9 +244,7 @@ class RecoveryEngine:
         step_start = time.time()
 
         async with async_session() as session:
-            result = await session.execute(
-                select(LinkageRecoveryLog).where(LinkageRecoveryLog.id == step_id)
-            )
+            result = await session.execute(select(LinkageRecoveryLog).where(LinkageRecoveryLog.id == step_id))
             step = result.scalar_one_or_none()
             if step is None:
                 return False
@@ -296,9 +294,7 @@ class RecoveryEngine:
         """更新恢复步骤状态"""
         duration_ms = int((time.time() - start_time) * 1000)
         async with async_session() as session:
-            result = await session.execute(
-                select(LinkageRecoveryLog).where(LinkageRecoveryLog.id == step_id)
-            )
+            result = await session.execute(select(LinkageRecoveryLog).where(LinkageRecoveryLog.id == step_id))
             step = result.scalar_one_or_none()
             if step is not None:
                 step.status = status
@@ -321,9 +317,7 @@ class RecoveryEngine:
             if any(s.status in ("pending", "executing") for s in all_steps):
                 return
 
-            recovery_result = await session.execute(
-                select(LinkageRecovery).where(LinkageRecovery.id == recovery_id)
-            )
+            recovery_result = await session.execute(select(LinkageRecovery).where(LinkageRecovery.id == recovery_id))
             recovery = recovery_result.scalar_one_or_none()
             if recovery is None or recovery.status not in ("executing",):
                 return
@@ -341,9 +335,7 @@ class RecoveryEngine:
 
             recovery.completed_at = datetime.now()
             if recovery.started_at:
-                recovery.total_duration_ms = int(
-                    (recovery.completed_at - recovery.started_at).total_seconds() * 1000
-                )
+                recovery.total_duration_ms = int((recovery.completed_at - recovery.started_at).total_seconds() * 1000)
             await session.commit()
 
 

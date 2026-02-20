@@ -2,6 +2,7 @@
 节能机会管理 API - v1
 提供机会仪表盘、详情、模拟、设备选择和执行功能
 """
+
 from typing import Optional, List
 from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -10,20 +11,21 @@ from sqlalchemy import select, func, and_, case
 
 from ..deps import get_db, require_viewer, require_admin
 from ...models.user import User
-from ...models.energy import (
-    EnergyOpportunity, OpportunityMeasure,
-    ExecutionPlan, ExecutionTask, ExecutionResult
-)
+from ...models.energy import EnergyOpportunity, OpportunityMeasure, ExecutionPlan, ExecutionTask, ExecutionResult
 from ...schemas.energy import (
-    EnergyOpportunityCreate, EnergyOpportunityUpdate, EnergyOpportunityResponse,
-    OpportunityMeasureCreate, OpportunityMeasureResponse,
-    ExecutionPlanCreate, ExecutionPlanResponse,
-    ExecutionTaskCreate, ExecutionTaskResponse,
-    DashboardResponse, DashboardSummaryCards, OpportunitySummary,
-    SimulationRequest, SimulationResponse,
-    DeviceSelectionRequest, DeviceSelectionResponse
+    EnergyOpportunityCreate,
+    EnergyOpportunityUpdate,
+    EnergyOpportunityResponse,
+    OpportunityMeasureResponse,
+    DashboardResponse,
+    DashboardSummaryCards,
+    OpportunitySummary,
+    SimulationRequest,
+    SimulationResponse,
+    DeviceSelectionRequest,
+    DeviceSelectionResponse,
 )
-from ...services.opportunity_engine import OpportunityEngine, OpportunityCategory
+from ...services.opportunity_engine import OpportunityEngine
 from ...services.simulation_service import SimulationService
 from ...services.device_selector_service import DeviceSelectorService
 
@@ -32,11 +34,9 @@ router = APIRouter()
 
 # ========== 仪表盘 ==========
 
+
 @router.get("/dashboard", summary="获取机会仪表盘数据")
-async def get_dashboard(
-    db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_viewer)
-) -> DashboardResponse:
+async def get_dashboard(db: AsyncSession = Depends(get_db), _: User = Depends(require_viewer)) -> DashboardResponse:
     """
     获取节能机会仪表盘数据，包括：
     - 概览卡片（年度可节省/待处理/执行中/本月已节省）
@@ -53,18 +53,15 @@ async def get_dashboard(
                 (EnergyOpportunity.priority == "high", 1),
                 (EnergyOpportunity.priority == "medium", 2),
                 (EnergyOpportunity.priority == "low", 3),
-                else_=4
+                else_=4,
             ),
-            EnergyOpportunity.potential_saving.desc()
+            EnergyOpportunity.potential_saving.desc(),
         )
     )
     db_opportunities = result.scalars().all()
 
     # 执行中的计划数
-    exec_result = await db.execute(
-        select(func.count(ExecutionPlan.id))
-        .where(ExecutionPlan.status == "executing")
-    )
+    exec_result = await db.execute(select(func.count(ExecutionPlan.id)).where(ExecutionPlan.status == "executing"))
     executing_count = exec_result.scalar() or 0
 
     # 本月已完成的节省
@@ -74,7 +71,7 @@ async def get_dashboard(
         .where(
             and_(
                 ExecutionResult.status == "completed",
-                ExecutionResult.tracking_end >= datetime.now().replace(day=1).date()
+                ExecutionResult.tracking_end >= datetime.now().replace(day=1).date(),
             )
         )
     )
@@ -92,7 +89,7 @@ async def get_dashboard(
             confidence=float(o.confidence or 0.8),
             status=o.status,
             source_plugin=o.source_plugin,
-            analysis_data=o.analysis_data if isinstance(o.analysis_data, dict) else None
+            analysis_data=o.analysis_data if isinstance(o.analysis_data, dict) else None,
         )
         for o in db_opportunities
     ]
@@ -118,24 +115,24 @@ async def get_dashboard(
             annual_potential_saving=round(annual_saving, 2),
             pending_opportunities=len([o for o in opportunities if o.status in ["discovered", "ready"]]),
             executing_plans=executing_count,
-            monthly_actual_saving=round(monthly_saving, 2)
+            monthly_actual_saving=round(monthly_saving, 2),
         ),
         opportunities=opportunities,
         by_category=by_category,
-        total_count=len(opportunities)
+        total_count=len(opportunities),
     )
 
 
 # ========== 自动检测 ==========
 
+
 @router.post("/detect", summary="手动触发节能机会检测")
 async def trigger_detection(
-    days: int = Query(30, ge=7, le=365),
-    db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_admin)
+    days: int = Query(30, ge=7, le=365), db: AsyncSession = Depends(get_db), _: User = Depends(require_admin)
 ):
     """手动触发一轮节能机会自动检测"""
     from ...services.opportunity_detector import OpportunityDetector
+
     detector = OpportunityDetector(db)
     result = await detector.run_detection(days=days)
     return {"code": 0, "data": result, "message": "检测完成"}
@@ -143,17 +140,13 @@ async def trigger_detection(
 
 # ========== 机会详情 ==========
 
+
 @router.get("/{opportunity_id}/detail", summary="获取机会详情")
 async def get_opportunity_detail(
-    opportunity_id: int,
-    db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_viewer)
+    opportunity_id: int, db: AsyncSession = Depends(get_db), _: User = Depends(require_viewer)
 ) -> EnergyOpportunityResponse:
     """获取单个节能机会的详细信息，包括措施列表"""
-    result = await db.execute(
-        select(EnergyOpportunity)
-        .where(EnergyOpportunity.id == opportunity_id)
-    )
+    result = await db.execute(select(EnergyOpportunity).where(EnergyOpportunity.id == opportunity_id))
     opportunity = result.scalar_one_or_none()
 
     if not opportunity:
@@ -175,12 +168,13 @@ async def get_opportunity_detail(
 
 # ========== 模拟 ==========
 
+
 @router.post("/{opportunity_id}/simulate", summary="模拟参数调整效果")
 async def simulate_opportunity(
     opportunity_id: int,
     request: SimulationRequest,
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_viewer)
+    _: User = Depends(require_viewer),
 ) -> SimulationResponse:
     """
     模拟参数调整后的效果，支持：
@@ -189,9 +183,7 @@ async def simulate_opportunity(
     - device_regulation: 设备调节模拟
     """
     # 验证机会存在
-    result = await db.execute(
-        select(EnergyOpportunity).where(EnergyOpportunity.id == opportunity_id)
-    )
+    result = await db.execute(select(EnergyOpportunity).where(EnergyOpportunity.id == opportunity_id))
     opportunity = result.scalar_one_or_none()
     if not opportunity:
         raise HTTPException(status_code=404, detail=f"机会ID {opportunity_id} 不存在")
@@ -204,20 +196,20 @@ async def simulate_opportunity(
         if sim_type == "demand_adjustment":
             result = await simulation.simulate_demand_adjustment(
                 new_declared_demand=params.get("new_declared_demand", 0),
-                historical_days=params.get("historical_days", 30)
+                historical_days=params.get("historical_days", 30),
             )
         elif sim_type == "peak_shift":
             result = await simulation.simulate_peak_shift(
                 shift_power=params.get("shift_power", 0),
                 shift_hours=params.get("shift_hours", 4),
                 source_period=params.get("source_period", "peak"),
-                target_period=params.get("target_period", "valley")
+                target_period=params.get("target_period", "valley"),
             )
         elif sim_type == "device_regulation":
             result = await simulation.simulate_device_regulation(
                 device_id=params.get("device_id"),
                 target_value=params.get("target_value"),
-                regulation_type=params.get("regulation_type", "temperature")
+                regulation_type=params.get("regulation_type", "temperature"),
             )
         else:
             raise HTTPException(status_code=400, detail=f"不支持的模拟类型: {sim_type}")
@@ -229,7 +221,7 @@ async def simulate_opportunity(
             benefit=result.benefit,
             confidence=result.confidence,
             warnings=result.warnings,
-            recommendations=result.recommendations
+            recommendations=result.recommendations,
         )
 
     except Exception as e:
@@ -238,35 +230,31 @@ async def simulate_opportunity(
 
 # ========== 设备选择 ==========
 
+
 @router.get("/{opportunity_id}/devices", summary="获取可参与设备列表")
 async def get_available_devices(
     opportunity_id: int,
     regulation_type: Optional[str] = Query(None, description="调节类型过滤"),
     execution_mode: Optional[str] = Query(None, description="执行方式过滤: auto/manual"),
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_viewer)
+    _: User = Depends(require_viewer),
 ):
     """获取可参与该优化机会的设备列表"""
     # 验证机会存在
-    result = await db.execute(
-        select(EnergyOpportunity).where(EnergyOpportunity.id == opportunity_id)
-    )
+    result = await db.execute(select(EnergyOpportunity).where(EnergyOpportunity.id == opportunity_id))
     opportunity = result.scalar_one_or_none()
     if not opportunity:
         raise HTTPException(status_code=404, detail=f"机会ID {opportunity_id} 不存在")
 
     selector = DeviceSelectorService(db)
-    devices = await selector.get_available_devices(
-        regulation_type=regulation_type,
-        execution_mode=execution_mode
-    )
+    devices = await selector.get_available_devices(regulation_type=regulation_type, execution_mode=execution_mode)
 
     return {
         "opportunity_id": opportunity_id,
         "opportunity_title": opportunity.title,
         "available_devices": devices,
         "device_count": len(devices),
-        "total_adjustable_power": round(sum(d["total_adjustable_power"] for d in devices), 2)
+        "total_adjustable_power": round(sum(d["total_adjustable_power"] for d in devices), 2),
     }
 
 
@@ -275,24 +263,20 @@ async def select_devices(
     opportunity_id: int,
     request: DeviceSelectionRequest,
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_viewer)
+    _: User = Depends(require_viewer),
 ) -> DeviceSelectionResponse:
     """
     选择参与优化的设备，返回验证结果和时段交集
     """
     # 验证机会存在
-    result = await db.execute(
-        select(EnergyOpportunity).where(EnergyOpportunity.id == opportunity_id)
-    )
+    result = await db.execute(select(EnergyOpportunity).where(EnergyOpportunity.id == opportunity_id))
     opportunity = result.scalar_one_or_none()
     if not opportunity:
         raise HTTPException(status_code=404, detail=f"机会ID {opportunity_id} 不存在")
 
     selector = DeviceSelectorService(db)
     validation = await selector.validate_device_selection(
-        device_ids=request.selected_device_ids,
-        target_power=request.target_power,
-        target_hours=request.target_hours
+        device_ids=request.selected_device_ids, target_power=request.target_power, target_hours=request.target_hours
     )
 
     return DeviceSelectionResponse(
@@ -300,7 +284,7 @@ async def select_devices(
         total_adjustable_power=validation["total_adjustable_power"],
         time_intersection=validation["time_intersection"]["intersection_hours"],
         is_feasible=validation["is_valid"],
-        warnings=validation["warnings"]
+        warnings=validation["warnings"],
     )
 
 
@@ -308,14 +292,12 @@ async def select_devices(
 
 
 def _generate_tasks_from_analysis_data(
-    plan_id: int,
-    source_plugin: Optional[str],
-    analysis_data: dict
+    plan_id: int, source_plugin: Optional[str], analysis_data: dict
 ) -> List[ExecutionTask]:
     """从 analysis_data 生成执行任务 — 策略模式"""
-    if source_plugin == 'peak_valley_optimizer':
+    if source_plugin == "peak_valley_optimizer":
         return _generate_load_shift_tasks(plan_id, analysis_data)
-    elif source_plugin == 'demand_controller':
+    elif source_plugin == "demand_controller":
         return _generate_demand_tasks(plan_id, analysis_data)
     else:
         return _generate_generic_tasks(plan_id, source_plugin, analysis_data)
@@ -324,96 +306,97 @@ def _generate_tasks_from_analysis_data(
 def _generate_load_shift_tasks(plan_id: int, data: dict) -> List[ExecutionTask]:
     """负荷转移类 — 按设备+规则生成任务"""
     tasks = []
-    period_names = {
-        'sharp': '尖峰', 'peak': '峰时', 'flat': '平时',
-        'valley': '谷时', 'deep_valley': '深谷'
-    }
-    device_rules = data.get('device_rules', [])
+    period_names = {"sharp": "尖峰", "peak": "峰时", "flat": "平时", "valley": "谷时", "deep_valley": "深谷"}
+    device_rules = data.get("device_rules", [])
     idx = 0
     for device_rule in device_rules:
-        device_name = device_rule.get('device_name', f'设备{idx+1}')
-        device_id = device_rule.get('device_id')
-        for rule in device_rule.get('rules', []):
-            source_name = period_names.get(rule.get('source_period', ''), '源')
-            target_name = period_names.get(rule.get('target_period', ''), '目标')
-            tasks.append(ExecutionTask(
-                plan_id=plan_id,
-                task_type='load_shift',
-                task_name=f"{device_name} - {source_name}转{target_name}",
-                target_object=f"device:{device_id}" if device_id else device_name,
-                execution_mode='manual',
-                parameters={
-                    'device_id': device_id,
-                    'device_name': device_name,
-                    'source_period': rule.get('source_period'),
-                    'target_period': rule.get('target_period'),
-                    'power': rule.get('power', 0),
-                    'hours': rule.get('hours', 0),
-                },
-                status='pending',
-                sort_order=idx
-            ))
+        device_name = device_rule.get("device_name", f"设备{idx+1}")
+        device_id = device_rule.get("device_id")
+        for rule in device_rule.get("rules", []):
+            source_name = period_names.get(rule.get("source_period", ""), "源")
+            target_name = period_names.get(rule.get("target_period", ""), "目标")
+            tasks.append(
+                ExecutionTask(
+                    plan_id=plan_id,
+                    task_type="load_shift",
+                    task_name=f"{device_name} - {source_name}转{target_name}",
+                    target_object=f"device:{device_id}" if device_id else device_name,
+                    execution_mode="manual",
+                    parameters={
+                        "device_id": device_id,
+                        "device_name": device_name,
+                        "source_period": rule.get("source_period"),
+                        "target_period": rule.get("target_period"),
+                        "power": rule.get("power", 0),
+                        "hours": rule.get("hours", 0),
+                    },
+                    status="pending",
+                    sort_order=idx,
+                )
+            )
             idx += 1
     return tasks
 
 
 def _generate_demand_tasks(plan_id: int, data: dict) -> List[ExecutionTask]:
     """需量控制类"""
-    target_demand = data.get('target_demand') or data.get('recommended_demand')
-    current_demand = data.get('current_demand')
-    name = f"调整申报需量: {current_demand}kW → {target_demand}kW" if current_demand and target_demand else "调整申报需量"
-    return [ExecutionTask(
-        plan_id=plan_id,
-        task_type='demand_adjust',
-        task_name=name,
-        target_object="电力需量配置",
-        execution_mode='manual',
-        parameters={'current_demand': current_demand, 'target_demand': target_demand, 'analysis_data': data},
-        status='pending',
-        sort_order=0
-    )]
+    target_demand = data.get("target_demand") or data.get("recommended_demand")
+    current_demand = data.get("current_demand")
+    name = (
+        f"调整申报需量: {current_demand}kW → {target_demand}kW" if current_demand and target_demand else "调整申报需量"
+    )
+    return [
+        ExecutionTask(
+            plan_id=plan_id,
+            task_type="demand_adjust",
+            task_name=name,
+            target_object="电力需量配置",
+            execution_mode="manual",
+            parameters={"current_demand": current_demand, "target_demand": target_demand, "analysis_data": data},
+            status="pending",
+            sort_order=0,
+        )
+    ]
 
 
 def _generate_generic_tasks(plan_id: int, source_plugin: Optional[str], data: dict) -> List[ExecutionTask]:
     """通用 fallback"""
-    desc = data.get('description', '') or data.get('suggestion', '') or '执行节能优化措施'
-    return [ExecutionTask(
-        plan_id=plan_id,
-        task_type='manual_operation',
-        task_name=f"执行优化措施 ({source_plugin or '通用'})",
-        target_object=str(desc)[:200],
-        execution_mode='manual',
-        parameters={'analysis_data': data},
-        status='pending',
-        sort_order=0
-    )]
+    desc = data.get("description", "") or data.get("suggestion", "") or "执行节能优化措施"
+    return [
+        ExecutionTask(
+            plan_id=plan_id,
+            task_type="manual_operation",
+            task_name=f"执行优化措施 ({source_plugin or '通用'})",
+            target_object=str(desc)[:200],
+            execution_mode="manual",
+            parameters={"analysis_data": data},
+            status="pending",
+            sort_order=0,
+        )
+    ]
 
 
 # ========== 执行 ==========
+
 
 @router.post("/{opportunity_id}/execute", summary="确认执行")
 async def execute_opportunity(
     opportunity_id: int,
     selected_device_ids: List[int] = [],
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_admin)
+    current_user: User = Depends(require_admin),
 ):
     """
     确认执行节能机会，生成执行计划和任务清单
     """
     # 验证机会存在且状态正确
-    result = await db.execute(
-        select(EnergyOpportunity).where(EnergyOpportunity.id == opportunity_id)
-    )
+    result = await db.execute(select(EnergyOpportunity).where(EnergyOpportunity.id == opportunity_id))
     opportunity = result.scalar_one_or_none()
     if not opportunity:
         raise HTTPException(status_code=404, detail=f"机会ID {opportunity_id} 不存在")
 
     if opportunity.status not in ["discovered", "simulating", "ready"]:
-        raise HTTPException(
-            status_code=400,
-            detail=f"当前状态({opportunity.status})不允许执行"
-        )
+        raise HTTPException(status_code=400, detail=f"当前状态({opportunity.status})不允许执行")
 
     # 获取措施
     measures_result = await db.execute(
@@ -429,7 +412,7 @@ async def execute_opportunity(
         plan_name=f"{opportunity.title} - 执行计划",
         expected_saving=opportunity.potential_saving,
         status="pending",
-        created_by=current_user.id
+        created_by=current_user.id,
     )
     db.add(plan)
     await db.flush()
@@ -446,10 +429,10 @@ async def execute_opportunity(
             parameters={
                 "current_state": measure.current_state,
                 "target_state": measure.target_state,
-                "selected_devices": measure.selected_devices or selected_device_ids
+                "selected_devices": measure.selected_devices or selected_device_ids,
             },
             status="pending",
-            sort_order=idx
+            sort_order=idx,
         )
         db.add(task)
         tasks.append(task)
@@ -458,9 +441,7 @@ async def execute_opportunity(
     # 如果没有 measures（自动识别的机会只有 analysis_data），从 analysis_data 生成任务
     if not tasks and opportunity.analysis_data:
         tasks = _generate_tasks_from_analysis_data(
-            plan_id=plan.id,
-            source_plugin=opportunity.source_plugin,
-            analysis_data=opportunity.analysis_data
+            plan_id=plan.id, source_plugin=opportunity.source_plugin, analysis_data=opportunity.analysis_data
         )
         for task in tasks:
             db.add(task)
@@ -477,11 +458,12 @@ async def execute_opportunity(
         "plan_id": plan.id,
         "task_count": len(tasks),
         "expected_saving": float(plan.expected_saving or 0),
-        "status": plan.status
+        "status": plan.status,
     }
 
 
 # ========== CRUD 辅助 ==========
+
 
 @router.get("", summary="获取机会列表")
 async def list_opportunities(
@@ -491,7 +473,7 @@ async def list_opportunities(
     skip: int = Query(0, ge=0),
     limit: int = Query(20, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_viewer)
+    _: User = Depends(require_viewer),
 ):
     """获取节能机会列表"""
     query = select(EnergyOpportunity)
@@ -520,15 +502,13 @@ async def list_opportunities(
         "items": [EnergyOpportunityResponse.model_validate(i) for i in items],
         "total": total,
         "skip": skip,
-        "limit": limit
+        "limit": limit,
     }
 
 
 @router.post("", summary="创建节能机会")
 async def create_opportunity(
-    data: EnergyOpportunityCreate,
-    db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_admin)
+    data: EnergyOpportunityCreate, db: AsyncSession = Depends(get_db), _: User = Depends(require_admin)
 ):
     """手动创建节能机会"""
     opportunity = EnergyOpportunity(**data.model_dump())
@@ -543,12 +523,10 @@ async def update_opportunity(
     opportunity_id: int,
     data: EnergyOpportunityUpdate,
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_admin)
+    _: User = Depends(require_admin),
 ):
     """更新节能机会"""
-    result = await db.execute(
-        select(EnergyOpportunity).where(EnergyOpportunity.id == opportunity_id)
-    )
+    result = await db.execute(select(EnergyOpportunity).where(EnergyOpportunity.id == opportunity_id))
     opportunity = result.scalar_one_or_none()
     if not opportunity:
         raise HTTPException(status_code=404, detail=f"机会ID {opportunity_id} 不存在")
@@ -564,15 +542,9 @@ async def update_opportunity(
 
 
 @router.delete("/{opportunity_id}", summary="删除节能机会")
-async def delete_opportunity(
-    opportunity_id: int,
-    db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_admin)
-):
+async def delete_opportunity(opportunity_id: int, db: AsyncSession = Depends(get_db), _: User = Depends(require_admin)):
     """删除节能机会（仅限discovered状态）"""
-    result = await db.execute(
-        select(EnergyOpportunity).where(EnergyOpportunity.id == opportunity_id)
-    )
+    result = await db.execute(select(EnergyOpportunity).where(EnergyOpportunity.id == opportunity_id))
     opportunity = result.scalar_one_or_none()
     if not opportunity:
         raise HTTPException(status_code=404, detail=f"机会ID {opportunity_id} 不存在")
@@ -588,12 +560,8 @@ async def delete_opportunity(
 
 # ========== 工具函数 ==========
 
+
 def _get_category_name(category: int) -> str:
     """获取类别名称"""
-    names = {
-        1: "bill_optimization",
-        2: "device_operation",
-        3: "equipment_upgrade",
-        4: "comprehensive"
-    }
+    names = {1: "bill_optimization", 2: "device_operation", 3: "equipment_upgrade", 4: "comprehensive"}
     return names.get(category, "unknown")

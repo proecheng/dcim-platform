@@ -2,6 +2,7 @@
 联动策略 Schema
 Story 9-1: 联动引擎核心框架
 """
+
 from datetime import datetime
 from typing import Literal, Optional, List
 
@@ -10,8 +11,10 @@ from pydantic import BaseModel, ConfigDict
 
 # ==================== Action Schemas ====================
 
+
 class LinkageActionCreate(BaseModel):
     """创建联动动作"""
+
     action_type: str
     action_config: dict
     sort_order: int = 0
@@ -21,6 +24,7 @@ class LinkageActionCreate(BaseModel):
 
 class LinkageActionResponse(BaseModel):
     """联动动作响应"""
+
     model_config = ConfigDict(from_attributes=True)
 
     id: int
@@ -35,8 +39,10 @@ class LinkageActionResponse(BaseModel):
 
 # ==================== Policy Schemas ====================
 
+
 class LinkagePolicyCreate(BaseModel):
     """创建联动策略"""
+
     name: str
     description: Optional[str] = None
     trigger_type: str
@@ -48,6 +54,7 @@ class LinkagePolicyCreate(BaseModel):
 
 class LinkagePolicyUpdate(BaseModel):
     """更新联动策略"""
+
     name: Optional[str] = None
     description: Optional[str] = None
     trigger_type: Optional[str] = None
@@ -59,6 +66,7 @@ class LinkagePolicyUpdate(BaseModel):
 
 class LinkagePolicyResponse(BaseModel):
     """联动策略响应"""
+
     model_config = ConfigDict(from_attributes=True)
 
     id: int
@@ -76,8 +84,10 @@ class LinkagePolicyResponse(BaseModel):
 
 # ==================== Execution / Log Schemas ====================
 
+
 class LinkageLogResponse(BaseModel):
     """联动执行日志响应"""
+
     model_config = ConfigDict(from_attributes=True)
 
     id: int
@@ -94,6 +104,7 @@ class LinkageLogResponse(BaseModel):
 
 class LinkageExecutionResponse(BaseModel):
     """联动执行记录响应"""
+
     model_config = ConfigDict(from_attributes=True)
 
     id: int
@@ -111,14 +122,17 @@ class LinkageExecutionResponse(BaseModel):
 
 # ==================== Test / Info Schemas ====================
 
+
 class LinkagePolicyTestRequest(BaseModel):
     """联动策略测试请求"""
+
     event_type: Optional[str] = None
     payload: dict = {}
 
 
 class ActionTypeInfo(BaseModel):
     """动作类型信息"""
+
     action_type: str
     description: str
     is_implemented: bool
@@ -126,13 +140,16 @@ class ActionTypeInfo(BaseModel):
 
 # ==================== Recovery Schemas (Story 9-4) ====================
 
+
 class RecoveryCreate(BaseModel):
     """创建恢复请求"""
+
     mode: Literal["auto", "manual"] = "auto"
 
 
 class RecoveryLogResponse(BaseModel):
     """恢复步骤日志响应"""
+
     model_config = ConfigDict(from_attributes=True)
 
     id: int
@@ -151,6 +168,7 @@ class RecoveryLogResponse(BaseModel):
 
 class RecoveryResponse(BaseModel):
     """恢复记录响应"""
+
     model_config = ConfigDict(from_attributes=True)
 
     id: int
@@ -166,8 +184,10 @@ class RecoveryResponse(BaseModel):
 
 # ==================== Timeline Schemas (Story 9-5) ====================
 
+
 class TimelineEvent(BaseModel):
     """时间线中的单个事件"""
+
     timestamp: Optional[datetime] = None
     phase: str  # trigger / action / recovery
     event_type: str
@@ -178,6 +198,7 @@ class TimelineEvent(BaseModel):
 
 class TimelineReportResponse(BaseModel):
     """完整时间线报告"""
+
     execution_id: int
     event_id: str
     policy_name: str

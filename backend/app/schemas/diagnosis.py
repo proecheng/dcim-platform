@@ -2,6 +2,7 @@
 诊断 Schema
 Story 9-3: 智能故障诊断
 """
+
 from datetime import datetime
 from typing import Optional, List
 
@@ -10,8 +11,10 @@ from pydantic import BaseModel, ConfigDict
 
 # ==================== Cause Item ====================
 
+
 class DiagnosisCauseItem(BaseModel):
     """诊断原因条目"""
+
     cause: str
     confidence: int
     suggested_actions: List[str] = []
@@ -19,8 +22,10 @@ class DiagnosisCauseItem(BaseModel):
 
 # ==================== Rule Schemas ====================
 
+
 class DiagnosisRuleCreate(BaseModel):
     """创建诊断规则"""
+
     rule_code: str
     name: str
     description: Optional[str] = None
@@ -33,6 +38,7 @@ class DiagnosisRuleCreate(BaseModel):
 
 class DiagnosisRuleUpdate(BaseModel):
     """更新诊断规则"""
+
     name: Optional[str] = None
     description: Optional[str] = None
     category: Optional[str] = None
@@ -44,6 +50,7 @@ class DiagnosisRuleUpdate(BaseModel):
 
 class DiagnosisRuleResponse(BaseModel):
     """诊断规则响应"""
+
     model_config = ConfigDict(from_attributes=True)
 
     id: int
@@ -62,8 +69,10 @@ class DiagnosisRuleResponse(BaseModel):
 
 # ==================== Result Schemas ====================
 
+
 class DiagnosisResultResponse(BaseModel):
     """诊断结果响应"""
+
     model_config = ConfigDict(from_attributes=True)
 
     id: int
@@ -80,8 +89,10 @@ class DiagnosisResultResponse(BaseModel):
 
 # ==================== Category Schema ====================
 
+
 class DiagnosisCategoryItem(BaseModel):
     """诊断分类条目"""
+
     code: str
     name: str
     count: int = 0

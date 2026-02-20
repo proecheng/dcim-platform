@@ -1,6 +1,7 @@
 """
 资产管理模型
 """
+
 from datetime import datetime
 from enum import Enum as PyEnum
 from sqlalchemy import Column, Integer, String, Boolean, Float, Text, DateTime, Date, ForeignKey, Enum
@@ -11,32 +12,37 @@ from ..core.database import Base
 
 # ==================== 枚举定义 ====================
 
+
 class AssetStatus(str, PyEnum):
     """资产状态枚举"""
-    in_stock = "in_stock"           # 库存中
-    in_use = "in_use"               # 使用中
-    borrowed = "borrowed"           # 借出
-    maintenance = "maintenance"     # 维护中
-    scrapped = "scrapped"           # 已报废
+
+    in_stock = "in_stock"  # 库存中
+    in_use = "in_use"  # 使用中
+    borrowed = "borrowed"  # 借出
+    maintenance = "maintenance"  # 维护中
+    scrapped = "scrapped"  # 已报废
 
 
 class AssetType(str, PyEnum):
     """资产类型枚举"""
-    server = "server"               # 服务器
-    network = "network"             # 网络设备
-    storage = "storage"             # 存储设备
-    ups = "ups"                     # UPS
-    pdu = "pdu"                     # PDU
-    ac = "ac"                       # 空调
-    cabinet = "cabinet"             # 机柜
-    sensor = "sensor"               # 传感器
-    other = "other"                 # 其他
+
+    server = "server"  # 服务器
+    network = "network"  # 网络设备
+    storage = "storage"  # 存储设备
+    ups = "ups"  # UPS
+    pdu = "pdu"  # PDU
+    ac = "ac"  # 空调
+    cabinet = "cabinet"  # 机柜
+    sensor = "sensor"  # 传感器
+    other = "other"  # 其他
 
 
 # ==================== 机柜模型 ====================
 
+
 class Cabinet(Base):
     """机柜表"""
+
     __tablename__ = "cabinets"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -64,8 +70,10 @@ class Cabinet(Base):
 
 # ==================== 资产模型 ====================
 
+
 class Asset(Base):
     """资产表"""
+
     __tablename__ = "assets"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -112,8 +120,10 @@ class Asset(Base):
 
 # ==================== 资产生命周期模型 ====================
 
+
 class AssetLifecycle(Base):
     """资产生命周期记录表"""
+
     __tablename__ = "asset_lifecycles"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -132,8 +142,10 @@ class AssetLifecycle(Base):
 
 # ==================== 维护记录模型 ====================
 
+
 class MaintenanceRecord(Base):
     """维护记录表"""
+
     __tablename__ = "maintenance_records"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -154,8 +166,10 @@ class MaintenanceRecord(Base):
 
 # ==================== 资产盘点模型 ====================
 
+
 class AssetInventory(Base):
     """资产盘点表"""
+
     __tablename__ = "asset_inventories"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -177,6 +191,7 @@ class AssetInventory(Base):
 
 class AssetInventoryItem(Base):
     """资产盘点明细表"""
+
     __tablename__ = "asset_inventory_items"
 
     id = Column(Integer, primary_key=True, autoincrement=True)

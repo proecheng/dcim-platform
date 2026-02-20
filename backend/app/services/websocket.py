@@ -1,10 +1,10 @@
 """
 WebSocket 服务
 """
+
 import logging
 from typing import List, Dict
 from fastapi import WebSocket
-import json
 
 logger = logging.getLogger(__name__)
 
@@ -18,7 +18,7 @@ class ConnectionManager:
             "alarms": [],
             "control": [],
             "system": [],
-            "linkage": []
+            "linkage": [],
         }
 
     async def connect(self, websocket: WebSocket, channel: str = "realtime"):
@@ -49,10 +49,7 @@ class ConnectionManager:
 
     async def broadcast_realtime(self, point_data: dict):
         """广播实时数据"""
-        message = {
-            "type": "realtime",
-            "data": point_data
-        }
+        message = {"type": "realtime", "data": point_data}
         await self.broadcast(message, "realtime")
 
     async def broadcast_alarm(self, alarm_data: dict):
@@ -60,11 +57,7 @@ class ConnectionManager:
         action = alarm_data.get("action", "new")
         # 构建消息时排除 action 字段，避免重复
         data = {k: v for k, v in alarm_data.items() if k != "action"}
-        message = {
-            "type": "alarm",
-            "action": action,
-            "data": data
-        }
+        message = {"type": "alarm", "action": action, "data": data}
         await self.broadcast(message, "alarms")
 
     async def broadcast_system(self, system_data: dict):

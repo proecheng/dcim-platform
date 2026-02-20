@@ -1,6 +1,7 @@
 """
 日志模型
 """
+
 from datetime import datetime
 from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey
 
@@ -9,6 +10,7 @@ from ..core.database import Base
 
 class OperationLog(Base):
     """操作日志表"""
+
     __tablename__ = "operation_logs"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -34,6 +36,7 @@ class OperationLog(Base):
 
 class SystemLog(Base):
     """系统日志表"""
+
     __tablename__ = "system_logs"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -47,6 +50,7 @@ class SystemLog(Base):
 
 class CommunicationLog(Base):
     """通讯日志表"""
+
     __tablename__ = "communication_logs"
 
     id = Column(Integer, primary_key=True, autoincrement=True)

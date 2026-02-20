@@ -5,6 +5,7 @@ Device Control Service
 提供设备调节控制功能，支持自动和手动执行
 暂时使用模拟控制，预留BMS对接接口
 """
+
 from typing import Dict, List, Optional, Any
 from datetime import datetime
 from enum import Enum
@@ -12,13 +13,12 @@ from dataclasses import dataclass
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_
 
-from ..models.energy import (
-    PowerDevice, LoadRegulationConfig, DeviceShiftConfig
-)
+from ..models.energy import PowerDevice, LoadRegulationConfig, DeviceShiftConfig
 
 
 class ControlResult(str, Enum):
     """控制结果"""
+
     SUCCESS = "success"
     FAILED = "failed"
     PARTIAL = "partial"
@@ -28,20 +28,22 @@ class ControlResult(str, Enum):
 
 class ControlInterface(str, Enum):
     """控制接口类型"""
-    BMS = "bms"           # 楼宇管理系统
-    DIRECT = "direct"     # 直接控制
-    MODBUS = "modbus"     # Modbus协议
-    BACNET = "bacnet"     # BACnet协议
-    MANUAL = "manual"     # 需要人工操作
+
+    BMS = "bms"  # 楼宇管理系统
+    DIRECT = "direct"  # 直接控制
+    MODBUS = "modbus"  # Modbus协议
+    BACNET = "bacnet"  # BACnet协议
+    MANUAL = "manual"  # 需要人工操作
     SIMULATED = "simulated"  # 模拟（开发测试）
 
 
 @dataclass
 class ControlAction:
     """控制动作"""
+
     device_id: int
     device_name: str
-    action_type: str        # temperature/brightness/power/mode
+    action_type: str  # temperature/brightness/power/mode
     current_value: float
     target_value: float
     unit: str
@@ -71,7 +73,7 @@ class DeviceControlService:
         self._interface_config = {
             "default": ControlInterface.SIMULATED,
             "ac": ControlInterface.BMS,
-            "lighting": ControlInterface.MANUAL
+            "lighting": ControlInterface.MANUAL,
         }
 
     async def control_device_regulation(
@@ -80,7 +82,7 @@ class DeviceControlService:
         regulation_type: str,
         target_value: float,
         scheduled_time: Optional[datetime] = None,
-        force: bool = False
+        force: bool = False,
     ) -> ControlAction:
         """
         控制设备调节
@@ -108,7 +110,7 @@ class DeviceControlService:
                 interface=ControlInterface.MANUAL,
                 result=ControlResult.FAILED,
                 message=f"设备ID {device_id} 不存在",
-                executed_at=datetime.now()
+                executed_at=datetime.now(),
             )
 
         reg_config = await self._get_regulation_config(device_id, regulation_type)
@@ -123,13 +125,11 @@ class DeviceControlService:
                 interface=ControlInterface.MANUAL,
                 result=ControlResult.FAILED,
                 message=f"设备 {device.device_name} 无 {regulation_type} 调节配置",
-                executed_at=datetime.now()
+                executed_at=datetime.now(),
             )
 
         # 2. 验证控制权限和约束
-        validation = await self.validate_control_permission(
-            device_id, regulation_type, target_value, force
-        )
+        validation = await self.validate_control_permission(device_id, regulation_type, target_value, force)
         if not validation["is_allowed"]:
             return ControlAction(
                 device_id=device_id,
@@ -141,7 +141,7 @@ class DeviceControlService:
                 interface=ControlInterface.MANUAL,
                 result=ControlResult.FAILED,
                 message="; ".join(validation["reasons"]),
-                executed_at=datetime.now()
+                executed_at=datetime.now(),
             )
 
         # 3. 确定控制接口
@@ -157,9 +157,7 @@ class DeviceControlService:
             # NOTE: 定时调度队列待后续版本实现，当前仅记录计划
         else:
             # 立即执行
-            result, message = await self._execute_control(
-                device, reg_config, target_value, interface
-            )
+            result, message = await self._execute_control(device, reg_config, target_value, interface)
 
         # 5. 记录控制日志
         action = ControlAction(
@@ -172,7 +170,7 @@ class DeviceControlService:
             interface=interface,
             result=result,
             message=message,
-            executed_at=datetime.now()
+            executed_at=datetime.now(),
         )
 
         await self.log_control_action(action)
@@ -185,11 +183,7 @@ class DeviceControlService:
         return action
 
     async def validate_control_permission(
-        self,
-        device_id: int,
-        regulation_type: str,
-        target_value: float,
-        force: bool = False
+        self, device_id: int, regulation_type: str, target_value: float, force: bool = False
     ) -> Dict[str, Any]:
         """
         验证控制权限和约束
@@ -238,16 +232,9 @@ class DeviceControlService:
             warnings.extend([f"[已忽略] {r}" for r in reasons])
             reasons = []
 
-        return {
-            "is_allowed": len(reasons) == 0,
-            "reasons": reasons,
-            "warnings": warnings
-        }
+        return {"is_allowed": len(reasons) == 0, "reasons": reasons, "warnings": warnings}
 
-    async def execute_scheduled_control(
-        self,
-        schedule_id: int
-    ) -> ControlAction:
+    async def execute_scheduled_control(self, schedule_id: int) -> ControlAction:
         """
         执行定时控制任务
 
@@ -261,11 +248,7 @@ class DeviceControlService:
         # 从调度表获取任务信息，调用 control_device_regulation
         raise NotImplementedError("定时控制功能待实现")
 
-    async def get_control_status(
-        self,
-        device_id: int,
-        regulation_type: Optional[str] = None
-    ) -> Dict[str, Any]:
+    async def get_control_status(self, device_id: int, regulation_type: Optional[str] = None) -> Dict[str, Any]:
         """
         获取设备控制状态
 
@@ -284,10 +267,7 @@ class DeviceControlService:
 
         # 获取所有调节配置
         query = select(LoadRegulationConfig).where(
-            and_(
-                LoadRegulationConfig.device_id == device_id,
-                LoadRegulationConfig.is_enabled == True
-            )
+            and_(LoadRegulationConfig.device_id == device_id, LoadRegulationConfig.is_enabled == True)
         )
         if regulation_type:
             query = query.where(LoadRegulationConfig.regulation_type == regulation_type)
@@ -298,18 +278,20 @@ class DeviceControlService:
         regulations = []
         for config in configs:
             interface = self._get_control_interface(device, config)
-            regulations.append({
-                "config_id": config.id,
-                "regulation_type": config.regulation_type,
-                "current_value": config.current_value,
-                "default_value": config.default_value,
-                "min_value": config.min_value,
-                "max_value": config.max_value,
-                "unit": config.unit,
-                "is_auto": config.is_auto,
-                "interface": interface.value,
-                "is_controllable": interface != ControlInterface.MANUAL
-            })
+            regulations.append(
+                {
+                    "config_id": config.id,
+                    "regulation_type": config.regulation_type,
+                    "current_value": config.current_value,
+                    "default_value": config.default_value,
+                    "min_value": config.min_value,
+                    "max_value": config.max_value,
+                    "unit": config.unit,
+                    "is_auto": config.is_auto,
+                    "interface": interface.value,
+                    "is_controllable": interface != ControlInterface.MANUAL,
+                }
+            )
 
         return {
             "device_id": device_id,
@@ -317,13 +299,10 @@ class DeviceControlService:
             "device_type": device.device_type,
             "regulations": regulations,
             "is_controllable": any(r["is_controllable"] for r in regulations),
-            "control_count": len(regulations)
+            "control_count": len(regulations),
         }
 
-    async def log_control_action(
-        self,
-        action: ControlAction
-    ) -> None:
+    async def log_control_action(self, action: ControlAction) -> None:
         """
         记录控制操作日志
 
@@ -331,6 +310,7 @@ class DeviceControlService:
         """
         # 暂时只打印日志
         import logging
+
         logger = logging.getLogger(__name__)
         logger.info(
             f"[DeviceControl] {action.device_name} ({action.device_id}) "
@@ -338,10 +318,7 @@ class DeviceControlService:
             f"| Result: {action.result.value} | {action.message}"
         )
 
-    async def batch_control(
-        self,
-        controls: List[Dict[str, Any]]
-    ) -> List[ControlAction]:
+    async def batch_control(self, controls: List[Dict[str, Any]]) -> List[ControlAction]:
         """
         批量执行控制
 
@@ -362,7 +339,7 @@ class DeviceControlService:
                 regulation_type=ctrl["regulation_type"],
                 target_value=ctrl["target_value"],
                 scheduled_time=ctrl.get("scheduled_time"),
-                force=ctrl.get("force", False)
+                force=ctrl.get("force", False),
             )
             results.append(action)
         return results
@@ -371,22 +348,15 @@ class DeviceControlService:
 
     async def _get_device(self, device_id: int) -> Optional[PowerDevice]:
         """获取设备"""
-        result = await self.db.execute(
-            select(PowerDevice).where(PowerDevice.id == device_id)
-        )
+        result = await self.db.execute(select(PowerDevice).where(PowerDevice.id == device_id))
         return result.scalar_one_or_none()
 
-    async def _get_regulation_config(
-        self,
-        device_id: int,
-        regulation_type: str
-    ) -> Optional[LoadRegulationConfig]:
+    async def _get_regulation_config(self, device_id: int, regulation_type: str) -> Optional[LoadRegulationConfig]:
         """获取调节配置"""
         result = await self.db.execute(
             select(LoadRegulationConfig).where(
                 and_(
-                    LoadRegulationConfig.device_id == device_id,
-                    LoadRegulationConfig.regulation_type == regulation_type
+                    LoadRegulationConfig.device_id == device_id, LoadRegulationConfig.regulation_type == regulation_type
                 )
             )
         )
@@ -394,16 +364,10 @@ class DeviceControlService:
 
     async def _get_shift_config(self, device_id: int) -> Optional[DeviceShiftConfig]:
         """获取转移配置"""
-        result = await self.db.execute(
-            select(DeviceShiftConfig).where(DeviceShiftConfig.device_id == device_id)
-        )
+        result = await self.db.execute(select(DeviceShiftConfig).where(DeviceShiftConfig.device_id == device_id))
         return result.scalar_one_or_none()
 
-    def _get_control_interface(
-        self,
-        device: PowerDevice,
-        config: LoadRegulationConfig
-    ) -> ControlInterface:
+    def _get_control_interface(self, device: PowerDevice, config: LoadRegulationConfig) -> ControlInterface:
         """确定设备控制接口"""
         # 优先使用配置的接口
         # NOTE: 后续版本从配置中读取实际接口类型
@@ -425,11 +389,7 @@ class DeviceControlService:
         return ControlInterface.MANUAL
 
     async def _execute_control(
-        self,
-        device: PowerDevice,
-        config: LoadRegulationConfig,
-        target_value: float,
-        interface: ControlInterface
+        self, device: PowerDevice, config: LoadRegulationConfig, target_value: float, interface: ControlInterface
     ) -> tuple[ControlResult, str]:
         """
         执行实际控制
@@ -444,36 +404,23 @@ class DeviceControlService:
             return await self._execute_bms_control(device, config, target_value)
 
         if interface == ControlInterface.MANUAL:
-            return (
-                ControlResult.PENDING,
-                "需要人工操作，请按指引进行调节"
-            )
+            return (ControlResult.PENDING, "需要人工操作，请按指引进行调节")
 
         # 其他接口待实现
-        return (
-            ControlResult.FAILED,
-            f"控制接口 {interface.value} 尚未实现"
-        )
+        return (ControlResult.FAILED, f"控制接口 {interface.value} 尚未实现")
 
     async def _execute_simulated_control(
-        self,
-        device: PowerDevice,
-        config: LoadRegulationConfig,
-        target_value: float
+        self, device: PowerDevice, config: LoadRegulationConfig, target_value: float
     ) -> tuple[ControlResult, str]:
         """模拟控制执行"""
         # 模拟执行成功
         return (
             ControlResult.SIMULATED,
-            f"[模拟] {device.device_name} {config.regulation_type} "
-            f"已调节至 {target_value}{config.unit or ''}"
+            f"[模拟] {device.device_name} {config.regulation_type} " f"已调节至 {target_value}{config.unit or ''}",
         )
 
     async def _execute_bms_control(
-        self,
-        device: PowerDevice,
-        config: LoadRegulationConfig,
-        target_value: float
+        self, device: PowerDevice, config: LoadRegulationConfig, target_value: float
     ) -> tuple[ControlResult, str]:
         """
         BMS控制执行
@@ -487,6 +434,5 @@ class DeviceControlService:
         # 暂时返回模拟结果
         return (
             ControlResult.SIMULATED,
-            f"[BMS模拟] {device.device_name} {config.regulation_type} "
-            f"已调节至 {target_value}{config.unit or ''}"
+            f"[BMS模拟] {device.device_name} {config.regulation_type} " f"已调节至 {target_value}{config.unit or ''}",
         )

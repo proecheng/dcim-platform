@@ -1,6 +1,7 @@
 """
 报表相关 Schema
 """
+
 from typing import Optional, List, Dict, Any
 from datetime import datetime
 from pydantic import BaseModel, ConfigDict, Field
@@ -8,6 +9,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 class ReportTemplateCreate(BaseModel):
     """创建报表模板"""
+
     template_name: str
     template_type: Optional[str] = None
     template_config: Optional[str] = None
@@ -17,6 +19,7 @@ class ReportTemplateCreate(BaseModel):
 
 class ReportTemplateUpdate(BaseModel):
     """更新报表模板"""
+
     template_name: Optional[str] = None
     template_type: Optional[str] = None
     template_config: Optional[str] = None
@@ -26,6 +29,7 @@ class ReportTemplateUpdate(BaseModel):
 
 class ReportTemplateInfo(BaseModel):
     """报表模板信息"""
+
     model_config = ConfigDict(from_attributes=True)
 
     id: int
@@ -41,6 +45,7 @@ class ReportTemplateInfo(BaseModel):
 
 class ReportRecordInfo(BaseModel):
     """报表记录信息"""
+
     model_config = ConfigDict(from_attributes=True)
 
     id: int
@@ -60,6 +65,7 @@ class ReportRecordInfo(BaseModel):
 
 class ReportGenerate(BaseModel):
     """生成报表"""
+
     template_id: Optional[int] = None
     report_type: Optional[str] = None
     start_time: datetime
@@ -69,8 +75,10 @@ class ReportGenerate(BaseModel):
 
 # --- Story 12-1: 自动运行报表 ---
 
+
 class ReportScheduleCreate(BaseModel):
     """创建报表调度"""
+
     name: str = Field(..., min_length=1, max_length=100, description="调度名称")
     report_type: str = Field(..., description="报表类型: daily/weekly/monthly")
     is_enabled: bool = Field(True, description="是否启用")
@@ -78,6 +86,7 @@ class ReportScheduleCreate(BaseModel):
 
 class ReportScheduleUpdate(BaseModel):
     """更新报表调度"""
+
     name: Optional[str] = Field(None, max_length=100, description="调度名称")
     report_type: Optional[str] = Field(None, description="报表类型: daily/weekly/monthly")
     is_enabled: Optional[bool] = Field(None, description="是否启用")
@@ -85,6 +94,7 @@ class ReportScheduleUpdate(BaseModel):
 
 class ReportScheduleResponse(BaseModel):
     """报表调度响应"""
+
     model_config = ConfigDict(from_attributes=True)
 
     id: int
@@ -100,11 +110,13 @@ class ReportScheduleResponse(BaseModel):
 
 class AutoReportRequest(BaseModel):
     """自动报表生成请求"""
+
     report_type: str = Field(..., description="报表类型: daily/weekly/monthly")
 
 
 class AutoReportData(BaseModel):
     """自动报表数据"""
+
     report_type: str
     title: str
     period: Dict[str, str]

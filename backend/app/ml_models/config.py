@@ -3,14 +3,16 @@
 
 定义所有模型的超参数和配置
 """
+
 from dataclasses import dataclass, field
-from typing import List, Optional
+from typing import List
 from pathlib import Path
 
 
 @dataclass
 class TransformerConfig:
     """时序Transformer配置"""
+
     # 输入特征维度：功率(1) + 时段类型(5) + 工作日(1) + 温度(1) = 8
     input_dim: int = 8
     # 模型维度
@@ -34,6 +36,7 @@ class TransformerConfig:
 @dataclass
 class GNNConfig:
     """图神经网络配置"""
+
     # 节点特征维度
     node_input_dim: int = 64
     # 隐藏层维度
@@ -57,6 +60,7 @@ class GNNConfig:
 @dataclass
 class RLConfig:
     """强化学习配置"""
+
     # 状态空间维度
     state_dim: int = 128
     # 动作空间维度（连续动作）
@@ -92,6 +96,7 @@ class RLConfig:
 @dataclass
 class MLConfig:
     """总体ML配置"""
+
     # 设备 (cpu/cuda)
     device: str = "cpu"
     # 模型检查点目录

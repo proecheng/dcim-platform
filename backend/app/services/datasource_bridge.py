@@ -1,4 +1,5 @@
 """数据源桥接服务 — 将 DataSourcePoint 采集数据同步到 Point/PointRealtime — Story 4.1"""
+
 import json
 from datetime import datetime
 from typing import Optional
@@ -32,7 +33,9 @@ async def sync_point_data(
 
     # 更新 PointRealtime
     await session.execute(
-        update(PointRealtime).where(PointRealtime.point_id == point_id).values(
+        update(PointRealtime)
+        .where(PointRealtime.point_id == point_id)
+        .values(
             value=value,
             raw_value=value,
             quality=quality,
@@ -46,14 +49,16 @@ async def sync_point_data(
     # 写入 Redis 缓存
     if redis_service.is_available:
         try:
-            cache_data = json.dumps({
-                "value": value,
-                "value_text": str(value),
-                "quality": quality,
-                "status": status,
-                "alarm_level": alarm_level,
-                "updated_at": now.isoformat(),
-            })
+            cache_data = json.dumps(
+                {
+                    "value": value,
+                    "value_text": str(value),
+                    "quality": quality,
+                    "status": status,
+                    "alarm_level": alarm_level,
+                    "updated_at": now.isoformat(),
+                }
+            )
             await redis_service.set(f"point:{point_id}:latest", cache_data, ttl=60)
         except Exception:
             pass  # Redis 缓存写入失败不影响数据桥接
@@ -72,24 +77,22 @@ async def link_datasource_to_point(
         True if link was created successfully
     """
     # 验证 DataSourcePoint 存在
-    ds_result = await session.execute(
-        select(DataSourcePoint).where(DataSourcePoint.id == datasource_point_id)
-    )
+    ds_result = await session.execute(select(DataSourcePoint).where(DataSourcePoint.id == datasource_point_id))
     ds_point = ds_result.scalar_one_or_none()
     if not ds_point:
         return False
 
     # 验证 Point 存在
-    pt_result = await session.execute(
-        select(Point).where(Point.id == point_id)
-    )
+    pt_result = await session.execute(select(Point).where(Point.id == point_id))
     point = pt_result.scalar_one_or_none()
     if not point:
         return False
 
     # 存储映射关系
     await session.execute(
-        update(Point).where(Point.id == point_id).values(
+        update(Point)
+        .where(Point.id == point_id)
+        .values(
             energy_device_id=datasource_point_id,  # 复用此字段存储映射
             updated_at=datetime.now(),
         )

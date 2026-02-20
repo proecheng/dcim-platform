@@ -2,6 +2,7 @@
 联动引擎 — 策略匹配与动作执行
 Story 9-1: 联动引擎核心框架
 """
+
 import asyncio
 import logging
 import time
@@ -13,7 +14,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
 from ..core.database import async_session
-from ..models.linkage import LinkagePolicy, LinkageAction, LinkageExecution, LinkageLog
+from ..models.linkage import LinkagePolicy, LinkageExecution, LinkageLog
 from .event_bus import Event, get_event_bus
 from .action_handlers import default_registry, ActionHandlerRegistry
 
@@ -42,7 +43,7 @@ class LinkageEngine:
             new_cache: Dict[int, dict] = {}
             for p in policies:
                 actions_data = []
-                if hasattr(p, 'actions') and p.actions is not None:
+                if hasattr(p, "actions") and p.actions is not None:
                     sorted_actions = sorted(p.actions, key=lambda a: a.sort_order if a.sort_order is not None else 0)
                     actions_data = [
                         {
@@ -87,7 +88,9 @@ class LinkageEngine:
 
         logger.info(
             "联动引擎: 事件 %s 匹配 %d 条策略, is_test=%s",
-            event.event_type, len(matched), event.is_test,
+            event.event_type,
+            len(matched),
+            event.is_test,
         )
 
         # 按优先级排序执行
@@ -197,13 +200,16 @@ class LinkageEngine:
         # 广播联动执行结果到 WebSocket
         try:
             from ..services.websocket import ws_manager
-            await ws_manager.broadcast_linkage({
-                "execution_id": execution_id,
-                "policy_name": policy_data["name"],
-                "status": status,
-                "event_type": event.event_type,
-                "is_test": event.is_test,
-            })
+
+            await ws_manager.broadcast_linkage(
+                {
+                    "execution_id": execution_id,
+                    "policy_name": policy_data["name"],
+                    "status": status,
+                    "event_type": event.event_type,
+                    "is_test": event.is_test,
+                }
+            )
         except Exception as e:
             logger.warning("联动引擎: WebSocket 广播失败: %s", e)
 
@@ -211,15 +217,18 @@ class LinkageEngine:
         if status in ("partial_failure", "failed"):
             try:
                 from ..services.websocket import ws_manager
-                await ws_manager.broadcast_alarm({
-                    "action": "linkage_failure",
-                    "alarm_level": "critical",
-                    "alarm_message": f"联动策略执行{'部分失败' if status == 'partial_failure' else '失败'}: "
-                                     f"{policy_data['name']}（失败 {fail_count} 个动作）",
-                    "execution_id": execution_id,
-                    "policy_name": policy_data["name"],
-                    "event_id": event_id,
-                })
+
+                await ws_manager.broadcast_alarm(
+                    {
+                        "action": "linkage_failure",
+                        "alarm_level": "critical",
+                        "alarm_message": f"联动策略执行{'部分失败' if status == 'partial_failure' else '失败'}: "
+                        f"{policy_data['name']}（失败 {fail_count} 个动作）",
+                        "execution_id": execution_id,
+                        "policy_name": policy_data["name"],
+                        "event_id": event_id,
+                    }
+                )
             except Exception as e:
                 logger.warning("联动引擎: 失败告警通知发送失败: %s", e)
 
@@ -278,7 +287,10 @@ class LinkageEngine:
                     if attempt < max_attempts - 1:
                         logger.info(
                             "联动引擎: 动作 %s 第 %d 次执行失败，%0.1fs 后重试: %s",
-                            action_type, attempt + 1, 0.5, last_error,
+                            action_type,
+                            attempt + 1,
+                            0.5,
+                            last_error,
                         )
                         await asyncio.sleep(0.5)
                     else:
@@ -289,7 +301,9 @@ class LinkageEngine:
                 if attempt < max_attempts - 1:
                     logger.info(
                         "联动引擎: 动作 %s 第 %d 次超时，%0.1fs 后重试",
-                        action_type, attempt + 1, 0.5,
+                        action_type,
+                        attempt + 1,
+                        0.5,
                     )
                     await asyncio.sleep(0.5)
                 else:
@@ -300,7 +314,10 @@ class LinkageEngine:
                 if attempt < max_attempts - 1:
                     logger.info(
                         "联动引擎: 动作 %s 第 %d 次异常，%0.1fs 后重试: %s",
-                        action_type, attempt + 1, 0.5, last_error,
+                        action_type,
+                        attempt + 1,
+                        0.5,
+                        last_error,
                     )
                     await asyncio.sleep(0.5)
                 else:
@@ -315,9 +332,7 @@ class LinkageEngine:
         """更新执行记录状态"""
         duration_ms = int((time.time() - start_time) * 1000)
         async with async_session() as session:
-            result = await session.execute(
-                select(LinkageExecution).where(LinkageExecution.id == execution_id)
-            )
+            result = await session.execute(select(LinkageExecution).where(LinkageExecution.id == execution_id))
             execution = result.scalar_one_or_none()
             if execution is not None:
                 execution.status = status
@@ -329,9 +344,7 @@ class LinkageEngine:
         """更新日志记录"""
         duration_ms = int((time.time() - start_time) * 1000)
         async with async_session() as session:
-            result = await session.execute(
-                select(LinkageLog).where(LinkageLog.id == log_id)
-            )
+            result = await session.execute(select(LinkageLog).where(LinkageLog.id == log_id))
             log_entry = result.scalar_one_or_none()
             if log_entry is not None:
                 log_entry.status = status

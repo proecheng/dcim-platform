@@ -1,6 +1,7 @@
 """
 资产管理数据模型
 """
+
 from typing import Optional, List, Dict
 from pydantic import BaseModel, Field
 from datetime import datetime, date
@@ -10,8 +11,10 @@ from app.models.asset import AssetStatus, AssetType
 
 # ==================== 机柜 Schemas ====================
 
+
 class CabinetBase(BaseModel):
     """机柜基础模型"""
+
     cabinet_code: str = Field(..., description="机柜编码")
     cabinet_name: str = Field(..., description="机柜名称")
     location: Optional[str] = Field(None, description="位置")
@@ -28,11 +31,13 @@ class CabinetBase(BaseModel):
 
 class CabinetCreate(CabinetBase):
     """创建机柜"""
+
     pass
 
 
 class CabinetUpdate(BaseModel):
     """更新机柜"""
+
     cabinet_code: Optional[str] = Field(None, description="机柜编码")
     cabinet_name: Optional[str] = Field(None, description="机柜名称")
     location: Optional[str] = Field(None, description="位置")
@@ -49,6 +54,7 @@ class CabinetUpdate(BaseModel):
 
 class CabinetResponse(CabinetBase):
     """机柜响应"""
+
     id: int = Field(..., description="机柜ID")
     used_u: int = Field(0, description="已使用U数")
     available_u: int = Field(42, description="可用U数")
@@ -62,8 +68,10 @@ class CabinetResponse(CabinetBase):
 
 # ==================== 资产 Schemas ====================
 
+
 class AssetBase(BaseModel):
     """资产基础模型"""
+
     asset_code: str = Field(..., description="资产编码")
     asset_name: str = Field(..., description="资产名称")
     asset_type: AssetType = Field(..., description="资产类型")
@@ -94,11 +102,13 @@ class AssetBase(BaseModel):
 
 class AssetCreate(AssetBase):
     """创建资产"""
+
     pass
 
 
 class AssetUpdate(BaseModel):
     """更新资产"""
+
     asset_code: Optional[str] = Field(None, description="资产编码")
     asset_name: Optional[str] = Field(None, description="资产名称")
     asset_type: Optional[AssetType] = Field(None, description="资产类型")
@@ -129,6 +139,7 @@ class AssetUpdate(BaseModel):
 
 class AssetResponse(AssetBase):
     """资产响应"""
+
     id: int = Field(..., description="资产ID")
     cabinet_name: Optional[str] = Field(None, description="机柜名称")
     warranty_status: str = Field("unknown", description="保修状态: valid/expiring/expired/unknown")
@@ -141,8 +152,10 @@ class AssetResponse(AssetBase):
 
 # ==================== 资产生命周期 Schemas ====================
 
+
 class LifecycleCreate(BaseModel):
     """创建资产生命周期记录"""
+
     asset_id: int = Field(..., description="资产ID")
     action: str = Field(..., description="操作类型: purchase/deploy/move/maintain/scrap等")
     action_date: datetime = Field(..., description="操作日期")
@@ -154,6 +167,7 @@ class LifecycleCreate(BaseModel):
 
 class LifecycleResponse(BaseModel):
     """资产生命周期响应"""
+
     id: int = Field(..., description="记录ID")
     asset_id: int = Field(..., description="资产ID")
     action: str = Field(..., description="操作类型")
@@ -170,8 +184,10 @@ class LifecycleResponse(BaseModel):
 
 # ==================== 维护记录 Schemas ====================
 
+
 class MaintenanceCreate(BaseModel):
     """创建维护记录"""
+
     asset_id: int = Field(..., description="资产ID")
     maintenance_type: str = Field(..., description="维护类型: routine/repair/upgrade等")
     start_time: datetime = Field(..., description="开始时间")
@@ -185,6 +201,7 @@ class MaintenanceCreate(BaseModel):
 
 class MaintenanceResponse(BaseModel):
     """维护记录响应"""
+
     id: int = Field(..., description="记录ID")
     asset_id: int = Field(..., description="资产ID")
     maintenance_type: str = Field(..., description="维护类型")
@@ -203,8 +220,10 @@ class MaintenanceResponse(BaseModel):
 
 # ==================== 资产盘点 Schemas ====================
 
+
 class InventoryCreate(BaseModel):
     """创建资产盘点"""
+
     inventory_code: str = Field(..., description="盘点编码")
     inventory_date: date = Field(..., description="盘点日期")
     operator: Optional[str] = Field(None, description="盘点人")
@@ -213,6 +232,7 @@ class InventoryCreate(BaseModel):
 
 class InventoryItemUpdate(BaseModel):
     """更新盘点明细"""
+
     actual_location: Optional[str] = Field(None, description="实际位置")
     is_matched: bool = Field(..., description="是否匹配")
     check_time: Optional[datetime] = Field(None, description="盘点时间")
@@ -221,6 +241,7 @@ class InventoryItemUpdate(BaseModel):
 
 class InventoryItemResponse(BaseModel):
     """盘点明细响应"""
+
     id: int = Field(..., description="明细ID")
     inventory_id: int = Field(..., description="盘点ID")
     asset_id: int = Field(..., description="资产ID")
@@ -236,6 +257,7 @@ class InventoryItemResponse(BaseModel):
 
 class InventoryResponse(BaseModel):
     """资产盘点响应"""
+
     id: int = Field(..., description="盘点ID")
     inventory_code: str = Field(..., description="盘点编码")
     inventory_date: date = Field(..., description="盘点日期")
@@ -256,8 +278,10 @@ class InventoryResponse(BaseModel):
 
 # ==================== 资产统计 Schemas ====================
 
+
 class AssetStatistics(BaseModel):
     """资产统计信息"""
+
     total_count: int = Field(..., description="资产总数")
     by_status: Dict[str, int] = Field(default_factory=dict, description="按状态统计")
     by_type: Dict[str, int] = Field(default_factory=dict, description="按类型统计")
@@ -268,8 +292,10 @@ class AssetStatistics(BaseModel):
 
 # ==================== 保修预警 Schemas ====================
 
+
 class WarrantyAlertItem(BaseModel):
     """保修预警项"""
+
     asset_id: int
     asset_code: str
     asset_name: str
@@ -278,8 +304,10 @@ class WarrantyAlertItem(BaseModel):
     days_remaining: int
     status: Optional[str] = None
 
+
 class WarrantyAlertResponse(BaseModel):
     """保修预警汇总"""
+
     within_30_days: List[WarrantyAlertItem] = []
     within_60_days: List[WarrantyAlertItem] = []
     within_90_days: List[WarrantyAlertItem] = []

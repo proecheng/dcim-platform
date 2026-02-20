@@ -4,20 +4,22 @@
 提供REST API访问深度学习模块的功能
 """
 
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 from typing import List, Dict, Optional, Any
 from datetime import datetime
 
-from ..services.ml_service import get_ml_service, MLEnergySavingService
+from ..services.ml_service import get_ml_service
 
 router = APIRouter(prefix="/ml", tags=["深度学习节能优化"])
 
 
 # ========== 请求/响应模型 ==========
 
+
 class LoadAnalysisRequest(BaseModel):
     """负荷分析请求"""
+
     power_data: List[List[float]] = Field(..., description="功率时序数据")
     period_types: List[List[int]] = Field(..., description="时段类型 (0-4)")
     is_weekday: List[List[int]] = Field(..., description="工作日标志 (0/1)")
@@ -26,6 +28,7 @@ class LoadAnalysisRequest(BaseModel):
 
 class PeakValleySavingRequest(BaseModel):
     """峰谷收益计算请求"""
+
     predictions: List[Dict[str, Any]] = Field(..., description="负荷分析结果")
     price_diff: float = Field(..., description="峰谷电价差 (元/kWh)")
     shift_hours: float = Field(2.0, description="每日转移时长")
@@ -34,11 +37,13 @@ class PeakValleySavingRequest(BaseModel):
 
 class MeasureConflictRequest(BaseModel):
     """措施冲突分析请求"""
+
     measures: List[Dict[str, Any]] = Field(..., description="候选措施列表")
 
 
 class RLUpdateRequest(BaseModel):
     """RL更新请求"""
+
     actual_saving: float = Field(..., description="实际节能收益")
     expected_saving: float = Field(..., description="预期节能收益")
     comfort_violation: float = Field(0.0, description="舒适度违反程度")
@@ -48,6 +53,7 @@ class RLUpdateRequest(BaseModel):
 
 class IntelligentSchemeRequest(BaseModel):
     """智能方案生成请求"""
+
     power_data: List[List[float]]
     period_types: List[List[int]]
     is_weekday: List[List[int]]
@@ -59,12 +65,14 @@ class IntelligentSchemeRequest(BaseModel):
 
 class TrainRequest(BaseModel):
     """模型训练请求"""
+
     transformer_epochs: int = Field(50, ge=1, le=500)
     gnn_epochs: int = Field(30, ge=1, le=200)
     rl_steps: int = Field(1000, ge=100, le=10000)
 
 
 # ========== API端点 ==========
+
 
 @router.get("/status")
 async def get_status():
@@ -75,10 +83,7 @@ async def get_status():
     """
     try:
         service = get_ml_service()
-        return {
-            "success": True,
-            "data": service.get_model_status()
-        }
+        return {"success": True, "data": service.get_model_status()}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -96,10 +101,7 @@ async def analyze_loads(request: LoadAnalysisRequest):
     try:
         service = get_ml_service()
         result = service.analyze_transferable_loads(
-            request.power_data,
-            request.period_types,
-            request.is_weekday,
-            request.temperature
+            request.power_data, request.period_types, request.is_weekday, request.temperature
         )
         return {"success": True, "data": result}
     except Exception as e:
@@ -116,10 +118,7 @@ async def calculate_saving(request: PeakValleySavingRequest):
     try:
         service = get_ml_service()
         result = service.calculate_peak_valley_saving(
-            request.predictions,
-            request.price_diff,
-            request.shift_hours,
-            request.working_days
+            request.predictions, request.price_diff, request.shift_hours, request.working_days
         )
         return {"success": True, "data": result}
     except Exception as e:
@@ -177,7 +176,7 @@ async def update_rl_agent(request: RLUpdateRequest):
             request.expected_saving,
             request.comfort_violation,
             request.safety_violation,
-            request.current_state
+            request.current_state,
         )
         return {"success": True, "data": result}
     except Exception as e:
@@ -200,7 +199,7 @@ async def generate_scheme(request: IntelligentSchemeRequest):
             request.temperature,
             request.candidate_measures,
             request.price_diff,
-            request.current_state
+            request.current_state,
         )
         return {"success": True, "data": result}
     except Exception as e:
@@ -216,11 +215,7 @@ async def train_models(request: TrainRequest):
     """
     try:
         service = get_ml_service()
-        result = service.train_models(
-            request.transformer_epochs,
-            request.gnn_epochs,
-            request.rl_steps
-        )
+        result = service.train_models(request.transformer_epochs, request.gnn_epochs, request.rl_steps)
         return {"success": True, "data": result}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -228,11 +223,12 @@ async def train_models(request: TrainRequest):
 
 # ========== 与现有系统集成 ==========
 
+
 @router.post("/integrate/opportunity-engine")
 async def integrate_with_opportunity_engine(
     opportunities: List[Dict[str, Any]],
     power_data: Optional[List[List[float]]] = None,
-    period_types: Optional[List[List[int]]] = None
+    period_types: Optional[List[List[int]]] = None,
 ):
     """
     与现有机会分析引擎集成
@@ -248,7 +244,7 @@ async def integrate_with_opportunity_engine(
         result = {
             "original_opportunities": opportunities,
             "ml_enhancements": {},
-            "timestamp": datetime.now().isoformat()
+            "timestamp": datetime.now().isoformat(),
         }
 
         # 如果提供了负荷数据，进行深度分析
@@ -257,21 +253,21 @@ async def integrate_with_opportunity_engine(
             is_weekday = [[1] * len(p) for p in power_data]
             temperature = [[25.0] * len(p) for p in power_data]
 
-            load_analysis = service.analyze_transferable_loads(
-                power_data, period_types, is_weekday, temperature
-            )
+            load_analysis = service.analyze_transferable_loads(power_data, period_types, is_weekday, temperature)
             result["ml_enhancements"]["load_analysis"] = load_analysis
 
         # 将机会转换为措施格式进行冲突分析
         measures = []
         for opp in opportunities:
-            measures.append({
-                "measure_type": opp.get("category", 0),
-                "device_ids": opp.get("device_ids", []),
-                "execution_hours": list(range(8, 18)),  # 默认工作时间
-                "power_direction": 1 if "reduction" in str(opp.get("title", "")).lower() else 0,
-                "expected_benefit": opp.get("potential_saving", 0)
-            })
+            measures.append(
+                {
+                    "measure_type": opp.get("category", 0),
+                    "device_ids": opp.get("device_ids", []),
+                    "execution_hours": list(range(8, 18)),  # 默认工作时间
+                    "power_direction": 1 if "reduction" in str(opp.get("title", "")).lower() else 0,
+                    "expected_benefit": opp.get("potential_saving", 0),
+                }
+            )
 
         if measures:
             conflict_analysis = service.analyze_measure_conflicts(measures)

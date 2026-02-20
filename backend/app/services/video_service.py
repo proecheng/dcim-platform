@@ -2,6 +2,7 @@
 视频监控服务
 Story 10-1: 摄像头元数据管理
 """
+
 import logging
 from typing import Optional, List, Dict, Any
 
@@ -12,13 +13,17 @@ from ..models.video import NVR, Camera, CameraPreset, VideoEvent
 from ..models.alarm import Alarm
 from ..models.point import Point
 from ..schemas.video import (
-    NVRCreate, NVRUpdate, CameraCreate, CameraUpdate, CameraPresetCreate,
+    NVRCreate,
+    NVRUpdate,
+    CameraCreate,
+    CameraUpdate,
 )
 
 logger = logging.getLogger(__name__)
 
 
 # ========== NVR 服务 ==========
+
 
 async def create_nvr(db: AsyncSession, data: NVRCreate) -> NVR:
     """创建 NVR"""
@@ -58,9 +63,7 @@ async def update_nvr(db: AsyncSession, nvr_id: int, data: NVRUpdate) -> Optional
 async def delete_nvr(db: AsyncSession, nvr_id: int) -> bool:
     """删除 NVR（有关联摄像头时拒绝）"""
     # 检查关联摄像头
-    count_result = await db.execute(
-        select(func.count(Camera.id)).where(Camera.nvr_id == nvr_id)
-    )
+    count_result = await db.execute(select(func.count(Camera.id)).where(Camera.nvr_id == nvr_id))
     camera_count = count_result.scalar() or 0
     if camera_count > 0:
         raise ValueError(f"该 NVR 下有 {camera_count} 个摄像头，请先删除或解绑摄像头")
@@ -81,9 +84,7 @@ async def get_nvr(db: AsyncSession, nvr_id: int) -> Optional[NVR]:
     return result.scalar_one_or_none()
 
 
-async def list_nvrs(
-    db: AsyncSession, page: int = 1, page_size: int = 20
-) -> Dict[str, Any]:
+async def list_nvrs(db: AsyncSession, page: int = 1, page_size: int = 20) -> Dict[str, Any]:
     """NVR 列表（分页）"""
     count_result = await db.execute(select(func.count(NVR.id)))
     total = count_result.scalar() or 0
@@ -98,13 +99,12 @@ async def list_nvrs(
 
 async def get_nvr_camera_count(db: AsyncSession, nvr_id: int) -> int:
     """获取 NVR 关联摄像头数量"""
-    result = await db.execute(
-        select(func.count(Camera.id)).where(Camera.nvr_id == nvr_id)
-    )
+    result = await db.execute(select(func.count(Camera.id)).where(Camera.nvr_id == nvr_id))
     return result.scalar() or 0
 
 
 # ========== Camera 服务 ==========
+
 
 async def create_camera(db: AsyncSession, data: CameraCreate) -> Camera:
     """创建摄像头（含预置位）"""
@@ -141,9 +141,7 @@ async def create_camera(db: AsyncSession, data: CameraCreate) -> Camera:
     return camera
 
 
-async def update_camera(
-    db: AsyncSession, camera_id: int, data: CameraUpdate
-) -> Optional[Camera]:
+async def update_camera(db: AsyncSession, camera_id: int, data: CameraUpdate) -> Optional[Camera]:
     """更新摄像头（含预置位替换）"""
     result = await db.execute(select(Camera).where(Camera.id == camera_id))
     camera = result.scalar_one_or_none()
@@ -156,9 +154,7 @@ async def update_camera(
 
     # 如果提供了 presets，替换全部预置位
     if data.presets is not None:
-        await db.execute(
-            delete(CameraPreset).where(CameraPreset.camera_id == camera_id)
-        )
+        await db.execute(delete(CameraPreset).where(CameraPreset.camera_id == camera_id))
         for preset_data in data.presets:
             preset = CameraPreset(
                 camera_id=camera_id,
@@ -181,9 +177,7 @@ async def delete_camera(db: AsyncSession, camera_id: int) -> bool:
         return False
 
     # 删除预置位
-    await db.execute(
-        delete(CameraPreset).where(CameraPreset.camera_id == camera_id)
-    )
+    await db.execute(delete(CameraPreset).where(CameraPreset.camera_id == camera_id))
     await db.delete(camera)
     await db.commit()
     return True
@@ -198,9 +192,7 @@ async def get_camera(db: AsyncSession, camera_id: int) -> Optional[Dict[str, Any
 
     # 获取预置位
     presets_result = await db.execute(
-        select(CameraPreset)
-        .where(CameraPreset.camera_id == camera_id)
-        .order_by(CameraPreset.preset_index)
+        select(CameraPreset).where(CameraPreset.camera_id == camera_id).order_by(CameraPreset.preset_index)
     )
     presets = presets_result.scalars().all()
 
@@ -251,9 +243,7 @@ async def list_cameras(
     nvr_ids = {c.nvr_id for c in cameras if c.nvr_id}
     nvr_names: Dict[int, str] = {}
     if nvr_ids:
-        nvr_result = await db.execute(
-            select(NVR.id, NVR.name).where(NVR.id.in_(nvr_ids))
-        )
+        nvr_result = await db.execute(select(NVR.id, NVR.name).where(NVR.id.in_(nvr_ids)))
         nvr_names = {row[0]: row[1] for row in nvr_result.all()}
 
     # 批量获取预置位
@@ -261,9 +251,7 @@ async def list_cameras(
     presets_map: Dict[int, List] = {cid: [] for cid in camera_ids}
     if camera_ids:
         presets_result = await db.execute(
-            select(CameraPreset)
-            .where(CameraPreset.camera_id.in_(camera_ids))
-            .order_by(CameraPreset.preset_index)
+            select(CameraPreset).where(CameraPreset.camera_id.in_(camera_ids)).order_by(CameraPreset.preset_index)
         )
         for preset in presets_result.scalars().all():
             presets_map[preset.camera_id].append(preset)
@@ -279,9 +267,7 @@ async def list_cameras(
 async def get_cameras_by_area(db: AsyncSession, area_code: str) -> List[Camera]:
     """按区域查询摄像头（联动用）"""
     result = await db.execute(
-        select(Camera)
-        .where(Camera.area_code == area_code, Camera.is_enabled == True)
-        .order_by(Camera.name)
+        select(Camera).where(Camera.area_code == area_code, Camera.is_enabled == True).order_by(Camera.name)
     )
     return list(result.scalars().all())
 
@@ -289,14 +275,13 @@ async def get_cameras_by_area(db: AsyncSession, area_code: str) -> List[Camera]:
 async def get_cameras_by_device(db: AsyncSession, device_id: int) -> List[Camera]:
     """按设备查询摄像头（联动用）"""
     result = await db.execute(
-        select(Camera)
-        .where(Camera.device_id == device_id, Camera.is_enabled == True)
-        .order_by(Camera.name)
+        select(Camera).where(Camera.device_id == device_id, Camera.is_enabled == True).order_by(Camera.name)
     )
     return list(result.scalars().all())
 
 
 # ========== VideoEvent 服务 ==========
+
 
 async def create_video_event(
     db: AsyncSession,
@@ -354,35 +339,41 @@ async def list_video_events(
     cam_ids = {e.camera_id for e in items}
     cam_names: Dict[int, str] = {}
     if cam_ids:
-        cam_result = await db.execute(
-            select(Camera.id, Camera.name).where(Camera.id.in_(cam_ids))
-        )
+        cam_result = await db.execute(select(Camera.id, Camera.name).where(Camera.id.in_(cam_ids)))
         cam_names = {row[0]: row[1] for row in cam_result.all()}
 
     return {"total": total, "items": items, "cam_names": cam_names}
 
 
-async def ptz_control(
-    db: AsyncSession, camera_id: int, action: str, speed: int, operator: str
-) -> VideoEvent:
+async def ptz_control(db: AsyncSession, camera_id: int, action: str, speed: int, operator: str) -> VideoEvent:
     """云台控制（模拟 ONVIF PTZ 命令）"""
     import json
+
     detail = json.dumps({"action": action, "speed": speed}, ensure_ascii=False)
     logger.info("PTZ 控制: camera=%d action=%s speed=%d operator=%s", camera_id, action, speed, operator)
     return await create_video_event(
-        db, camera_id, "ptz_control", "manual", detail=detail, operator=operator,
+        db,
+        camera_id,
+        "ptz_control",
+        "manual",
+        detail=detail,
+        operator=operator,
     )
 
 
-async def call_preset(
-    db: AsyncSession, camera_id: int, preset_index: int, operator: str
-) -> VideoEvent:
+async def call_preset(db: AsyncSession, camera_id: int, preset_index: int, operator: str) -> VideoEvent:
     """调用预置位（模拟 ONVIF 预置位调用）"""
     import json
+
     detail = json.dumps({"preset_index": preset_index}, ensure_ascii=False)
     logger.info("预置位调用: camera=%d preset=%d operator=%s", camera_id, preset_index, operator)
     return await create_video_event(
-        db, camera_id, "preset_call", "manual", detail=detail, operator=operator,
+        db,
+        camera_id,
+        "preset_call",
+        "manual",
+        detail=detail,
+        operator=operator,
     )
 
 
@@ -395,25 +386,37 @@ async def start_recording(
 ) -> VideoEvent:
     """开始录像（模拟 ONVIF 录像触发）"""
     import json
+
     detail = json.dumps({"action": "start"}, ensure_ascii=False)
     logger.info("开始录像: camera=%d source=%s alarm=%s", camera_id, trigger_source, alarm_id)
     return await create_video_event(
-        db, camera_id, "recording_start", trigger_source,
-        alarm_id=alarm_id, linkage_execution_id=linkage_execution_id, detail=detail,
+        db,
+        camera_id,
+        "recording_start",
+        trigger_source,
+        alarm_id=alarm_id,
+        linkage_execution_id=linkage_execution_id,
+        detail=detail,
     )
 
 
 async def stop_recording(db: AsyncSession, camera_id: int) -> VideoEvent:
     """停止录像（模拟 ONVIF 录像停止）"""
     import json
+
     detail = json.dumps({"action": "stop"}, ensure_ascii=False)
     logger.info("停止录像: camera=%d", camera_id)
     return await create_video_event(
-        db, camera_id, "recording_stop", "manual", detail=detail,
+        db,
+        camera_id,
+        "recording_stop",
+        "manual",
+        detail=detail,
     )
 
 
 # ========== 回放服务 (Story 10-4) ==========
+
 
 async def get_playback_info(db: AsyncSession, alarm_id: int) -> Optional[Dict[str, Any]]:
     """获取告警回放信息（摄像头 + 时间定位）"""
@@ -449,9 +452,7 @@ async def get_playback_info(db: AsyncSession, alarm_id: int) -> Optional[Dict[st
     cam_ids = {e.camera_id for e in recording_events}
     cam_names: Dict[int, str] = {}
     if cam_ids:
-        cam_result = await db.execute(
-            select(Camera.id, Camera.name).where(Camera.id.in_(cam_ids))
-        )
+        cam_result = await db.execute(select(Camera.id, Camera.name).where(Camera.id.in_(cam_ids)))
         cam_names = {row[0]: row[1] for row in cam_result.all()}
 
     return {
@@ -498,7 +499,7 @@ async def list_recording_segments(
         count_query = count_query.where(VideoEvent.created_at <= parsed_end)
 
     total_result = await db.execute(count_query)
-    total = total_result.scalar() or 0
+    total_result.scalar() or 0
 
     query = query.order_by(VideoEvent.created_at)
     result = await db.execute(query)
@@ -507,9 +508,7 @@ async def list_recording_segments(
     # 配对 start/stop 事件为片段
     segments: List[Dict[str, Any]] = []
     # 获取摄像头名称
-    cam_result = await db.execute(
-        select(Camera.name).where(Camera.id == camera_id)
-    )
+    cam_result = await db.execute(select(Camera.name).where(Camera.id == camera_id))
     camera_name = cam_result.scalar_one_or_none()
 
     pending_start = None
@@ -517,45 +516,51 @@ async def list_recording_segments(
         if evt.event_type == "recording_start":
             if pending_start:
                 # 前一个 start 没有 stop，生成无结束时间的片段
-                segments.append({
-                    "id": pending_start.id,
-                    "camera_id": camera_id,
-                    "camera_name": camera_name,
-                    "start_time": pending_start.created_at,
-                    "end_time": None,
-                    "alarm_id": pending_start.alarm_id,
-                    "duration_seconds": None,
-                })
+                segments.append(
+                    {
+                        "id": pending_start.id,
+                        "camera_id": camera_id,
+                        "camera_name": camera_name,
+                        "start_time": pending_start.created_at,
+                        "end_time": None,
+                        "alarm_id": pending_start.alarm_id,
+                        "duration_seconds": None,
+                    }
+                )
             pending_start = evt
         elif evt.event_type == "recording_stop" and pending_start:
             duration = None
             if pending_start.created_at and evt.created_at:
                 duration = int((evt.created_at - pending_start.created_at).total_seconds())
-            segments.append({
-                "id": pending_start.id,
-                "camera_id": camera_id,
-                "camera_name": camera_name,
-                "start_time": pending_start.created_at,
-                "end_time": evt.created_at,
-                "alarm_id": pending_start.alarm_id,
-                "duration_seconds": duration,
-            })
+            segments.append(
+                {
+                    "id": pending_start.id,
+                    "camera_id": camera_id,
+                    "camera_name": camera_name,
+                    "start_time": pending_start.created_at,
+                    "end_time": evt.created_at,
+                    "alarm_id": pending_start.alarm_id,
+                    "duration_seconds": duration,
+                }
+            )
             pending_start = None
 
     # 最后一个 start 没有 stop
     if pending_start:
-        segments.append({
-            "id": pending_start.id,
-            "camera_id": camera_id,
-            "camera_name": camera_name,
-            "start_time": pending_start.created_at,
-            "end_time": None,
-            "alarm_id": pending_start.alarm_id,
-            "duration_seconds": None,
-        })
+        segments.append(
+            {
+                "id": pending_start.id,
+                "camera_id": camera_id,
+                "camera_name": camera_name,
+                "start_time": pending_start.created_at,
+                "end_time": None,
+                "alarm_id": pending_start.alarm_id,
+                "duration_seconds": None,
+            }
+        )
 
     # 分页
     start_idx = (page - 1) * page_size
-    paged_segments = segments[start_idx:start_idx + page_size]
+    paged_segments = segments[start_idx : start_idx + page_size]
 
     return {"total": len(segments), "items": paged_segments}

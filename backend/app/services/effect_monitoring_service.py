@@ -8,16 +8,21 @@ S4c: 计算实际节能量
 S4d: 计算效果达成率
 S4e: 将监测数据推送到 RL 模块
 """
+
 import logging
 from datetime import datetime, timedelta
 from decimal import Decimal
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, and_
 
 from app.models.energy import (
-    EnergySavingProposal, ProposalMeasure, MeasureExecutionLog,
-    MeasureBaseline, MonitoringRecord, EffectReport, MonitoringSession
+    EnergySavingProposal,
+    ProposalMeasure,
+    MeasureBaseline,
+    MonitoringRecord,
+    EffectReport,
+    MonitoringSession,
 )
 
 logger = logging.getLogger(__name__)
@@ -44,6 +49,7 @@ class EffectMonitoringService:
             try:
                 from app.services.ml_service import MLEnergySavingService
                 from app.ml_models.config import MLConfig
+
                 self._rl_service = MLEnergySavingService(MLConfig())
             except Exception as e:
                 logger.warning(f"RL 服务初始化失败: {e}")
@@ -51,11 +57,7 @@ class EffectMonitoringService:
 
     # ==================== S4a: 采集执行前基准值 ====================
 
-    async def capture_baseline(
-        self,
-        measure: ProposalMeasure,
-        duration_minutes: int = 60
-    ) -> MeasureBaseline:
+    async def capture_baseline(self, measure: ProposalMeasure, duration_minutes: int = 60) -> MeasureBaseline:
         """
         采集措施执行前的基准值
 
@@ -84,7 +86,7 @@ class EffectMonitoringService:
             device_params=current_state,
             data_source="realtime",
             device_ids=current_state.get("device_ids", []),
-            point_ids=current_state.get("point_ids", [])
+            point_ids=current_state.get("point_ids", []),
         )
 
         self.db.add(baseline)
@@ -94,11 +96,7 @@ class EffectMonitoringService:
         logger.info(f"措施 {measure.id} 基准值采集完成: 平均功率 {baseline.power_avg}kW")
         return baseline
 
-    def _fetch_power_data(
-        self,
-        measure: ProposalMeasure,
-        duration_minutes: int
-    ) -> Dict[str, float]:
+    def _fetch_power_data(self, measure: ProposalMeasure, duration_minutes: int) -> Dict[str, float]:
         """
         从监测系统获取功率数据
 
@@ -119,7 +117,7 @@ class EffectMonitoringService:
                 "max": base_power,
                 "min": base_power,
                 "samples": duration_minutes,
-                "is_demo_data": False
+                "is_demo_data": False,
             }
 
         # 模拟模式：使用确定性算法生成波动数据
@@ -134,16 +132,13 @@ class EffectMonitoringService:
             "max": max(samples),
             "min": min(samples),
             "samples": len(samples),
-            "is_demo_data": True
+            "is_demo_data": True,
         }
 
     # ==================== S4b: 持续监测 ====================
 
     async def start_monitoring(
-        self,
-        proposal: EnergySavingProposal,
-        interval_minutes: int = 15,
-        report_interval: str = "daily"
+        self, proposal: EnergySavingProposal, interval_minutes: int = 15, report_interval: str = "daily"
     ) -> MonitoringSession:
         """
         启动方案的持续监测
@@ -164,7 +159,7 @@ class EffectMonitoringService:
             report_interval=report_interval,
             auto_rl_feedback=True,
             total_records=0,
-            total_energy_saved=Decimal("0")
+            total_energy_saved=Decimal("0"),
         )
 
         self.db.add(session)
@@ -175,9 +170,7 @@ class EffectMonitoringService:
         return session
 
     async def record_monitoring_data(
-        self,
-        measure: ProposalMeasure,
-        baseline: MeasureBaseline = None
+        self, measure: ProposalMeasure, baseline: MeasureBaseline = None
     ) -> MonitoringRecord:
         """
         记录一次监测数据 (S4b)
@@ -219,7 +212,7 @@ class EffectMonitoringService:
             cost_saved=cost_saved,
             device_params=measure.target_state,
             status=status,
-            anomaly_message=anomaly_msg
+            anomaly_message=anomaly_msg,
         )
 
         self.db.add(record)
@@ -266,19 +259,13 @@ class EffectMonitoringService:
     async def _calculate_cumulative_savings(self, measure_id: int) -> Decimal:
         """计算累计节能量"""
         result = await self.db.execute(
-            select(func.sum(MonitoringRecord.power_diff))
-            .where(MonitoringRecord.measure_id == measure_id)
+            select(func.sum(MonitoringRecord.power_diff)).where(MonitoringRecord.measure_id == measure_id)
         )
         total_diff = result.scalar() or Decimal("0")
         # 简化: 假设每条记录代表15分钟
         return total_diff * Decimal("0.25")  # kW * 0.25h = kWh
 
-    def _detect_anomaly(
-        self,
-        current: float,
-        baseline: float,
-        diff: float
-    ) -> tuple:
+    def _detect_anomaly(self, current: float, baseline: float, diff: float) -> tuple:
         """检测异常"""
         if diff < -baseline * 0.1:
             return "warning", f"功率反升 {abs(diff):.1f}kW"
@@ -289,10 +276,7 @@ class EffectMonitoringService:
     # ==================== S4c: 计算实际节能量 ====================
 
     async def calculate_actual_savings(
-        self,
-        measure_id: int,
-        period_start: datetime,
-        period_end: datetime
+        self, measure_id: int, period_start: datetime, period_end: datetime
     ) -> Dict[str, Any]:
         """
         计算指定周期内的实际节能量 (S4c)
@@ -305,7 +289,7 @@ class EffectMonitoringService:
                 and_(
                     MonitoringRecord.measure_id == measure_id,
                     MonitoringRecord.recorded_at >= period_start,
-                    MonitoringRecord.recorded_at <= period_end
+                    MonitoringRecord.recorded_at <= period_end,
                 )
             )
         )
@@ -326,16 +310,13 @@ class EffectMonitoringService:
             "cost_saved": cost_saved,
             "records": len(records),
             "period_hours": hours,
-            "avg_power_diff": total_power_diff / len(records) if records else 0
+            "avg_power_diff": total_power_diff / len(records) if records else 0,
         }
 
     # ==================== S4d: 计算效果达成率 ====================
 
     async def calculate_achievement_rate(
-        self,
-        proposal_id: int,
-        period_start: datetime = None,
-        period_end: datetime = None
+        self, proposal_id: int, period_start: datetime = None, period_end: datetime = None
     ) -> EffectReport:
         """
         计算效果达成率 (S4d)
@@ -348,9 +329,7 @@ class EffectMonitoringService:
             period_start = period_end - timedelta(days=1)
 
         # 获取方案
-        stmt = select(EnergySavingProposal).where(
-            EnergySavingProposal.id == proposal_id
-        )
+        stmt = select(EnergySavingProposal).where(EnergySavingProposal.id == proposal_id)
         result = await self.db.execute(stmt)
         proposal = result.scalar_one_or_none()
 
@@ -368,9 +347,7 @@ class EffectMonitoringService:
 
         for measure in proposal.measures:
             if measure.is_selected:
-                savings = await self.calculate_actual_savings(
-                    measure.id, period_start, period_end
-                )
+                savings = await self.calculate_actual_savings(measure.id, period_start, period_end)
                 actual_energy += Decimal(str(savings["energy_saved"]))
                 actual_cost += Decimal(str(savings["cost_saved"]))
 
@@ -392,7 +369,7 @@ class EffectMonitoringService:
             cost_achievement_rate=Decimal(str(achievement_rate)),
             rl_feedback_sent=False,
             data_quality=Decimal("0.95"),
-            monitoring_coverage=Decimal("0.90")
+            monitoring_coverage=Decimal("0.90"),
         )
 
         self.db.add(report)
@@ -423,7 +400,7 @@ class EffectMonitoringService:
                 "actual_saving": float(report.actual_cost_saved or 0),
                 "expected_saving": float(report.expected_cost_saved or 0),
                 "period_days": (report.period_end - report.period_start).days,
-                "data_quality": float(report.data_quality or 0)
+                "data_quality": float(report.data_quality or 0),
             }
 
             # 计算奖励
@@ -440,12 +417,7 @@ class EffectMonitoringService:
 
             logger.info(f"RL 反馈成功: 奖励={reward:.2f}, 动作={actions}")
 
-            return {
-                "success": True,
-                "reward": reward,
-                "actions": actions,
-                "state": state
-            }
+            return {"success": True, "reward": reward, "actions": actions, "state": state}
 
         except Exception as e:
             logger.error(f"RL 反馈失败: {e}")
@@ -465,9 +437,7 @@ class EffectMonitoringService:
 
     async def stop_monitoring(self, session_id: int) -> MonitoringSession:
         """停止监测会话"""
-        stmt = select(MonitoringSession).where(
-            MonitoringSession.id == session_id
-        )
+        stmt = select(MonitoringSession).where(MonitoringSession.id == session_id)
         result = await self.db.execute(stmt)
         session = result.scalar_one_or_none()
 
@@ -481,8 +451,7 @@ class EffectMonitoringService:
     async def get_monitoring_status(self, proposal_id: int) -> Dict[str, Any]:
         """获取监测状态"""
         stmt = select(MonitoringSession).where(
-            MonitoringSession.proposal_id == proposal_id,
-            MonitoringSession.status == "active"
+            MonitoringSession.proposal_id == proposal_id, MonitoringSession.status == "active"
         )
         result = await self.db.execute(stmt)
         session = result.scalar_one_or_none()
@@ -496,7 +465,7 @@ class EffectMonitoringService:
             "started_at": session.started_at.isoformat(),
             "total_records": session.total_records,
             "total_energy_saved": float(session.total_energy_saved or 0),
-            "avg_achievement_rate": float(session.avg_achievement_rate or 0)
+            "avg_achievement_rate": float(session.avg_achievement_rate or 0),
         }
 
     # ==================== 报告生成 ====================
@@ -517,19 +486,17 @@ class EffectMonitoringService:
 
     async def get_effect_summary(self, proposal_id: int) -> Dict[str, Any]:
         """获取效果汇总"""
-        stmt = select(EffectReport).where(
-            EffectReport.proposal_id == proposal_id
-        ).order_by(EffectReport.period_end.desc()).limit(30)
+        stmt = (
+            select(EffectReport)
+            .where(EffectReport.proposal_id == proposal_id)
+            .order_by(EffectReport.period_end.desc())
+            .limit(30)
+        )
         result = await self.db.execute(stmt)
         reports = result.scalars().all()
 
         if not reports:
-            return {
-                "total_reports": 0,
-                "avg_achievement_rate": 0,
-                "total_energy_saved": 0,
-                "total_cost_saved": 0
-            }
+            return {"total_reports": 0, "avg_achievement_rate": 0, "total_energy_saved": 0, "total_cost_saved": 0}
 
         return {
             "total_reports": len(reports),
@@ -539,6 +506,6 @@ class EffectMonitoringService:
             "latest_report": {
                 "period": f"{reports[0].period_start} - {reports[0].period_end}",
                 "achievement_rate": float(reports[0].achievement_rate or 0),
-                "rl_feedback_sent": reports[0].rl_feedback_sent
-            }
+                "rl_feedback_sent": reports[0].rl_feedback_sent,
+            },
         }

@@ -1,4 +1,5 @@
 """连接测试服务"""
+
 import asyncio
 import logging
 from dataclasses import asdict
@@ -42,22 +43,28 @@ async def test_datasource_connection(
 
         logger.info(
             "连接测试完成: protocol_type=%s, success=%s, latency_ms=%s",
-            protocol_type, result.success, result.latency_ms,
+            protocol_type,
+            result.success,
+            result.latency_ms,
         )
         return asdict(result)
 
     except asyncio.TimeoutError:
         logger.warning("连接测试超时: protocol_type=%s", protocol_type)
-        return asdict(ConnectionResult(
-            success=False,
-            message="连接测试超时 (10s)",
-        ))
+        return asdict(
+            ConnectionResult(
+                success=False,
+                message="连接测试超时 (10s)",
+            )
+        )
     except Exception as e:
         logger.error("连接测试异常: protocol_type=%s, error=%s", protocol_type, e)
-        return asdict(ConnectionResult(
-            success=False,
-            message=str(e),
-        ))
+        return asdict(
+            ConnectionResult(
+                success=False,
+                message=str(e),
+            )
+        )
     finally:
         try:
             await adapter.disconnect()

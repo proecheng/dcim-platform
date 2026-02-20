@@ -19,7 +19,6 @@ Demo Data Generator for Typical Small-Medium Data Center
 
 import random
 from datetime import datetime, timedelta, date
-from typing import List, Dict, Any
 
 # 典型中小型算力中心配置
 DATACENTER_CONFIG = {
@@ -51,26 +50,143 @@ DATACENTER_CONFIG = {
     # 用电设备配置
     "devices": [
         # IT设备 - 服务器
-        {"code": "SRV-A01-01", "name": "A1机柜服务器组", "type": "IT_SERVER", "power": 25, "is_it": True, "circuit": "PDU-A01"},
-        {"code": "SRV-A01-02", "name": "A1机柜GPU服务器", "type": "IT_SERVER", "power": 40, "is_it": True, "circuit": "PDU-A01"},
-        {"code": "SRV-A02-01", "name": "A2机柜服务器组", "type": "IT_SERVER", "power": 30, "is_it": True, "circuit": "PDU-A02"},
-        {"code": "SRV-A02-02", "name": "A2机柜存储阵列", "type": "IT_STORAGE", "power": 15, "is_it": True, "circuit": "PDU-A02"},
-        {"code": "SRV-B01-01", "name": "B1机柜服务器组", "type": "IT_SERVER", "power": 35, "is_it": True, "circuit": "PDU-B01"},
-        {"code": "SRV-B01-02", "name": "B1机柜网络设备", "type": "IT_SERVER", "power": 8, "is_it": True, "circuit": "PDU-B01"},
-        {"code": "SRV-B01-03", "name": "B1机柜AI训练服务器", "type": "IT_SERVER", "power": 60, "is_it": True, "circuit": "PDU-B01"},
-        {"code": "STG-001", "name": "集中存储系统", "type": "IT_STORAGE", "power": 20, "is_it": True, "circuit": "PDU-A01"},
-        {"code": "NET-001", "name": "核心网络交换机", "type": "IT_SERVER", "power": 5, "is_it": True, "circuit": "PDU-A02"},
-        {"code": "NET-002", "name": "汇聚交换机组", "type": "IT_SERVER", "power": 3, "is_it": True, "circuit": "PDU-B01"},
+        {
+            "code": "SRV-A01-01",
+            "name": "A1机柜服务器组",
+            "type": "IT_SERVER",
+            "power": 25,
+            "is_it": True,
+            "circuit": "PDU-A01",
+        },
+        {
+            "code": "SRV-A01-02",
+            "name": "A1机柜GPU服务器",
+            "type": "IT_SERVER",
+            "power": 40,
+            "is_it": True,
+            "circuit": "PDU-A01",
+        },
+        {
+            "code": "SRV-A02-01",
+            "name": "A2机柜服务器组",
+            "type": "IT_SERVER",
+            "power": 30,
+            "is_it": True,
+            "circuit": "PDU-A02",
+        },
+        {
+            "code": "SRV-A02-02",
+            "name": "A2机柜存储阵列",
+            "type": "IT_STORAGE",
+            "power": 15,
+            "is_it": True,
+            "circuit": "PDU-A02",
+        },
+        {
+            "code": "SRV-B01-01",
+            "name": "B1机柜服务器组",
+            "type": "IT_SERVER",
+            "power": 35,
+            "is_it": True,
+            "circuit": "PDU-B01",
+        },
+        {
+            "code": "SRV-B01-02",
+            "name": "B1机柜网络设备",
+            "type": "IT_SERVER",
+            "power": 8,
+            "is_it": True,
+            "circuit": "PDU-B01",
+        },
+        {
+            "code": "SRV-B01-03",
+            "name": "B1机柜AI训练服务器",
+            "type": "IT_SERVER",
+            "power": 60,
+            "is_it": True,
+            "circuit": "PDU-B01",
+        },
+        {
+            "code": "STG-001",
+            "name": "集中存储系统",
+            "type": "IT_STORAGE",
+            "power": 20,
+            "is_it": True,
+            "circuit": "PDU-A01",
+        },
+        {
+            "code": "NET-001",
+            "name": "核心网络交换机",
+            "type": "IT_SERVER",
+            "power": 5,
+            "is_it": True,
+            "circuit": "PDU-A02",
+        },
+        {
+            "code": "NET-002",
+            "name": "汇聚交换机组",
+            "type": "IT_SERVER",
+            "power": 3,
+            "is_it": True,
+            "circuit": "PDU-B01",
+        },
         # UPS
-        {"code": "UPS-001", "name": "1#UPS(400kVA)", "type": "UPS", "power": 40, "is_it": False, "circuit": "UPS-IN-001"},
+        {
+            "code": "UPS-001",
+            "name": "1#UPS(400kVA)",
+            "type": "UPS",
+            "power": 40,
+            "is_it": False,
+            "circuit": "UPS-IN-001",
+        },
         # 空调设备
-        {"code": "CRAC-001", "name": "1#精密空调", "type": "HVAC", "power": 30, "is_it": False, "circuit": "AC-001", "adjustable": True},
-        {"code": "CRAC-002", "name": "2#精密空调", "type": "HVAC", "power": 30, "is_it": False, "circuit": "AC-001", "adjustable": True},
-        {"code": "CRAC-003", "name": "3#精密空调", "type": "HVAC", "power": 25, "is_it": False, "circuit": "AC-001", "adjustable": True},
+        {
+            "code": "CRAC-001",
+            "name": "1#精密空调",
+            "type": "HVAC",
+            "power": 30,
+            "is_it": False,
+            "circuit": "AC-001",
+            "adjustable": True,
+        },
+        {
+            "code": "CRAC-002",
+            "name": "2#精密空调",
+            "type": "HVAC",
+            "power": 30,
+            "is_it": False,
+            "circuit": "AC-001",
+            "adjustable": True,
+        },
+        {
+            "code": "CRAC-003",
+            "name": "3#精密空调",
+            "type": "HVAC",
+            "power": 25,
+            "is_it": False,
+            "circuit": "AC-001",
+            "adjustable": True,
+        },
         {"code": "AHU-001", "name": "新风机组", "type": "HVAC", "power": 8, "is_it": False, "circuit": "AC-001"},
         # 照明
-        {"code": "LT-MAIN", "name": "主机房照明", "type": "LIGHTING", "power": 5, "is_it": False, "circuit": "LT-001", "adjustable": True},
-        {"code": "LT-AUX", "name": "辅助区照明", "type": "LIGHTING", "power": 3, "is_it": False, "circuit": "LT-001", "adjustable": True},
+        {
+            "code": "LT-MAIN",
+            "name": "主机房照明",
+            "type": "LIGHTING",
+            "power": 5,
+            "is_it": False,
+            "circuit": "LT-001",
+            "adjustable": True,
+        },
+        {
+            "code": "LT-AUX",
+            "name": "辅助区照明",
+            "type": "LIGHTING",
+            "power": 3,
+            "is_it": False,
+            "circuit": "LT-001",
+            "adjustable": True,
+        },
         # 其他
         {"code": "PUMP-001", "name": "冷冻水泵", "type": "PUMP", "power": 15, "is_it": False, "circuit": "AC-001"},
         {"code": "PUMP-002", "name": "冷却水泵", "type": "PUMP", "power": 12, "is_it": False, "circuit": "AC-001"},
@@ -233,15 +349,16 @@ class DemoDataGenerator:
     """展示数据生成器"""
 
     def __init__(self, db_path: str = None):
-        import sqlite3
         if db_path is None:
             import os
-            db_path = os.path.join(os.path.dirname(__file__), '..', '..', 'dcim.db')
+
+            db_path = os.path.join(os.path.dirname(__file__), "..", "..", "dcim.db")
         self.db_path = db_path
         self.conn = None
 
     def connect(self):
         import sqlite3
+
         self.conn = sqlite3.connect(self.db_path)
         self.conn.row_factory = sqlite3.Row
         return self.conn
@@ -251,26 +368,50 @@ class DemoDataGenerator:
             self.conn.close()
 
     # 允许清除的表白名单
-    ALLOWED_TABLES = frozenset([
-        'energy_suggestions', 'pue_history', 'energy_monthly', 'energy_daily',
-        'energy_hourly', 'demand_15min_data', 'power_curve_data',
-        'regulation_history', 'load_regulation_configs',
-        'device_shift_configs', 'device_load_profiles',
-        'power_devices', 'distribution_circuits', 'distribution_panels',
-        'meter_points', 'transformers', 'electricity_pricing'
-    ])
+    ALLOWED_TABLES = frozenset(
+        [
+            "energy_suggestions",
+            "pue_history",
+            "energy_monthly",
+            "energy_daily",
+            "energy_hourly",
+            "demand_15min_data",
+            "power_curve_data",
+            "regulation_history",
+            "load_regulation_configs",
+            "device_shift_configs",
+            "device_load_profiles",
+            "power_devices",
+            "distribution_circuits",
+            "distribution_panels",
+            "meter_points",
+            "transformers",
+            "electricity_pricing",
+        ]
+    )
 
     def clear_demo_data(self):
         """清除旧的演示数据"""
         cursor = self.conn.cursor()
         # 按依赖顺序删除，使用白名单验证防止SQL注入
         tables = [
-            'energy_suggestions', 'pue_history', 'energy_monthly', 'energy_daily',
-            'energy_hourly', 'demand_15min_data', 'power_curve_data',
-            'regulation_history', 'load_regulation_configs',
-            'device_shift_configs', 'device_load_profiles',
-            'power_devices', 'distribution_circuits', 'distribution_panels',
-            'meter_points', 'transformers', 'electricity_pricing'
+            "energy_suggestions",
+            "pue_history",
+            "energy_monthly",
+            "energy_daily",
+            "energy_hourly",
+            "demand_15min_data",
+            "power_curve_data",
+            "regulation_history",
+            "load_regulation_configs",
+            "device_shift_configs",
+            "device_load_profiles",
+            "power_devices",
+            "distribution_circuits",
+            "distribution_panels",
+            "meter_points",
+            "transformers",
+            "electricity_pricing",
         ]
         for table in tables:
             # 白名单验证，防止SQL注入
@@ -288,12 +429,15 @@ class DemoDataGenerator:
         """生成变压器数据"""
         cursor = self.conn.cursor()
         config = DATACENTER_CONFIG["transformer"]
-        cursor.execute("""
+        cursor.execute(
+            """
             INSERT INTO transformers (transformer_code, transformer_name, rated_capacity,
                 voltage_high, voltage_low, connection_type, efficiency, status, is_enabled,
                 location, created_at, updated_at)
             VALUES (?, ?, ?, ?, ?, 'Dyn11', 98.5, 'running', 1, '配电室', datetime('now'), datetime('now'))
-        """, (config["code"], config["name"], config["capacity"], config["voltage_high"], config["voltage_low"]))
+        """,
+            (config["code"], config["name"], config["capacity"], config["voltage_high"], config["voltage_low"]),
+        )
         self.conn.commit()
         transformer_id = cursor.lastrowid
         print(f"已创建变压器: {config['name']} (ID={transformer_id})")
@@ -303,13 +447,16 @@ class DemoDataGenerator:
         """生成计量点数据"""
         cursor = self.conn.cursor()
         config = DATACENTER_CONFIG["meter_point"]
-        cursor.execute("""
+        cursor.execute(
+            """
             INSERT INTO meter_points (meter_code, meter_name, meter_no, transformer_id,
                 ct_ratio, pt_ratio, multiplier, declared_demand, demand_type, demand_period,
                 customer_no, customer_name, status, is_enabled, created_at, updated_at)
             VALUES (?, ?, 'DDB001', ?, '400/5', '10000/100', 80, ?, 'kW', 15,
                 'GD202401001', '智算中心', 'normal', 1, datetime('now'), datetime('now'))
-        """, (config["code"], config["name"], transformer_id, config["declared_demand"]))
+        """,
+            (config["code"], config["name"], transformer_id, config["declared_demand"]),
+        )
         self.conn.commit()
         meter_id = cursor.lastrowid
         print(f"已创建计量点: {config['name']} (ID={meter_id})")
@@ -320,11 +467,14 @@ class DemoDataGenerator:
         cursor = self.conn.cursor()
         today = date.today()
         for p in DATACENTER_CONFIG["pricing"]:
-            cursor.execute("""
+            cursor.execute(
+                """
                 INSERT INTO electricity_pricing (pricing_name, period_type, start_time, end_time,
                     price, effective_date, is_enabled, created_at, updated_at)
                 VALUES (?, ?, ?, ?, ?, ?, 1, datetime('now'), datetime('now'))
-            """, (p["name"], p["type"], p["start"], p["end"], p["price"], today.isoformat()))
+            """,
+                (p["name"], p["type"], p["start"], p["end"], p["price"], today.isoformat()),
+            )
         self.conn.commit()
         print(f"已创建电价配置: {len(DATACENTER_CONFIG['pricing'])}条")
 
@@ -333,12 +483,15 @@ class DemoDataGenerator:
         cursor = self.conn.cursor()
         panel_ids = {}
         for p in DATACENTER_CONFIG["panels"]:
-            cursor.execute("""
+            cursor.execute(
+                """
                 INSERT INTO distribution_panels (panel_code, panel_name, panel_type,
                     rated_current, rated_voltage, meter_point_id, location, status,
                     is_enabled, created_at, updated_at)
                 VALUES (?, ?, ?, ?, 380, ?, '配电室', 'running', 1, datetime('now'), datetime('now'))
-            """, (p["code"], p["name"], p["type"], p["current"], meter_id))
+            """,
+                (p["code"], p["name"], p["type"], p["current"], meter_id),
+            )
             panel_ids[p["code"]] = cursor.lastrowid
         self.conn.commit()
         print(f"已创建配电柜: {len(panel_ids)}个")
@@ -350,9 +503,27 @@ class DemoDataGenerator:
         circuit_ids = {}
         # 为每个配电柜创建回路
         circuit_configs = [
-            {"code": "C-PDU-A01-01", "name": "A1列头柜主回路", "panel": "PDU-A01", "type": "it_equipment", "current": 250},
-            {"code": "C-PDU-A02-01", "name": "A2列头柜主回路", "panel": "PDU-A02", "type": "it_equipment", "current": 250},
-            {"code": "C-PDU-B01-01", "name": "B1列头柜主回路", "panel": "PDU-B01", "type": "it_equipment", "current": 250},
+            {
+                "code": "C-PDU-A01-01",
+                "name": "A1列头柜主回路",
+                "panel": "PDU-A01",
+                "type": "it_equipment",
+                "current": 250,
+            },
+            {
+                "code": "C-PDU-A02-01",
+                "name": "A2列头柜主回路",
+                "panel": "PDU-A02",
+                "type": "it_equipment",
+                "current": 250,
+            },
+            {
+                "code": "C-PDU-B01-01",
+                "name": "B1列头柜主回路",
+                "panel": "PDU-B01",
+                "type": "it_equipment",
+                "current": 250,
+            },
             {"code": "C-UPS-IN-01", "name": "UPS输入回路", "panel": "UPS-IN-001", "type": "ups", "current": 630},
             {"code": "C-AC-01", "name": "空调主回路", "panel": "AC-001", "type": "hvac", "current": 400},
             {"code": "C-LT-01", "name": "照明主回路", "panel": "LT-001", "type": "lighting", "current": 100},
@@ -360,13 +531,22 @@ class DemoDataGenerator:
         for c in circuit_configs:
             panel_id = panel_ids.get(c["panel"])
             if panel_id:
-                cursor.execute("""
+                cursor.execute(
+                    """
                     INSERT INTO distribution_circuits (circuit_code, circuit_name, panel_id,
                         rated_current, load_type, is_shiftable, shift_priority, is_enabled,
                         created_at, updated_at)
                     VALUES (?, ?, ?, ?, ?, ?, 5, 1, datetime('now'), datetime('now'))
-                """, (c["code"], c["name"], panel_id, c["current"], c["type"],
-                      1 if c["type"] in ["hvac", "lighting"] else 0))
+                """,
+                    (
+                        c["code"],
+                        c["name"],
+                        panel_id,
+                        c["current"],
+                        c["type"],
+                        1 if c["type"] in ["hvac", "lighting"] else 0,
+                    ),
+                )
                 circuit_ids[c["panel"]] = cursor.lastrowid
         self.conn.commit()
         print(f"已创建配电回路: {len(circuit_ids)}个")
@@ -378,13 +558,23 @@ class DemoDataGenerator:
         device_ids = {}
         for d in DATACENTER_CONFIG["devices"]:
             circuit_id = circuit_ids.get(d["circuit"])
-            cursor.execute("""
+            cursor.execute(
+                """
                 INSERT INTO power_devices (device_code, device_name, device_type, rated_power,
                     rated_voltage, power_factor, circuit_id, is_it_load, is_critical, is_metered,
                     is_enabled, created_at, updated_at)
                 VALUES (?, ?, ?, ?, 380, 0.9, ?, ?, ?, 1, 1, datetime('now'), datetime('now'))
-            """, (d["code"], d["name"], d["type"], d["power"], circuit_id,
-                  1 if d["is_it"] else 0, 1 if d["type"] in ["IT_SERVER", "UPS"] else 0))
+            """,
+                (
+                    d["code"],
+                    d["name"],
+                    d["type"],
+                    d["power"],
+                    circuit_id,
+                    1 if d["is_it"] else 0,
+                    1 if d["type"] in ["IT_SERVER", "UPS"] else 0,
+                ),
+            )
             device_ids[d["code"]] = cursor.lastrowid
         self.conn.commit()
         print(f"已创建用电设备: {len(device_ids)}个")
@@ -400,25 +590,31 @@ class DemoDataGenerator:
                 if device_id:
                     if d["type"] == "HVAC":
                         # 空调温度调节
-                        cursor.execute("""
+                        cursor.execute(
+                            """
                             INSERT INTO load_regulation_configs (device_id, regulation_type,
                                 min_value, max_value, current_value, default_value, step_size, unit,
                                 power_factor, base_power, priority, comfort_impact, is_enabled, is_auto,
                                 created_at, updated_at)
                             VALUES (?, 'temperature', 18, 28, 24, 24, 1, '℃', ?, ?, 3, 'medium', 1, 0,
                                 datetime('now'), datetime('now'))
-                        """, (device_id, d["power"] * 0.03, d["power"]))
+                        """,
+                            (device_id, d["power"] * 0.03, d["power"]),
+                        )
                         count += 1
                     elif d["type"] == "LIGHTING":
                         # 照明亮度调节
-                        cursor.execute("""
+                        cursor.execute(
+                            """
                             INSERT INTO load_regulation_configs (device_id, regulation_type,
                                 min_value, max_value, current_value, default_value, step_size, unit,
                                 power_factor, base_power, priority, comfort_impact, is_enabled, is_auto,
                                 created_at, updated_at)
                             VALUES (?, 'brightness', 30, 100, 100, 100, 10, '%', ?, ?, 5, 'low', 1, 0,
                                 datetime('now'), datetime('now'))
-                        """, (device_id, d["power"] * 0.007, d["power"]))
+                        """,
+                            (device_id, d["power"] * 0.007, d["power"]),
+                        )
                         count += 1
         self.conn.commit()
         print(f"已创建负荷调节配置: {count}个")
@@ -452,14 +648,16 @@ class DemoDataGenerator:
                     energy = power  # 1小时的能耗 = 功率 * 1h
 
                     period = get_time_period(hour)
-                    price = get_price_by_period(period)
+                    get_price_by_period(period)
 
-                    cursor.execute("""
+                    cursor.execute(
+                        """
                         INSERT INTO energy_hourly (device_id, stat_time, total_energy, avg_power,
                             max_power, min_power, created_at)
                         VALUES (?, ?, ?, ?, ?, ?, datetime('now'))
-                    """, (device_id, stat_time.isoformat(), energy, power,
-                          power * 1.05, power * 0.95))
+                    """,
+                        (device_id, stat_time.isoformat(), energy, power, power * 1.05, power * 0.95),
+                    )
                     hourly_count += 1
 
                     daily_energy += energy
@@ -477,12 +675,24 @@ class DemoDataGenerator:
                 energy_cost = peak_energy * 1.0 + normal_energy * 0.7 + valley_energy * 0.4
                 avg_power = power_sum / 24
 
-                cursor.execute("""
+                cursor.execute(
+                    """
                     INSERT INTO energy_daily (device_id, stat_date, total_energy, peak_energy,
                         normal_energy, valley_energy, max_power, avg_power, energy_cost, created_at)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
-                """, (device_id, stat_date.isoformat(), daily_energy, peak_energy,
-                      normal_energy, valley_energy, max_power, avg_power, energy_cost))
+                """,
+                    (
+                        device_id,
+                        stat_date.isoformat(),
+                        daily_energy,
+                        peak_energy,
+                        normal_energy,
+                        valley_energy,
+                        max_power,
+                        avg_power,
+                        energy_cost,
+                    ),
+                )
                 daily_count += 1
 
             # 每100条提交一次
@@ -511,11 +721,10 @@ class DemoDataGenerator:
 
                     # 计算总功率 (所有设备功率之和)
                     total_power = sum(
-                        generate_load_curve(hour, d["type"], d["power"])
-                        for d in DATACENTER_CONFIG["devices"]
+                        generate_load_curve(hour, d["type"], d["power"]) for d in DATACENTER_CONFIG["devices"]
                     )
                     # 添加随机波动
-                    total_power *= (1 + random.uniform(-0.05, 0.05))
+                    total_power *= 1 + random.uniform(-0.05, 0.05)
 
                     period = get_time_period(hour)
                     is_peak = period in ["peak", "sharp"]
@@ -526,23 +735,38 @@ class DemoDataGenerator:
                         daily_max = total_power
                         daily_max_time = timestamp
 
-                    cursor.execute("""
+                    cursor.execute(
+                        """
                         INSERT INTO demand_15min_data (meter_point_id, timestamp, average_power,
                             max_power, min_power, rolling_demand, declared_demand, demand_ratio,
                             is_peak_period, time_period, is_over_declared, recorded_at)
                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
-                    """, (meter_id, timestamp.isoformat(), total_power,
-                          total_power * 1.02, total_power * 0.98, total_power,
-                          declared_demand, demand_ratio, 1 if is_peak else 0,
-                          period, 1 if is_over else 0))
+                    """,
+                        (
+                            meter_id,
+                            timestamp.isoformat(),
+                            total_power,
+                            total_power * 1.02,
+                            total_power * 0.98,
+                            total_power,
+                            declared_demand,
+                            demand_ratio,
+                            1 if is_peak else 0,
+                            period,
+                            1 if is_over else 0,
+                        ),
+                    )
                     count += 1
 
             # 标记当日最大需量
             if daily_max_time:
-                cursor.execute("""
+                cursor.execute(
+                    """
                     UPDATE demand_15min_data SET is_max_of_day = 1
                     WHERE meter_point_id = ? AND timestamp = ?
-                """, (meter_id, daily_max_time.isoformat()))
+                """,
+                    (meter_id, daily_max_time.isoformat()),
+                )
 
         self.conn.commit()
         print(f"已创建15分钟需量数据: {count}条")
@@ -555,40 +779,53 @@ class DemoDataGenerator:
 
         for day_offset in range(days):
             for hour in range(24):
-                record_time = now - timedelta(days=day_offset, hours=23-hour)
+                record_time = now - timedelta(days=day_offset, hours=23 - hour)
 
                 # 计算IT负载
                 it_power = sum(
-                    generate_load_curve(hour, d["type"], d["power"])
-                    for d in DATACENTER_CONFIG["devices"] if d["is_it"]
+                    generate_load_curve(hour, d["type"], d["power"]) for d in DATACENTER_CONFIG["devices"] if d["is_it"]
                 )
 
                 # 计算制冷功率
                 cooling_power = sum(
                     generate_load_curve(hour, d["type"], d["power"])
-                    for d in DATACENTER_CONFIG["devices"] if d["type"] == "HVAC"
+                    for d in DATACENTER_CONFIG["devices"]
+                    if d["type"] == "HVAC"
                 )
 
                 # 计算其他功率
                 ups_loss = 40 * 0.05  # UPS损耗约5%
                 lighting_power = sum(
                     generate_load_curve(hour, d["type"], d["power"])
-                    for d in DATACENTER_CONFIG["devices"] if d["type"] == "LIGHTING"
+                    for d in DATACENTER_CONFIG["devices"]
+                    if d["type"] == "LIGHTING"
                 )
                 other_power = sum(
                     generate_load_curve(hour, d["type"], d["power"])
-                    for d in DATACENTER_CONFIG["devices"] if d["type"] == "PUMP"
+                    for d in DATACENTER_CONFIG["devices"]
+                    if d["type"] == "PUMP"
                 )
 
                 total_power = it_power + cooling_power + ups_loss + lighting_power + other_power
                 pue = total_power / it_power if it_power > 0 else 1.5
 
-                cursor.execute("""
+                cursor.execute(
+                    """
                     INSERT INTO pue_history (record_time, total_power, it_power, cooling_power,
                         ups_loss, lighting_power, other_power, pue, created_at)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
-                """, (record_time.isoformat(), total_power, it_power, cooling_power,
-                      ups_loss, lighting_power, other_power, round(pue, 3)))
+                """,
+                    (
+                        record_time.isoformat(),
+                        total_power,
+                        it_power,
+                        cooling_power,
+                        ups_loss,
+                        lighting_power,
+                        other_power,
+                        round(pue, 3),
+                    ),
+                )
                 count += 1
 
         self.conn.commit()
@@ -598,6 +835,7 @@ class DemoDataGenerator:
         """生成节能建议"""
         cursor = self.conn.cursor()
         import json
+
         suggestions = []
 
         # 1. 负荷转移建议 - 空调
@@ -605,129 +843,165 @@ class DemoDataGenerator:
             if d["type"] == "HVAC" and d.get("adjustable"):
                 device_id = device_ids.get(d["code"])
                 saving = d["power"] * 0.3 * 5 * 30 * (1.0 - 0.4)  # 30%功率转移5小时，峰谷差价
-                suggestions.append({
-                    "rule_id": "SHIFT_LOAD_PEAK_TO_VALLEY",
-                    "rule_name": "负荷转移-峰转谷",
-                    "device_id": device_id,
-                    "category": "cost",
-                    "suggestion": f"建议将{d['name']}的部分运行负荷从高峰时段(10:00-12:00, 14:00-17:00)转移到低谷时段(23:00-07:00)，预计每月可节省电费{saving:.0f}元",
-                    "priority": "high",
-                    "potential_saving": d["power"] * 0.3 * 5 * 30,
-                    "potential_cost_saving": saving,
-                    "difficulty": "medium",
-                    "implementation_steps": json.dumps([
-                        {"step": 1, "description": "分析空调负荷曲线，确定可转移时段"},
-                        {"step": 2, "description": "调整空调运行策略，夜间预冷"},
-                        {"step": 3, "description": "监测室内温度，确保不影响设备运行"}
-                    ]),
-                })
+                suggestions.append(
+                    {
+                        "rule_id": "SHIFT_LOAD_PEAK_TO_VALLEY",
+                        "rule_name": "负荷转移-峰转谷",
+                        "device_id": device_id,
+                        "category": "cost",
+                        "suggestion": f"建议将{d['name']}的部分运行负荷从高峰时段(10:00-12:00, 14:00-17:00)转移到低谷时段(23:00-07:00)，预计每月可节省电费{saving:.0f}元",
+                        "priority": "high",
+                        "potential_saving": d["power"] * 0.3 * 5 * 30,
+                        "potential_cost_saving": saving,
+                        "difficulty": "medium",
+                        "implementation_steps": json.dumps(
+                            [
+                                {"step": 1, "description": "分析空调负荷曲线，确定可转移时段"},
+                                {"step": 2, "description": "调整空调运行策略，夜间预冷"},
+                                {"step": 3, "description": "监测室内温度，确保不影响设备运行"},
+                            ]
+                        ),
+                    }
+                )
 
         # 2. 温度优化建议
-        suggestions.append({
-            "rule_id": "REDUCE_HVAC_SETPOINT",
-            "rule_name": "空调温度优化",
-            "device_id": None,
-            "category": "efficiency",
-            "suggestion": "建议将机房空调设定温度从24℃提高到26℃，可降低制冷能耗约15%，每月节省约2000kWh",
-            "priority": "medium",
-            "potential_saving": 2000,
-            "potential_cost_saving": 2000 * 0.7,
-            "difficulty": "easy",
-            "implementation_steps": json.dumps([
-                {"step": 1, "description": "逐步提高设定温度，每次1℃"},
-                {"step": 2, "description": "监测服务器进风温度，确保不超过27℃"},
-                {"step": 3, "description": "观察一周，确认设备运行正常"}
-            ]),
-        })
+        suggestions.append(
+            {
+                "rule_id": "REDUCE_HVAC_SETPOINT",
+                "rule_name": "空调温度优化",
+                "device_id": None,
+                "category": "efficiency",
+                "suggestion": "建议将机房空调设定温度从24℃提高到26℃，可降低制冷能耗约15%，每月节省约2000kWh",
+                "priority": "medium",
+                "potential_saving": 2000,
+                "potential_cost_saving": 2000 * 0.7,
+                "difficulty": "easy",
+                "implementation_steps": json.dumps(
+                    [
+                        {"step": 1, "description": "逐步提高设定温度，每次1℃"},
+                        {"step": 2, "description": "监测服务器进风温度，确保不超过27℃"},
+                        {"step": 3, "description": "观察一周，确认设备运行正常"},
+                    ]
+                ),
+            }
+        )
 
         # 3. 需量优化建议
-        suggestions.append({
-            "rule_id": "DEMAND_OPTIMIZATION",
-            "rule_name": "需量优化",
-            "device_id": None,
-            "category": "demand",
-            "suggestion": "当前申报需量400kW，实际最大需量约350kW，建议调整申报需量为380kW，可节省需量电费约600元/月",
-            "priority": "high",
-            "potential_saving": 0,
-            "potential_cost_saving": 600,
-            "difficulty": "medium",
-            "implementation_steps": json.dumps([
-                {"step": 1, "description": "收集近3个月需量数据"},
-                {"step": 2, "description": "分析需量分布，确定合理申报值"},
-                {"step": 3, "description": "向供电局申请调整申报需量"}
-            ]),
-        })
+        suggestions.append(
+            {
+                "rule_id": "DEMAND_OPTIMIZATION",
+                "rule_name": "需量优化",
+                "device_id": None,
+                "category": "demand",
+                "suggestion": "当前申报需量400kW，实际最大需量约350kW，建议调整申报需量为380kW，可节省需量电费约600元/月",
+                "priority": "high",
+                "potential_saving": 0,
+                "potential_cost_saving": 600,
+                "difficulty": "medium",
+                "implementation_steps": json.dumps(
+                    [
+                        {"step": 1, "description": "收集近3个月需量数据"},
+                        {"step": 2, "description": "分析需量分布，确定合理申报值"},
+                        {"step": 3, "description": "向供电局申请调整申报需量"},
+                    ]
+                ),
+            }
+        )
 
         # 4. PUE优化建议
-        suggestions.append({
-            "rule_id": "PUE_IMPROVEMENT",
-            "rule_name": "PUE优化",
-            "device_id": None,
-            "category": "pue",
-            "suggestion": "当前PUE为1.65，通过优化空调运行策略和提高冷通道封闭效果，可将PUE降低至1.50，年节省电费约50000元",
-            "priority": "high",
-            "potential_saving": 50000 / 0.7,
-            "potential_cost_saving": 50000,
-            "difficulty": "hard",
-            "implementation_steps": json.dumps([
-                {"step": 1, "description": "完善冷热通道隔离"},
-                {"step": 2, "description": "优化空调送风温度和风量"},
-                {"step": 3, "description": "安装变频控制，按需制冷"},
-                {"step": 4, "description": "定期清洁空调滤网和盘管"}
-            ]),
-        })
+        suggestions.append(
+            {
+                "rule_id": "PUE_IMPROVEMENT",
+                "rule_name": "PUE优化",
+                "device_id": None,
+                "category": "pue",
+                "suggestion": "当前PUE为1.65，通过优化空调运行策略和提高冷通道封闭效果，可将PUE降低至1.50，年节省电费约50000元",
+                "priority": "high",
+                "potential_saving": 50000 / 0.7,
+                "potential_cost_saving": 50000,
+                "difficulty": "hard",
+                "implementation_steps": json.dumps(
+                    [
+                        {"step": 1, "description": "完善冷热通道隔离"},
+                        {"step": 2, "description": "优化空调送风温度和风量"},
+                        {"step": 3, "description": "安装变频控制，按需制冷"},
+                        {"step": 4, "description": "定期清洁空调滤网和盘管"},
+                    ]
+                ),
+            }
+        )
 
         # 5. 照明优化建议
         for d in DATACENTER_CONFIG["devices"]:
             if d["type"] == "LIGHTING":
                 device_id = device_ids.get(d["code"])
                 saving = d["power"] * 0.3 * 12 * 30  # 降低30%亮度，每天12小时
-                suggestions.append({
-                    "rule_id": "REDUCE_LIGHTING_INTENSITY",
-                    "rule_name": "照明亮度优化",
-                    "device_id": device_id,
-                    "category": "efficiency",
-                    "suggestion": f"建议在非工作时段(20:00-08:00)将{d['name']}亮度从100%降低到50%，预计节省{saving:.0f}kWh/月",
-                    "priority": "low",
-                    "potential_saving": saving,
-                    "potential_cost_saving": saving * 0.5,
-                    "difficulty": "easy",
-                    "implementation_steps": json.dumps([
-                        {"step": 1, "description": "安装照明控制系统或定时器"},
-                        {"step": 2, "description": "设置分时段亮度策略"},
-                        {"step": 3, "description": "保留应急照明"}
-                    ]),
-                })
+                suggestions.append(
+                    {
+                        "rule_id": "REDUCE_LIGHTING_INTENSITY",
+                        "rule_name": "照明亮度优化",
+                        "device_id": device_id,
+                        "category": "efficiency",
+                        "suggestion": f"建议在非工作时段(20:00-08:00)将{d['name']}亮度从100%降低到50%，预计节省{saving:.0f}kWh/月",
+                        "priority": "low",
+                        "potential_saving": saving,
+                        "potential_cost_saving": saving * 0.5,
+                        "difficulty": "easy",
+                        "implementation_steps": json.dumps(
+                            [
+                                {"step": 1, "description": "安装照明控制系统或定时器"},
+                                {"step": 2, "description": "设置分时段亮度策略"},
+                                {"step": 3, "description": "保留应急照明"},
+                            ]
+                        ),
+                    }
+                )
 
         # 6. 削峰建议
-        suggestions.append({
-            "rule_id": "PEAK_SHAVING",
-            "rule_name": "削峰填谷",
-            "device_id": None,
-            "category": "demand",
-            "suggestion": "在14:00-17:00尖峰时段，建议降低非关键负荷功率约30kW，避免超过申报需量，预防需量罚款",
-            "priority": "urgent",
-            "potential_saving": 0,
-            "potential_cost_saving": 30 * 2 * 30,  # 超需量罚款
-            "difficulty": "medium",
-            "implementation_steps": json.dumps([
-                {"step": 1, "description": "识别可调节的非关键负荷"},
-                {"step": 2, "description": "设置需量预警阈值(90%)"},
-                {"step": 3, "description": "制定应急降负荷预案"},
-                {"step": 4, "description": "在需量接近阈值时自动或手动降负荷"}
-            ]),
-        })
+        suggestions.append(
+            {
+                "rule_id": "PEAK_SHAVING",
+                "rule_name": "削峰填谷",
+                "device_id": None,
+                "category": "demand",
+                "suggestion": "在14:00-17:00尖峰时段，建议降低非关键负荷功率约30kW，避免超过申报需量，预防需量罚款",
+                "priority": "urgent",
+                "potential_saving": 0,
+                "potential_cost_saving": 30 * 2 * 30,  # 超需量罚款
+                "difficulty": "medium",
+                "implementation_steps": json.dumps(
+                    [
+                        {"step": 1, "description": "识别可调节的非关键负荷"},
+                        {"step": 2, "description": "设置需量预警阈值(90%)"},
+                        {"step": 3, "description": "制定应急降负荷预案"},
+                        {"step": 4, "description": "在需量接近阈值时自动或手动降负荷"},
+                    ]
+                ),
+            }
+        )
 
         # 插入数据库
         for s in suggestions:
-            cursor.execute("""
+            cursor.execute(
+                """
                 INSERT INTO energy_suggestions (rule_id, rule_name, device_id, category,
                     suggestion, priority, potential_saving, potential_cost_saving, difficulty,
                     implementation_steps, status, created_at, updated_at)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', datetime('now'), datetime('now'))
-            """, (s["rule_id"], s["rule_name"], s.get("device_id"), s["category"],
-                  s["suggestion"], s["priority"], s["potential_saving"],
-                  s["potential_cost_saving"], s["difficulty"], s.get("implementation_steps")))
+            """,
+                (
+                    s["rule_id"],
+                    s["rule_name"],
+                    s.get("device_id"),
+                    s["category"],
+                    s["suggestion"],
+                    s["priority"],
+                    s["potential_saving"],
+                    s["potential_cost_saving"],
+                    s["difficulty"],
+                    s.get("implementation_steps"),
+                ),
+            )
 
         self.conn.commit()
         print(f"已创建节能建议: {len(suggestions)}条")
@@ -782,7 +1056,7 @@ def main():
         db_path = sys.argv[1]
     else:
         # 默认路径
-        db_path = os.path.join(os.path.dirname(__file__), '..', '..', 'dcim.db')
+        db_path = os.path.join(os.path.dirname(__file__), "..", "..", "dcim.db")
 
     db_path = os.path.abspath(db_path)
     print(f"数据库路径: {db_path}")

@@ -2,6 +2,7 @@
 视频监控 API
 Story 10-1: 摄像头元数据管理
 """
+
 import logging
 from typing import Optional
 
@@ -14,10 +15,21 @@ from ...models.user import User
 from ...models.alarm import Alarm
 from ...models.point import Point
 from ...schemas.video import (
-    NVRCreate, NVRUpdate, NVRResponse,
-    CameraCreate, CameraUpdate, CameraResponse, CameraPresetResponse,
-    PTZControlRequest, PresetCallRequest, RecordingRequest, VideoEventResponse,
-    PlaybackInfoResponse, AlarmBrief, CameraBrief, RecordingSegmentResponse,
+    NVRCreate,
+    NVRUpdate,
+    NVRResponse,
+    CameraCreate,
+    CameraUpdate,
+    CameraResponse,
+    CameraPresetResponse,
+    PTZControlRequest,
+    PresetCallRequest,
+    RecordingRequest,
+    VideoEventResponse,
+    PlaybackInfoResponse,
+    AlarmBrief,
+    CameraBrief,
+    RecordingSegmentResponse,
 )
 from ...services import video_service
 
@@ -27,6 +39,7 @@ router = APIRouter()
 
 
 # ========== NVR 端点 ==========
+
 
 @router.post("/nvrs", response_model=NVRResponse, summary="创建NVR")
 async def create_nvr(
@@ -108,6 +121,7 @@ async def delete_nvr(
 
 # ========== Camera 端点 ==========
 
+
 # 静态路由必须在参数化路由之前
 @router.get("/cameras/by-alarm/{alarm_id}", summary="按告警查询关联摄像头")
 async def get_cameras_by_alarm(
@@ -185,8 +199,12 @@ async def list_cameras(
 ):
     """获取摄像头列表（分页+筛选）"""
     result = await video_service.list_cameras(
-        db, nvr_id=nvr_id, area_code=area_code, status=status,
-        page=page, page_size=page_size,
+        db,
+        nvr_id=nvr_id,
+        area_code=area_code,
+        status=status,
+        page=page,
+        page_size=page_size,
     )
     items = []
     for camera in result["cameras"]:
@@ -247,6 +265,7 @@ async def delete_camera(
 
 # ========== 辅助函数 ==========
 
+
 def _build_nvr_response(nvr, camera_count: int) -> NVRResponse:
     """构建 NVR 响应（密码掩码）"""
     return NVRResponse(
@@ -272,13 +291,12 @@ def _build_camera_response(detail: dict) -> CameraResponse:
     camera = detail["camera"]
     resp = CameraResponse.model_validate(camera)
     resp.nvr_name = detail.get("nvr_name")
-    resp.presets = [
-        CameraPresetResponse.model_validate(p) for p in detail.get("presets", [])
-    ]
+    resp.presets = [CameraPresetResponse.model_validate(p) for p in detail.get("presets", [])]
     return resp
 
 
 # ========== PTZ / 录像 / 事件端点 (Story 10-3) ==========
+
 
 @router.post("/ptz/control", response_model=VideoEventResponse, summary="云台控制")
 async def ptz_control(
@@ -292,7 +310,11 @@ async def ptz_control(
     if not cam:
         raise HTTPException(status_code=404, detail="摄像头不存在")
     event = await video_service.ptz_control(
-        db, data.camera_id, data.action, data.speed, user.username,
+        db,
+        data.camera_id,
+        data.action,
+        data.speed,
+        user.username,
     )
     resp = VideoEventResponse.model_validate(event)
     resp.camera_name = cam["camera"].name
@@ -310,7 +332,10 @@ async def call_preset(
     if not cam:
         raise HTTPException(status_code=404, detail="摄像头不存在")
     event = await video_service.call_preset(
-        db, data.camera_id, data.preset_index, user.username,
+        db,
+        data.camera_id,
+        data.preset_index,
+        user.username,
     )
     resp = VideoEventResponse.model_validate(event)
     resp.camera_name = cam["camera"].name
@@ -328,8 +353,11 @@ async def start_recording(
     if not cam:
         raise HTTPException(status_code=404, detail="摄像头不存在")
     event = await video_service.start_recording(
-        db, data.camera_id, "manual",
-        alarm_id=data.alarm_id, linkage_execution_id=data.linkage_execution_id,
+        db,
+        data.camera_id,
+        "manual",
+        alarm_id=data.alarm_id,
+        linkage_execution_id=data.linkage_execution_id,
     )
     resp = VideoEventResponse.model_validate(event)
     resp.camera_name = cam["camera"].name
@@ -363,8 +391,11 @@ async def list_video_events(
 ):
     """获取视频事件列表（分页+筛选）"""
     result = await video_service.list_video_events(
-        db, camera_id=camera_id, event_type=event_type,
-        page=page, page_size=page_size,
+        db,
+        camera_id=camera_id,
+        event_type=event_type,
+        page=page,
+        page_size=page_size,
     )
     items = []
     for event in result["items"]:
@@ -381,6 +412,7 @@ async def list_video_events(
 
 # ========== 回放端点 (Story 10-4) ==========
 
+
 @router.get("/playback/alarm/{alarm_id}", response_model=PlaybackInfoResponse, summary="告警回放信息")
 async def get_playback_info(
     alarm_id: int,
@@ -395,8 +427,11 @@ async def get_playback_info(
     # 构建响应
     cameras = [
         CameraBrief(
-            id=c.id, name=c.name, code=c.code,
-            rtsp_url=c.rtsp_url, hls_url=c.hls_url,
+            id=c.id,
+            name=c.name,
+            code=c.code,
+            rtsp_url=c.rtsp_url,
+            hls_url=c.hls_url,
             location_description=c.location_description,
         )
         for c in result["cameras"]
@@ -427,8 +462,12 @@ async def list_recording_segments(
 ):
     """查询录像片段列表（按摄像头+时间范围）"""
     result = await video_service.list_recording_segments(
-        db, camera_id, start_time=start_time, end_time=end_time,
-        page=page, page_size=page_size,
+        db,
+        camera_id,
+        start_time=start_time,
+        end_time=end_time,
+        page=page,
+        page_size=page_size,
     )
     return {
         "total": result["total"],

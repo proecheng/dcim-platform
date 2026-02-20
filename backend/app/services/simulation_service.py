@@ -5,34 +5,34 @@ Simulation Service
 提供What-if模拟计算功能，支持参数调整实时计算收益
 用于节能建议详情页的交互式模拟器
 """
+
 import logging
-from typing import Dict, List, Optional, Any, Tuple
-from datetime import datetime, date, timedelta
+from typing import Dict, List, Optional, Any
+from datetime import datetime, timedelta
 from dataclasses import dataclass, field
 from enum import Enum
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, and_, func
+from sqlalchemy import select, and_
 
 from .pricing_service import PricingService
-from ..models.energy import (
-    PowerDevice, DeviceShiftConfig, LoadRegulationConfig,
-    PUEHistory, EnergyDaily
-)
+from ..models.energy import PowerDevice, DeviceShiftConfig, LoadRegulationConfig, PUEHistory
 
 logger = logging.getLogger(__name__)
 
 
 class SimulationType(str, Enum):
     """模拟类型"""
-    DEMAND_ADJUSTMENT = "demand_adjustment"   # 需量调整
-    PEAK_SHIFT = "peak_shift"                 # 峰谷转移
-    DEVICE_REGULATION = "device_regulation"   # 设备调节
-    POWER_FACTOR = "power_factor"             # 功率因数改善
+
+    DEMAND_ADJUSTMENT = "demand_adjustment"  # 需量调整
+    PEAK_SHIFT = "peak_shift"  # 峰谷转移
+    DEVICE_REGULATION = "device_regulation"  # 设备调节
+    POWER_FACTOR = "power_factor"  # 功率因数改善
 
 
 @dataclass
 class SimulationResult:
     """模拟结果"""
+
     simulation_type: SimulationType
     is_feasible: bool
     current_state: Dict[str, Any]
@@ -59,9 +59,7 @@ class SimulationService:
         self.pricing_service = PricingService(db)
 
     async def simulate_demand_adjustment(
-        self,
-        new_declared_demand: float,
-        historical_days: int = 30
+        self, new_declared_demand: float, historical_days: int = 30
     ) -> SimulationResult:
         """
         模拟需量调整
@@ -92,7 +90,7 @@ class SimulationService:
                 simulated_state={"declared_demand": new_declared_demand},
                 benefit={"error": "缺少历史数据"},
                 confidence=0,
-                warnings=["无法获取历史需量数据"]
+                warnings=["无法获取历史需量数据"],
             )
 
         max_demand = max(demand_history)
@@ -100,9 +98,7 @@ class SimulationService:
         percentile_95 = sorted(demand_history)[int(len(demand_history) * 0.95)]
 
         # 计算当前成本（按月）
-        current_monthly_cost = self._calculate_demand_cost(
-            current_declared, max_demand, demand_price, over_multiplier
-        )
+        current_monthly_cost = self._calculate_demand_cost(current_declared, max_demand, demand_price, over_multiplier)
 
         # 计算模拟成本
         simulated_monthly_cost = self._calculate_demand_cost(
@@ -110,9 +106,7 @@ class SimulationService:
         )
 
         # 计算超需量风险
-        over_risk = self._calculate_over_demand_risk(
-            new_declared_demand, demand_history
-        )
+        over_risk = self._calculate_over_demand_risk(new_declared_demand, demand_history)
 
         # 计算收益
         monthly_saving = current_monthly_cost - simulated_monthly_cost
@@ -120,9 +114,7 @@ class SimulationService:
 
         # 确定可行性和置信度
         is_feasible = new_declared_demand >= percentile_95 * 0.95
-        confidence = self._calculate_confidence(
-            is_feasible, over_risk, len(demand_history)
-        )
+        confidence = self._calculate_confidence(is_feasible, over_risk, len(demand_history))
 
         warnings = []
         recommendations = []
@@ -145,25 +137,23 @@ class SimulationService:
                 "max_demand": max_demand,
                 "avg_demand": round(avg_demand, 2),
                 "percentile_95": round(percentile_95, 2),
-                "monthly_cost": round(current_monthly_cost, 2)
+                "monthly_cost": round(current_monthly_cost, 2),
             },
             simulated_state={
                 "declared_demand": new_declared_demand,
                 "over_demand_risk": round(over_risk * 100, 2),
-                "monthly_cost": round(simulated_monthly_cost, 2)
+                "monthly_cost": round(simulated_monthly_cost, 2),
             },
             benefit={
                 "monthly_saving": round(monthly_saving, 2),
                 "annual_saving": round(annual_saving, 2),
                 "saving_percentage": round(
-                    (monthly_saving / current_monthly_cost * 100)
-                    if current_monthly_cost > 0 else 0,
-                    2
-                )
+                    (monthly_saving / current_monthly_cost * 100) if current_monthly_cost > 0 else 0, 2
+                ),
             },
             confidence=round(confidence, 2),
             warnings=warnings,
-            recommendations=recommendations
+            recommendations=recommendations,
         )
 
     async def simulate_peak_shift(
@@ -172,7 +162,7 @@ class SimulationService:
         shift_hours: float,
         source_period: str = "peak",
         target_period: str = "valley",
-        working_days_per_year: int = 300
+        working_days_per_year: int = 300,
     ) -> SimulationResult:
         """
         模拟峰谷负荷转移
@@ -201,7 +191,7 @@ class SimulationService:
                 simulated_state={"target_period": target_period, "target_price": target_price},
                 benefit={"error": "目标时段电价不低于源时段"},
                 confidence=0,
-                warnings=["无法获得峰谷价差收益"]
+                warnings=["无法获得峰谷价差收益"],
             )
 
         # 获取可转移设备信息
@@ -229,9 +219,7 @@ class SimulationService:
             warnings.append("每日转移时间较长，可能影响运营")
 
         # 选择推荐设备
-        recommended_devices = self._select_devices_for_shift(
-            shiftable_devices, shift_power
-        )
+        recommended_devices = self._select_devices_for_shift(shiftable_devices, shift_power)
 
         return SimulationResult(
             simulation_type=SimulationType.PEAK_SHIFT,
@@ -240,31 +228,28 @@ class SimulationService:
                 "source_period": source_period,
                 "source_price": source_price,
                 "available_shiftable_power": round(max_shiftable_power, 2),
-                "shiftable_device_count": len(shiftable_devices)
+                "shiftable_device_count": len(shiftable_devices),
             },
             simulated_state={
                 "target_period": target_period,
                 "target_price": target_price,
                 "shift_power": shift_power,
                 "shift_hours": shift_hours,
-                "price_diff": round(price_diff, 4)
+                "price_diff": round(price_diff, 4),
             },
             benefit={
                 "daily_energy_shifted": round(daily_energy, 2),
                 "daily_saving": round(daily_saving, 2),
                 "annual_saving": round(annual_saving, 2),
-                "recommended_devices": recommended_devices
+                "recommended_devices": recommended_devices,
             },
             confidence=round(confidence, 2),
             warnings=warnings,
-            recommendations=recommendations
+            recommendations=recommendations,
         )
 
     async def simulate_device_regulation(
-        self,
-        device_id: int,
-        target_value: float,
-        regulation_type: str = "temperature"
+        self, device_id: int, target_value: float, regulation_type: str = "temperature"
     ) -> SimulationResult:
         """
         模拟设备调节
@@ -287,7 +272,7 @@ class SimulationService:
                 simulated_state={},
                 benefit={"error": f"设备ID {device_id} 不存在"},
                 confidence=0,
-                warnings=["设备不存在"]
+                warnings=["设备不存在"],
             )
 
         # 获取调节配置
@@ -300,7 +285,7 @@ class SimulationService:
                 simulated_state={},
                 benefit={"error": "该设备没有配置调节参数"},
                 confidence=0,
-                warnings=["未找到调节配置"]
+                warnings=["未找到调节配置"],
             )
 
         # 验证目标值范围
@@ -351,29 +336,27 @@ class SimulationService:
                 "regulation_type": regulation_type,
                 "current_value": current_val,
                 "current_power_estimate": round(base_power, 2),
-                "unit": reg_config.unit
+                "unit": reg_config.unit,
             },
             simulated_state={
                 "target_value": target_value,
                 "value_change": round(value_change, 2),
                 "power_change": round(power_change, 2),
                 "comfort_impact": comfort_impact,
-                "performance_impact": performance_impact
+                "performance_impact": performance_impact,
             },
             benefit={
                 "power_saving_kw": round(power_change, 2),
                 "daily_saving": round(daily_saving, 2),
-                "annual_saving": round(annual_saving, 2)
+                "annual_saving": round(annual_saving, 2),
             },
             confidence=round(confidence, 2),
             warnings=warnings,
-            recommendations=recommendations
+            recommendations=recommendations,
         )
 
     async def calculate_benefit_with_confidence(
-        self,
-        base_benefit: float,
-        uncertainty_factors: Dict[str, float]
+        self, base_benefit: float, uncertainty_factors: Dict[str, float]
     ) -> Dict[str, Any]:
         """
         计算带置信区间的收益
@@ -395,11 +378,7 @@ class SimulationService:
         implementation_risk = uncertainty_factors.get("implementation_risk", 0.7)
 
         # 综合置信度
-        overall_confidence = (
-            data_quality * 0.3 +
-            assumption_risk * 0.3 +
-            implementation_risk * 0.4
-        )
+        overall_confidence = data_quality * 0.3 + assumption_risk * 0.3 + implementation_risk * 0.4
 
         # 计算置信区间
         uncertainty_range = 1 - overall_confidence
@@ -419,14 +398,11 @@ class SimulationService:
             "factors": {
                 "data_quality": data_quality,
                 "assumption_risk": assumption_risk,
-                "implementation_risk": implementation_risk
-            }
+                "implementation_risk": implementation_risk,
+            },
         }
 
-    async def run_combined_simulation(
-        self,
-        scenarios: List[Dict[str, Any]]
-    ) -> Dict[str, Any]:
+    async def run_combined_simulation(self, scenarios: List[Dict[str, Any]]) -> Dict[str, Any]:
         """
         运行组合模拟
 
@@ -459,10 +435,7 @@ class SimulationService:
             else:
                 continue
 
-            results.append({
-                "type": sim_type,
-                "result": result
-            })
+            results.append({"type": sim_type, "result": result})
 
             # 累计收益
             if result.is_feasible:
@@ -483,10 +456,10 @@ class SimulationService:
             "combined_benefit": {
                 "total_annual_saving": round(total_annual_saving, 2),
                 "overall_feasibility": overall_feasibility,
-                "combined_confidence": round(combined_confidence, 2)
+                "combined_confidence": round(combined_confidence, 2),
             },
             "all_warnings": list(set(all_warnings)),
-            "simulation_time": datetime.now().isoformat()
+            "simulation_time": datetime.now().isoformat(),
         }
 
     # ========== 私有方法 ==========
@@ -506,13 +479,7 @@ class SimulationService:
             logger.warning(f"Failed to get power history: {e}")
             return []
 
-    def _calculate_demand_cost(
-        self,
-        declared: float,
-        actual_max: float,
-        price: float,
-        over_multiplier: float
-    ) -> float:
+    def _calculate_demand_cost(self, declared: float, actual_max: float, price: float, over_multiplier: float) -> float:
         """计算需量电费"""
         if actual_max <= declared:
             return declared * price
@@ -520,11 +487,7 @@ class SimulationService:
             over_demand = actual_max - declared
             return declared * price + over_demand * price * over_multiplier
 
-    def _calculate_over_demand_risk(
-        self,
-        declared: float,
-        demand_history: List[float]
-    ) -> float:
+    def _calculate_over_demand_risk(self, declared: float, demand_history: List[float]) -> float:
         """计算超需量风险"""
         if not demand_history or declared <= 0:
             return 0.5
@@ -532,12 +495,7 @@ class SimulationService:
         over_count = sum(1 for d in demand_history if d > declared)
         return over_count / len(demand_history)
 
-    def _calculate_confidence(
-        self,
-        is_feasible: bool,
-        over_risk: float,
-        sample_size: int
-    ) -> float:
+    def _calculate_confidence(self, is_feasible: bool, over_risk: float, sample_size: int) -> float:
         """计算置信度"""
         base = 0.8 if is_feasible else 0.4
         risk_penalty = over_risk * 0.3
@@ -551,43 +509,32 @@ class SimulationService:
             result = await self.db.execute(
                 select(PowerDevice, DeviceShiftConfig)
                 .join(DeviceShiftConfig, PowerDevice.id == DeviceShiftConfig.device_id)
-                .where(
-                    and_(
-                        DeviceShiftConfig.is_shiftable == True,
-                        PowerDevice.is_enabled == True
-                    )
-                )
+                .where(and_(DeviceShiftConfig.is_shiftable == True, PowerDevice.is_enabled == True))
             )
             rows = result.all()
 
             devices = []
             for device, config in rows:
                 shiftable_power = (device.rated_power or 0) * (config.shiftable_power_ratio or 0)
-                devices.append({
-                    "device_id": device.id,
-                    "device_name": device.device_name,
-                    "device_type": device.device_type,
-                    "rated_power": device.rated_power,
-                    "shiftable_power": shiftable_power,
-                    "allowed_hours": config.allowed_shift_hours or []
-                })
+                devices.append(
+                    {
+                        "device_id": device.id,
+                        "device_name": device.device_name,
+                        "device_type": device.device_type,
+                        "rated_power": device.rated_power,
+                        "shiftable_power": shiftable_power,
+                        "allowed_hours": config.allowed_shift_hours or [],
+                    }
+                )
             return devices
         except Exception as e:
             logger.warning(f"Failed to get shiftable devices: {e}")
             return []
 
-    def _select_devices_for_shift(
-        self,
-        devices: List[Dict],
-        target_power: float
-    ) -> List[Dict]:
+    def _select_devices_for_shift(self, devices: List[Dict], target_power: float) -> List[Dict]:
         """选择转移设备"""
         # 按可转移功率排序
-        sorted_devices = sorted(
-            devices,
-            key=lambda d: d.get("shiftable_power", 0),
-            reverse=True
-        )
+        sorted_devices = sorted(devices, key=lambda d: d.get("shiftable_power", 0), reverse=True)
 
         selected = []
         accumulated_power = 0
@@ -595,34 +542,30 @@ class SimulationService:
         for dev in sorted_devices:
             if accumulated_power >= target_power:
                 break
-            selected.append({
-                "device_id": dev["device_id"],
-                "device_name": dev["device_name"],
-                "shiftable_power": dev["shiftable_power"]
-            })
+            selected.append(
+                {
+                    "device_id": dev["device_id"],
+                    "device_name": dev["device_name"],
+                    "shiftable_power": dev["shiftable_power"],
+                }
+            )
             accumulated_power += dev["shiftable_power"]
 
         return selected
 
     async def _get_device(self, device_id: int) -> Optional[PowerDevice]:
         """获取设备"""
-        result = await self.db.execute(
-            select(PowerDevice).where(PowerDevice.id == device_id)
-        )
+        result = await self.db.execute(select(PowerDevice).where(PowerDevice.id == device_id))
         return result.scalar_one_or_none()
 
-    async def _get_regulation_config(
-        self,
-        device_id: int,
-        regulation_type: str
-    ) -> Optional[LoadRegulationConfig]:
+    async def _get_regulation_config(self, device_id: int, regulation_type: str) -> Optional[LoadRegulationConfig]:
         """获取调节配置"""
         result = await self.db.execute(
             select(LoadRegulationConfig).where(
                 and_(
                     LoadRegulationConfig.device_id == device_id,
                     LoadRegulationConfig.regulation_type == regulation_type,
-                    LoadRegulationConfig.is_enabled == True
+                    LoadRegulationConfig.is_enabled == True,
                 )
             )
         )

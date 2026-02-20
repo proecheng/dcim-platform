@@ -1,6 +1,6 @@
 """后端 MQTT 客户端 — Story 2.1 + Story 15.1 动态订阅"""
+
 import asyncio
-import fnmatch
 import json
 import logging
 from typing import Callable, Optional
@@ -84,6 +84,7 @@ class MqttService:
         while self._running:
             try:
                 import aiomqtt
+
                 async with aiomqtt.Client(
                     hostname=settings.mqtt_host,
                     port=settings.mqtt_port,
@@ -152,6 +153,7 @@ class MqttService:
             # OTA 状态上报: dcim/{site_id}/gw/{gw_id}/ota/status (6段)
             if len(parts) == 6 and parts[0] == "dcim" and parts[4] == "ota" and parts[5] == "status":
                 from ..services.ota_service import ota_service
+
                 async with async_session() as db:
                     await ota_service.handle_ota_status(payload, db)
             # 原有网关消息: dcim/{site_id}/gw/{gw_id}/{type} (5段)
@@ -178,7 +180,7 @@ class MqttService:
           # 匹配多层: sensor/# 匹配 sensor/room1/data
         """
         # 将 MQTT 通配符转换为 fnmatch 模式
-        fn_pattern = pattern.replace("+", "*").replace("#", "**")
+        pattern.replace("+", "*").replace("#", "**")
         # fnmatch 不支持 **，手动处理 # 通配符
         if "#" in pattern:
             prefix = pattern.split("#")[0]
@@ -188,10 +190,7 @@ class MqttService:
         pattern_parts = pattern.split("/")
         if len(topic_parts) != len(pattern_parts):
             return False
-        return all(
-            pp == "+" or pp == tp
-            for tp, pp in zip(topic_parts, pattern_parts)
-        )
+        return all(pp == "+" or pp == tp for tp, pp in zip(topic_parts, pattern_parts))
 
     async def _heartbeat_check_loop(self) -> None:
         """定时检查网关心跳超时"""

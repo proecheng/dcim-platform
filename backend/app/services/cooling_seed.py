@@ -1,9 +1,9 @@
 """
 制冷设备种子数据 - 创建精密空调、群控组、冷通道及其关联点位
 """
-from datetime import datetime, date
+
+from datetime import date
 from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..core.database import async_session
 from ..models.device import Device
@@ -11,6 +11,7 @@ from ..models.point import Point
 from ..models.cooling import CoolingUnit, CoolingGroup, ColdAisle
 
 import logging
+
 logger = logging.getLogger(__name__)
 
 
@@ -125,43 +126,179 @@ def _ac_points(code: str):
     return [
         # 送风回风温湿度
         {"suffix": "supply_temp", "name": "送风温度", "type": "AI", "unit": "℃", "min": 18, "max": 25, "addr": "40001"},
-        {"suffix": "supply_humidity", "name": "送风湿度", "type": "AI", "unit": "%", "min": 30, "max": 60, "addr": "40002"},
+        {
+            "suffix": "supply_humidity",
+            "name": "送风湿度",
+            "type": "AI",
+            "unit": "%",
+            "min": 30,
+            "max": 60,
+            "addr": "40002",
+        },
         {"suffix": "return_temp", "name": "回风温度", "type": "AI", "unit": "℃", "min": 25, "max": 35, "addr": "40003"},
-        {"suffix": "return_humidity", "name": "回风湿度", "type": "AI", "unit": "%", "min": 30, "max": 70, "addr": "40004"},
+        {
+            "suffix": "return_humidity",
+            "name": "回风湿度",
+            "type": "AI",
+            "unit": "%",
+            "min": 30,
+            "max": 70,
+            "addr": "40004",
+        },
         # 压缩机
-        {"suffix": "compressor1_voltage", "name": "压缩机1电压", "type": "AI", "unit": "V", "min": 360, "max": 400, "addr": "40005"},
-        {"suffix": "compressor1_current", "name": "压缩机1电流", "type": "AI", "unit": "A", "min": 5, "max": 20, "addr": "40006"},
-        {"suffix": "compressor2_voltage", "name": "压缩机2电压", "type": "AI", "unit": "V", "min": 360, "max": 400, "addr": "40007"},
-        {"suffix": "compressor2_current", "name": "压缩机2电流", "type": "AI", "unit": "A", "min": 5, "max": 20, "addr": "40008"},
-        {"suffix": "compressor1_freq", "name": "压缩机1频率", "type": "AI", "unit": "Hz", "min": 30, "max": 100, "addr": "40009"},
-        {"suffix": "compressor2_freq", "name": "压缩机2频率", "type": "AI", "unit": "Hz", "min": 30, "max": 100, "addr": "40010"},
+        {
+            "suffix": "compressor1_voltage",
+            "name": "压缩机1电压",
+            "type": "AI",
+            "unit": "V",
+            "min": 360,
+            "max": 400,
+            "addr": "40005",
+        },
+        {
+            "suffix": "compressor1_current",
+            "name": "压缩机1电流",
+            "type": "AI",
+            "unit": "A",
+            "min": 5,
+            "max": 20,
+            "addr": "40006",
+        },
+        {
+            "suffix": "compressor2_voltage",
+            "name": "压缩机2电压",
+            "type": "AI",
+            "unit": "V",
+            "min": 360,
+            "max": 400,
+            "addr": "40007",
+        },
+        {
+            "suffix": "compressor2_current",
+            "name": "压缩机2电流",
+            "type": "AI",
+            "unit": "A",
+            "min": 5,
+            "max": 20,
+            "addr": "40008",
+        },
+        {
+            "suffix": "compressor1_freq",
+            "name": "压缩机1频率",
+            "type": "AI",
+            "unit": "Hz",
+            "min": 30,
+            "max": 100,
+            "addr": "40009",
+        },
+        {
+            "suffix": "compressor2_freq",
+            "name": "压缩机2频率",
+            "type": "AI",
+            "unit": "Hz",
+            "min": 30,
+            "max": 100,
+            "addr": "40010",
+        },
         # 风机
         {"suffix": "fan1_speed", "name": "风机1转速", "type": "AI", "unit": "%", "min": 0, "max": 100, "addr": "40011"},
         {"suffix": "fan2_speed", "name": "风机2转速", "type": "AI", "unit": "%", "min": 0, "max": 100, "addr": "40012"},
         {"suffix": "fan3_speed", "name": "风机3转速", "type": "AI", "unit": "%", "min": 0, "max": 100, "addr": "40013"},
         # 制冷量与功率
-        {"suffix": "cooling_capacity", "name": "制冷量", "type": "AI", "unit": "kW", "min": 0, "max": 70, "addr": "40014"},
+        {
+            "suffix": "cooling_capacity",
+            "name": "制冷量",
+            "type": "AI",
+            "unit": "kW",
+            "min": 0,
+            "max": 70,
+            "addr": "40014",
+        },
         {"suffix": "power", "name": "功耗", "type": "AI", "unit": "kW", "min": 0, "max": 25, "addr": "40015"},
         {"suffix": "cop", "name": "COP", "type": "AI", "unit": "", "min": 2, "max": 5, "addr": "40016"},
         # DI状态
-        {"suffix": "compressor1_status", "name": "压缩机1状态", "type": "DI", "unit": "", "min": 0, "max": 1, "addr": "10001"},
-        {"suffix": "compressor2_status", "name": "压缩机2状态", "type": "DI", "unit": "", "min": 0, "max": 1, "addr": "10002"},
+        {
+            "suffix": "compressor1_status",
+            "name": "压缩机1状态",
+            "type": "DI",
+            "unit": "",
+            "min": 0,
+            "max": 1,
+            "addr": "10001",
+        },
+        {
+            "suffix": "compressor2_status",
+            "name": "压缩机2状态",
+            "type": "DI",
+            "unit": "",
+            "min": 0,
+            "max": 1,
+            "addr": "10002",
+        },
         {"suffix": "fan1_status", "name": "风机1状态", "type": "DI", "unit": "", "min": 0, "max": 1, "addr": "10003"},
         {"suffix": "fan2_status", "name": "风机2状态", "type": "DI", "unit": "", "min": 0, "max": 1, "addr": "10004"},
         {"suffix": "filter_alarm", "name": "滤网告警", "type": "DI", "unit": "", "min": 0, "max": 1, "addr": "10005"},
-        {"suffix": "high_temp_alarm", "name": "高温告警", "type": "DI", "unit": "", "min": 0, "max": 1, "addr": "10006"},
+        {
+            "suffix": "high_temp_alarm",
+            "name": "高温告警",
+            "type": "DI",
+            "unit": "",
+            "min": 0,
+            "max": 1,
+            "addr": "10006",
+        },
     ]
 
 
 def _outdoor_ac_points(code: str):
     """生成室外机的点位列表"""
     return [
-        {"suffix": "ambient_temp", "name": "环境温度", "type": "AI", "unit": "℃", "min": -10, "max": 45, "addr": "40001"},
-        {"suffix": "condenser_temp", "name": "冷凝器温度", "type": "AI", "unit": "℃", "min": 30, "max": 70, "addr": "40002"},
-        {"suffix": "discharge_pressure", "name": "排气压力", "type": "AI", "unit": "bar", "min": 10, "max": 30, "addr": "40003"},
-        {"suffix": "suction_pressure", "name": "吸气压力", "type": "AI", "unit": "bar", "min": 3, "max": 10, "addr": "40004"},
+        {
+            "suffix": "ambient_temp",
+            "name": "环境温度",
+            "type": "AI",
+            "unit": "℃",
+            "min": -10,
+            "max": 45,
+            "addr": "40001",
+        },
+        {
+            "suffix": "condenser_temp",
+            "name": "冷凝器温度",
+            "type": "AI",
+            "unit": "℃",
+            "min": 30,
+            "max": 70,
+            "addr": "40002",
+        },
+        {
+            "suffix": "discharge_pressure",
+            "name": "排气压力",
+            "type": "AI",
+            "unit": "bar",
+            "min": 10,
+            "max": 30,
+            "addr": "40003",
+        },
+        {
+            "suffix": "suction_pressure",
+            "name": "吸气压力",
+            "type": "AI",
+            "unit": "bar",
+            "min": 3,
+            "max": 10,
+            "addr": "40004",
+        },
         {"suffix": "fan_speed", "name": "风机转速", "type": "AI", "unit": "%", "min": 0, "max": 100, "addr": "40005"},
-        {"suffix": "compressor_status", "name": "压缩机状态", "type": "DI", "unit": "", "min": 0, "max": 1, "addr": "10001"},
+        {
+            "suffix": "compressor_status",
+            "name": "压缩机状态",
+            "type": "DI",
+            "unit": "",
+            "min": 0,
+            "max": 1,
+            "addr": "10001",
+        },
     ]
 
 
@@ -169,10 +306,42 @@ def _cold_aisle_points(code: str):
     """生成冷通道的点位列表"""
     return [
         {"suffix": "aisle_temp", "name": "通道温度", "type": "AI", "unit": "℃", "min": 20, "max": 30, "addr": "40001"},
-        {"suffix": "aisle_humidity", "name": "通道湿度", "type": "AI", "unit": "%", "min": 30, "max": 70, "addr": "40002"},
-        {"suffix": "differential_pressure", "name": "通道压差", "type": "AI", "unit": "Pa", "min": 0, "max": 50, "addr": "40003"},
-        {"suffix": "skylight1_status", "name": "天窗1状态", "type": "DI", "unit": "", "min": 0, "max": 1, "addr": "10001"},
-        {"suffix": "skylight2_status", "name": "天窗2状态", "type": "DI", "unit": "", "min": 0, "max": 1, "addr": "10002"},
+        {
+            "suffix": "aisle_humidity",
+            "name": "通道湿度",
+            "type": "AI",
+            "unit": "%",
+            "min": 30,
+            "max": 70,
+            "addr": "40002",
+        },
+        {
+            "suffix": "differential_pressure",
+            "name": "通道压差",
+            "type": "AI",
+            "unit": "Pa",
+            "min": 0,
+            "max": 50,
+            "addr": "40003",
+        },
+        {
+            "suffix": "skylight1_status",
+            "name": "天窗1状态",
+            "type": "DI",
+            "unit": "",
+            "min": 0,
+            "max": 1,
+            "addr": "10001",
+        },
+        {
+            "suffix": "skylight2_status",
+            "name": "天窗2状态",
+            "type": "DI",
+            "unit": "",
+            "min": 0,
+            "max": 1,
+            "addr": "10002",
+        },
         {"suffix": "fire_alarm", "name": "消防告警", "type": "DI", "unit": "", "min": 0, "max": 1, "addr": "10003"},
     ]
 
@@ -205,9 +374,7 @@ async def seed_cooling_devices():
     """种子数据：创建制冷设备及关联点位"""
     async with async_session() as session:
         # 检查是否已有AC-A01设备，避免重复创建
-        existing = await session.execute(
-            select(Device).where(Device.device_code == "AC-A01")
-        )
+        existing = await session.execute(select(Device).where(Device.device_code == "AC-A01"))
         if existing.scalar_one_or_none():
             logger.info("制冷种子数据已存在，跳过")
             return

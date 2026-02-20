@@ -5,10 +5,11 @@
 V3.1: 集成数据追溯链支持 (专利S1)
 V3.2: 异步SQLAlchemy 2.0兼容版本
 """
+
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
-from datetime import datetime, timedelta, date
-from typing import List, Dict, Any, Optional
+from datetime import datetime, timedelta
+from typing import Dict, Any
 from decimal import Decimal
 
 from ..models.energy import EnergySavingProposal, ProposalMeasure
@@ -21,36 +22,12 @@ class TemplateGenerator:
 
     # 模板配置
     TEMPLATE_CONFIGS = {
-        "A1": {
-            "name": "峰谷套利优化方案",
-            "type": "A",
-            "description": "通过调整用电时段，避开尖峰高峰时段，降低电费"
-        },
-        "A2": {
-            "name": "需量控制方案",
-            "type": "A",
-            "description": "优化申报需量，避免偶发性高峰，降低基本电费"
-        },
-        "A3": {
-            "name": "设备运行优化方案",
-            "type": "A",
-            "description": "优化设备运行参数，提高运行效率，降低能耗"
-        },
-        "A4": {
-            "name": "VPP需求响应方案",
-            "type": "A",
-            "description": "参与虚拟电厂需求响应市场，获得补贴收益"
-        },
-        "A5": {
-            "name": "负荷调度优化方案",
-            "type": "A",
-            "description": "优化负荷曲线，提高负荷率，降低峰谷差"
-        },
-        "B1": {
-            "name": "设备改造升级方案",
-            "type": "B",
-            "description": "改造老旧设备，提升能效水平"
-        }
+        "A1": {"name": "峰谷套利优化方案", "type": "A", "description": "通过调整用电时段，避开尖峰高峰时段，降低电费"},
+        "A2": {"name": "需量控制方案", "type": "A", "description": "优化申报需量，避免偶发性高峰，降低基本电费"},
+        "A3": {"name": "设备运行优化方案", "type": "A", "description": "优化设备运行参数，提高运行效率，降低能耗"},
+        "A4": {"name": "VPP需求响应方案", "type": "A", "description": "参与虚拟电厂需求响应市场，获得补贴收益"},
+        "A5": {"name": "负荷调度优化方案", "type": "A", "description": "优化负荷曲线，提高负荷率，降低峰谷差"},
+        "B1": {"name": "设备改造升级方案", "type": "B", "description": "改造老旧设备，提升能效水平"},
     }
 
     def __init__(self, db: AsyncSession, enable_trace: bool = True):
@@ -62,18 +39,12 @@ class TemplateGenerator:
     def _get_traced_calculator(self, proposal_id: int = None, measure_id: int = None) -> TracedFormulaCalculator:
         """获取带追溯功能的计算器"""
         if self._traced_calculator is None or self._traced_calculator.proposal_id != proposal_id:
-            self._traced_calculator = TracedFormulaCalculator(
-                self.db, proposal_id=proposal_id, measure_id=measure_id
-            )
+            self._traced_calculator = TracedFormulaCalculator(self.db, proposal_id=proposal_id, measure_id=measure_id)
         else:
             self._traced_calculator.measure_id = measure_id
         return self._traced_calculator
 
-    async def generate_proposal(
-        self,
-        template_id: str,
-        analysis_days: int = 30
-    ) -> EnergySavingProposal:
+    async def generate_proposal(self, template_id: str, analysis_days: int = 30) -> EnergySavingProposal:
         """
         生成方案的主入口
 
@@ -94,7 +65,7 @@ class TemplateGenerator:
             "A3": self.generate_equipment_optimization_proposal,
             "A4": self.generate_vpp_response_proposal,
             "A5": self.generate_load_scheduling_proposal,
-            "B1": self.generate_equipment_upgrade_proposal
+            "B1": self.generate_equipment_upgrade_proposal,
         }
 
         proposal = await generator_map[template_id](analysis_days)
@@ -151,10 +122,10 @@ class TemplateGenerator:
                 "低谷占比": float(peak_valley_data["低谷占比"]),
                 "深谷电量": float(peak_valley_data["深谷电量"]),
                 "深谷占比": float(peak_valley_data["深谷占比"]),
-                "总电量": float(peak_valley_data["总电量"])
+                "总电量": float(peak_valley_data["总电量"]),
             },
             analysis_start_date=start_date.date(),
-            analysis_end_date=end_date.date()
+            analysis_end_date=end_date.date(),
         )
 
         # 3. 生成措施列表
@@ -180,29 +151,23 @@ class TemplateGenerator:
         return proposal
 
     async def _generate_measure_heat_treatment_shift(
-        self,
-        proposal: EnergySavingProposal,
-        analysis_days: int
+        self, proposal: EnergySavingProposal, analysis_days: int
     ) -> ProposalMeasure:
         """生成措施1: 热处理预热工序时段调整"""
 
         # 参数设置
         shiftable_power = Decimal("2500")  # 可转移功率 2500kW
-        shift_hours = Decimal("2")         # 每日转移2小时
-        sharp_price = Decimal("1.1")       # 尖峰电价
-        valley_price = Decimal("0.111")    # 低谷电价
+        shift_hours = Decimal("2")  # 每日转移2小时
+        sharp_price = Decimal("1.1")  # 尖峰电价
+        valley_price = Decimal("0.111")  # 低谷电价
 
         # 调用计算器 (带追溯)
         if self.enable_trace:
             tc = self._get_traced_calculator(proposal_id=None, measure_id=None)
-            benefit = await tc.traced_peak_shift_benefit(
-                shiftable_power, shift_hours, sharp_price, valley_price
-            )
+            benefit = await tc.traced_peak_shift_benefit(shiftable_power, shift_hours, sharp_price, valley_price)
             measure_traces = benefit.get("_traces", {})
         else:
-            benefit = self.calculator.calc_peak_shift_benefit(
-                shiftable_power, shift_hours, sharp_price, valley_price
-            )
+            benefit = self.calculator.calc_peak_shift_benefit(shiftable_power, shift_hours, sharp_price, valley_price)
             measure_traces = {}
 
         measure = ProposalMeasure(
@@ -214,14 +179,14 @@ class TemplateGenerator:
                 "预热功率": f"{shiftable_power} kW",
                 "日耗电": f"{shiftable_power * shift_hours} kWh",
                 "电价": f"{sharp_price} 元/kWh",
-                "日电费": f"{float(shiftable_power * shift_hours * sharp_price)} 元"
+                "日电费": f"{float(shiftable_power * shift_hours * sharp_price)} 元",
             },
             target_state={
                 "预热时段": "11:00-13:00（平段）",
                 "预热功率": f"{shiftable_power} kW",
                 "日耗电": f"{shiftable_power * shift_hours} kWh",
                 "电价": f"{valley_price} 元/kWh",
-                "日电费": f"{float(shiftable_power * shift_hours * valley_price)} 元"
+                "日电费": f"{float(shiftable_power * shift_hours * valley_price)} 元",
             },
             calculation_formula=f"""
 【计算步骤】
@@ -232,7 +197,7 @@ class TemplateGenerator:
             """.strip(),
             calculation_basis=f"基于过去{analysis_days}天尖峰时段平均负荷数据，热处理预热工序功率约{shiftable_power}kW",
             annual_benefit=benefit["年收益"],
-            investment=Decimal("0")
+            investment=Decimal("0"),
         )
 
         # V3.1: 写入追溯数据
@@ -243,29 +208,23 @@ class TemplateGenerator:
         return measure
 
     async def _generate_measure_auxiliary_equipment_shift(
-        self,
-        proposal: EnergySavingProposal,
-        analysis_days: int
+        self, proposal: EnergySavingProposal, analysis_days: int
     ) -> ProposalMeasure:
         """生成措施2: 辅助设备错峰运行"""
 
         # 参数设置
         shiftable_power = Decimal("1200")  # 可转移功率 1200kW
-        shift_hours = Decimal("3")         # 每日转移3小时
-        peak_price = Decimal("0.68")       # 高峰电价
-        flat_price = Decimal("0.425")      # 平段电价
+        shift_hours = Decimal("3")  # 每日转移3小时
+        peak_price = Decimal("0.68")  # 高峰电价
+        flat_price = Decimal("0.425")  # 平段电价
 
         # 调用计算器 (带追溯)
         if self.enable_trace:
             tc = self._get_traced_calculator()
-            benefit = await tc.traced_peak_shift_benefit(
-                shiftable_power, shift_hours, peak_price, flat_price
-            )
+            benefit = await tc.traced_peak_shift_benefit(shiftable_power, shift_hours, peak_price, flat_price)
             measure_traces = benefit.get("_traces", {})
         else:
-            benefit = self.calculator.calc_peak_shift_benefit(
-                shiftable_power, shift_hours, peak_price, flat_price
-            )
+            benefit = self.calculator.calc_peak_shift_benefit(shiftable_power, shift_hours, peak_price, flat_price)
             measure_traces = {}
 
         measure = ProposalMeasure(
@@ -276,13 +235,13 @@ class TemplateGenerator:
                 "运行时段": "8:00-11:00, 18:00-21:00（高峰）",
                 "设备功率": f"{shiftable_power} kW",
                 "日耗电": f"{shiftable_power * shift_hours} kWh",
-                "电价": f"{peak_price} 元/kWh"
+                "电价": f"{peak_price} 元/kWh",
             },
             target_state={
                 "运行时段": "11:00-14:00, 21:00-24:00（平段）",
                 "设备功率": f"{shiftable_power} kW",
                 "日耗电": f"{shiftable_power * shift_hours} kWh",
-                "电价": f"{flat_price} 元/kWh"
+                "电价": f"{flat_price} 元/kWh",
             },
             calculation_formula=f"""
 【计算步骤】
@@ -293,7 +252,7 @@ class TemplateGenerator:
             """.strip(),
             calculation_basis=f"基于过去{analysis_days}天高峰时段辅助设备运行数据",
             annual_benefit=benefit["年收益"],
-            investment=Decimal("0")
+            investment=Decimal("0"),
         )
 
         # V3.1: 写入追溯数据
@@ -304,29 +263,23 @@ class TemplateGenerator:
         return measure
 
     async def _generate_measure_compressor_optimization(
-        self,
-        proposal: EnergySavingProposal,
-        analysis_days: int
+        self, proposal: EnergySavingProposal, analysis_days: int
     ) -> ProposalMeasure:
         """生成措施3: 空压机储气罐充气策略优化"""
 
         # 参数设置
-        shiftable_power = Decimal("800")   # 可转移功率 800kW
-        shift_hours = Decimal("4")         # 每日转移4小时
-        sharp_price = Decimal("1.1")       # 尖峰电价
-        valley_price = Decimal("0.111")    # 低谷电价
+        shiftable_power = Decimal("800")  # 可转移功率 800kW
+        shift_hours = Decimal("4")  # 每日转移4小时
+        sharp_price = Decimal("1.1")  # 尖峰电价
+        valley_price = Decimal("0.111")  # 低谷电价
 
         # 调用计算器 (带追溯)
         if self.enable_trace:
             tc = self._get_traced_calculator()
-            benefit = await tc.traced_peak_shift_benefit(
-                shiftable_power, shift_hours, sharp_price, valley_price
-            )
+            benefit = await tc.traced_peak_shift_benefit(shiftable_power, shift_hours, sharp_price, valley_price)
             measure_traces = benefit.get("_traces", {})
         else:
-            benefit = self.calculator.calc_peak_shift_benefit(
-                shiftable_power, shift_hours, sharp_price, valley_price
-            )
+            benefit = self.calculator.calc_peak_shift_benefit(shiftable_power, shift_hours, sharp_price, valley_price)
             measure_traces = {}
 
         measure = ProposalMeasure(
@@ -337,13 +290,13 @@ class TemplateGenerator:
                 "充气策略": "随用随充（含尖峰时段）",
                 "尖峰充气时长": f"{shift_hours} h/天",
                 "充气功率": f"{shiftable_power} kW",
-                "电价": f"{sharp_price} 元/kWh"
+                "电价": f"{sharp_price} 元/kWh",
             },
             target_state={
                 "充气策略": "低谷预充 + 平段补充",
                 "低谷充气时长": f"{shift_hours} h/天",
                 "充气功率": f"{shiftable_power} kW",
-                "电价": f"{valley_price} 元/kWh"
+                "电价": f"{valley_price} 元/kWh",
             },
             calculation_formula=f"""
 【计算步骤】
@@ -357,9 +310,9 @@ class TemplateGenerator:
 - 低谷时段(23:00-7:00)提前充气至满压
 - 尖峰时段依靠储气罐供气，减少空压机启动
             """.strip(),
-            calculation_basis=f"基于空压机系统运行数据和储气罐容积分析",
+            calculation_basis="基于空压机系统运行数据和储气罐容积分析",
             annual_benefit=benefit["年收益"],
-            investment=Decimal("0")
+            investment=Decimal("0"),
         )
 
         # V3.1: 写入追溯数据
@@ -402,10 +355,10 @@ class TemplateGenerator:
                 "当前申报需量": float(demand_data["当前申报需量"]),
                 "历史95分位": float(demand_data["历史95分位"]),
                 "建议申报需量": float(demand_data["建议申报需量"]),
-                "需量电价": float(demand_data["需量电价"])
+                "需量电价": float(demand_data["需量电价"]),
             },
             analysis_start_date=start_date.date(),
-            analysis_end_date=end_date.date()
+            analysis_end_date=end_date.date(),
         )
 
         # 3. 生成措施列表
@@ -431,10 +384,7 @@ class TemplateGenerator:
         return proposal
 
     async def _generate_measure_demand_reduction(
-        self,
-        proposal: EnergySavingProposal,
-        demand_data: Dict[str, Decimal],
-        demand_traces: Dict = None
+        self, proposal: EnergySavingProposal, demand_data: Dict[str, Decimal], demand_traces: Dict = None
     ) -> ProposalMeasure:
         """生成措施1: 降低申报需量至合理水平"""
 
@@ -450,12 +400,12 @@ class TemplateGenerator:
             current_state={
                 "申报需量": f"{current_demand} kW",
                 "需量电价": f"{demand_price} 元/kW·月",
-                "月基本电费": f"{float(current_demand * demand_price)} 元"
+                "月基本电费": f"{float(current_demand * demand_price)} 元",
             },
             target_state={
                 "申报需量": f"{recommended_demand} kW",
                 "需量电价": f"{demand_price} 元/kW·月",
-                "月基本电费": f"{float(recommended_demand * demand_price)} 元"
+                "月基本电费": f"{float(recommended_demand * demand_price)} 元",
             },
             calculation_formula=f"""
 【计算步骤】
@@ -470,7 +420,7 @@ class TemplateGenerator:
             """.strip(),
             calculation_basis="基于近3个月需量历史数据统计分析，95%的时间需量不会超过建议值",
             annual_benefit=annual_saving,
-            investment=Decimal("0")
+            investment=Decimal("0"),
         )
 
         # V3.1: 写入追溯数据
@@ -481,9 +431,7 @@ class TemplateGenerator:
         return measure
 
     async def _generate_measure_demand_monitoring(
-        self,
-        proposal: EnergySavingProposal,
-        demand_data: Dict[str, Decimal]
+        self, proposal: EnergySavingProposal, demand_data: Dict[str, Decimal]
     ) -> ProposalMeasure:
         """生成措施2: 需量实时监控与预警"""
 
@@ -495,16 +443,12 @@ class TemplateGenerator:
             measure_code=f"{proposal.proposal_code}-M002",
             regulation_object="需量监控预警系统",
             regulation_description="建立需量实时监控机制，当接近申报需量80%时提前预警",
-            current_state={
-                "监控方式": "人工巡检（滞后）",
-                "预警能力": "无",
-                "超需量风险": "较高"
-            },
+            current_state={"监控方式": "人工巡检（滞后）", "预警能力": "无", "超需量风险": "较高"},
             target_state={
                 "监控方式": "实时自动监控",
                 "预警阈值": f"{float(recommended_demand * Decimal('0.8'))} kW（80%申报需量）",
                 "预警方式": "短信 + 邮件 + 系统推送",
-                "超需量风险": "可控"
+                "超需量风险": "可控",
             },
             calculation_formula=f"""
 【收益估算】
@@ -519,15 +463,13 @@ class TemplateGenerator:
             """.strip(),
             calculation_basis="基于历史超需量事件统计，年均2-3次偶发性高峰事件",
             annual_benefit=estimated_benefit,
-            investment=Decimal("0")
+            investment=Decimal("0"),
         )
 
         return measure
 
     async def _generate_measure_peak_load_control(
-        self,
-        proposal: EnergySavingProposal,
-        demand_data: Dict[str, Decimal]
+        self, proposal: EnergySavingProposal, demand_data: Dict[str, Decimal]
     ) -> ProposalMeasure:
         """生成措施3: 高峰时段负荷控制"""
 
@@ -538,16 +480,12 @@ class TemplateGenerator:
             measure_code=f"{proposal.proposal_code}-M003",
             regulation_object="高峰时段负荷管理",
             regulation_description="建立负荷控制策略，当需量预警时自动或手动削减非关键负荷",
-            current_state={
-                "负荷控制": "无自动化手段",
-                "响应时间": "15-30分钟（人工）",
-                "可控负荷": "未梳理"
-            },
+            current_state={"负荷控制": "无自动化手段", "响应时间": "15-30分钟（人工）", "可控负荷": "未梳理"},
             target_state={
                 "负荷控制": "分级自动控制",
                 "响应时间": "< 1分钟",
                 "可控负荷": "空调、照明、辅助设备等约800kW",
-                "控制策略": "Ⅰ级预警：提示；Ⅱ级预警：自动削减非关键负荷"
+                "控制策略": "Ⅰ级预警：提示；Ⅱ级预警：自动削减非关键负荷",
             },
             calculation_formula=f"""
 【收益估算】
@@ -568,7 +506,7 @@ class TemplateGenerator:
             """.strip(),
             calculation_basis="基于可转移负荷梳理结果和需量电费单价计算",
             annual_benefit=estimated_benefit,
-            investment=Decimal("0")
+            investment=Decimal("0"),
         )
 
         return measure
@@ -607,10 +545,10 @@ class TemplateGenerator:
             current_situation={
                 "空调系统负荷率": float(hvac_load_rate),
                 "水泵系统负荷率": float(pump_load_rate),
-                "分析周期": f"{analysis_days}天"
+                "分析周期": f"{analysis_days}天",
             },
             analysis_start_date=start_date.date(),
-            analysis_end_date=end_date.date()
+            analysis_end_date=end_date.date(),
         )
 
         # 2. 生成措施列表
@@ -635,10 +573,7 @@ class TemplateGenerator:
 
         return proposal
 
-    async def _generate_measure_compressor_load_matching(
-        self,
-        proposal: EnergySavingProposal
-    ) -> ProposalMeasure:
+    async def _generate_measure_compressor_load_matching(self, proposal: EnergySavingProposal) -> ProposalMeasure:
         """生成措施1: 空压机负荷匹配优化"""
 
         # 优化收益估算
@@ -658,13 +593,13 @@ class TemplateGenerator:
                 "运行策略": "固定2台大功率空压机运行",
                 "单台功率": "160kW",
                 "平均负荷率": "60%",
-                "平均功率": f"{current_power} kW"
+                "平均功率": f"{current_power} kW",
             },
             target_state={
                 "运行策略": "1台大功率 + 1台小功率组合",
                 "组合功率": "110kW + 75kW",
                 "平均负荷率": "75%",
-                "平均功率": f"{optimized_power} kW"
+                "平均功率": f"{optimized_power} kW",
             },
             calculation_formula=f"""
 【计算步骤】
@@ -680,15 +615,12 @@ class TemplateGenerator:
             """.strip(),
             calculation_basis="基于空压机运行数据和用气负荷曲线分析",
             annual_benefit=annual_saving,
-            investment=Decimal("0")
+            investment=Decimal("0"),
         )
 
         return measure
 
-    async def _generate_measure_pump_frequency_control(
-        self,
-        proposal: EnergySavingProposal
-    ) -> ProposalMeasure:
+    async def _generate_measure_pump_frequency_control(self, proposal: EnergySavingProposal) -> ProposalMeasure:
         """生成措施2: 循环水泵变频调速优化"""
 
         # 优化收益估算（假设节能20%）
@@ -708,13 +640,13 @@ class TemplateGenerator:
                 "运行方式": "工频恒速运行",
                 "额定功率": f"{current_power} kW",
                 "流量调节": "阀门节流",
-                "能耗": "较高"
+                "能耗": "较高",
             },
             target_state={
                 "运行方式": "根据温度需求调整转速",
                 "调节方式": "优化控制策略",
                 "预期节能": "20%",
-                "节省功率": f"{saved_power} kW"
+                "节省功率": f"{saved_power} kW",
             },
             calculation_formula=f"""
 【计算步骤】
@@ -732,15 +664,12 @@ class TemplateGenerator:
             """.strip(),
             calculation_basis="基于水泵运行数据和冷却负荷分析，参考行业经验值",
             annual_benefit=annual_saving,
-            investment=Decimal("0")
+            investment=Decimal("0"),
         )
 
         return measure
 
-    async def _generate_measure_lighting_zone_control(
-        self,
-        proposal: EnergySavingProposal
-    ) -> ProposalMeasure:
+    async def _generate_measure_lighting_zone_control(self, proposal: EnergySavingProposal) -> ProposalMeasure:
         """生成措施3: 照明分区控制"""
 
         # 优化收益估算
@@ -760,13 +689,13 @@ class TemplateGenerator:
                 "控制方式": "大区域统一开关",
                 "控制精度": "粗放",
                 "平均功率": f"{current_power} kW",
-                "浪费现象": "无人区域常亮、自然采光区域开灯"
+                "浪费现象": "无人区域常亮、自然采光区域开灯",
             },
             target_state={
                 "控制方式": "分区控制 + 定时控制",
                 "控制精度": "精细化",
                 "预期节能": "30%",
-                "节省功率": f"{saved_power} kW"
+                "节省功率": f"{saved_power} kW",
             },
             calculation_formula=f"""
 【计算步骤】
@@ -785,7 +714,7 @@ class TemplateGenerator:
             """.strip(),
             calculation_basis="基于照明系统现场调研和使用情况分析",
             annual_benefit=annual_saving,
-            investment=Decimal("0")
+            investment=Decimal("0"),
         )
 
         return measure
@@ -824,10 +753,10 @@ class TemplateGenerator:
                 "Ⅱ级资源容量": float(vpp_data["Ⅱ级资源"]["容量"]),
                 "Ⅲ级资源容量": float(vpp_data["Ⅲ级资源"]["容量"]),
                 "总容量": float(vpp_data["总容量"]),
-                "预期总收益": float(vpp_data["总年收益"])
+                "预期总收益": float(vpp_data["总年收益"]),
             },
             analysis_start_date=start_date.date(),
-            analysis_end_date=end_date.date()
+            analysis_end_date=end_date.date(),
         )
 
         # 3. 生成措施列表
@@ -853,10 +782,7 @@ class TemplateGenerator:
         return proposal
 
     async def _generate_measure_vpp_level1(
-        self,
-        proposal: EnergySavingProposal,
-        vpp_data: Dict[str, Any],
-        vpp_traces: Dict = None
+        self, proposal: EnergySavingProposal, vpp_data: Dict[str, Any], vpp_traces: Dict = None
     ) -> ProposalMeasure:
         """生成措施1: Ⅰ级快速响应资源"""
 
@@ -869,18 +795,13 @@ class TemplateGenerator:
             measure_code=f"{proposal.proposal_code}-M001",
             regulation_object="Ⅰ级快速响应资源（照明、空调）",
             regulation_description="注册Ⅰ级快速响应资源，响应时间≤5分钟，参与电网削峰填谷获得补贴",
-            current_state={
-                "响应能力": "未注册",
-                "可响应容量": f"{capacity} kW",
-                "市场参与": "否",
-                "收益": "0元"
-            },
+            current_state={"响应能力": "未注册", "可响应容量": f"{capacity} kW", "市场参与": "否", "收益": "0元"},
             target_state={
                 "响应能力": "已注册，响应时间≤5分钟",
                 "注册容量": f"{capacity} kW",
                 "响应设备": "办公照明、空调系统",
                 "年响应次数": f"{response_count}次",
-                "年收益": f"{annual_benefit}万元"
+                "年收益": f"{annual_benefit}万元",
             },
             calculation_formula=f"""
 【计算步骤】
@@ -900,7 +821,7 @@ class TemplateGenerator:
             """.strip(),
             calculation_basis="基于虚拟电厂市场规则和补偿标准（上海、江苏等地市场数据）",
             annual_benefit=annual_benefit,
-            investment=Decimal("0")
+            investment=Decimal("0"),
         )
 
         # V3.1: 写入追溯数据
@@ -913,10 +834,7 @@ class TemplateGenerator:
         return measure
 
     async def _generate_measure_vpp_level2(
-        self,
-        proposal: EnergySavingProposal,
-        vpp_data: Dict[str, Any],
-        vpp_traces: Dict = None
+        self, proposal: EnergySavingProposal, vpp_data: Dict[str, Any], vpp_traces: Dict = None
     ) -> ProposalMeasure:
         """生成措施2: Ⅱ级常规响应资源"""
 
@@ -929,18 +847,13 @@ class TemplateGenerator:
             measure_code=f"{proposal.proposal_code}-M002",
             regulation_object="Ⅱ级常规响应资源（空压机、循环水泵）",
             regulation_description="注册Ⅱ级常规响应资源，响应时间≤15分钟，通过设备调度参与需求响应",
-            current_state={
-                "响应能力": "未注册",
-                "可响应容量": f"{capacity} kW",
-                "市场参与": "否",
-                "收益": "0元"
-            },
+            current_state={"响应能力": "未注册", "可响应容量": f"{capacity} kW", "市场参与": "否", "收益": "0元"},
             target_state={
                 "响应能力": "已注册，响应时间≤15分钟",
                 "注册容量": f"{capacity} kW",
                 "响应设备": "空压机、循环水泵",
                 "年响应次数": f"{response_count}次",
-                "年收益": f"{annual_benefit}万元"
+                "年收益": f"{annual_benefit}万元",
             },
             calculation_formula=f"""
 【计算步骤】
@@ -962,7 +875,7 @@ class TemplateGenerator:
             """.strip(),
             calculation_basis="基于VPP市场Ⅱ级资源补偿标准",
             annual_benefit=annual_benefit,
-            investment=Decimal("0")
+            investment=Decimal("0"),
         )
 
         # V3.1: 写入追溯数据
@@ -975,10 +888,7 @@ class TemplateGenerator:
         return measure
 
     async def _generate_measure_vpp_level3(
-        self,
-        proposal: EnergySavingProposal,
-        vpp_data: Dict[str, Any],
-        vpp_traces: Dict = None
+        self, proposal: EnergySavingProposal, vpp_data: Dict[str, Any], vpp_traces: Dict = None
     ) -> ProposalMeasure:
         """生成措施3: Ⅲ级计划响应资源"""
 
@@ -991,18 +901,13 @@ class TemplateGenerator:
             measure_code=f"{proposal.proposal_code}-M003",
             regulation_object="Ⅲ级计划响应资源（生产负荷）",
             regulation_description="注册Ⅲ级计划响应资源，提前4小时通知，通过生产计划调整参与需求响应",
-            current_state={
-                "响应能力": "未注册",
-                "可响应容量": f"{capacity} kW",
-                "市场参与": "否",
-                "收益": "0元"
-            },
+            current_state={"响应能力": "未注册", "可响应容量": f"{capacity} kW", "市场参与": "否", "收益": "0元"},
             target_state={
                 "响应能力": "已注册，提前4小时通知",
                 "注册容量": f"{capacity} kW",
                 "响应设备": "热处理生产线、辅助生产设备",
                 "年响应次数": f"{response_count}次",
-                "年收益": f"{annual_benefit}万元"
+                "年收益": f"{annual_benefit}万元",
             },
             calculation_formula=f"""
 【计算步骤】
@@ -1030,7 +935,7 @@ class TemplateGenerator:
             """.strip(),
             calculation_basis="基于VPP市场Ⅲ级资源补偿标准和生产计划灵活性分析",
             annual_benefit=annual_benefit,
-            investment=Decimal("0")
+            investment=Decimal("0"),
         )
 
         # V3.1: 写入追溯数据
@@ -1079,10 +984,10 @@ class TemplateGenerator:
                 "平均负荷": float(load_curve["平均负荷"]),
                 "峰谷差": float(load_curve["峰谷差"]),
                 "负荷率": float(load_curve["负荷率"]),
-                "峰谷比": float(load_curve["峰谷比"])
+                "峰谷比": float(load_curve["峰谷比"]),
             },
             analysis_start_date=start_date.date(),
-            analysis_end_date=end_date.date()
+            analysis_end_date=end_date.date(),
         )
 
         # 2. 生成措施列表
@@ -1108,10 +1013,7 @@ class TemplateGenerator:
         return proposal
 
     async def _generate_measure_production_scheduling(
-        self,
-        proposal: EnergySavingProposal,
-        load_curve: Dict[str, Decimal],
-        load_traces: Dict = None
+        self, proposal: EnergySavingProposal, load_curve: Dict[str, Decimal], load_traces: Dict = None
     ) -> ProposalMeasure:
         """生成措施1: 生产计划优化"""
 
@@ -1126,13 +1028,13 @@ class TemplateGenerator:
                 "排产依据": "订单交期优先",
                 "能耗考虑": "较少",
                 "负荷特征": f"峰谷差{load_curve['峰谷差']}kW，负荷率{load_curve['负荷率']}%",
-                "优化空间": "较大"
+                "优化空间": "较大",
             },
             target_state={
                 "排产依据": "交期 + 能耗成本综合优化",
                 "能耗考虑": "充分",
                 "预期效果": "峰谷差降低15%，负荷率提升10%",
-                "优化方式": "高能耗批次避开尖峰高峰时段"
+                "优化方式": "高能耗批次避开尖峰高峰时段",
             },
             calculation_formula=f"""
 【收益估算】
@@ -1158,7 +1060,7 @@ class TemplateGenerator:
             """.strip(),
             calculation_basis="基于生产计划和负荷曲线分析，结合峰谷电价测算",
             annual_benefit=estimated_benefit,
-            investment=Decimal("0")
+            investment=Decimal("0"),
         )
 
         # V3.1: 写入追溯数据
@@ -1169,10 +1071,7 @@ class TemplateGenerator:
         return measure
 
     async def _generate_measure_equipment_sequencing(
-        self,
-        proposal: EnergySavingProposal,
-        load_curve: Dict[str, Decimal],
-        load_traces: Dict = None
+        self, proposal: EnergySavingProposal, load_curve: Dict[str, Decimal], load_traces: Dict = None
     ) -> ProposalMeasure:
         """生成措施2: 设备启停时序优化"""
 
@@ -1187,13 +1086,13 @@ class TemplateGenerator:
                 "启动方式": "集中启动（早8:00）",
                 "峰值影响": "造成早高峰需量冲高",
                 "启动功率": "约2000kW同时启动",
-                "需量影响": "增加申报需量约200kW"
+                "需量影响": "增加申报需量约200kW",
             },
             target_state={
                 "启动方式": "梯次启动",
                 "启动间隔": "每批次间隔15分钟",
                 "峰值削减": "削减启动峰值约500kW",
-                "需量影响": "降低需量冲高风险"
+                "需量影响": "降低需量冲高风险",
             },
             calculation_formula=f"""
 【收益估算】
@@ -1221,7 +1120,7 @@ class TemplateGenerator:
             """.strip(),
             calculation_basis="基于设备启动功率统计和需量数据分析",
             annual_benefit=estimated_benefit,
-            investment=Decimal("0")
+            investment=Decimal("0"),
         )
 
         # V3.1: 写入追溯数据
@@ -1232,10 +1131,7 @@ class TemplateGenerator:
         return measure
 
     async def _generate_measure_load_smoothing(
-        self,
-        proposal: EnergySavingProposal,
-        load_curve: Dict[str, Decimal],
-        load_traces: Dict = None
+        self, proposal: EnergySavingProposal, load_curve: Dict[str, Decimal], load_traces: Dict = None
     ) -> ProposalMeasure:
         """生成措施3: 负荷曲线平滑化"""
 
@@ -1250,13 +1146,13 @@ class TemplateGenerator:
                 "负荷率": f"{load_curve['负荷率']}%",
                 "峰谷差": f"{load_curve['峰谷差']} kW",
                 "峰谷比": f"{load_curve['峰谷比']}",
-                "曲线特征": "峰谷明显，波动较大"
+                "曲线特征": "峰谷明显，波动较大",
             },
             target_state={
                 "目标负荷率": f"{float(load_curve['负荷率']) + 8}%",
                 "目标峰谷差": f"{float(load_curve['峰谷差']) * 0.85} kW（降低15%）",
                 "优化手段": "填谷 + 削峰",
-                "曲线特征": "相对平滑"
+                "曲线特征": "相对平滑",
             },
             calculation_formula=f"""
 【收益估算】
@@ -1283,7 +1179,7 @@ class TemplateGenerator:
             """.strip(),
             calculation_basis="基于负荷曲线特征分析和填谷削峰潜力评估",
             annual_benefit=estimated_benefit,
-            investment=Decimal("0")
+            investment=Decimal("0"),
         )
 
         # V3.1: 写入追溯数据
@@ -1310,10 +1206,9 @@ class TemplateGenerator:
         if self.enable_trace:
             tc = self._get_traced_calculator()
             pump_benchmark = await tc.traced_equipment_efficiency_benchmark("PUMP")
-            benchmark_traces = pump_benchmark.get("_traces", {})
+            pump_benchmark.get("_traces", {})
         else:
             pump_benchmark = await self.calculator.calc_equipment_efficiency_benchmark("PUMP")
-            benchmark_traces = {}
 
         proposal = EnergySavingProposal(
             proposal_code=await self._generate_proposal_code("B1"),
@@ -1323,10 +1218,10 @@ class TemplateGenerator:
             current_situation={
                 "水泵系统当前能效": float(pump_benchmark["当前能效"]),
                 "水泵系统行业先进能效": float(pump_benchmark["行业先进能效"]),
-                "能效差距": float(pump_benchmark["能效差距"])
+                "能效差距": float(pump_benchmark["能效差距"]),
             },
             analysis_start_date=start_date.date(),
-            analysis_end_date=end_date.date()
+            analysis_end_date=end_date.date(),
         )
 
         # 2. 生成措施列表
@@ -1351,10 +1246,7 @@ class TemplateGenerator:
 
         return proposal
 
-    async def _generate_measure_compressor_replacement(
-        self,
-        proposal: EnergySavingProposal
-    ) -> ProposalMeasure:
+    async def _generate_measure_compressor_replacement(self, proposal: EnergySavingProposal) -> ProposalMeasure:
         """生成措施1: 老旧空压机更换为变频空压机"""
 
         # 参数设置
@@ -1378,7 +1270,7 @@ class TemplateGenerator:
                 "排气量": "30 m³/min",
                 "能效等级": "3级（旧标准）",
                 "调节方式": "加卸载",
-                "平均功率": f"{old_power * Decimal('0.85')} kW"
+                "平均功率": f"{old_power * Decimal('0.85')} kW",
             },
             target_state={
                 "设备型号": "永磁变频螺杆空压机",
@@ -1386,7 +1278,7 @@ class TemplateGenerator:
                 "排气量": "30 m³/min",
                 "能效等级": "1级（新标准）",
                 "调节方式": "变频调速",
-                "平均功率": f"{new_power * Decimal('0.75')} kW"
+                "平均功率": f"{new_power * Decimal('0.75')} kW",
             },
             calculation_formula=f"""
 【计算步骤】
@@ -1409,15 +1301,12 @@ class TemplateGenerator:
             """.strip(),
             calculation_basis="基于空压机运行数据和厂家技术参数",
             annual_benefit=annual_saving,
-            investment=investment
+            investment=investment,
         )
 
         return measure
 
-    async def _generate_measure_pump_vfd_installation(
-        self,
-        proposal: EnergySavingProposal
-    ) -> ProposalMeasure:
+    async def _generate_measure_pump_vfd_installation(self, proposal: EnergySavingProposal) -> ProposalMeasure:
         """生成措施2: 普通水泵加装变频器"""
 
         # 参数设置
@@ -1439,13 +1328,13 @@ class TemplateGenerator:
                 "调节方式": "阀门节流",
                 "额定功率": f"{pump_power} kW × 2台",
                 "平均功率": f"{pump_power * Decimal('0.8')} kW/台",
-                "效率": "低（节流损耗大）"
+                "效率": "低（节流损耗大）",
             },
             target_state={
                 "调节方式": "变频调速",
                 "额定功率": f"{pump_power} kW × 2台",
                 "平均功率": f"{pump_power * Decimal('0.8') * (Decimal('1') - energy_saving_ratio)} kW/台",
-                "效率": "高（按需调速）"
+                "效率": "高（按需调速）",
             },
             calculation_formula=f"""
 【计算步骤】
@@ -1471,20 +1360,17 @@ class TemplateGenerator:
             """.strip(),
             calculation_basis="基于水泵运行曲线分析和变频改造节能测算",
             annual_benefit=annual_saving,
-            investment=investment
+            investment=investment,
         )
 
         return measure
 
-    async def _generate_measure_led_retrofit(
-        self,
-        proposal: EnergySavingProposal
-    ) -> ProposalMeasure:
+    async def _generate_measure_led_retrofit(self, proposal: EnergySavingProposal) -> ProposalMeasure:
         """生成措施3: 传统照明改造为LED"""
 
         # 参数设置
         old_power = Decimal("120")  # 传统照明总功率
-        led_power = Decimal("50")   # LED照明总功率
+        led_power = Decimal("50")  # LED照明总功率
         saved_power = old_power - led_power
         annual_hours = Decimal("4000")
         avg_price = Decimal("0.436")
@@ -1502,14 +1388,14 @@ class TemplateGenerator:
                 "总功率": f"{old_power} kW",
                 "照度": "300-500 lux",
                 "光效": "60-80 lm/W",
-                "使用寿命": "8000-10000小时"
+                "使用寿命": "8000-10000小时",
             },
             target_state={
                 "灯具类型": "LED灯具",
                 "总功率": f"{led_power} kW",
                 "照度": "300-500 lux（不变）",
                 "光效": "120-150 lm/W",
-                "使用寿命": "50000小时"
+                "使用寿命": "50000小时",
             },
             calculation_formula=f"""
 【计算步骤】
@@ -1540,7 +1426,7 @@ class TemplateGenerator:
             """.strip(),
             calculation_basis="基于照明系统现状调研和LED改造方案测算",
             annual_benefit=annual_saving,
-            investment=investment
+            investment=investment,
         )
 
         return measure

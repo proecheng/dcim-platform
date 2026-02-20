@@ -1,14 +1,17 @@
 """
 配电与制冷拓扑配置 Schema
 """
+
 from typing import Optional, List
 from pydantic import BaseModel, Field, model_validator
 
 
 # ==================== PowerPhaseMapping Schemas ====================
 
+
 class PowerPhaseMappingCreate(BaseModel):
     """创建三相接线映射"""
+
     cabinet_id: int = Field(..., description="机柜ID")
     pdu_device_id: int = Field(..., description="PDU设备ID")
     phase: str = Field(..., description="相位: A/B/C")
@@ -19,6 +22,7 @@ class PowerPhaseMappingCreate(BaseModel):
 
 class PowerPhaseMappingUpdate(BaseModel):
     """更新三相接线映射"""
+
     phase: Optional[str] = Field(None, description="相位: A/B/C")
     feed_type: Optional[str] = Field(None, description="馈电类型: primary/backup")
     rated_current: Optional[float] = Field(None, description="额定电流(A)")
@@ -27,6 +31,7 @@ class PowerPhaseMappingUpdate(BaseModel):
 
 class PowerPhaseMappingResponse(BaseModel):
     """三相接线映射响应"""
+
     id: int
     cabinet_id: int
     pdu_device_id: int
@@ -45,8 +50,10 @@ class PowerPhaseMappingResponse(BaseModel):
 
 # ==================== CoolingZone Schemas ====================
 
+
 class CoolingZoneCreate(BaseModel):
     """创建制冷区域"""
+
     zone_name: str = Field(..., description="区域名称")
     room_id: Optional[int] = Field(None, description="所属房间ID")
     design_capacity_kw: Optional[float] = Field(None, description="设计制冷量(kW)")
@@ -57,6 +64,7 @@ class CoolingZoneCreate(BaseModel):
 
 class CoolingZoneUpdate(BaseModel):
     """更新制冷区域"""
+
     zone_name: Optional[str] = Field(None, description="区域名称")
     room_id: Optional[int] = Field(None, description="所属房间ID")
     design_capacity_kw: Optional[float] = Field(None, description="设计制冷量(kW)")
@@ -67,6 +75,7 @@ class CoolingZoneUpdate(BaseModel):
 
 class CoolingZoneCabinetItem(BaseModel):
     """制冷区域中的机柜简要信息"""
+
     id: int
     cabinet_code: str
     cabinet_name: str
@@ -74,6 +83,7 @@ class CoolingZoneCabinetItem(BaseModel):
 
 class CoolingZoneUnitItem(BaseModel):
     """制冷区域中的空调简要信息"""
+
     id: int
     device_code: Optional[str] = None
     device_name: Optional[str] = None
@@ -82,6 +92,7 @@ class CoolingZoneUnitItem(BaseModel):
 
 class CoolingZoneResponse(BaseModel):
     """制冷区域响应"""
+
     id: int
     zone_code: str
     zone_name: str
@@ -97,8 +108,10 @@ class CoolingZoneResponse(BaseModel):
 
 # ==================== PhaseBalance Schemas ====================
 
+
 class PhaseBalanceResponse(BaseModel):
     """三相不平衡度响应"""
+
     pdu_device_id: int
     pdu_device_name: Optional[str] = None
     phase_a_power: float = 0.0
@@ -113,8 +126,10 @@ class PhaseBalanceResponse(BaseModel):
 
 # ==================== CabinetTopologySummary ====================
 
+
 class SpatialInfo(BaseModel):
     """空间信息"""
+
     site_name: Optional[str] = None
     floor_name: Optional[str] = None
     room_name: Optional[str] = None
@@ -123,6 +138,7 @@ class SpatialInfo(BaseModel):
 
 class PowerInfo(BaseModel):
     """配电信息"""
+
     pdu_device_name: Optional[str] = None
     phase: Optional[str] = None
     feed_type: Optional[str] = None
@@ -130,12 +146,14 @@ class PowerInfo(BaseModel):
 
 class CoolingInfo(BaseModel):
     """制冷信息"""
+
     zone_name: Optional[str] = None
     design_capacity_kw: Optional[float] = None
 
 
 class CabinetTopologySummary(BaseModel):
     """机柜拓扑汇总"""
+
     cabinet_id: int
     cabinet_code: Optional[str] = None
     cabinet_name: Optional[str] = None
@@ -146,8 +164,10 @@ class CabinetTopologySummary(BaseModel):
 
 # ==================== CoolingZoneCapacity ====================
 
+
 class CoolingZoneCapacityResponse(BaseModel):
     """制冷区域容量使用响应"""
+
     zone_id: int
     zone_name: str
     design_capacity_kw: Optional[float] = None
@@ -157,6 +177,7 @@ class CoolingZoneCapacityResponse(BaseModel):
 
 # ==================== 智能选址 Schemas ====================
 
+
 class SmartSiteWeights(BaseModel):
     space: float = Field(30, ge=0, description="空间容量权重")
     power: float = Field(25, ge=0, description="电力容量权重")
@@ -164,7 +185,7 @@ class SmartSiteWeights(BaseModel):
     temperature: float = Field(15, ge=0, description="温度环境权重")
     cooling: float = Field(10, ge=0, description="制冷余量权重")
 
-    @model_validator(mode='after')
+    @model_validator(mode="after")
     def normalize_weights(self):
         total = self.space + self.power + self.phase_balance + self.temperature + self.cooling
         if total <= 0:
@@ -220,14 +241,17 @@ class SmartSiteResponse(BaseModel):
 
 # ==================== 故障影响分析 Schemas ====================
 
+
 class FaultImpactRequest(BaseModel):
     """故障影响分析请求"""
+
     fault_source_type: str = Field(..., description="故障源类型: pdu/panel")
     fault_source_id: int = Field(..., description="故障源ID (pdu→devices.id, panel→distribution_panels.id)")
 
 
 class AffectedCabinet(BaseModel):
     """受影响机柜"""
+
     cabinet_id: int
     cabinet_code: str
     cabinet_name: str
@@ -241,6 +265,7 @@ class AffectedCabinet(BaseModel):
 
 class AffectedAsset(BaseModel):
     """受影响资产"""
+
     asset_id: int
     asset_code: str
     asset_name: str
@@ -250,6 +275,7 @@ class AffectedAsset(BaseModel):
 
 class CoolingImpactItem(BaseModel):
     """制冷交叉影响"""
+
     zone_id: int
     zone_name: str
     affected_cabinet_count: int = 0
@@ -261,6 +287,7 @@ class CoolingImpactItem(BaseModel):
 
 class RelatedAlarmItem(BaseModel):
     """关联告警"""
+
     alarm_id: int
     alarm_no: str
     alarm_level: str
@@ -271,6 +298,7 @@ class RelatedAlarmItem(BaseModel):
 
 class FaultImpactResponse(BaseModel):
     """故障影响分析响应"""
+
     fault_source_type: str
     fault_source_id: int
     fault_source_name: Optional[str] = None

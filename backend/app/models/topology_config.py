@@ -1,10 +1,17 @@
 """
 配电与制冷拓扑配置模型 — 机柜→PDU三相接线映射、制冷区域
 """
+
 from datetime import datetime
 from sqlalchemy import (
-    Column, Integer, String, Float, Text, DateTime,
-    ForeignKey, UniqueConstraint,
+    Column,
+    Integer,
+    String,
+    Float,
+    Text,
+    DateTime,
+    ForeignKey,
+    UniqueConstraint,
 )
 
 from ..core.database import Base
@@ -12,10 +19,9 @@ from ..core.database import Base
 
 class PowerPhaseMapping(Base):
     """机柜→PDU 三相接线映射"""
+
     __tablename__ = "power_phase_mappings"
-    __table_args__ = (
-        UniqueConstraint("cabinet_id", "feed_type", name="uq_cabinet_feed_type"),
-    )
+    __table_args__ = (UniqueConstraint("cabinet_id", "feed_type", name="uq_cabinet_feed_type"),)
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     cabinet_id = Column(Integer, ForeignKey("cabinets.id", ondelete="CASCADE"), nullable=False, comment="机柜ID")
@@ -28,6 +34,7 @@ class PowerPhaseMapping(Base):
 
 class CoolingZone(Base):
     """制冷区域"""
+
     __tablename__ = "cooling_zones"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -42,10 +49,9 @@ class CoolingZone(Base):
 
 class CoolingZoneCabinet(Base):
     """制冷区域↔机柜关联"""
+
     __tablename__ = "cooling_zone_cabinets"
-    __table_args__ = (
-        UniqueConstraint("zone_id", "cabinet_id", name="uq_zone_cabinet"),
-    )
+    __table_args__ = (UniqueConstraint("zone_id", "cabinet_id", name="uq_zone_cabinet"),)
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     zone_id = Column(Integer, ForeignKey("cooling_zones.id", ondelete="CASCADE"), nullable=False, comment="制冷区域ID")
@@ -54,11 +60,12 @@ class CoolingZoneCabinet(Base):
 
 class CoolingZoneUnit(Base):
     """制冷区域↔空调关联"""
+
     __tablename__ = "cooling_zone_units"
-    __table_args__ = (
-        UniqueConstraint("zone_id", "cooling_unit_id", name="uq_zone_cooling_unit"),
-    )
+    __table_args__ = (UniqueConstraint("zone_id", "cooling_unit_id", name="uq_zone_cooling_unit"),)
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     zone_id = Column(Integer, ForeignKey("cooling_zones.id", ondelete="CASCADE"), nullable=False, comment="制冷区域ID")
-    cooling_unit_id = Column(Integer, ForeignKey("cooling_units.id", ondelete="CASCADE"), nullable=False, comment="空调ID")
+    cooling_unit_id = Column(
+        Integer, ForeignKey("cooling_units.id", ondelete="CASCADE"), nullable=False, comment="空调ID"
+    )

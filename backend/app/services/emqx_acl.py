@@ -8,6 +8,7 @@ Topic 格式: dcim/{site_id}/gw/{gw_id}/{type}
 1. 本地规则表 (mqtt_acl_rules) — 供平台内部鉴权查询
 2. EMQX HTTP API 同步 — 将规则推送到 EMQX Broker (可选，优雅降级)
 """
+
 import logging
 from typing import Optional
 
@@ -51,9 +52,7 @@ class EmqxAclService:
             },
         ]
 
-    async def on_site_created(
-        self, site_id: int, site_code: str, db: AsyncSession
-    ) -> list[MqttAclRule]:
+    async def on_site_created(self, site_id: int, site_code: str, db: AsyncSession) -> list[MqttAclRule]:
         """站点创建后自动配置 ACL 规则"""
         rules_data = self.generate_acl_rules(site_id, site_code)
         created = []
@@ -71,9 +70,7 @@ class EmqxAclService:
 
     async def on_site_deleted(self, site_id: int, db: AsyncSession) -> int:
         """站点删除后清理 ACL 规则（本地 + EMQX 远程）"""
-        result = await db.execute(
-            delete(MqttAclRule).where(MqttAclRule.site_id == site_id)
-        )
+        result = await db.execute(delete(MqttAclRule).where(MqttAclRule.site_id == site_id))
         count = result.rowcount
 
         # 尝试清理 EMQX 远程规则 (非阻塞，失败不影响主流程)
@@ -84,14 +81,10 @@ class EmqxAclService:
 
     async def get_site_rules(self, site_id: int, db: AsyncSession) -> list[MqttAclRule]:
         """获取站点的 ACL 规则"""
-        result = await db.execute(
-            select(MqttAclRule).where(MqttAclRule.site_id == site_id)
-        )
+        result = await db.execute(select(MqttAclRule).where(MqttAclRule.site_id == site_id))
         return list(result.scalars().all())
 
-    async def refresh_site_rules(
-        self, site_id: int, site_code: str, db: AsyncSession
-    ) -> list[MqttAclRule]:
+    async def refresh_site_rules(self, site_id: int, site_code: str, db: AsyncSession) -> list[MqttAclRule]:
         """刷新站点 ACL 规则（删除旧规则，重新生成）"""
         await self.on_site_deleted(site_id, db)
         return await self.on_site_created(site_id, site_code, db)
@@ -148,9 +141,7 @@ class EmqxAclService:
                 if resp.status_code in (200, 201, 204):
                     logger.info("EMQX ACL 同步成功: 站点 %s", site_code)
                 else:
-                    logger.warning(
-                        "EMQX ACL 同步失败: %d %s", resp.status_code, resp.text
-                    )
+                    logger.warning("EMQX ACL 同步失败: %d %s", resp.status_code, resp.text)
         except Exception as e:
             logger.warning("EMQX ACL 同步异常(已降级): %s", e)
 
@@ -172,9 +163,7 @@ class EmqxAclService:
                 if resp.status_code in (200, 204, 404):
                     logger.info("EMQX ACL 远程清理成功: 站点 %d", site_id)
                 else:
-                    logger.warning(
-                        "EMQX ACL 远程清理失败: %d %s", resp.status_code, resp.text
-                    )
+                    logger.warning("EMQX ACL 远程清理失败: %d %s", resp.status_code, resp.text)
         except Exception as e:
             logger.warning("EMQX ACL 远程清理异常(已降级): %s", e)
 

@@ -1,5 +1,6 @@
 """网关和数据源 Schema"""
-from typing import Optional, Any
+
+from typing import Optional
 from datetime import datetime
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -126,6 +127,7 @@ class ConnectionTestResponse(BaseModel):
 
 class GatewayStatusSummary(BaseModel):
     """网关状态汇总"""
+
     total: int
     online: int
     offline: int
@@ -133,12 +135,14 @@ class GatewayStatusSummary(BaseModel):
 
 class GatewayDetailResponse(GatewayResponse):
     """网关详情（含关联统计）"""
+
     datasource_count: int = 0
     point_count: int = 0
 
 
 class GatewayEventResponse(BaseModel):
     """网关事件"""
+
     model_config = ConfigDict(from_attributes=True)
 
     id: int
@@ -152,6 +156,7 @@ class GatewayEventResponse(BaseModel):
 
 class ConfigPushResponse(BaseModel):
     """配置下发响应"""
+
     model_config = ConfigDict(from_attributes=True)
 
     id: int
@@ -163,6 +168,7 @@ class ConfigPushResponse(BaseModel):
 
 class ConfigPushRecordResponse(BaseModel):
     """配置下发记录详情"""
+
     model_config = ConfigDict(from_attributes=True)
 
     id: int
@@ -207,4 +213,5 @@ class DeviceTemplateResponse(DeviceTemplateBase):
 
 class GatewayAssignSite(BaseModel):
     """网关站点分配请求"""
+
     site_id: int = Field(..., description="目标站点ID")

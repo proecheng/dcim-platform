@@ -12,19 +12,13 @@ Data sources:
 - VPP configuration parameters
 - 30 days of load curve data (15-min intervals, 96 points/day)
 """
+
 from datetime import date, time, datetime, timedelta
 import random
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import delete
 
-from app.models.vpp_data import (
-    ElectricityBill,
-    LoadCurve,
-    ElectricityPrice,
-    AdjustableLoad,
-    VPPConfig,
-    TimePeriodType
-)
+from app.models.vpp_data import ElectricityBill, LoadCurve, ElectricityPrice, AdjustableLoad, VPPConfig, TimePeriodType
 
 
 async def clear_vpp_data(db: AsyncSession) -> None:
@@ -77,78 +71,78 @@ async def init_vpp_test_data(db: AsyncSession) -> None:
         {
             "month": "2025-01",
             "total_consumption": 20970000,  # 2097万kWh
-            "total_cost": 14230000,          # 1423万元
-            "peak_consumption": 6291000,     # 约30%峰段
-            "valley_consumption": 6291000,   # 约30%谷段
-            "flat_consumption": 8388000,     # 约40%平段
-            "max_demand": 39900,             # 39.9 MW
+            "total_cost": 14230000,  # 1423万元
+            "peak_consumption": 6291000,  # 约30%峰段
+            "valley_consumption": 6291000,  # 约30%谷段
+            "flat_consumption": 8388000,  # 约40%平段
+            "max_demand": 39900,  # 39.9 MW
             "power_factor": 0.94,
             "basic_fee": 1200000,
-            "market_purchase_fee": 9800000,   # 约69%市场化购电
-            "transmission_fee": 3100000,      # 约22%输配电费
-            "system_operation_fee": 500000,   # 约3.5%系统运行费
-            "government_fund": 430000         # 约3%政府性基金
+            "market_purchase_fee": 9800000,  # 约69%市场化购电
+            "transmission_fee": 3100000,  # 约22%输配电费
+            "system_operation_fee": 500000,  # 约3.5%系统运行费
+            "government_fund": 430000,  # 约3%政府性基金
         },
         {
             "month": "2025-03",
             "total_consumption": 24850000,  # 2485万kWh
-            "total_cost": 17170000,          # 1717万元
+            "total_cost": 17170000,  # 1717万元
             "peak_consumption": 7455000,
             "valley_consumption": 7455000,
             "flat_consumption": 9940000,
-            "max_demand": 42000,             # 42.0 MW
+            "max_demand": 42000,  # 42.0 MW
             "power_factor": 0.95,
             "basic_fee": 1200000,
             "market_purchase_fee": 11800000,
             "transmission_fee": 3700000,
             "system_operation_fee": 600000,
-            "government_fund": 520000
+            "government_fund": 520000,
         },
         {
             "month": "2025-06",
             "total_consumption": 26010000,  # 2601万kWh
-            "total_cost": 18130000,          # 1813万元
+            "total_cost": 18130000,  # 1813万元
             "peak_consumption": 7803000,
             "valley_consumption": 7803000,
             "flat_consumption": 10404000,
-            "max_demand": 41500,             # 41.5 MW
+            "max_demand": 41500,  # 41.5 MW
             "power_factor": 0.94,
             "basic_fee": 1200000,
             "market_purchase_fee": 12500000,
             "transmission_fee": 3900000,
             "system_operation_fee": 620000,
-            "government_fund": 550000
+            "government_fund": 550000,
         },
         {
             "month": "2025-08",
             "total_consumption": 28070000,  # 2807万kWh (highest)
-            "total_cost": 19710000,          # 1971万元 (highest)
+            "total_cost": 19710000,  # 1971万元 (highest)
             "peak_consumption": 8421000,
             "valley_consumption": 8421000,
             "flat_consumption": 11228000,
-            "max_demand": 42500,             # 42.5 MW
+            "max_demand": 42500,  # 42.5 MW
             "power_factor": 0.95,
             "basic_fee": 1200000,
             "market_purchase_fee": 13700000,
             "transmission_fee": 4200000,
             "system_operation_fee": 680000,
-            "government_fund": 600000
+            "government_fund": 600000,
         },
         {
             "month": "2025-10",
             "total_consumption": 27240000,  # 2724万kWh
-            "total_cost": 18430000,          # 1843万元
+            "total_cost": 18430000,  # 1843万元
             "peak_consumption": 8172000,
             "valley_consumption": 8172000,
             "flat_consumption": 10896000,
-            "max_demand": 41800,             # 41.8 MW
+            "max_demand": 41800,  # 41.8 MW
             "power_factor": 0.94,
             "basic_fee": 1200000,
             "market_purchase_fee": 12800000,
             "transmission_fee": 3950000,
             "system_operation_fee": 650000,
-            "government_fund": 580000
-        }
+            "government_fund": 580000,
+        },
     ]
 
     for bill_data in bills_data:
@@ -170,7 +164,7 @@ async def init_vpp_test_data(db: AsyncSession) -> None:
             "price": 0.85,
             "start_time": time(8, 0),
             "end_time": time(11, 0),
-            "effective_date": date(2025, 1, 1)
+            "effective_date": date(2025, 1, 1),
         },
         # Peak period 2: 18:00-21:00
         {
@@ -178,7 +172,7 @@ async def init_vpp_test_data(db: AsyncSession) -> None:
             "price": 0.85,
             "start_time": time(18, 0),
             "end_time": time(21, 0),
-            "effective_date": date(2025, 1, 1)
+            "effective_date": date(2025, 1, 1),
         },
         # Valley period: 23:00-7:00 (overnight)
         {
@@ -186,7 +180,7 @@ async def init_vpp_test_data(db: AsyncSession) -> None:
             "price": 0.35,
             "start_time": time(23, 0),
             "end_time": time(7, 0),
-            "effective_date": date(2025, 1, 1)
+            "effective_date": date(2025, 1, 1),
         },
         # Flat period 1: 7:00-8:00
         {
@@ -194,7 +188,7 @@ async def init_vpp_test_data(db: AsyncSession) -> None:
             "price": 0.55,
             "start_time": time(7, 0),
             "end_time": time(8, 0),
-            "effective_date": date(2025, 1, 1)
+            "effective_date": date(2025, 1, 1),
         },
         # Flat period 2: 11:00-18:00
         {
@@ -202,7 +196,7 @@ async def init_vpp_test_data(db: AsyncSession) -> None:
             "price": 0.55,
             "start_time": time(11, 0),
             "end_time": time(18, 0),
-            "effective_date": date(2025, 1, 1)
+            "effective_date": date(2025, 1, 1),
         },
         # Flat period 3: 21:00-23:00
         {
@@ -210,8 +204,8 @@ async def init_vpp_test_data(db: AsyncSession) -> None:
             "price": 0.55,
             "start_time": time(21, 0),
             "end_time": time(23, 0),
-            "effective_date": date(2025, 1, 1)
-        }
+            "effective_date": date(2025, 1, 1),
+        },
     ]
 
     for price_data in prices_data:
@@ -227,11 +221,11 @@ async def init_vpp_test_data(db: AsyncSession) -> None:
         {
             "equipment_name": "拉丝机组A",
             "equipment_type": "生产设备",
-            "rated_power": 2000,      # 2000 kW
-            "adjustable_ratio": 30,    # 30% adjustable
-            "response_time": 15,       # 15 minutes
+            "rated_power": 2000,  # 2000 kW
+            "adjustable_ratio": 30,  # 30% adjustable
+            "response_time": 15,  # 15 minutes
             "adjustment_cost": 500,
-            "is_active": True
+            "is_active": True,
         },
         {
             "equipment_name": "拉丝机组B",
@@ -240,34 +234,34 @@ async def init_vpp_test_data(db: AsyncSession) -> None:
             "adjustable_ratio": 30,
             "response_time": 15,
             "adjustment_cost": 500,
-            "is_active": True
+            "is_active": True,
         },
         {
             "equipment_name": "热处理炉",
             "equipment_type": "热处理设备",
-            "rated_power": 5000,       # 5000 kW
-            "adjustable_ratio": 20,    # 20% adjustable
-            "response_time": 30,       # 30 minutes
+            "rated_power": 5000,  # 5000 kW
+            "adjustable_ratio": 20,  # 20% adjustable
+            "response_time": 30,  # 30 minutes
             "adjustment_cost": 1000,
-            "is_active": True
+            "is_active": True,
         },
         {
             "equipment_name": "中央空调系统",
             "equipment_type": "辅助设备",
             "rated_power": 3000,
-            "adjustable_ratio": 50,    # 50% adjustable
-            "response_time": 5,        # 5 minutes (fast response)
+            "adjustable_ratio": 50,  # 50% adjustable
+            "response_time": 5,  # 5 minutes (fast response)
             "adjustment_cost": 100,
-            "is_active": True
+            "is_active": True,
         },
         {
             "equipment_name": "压缩空气系统",
             "equipment_type": "辅助设备",
             "rated_power": 1500,
-            "adjustable_ratio": 40,    # 40% adjustable
+            "adjustable_ratio": 40,  # 40% adjustable
             "response_time": 10,
             "adjustment_cost": 200,
-            "is_active": True
+            "is_active": True,
         },
         {
             "equipment_name": "水泵系统",
@@ -276,16 +270,16 @@ async def init_vpp_test_data(db: AsyncSession) -> None:
             "adjustable_ratio": 30,
             "response_time": 5,
             "adjustment_cost": 50,
-            "is_active": True
+            "is_active": True,
         },
         {
             "equipment_name": "照明系统",
             "equipment_type": "照明",
             "rated_power": 500,
-            "adjustable_ratio": 60,    # 60% adjustable
-            "response_time": 1,        # 1 minute (instant)
+            "adjustable_ratio": 60,  # 60% adjustable
+            "response_time": 1,  # 1 minute (instant)
             "adjustment_cost": 20,
-            "is_active": True
+            "is_active": True,
         },
         {
             "equipment_name": "镀锌生产线",
@@ -294,8 +288,8 @@ async def init_vpp_test_data(db: AsyncSession) -> None:
             "adjustable_ratio": 25,
             "response_time": 20,
             "adjustment_cost": 400,
-            "is_active": True
-        }
+            "is_active": True,
+        },
     ]
 
     for load_data in loads_data:
@@ -316,90 +310,60 @@ async def init_vpp_test_data(db: AsyncSession) -> None:
             "config_key": "daily_shift_hours",
             "config_value": 4.0,
             "config_unit": "小时",
-            "description": "每日峰谷转移小时数"
+            "description": "每日峰谷转移小时数",
         },
-
         # Demand optimization parameters
         {
             "config_key": "target_demand_ratio",
             "config_value": 0.9,
             "config_unit": "-",
-            "description": "目标需量比例(削减10%)"
+            "description": "目标需量比例(削减10%)",
         },
-        {
-            "config_key": "demand_price",
-            "config_value": 40.0,
-            "config_unit": "元/kW/月",
-            "description": "需量电价"
-        },
-
+        {"config_key": "demand_price", "config_value": 40.0, "config_unit": "元/kW/月", "description": "需量电价"},
         # Demand response parameters
-        {
-            "config_key": "response_count",
-            "config_value": 20.0,
-            "config_unit": "次/年",
-            "description": "年需求响应次数"
-        },
+        {"config_key": "response_count", "config_value": 20.0, "config_unit": "次/年", "description": "年需求响应次数"},
         {
             "config_key": "response_price",
             "config_value": 4.0,
             "config_unit": "元/kW",
-            "description": "需求响应补贴单价"
+            "description": "需求响应补贴单价",
         },
-
         # Ancillary service parameters
         {
             "config_key": "service_hours",
             "config_value": 200.0,
             "config_unit": "小时/年",
-            "description": "辅助服务年小时数"
+            "description": "辅助服务年小时数",
         },
-        {
-            "config_key": "service_price",
-            "config_value": 0.75,
-            "config_unit": "元/kW·h",
-            "description": "辅助服务价格"
-        },
-
+        {"config_key": "service_price", "config_value": 0.75, "config_unit": "元/kW·h", "description": "辅助服务价格"},
         # Spot market parameters
         {
             "config_key": "arbitrage_hours",
             "config_value": 500.0,
             "config_unit": "小时/年",
-            "description": "现货套利年小时数"
+            "description": "现货套利年小时数",
         },
         {
             "config_key": "price_spread_spot",
             "config_value": 0.3,
             "config_unit": "元/kWh",
-            "description": "现货市场价差"
+            "description": "现货市场价差",
         },
-
         # Investment cost parameters
         {
             "config_key": "monitoring_system_cost",
             "config_value": 500000.0,
             "config_unit": "元",
-            "description": "监测系统投资"
+            "description": "监测系统投资",
         },
         {
             "config_key": "control_system_cost",
             "config_value": 800000.0,
             "config_unit": "元",
-            "description": "控制系统投资"
+            "description": "控制系统投资",
         },
-        {
-            "config_key": "platform_cost",
-            "config_value": 200000.0,
-            "config_unit": "元",
-            "description": "平台建设投资"
-        },
-        {
-            "config_key": "other_cost",
-            "config_value": 100000.0,
-            "config_unit": "元",
-            "description": "其他投资"
-        }
+        {"config_key": "platform_cost", "config_value": 200000.0, "config_unit": "元", "description": "平台建设投资"},
+        {"config_key": "other_cost", "config_value": 100000.0, "config_unit": "元", "description": "其他投资"},
     ]
 
     for config_data in configs_data:
@@ -452,14 +416,7 @@ async def init_vpp_test_data(db: AsyncSession) -> None:
 
         for hour in range(24):
             for minute in [0, 15, 30, 45]:
-                timestamp = datetime(
-                    current_date.year,
-                    current_date.month,
-                    current_date.day,
-                    hour,
-                    minute,
-                    0
-                )
+                timestamp = datetime(current_date.year, current_date.month, current_date.day, hour, minute, 0)
 
                 # Get time period
                 period_type = get_time_period(hour)
@@ -481,7 +438,7 @@ async def init_vpp_test_data(db: AsyncSession) -> None:
                 # Morning ramp-up (6:00-8:00)
                 if 6 <= hour < 8:
                     ramp_factor = (hour - 6) / 2  # 0 to 1
-                    load_value *= (0.9 + 0.1 * ramp_factor)
+                    load_value *= 0.9 + 0.1 * ramp_factor
 
                 # Lunch dip (12:00-13:00) on workdays
                 if is_workday and 12 <= hour < 13:
@@ -490,14 +447,14 @@ async def init_vpp_test_data(db: AsyncSession) -> None:
                 # Evening ramp-down (21:00-23:00)
                 if 21 <= hour < 23:
                     ramp_factor = (hour - 21) / 2  # 0 to 1
-                    load_value *= (1.0 - 0.05 * ramp_factor)
+                    load_value *= 1.0 - 0.05 * ramp_factor
 
                 curve = LoadCurve(
                     timestamp=timestamp,
                     load_value=round(load_value, 2),
                     date=current_date,
                     time_period=period_type,
-                    is_workday=is_workday
+                    is_workday=is_workday,
                 )
                 load_curves_batch.append(curve)
 
@@ -508,18 +465,18 @@ async def init_vpp_test_data(db: AsyncSession) -> None:
     await db.commit()
 
     # Print summary
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("VPP Test Data Initialization Complete!")
-    print("="*60)
+    print("=" * 60)
     print(f"  [OK] Electricity Bills: {len(bills_data)} months")
     print(f"  [OK] Electricity Prices: {len(prices_data)} periods")
     print(f"  [OK] Adjustable Loads: {len(loads_data)} equipment")
     print(f"  [OK] VPP Configs: {len(configs_data)} parameters")
     print(f"  [OK] Load Curves: {len(load_curves_batch)} data points ({DAYS_TO_GENERATE} days x 96 points/day)")
-    print(f"\nTotal Adjustable Capacity: ~5,290 kW")
+    print("\nTotal Adjustable Capacity: ~5,290 kW")
     print(f"Base Load: {BASE_LOAD:,} kW (35 MW)")
     print(f"Load Curve Period: {START_DATE} to {START_DATE + timedelta(days=DAYS_TO_GENERATE-1)}")
-    print("="*60 + "\n")
+    print("=" * 60 + "\n")
 
 
 # Standalone execution for testing

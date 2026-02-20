@@ -1,6 +1,7 @@
 """
 告警模型
 """
+
 from datetime import datetime
 from sqlalchemy import Column, Integer, String, Boolean, DateTime, Float, Text, ForeignKey, Date
 
@@ -9,6 +10,7 @@ from ..core.database import Base
 
 class AlarmThreshold(Base):
     """告警阈值配置表"""
+
     __tablename__ = "alarm_thresholds"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -27,6 +29,7 @@ class AlarmThreshold(Base):
 
 class Alarm(Base):
     """告警记录表"""
+
     __tablename__ = "alarms"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -61,6 +64,7 @@ class Alarm(Base):
 
 class AlarmRule(Base):
     """告警规则表（复合告警）"""
+
     __tablename__ = "alarm_rules"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -75,6 +79,7 @@ class AlarmRule(Base):
 
 class AlarmShield(Base):
     """告警屏蔽表"""
+
     __tablename__ = "alarm_shields"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -89,6 +94,7 @@ class AlarmShield(Base):
 
 class AlarmDailyStats(Base):
     """告警统计表（按天聚合）"""
+
     __tablename__ = "alarm_daily_stats"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -105,6 +111,7 @@ class AlarmDailyStats(Base):
 
 class AlarmEscalation(Base):
     """告警升级规则表"""
+
     __tablename__ = "alarm_escalations"
 
     id = Column(Integer, primary_key=True, autoincrement=True)

@@ -30,17 +30,15 @@ class PositionalEncoding(nn.Module):
 
         pe = torch.zeros(max_len, d_model)
         position = torch.arange(0, max_len, dtype=torch.float).unsqueeze(1)
-        div_term = torch.exp(
-            torch.arange(0, d_model, 2).float() * (-math.log(10000.0) / d_model)
-        )
+        div_term = torch.exp(torch.arange(0, d_model, 2).float() * (-math.log(10000.0) / d_model))
         pe[:, 0::2] = torch.sin(position * div_term)
         pe[:, 1::2] = torch.cos(position * div_term)
         pe = pe.unsqueeze(0)  # (1, max_len, d_model)
 
-        self.register_buffer('pe', pe)
+        self.register_buffer("pe", pe)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        x = x + self.pe[:, :x.size(1)]
+        x = x + self.pe[:, : x.size(1)]
         return self.dropout(x)
 
 
@@ -71,11 +69,7 @@ class FeatureEmbedding(nn.Module):
         self.layer_norm = nn.LayerNorm(config.d_model)
 
     def forward(
-        self,
-        power: torch.Tensor,
-        period_type: torch.Tensor,
-        is_weekday: torch.Tensor,
-        temperature: torch.Tensor
+        self, power: torch.Tensor, period_type: torch.Tensor, is_weekday: torch.Tensor, temperature: torch.Tensor
     ) -> torch.Tensor:
         # 连续特征 (batch, seq_len, 2)
         continuous = torch.stack([power, temperature], dim=-1)
@@ -101,10 +95,7 @@ class TransferabilityClassificationHead(nn.Module):
     def __init__(self, d_model: int, dropout: float = 0.1):
         super().__init__()
         self.classifier = nn.Sequential(
-            nn.Linear(d_model, d_model // 2),
-            nn.ReLU(),
-            nn.Dropout(dropout),
-            nn.Linear(d_model // 2, 1)
+            nn.Linear(d_model, d_model // 2), nn.ReLU(), nn.Dropout(dropout), nn.Linear(d_model // 2, 1)
         )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
@@ -117,10 +108,7 @@ class PeriodPredictionHead(nn.Module):
     def __init__(self, d_model: int, num_periods: int, dropout: float = 0.1):
         super().__init__()
         self.predictor = nn.Sequential(
-            nn.Linear(d_model, d_model // 2),
-            nn.ReLU(),
-            nn.Dropout(dropout),
-            nn.Linear(d_model // 2, num_periods)
+            nn.Linear(d_model, d_model // 2), nn.ReLU(), nn.Dropout(dropout), nn.Linear(d_model // 2, num_periods)
         )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
@@ -137,7 +125,7 @@ class CapacityRegressionHead(nn.Module):
             nn.ReLU(),
             nn.Dropout(dropout),
             nn.Linear(d_model // 2, 1),
-            nn.ReLU()  # 功率量必须非负
+            nn.ReLU(),  # 功率量必须非负
         )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
@@ -165,9 +153,7 @@ class LoadTransferabilityTransformer(nn.Module):
 
         # S2-TF-b: 位置编码
         self.positional_encoding = PositionalEncoding(
-            d_model=config.d_model,
-            max_len=config.max_seq_len,
-            dropout=config.dropout
+            d_model=config.d_model, max_len=config.max_seq_len, dropout=config.dropout
         )
 
         # S2-TF-c: Transformer编码器
@@ -176,23 +162,14 @@ class LoadTransferabilityTransformer(nn.Module):
             nhead=config.n_heads,
             dim_feedforward=config.d_ff,
             dropout=config.dropout,
-            batch_first=True
+            batch_first=True,
         )
-        self.transformer_encoder = nn.TransformerEncoder(
-            encoder_layer,
-            num_layers=config.n_layers
-        )
+        self.transformer_encoder = nn.TransformerEncoder(encoder_layer, num_layers=config.n_layers)
 
         # S2-TF-d: 三个预测头
-        self.transferability_head = TransferabilityClassificationHead(
-            config.d_model, config.dropout
-        )
-        self.period_head = PeriodPredictionHead(
-            config.d_model, config.num_period_outputs, config.dropout
-        )
-        self.capacity_head = CapacityRegressionHead(
-            config.d_model, config.dropout
-        )
+        self.transferability_head = TransferabilityClassificationHead(config.d_model, config.dropout)
+        self.period_head = PeriodPredictionHead(config.d_model, config.num_period_outputs, config.dropout)
+        self.capacity_head = CapacityRegressionHead(config.d_model, config.dropout)
 
     def forward(
         self,
@@ -200,7 +177,7 @@ class LoadTransferabilityTransformer(nn.Module):
         period_type: torch.Tensor,
         is_weekday: torch.Tensor,
         temperature: torch.Tensor,
-        mask: Optional[torch.Tensor] = None
+        mask: Optional[torch.Tensor] = None,
     ) -> Dict[str, torch.Tensor]:
         """
         前向传播
@@ -234,11 +211,7 @@ class LoadTransferabilityTransformer(nn.Module):
         period_probs = self.period_head(global_feat)
         capacity = self.capacity_head(global_feat)
 
-        return {
-            'transferability': transferability,
-            'period_probs': period_probs,
-            'capacity': capacity
-        }
+        return {"transferability": transferability, "period_probs": period_probs, "capacity": capacity}
 
     def compute_loss(
         self,
@@ -246,33 +219,19 @@ class LoadTransferabilityTransformer(nn.Module):
         targets: Dict[str, torch.Tensor],
         alpha: float = 1.0,
         beta: float = 0.5,
-        gamma: float = 0.5
+        gamma: float = 0.5,
     ) -> Dict[str, torch.Tensor]:
         """
         计算多任务损失函数 (S2-TF-e)
 
         L = alpha * L_cls + beta * L_reg + gamma * L_period
         """
-        loss_cls = F.binary_cross_entropy(
-            predictions['transferability'],
-            targets['transferability']
-        )
+        loss_cls = F.binary_cross_entropy(predictions["transferability"], targets["transferability"])
 
-        loss_reg = F.mse_loss(
-            predictions['capacity'],
-            targets['capacity']
-        )
+        loss_reg = F.mse_loss(predictions["capacity"], targets["capacity"])
 
-        loss_period = F.cross_entropy(
-            predictions['period_probs'],
-            targets['period_labels']
-        )
+        loss_period = F.cross_entropy(predictions["period_probs"], targets["period_labels"])
 
         total_loss = alpha * loss_cls + beta * loss_reg + gamma * loss_period
 
-        return {
-            'total': total_loss,
-            'classification': loss_cls,
-            'regression': loss_reg,
-            'period': loss_period
-        }
+        return {"total": total_loss, "classification": loss_cls, "regression": loss_reg, "period": loss_period}

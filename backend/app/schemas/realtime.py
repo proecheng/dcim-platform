@@ -1,6 +1,7 @@
 """
 实时数据相关 Schema
 """
+
 from typing import Optional, Dict, Any
 from datetime import datetime
 from pydantic import BaseModel
@@ -8,6 +9,7 @@ from pydantic import BaseModel
 
 class RealtimeData(BaseModel):
     """实时数据"""
+
     point_id: int
     point_code: str
     point_name: str
@@ -25,6 +27,7 @@ class RealtimeData(BaseModel):
 
 class RealtimeSummary(BaseModel):
     """实时数据汇总"""
+
     total_points: int
     normal_count: int
     alarm_count: int
@@ -37,5 +40,6 @@ class RealtimeSummary(BaseModel):
 
 class ControlCommand(BaseModel):
     """控制指令"""
+
     value: float
     remark: Optional[str] = None

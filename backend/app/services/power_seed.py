@@ -1,9 +1,9 @@
 """
 供配电设备种子数据 - 创建UPS、电池组、配电柜、PDU及其关联点位
 """
-from datetime import datetime, date
+
+from datetime import date
 from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..core.database import async_session
 from ..models.device import Device
@@ -11,6 +11,7 @@ from ..models.point import Point
 from ..models.power import UPSDevice, BatteryGroup
 
 import logging
+
 logger = logging.getLogger(__name__)
 
 
@@ -99,18 +100,106 @@ def _ups_points(code: str):
     """生成UPS设备的点位列表"""
     return [
         # AI 点位
-        {"suffix": "input_voltage_a", "name": "输入电压A相", "type": "AI", "unit": "V", "min": 340, "max": 420, "addr": "40001"},
-        {"suffix": "input_voltage_b", "name": "输入电压B相", "type": "AI", "unit": "V", "min": 340, "max": 420, "addr": "40002"},
-        {"suffix": "input_voltage_c", "name": "输入电压C相", "type": "AI", "unit": "V", "min": 340, "max": 420, "addr": "40003"},
-        {"suffix": "output_voltage_a", "name": "输出电压A相", "type": "AI", "unit": "V", "min": 210, "max": 230, "addr": "40004"},
-        {"suffix": "output_voltage_b", "name": "输出电压B相", "type": "AI", "unit": "V", "min": 210, "max": 230, "addr": "40005"},
-        {"suffix": "output_voltage_c", "name": "输出电压C相", "type": "AI", "unit": "V", "min": 210, "max": 230, "addr": "40006"},
-        {"suffix": "input_freq", "name": "输入频率", "type": "AI", "unit": "Hz", "min": 49.0, "max": 51.0, "addr": "40007"},
-        {"suffix": "output_freq", "name": "输出频率", "type": "AI", "unit": "Hz", "min": 49.5, "max": 50.5, "addr": "40008"},
-        {"suffix": "input_power_factor", "name": "输入功率因数", "type": "AI", "unit": "", "min": 0.8, "max": 1.0, "addr": "40009"},
-        {"suffix": "output_power_factor", "name": "输出功率因数", "type": "AI", "unit": "", "min": 0.8, "max": 1.0, "addr": "40010"},
+        {
+            "suffix": "input_voltage_a",
+            "name": "输入电压A相",
+            "type": "AI",
+            "unit": "V",
+            "min": 340,
+            "max": 420,
+            "addr": "40001",
+        },
+        {
+            "suffix": "input_voltage_b",
+            "name": "输入电压B相",
+            "type": "AI",
+            "unit": "V",
+            "min": 340,
+            "max": 420,
+            "addr": "40002",
+        },
+        {
+            "suffix": "input_voltage_c",
+            "name": "输入电压C相",
+            "type": "AI",
+            "unit": "V",
+            "min": 340,
+            "max": 420,
+            "addr": "40003",
+        },
+        {
+            "suffix": "output_voltage_a",
+            "name": "输出电压A相",
+            "type": "AI",
+            "unit": "V",
+            "min": 210,
+            "max": 230,
+            "addr": "40004",
+        },
+        {
+            "suffix": "output_voltage_b",
+            "name": "输出电压B相",
+            "type": "AI",
+            "unit": "V",
+            "min": 210,
+            "max": 230,
+            "addr": "40005",
+        },
+        {
+            "suffix": "output_voltage_c",
+            "name": "输出电压C相",
+            "type": "AI",
+            "unit": "V",
+            "min": 210,
+            "max": 230,
+            "addr": "40006",
+        },
+        {
+            "suffix": "input_freq",
+            "name": "输入频率",
+            "type": "AI",
+            "unit": "Hz",
+            "min": 49.0,
+            "max": 51.0,
+            "addr": "40007",
+        },
+        {
+            "suffix": "output_freq",
+            "name": "输出频率",
+            "type": "AI",
+            "unit": "Hz",
+            "min": 49.5,
+            "max": 50.5,
+            "addr": "40008",
+        },
+        {
+            "suffix": "input_power_factor",
+            "name": "输入功率因数",
+            "type": "AI",
+            "unit": "",
+            "min": 0.8,
+            "max": 1.0,
+            "addr": "40009",
+        },
+        {
+            "suffix": "output_power_factor",
+            "name": "输出功率因数",
+            "type": "AI",
+            "unit": "",
+            "min": 0.8,
+            "max": 1.0,
+            "addr": "40010",
+        },
         {"suffix": "load_rate", "name": "负载率", "type": "AI", "unit": "%", "min": 0, "max": 100, "addr": "40011"},
-        {"suffix": "backup_time", "name": "备电时间", "type": "AI", "unit": "min", "min": 10, "max": 120, "addr": "40012"},
+        {
+            "suffix": "backup_time",
+            "name": "备电时间",
+            "type": "AI",
+            "unit": "min",
+            "min": 10,
+            "max": 120,
+            "addr": "40012",
+        },
         {"suffix": "bus_temp", "name": "母排温度", "type": "AI", "unit": "℃", "min": 20, "max": 60, "addr": "40013"},
         # DI 点位
         {"suffix": "mains_status", "name": "市电状态", "type": "DI", "unit": "", "min": 0, "max": 1, "addr": "10001"},
@@ -122,14 +211,78 @@ def _battery_points(ups_code: str, group_idx: int):
     """生成电池组的点位列表"""
     prefix = f"{ups_code}_BAT{group_idx}"
     return [
-        {"suffix": "soh", "name": f"电池组{group_idx}健康度", "type": "AI", "unit": "%", "min": 60, "max": 100, "addr": f"4010{group_idx}"},
-        {"suffix": "soc", "name": f"电池组{group_idx}荷电状态", "type": "AI", "unit": "%", "min": 0, "max": 100, "addr": f"4011{group_idx}"},
-        {"suffix": "voltage", "name": f"电池组{group_idx}电压", "type": "AI", "unit": "V", "min": 360, "max": 440, "addr": f"4012{group_idx}"},
-        {"suffix": "current", "name": f"电池组{group_idx}电流", "type": "AI", "unit": "A", "min": -50, "max": 50, "addr": f"4013{group_idx}"},
-        {"suffix": "temperature", "name": f"电池组{group_idx}温度", "type": "AI", "unit": "℃", "min": 15, "max": 45, "addr": f"4014{group_idx}"},
-        {"suffix": "internal_resistance", "name": f"电池组{group_idx}内阻", "type": "AI", "unit": "mΩ", "min": 1, "max": 5, "addr": f"4015{group_idx}"},
-        {"suffix": "backup_time", "name": f"电池组{group_idx}备电时间", "type": "AI", "unit": "min", "min": 10, "max": 120, "addr": f"4016{group_idx}"},
-        {"suffix": "status", "name": f"电池组{group_idx}状态", "type": "DI", "unit": "", "min": 0, "max": 1, "addr": f"1010{group_idx}"},
+        {
+            "suffix": "soh",
+            "name": f"电池组{group_idx}健康度",
+            "type": "AI",
+            "unit": "%",
+            "min": 60,
+            "max": 100,
+            "addr": f"4010{group_idx}",
+        },
+        {
+            "suffix": "soc",
+            "name": f"电池组{group_idx}荷电状态",
+            "type": "AI",
+            "unit": "%",
+            "min": 0,
+            "max": 100,
+            "addr": f"4011{group_idx}",
+        },
+        {
+            "suffix": "voltage",
+            "name": f"电池组{group_idx}电压",
+            "type": "AI",
+            "unit": "V",
+            "min": 360,
+            "max": 440,
+            "addr": f"4012{group_idx}",
+        },
+        {
+            "suffix": "current",
+            "name": f"电池组{group_idx}电流",
+            "type": "AI",
+            "unit": "A",
+            "min": -50,
+            "max": 50,
+            "addr": f"4013{group_idx}",
+        },
+        {
+            "suffix": "temperature",
+            "name": f"电池组{group_idx}温度",
+            "type": "AI",
+            "unit": "℃",
+            "min": 15,
+            "max": 45,
+            "addr": f"4014{group_idx}",
+        },
+        {
+            "suffix": "internal_resistance",
+            "name": f"电池组{group_idx}内阻",
+            "type": "AI",
+            "unit": "mΩ",
+            "min": 1,
+            "max": 5,
+            "addr": f"4015{group_idx}",
+        },
+        {
+            "suffix": "backup_time",
+            "name": f"电池组{group_idx}备电时间",
+            "type": "AI",
+            "unit": "min",
+            "min": 10,
+            "max": 120,
+            "addr": f"4016{group_idx}",
+        },
+        {
+            "suffix": "status",
+            "name": f"电池组{group_idx}状态",
+            "type": "DI",
+            "unit": "",
+            "min": 0,
+            "max": 1,
+            "addr": f"1010{group_idx}",
+        },
     ], prefix
 
 
@@ -137,12 +290,60 @@ def _cabinet_points(code: str):
     """生成配电柜的点位列表"""
     return [
         {"suffix": "total_power", "name": "总功率", "type": "AI", "unit": "kW", "min": 0, "max": 500, "addr": "40001"},
-        {"suffix": "input_voltage_a", "name": "输入电压A相", "type": "AI", "unit": "V", "min": 340, "max": 420, "addr": "40002"},
-        {"suffix": "input_voltage_b", "name": "输入电压B相", "type": "AI", "unit": "V", "min": 340, "max": 420, "addr": "40003"},
-        {"suffix": "input_voltage_c", "name": "输入电压C相", "type": "AI", "unit": "V", "min": 340, "max": 420, "addr": "40004"},
-        {"suffix": "output_current_a", "name": "输出电流A相", "type": "AI", "unit": "A", "min": 0, "max": 800, "addr": "40005"},
-        {"suffix": "output_current_b", "name": "输出电流B相", "type": "AI", "unit": "A", "min": 0, "max": 800, "addr": "40006"},
-        {"suffix": "output_current_c", "name": "输出电流C相", "type": "AI", "unit": "A", "min": 0, "max": 800, "addr": "40007"},
+        {
+            "suffix": "input_voltage_a",
+            "name": "输入电压A相",
+            "type": "AI",
+            "unit": "V",
+            "min": 340,
+            "max": 420,
+            "addr": "40002",
+        },
+        {
+            "suffix": "input_voltage_b",
+            "name": "输入电压B相",
+            "type": "AI",
+            "unit": "V",
+            "min": 340,
+            "max": 420,
+            "addr": "40003",
+        },
+        {
+            "suffix": "input_voltage_c",
+            "name": "输入电压C相",
+            "type": "AI",
+            "unit": "V",
+            "min": 340,
+            "max": 420,
+            "addr": "40004",
+        },
+        {
+            "suffix": "output_current_a",
+            "name": "输出电流A相",
+            "type": "AI",
+            "unit": "A",
+            "min": 0,
+            "max": 800,
+            "addr": "40005",
+        },
+        {
+            "suffix": "output_current_b",
+            "name": "输出电流B相",
+            "type": "AI",
+            "unit": "A",
+            "min": 0,
+            "max": 800,
+            "addr": "40006",
+        },
+        {
+            "suffix": "output_current_c",
+            "name": "输出电流C相",
+            "type": "AI",
+            "unit": "A",
+            "min": 0,
+            "max": 800,
+            "addr": "40007",
+        },
         {"suffix": "bus_temp", "name": "母排温度", "type": "AI", "unit": "℃", "min": 20, "max": 60, "addr": "40008"},
     ]
 
@@ -154,8 +355,28 @@ def _pdu_points(code: str):
         {"suffix": "temperature", "name": "温度", "type": "AI", "unit": "℃", "min": 15, "max": 50, "addr": "40002"},
     ]
     for i in range(1, 5):
-        points.append({"suffix": f"outlet_current_{i}", "name": f"支路{i}电流", "type": "AI", "unit": "A", "min": 0, "max": 16, "addr": f"4001{i}"})
-        points.append({"suffix": f"outlet_power_{i}", "name": f"支路{i}功率", "type": "AI", "unit": "kW", "min": 0, "max": 5, "addr": f"4002{i}"})
+        points.append(
+            {
+                "suffix": f"outlet_current_{i}",
+                "name": f"支路{i}电流",
+                "type": "AI",
+                "unit": "A",
+                "min": 0,
+                "max": 16,
+                "addr": f"4001{i}",
+            }
+        )
+        points.append(
+            {
+                "suffix": f"outlet_power_{i}",
+                "name": f"支路{i}功率",
+                "type": "AI",
+                "unit": "kW",
+                "min": 0,
+                "max": 5,
+                "addr": f"4002{i}",
+            }
+        )
     return points
 
 
@@ -187,9 +408,7 @@ async def seed_power_devices():
     """种子数据：创建供配电设备及关联点位"""
     async with async_session() as session:
         # 检查是否已有UPS-A01设备，避免重复创建
-        existing = await session.execute(
-            select(Device).where(Device.device_code == "UPS-A01")
-        )
+        existing = await session.execute(select(Device).where(Device.device_code == "UPS-A01"))
         if existing.scalar_one_or_none():
             logger.info("供配电种子数据已存在，跳过")
             return

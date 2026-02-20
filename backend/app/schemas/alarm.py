@@ -1,6 +1,7 @@
 """
 告警相关 Schema
 """
+
 from typing import Optional, Dict, List
 from datetime import datetime
 from pydantic import BaseModel, ConfigDict
@@ -8,6 +9,7 @@ from pydantic import BaseModel, ConfigDict
 
 class AlarmInfo(BaseModel):
     """告警信息"""
+
     model_config = ConfigDict(from_attributes=True)
 
     id: int
@@ -41,28 +43,33 @@ class AlarmInfo(BaseModel):
 
 class AlarmAcknowledge(BaseModel):
     """确认告警"""
+
     remark: Optional[str] = None
 
 
 class AlarmResolve(BaseModel):
     """解决告警"""
+
     remark: Optional[str] = None
     resolve_type: str = "manual"
 
 
 class AlarmProcess(BaseModel):
     """处理告警"""
+
     process_remark: str
 
 
 class BatchAcknowledgeRequest(BaseModel):
     """批量确认告警"""
+
     alarm_ids: List[int]
     remark: Optional[str] = None
 
 
 class AlarmCount(BaseModel):
     """告警数量统计"""
+
     critical: int = 0
     major: int = 0
     minor: int = 0
@@ -72,6 +79,7 @@ class AlarmCount(BaseModel):
 
 class AlarmStatistics(BaseModel):
     """告警统计"""
+
     total: int
     by_level: Dict[str, int] = {}
     by_status: Dict[str, int] = {}
@@ -83,6 +91,7 @@ class AlarmStatistics(BaseModel):
 
 class AlarmTrend(BaseModel):
     """告警趋势"""
+
     date: str
     critical: int = 0
     major: int = 0
@@ -124,6 +133,7 @@ AlarmResponse = AlarmInfo
 
 class AlarmStats(BaseModel):
     """告警统计"""
+
     total: int
     active: int
     acknowledged: int
@@ -134,6 +144,7 @@ class AlarmStats(BaseModel):
 # 告警规则相关 Schema
 class AlarmRuleBase(BaseModel):
     """告警规则基础"""
+
     rule_name: str
     rule_type: str = "and"  # and/or/sequence
     condition_expr: Optional[str] = None
@@ -144,11 +155,13 @@ class AlarmRuleBase(BaseModel):
 
 class AlarmRuleCreate(AlarmRuleBase):
     """创建告警规则"""
+
     pass
 
 
 class AlarmRuleUpdate(BaseModel):
     """更新告警规则"""
+
     rule_name: Optional[str] = None
     rule_type: Optional[str] = None
     condition_expr: Optional[str] = None
@@ -159,6 +172,7 @@ class AlarmRuleUpdate(BaseModel):
 
 class AlarmRuleInfo(AlarmRuleBase):
     """告警规则信息"""
+
     model_config = ConfigDict(from_attributes=True)
 
     id: int
@@ -168,6 +182,7 @@ class AlarmRuleInfo(AlarmRuleBase):
 # 告警屏蔽相关 Schema
 class AlarmShieldBase(BaseModel):
     """告警屏蔽基础"""
+
     point_id: Optional[int] = None  # 空表示全局屏蔽
     alarm_level: Optional[str] = None  # 空表示屏蔽全部级别
     start_time: datetime
@@ -177,11 +192,13 @@ class AlarmShieldBase(BaseModel):
 
 class AlarmShieldCreate(AlarmShieldBase):
     """创建告警屏蔽"""
+
     pass
 
 
 class AlarmShieldInfo(AlarmShieldBase):
     """告警屏蔽信息"""
+
     model_config = ConfigDict(from_attributes=True)
 
     id: int
@@ -203,6 +220,7 @@ LEVEL_ORDER = {"info": 0, "minor": 1, "major": 2, "critical": 3}
 
 class AlarmEscalationBase(BaseModel):
     """告警升级规则基础"""
+
     rule_name: str
     source_level: str
     timeout_minutes: int
@@ -211,7 +229,7 @@ class AlarmEscalationBase(BaseModel):
     is_enabled: bool = True
     description: Optional[str] = None
 
-    @model_validator(mode='after')
+    @model_validator(mode="after")
     def validate_level_order(self):
         """target_level 必须高于 source_level"""
         src = LEVEL_ORDER.get(self.source_level, -1)
@@ -223,11 +241,13 @@ class AlarmEscalationBase(BaseModel):
 
 class AlarmEscalationCreate(AlarmEscalationBase):
     """创建告警升级规则"""
+
     pass
 
 
 class AlarmEscalationUpdate(BaseModel):
     """更新告警升级规则"""
+
     rule_name: Optional[str] = None
     source_level: Optional[str] = None
     timeout_minutes: Optional[int] = None
@@ -239,15 +259,16 @@ class AlarmEscalationUpdate(BaseModel):
 
 class AlarmEscalationInfo(AlarmEscalationBase):
     """告警升级规则信息"""
+
     model_config = ConfigDict(from_attributes=True)
 
     id: int
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
 
-    @field_validator('notify_user_ids', mode='before')
+    @field_validator("notify_user_ids", mode="before")
     @classmethod
     def parse_notify_ids(cls, v):
         if isinstance(v, str):
-            return [int(x.strip()) for x in v.split(',') if x.strip()] if v else []
+            return [int(x.strip()) for x in v.split(",") if x.strip()] if v else []
         return v or []

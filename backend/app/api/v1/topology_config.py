@@ -1,6 +1,7 @@
 """
 配电与制冷拓扑配置 API
 """
+
 from typing import Optional, List
 from datetime import datetime
 
@@ -16,27 +17,47 @@ from ...models.asset import Cabinet, Asset
 from ...models.cooling import CoolingUnit
 from ...models.spatial import Site, Floor, Room, Row
 from ...models.topology_config import (
-    PowerPhaseMapping, CoolingZone, CoolingZoneCabinet, CoolingZoneUnit,
+    PowerPhaseMapping,
+    CoolingZone,
+    CoolingZoneCabinet,
+    CoolingZoneUnit,
 )
 from ...models.energy import DistributionPanel, DistributionCircuit, PowerDevice
 from ...models.alarm import Alarm
 from ...models.point import Point
 from ...schemas.topology_config import (
-    PowerPhaseMappingCreate, PowerPhaseMappingUpdate, PowerPhaseMappingResponse,
-    CoolingZoneCreate, CoolingZoneUpdate, CoolingZoneResponse,
-    CoolingZoneCabinetItem, CoolingZoneUnitItem,
+    PowerPhaseMappingCreate,
+    PowerPhaseMappingUpdate,
+    PowerPhaseMappingResponse,
+    CoolingZoneCreate,
+    CoolingZoneUpdate,
+    CoolingZoneResponse,
+    CoolingZoneCabinetItem,
+    CoolingZoneUnitItem,
     PhaseBalanceResponse,
-    CabinetTopologySummary, SpatialInfo, PowerInfo, CoolingInfo,
+    CabinetTopologySummary,
+    SpatialInfo,
+    PowerInfo,
+    CoolingInfo,
     CoolingZoneCapacityResponse,
-    SmartSiteRequest, SmartSiteResponse, CabinetSiteScore, DimensionScore, SmartSiteWeights,
-    FaultImpactRequest, FaultImpactResponse, AffectedCabinet, AffectedAsset,
-    CoolingImpactItem, RelatedAlarmItem,
+    SmartSiteRequest,
+    SmartSiteResponse,
+    CabinetSiteScore,
+    DimensionScore,
+    SmartSiteWeights,
+    FaultImpactRequest,
+    FaultImpactResponse,
+    AffectedCabinet,
+    AffectedAsset,
+    CoolingImpactItem,
+    RelatedAlarmItem,
 )
 
 router = APIRouter()
 
 
 # ==================== 三相接线映射 ====================
+
 
 @router.get("/power-phase", response_model=List[PowerPhaseMappingResponse])
 async def list_power_phase_mappings(
@@ -149,7 +170,9 @@ async def get_phase_balance(
         return PhaseBalanceResponse(
             pdu_device_id=pdu_device_id,
             pdu_device_name=pdu_name,
-            phase_a_power=a, phase_b_power=b, phase_c_power=c,
+            phase_a_power=a,
+            phase_b_power=b,
+            phase_c_power=c,
             imbalance_rate=None,
             data_source="no_data",
             phase_a_cabinets=phase_cabinets["A"],
@@ -166,7 +189,9 @@ async def get_phase_balance(
     return PhaseBalanceResponse(
         pdu_device_id=pdu_device_id,
         pdu_device_name=pdu_name,
-        phase_a_power=a, phase_b_power=b, phase_c_power=c,
+        phase_a_power=a,
+        phase_b_power=b,
+        phase_c_power=c,
         imbalance_rate=imbalance_rate,
         data_source="estimated",
         phase_a_cabinets=phase_cabinets["A"],
@@ -294,6 +319,7 @@ async def delete_power_phase_mapping(
 
 # ==================== 制冷区域 ====================
 
+
 async def _build_zone_response(db: AsyncSession, zone: CoolingZone) -> CoolingZoneResponse:
     """构建制冷区域响应（含关联机柜和空调）"""
     # 查询关联机柜
@@ -303,10 +329,7 @@ async def _build_zone_response(db: AsyncSession, zone: CoolingZone) -> CoolingZo
         .where(CoolingZoneCabinet.zone_id == zone.id)
     )
     cab_result = await db.execute(cab_stmt)
-    cabinets = [
-        CoolingZoneCabinetItem(id=row[0], cabinet_code=row[1], cabinet_name=row[2])
-        for row in cab_result.all()
-    ]
+    cabinets = [CoolingZoneCabinetItem(id=row[0], cabinet_code=row[1], cabinet_name=row[2]) for row in cab_result.all()]
 
     # 查询关联空调 → join devices 获取设备名称
     unit_stmt = (
@@ -322,9 +345,7 @@ async def _build_zone_response(db: AsyncSession, zone: CoolingZone) -> CoolingZo
     )
     unit_result = await db.execute(unit_stmt)
     cooling_units = [
-        CoolingZoneUnitItem(
-            id=row[0], device_code=row[1], device_name=row[2], cooling_capacity_kw=row[3]
-        )
+        CoolingZoneUnitItem(id=row[0], device_code=row[1], device_name=row[2], cooling_capacity_kw=row[3])
         for row in unit_result.all()
     ]
 
@@ -373,9 +394,7 @@ async def create_cooling_zone(
 ):
     """创建制冷区域"""
     # 自动生成 zone_code: 查询最大序号 +1
-    max_result = await db.execute(
-        select(func.max(CoolingZone.zone_code))
-    )
+    max_result = await db.execute(select(func.max(CoolingZone.zone_code)))
     max_code = max_result.scalar()
     if max_code and max_code.startswith("CZ-"):
         try:
@@ -445,17 +464,13 @@ async def update_cooling_zone(
 
     # 更新机柜关联：先删旧再插新
     if "cabinet_ids" in update_data and update_data["cabinet_ids"] is not None:
-        await db.execute(
-            delete(CoolingZoneCabinet).where(CoolingZoneCabinet.zone_id == zone_id)
-        )
+        await db.execute(delete(CoolingZoneCabinet).where(CoolingZoneCabinet.zone_id == zone_id))
         for cab_id in update_data["cabinet_ids"]:
             db.add(CoolingZoneCabinet(zone_id=zone_id, cabinet_id=cab_id))
 
     # 更新空调关联
     if "cooling_unit_ids" in update_data and update_data["cooling_unit_ids"] is not None:
-        await db.execute(
-            delete(CoolingZoneUnit).where(CoolingZoneUnit.zone_id == zone_id)
-        )
+        await db.execute(delete(CoolingZoneUnit).where(CoolingZoneUnit.zone_id == zone_id))
         for unit_id in update_data["cooling_unit_ids"]:
             db.add(CoolingZoneUnit(zone_id=zone_id, cooling_unit_id=unit_id))
 
@@ -519,6 +534,7 @@ async def get_cooling_zone_capacity(
 
 # ==================== 机柜拓扑汇总 ====================
 
+
 @router.get("/cabinet/{cabinet_id}/topology-summary", response_model=CabinetTopologySummary)
 async def get_cabinet_topology_summary(
     cabinet_id: int,
@@ -560,11 +576,13 @@ async def get_cabinet_topology_summary(
     for pm in power_mappings:
         dev_result = await db.execute(select(Device).where(Device.id == pm.pdu_device_id))
         dev = dev_result.scalar_one_or_none()
-        power_list.append(PowerInfo(
-            pdu_device_name=dev.device_name if dev else None,
-            phase=pm.phase,
-            feed_type=pm.feed_type,
-        ))
+        power_list.append(
+            PowerInfo(
+                pdu_device_name=dev.device_name if dev else None,
+                phase=pm.phase,
+                feed_type=pm.feed_type,
+            )
+        )
 
     # 制冷信息
     cooling_stmt = (
@@ -573,10 +591,7 @@ async def get_cabinet_topology_summary(
         .where(CoolingZoneCabinet.cabinet_id == cabinet_id)
     )
     cooling_result = await db.execute(cooling_stmt)
-    cooling_list = [
-        CoolingInfo(zone_name=row[0], design_capacity_kw=row[1])
-        for row in cooling_result.all()
-    ]
+    cooling_list = [CoolingInfo(zone_name=row[0], design_capacity_kw=row[1]) for row in cooling_result.all()]
 
     return CabinetTopologySummary(
         cabinet_id=cab.id,
@@ -589,6 +604,7 @@ async def get_cabinet_topology_summary(
 
 
 # ==================== 智能选址推荐 ====================
+
 
 @router.post("/smart-site-selection", response_model=SmartSiteResponse)
 async def smart_site_selection(
@@ -605,10 +621,11 @@ async def smart_site_selection(
     total_evaluated = len(cabinets)
 
     # used_u 聚合
-    used_u_stmt = select(
-        Asset.cabinet_id,
-        func.coalesce(func.sum(Asset.u_height), 0).label("used_u")
-    ).where(Asset.u_height.isnot(None)).group_by(Asset.cabinet_id)
+    used_u_stmt = (
+        select(Asset.cabinet_id, func.coalesce(func.sum(Asset.u_height), 0).label("used_u"))
+        .where(Asset.u_height.isnot(None))
+        .group_by(Asset.cabinet_id)
+    )
     used_u_result = await db.execute(used_u_stmt)
     used_u_map = {row.cabinet_id: int(row.used_u) for row in used_u_result}
 
@@ -657,11 +674,16 @@ async def smart_site_selection(
 
         # 空间评分
         space_score = min(100, (available_u / data.required_u) * 50)
-        dimensions.append(DimensionScore(
-            dimension="空间容量", score=round(space_score, 1),
-            weight=weights.space, weighted_score=round(space_score * weights.space / 100, 2),
-            data_available=True, detail=f"可用{available_u}U，需要{data.required_u}U"
-        ))
+        dimensions.append(
+            DimensionScore(
+                dimension="空间容量",
+                score=round(space_score, 1),
+                weight=weights.space,
+                weighted_score=round(space_score * weights.space / 100, 2),
+                data_available=True,
+                detail=f"可用{available_u}U，需要{data.required_u}U",
+            )
+        )
 
         # 电力评分
         if req_power is None:
@@ -673,11 +695,16 @@ async def smart_site_selection(
         else:
             p_score = min(100, (cab.max_power / req_power) * 50)
             p_avail, p_detail = True, f"最大{cab.max_power}kW，需要{req_power}kW"
-        dimensions.append(DimensionScore(
-            dimension="电力容量", score=round(p_score, 1),
-            weight=weights.power, weighted_score=round(p_score * weights.power / 100, 2),
-            data_available=p_avail, detail=p_detail
-        ))
+        dimensions.append(
+            DimensionScore(
+                dimension="电力容量",
+                score=round(p_score, 1),
+                weight=weights.power,
+                weighted_score=round(p_score * weights.power / 100, 2),
+                data_available=p_avail,
+                detail=p_detail,
+            )
+        )
 
         # 三相平衡度评分
         cab_ppms = cab_ppm_map.get(cab.id, [])
@@ -689,7 +716,7 @@ async def smart_site_selection(
             phase_power = {"A": 0.0, "B": 0.0, "C": 0.0}
             for p in pdu_ppms:
                 phase_power[p.phase] = phase_power.get(p.phase, 0) + cab_power_map.get(p.cabinet_id, 0)
-            phase_power[primary_ppm.phase] += (req_power or 0)
+            phase_power[primary_ppm.phase] += req_power or 0
             a, b, c = phase_power["A"], phase_power["B"], phase_power["C"]
             avg = (a + b + c) / 3
             if avg == 0:
@@ -698,11 +725,16 @@ async def smart_site_selection(
                 imbalance = (max(a, b, c) - min(a, b, c)) / avg * 100
                 ph_score = max(0, 100 - imbalance * 3)
                 ph_avail, ph_detail = True, f"模拟不平衡度{imbalance:.1f}%"
-        dimensions.append(DimensionScore(
-            dimension="三相平衡度", score=round(ph_score, 1),
-            weight=weights.phase_balance, weighted_score=round(ph_score * weights.phase_balance / 100, 2),
-            data_available=ph_avail, detail=ph_detail
-        ))
+        dimensions.append(
+            DimensionScore(
+                dimension="三相平衡度",
+                score=round(ph_score, 1),
+                weight=weights.phase_balance,
+                weighted_score=round(ph_score * weights.phase_balance / 100, 2),
+                data_available=ph_avail,
+                detail=ph_detail,
+            )
+        )
 
         # 温度环境评分
         zone_ids = cab_zone_map.get(cab.id, [])
@@ -718,11 +750,16 @@ async def smart_site_selection(
                 utilization = total_power / zone.design_capacity_kw * 100
                 t_score = max(0, 100 - utilization)
                 t_avail, t_detail = True, f"制冷利用率{utilization:.1f}%"
-        dimensions.append(DimensionScore(
-            dimension="温度环境", score=round(t_score, 1),
-            weight=weights.temperature, weighted_score=round(t_score * weights.temperature / 100, 2),
-            data_available=t_avail, detail=t_detail
-        ))
+        dimensions.append(
+            DimensionScore(
+                dimension="温度环境",
+                score=round(t_score, 1),
+                weight=weights.temperature,
+                weighted_score=round(t_score * weights.temperature / 100, 2),
+                data_available=t_avail,
+                detail=t_detail,
+            )
+        )
 
         # 制冷余量评分
         if req_power is None or req_power == 0:
@@ -744,11 +781,16 @@ async def smart_site_selection(
                     cl_score = min(100, (remaining / req_power) * 50)
                     cl_detail = f"剩余制冷{remaining:.1f}kW"
                 cl_avail = True
-        dimensions.append(DimensionScore(
-            dimension="制冷余量", score=round(cl_score, 1),
-            weight=weights.cooling, weighted_score=round(cl_score * weights.cooling / 100, 2),
-            data_available=cl_avail, detail=cl_detail
-        ))
+        dimensions.append(
+            DimensionScore(
+                dimension="制冷余量",
+                score=round(cl_score, 1),
+                weight=weights.cooling,
+                weighted_score=round(cl_score * weights.cooling / 100, 2),
+                data_available=cl_avail,
+                detail=cl_detail,
+            )
+        )
 
         # 综合评分 + 置信度
         total_score = sum(d.weighted_score for d in dimensions)
@@ -765,10 +807,19 @@ async def smart_site_selection(
                     room_name = room.room_name
 
         return CabinetSiteScore(
-            cabinet_id=cab.id, cabinet_code=cab.cabinet_code, cabinet_name=cab.cabinet_name,
-            location=cab.location, room_name=room_name, row_name=row_name,
-            available_u=available_u, total_score=round(total_score, 1), confidence=confidence,
-            dimensions=dimensions, grid_x=cab.grid_x, grid_y=cab.grid_y, aisle_type=cab.aisle_type,
+            cabinet_id=cab.id,
+            cabinet_code=cab.cabinet_code,
+            cabinet_name=cab.cabinet_name,
+            location=cab.location,
+            room_name=room_name,
+            row_name=row_name,
+            available_u=available_u,
+            total_score=round(total_score, 1),
+            confidence=confidence,
+            dimensions=dimensions,
+            grid_x=cab.grid_x,
+            grid_y=cab.grid_y,
+            aisle_type=cab.aisle_type,
         )
 
     # 3. 评分所有机柜
@@ -781,13 +832,14 @@ async def smart_site_selection(
     candidates.sort(key=lambda x: x.total_score, reverse=True)
 
     return SmartSiteResponse(
-        candidates=candidates[:data.limit],
+        candidates=candidates[: data.limit],
         total_evaluated=total_evaluated,
         qualified_count=len(candidates),
     )
 
 
 # ==================== 故障影响分析 ====================
+
 
 @router.post("/fault-impact-analysis", response_model=FaultImpactResponse)
 async def fault_impact_analysis(
@@ -805,9 +857,7 @@ async def fault_impact_analysis(
 
     # ---- PDU 故障 ----
     if data.fault_source_type == "pdu":
-        dev_result = await db.execute(
-            select(Device).where(Device.id == data.fault_source_id)
-        )
+        dev_result = await db.execute(select(Device).where(Device.id == data.fault_source_id))
         dev = dev_result.scalar_one_or_none()
         if not dev:
             raise HTTPException(status_code=404, detail="PDU设备不存在")
@@ -818,9 +868,7 @@ async def fault_impact_analysis(
 
     # ---- 配电柜故障 ----
     elif data.fault_source_type == "panel":
-        panel_result = await db.execute(
-            select(DistributionPanel).where(DistributionPanel.id == data.fault_source_id)
-        )
+        panel_result = await db.execute(select(DistributionPanel).where(DistributionPanel.id == data.fault_source_id))
         panel = panel_result.scalar_one_or_none()
         if not panel:
             raise HTTPException(status_code=404, detail="配电柜不存在")
@@ -838,9 +886,7 @@ async def fault_impact_analysis(
                     continue
                 visited.add(pid)
                 child_result = await db.execute(
-                    select(DistributionPanel.id).where(
-                        DistributionPanel.parent_panel_id == pid
-                    )
+                    select(DistributionPanel.id).where(DistributionPanel.parent_panel_id == pid)
                 )
                 for row in child_result.all():
                     if row[0] not in visited:
@@ -852,9 +898,7 @@ async def fault_impact_analysis(
         # 查询回路 → PowerDevice → 过滤 PDU
         if all_panel_ids:
             circuit_result = await db.execute(
-                select(DistributionCircuit.id).where(
-                    DistributionCircuit.panel_id.in_(all_panel_ids)
-                )
+                select(DistributionCircuit.id).where(DistributionCircuit.panel_id.in_(all_panel_ids))
             )
             circuit_ids = [r[0] for r in circuit_result.all()]
 
@@ -882,9 +926,7 @@ async def fault_impact_analysis(
 
     if affected_pdu_device_ids:
         ppm_result = await db.execute(
-            select(PowerPhaseMapping).where(
-                PowerPhaseMapping.pdu_device_id.in_(affected_pdu_device_ids)
-            )
+            select(PowerPhaseMapping).where(PowerPhaseMapping.pdu_device_id.in_(affected_pdu_device_ids))
         )
         ppms = ppm_result.scalars().all()
 
@@ -895,16 +937,14 @@ async def fault_impact_analysis(
 
         cab_ids = list(cab_ppm_map.keys())
         if cab_ids:
-            cab_result = await db.execute(
-                select(Cabinet).where(Cabinet.id.in_(cab_ids))
-            )
+            cab_result = await db.execute(select(Cabinet).where(Cabinet.id.in_(cab_ids)))
             cab_map = {c.id: c for c in cab_result.scalars().all()}
 
             # 资产计数
             asset_count_result = await db.execute(
-                select(Asset.cabinet_id, func.count(Asset.id)).where(
-                    Asset.cabinet_id.in_(cab_ids)
-                ).group_by(Asset.cabinet_id)
+                select(Asset.cabinet_id, func.count(Asset.id))
+                .where(Asset.cabinet_id.in_(cab_ids))
+                .group_by(Asset.cabinet_id)
             )
             asset_count_map = {r[0]: r[1] for r in asset_count_result.all()}
 
@@ -929,72 +969,68 @@ async def fault_impact_analysis(
                 impact_level = "degraded" if has_other_feed else "power_loss"
                 has_redundancy = has_other_feed
 
-                affected_cabinets_list.append(AffectedCabinet(
-                    cabinet_id=cab_id,
-                    cabinet_code=cab.cabinet_code,
-                    cabinet_name=cab.cabinet_name,
-                    location=cab.location,
-                    feed_type=first_ppm.feed_type,
-                    phase=first_ppm.phase,
-                    asset_count=asset_count_map.get(cab_id, 0),
-                    impact_level=impact_level,
-                    has_redundancy=has_redundancy,
-                ))
+                affected_cabinets_list.append(
+                    AffectedCabinet(
+                        cabinet_id=cab_id,
+                        cabinet_code=cab.cabinet_code,
+                        cabinet_name=cab.cabinet_name,
+                        location=cab.location,
+                        feed_type=first_ppm.feed_type,
+                        phase=first_ppm.phase,
+                        asset_count=asset_count_map.get(cab_id, 0),
+                        impact_level=impact_level,
+                        has_redundancy=has_redundancy,
+                    )
+                )
 
     # ---- 受影响资产 ----
     affected_assets_list: list[AffectedAsset] = []
     if affected_cabinet_ids:
         asset_result = await db.execute(
-            select(Asset, Cabinet.cabinet_code).join(
-                Cabinet, Cabinet.id == Asset.cabinet_id
-            ).where(Asset.cabinet_id.in_(affected_cabinet_ids))
+            select(Asset, Cabinet.cabinet_code)
+            .join(Cabinet, Cabinet.id == Asset.cabinet_id)
+            .where(Asset.cabinet_id.in_(affected_cabinet_ids))
         )
         for row in asset_result.all():
             asset = row[0]
             cab_code = row[1]
             asset_type_val = asset.asset_type
-            if hasattr(asset_type_val, 'value'):
+            if hasattr(asset_type_val, "value"):
                 asset_type_val = asset_type_val.value
-            affected_assets_list.append(AffectedAsset(
-                asset_id=asset.id,
-                asset_code=asset.asset_code,
-                asset_name=asset.asset_name,
-                asset_type=str(asset_type_val) if asset_type_val else None,
-                cabinet_code=cab_code,
-            ))
+            affected_assets_list.append(
+                AffectedAsset(
+                    asset_id=asset.id,
+                    asset_code=asset.asset_code,
+                    asset_name=asset.asset_name,
+                    asset_type=str(asset_type_val) if asset_type_val else None,
+                    cabinet_code=cab_code,
+                )
+            )
 
     # ---- 制冷交叉影响 ----
     cooling_impacts_list: list[CoolingImpactItem] = []
     if affected_cabinet_ids:
         czc_result = await db.execute(
-            select(CoolingZoneCabinet.zone_id).where(
-                CoolingZoneCabinet.cabinet_id.in_(affected_cabinet_ids)
-            ).distinct()
+            select(CoolingZoneCabinet.zone_id).where(CoolingZoneCabinet.cabinet_id.in_(affected_cabinet_ids)).distinct()
         )
         zone_ids = [r[0] for r in czc_result.all()]
 
         for zone_id in zone_ids:
-            zone_result = await db.execute(
-                select(CoolingZone).where(CoolingZone.id == zone_id)
-            )
+            zone_result = await db.execute(select(CoolingZone).where(CoolingZone.id == zone_id))
             zone = zone_result.scalar_one_or_none()
             if not zone:
                 continue
 
             # 该区域所有机柜
             all_czc_result = await db.execute(
-                select(CoolingZoneCabinet.cabinet_id).where(
-                    CoolingZoneCabinet.zone_id == zone_id
-                )
+                select(CoolingZoneCabinet.cabinet_id).where(CoolingZoneCabinet.zone_id == zone_id)
             )
             zone_cab_ids = {r[0] for r in all_czc_result.all()}
             affected_in_zone = zone_cab_ids & affected_cabinet_ids
 
             # 查询制冷单元
             czu_result = await db.execute(
-                select(CoolingZoneUnit.cooling_unit_id).where(
-                    CoolingZoneUnit.zone_id == zone_id
-                )
+                select(CoolingZoneUnit.cooling_unit_id).where(CoolingZoneUnit.zone_id == zone_id)
             )
             cu_ids = [r[0] for r in czu_result.all()]
 
@@ -1003,17 +1039,13 @@ async def fault_impact_analysis(
             data_source = "unknown"
 
             for cu_id in cu_ids:
-                cu_result = await db.execute(
-                    select(CoolingUnit).where(CoolingUnit.id == cu_id)
-                )
+                cu_result = await db.execute(select(CoolingUnit).where(CoolingUnit.id == cu_id))
                 cu = cu_result.scalar_one_or_none()
                 if not cu:
                     continue
 
                 # 获取空调设备名称
-                ac_dev_result = await db.execute(
-                    select(Device).where(Device.id == cu.device_id)
-                )
+                ac_dev_result = await db.execute(select(Device).where(Device.id == cu.device_id))
                 ac_dev = ac_dev_result.scalar_one_or_none()
                 if ac_dev:
                     cooling_unit_names.append(ac_dev.device_name)
@@ -1029,9 +1061,7 @@ async def fault_impact_analysis(
                     hvac_pd = hvac_pd_result.scalar_one_or_none()
                     if hvac_pd and hvac_pd.circuit_id:
                         circ_result = await db.execute(
-                            select(DistributionCircuit.panel_id).where(
-                                DistributionCircuit.id == hvac_pd.circuit_id
-                            )
+                            select(DistributionCircuit.panel_id).where(DistributionCircuit.id == hvac_pd.circuit_id)
                         )
                         circ_row = circ_result.first()
                         if circ_row and circ_row[0] in all_panel_ids:
@@ -1041,15 +1071,17 @@ async def fault_impact_analysis(
             if data_source == "unknown" and all_panel_ids:
                 data_source = "unknown"
 
-            cooling_impacts_list.append(CoolingImpactItem(
-                zone_id=zone_id,
-                zone_name=zone.zone_name,
-                affected_cabinet_count=len(affected_in_zone),
-                total_cabinet_count=len(zone_cab_ids),
-                cooling_units=cooling_unit_names,
-                same_power_circuit=same_power_circuit,
-                power_circuit_data_source=data_source,
-            ))
+            cooling_impacts_list.append(
+                CoolingImpactItem(
+                    zone_id=zone_id,
+                    zone_name=zone.zone_name,
+                    affected_cabinet_count=len(affected_in_zone),
+                    total_cabinet_count=len(zone_cab_ids),
+                    cooling_units=cooling_unit_names,
+                    same_power_circuit=same_power_circuit,
+                    power_circuit_data_source=data_source,
+                )
+            )
 
     # ---- 关联告警 ----
     related_alarms_list: list[RelatedAlarmItem] = []
@@ -1058,9 +1090,7 @@ async def fault_impact_analysis(
     # 也收集 PowerDevice.monitor_device_id
     if all_panel_ids:
         circuit_result2 = await db.execute(
-            select(DistributionCircuit.id).where(
-                DistributionCircuit.panel_id.in_(all_panel_ids)
-            )
+            select(DistributionCircuit.id).where(DistributionCircuit.panel_id.in_(all_panel_ids))
         )
         cids2 = [r[0] for r in circuit_result2.all()]
         if cids2:
@@ -1074,9 +1104,7 @@ async def fault_impact_analysis(
                 all_affected_device_ids.add(r[0])
 
     if all_affected_device_ids:
-        point_result = await db.execute(
-            select(Point.id).where(Point.device_id.in_(all_affected_device_ids))
-        )
+        point_result = await db.execute(select(Point.id).where(Point.device_id.in_(all_affected_device_ids)))
         point_ids = [r[0] for r in point_result.all()]
 
         if point_ids:
@@ -1087,14 +1115,16 @@ async def fault_impact_analysis(
                 )
             )
             for alarm in alarm_result.scalars().all():
-                related_alarms_list.append(RelatedAlarmItem(
-                    alarm_id=alarm.id,
-                    alarm_no=alarm.alarm_no,
-                    alarm_level=alarm.alarm_level,
-                    alarm_message=alarm.alarm_message,
-                    status=alarm.status,
-                    created_at=alarm.created_at.isoformat() if alarm.created_at else None,
-                ))
+                related_alarms_list.append(
+                    RelatedAlarmItem(
+                        alarm_id=alarm.id,
+                        alarm_no=alarm.alarm_no,
+                        alarm_level=alarm.alarm_level,
+                        alarm_message=alarm.alarm_message,
+                        status=alarm.status,
+                        created_at=alarm.created_at.isoformat() if alarm.created_at else None,
+                    )
+                )
 
     # ---- 建议操作 ----
     suggestions: list[str] = []

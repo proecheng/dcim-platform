@@ -2,6 +2,7 @@
 联动动作处理器
 Story 9-1: 联动引擎核心框架
 """
+
 import logging
 import time
 from abc import ABC, abstractmethod
@@ -16,6 +17,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class ActionResult:
     """动作执行结果"""
+
     success: bool
     status: str
     error_message: Optional[str] = None
@@ -87,12 +89,14 @@ class WebhookHandler(ActionHandler):
             if event.is_test:
                 duration = int((time.time() - start) * 1000)
                 return ActionResult(
-                    success=True, status="success",
+                    success=True,
+                    status="success",
                     error_message="测试模式: 跳过实际 HTTP 请求",
                     duration_ms=duration,
                 )
 
             import httpx
+
             headers = config.get("headers", {})
             body = {
                 "event_type": event.event_type,
@@ -132,6 +136,7 @@ class VideoRecordHandler(ActionHandler):
 
     async def execute(self, config: dict, event: Event) -> ActionResult:
         import time as _time
+
         start = _time.time()
         try:
             from ..core.database import async_session
@@ -153,7 +158,8 @@ class VideoRecordHandler(ActionHandler):
                 if not cameras:
                     duration = int((_time.time() - start) * 1000)
                     return ActionResult(
-                        success=True, status="success",
+                        success=True,
+                        status="success",
                         error_message="未找到关联摄像头，跳过录像",
                         duration_ms=duration,
                     )
@@ -161,7 +167,9 @@ class VideoRecordHandler(ActionHandler):
                 # 为每个摄像头触发录像
                 for cam in cameras[:4]:  # 最多 4 路同时录像
                     await video_service.start_recording(
-                        db, cam.id, "linkage",
+                        db,
+                        cam.id,
+                        "linkage",
                         alarm_id=int(alarm_id) if alarm_id else None,
                     )
 
@@ -182,6 +190,7 @@ class VideoPopupHandler(ActionHandler):
 
     async def execute(self, config: dict, event: Event) -> ActionResult:
         import time as _time
+
         start = _time.time()
         try:
             from ..core.database import async_session
@@ -203,7 +212,8 @@ class VideoPopupHandler(ActionHandler):
             if not cameras:
                 duration = int((_time.time() - start) * 1000)
                 return ActionResult(
-                    success=True, status="success",
+                    success=True,
+                    status="success",
                     error_message="未找到关联摄像头",
                     duration_ms=duration,
                 )

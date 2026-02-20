@@ -34,12 +34,12 @@ def register_all_plugins():
 
 # 导出
 __all__ = [
-    'plugin_manager',
-    'register_all_plugins',
-    'LoadShiftingPlugin',
-    'DemandOptimizationPlugin',
-    'PowerFactorPlugin',
-    'PeakValleyOptimizationPlugin',
-    'PUEOptimizationPlugin',
-    'EquipmentEfficiencyPlugin',
+    "plugin_manager",
+    "register_all_plugins",
+    "LoadShiftingPlugin",
+    "DemandOptimizationPlugin",
+    "PowerFactorPlugin",
+    "PeakValleyOptimizationPlugin",
+    "PUEOptimizationPlugin",
+    "EquipmentEfficiencyPlugin",
 ]

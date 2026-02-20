@@ -1,4 +1,5 @@
 """数据质量相关 Schema"""
+
 from pydantic import BaseModel
 from typing import List, Optional
 from datetime import datetime

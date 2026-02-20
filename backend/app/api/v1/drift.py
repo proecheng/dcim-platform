@@ -2,6 +2,7 @@
 传感器数据漂移检测 API
 Story 9-7: 传感器数据漂移检测
 """
+
 import logging
 from typing import Optional
 
@@ -13,7 +14,9 @@ from ..deps import get_db, require_operator, require_viewer
 from ...models.user import User
 from ...models.drift import DriftDetectionResult
 from ...schemas.drift import (
-    DriftDetectionResultResponse, DriftDetectionSummary, DriftDetectResponse,
+    DriftDetectionResultResponse,
+    DriftDetectionSummary,
+    DriftDetectResponse,
 )
 from ...services import drift_detection
 
@@ -104,9 +107,7 @@ async def get_result(
     _: User = Depends(require_viewer),
 ):
     """获取单条漂移检测结果详情"""
-    result = await db.execute(
-        select(DriftDetectionResult).where(DriftDetectionResult.id == result_id)
-    )
+    result = await db.execute(select(DriftDetectionResult).where(DriftDetectionResult.id == result_id))
     record = result.scalar_one_or_none()
     if not record:
         raise HTTPException(status_code=404, detail="漂移检测记录不存在")

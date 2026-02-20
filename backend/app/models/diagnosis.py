@@ -2,6 +2,7 @@
 诊断规则模型
 Story 9-3: 智能故障诊断
 """
+
 from datetime import datetime
 from sqlalchemy import Column, Integer, String, Boolean, DateTime, Text, ForeignKey, JSON
 
@@ -10,13 +11,18 @@ from ..core.database import Base
 
 class DiagnosisRule(Base):
     """诊断规则表"""
+
     __tablename__ = "diagnosis_rules"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     rule_code = Column(String(50), unique=True, nullable=False, comment="规则编码")
     name = Column(String(100), nullable=False, comment="规则名称")
     description = Column(Text, nullable=True, comment="规则描述")
-    category = Column(String(30), nullable=False, comment="分类: temperature/humidity/power/communication/security/cooling/environment/composite")
+    category = Column(
+        String(30),
+        nullable=False,
+        comment="分类: temperature/humidity/power/communication/security/cooling/environment/composite",
+    )
     trigger_condition = Column(JSON, comment="触发条件")
     diagnosis_logic = Column(JSON, comment="诊断逻辑(含possible_causes)")
     priority = Column(Integer, default=0, comment="优先级(高优先匹配)")
@@ -28,6 +34,7 @@ class DiagnosisRule(Base):
 
 class DiagnosisResult(Base):
     """诊断结果表"""
+
     __tablename__ = "diagnosis_results"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
