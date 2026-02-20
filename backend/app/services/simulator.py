@@ -208,7 +208,7 @@ class DataSimulator:
                                 count = max(0, int(current or 0) - 1)
                                 await redis_service.set(key, str(count), ttl=86400)
                         except Exception:
-                            pass
+                            pass  # Redis 不可用时静默跳过
 
         # 更新实时值
         result = await session.execute(
@@ -334,7 +334,7 @@ class DataSimulator:
                     ttl=60
                 )
             except Exception:
-                pass
+                pass  # Redis 设备在线状态写入失败不影响主流程
 
         return {
             "point_id": point.id,

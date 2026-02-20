@@ -60,7 +60,8 @@ async def get_devices(
         query = query.where(Device.status == status)
 
     count_query = select(func.count()).select_from(query.subquery())
-    total = (await db.execute(count_query)).scalar()
+    total_result = await db.execute(count_query)
+    total = int(total_result.scalar() or 0)
 
     query = query.order_by(Device.area_code, Device.device_code)
     query = query.offset((page - 1) * page_size).limit(page_size)
@@ -69,7 +70,7 @@ async def get_devices(
 
     return PageResponse(
         items=[DeviceInfo.model_validate(d) for d in devices],
-        total=total,
+        total=int(total) if total is not None else 0,
         page=page,
         page_size=page_size
     )
@@ -134,12 +135,12 @@ async def get_status_summary(
     """
     # 总数和启用数
     total_result = await db.execute(select(func.count(Device.id)))
-    total = total_result.scalar()
+    total = int(total_result.scalar() or 0)
 
     enabled_result = await db.execute(
         select(func.count(Device.id)).where(Device.is_enabled == True)
     )
-    enabled = enabled_result.scalar()
+    enabled = int(enabled_result.scalar() or 0)
 
     # 按状态统计
     status_result = await db.execute(
@@ -192,7 +193,7 @@ async def get_status_board(
             for i, d in enumerate(devices):
                 online_map[d.id] = values[i] is not None if i < len(values) else False
         except Exception:
-            pass
+            pass  # Redis 在线状态获取失败不影响设备看板
 
     # 分组统计
     groups: dict = {}
@@ -204,7 +205,8 @@ async def get_status_board(
             effective_status = d.status
 
         summary["total"] += 1
-        summary[effective_status] = summary.get(effective_status, 0) + 1
+        eff_status_key = str(effective_status)
+        summary[eff_status_key] = summary.get(eff_status_key, 0) + 1
 
         key = f"{d.area_code}_{d.device_type}"
         if key not in groups:
@@ -220,7 +222,9 @@ async def get_status_board(
             "device_name": d.device_name,
             "status": effective_status,
         })
-        groups[key]["stats"][effective_status] = groups[key]["stats"].get(effective_status, 0) + 1
+        # 使用字符串键以避免 SQLAlchemy 相关的类型冲突
+        stat_key = eff_status_key
+        groups[key]["stats"][stat_key] = groups[key]["stats"].get(stat_key, 0) + 1
 
     return {
         "summary": summary,
@@ -328,7 +332,7 @@ async def get_device_detail(
                 "trigger_value": alarm.trigger_value,
                 "threshold_value": alarm.threshold_value,
                 "status": alarm.status,
-                "created_at": alarm.created_at.isoformat() if alarm.created_at else None,
+                "created_at": (alarm.created_at.isoformat() if alarm.created_at else None),
             })
 
     return {

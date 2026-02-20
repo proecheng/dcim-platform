@@ -69,7 +69,7 @@ async def get_system_health(
         storage_info["disk_free_gb"] = round(free / (1024**3), 2)
         storage_info["disk_usage_percent"] = round(used / total * 100, 1)
     except Exception:
-        pass
+        pass  # 磁盘信息获取失败不影响健康检查
 
     return {
         "redis": {"status": redis_status},

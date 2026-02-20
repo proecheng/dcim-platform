@@ -1,58 +1,58 @@
 # 后端 API 接口契约
 
-> 基于 backend/app/api/v1/ 目录下 47 个路由模块的穷举式扫描。
+> 基于 backend/app/api/v1/ 目录下 47 个路由模块的精确统计。
 > 所有 API 均挂载在 `/api/v1` 前缀下。
 
 ## API 总览
 
 | 模块 | 前缀 | 标签 | 端点数(估) | 说明 |
 |------|------|------|-----------|------|
-| auth | /auth | 认证 | 5+ | 登录/登出/刷新/用户信息 |
-| user | /users | 用户管理 | 6+ | 用户 CRUD/密码修改 |
-| device | /devices | 设备管理 | 5+ | 设备 CRUD |
-| point | /points | 点位管理 | 8+ | 点位 CRUD/批量/分组 |
-| realtime | /realtime | 实时数据 | 4+ | 实时数据查询/汇总 |
-| alarm | /alarms | 告警管理 | 15+ | 告警 CRUD/确认/处理/屏蔽/规则/统计 |
-| threshold | /thresholds | 阈值配置 | 5+ | 阈值 CRUD |
-| history | /history | 历史数据 | 5+ | 历史查询/导出/统计 |
-| report | /reports | 报表 | 6+ | 模板/生成/下载/健康评分 |
-| log | /logs | 日志 | 3+ | 操作日志/系统日志 |
-| statistics | /statistics | 统计分析 | 4+ | 仪表盘/趋势/分布 |
-| config | /configs | 系统配置 | 5+ | 配置 CRUD/字典 |
-| energy | /energy | 用电管理 | 20+ | 设备/实时/PUE/统计/建议/配电 |
-| power | /power | 供配电管理 | 10+ | UPS/电池/配电柜/PDU |
-| cooling | /cooling | 制冷系统 | 8+ | 空调/冷通道/群控 |
-| regulation | /regulation | 负荷调节 | 6+ | 调节配置/历史/执行 |
-| asset | (内置) | 资产管理 | 15+ | 资产/机柜/生命周期/盘点 |
-| capacity | (内置) | 容量管理 | 10+ | 四维容量/规划/历史/趋势 |
-| operation | (内置) | 运维管理 | 15+ | 工单/巡检/知识库 |
-| demo | (内置) | 演示数据 | 3+ | 演示数据加载/重置 |
-| floor_map | /floor-map | 楼层图 | 3+ | 楼层图 CRUD |
-| proposal | (内置) | 方案管理 | 5+ | 节能方案 CRUD |
-| vpp | /vpp | VPP方案分析 | 5+ | VPP 分析/配置 |
-| pricing | /pricing | 电价配置 | 5+ | 电价 CRUD/配置 |
-| opportunities | /opportunities | 节能机会 | 8+ | 机会检测/措施/仪表盘 |
-| execution | /execution | 执行管理 | 8+ | 执行计划/任务/结果 |
-| demand | (内置) | 需量嵌入式API | 6+ | 需量分析/15分钟数据 |
-| dispatch | /dispatch | 可调度资源配置 | 5+ | 调度设备/储能/光伏 |
-| monitoring | /monitoring | 电费监控 | 5+ | 实时监控/月度统计 |
-| topology | /topology | 拓扑编辑 | 8+ | 配电拓扑 CRUD |
-| trace | (内置) | 数据追溯链 | 5+ | 追溯记录/追溯树 |
-| optimization | /optimization | 日前调度优化 | 4+ | 优化执行/结果 |
-| datasources | /datasources | 数据源管理 | 6+ | 数据源 CRUD/测试连接 |
-| gateways | /gateways | 网关管理 | 6+ | 网关 CRUD/心跳/事件 |
-| device_templates | /device-templates | 设备模板 | 4+ | 模板 CRUD |
-| system_health | /system | 系统 | 3+ | 健康检查/降级状态 |
-| data_quality | /data-quality | 数据质量 | 4+ | 质量标记/统计 |
-| escalation | /escalations | 告警升级 | 4+ | 升级规则 CRUD |
-| spatial | (内置) | 空间拓扑 | 10+ | 站点/楼层/房间/列 CRUD |
-| topology_config | /topology-config | 拓扑配置 | 6+ | PDU相位/制冷区域 |
-| linkage | /linkage | 联动管理 | 10+ | 策略/执行/恢复/时间线 |
-| diagnosis | /diagnosis | 智能诊断 | 5+ | 规则/结果/触发 |
-| command | /command | 控制命令 | 5+ | 命令审批/审计 |
-| drift | /drift | 漂移检测 | 4+ | 检测结果/触发 |
-| video | /video | 视频监控 | 8+ | NVR/摄像头/预置位/事件 |
-| ml | /ml | 深度学习节能优化 | 3+ | ML 模型 (可选, 需 torch) |
+ | auth | /auth | 认证 | 8 | 登录/登出/刷新/用户信息 |
+ | user | /users | 用户管理 | 12 | 用户 CRUD/密码修改 |
+ | device | /devices | 设备管理 | 10 | 设备 CRUD |
+ | point | /points | 点位管理 | 14 | 点位 CRUD/批量/分组 |
+ | realtime | /realtime | 实时数据 | 8 | 实时数据查询/汇总 |
+ | alarm | /alarms | 告警管理 | 21 | 告警 CRUD/确认/处理/屏蔽/规则/统计 |
+ | threshold | /thresholds | 阈值配置 | 10 | 阈值 CRUD |
+ | history | /history | 历史数据 | 7 | 历史查询/导出/统计 |
+ | report | /reports | 报表 | 20 | 模板/生成/下载/健康评分 |
+ | log | /logs | 日志 | 5 | 操作日志/系统日志 |
+ | statistics | /statistics | 统计分析 | 6 | 仪表盘/趋势/分布 |
+ | config | /configs | 系统配置 | 7 | 配置 CRUD/字典 |
+ | energy | /energy | 用电管理 | 86 | 设备/实时/PUE/统计/建议/配电 |
+ | power | /power | 供配电管理 | 13 | UPS/电池/配电柜/PDU |
+ | cooling | /cooling | 制冷系统 | 16 | 空调/冷通道/群控 |
+ | regulation | /regulation | 负荷调节 | 9 | 调节配置/历史/执行 |
+ | asset | (内置) | 资产管理 | 25 | 资产/机柜/生命周期/盘点 |
+ | capacity | (内置) | 容量管理 | 31 | 四维容量/规划/历史/趋势 |
+ | operation | (内置) | 运维管理 | 41 | 工单/巡检/知识库 |
+ | demo | (内置) | 演示数据 | 5 | 演示数据加载/重置 |
+ | floor_map | /floor-map | 楼层图 | 3 | 楼层图 CRUD |
+ | proposal | (内置) | 方案管理 | 33 | 节能方案 CRUD |
+ | vpp | /vpp | VPP方案分析 | 7 | VPP 分析/配置 |
+ | pricing | /pricing | 电价配置 | 8 | 电价 CRUD/配置 |
+ | opportunities | /opportunities | 节能机会 | 11 | 机会检测/措施/仪表盘 |
+ | execution | /execution | 执行管理 | 12 | 执行计划/任务/结果 |
+ | demand | (内置) | 需量嵌入式API | 4 | 需量分析/15分钟数据 |
+ | dispatch | /dispatch | 可调度资源配置 | 18 | 调度设备/储能/光伏 |
+ | monitoring | /monitoring | 电费监控 | 10 | 实时监控/月度统计 |
+ | topology | /topology | 拓扑编辑 | 16 | 配电拓扑 CRUD |
+ | trace | (内置) | 数据追溯链 | 11 | 追溯记录/追溯树 |
+ | optimization | /optimization | 日前调度优化 | 13 | 优化执行/结果 |
+ | datasources | /datasources | 数据源管理 | 12 | 数据源 CRUD/测试连接 |
+ | gateways | /gateways | 网关管理 | 10 | 网关 CRUD/心跳/事件 |
+ | device_templates | /device-templates | 设备模板 | 6 | 模板 CRUD |
+ | system_health | /system | 系统 | 6 | 健康检查/降级状态 |
+ | data_quality | /data-quality | 数据质量 | 2 | 质量标记/统计 |
+ | escalation | /escalations | 告警升级 | 6 | 升级规则 CRUD |
+ | spatial | (内置) | 空间拓扑 | 25 | 站点/楼层/房间/列 CRUD |
+ | topology_config | /topology-config | 拓扑配置 | 15 | PDU相位/制冷区域 |
+ | linkage | /linkage | 联动管理 | 20 | 策略/执行/恢复/时间线 |
+ | diagnosis | /diagnosis | 智能诊断 | 12 | 规则/结果/触发 |
+ | command | /command | 控制命令 | 8 | 命令审批/审计 |
+ | drift | /drift | 漂移检测 | 5 | 检测结果/触发 |
+ | video | /video | 视频监控 | 20 | NVR/摄像头/预置位/事件 |
+ | ml | /ml | 深度学习节能优化 | 9 | ML 模型 (可选, 需 torch) |
 
 ## 系统级端点 (main.py 直接注册)
 

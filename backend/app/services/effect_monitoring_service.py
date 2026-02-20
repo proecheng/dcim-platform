@@ -103,7 +103,7 @@ class EffectMonitoringService:
         从监测系统获取功率数据
 
         优先从数据库获取真实数据，若无数据且启用模拟模式则生成模拟数据。
-        TODO: 当有真实数据采集系统后应从 PointRealtime 表获取
+        注意：接入真实采集系统后，应从 PointRealtime 表查询实时功率数据。
         """
         import math
         from ..core.config import get_settings
@@ -231,7 +231,7 @@ class EffectMonitoringService:
         """获取当前功率
 
         优先从数据库获取真实数据，若无数据且启用模拟模式则生成模拟数据。
-        TODO: 当有真实数据采集系统后应从 PointRealtime 表获取
+        注意：接入真实采集系统后，应从 PointRealtime 表查询实时功率数据。
         """
         import math
         from datetime import datetime

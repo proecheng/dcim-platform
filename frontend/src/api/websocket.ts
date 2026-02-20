@@ -80,7 +80,7 @@ export class WebSocketClient {
     if (!this.ws) return
 
     this.ws.onopen = () => {
-      console.log('WebSocket 已连接:', this.url)
+      if (import.meta.env.DEV) console.log('WebSocket 已连接:', this.url)
       this.reconnectAttempts = 0
       this.startHeartbeat()
       degradationFlags.websocketDown = false
@@ -88,7 +88,7 @@ export class WebSocketClient {
     }
 
     this.ws.onclose = () => {
-      console.log('WebSocket 已关闭:', this.url)
+      if (import.meta.env.DEV) console.log('WebSocket 已关闭:', this.url)
       this.stopHeartbeat()
       degradationFlags.websocketDown = true
       this.onCloseCallback?.()
@@ -168,7 +168,7 @@ export class WebSocketClient {
 
     this.reconnectAttempts++
     const delay = Math.min(1000 * Math.pow(2, this.reconnectAttempts - 1), 30000)
-    console.log(`WebSocket 将在 ${delay}ms 后重连 (${this.reconnectAttempts}/${this.maxReconnectAttempts})`)
+    if (import.meta.env.DEV) console.log(`WebSocket 将在 ${delay}ms 后重连 (${this.reconnectAttempts}/${this.maxReconnectAttempts})`)
 
     this.reconnectTimer = window.setTimeout(() => {
       this.connect()

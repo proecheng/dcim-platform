@@ -62,4 +62,4 @@ async def test_datasource_connection(
         try:
             await adapter.disconnect()
         except Exception:
-            pass
+            pass  # 断开连接失败可忽略

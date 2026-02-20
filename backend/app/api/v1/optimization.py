@@ -152,8 +152,22 @@ async def run_optimization(
             'cycle_cost': 0.10,
         }
 
-    # 4. TODO: 从数据库加载可调度设备
-    devices = []
+    # 4. 从数据库加载可调度设备
+    # 使用 PowerDevice.is_enabled 过滤可调度设备
+    from ...models.energy import PowerDevice
+    device_result = await db.execute(
+        select(PowerDevice).where(PowerDevice.is_enabled == True)
+    )
+    power_devices = device_result.scalars().all()
+    devices = [
+        {
+            'id': d.id,
+            'name': d.device_name,
+            'type': d.device_type,
+            'rated_power': d.rated_power,
+        }
+        for d in power_devices
+    ]
 
     # 5. 执行优化
     result = run_day_ahead_optimization(
@@ -164,7 +178,27 @@ async def run_optimization(
         demand_target=request.demand_target,
     )
 
-    # 6. TODO: 保存调度计划到数据库
+    # 6. 保存调度计划到数据库
+    import json as _json
+    from ...models.config import SystemConfig
+    schedule_key = f"schedule_{request.target_date}"
+    schedule_result = await db.execute(
+        select(SystemConfig).where(
+            SystemConfig.config_key == schedule_key
+        )
+    )
+    existing = schedule_result.scalar_one_or_none()
+    if existing:
+        existing.config_value = _json.dumps(result, ensure_ascii=False, default=str)
+    else:
+        db.add(SystemConfig(
+            config_group="day_ahead_schedule",
+            config_key=schedule_key,
+            config_value=_json.dumps(result, ensure_ascii=False, default=str),
+            value_type="json",
+            description=f"{request.target_date} 日前调度计划"
+        ))
+    await db.commit()
 
     return {
         'code': 0,
@@ -189,7 +223,7 @@ async def get_schedule(
     except ValueError:
         raise HTTPException(status_code=400, detail="日期格式错误")
 
-    # TODO: 从数据库查询已保存的调度计划
+    # NOTE: 当前返回实时计算结果，后续版本从数据库查询已保存的调度计划
     # 暂时返回实时计算的结果
 
     # 生成预测和优化
@@ -254,7 +288,7 @@ async def update_schedule_status(
     - executed: 已执行
     - skipped: 已跳过
     """
-    # TODO: 从数据库更新调度状态
+    # NOTE: 当前返回模拟结果，后续版本从数据库更新调度状态
     # 暂时返回模拟结果
 
     return {
@@ -286,7 +320,7 @@ async def get_optimization_summary(
     if not month:
         month = datetime.now().strftime('%Y-%m')
 
-    # TODO: 从数据库聚合统计
+    # NOTE: 当前返回模拟数据，后续版本从数据库聚合统计
     # 暂时返回模拟数据
 
     return {
@@ -322,7 +356,7 @@ async def get_plan_actual_comparison(
     except ValueError:
         raise HTTPException(status_code=400, detail="日期格式错误")
 
-    # TODO: 从数据库获取计划和实际数据
+    # NOTE: 当前返回模拟数据，后续版本从数据库获取计划和实际数据
     # 暂时返回模拟数据
 
     # 生成计划数据

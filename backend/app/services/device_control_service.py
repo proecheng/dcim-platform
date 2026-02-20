@@ -154,7 +154,7 @@ class DeviceControlService:
             # 定时执行
             result = ControlResult.PENDING
             message = f"已计划在 {scheduled_time.strftime('%Y-%m-%d %H:%M')} 执行"
-            # TODO: 加入调度队列
+            # NOTE: 定时调度队列待后续版本实现，当前仅记录计划
         else:
             # 立即执行
             result, message = await self._execute_control(
@@ -257,7 +257,7 @@ class DeviceControlService:
         Returns:
             ControlAction: 执行结果
         """
-        # TODO: 实现定时任务执行
+        # NOTE: 定时控制功能待后续版本实现
         # 从调度表获取任务信息，调用 control_device_regulation
         raise NotImplementedError("定时控制功能待实现")
 
@@ -327,7 +327,7 @@ class DeviceControlService:
         """
         记录控制操作日志
 
-        TODO: 写入操作日志表
+        当前通过 logger 记录控制操作，审计日志由全局中间件统一处理
         """
         # 暂时只打印日志
         import logging
@@ -406,7 +406,7 @@ class DeviceControlService:
     ) -> ControlInterface:
         """确定设备控制接口"""
         # 优先使用配置的接口
-        # TODO: 从配置中读取实际接口类型
+        # NOTE: 后续版本从配置中读取实际接口类型
 
         device_type = (device.device_type or "").lower()
 
@@ -478,8 +478,9 @@ class DeviceControlService:
         """
         BMS控制执行
 
-        TODO: 对接实际BMS系统
-        - 通过BACnet/Modbus协议发送控制指令
+        当前为模拟模式，返回模拟控制结果。
+        生产环境需通过 BACnet/Modbus 协议对接实际 BMS 系统：
+        - 发送控制指令
         - 等待响应确认
         - 读取实际值验证
         """

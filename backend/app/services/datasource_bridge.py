@@ -56,7 +56,7 @@ async def sync_point_data(
             })
             await redis_service.set(f"point:{point_id}:latest", cache_data, ttl=60)
         except Exception:
-            pass
+            pass  # Redis 缓存写入失败不影响数据桥接
 
 
 async def link_datasource_to_point(
