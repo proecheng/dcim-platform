@@ -78,7 +78,7 @@
             @node-click="handleNodeClick"
             @node-contextmenu="handleContextMenu"
           >
-            <template #default="{ node, data }">
+            <template #default="{ data }">
               <div class="tree-node" :class="[data.type, data.pointType ? `point-${data.pointType}` : '', { selected: selectedNode?.key === data.key, virtual: data.isVirtual }]">
                 <el-icon class="node-icon">
                   <component :is="getNodeIcon(data.type, data.pointType)" />

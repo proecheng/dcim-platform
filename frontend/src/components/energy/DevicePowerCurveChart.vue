@@ -103,7 +103,7 @@ function generateMockPowerData(): number[] {
 
   for (let hour = 0; hour < 24; hour++) {
     const period = getHourPeriod(hour)
-    let powerFactor = 1.0
+    let powerFactor: number
 
     switch (period) {
       case 'sharp':

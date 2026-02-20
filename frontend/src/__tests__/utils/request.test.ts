@@ -50,7 +50,7 @@ describe('request 工具', () => {
 
     // 使用 fetch mock 来验证请求头
     const originalGet = request.get
-    let capturedHeaders: any = null
+    const capturedHeaders: any = null
 
     // 通过拦截 axios 来验证
     // 简单验证：发送请求后检查 token 是否被设置

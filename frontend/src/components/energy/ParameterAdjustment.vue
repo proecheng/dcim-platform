@@ -247,7 +247,7 @@ const hasChanges = computed(() => {
   const defaultHours = params.default_shift_hours || 2
 
   return (
-    JSON.stringify(paramForm.selected_devices.sort()) !== JSON.stringify([...defaultDevices].sort()) ||
+    JSON.stringify([...paramForm.selected_devices].sort()) !== JSON.stringify([...defaultDevices].sort()) ||
     paramForm.shift_hours !== defaultHours ||
     paramForm.source_period !== (params.sharp_price ? 'sharp' : 'peak') ||
     paramForm.target_period !== 'valley'

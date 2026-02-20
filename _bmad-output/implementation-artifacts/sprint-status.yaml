@@ -1,4 +1,4 @@
-# generated: 2026-02-15
+# generated: 2026-02-20
 # project: DCIM
 # project_key: NOKEY
 # tracking_system: file-system
@@ -13,7 +13,7 @@
 #   cancelled     - No longer needed
 #   optional      - May be done if time permits (used for retrospectives)
 
-generated: 2026-02-15
+generated: 2026-02-20
 project: DCIM
 project_key: NOKEY
 tracking_system: file-system
@@ -28,7 +28,7 @@ development_status:
   1-4-snmp-v2c-v3-adapter: done
   1-5-connection-test: done
   1-6-dry-contact-signal-collection: done
-  epic-1-retrospective: optional
+  epic-1-retrospective: done
 
   # Epic 2: 网关管理 + MQTT 通信链路 (MVP)
   epic-2: done
@@ -38,7 +38,7 @@ development_status:
   2-4-offline-cache-and-resume: done
   2-5-mqtt-data-reporting-pipeline: done
   2-6-redis-cache-strategy: done
-  epic-2-retrospective: optional
+  epic-2-retrospective: done
 
   # Epic 3: 数据源管理 UI + 设备模板 (MVP)
   epic-3: done
@@ -47,7 +47,7 @@ development_status:
   3-3-readonly-mode-and-write-permission: done
   3-4-device-template-management: done
   3-5-integration-report-export: done
-  epic-3-retrospective: optional
+  epic-3-retrospective: done
 
   # Epic 4: 实时监控适配 (MVP)
   epic-4: done
@@ -56,7 +56,7 @@ development_status:
   4-3-device-status-board: done
   4-4-communication-interruption-detection: done
   4-5-graceful-degradation: done
-  epic-4-retrospective: optional
+  epic-4-retrospective: done
 
   # Epic 5: 告警管理增强 (MVP)
   epic-5: done
@@ -65,7 +65,7 @@ development_status:
   5-3-alarm-handling-closed-loop: done
   5-4-data-quality-marking-and-false-alarm-prevention: done
   5-5-alarm-escalation-rules-and-frontend-management: done
-  epic-5-retrospective: optional
+  epic-5-retrospective: done
 
   # Epic 6: 能源管理 (MVP + Phase 2)
   epic-6: done
@@ -74,7 +74,7 @@ development_status:
   6-3-energy-saving-opportunity-identification: done
   6-4-energy-saving-plan-execution-and-tracking: done
   6-5-energy-efficiency-report-export: done
-  epic-6-retrospective: optional
+  epic-6-retrospective: done
 
   # Epic 7: 资产与容量管理 (Phase 1.5 + Phase 2)
   epic-7: done
@@ -111,7 +111,7 @@ development_status:
   10-2-alarm-linked-video-retrieval: done
   10-3-zone-linked-recording-and-ptz-control: done
   10-4-alarm-playback: done
-  epic-10-retrospective: optional
+  epic-10-retrospective: done
 
   # Epic 11: 运维管理 (Phase 2)
   epic-11: done
@@ -120,7 +120,7 @@ development_status:
   11-3-knowledge-base: done
   11-4-alarm-auto-create-work-order: done
   11-5-work-order-approval-process: done
-  epic-11-retrospective: optional
+  epic-11-retrospective: done
 
   # Epic 12: 报表与决策支持 (Phase 2)
   epic-12: done
@@ -128,7 +128,7 @@ development_status:
   12-2-intelligent-summary-panel: done
   12-3-pdf-report-export: done
   12-4-device-health-assessment: done
-  epic-12-retrospective: optional
+  epic-12-retrospective: done
 
   # Epic 13: 用户与系统管理 (MVP)
   epic-13: done
@@ -138,7 +138,7 @@ development_status:
   13-4-data-backup-and-system-health: done
   13-5-site-level-data-isolation: done
   13-6-password-policy-management: done
-  epic-13-retrospective: optional
+  epic-13-retrospective: done
 
   # Epic 14: 棕地改进 - 代码质量与测试 (MVP)
   epic-14: done
@@ -157,14 +157,14 @@ development_status:
   15-3-bacnet-ip-adapter: done
   15-4-opc-ua-adapter: done
   15-5-ota-gateway-upgrade: done
-  epic-15-retrospective: optional
+  epic-15-retrospective: done
 
   # Epic 16: 多站点集中管理 (推广阶段)
   epic-16: done
   16-1-site-management: done
   16-2-site-switching-and-unified-view: done
   16-3-multi-site-gateway-access: done
-  epic-16-retrospective: optional
+  epic-16-retrospective: done
 
   # Epic 17: 2.5D 视觉增强 (推广阶段)
   epic-17: done
@@ -172,4 +172,4 @@ development_status:
   17-2-dashboard-overview-25d-enhancement: done
   17-3-list-form-25d-enhancement: done
   17-4-special-page-25d-enhancement: done
-  epic-17-retrospective: optional
+  epic-17-retrospective: done

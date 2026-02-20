@@ -839,7 +839,7 @@ import { getPointList, type PointInfo } from '@/api/modules/point'
 import { useAlarm } from '@/composables/useAlarm'
 
 // WebSocket 订阅（不自动拉取数据，不播放声音/通知，仅订阅消息）
-const { } = useAlarm({ autoFetch: false, autoSubscribe: true, playSound: false, showNotification: false })
+useAlarm({ autoFetch: false, autoSubscribe: true, playSound: false, showNotification: false })
 
 // ==================== 标签页 ====================
 const activeTab = ref('records')

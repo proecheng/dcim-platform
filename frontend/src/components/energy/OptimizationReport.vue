@@ -140,7 +140,7 @@
               </div>
             </div>
             <div class="metric-item">
-              <div class="metric-label">准确率 (偏差<10%)</div>
+              <div class="metric-label">准确率 (偏差&lt;10%)</div>
               <div class="metric-value">{{ report?.forecast_quality?.accuracy_rate || 0 }}%</div>
               <div class="metric-bar">
                 <el-progress
