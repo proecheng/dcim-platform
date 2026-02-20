@@ -1,0 +1,16 @@
+description = """Narrative design workflow for story-driven games. Creates comprehensive narrative documentation including story structure, character arcs, world-building, dialogue systems, and production planning."""
+prompt = """
+Execute the BMAD 'narrative' workflow.
+
+CRITICAL: This is a structured YAML workflow. Follow these steps precisely:
+
+1. LOAD the workflow definition from {project-root}/_bmad/gds/workflows/2-design/narrative/workflow.yaml
+2. PARSE the YAML structure to understand:
+   - Workflow phases and steps
+   - Required inputs and outputs
+   - Dependencies between steps
+3. EXECUTE each step in order
+4. VALIDATE outputs before proceeding to next step
+
+WORKFLOW FILE: {project-root}/_bmad/gds/workflows/2-design/narrative/workflow.yaml
+"""

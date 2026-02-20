@@ -1,0 +1,14 @@
+description = """Creates a comprehensive Game Brief through collaborative step-by-step discovery to capture game vision before detailed design."""
+prompt = """
+Execute the BMAD 'create-game-brief' workflow.
+
+CRITICAL: You must load and follow the workflow definition exactly.
+
+WORKFLOW INSTRUCTIONS:
+1. LOAD the workflow file from {project-root}/_bmad/gds/workflows/1-preproduction/game-brief/workflow.md
+2. READ its entire contents
+3. FOLLOW every step precisely as specified
+4. DO NOT skip or modify any steps
+
+WORKFLOW FILE: {project-root}/_bmad/gds/workflows/1-preproduction/game-brief/workflow.md
+"""
