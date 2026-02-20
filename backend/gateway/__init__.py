@@ -1,1 +1,1 @@
-# gateway stub for development
+"""采集网关模块"""
