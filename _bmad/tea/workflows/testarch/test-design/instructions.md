@@ -51,6 +51,13 @@ From `workflow.yaml`, resolve:
 Load, read completely, and execute:
 `{project-root}/_bmad/tea/workflows/testarch/test-design/steps-c/step-01-detect-mode.md`
 
+### 3. Resume Support
+
+If the user selects **Resume** mode, load, read completely, and execute:
+`{project-root}/_bmad/tea/workflows/testarch/test-design/steps-c/step-01b-resume.md`
+
+This checks the output document for progress tracking frontmatter and routes to the next incomplete step.
+
 ---
 
 ## OUTPUT GENERATION GUIDANCE

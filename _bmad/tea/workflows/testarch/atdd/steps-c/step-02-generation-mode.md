@@ -1,6 +1,7 @@
 ---
 name: 'step-02-generation-mode'
 description: 'Choose AI generation or recording mode'
+outputFile: '{test_artifacts}/atdd-checklist-{story_id}.md'
 nextStepFile: './step-03-test-strategy.md'
 ---
 
@@ -80,6 +81,30 @@ If `none`:
 ## 3. Confirm Mode
 
 State the chosen mode and why. Then proceed.
+
+---
+
+## 4. Save Progress
+
+**Save this step's accumulated work to `{outputFile}`.**
+
+- **If `{outputFile}` does not exist** (first save), create it with YAML frontmatter:
+
+  ```yaml
+  ---
+  stepsCompleted: ['step-02-generation-mode']
+  lastStep: 'step-02-generation-mode'
+  lastSaved: '{date}'
+  ---
+  ```
+
+  Then write this step's output below the frontmatter.
+
+- **If `{outputFile}` already exists**, update:
+  - Add `'step-02-generation-mode'` to `stepsCompleted` array (only if not already present)
+  - Set `lastStep: 'step-02-generation-mode'`
+  - Set `lastSaved: '{date}'`
+  - Append this step's output to the appropriate section.
 
 Load next step: `{nextStepFile}`
 

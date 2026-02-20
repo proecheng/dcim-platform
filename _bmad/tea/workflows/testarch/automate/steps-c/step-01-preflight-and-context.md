@@ -1,6 +1,7 @@
 ---
 name: 'step-01-preflight-and-context'
 description: 'Determine mode, verify framework, and load context and knowledge'
+outputFile: '{test_artifacts}/automation-summary.md'
 nextStepFile: './step-02-identify-targets.md'
 knowledgeIndex: '{project-root}/_bmad/tea/testarch/tea-index.csv'
 ---
@@ -121,6 +122,30 @@ Use `{knowledgeIndex}` and load only what is required.
 ## 5. Confirm Inputs
 
 Summarize loaded artifacts, framework, and knowledge fragments, then proceed.
+
+---
+
+## 6. Save Progress
+
+**Save this step's accumulated work to `{outputFile}`.**
+
+- **If `{outputFile}` does not exist** (first save), create it with YAML frontmatter:
+
+  ```yaml
+  ---
+  stepsCompleted: ['step-01-preflight-and-context']
+  lastStep: 'step-01-preflight-and-context'
+  lastSaved: '{date}'
+  ---
+  ```
+
+  Then write this step's output below the frontmatter.
+
+- **If `{outputFile}` already exists**, update:
+  - Add `'step-01-preflight-and-context'` to `stepsCompleted` array (only if not already present)
+  - Set `lastStep: 'step-01-preflight-and-context'`
+  - Set `lastSaved: '{date}'`
+  - Append this step's output to the appropriate section.
 
 Load next step: `{nextStepFile}`
 

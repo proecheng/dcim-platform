@@ -1,3 +1,9 @@
+---
+stepsCompleted: []
+lastStep: ''
+lastSaved: ''
+---
+
 # Test Design for QA: {Feature Name}
 
 **Purpose:** Test execution recipe for QA team. Defines what to test, how to test it, and what QA needs from other teams.

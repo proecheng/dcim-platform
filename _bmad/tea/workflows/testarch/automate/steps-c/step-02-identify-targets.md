@@ -1,6 +1,7 @@
 ---
 name: 'step-02-identify-targets'
 description: 'Identify automation targets and create coverage plan'
+outputFile: '{test_artifacts}/automation-summary.md'
 nextStepFile: './step-03-generate-tests.md'
 ---
 
@@ -93,6 +94,30 @@ Produce a concise coverage plan:
 - Targets by test level
 - Priority assignments
 - Justification for coverage scope (critical-paths/comprehensive/selective)
+
+---
+
+## 5. Save Progress
+
+**Save this step's accumulated work to `{outputFile}`.**
+
+- **If `{outputFile}` does not exist** (first save), create it with YAML frontmatter:
+
+  ```yaml
+  ---
+  stepsCompleted: ['step-02-identify-targets']
+  lastStep: 'step-02-identify-targets'
+  lastSaved: '{date}'
+  ---
+  ```
+
+  Then write this step's output below the frontmatter.
+
+- **If `{outputFile}` already exists**, update:
+  - Add `'step-02-identify-targets'` to `stepsCompleted` array (only if not already present)
+  - Set `lastStep: 'step-02-identify-targets'`
+  - Set `lastSaved: '{date}'`
+  - Append this step's output to the appropriate section.
 
 Load next step: `{nextStepFile}`
 

@@ -3,6 +3,7 @@ name: 'step-02-load-context'
 description: 'Load documents, configuration, and knowledge fragments for the chosen mode'
 nextStepFile: './step-03-risk-and-testability.md'
 knowledgeIndex: '{project-root}/_bmad/tea/testarch/tea-index.csv'
+outputFile: '{test_artifacts}/test-design-progress.md'
 ---
 
 # Step 2: Load Context & Knowledge Base
@@ -138,6 +139,30 @@ Use `{knowledgeIndex}` to select and load only relevant fragments.
 ## 5. Confirm Loaded Inputs
 
 Summarize what was loaded and confirm with the user if anything is missing.
+
+---
+
+### 6. Save Progress
+
+**Save this step's accumulated work to `{outputFile}`.**
+
+- **If `{outputFile}` does not exist** (first save), create it with YAML frontmatter:
+
+  ```yaml
+  ---
+  stepsCompleted: ['step-02-load-context']
+  lastStep: 'step-02-load-context'
+  lastSaved: '{date}'
+  ---
+  ```
+
+  Then write this step's output below the frontmatter.
+
+- **If `{outputFile}` already exists**, update:
+  - Add `'step-02-load-context'` to `stepsCompleted` array (only if not already present)
+  - Set `lastStep: 'step-02-load-context'`
+  - Set `lastSaved: '{date}'`
+  - Append this step's output to the appropriate section of the document.
 
 Load next step: `{nextStepFile}`
 
