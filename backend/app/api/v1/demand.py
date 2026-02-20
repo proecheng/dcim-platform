@@ -231,7 +231,7 @@ async def get_load_period_distribution(
 
     # 获取电价时段配置
     pricing_result = await db.execute(
-        select(ElectricityPricing).where(ElectricityPricing.is_active == True)
+        select(ElectricityPricing).where(ElectricityPricing.is_enabled == True)
     )
     pricing_records = pricing_result.scalars().all()
 
@@ -260,8 +260,8 @@ async def get_load_period_distribution(
 
     query = select(PowerCurveData).where(
         and_(
-            PowerCurveData.record_time >= start_time,
-            PowerCurveData.record_time <= end_time
+            PowerCurveData.timestamp >= start_time,
+            PowerCurveData.timestamp <= end_time
         )
     )
 
@@ -285,10 +285,10 @@ async def get_load_period_distribution(
         # 按小时分组
         hour_powers = {}
         for r in records:
-            hour = r.record_time.hour
+            hour = r.timestamp.hour
             if hour not in hour_powers:
                 hour_powers[hour] = []
-            hour_powers[hour].append(r.power or 0)
+            hour_powers[hour].append(r.active_power or 0)
 
         for hour in range(24):
             period = period_map.get(hour, 'flat')
@@ -379,18 +379,18 @@ async def get_power_factor_trend(
 
     # 查询功率因数数据（假设 PowerCurveData 有 power_factor 字段）
     query = select(
-        func.date(PowerCurveData.record_time).label('date'),
+        func.date(PowerCurveData.timestamp).label('date'),
         func.avg(PowerCurveData.power_factor).label('avg_pf'),
         func.min(PowerCurveData.power_factor).label('min_pf'),
         func.max(PowerCurveData.power_factor).label('max_pf')
     ).where(
         and_(
-            PowerCurveData.record_time >= start_date,
-            PowerCurveData.record_time <= end_date,
+            PowerCurveData.timestamp >= start_date,
+            PowerCurveData.timestamp <= end_date,
             PowerCurveData.power_factor.isnot(None),
             PowerCurveData.power_factor > 0
         )
-    ).group_by(func.date(PowerCurveData.record_time))
+    ).group_by(func.date(PowerCurveData.timestamp))
 
     if meter_point_id:
         query = query.where(PowerCurveData.meter_point_id == meter_point_id)

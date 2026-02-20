@@ -311,30 +311,20 @@ class TestDemandAPI:
         assert body["data"]["max_value"] > 0
 
     async def test_get_load_period(self, client, admin_user, async_db):
-        """GET /demand/load-period — 端点存在已知模型属性缺陷(is_active)，验证可达性"""
+        """GET /demand/load-period — 负荷时段分布"""
         _, token = admin_user
-        try:
-            resp = await client.get("/api/v1/demand/load-period", headers=auth_headers(token))
-            # 如果源码缺陷已修复，应返回200
-            assert resp.status_code in (200, 500)
-        except (AttributeError, Exception):
-            # ElectricityPricing.is_active 不存在 — 已知源码缺陷，ASGI层抛出异常
-            pytest.xfail("已知源码缺陷: ElectricityPricing.is_active 属性不存在")
+        resp = await client.get("/api/v1/demand/load-period", headers=auth_headers(token))
+        assert resp.status_code == 200
 
     async def test_get_power_factor_trend(self, client, admin_user, async_db):
-        """GET /demand/power-factor-trend — 端点存在已知模型属性缺陷(record_time)，验证可达性"""
+        """GET /demand/power-factor-trend — 功率因数趋势"""
         _, token = admin_user
-        try:
-            resp = await client.get(
-                "/api/v1/demand/power-factor-trend",
-                params={"days": 7},
-                headers=auth_headers(token),
-            )
-            # 如果源码缺陷已修复，应返回200
-            assert resp.status_code in (200, 500)
-        except (AttributeError, Exception):
-            # PowerCurveData.record_time 不存在 — 已知源码缺陷，ASGI层抛出异常
-            pytest.xfail("已知源码缺陷: PowerCurveData.record_time 属性不存在")
+        resp = await client.get(
+            "/api/v1/demand/power-factor-trend",
+            params={"days": 7},
+            headers=auth_headers(token),
+        )
+        assert resp.status_code == 200
 
 
 # ============== Power API Tests ==============
