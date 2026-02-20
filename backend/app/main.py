@@ -344,9 +344,9 @@ async def lifespan(app: FastAPI):
 
     effect_tracking_task = asyncio.create_task(_effect_tracking_loop())
 
-    print(f"{'='*50}")
+    print(f"{'=' * 50}")
     print(f"{settings.app_name} v{settings.app_version} 启动成功")
-    print(f"{'='*50}")
+    print(f"{'=' * 50}")
     print("数据模拟器已启动，每5秒采集一次")
     print("告警引擎已加载阈值缓存")
     print("联动引擎已加载策略缓存")

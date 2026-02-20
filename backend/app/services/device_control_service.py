@@ -416,7 +416,7 @@ class DeviceControlService:
         # 模拟执行成功
         return (
             ControlResult.SIMULATED,
-            f"[模拟] {device.device_name} {config.regulation_type} " f"已调节至 {target_value}{config.unit or ''}",
+            f"[模拟] {device.device_name} {config.regulation_type} 已调节至 {target_value}{config.unit or ''}",
         )
 
     async def _execute_bms_control(
@@ -434,5 +434,5 @@ class DeviceControlService:
         # 暂时返回模拟结果
         return (
             ControlResult.SIMULATED,
-            f"[BMS模拟] {device.device_name} {config.regulation_type} " f"已调节至 {target_value}{config.unit or ''}",
+            f"[BMS模拟] {device.device_name} {config.regulation_type} 已调节至 {target_value}{config.unit or ''}",
         )

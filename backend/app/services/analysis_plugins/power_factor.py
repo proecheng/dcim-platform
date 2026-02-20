@@ -146,7 +146,7 @@ class PowerFactorPlugin(AnalysisPlugin):
 
 ### 电费影响分析
 - 功率因数考核基准: {penalty_threshold}
-- 当前状态: {'存在罚款风险' if avg_pf < penalty_threshold else '正常'}
+- 当前状态: {"存在罚款风险" if avg_pf < penalty_threshold else "正常"}
 - 月均罚款估算: ¥{monthly_penalty:.0f}
 - 年罚款损失: ¥{yearly_penalty:.0f}
 
@@ -167,7 +167,7 @@ class PowerFactorPlugin(AnalysisPlugin):
 ### 投资回报分析
 - 设备投资: ¥{investment:.0f}
 - 年节省电费: ¥{total_benefit:.0f}
-- 投资回报期: {investment/total_benefit*12:.1f} 个月
+- 投资回报期: {investment / total_benefit * 12:.1f} 个月
 
 ### 功率因数低的设备
 {chr(10).join([f"- {p.device_name}: PF={p.power_factor:.3f}" for p in sorted(context.power_data, key=lambda x: x.power_factor)[:5]])}

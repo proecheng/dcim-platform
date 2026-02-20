@@ -413,7 +413,7 @@ class DemandAnalysisService:
                 risk_level="high",
                 confidence=0.95,
                 description=f"当前申报需量{stats.declared_demand:.0f}kW，"
-                f"实际已超{(stats.utilization_rate-1)*100:.1f}%，"
+                f"实际已超{(stats.utilization_rate - 1) * 100:.1f}%，"
                 f"存在超需量罚款风险",
             )
 

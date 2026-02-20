@@ -111,7 +111,7 @@ class PeakValleyOptimizationPlugin(AnalysisPlugin):
 | 时段 | 电量占比 | 理想占比 | 电价 |
 |------|----------|----------|------|
 | 峰时 | {peak_ratio:.1%} | {ideal_peak:.1%} | ¥{peak_price}/kWh |
-| 平时 | {flat_ratio:.1%} | {1-ideal_peak-ideal_valley:.1%} | ¥{flat_price}/kWh |
+| 平时 | {flat_ratio:.1%} | {1 - ideal_peak - ideal_valley:.1%} | ¥{flat_price}/kWh |
 | 谷时 | {valley_ratio:.1%} | {ideal_valley:.1%} | ¥{valley_price}/kWh |
 
 ### 电价分析
@@ -191,7 +191,7 @@ class PeakValleyOptimizationPlugin(AnalysisPlugin):
 
 ### 储能系统配置建议
 - 储能容量: {storage_capacity:.0f} kWh
-- 功率配置: {storage_capacity/4:.0f} kW (4小时放电)
+- 功率配置: {storage_capacity / 4:.0f} kW (4小时放电)
 - 系统效率: 85%
 
 ### 投资收益分析

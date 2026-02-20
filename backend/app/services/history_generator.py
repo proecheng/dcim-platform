@@ -123,7 +123,7 @@ class HistoryGenerator:
                         batch_records = []
 
                 if (i + 1) % 50 == 0:
-                    print(f"  已处理 {i+1}/{len(points)} 个点位")
+                    print(f"  已处理 {i + 1}/{len(points)} 个点位")
 
             # 写入剩余记录
             if batch_records:
@@ -167,7 +167,7 @@ class HistoryGenerator:
                 # 每天提交一次
                 await session.commit()
                 if (day_offset + 1) % 5 == 0:
-                    print(f"  已生成 {day_offset+1}/{self.days} 天能耗数据")
+                    print(f"  已生成 {day_offset + 1}/{self.days} 天能耗数据")
 
             print("能耗历史数据生成完成")
 

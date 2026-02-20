@@ -114,14 +114,14 @@ class PUEOptimizationPlugin(AnalysisPlugin):
 | 平均PUE | {avg_pue:.2f} | {pue_level} |
 | 最低PUE | {min_pue:.2f} | - |
 | 最高PUE | {max_pue:.2f} | - |
-| PUE波动 | ±{pue_std:.2f} | {'稳定' if pue_std < 0.1 else '波动较大'} |
+| PUE波动 | ±{pue_std:.2f} | {"稳定" if pue_std < 0.1 else "波动较大"} |
 
 ### 功率分布
 | 类别 | 功率(kW) | 占比 |
 |------|----------|------|
-| IT负载 | {avg_it_power:.1f} | {avg_it_power/avg_total_power*100:.1f}% |
-| 制冷系统 | {avg_cooling_power:.1f} | {cooling_ratio*100:.1f}% |
-| 其他 | {avg_total_power-avg_it_power-avg_cooling_power:.1f} | {(1-avg_it_power/avg_total_power-cooling_ratio)*100:.1f}% |
+| IT负载 | {avg_it_power:.1f} | {avg_it_power / avg_total_power * 100:.1f}% |
+| 制冷系统 | {avg_cooling_power:.1f} | {cooling_ratio * 100:.1f}% |
+| 其他 | {avg_total_power - avg_it_power - avg_cooling_power:.1f} | {(1 - avg_it_power / avg_total_power - cooling_ratio) * 100:.1f}% |
 | 总功率 | {avg_total_power:.1f} | 100% |
 
 ### PUE等级标准
@@ -247,7 +247,7 @@ class PUEOptimizationPlugin(AnalysisPlugin):
 ### 当前状态
 - PUE范围: {min_pue:.2f} ~ {max_pue:.2f}
 - 标准差: {pue_std:.2f}
-- 波动幅度: {(max_pue-min_pue)/avg_pue*100:.1f}%
+- 波动幅度: {(max_pue - min_pue) / avg_pue * 100:.1f}%
 
 ### 可能原因
 1. IT负载波动大

@@ -190,10 +190,10 @@ class TemplateGenerator:
             },
             calculation_formula=f"""
 【计算步骤】
-1. 日转移电量 = {shiftable_power} kW × {shift_hours} h = {benefit['日转移电量']} kWh
+1. 日转移电量 = {shiftable_power} kW × {shift_hours} h = {benefit["日转移电量"]} kWh
 2. 价差 = {sharp_price} - {valley_price} = {sharp_price - valley_price} 元/kWh
-3. 日收益 = {benefit['日转移电量']} kWh × {sharp_price - valley_price} 元/kWh = {benefit['日收益']} 元
-4. 年收益 = {benefit['日收益']} 元 × 300天 = {benefit['年收益']} 万元
+3. 日收益 = {benefit["日转移电量"]} kWh × {sharp_price - valley_price} 元/kWh = {benefit["日收益"]} 元
+4. 年收益 = {benefit["日收益"]} 元 × 300天 = {benefit["年收益"]} 万元
             """.strip(),
             calculation_basis=f"基于过去{analysis_days}天尖峰时段平均负荷数据，热处理预热工序功率约{shiftable_power}kW",
             annual_benefit=benefit["年收益"],
@@ -245,10 +245,10 @@ class TemplateGenerator:
             },
             calculation_formula=f"""
 【计算步骤】
-1. 日转移电量 = {shiftable_power} kW × {shift_hours} h = {benefit['日转移电量']} kWh
+1. 日转移电量 = {shiftable_power} kW × {shift_hours} h = {benefit["日转移电量"]} kWh
 2. 价差 = {peak_price} - {flat_price} = {peak_price - flat_price} 元/kWh
-3. 日收益 = {benefit['日转移电量']} kWh × {peak_price - flat_price} 元/kWh = {benefit['日收益']} 元
-4. 年收益 = {benefit['日收益']} 元 × 300天 = {benefit['年收益']} 万元
+3. 日收益 = {benefit["日转移电量"]} kWh × {peak_price - flat_price} 元/kWh = {benefit["日收益"]} 元
+4. 年收益 = {benefit["日收益"]} 元 × 300天 = {benefit["年收益"]} 万元
             """.strip(),
             calculation_basis=f"基于过去{analysis_days}天高峰时段辅助设备运行数据",
             annual_benefit=benefit["年收益"],
@@ -300,10 +300,10 @@ class TemplateGenerator:
             },
             calculation_formula=f"""
 【计算步骤】
-1. 日转移电量 = {shiftable_power} kW × {shift_hours} h = {benefit['日转移电量']} kWh
+1. 日转移电量 = {shiftable_power} kW × {shift_hours} h = {benefit["日转移电量"]} kWh
 2. 价差 = {sharp_price} - {valley_price} = {sharp_price - valley_price} 元/kWh
-3. 日收益 = {benefit['日转移电量']} kWh × {sharp_price - valley_price} 元/kWh = {benefit['日收益']} 元
-4. 年收益 = {benefit['日收益']} 元 × 300天 = {benefit['年收益']} 万元
+3. 日收益 = {benefit["日转移电量"]} kWh × {sharp_price - valley_price} 元/kWh = {benefit["日收益"]} 元
+4. 年收益 = {benefit["日收益"]} 元 × 300天 = {benefit["年收益"]} 万元
 
 【技术说明】
 - 现有储气罐容积可支持4小时缓冲
@@ -410,12 +410,12 @@ class TemplateGenerator:
             calculation_formula=f"""
 【计算步骤】
 1. 需量降低量 = {current_demand} - {recommended_demand} = {current_demand - recommended_demand} kW
-2. 月节省 = {current_demand - recommended_demand} kW × {demand_price} 元/kW·月 = {demand_data['月节省']} 万元
-3. 年节省 = {demand_data['月节省']} 万元 × 12月 = {annual_saving} 万元
+2. 月节省 = {current_demand - recommended_demand} kW × {demand_price} 元/kW·月 = {demand_data["月节省"]} 万元
+3. 年节省 = {demand_data["月节省"]} 万元 × 12月 = {annual_saving} 万元
 
 【依据说明】
 - 建议申报需量 = 历史95分位需量 × 1.05（安全余量）
-- 历史95分位需量: {demand_data['历史95分位']} kW
+- 历史95分位需量: {demand_data["历史95分位"]} kW
 - 安全余量5%可应对偶发性高峰
             """.strip(),
             calculation_basis="基于近3个月需量历史数据统计分析，95%的时间需量不会超过建议值",
@@ -805,10 +805,10 @@ class TemplateGenerator:
             },
             calculation_formula=f"""
 【计算步骤】
-1. 注册容量 = {capacity} kW = {capacity / Decimal('1000')} MW
+1. 注册容量 = {capacity} kW = {capacity / Decimal("1000")} MW
 2. 补偿标准 = 600 元/MW·次
 3. 年响应次数 = {response_count} 次
-4. 年收益 = {capacity / Decimal('1000')} MW × 600元/MW·次 × {response_count}次 = {annual_benefit} 万元
+4. 年收益 = {capacity / Decimal("1000")} MW × 600元/MW·次 × {response_count}次 = {annual_benefit} 万元
 
 【响应机制】
 - 接到指令后5分钟内完成负荷削减
@@ -816,8 +816,8 @@ class TemplateGenerator:
 - 响应方式：办公区域照明降低30%、空调温度上调2℃
 
 【资源清单】
-- 办公照明系统：约{float(capacity * Decimal('0.4'))} kW
-- 空调系统：约{float(capacity * Decimal('0.6'))} kW
+- 办公照明系统：约{float(capacity * Decimal("0.4"))} kW
+- 空调系统：约{float(capacity * Decimal("0.6"))} kW
             """.strip(),
             calculation_basis="基于虚拟电厂市场规则和补偿标准（上海、江苏等地市场数据）",
             annual_benefit=annual_benefit,
@@ -857,10 +857,10 @@ class TemplateGenerator:
             },
             calculation_formula=f"""
 【计算步骤】
-1. 注册容量 = {capacity} kW = {capacity / Decimal('1000')} MW
+1. 注册容量 = {capacity} kW = {capacity / Decimal("1000")} MW
 2. 补偿标准 = 300 元/MW·次
 3. 年响应次数 = {response_count} 次
-4. 年收益 = {capacity / Decimal('1000')} MW × 300元/MW·次 × {response_count}次 = {annual_benefit} 万元
+4. 年收益 = {capacity / Decimal("1000")} MW × 300元/MW·次 × {response_count}次 = {annual_benefit} 万元
 
 【响应机制】
 - 接到指令后15分钟内完成负荷调整
@@ -870,8 +870,8 @@ class TemplateGenerator:
   * 循环水泵：降低转速或暂停备用泵
 
 【资源清单】
-- 空压机系统：约{float(capacity * Decimal('0.6'))} kW
-- 循环水泵：约{float(capacity * Decimal('0.4'))} kW
+- 空压机系统：约{float(capacity * Decimal("0.6"))} kW
+- 循环水泵：约{float(capacity * Decimal("0.4"))} kW
             """.strip(),
             calculation_basis="基于VPP市场Ⅱ级资源补偿标准",
             annual_benefit=annual_benefit,
@@ -911,10 +911,10 @@ class TemplateGenerator:
             },
             calculation_formula=f"""
 【计算步骤】
-1. 注册容量 = {capacity} kW = {capacity / Decimal('1000')} MW
+1. 注册容量 = {capacity} kW = {capacity / Decimal("1000")} MW
 2. 补偿标准 = 200 元/MW·次
 3. 年响应次数 = {response_count} 次
-4. 年收益 = {capacity / Decimal('1000')} MW × 200元/MW·次 × {response_count}次 = {annual_benefit} 万元
+4. 年收益 = {capacity / Decimal("1000")} MW × 200元/MW·次 × {response_count}次 = {annual_benefit} 万元
 
 【响应机制】
 - 提前4小时接到通知
@@ -925,8 +925,8 @@ class TemplateGenerator:
   * 设备维护保养窗口调整
 
 【资源清单】
-- 热处理生产线：约{float(capacity * Decimal('0.7'))} kW
-- 辅助生产设备：约{float(capacity * Decimal('0.3'))} kW
+- 热处理生产线：约{float(capacity * Decimal("0.7"))} kW
+- 辅助生产设备：约{float(capacity * Decimal("0.3"))} kW
 
 【业务保障】
 - 不影响紧急订单生产
@@ -1173,9 +1173,9 @@ class TemplateGenerator:
 - 负荷转移：灵活安排可转移负荷时段
 
 【监控指标】
-- 日负荷率目标：≥ {float(load_curve['负荷率']) + 8}%
-- 峰谷差目标：≤ {float(load_curve['峰谷差']) * 0.85} kW
-- 峰谷比目标：≤ {float(load_curve['峰谷比']) * 0.9}
+- 日负荷率目标：≥ {float(load_curve["负荷率"]) + 8}%
+- 峰谷差目标：≤ {float(load_curve["峰谷差"]) * 0.85} kW
+- 峰谷比目标：≤ {float(load_curve["峰谷比"]) * 0.9}
             """.strip(),
             calculation_basis="基于负荷曲线特征分析和填谷削峰潜力评估",
             annual_benefit=estimated_benefit,
@@ -1283,9 +1283,9 @@ class TemplateGenerator:
             calculation_formula=f"""
 【计算步骤】
 1. 平均节省功率：
-   - 老设备：{old_power} kW × 85% = {old_power * Decimal('0.85')} kW
-   - 新设备：{new_power} kW × 75% = {new_power * Decimal('0.75')} kW
-   - 节省功率 = {old_power * Decimal('0.85')} - {new_power * Decimal('0.75')} = {saved_power} kW
+   - 老设备：{old_power} kW × 85% = {old_power * Decimal("0.85")} kW
+   - 新设备：{new_power} kW × 75% = {new_power * Decimal("0.75")} kW
+   - 节省功率 = {old_power * Decimal("0.85")} - {new_power * Decimal("0.75")} = {saved_power} kW
 
 2. 年节省电量 = {saved_power} kW × {annual_hours} h = {saved_power * annual_hours} kWh
 
@@ -1340,9 +1340,9 @@ class TemplateGenerator:
 【计算步骤】
 1. 单台节省功率 = {pump_power} kW × 80%负载率 × {float(energy_saving_ratio * 100)}%节能率 = {saved_power} kW
 
-2. 2台年节省电量 = {saved_power} kW × 2台 × {annual_hours} h = {saved_power * Decimal('2') * annual_hours} kWh
+2. 2台年节省电量 = {saved_power} kW × 2台 × {annual_hours} h = {saved_power * Decimal("2") * annual_hours} kWh
 
-3. 年节省金额 = {saved_power * Decimal('2') * annual_hours} kWh × {avg_price} 元/kWh = {annual_saving} 万元
+3. 年节省金额 = {saved_power * Decimal("2") * annual_hours} kWh × {avg_price} 元/kWh = {annual_saving} 万元
 
 4. 投资回收期 = {investment} 万元 ÷ {annual_saving} 万元/年 = {payback_period} 年
 
@@ -1403,14 +1403,14 @@ class TemplateGenerator:
 
 2. 年节省电量 = {saved_power} kW × {annual_hours} h = {saved_power * annual_hours} kWh
 
-3. 年节省电费 = {saved_power * annual_hours} kWh × {avg_price} 元/kWh = {float(saved_power * annual_hours * avg_price / Decimal('10000'))} 万元
+3. 年节省电费 = {saved_power * annual_hours} kWh × {avg_price} 元/kWh = {float(saved_power * annual_hours * avg_price / Decimal("10000"))} 万元
 
 4. 维护成本节省：
    - 传统灯具更换频次高，年维护约0.7万元
    - LED灯具寿命长，年维护约0.2万元
    - 年节省维护成本：0.5万元
 
-5. 年总收益 = {float(saved_power * annual_hours * avg_price / Decimal('10000'))} + 0.5 = {annual_saving} 万元
+5. 年总收益 = {float(saved_power * annual_hours * avg_price / Decimal("10000"))} + 0.5 = {annual_saving} 万元
 
 6. 投资回收期 = {investment} 万元 ÷ {annual_saving} 万元/年 = {payback_period} 年
 

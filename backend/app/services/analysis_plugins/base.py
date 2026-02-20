@@ -488,7 +488,7 @@ class AnalysisPlugin(ABC):
         # 检查能耗数据天数
         if len(context.energy_data) < self._config.min_data_days:
             self._logger.warning(
-                f"能耗数据不足: 需要 {self._config.min_data_days} 天, " f"实际 {len(context.energy_data)} 天"
+                f"能耗数据不足: 需要 {self._config.min_data_days} 天, 实际 {len(context.energy_data)} 天"
             )
             return False
         return True

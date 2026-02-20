@@ -152,7 +152,7 @@ class DemandOptimizationPlugin(AnalysisPlugin):
 - 编码: {meter_point.meter_code}
 - 名称: {meter_point.meter_name}
 - 当前申报需量: {declared_demand:.0f} {meter_point.demand_type}
-- 变压器: {meter_point.transformer_name or '未配置'}
+- 变压器: {meter_point.transformer_name or "未配置"}
 
 ### 历史需量统计 (近{len(demand_history)}月)
 - 最大需量: {max_demand_12m:.1f} kW
@@ -163,7 +163,7 @@ class DemandOptimizationPlugin(AnalysisPlugin):
 
 ### 优化建议
 - **建议申报需量**: {recommended_demand:.0f} {meter_point.demand_type}
-- 安全裕度: {safety_margin*100:.0f}%
+- 安全裕度: {safety_margin * 100:.0f}%
 - 优化类型: 降低申报需量
 
 ### 效益分析
@@ -172,8 +172,8 @@ class DemandOptimizationPlugin(AnalysisPlugin):
 - **年节省需量电费: ¥{yearly_saving:.0f}**
 
 ### 风险评估
-- 风险等级: {'低' if risk_level == 'low' else '中'}
-- 风险说明: {'需量利用率较低，降低申报风险较小' if risk_level == 'low' else '建议保留适当裕度'}
+- 风险等级: {"低" if risk_level == "low" else "中"}
+- 风险说明: {"需量利用率较低，降低申报风险较小" if risk_level == "low" else "建议保留适当裕度"}
 
 ### 实施步骤
 1. 向供电局提交需量变更申请
@@ -218,7 +218,7 @@ class DemandOptimizationPlugin(AnalysisPlugin):
                 results.append(
                     self.create_suggestion(
                         title=f"提高计量点{meter_point.meter_code}申报需量",
-                        description=f"当前申报需量{declared_demand:.0f}kW，实际已超{(utilization_rate-1)*100:.1f}%，存在超需量罚款风险",
+                        description=f"当前申报需量{declared_demand:.0f}kW，实际已超{(utilization_rate - 1) * 100:.1f}%，存在超需量罚款风险",
                         detail=f"""
 ## 需量超限预警
 
@@ -287,7 +287,7 @@ class DemandOptimizationPlugin(AnalysisPlugin):
 ### 需量波动分析
 - 最大需量: {max_demand_12m:.1f} kW
 - 95%分位数: {demand_95th:.1f} kW
-- 需量波动: {std_dev:.1f} kW ({std_dev/avg_max_demand*100:.1f}%)
+- 需量波动: {std_dev:.1f} kW ({std_dev / avg_max_demand * 100:.1f}%)
 
 ### 削峰建议
 - 目标削减: {peak_shave_target:.1f} kW
@@ -428,7 +428,7 @@ class DemandOptimizationPlugin(AnalysisPlugin):
             # 生成设备贡献表
             device_table = "\n".join(
                 [
-                    f"| {d.device_name} | {d.device_type} | {d.rated_power:.1f} | {(d.rated_power/total_rated*100):.1f}% |"
+                    f"| {d.device_name} | {d.device_type} | {d.rated_power:.1f} | {(d.rated_power / total_rated * 100):.1f}% |"
                     for d in high_power_devices[:8]
                 ]
             )

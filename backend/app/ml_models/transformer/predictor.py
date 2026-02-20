@@ -286,7 +286,7 @@ class TransferabilityPredictor:
                 history["val_loss"].append(val_loss)
 
             if (epoch + 1) % 10 == 0:
-                msg = f"Epoch {epoch+1}/{epochs}, Train Loss: {avg_loss:.4f}"
+                msg = f"Epoch {epoch + 1}/{epochs}, Train Loss: {avg_loss:.4f}"
                 if val_loader:
                     msg += f", Val Loss: {history['val_loss'][-1]:.4f}"
                 logger.info(msg)

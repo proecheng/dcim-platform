@@ -451,7 +451,7 @@ class SuggestionEngineService:
         title = template["title"]
         problem = template["problem"].format(**data)
         analysis = template["analysis"].format(**data)
-        effect = f"月电费可节省{annual_saving/12:.0f}元，年节省{annual_saving/10000:.2f}万元"
+        effect = f"月电费可节省{annual_saving / 12:.0f}元，年节省{annual_saving / 10000:.2f}万元"
 
         return {
             "rule_id": template["template_id"],

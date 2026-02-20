@@ -475,7 +475,7 @@ async def init_vpp_test_data(db: AsyncSession) -> None:
     print(f"  [OK] Load Curves: {len(load_curves_batch)} data points ({DAYS_TO_GENERATE} days x 96 points/day)")
     print("\nTotal Adjustable Capacity: ~5,290 kW")
     print(f"Base Load: {BASE_LOAD:,} kW (35 MW)")
-    print(f"Load Curve Period: {START_DATE} to {START_DATE + timedelta(days=DAYS_TO_GENERATE-1)}")
+    print(f"Load Curve Period: {START_DATE} to {START_DATE + timedelta(days=DAYS_TO_GENERATE - 1)}")
     print("=" * 60 + "\n")
 
 

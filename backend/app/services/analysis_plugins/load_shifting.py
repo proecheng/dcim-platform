@@ -122,7 +122,7 @@ class LoadShiftingPlugin(AnalysisPlugin):
                 device_list = (
                     "\n".join(
                         [
-                            f"- {d.device_name} ({d.device_type}): {d.rated_power:.1f}kW, 可转移{d.shiftable_power_ratio*100:.0f}%"
+                            f"- {d.device_name} ({d.device_type}): {d.rated_power:.1f}kW, 可转移{d.shiftable_power_ratio * 100:.0f}%"
                             for d in shiftable_devices[:5]
                         ]
                     )
@@ -140,7 +140,7 @@ class LoadShiftingPlugin(AnalysisPlugin):
 ### 当前状态
 - 峰时+尖峰用电占比: {peak_ratio:.1%}
 - 谷时用电占比: {valley_ratio:.1%}
-- 日均峰时电量: {(total_peak+total_sharp)/len(context.energy_data):.1f} kWh
+- 日均峰时电量: {(total_peak + total_sharp) / len(context.energy_data):.1f} kWh
 
 ### 可转移设备清单
 {device_list}
@@ -298,7 +298,7 @@ class LoadShiftingPlugin(AnalysisPlugin):
             results.append(
                 self.create_suggestion(
                     title=f"转移{device.device_name}部分负荷至谷时",
-                    description=f"{device.device_name}峰时用电占比{device.peak_energy_ratio:.1%}，建议将{device.shiftable_power_ratio*100:.0f}%负荷转移至谷时",
+                    description=f"{device.device_name}峰时用电占比{device.peak_energy_ratio:.1%}，建议将{device.shiftable_power_ratio * 100:.0f}%负荷转移至谷时",
                     detail=f"""
 ## 设备负荷转移分析
 
@@ -311,7 +311,7 @@ class LoadShiftingPlugin(AnalysisPlugin):
 ### 用电分布
 - 峰时用电占比: {device.peak_energy_ratio:.1%}
 - 谷时用电占比: {device.valley_energy_ratio:.1%}
-- 可转移功率比例: {device.shiftable_power_ratio*100:.0f}%
+- 可转移功率比例: {device.shiftable_power_ratio * 100:.0f}%
 
 ### 转移建议
 - 从时段: {from_str}
@@ -319,7 +319,7 @@ class LoadShiftingPlugin(AnalysisPlugin):
 - 日转移电量: {shiftable_energy:.1f} kWh
 
 ### 预期效果
-- 日节省电费: ¥{analysis['daily_saving']:.2f}
+- 日节省电费: ¥{analysis["daily_saving"]:.2f}
 - 年节省电费: ¥{yearly_saving:.0f}
 
 ### 实施步骤
@@ -465,13 +465,13 @@ class LoadShiftingPlugin(AnalysisPlugin):
 ### 计量点信息
 - 编码: {meter_point.meter_code}
 - 名称: {meter_point.meter_name}
-- 变压器: {meter_point.transformer_name or '未配置'}
+- 变压器: {meter_point.transformer_name or "未配置"}
 - 申报需量: {meter_point.declared_demand:.0f} {meter_point.demand_type}
 
 ### 用电分布
 - 峰时占比: {peak_ratio:.1%}
 - 谷时占比: {valley_ratio:.1%}
-- 日均电量: {total_energy/len(mp_energy):.1f} kWh
+- 日均电量: {total_energy / len(mp_energy):.1f} kWh
 
 ### 可转移设备
 {device_list}
@@ -521,4 +521,4 @@ class LoadShiftingPlugin(AnalysisPlugin):
                 end = h
         ranges.append((start, end))
 
-        return ", ".join([f"{s}:00-{e+1}:00" if s != e else f"{s}:00" for s, e in ranges])
+        return ", ".join([f"{s}:00-{e + 1}:00" if s != e else f"{s}:00" for s, e in ranges])

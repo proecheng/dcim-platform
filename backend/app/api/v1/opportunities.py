@@ -310,7 +310,7 @@ def _generate_load_shift_tasks(plan_id: int, data: dict) -> List[ExecutionTask]:
     device_rules = data.get("device_rules", [])
     idx = 0
     for device_rule in device_rules:
-        device_name = device_rule.get("device_name", f"设备{idx+1}")
+        device_name = device_rule.get("device_name", f"设备{idx + 1}")
         device_id = device_rule.get("device_id")
         for rule in device_rule.get("rules", []):
             source_name = period_names.get(rule.get("source_period", ""), "源")

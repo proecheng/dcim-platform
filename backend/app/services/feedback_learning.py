@@ -357,7 +357,7 @@ class FeedbackLearner:
         # 执行效率建议
         if execution_data.get("success_rate", 100) < 90:
             recommendations.append(
-                f"调度执行成功率较低({execution_data['success_rate']}%)，" "建议检查设备通讯状态或优化调度时间安排"
+                f"调度执行成功率较低({execution_data['success_rate']}%)，建议检查设备通讯状态或优化调度时间安排"
             )
 
         # 需量控制建议
@@ -375,7 +375,7 @@ class FeedbackLearner:
         achievement = execution_data.get("saving_achievement", 0)
         if achievement < 80:
             recommendations.append(
-                f"节省达成率较低({achievement}%)，" "建议分析未达成原因，可能是设备可调度性受限或预测偏差导致"
+                f"节省达成率较低({achievement}%)，建议分析未达成原因，可能是设备可调度性受限或预测偏差导致"
             )
 
         if not recommendations:

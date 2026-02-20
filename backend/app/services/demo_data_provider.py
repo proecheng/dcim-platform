@@ -333,7 +333,7 @@ class DemoDataProvider:
 
         for hour in range(24):
             for quarter in range(4):
-                time_str = f"{hour:02d}:{quarter*15:02d}"
+                time_str = f"{hour:02d}:{quarter * 15:02d}"
                 ts = target_date.replace(hour=hour, minute=quarter * 15, second=0, microsecond=0)
 
                 # 使用时间因子生成功率

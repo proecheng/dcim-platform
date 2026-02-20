@@ -123,7 +123,7 @@ class SimulationService:
             warnings.append(f"新申报需量({new_declared_demand:.0f}kW)低于历史最大需量({max_demand:.0f}kW)")
 
         if over_risk > 0.2:
-            warnings.append(f"超需量风险较高({over_risk*100:.1f}%)")
+            warnings.append(f"超需量风险较高({over_risk * 100:.1f}%)")
             recommendations.append("建议适当提高申报需量或采取需量控制措施")
 
         if new_declared_demand > max_demand * 1.3:

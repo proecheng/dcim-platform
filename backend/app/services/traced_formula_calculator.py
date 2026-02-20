@@ -438,7 +438,7 @@ class TracedFormulaCalculator(FormulaCalculator):
             param_name="峰谷套利年收益",
             formula="{shiftable_power} × {shift_hours} × {price_diff} × {working_days} / 10000",
             formula_display=(
-                f"{shiftable_power} × {shift_hours} × {price_diff} × " f"{working_days} / 10000 = {data['年收益']} 万元"
+                f"{shiftable_power} × {shift_hours} × {price_diff} × {working_days} / 10000 = {data['年收益']} 万元"
             ),
             child_traces=[shiftable_power_trace, t_price_diff],
             value=data["年收益"],

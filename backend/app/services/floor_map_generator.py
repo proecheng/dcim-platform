@@ -117,8 +117,8 @@ class FloorMapGenerator:
             elements.append(
                 {
                     "type": "device",
-                    "id": f"B1_CHILLER_{i+1:02d}",
-                    "name": f"冷水机组{i+1}",
+                    "id": f"B1_CHILLER_{i + 1:02d}",
+                    "name": f"冷水机组{i + 1}",
                     "deviceType": "chiller",
                     "x": 4 + i * 5,
                     "y": 5,
@@ -133,8 +133,8 @@ class FloorMapGenerator:
             elements.append(
                 {
                     "type": "device",
-                    "id": f"B1_TOWER_{i+1:02d}",
-                    "name": f"冷却塔{i+1}",
+                    "id": f"B1_TOWER_{i + 1:02d}",
+                    "name": f"冷却塔{i + 1}",
                     "deviceType": "cooling_tower",
                     "x": 22 + i * 6,
                     "y": 5,
@@ -149,8 +149,8 @@ class FloorMapGenerator:
             elements.append(
                 {
                     "type": "device",
-                    "id": f"B1_PUMP_{i+1:02d}",
-                    "name": f"冷冻水泵{i+1}",
+                    "id": f"B1_PUMP_{i + 1:02d}",
+                    "name": f"冷冻水泵{i + 1}",
                     "deviceType": "pump",
                     "x": 4 + i * 8,
                     "y": 18,
@@ -189,8 +189,8 @@ class FloorMapGenerator:
                 elements.append(
                     {
                         "type": "cabinet",
-                        "id": f"CAB-{floor_code}-{cabinet_idx+1:02d}",
-                        "name": f"机柜{cabinet_idx+1}",
+                        "id": f"CAB-{floor_code}-{cabinet_idx + 1:02d}",
+                        "name": f"机柜{cabinet_idx + 1}",
                         "x": x,
                         "y": y,
                         "width": cabinet_width,
@@ -222,8 +222,8 @@ class FloorMapGenerator:
             elements.append(
                 {
                     "type": "device",
-                    "id": f"{floor_code}_UPS_{i+1:02d}",
-                    "name": f"UPS主机{i+1}",
+                    "id": f"{floor_code}_UPS_{i + 1:02d}",
+                    "name": f"UPS主机{i + 1}",
                     "deviceType": "ups",
                     "x": width - 9 + i * 4,
                     "y": 4,
@@ -255,8 +255,8 @@ class FloorMapGenerator:
             elements.append(
                 {
                     "type": "device",
-                    "id": f"{floor_code}_AC_{i+1:02d}",
-                    "name": f"精密空调{i+1}",
+                    "id": f"{floor_code}_AC_{i + 1:02d}",
+                    "name": f"精密空调{i + 1}",
                     "deviceType": "ac",
                     "x": width - 9 + col_offset * 4,
                     "y": 14 + row_offset * 5,
@@ -280,8 +280,8 @@ class FloorMapGenerator:
             objects.append(
                 {
                     "type": "equipment",
-                    "id": f"B1_CHILLER_{i+1:02d}",
-                    "name": f"冷水机组{i+1}",
+                    "id": f"B1_CHILLER_{i + 1:02d}",
+                    "name": f"冷水机组{i + 1}",
                     "equipmentType": "chiller",
                     "position": [5 + i * 6, 1.5, 8],
                     "size": [4, 3, 6],
@@ -294,8 +294,8 @@ class FloorMapGenerator:
             objects.append(
                 {
                     "type": "equipment",
-                    "id": f"B1_TOWER_{i+1:02d}",
-                    "name": f"冷却塔{i+1}",
+                    "id": f"B1_TOWER_{i + 1:02d}",
+                    "name": f"冷却塔{i + 1}",
                     "equipmentType": "cooling_tower",
                     "position": [25 + i * 7, 2, 8],
                     "size": [5, 4, 5],
@@ -308,8 +308,8 @@ class FloorMapGenerator:
             objects.append(
                 {
                     "type": "equipment",
-                    "id": f"B1_PUMP_{i+1:02d}",
-                    "name": f"冷冻水泵{i+1}",
+                    "id": f"B1_PUMP_{i + 1:02d}",
+                    "name": f"冷冻水泵{i + 1}",
                     "equipmentType": "pump",
                     "position": [5 + i * 8, 0.75, 22],
                     "size": [2, 1.5, 3],
@@ -363,8 +363,8 @@ class FloorMapGenerator:
                 objects.append(
                     {
                         "type": "cabinet",
-                        "id": f"CAB-{floor_code}-{cabinet_idx+1:02d}",
-                        "name": f"机柜{cabinet_idx+1}",
+                        "id": f"CAB-{floor_code}-{cabinet_idx + 1:02d}",
+                        "name": f"机柜{cabinet_idx + 1}",
                         "position": [x, 1.1, z],
                         "size": [0.6, 2.2, 1.0],
                         "color": "#333344",
@@ -380,8 +380,8 @@ class FloorMapGenerator:
             objects.append(
                 {
                     "type": "equipment",
-                    "id": f"{floor_code}_UPS_{i+1:02d}",
-                    "name": f"UPS主机{i+1}",
+                    "id": f"{floor_code}_UPS_{i + 1:02d}",
+                    "name": f"UPS主机{i + 1}",
                     "equipmentType": "ups",
                     "position": [width - 6 + i * 3, 1, 5],
                     "size": [2, 2, 1.5],
@@ -397,8 +397,8 @@ class FloorMapGenerator:
             objects.append(
                 {
                     "type": "equipment",
-                    "id": f"{floor_code}_AC_{i+1:02d}",
-                    "name": f"精密空调{i+1}",
+                    "id": f"{floor_code}_AC_{i + 1:02d}",
+                    "name": f"精密空调{i + 1}",
                     "equipmentType": "ac",
                     "position": [width - 5 + col_offset * 3, 1.5, 15 + row_offset * 5],
                     "size": [1.5, 3, 1.2],
@@ -412,8 +412,8 @@ class FloorMapGenerator:
             objects.append(
                 {
                     "type": "aisle",
-                    "id": f"cold_aisle_{floor_code}_{row+1}",
-                    "name": f"冷通道{row+1}",
+                    "id": f"cold_aisle_{floor_code}_{row + 1}",
+                    "name": f"冷通道{row + 1}",
                     "position": [cols * 2 + 2.5, 0.05, z],
                     "size": [cols * 4, 0.1, 3],
                     "color": "#0066ff",

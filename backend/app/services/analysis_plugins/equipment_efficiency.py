@@ -313,10 +313,10 @@ class EquipmentEfficiencyPlugin(AnalysisPlugin):
 ### 负载分布统计
 | 负载区间 | 设备数量 | 占比 | 状态 |
 |----------|----------|------|------|
-| < 30% (低载) | {len([d for d in devices_with_load if d.get('load_rate', 0) < 0.3])} | {len([d for d in devices_with_load if d.get('load_rate', 0) < 0.3])/len(devices_with_load)*100:.0f}% | ⚠️ 效率低 |
-| 30-40% | {len([d for d in devices_with_load if 0.3 <= d.get('load_rate', 0) < 0.4])} | {len([d for d in devices_with_load if 0.3 <= d.get('load_rate', 0) < 0.4])/len(devices_with_load)*100:.0f}% | 一般 |
-| 40-80% (最佳) | {len(optimal_devices)} | {optimal_ratio*100:.0f}% | ✅ 最佳 |
-| > 80% (高载) | {len([d for d in devices_with_load if d.get('load_rate', 0) > 0.8])} | {len([d for d in devices_with_load if d.get('load_rate', 0) > 0.8])/len(devices_with_load)*100:.0f}% | ⚠️ 风险 |
+| < 30% (低载) | {len([d for d in devices_with_load if d.get("load_rate", 0) < 0.3])} | {len([d for d in devices_with_load if d.get("load_rate", 0) < 0.3]) / len(devices_with_load) * 100:.0f}% | ⚠️ 效率低 |
+| 30-40% | {len([d for d in devices_with_load if 0.3 <= d.get("load_rate", 0) < 0.4])} | {len([d for d in devices_with_load if 0.3 <= d.get("load_rate", 0) < 0.4]) / len(devices_with_load) * 100:.0f}% | 一般 |
+| 40-80% (最佳) | {len(optimal_devices)} | {optimal_ratio * 100:.0f}% | ✅ 最佳 |
+| > 80% (高载) | {len([d for d in devices_with_load if d.get("load_rate", 0) > 0.8])} | {len([d for d in devices_with_load if d.get("load_rate", 0) > 0.8]) / len(devices_with_load) * 100:.0f}% | ⚠️ 风险 |
 
 ### 整体指标
 - 平均负载率: {avg_load_rate:.1%}
