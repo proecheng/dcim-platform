@@ -297,3 +297,196 @@ class TestToggleEscalation:
             "/api/v1/escalations/99999/toggle", headers=auth_headers(token)
         )
         assert resp.status_code == 404
+
+
+# ============== 补充覆盖率测试 ==============
+
+class TestListEscalationsCoverageExtra:
+    """补充升级规则列表 (L37-40, L63-64)"""
+
+    async def test_list_both_filters(self, client, admin_user, async_db):
+        """GET /escalations?source_level=minor&is_enabled=true — 组合筛选"""
+        _, token = admin_user
+        await _create_rule(async_db, source_level="minor", is_enabled=True, rule_name="combo1")
+        await _create_rule(async_db, source_level="minor", is_enabled=False, rule_name="combo2")
+        await _create_rule(async_db, source_level="major", is_enabled=True, rule_name="combo3")
+
+        resp = await client.get(
+            "/api/v1/escalations",
+            params={"source_level": "minor", "is_enabled": "true"},
+            headers=auth_headers(token),
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["total"] == 1
+        assert data["items"][0]["rule_name"] == "combo1"
+
+    async def test_list_page_size(self, client, admin_user, async_db):
+        """GET /escalations?page=1&page_size=1 — 小页面"""
+        _, token = admin_user
+        await _create_rule(async_db, rule_name="page1")
+        await _create_rule(async_db, rule_name="page2")
+
+        resp = await client.get(
+            "/api/v1/escalations",
+            params={"page": 1, "page_size": 1},
+            headers=auth_headers(token),
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["total"] == 2
+        assert len(data["items"]) == 1
+
+
+class TestCreateEscalationCoverageExtra:
+    """补充创建升级规则 (L63-64)"""
+
+    async def test_create_with_description(self, client, admin_user):
+        """POST /escalations — 带描述创建"""
+        _, token = admin_user
+        resp = await client.post(
+            "/api/v1/escalations",
+            json={
+                "rule_name": "desc_rule",
+                "source_level": "info",
+                "timeout_minutes": 10,
+                "target_level": "minor",
+                "notify_user_ids": [1],
+                "description": "detailed_desc",
+                "is_enabled": False,
+            },
+            headers=auth_headers(token),
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["description"] == "detailed_desc"
+        assert data["is_enabled"] is False
+        assert data["notify_user_ids"] == [1]
+
+
+class TestUpdateEscalationCoverageExtra:
+    """补充更新升级规则 (L92-97, L101-106)"""
+
+    async def test_update_notify_ids(self, client, admin_user, async_db):
+        """PUT /escalations/{id} — 更新通知用户"""
+        _, token = admin_user
+        rule = await _create_rule(async_db, notify_user_ids="1,2")
+
+        resp = await client.put(
+            f"/api/v1/escalations/{rule.id}",
+            json={"notify_user_ids": [3, 4, 5]},
+            headers=auth_headers(token),
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["notify_user_ids"] == [3, 4, 5]
+
+    async def test_update_is_enabled(self, client, admin_user, async_db):
+        """PUT /escalations/{id} — 更新启用状态"""
+        _, token = admin_user
+        rule = await _create_rule(async_db, is_enabled=True)
+
+        resp = await client.put(
+            f"/api/v1/escalations/{rule.id}",
+            json={"is_enabled": False},
+            headers=auth_headers(token),
+        )
+        assert resp.status_code == 200
+        assert resp.json()["is_enabled"] is False
+
+    async def test_update_all_fields(self, client, admin_user, async_db):
+        """PUT /escalations/{id} — 更新所有字段"""
+        _, token = admin_user
+        rule = await _create_rule(async_db)
+
+        resp = await client.put(
+            f"/api/v1/escalations/{rule.id}",
+            json={
+                "rule_name": "all_updated",
+                "source_level": "minor",
+                "timeout_minutes": 99,
+                "target_level": "critical",
+                "notify_user_ids": [10],
+                "is_enabled": False,
+                "description": "new_desc",
+            },
+            headers=auth_headers(token),
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["rule_name"] == "all_updated"
+        assert data["timeout_minutes"] == 99
+        assert data["target_level"] == "critical"
+        assert data["description"] == "new_desc"
+
+
+class TestDeleteEscalationCoverageExtra:
+    """补充删除升级规则 (L118-124)"""
+
+    async def test_delete_disabled_rule(self, client, admin_user, async_db):
+        """DELETE /escalations/{id} — 删除禁用规则"""
+        _, token = admin_user
+        rule = await _create_rule(async_db, is_enabled=False, rule_name="disabled_del")
+
+        resp = await client.delete(
+            f"/api/v1/escalations/{rule.id}", headers=auth_headers(token),
+        )
+        assert resp.status_code == 200
+        assert "已删除" in resp.json()["message"]
+
+
+class TestToggleEscalationCoverageExtra:
+    """补充切换升级规则 (L136-143)"""
+
+    async def test_toggle_twice(self, client, admin_user, async_db):
+        """PUT /escalations/{id}/toggle — 连续切换两次"""
+        _, token = admin_user
+        rule = await _create_rule(async_db, is_enabled=True)
+
+        resp1 = await client.put(
+            f"/api/v1/escalations/{rule.id}/toggle", headers=auth_headers(token),
+        )
+        assert resp1.status_code == 200
+        assert resp1.json()["is_enabled"] is False
+
+        resp2 = await client.put(
+            f"/api/v1/escalations/{rule.id}/toggle", headers=auth_headers(token),
+        )
+        assert resp2.status_code == 200
+        assert resp2.json()["is_enabled"] is True
+
+    async def test_toggle_requires_operator(self, client, viewer_user, async_db):
+        """PUT /escalations/{id}/toggle — viewer 无权限"""
+        _, token = viewer_user
+        rule = await _create_rule(async_db)
+
+        resp = await client.put(
+            f"/api/v1/escalations/{rule.id}/toggle", headers=auth_headers(token),
+        )
+        assert resp.status_code == 403
+
+
+class TestGetEscalationCoverageExtra:
+    """补充获取升级规则详情 (L76-79)"""
+
+    async def test_get_detail_fields(self, client, admin_user, async_db):
+        """GET /escalations/{id} — 验证所有字段"""
+        _, token = admin_user
+        rule = await _create_rule(
+            async_db, rule_name="detail_check",
+            source_level="minor", target_level="major",
+            timeout_minutes=45, notify_user_ids="1,2,3",
+            description="detail_desc",
+        )
+
+        resp = await client.get(
+            f"/api/v1/escalations/{rule.id}", headers=auth_headers(token),
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["rule_name"] == "detail_check"
+        assert data["source_level"] == "minor"
+        assert data["target_level"] == "major"
+        assert data["timeout_minutes"] == 45
+        assert data["notify_user_ids"] == [1, 2, 3]
+        assert data["description"] == "detail_desc"

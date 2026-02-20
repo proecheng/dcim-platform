@@ -103,6 +103,59 @@ class TestGetUsers:
         assert resp.status_code == 403
 
 
+class TestGetSiteUsers:
+    """站点用户列表端点（覆盖行 77-89）"""
+
+    async def test_get_site_users_success(self, client, admin_user, async_db):
+        """获取站点下的用户列表"""
+        _, token = admin_user
+        site = Site(site_code="SITE_USR01", site_name="站点用户测试")
+        async_db.add(site)
+        user = User(
+            username="site_member_user",
+            password_hash=get_password_hash("Test@1234"),
+            role="operator",
+            is_active=True,
+        )
+        async_db.add(user)
+        await async_db.flush()
+
+        async_db.add(UserSite(user_id=user.id, site_id=site.id))
+        await async_db.flush()
+
+        resp = await client.get(
+            f"{USERS_URL}/sites/{site.id}/users",
+            headers=auth_headers(token),
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert len(data) >= 1
+        assert any(u["username"] == "site_member_user" for u in data)
+
+    async def test_get_site_users_empty(self, client, admin_user, async_db):
+        """站点无关联用户"""
+        _, token = admin_user
+        site = Site(site_code="SITE_USR02", site_name="空站点")
+        async_db.add(site)
+        await async_db.flush()
+
+        resp = await client.get(
+            f"{USERS_URL}/sites/{site.id}/users",
+            headers=auth_headers(token),
+        )
+        assert resp.status_code == 200
+        assert resp.json() == []
+
+    async def test_get_site_users_not_found(self, client, admin_user):
+        """站点不存在"""
+        _, token = admin_user
+        resp = await client.get(
+            f"{USERS_URL}/sites/99999/users",
+            headers=auth_headers(token),
+        )
+        assert resp.status_code == 404
+
+
 class TestGetUser:
     """用户详情端点（覆盖行 102-105）"""
 

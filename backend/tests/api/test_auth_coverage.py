@@ -376,3 +376,92 @@ class TestLogoutAndRefresh:
         body = resp.json()
         assert body["access_token"] != token
         assert body["token_type"] == "bearer"
+
+    async def test_logout_with_token(self, client, admin_user):
+        """已认证用户登出成功（覆盖行 208）"""
+        _, token = admin_user
+        resp = await client.post(
+            "/api/v1/auth/logout", headers=auth_headers(token)
+        )
+        assert resp.status_code == 200
+        assert resp.json()["message"] == "登出成功"
+
+
+class TestGetMe:
+    """获取当前用户信息（覆盖行 229）"""
+
+    async def test_get_me_success(self, client, admin_user):
+        """获取当前用户信息"""
+        user, token = admin_user
+        resp = await client.get(
+            "/api/v1/auth/me", headers=auth_headers(token)
+        )
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["username"] == user.username
+        assert body["role"] == "admin"
+        assert body["is_active"] is True
+
+
+class TestLoginDisabledUser:
+    """禁用用户登录（覆盖行 134-138）"""
+
+    async def test_login_disabled_user_returns_403(self, client, async_db):
+        """禁用用户登录返回 403"""
+        from app.api.v1.auth import login_limiter
+        login_limiter.attempts.clear()
+
+        user = User(
+            username="disabled_login_user",
+            password_hash=get_password_hash("Test@1234"),
+            real_name="禁用用户",
+            role="operator",
+            is_active=False,
+        )
+        async_db.add(user)
+        await async_db.flush()
+
+        resp = await client.post(
+            "/api/v1/auth/login",
+            data={"username": "disabled_login_user", "password": "Test@1234"},
+        )
+        assert resp.status_code == 403
+        assert "禁用" in resp.json()["detail"]
+
+
+class TestSessionKick:
+    """并发会话限制踢出旧会话（覆盖行 178-180）"""
+
+    async def test_login_kicks_oldest_session(self, client, async_db):
+        """超过 MAX_SESSIONS 时踢出最早的会话"""
+        from app.api.v1.auth import login_limiter
+        from app.models.user import UserSession
+        login_limiter.attempts.clear()
+
+        user = User(
+            username="session_kick_user",
+            password_hash=get_password_hash("Test@1234"),
+            real_name="会话踢出测试",
+            role="admin",
+            is_active=True,
+            login_count=0,
+        )
+        async_db.add(user)
+        await async_db.flush()
+
+        # 预先创建 4 个活跃会话（超过 MAX_SESSIONS=3）
+        for i in range(4):
+            async_db.add(UserSession(
+                user_id=user.id,
+                token_jti=f"pre_session_{i}",
+                is_active=True,
+            ))
+        await async_db.flush()
+
+        # 再次登录，应触发踢出逻辑
+        resp = await client.post(
+            "/api/v1/auth/login",
+            data={"username": "session_kick_user", "password": "Test@1234"},
+        )
+        assert resp.status_code == 200
+        assert "access_token" in resp.json()

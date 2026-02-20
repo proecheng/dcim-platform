@@ -1,0 +1,17 @@
+[run]
+source = app
+concurrency = greenlet
+omit =
+    app/ml_models/*
+    app/tools/*
+    app/mqtt/*
+
+[report]
+exclude_lines =
+    pragma: no cover
+    if __name__ == .__main__.:
+    pass
+omit =
+    app/ml_models/*
+    app/tools/*
+    app/mqtt/*
