@@ -30,6 +30,9 @@ apscheduler==3.10.4
 # Data export
 openpyxl==3.1.2
 
+# PDF 报表生成
+reportlab>=4.0
+
 # Deep learning (optional) — 见 requirements-ml.txt
 # pip install -r requirements-ml.txt
 
