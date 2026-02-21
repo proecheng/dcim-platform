@@ -13,203 +13,176 @@
         class="dark-menu"
         @select="handleMenuSelect"
       >
-        <!-- 监控仪表盘 -->
+        <!-- ══════ 监控域 ══════ -->
+        <li v-show="!isCollapse" class="menu-group-title">监控域</li>
+
         <el-menu-item index="/dashboard">
           <el-icon><Monitor /></el-icon>
-          <template #title>监控仪表盘</template>
+          <template #title>综合概览</template>
         </el-menu-item>
 
-        <!-- 点位管理 -->
-        <el-menu-item index="/devices">
-          <el-icon><Cpu /></el-icon>
-          <template #title>点位管理</template>
-        </el-menu-item>
-
-        <!-- 设备管理 -->
-        <el-menu-item index="/device-manage">
-          <el-icon><SetUp /></el-icon>
-          <template #title>设备管理</template>
-        </el-menu-item>
-
-        <!-- ===== 华为6大域 ===== -->
-
-        <!-- 域1: 供配电管理 -->
         <el-sub-menu index="/power">
           <template #title>
             <el-icon><Lightning /></el-icon>
-            <span>供配电管理</span>
+            <span>供配电监控</span>
           </template>
-          <el-menu-item index="/power/overview">
-            <el-icon><DataBoard /></el-icon>
-            <template #title>供配电总览</template>
-          </el-menu-item>
-          <el-menu-item index="/power/ups">
-            <el-icon><Lightning /></el-icon>
-            <template #title>UPS监控</template>
-          </el-menu-item>
-          <el-menu-item index="/power/battery">
-            <el-icon><Coin /></el-icon>
-            <template #title>电池组</template>
-          </el-menu-item>
-          <el-menu-item index="/power/cabinet">
-            <el-icon><Grid /></el-icon>
-            <template #title>配电柜</template>
-          </el-menu-item>
-          <el-menu-item index="/power/pdu">
-            <el-icon><Menu /></el-icon>
-            <template #title>机柜PDU</template>
-          </el-menu-item>
-          <el-menu-item index="/power/monitor">
-            <el-icon><Odometer /></el-icon>
-            <template #title>用电监控</template>
-          </el-menu-item>
-          <el-menu-item index="/power/statistics">
-            <el-icon><TrendCharts /></el-icon>
-            <template #title>能耗统计</template>
-          </el-menu-item>
-          <el-menu-item index="/power/config">
-            <el-icon><Setting /></el-icon>
-            <template #title>配电配置</template>
-          </el-menu-item>
-          <el-menu-item index="/power/topology">
-            <el-icon><Share /></el-icon>
-            <template #title>配电拓扑</template>
-          </el-menu-item>
+          <el-menu-item index="/power/overview">供配电总览</el-menu-item>
+          <el-menu-item index="/power/ups">UPS监控</el-menu-item>
+          <el-menu-item index="/power/battery">电池组</el-menu-item>
+          <el-menu-item index="/power/cabinet">配电柜</el-menu-item>
+          <el-menu-item index="/power/pdu">机柜PDU</el-menu-item>
+          <el-menu-item index="/power/topology">配电拓扑</el-menu-item>
         </el-sub-menu>
 
-        <!-- 域2: 制冷系统 -->
         <el-sub-menu index="/cooling">
           <template #title>
             <el-icon><IceCream /></el-icon>
-            <span>制冷系统</span>
+            <span>制冷监控</span>
           </template>
-          <el-menu-item index="/cooling/overview">
-            <el-icon><DataBoard /></el-icon>
-            <template #title>制冷总览</template>
-          </el-menu-item>
+          <el-menu-item index="/cooling/overview">制冷总览</el-menu-item>
+          <el-menu-item index="/cooling/indoor">精密空调</el-menu-item>
+          <el-menu-item index="/cooling/outdoor">室外机</el-menu-item>
+          <el-menu-item index="/cooling/cold-aisle">冷通道</el-menu-item>
+          <el-menu-item index="/cooling/group-control">群控状态</el-menu-item>
         </el-sub-menu>
 
-        <!-- 域3: 环境监控 -->
         <el-sub-menu index="/environment">
           <template #title>
             <el-icon><Sunny /></el-icon>
             <span>环境监控</span>
           </template>
-          <el-menu-item index="/environment/overview">
-            <el-icon><DataBoard /></el-icon>
-            <template #title>环境总览</template>
-          </el-menu-item>
+          <el-menu-item index="/environment/overview">环境总览</el-menu-item>
+          <el-menu-item index="/environment/temperature">温湿度监测</el-menu-item>
+          <el-menu-item index="/environment/water-leak">水浸检测</el-menu-item>
+          <el-menu-item index="/environment/smoke-infrared">烟雾/红外检测</el-menu-item>
         </el-sub-menu>
 
-        <!-- 域4: 安防消防 -->
         <el-sub-menu index="/security">
           <template #title>
             <el-icon><Lock /></el-icon>
             <span>安防消防</span>
           </template>
-          <el-menu-item index="/security/overview">
-            <el-icon><DataBoard /></el-icon>
-            <template #title>安防总览</template>
-          </el-menu-item>
+          <el-menu-item index="/security/overview">安防总览</el-menu-item>
+          <el-menu-item index="/security/access-control">门禁管理</el-menu-item>
+          <el-sub-menu index="/security/video">
+            <template #title>视频监控</template>
+            <el-menu-item index="/security/video/cameras">摄像头管理</el-menu-item>
+            <el-menu-item index="/security/video/control">视频控制</el-menu-item>
+            <el-menu-item index="/security/video/playback">告警回放</el-menu-item>
+          </el-sub-menu>
+          <el-menu-item index="/security/fire-linkage">消防联动</el-menu-item>
         </el-sub-menu>
 
-        <!-- 域5: 基础设施 -->
-        <el-sub-menu index="/infrastructure">
-          <template #title>
-            <el-icon><OfficeBuilding /></el-icon>
-            <span>基础设施</span>
-          </template>
-          <el-menu-item index="/infrastructure/asset">
-            <el-icon><Document /></el-icon>
-            <template #title>资产台账</template>
-          </el-menu-item>
-          <el-menu-item index="/infrastructure/cabinet">
-            <el-icon><Grid /></el-icon>
-            <template #title>机柜管理</template>
-          </el-menu-item>
-          <el-menu-item index="/infrastructure/capacity">
-            <el-icon><DataAnalysis /></el-icon>
-            <template #title>容量管理</template>
-          </el-menu-item>
-        </el-sub-menu>
-
-        <!-- 域6: 节能中心 -->
-        <el-sub-menu index="/energy-saving">
-          <template #title>
-            <el-icon><Opportunity /></el-icon>
-            <span>节能中心</span>
-          </template>
-          <el-menu-item index="/energy-saving/analysis">
-            <el-icon><Opportunity /></el-icon>
-            <template #title>节能分析</template>
-          </el-menu-item>
-          <el-menu-item index="/energy-saving/regulation">
-            <el-icon><Operation /></el-icon>
-            <template #title>负荷调节</template>
-          </el-menu-item>
-          <el-menu-item index="/energy-saving/execution">
-            <el-icon><VideoPlay /></el-icon>
-            <template #title>执行管理</template>
-          </el-menu-item>
-        </el-sub-menu>
-
-        <!-- ===== 独立入口 ===== -->
-
-        <!-- 告警管理 -->
         <el-menu-item index="/alarms">
           <el-icon><Bell /></el-icon>
-          <template #title>告警管理</template>
+          <template #title>告警中心</template>
         </el-menu-item>
 
-        <!-- 历史数据 -->
-        <el-menu-item index="/history">
-          <el-icon><TrendCharts /></el-icon>
-          <template #title>历史数据</template>
-        </el-menu-item>
+        <!-- ══════ 管理域 ══════ -->
+        <li v-show="!isCollapse" class="menu-group-title">管理域</li>
 
-        <!-- 报表分析 -->
-        <el-menu-item index="/reports">
-          <el-icon><Document /></el-icon>
-          <template #title>报表分析</template>
-        </el-menu-item>
+        <el-sub-menu index="/energy">
+          <template #title>
+            <el-icon><Opportunity /></el-icon>
+            <span>能效管理</span>
+          </template>
+          <el-menu-item index="/energy/monitor">用电监控</el-menu-item>
+          <el-menu-item index="/energy/statistics">能耗统计</el-menu-item>
+          <el-menu-item index="/energy/analysis">节能分析</el-menu-item>
+          <el-menu-item index="/energy/regulation">负荷调节</el-menu-item>
+          <el-menu-item index="/energy/execution">执行管理</el-menu-item>
+          <el-menu-item index="/energy/report">能效报告</el-menu-item>
+        </el-sub-menu>
 
-        <!-- 运维管理 -->
+        <el-sub-menu index="/asset">
+          <template #title>
+            <el-icon><OfficeBuilding /></el-icon>
+            <span>资产与容量</span>
+          </template>
+          <el-menu-item index="/asset/list">资产台账</el-menu-item>
+          <el-menu-item index="/asset/cabinet">机柜管理</el-menu-item>
+          <el-menu-item index="/asset/capacity">容量管理</el-menu-item>
+          <el-menu-item index="/asset/spatial">空间拓扑</el-menu-item>
+        </el-sub-menu>
+
         <el-sub-menu index="/operation">
           <template #title>
             <el-icon><Tools /></el-icon>
             <span>运维管理</span>
           </template>
-          <el-menu-item index="/operation/workorder">
-            <el-icon><Tickets /></el-icon>
-            <template #title>工单管理</template>
-          </el-menu-item>
-          <el-menu-item index="/operation/inspection">
-            <el-icon><List /></el-icon>
-            <template #title>巡检管理</template>
-          </el-menu-item>
-          <el-menu-item index="/operation/knowledge">
-            <el-icon><Reading /></el-icon>
-            <template #title>知识库</template>
-          </el-menu-item>
+          <el-menu-item index="/operation/workorder">工单管理</el-menu-item>
+          <el-menu-item index="/operation/inspection">巡检管理</el-menu-item>
+          <el-menu-item index="/operation/knowledge">知识库</el-menu-item>
+          <el-menu-item index="/operation/reports">报表分析</el-menu-item>
+          <el-menu-item index="/operation/history">历史数据</el-menu-item>
         </el-sub-menu>
 
-        <!-- 虚拟电厂 -->
         <el-sub-menu index="/vpp">
           <template #title>
             <el-icon><Connection /></el-icon>
             <span>虚拟电厂</span>
           </template>
-          <el-menu-item index="/vpp/analysis">
-            <el-icon><DataAnalysis /></el-icon>
-            <template #title>VPP方案分析</template>
-          </el-menu-item>
+          <el-menu-item index="/vpp/analysis">VPP方案分析</el-menu-item>
         </el-sub-menu>
 
-        <!-- 系统设置 -->
-        <el-menu-item index="/settings">
-          <el-icon><Setting /></el-icon>
-          <template #title>系统设置</template>
-        </el-menu-item>
+        <!-- ══════ 配置域 ══════ -->
+        <template v-if="isOperator">
+          <li v-show="!isCollapse" class="menu-group-title">配置域</li>
+
+          <el-sub-menu index="/collection">
+            <template #title>
+              <el-icon><Connection /></el-icon>
+              <span>采集配置</span>
+            </template>
+            <el-menu-item index="/collection/device-manage">设备管理</el-menu-item>
+            <el-menu-item index="/collection/device-status">设备状态看板</el-menu-item>
+            <el-menu-item index="/collection/devices">点位管理</el-menu-item>
+            <el-menu-item index="/collection/datasources">数据源管理</el-menu-item>
+            <el-menu-item index="/collection/device-templates">设备模板</el-menu-item>
+            <el-menu-item index="/collection/power-config">配电配置</el-menu-item>
+            <el-menu-item index="/collection/gateway">网关管理</el-menu-item>
+          </el-sub-menu>
+
+          <el-sub-menu index="/strategy">
+            <template #title>
+              <el-icon><SetUp /></el-icon>
+              <span>策略引擎</span>
+            </template>
+            <el-sub-menu v-if="isAdmin" index="/strategy/alarm-rules">
+              <template #title>告警规则</template>
+              <el-menu-item index="/strategy/alarm-rules/thresholds">阈值配置</el-menu-item>
+              <el-menu-item index="/strategy/alarm-rules/compound">复合规则</el-menu-item>
+              <el-menu-item index="/strategy/alarm-rules/escalation">升级规则</el-menu-item>
+              <el-menu-item index="/strategy/alarm-rules/shield">告警屏蔽</el-menu-item>
+            </el-sub-menu>
+            <el-sub-menu index="/strategy/linkage">
+              <template #title>联动策略</template>
+              <el-menu-item index="/strategy/linkage/policy">策略管理</el-menu-item>
+              <el-menu-item index="/strategy/linkage/execution">执行日志</el-menu-item>
+              <el-menu-item index="/strategy/linkage/recovery">联动恢复</el-menu-item>
+              <el-menu-item index="/strategy/linkage/timeline">事件时间线</el-menu-item>
+              <el-menu-item index="/strategy/linkage/command">命令管理</el-menu-item>
+            </el-sub-menu>
+            <el-sub-menu index="/strategy/diagnosis">
+              <template #title>智能诊断</template>
+              <el-menu-item index="/strategy/diagnosis/results">诊断结果</el-menu-item>
+              <el-menu-item v-if="isAdmin" index="/strategy/diagnosis/rules">诊断规则</el-menu-item>
+            </el-sub-menu>
+            <el-menu-item index="/strategy/drift">漂移检测</el-menu-item>
+          </el-sub-menu>
+
+          <el-sub-menu v-if="isAdmin" index="/system">
+            <template #title>
+              <el-icon><Setting /></el-icon>
+              <span>系统管理</span>
+            </template>
+            <el-menu-item index="/system/users">用户管理</el-menu-item>
+            <el-menu-item index="/system/sites">站点管理</el-menu-item>
+            <el-menu-item index="/system/audit-log">操作审计</el-menu-item>
+            <el-menu-item index="/system/settings">系统设置</el-menu-item>
+            <el-menu-item index="/system/site-selection">智能选址</el-menu-item>
+          </el-sub-menu>
+        </template>
       </el-menu>
     </el-aside>
 
@@ -279,7 +252,9 @@ import {
   Grid, SetUp, Tickets, List, Reading,
   Opportunity, Operation, VideoPlay,
   IceCream, Sunny, Lock, OfficeBuilding, DataBoard, Tools, Connection,
-  Coin, Menu
+  Coin, Menu,
+  Key, VideoCamera, Camera, Warning, View, Timer,
+  RefreshRight, FirstAidKit, User, MapLocation, Box, Files
 } from '@element-plus/icons-vue'
 import { useUserStore, useAlarmStore } from '@/stores'
 import { getAlarmCount } from '@/api/alarm'
@@ -294,6 +269,7 @@ useDataQuality()
 const router = useRouter()
 const route = useRoute()
 const userStore = useUserStore()
+const { isAdmin, isOperator } = userStore
 const alarmStore = useAlarmStore()
 const isCollapse = ref(false)
 const videoPopupRef = ref<InstanceType<typeof VideoPopup>>()
@@ -351,9 +327,12 @@ function handleCommand(command: string) {
   transition: width 0.3s;
   overflow: hidden;
   border-right: 1px solid var(--border-color);
+  display: flex;
+  flex-direction: column;
 
   .logo {
     height: var(--header-height);
+    min-height: var(--header-height);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -372,7 +351,34 @@ function handleCommand(command: string) {
   .dark-menu {
     border-right: none;
     background-color: transparent;
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+
+    &::-webkit-scrollbar {
+      width: 4px;
+    }
+
+    &::-webkit-scrollbar-thumb {
+      background: var(--border-color);
+      border-radius: 2px;
+    }
+
+    &::-webkit-scrollbar-track {
+      background: transparent;
+    }
   }
+}
+
+.menu-group-title {
+  padding: 12px 20px 4px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--el-text-color-placeholder);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  list-style: none;
+  user-select: none;
 }
 
 .header {

@@ -78,7 +78,7 @@ async def init_default_data():
         permissions_result = await session.execute(select(RolePermission))
         if not permissions_result.scalars().all():
             default_permissions = [
-                # admin 权限
+                # admin 权限 — 全部资源完整访问
                 ("admin", "user:read"),
                 ("admin", "user:write"),
                 ("admin", "user:delete"),
@@ -93,17 +93,59 @@ async def init_default_data():
                 ("admin", "log:read"),
                 ("admin", "report:read"),
                 ("admin", "report:write"),
-                # operator 权限
+                ("admin", "device:read"),
+                ("admin", "device:write"),
+                ("admin", "device:delete"),
+                ("admin", "gateway:read"),
+                ("admin", "gateway:write"),
+                ("admin", "gateway:delete"),
+                ("admin", "energy:read"),
+                ("admin", "energy:write"),
+                ("admin", "asset:read"),
+                ("admin", "asset:write"),
+                ("admin", "asset:delete"),
+                ("admin", "linkage:read"),
+                ("admin", "linkage:write"),
+                ("admin", "linkage:delete"),
+                ("admin", "diagnosis:read"),
+                ("admin", "diagnosis:write"),
+                ("admin", "video:read"),
+                ("admin", "video:write"),
+                ("admin", "site:read"),
+                ("admin", "site:write"),
+                ("admin", "site:delete"),
+                # operator 权限 — 采集配置、策略引擎、运维管理
                 ("operator", "point:read"),
                 ("operator", "point:write"),
                 ("operator", "alarm:read"),
                 ("operator", "alarm:ack"),
                 ("operator", "report:read"),
                 ("operator", "report:write"),
-                # viewer 权限
+                ("operator", "device:read"),
+                ("operator", "device:write"),
+                ("operator", "gateway:read"),
+                ("operator", "gateway:write"),
+                ("operator", "energy:read"),
+                ("operator", "energy:write"),
+                ("operator", "asset:read"),
+                ("operator", "asset:write"),
+                ("operator", "linkage:read"),
+                ("operator", "linkage:write"),
+                ("operator", "diagnosis:read"),
+                ("operator", "diagnosis:write"),
+                ("operator", "video:read"),
+                ("operator", "video:write"),
+                ("operator", "site:read"),
+                ("operator", "config:read"),
+                # viewer 权限 — 监控域 + 管理域只读
                 ("viewer", "point:read"),
                 ("viewer", "alarm:read"),
                 ("viewer", "report:read"),
+                ("viewer", "device:read"),
+                ("viewer", "energy:read"),
+                ("viewer", "asset:read"),
+                ("viewer", "video:read"),
+                ("viewer", "site:read"),
             ]
             for role, permission in default_permissions:
                 perm = RolePermission(role=role, permission=permission)

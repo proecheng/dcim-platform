@@ -24,491 +24,271 @@ const routes: RouteRecordRaw[] = [
     component: () => import('@/layouts/MainLayout.vue'),
     redirect: '/dashboard',
     children: [
-      // ===== 独立入口 =====
+      // ══════ 监控域 ══════
       {
         path: 'dashboard',
         name: 'Dashboard',
         component: () => import('@/views/dashboard/index.vue'),
-        meta: { title: '监控仪表盘', icon: 'Monitor' }
-      },
-      // moved to AFTER linkage
-      // diagnosis block moved to AFTER linkage
-      {
-        path: 'diagnosis',
-        name: 'Diagnosis',
-        redirect: '/diagnosis/results',
-        meta: { title: '智能诊断', icon: 'FirstAidKit' },
-        children: [
-          {
-            path: 'results',
-            name: 'DiagnosisResults',
-            component: () => import('@/views/diagnosis/results.vue'),
-            meta: { title: '诊断结果', icon: 'DataAnalysis' }
-          },
-          {
-            path: 'rules',
-            name: 'DiagnosisRules',
-            component: () => import('@/views/diagnosis/rules.vue'),
-            meta: { title: '诊断规则', icon: 'SetUp' }
-          }
-        ]
-      },
-      {
-        path: 'devices',
-        name: 'Devices',
-        component: () => import('@/views/device/index.vue'),
-        meta: { title: '点位管理', icon: 'Cpu' }
-      },
-      {
-        path: 'datasources',
-        name: 'Datasources',
-        component: () => import('@/views/datasource/index.vue'),
-        meta: { title: '数据源管理', icon: 'Connection' }
-      },
-      {
-        path: 'device-templates',
-        name: 'DeviceTemplates',
-        component: () => import('@/views/device-template/index.vue'),
-        meta: { title: '设备模板', icon: 'Files' }
-      },
-      {
-        path: 'device-manage',
-        name: 'DeviceManage',
-        component: () => import('@/views/device-manage/index.vue'),
-        meta: { title: '设备管理', icon: 'SetUp' }
-      },
-      {
-        path: 'device-manage/detail/:id',
-        name: 'DeviceDetail',
-        component: () => import('@/views/device-manage/detail.vue'),
-        meta: { title: '设备详情', icon: 'View', hidden: true }
-      },
-      {
-        path: 'device-status',
-        name: 'DeviceStatus',
-        component: () => import('@/views/device-status/index.vue'),
-        meta: { title: '设备状态看板', icon: 'Odometer' }
+        meta: { title: '综合概览', icon: 'Monitor' }
       },
 
-      // ===== 华为6大域 =====
-
-      // 域1: 供配电管理
+      // 供配电监控
       {
         path: 'power',
         name: 'Power',
         redirect: '/power/overview',
-        meta: { title: '供配电管理', icon: 'Lightning' },
+        meta: { title: '供配电监控', icon: 'Lightning' },
         children: [
-          {
-            path: 'overview',
-            name: 'PowerOverview',
-            component: () => import('@/views/power/overview.vue'),
-            meta: { title: '供配电总览', icon: 'DataBoard' }
-          },
-          {
-            path: 'ups',
-            name: 'PowerUPS',
-            component: () => import('@/views/power/ups.vue'),
-            meta: { title: 'UPS监控', icon: 'Lightning' }
-          },
-          {
-            path: 'battery',
-            name: 'PowerBattery',
-            component: () => import('@/views/power/battery.vue'),
-            meta: { title: '电池组', icon: 'Coin' }
-          },
-          {
-            path: 'cabinet',
-            name: 'PowerCabinet',
-            component: () => import('@/views/power/cabinet.vue'),
-            meta: { title: '配电柜', icon: 'Grid' }
-          },
-          {
-            path: 'pdu',
-            name: 'PowerPDU',
-            component: () => import('@/views/power/pdu.vue'),
-            meta: { title: '机柜PDU', icon: 'Menu' }
-          },
-          {
-            path: 'monitor',
-            name: 'PowerMonitor',
-            component: () => import('@/views/energy/monitor.vue'),
-            meta: { title: '用电监控', icon: 'Odometer' }
-          },
-          {
-            path: 'statistics',
-            name: 'PowerStatistics',
-            component: () => import('@/views/energy/statistics.vue'),
-            meta: { title: '能耗统计', icon: 'TrendCharts' }
-          },
-          {
-            path: 'config',
-            name: 'PowerConfig',
-            component: () => import('@/views/energy/config.vue'),
-            meta: { title: '配电配置', icon: 'Setting' }
-          },
-          {
-            path: 'topology',
-            name: 'PowerTopology',
-            component: () => import('@/views/energy/topology.vue'),
-            meta: { title: '配电拓扑', icon: 'Share' }
-          }
+          { path: 'overview', name: 'PowerOverview', component: () => import('@/views/power/overview.vue'), meta: { title: '供配电总览', icon: 'DataBoard' } },
+          { path: 'ups', name: 'PowerUPS', component: () => import('@/views/power/ups.vue'), meta: { title: 'UPS监控', icon: 'Lightning' } },
+          { path: 'battery', name: 'PowerBattery', component: () => import('@/views/power/battery.vue'), meta: { title: '电池组', icon: 'Coin' } },
+          { path: 'cabinet', name: 'PowerCabinet', component: () => import('@/views/power/cabinet.vue'), meta: { title: '配电柜', icon: 'Grid' } },
+          { path: 'pdu', name: 'PowerPDU', component: () => import('@/views/power/pdu.vue'), meta: { title: '机柜PDU', icon: 'Menu' } },
+          { path: 'topology', name: 'PowerTopology', component: () => import('@/views/energy/topology.vue'), meta: { title: '配电拓扑', icon: 'Share' } }
         ]
       },
 
-      // 域2: 制冷系统
+      // 制冷监控
       {
         path: 'cooling',
         name: 'Cooling',
         redirect: '/cooling/overview',
-        meta: { title: '制冷系统', icon: 'IceCream' },
+        meta: { title: '制冷监控', icon: 'IceCream' },
         children: [
-          {
-            path: 'overview',
-            name: 'CoolingOverview',
-            component: () => import('@/views/cooling/overview.vue'),
-            meta: { title: '制冷总览', icon: 'DataBoard' }
-          },
-          {
-            path: 'indoor',
-            name: 'CoolingIndoor',
-            component: () => import('@/views/cooling/indoor.vue'),
-            meta: { title: '精密空调', icon: 'IceCream' }
-          },
-          {
-            path: 'outdoor',
-            name: 'CoolingOutdoor',
-            component: () => import('@/views/cooling/outdoor.vue'),
-            meta: { title: '室外机', icon: 'Sunny' }
-          },
-          {
-            path: 'cold-aisle',
-            name: 'CoolingColdAisle',
-            component: () => import('@/views/cooling/cold-aisle.vue'),
-            meta: { title: '冷通道', icon: 'Box' }
-          },
-          {
-            path: 'group-control',
-            name: 'CoolingGroupControl',
-            component: () => import('@/views/cooling/group-control.vue'),
-            meta: { title: '群控状态', icon: 'Connection' }
-          }
+          { path: 'overview', name: 'CoolingOverview', component: () => import('@/views/cooling/overview.vue'), meta: { title: '制冷总览', icon: 'DataBoard' } },
+          { path: 'indoor', name: 'CoolingIndoor', component: () => import('@/views/cooling/indoor.vue'), meta: { title: '精密空调', icon: 'IceCream' } },
+          { path: 'outdoor', name: 'CoolingOutdoor', component: () => import('@/views/cooling/outdoor.vue'), meta: { title: '室外机', icon: 'Sunny' } },
+          { path: 'cold-aisle', name: 'CoolingColdAisle', component: () => import('@/views/cooling/cold-aisle.vue'), meta: { title: '冷通道', icon: 'Box' } },
+          { path: 'group-control', name: 'CoolingGroupControl', component: () => import('@/views/cooling/group-control.vue'), meta: { title: '群控状态', icon: 'Connection' } }
         ]
       },
 
-      // 域3: 环境监控
+      // 环境监控
       {
         path: 'environment',
         name: 'Environment',
         redirect: '/environment/overview',
         meta: { title: '环境监控', icon: 'Sunny' },
         children: [
-          {
-            path: 'overview',
-            name: 'EnvironmentOverview',
-            component: () => import('@/views/environment/overview.vue'),
-            meta: { title: '环境总览', icon: 'DataBoard' }
-          }
+          { path: 'overview', name: 'EnvironmentOverview', component: () => import('@/views/environment/overview.vue'), meta: { title: '环境总览', icon: 'DataBoard' } },
+          { path: 'temperature', name: 'EnvironmentTemperature', component: () => import('@/views/environment/temperature.vue'), meta: { title: '温湿度监测', icon: 'Odometer' } },
+          { path: 'water-leak', name: 'EnvironmentWaterLeak', component: () => import('@/views/environment/water-leak.vue'), meta: { title: '水浸检测', icon: 'Warning' } },
+          { path: 'smoke-infrared', name: 'EnvironmentSmokeInfrared', component: () => import('@/views/environment/smoke-infrared.vue'), meta: { title: '烟雾/红外检测', icon: 'View' } }
         ]
       },
 
-      // 域4: 安防消防
+      // 安防消防
       {
         path: 'security',
         name: 'Security',
         redirect: '/security/overview',
         meta: { title: '安防消防', icon: 'Lock' },
         children: [
+          { path: 'overview', name: 'SecurityOverview', component: () => import('@/views/security/overview.vue'), meta: { title: '安防总览', icon: 'DataBoard' } },
+          { path: 'access-control', name: 'SecurityAccessControl', component: () => import('@/views/security/access-control.vue'), meta: { title: '门禁管理', icon: 'Key' } },
           {
-            path: 'overview',
-            name: 'SecurityOverview',
-            component: () => import('@/views/security/overview.vue'),
-            meta: { title: '安防总览', icon: 'DataBoard' }
-          }
+            path: 'video',
+            name: 'SecurityVideo',
+            redirect: '/security/video/cameras',
+            meta: { title: '视频监控', icon: 'VideoCamera' },
+            children: [
+              { path: 'cameras', name: 'VideoCameras', component: () => import('@/views/video/index.vue'), meta: { title: '摄像头管理', icon: 'Camera' } },
+              { path: 'control', name: 'VideoControl', component: () => import('@/views/video/control.vue'), meta: { title: '视频控制', icon: 'VideoPlay' } },
+              { path: 'playback', name: 'VideoPlayback', component: () => import('@/views/video/playback.vue'), meta: { title: '告警回放', icon: 'Timer' } }
+            ]
+          },
+          { path: 'fire-linkage', name: 'SecurityFireLinkage', component: () => import('@/views/security/fire-linkage.vue'), meta: { title: '消防联动', icon: 'Warning' } }
         ]
       },
 
-      // 域5: 基础设施
-      {
-        path: 'infrastructure',
-        name: 'Infrastructure',
-        redirect: '/infrastructure/asset',
-        meta: { title: '基础设施', icon: 'OfficeBuilding' },
-        children: [
-          {
-            path: 'asset',
-            name: 'InfraAssetList',
-            component: () => import('@/views/asset/index.vue'),
-            meta: { title: '资产台账', icon: 'Document' }
-          },
-          {
-            path: 'cabinet',
-            name: 'InfraCabinetManage',
-            component: () => import('@/views/asset/cabinet.vue'),
-            meta: { title: '机柜管理', icon: 'Grid' }
-          },
-          {
-            path: 'capacity',
-            name: 'InfraCapacity',
-            component: () => import('@/views/capacity/index.vue'),
-            meta: { title: '容量管理', icon: 'DataAnalysis' }
-          },
-          {
-            path: 'spatial',
-            name: 'InfraSpatial',
-            component: () => import('@/views/topology/spatial.vue'),
-            meta: { title: '空间拓扑', icon: 'OfficeBuilding' }
-          },
-          {
-            path: 'power-topology',
-            name: 'InfraPowerTopology',
-            component: () => import('@/views/topology/power.vue'),
-            meta: { title: 'PDU 相位配置', icon: 'Connection' }
-          },
-          {
-            path: 'cooling-topology',
-            name: 'CoolingTopology',
-            component: () => import('@/views/topology/cooling.vue'),
-            meta: { title: '制冷区域配置', icon: 'WindPower' }
-          },
-          {
-            path: 'site-selection',
-            name: 'InfraSiteSelection',
-            component: () => import('@/views/topology/site-selection.vue'),
-            meta: { title: '智能选址', icon: 'MapLocation' }
-          },
-          {
-            path: 'fault-impact',
-            name: 'InfraFaultImpact',
-            component: () => import('@/views/topology/fault-impact.vue'),
-            meta: { title: '故障影响分析', icon: 'Warning' }
-          }
-        ]
-      },
-
-      // 域6: 节能中心
-      {
-        path: 'energy-saving',
-        name: 'EnergySaving',
-        redirect: '/energy-saving/analysis',
-        meta: { title: '节能中心', icon: 'Opportunity' },
-        children: [
-          {
-            path: 'analysis',
-            name: 'SavingAnalysis',
-            component: () => import('@/views/energy/analysis.vue'),
-            meta: { title: '节能分析', icon: 'Opportunity' }
-          },
-          {
-            path: 'regulation',
-            name: 'SavingRegulation',
-            component: () => import('@/views/energy/regulation.vue'),
-            meta: { title: '负荷调节', icon: 'Operation' }
-          },
-          {
-            path: 'execution',
-            name: 'SavingExecution',
-            component: () => import('@/views/energy/execution.vue'),
-            meta: { title: '执行管理', icon: 'VideoPlay' }
-          },
-          {
-            path: 'report',
-            name: 'EnergyReport',
-            component: () => import('@/views/energy/report.vue'),
-            meta: { title: '能效报告', icon: 'Document' }
-          }
-        ]
-      },
-
-      // ===== 独立入口（续） =====
+      // 告警中心
       {
         path: 'alarms',
         name: 'Alarms',
         component: () => import('@/views/alarm/index.vue'),
-        meta: { title: '告警管理', icon: 'Bell' }
+        meta: { title: '告警中心', icon: 'Bell' }
       },
+
+      // ══════ 管理域 ══════
+
+      // 能效管理
       {
-        path: 'history',
-        name: 'History',
-        component: () => import('@/views/history/index.vue'),
-        meta: { title: '历史数据', icon: 'TrendCharts' }
+        path: 'energy',
+        name: 'Energy',
+        redirect: '/energy/monitor',
+        meta: { title: '能效管理', icon: 'Opportunity' },
+        children: [
+          { path: 'monitor', name: 'EnergyMonitor', component: () => import('@/views/energy/monitor.vue'), meta: { title: '用电监控', icon: 'Odometer' } },
+          { path: 'statistics', name: 'EnergyStatistics', component: () => import('@/views/energy/statistics.vue'), meta: { title: '能耗统计', icon: 'TrendCharts' } },
+          { path: 'analysis', name: 'EnergyAnalysis', component: () => import('@/views/energy/analysis.vue'), meta: { title: '节能分析', icon: 'Opportunity' } },
+          { path: 'regulation', name: 'EnergyRegulation', component: () => import('@/views/energy/regulation.vue'), meta: { title: '负荷调节', icon: 'Operation' } },
+          { path: 'execution', name: 'EnergyExecution', component: () => import('@/views/energy/execution.vue'), meta: { title: '执行管理', icon: 'VideoPlay' } },
+          { path: 'report', name: 'EnergyReport', component: () => import('@/views/energy/report.vue'), meta: { title: '能效报告', icon: 'Document' } }
+        ]
       },
+
+      // 资产与容量
       {
-        path: 'reports',
-        name: 'Reports',
-        component: () => import('@/views/report/index.vue'),
-        meta: { title: '报表分析', icon: 'Document' }
+        path: 'asset',
+        name: 'Asset',
+        redirect: '/asset/list',
+        meta: { title: '资产与容量', icon: 'OfficeBuilding' },
+        children: [
+          { path: 'list', name: 'AssetList', component: () => import('@/views/asset/index.vue'), meta: { title: '资产台账', icon: 'Document' } },
+          { path: 'cabinet', name: 'AssetCabinet', component: () => import('@/views/asset/cabinet.vue'), meta: { title: '机柜管理', icon: 'Grid' } },
+          { path: 'capacity', name: 'AssetCapacity', component: () => import('@/views/capacity/index.vue'), meta: { title: '容量管理', icon: 'DataAnalysis' } },
+          { path: 'spatial', name: 'AssetSpatial', component: () => import('@/views/topology/spatial.vue'), meta: { title: '空间拓扑', icon: 'OfficeBuilding' } }
+        ]
       },
+
+      // 运维管理
       {
         path: 'operation',
         name: 'Operation',
         redirect: '/operation/workorder',
         meta: { title: '运维管理', icon: 'Tools' },
         children: [
-          {
-            path: 'workorder',
-            name: 'WorkOrder',
-            component: () => import('@/views/operation/workorder.vue'),
-            meta: { title: '工单管理', icon: 'Tickets' }
-          },
-          {
-            path: 'inspection',
-            name: 'Inspection',
-            component: () => import('@/views/operation/inspection.vue'),
-            meta: { title: '巡检管理', icon: 'List' }
-          },
-          {
-            path: 'knowledge',
-            name: 'Knowledge',
-            component: () => import('@/views/operation/knowledge.vue'),
-            meta: { title: '知识库', icon: 'Reading' }
-          }
+          { path: 'workorder', name: 'WorkOrder', component: () => import('@/views/operation/workorder.vue'), meta: { title: '工单管理', icon: 'Tickets' } },
+          { path: 'inspection', name: 'Inspection', component: () => import('@/views/operation/inspection.vue'), meta: { title: '巡检管理', icon: 'List' } },
+          { path: 'knowledge', name: 'Knowledge', component: () => import('@/views/operation/knowledge.vue'), meta: { title: '知识库', icon: 'Reading' } },
+          { path: 'reports', name: 'Reports', component: () => import('@/views/report/index.vue'), meta: { title: '报表分析', icon: 'Document' } },
+          { path: 'history', name: 'History', component: () => import('@/views/history/index.vue'), meta: { title: '历史数据', icon: 'TrendCharts' } }
         ]
       },
+
+      // 虚拟电厂
       {
         path: 'vpp',
         name: 'VPP',
         redirect: '/vpp/analysis',
         meta: { title: '虚拟电厂', icon: 'Connection' },
         children: [
-          {
-            path: 'analysis',
-            name: 'VPPAnalysis',
-            component: () => import('@/views/vpp/VPPAnalysis.vue'),
-            meta: { title: 'VPP方案分析', icon: 'DataAnalysis' }
-          }
-        ]
-      },
-      {
-        path: 'diagnosis',
-        name: 'Diagnosis',
-        redirect: '/diagnosis/results',
-        meta: { title: '智能诊断', icon: 'FirstAidKit' },
-        children: [
-          {
-            path: 'results',
-            name: 'DiagnosisResults',
-            component: () => import('@/views/diagnosis/results.vue'),
-            meta: { title: '诊断结果', icon: 'DataAnalysis' }
-          },
-          {
-            path: 'rules',
-            name: 'DiagnosisRules',
-            component: () => import('@/views/diagnosis/rules.vue'),
-            meta: { title: '诊断规则', icon: 'SetUp' }
-          }
-        ]
-      },
-      {
-        path: 'linkage',
-        name: 'Linkage',
-        redirect: '/linkage/policy',
-        meta: { title: '联动管理', icon: 'Connection' },
-        children: [
-          {
-            path: 'policy',
-            name: 'LinkagePolicy',
-            component: () => import('@/views/linkage/policy.vue'),
-            meta: { title: '联动策略', icon: 'SetUp' }
-          },
-          {
-            path: 'execution',
-            name: 'LinkageExecution',
-            component: () => import('@/views/linkage/execution.vue'),
-            meta: { title: '执行日志', icon: 'Document' }
-          },
-          {
-            path: 'recovery',
-            name: 'LinkageRecovery',
-            component: () => import('@/views/linkage/recovery.vue'),
-            meta: { title: '联动恢复', icon: 'RefreshRight' }
-          },
-          {
-            path: 'timeline',
-            name: 'LinkageTimeline',
-            component: () => import('@/views/linkage/timeline.vue'),
-            meta: { title: '事件时间线', icon: 'Timer' }
-          },
-          {
-            path: 'command',
-            name: 'LinkageCommand',
-            component: () => import('@/views/linkage/command.vue'),
-            meta: { title: '命令管理', icon: 'Operation' }
-          },
-          {
-            path: 'drift',
-            name: 'LinkageDrift',
-            component: () => import('@/views/linkage/drift.vue'),
-            meta: { title: '漂移检测', icon: 'TrendCharts' }
-          }
-        ]
-      },
-      {
-        path: 'video',
-        name: 'VideoManagement',
-        redirect: '/video/cameras',
-        meta: { title: '视频监控', icon: 'VideoCamera' },
-        children: [
-          {
-            path: 'cameras',
-            name: 'VideoCameras',
-            component: () => import('@/views/video/index.vue'),
-            meta: { title: '摄像头管理', icon: 'Camera' }
-          },
-          {
-            path: 'control',
-            name: 'VideoControl',
-            component: () => import('@/views/video/control.vue'),
-            meta: { title: '视频控制', icon: 'VideoPlay' }
-          },
-          {
-            path: 'playback',
-            name: 'VideoPlayback',
-            component: () => import('@/views/video/playback.vue'),
-            meta: { title: '告警回放', icon: 'Timer' }
-          }
-        ]
-      },
-      {
-        path: 'settings',
-        name: 'Settings',
-        component: () => import('@/views/settings/index.vue'),
-        meta: { title: '系统设置', icon: 'Setting' }
-      },
-      {
-        path: 'system',
-        name: 'System',
-        meta: { title: '系统管理', icon: 'Setting' },
-        redirect: '/system/users',
-        children: [
-          {
-            path: 'users',
-            name: 'UserManagement',
-            component: () => import('@/views/system/user.vue'),
-            meta: { title: '用户管理', icon: 'User' }
-          },
-          {
-            path: 'audit-log',
-            name: 'AuditLog',
-            component: () => import('@/views/system/audit-log.vue'),
-            meta: { title: '操作审计', icon: 'Document' }
-          }
+          { path: 'analysis', name: 'VPPAnalysis', component: () => import('@/views/vpp/VPPAnalysis.vue'), meta: { title: 'VPP方案分析', icon: 'DataAnalysis' } }
         ]
       },
 
-      // ===== 旧路由重定向（向后兼容） =====
-      { path: 'energy/monitor', redirect: '/power/monitor' },
-      { path: 'energy/statistics', redirect: '/power/statistics' },
-      { path: 'energy/config', redirect: '/power/config' },
+      // ══════ 配置域 ══════
+
+      // 采集配置
+      {
+        path: 'collection',
+        name: 'Collection',
+        redirect: '/collection/device-manage',
+        meta: { title: '采集配置', icon: 'Connection' },
+        children: [
+          { path: 'device-manage', name: 'DeviceManage', component: () => import('@/views/device-manage/index.vue'), meta: { title: '设备管理', icon: 'SetUp' } },
+          { path: 'device-manage/detail/:id', name: 'DeviceDetail', component: () => import('@/views/device-manage/detail.vue'), meta: { title: '设备详情', icon: 'View', hidden: true } },
+          { path: 'device-status', name: 'DeviceStatus', component: () => import('@/views/device-status/index.vue'), meta: { title: '设备状态看板', icon: 'Odometer' } },
+          { path: 'devices', name: 'Devices', component: () => import('@/views/device/index.vue'), meta: { title: '点位管理', icon: 'Cpu' } },
+          { path: 'datasources', name: 'Datasources', component: () => import('@/views/datasource/index.vue'), meta: { title: '数据源管理', icon: 'Connection' } },
+          { path: 'device-templates', name: 'DeviceTemplates', component: () => import('@/views/device-template/index.vue'), meta: { title: '设备模板', icon: 'Files' } },
+          { path: 'power-config', name: 'PowerConfig', component: () => import('@/views/energy/config.vue'), meta: { title: '配电配置', icon: 'Setting' } },
+          { path: 'gateway', name: 'Gateway', component: () => import('@/views/gateway/index.vue'), meta: { title: '网关管理', icon: 'Connection' } }
+        ]
+      },
+
+      // 策略引擎
+      {
+        path: 'strategy',
+        name: 'Strategy',
+        redirect: '/strategy/linkage/policy',
+        meta: { title: '策略引擎', icon: 'SetUp' },
+        children: [
+          {
+            path: 'alarm-rules',
+            name: 'StrategyAlarmRules',
+            redirect: '/strategy/alarm-rules/thresholds',
+            meta: { title: '告警规则', icon: 'Bell' },
+            children: [
+              { path: 'thresholds', name: 'AlarmThresholds', component: () => import('@/views/alarm/thresholds.vue'), meta: { title: '阈值配置', icon: 'Odometer' } },
+              { path: 'compound', name: 'AlarmCompound', component: () => import('@/views/alarm/compound.vue'), meta: { title: '复合规则', icon: 'Connection' } },
+              { path: 'escalation', name: 'AlarmEscalation', component: () => import('@/views/alarm/escalation.vue'), meta: { title: '升级规则', icon: 'Top' } },
+              { path: 'shield', name: 'AlarmShield', component: () => import('@/views/alarm/shield.vue'), meta: { title: '告警屏蔽', icon: 'TurnOff' } }
+            ]
+          },
+          {
+            path: 'linkage',
+            name: 'StrategyLinkage',
+            redirect: '/strategy/linkage/policy',
+            meta: { title: '联动策略', icon: 'Connection' },
+            children: [
+              { path: 'policy', name: 'LinkagePolicy', component: () => import('@/views/linkage/policy.vue'), meta: { title: '联动策略', icon: 'SetUp' } },
+              { path: 'execution', name: 'LinkageExecution', component: () => import('@/views/linkage/execution.vue'), meta: { title: '执行日志', icon: 'Document' } },
+              { path: 'recovery', name: 'LinkageRecovery', component: () => import('@/views/linkage/recovery.vue'), meta: { title: '联动恢复', icon: 'RefreshRight' } },
+              { path: 'timeline', name: 'LinkageTimeline', component: () => import('@/views/linkage/timeline.vue'), meta: { title: '事件时间线', icon: 'Timer' } },
+              { path: 'command', name: 'LinkageCommand', component: () => import('@/views/linkage/command.vue'), meta: { title: '命令管理', icon: 'Operation' } }
+            ]
+          },
+          {
+            path: 'diagnosis',
+            name: 'StrategyDiagnosis',
+            redirect: '/strategy/diagnosis/results',
+            meta: { title: '智能诊断', icon: 'FirstAidKit' },
+            children: [
+              { path: 'results', name: 'DiagnosisResults', component: () => import('@/views/diagnosis/results.vue'), meta: { title: '诊断结果', icon: 'DataAnalysis' } },
+              { path: 'rules', name: 'DiagnosisRules', component: () => import('@/views/diagnosis/rules.vue'), meta: { title: '诊断规则', icon: 'SetUp' } }
+            ]
+          },
+          { path: 'drift', name: 'StrategyDrift', component: () => import('@/views/linkage/drift.vue'), meta: { title: '漂移检测', icon: 'TrendCharts' } }
+        ]
+      },
+
+      // 系统管理
+      {
+        path: 'system',
+        name: 'System',
+        redirect: '/system/users',
+        meta: { title: '系统管理', icon: 'Setting' },
+        children: [
+          { path: 'users', name: 'UserManagement', component: () => import('@/views/system/user.vue'), meta: { title: '用户管理', icon: 'User' } },
+          { path: 'sites', name: 'SiteManagement', component: () => import('@/views/system/sites.vue'), meta: { title: '站点管理', icon: 'OfficeBuilding' } },
+          { path: 'audit-log', name: 'AuditLog', component: () => import('@/views/system/audit-log.vue'), meta: { title: '操作审计', icon: 'Document' } },
+          { path: 'settings', name: 'SystemSettings', component: () => import('@/views/settings/index.vue'), meta: { title: '系统设置', icon: 'Setting' } },
+          { path: 'site-selection', name: 'SiteSelection', component: () => import('@/views/topology/site-selection.vue'), meta: { title: '智能选址', icon: 'MapLocation' } }
+        ]
+      },
+
+      // ══════ 旧路由兼容重定向 ══════
+      { path: 'power/monitor', redirect: '/energy/monitor' },
+      { path: 'power/statistics', redirect: '/energy/statistics' },
+      { path: 'power/config', redirect: '/collection/power-config' },
+      { path: 'energy-saving/analysis', redirect: '/energy/analysis' },
+      { path: 'energy-saving/regulation', redirect: '/energy/regulation' },
+      { path: 'energy-saving/execution', redirect: '/energy/execution' },
+      { path: 'energy-saving', redirect: '/energy/monitor' },
+      { path: 'infrastructure/asset', redirect: '/asset/list' },
+      { path: 'infrastructure/cabinet', redirect: '/asset/cabinet' },
+      { path: 'infrastructure/capacity', redirect: '/asset/capacity' },
+      { path: 'infrastructure/spatial', redirect: '/asset/spatial' },
+      { path: 'infrastructure/power-topology', redirect: '/collection/power-config' },
+      { path: 'infrastructure/cooling-topology', redirect: '/collection/power-config' },
+      { path: 'infrastructure/site-selection', redirect: '/system/site-selection' },
+      { path: 'infrastructure/fault-impact', redirect: '/asset/capacity' },
+      { path: 'infrastructure', redirect: '/asset/list' },
+      { path: 'devices', redirect: '/collection/devices' },
+      { path: 'datasources', redirect: '/collection/datasources' },
+      { path: 'device-templates', redirect: '/collection/device-templates' },
+      { path: 'device-manage', redirect: '/collection/device-manage' },
+      { path: 'device-status', redirect: '/collection/device-status' },
+      { path: 'history', redirect: '/operation/history' },
+      { path: 'reports', redirect: '/operation/reports' },
+      { path: 'settings', redirect: '/system/settings' },
+      { path: 'linkage/policy', redirect: '/strategy/linkage/policy' },
+      { path: 'linkage/execution', redirect: '/strategy/linkage/execution' },
+      { path: 'linkage/recovery', redirect: '/strategy/linkage/recovery' },
+      { path: 'linkage/timeline', redirect: '/strategy/linkage/timeline' },
+      { path: 'linkage/command', redirect: '/strategy/linkage/command' },
+      { path: 'linkage', redirect: '/strategy/linkage/policy' },
+      { path: 'diagnosis/results', redirect: '/strategy/diagnosis/results' },
+      { path: 'diagnosis/rules', redirect: '/strategy/diagnosis/rules' },
+      { path: 'diagnosis', redirect: '/strategy/diagnosis/results' },
+      { path: 'video/cameras', redirect: '/security/video/cameras' },
+      { path: 'video/control', redirect: '/security/video/control' },
+      { path: 'video/playback', redirect: '/security/video/playback' },
+      { path: 'video', redirect: '/security/video/cameras' },
+      { path: 'energy/config', redirect: '/collection/power-config' },
       { path: 'energy/topology', redirect: '/power/topology' },
-      { path: 'energy/analysis', redirect: '/energy-saving/analysis' },
-      { path: 'energy/regulation', redirect: '/energy-saving/regulation' },
-      { path: 'energy/execution', redirect: '/energy-saving/execution' },
-      { path: 'energy', redirect: '/power/monitor' },
-      { path: 'asset/list', redirect: '/infrastructure/asset' },
-      { path: 'asset/cabinet', redirect: '/infrastructure/cabinet' },
-      { path: 'asset', redirect: '/infrastructure/asset' },
-      { path: 'capacity', name: 'CapacityRedirect', redirect: '/infrastructure/capacity' }
+      { path: 'capacity', name: 'CapacityRedirect', redirect: '/asset/capacity' }
     ]
   }
 ]
