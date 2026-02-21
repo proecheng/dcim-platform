@@ -137,11 +137,11 @@
             ref="uploadRef"
             :auto-upload="false"
             :show-file-list="false"
-            accept="image/*"
+            accept="image/*,.pdf"
             :on-change="handleBillUpload"
             style="display: inline-block; margin-left: 12px;"
           >
-            <el-button type="success">
+            <el-button type="success" :loading="ocrLoading">
               <el-icon><Upload /></el-icon>上传电费单识别
             </el-button>
           </el-upload>
@@ -745,6 +745,100 @@
       @close="shiftDetailDrawerVisible = false"
       @accept-ratio="handleAcceptFromDrawer"
     />
+
+    <!-- 电费单 OCR 识别结果确认对话框 -->
+    <el-dialog
+      v-model="ocrDialogVisible"
+      title="电费单识别结果确认"
+      width="900px"
+      :close-on-click-modal="false"
+    >
+      <div class="ocr-result-container">
+        <!-- 左侧：原图预览 -->
+        <div class="ocr-preview">
+          <div class="ocr-section-title">电费单原图</div>
+          <div class="ocr-image-wrapper">
+            <img v-if="ocrPreviewUrl" :src="ocrPreviewUrl" alt="电费单" />
+            <div v-else class="ocr-no-image">无法预览</div>
+          </div>
+          <div v-if="ocrResult" class="ocr-meta">
+            <el-tag size="small">{{ ocrResult.provider }}</el-tag>
+            <span class="ocr-confidence">
+              整体置信度: <strong>{{ ocrResult.confidence.toFixed(1) }}%</strong>
+            </span>
+          </div>
+        </div>
+        <!-- 右侧：结构化数据 -->
+        <div class="ocr-data">
+          <div class="ocr-section-title">识别数据 <span class="ocr-tip">（可直接编辑修正）</span></div>
+          <el-table :data="ocrEditItems" size="small" stripe>
+            <el-table-column label="时段名称" min-width="120">
+              <template #default="{ row }">
+                <el-input v-model="row.pricing_name" size="small" />
+              </template>
+            </el-table-column>
+            <el-table-column label="时段类型" width="120">
+              <template #default="{ row }">
+                <el-select v-model="row.period_type" size="small">
+                  <el-option label="尖峰" value="sharp" />
+                  <el-option label="高峰" value="peak" />
+                  <el-option label="平段" value="flat" />
+                  <el-option label="低谷" value="valley" />
+                  <el-option label="深谷" value="deep_valley" />
+                </el-select>
+              </template>
+            </el-table-column>
+            <el-table-column label="开始时间" width="100">
+              <template #default="{ row }">
+                <el-input v-model="row.start_time" size="small" placeholder="HH:MM" />
+              </template>
+            </el-table-column>
+            <el-table-column label="结束时间" width="100">
+              <template #default="{ row }">
+                <el-input v-model="row.end_time" size="small" placeholder="HH:MM" />
+              </template>
+            </el-table-column>
+            <el-table-column label="单价(元/kWh)" width="130">
+              <template #default="{ row }">
+                <el-input-number
+                  v-model="row.price"
+                  size="small"
+                  :precision="4"
+                  :step="0.01"
+                  :min="0"
+                  controls-position="right"
+                  :class="{ 'low-confidence': row.confidence < 80 }"
+                />
+              </template>
+            </el-table-column>
+            <el-table-column label="置信度" width="80" align="center">
+              <template #default="{ row }">
+                <el-tag
+                  :type="row.confidence >= 80 ? 'success' : 'warning'"
+                  size="small"
+                >
+                  {{ row.confidence.toFixed(0) }}%
+                </el-tag>
+              </template>
+            </el-table-column>
+          </el-table>
+          <el-alert
+            v-if="hasLowConfidenceItems"
+            type="warning"
+            :closable="false"
+            style="margin-top: 12px;"
+          >
+            <template #title>部分字段置信度较低，请核实黄色高亮的数据</template>
+          </el-alert>
+        </div>
+      </div>
+      <template #footer>
+        <el-button @click="ocrDialogVisible = false">取消</el-button>
+        <el-button type="primary" :loading="ocrImporting" @click="handleOcrConfirm">
+          确认导入
+        </el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -761,8 +855,10 @@ import {
   getPricingList, createPricing, updatePricing, deletePricing,
   getShiftRatioRecommendations, updateDeviceShiftRatio, acceptAllRecommendations,
   getTransformersWithMeters,
+  uploadBillForOcr,
   type Transformer, type MeterPoint, type DistributionPanel, type DistributionCircuit, type ElectricityPricing,
-  type RatioRecommendation, type TransformerWithMeterPoints, type MeterPointDemandInfo
+  type RatioRecommendation, type TransformerWithMeterPoints, type MeterPointDemandInfo,
+  type OcrBillItem, type OcrBillResult
 } from '@/api/modules/energy'
 
 const activeTab = ref('transformer')
@@ -823,6 +919,17 @@ const ratioForm = ref<any>({})
 // 设备详情抽屉
 const shiftDetailDrawerVisible = ref(false)
 const selectedShiftDevice = ref<RatioRecommendation | null>(null)
+
+// OCR 电费单识别状态
+const ocrLoading = ref(false)
+const ocrImporting = ref(false)
+const ocrDialogVisible = ref(false)
+const ocrResult = ref<OcrBillResult | null>(null)
+const ocrPreviewUrl = ref('')
+const ocrEditItems = ref<OcrBillItem[]>([])
+const hasLowConfidenceItems = computed(() =>
+  ocrEditItems.value.some(item => item.confidence < 80)
+)
 
 // 需量配置计算属性
 const totalCapacity = computed(() =>
@@ -1127,15 +1234,82 @@ const handleDeletePricing = async (row: ElectricityPricing) => {
   loadPricing()
 }
 
-const handleBillUpload = (file: any) => {
-  // OCR功能预留 - 后续可接入百度/阿里云OCR识别电费单
-  ElMessage.info('电费单OCR识别功能开发中，请手动添加电价配置')
-  // 未来实现：
-  // 1. 上传图片到后端
-  // 2. 调用OCR接口识别电费单内容
-  // 3. 解析识别结果，提取电价信息
-  // 4. 自动填充pricingList
-  void file // suppress unused variable warning
+const handleBillUpload = async (uploadFile: { raw: File; name: string }) => {
+  const file = uploadFile.raw
+  // 校验文件大小
+  const maxSize = 10 * 1024 * 1024
+  if (file.size > maxSize) {
+    ElMessage.warning('文件大小不能超过10MB')
+    return
+  }
+  // 校验文件类型
+  const validTypes = ['image/jpeg', 'image/png', 'image/jpg', 'application/pdf']
+  if (!validTypes.includes(file.type)) {
+    ElMessage.warning('请上传 JPG/PNG/PDF 格式的文件')
+    return
+  }
+
+  // 生成预览 URL
+  ocrPreviewUrl.value = file.type === 'application/pdf' ? '' : URL.createObjectURL(file)
+  ocrLoading.value = true
+
+  try {
+    const res = await uploadBillForOcr(file)
+    const data = res.data?.data
+    if (!data || !data.success) {
+      const msg = data?.error_message || '识别失败，请手动输入'
+      ElMessage.warning(msg)
+      return
+    }
+    ocrResult.value = data
+    // 深拷贝 items 用于编辑
+    ocrEditItems.value = data.items.map(item => ({ ...item }))
+    ocrDialogVisible.value = true
+  } catch {
+    ElMessage.error('识别失败，请手动输入')
+  } finally {
+    ocrLoading.value = false
+  }
+}
+
+const handleOcrConfirm = async () => {
+  if (ocrEditItems.value.length === 0) {
+    ElMessage.warning('没有可导入的电价数据')
+    return
+  }
+  ocrImporting.value = true
+  try {
+    let successCount = 0
+    for (const item of ocrEditItems.value) {
+      try {
+        await createPricing({
+          pricing_name: item.pricing_name,
+          period_type: item.period_type,
+          start_time: item.start_time,
+          end_time: item.end_time,
+          price: item.price,
+          effective_date: item.effective_date,
+        })
+        successCount++
+      } catch {
+        // 单条失败不阻塞其他条目
+      }
+    }
+    if (successCount > 0) {
+      ElMessage.success(`成功导入 ${successCount} 条电价配置`)
+      ocrDialogVisible.value = false
+      loadPricing()
+    } else {
+      ElMessage.error('导入失败，请手动添加')
+    }
+  } finally {
+    ocrImporting.value = false
+    // 释放预览 URL
+    if (ocrPreviewUrl.value) {
+      URL.revokeObjectURL(ocrPreviewUrl.value)
+      ocrPreviewUrl.value = ''
+    }
+  }
 }
 
 // 需量配置方法
@@ -1640,5 +1814,81 @@ onMounted(() => {
   background-color: var(--bg-tertiary);
   border-radius: 4px;
   font-size: 13px;
+}
+
+// OCR 识别结果对话框样式
+.ocr-result-container {
+  display: flex;
+  gap: 20px;
+  min-height: 360px;
+}
+
+.ocr-preview {
+  flex: 0 0 280px;
+  display: flex;
+  flex-direction: column;
+}
+
+.ocr-data {
+  flex: 1;
+  min-width: 0;
+}
+
+.ocr-section-title {
+  font-weight: 600;
+  font-size: 14px;
+  margin-bottom: 12px;
+  color: var(--text-primary);
+}
+
+.ocr-tip {
+  font-weight: 400;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.ocr-image-wrapper {
+  flex: 1;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--bg-tertiary);
+  min-height: 240px;
+
+  img {
+    max-width: 100%;
+    max-height: 300px;
+    object-fit: contain;
+  }
+}
+
+.ocr-no-image {
+  color: var(--text-placeholder);
+  font-style: italic;
+}
+
+.ocr-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.ocr-confidence {
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+// 低置信度字段高亮
+.low-confidence {
+  :deep(.el-input__wrapper),
+  :deep(.el-input-number__decrease),
+  :deep(.el-input-number__increase) {
+    background-color: rgba(230, 162, 60, 0.15);
+    border-color: var(--warning-color);
+  }
 }
 </style>

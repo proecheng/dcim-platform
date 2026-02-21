@@ -252,7 +252,7 @@ let timer: number | null = null
 // 6大域概览数据
 const domainOverview = ref([
   { name: '供配电', icon: markRaw(Lightning), path: '/power/overview', color: '#409EFF', stat: '运行中' },
-  { name: '制冷系统', icon: markRaw(IceCream), path: '/cooling/overview', color: '#67C23A', stat: '开发中' },
+  { name: '制冷系统', icon: markRaw(IceCream), path: '/cooling/overview', color: '#67C23A', stat: '运行中' },
   { name: '环境监控', icon: markRaw(Sunny), path: '/environment/overview', color: '#E6A23C', stat: '运行中' },
   { name: '安防消防', icon: markRaw(Lock), path: '/security/overview', color: '#F56C6C', stat: '运行中' },
   { name: '基础设施', icon: markRaw(OfficeBuilding), path: '/infrastructure/asset', color: '#909399', stat: '运行中' },

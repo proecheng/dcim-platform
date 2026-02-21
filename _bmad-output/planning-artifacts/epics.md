@@ -1,10 +1,12 @@
 ---
-stepsCompleted: [requirements-inventory, epic-design, story-creation, coverage-map]
+stepsCompleted: [requirements-inventory, epic-design, story-creation, coverage-map, phase2-supplement]
 inputDocuments: [_bmad-output/planning-artifacts/prd.md, _bmad-output/planning-artifacts/architecture.md]
 workflowType: epics-and-stories
 project_name: DCIM
 user_name: proecheng
-date: 2026-02-15
+date: 2026-02-21
+phase2_supplement_date: 2026-02-21
+phase2_supplement_epics: [18, 19, 20, 21, 22, 23]
 ---
 
 # DCIM 算力中心智能监控系统 - Epics & Stories
@@ -1975,4 +1977,445 @@ So that 远程机房的数据可以汇聚到统一平台。
 
 ---
 
-*文档结束 - 共 17 个 Epic，86 个 Story，覆盖 FR1-FR92 全部 92 条功能需求 + 4 项关键 NFR*
+---
+
+## Phase 2 补全 — Epic 18-23：待开发页面实现
+
+**背景：** Epic 1-17 已全部实施完毕。以下 Epic 18-23 针对前端仍使用 PlaceholderView 占位组件的页面和代码级 TODO，将其实现为完整功能页面。
+
+**优先级排序：** P0: Epic 21, 22 → P1: Epic 18, 20 → P2: Epic 19 → P3: Epic 23
+
+### 新增 Epic 总览
+
+| # | Epic | 阶段 | FR 覆盖 | 故事数 |
+|---|------|------|---------|--------|
+| 18 | 环境监控子系统详情页 | Phase 2 补全 | FR21,FR22,FR24,FR35 | 3 |
+| 19 | 安防消防前端可视化 | Phase 2 补全 | FR36,FR37,FR44 | 2 |
+| 20 | 告警规则增强管理页 | Phase 2 补全 | FR27,FR33,FR87 | 4 |
+| 21 | 网关管理前端 | Phase 2 补全 | FR15,FR16,FR17 | 2 |
+| 22 | 站点管理前端 | Phase 2 补全 | FR82 | 1 |
+| 23 | 大屏增强与能源 OCR | Phase 2 补全 | FR22,FR48,愿景 | 3 |
+
+### 新增 Epic 依赖关系
+
+```
+Epic 18 — 独立（后端 API 已就绪）
+Epic 19 — 独立（后端联动引擎已就绪）
+Epic 20 — 独立（后端告警 API 已就绪）
+Epic 21 — 独立（后端网关 API 已就绪）
+Epic 22 — 独立（后端站点 API 需验证，Story 自包含）
+Epic 23 — Story 23.3 需后端新增 OCR API
+所有 Epic 互不依赖，可并行开发。
+```
+
+### 新增 FR 覆盖映射
+
+```
+FR15: Epic 21 - 网关注册展示
+FR16: Epic 21 - 网关状态监控页
+FR17: Epic 21 - 远程配置下发 UI
+FR21(环境): Epic 18 - 环境子系统详情页
+FR22(环境): Epic 18 - 传感器设备详情
+FR22(大屏): Epic 23 - 大屏历史弹窗
+FR24(环境): Epic 18 - 环境设备状态
+FR27: Epic 20 - 阈值配置增强页
+FR33: Epic 20 - 升级规则可视化
+FR35: Epic 18 - 漂移检测关联展示
+FR36: Epic 19 - 消防联动可视化
+FR37: Epic 19 - 消防分级联动展示
+FR44(门禁): Epic 19 - 门禁时间线视图
+FR48(增强): Epic 23 - 电费单 OCR
+FR82: Epic 22 - 多站点管理页
+FR87: Epic 20 - 告警规则前端管理
+```
+
+---
+
+
+## Epic 21: Gateway Management Frontend
+
+**Phase:** Phase 2 Supplement
+**Goal:** Enable operations engineers to view and manage all collection gateways' status and perform remote configuration deployment through the frontend.
+**FR Coverage:** FR15, FR16, FR17
+
+### Story 21.1: Gateway List and Status Monitoring
+
+As a operations engineer,
+I want to view the running status of all collection gateways on the gateway management page,
+So that I can promptly detect gateway failures and understand each gateway's load.
+
+**Acceptance Criteria:**
+
+- **Given** operations engineer enters the gateway management page (`/collection/gateway`)
+- **When** the page loads
+- **Then** display a gateway list table with: gateway name, unique ID, IP address, online/offline status, CPU usage, memory usage, disk usage, last heartbeat time, associated datasource count
+- **And** offline gateways highlighted with red background
+- **And** CPU/memory/disk usage displayed as progress bars, orange above 80%, red above 90%
+- **And** support filtering by status (online/offline) and searching by name
+- **And** clicking a gateway row expands a detail panel showing the datasources and total point count managed by that gateway
+- **And** gateway online/offline status pushed in real-time via WebSocket system channel, no REST API polling needed
+- **And** gateway offline events triggered by backend Redis TTL expiry, frontend immediately updates list status upon receiving offline event
+- **And** page replaces current PlaceholderView component
+- **And** page style consistent with `device-manage/index.vue`, includes 2.5D visual enhancement
+
+**FR Trace:** FR15, FR16
+
+### Story 21.2: Gateway Remote Configuration Deployment
+
+As a operations engineer,
+I want to remotely deploy collection configurations to gateways through the frontend,
+So that I don't need to go on-site to modify gateway configurations.
+
+**Acceptance Criteria:**
+
+- **Given** operations engineer is in the gateway detail panel
+- **When** clicking the "Deploy Configuration" button
+- **Then** a confirmation dialog appears showing the configuration summary to be deployed (datasource count, point count)
+- **And** after confirmation, calls backend API to execute configuration deployment
+- **And** button shows loading state during deployment
+- **And** successful deployment shows success message, failure shows error reason
+- **And** supports viewing gateway configuration deployment history (time, operator, result)
+- **And** when gateway is offline, "Deploy Configuration" button is grayed out with tooltip "Gateway offline, cannot deploy"
+
+**FR Trace:** FR17
+
+---
+
+## Epic 22: Site Management Frontend
+
+**Phase:** Phase 2 Supplement
+**Goal:** Enable operations supervisors to manage multi-site configurations and switch site data in a unified view.
+**FR Coverage:** FR82
+
+### Story 22.1: Site Management CRUD and Switching
+
+As a operations supervisor,
+I want to create, edit, delete sites on the site management page and quickly switch current site in the system,
+So that I can uniformly manage configurations for multiple data centers, and operations staff only see data within their permission scope.
+
+**Acceptance Criteria:**
+
+- **Given** operations supervisor enters the site management page (`/system/sites`)
+- **When** the page loads
+- **Then** display a site list table with: site name, site code, address, contact person, device count, gateway count, status (enabled/disabled), creation time
+- **And** support adding new site (popup form dialog with name, code, address, contact, description)
+- **And** support editing and deleting sites (deletion requires double confirmation, sites with devices cannot be deleted with reason shown)
+- **And** page header or global Header provides a site switcher dropdown component, switching filters all global data by selected site
+- **And** operations staff (non-supervisors) only see sites within their permission scope in the switcher
+- **And** before implementation, check if `backend/app/api/v1/` has sites-related route module; if backend CRUD API is missing, this Story scope includes creating backend site management API (`POST/GET/PUT/DELETE /api/v1/sites`) with corresponding SQLAlchemy Model and Pydantic Schema
+- **And** page replaces current PlaceholderView component
+- **And** page style consistent with `system/user.vue`, includes 2.5D visual enhancement
+
+**FR Trace:** FR82
+
+---
+
+## Epic 18: Environment Monitoring Subsystem Detail Pages
+
+**Phase:** Phase 2 Supplement
+**Goal:** Enable operations engineers to quickly discover temperature/humidity, water leak, smoke/infrared anomalies through zone-grouped visualization, identifying problem areas at a glance.
+**FR Coverage:** FR21 (environment subsystem), FR22 (environment device details), FR24 (environment device status), FR35 (drift correlation display)
+
+### Story 18.1: Temperature and Humidity Monitoring Page
+
+As a operations engineer,
+I want to quickly discover temperature/humidity anomalies through zone-grouped cards on the temperature monitoring page and view real-time data and trends for each sensor,
+So that I can take action before temperature/humidity exceeds limits.
+
+**Acceptance Criteria:**
+
+- **Given** operations engineer enters the temperature/humidity monitoring page (`/environment/temperature`)
+- **When** the page loads
+- **Then** top displays stat cards: total sensors, online count, alarm count, average temperature, average humidity, suspected drift count
+- **And** core area is a **zone/room grouped card layout**, each zone card shows: zone name, sensor count, average temperature/humidity, max/min values, alarm count. Anomaly zone cards highlighted with red border, suspected drift zones with yellow border
+- **And** component architecture reserves heatmap upgrade interface: data layer encapsulated via `composable`, can be replaced with heatmap rendering when sensor location data is ready without refactoring page logic
+- **And** clicking a zone card expands sensor list for that zone, clicking a sensor shows detail panel: device name, current temperature/humidity values, last 24-hour trend chart (ECharts), associated alarm list
+- **And** bottom auxiliary area is a sensor data table, supports filtering by zone, by status (normal/alarm/offline/suspected drift), and searching by name
+- **And** sensors marked as "suspected drift" in data quality have clear identification in both cards and table (yellow icon + tooltip "Data reliability: Low")
+- **And** page receives real-time data updates via WebSocket, cards and table auto-refresh
+- **And** page replaces current PlaceholderView component
+- **And** follows `cooling/overview.vue` "see everything at a glance" design pattern, includes 2.5D visual enhancement
+
+**FR Trace:** FR21, FR22, FR24, FR35
+
+### Story 18.2: Water Leak Detection Page
+
+As a operations engineer,
+I want to view all water leak sensors' real-time status and zone distribution on the water leak detection page,
+So that I can locate the leak position immediately when a leak occurs.
+
+**Acceptance Criteria:**
+
+- **Given** operations engineer enters the water leak detection page (`/environment/water-leak`)
+- **When** the page loads
+- **Then** top displays stat cards: total sensors, online count, alarm count (current leaks), last 24-hour alarm count
+- **And** core area is **zone/room grouped status cards**, each zone shows: zone name, sensor count, current status summary (all normal / has leak alarm). Leak alarm zone cards with red pulse animation
+- **And** clicking a zone card expands sensor list, clicking a sensor shows detail panel: device name, current status (normal/leak/offline), recent alarm records list, installation location description
+- **And** bottom auxiliary area is a sensor list table, supports filtering by status and by zone
+- **And** water leak sensors are DI type (dry contact), state changes trigger alarms rather than threshold judgment
+- **And** page receives real-time status changes via WebSocket
+- **And** page replaces current PlaceholderView component, includes 2.5D visual enhancement
+
+**FR Trace:** FR21, FR24
+
+### Story 18.3: Smoke and Infrared Detection Page
+
+As a operations engineer,
+I want to view all smoke and infrared sensors' real-time status and zone distribution on the smoke/infrared detection page,
+So that I can quickly locate and respond when smoke or intrusion events occur.
+
+**Acceptance Criteria:**
+
+- **Given** operations engineer enters the smoke/infrared detection page (`/environment/smoke-infrared`)
+- **When** the page loads
+- **Then** top displays stat cards: smoke sensor total/alarm count, infrared sensor total/alarm count, last 24-hour event count
+- **And** core area is **zone/room grouped status cards**, each zone shows: zone name, smoke/infrared sensor counts, current status summary. Alarm zone cards highlighted in red
+- **And** clicking a zone card expands sensor list, clicking a sensor shows detail panel: device name, type (smoke/infrared), current status, recent event records, associated linkage policy (if any)
+- **And** when smoke sensor is in alarm, detail panel shows associated fire linkage policy status (configured/not configured)
+- **And** bottom auxiliary area is a sensor list table, supports filtering by type (smoke/infrared) and status
+- **And** sensors are DI type, state changes trigger alarms
+- **And** page receives real-time status changes via WebSocket
+- **And** page replaces current PlaceholderView component, includes 2.5D visual enhancement
+
+**FR Trace:** FR21, FR24
+
+---
+
+## Epic 20: Alarm Rule Enhanced Management Pages
+
+**Phase:** Phase 2 Supplement
+**Goal:** Enable system administrators to get more powerful rule management capabilities in independent pages than the alarm center tabs - batch operations, visual editors, rule test preview.
+**FR Coverage:** FR27 (threshold configuration), FR33 (escalation rules), FR87 (alarm rule frontend management)
+
+### Story 20.1: Threshold Configuration Enhanced Page
+
+As a system administrator,
+I want to batch manage alarm thresholds on an independent threshold configuration page and visually see the relationship between thresholds and real-time data through visual threshold lines,
+So that I can efficiently configure reasonable alarm thresholds for large numbers of points, avoiding false alarms and missed alarms.
+
+**Acceptance Criteria:**
+
+- **Given** system administrator enters the threshold configuration page (`/strategy/alarm-rules/thresholds`)
+- **When** the page loads
+- **Then** display threshold rule list table with: rule name, associated point/device type, 4-level thresholds (info/minor/major/critical), enabled status, last trigger time
+- **And** support batch filtering by device type (e.g. "all temperature/humidity sensors", "all UPS")
+- **And** support batch operations: batch enable/disable, batch modify thresholds for same device type
+- **And** when adding/editing threshold rules, popup configuration dialog includes **visual threshold line preview**: ECharts trend chart showing the point's last 24-hour data, 4-level thresholds overlaid as colored horizontal lines (info-blue, minor-yellow, major-orange, critical-red), dragging threshold lines directly adjusts threshold values
+- **And** support single rule CRUD operations (create/edit/delete/enable/disable)
+- **And** deletion requires double confirmation
+- **And** page replaces current PlaceholderView component, includes 2.5D visual enhancement
+
+**FR Trace:** FR27, FR87
+
+### Story 20.2: Compound Rule Configuration Page
+
+As a system administrator,
+I want to configure multi-condition compound alarm rules through a visual editor on an independent compound rule page and preview rule trigger effects,
+So that I can create more precise alarm rules, reducing false alarms from single threshold judgment.
+
+**Acceptance Criteria:**
+
+- **Given** system administrator enters the compound rule page (`/strategy/alarm-rules/compound`)
+- **When** the page loads
+- **Then** display compound rule list table with: rule name, condition count, logic relationship (AND/OR), associated devices, enabled status, last trigger time
+
+**Must Deliver:**
+- **And** when adding/editing rules, popup condition editor form: support adding multiple condition rows, each row selects: point -> comparison operator (>, <, =, >=, <=) -> threshold value; conditions support AND/OR logic selection (dropdown); support nested condition groups
+- **And** editor bottom provides **rule test preview** function: input simulated point values, **simple conditions (threshold comparison, AND/OR combination) calculated purely in frontend JavaScript with real-time trigger result display**
+
+**Enhancement (non-blocking):**
+- **And** visual connection lines between conditions showing logic relationships (enhanced interaction, can iterate later)
+- **And** complex conditions (time windows, frequency statistics) reserve backend test API endpoint `POST /api/v1/alarms/rules/test`
+
+- **And** support rule CRUD and enable/disable operations
+- **And** page replaces current PlaceholderView component, includes 2.5D visual enhancement
+
+**FR Trace:** FR87
+
+### Story 20.3: Escalation Rule Management Page
+
+As a system administrator,
+I want to configure alarm timeout escalation chains through a visual interface on an independent escalation rule page,
+So that I can ensure important alarms automatically escalate notification to supervisors when not handled in time.
+
+**Acceptance Criteria:**
+
+- **Given** system administrator enters the escalation rule page (`/strategy/alarm-rules/escalation`)
+- **When** the page loads
+- **Then** display escalation rule list table with: rule name, applicable alarm level, escalation chain layers, notification person count, enabled status
+
+**Must Deliver:**
+- **And** when adding/editing rules, popup configuration panel with **vertical list form** showing escalation chain: each row is an escalation node showing sequence number, timeout input (minutes), notification method selection, notification person selection, alarm level upgrade toggle
+- **And** support adding/deleting escalation nodes, up/down arrows to adjust order
+
+**Enhancement (non-blocking):**
+- **And** escalation chain displayed as visual flowchart with connection lines and arrows between nodes (enhanced interaction, can iterate later)
+- **And** drag to adjust node order
+
+- **And** support configuring different escalation chains for different alarm levels (e.g. minor alarm 30-min escalation, major alarm 10-min escalation)
+- **And** support rule CRUD and enable/disable operations
+- **And** page replaces current PlaceholderView component, includes 2.5D visual enhancement
+
+**FR Trace:** FR33, FR87
+
+### Story 20.4: Alarm Shield Management Page
+
+As a system administrator,
+I want to manage shielding policies through a calendar view on an independent alarm shield page, supporting batch shielding by zone and device type,
+So that I can temporarily shield alarms during device maintenance, system upgrades and other scenarios, avoiding large volumes of invalid alarms disturbing operations.
+
+**Acceptance Criteria:**
+
+- **Given** system administrator enters the alarm shield page (`/strategy/alarm-rules/shield`)
+- **When** the page loads
+- **Then** top displays **calendar view**, showing currently active and planned shielding policies on a timeline, different shielding scopes distinguished by different colors
+- **And** bottom displays shielding policy list table with: policy name, shielding scope (global/zone/device type/specific device), shielding period (start-end), shielded alarm levels, status (active/expired/planned), creator
+- **And** when adding shielding policy, supports:
+  - Batch shield by zone (select zone, shield all device alarms in that zone)
+  - Batch shield by device type (e.g. shield all AC alarms)
+  - Shield by specific device
+  - Configure shielding period (start time, end time, support "take effect immediately" or "scheduled")
+  - Select shielded alarm levels (multi-select: info/minor/major/critical)
+- **And** expired shielding policies automatically marked as "expired", no longer effective
+- **And** support early termination of active shielding policies
+- **And** support policy CRUD operations
+- **And** page replaces current PlaceholderView component, includes 2.5D visual enhancement
+
+**FR Trace:** FR87
+
+---
+
+## Epic 19: Security and Fire Protection Frontend Visualization
+
+**Phase:** Phase 2 Supplement
+**Goal:** Enable operations engineers to view access control entry/exit records and anomaly events through timeline view, and view fire linkage policy visual execution status.
+**FR Coverage:** FR36 (linkage policy visualization), FR37 (fire graded linkage display), FR44 (access control association)
+
+### Story 19.1: Access Control Management Page
+
+As a operations engineer,
+I want to view all access control device status on the access control management page and browse entry/exit records and anomaly events through a timeline view,
+So that I can monitor data center access in real-time and quickly discover security anomalies like unauthorized access.
+
+**Acceptance Criteria:**
+
+- **Given** operations engineer enters the access control management page (`/security/access-control`)
+- **When** the page loads
+- **Then** top displays stat cards: total access control devices, online count, alarm count (anomaly events), today's total entry/exit count
+- **And** left side displays access control device list, each device shows: name, location, current status (normal closed/normal open/anomaly/offline), last event time
+- **And** right side core area is a **timeline view**, vertically displaying entry/exit records for the selected access control device along a time axis:
+  - Each record shows: time, event type (card swipe open/remote open/anomaly open/fire linkage open), personnel info (if available), result (success/failure)
+  - Anomaly events (unauthorized time period access, multiple card swipe failures, forced entry) highlighted in red with warning icon
+  - Fire linkage door open events marked in orange showing associated linkage policy name
+- **And** timeline supports filtering by date range and by event type
+- **And** clicking different access control devices in the device list, right side timeline automatically switches to that device's records
+- **And** access control device data sourced from dry contact signals converted through Modbus I/O collection module (DI type), state changes trigger events
+- **And** page receives real-time access control events via WebSocket
+- **And** page replaces current PlaceholderView component, includes 2.5D visual enhancement
+
+**FR Trace:** FR44
+
+### Story 19.2: Fire Linkage Visualization Page
+
+As a operations engineer,
+I want to view all linkage policies' configuration status and historical execution records on the fire linkage page, and review the complete process of linkage events through a visual timeline,
+So that I can confirm linkage policies are correctly configured and efficiently review the complete handling chain of fire events after the fact.
+
+**Acceptance Criteria:**
+
+- **Given** operations engineer enters the fire linkage page (`/security/fire-linkage`)
+- **When** the page loads
+- **Then** top displays stat cards: total linkage policies, enabled count, last 30-day trigger count, average response time
+
+**Policy Configuration Area:**
+- **And** display fire linkage policy list, each policy shows: name, trigger condition (single sensor warning/multi-sensor linkage), linkage action count, enabled status
+- **And** clicking a policy expands **linkage action chain visualization**: horizontal flowchart showing trigger condition -> action 1 (shut AC) -> action 2 (open access) -> action 3 (cut power) -> action 4 (start exhaust) -> action 5 (open lighting) -> action 6 (activate video) -> notification, each action node shows target device and expected response time
+- **And** graded linkage distinguished by different colors: warning level (yellow) notification + video only, linkage level (red) executes all actions
+
+**Execution History Area:**
+- **And** display linkage execution history list, each record includes: trigger time, trigger source (sensor name), linkage level (warning/linkage), execution result (all success/partial failure), duration
+- **And** clicking a history record expands **event timeline**: vertical time axis showing complete chain from detection to recovery, each node shows: timestamp, action description, execution result (success check/failure X), time taken
+- **And** failed action nodes highlighted in red showing failure reason
+- **And** timeline bottom shows recovery status: recovered/pending recovery, and each device's recovery progress
+- **And** page replaces current PlaceholderView component, includes 2.5D visual enhancement
+
+**FR Trace:** FR36, FR37
+
+---
+
+## Epic 23: Bigscreen Enhancement and Energy OCR
+
+**Phase:** Phase 2 Supplement
+**Goal:** Enable operations engineers to view device historical data popups on the bigscreen and 3D floor scenes; enable energy managers to auto-fill electricity pricing configuration through OCR recognition of electricity bills.
+**FR Coverage:** FR22 (bigscreen version historical data), FR48 (electricity pricing enhancement), Vision feature (3D floor scene)
+**Note:** 3 Stories are independently deliverable with different tech stacks.
+
+### Story 23.1: Bigscreen Device Historical Data Popup
+
+As a operations engineer,
+I want to view a device's historical data trend popup when clicking a device on the bigscreen,
+So that I can quickly understand device operation trends in the bigscreen monitoring scenario without switching to the management backend.
+
+**Acceptance Criteria:**
+
+- **Given** operations engineer on the bigscreen page (`/bigscreen`) has selected a device
+- **When** clicking the "View History" button in the device detail panel
+- **Then** popup a historical data dialog (fullscreen modal, dark theme consistent with bigscreen style)
+- **And** dialog top shows device name, device type, current status
+- **And** core area is an ECharts trend chart, defaulting to show all AI-type points' last 24-hour data curves for that device
+- **And** support switching time range: last 1 hour / 6 hours / 24 hours / 7 days
+- **And** support checking/unchecking specific points to control which curves display in the trend chart
+- **And** trend chart overlays alarm threshold lines (if configured), above-threshold areas marked with semi-transparent red background
+- **And** replaces current `handleViewHistory` function's `console.log` placeholder logic
+- **And** dialog supports ESC to close, clicking overlay to close
+
+**FR Trace:** FR22
+
+### Story 23.2: Bigscreen 3D Floor Scene Loading
+
+As a operations engineer,
+I want to load corresponding 3D scenes by floor when switching to 3D mode on the bigscreen,
+So that I can intuitively view the spatial distribution and running status of data center equipment through a three-dimensional perspective.
+
+**Acceptance Criteria:**
+
+- **Given** operations engineer on the bigscreen page, currently in 3D mode
+- **When** switching the floor selector to a specific floor
+- **Then** **procedurally generate a 3D scene** based on cabinet spatial topology data (row/column numbers, hot/cold aisle assignment): use Three.js BoxGeometry for cabinets (arranged by rows and columns), PlaneGeometry for floor, different colors distinguishing cold aisles (blue semi-transparent) and hot aisles (red semi-transparent)
+- **And** scene displays procedurally generated cabinet row/column layout, cabinet dimensions proportional to standard 42U, spacing based on hot/cold aisle width
+- **And** if backend has spatial topology data (row/column numbers), fetch from API; if no data, use default 4x10 cabinet layout as demo
+- **And** device models colored by real-time status: normal-green, alarm-red pulse, offline-gray
+- **And** support mouse/touch interaction: rotate (left-click drag), zoom (scroll wheel), pan (right-click drag)
+- **And** clicking a device model triggers device selection event, linking to right-side device detail panel
+- **And** 3D scene generation failure or browser not supporting WebGL automatically degrades to 2D floor plan
+- **And** if floor has no corresponding spatial topology data, maintain current 2D floor plan mode and log a console message
+- **And** replaces current `handleFloorChange` function's 3D mode TODO comment logic
+
+**FR Trace:** Vision feature (Digital Twin Bigscreen)
+
+### Story 23.3: Electricity Bill OCR Recognition
+
+As a energy manager,
+I want to upload an electricity bill image and have the system automatically recognize and extract electricity pricing information to fill the configuration form,
+So that I don't need to manually input electricity pricing data item by item, reducing input errors and workload.
+
+**Acceptance Criteria:**
+
+- **Given** energy manager on the power distribution configuration page (`/collection/power-config`) in the electricity pricing configuration area
+- **When** clicking the "Upload Electricity Bill" button and selecting an image file (supports JPG/PNG/PDF, <=10MB)
+- **Then** image uploaded to backend OCR recognition endpoint
+- **And** backend calls OCR service (PaddleOCR local deployment preferred to avoid cloud API dependency and costs; if deployment is difficult, can degrade to Baidu Cloud/Alibaba Cloud OCR API requiring API Key configuration) to recognize electricity bill content
+- **And** MVP stage supports **1-2 common electricity bill templates** (State Grid, China Southern Power Grid standard formats); for other format bills where overall OCR confidence is below 60%, prompt "This bill format is not yet supported, please input manually"
+- **And** backend parses recognition results, extracting key information: electricity rates (peak/high/flat/valley/deep valley), time period divisions, basic electricity fee, power factor adjustment fee
+- **And** after recognition, frontend pops up **recognition result confirmation dialog**: left side shows original image, right side shows extracted structured data, each field can be manually corrected
+- **And** after user confirmation, auto-fills the electricity pricing configuration form
+- **And** fields with recognition confidence below 80% highlighted in yellow, prompting user to verify
+- **And** OCR recognition failure shows friendly error message "Recognition failed, please input manually", does not block normal flow
+- **And** replaces current `handleBillUpload` function's placeholder logic
+- **And** requires new backend API endpoint: `POST /api/v1/energy/ocr/bill` (receives image, returns structured electricity pricing data)
+
+**FR Trace:** FR48
+
+---
+
+*Document updated - Total 23 Epics, 100 Stories, covering FR1-FR92 all 92 functional requirements + 4 key NFRs + Phase 2 supplement pages*

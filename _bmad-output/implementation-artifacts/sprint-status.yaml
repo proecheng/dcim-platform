@@ -1,19 +1,42 @@
-# generated: 2026-02-20
+# generated: 2026-02-21
 # project: DCIM
 # project_key: NOKEY
 # tracking_system: file-system
 # story_location: _bmad-output/implementation-artifacts
 
 # STATUS DEFINITIONS:
-#   backlog       - Not yet started
-#   in-progress   - Currently being worked on
-#   review        - In code review or QA
-#   done          - Completed and verified
-#   blocked       - Cannot proceed due to dependency or issue
-#   cancelled     - No longer needed
-#   optional      - May be done if time permits (used for retrospectives)
+# ==================
+# Epic Status:
+#   - backlog: Epic not yet started
+#   - in-progress: Epic actively being worked on
+#   - done: All stories in epic completed
+#
+# Story Status:
+#   - backlog: Story only exists in epic file
+#   - ready-for-dev: Story file created in stories folder
+#   - in-progress: Developer actively working on implementation
+#   - review: Implementation complete, ready for review
+#   - done: Story completed and verified
+#
+# Retrospective Status:
+#   - optional: Can be completed but not required
+#   - done: Retrospective has been completed
+#
+# WORKFLOW NOTES:
+# ===============
+# - Epic transitions to 'in-progress' automatically when first story is created
+# - Stories can be worked in parallel if team capacity allows
+# - SM typically creates next story after previous one is 'done' to incorporate learnings
+# - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
+#
+# PRIORITY (Epic 18-23):
+# ======================
+# P0: Epic 21 (网关管理), Epic 22 (站点管理)
+# P1: Epic 18 (环境监控), Epic 20 (告警规则增强)
+# P2: Epic 19 (安防消防)
+# P3: Epic 23 (大屏+OCR)
 
-generated: 2026-02-20
+generated: 2026-02-21
 project: DCIM
 project_key: NOKEY
 tracking_system: file-system
@@ -173,3 +196,47 @@ development_status:
   17-3-list-form-25d-enhancement: done
   17-4-special-page-25d-enhancement: done
   epic-17-retrospective: done
+
+  # ============================================================
+  # Phase 2 补充 - 待开发前端页面 (Epic 18-23)
+  # 新增于 2026-02-21，替换 PlaceholderView 占位页面
+  # ============================================================
+
+  # Epic 18: 环境监控子系统详情页 (P1)
+  epic-18: in-progress
+  18-1-temperature-and-humidity-monitoring-page: done
+  18-2-water-leak-detection-page: done
+  18-3-smoke-and-infrared-detection-page: done
+  epic-18-retrospective: optional
+
+  # Epic 19: 安防消防前端可视化 (P2)
+  epic-19: in-progress
+  19-1-access-control-management-page: done
+  19-2-fire-linkage-visualization-page: done
+  epic-19-retrospective: optional
+
+  # Epic 20: 告警规则增强管理页 (P1)
+  epic-20: in-progress
+  20-1-threshold-configuration-enhanced-page: done
+  20-2-compound-rule-configuration-page: done
+  20-3-escalation-rule-management-page: done
+  20-4-alarm-shield-management-page: done
+  epic-20-retrospective: optional
+
+  # Epic 21: 网关管理前端 (P0)
+  epic-21: in-progress
+  21-1-gateway-list-and-status-monitoring: done
+  21-2-gateway-remote-configuration-deployment: done
+  epic-21-retrospective: optional
+
+  # Epic 22: 站点管理前端 (P0)
+  epic-22: in-progress
+  22-1-site-management-crud-and-switching: done
+  epic-22-retrospective: optional
+
+  # Epic 23: 大屏增强与能源 OCR (P3)
+  epic-23: in-progress
+  23-1-bigscreen-device-historical-data-popup: done
+  23-2-bigscreen-3d-floor-scene-loading: done
+  23-3-electricity-bill-ocr-recognition: done
+  epic-23-retrospective: optional

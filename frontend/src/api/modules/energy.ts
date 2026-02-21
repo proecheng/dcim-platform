@@ -2387,3 +2387,36 @@ export function getEnergyReportPreview(params: { year: number; month: number }) 
 export function exportEnergyReport(params: { year: number; month: number; format: 'excel' | 'pdf' }) {
   return request.get('/v1/energy/report/export', { params, responseType: 'blob' })
 }
+
+// ==================== 电费单 OCR 识别 ====================
+
+/** OCR 识别的单条电价数据 */
+export interface OcrBillItem {
+  pricing_name: string
+  period_type: 'sharp' | 'peak' | 'flat' | 'valley' | 'deep_valley'
+  start_time: string
+  end_time: string
+  price: number
+  confidence: number
+  effective_date: string
+}
+
+/** 电费单 OCR 识别结果 */
+export interface OcrBillResult {
+  success: boolean
+  confidence: number
+  provider: string
+  items: OcrBillItem[]
+  raw_text?: string
+  error_message?: string
+}
+
+/** 上传电费单进行 OCR 识别 */
+export function uploadBillForOcr(file: File) {
+  const formData = new FormData()
+  formData.append('file', file)
+  return request.post<ResponseModel<OcrBillResult>>('/v1/energy/ocr/bill', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+    timeout: 30000,
+  })
+}

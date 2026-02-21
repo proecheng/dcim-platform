@@ -5,7 +5,7 @@
 from typing import Optional, List, Dict, Any
 from datetime import date, datetime, timedelta
 from io import BytesIO
-from fastapi import APIRouter, Depends, Query, HTTPException
+from fastapi import APIRouter, Depends, Query, HTTPException, UploadFile, File
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, update, delete
@@ -4191,4 +4191,65 @@ async def export_energy_report(
         file_buffer,
         media_type=media_type,
         headers={"Content-Disposition": f"attachment; filename={filename}"},
+    )
+
+
+# ==================== 电费单 OCR 识别 ====================
+
+
+@router.post("/ocr/bill", response_model=ResponseModel, summary="电费单OCR识别")
+async def ocr_bill(
+    file: UploadFile = File(..., description="电费单图片文件(JPG/PNG/PDF, ≤10MB)"),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    上传电费单图片，OCR 识别并返回结构化电价数据。
+
+    MVP 阶段支持国家电网、南方电网标准格式。
+    PaddleOCR 未安装时自动降级为 mock 模式。
+    """
+    from ...services.ocr_service import recognize_bill
+    from ...schemas.energy import OcrBillResultSchema, OcrBillItemSchema
+
+    file_bytes = await file.read()
+    filename = file.filename or "unknown.jpg"
+
+    result = await recognize_bill(file_bytes, filename)
+
+    if not result.success:
+        return ResponseModel(
+            code=200,
+            message=result.error_message or "识别失败，请手动输入",
+            data=OcrBillResultSchema(
+                success=False,
+                confidence=0,
+                provider="unknown",
+                items=[],
+                error_message=result.error_message,
+            ).model_dump(),
+        )
+
+    items = [
+        OcrBillItemSchema(
+            pricing_name=item.pricing_name,
+            period_type=item.period_type,
+            start_time=item.start_time,
+            end_time=item.end_time,
+            price=item.price,
+            confidence=item.confidence,
+            effective_date=item.effective_date,
+        )
+        for item in result.items
+    ]
+
+    return ResponseModel(
+        code=200,
+        message="识别成功",
+        data=OcrBillResultSchema(
+            success=True,
+            confidence=result.confidence,
+            provider=result.provider,
+            items=items,
+            raw_text=result.raw_text,
+        ).model_dump(),
     )

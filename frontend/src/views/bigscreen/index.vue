@@ -18,6 +18,14 @@
       @elementClick="handleFloorElementClick"
     />
 
+    <!-- 3D楼层场景 (3D模式下且有楼层3D数据时显示) -->
+    <BigscreenFloor3D
+      v-if="viewMode === '3d' && floor3DActive"
+      :floorCode="currentFloor"
+      @cabinetClick="handleFloor3DCabinetClick"
+      @fallback="handleFloor3DFallback"
+    />
+
     <!-- 悬浮面板层 -->
     <div class="overlay-panels">
       <!-- 顶部状态栏 -->
@@ -162,6 +170,12 @@
         @close="contextMenuVisible = false"
         @select="handleContextMenuSelect"
       />
+
+      <!-- 历史数据弹窗 -->
+      <BigscreenHistoryDialog
+        v-model:visible="historyDialogVisible"
+        :deviceId="historyDeviceId"
+      />
     </div>
   </div>
 </template>
@@ -198,6 +212,8 @@ import { useEntranceAnimation } from '@/composables/bigscreen/useEntranceAnimati
 import { useKeyboardShortcuts } from '@/composables/bigscreen/useKeyboardShortcuts'
 import { useTheme } from '@/composables/bigscreen/useTheme'
 import { ContextMenu, ThemeSelector, type ContextMenuItem } from '@/components/bigscreen/ui'
+import BigscreenHistoryDialog from '@/components/bigscreen/BigscreenHistoryDialog.vue'
+import BigscreenFloor3D from '@/components/bigscreen/BigscreenFloor3D.vue'
 import type { SceneMode } from '@/types/bigscreen'
 
 const store = useBigscreenStore()
@@ -209,6 +225,7 @@ const isSceneReady = ref(false)
 const currentFloor = ref('F1')
 const viewMode = ref<'2d' | '3d'>('3d')
 const floorMapData2D = ref<MapData2D | null>(null)
+const floor3DActive = ref(false)
 
 // 屏幕自适应
 const screenAdapt = useScreenAdapt({
@@ -224,6 +241,10 @@ const entranceAnimation = useEntranceAnimation({
 
 // 主题管理
 const { currentThemeName, setTheme } = useTheme()
+
+// 历史数据弹窗状态
+const historyDialogVisible = ref(false)
+const historyDeviceId = ref('')
 
 // 右键菜单状态
 const contextMenuVisible = ref(false)
@@ -420,10 +441,10 @@ function handleLocateDevice(deviceId: string) {
   })
 }
 
-// 查看历史（占位，后续实现）
+// 查看历史 — 打开历史数据弹窗
 function handleViewHistory(deviceId: string) {
-  console.log('View history for:', deviceId)
-  // TODO: 打开历史数据弹窗
+  historyDeviceId.value = deviceId
+  historyDialogVisible.value = true
 }
 
 // 定位告警设备
@@ -484,11 +505,24 @@ function handleFloorChange(data: { floor: string; mode: '2d' | '3d'; mapData: an
 
   if (data.mode === '2d') {
     floorMapData2D.value = data.mapData as MapData2D
+    floor3DActive.value = false
   } else {
     floorMapData2D.value = null
-    // 3D模式下，可以根据楼层加载不同的3D场景数据
-    // TODO: 加载对应楼层的3D场景
+    // 3D模式下，激活楼层3D场景组件
+    floor3DActive.value = true
   }
+}
+
+// 处理3D楼层场景中的机柜点击
+function handleFloor3DCabinetClick(cabinetId: string) {
+  store.selectDevice(cabinetId)
+}
+
+// 处理3D场景降级（WebGL不支持）
+function handleFloor3DFallback() {
+  console.warn('[Bigscreen] 3D场景降级到2D模式')
+  floor3DActive.value = false
+  viewMode.value = '2d'
 }
 
 // 处理2D平面图元素点击
@@ -510,6 +544,10 @@ onMounted(() => {
     onToggleTour: handleToggleTour,
     onToggleHeatmap: () => store.toggleLayer('heatmap'),
     onEscape: () => {
+      if (historyDialogVisible.value) {
+        historyDialogVisible.value = false
+        return
+      }
       contextMenuVisible.value = false
       store.selectDevice(null)
     }

@@ -2114,3 +2114,29 @@ class TopologyNodeResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+# ========== 电费单 OCR 识别 ==========
+
+
+class OcrBillItemSchema(BaseModel):
+    """OCR 识别的单条电价数据"""
+
+    pricing_name: str = Field(..., description="时段名称")
+    period_type: str = Field(..., description="时段类型: sharp/peak/flat/valley/deep_valley")
+    start_time: str = Field(..., description="开始时间 HH:MM")
+    end_time: str = Field(..., description="结束时间 HH:MM")
+    price: float = Field(..., description="电价 元/kWh")
+    confidence: float = Field(..., description="字段级置信度 0-100")
+    effective_date: str = Field(..., description="生效日期 YYYY-MM-DD")
+
+
+class OcrBillResultSchema(BaseModel):
+    """电费单 OCR 识别结果"""
+
+    success: bool = Field(..., description="是否识别成功")
+    confidence: float = Field(0, description="整体置信度 0-100")
+    provider: str = Field("unknown", description="电网供应商: 国家电网/南方电网/unknown")
+    items: List[OcrBillItemSchema] = Field(default_factory=list, description="识别的电价条目")
+    raw_text: Optional[str] = Field(None, description="原始 OCR 文本（调试用）")
+    error_message: Optional[str] = Field(None, description="错误信息")
