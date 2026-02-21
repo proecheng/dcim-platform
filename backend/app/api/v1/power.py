@@ -464,9 +464,7 @@ async def get_cabinet_branches(
     from ...models.energy import DistributionPanel, DistributionCircuit
 
     # 通过 device_id 找到对应的 DistributionPanel
-    panel_r = await db.execute(
-        select(DistributionPanel).where(DistributionPanel.device_id == device_id)
-    )
+    panel_r = await db.execute(select(DistributionPanel).where(DistributionPanel.device_id == device_id))
     panel = panel_r.scalar_one_or_none()
 
     if not panel:
@@ -484,26 +482,30 @@ async def get_cabinet_branches(
 
     # 查询该 panel 下的所有回路
     circuits_r = await db.execute(
-        select(DistributionCircuit).where(
+        select(DistributionCircuit)
+        .where(
             DistributionCircuit.panel_id == panel.id,
             DistributionCircuit.is_enabled == True,
-        ).order_by(DistributionCircuit.circuit_code)
+        )
+        .order_by(DistributionCircuit.circuit_code)
     )
     circuits = circuits_r.scalars().all()
 
     branches = []
     for c in circuits:
-        branches.append({
-            "branch_name": c.circuit_name,
-            "circuit_code": c.circuit_code,
-            "rated_current": c.rated_current,
-            "breaker_type": c.breaker_type,
-            "load_type": c.load_type,
-            "current": None,
-            "voltage": None,
-            "power": None,
-            "breaker_status": "on" if c.is_enabled else "off",
-        })
+        branches.append(
+            {
+                "branch_name": c.circuit_name,
+                "circuit_code": c.circuit_code,
+                "rated_current": c.rated_current,
+                "breaker_type": c.breaker_type,
+                "load_type": c.load_type,
+                "current": None,
+                "voltage": None,
+                "power": None,
+                "breaker_status": "on" if c.is_enabled else "off",
+            }
+        )
 
     return {"branches": branches, "panel_id": panel.id}
 

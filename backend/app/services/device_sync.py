@@ -78,9 +78,7 @@ class DeviceSyncService:
         self._set_syncing(True)
         try:
             # 先检查是否已有同编码的 Device（避免唯一约束冲突）
-            existing = await self.db.execute(
-                select(Device).where(Device.device_code == panel.panel_code)
-            )
+            existing = await self.db.execute(select(Device).where(Device.device_code == panel.panel_code))
             device = existing.scalar_one_or_none()
             if device:
                 # 已存在，直接关联
@@ -118,9 +116,7 @@ class DeviceSyncService:
         self._set_syncing(True)
         try:
             # 先检查是否已有同编码的 Device
-            existing = await self.db.execute(
-                select(Device).where(Device.device_code == power_device.device_code)
-            )
+            existing = await self.db.execute(select(Device).where(Device.device_code == power_device.device_code))
             device = existing.scalar_one_or_none()
             if device:
                 power_device.monitor_device_id = device.id
@@ -144,9 +140,7 @@ class DeviceSyncService:
             # UPS 自动创建扩展记录
             if device_type == "UPS":
                 # 检查是否已有 UPSDevice 扩展
-                ups_existing = await self.db.execute(
-                    select(UPSDevice).where(UPSDevice.device_id == device.id)
-                )
+                ups_existing = await self.db.execute(select(UPSDevice).where(UPSDevice.device_id == device.id))
                 if not ups_existing.scalar_one_or_none():
                     ups = UPSDevice(
                         device_id=device.id,
@@ -174,9 +168,7 @@ class DeviceSyncService:
             if device.device_type in self.PANEL_DEVICE_TYPES:
                 # 检查是否已有同编码的 Panel
                 existing = await self.db.execute(
-                    select(DistributionPanel).where(
-                        DistributionPanel.panel_code == device.device_code
-                    )
+                    select(DistributionPanel).where(DistributionPanel.panel_code == device.device_code)
                 )
                 panel = existing.scalar_one_or_none()
                 if panel:
@@ -202,9 +194,7 @@ class DeviceSyncService:
             elif device.device_type in self.POWER_DEVICE_TYPES:
                 # 检查是否已有同编码的 PowerDevice
                 existing = await self.db.execute(
-                    select(PowerDevice).where(
-                        PowerDevice.device_code == device.device_code
-                    )
+                    select(PowerDevice).where(PowerDevice.device_code == device.device_code)
                 )
                 pd = existing.scalar_one_or_none()
                 if pd:
@@ -212,9 +202,7 @@ class DeviceSyncService:
                     return ("device", pd.id)
 
                 # 创建新 PowerDevice（未挂载到任何回路，用户可在拓扑中拖拽连接）
-                power_type = self.DEVICE_TO_POWER_TYPE_MAP.get(
-                    device.device_type, "OTHER"
-                )
+                power_type = self.DEVICE_TO_POWER_TYPE_MAP.get(device.device_type, "OTHER")
                 pd = PowerDevice(
                     device_code=device.device_code,
                     device_name=device.device_name,
@@ -241,9 +229,7 @@ class DeviceSyncService:
             return
         self._set_syncing(True)
         try:
-            result = await self.db.execute(
-                select(Device).where(Device.id == panel.device_id)
-            )
+            result = await self.db.execute(select(Device).where(Device.id == panel.device_id))
             device = result.scalar_one_or_none()
             if device:
                 device.device_name = panel.panel_name
@@ -258,9 +244,7 @@ class DeviceSyncService:
             return
         self._set_syncing(True)
         try:
-            result = await self.db.execute(
-                select(Device).where(Device.id == power_device.monitor_device_id)
-            )
+            result = await self.db.execute(select(Device).where(Device.id == power_device.monitor_device_id))
             device = result.scalar_one_or_none()
             if device:
                 device.device_name = power_device.device_name
@@ -277,9 +261,7 @@ class DeviceSyncService:
         try:
             if device.device_type in self.PANEL_DEVICE_TYPES:
                 result = await self.db.execute(
-                    select(DistributionPanel).where(
-                        DistributionPanel.device_id == device.id
-                    )
+                    select(DistributionPanel).where(DistributionPanel.device_id == device.id)
                 )
                 panel = result.scalar_one_or_none()
                 if panel:
@@ -288,11 +270,7 @@ class DeviceSyncService:
                     panel.updated_at = datetime.now()
 
             elif device.device_type in self.POWER_DEVICE_TYPES:
-                result = await self.db.execute(
-                    select(PowerDevice).where(
-                        PowerDevice.monitor_device_id == device.id
-                    )
-                )
+                result = await self.db.execute(select(PowerDevice).where(PowerDevice.monitor_device_id == device.id))
                 pd = result.scalar_one_or_none()
                 if pd:
                     pd.device_name = device.device_name
@@ -309,14 +287,10 @@ class DeviceSyncService:
             return
         self._set_syncing(True)
         try:
-            result = await self.db.execute(
-                select(DistributionPanel).where(DistributionPanel.id == panel_id)
-            )
+            result = await self.db.execute(select(DistributionPanel).where(DistributionPanel.id == panel_id))
             panel = result.scalar_one_or_none()
             if panel and panel.device_id:
-                dev_result = await self.db.execute(
-                    select(Device).where(Device.id == panel.device_id)
-                )
+                dev_result = await self.db.execute(select(Device).where(Device.id == panel.device_id))
                 device = dev_result.scalar_one_or_none()
                 if device:
                     device.status = "offline"
@@ -331,14 +305,10 @@ class DeviceSyncService:
             return
         self._set_syncing(True)
         try:
-            result = await self.db.execute(
-                select(PowerDevice).where(PowerDevice.id == power_device_id)
-            )
+            result = await self.db.execute(select(PowerDevice).where(PowerDevice.id == power_device_id))
             pd = result.scalar_one_or_none()
             if pd and pd.monitor_device_id:
-                dev_result = await self.db.execute(
-                    select(Device).where(Device.id == pd.monitor_device_id)
-                )
+                dev_result = await self.db.execute(select(Device).where(Device.id == pd.monitor_device_id))
                 device = dev_result.scalar_one_or_none()
                 if device:
                     device.status = "offline"
@@ -355,9 +325,7 @@ class DeviceSyncService:
         try:
             if device.device_type in self.PANEL_DEVICE_TYPES:
                 result = await self.db.execute(
-                    select(DistributionPanel).where(
-                        DistributionPanel.device_id == device.id
-                    )
+                    select(DistributionPanel).where(DistributionPanel.device_id == device.id)
                 )
                 panel = result.scalar_one_or_none()
                 if panel:
@@ -366,11 +334,7 @@ class DeviceSyncService:
                     panel.updated_at = datetime.now()
 
             elif device.device_type in self.POWER_DEVICE_TYPES:
-                result = await self.db.execute(
-                    select(PowerDevice).where(
-                        PowerDevice.monitor_device_id == device.id
-                    )
-                )
+                result = await self.db.execute(select(PowerDevice).where(PowerDevice.monitor_device_id == device.id))
                 pd = result.scalar_one_or_none()
                 if pd:
                     pd.is_enabled = False
@@ -393,19 +357,21 @@ class DeviceSyncService:
 
         # 1. DistributionPanel ↔ Device (by panel_code == device_code)
         panels = (
-            await self.db.execute(
-                select(DistributionPanel).where(
-                    DistributionPanel.device_id.is_(None),
-                    DistributionPanel.is_enabled == True,
+            (
+                await self.db.execute(
+                    select(DistributionPanel).where(
+                        DistributionPanel.device_id.is_(None),
+                        DistributionPanel.is_enabled == True,
+                    )
                 )
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
 
         for panel in panels:
             device = (
-                await self.db.execute(
-                    select(Device).where(Device.device_code == panel.panel_code)
-                )
+                await self.db.execute(select(Device).where(Device.device_code == panel.panel_code))
             ).scalar_one_or_none()
             if device:
                 panel.device_id = device.id
@@ -429,13 +395,17 @@ class DeviceSyncService:
 
         # 2. PowerDevice ↔ Device (by device_code)
         power_devices = (
-            await self.db.execute(
-                select(PowerDevice).where(
-                    PowerDevice.monitor_device_id.is_(None),
-                    PowerDevice.is_enabled == True,
+            (
+                await self.db.execute(
+                    select(PowerDevice).where(
+                        PowerDevice.monitor_device_id.is_(None),
+                        PowerDevice.is_enabled == True,
+                    )
                 )
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
 
         for pd in power_devices:
             device_type = self.POWER_DEVICE_TYPE_MAP.get(pd.device_type)
@@ -443,9 +413,7 @@ class DeviceSyncService:
                 continue
 
             device = (
-                await self.db.execute(
-                    select(Device).where(Device.device_code == pd.device_code)
-                )
+                await self.db.execute(select(Device).where(Device.device_code == pd.device_code))
             ).scalar_one_or_none()
             if device:
                 pd.monitor_device_id = device.id
@@ -469,21 +437,24 @@ class DeviceSyncService:
         # 3. Device → DistributionPanel (反向: 已有 CABINET 设备但无 Panel)
         created_panels_for_devices = 0
         cabinet_devices = (
-            await self.db.execute(
-                select(Device).where(
-                    Device.device_type == self.PANEL_TO_DEVICE_TYPE,
-                    Device.is_enabled == True,
+            (
+                await self.db.execute(
+                    select(Device).where(
+                        Device.device_type == self.PANEL_TO_DEVICE_TYPE,
+                        Device.is_enabled == True,
+                    )
                 )
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
 
         for dev in cabinet_devices:
             # 检查是否已有关联的 Panel（通过 device_id 或 device_code）
             existing_panel = (
                 await self.db.execute(
                     select(DistributionPanel).where(
-                        (DistributionPanel.device_id == dev.id)
-                        | (DistributionPanel.panel_code == dev.device_code)
+                        (DistributionPanel.device_id == dev.id) | (DistributionPanel.panel_code == dev.device_code)
                     )
                 )
             ).scalar_one_or_none()
@@ -507,20 +478,23 @@ class DeviceSyncService:
         created_power_for_devices = 0
         for dev_type, power_type in self.DEVICE_TO_POWER_TYPE_MAP.items():
             devs = (
-                await self.db.execute(
-                    select(Device).where(
-                        Device.device_type == dev_type,
-                        Device.is_enabled == True,
+                (
+                    await self.db.execute(
+                        select(Device).where(
+                            Device.device_type == dev_type,
+                            Device.is_enabled == True,
+                        )
                     )
                 )
-            ).scalars().all()
+                .scalars()
+                .all()
+            )
 
             for dev in devs:
                 existing_pd = (
                     await self.db.execute(
                         select(PowerDevice).where(
-                            (PowerDevice.monitor_device_id == dev.id)
-                            | (PowerDevice.device_code == dev.device_code)
+                            (PowerDevice.monitor_device_id == dev.id) | (PowerDevice.device_code == dev.device_code)
                         )
                     )
                 ).scalar_one_or_none()

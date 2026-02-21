@@ -617,60 +617,70 @@ async def get_unlinked_devices(
 
     if node_type == "panel":
         all_devs = (
-            await db.execute(
-                select(Device).where(
-                    Device.device_type == "CABINET",
-                    Device.is_enabled == True,
+            (
+                await db.execute(
+                    select(Device).where(
+                        Device.device_type == "CABINET",
+                        Device.is_enabled == True,
+                    )
                 )
             )
-        ).scalars().all()
+            .scalars()
+            .all()
+        )
 
         for dev in all_devs:
             existing = (
                 await db.execute(
                     select(DistributionPanel.id).where(
-                        (DistributionPanel.device_id == dev.id)
-                        | (DistributionPanel.panel_code == dev.device_code)
+                        (DistributionPanel.device_id == dev.id) | (DistributionPanel.panel_code == dev.device_code)
                     )
                 )
             ).scalar_one_or_none()
             if not existing:
-                results.append({
-                    "id": dev.id,
-                    "device_code": dev.device_code,
-                    "device_name": dev.device_name,
-                    "device_type": dev.device_type,
-                    "area_code": dev.area_code,
-                })
-
-    elif node_type == "device":
-        for dev_type in ("UPS", "AC", "PDU", "IT"):
-            devs = (
-                await db.execute(
-                    select(Device).where(
-                        Device.device_type == dev_type,
-                        Device.is_enabled == True,
-                    )
-                )
-            ).scalars().all()
-
-            for dev in devs:
-                existing = (
-                    await db.execute(
-                        select(PowerDevice.id).where(
-                            (PowerDevice.monitor_device_id == dev.id)
-                            | (PowerDevice.device_code == dev.device_code)
-                        )
-                    )
-                ).scalar_one_or_none()
-                if not existing:
-                    results.append({
+                results.append(
+                    {
                         "id": dev.id,
                         "device_code": dev.device_code,
                         "device_name": dev.device_name,
                         "device_type": dev.device_type,
                         "area_code": dev.area_code,
-                    })
+                    }
+                )
+
+    elif node_type == "device":
+        for dev_type in ("UPS", "AC", "PDU", "IT"):
+            devs = (
+                (
+                    await db.execute(
+                        select(Device).where(
+                            Device.device_type == dev_type,
+                            Device.is_enabled == True,
+                        )
+                    )
+                )
+                .scalars()
+                .all()
+            )
+
+            for dev in devs:
+                existing = (
+                    await db.execute(
+                        select(PowerDevice.id).where(
+                            (PowerDevice.monitor_device_id == dev.id) | (PowerDevice.device_code == dev.device_code)
+                        )
+                    )
+                ).scalar_one_or_none()
+                if not existing:
+                    results.append(
+                        {
+                            "id": dev.id,
+                            "device_code": dev.device_code,
+                            "device_name": dev.device_name,
+                            "device_type": dev.device_type,
+                            "area_code": dev.area_code,
+                        }
+                    )
 
     return {"items": results, "total": len(results)}
 

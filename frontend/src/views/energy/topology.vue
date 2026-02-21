@@ -1229,7 +1229,7 @@ const loadUnlinkedDevices = async () => {
   if (nodeType === 'panel') {
     try {
       const res = await getUnlinkedDevices('panel')
-      const data = res?.data ?? res
+      const data = (res as any)?.data ?? res
       unlinkedDevices.value = data?.items ?? []
     } catch {
       unlinkedDevices.value = []
@@ -1237,7 +1237,7 @@ const loadUnlinkedDevices = async () => {
   } else if (nodeType === 'device') {
     try {
       const res = await getUnlinkedDevices('device')
-      const data = res?.data ?? res
+      const data = (res as any)?.data ?? res
       unlinkedDevices.value = data?.items ?? []
     } catch {
       unlinkedDevices.value = []
