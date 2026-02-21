@@ -316,7 +316,7 @@ onMounted(() => {
 
 async function loadUserOptions() {
   try {
-    const result = await getUserList({ page_size: 200 })
+    const result = await getUserList({ page: 1, page_size: 100 })
     userOptions.value = result.items || []
   } catch (e) {
     console.error('加载用户列表失败', e)

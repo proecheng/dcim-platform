@@ -300,15 +300,23 @@ async function loadPointOptions() {
 async function loadData() {
   loading.value = true
   try {
-    const params: Record<string, string | number | boolean> = {
-      page: 1,
-      page_size: 500 // 加载全部用于前端聚合
-    }
-    if (filters.thresholdType) params.threshold_type = filters.thresholdType
-    if (typeof filters.isEnabled === 'boolean') params.is_enabled = filters.isEnabled
+    const baseParams: Record<string, string | number | boolean> = {}
+    if (filters.thresholdType) baseParams.threshold_type = filters.thresholdType
+    if (typeof filters.isEnabled === 'boolean') baseParams.is_enabled = filters.isEnabled
 
-    const result = await getThresholdList(params)
-    rawThresholds.value = result.items || []
+    // 分页加载全部数据用于前端聚合（后端 page_size 上限 100）
+    let allItems: ThresholdInfo[] = []
+    let page = 1
+    const pageSize = 100
+    let total = 0
+    do {
+      const result = await getThresholdList({ ...baseParams, page, page_size: pageSize })
+      allItems = allItems.concat(result.items || [])
+      total = result.total || 0
+      page++
+    } while (allItems.length < total)
+
+    rawThresholds.value = allItems
     aggregateAndFilter()
   } catch (e) {
     console.error('加载阈值失败', e)

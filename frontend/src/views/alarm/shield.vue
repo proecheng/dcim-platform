@@ -281,8 +281,8 @@ onMounted(() => {
 async function loadOptions() {
   try {
     const [devResult, ptResult] = await Promise.all([
-      getDeviceList({ page_size: 500 }),
-      getPointList({ page_size: 500 })
+      getDeviceList({ page: 1, page_size: 100 }),
+      getPointList({ page: 1, page_size: 100 })
     ])
     deviceOptions.value = devResult.items || []
     pointOptions.value = ptResult.items || []
@@ -345,7 +345,7 @@ function toShieldRow(shield: AlarmShieldInfo): ShieldRow {
 async function loadData() {
   loading.value = true
   try {
-    const result = await getAlarmShields({ page_size: 500 })
+    const result = await getAlarmShields({ page: 1, page_size: 100 })
     const items = result.items || []
     allRows.value = items.map(toShieldRow)
     updateStats()
