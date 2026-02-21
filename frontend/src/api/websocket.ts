@@ -62,7 +62,9 @@ export class WebSocketClient {
     this.isManualClose = false
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
     const host = window.location.host
-    const wsUrl = `${protocol}//${host}${this.url}`
+    const token = localStorage.getItem('token') || ''
+    const separator = this.url.includes('?') ? '&' : '?'
+    const wsUrl = `${protocol}//${host}${this.url}${token ? `${separator}token=${token}` : ''}`
 
     try {
       this.ws = new WebSocket(wsUrl)
