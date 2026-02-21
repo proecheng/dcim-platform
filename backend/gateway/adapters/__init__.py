@@ -17,13 +17,35 @@ from .registry import (
     list_adapters,
 )
 
-from . import modbus_tcp  # 触发 @register_adapter 装饰器
-from . import modbus_rtu  # 触发 @register_adapter 装饰器
-from . import snmp  # 触发 @register_adapter 装饰器
-from . import mqtt_device  # 触发 @register_adapter 装饰器
-from . import http_rest  # 触发 @register_adapter 装饰器
-from . import bacnet_ip  # 触发 @register_adapter 装饰器
-from . import opc_ua  # 触发 @register_adapter 装饰器
+# 触发 @register_adapter 装饰器 — 缺少可选依赖时静默跳过
+try:
+    from . import modbus_tcp
+except ImportError:
+    pass
+try:
+    from . import modbus_rtu
+except ImportError:
+    pass
+try:
+    from . import snmp
+except ImportError:
+    pass
+try:
+    from . import mqtt_device
+except ImportError:
+    pass
+try:
+    from . import http_rest
+except ImportError:
+    pass
+try:
+    from . import bacnet_ip
+except ImportError:
+    pass
+try:
+    from . import opc_ua
+except ImportError:
+    pass
 
 __all__ = [
     "BaseProtocolAdapter",
