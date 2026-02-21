@@ -157,6 +157,7 @@
             :group="form.rootGroup"
             :point-options="pointOptions"
             :depth="0"
+            @update:group="(val: any) => form.rootGroup = val"
           />
         </div>
 

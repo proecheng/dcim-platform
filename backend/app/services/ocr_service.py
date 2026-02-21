@@ -23,9 +23,11 @@ _paddle_available = False
 _PaddleOCR = None
 try:
     import importlib.util
+
     _paddle_available = importlib.util.find_spec("paddleocr") is not None
     if _paddle_available:
         from paddleocr import PaddleOCR as _PaddleOCR_cls
+
         _PaddleOCR = _PaddleOCR_cls
         logger.info("PaddleOCR 可用，使用本地 OCR 引擎")
     else:
@@ -215,9 +217,7 @@ def _detect_provider(raw_text: str) -> str:
     return "未知电力公司"
 
 
-def _extract_pricing_items(
-    raw_text: str, effective_date: str
-) -> list[OcrBillItem]:
+def _extract_pricing_items(raw_text: str, effective_date: str) -> list[OcrBillItem]:
     """
     从 OCR 文本中提取电价信息
 
@@ -259,15 +259,17 @@ def _extract_pricing_items(
             continue
         matched_periods.add(period_type)
 
-        items.append(OcrBillItem(
-            pricing_name=_PERIOD_NAME_MAP[period_cn],
-            period_type=period_type,
-            start_time=start_time,
-            end_time=end_time,
-            price=price,
-            confidence=0.0,  # 后续由调用方填充
-            effective_date=effective_date,
-        ))
+        items.append(
+            OcrBillItem(
+                pricing_name=_PERIOD_NAME_MAP[period_cn],
+                period_type=period_type,
+                start_time=start_time,
+                end_time=end_time,
+                price=price,
+                confidence=0.0,  # 后续由调用方填充
+                effective_date=effective_date,
+            )
+        )
 
     # 再尝试仅有价格的模式（补充未匹配到的时段）
     for match in pattern_price_only.finditer(raw_text):
@@ -279,15 +281,17 @@ def _extract_pricing_items(
             continue
         matched_periods.add(period_type)
 
-        items.append(OcrBillItem(
-            pricing_name=_PERIOD_NAME_MAP[period_cn],
-            period_type=period_type,
-            start_time="",
-            end_time="",
-            price=price,
-            confidence=0.0,
-            effective_date=effective_date,
-        ))
+        items.append(
+            OcrBillItem(
+                pricing_name=_PERIOD_NAME_MAP[period_cn],
+                period_type=period_type,
+                start_time="",
+                end_time="",
+                price=price,
+                confidence=0.0,
+                effective_date=effective_date,
+            )
+        )
 
     return items
 
@@ -380,7 +384,9 @@ async def _recognize_with_paddle(file_bytes: bytes, filename: str) -> OcrBillRes
 
     logger.info(
         "PaddleOCR 识别完成: 供电公司=%s, 识别到 %d 个时段, 平均置信度=%.1f%%",
-        provider, len(items), avg_confidence,
+        provider,
+        len(items),
+        avg_confidence,
     )
 
     return OcrBillResult(

@@ -105,6 +105,7 @@
           :group="child"
           :point-options="pointOptions"
           :depth="depth + 1"
+          @update:group="(val: ConditionGroup) => updateChildGroup(idx, val)"
           @remove="removeChild(idx)"
         />
       </div>
@@ -146,54 +147,82 @@ const props = defineProps<{
   depth: number
 }>()
 
-defineEmits<{
+const emit = defineEmits<{
   remove: []
+  'update:group': [value: ConditionGroup]
 }>()
+
+// ==================== 辅助: 不可变更新 ====================
+function emitUpdate(patch: Partial<ConditionGroup>) {
+  emit('update:group', { ...props.group, ...patch } as ConditionGroup)
+}
 
 // ==================== 操作方法 ====================
 function updateLogic(val: 'AND' | 'OR') {
-  props.group.logic = val
+  emitUpdate({ logic: val })
 }
 
 function addCondition() {
-  props.group.children.push({
-    id: crypto.randomUUID(),
-    type: 'condition',
-    pointId: undefined,
-    pointName: '',
-    operator: '>',
-    threshold: undefined
+  emitUpdate({
+    children: [
+      ...props.group.children,
+      {
+        id: crypto.randomUUID(),
+        type: 'condition',
+        pointId: undefined,
+        pointName: '',
+        operator: '>',
+        threshold: undefined
+      }
+    ]
   })
 }
 
 function addSubGroup() {
   if (props.depth >= MAX_DEPTH) return
-  props.group.children.push({
-    id: crypto.randomUUID(),
-    type: 'group',
-    logic: 'AND',
-    children: []
+  emitUpdate({
+    children: [
+      ...props.group.children,
+      {
+        id: crypto.randomUUID(),
+        type: 'group',
+        logic: 'AND',
+        children: []
+      }
+    ]
   })
 }
 
 function removeChild(idx: number) {
-  props.group.children.splice(idx, 1)
+  emitUpdate({
+    children: props.group.children.filter((_, i) => i !== idx)
+  })
+}
+
+function updateChildGroup(idx: number, updated: ConditionGroup) {
+  const newChildren = [...props.group.children]
+  newChildren[idx] = updated
+  emitUpdate({ children: newChildren })
 }
 
 function updateChildCondition(idx: number, field: string, val: unknown) {
   const child = props.group.children[idx]
   if (child.type !== 'condition') return
 
+  const updated = { ...child }
   if (field === 'pointId') {
-    child.pointId = val as number
-    // 同步点位名称
+    updated.pointId = val as number
     const point = props.pointOptions.find(p => p.id === val)
-    child.pointName = point?.point_name || ''
+    updated.pointName = point?.point_name || ''
   } else if (field === 'operator') {
-    child.operator = val as ConditionItem['operator']
+    updated.operator = val as ConditionItem['operator']
   } else if (field === 'threshold') {
-    child.threshold = val as number | undefined
+    updated.threshold = val as number | undefined
   }
+
+  const newChildren = [...props.group.children]
+  newChildren[idx] = updated
+  emitUpdate({ children: newChildren })
 }
 </script>
 
