@@ -16,6 +16,7 @@ from ...models.alarm import Alarm
 from ...schemas.device import DeviceCreate, DeviceUpdate, DeviceInfo, DeviceStatusSummary
 from ...schemas.common import PageResponse
 from ...core.redis import redis_service
+from ...services.device_sync import DeviceSyncService
 
 router = APIRouter()
 
@@ -318,6 +319,12 @@ async def create_device(data: DeviceCreate, db: AsyncSession = Depends(get_db), 
 
     device = Device(**data.model_dump())
     db.add(device)
+    await db.flush()
+
+    # 双向同步: Device → 拓扑节点
+    sync = DeviceSyncService(db)
+    await sync.on_device_created(device)
+
     await db.commit()
     await db.refresh(device)
 
@@ -340,6 +347,13 @@ async def update_device(
     update_data["updated_at"] = datetime.now()
 
     await db.execute(update(Device).where(Device.id == device_id).values(**update_data))
+
+    # 双向同步: Device 更新 → 拓扑节点
+    result = await db.execute(select(Device).where(Device.id == device_id))
+    device = result.scalar_one()
+    sync = DeviceSyncService(db)
+    await sync.on_device_updated(device)
+
     await db.commit()
 
     result = await db.execute(select(Device).where(Device.id == device_id))
@@ -364,6 +378,10 @@ async def delete_device(device_id: int, db: AsyncSession = Depends(get_db), _: U
 
     if point_count > 0:
         raise HTTPException(status_code=400, detail=f"设备下有 {point_count} 个点位，请先删除点位")
+
+    # 双向同步: Device 删除 → 禁用拓扑节点
+    sync = DeviceSyncService(db)
+    await sync.on_device_deleted(device)
 
     await db.execute(delete(Device).where(Device.id == device_id))
     await db.commit()

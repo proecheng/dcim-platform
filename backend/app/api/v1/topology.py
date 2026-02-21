@@ -7,7 +7,7 @@ Updated: 2025-01-29 - Added point type support
 Updated: 2026-01-29 - Added sync endpoint and device points query
 """
 
-from fastapi import APIRouter, Depends, HTTPException, Body, Path
+from fastapi import APIRouter, Depends, HTTPException, Body, Path, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
@@ -15,6 +15,7 @@ from ..deps import get_db
 from ...services.energy_topology import EnergyTopologyService
 from ...services.topology_sync import TopologySyncService
 from ...services.point_device_matcher import PointDeviceMatcher
+from ...services.device_sync import DeviceSyncService
 from ...schemas.energy import (
     TopologyNodeCreate,
     TopologyNodeUpdate,
@@ -29,7 +30,7 @@ from ...schemas.energy import (
     DevicePointConfigResponse,
 )
 from ...models.point import Point, PointRealtime
-from ...models.energy import PowerDevice
+from ...models.energy import PowerDevice, DistributionPanel
 
 router = APIRouter()
 
@@ -41,6 +42,20 @@ async def create_topology_node(data: TopologyNodeCreate, db: AsyncSession = Depe
     """
     try:
         node_id, node_type = await EnergyTopologyService.create_node(db, data)
+
+        # 双向同步: 拓扑节点 → Device 表
+        device_sync = DeviceSyncService(db)
+        if node_type == "panel":
+            panel_r = await db.execute(select(DistributionPanel).where(DistributionPanel.id == node_id))
+            panel_obj = panel_r.scalar_one_or_none()
+            if panel_obj:
+                await device_sync.on_panel_created(panel_obj)
+        elif node_type == "device":
+            pd_r = await db.execute(select(PowerDevice).where(PowerDevice.id == node_id))
+            pd_obj = pd_r.scalar_one_or_none()
+            if pd_obj:
+                await device_sync.on_power_device_created(pd_obj)
+
         await db.commit()
 
         # 通知数据模拟器
@@ -77,6 +92,19 @@ async def update_topology_node(data: TopologyNodeUpdate, db: AsyncSession = Depe
         if not success:
             raise HTTPException(status_code=404, detail="节点不存在")
 
+        # 双向同步: 拓扑节点更新 → Device 表
+        device_sync = DeviceSyncService(db)
+        if data.node_type == TopologyNodeType.PANEL:
+            panel_r = await db.execute(select(DistributionPanel).where(DistributionPanel.id == data.node_id))
+            panel_obj = panel_r.scalar_one_or_none()
+            if panel_obj:
+                await device_sync.on_panel_updated(panel_obj)
+        elif data.node_type == TopologyNodeType.DEVICE:
+            pd_r = await db.execute(select(PowerDevice).where(PowerDevice.id == data.node_id))
+            pd_obj = pd_r.scalar_one_or_none()
+            if pd_obj:
+                await device_sync.on_power_device_updated(pd_obj)
+
         await db.commit()
 
         # 通知数据模拟器
@@ -103,6 +131,13 @@ async def delete_topology_node(data: TopologyNodeDelete, db: AsyncSession = Depe
     删除拓扑节点，可选择级联删除子节点
     """
     try:
+        # 双向同步: 删除前先同步 Device 状态
+        device_sync = DeviceSyncService(db)
+        if data.node_type == TopologyNodeType.PANEL:
+            await device_sync.on_panel_deleted(data.node_id)
+        elif data.node_type == TopologyNodeType.DEVICE:
+            await device_sync.on_power_device_deleted(data.node_id)
+
         # 检查级联影响
         if data.cascade:
             sync_service = TopologySyncService(db)
@@ -182,7 +217,6 @@ async def create_device_points(data: DevicePointConfigCreate, db: AsyncSession =
     """
     try:
         # 检查设备是否存在
-        from ...models.energy import PowerDevice
         from sqlalchemy import select
 
         result = await db.execute(select(PowerDevice).where(PowerDevice.id == data.energy_device_id))
@@ -565,3 +599,95 @@ async def get_device_linked_points(device_id: int, db: AsyncSession = Depends(ge
         "points": points_data,
         "point_count": len(points_data),
     }
+
+
+@router.get("/unlinked-devices", summary="获取未关联拓扑的设备列表")
+async def get_unlinked_devices(
+    node_type: str = Query(..., description="节点类型: panel 或 device"),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    获取尚未关联到拓扑节点的动环设备列表。
+    - node_type=panel: 返回 device_type=CABINET 且无对应 DistributionPanel 的设备
+    - node_type=device: 返回 device_type in (UPS,AC,PDU,IT) 且无对应 PowerDevice 的设备
+    """
+    from ...models.device import Device
+
+    results = []
+
+    if node_type == "panel":
+        all_devs = (
+            await db.execute(
+                select(Device).where(
+                    Device.device_type == "CABINET",
+                    Device.is_enabled == True,
+                )
+            )
+        ).scalars().all()
+
+        for dev in all_devs:
+            existing = (
+                await db.execute(
+                    select(DistributionPanel.id).where(
+                        (DistributionPanel.device_id == dev.id)
+                        | (DistributionPanel.panel_code == dev.device_code)
+                    )
+                )
+            ).scalar_one_or_none()
+            if not existing:
+                results.append({
+                    "id": dev.id,
+                    "device_code": dev.device_code,
+                    "device_name": dev.device_name,
+                    "device_type": dev.device_type,
+                    "area_code": dev.area_code,
+                })
+
+    elif node_type == "device":
+        for dev_type in ("UPS", "AC", "PDU", "IT"):
+            devs = (
+                await db.execute(
+                    select(Device).where(
+                        Device.device_type == dev_type,
+                        Device.is_enabled == True,
+                    )
+                )
+            ).scalars().all()
+
+            for dev in devs:
+                existing = (
+                    await db.execute(
+                        select(PowerDevice.id).where(
+                            (PowerDevice.monitor_device_id == dev.id)
+                            | (PowerDevice.device_code == dev.device_code)
+                        )
+                    )
+                ).scalar_one_or_none()
+                if not existing:
+                    results.append({
+                        "id": dev.id,
+                        "device_code": dev.device_code,
+                        "device_name": dev.device_name,
+                        "device_type": dev.device_type,
+                        "area_code": dev.area_code,
+                    })
+
+    return {"items": results, "total": len(results)}
+
+
+# ==================== 设备双向同步 ====================
+
+
+@router.post("/sync-devices", summary="同步拓扑节点与动环设备")
+async def sync_topology_devices(db: AsyncSession = Depends(get_db)):
+    """
+    一次性迁移：为已有拓扑节点和动环设备建立双向关联。
+    通过 device_code 匹配已有记录，未匹配的自动创建。
+    """
+    try:
+        sync = DeviceSyncService(db)
+        result = await sync.migrate_existing_data()
+        return {"success": True, "message": "同步完成", **result}
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(status_code=500, detail=f"同步失败: {str(e)}")

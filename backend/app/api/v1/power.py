@@ -454,6 +454,60 @@ async def list_cabinets(
     )
 
 
+@router.get("/cabinets/{device_id}/branches", summary="配电柜支路详情")
+async def get_cabinet_branches(
+    device_id: int,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_viewer),
+):
+    """获取配电柜的支路/回路信息（从 distribution_circuits 表查询）"""
+    from ...models.energy import DistributionPanel, DistributionCircuit
+
+    # 通过 device_id 找到对应的 DistributionPanel
+    panel_r = await db.execute(
+        select(DistributionPanel).where(DistributionPanel.device_id == device_id)
+    )
+    panel = panel_r.scalar_one_or_none()
+
+    if not panel:
+        # 也尝试通过 device_code 匹配
+        dev_r = await db.execute(select(Device).where(Device.id == device_id))
+        dev = dev_r.scalar_one_or_none()
+        if dev:
+            panel_r2 = await db.execute(
+                select(DistributionPanel).where(DistributionPanel.panel_code == dev.device_code)
+            )
+            panel = panel_r2.scalar_one_or_none()
+
+    if not panel:
+        return {"branches": [], "panel_id": None}
+
+    # 查询该 panel 下的所有回路
+    circuits_r = await db.execute(
+        select(DistributionCircuit).where(
+            DistributionCircuit.panel_id == panel.id,
+            DistributionCircuit.is_enabled == True,
+        ).order_by(DistributionCircuit.circuit_code)
+    )
+    circuits = circuits_r.scalars().all()
+
+    branches = []
+    for c in circuits:
+        branches.append({
+            "branch_name": c.circuit_name,
+            "circuit_code": c.circuit_code,
+            "rated_current": c.rated_current,
+            "breaker_type": c.breaker_type,
+            "load_type": c.load_type,
+            "current": None,
+            "voltage": None,
+            "power": None,
+            "breaker_status": "on" if c.is_enabled else "off",
+        })
+
+    return {"branches": branches, "panel_id": panel.id}
+
+
 @router.get("/pdus", summary="PDU列表")
 async def list_pdus(
     page: int = Query(1, ge=1),
