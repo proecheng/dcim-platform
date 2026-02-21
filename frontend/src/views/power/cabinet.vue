@@ -86,14 +86,14 @@
           </el-table-column>
         </el-table>
       </template>
-      <el-empty v-else description="暂无支路数据" />
+      <el-empty v-else description="该配电柜暂无支路/回路数据，请在配电拓扑中配置回路" />
     </el-drawer>
   </div>
 </template>
 
 <script setup lang="ts">
 import { Refresh } from '@element-plus/icons-vue'
-import { getCabinetList } from '@/api/modules/power'
+import { getCabinetList, getCabinetBranches } from '@/api/modules/power'
 
 const loading = ref(false)
 const drawerVisible = ref(false)
@@ -163,7 +163,33 @@ async function loadData() {
   try {
     const res = await getCabinetList()
     const data = res?.data ?? res
-    cabinetList.value = Array.isArray(data) ? data : (data?.items ?? [])
+    const rawItems = Array.isArray(data) ? data : (data?.items ?? [])
+    // API 返回 {device: {...}, points: {...}} 结构，需要展平为前端所需格式
+    cabinetList.value = rawItems.map((item: any) => {
+      if (item.device) {
+        // 后端返回嵌套结构，展平
+        const dev = item.device
+        const pts = item.points || {}
+        // 从点位中提取关键数值（点位 key 格式: {device_code}_{metric}）
+        const totalPower = Object.values(pts).find((p: any) => p.name === '总功率')
+        const inputVoltageA = Object.values(pts).find((p: any) => p.name === '输入电压A相')
+        const outputCurrentA = Object.values(pts).find((p: any) => p.name === '输出电流A相')
+        const busTemp = Object.values(pts).find((p: any) => p.name === '母排温度')
+        return {
+          id: dev.id,
+          device_code: dev.device_code,
+          device_name: dev.device_name,
+          area: dev.area_code || '',
+          total_power: (totalPower as any)?.value ?? null,
+          input_voltage: (inputVoltageA as any)?.value ?? null,
+          output_current: (outputCurrentA as any)?.value ?? null,
+          busbar_temp: (busTemp as any)?.value ?? null,
+          status: dev.status === 'online' ? 'normal' : dev.status,
+        }
+      }
+      // 已经是展平格式（mock 数据或其他来源）
+      return item
+    })
   } catch {
     console.warn('配电柜列表API未就绪，使用模拟数据')
     cabinetList.value = mockCabinetList
@@ -180,16 +206,23 @@ function openDetail(row: CabinetItem) {
   drawerVisible.value = true
   detailLoading.value = true
 
-  // 如果行数据自带支路信息则直接使用，否则用模拟数据
-  setTimeout(() => {
-    if (row.branches && row.branches.length > 0) {
+  // 从后端获取支路数据
+  getCabinetBranches(row.id).then((res: any) => {
+    const data = res?.data ?? res
+    const apiBranches = data?.branches ?? []
+    if (apiBranches.length > 0) {
+      branches.value = apiBranches
+    } else if (row.branches && row.branches.length > 0) {
       branches.value = row.branches
     } else {
-      const mock = mockCabinetList.find(c => c.id === row.id)
-      branches.value = mock?.branches ?? []
+      branches.value = []
     }
     detailLoading.value = false
-  }, 300)
+  }).catch(() => {
+    // API 失败时回退到行数据或空
+    branches.value = row.branches ?? []
+    detailLoading.value = false
+  })
 }
 
 onMounted(() => {

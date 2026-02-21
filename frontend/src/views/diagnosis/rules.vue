@@ -2,10 +2,16 @@
 // Admin-only YAML reload and CRUD for diagnosis rules
 import { ref, reactive, computed, onMounted } from 'vue';
 import { getDiagnosisRules, createDiagnosisRule, updateDiagnosisRule, deleteDiagnosisRule, toggleDiagnosisRule, reloadDiagnosisRules } from '@/api/modules/diagnosis';
+import { useUserStore } from '@/stores/user';
 import { ElMessage } from 'element-plus';
+
+const userStore = useUserStore();
 
 const rules = ref<Array<any>>([]);
 const loading = ref(false);
+const total = ref(0);
+const page = ref(1);
+const pageSize = ref(20);
 
 const dialogVisible = ref(false);
 const dialogMode = ref<'create'|'edit'>('create');
@@ -23,14 +29,14 @@ const categoryLabelMap: Record<string, string> = {
   composite: '综合'
 };
 
-// Admin flag (simple global hint)
-const isAdmin = computed(() => (typeof window !== 'undefined' && (window as any).USER_IS_ADMIN === true));
+const isAdmin = computed(() => userStore.isAdmin);
 
 async function loadRules() {
   loading.value = true;
   try {
-    const res = await getDiagnosisRules();
+    const res = await getDiagnosisRules({ page: page.value, page_size: pageSize.value });
     rules.value = res?.items ?? [];
+    total.value = res?.total ?? 0;
   } catch (e) {
     console.error(e);
   } finally {
@@ -80,8 +86,11 @@ async function deleteRule(rule: any) {
 async function onToggle(rule: any) {
   try {
     await toggleDiagnosisRule(rule.id);
+    await loadRules();
   } catch (e) {
     console.error(e);
+    // 恢复开关状态
+    rule.is_enabled = !rule.is_enabled;
   }
 }
 
@@ -94,6 +103,11 @@ async function reloadRulesYaml() {
   } catch (e) {
     console.error(e);
   }
+}
+
+function onPageChange(newPage: number) {
+  page.value = newPage;
+  loadRules();
 }
 
 onMounted(() => {
@@ -132,6 +146,15 @@ onMounted(() => {
         </template>
       </el-table-column>
     </el-table>
+
+    <el-pagination
+      v-model:current-page="page"
+      :page-size="pageSize"
+      :total="total"
+      layout="total, prev, pager, next"
+      @current-change="onPageChange"
+      style="margin-top: 12px;"
+    />
 
     <el-dialog :title="dialogMode === 'create' ? '新建规则' : '编辑规则'" v-model="dialogVisible">
       <el-form :model="currentRule" ref="ruleForm" label-width="120px">

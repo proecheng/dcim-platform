@@ -157,7 +157,26 @@ async function loadData() {
   try {
     const res = await getPDUList()
     const data = res?.data ?? res
-    pduList.value = Array.isArray(data) ? data : (data?.items ?? [])
+    const rawItems = Array.isArray(data) ? data : (data?.items ?? [])
+    // API 返回 {device: {...}, points: {...}} 结构，需要展平
+    pduList.value = rawItems.map((item: any) => {
+      if (item.device) {
+        const dev = item.device
+        const pts = item.points || {}
+        const totalCurrent = Object.values(pts).find((p: any) => p.name?.includes('电流'))
+        const temp = Object.values(pts).find((p: any) => p.name?.includes('温度'))
+        return {
+          id: dev.id,
+          device_code: dev.device_code,
+          device_name: dev.device_name,
+          area: dev.area_code || '',
+          total_current: (totalCurrent as any)?.value ?? null,
+          temperature: (temp as any)?.value ?? null,
+          status: dev.status === 'online' ? 'normal' : dev.status,
+        }
+      }
+      return item
+    })
   } catch {
     console.warn('PDU列表API未就绪，使用模拟数据')
     pduList.value = mockPDUList
