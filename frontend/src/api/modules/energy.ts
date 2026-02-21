@@ -2420,3 +2420,19 @@ export function uploadBillForOcr(file: File) {
     timeout: 30000,
   })
 }
+
+/** 未关联拓扑的设备 */
+export interface UnlinkedDevice {
+  id: number
+  device_code: string
+  device_name: string
+  device_type: string
+  area_code: string | null
+}
+
+/** 获取未关联拓扑的设备列表 */
+export function getUnlinkedDevices(nodeType: 'panel' | 'device') {
+  return request.get<ResponseModel<{ items: UnlinkedDevice[]; total: number }>>('/v1/topology/unlinked-devices', {
+    params: { node_type: nodeType },
+  })
+}

@@ -92,6 +92,11 @@ export function getCabinetList(params?: { page?: number; page_size?: number }) {
   return request.get<any>('/v1/power/cabinets', { params })
 }
 
+/** 获取配电柜支路详情 */
+export function getCabinetBranches(deviceId: number) {
+  return request.get<any>(`/v1/power/cabinets/${deviceId}/branches`)
+}
+
 /** 获取 PDU 列表 */
 export function getPDUList(params?: { page?: number; page_size?: number }) {
   return request.get<any>('/v1/power/pdus', { params })
