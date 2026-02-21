@@ -428,7 +428,7 @@ function renderTimeline() {
     },
     series: [{
       type: 'custom',
-      renderItem: (params: Record<string, unknown>, api: Record<string, Function>) => {
+      renderItem: (params: Record<string, unknown>, api: Record<string, (...args: unknown[]) => unknown>) => {
         const catIdx = api.value(0) as number
         const startVal = api.coord([api.value(1), catIdx])
         const endVal = api.coord([api.value(2), catIdx])
