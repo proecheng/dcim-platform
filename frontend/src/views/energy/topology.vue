@@ -327,6 +327,28 @@
           <el-input v-model="addForm.name" placeholder="输入名称" />
         </el-form-item>
 
+        <!-- 关联已有设备（仅配电柜和设备类型显示） -->
+        <el-form-item v-if="actualNodeType === 'panel' || actualNodeType === 'device'" label="关联已有设备">
+          <el-select
+            v-model="addForm.link_device_id"
+            placeholder="新建设备（或选择已有设备）"
+            clearable
+            filterable
+            style="width: 100%;"
+            @change="onLinkDeviceChange"
+          >
+            <el-option
+              v-for="dev in unlinkedDevices"
+              :key="dev.id"
+              :label="`${dev.device_name} (${dev.device_code})`"
+              :value="dev.id"
+            />
+          </el-select>
+          <div v-if="unlinkedDevices.length === 0" style="color: var(--el-text-color-placeholder); font-size: 12px; margin-top: 4px;">
+            暂无未关联的设备
+          </div>
+        </el-form-item>
+
         <!-- 变压器特有字段 -->
         <template v-if="actualNodeType === 'transformer'">
           <el-form-item label="额定容量" prop="rated_capacity">
@@ -587,12 +609,14 @@ import {
   createDevicePoints,
   updateDevicePoint,
   deleteDevicePointById,
+  getUnlinkedDevices,
   type DistributionTopology,
   type TopologyNodeTypeEnum,
   type TopologyNodeCreateRequest,
   type TopologyNodeUpdateRequest,
   type DeviceLinkedPoint,
-  type DeviceLinkedPointsResponse
+  type DeviceLinkedPointsResponse,
+  type UnlinkedDevice
 } from '@/api/modules/energy'
 
 // 扩展节点类型，增加 grid 和 point
@@ -639,6 +663,7 @@ const addFormRef = ref<FormInstance>()
 const addForm = reactive<any>({
   name: '',
   parent_id: null,
+  link_device_id: null as number | null,
   rated_capacity: 1000,
   voltage_high: 10,
   voltage_low: 400,
@@ -662,6 +687,9 @@ const addForm = reactive<any>({
 const addFormRules = {
   name: [{ required: true, message: '请输入名称', trigger: 'blur' }]
 }
+
+// 未关联拓扑的设备列表
+const unlinkedDevices = ref<UnlinkedDevice[]>([])
 
 // 编辑表单
 const editForm = reactive<any>({
@@ -1178,6 +1206,7 @@ const handleOpenAddDialog = () => {
 
   // 重置表单
   addForm.name = ''
+  addForm.link_device_id = null
   addForm.measurement_types = []
 
   // 默认选择添加下级（如果可以的话）
@@ -1187,18 +1216,59 @@ const handleOpenAddDialog = () => {
     addPosition.value = 'sibling'
   }
 
+  // 加载未关联设备列表
+  loadUnlinkedDevices()
+
   showAddDialog.value = true
+}
+
+// 加载未关联拓扑的设备列表
+const loadUnlinkedDevices = async () => {
+  // 根据当前要添加的节点类型决定查询 panel 还是 device
+  const nodeType = actualNodeType.value
+  if (nodeType === 'panel') {
+    try {
+      const res = await getUnlinkedDevices('panel')
+      const data = res?.data ?? res
+      unlinkedDevices.value = data?.items ?? []
+    } catch {
+      unlinkedDevices.value = []
+    }
+  } else if (nodeType === 'device') {
+    try {
+      const res = await getUnlinkedDevices('device')
+      const data = res?.data ?? res
+      unlinkedDevices.value = data?.items ?? []
+    } catch {
+      unlinkedDevices.value = []
+    }
+  } else {
+    unlinkedDevices.value = []
+  }
+}
+
+// 选择关联设备时自动填充名称
+const onLinkDeviceChange = (deviceId: number | null) => {
+  if (deviceId) {
+    const dev = unlinkedDevices.value.find(d => d.id === deviceId)
+    if (dev) {
+      addForm.name = dev.device_name
+    }
+  }
 }
 
 // 位置变更时的回调
 const onPositionChange = () => {
-  // 重置表单名称
+  // 重置表单名称和关联设备
   addForm.name = ''
+  addForm.link_device_id = null
+  loadUnlinkedDevices()
 }
 
 const handleAddNode = (type: ExtendedNodeType) => {
   // 保留此函数用于兼容，但现在主要通过 handleOpenAddDialog 调用
   addForm.name = ''
+  addForm.link_device_id = null
   addForm.parent_id = null
   showAddDialog.value = true
 }
@@ -1214,7 +1284,9 @@ const handleAddChildNode = (parentNode: any) => {
   selectedNode.value = parentNode
   addPosition.value = 'child'
   addForm.name = ''
+  addForm.link_device_id = null
   addForm.measurement_types = []
+  loadUnlinkedDevices()
   showAddDialog.value = true
 }
 
@@ -1229,7 +1301,9 @@ const handleAddSiblingNode = (node: any) => {
   selectedNode.value = node
   addPosition.value = 'sibling'
   addForm.name = ''
+  addForm.link_device_id = null
   addForm.measurement_types = []
+  loadUnlinkedDevices()
   showAddDialog.value = true
 }
 
@@ -1445,7 +1519,13 @@ const handleConfirmAdd = async () => {
       createData.ct_ratio = addForm.ct_ratio
       createData.pt_ratio = addForm.pt_ratio
     } else if (nodeType === 'panel') {
-      createData.panel_code = generateNextCode('panel', addForm.panel_type)
+      // 如果关联了已有设备，使用设备编码作为配电柜编码（便于同步匹配）
+      if (addForm.link_device_id) {
+        const linkedDev = unlinkedDevices.value.find(d => d.id === addForm.link_device_id)
+        createData.panel_code = linkedDev?.device_code || generateNextCode('panel', addForm.panel_type)
+      } else {
+        createData.panel_code = generateNextCode('panel', addForm.panel_type)
+      }
       createData.panel_name = addForm.name
       createData.panel_type = addForm.panel_type
     } else if (nodeType === 'circuit') {
@@ -1454,9 +1534,16 @@ const handleConfirmAdd = async () => {
       createData.circuit_type = addForm.circuit_type
       createData.rated_current = addForm.rated_current
     } else if (nodeType === 'device') {
-      createData.device_code = generateNextCode('device', addForm.device_type)
+      // 如果关联了已有设备，使用设备编码
+      if (addForm.link_device_id) {
+        const linkedDev = unlinkedDevices.value.find(d => d.id === addForm.link_device_id)
+        createData.device_code = linkedDev?.device_code || generateNextCode('device', addForm.device_type)
+        createData.device_type = linkedDev?.device_type || addForm.device_type
+      } else {
+        createData.device_code = generateNextCode('device', addForm.device_type)
+        createData.device_type = addForm.device_type
+      }
       createData.device_name = addForm.name
-      createData.device_type = addForm.device_type
       createData.rated_power = addForm.rated_power
     } else if (nodeType === 'point') {
       createData.point_code = generateNextCode('point', addForm.point_type)
