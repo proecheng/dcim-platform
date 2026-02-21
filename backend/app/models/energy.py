@@ -109,6 +109,7 @@ class DistributionPanel(Base):
     # 位置
     location = Column(String(100), comment="安装位置")
     area_code = Column(String(10), comment="区域代码")
+    device_id = Column(Integer, ForeignKey("devices.id"), nullable=True, comment="关联动环设备ID")
 
     status = Column(String(20), default="running", comment="状态: running/fault/maintenance")
     is_enabled = Column(Boolean, default=True, comment="是否启用")
@@ -118,6 +119,7 @@ class DistributionPanel(Base):
     # 关系
     meter_point = relationship("MeterPoint", back_populates="panels")
     circuits = relationship("DistributionCircuit", back_populates="panel")
+    device = relationship("Device", foreign_keys=[device_id])
 
 
 class DistributionCircuit(Base):
