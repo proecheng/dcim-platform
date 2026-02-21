@@ -1234,8 +1234,12 @@ const handleDeletePricing = async (row: ElectricityPricing) => {
   loadPricing()
 }
 
-const handleBillUpload = async (uploadFile: { raw: File; name: string }) => {
+const handleBillUpload = async (uploadFile: { raw?: File; name: string }) => {
   const file = uploadFile.raw
+  if (!file) {
+    ElMessage.warning('文件读取失败')
+    return
+  }
   // 校验文件大小
   const maxSize = 10 * 1024 * 1024
   if (file.size > maxSize) {
@@ -1255,7 +1259,7 @@ const handleBillUpload = async (uploadFile: { raw: File; name: string }) => {
 
   try {
     const res = await uploadBillForOcr(file)
-    const data = res.data?.data
+    const data = res.data
     if (!data || !data.success) {
       const msg = data?.error_message || '识别失败，请手动输入'
       ElMessage.warning(msg)

@@ -464,13 +464,13 @@ function scopeLabel(scope: string): string {
   return map[scope] || scope
 }
 
-function scopeTagType(scope: string): '' | 'success' | 'warning' | 'danger' | 'info' {
-  const map: Record<string, '' | 'success' | 'warning' | 'danger' | 'info'> = { global: 'danger', area: 'warning', device_type: '', device: 'success' }
+function scopeTagType(scope: string): 'success' | 'warning' | 'danger' | 'info' {
+  const map: Record<string, 'success' | 'warning' | 'danger' | 'info'> = { global: 'danger', area: 'warning', device_type: 'info', device: 'success' }
   return map[scope] || 'info'
 }
 
-function levelTagType(level: string): '' | 'success' | 'warning' | 'danger' | 'info' {
-  const map: Record<string, '' | 'success' | 'warning' | 'danger' | 'info'> = { critical: 'danger', major: 'warning', minor: '', info: 'info' }
+function levelTagType(level: string): 'success' | 'warning' | 'danger' | 'info' {
+  const map: Record<string, 'success' | 'warning' | 'danger' | 'info'> = { critical: 'danger', major: 'warning', minor: 'info', info: 'info' }
   return map[level] || 'info'
 }
 
@@ -479,8 +479,8 @@ function levelLabel(level: string): string {
   return map[level] || level
 }
 
-function statusTagType(status: string): '' | 'success' | 'warning' | 'danger' | 'info' {
-  const map: Record<string, '' | 'success' | 'warning' | 'danger' | 'info'> = { active: 'success', scheduled: '', expired: 'info' }
+function statusTagType(status: string): 'success' | 'warning' | 'danger' | 'info' {
+  const map: Record<string, 'success' | 'warning' | 'danger' | 'info'> = { active: 'success', scheduled: 'info', expired: 'info' }
   return map[status] || 'info'
 }
 

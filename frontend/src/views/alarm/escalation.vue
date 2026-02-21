@@ -361,9 +361,9 @@ function resetFilters() {
 }
 
 // ==================== 辅助函数 ====================
-function levelTagType(level: string): '' | 'success' | 'warning' | 'danger' | 'info' {
-  const map: Record<string, '' | 'success' | 'warning' | 'danger' | 'info'> = {
-    critical: 'danger', major: 'warning', minor: '', info: 'info'
+function levelTagType(level: string): 'success' | 'warning' | 'danger' | 'info' {
+  const map: Record<string, 'success' | 'warning' | 'danger' | 'info'> = {
+    critical: 'danger', major: 'warning', minor: 'info', info: 'info'
   }
   return map[level] || 'info'
 }

@@ -46,8 +46,8 @@ export function getLinkageLevel(policy: LinkagePolicy): LinkageLevel {
 }
 
 /** 格式化执行结果 */
-export function formatExecutionStatus(status: string): { label: string; type: string } {
-  const map: Record<string, { label: string; type: string }> = {
+export function formatExecutionStatus(status: string): { label: string; type: 'success' | 'warning' | 'danger' | 'primary' | 'info' } {
+  const map: Record<string, { label: string; type: 'success' | 'warning' | 'danger' | 'primary' | 'info' }> = {
     completed: { label: '全部成功', type: 'success' },
     partial_failure: { label: '部分失败', type: 'warning' },
     failed: { label: '失败', type: 'danger' },
