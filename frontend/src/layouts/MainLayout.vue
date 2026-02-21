@@ -141,6 +141,7 @@
             <el-menu-item index="/collection/device-templates">设备模板</el-menu-item>
             <el-menu-item index="/collection/power-config">配电配置</el-menu-item>
             <el-menu-item index="/collection/gateway">网关管理</el-menu-item>
+            <el-menu-item index="/collection/drift">漂移检测</el-menu-item>
           </el-sub-menu>
 
           <el-sub-menu index="/strategy">
@@ -168,7 +169,6 @@
               <el-menu-item index="/strategy/diagnosis/results">诊断结果</el-menu-item>
               <el-menu-item v-if="isAdmin" index="/strategy/diagnosis/rules">诊断规则</el-menu-item>
             </el-sub-menu>
-            <el-menu-item index="/strategy/drift">漂移检测</el-menu-item>
           </el-sub-menu>
 
           <el-sub-menu v-if="isAdmin" index="/system">
@@ -256,6 +256,7 @@ import {
   Key, VideoCamera, Camera, Warning, View, Timer,
   RefreshRight, FirstAidKit, User, MapLocation, Box, Files
 } from '@element-plus/icons-vue'
+import { storeToRefs } from 'pinia'
 import { useUserStore, useAlarmStore } from '@/stores'
 import { getAlarmCount } from '@/api/alarm'
 import DegradationBanner from '@/components/common/DegradationBanner.vue'
@@ -269,7 +270,7 @@ useDataQuality()
 const router = useRouter()
 const route = useRoute()
 const userStore = useUserStore()
-const { isAdmin, isOperator } = userStore
+const { isAdmin, isOperator } = storeToRefs(userStore)
 const alarmStore = useAlarmStore()
 const isCollapse = ref(false)
 const videoPopupRef = ref<InstanceType<typeof VideoPopup>>()

@@ -183,7 +183,8 @@ const routes: RouteRecordRaw[] = [
           { path: 'datasources', name: 'Datasources', component: () => import('@/views/datasource/index.vue'), meta: { title: '数据源管理', icon: 'Connection' } },
           { path: 'device-templates', name: 'DeviceTemplates', component: () => import('@/views/device-template/index.vue'), meta: { title: '设备模板', icon: 'Files' } },
           { path: 'power-config', name: 'PowerConfig', component: () => import('@/views/energy/config.vue'), meta: { title: '配电配置', icon: 'Setting' } },
-          { path: 'gateway', name: 'Gateway', component: () => import('@/views/gateway/index.vue'), meta: { title: '网关管理', icon: 'Connection' } }
+          { path: 'gateway', name: 'Gateway', component: () => import('@/views/gateway/index.vue'), meta: { title: '网关管理', icon: 'Connection' } },
+          { path: 'drift', name: 'CollectionDrift', component: () => import('@/views/linkage/drift.vue'), meta: { title: '漂移检测', icon: 'TrendCharts' } }
         ]
       },
 
@@ -229,7 +230,7 @@ const routes: RouteRecordRaw[] = [
               { path: 'rules', name: 'DiagnosisRules', component: () => import('@/views/diagnosis/rules.vue'), meta: { title: '诊断规则', icon: 'SetUp' } }
             ]
           },
-          { path: 'drift', name: 'StrategyDrift', component: () => import('@/views/linkage/drift.vue'), meta: { title: '漂移检测', icon: 'TrendCharts' } }
+          { path: 'drift', name: 'StrategyDrift', redirect: '/collection/drift' }
         ]
       },
 

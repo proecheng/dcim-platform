@@ -37,6 +37,7 @@ export class WebSocketClient {
   private reconnectTimer: number | null = null
   private messageHandlers: Map<string, Set<MessageHandler>> = new Map()
   private isManualClose: boolean = false
+  private hasConnected: boolean = false
   private onOpenCallback?: ConnectionHandler
   private onCloseCallback?: ConnectionHandler
   private onErrorCallback?: (error: Event) => void
@@ -84,6 +85,7 @@ export class WebSocketClient {
     this.ws.onopen = () => {
       if (import.meta.env.DEV) console.log('WebSocket 已连接:', this.url)
       this.reconnectAttempts = 0
+      this.hasConnected = true
       this.startHeartbeat()
       degradationFlags.websocketDown = false
       this.onOpenCallback?.()
@@ -92,7 +94,10 @@ export class WebSocketClient {
     this.ws.onclose = () => {
       if (import.meta.env.DEV) console.log('WebSocket 已关闭:', this.url)
       this.stopHeartbeat()
-      degradationFlags.websocketDown = true
+      // 只有曾经成功连接过再断开，才标记降级（避免首次连不上就显示 banner）
+      if (this.hasConnected) {
+        degradationFlags.websocketDown = true
+      }
       this.onCloseCallback?.()
 
       if (!this.isManualClose) {
