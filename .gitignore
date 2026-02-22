@@ -59,9 +59,26 @@ htmlcov/
 .cache/
 tmpclaude-*
 nul
+_backend_stderr.log
+_backend_stdout.log
+backend_log.txt
+proxy_log.txt
+acceptance_results.json
 
-# Claude 相关
+# 临时调试脚本（下划线前缀）
+_check_*.py
+_write_*.py
+_build_*.py
+
+# Claude / AI 工具相关
 .claude/
+.gemini/
+.opencode/
+.sisyphus/
+.ruff_cache/
+
+# 参考文档（大文件，不入库）
+docs/ref/
 
 # 截图文件（不提交到仓库）
 *.png
@@ -74,3 +91,7 @@ nul
 .playwright-mcp/
 e2e/test-results/
 e2e/.auth/
+
+# 生成的临时文件
+openapi*.json
+*.bat.log
