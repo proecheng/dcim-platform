@@ -8,7 +8,7 @@ from datetime import datetime
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Query
 from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy import select
+from sqlalchemy import select, text
 from jose import jwt, JWTError
 
 from .core.config import get_settings
@@ -29,6 +29,10 @@ from .engines.escalation_engine import check_escalations
 from .engines.diagnosis_engine import diagnosis_engine
 from .services.pue_calculator import write_pue_history
 from .services.energy_aggregator import aggregate_hourly, aggregate_daily, aggregate_monthly
+from .middleware.request_logging import RequestLoggingMiddleware
+from .middleware.metrics_middleware import MetricsMiddleware
+from .middleware.metrics import metrics_collector
+from .middleware.error_handler import register_exception_handlers
 
 import logging
 
@@ -444,6 +448,15 @@ app.add_middleware(
     expose_headers=["X-Degraded", "X-Degraded-Message"],
 )
 
+# 性能指标中间件
+app.add_middleware(MetricsMiddleware)
+
+# 请求日志中间件
+app.add_middleware(RequestLoggingMiddleware)
+
+# 全局异常处理器
+register_exception_handlers(app)
+
 # 注册 API v1 路由
 app.include_router(api_router, prefix="/api/v1")
 
@@ -456,8 +469,72 @@ async def root():
 
 @app.get("/api/health", tags=["系统"])
 async def health():
-    """健康检查"""
-    return {"status": "healthy"}
+    """健康检查 — 含数据库连通性检测"""
+    now = datetime.now().isoformat()
+    version = settings.app_version
+    try:
+        async with async_session() as session:
+            await session.execute(text("SELECT 1"))
+        return {
+            "status": "healthy",
+            "database": "connected",
+            "timestamp": now,
+            "version": version,
+        }
+    except Exception:
+        from fastapi.responses import JSONResponse
+
+        return JSONResponse(
+            status_code=503,
+            content={
+                "status": "unhealthy",
+                "database": "disconnected",
+                "timestamp": now,
+                "version": version,
+            },
+        )
+
+
+@app.get("/api/readiness", tags=["系统"])
+async def readiness():
+    """就绪检查 — 数据库 / Redis / WebSocket 综合检测"""
+    now = datetime.now().isoformat()
+    checks = {}
+    ready = True
+
+    # 数据库检查
+    try:
+        async with async_session() as session:
+            await session.execute(text("SELECT 1"))
+        checks["database"] = "ok"
+    except Exception:
+        checks["database"] = "fail"
+        ready = False
+
+    # Redis 检查
+    try:
+        if redis_service.is_available:
+            await redis_service._pool.ping()
+            checks["redis"] = "ok"
+        else:
+            checks["redis"] = "disabled"
+    except Exception:
+        checks["redis"] = "fail"
+
+    # WebSocket 检查
+    checks["websocket"] = {
+        "status": "ok",
+        "connections": ws_manager.total_connections,
+    }
+
+    payload = {"ready": ready, "checks": checks, "timestamp": now}
+
+    if not ready:
+        from fastapi.responses import JSONResponse
+
+        return JSONResponse(status_code=503, content=payload)
+
+    return payload
 
 
 @app.get("/api/stats", tags=["系统"])
@@ -481,6 +558,27 @@ async def get_stats():
             "points": {"total": point_row[0] or 0, "enabled": point_row[1] or 0, "by_type": type_counts},
             "license": {"type": "standard", "max_points": settings.max_points, "used_points": point_row[0] or 0},
         }
+
+
+@app.get("/api/metrics", tags=["系统"])
+async def get_app_metrics():
+    """性能指标"""
+    import platform
+
+    metrics = await metrics_collector.get_metrics()
+    metrics["system"] = {
+        "python_version": platform.python_version(),
+        "websocket_connections": ws_manager.total_connections,
+    }
+    try:
+        import psutil
+
+        process = psutil.Process()
+        metrics["system"]["memory_mb"] = round(process.memory_info().rss / 1024 / 1024, 1)
+        metrics["system"]["cpu_percent"] = process.cpu_percent()
+    except ImportError:
+        pass
+    return metrics
 
 
 # WebSocket 路由 - 需要 JWT 令牌认证

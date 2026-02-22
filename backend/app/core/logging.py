@@ -1,13 +1,45 @@
 """
 日志配置模块
-Centralized logging configuration for the application.
+Centralized logging configuration with JSON structured logging support.
 """
 
+import json
 import logging
 import sys
+from contextvars import ContextVar
+from datetime import datetime, timezone
 from typing import Optional
 
 from .config import get_settings
+
+# 请求 ID 上下文变量 — 供中间件设置，供 JSONFormatter 读取
+request_id_var: ContextVar[str] = ContextVar("request_id", default="")
+
+
+class JSONFormatter(logging.Formatter):
+    """结构化 JSON 日志格式化器"""
+
+    def format(self, record: logging.LogRecord) -> str:
+        log_entry = {
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "level": record.levelname,
+            "logger": record.name,
+            "message": record.getMessage(),
+            "request_id": request_id_var.get(""),
+        }
+
+        # 附加额外字段
+        extra = {}
+        if record.exc_info and record.exc_info[0] is not None:
+            extra["exception"] = self.formatException(record.exc_info)
+        if hasattr(record, "duration_ms"):
+            extra["duration_ms"] = record.duration_ms
+        if hasattr(record, "status_code"):
+            extra["status_code"] = record.status_code
+        if extra:
+            log_entry["extra"] = extra
+
+        return json.dumps(log_entry, ensure_ascii=False)
 
 
 def setup_logging(name: Optional[str] = None) -> logging.Logger:
@@ -42,10 +74,15 @@ def setup_logging(name: Optional[str] = None) -> logging.Logger:
             logger.setLevel(logging.INFO)
             handler.setLevel(logging.INFO)
 
-        # 设置日志格式
-        formatter = logging.Formatter(
-            fmt="[%(asctime)s] %(levelname)s [%(name)s:%(lineno)d] %(message)s", datefmt="%Y-%m-%d %H:%M:%S"
-        )
+        # 调试模式使用可读文本格式，生产模式使用 JSON 格式
+        if settings.debug:
+            formatter = logging.Formatter(
+                fmt="[%(asctime)s] %(levelname)s [%(name)s:%(lineno)d] %(message)s",
+                datefmt="%Y-%m-%d %H:%M:%S",
+            )
+        else:
+            formatter = JSONFormatter()
+
         handler.setFormatter(formatter)
         logger.addHandler(handler)
 
