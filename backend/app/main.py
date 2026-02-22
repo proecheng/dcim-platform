@@ -398,6 +398,11 @@ async def lifespan(app: FastAPI):
     print("能耗聚合任务已启动，每30分钟检查一次")
     print("节能机会自动检测已启动，每小时检查一次")
     print("效果追踪任务已启动，每6小时检查一次")
+
+    # 启动 WebSocket 心跳检测
+    ws_manager.start_heartbeat()
+    print("WebSocket 心跳检测已启动，每30秒检查一次")
+
     print("API文档: http://localhost:8000/docs")
 
     yield
@@ -412,6 +417,7 @@ async def lifespan(app: FastAPI):
     energy_agg_task.cancel()
     detection_task.cancel()
     effect_tracking_task.cancel()
+    ws_manager.stop_heartbeat()
     # 关闭 Redis 连接
     await redis_service.close()
     print("应用关闭")

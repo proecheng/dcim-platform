@@ -4,7 +4,7 @@
 
 from datetime import datetime
 from enum import Enum as PyEnum
-from sqlalchemy import Column, Integer, String, Boolean, Text, DateTime, ForeignKey, Enum
+from sqlalchemy import Column, Integer, String, Boolean, Text, DateTime, ForeignKey, Enum, Index
 from sqlalchemy.orm import relationship
 
 from ..core.database import Base
@@ -70,6 +70,11 @@ class WorkOrder(Base):
     """工单表"""
 
     __tablename__ = "work_orders"
+    __table_args__ = (
+        Index("ix_work_orders_status", "status"),
+        Index("ix_work_orders_assignee", "assignee"),
+        Index("ix_work_orders_created_at", "created_at"),
+    )
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     order_no = Column(String(50), unique=True, nullable=False, comment="工单编号")

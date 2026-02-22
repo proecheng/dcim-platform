@@ -1,0 +1,38 @@
+{
+  "alarm": {
+    "body_text_len": 0,
+    "html_len": 4720,
+    "has_table": false,
+    "has_card": false,
+    "has_content": false,
+    "console_errors": [],
+    "body_preview": ""
+  },
+  "gateway": {
+    "body_text_len": 0,
+    "html_len": 4720,
+    "has_table": false,
+    "has_card": false,
+    "has_content": false,
+    "console_errors": [],
+    "body_preview": ""
+  },
+  "logs": {
+    "body_text_len": 0,
+    "html_len": 4720,
+    "has_table": false,
+    "has_card": false,
+    "has_content": false,
+    "console_errors": [],
+    "body_preview": ""
+  },
+  "topology": {
+    "body_text_len": 0,
+    "html_len": 4720,
+    "has_table": false,
+    "has_card": false,
+    "has_content": false,
+    "console_errors": [],
+    "body_preview": ""
+  }
+}

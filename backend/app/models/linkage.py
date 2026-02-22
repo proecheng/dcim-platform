@@ -4,7 +4,7 @@ Story 9-1: 联动引擎核心框架
 """
 
 from datetime import datetime
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, Text, ForeignKey, JSON
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, Text, ForeignKey, JSON, Index
 from sqlalchemy.orm import relationship
 
 from ..core.database import Base
@@ -49,6 +49,10 @@ class LinkageExecution(Base):
     """联动执行记录表"""
 
     __tablename__ = "linkage_executions"
+    __table_args__ = (
+        Index("ix_linkage_exec_policy_status", "policy_id", "status"),
+        Index("ix_linkage_exec_started_at", "started_at"),
+    )
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     policy_id = Column(Integer, ForeignKey("linkage_policies.id"), nullable=False, comment="策略ID")

@@ -131,6 +131,12 @@ export class WebSocketClient {
       return
     }
 
+    // 响应后端心跳 ping
+    if (type === 'ping') {
+      this.send({ type: 'pong' })
+      return
+    }
+
     // 触发对应类型的处理器
     const handlers = this.messageHandlers.get(type)
     if (handlers) {

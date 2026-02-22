@@ -3,7 +3,7 @@
 """
 
 from datetime import datetime
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, Float, Text, ForeignKey, Date
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, Float, Text, ForeignKey, Date, Index
 
 from ..core.database import Base
 
@@ -12,6 +12,9 @@ class AlarmThreshold(Base):
     """告警阈值配置表"""
 
     __tablename__ = "alarm_thresholds"
+    __table_args__ = (
+        Index("ix_alarm_thresholds_point_id", "point_id"),
+    )
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     point_id = Column(Integer, ForeignKey("points.id"), nullable=False, comment="点位ID")
@@ -31,6 +34,11 @@ class Alarm(Base):
     """告警记录表"""
 
     __tablename__ = "alarms"
+    __table_args__ = (
+        Index("ix_alarms_status_level", "status", "alarm_level"),
+        Index("ix_alarms_point_id", "point_id"),
+        Index("ix_alarms_created_at", "created_at"),
+    )
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     alarm_no = Column(String(50), unique=True, nullable=False, comment="告警编号")

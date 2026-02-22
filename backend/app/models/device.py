@@ -3,7 +3,7 @@
 """
 
 from datetime import datetime
-from sqlalchemy import Column, Integer, String, Boolean, Float, Text, DateTime, Date, ForeignKey
+from sqlalchemy import Column, Integer, String, Boolean, Float, Text, DateTime, Date, ForeignKey, Index
 
 from ..core.database import Base
 
@@ -12,6 +12,11 @@ class Device(Base):
     """设备表"""
 
     __tablename__ = "devices"
+    __table_args__ = (
+        Index("ix_devices_type_area", "device_type", "area_code"),
+        Index("ix_devices_status", "status"),
+        Index("ix_devices_site_id", "site_id"),
+    )
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     device_code = Column(String(50), unique=True, nullable=False, comment="设备编码")

@@ -23,6 +23,18 @@ export default defineConfig({
       '@': path.resolve(__dirname, 'src')
     }
   },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'echarts': ['echarts'],
+          'element-plus': ['element-plus', '@element-plus/icons-vue'],
+          'three': ['three'],
+          'vue-vendor': ['vue', 'vue-router', 'pinia'],
+        }
+      }
+    }
+  },
   server: {
     port: 3000,
     host: '0.0.0.0',

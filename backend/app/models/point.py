@@ -3,7 +3,7 @@
 """
 
 from datetime import datetime
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, Float, Text, ForeignKey
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, Float, Text, ForeignKey, Index
 
 from ..core.database import Base
 
@@ -12,6 +12,11 @@ class Point(Base):
     """点位表 - 核心表"""
 
     __tablename__ = "points"
+    __table_args__ = (
+        Index("ix_points_device_id", "device_id"),
+        Index("ix_points_type_area", "point_type", "area_code"),
+        Index("ix_points_enabled", "is_enabled"),
+    )
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     point_code = Column(String(50), unique=True, nullable=False, comment="点位编码")

@@ -1,0 +1,86 @@
+{
+  "asset": {
+    "status": "✅",
+    "url": "http://localhost:3000/asset",
+    "errors": []
+  },
+  "capacity": {
+    "status": "✅",
+    "url": "http://localhost:3000/capacity",
+    "errors": []
+  },
+  "gateway": {
+    "status": "❌",
+    "url": "http://localhost:3000/gateway",
+    "errors": [
+      "页面可能白屏"
+    ]
+  },
+  "device_manage": {
+    "status": "✅",
+    "url": "http://localhost:3000/device-manage",
+    "errors": []
+  },
+  "device_status": {
+    "status": "✅",
+    "url": "http://localhost:3000/device-status",
+    "errors": []
+  },
+  "workorder": {
+    "status": "✅",
+    "url": "http://localhost:3000/operation/workorder",
+    "errors": []
+  },
+  "inspection": {
+    "status": "✅",
+    "url": "http://localhost:3000/operation/inspection",
+    "errors": []
+  },
+  "knowledge": {
+    "status": "✅",
+    "url": "http://localhost:3000/operation/knowledge",
+    "errors": []
+  },
+  "users": {
+    "status": "✅",
+    "url": "http://localhost:3000/system/users",
+    "errors": []
+  },
+  "logs": {
+    "status": "❌",
+    "url": "http://localhost:3000/system/logs",
+    "errors": [
+      "页面可能白屏"
+    ]
+  },
+  "sites": {
+    "status": "✅",
+    "url": "http://localhost:3000/system/sites",
+    "errors": []
+  },
+  "reports": {
+    "status": "✅",
+    "url": "http://localhost:3000/reports",
+    "errors": [
+      "错误提示: "
+    ]
+  },
+  "topology": {
+    "status": "❌",
+    "url": "http://localhost:3000/topology/site-selection",
+    "errors": [
+      "页面可能白屏"
+    ]
+  },
+  "bigscreen": {
+    "status": "✅",
+    "url": "http://localhost:3000/bigscreen",
+    "errors": []
+  },
+  "_console_errors": [
+    "加载日报失败 mn",
+    "Failed to load resource: the server responded with a status of 422 (Unprocessable Entity)",
+    "WebSocket 错误: Event",
+    "WebSocket connection to 'ws://localhost:3000/ws/system?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhZG1pbiIsImV4cCI6MTc3MTc1MzkwNywianRpIjoiMjExOTZlNTczYTE4NDY4MjkxYjk2ZmFiNjk5NjgxY2MifQ.4WbaOjXueNv0vlsupg_wqB_uE4qTavnPVACFER_YTLw' failed: Invalid frame header"
+  ]
+}

@@ -1,0 +1,68 @@
+{
+  "login": {
+    "status": "✅",
+    "url": "http://localhost:3000/dashboard",
+    "errors": []
+  },
+  "dashboard": {
+    "status": "✅",
+    "url": "http://localhost:3000/dashboard",
+    "errors": []
+  },
+  "alarm": {
+    "status": "❌",
+    "url": "http://localhost:3000/alarm",
+    "errors": [
+      "页面可能白屏"
+    ]
+  },
+  "energy_monitor": {
+    "status": "✅",
+    "url": "http://localhost:3000/energy/monitor",
+    "errors": []
+  },
+  "energy_topology": {
+    "status": "✅",
+    "url": "http://localhost:3000/energy/topology",
+    "errors": []
+  },
+  "energy_statistics": {
+    "status": "✅",
+    "url": "http://localhost:3000/energy/statistics",
+    "errors": []
+  },
+  "environment_overview": {
+    "status": "✅",
+    "url": "http://localhost:3000/environment/overview",
+    "errors": []
+  },
+  "environment_temperature": {
+    "status": "✅",
+    "url": "http://localhost:3000/environment/temperature",
+    "errors": [
+      "错误提示: "
+    ]
+  },
+  "power_overview": {
+    "status": "✅",
+    "url": "http://localhost:3000/power/overview",
+    "errors": []
+  },
+  "cooling_overview": {
+    "status": "✅",
+    "url": "http://localhost:3000/cooling/overview",
+    "errors": []
+  },
+  "security_overview": {
+    "status": "✅",
+    "url": "http://localhost:3000/security/overview",
+    "errors": []
+  },
+  "_console_errors": [
+    "WebSocket connection to 'ws://localhost:3000/ws/system?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhZG1pbiIsImV4cCI6MTc3MTc1MzkwNywianRpIjoiMWMwMDYzZjQyODkzNDcyMGFkYzFkN2I2NzAwYmFkM2IifQ.3YUSyRKaVPf8XLzfdEaWnbG9vaqqFo5dVWI00zWe3LA' failed: Invalid frame header",
+    "WebSocket connection to 'ws://localhost:3000/ws/realtime?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhZG1pbiIsImV4cCI6MTc3MTc1MzkwNywianRpIjoiMWMwMDYzZjQyODkzNDcyMGFkYzFkN2I2NzAwYmFkM2IifQ.3YUSyRKaVPf8XLzfdEaWnbG9vaqqFo5dVWI00zWe3LA' failed: Invalid frame header",
+    "WebSocket 错误: Event",
+    "Failed to load resource: the server responded with a status of 422 (Unprocessable Entity)",
+    "漂移检测数据加载失败 mn"
+  ]
+}

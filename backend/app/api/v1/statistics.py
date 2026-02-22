@@ -3,7 +3,7 @@
 """
 
 from datetime import datetime, timedelta
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, and_
 
@@ -13,12 +13,13 @@ from ...models.point import Point, PointRealtime
 from ...models.device import Device
 from ...models.alarm import Alarm
 from ...models.history import PointHistory
+from ...core.cache_headers import set_cache_headers, CACHE_SHORT, CACHE_MEDIUM
 
 router = APIRouter()
 
 
 @router.get("/overview", summary="获取系统概览统计")
-async def get_overview(db: AsyncSession = Depends(get_db), _: User = Depends(require_viewer)):
+async def get_overview(response: Response, db: AsyncSession = Depends(get_db), _: User = Depends(require_viewer)):
     """
     获取系统概览统计信息
     """
@@ -45,6 +46,7 @@ async def get_overview(db: AsyncSession = Depends(get_db), _: User = Depends(req
     )
     realtime_status = {row[0]: row[1] for row in realtime_result.all()}
 
+    set_cache_headers(response, CACHE_SHORT)
     return {
         "points": {"total": point_total, "enabled": point_enabled, "disabled": point_total - point_enabled},
         "devices": {"total": device_total, "online": device_online, "offline": device_total - device_online},
@@ -55,7 +57,7 @@ async def get_overview(db: AsyncSession = Depends(get_db), _: User = Depends(req
 
 
 @router.get("/points", summary="获取点位统计")
-async def get_points_statistics(db: AsyncSession = Depends(get_db), _: User = Depends(require_viewer)):
+async def get_points_statistics(response: Response, db: AsyncSession = Depends(get_db), _: User = Depends(require_viewer)):
     """
     获取点位统计信息
     """
@@ -77,6 +79,7 @@ async def get_points_statistics(db: AsyncSession = Depends(get_db), _: User = De
     )
     by_status = {row[0]: row[1] for row in status_result.all()}
 
+    set_cache_headers(response, CACHE_MEDIUM)
     return {"by_type": by_type, "by_device_type": by_device_type, "by_area": by_area, "by_status": by_status}
 
 

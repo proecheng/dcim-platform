@@ -3,7 +3,7 @@
 """
 
 from datetime import datetime
-from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey
+from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, Index
 
 from ..core.database import Base
 
@@ -12,6 +12,10 @@ class OperationLog(Base):
     """操作日志表"""
 
     __tablename__ = "operation_logs"
+    __table_args__ = (
+        Index("ix_operation_logs_user_time", "user_id", "created_at"),
+        Index("ix_operation_logs_module", "module"),
+    )
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     user_id = Column(Integer, ForeignKey("users.id"), comment="用户ID")
@@ -38,6 +42,9 @@ class SystemLog(Base):
     """系统日志表"""
 
     __tablename__ = "system_logs"
+    __table_args__ = (
+        Index("ix_system_logs_level_time", "log_level", "created_at"),
+    )
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     log_level = Column(String(20), nullable=False, comment="日志级别: DEBUG/INFO/WARN/ERROR/FATAL")

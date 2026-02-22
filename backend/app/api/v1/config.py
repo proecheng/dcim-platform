@@ -4,7 +4,7 @@
 
 from datetime import datetime
 from typing import Optional
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update
@@ -15,6 +15,7 @@ from ..deps import get_db, require_viewer, require_admin
 from ...models.user import User
 from ...models.config import SystemConfig, Dictionary, License
 from ...schemas.config import SystemConfigInfo, SystemConfigUpdate, DictionaryInfo, LicenseInfo, LicenseActivate
+from ...core.cache_headers import set_cache_headers, CACHE_LONG
 
 router = APIRouter()
 
@@ -90,6 +91,7 @@ async def update_configs(
 
 @router.get("/dictionaries", summary="获取数据字典")
 async def get_dictionaries(
+    response: Response,
     dict_type: Optional[str] = Query(None, description="字典类型"),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_viewer),
@@ -111,6 +113,7 @@ async def get_dictionaries(
             grouped[d.dict_type] = []
         grouped[d.dict_type].append(DictionaryInfo.model_validate(d))
 
+    set_cache_headers(response, CACHE_LONG)
     return grouped
 
 

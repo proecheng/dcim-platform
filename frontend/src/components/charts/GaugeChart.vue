@@ -4,7 +4,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, watch, shallowRef, computed } from 'vue'
-import * as echarts from 'echarts'
+import echarts from '@/utils/echarts'
 
 interface Props {
   value: number

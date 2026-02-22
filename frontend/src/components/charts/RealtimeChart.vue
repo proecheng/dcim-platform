@@ -4,7 +4,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, shallowRef } from 'vue'
-import * as echarts from 'echarts'
+import echarts from '@/utils/echarts'
 import dayjs from 'dayjs'
 
 interface DataPoint {
