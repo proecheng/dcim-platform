@@ -315,11 +315,17 @@ const statCards = computed(() => [
 ])
 
 // 告警数: 离线且启用的网关
+// ⚠️ 数据映射说明: 后端 GatewayStatusSummary 只有 total/online/offline，无 alarm 字段。
+// 前端将"离线且启用"的网关视为告警网关。
 const alertCount = computed(() => {
   return tableData.value.filter(g => g.status === 'offline' && g.is_enabled).length
 })
 
 // 平均负载: 在线网关的平均 CPU 使用率
+// ⚠️ 数据映射说明: 后端 Gateway 模型无"数据吞吐量"字段。
+// 前端用 cpu_usage 平均值作为"平均负载"指标替代。
+// 相关映射: datasource_count → 关联数据源数, capabilities → 协议能力标签,
+//           cpu_usage/memory_usage → 连接质量/负载指标
 const avgThroughput = computed(() => {
   const onlineGateways = tableData.value.filter(g => g.status === 'online' && g.cpu_usage != null)
   if (onlineGateways.length === 0) return '--'

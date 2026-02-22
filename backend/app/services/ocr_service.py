@@ -6,6 +6,16 @@
 - PaddleOCR 可用时，真实识别电费单图片并提取电价信息
 - 支持国家电网（五时段）和南方电网（三/四时段）电费单模板
 - mock 模式返回国家电网标准五时段电价示例数据
+
+TODO [生产集成计划]:
+  1. 安装 PaddleOCR: pip install paddleocr paddlepaddle
+     - 需要约 1.5GB 磁盘空间（模型文件）
+     - 首次运行自动下载中文 OCR 模型
+  2. 或集成云 OCR API（百度/腾讯/阿里）替代本地 PaddleOCR:
+     - 优点: 无需本地 GPU/大磁盘，识别精度更高
+     - 缺点: 需要网络访问，有 API 调用费用
+  3. 当前 mock 模式仅用于开发/演示，返回固定的国家电网五时段电价数据
+  4. 生产环境必须安装 PaddleOCR 或配置云 OCR API 才能真正识别电费单
 """
 
 import asyncio
@@ -108,7 +118,12 @@ class OcrBillResult:
 
 
 def _get_mock_result() -> OcrBillResult:
-    """返回国家电网标准五时段电价 mock 数据"""
+    """
+    返回国家电网标准五时段电价 mock 数据
+
+    TODO: 此函数仅用于开发/演示环境。生产环境应安装 PaddleOCR 或配置云 OCR API，
+    使 _paddle_available=True，此函数将不会被调用。
+    """
     today = date.today().isoformat()
     items = [
         OcrBillItem(
@@ -204,6 +219,7 @@ async def recognize_bill(file_bytes: bytes, filename: str) -> OcrBillResult:
         return await _recognize_with_paddle(file_bytes, filename)
 
     # PaddleOCR 不可用，使用 mock 模式
+    # TODO: 生产环境需安装 PaddleOCR 或配置云 OCR API，参见文件顶部注释
     logger.info("使用 mock 模式返回示例电价数据 (PaddleOCR 未安装)")
     return _get_mock_result()
 

@@ -79,7 +79,7 @@ async def reload_rules_from_yaml(
     return {"message": f"诊断规则重载完成，共 {count} 条", "count": count}
 
 
-@router.get("/rules", response_model=list)
+@router.get("/rules", response_model=dict)
 async def list_rules(
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_viewer),

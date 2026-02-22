@@ -29,6 +29,8 @@ export interface SiteForm {
   site_code: string
   site_name: string
   address?: string
+  contact_person?: string
+  contact_phone?: string
   description?: string
 }
 

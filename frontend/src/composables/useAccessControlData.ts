@@ -57,6 +57,16 @@ function doorStatusText(status: DoorStatus): string {
 
 /**
  * 从告警记录推导事件类型
+ *
+ * 门禁设备为 DI 类型，事件类型不是直接字段，而是从告警记录的多个字段组合推导。
+ * 推导优先级（从高到低）：
+ *   1. 消防联动开门 — alarm_message 包含 "消防"/"联动"/"fire" 关键字
+ *   2. 异常开门 — alarm_level 为 critical/major，或 alarm_message 包含 "异常"/"强行"/"非授权"/"闯入"/"失败"
+ *   3. 远程开门 — alarm_message 包含 "远程"/"remote"，或 alarm_type === 'system'
+ *   4. 刷卡开门 — 默认（以上均不匹配时）
+ *
+ * ⚠️ 技术债务: 此映射关系依赖后端告警分类规则。如果后端修改了 alarm_type/alarm_level 的
+ *    语义或新增了告警类型，此推导逻辑需要同步更新。
  */
 function deriveEventType(alarm: AlarmInfo, firePolicyNames: Set<string>): AccessEventType {
   const msg = (alarm.alarm_message || '').toLowerCase()
