@@ -2,7 +2,7 @@
 报表 API - v1
 """
 
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from typing import Optional, List
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
@@ -346,7 +346,7 @@ async def download_report(
 
 @router.get("/daily", summary="获取日报数据")
 async def get_daily_report(
-    date: Optional[datetime] = Query(None, description="日期，默认昨天"),
+    date: Optional[date] = Query(None, description="日期，默认昨天，格式 YYYY-MM-DD"),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_viewer),
 ):
@@ -354,9 +354,9 @@ async def get_daily_report(
     获取日报数据
     """
     if not date:
-        date = datetime.now() - timedelta(days=1)
+        date = (datetime.now() - timedelta(days=1)).date()
 
-    start_time = date.replace(hour=0, minute=0, second=0, microsecond=0)
+    start_time = datetime.combine(date, datetime.min.time())
     end_time = start_time + timedelta(days=1)
 
     # 调用生成报表逻辑

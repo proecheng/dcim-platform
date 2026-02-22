@@ -137,13 +137,13 @@ export function useTemperatureData() {
 
   async function fetchDriftData() {
     try {
-      const res = await getDriftResults({ page_size: 500, status: 'suspected' })
+      const res = await getDriftResults({ page_size: 100, status: 'suspected' })
       const ids = new Set<number>()
       if (res && res.items) {
         res.items.forEach((d: DriftDetectionResult) => ids.add(d.point_id))
       }
       // 也获取 confirmed 状态
-      const res2 = await getDriftResults({ page_size: 500, status: 'confirmed' })
+      const res2 = await getDriftResults({ page_size: 100, status: 'confirmed' })
       if (res2 && res2.items) {
         res2.items.forEach((d: DriftDetectionResult) => ids.add(d.point_id))
       }

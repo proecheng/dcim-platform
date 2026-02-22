@@ -9,7 +9,7 @@ from unittest.mock import AsyncMock, MagicMock, patch, PropertyMock
 from datetime import datetime, timezone
 
 # 确保 gateway 根目录在 sys.path
-_root = os.path.join(os.path.dirname(__file__), "..", "..")
+_root = os.path.join(os.path.dirname(__file__), "..")
 sys.path.insert(0, _root)
 
 
