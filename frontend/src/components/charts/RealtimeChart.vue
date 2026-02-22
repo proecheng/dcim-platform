@@ -4,7 +4,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, shallowRef } from 'vue'
-import echarts from '@/utils/echarts'
+import echarts, { type EChartsOption } from '@/utils/echarts'
 import dayjs from 'dayjs'
 
 interface DataPoint {
@@ -43,7 +43,7 @@ const chartInstance = shallowRef<echarts.ECharts>()
 
 const dataQueue = ref<DataPoint[]>([])
 
-const getOption = (): echarts.EChartsOption => {
+const getOption = (): EChartsOption => {
   const markLineData: any[] = []
 
   if (props.showMarkLine) {

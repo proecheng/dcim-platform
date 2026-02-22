@@ -12,9 +12,7 @@ class AlarmThreshold(Base):
     """告警阈值配置表"""
 
     __tablename__ = "alarm_thresholds"
-    __table_args__ = (
-        Index("ix_alarm_thresholds_point_id", "point_id"),
-    )
+    __table_args__ = (Index("ix_alarm_thresholds_point_id", "point_id"),)
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     point_id = Column(Integer, ForeignKey("points.id"), nullable=False, comment="点位ID")

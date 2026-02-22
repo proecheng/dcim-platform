@@ -43,7 +43,9 @@ class ConnectionManager:
         if channel in self.active_connections:
             if websocket in self.active_connections[channel]:
                 self.active_connections[channel].remove(websocket)
-                logger.debug("WebSocket 连接断开: channel=%s, 剩余连接数=%d", channel, len(self.active_connections[channel]))
+                logger.debug(
+                    "WebSocket 连接断开: channel=%s, 剩余连接数=%d", channel, len(self.active_connections[channel])
+                )
 
     def start_heartbeat(self):
         """启动心跳检测后台任务"""

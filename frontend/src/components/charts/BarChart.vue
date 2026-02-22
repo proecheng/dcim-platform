@@ -4,7 +4,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, watch, shallowRef } from 'vue'
-import echarts from '@/utils/echarts'
+import echarts, { type EChartsOption } from '@/utils/echarts'
 
 interface SeriesData {
   name: string
@@ -47,7 +47,7 @@ const props = withDefaults(defineProps<Props>(), {
 const chartRef = ref<HTMLElement>()
 const chartInstance = shallowRef<echarts.ECharts>()
 
-const getOption = (): echarts.EChartsOption => {
+const getOption = (): EChartsOption => {
   const categoryAxis = {
     type: 'category' as const,
     data: props.xData,

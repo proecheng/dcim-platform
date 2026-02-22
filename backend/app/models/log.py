@@ -42,9 +42,7 @@ class SystemLog(Base):
     """系统日志表"""
 
     __tablename__ = "system_logs"
-    __table_args__ = (
-        Index("ix_system_logs_level_time", "log_level", "created_at"),
-    )
+    __table_args__ = (Index("ix_system_logs_level_time", "log_level", "created_at"),)
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     log_level = Column(String(20), nullable=False, comment="日志级别: DEBUG/INFO/WARN/ERROR/FATAL")

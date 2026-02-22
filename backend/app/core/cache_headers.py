@@ -18,7 +18,7 @@ def set_cache_headers(response: Response, max_age: int = 60, private: bool = Tru
 
 
 # 预定义缓存策略
-CACHE_SHORT = 30       # 30 秒 — 实时性要求较高的统计数据
-CACHE_MEDIUM = 300     # 5 分钟 — 概览/仪表盘数据
-CACHE_LONG = 1800      # 30 分钟 — 配置/字典等低频变更数据
-CACHE_STATIC = 86400   # 24 小时 — 几乎不变的参考数据
+CACHE_SHORT = 30  # 30 秒 — 实时性要求较高的统计数据
+CACHE_MEDIUM = 300  # 5 分钟 — 概览/仪表盘数据
+CACHE_LONG = 1800  # 30 分钟 — 配置/字典等低频变更数据
+CACHE_STATIC = 86400  # 24 小时 — 几乎不变的参考数据

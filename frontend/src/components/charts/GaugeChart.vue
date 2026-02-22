@@ -4,7 +4,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, watch, shallowRef, computed } from 'vue'
-import echarts from '@/utils/echarts'
+import echarts, { type EChartsOption } from '@/utils/echarts'
 
 interface Props {
   value: number
@@ -52,7 +52,7 @@ const axisLineColors = computed(() => {
   return defaultColors.map(c => [c.value, c.color])
 })
 
-const getOption = (): echarts.EChartsOption => {
+const getOption = (): EChartsOption => {
   return {
     series: [
       {

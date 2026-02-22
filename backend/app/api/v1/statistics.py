@@ -57,7 +57,9 @@ async def get_overview(response: Response, db: AsyncSession = Depends(get_db), _
 
 
 @router.get("/points", summary="获取点位统计")
-async def get_points_statistics(response: Response, db: AsyncSession = Depends(get_db), _: User = Depends(require_viewer)):
+async def get_points_statistics(
+    response: Response, db: AsyncSession = Depends(get_db), _: User = Depends(require_viewer)
+):
     """
     获取点位统计信息
     """
