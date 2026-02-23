@@ -4,7 +4,6 @@
 """
 
 import logging
-import traceback
 import uuid
 from contextvars import ContextVar
 from datetime import datetime, timezone
