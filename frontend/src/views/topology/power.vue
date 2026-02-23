@@ -110,7 +110,7 @@
       v-model="mappingDialogVisible"
       :title="isEditMapping ? '编辑接线' : '添加接线'"
       width="520px"
-      @closed="resetMappingForm"
+      destroy-on-close
     >
       <el-form ref="mappingFormRef" :model="mappingForm" :rules="mappingRules" label-width="100px">
         <el-form-item label="机柜" prop="cabinet_id">

@@ -114,7 +114,7 @@
     />
 
     <!-- 新增/编辑设备对话框 -->
-    <el-dialog v-model="dialogVisible" :title="isEdit ? '编辑设备' : '新增设备'" width="560px" @closed="resetForm">
+    <el-dialog v-model="dialogVisible" :title="isEdit ? '编辑设备' : '新增设备'" width="560px" :destroy-on-close="true">
       <el-form ref="formRef" :model="form" :rules="formRules" label-width="90px">
         <el-form-item label="设备编码" prop="device_code">
           <el-input v-model="form.device_code" :disabled="isEdit" placeholder="请输入设备编码" />

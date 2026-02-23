@@ -41,7 +41,7 @@
       v-model="zoneDialogVisible"
       :title="isEditZone ? '编辑制冷区域' : '新增制冷区域'"
       width="720px"
-      @closed="resetZoneForm"
+      destroy-on-close
     >
       <el-form ref="zoneFormRef" :model="zoneForm" :rules="zoneRules" label-width="100px">
         <el-form-item label="区域名称" prop="zone_name">
