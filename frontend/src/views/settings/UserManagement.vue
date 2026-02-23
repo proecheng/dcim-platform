@@ -534,13 +534,17 @@ function resetForm() {
     role: 'operator',
     department: ''
   })
-  formRef.value?.clearValidate()
+  nextTick(() => {
+    formRef.value?.clearValidate()
+  })
 }
 
 function handleResetPwdClose() {
   pwdForm.password = ''
   pwdForm.confirmPassword = ''
-  resetPwdFormRef.value?.clearValidate()
+  nextTick(() => {
+    resetPwdFormRef.value?.clearValidate()
+  })
 }
 
 // ===== 初始化 =====

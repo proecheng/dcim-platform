@@ -485,7 +485,9 @@ function resetForm() {
     install_date: '',
     description: ''
   })
-  formRef.value?.clearValidate()
+  nextTick(() => {
+    formRef.value?.clearValidate()
+  })
 }
 
 // ===== 初始化 =====
