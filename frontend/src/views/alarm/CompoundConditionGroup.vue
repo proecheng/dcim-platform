@@ -188,7 +188,7 @@ function addCondition() {
 }
 
 function addSubGroup() {
-  if (props.depth >= MAX_DEPTH) return
+  if (props.depth >= props.maxDepth) return
   emitUpdate({
     children: [
       ...props.group.children,

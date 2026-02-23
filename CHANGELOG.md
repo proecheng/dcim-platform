@@ -41,6 +41,24 @@
 - 配电拓扑页面「关联已有设备」功能
 - DeviceSyncService 双向同步服务
 
+### 代码审查修复（CR-01 ~ CR-12）
+- **CR-01 [HIGH]**: 升级链 JSON 从 description 迁移到专用 escalation_chain 字段
+- **CR-02 [HIGH]**: condition_expr 后端 JSON schema 校验 + 前端反序列化错误提示
+- **CR-03 [HIGH]**: OCR 文件魔数校验 + API 层 10MB 前置大小检查 (HTTP 413)
+- **CR-04 [HIGH]**: WebSocket 单例 onUnmounted 安全清理
+- **CR-05 [MEDIUM]**: Three.js GridHelper/Fog 资源清理完善
+- **CR-06 [MEDIUM]**: 屏蔽策略编辑改为先创建后删除，防止数据丢失
+- **CR-07 [MEDIUM]**: 批量配置下发改为 3 并发控制
+- **CR-08 [MEDIUM]**: 24h 告警数按 device_type 过滤，修复全局计数误导
+- **CR-09 [MEDIUM]**: 阈值全量加载标记技术债务
+- **CR-10 [LOW]**: BigscreenHistoryDialog 非数字 deviceId 显示明确提示
+- **CR-11 [LOW]**: 网关页面标签修正（平均负载→平均 CPU，能力标签→协议能力）
+- **CR-12 [LOW]**: 条件组深度限制改为 prop + 禁用按钮带 tooltip
+
+### 代码质量
+- 后端全量 ruff format + lint 自动修复（270 lint fixes，144 files reformatted）
+- 新增 escalation_chain 数据库迁移
+
 ## [3.0.0] - 2026-02-20
 
 全部 17 个 Epic / 86 个 Story 开发完毕，项目核心功能 100% 完成。
