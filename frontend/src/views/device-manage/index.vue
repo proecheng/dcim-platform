@@ -67,10 +67,10 @@
     <el-table :data="tableData" stripe border v-loading="loading" style="width: 100%;">
       <el-table-column prop="device_code" label="设备编码" width="130" />
       <el-table-column prop="device_name" label="设备名称" width="140" />
-      <el-table-column prop="device_type" label="设备类型" width="100">
+      <el-table-column prop="device_type" label="设备类型" width="130">
         <template #default="{ row }">
           <el-tag :type="deviceTypeTagMap[row.device_type] || 'info'" size="small">
-            {{ row.device_type }}
+            {{ getDeviceTypeLabel(row.device_type) }}
           </el-tag>
         </template>
       </el-table-column>
@@ -180,48 +180,68 @@ const router = useRouter()
 
 const deviceTypeOptions = [
   { label: 'UPS', value: 'UPS' },
-  { label: 'AC', value: 'AC' },
   { label: 'PDU', value: 'PDU' },
-  { label: 'TH', value: 'TH' },
-  { label: 'DOOR', value: 'DOOR' },
-  { label: 'SMOKE', value: 'SMOKE' },
-  { label: 'WATER', value: 'WATER' }
+  { label: '精密空调(室内)', value: 'PRECISION_AC_INDOOR' },
+  { label: '精密空调(室外)', value: 'PRECISION_AC_OUTDOOR' },
+  { label: '空调', value: 'AC' },
+  { label: '机柜', value: 'CABINET' },
+  { label: '冷通道', value: 'COLD_AISLE' },
+  { label: '温湿度', value: 'TH' },
+  { label: '门禁', value: 'DOOR' },
+  { label: '烟感', value: 'SMOKE' },
+  { label: '水浸', value: 'WATER' },
 ]
 
 const areaOptions = [
+  { label: 'A区', value: 'A' },
   { label: 'A1', value: 'A1' },
   { label: 'A2', value: 'A2' },
+  { label: 'B区', value: 'B' },
   { label: 'B1', value: 'B1' },
   { label: 'F1', value: 'F1' },
   { label: 'F2', value: 'F2' },
-  { label: 'F3', value: 'F3' }
+  { label: 'F3', value: 'F3' },
 ]
 
 const statusOptions = [
   { label: '在线', value: 'online' },
+  { label: '运行中', value: 'running' },
   { label: '离线', value: 'offline' },
   { label: '维护中', value: 'maintenance' },
-  { label: '告警', value: 'alarm' }
+  { label: '告警', value: 'alarm' },
 ]
 
 // ===== 标签映射 =====
 type TagType = 'success' | 'warning' | 'danger' | 'info' | 'primary'
 
+const deviceTypeLabelMap: Record<string, string> = Object.fromEntries(
+  deviceTypeOptions.map(item => [item.value, item.label])
+)
+
+function getDeviceTypeLabel(type: string): string {
+  return deviceTypeLabelMap[type] || type
+}
+
 const deviceTypeTagMap: Record<string, TagType> = {
   UPS: 'danger',
-  AC: 'primary',
   PDU: 'warning',
-  TH: 'success',
+  PRECISION_AC_INDOOR: 'primary',
+  PRECISION_AC_OUTDOOR: 'primary',
+  AC: 'primary',
+  CABINET: 'success',
+  COLD_AISLE: 'success',
+  TH: 'info',
   DOOR: 'info',
   SMOKE: 'info',
-  WATER: 'info'
+  WATER: 'info',
 }
 
 const statusTagMap: Record<string, { type: TagType; text: string }> = {
   online: { type: 'success', text: '在线' },
+  running: { type: 'success', text: '运行中' },
   offline: { type: 'danger', text: '离线' },
   maintenance: { type: 'warning', text: '维护中' },
-  alarm: { type: 'danger', text: '告警' }
+  alarm: { type: 'danger', text: '告警' },
 }
 
 // ===== 统计数据 =====
@@ -346,7 +366,7 @@ function handleAdd() {
 
 // ===== 详情 =====
 function handleDetail(row: DeviceInfo) {
-  router.push(`/device-manage/detail/${row.id}`)
+  router.push(`/collection/device-manage/detail/${row.id}`)
 }
 
 // ===== 编辑 =====

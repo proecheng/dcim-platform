@@ -13,7 +13,7 @@
         <el-descriptions-item label="设备编码">{{ deviceData.device_code }}</el-descriptions-item>
         <el-descriptions-item label="设备名称">{{ deviceData.device_name }}</el-descriptions-item>
         <el-descriptions-item label="设备类型">
-          <el-tag size="small">{{ deviceData.device_type }}</el-tag>
+          <el-tag size="small">{{ getDeviceTypeLabel(deviceData.device_type) }}</el-tag>
         </el-descriptions-item>
         <el-descriptions-item label="区域">{{ deviceData.area_code }}</el-descriptions-item>
         <el-descriptions-item label="状态">
@@ -153,6 +153,24 @@ import {
 import { getPointTrend, type TrendData } from '@/api/modules/history'
 import DataQualityTag from '@/components/common/DataQualityTag.vue'
 
+// 设备类型中文映射
+const deviceTypeLabelMap: Record<string, string> = {
+  UPS: 'UPS',
+  PDU: 'PDU',
+  PRECISION_AC_INDOOR: '精密空调(室内)',
+  PRECISION_AC_OUTDOOR: '精密空调(室外)',
+  AC: '空调',
+  CABINET: '机柜',
+  COLD_AISLE: '冷通道',
+  TH: '温湿度',
+  DOOR: '门禁',
+  SMOKE: '烟感',
+  WATER: '水浸',
+}
+function getDeviceTypeLabel(type: string): string {
+  return deviceTypeLabelMap[type] || type
+}
+
 const router = useRouter()
 const route = useRoute()
 
@@ -177,6 +195,7 @@ type TagType = 'success' | 'warning' | 'danger' | 'info' | 'primary'
 const statusTagType = computed<TagType>(() => {
   const map: Record<string, TagType> = {
     online: 'success',
+    running: 'success',
     offline: 'danger',
     maintenance: 'warning',
     alarm: 'danger'
@@ -187,6 +206,7 @@ const statusTagType = computed<TagType>(() => {
 const statusText = computed(() => {
   const map: Record<string, string> = {
     online: '在线',
+    running: '运行中',
     offline: '离线',
     maintenance: '维护中',
     alarm: '告警'
