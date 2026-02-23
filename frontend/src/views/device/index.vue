@@ -22,12 +22,7 @@
         <el-form-item label="用途">
           <el-select v-model="filters.device_type" style="width: 150px">
             <el-option label="全部" value="ALL" />
-            <el-option label="功率" value="power" />
-            <el-option label="电流" value="current" />
-            <el-option label="电能" value="energy" />
-            <el-option label="电压" value="voltage" />
-            <el-option label="功率因数" value="power_factor" />
-            <el-option label="其他" value="other" />
+            <el-option v-for="item in deviceTypeOptions" :key="item.value" :label="item.label" :value="item.value" />
           </el-select>
         </el-form-item>
         <el-form-item label="区域">
@@ -88,7 +83,11 @@
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="device_type" label="用途" width="80" />
+        <el-table-column prop="device_type" label="用途" width="120">
+          <template #default="{ row }">
+            {{ getDeviceTypeLabel(row.device_type) }}
+          </template>
+        </el-table-column>
         <el-table-column prop="area_code" label="区域" width="60" />
         <el-table-column label="关联设备" min-width="75">
           <template #default="{ row }">
@@ -96,6 +95,7 @@
               <span class="linked-device">{{ row.energy_device_name }}</span>
               <span class="unlink-btn" @click="handleUnlink(row)">取消关联</span>
             </div>
+            <span v-else-if="row.energy_device_id" class="linked-device" style="color: #909399; font-style: italic;">设备已删除</span>
             <span v-else class="link-btn" @click="handleLink(row)">关联设备</span>
           </template>
         </el-table-column>
@@ -147,12 +147,7 @@
           <el-col :span="12">
             <el-form-item label="用途" prop="device_type">
               <el-select v-model="form.device_type" :disabled="editMode">
-                <el-option label="功率" value="power" />
-                <el-option label="电流" value="current" />
-                <el-option label="电能" value="energy" />
-                <el-option label="电压" value="voltage" />
-                <el-option label="功率因数" value="power_factor" />
-                <el-option label="其他" value="other" />
+                <el-option v-for="item in deviceTypeOptions" :key="item.value" :label="item.label" :value="item.value" />
               </el-select>
             </el-form-item>
           </el-col>
@@ -246,6 +241,36 @@ import {
   type Point
 } from '@/api/point'
 import { getPowerDevices, type PowerDevice } from '@/api/modules/energy'
+
+// 设备类型选项映射
+const deviceTypeOptions = [
+  { label: 'IT设备', value: 'IT' },
+  { label: '照明', value: 'LIGHT' },
+  { label: 'UPS', value: 'UPS' },
+  { label: 'PDU', value: 'PDU' },
+  { label: '配电柜', value: 'PDB' },
+  { label: '精密空调(室内)', value: 'PRECISION_AC_INDOOR' },
+  { label: '精密空调(室外)', value: 'PRECISION_AC_OUTDOOR' },
+  { label: '空调', value: 'AC' },
+  { label: '机柜', value: 'CABINET' },
+  { label: '冷通道', value: 'COLD_AISLE' },
+  { label: '冷水机组', value: 'CH' },
+  { label: '冷却塔', value: 'CT' },
+  { label: '水泵', value: 'PUMP' },
+  { label: '管道', value: 'PIPE' },
+  { label: '水处理', value: 'WATER' },
+  { label: '温湿度', value: 'TH' },
+  { label: '烟感', value: 'SMOKE' },
+  { label: '门禁', value: 'DOOR' },
+]
+
+const deviceTypeLabelMap: Record<string, string> = Object.fromEntries(
+  deviceTypeOptions.map(item => [item.value, item.label])
+)
+
+function getDeviceTypeLabel(type: string): string {
+  return deviceTypeLabelMap[type] || type
+}
 
 const points = ref<Point[]>([])
 const dialogVisible = ref(false)
