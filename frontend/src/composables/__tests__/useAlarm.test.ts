@@ -76,7 +76,7 @@ function handleAlarmResolve(
     result.splice(index, 1)
     newCount.total = Math.max(0, newCount.total - 1)
     const levelKey = alarm.alarm_level as keyof Omit<AlarmCount, 'total'>
-    if (levelKey in newCount && levelKey !== 'total') {
+    if (levelKey in newCount && levelKey !== ('total' as string)) {
       newCount[levelKey] = Math.max(0, newCount[levelKey] - 1)
     }
   }
