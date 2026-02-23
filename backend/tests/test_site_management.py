@@ -9,6 +9,7 @@ Story 16-1: 站点管理测试
 - require_site_access 依赖
 - EmqxAclService 单元测试
 """
+
 import pytest
 from httpx import AsyncClient
 
@@ -16,6 +17,7 @@ from tests.conftest import auth_headers
 
 
 # ==================== 辅助函数 ====================
+
 
 async def create_site(client: AsyncClient, token: str, **kwargs) -> dict:
     """创建站点并返回响应数据"""
@@ -37,6 +39,7 @@ async def create_site(client: AsyncClient, token: str, **kwargs) -> dict:
 async def create_gateway_for_site(db, site_id: int, gateway_id: str = "gw-test-001"):
     """在指定站点下创建网关"""
     from app.models.gateway import Gateway
+
     gw = Gateway(gateway_id=gateway_id, name="测试网关", site_id=site_id)
     db.add(gw)
     await db.flush()
@@ -47,11 +50,9 @@ async def create_device_for_site(db, site_id: int, name: str = "测试设备"):
     """在指定站点下创建设备"""
     from app.models.device import Device
     import uuid
+
     code = f"DEV-{uuid.uuid4().hex[:8]}"
-    dev = Device(
-        device_code=code, device_name=name, device_type="UPS",
-        area_code="A01", site_id=site_id
-    )
+    dev = Device(device_code=code, device_name=name, device_type="UPS", area_code="A01", site_id=site_id)
     db.add(dev)
     await db.flush()
     return dev
@@ -60,9 +61,9 @@ async def create_device_for_site(db, site_id: int, name: str = "测试设备"):
 async def create_datasource_for_site(db, site_id: int, name: str = "测试数据源"):
     """在指定站点下创建数据源"""
     from app.models.gateway import DataSource
+
     ds = DataSource(
-        name=name, protocol_type="modbus_tcp", site_id=site_id,
-        connection_config={"host": "127.0.0.1", "port": 502}
+        name=name, protocol_type="modbus_tcp", site_id=site_id, connection_config={"host": "127.0.0.1", "port": 502}
     )
     db.add(ds)
     await db.flush()
@@ -70,6 +71,7 @@ async def create_datasource_for_site(db, site_id: int, name: str = "测试数据
 
 
 # ==================== Site CRUD 测试 ====================
+
 
 class TestSiteCRUD:
     """站点 CRUD 基础测试"""
@@ -111,7 +113,8 @@ class TestSiteCRUD:
         await create_site(client, token, site_code="S2", site_name="站点2")
 
         resp = await client.get(
-            "/api/v1/spatial/sites", params={"status": "active"},
+            "/api/v1/spatial/sites",
+            params={"status": "active"},
             headers=auth_headers(token),
         )
         assert resp.status_code == 200
@@ -232,9 +235,7 @@ class TestSiteDelete:
         """删除无关联数据的站点 — 成功"""
         _, token = admin_user
         site = await create_site(client, token)
-        resp = await client.delete(
-            f"/api/v1/spatial/sites/{site['id']}", headers=auth_headers(token)
-        )
+        resp = await client.delete(f"/api/v1/spatial/sites/{site['id']}", headers=auth_headers(token))
         assert resp.status_code == 200
 
     @pytest.mark.asyncio
@@ -244,9 +245,7 @@ class TestSiteDelete:
         site = await create_site(client, token)
         await create_gateway_for_site(async_db, site["id"])
 
-        resp = await client.delete(
-            f"/api/v1/spatial/sites/{site['id']}", headers=auth_headers(token)
-        )
+        resp = await client.delete(f"/api/v1/spatial/sites/{site['id']}", headers=auth_headers(token))
         assert resp.status_code == 400
         assert "网关" in resp.json()["detail"]
 
@@ -257,9 +256,7 @@ class TestSiteDelete:
         site = await create_site(client, token)
         await create_device_for_site(async_db, site["id"])
 
-        resp = await client.delete(
-            f"/api/v1/spatial/sites/{site['id']}", headers=auth_headers(token)
-        )
+        resp = await client.delete(f"/api/v1/spatial/sites/{site['id']}", headers=auth_headers(token))
         assert resp.status_code == 400
         assert "设备" in resp.json()["detail"]
 
@@ -270,9 +267,7 @@ class TestSiteDelete:
         site = await create_site(client, token)
         await create_datasource_for_site(async_db, site["id"])
 
-        resp = await client.delete(
-            f"/api/v1/spatial/sites/{site['id']}", headers=auth_headers(token)
-        )
+        resp = await client.delete(f"/api/v1/spatial/sites/{site['id']}", headers=auth_headers(token))
         assert resp.status_code == 400
         assert "数据源" in resp.json()["detail"]
 
@@ -280,9 +275,7 @@ class TestSiteDelete:
     async def test_delete_nonexistent_site(self, client, admin_user):
         """删除不存在的站点"""
         _, token = admin_user
-        resp = await client.delete(
-            "/api/v1/spatial/sites/99999", headers=auth_headers(token)
-        )
+        resp = await client.delete("/api/v1/spatial/sites/99999", headers=auth_headers(token))
         assert resp.status_code == 404
 
 
@@ -361,17 +354,14 @@ class TestSiteAclRules:
         assert len(resp.json()) >= 2
 
         # 删除站点
-        resp = await client.delete(
-            f"/api/v1/spatial/sites/{site_id}", headers=auth_headers(token)
-        )
+        resp = await client.delete(f"/api/v1/spatial/sites/{site_id}", headers=auth_headers(token))
         assert resp.status_code == 200
 
         # 验证规则已清理（通过直接查询数据库）
         from sqlalchemy import select, func
         from app.models.gateway import MqttAclRule
-        result = await async_db.execute(
-            select(func.count(MqttAclRule.id)).where(MqttAclRule.site_id == site_id)
-        )
+
+        result = await async_db.execute(select(func.count(MqttAclRule.id)).where(MqttAclRule.site_id == site_id))
         assert result.scalar() == 0
 
 
@@ -391,7 +381,8 @@ class TestGatewaySiteFilter:
 
         # 过滤站点1
         resp = await client.get(
-            "/api/v1/gateways", params={"site_id": site1["id"]},
+            "/api/v1/gateways",
+            params={"site_id": site1["id"]},
             headers=auth_headers(token),
         )
         assert resp.status_code == 200
@@ -400,7 +391,8 @@ class TestGatewaySiteFilter:
 
         # 过滤站点2
         resp = await client.get(
-            "/api/v1/gateways", params={"site_id": site2["id"]},
+            "/api/v1/gateways",
+            params={"site_id": site2["id"]},
             headers=auth_headers(token),
         )
         assert resp.status_code == 200
@@ -415,7 +407,8 @@ class TestGatewaySiteFilter:
         await create_gateway_for_site(async_db, site["id"], "gw-sum-001")
 
         resp = await client.get(
-            "/api/v1/gateways/summary", params={"site_id": site["id"]},
+            "/api/v1/gateways/summary",
+            params={"site_id": site["id"]},
             headers=auth_headers(token),
         )
         assert resp.status_code == 200
@@ -438,7 +431,8 @@ class TestDatasourceSiteFilter:
         await create_datasource_for_site(async_db, site2["id"], "数据源3")
 
         resp = await client.get(
-            "/api/v1/datasources", params={"site_id": site1["id"]},
+            "/api/v1/datasources",
+            params={"site_id": site1["id"]},
             headers=auth_headers(token),
         )
         assert resp.status_code == 200
@@ -446,7 +440,8 @@ class TestDatasourceSiteFilter:
         assert data["total"] == 1
 
         resp = await client.get(
-            "/api/v1/datasources", params={"site_id": site2["id"]},
+            "/api/v1/datasources",
+            params={"site_id": site2["id"]},
             headers=auth_headers(token),
         )
         assert resp.status_code == 200
@@ -458,9 +453,7 @@ class TestSiteAccessPermission:
     """站点访问权限测试"""
 
     @pytest.mark.asyncio
-    async def test_require_site_access_blocks_unauthorized_operator(
-        self, client, operator_user, admin_user, async_db
-    ):
+    async def test_require_site_access_blocks_unauthorized_operator(self, client, operator_user, admin_user, async_db):
         """operator 无站点权限时，update/delete/status 被 require_site_access 拦截"""
         _, admin_token = admin_user
         operator, operator_token = operator_user
@@ -494,9 +487,7 @@ class TestSiteAccessPermission:
         assert resp.status_code == 403
 
     @pytest.mark.asyncio
-    async def test_require_site_access_allows_authorized_operator(
-        self, client, operator_user, admin_user, async_db
-    ):
+    async def test_require_site_access_allows_authorized_operator(self, client, operator_user, admin_user, async_db):
         """operator 有站点权限时，可以正常操作"""
         _, admin_token = admin_user
         operator, operator_token = operator_user
@@ -506,6 +497,7 @@ class TestSiteAccessPermission:
 
         # 给 operator 分配站点权限
         from app.models.user import UserSite
+
         us = UserSite(user_id=operator.id, site_id=site_id)
         async_db.add(us)
         await async_db.flush()
@@ -538,6 +530,7 @@ class TestSiteAccessPermission:
 
         # 给 viewer 分配站点1权限
         from app.models.user import UserSite
+
         us = UserSite(user_id=viewer.id, site_id=site1["id"])
         async_db.add(us)
         await async_db.flush()
@@ -566,14 +559,13 @@ class TestSiteAccessPermission:
 
         # 给 viewer 分配站点1权限
         from app.models.user import UserSite
+
         us = UserSite(user_id=viewer.id, site_id=site1["id"])
         async_db.add(us)
         await async_db.flush()
 
         # viewer 查看网关列表 — 只能看到站点1的网关
-        resp = await client.get(
-            "/api/v1/gateways", headers=auth_headers(viewer_token)
-        )
+        resp = await client.get("/api/v1/gateways", headers=auth_headers(viewer_token))
         assert resp.status_code == 200
         data = resp.json()
         # viewer 只能看到被授权站点的网关
@@ -606,6 +598,7 @@ class TestEmqxAclService:
     async def test_generate_acl_rules(self):
         """生成 ACL 规则"""
         from app.services.emqx_acl import EmqxAclService
+
         svc = EmqxAclService()
         rules = svc.generate_acl_rules(1, "SITE-001")
         assert len(rules) == 2
@@ -617,6 +610,7 @@ class TestEmqxAclService:
     async def test_match_topic_exact(self):
         """Topic 匹配 — 精确匹配"""
         from app.services.emqx_acl import EmqxAclService
+
         assert EmqxAclService._match_topic("dcim/1/gw/abc/data", "dcim/1/gw/abc/data")
         assert not EmqxAclService._match_topic("dcim/1/gw/abc/data", "dcim/2/gw/abc/data")
 
@@ -624,6 +618,7 @@ class TestEmqxAclService:
     async def test_match_topic_plus_wildcard(self):
         """Topic 匹配 — + 通配符"""
         from app.services.emqx_acl import EmqxAclService
+
         assert EmqxAclService._match_topic("dcim/+/gw/+/data", "dcim/1/gw/abc/data")
         assert EmqxAclService._match_topic("dcim/+/gw/+/data", "dcim/2/gw/xyz/data")
         assert not EmqxAclService._match_topic("dcim/+/gw/+/data", "dcim/1/gw/abc/status")
@@ -632,6 +627,7 @@ class TestEmqxAclService:
     async def test_match_topic_hash_wildcard(self):
         """Topic 匹配 — # 通配符"""
         from app.services.emqx_acl import EmqxAclService
+
         assert EmqxAclService._match_topic("dcim/1/gw/+/#", "dcim/1/gw/abc/data")
         assert EmqxAclService._match_topic("dcim/1/gw/+/#", "dcim/1/gw/abc/ota/status")
         assert not EmqxAclService._match_topic("dcim/1/gw/+/#", "dcim/2/gw/abc/data")
@@ -640,6 +636,7 @@ class TestEmqxAclService:
     async def test_match_client_wildcard(self):
         """客户端 ID 匹配 — 通配符"""
         from app.services.emqx_acl import EmqxAclService
+
         assert EmqxAclService._match_client("gw-SITE001-*", "gw-SITE001-abc")
         assert EmqxAclService._match_client("gw-SITE001-*", "gw-SITE001-xyz")
         assert not EmqxAclService._match_client("gw-SITE001-*", "gw-SITE002-abc")
@@ -707,7 +704,7 @@ class TestEmqxAclService:
 
         # 站点内网关 — 允许
         allowed = await emqx_acl_service.check_topic_permission(
-            site.id, f"gw-ACL-CHK-001", f"dcim/{site.id}/gw/001/data", "publish", async_db
+            site.id, "gw-ACL-CHK-001", f"dcim/{site.id}/gw/001/data", "publish", async_db
         )
         assert allowed is True
 
@@ -762,6 +759,7 @@ class TestSiteSummary:
 
         # 给 viewer 分配站点1权限
         from app.models.user import UserSite
+
         us = UserSite(user_id=viewer.id, site_id=site1["id"])
         async_db.add(us)
         await async_db.flush()

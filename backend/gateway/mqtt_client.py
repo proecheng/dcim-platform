@@ -1,4 +1,5 @@
 """MQTT 上报客户端。实现 Story: 2.5"""
+
 import json
 import logging
 import time

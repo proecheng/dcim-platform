@@ -1,4 +1,5 @@
 """工单管理 API 测试 — 工单全生命周期"""
+
 import pytest
 
 from httpx import AsyncClient, ASGITransport
@@ -14,6 +15,7 @@ from app.api.deps import get_db, require_admin, require_operator, require_viewer
 # ============================================================
 # Fixtures
 # ============================================================
+
 
 @pytest.fixture(scope="module")
 def anyio_backend():
@@ -118,6 +120,7 @@ async def _advance_to_processing(client: AsyncClient, order_id: int) -> None:
 # ============================================================
 # Tests
 # ============================================================
+
 
 @pytest.mark.anyio
 async def test_create_work_order(client):

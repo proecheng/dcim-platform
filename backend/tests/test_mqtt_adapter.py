@@ -1,5 +1,5 @@
 """MQTT 设备适配器测试 — Story 15.1"""
-import asyncio
+
 import json
 import sys
 import os
@@ -41,6 +41,7 @@ _parse_custom_format = _mqtt._parse_custom_format
 
 # ─── 注册表测试 ──────────────────────────────────────────────
 
+
 class TestAdapterRegistry:
     """适配器注册表"""
 
@@ -51,6 +52,7 @@ class TestAdapterRegistry:
 
 
 # ─── JSON 路径提取器测试 ─────────────────────────────────────
+
 
 class TestJsonExtractor:
     """JSON 路径提取器"""
@@ -85,6 +87,7 @@ class TestJsonExtractor:
 
 # ─── 自定义格式解析测试 ──────────────────────────────────────
 
+
 class TestCustomFormat:
     """自定义分隔符格式解析"""
 
@@ -105,6 +108,7 @@ class TestCustomFormat:
 
 
 # ─── MqttDeviceAdapter 核心测试 ──────────────────────────────
+
 
 class TestMqttDeviceAdapter:
     """MqttDeviceAdapter 核心功能"""
@@ -346,6 +350,7 @@ class TestMqttDeviceAdapter:
 
 # ─── MqttService 动态订阅测试 ────────────────────────────────
 
+
 class TestMqttServiceTopicMatching:
     """MqttService topic 匹配"""
 
@@ -355,6 +360,7 @@ class TestMqttServiceTopicMatching:
         _mqtt_client_path = os.path.join(_root, "backend", "app", "mqtt", "client.py")
         # 只需要测试静态方法 _topic_matches，直接从源码提取
         import ast
+
         with open(_mqtt_client_path, encoding="utf-8") as f:
             source = f.read()
         # 提取 _topic_matches 函数体
@@ -372,10 +378,7 @@ class TestMqttServiceTopicMatching:
         pattern_parts = pattern.split("/")
         if len(topic_parts) != len(pattern_parts):
             return False
-        return all(
-            pp == "+" or pp == tp
-            for tp, pp in zip(topic_parts, pattern_parts)
-        )
+        return all(pp == "+" or pp == tp for tp, pp in zip(topic_parts, pattern_parts))
 
     def test_exact_match(self):
         assert self._topic_matches("sensor/room1/data", "sensor/room1/data") is True

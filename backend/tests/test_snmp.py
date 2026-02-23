@@ -1,18 +1,15 @@
 """SNMP v2c/v3 适配器单元测试 — Story 1.4"""
+
 import asyncio
-from datetime import datetime, timezone
-from unittest.mock import AsyncMock, MagicMock, patch, PropertyMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
 from gateway.adapters.base import (
     AdapterState,
-    AdapterStatus,
-    ConnectionResult,
     DataQuality,
     DataSourceConfig,
     PointConfig,
-    PointValue,
 )
 from gateway.adapters.registry import ADAPTER_REGISTRY
 from gateway.adapters.snmp import (
@@ -25,6 +22,7 @@ from gateway.adapters.snmp import (
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture(autouse=True)
 def _clean_registry():
@@ -110,6 +108,7 @@ def _error_response(error_indication, var_binds=None):
 # 6.1: 适配器注册
 # ---------------------------------------------------------------------------
 
+
 class TestAdapterRegistration:
     """测试适配器双注册到 ADAPTER_REGISTRY"""
 
@@ -128,6 +127,7 @@ class TestAdapterRegistration:
 # 6.2: v2c connect/disconnect 生命周期
 # ---------------------------------------------------------------------------
 
+
 class TestV2cConnectDisconnect:
     """测试 v2c 连接和断开生命周期"""
 
@@ -136,9 +136,7 @@ class TestV2cConnectDisconnect:
         """v2c 连接成功 — sysDescr 读取正常"""
         mock_val = MagicMock()
         mock_val.prettyPrint.return_value = "Linux server"
-        mock_get_cmd.return_value = _success_response(
-            [(_mock_var_bind(".1.3.6.1.2.1.1.1.0", "x")[0], mock_val)]
-        )
+        mock_get_cmd.return_value = _success_response([(_mock_var_bind(".1.3.6.1.2.1.1.1.0", "x")[0], mock_val)])
 
         adapter = SnmpAdapter()
         config = _make_config("snmp_v2c")
@@ -155,9 +153,7 @@ class TestV2cConnectDisconnect:
         """v2c 断开连接"""
         mock_val = MagicMock()
         mock_val.prettyPrint.return_value = "Linux"
-        mock_get_cmd.return_value = _success_response(
-            [(_mock_var_bind(".1.3.6.1.2.1.1.1.0", "x")[0], mock_val)]
-        )
+        mock_get_cmd.return_value = _success_response([(_mock_var_bind(".1.3.6.1.2.1.1.1.0", "x")[0], mock_val)])
 
         adapter = SnmpAdapter()
         await adapter.connect(_make_config("snmp_v2c"))
@@ -182,6 +178,7 @@ class TestV2cConnectDisconnect:
 # 6.3: v3 connect/disconnect 生命周期
 # ---------------------------------------------------------------------------
 
+
 class TestV3ConnectDisconnect:
     """测试 v3 连接和断开生命周期"""
 
@@ -190,9 +187,7 @@ class TestV3ConnectDisconnect:
         """v3 authPriv 连接成功"""
         mock_val = MagicMock()
         mock_val.prettyPrint.return_value = "Cisco IOS"
-        mock_get_cmd.return_value = _success_response(
-            [(_mock_var_bind(".1.3.6.1.2.1.1.1.0", "x")[0], mock_val)]
-        )
+        mock_get_cmd.return_value = _success_response([(_mock_var_bind(".1.3.6.1.2.1.1.1.0", "x")[0], mock_val)])
 
         adapter = SnmpAdapter()
         config = _make_config("snmp_v3")
@@ -207,9 +202,7 @@ class TestV3ConnectDisconnect:
         """v3 断开连接"""
         mock_val = MagicMock()
         mock_val.prettyPrint.return_value = "Cisco"
-        mock_get_cmd.return_value = _success_response(
-            [(_mock_var_bind(".1.3.6.1.2.1.1.1.0", "x")[0], mock_val)]
-        )
+        mock_get_cmd.return_value = _success_response([(_mock_var_bind(".1.3.6.1.2.1.1.1.0", "x")[0], mock_val)])
 
         adapter = SnmpAdapter()
         await adapter.connect(_make_config("snmp_v3"))
@@ -223,18 +216,22 @@ class TestV3ConnectDisconnect:
 # 6.4: v3 安全级别校验
 # ---------------------------------------------------------------------------
 
+
 class TestV3SecurityValidation:
     """测试 v3 安全级别校验"""
 
     async def test_priv_without_auth_raises_error(self):
         """提供 priv 但未提供 auth → 报错"""
         adapter = SnmpAdapter()
-        config = _make_config("snmp_v3", connection_params={
-            "host": "192.168.1.100",
-            "username": "user1",
-            "priv_protocol": "AES",
-            "priv_key": "privpass",
-        })
+        config = _make_config(
+            "snmp_v3",
+            connection_params={
+                "host": "192.168.1.100",
+                "username": "user1",
+                "priv_protocol": "AES",
+                "priv_key": "privpass",
+            },
+        )
         result = await adapter.connect(config)
 
         assert result is False
@@ -245,6 +242,7 @@ class TestV3SecurityValidation:
 # ---------------------------------------------------------------------------
 # 6.5: GET 操作
 # ---------------------------------------------------------------------------
+
 
 class TestGetOperation:
     """测试 GET 操作读取单个 OID"""
@@ -303,6 +301,7 @@ class TestGetOperation:
 # 6.6: WALK 操作
 # ---------------------------------------------------------------------------
 
+
 class TestWalkOperation:
     """测试 WALK 操作遍历子树"""
 
@@ -349,6 +348,7 @@ class TestWalkOperation:
 # 6.7: 认证失败
 # ---------------------------------------------------------------------------
 
+
 class TestAuthFailure:
     """测试认证失败错误提示"""
 
@@ -381,6 +381,7 @@ class TestAuthFailure:
 # ---------------------------------------------------------------------------
 # 6.8: OID 不存在
 # ---------------------------------------------------------------------------
+
 
 class TestOidNotFound:
     """测试 OID 不存在处理"""
@@ -437,6 +438,7 @@ class TestOidNotFound:
 # 6.9: 超时重试
 # ---------------------------------------------------------------------------
 
+
 class TestTimeoutRetry:
     """测试超时重试 1 次 → UNRELIABLE"""
 
@@ -471,6 +473,7 @@ class TestTimeoutRetry:
 # 6.10: 数据归一化
 # ---------------------------------------------------------------------------
 
+
 class TestDataNormalization:
     """测试数据归一化（scale、offset、enum_mapping）"""
 
@@ -488,7 +491,9 @@ class TestDataNormalization:
         mock_val = MagicMock()
         mock_val.prettyPrint.return_value = "1"
         point = PointConfig(
-            point_id="s1", address=".1.0", data_type="int",
+            point_id="s1",
+            address=".1.0",
+            data_type="int",
             enum_mapping={"1": "运行", "0": "停止"},
         )
         value, quality = _normalize_value(mock_val, point)
@@ -500,7 +505,9 @@ class TestDataNormalization:
         mock_val = MagicMock()
         mock_val.prettyPrint.return_value = "active"
         point = PointConfig(
-            point_id="s2", address=".1.0", data_type="string",
+            point_id="s2",
+            address=".1.0",
+            data_type="string",
             enum_mapping={"active": "活跃", "inactive": "不活跃"},
         )
         value, quality = _normalize_value(mock_val, point)
@@ -521,6 +528,7 @@ class TestDataNormalization:
 # 6.11: write_point 始终返回 False
 # ---------------------------------------------------------------------------
 
+
 class TestWritePoint:
     """测试 write_point 始终返回 False"""
 
@@ -534,6 +542,7 @@ class TestWritePoint:
 # 6.12: test_connection
 # ---------------------------------------------------------------------------
 
+
 class TestTestConnection:
     """测试 test_connection 含 10 秒超时"""
 
@@ -544,9 +553,7 @@ class TestTestConnection:
         mock_val.prettyPrint.return_value = "Linux server 5.4"
 
         # connect + test_connection 各调用一次 getCmd
-        mock_get_cmd.return_value = _success_response(
-            [(_mock_var_bind(".1.3.6.1.2.1.1.1.0", "x")[0], mock_val)]
-        )
+        mock_get_cmd.return_value = _success_response([(_mock_var_bind(".1.3.6.1.2.1.1.1.0", "x")[0], mock_val)])
 
         adapter = SnmpAdapter()
         await adapter.connect(_make_config("snmp_v2c"))
@@ -571,9 +578,7 @@ class TestTestConnection:
             call_count += 1
             if call_count == 1:
                 # connect 调用正常返回
-                return _success_response(
-                    [(_mock_var_bind(".1.3.6.1.2.1.1.1.0", "x")[0], mock_val)]
-                )
+                return _success_response([(_mock_var_bind(".1.3.6.1.2.1.1.1.0", "x")[0], mock_val)])
             # test_connection 调用超时
             await asyncio.sleep(15)
 
@@ -591,6 +596,7 @@ class TestTestConnection:
 # 6.13: get_status
 # ---------------------------------------------------------------------------
 
+
 class TestGetStatus:
     """测试 get_status 返回正确 AdapterStatus"""
 
@@ -606,9 +612,7 @@ class TestGetStatus:
     async def test_connected_status(self, mock_get_cmd):
         mock_val = MagicMock()
         mock_val.prettyPrint.return_value = "Linux"
-        mock_get_cmd.return_value = _success_response(
-            [(_mock_var_bind(".1.3.6.1.2.1.1.1.0", "x")[0], mock_val)]
-        )
+        mock_get_cmd.return_value = _success_response([(_mock_var_bind(".1.3.6.1.2.1.1.1.0", "x")[0], mock_val)])
 
         adapter = SnmpAdapter()
         await adapter.connect(_make_config("snmp_v2c"))
@@ -646,6 +650,7 @@ class TestGetStatus:
 # ---------------------------------------------------------------------------
 # 补充: _parse_oid 解析
 # ---------------------------------------------------------------------------
+
 
 class TestParseOid:
     """测试 OID 地址解析"""

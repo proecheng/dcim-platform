@@ -1,4 +1,5 @@
 """传感器数据漂移检测 API 测试 — Story 9-7"""
+
 import pytest
 import random
 from datetime import datetime, timedelta
@@ -18,6 +19,7 @@ from app.api.deps import get_db, require_admin, require_operator, require_viewer
 # ============================================================
 # Fixtures
 # ============================================================
+
 
 @pytest.fixture(scope="module")
 def anyio_backend():
@@ -102,8 +104,10 @@ BASE_URL = "/api/v1/drift"
 # Helpers
 # ============================================================
 
-async def _create_point(session: AsyncSession, point_code: str = "AI_TH_A1_001",
-                        point_name: str = "A1区温度传感器") -> Point:
+
+async def _create_point(
+    session: AsyncSession, point_code: str = "AI_TH_A1_001", point_name: str = "A1区温度传感器"
+) -> Point:
     """创建一个 AI 类型测试点位"""
     point = Point(
         point_code=point_code,
@@ -119,8 +123,7 @@ async def _create_point(session: AsyncSession, point_code: str = "AI_TH_A1_001",
     return point
 
 
-async def _create_realtime(session: AsyncSession, point_id: int,
-                           value: float, quality: int = 0) -> PointRealtime:
+async def _create_realtime(session: AsyncSession, point_id: int, value: float, quality: int = 0) -> PointRealtime:
     """创建点位实时值"""
     rt = PointRealtime(point_id=point_id, value=value, quality=quality)
     session.add(rt)
@@ -128,8 +131,7 @@ async def _create_realtime(session: AsyncSession, point_id: int,
     return rt
 
 
-async def _create_history(session: AsyncSession, point_id: int,
-                          count: int, mean: float = 25.0, std: float = 1.0):
+async def _create_history(session: AsyncSession, point_id: int, count: int, mean: float = 25.0, std: float = 1.0):
     """创建历史数据记录，值围绕 mean 正态分布"""
     now = datetime.now()
     rng = random.Random(42)  # 固定种子保证可重复
@@ -145,10 +147,13 @@ async def _create_history(session: AsyncSession, point_id: int,
     await session.flush()
 
 
-async def _create_drift_record(session: AsyncSession, point_id: int,
-                                status: str = "suspected",
-                                point_code: str = "AI_TH_A1_001",
-                                point_name: str = "A1区温度传感器") -> DriftDetectionResult:
+async def _create_drift_record(
+    session: AsyncSession,
+    point_id: int,
+    status: str = "suspected",
+    point_code: str = "AI_TH_A1_001",
+    point_name: str = "A1区温度传感器",
+) -> DriftDetectionResult:
     """直接创建一条漂移检测结果"""
     record = DriftDetectionResult(
         point_id=point_id,
@@ -174,6 +179,7 @@ async def _create_drift_record(session: AsyncSession, point_id: int,
 # ============================================================
 # Tests — POST /detect
 # ============================================================
+
 
 @pytest.mark.anyio
 async def test_trigger_detection_no_data(client):
@@ -239,13 +245,15 @@ async def test_trigger_detection_suspected(client, db_session):
 # Tests — GET /results
 # ============================================================
 
+
 @pytest.mark.anyio
 async def test_list_results(client, db_session):
     """列出漂移检测结果，验证分页结构"""
     point = await _create_point(db_session)
     await _create_drift_record(db_session, point.id, status="suspected")
-    await _create_drift_record(db_session, point.id + 100, status="resolved",
-                                point_code="AI_TH_A1_002", point_name="A1区温度传感器2")
+    await _create_drift_record(
+        db_session, point.id + 100, status="resolved", point_code="AI_TH_A1_002", point_name="A1区温度传感器2"
+    )
     await db_session.commit()
 
     resp = await client.get(f"{BASE_URL}/results", params={"page": 1, "page_size": 10})
@@ -262,8 +270,9 @@ async def test_list_results_filter_status(client, db_session):
     """按状态筛选漂移检测结果"""
     point = await _create_point(db_session)
     await _create_drift_record(db_session, point.id, status="suspected")
-    await _create_drift_record(db_session, point.id + 100, status="resolved",
-                                point_code="AI_TH_A1_003", point_name="A1区温度传感器3")
+    await _create_drift_record(
+        db_session, point.id + 100, status="resolved", point_code="AI_TH_A1_003", point_name="A1区温度传感器3"
+    )
     await db_session.commit()
 
     resp = await client.get(f"{BASE_URL}/results", params={"status": "suspected"})
@@ -277,6 +286,7 @@ async def test_list_results_filter_status(client, db_session):
 # ============================================================
 # Tests — GET /results/{id}
 # ============================================================
+
 
 @pytest.mark.anyio
 async def test_get_result_detail(client, db_session):
@@ -305,6 +315,7 @@ async def test_get_result_not_found(client):
 # Tests — POST /results/{id}/resolve
 # ============================================================
 
+
 @pytest.mark.anyio
 async def test_resolve_drift(client, db_session):
     """手动解除漂移标记，验证状态变为 resolved"""
@@ -320,9 +331,7 @@ async def test_resolve_drift(client, db_session):
     assert data["resolved_at"] is not None
 
     # 验证 PointRealtime.quality 恢复为 0
-    rt_result = await db_session.execute(
-        select(PointRealtime).where(PointRealtime.point_id == point.id)
-    )
+    rt_result = await db_session.execute(select(PointRealtime).where(PointRealtime.point_id == point.id))
     rt = rt_result.scalar_one()
     assert rt.quality == 0
 
@@ -349,15 +358,18 @@ async def test_resolve_not_found(client):
 # Tests — GET /summary
 # ============================================================
 
+
 @pytest.mark.anyio
 async def test_get_summary(client, db_session):
     """获取漂移检测统计概览"""
     point = await _create_point(db_session)
     await _create_drift_record(db_session, point.id, status="suspected")
-    await _create_drift_record(db_session, point.id + 100, status="confirmed",
-                                point_code="AI_TH_A1_004", point_name="A1区温度传感器4")
-    await _create_drift_record(db_session, point.id + 200, status="resolved",
-                                point_code="AI_TH_A1_005", point_name="A1区温度传感器5")
+    await _create_drift_record(
+        db_session, point.id + 100, status="confirmed", point_code="AI_TH_A1_004", point_name="A1区温度传感器4"
+    )
+    await _create_drift_record(
+        db_session, point.id + 200, status="resolved", point_code="AI_TH_A1_005", point_name="A1区温度传感器5"
+    )
     await db_session.commit()
 
     resp = await client.get(f"{BASE_URL}/summary")

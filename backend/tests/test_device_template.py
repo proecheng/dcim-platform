@@ -1,5 +1,5 @@
 """设备模板管理测试 — Story 3.4"""
-import pytest
+
 import pytest_asyncio
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
@@ -11,6 +11,7 @@ from app.models.gateway import DeviceTemplate, DataSource, DataSourcePoint
 # ============================================================
 # Fixtures
 # ============================================================
+
 
 @pytest_asyncio.fixture
 async def db_session():
@@ -32,6 +33,7 @@ SAMPLE_POINT_CONFIG = [
 # ============================================================
 # 测试
 # ============================================================
+
 
 class TestDeviceTemplate:
     """设备模板 CRUD 测试"""
@@ -61,16 +63,25 @@ class TestDeviceTemplate:
     async def test_list_templates_with_filter(self, db_session: AsyncSession):
         """测试获取模板列表（含按厂商筛选）"""
         tpl1 = DeviceTemplate(
-            name="模板A", manufacturer="华为", model="M-A",
-            protocol_type="modbus_tcp", point_config=[],
+            name="模板A",
+            manufacturer="华为",
+            model="M-A",
+            protocol_type="modbus_tcp",
+            point_config=[],
         )
         tpl2 = DeviceTemplate(
-            name="模板B", manufacturer="海康威视", model="M-B",
-            protocol_type="snmp_v2c", point_config=[],
+            name="模板B",
+            manufacturer="海康威视",
+            model="M-B",
+            protocol_type="snmp_v2c",
+            point_config=[],
         )
         tpl3 = DeviceTemplate(
-            name="模板C", manufacturer="华为", model="M-C",
-            protocol_type="modbus_rtu", point_config=[],
+            name="模板C",
+            manufacturer="华为",
+            model="M-C",
+            protocol_type="modbus_rtu",
+            point_config=[],
         )
         db_session.add_all([tpl1, tpl2, tpl3])
         await db_session.commit()
@@ -81,9 +92,7 @@ class TestDeviceTemplate:
         assert len(all_items) == 3
 
         # 按厂商筛选
-        result = await db_session.execute(
-            select(DeviceTemplate).where(DeviceTemplate.manufacturer == "华为")
-        )
+        result = await db_session.execute(select(DeviceTemplate).where(DeviceTemplate.manufacturer == "华为"))
         huawei_items = result.scalars().all()
         assert len(huawei_items) == 2
         assert all(t.manufacturer == "华为" for t in huawei_items)
@@ -91,8 +100,11 @@ class TestDeviceTemplate:
     async def test_update_template(self, db_session: AsyncSession):
         """测试更新模板"""
         tpl = DeviceTemplate(
-            name="原始名称", manufacturer="厂商A", model="型号A",
-            protocol_type="modbus_tcp", point_config=[],
+            name="原始名称",
+            manufacturer="厂商A",
+            model="型号A",
+            protocol_type="modbus_tcp",
+            point_config=[],
         )
         db_session.add(tpl)
         await db_session.commit()
@@ -109,8 +121,11 @@ class TestDeviceTemplate:
     async def test_delete_template(self, db_session: AsyncSession):
         """测试删除模板"""
         tpl = DeviceTemplate(
-            name="待删除", manufacturer="厂商", model="型号",
-            protocol_type="snmp_v2c", point_config=[],
+            name="待删除",
+            manufacturer="厂商",
+            model="型号",
+            protocol_type="snmp_v2c",
+            point_config=[],
         )
         db_session.add(tpl)
         await db_session.commit()
@@ -119,22 +134,20 @@ class TestDeviceTemplate:
         await db_session.delete(tpl)
         await db_session.commit()
 
-        result = await db_session.execute(
-            select(DeviceTemplate).where(DeviceTemplate.id == tpl_id)
-        )
+        result = await db_session.execute(select(DeviceTemplate).where(DeviceTemplate.id == tpl_id))
         assert result.scalar_one_or_none() is None
 
     async def test_template_not_found(self, db_session: AsyncSession):
         """测试模板不存在返回 None"""
-        result = await db_session.execute(
-            select(DeviceTemplate).where(DeviceTemplate.id == 99999)
-        )
+        result = await db_session.execute(select(DeviceTemplate).where(DeviceTemplate.id == 99999))
         assert result.scalar_one_or_none() is None
 
     async def test_create_datasource_from_template(self, db_session: AsyncSession):
         """测试从模板创建数据源（验证 DataSourcePoint 自动填充）"""
         tpl = DeviceTemplate(
-            name="UPS模板", manufacturer="施耐德", model="APC-3000",
+            name="UPS模板",
+            manufacturer="施耐德",
+            model="APC-3000",
             protocol_type="modbus_tcp",
             point_config=SAMPLE_POINT_CONFIG,
         )
@@ -172,9 +185,7 @@ class TestDeviceTemplate:
         assert ds.protocol_type == "modbus_tcp"
 
         # 验证点位自动填充
-        result = await db_session.execute(
-            select(DataSourcePoint).where(DataSourcePoint.datasource_id == ds.id)
-        )
+        result = await db_session.execute(select(DataSourcePoint).where(DataSourcePoint.datasource_id == ds.id))
         points = result.scalars().all()
         assert len(points) == 2
         assert points[0].address == "40001"
@@ -184,8 +195,6 @@ class TestDeviceTemplate:
 
     async def test_create_datasource_from_nonexistent_template(self, db_session: AsyncSession):
         """测试从不存在的模板创建数据源（查询返回 None）"""
-        result = await db_session.execute(
-            select(DeviceTemplate).where(DeviceTemplate.id == 99999)
-        )
+        result = await db_session.execute(select(DeviceTemplate).where(DeviceTemplate.id == 99999))
         template = result.scalar_one_or_none()
         assert template is None

@@ -10,22 +10,19 @@
 - 调节方式（温度、频率、亮度等）
 - 允许/禁止的转移时段
 """
+
 import asyncio
 import sys
 from pathlib import Path
-from datetime import datetime
 from typing import Dict, List, Optional, Any
 
 # 确保能够导入app模块
 sys.path.insert(0, str(Path(__file__).parent))
 
 from sqlalchemy import select, func, delete
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import async_session, init_db
-from app.models.energy import (
-    PowerDevice, DeviceShiftConfig, LoadRegulationConfig
-)
+from app.models.energy import PowerDevice, DeviceShiftConfig, LoadRegulationConfig
 
 
 # ==================== 设备类型配置规则 ====================
@@ -44,7 +41,7 @@ SHIFT_CONFIG_TEMPLATES: Dict[str, Dict[str, Any]] = {
         "min_power": None,  # 最低功率由设备决定
         "max_ramp_rate": 5.0,  # 5kW/分钟
         "shift_notice_time": 15,  # 提前15分钟通知
-        "requires_manual_approval": False
+        "requires_manual_approval": False,
     },
     "HVAC": {
         "is_shiftable": True,
@@ -57,7 +54,7 @@ SHIFT_CONFIG_TEMPLATES: Dict[str, Dict[str, Any]] = {
         "min_power": None,
         "max_ramp_rate": 10.0,
         "shift_notice_time": 15,
-        "requires_manual_approval": False
+        "requires_manual_approval": False,
     },
     # 照明 - 可分区控制/调光转移
     "LIGHT": {
@@ -71,7 +68,7 @@ SHIFT_CONFIG_TEMPLATES: Dict[str, Dict[str, Any]] = {
         "min_power": 0,
         "max_ramp_rate": 100.0,  # 照明可快速调节
         "shift_notice_time": 5,
-        "requires_manual_approval": False
+        "requires_manual_approval": False,
     },
     "LIGHTING": {
         "is_shiftable": True,
@@ -84,7 +81,7 @@ SHIFT_CONFIG_TEMPLATES: Dict[str, Dict[str, Any]] = {
         "min_power": 0,
         "max_ramp_rate": 100.0,
         "shift_notice_time": 5,
-        "requires_manual_approval": False
+        "requires_manual_approval": False,
     },
     # 水泵/风机 - 可变频调速
     "PUMP": {
@@ -98,7 +95,7 @@ SHIFT_CONFIG_TEMPLATES: Dict[str, Dict[str, Any]] = {
         "min_power": None,
         "max_ramp_rate": 3.0,
         "shift_notice_time": 30,
-        "requires_manual_approval": False
+        "requires_manual_approval": False,
     },
     # 冷水机组 - 可调节冷冻水温度
     "CHILLER": {
@@ -112,7 +109,7 @@ SHIFT_CONFIG_TEMPLATES: Dict[str, Dict[str, Any]] = {
         "min_power": None,
         "max_ramp_rate": 2.0,
         "shift_notice_time": 60,
-        "requires_manual_approval": True
+        "requires_manual_approval": True,
     },
     # UPS - 可切换ECO模式
     "UPS": {
@@ -126,7 +123,7 @@ SHIFT_CONFIG_TEMPLATES: Dict[str, Dict[str, Any]] = {
         "min_power": None,
         "max_ramp_rate": 0,
         "shift_notice_time": 0,
-        "requires_manual_approval": True
+        "requires_manual_approval": True,
     },
     # IT设备 - 关键负荷，不可转移
     "IT": {
@@ -140,7 +137,7 @@ SHIFT_CONFIG_TEMPLATES: Dict[str, Dict[str, Any]] = {
         "min_power": None,
         "max_ramp_rate": 0,
         "shift_notice_time": 0,
-        "requires_manual_approval": True
+        "requires_manual_approval": True,
     },
     "IT_SERVER": {
         "is_shiftable": False,
@@ -153,7 +150,7 @@ SHIFT_CONFIG_TEMPLATES: Dict[str, Dict[str, Any]] = {
         "min_power": None,
         "max_ramp_rate": 0,
         "shift_notice_time": 0,
-        "requires_manual_approval": True
+        "requires_manual_approval": True,
     },
     "IT_STORAGE": {
         "is_shiftable": False,
@@ -166,7 +163,7 @@ SHIFT_CONFIG_TEMPLATES: Dict[str, Dict[str, Any]] = {
         "min_power": None,
         "max_ramp_rate": 0,
         "shift_notice_time": 0,
-        "requires_manual_approval": True
+        "requires_manual_approval": True,
     },
 }
 
@@ -193,8 +190,8 @@ REGULATION_CONFIG_TEMPLATES: Dict[str, Dict[str, Any]] = {
             {"value": 22.0, "power_ratio": 1.0},
             {"value": 24.0, "power_ratio": 0.85},
             {"value": 26.0, "power_ratio": 0.7},
-            {"value": 28.0, "power_ratio": 0.55}
-        ]
+            {"value": 28.0, "power_ratio": 0.55},
+        ],
     },
     "HVAC": {
         "regulation_type": "temperature",
@@ -215,8 +212,8 @@ REGULATION_CONFIG_TEMPLATES: Dict[str, Dict[str, Any]] = {
             {"value": 20.0, "power_ratio": 1.1},
             {"value": 23.0, "power_ratio": 0.85},
             {"value": 25.0, "power_ratio": 0.7},
-            {"value": 28.0, "power_ratio": 0.5}
-        ]
+            {"value": 28.0, "power_ratio": 0.5},
+        ],
     },
     # 照明 - 亮度调节
     "LIGHT": {
@@ -238,8 +235,8 @@ REGULATION_CONFIG_TEMPLATES: Dict[str, Dict[str, Any]] = {
             {"value": 40, "power_ratio": 0.4},
             {"value": 60, "power_ratio": 0.6},
             {"value": 80, "power_ratio": 0.8},
-            {"value": 100, "power_ratio": 1.0}
-        ]
+            {"value": 100, "power_ratio": 1.0},
+        ],
     },
     "LIGHTING": {
         "regulation_type": "brightness",
@@ -260,8 +257,8 @@ REGULATION_CONFIG_TEMPLATES: Dict[str, Dict[str, Any]] = {
             {"value": 40, "power_ratio": 0.4},
             {"value": 60, "power_ratio": 0.6},
             {"value": 80, "power_ratio": 0.8},
-            {"value": 100, "power_ratio": 1.0}
-        ]
+            {"value": 100, "power_ratio": 1.0},
+        ],
     },
     # 水泵/风机 - 频率调节
     "PUMP": {
@@ -283,8 +280,8 @@ REGULATION_CONFIG_TEMPLATES: Dict[str, Dict[str, Any]] = {
             {"value": 35, "power_ratio": 0.34},
             {"value": 40, "power_ratio": 0.51},
             {"value": 45, "power_ratio": 0.73},
-            {"value": 50, "power_ratio": 1.0}
-        ]
+            {"value": 50, "power_ratio": 1.0},
+        ],
     },
     # 冷水机组 - 冷冻水出水温度调节
     "CHILLER": {
@@ -305,8 +302,8 @@ REGULATION_CONFIG_TEMPLATES: Dict[str, Dict[str, Any]] = {
             {"value": 5.0, "power_ratio": 1.15},
             {"value": 7.0, "power_ratio": 1.0},
             {"value": 9.0, "power_ratio": 0.85},
-            {"value": 12.0, "power_ratio": 0.65}
-        ]
+            {"value": 12.0, "power_ratio": 0.65},
+        ],
     },
     # UPS - 运行模式调节
     "UPS": {
@@ -325,8 +322,8 @@ REGULATION_CONFIG_TEMPLATES: Dict[str, Dict[str, Any]] = {
         "is_auto": False,
         "power_curve": [
             {"value": 0, "power_ratio": 1.0, "label": "正常模式"},
-            {"value": 1, "power_ratio": 0.97, "label": "ECO模式"}
-        ]
+            {"value": 1, "power_ratio": 0.97, "label": "ECO模式"},
+        ],
     },
 }
 
@@ -360,7 +357,7 @@ def get_shift_config_for_device(device: PowerDevice) -> Optional[Dict[str, Any]]
             "min_power": None,
             "max_ramp_rate": 0,
             "shift_notice_time": 0,
-            "requires_manual_approval": True
+            "requires_manual_approval": True,
         }
 
     # 计算min_power（基于额定功率的20%）
@@ -368,11 +365,7 @@ def get_shift_config_for_device(device: PowerDevice) -> Optional[Dict[str, Any]]
     if template.get("is_shiftable") and device.rated_power:
         min_power = device.rated_power * 0.2
 
-    return {
-        "device_id": device.id,
-        **template,
-        "min_power": min_power or template.get("min_power")
-    }
+    return {"device_id": device.id, **template, "min_power": min_power or template.get("min_power")}
 
 
 def get_regulation_config_for_device(device: PowerDevice) -> Optional[Dict[str, Any]]:
@@ -400,10 +393,7 @@ def get_regulation_config_for_device(device: PowerDevice) -> Optional[Dict[str, 
     power_curve = None
     if template.get("power_curve"):
         power_curve = [
-            {
-                **point,
-                "power": round(base_power * point.get("power_ratio", 1.0), 2)
-            }
+            {**point, "power": round(base_power * point.get("power_ratio", 1.0), 2)}
             for point in template["power_curve"]
         ]
 
@@ -423,7 +413,7 @@ def get_regulation_config_for_device(device: PowerDevice) -> Optional[Dict[str, 
         "comfort_impact": template.get("comfort_impact", "none"),
         "performance_impact": template.get("performance_impact", "none"),
         "is_enabled": True,
-        "is_auto": template.get("is_auto", False)
+        "is_auto": template.get("is_auto", False),
     }
 
     return config
@@ -451,14 +441,10 @@ async def init_device_regulation_configs(force: bool = False, interactive: bool 
         print(f"找到 {len(devices)} 个用电设备")
 
         # 2. 检查是否已有配置
-        shift_count = await session.execute(
-            select(func.count(DeviceShiftConfig.id))
-        )
+        shift_count = await session.execute(select(func.count(DeviceShiftConfig.id)))
         existing_shift = shift_count.scalar()
 
-        reg_count = await session.execute(
-            select(func.count(LoadRegulationConfig.id))
-        )
+        reg_count = await session.execute(select(func.count(LoadRegulationConfig.id)))
         existing_reg = reg_count.scalar()
 
         if existing_shift > 0 or existing_reg > 0:
@@ -467,7 +453,7 @@ async def init_device_regulation_configs(force: bool = False, interactive: bool 
             if not force:
                 if interactive:
                     confirm = input("是否清除现有配置并重新生成? (y/n): ")
-                    if confirm.lower() != 'y':
+                    if confirm.lower() != "y":
                         print("取消操作")
                         return
                 else:
@@ -503,7 +489,9 @@ async def init_device_regulation_configs(force: bool = False, interactive: bool 
                 if shift_config["is_shiftable"]:
                     shiftable_count += 1
                     shiftable_power = (device.rated_power or 0) * shift_config["shiftable_power_ratio"]
-                    print(f"  [OK] 可转移负荷: {shiftable_power:.1f}kW ({shift_config['shiftable_power_ratio']*100:.0f}%)")
+                    print(
+                        f"  [OK] 可转移负荷: {shiftable_power:.1f}kW ({shift_config['shiftable_power_ratio'] * 100:.0f}%)"
+                    )
                     print(f"       允许时段: {format_hours(shift_config['allowed_shift_hours'])}")
                 else:
                     print(f"  [NO] 不可转移 (关键负荷: {shift_config['is_critical']})")
@@ -520,7 +508,7 @@ async def init_device_regulation_configs(force: bool = False, interactive: bool 
                     "temperature": "温度调节",
                     "brightness": "亮度调节",
                     "load": "负载/频率调节",
-                    "mode": "模式切换"
+                    "mode": "模式切换",
                 }.get(reg_config["regulation_type"], reg_config["regulation_type"])
 
                 print(f"  [OK] 可调节: {reg_type_name}")
@@ -580,10 +568,10 @@ def format_hours(hours: List[int]) -> str:
         if hours[i] == end + 1:
             end = hours[i]
         else:
-            ranges.append(f"{start}:00-{end+1}:00")
+            ranges.append(f"{start}:00-{end + 1}:00")
             start = hours[i]
             end = hours[i]
-    ranges.append(f"{start}:00-{end+1}:00")
+    ranges.append(f"{start}:00-{end + 1}:00")
 
     return ", ".join(ranges)
 

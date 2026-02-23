@@ -1,12 +1,18 @@
 """
 运维管理 API 核心测试
 """
+
 import pytest
-from datetime import datetime, timedelta
+from datetime import datetime
 
 from app.models.operation import (
-    WorkOrder, WorkOrderStatus, WorkOrderType, WorkOrderPriority,
-    InspectionPlan, InspectionTask, InspectionStatus,
+    WorkOrder,
+    WorkOrderStatus,
+    WorkOrderType,
+    WorkOrderPriority,
+    InspectionPlan,
+    InspectionTask,
+    InspectionStatus,
     KnowledgeBase,
 )
 from tests.conftest import auth_headers
@@ -111,9 +117,7 @@ class TestWorkOrderCRUD:
         assert body["title"] == "新建测试工单"
         assert body["order_no"].startswith("WO-")
 
-    async def test_get_work_order_detail(
-        self, client, admin_user, sample_work_order
-    ):
+    async def test_get_work_order_detail(self, client, admin_user, sample_work_order):
         """测试获取工单详情"""
         _, token = admin_user
         resp = await client.get(
@@ -134,9 +138,7 @@ class TestWorkOrderCRUD:
         )
         assert resp.status_code == 404
 
-    async def test_get_work_orders_filter_status(
-        self, client, admin_user, sample_work_order
-    ):
+    async def test_get_work_orders_filter_status(self, client, admin_user, sample_work_order):
         """测试按状态筛选工单"""
         _, token = admin_user
         resp = await client.get(
@@ -147,9 +149,7 @@ class TestWorkOrderCRUD:
         body = resp.json()
         assert len(body) >= 1
 
-    async def test_update_work_order(
-        self, client, admin_user, sample_work_order
-    ):
+    async def test_update_work_order(self, client, admin_user, sample_work_order):
         """测试更新工单"""
         _, token = admin_user
         resp = await client.put(
@@ -161,9 +161,7 @@ class TestWorkOrderCRUD:
         body = resp.json()
         assert body["title"] == "更新后的工单标题"
 
-    async def test_assign_work_order(
-        self, client, admin_user, sample_work_order
-    ):
+    async def test_assign_work_order(self, client, admin_user, sample_work_order):
         """测试派单"""
         _, token = admin_user
         resp = await client.post(
@@ -180,9 +178,7 @@ class TestWorkOrderCRUD:
 class TestWorkOrderStatusTransition:
     """工单状态转换测试"""
 
-    async def test_invalid_status_transition(
-        self, client, admin_user, async_db
-    ):
+    async def test_invalid_status_transition(self, client, admin_user, async_db):
         """测试非法状态转换"""
         _, token = admin_user
         # 创建已关闭的工单
@@ -234,9 +230,7 @@ class TestInspectionPlan:
         body = resp.json()
         assert body["name"] == "新建巡检计划"
 
-    async def test_get_inspection_plan_detail(
-        self, client, admin_user, sample_inspection_plan
-    ):
+    async def test_get_inspection_plan_detail(self, client, admin_user, sample_inspection_plan):
         """测试获取巡检计划详情"""
         _, token = admin_user
         resp = await client.get(
@@ -261,9 +255,7 @@ class TestInspectionTask:
         assert resp.status_code == 200
         assert isinstance(resp.json(), list)
 
-    async def test_create_inspection_task(
-        self, client, admin_user, sample_inspection_plan
-    ):
+    async def test_create_inspection_task(self, client, admin_user, sample_inspection_plan):
         """测试创建巡检任务"""
         _, token = admin_user
         resp = await client.post(
@@ -279,9 +271,7 @@ class TestInspectionTask:
         body = resp.json()
         assert body["task_no"].startswith("IT-")
 
-    async def test_start_inspection_task(
-        self, client, admin_user, sample_inspection_task
-    ):
+    async def test_start_inspection_task(self, client, admin_user, sample_inspection_task):
         """测试开始巡检任务"""
         _, token = admin_user
         resp = await client.post(
@@ -326,9 +316,7 @@ class TestKnowledgeBase:
         body = resp.json()
         assert body["title"] == "新建知识条目"
 
-    async def test_get_knowledge_detail(
-        self, client, admin_user, sample_knowledge
-    ):
+    async def test_get_knowledge_detail(self, client, admin_user, sample_knowledge):
         """测试获取知识库详情"""
         _, token = admin_user
         resp = await client.get(
@@ -352,9 +340,7 @@ class TestKnowledgeBase:
 class TestOperationStatistics:
     """运维统计测试"""
 
-    async def test_get_operation_statistics(
-        self, client, admin_user, sample_work_order
-    ):
+    async def test_get_operation_statistics(self, client, admin_user, sample_work_order):
         """测试获取运维统计"""
         _, token = admin_user
         resp = await client.get(

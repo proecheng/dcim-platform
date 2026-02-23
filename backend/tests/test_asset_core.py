@@ -1,6 +1,7 @@
 """
 资产管理 API 核心测试
 """
+
 import pytest
 from datetime import datetime, date, timedelta
 
@@ -48,9 +49,7 @@ class TestCabinetCRUD:
     async def test_get_cabinets_empty(self, client, admin_user):
         """测试空机柜列表"""
         _, token = admin_user
-        resp = await client.get(
-            "/api/v1/asset/cabinets", headers=auth_headers(token)
-        )
+        resp = await client.get("/api/v1/asset/cabinets", headers=auth_headers(token))
         assert resp.status_code == 200
         assert isinstance(resp.json(), list)
 
@@ -72,9 +71,7 @@ class TestCabinetCRUD:
         assert body["cabinet_code"] == "CAB-NEW-001"
         assert body["available_u"] == 42
 
-    async def test_create_cabinet_duplicate_code(
-        self, client, admin_user, sample_cabinet
-    ):
+    async def test_create_cabinet_duplicate_code(self, client, admin_user, sample_cabinet):
         """测试创建重复编码机柜"""
         _, token = admin_user
         resp = await client.post(
@@ -88,9 +85,7 @@ class TestCabinetCRUD:
         )
         assert resp.status_code == 400
 
-    async def test_get_cabinet_detail(
-        self, client, admin_user, sample_cabinet
-    ):
+    async def test_get_cabinet_detail(self, client, admin_user, sample_cabinet):
         """测试获取机柜详情"""
         _, token = admin_user
         resp = await client.get(
@@ -110,9 +105,7 @@ class TestCabinetCRUD:
         )
         assert resp.status_code == 404
 
-    async def test_delete_cabinet_with_assets(
-        self, client, admin_user, sample_asset
-    ):
+    async def test_delete_cabinet_with_assets(self, client, admin_user, sample_asset):
         """测试删除有资产的机柜"""
         _, token = admin_user
         resp = await client.delete(
@@ -129,9 +122,7 @@ class TestAssetCRUD:
     async def test_get_assets_empty(self, client, admin_user):
         """测试空资产列表"""
         _, token = admin_user
-        resp = await client.get(
-            "/api/v1/asset/assets", headers=auth_headers(token)
-        )
+        resp = await client.get("/api/v1/asset/assets", headers=auth_headers(token))
         assert resp.status_code == 200
         assert isinstance(resp.json(), list)
 
@@ -156,9 +147,7 @@ class TestAssetCRUD:
         body = resp.json()
         assert body["asset_code"] == "AST-NEW-001"
 
-    async def test_create_asset_duplicate_code(
-        self, client, admin_user, sample_asset
-    ):
+    async def test_create_asset_duplicate_code(self, client, admin_user, sample_asset):
         """测试创建重复编码资产"""
         _, token = admin_user
         resp = await client.post(
@@ -172,9 +161,7 @@ class TestAssetCRUD:
         )
         assert resp.status_code == 400
 
-    async def test_get_asset_detail(
-        self, client, admin_user, sample_asset
-    ):
+    async def test_get_asset_detail(self, client, admin_user, sample_asset):
         """测试获取资产详情"""
         _, token = admin_user
         resp = await client.get(
@@ -194,9 +181,7 @@ class TestAssetCRUD:
         )
         assert resp.status_code == 404
 
-    async def test_delete_asset(
-        self, client, admin_user, sample_asset
-    ):
+    async def test_delete_asset(self, client, admin_user, sample_asset):
         """测试删除资产"""
         _, token = admin_user
         resp = await client.delete(
@@ -213,9 +198,7 @@ class TestAssetStatistics:
     async def test_get_statistics(self, client, admin_user, sample_asset):
         """测试获取资产统计"""
         _, token = admin_user
-        resp = await client.get(
-            "/api/v1/asset/statistics", headers=auth_headers(token)
-        )
+        resp = await client.get("/api/v1/asset/statistics", headers=auth_headers(token))
         assert resp.status_code == 200
         body = resp.json()
         assert "total_count" in body
@@ -227,9 +210,7 @@ class TestAssetStatistics:
 class TestAssetLifecycle:
     """资产生命周期测试"""
 
-    async def test_get_lifecycle(
-        self, client, admin_user, sample_asset, async_db
-    ):
+    async def test_get_lifecycle(self, client, admin_user, sample_asset, async_db):
         """测试获取资产生命周期"""
         # 添加生命周期记录
         lifecycle = AssetLifecycle(
@@ -256,9 +237,7 @@ class TestAssetLifecycle:
 class TestAssetWarranty:
     """保修预警测试"""
 
-    async def test_get_warranty_expiring(
-        self, client, admin_user, sample_asset
-    ):
+    async def test_get_warranty_expiring(self, client, admin_user, sample_asset):
         """测试获取即将过保资产"""
         _, token = admin_user
         resp = await client.get(
@@ -269,9 +248,7 @@ class TestAssetWarranty:
         body = resp.json()
         assert isinstance(body, list)
 
-    async def test_get_warranty_alerts(
-        self, client, admin_user, sample_asset
-    ):
+    async def test_get_warranty_alerts(self, client, admin_user, sample_asset):
         """测试获取保修预警汇总"""
         _, token = admin_user
         resp = await client.get(
@@ -289,9 +266,7 @@ class TestAssetWarranty:
 class TestCabinetUsage:
     """机柜 U 位使用情况测试"""
 
-    async def test_get_cabinet_usage(
-        self, client, admin_user, sample_asset
-    ):
+    async def test_get_cabinet_usage(self, client, admin_user, sample_asset):
         """测试获取机柜 U 位使用情况"""
         _, token = admin_user
         resp = await client.get(

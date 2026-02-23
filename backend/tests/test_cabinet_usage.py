@@ -1,14 +1,20 @@
 """机柜 U 位可视化测试 — Story 7-2"""
+
 import pytest
-from datetime import datetime
 
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from sqlalchemy import delete, select
 
 from app.core.database import Base
 from app.models.asset import (
-    Asset, Cabinet, AssetLifecycle, AssetType, AssetStatus,
-    MaintenanceRecord, AssetInventory, AssetInventoryItem,
+    Asset,
+    Cabinet,
+    AssetLifecycle,
+    AssetType,
+    AssetStatus,
+    MaintenanceRecord,
+    AssetInventory,
+    AssetInventoryItem,
 )
 from app.models.user import User
 from app.api.v1.asset import get_cabinet_usage, move_asset_in_cabinet, MoveAssetRequest
@@ -17,6 +23,7 @@ from app.api.v1.asset import get_cabinet_usage, move_asset_in_cabinet, MoveAsset
 # ============================================================
 # Fixtures
 # ============================================================
+
 
 @pytest.fixture(scope="module")
 def anyio_backend():
@@ -102,11 +109,9 @@ async def sample_user(db: AsyncSession):
 # 测试
 # ============================================================
 
-class TestGetCabinetUsage:
 
-    async def test_get_cabinet_usage_returns_assets(
-        self, db: AsyncSession, sample_cabinet, sample_asset, sample_user
-    ):
+class TestGetCabinetUsage:
+    async def test_get_cabinet_usage_returns_assets(self, db: AsyncSession, sample_cabinet, sample_asset, sample_user):
         """get_cabinet_usage 应返回 assets 数组，包含完整字段"""
         result = await get_cabinet_usage(sample_cabinet.id, db, sample_user)
 
@@ -127,10 +132,7 @@ class TestGetCabinetUsage:
 
 
 class TestMoveAsset:
-
-    async def test_move_asset_success(
-        self, db: AsyncSession, sample_cabinet, sample_asset, sample_user
-    ):
+    async def test_move_asset_success(self, db: AsyncSession, sample_cabinet, sample_asset, sample_user):
         """移动资产到 U10，验证位置更新和生命周期记录"""
         req = MoveAssetRequest(asset_id=sample_asset.id, new_u_position=10)
         result = await move_asset_in_cabinet(sample_cabinet.id, req, db, sample_user)
@@ -155,9 +157,7 @@ class TestMoveAsset:
         assert lc.to_location == "U10"
         assert lc.remark == "U位拖拽移动"
 
-    async def test_move_asset_conflict(
-        self, db: AsyncSession, sample_cabinet, sample_asset, sample_user
-    ):
+    async def test_move_asset_conflict(self, db: AsyncSession, sample_cabinet, sample_asset, sample_user):
         """移动到已被占用的 U 位应返回 400"""
         from fastapi import HTTPException
 
@@ -181,9 +181,7 @@ class TestMoveAsset:
             await move_asset_in_cabinet(sample_cabinet.id, req, db, sample_user)
         assert exc_info.value.status_code == 400
 
-    async def test_move_asset_out_of_range(
-        self, db: AsyncSession, sample_cabinet, sample_asset, sample_user
-    ):
+    async def test_move_asset_out_of_range(self, db: AsyncSession, sample_cabinet, sample_asset, sample_user):
         """移动到超出机柜范围的 U 位应返回 400"""
         from fastapi import HTTPException
 
@@ -194,9 +192,7 @@ class TestMoveAsset:
         assert exc_info.value.status_code == 400
         assert "U位超出机柜范围" in exc_info.value.detail
 
-    async def test_move_asset_wrong_cabinet(
-        self, db: AsyncSession, sample_cabinet, sample_asset, sample_user
-    ):
+    async def test_move_asset_wrong_cabinet(self, db: AsyncSession, sample_cabinet, sample_asset, sample_user):
         """用错误的 cabinet_id 移动应返回 400"""
         from fastapi import HTTPException
 

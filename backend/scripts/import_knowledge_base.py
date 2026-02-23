@@ -6,7 +6,6 @@
 将 docs/knowledge-base/ 目录下的 Markdown 文档导入到系统知识库数据库中。
 """
 
-import os
 import sys
 import re
 import asyncio
@@ -18,8 +17,8 @@ project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
 from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
 import logging
+
 logging.disable(logging.WARNING)  # 抑制SQLAlchemy日志避免GBK编码问题
 
 from app.core.database import async_session, engine
@@ -57,13 +56,13 @@ TAGS_MAP = {
 def extract_title(content: str, filename: str) -> str:
     """从 Markdown 内容中提取标题"""
     # 尝试匹配一级标题
-    match = re.search(r'^#\s+(.+)$', content, re.MULTILINE)
+    match = re.search(r"^#\s+(.+)$", content, re.MULTILINE)
     if match:
         return match.group(1).strip()
 
     # 如果没有找到，使用文件名
     name = Path(filename).stem
-    return name.replace('-', ' ').replace('_', ' ').title()
+    return name.replace("-", " ").replace("_", " ").title()
 
 
 def get_category_from_path(file_path: str) -> str:
@@ -103,7 +102,7 @@ async def import_documents(docs_dir: str, dry_run: bool = False):
         for md_file in md_files:
             try:
                 # 读取文件内容
-                with open(md_file, 'r', encoding='utf-8') as f:
+                with open(md_file, "r", encoding="utf-8") as f:
                     content = f.read()
 
                 # 提取信息
@@ -144,10 +143,10 @@ async def import_documents(docs_dir: str, dry_run: bool = False):
                         is_published=True,
                         view_count=0,
                         created_at=datetime.now(),
-                        updated_at=datetime.now()
+                        updated_at=datetime.now(),
                     )
                     db.add(knowledge)
-                    print(f"  状态: 新建")
+                    print("  状态: 新建")
                     imported += 1
 
             except Exception as e:
@@ -157,7 +156,7 @@ async def import_documents(docs_dir: str, dry_run: bool = False):
         if not dry_run:
             await db.commit()
 
-    print(f"\n=== 导入完成 ===")
+    print("\n=== 导入完成 ===")
     print(f"新增: {imported} 条")
     print(f"更新: {skipped} 条")
 
@@ -185,13 +184,11 @@ async def main():
     import argparse
 
     parser = argparse.ArgumentParser(description="知识库文档导入工具")
-    parser.add_argument("--dry-run", "-n", action="store_true",
-                       help="预览模式，不实际写入数据库")
-    parser.add_argument("--list", "-l", action="store_true",
-                       help="列出现有知识库条目")
-    parser.add_argument("--dir", "-d", type=str,
-                       default=str(project_root.parent / "docs" / "knowledge-base"),
-                       help="知识库文档目录")
+    parser.add_argument("--dry-run", "-n", action="store_true", help="预览模式，不实际写入数据库")
+    parser.add_argument("--list", "-l", action="store_true", help="列出现有知识库条目")
+    parser.add_argument(
+        "--dir", "-d", type=str, default=str(project_root.parent / "docs" / "knowledge-base"), help="知识库文档目录"
+    )
 
     args = parser.parse_args()
 

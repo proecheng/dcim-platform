@@ -1,15 +1,20 @@
 """事件时间线报告 API 测试 — Story 9-5"""
+
 import pytest
 from datetime import datetime, timedelta
 
 from httpx import AsyncClient, ASGITransport
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
-from sqlalchemy import select, delete
+from sqlalchemy import delete
 
 from app.core.database import Base
 from app.models.linkage import (
-    LinkagePolicy, LinkageAction, LinkageExecution, LinkageLog,
-    LinkageRecovery, LinkageRecoveryLog,
+    LinkagePolicy,
+    LinkageAction,
+    LinkageExecution,
+    LinkageLog,
+    LinkageRecovery,
+    LinkageRecoveryLog,
 )
 from app.models.user import User
 from app.api.deps import get_db, require_admin, require_operator, require_viewer
@@ -18,6 +23,7 @@ from app.api.deps import get_db, require_admin, require_operator, require_viewer
 # ============================================================
 # Fixtures
 # ============================================================
+
 
 @pytest.fixture(scope="module")
 def anyio_backend():
@@ -268,6 +274,7 @@ async def _create_execution_with_recovery(db_session) -> tuple:
 # Tests — GET /timeline/{execution_id}
 # ============================================================
 
+
 @pytest.mark.anyio
 async def test_timeline_success_execution_only(client, db_session):
     """GET /timeline/{id} — 仅执行记录，无恢复，返回 200"""
@@ -384,9 +391,7 @@ async def test_timeline_events_sorted_by_timestamp(client, db_session):
 
     # 验证时间戳严格非递减
     for i in range(1, len(timestamps)):
-        assert timestamps[i] >= timestamps[i - 1], (
-            f"事件未按时间排序: {timestamps[i - 1]} > {timestamps[i]}"
-        )
+        assert timestamps[i] >= timestamps[i - 1], f"事件未按时间排序: {timestamps[i - 1]} > {timestamps[i]}"
 
 
 @pytest.mark.anyio
@@ -470,6 +475,7 @@ async def test_timeline_recovery_events_detail(client, db_session):
 # Tests — GET /timeline/{execution_id}/export
 # ============================================================
 
+
 @pytest.mark.anyio
 async def test_export_timeline_success(client, db_session):
     """GET /timeline/{id}/export — 返回 Excel 文件"""
@@ -477,9 +483,7 @@ async def test_export_timeline_success(client, db_session):
 
     resp = await client.get(f"{BASE_URL}/timeline/{execution.id}/export")
     assert resp.status_code == 200
-    assert resp.headers["content-type"] == (
-        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-    )
+    assert resp.headers["content-type"] == ("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
     assert "content-disposition" in resp.headers
     assert "timeline_EVT-TL-001" in resp.headers["content-disposition"]
     # Excel 文件应有内容

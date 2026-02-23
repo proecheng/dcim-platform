@@ -1,7 +1,7 @@
 """
 告警管理 API 覆盖率测试 — 覆盖 alarm.py 中未测试的端点
 """
-import pytest
+
 from datetime import datetime, timedelta
 from unittest.mock import AsyncMock, patch
 
@@ -12,34 +12,43 @@ from tests.conftest import auth_headers
 
 # ============== 辅助函数 ==============
 
+
 async def _seed_points_and_alarms(async_db):
     """创建测试点位和告警数据，返回 (point, point2, alarms)"""
     point = Point(
-        point_code="TH-TEST-001", point_name="测试温度点位",
-        point_type="AI", device_type="TH", area_code="A1",
+        point_code="TH-TEST-001",
+        point_name="测试温度点位",
+        point_type="AI",
+        device_type="TH",
+        area_code="A1",
     )
     point2 = Point(
-        point_code="UPS-TEST-001", point_name="测试UPS点位",
-        point_type="AI", device_type="UPS", area_code="B1",
+        point_code="UPS-TEST-001",
+        point_name="测试UPS点位",
+        point_type="AI",
+        device_type="UPS",
+        area_code="B1",
     )
     async_db.add_all([point, point2])
     await async_db.flush()
 
     now = datetime.now()
     alarms = []
-    for i, (pt, level, status) in enumerate([
-        (point, "critical", "active"),
-        (point, "major", "active"),
-        (point, "minor", "acknowledged"),
-        (point2, "info", "resolved"),
-        (point2, "critical", "active"),
-    ]):
+    for i, (pt, level, status) in enumerate(
+        [
+            (point, "critical", "active"),
+            (point, "major", "active"),
+            (point, "minor", "acknowledged"),
+            (point2, "info", "resolved"),
+            (point2, "critical", "active"),
+        ]
+    ):
         a = Alarm(
-            alarm_no=f"ALM-COV-{i+1:03d}",
+            alarm_no=f"ALM-COV-{i + 1:03d}",
             point_id=pt.id,
             alarm_level=level,
             alarm_type="threshold",
-            alarm_message=f"测试告警消息{i+1}",
+            alarm_message=f"测试告警消息{i + 1}",
             trigger_value=50.0 + i,
             threshold_value=45.0,
             status=status,
@@ -57,6 +66,7 @@ async def _seed_points_and_alarms(async_db):
 
 
 # ============== 告警列表与查询 ==============
+
 
 class TestAlarmListAndQuery:
     """告警列表、活动告警、计数、统计、趋势、高频点位"""
@@ -77,7 +87,8 @@ class TestAlarmListAndQuery:
         _, token = admin_user
         await _seed_points_and_alarms(async_db)
         resp = await client.get(
-            "/api/v1/alarms", params={"status": "active"},
+            "/api/v1/alarms",
+            params={"status": "active"},
             headers=auth_headers(token),
         )
         assert resp.status_code == 200
@@ -89,7 +100,8 @@ class TestAlarmListAndQuery:
         _, token = admin_user
         await _seed_points_and_alarms(async_db)
         resp = await client.get(
-            "/api/v1/alarms", params={"level": "critical"},
+            "/api/v1/alarms",
+            params={"level": "critical"},
             headers=auth_headers(token),
         )
         assert resp.status_code == 200
@@ -101,7 +113,8 @@ class TestAlarmListAndQuery:
         _, token = admin_user
         await _seed_points_and_alarms(async_db)
         resp = await client.get(
-            "/api/v1/alarms", params={"device_type": "TH"},
+            "/api/v1/alarms",
+            params={"device_type": "TH"},
             headers=auth_headers(token),
         )
         assert resp.status_code == 200
@@ -111,7 +124,8 @@ class TestAlarmListAndQuery:
         _, token = admin_user
         await _seed_points_and_alarms(async_db)
         resp = await client.get(
-            "/api/v1/alarms", params={"keyword": "消息"},
+            "/api/v1/alarms",
+            params={"keyword": "消息"},
             headers=auth_headers(token),
         )
         assert resp.status_code == 200
@@ -185,7 +199,8 @@ class TestAlarmListAndQuery:
         _, token = admin_user
         await _seed_points_and_alarms(async_db)
         resp = await client.get(
-            "/api/v1/alarms/trend", params={"days": 7},
+            "/api/v1/alarms/trend",
+            params={"days": 7},
             headers=auth_headers(token),
         )
         assert resp.status_code == 200
@@ -197,7 +212,8 @@ class TestAlarmListAndQuery:
         _, token = admin_user
         await _seed_points_and_alarms(async_db)
         resp = await client.get(
-            "/api/v1/alarms/top-points", params={"days": 7, "limit": 5},
+            "/api/v1/alarms/top-points",
+            params={"days": 7, "limit": 5},
             headers=auth_headers(token),
         )
         assert resp.status_code == 200
@@ -209,6 +225,7 @@ class TestAlarmListAndQuery:
 
 
 # ============== 导出 ==============
+
 
 class TestAlarmExport:
     """告警导出"""
@@ -235,6 +252,7 @@ class TestAlarmExport:
 
 # ============== 告警详情 ==============
 
+
 class TestAlarmDetail:
     """单条告警操作"""
 
@@ -244,7 +262,8 @@ class TestAlarmDetail:
         _, _, alarms = await _seed_points_and_alarms(async_db)
         alarm_id = alarms[0].id
         resp = await client.get(
-            f"/api/v1/alarms/{alarm_id}", headers=auth_headers(token),
+            f"/api/v1/alarms/{alarm_id}",
+            headers=auth_headers(token),
         )
         assert resp.status_code == 200
         data = resp.json()
@@ -255,12 +274,14 @@ class TestAlarmDetail:
         """GET /alarms/99999 — 不存在的告警"""
         _, token = admin_user
         resp = await client.get(
-            "/api/v1/alarms/99999", headers=auth_headers(token),
+            "/api/v1/alarms/99999",
+            headers=auth_headers(token),
         )
         assert resp.status_code == 404
 
 
 # ============== 确认/解决/处理（使用 conftest fixtures） ==============
+
 
 class TestAlarmActions:
     """确认、解决、处理告警"""
@@ -368,6 +389,7 @@ class TestAlarmActions:
 
 # ============== 告警规则 CRUD ==============
 
+
 class TestAlarmRules:
     """告警规则管理"""
 
@@ -394,8 +416,10 @@ class TestAlarmRules:
         """GET /alarms/rules — 规则列表"""
         _, token = admin_user
         rule = AlarmRule(
-            rule_name="列表测试规则", rule_type="or",
-            alarm_level="minor", is_enabled=True,
+            rule_name="列表测试规则",
+            rule_type="or",
+            alarm_level="minor",
+            is_enabled=True,
         )
         async_db.add(rule)
         await async_db.flush()
@@ -410,8 +434,10 @@ class TestAlarmRules:
         """GET /alarms/rules — 带筛选"""
         _, token = admin_user
         rule = AlarmRule(
-            rule_name="筛选规则", rule_type="and",
-            alarm_level="critical", is_enabled=True,
+            rule_name="筛选规则",
+            rule_type="and",
+            alarm_level="critical",
+            is_enabled=True,
         )
         async_db.add(rule)
         await async_db.flush()
@@ -427,14 +453,17 @@ class TestAlarmRules:
         """GET /alarms/rules/{id} — 规则详情"""
         _, token = admin_user
         rule = AlarmRule(
-            rule_name="详情规则", rule_type="and",
-            alarm_level="major", is_enabled=True,
+            rule_name="详情规则",
+            rule_type="and",
+            alarm_level="major",
+            is_enabled=True,
         )
         async_db.add(rule)
         await async_db.flush()
 
         resp = await client.get(
-            f"/api/v1/alarms/rules/{rule.id}", headers=auth_headers(token),
+            f"/api/v1/alarms/rules/{rule.id}",
+            headers=auth_headers(token),
         )
         assert resp.status_code == 200
         assert resp.json()["rule_name"] == "详情规则"
@@ -443,7 +472,8 @@ class TestAlarmRules:
         """GET /alarms/rules/99999 — 不存在"""
         _, token = admin_user
         resp = await client.get(
-            "/api/v1/alarms/rules/99999", headers=auth_headers(token),
+            "/api/v1/alarms/rules/99999",
+            headers=auth_headers(token),
         )
         assert resp.status_code == 404
 
@@ -451,8 +481,10 @@ class TestAlarmRules:
         """PUT /alarms/rules/{id} — 更新规则"""
         _, token = operator_user
         rule = AlarmRule(
-            rule_name="待更新规则", rule_type="and",
-            alarm_level="minor", is_enabled=True,
+            rule_name="待更新规则",
+            rule_type="and",
+            alarm_level="minor",
+            is_enabled=True,
         )
         async_db.add(rule)
         await async_db.flush()
@@ -480,14 +512,17 @@ class TestAlarmRules:
         """DELETE /alarms/rules/{id} — 删除规则"""
         _, token = operator_user
         rule = AlarmRule(
-            rule_name="待删除规则", rule_type="or",
-            alarm_level="info", is_enabled=False,
+            rule_name="待删除规则",
+            rule_type="or",
+            alarm_level="info",
+            is_enabled=False,
         )
         async_db.add(rule)
         await async_db.flush()
 
         resp = await client.delete(
-            f"/api/v1/alarms/rules/{rule.id}", headers=auth_headers(token),
+            f"/api/v1/alarms/rules/{rule.id}",
+            headers=auth_headers(token),
         )
         assert resp.status_code == 200
         assert "已删除" in resp.json()["message"]
@@ -496,7 +531,8 @@ class TestAlarmRules:
         """DELETE /alarms/rules/99999 — 不存在"""
         _, token = operator_user
         resp = await client.delete(
-            "/api/v1/alarms/rules/99999", headers=auth_headers(token),
+            "/api/v1/alarms/rules/99999",
+            headers=auth_headers(token),
         )
         assert resp.status_code == 404
 
@@ -504,8 +540,10 @@ class TestAlarmRules:
         """PUT /alarms/rules/{id}/toggle — 切换启用"""
         _, token = operator_user
         rule = AlarmRule(
-            rule_name="切换规则", rule_type="and",
-            alarm_level="major", is_enabled=True,
+            rule_name="切换规则",
+            rule_type="and",
+            alarm_level="major",
+            is_enabled=True,
         )
         async_db.add(rule)
         await async_db.flush()
@@ -530,6 +568,7 @@ class TestAlarmRules:
 
 # ============== 告警屏蔽 ==============
 
+
 class TestAlarmShields:
     """告警屏蔽管理"""
 
@@ -537,8 +576,10 @@ class TestAlarmShields:
         """POST /alarms/shields — 创建屏蔽"""
         _, token = operator_user
         point = Point(
-            point_code="SH-TEST-001", point_name="屏蔽测试点位",
-            point_type="AI", device_type="TH",
+            point_code="SH-TEST-001",
+            point_name="屏蔽测试点位",
+            point_type="AI",
+            device_type="TH",
         )
         async_db.add(point)
         await async_db.flush()
@@ -564,15 +605,18 @@ class TestAlarmShields:
         """GET /alarms/shields — 屏蔽列表"""
         _, token = admin_user
         point = Point(
-            point_code="SH-LIST-001", point_name="屏蔽列表点位",
-            point_type="AI", device_type="TH",
+            point_code="SH-LIST-001",
+            point_name="屏蔽列表点位",
+            point_type="AI",
+            device_type="TH",
         )
         async_db.add(point)
         await async_db.flush()
 
         now = datetime.now()
         shield = AlarmShield(
-            point_id=point.id, alarm_level="major",
+            point_id=point.id,
+            alarm_level="major",
             start_time=now - timedelta(hours=1),
             end_time=now + timedelta(hours=1),
             reason="测试屏蔽",
@@ -612,7 +656,8 @@ class TestAlarmShields:
         now = datetime.now()
         shield = AlarmShield(
             alarm_level="critical",
-            start_time=now, end_time=now + timedelta(hours=1),
+            start_time=now,
+            end_time=now + timedelta(hours=1),
             reason="待删除",
         )
         async_db.add(shield)
@@ -637,6 +682,7 @@ class TestAlarmShields:
 
 # ============== 补充覆盖率测试 ==============
 
+
 class TestAlarmListCoverageExtra:
     """补充 get_alarms 的分页、点位信息获取、keyword 分支 (L56, L69-85)"""
 
@@ -645,7 +691,8 @@ class TestAlarmListCoverageExtra:
         _, token = admin_user
         point, _, alarms = await _seed_points_and_alarms(async_db)
         resp = await client.get(
-            "/api/v1/alarms", params={"keyword": "告警消息1"},
+            "/api/v1/alarms",
+            params={"keyword": "告警消息1"},
             headers=auth_headers(token),
         )
         assert resp.status_code == 200
@@ -660,7 +707,8 @@ class TestAlarmListCoverageExtra:
         _, token = admin_user
         await _seed_points_and_alarms(async_db)
         resp = await client.get(
-            "/api/v1/alarms", params={"page": 2, "page_size": 2},
+            "/api/v1/alarms",
+            params={"page": 2, "page_size": 2},
             headers=auth_headers(token),
         )
         assert resp.status_code == 200
@@ -674,7 +722,8 @@ class TestAlarmListCoverageExtra:
         _, token = admin_user
         point, _, _ = await _seed_points_and_alarms(async_db)
         resp = await client.get(
-            "/api/v1/alarms", params={"point_id": point.id},
+            "/api/v1/alarms",
+            params={"point_id": point.id},
             headers=auth_headers(token),
         )
         assert resp.status_code == 200
@@ -706,7 +755,8 @@ class TestAlarmTrendCoverageExtra:
         _, token = admin_user
         await _seed_points_and_alarms(async_db)
         resp = await client.get(
-            "/api/v1/alarms/trend", params={"days": 1},
+            "/api/v1/alarms/trend",
+            params={"days": 1},
             headers=auth_headers(token),
         )
         assert resp.status_code == 200
@@ -729,7 +779,8 @@ class TestTopAlarmPointsCoverageExtra:
         _, token = admin_user
         await _seed_points_and_alarms(async_db)
         resp = await client.get(
-            "/api/v1/alarms/top-points", params={"days": 1, "limit": 10},
+            "/api/v1/alarms/top-points",
+            params={"days": 1, "limit": 10},
             headers=auth_headers(token),
         )
         assert resp.status_code == 200
@@ -811,14 +862,17 @@ class TestAlarmRulesCoverageExtra:
         _, token = admin_user
         for i in range(5):
             rule = AlarmRule(
-                rule_name=f"pag_rule_{i}", rule_type="and",
-                alarm_level="minor", is_enabled=True,
+                rule_name=f"pag_rule_{i}",
+                rule_type="and",
+                alarm_level="minor",
+                is_enabled=True,
             )
             async_db.add(rule)
         await async_db.flush()
 
         resp = await client.get(
-            "/api/v1/alarms/rules", params={"page": 2, "page_size": 2},
+            "/api/v1/alarms/rules",
+            params={"page": 2, "page_size": 2},
             headers=auth_headers(token),
         )
         assert resp.status_code == 200
@@ -844,8 +898,10 @@ class TestAlarmRulesCoverageExtra:
         """PUT /alarms/rules/{id}/toggle — 禁用后再启用"""
         _, token = operator_user
         rule = AlarmRule(
-            rule_name="toggle_enable", rule_type="and",
-            alarm_level="major", is_enabled=False,
+            rule_name="toggle_enable",
+            rule_type="and",
+            alarm_level="major",
+            is_enabled=False,
         )
         async_db.add(rule)
         await async_db.flush()
@@ -865,15 +921,18 @@ class TestAlarmShieldsCoverageExtra:
         """GET /alarms/shields — 屏蔽列表包含点位信息 (L571-577)"""
         _, token = admin_user
         point = Point(
-            point_code="SH-EXTRA-001", point_name="extra_shield_pt",
-            point_type="AI", device_type="UPS",
+            point_code="SH-EXTRA-001",
+            point_name="extra_shield_pt",
+            point_type="AI",
+            device_type="UPS",
         )
         async_db.add(point)
         await async_db.flush()
 
         now = datetime.now()
         shield = AlarmShield(
-            point_id=point.id, alarm_level="critical",
+            point_id=point.id,
+            alarm_level="critical",
             start_time=now - timedelta(hours=1),
             end_time=now + timedelta(hours=1),
             reason="with_point",
@@ -914,23 +973,28 @@ class TestAlarmShieldsCoverageExtra:
         """GET /alarms/shields?point_id=X — 按点位筛选 (L552-553)"""
         _, token = admin_user
         point = Point(
-            point_code="SH-FILTER-001", point_name="filter_pt",
-            point_type="AI", device_type="TH",
+            point_code="SH-FILTER-001",
+            point_name="filter_pt",
+            point_type="AI",
+            device_type="TH",
         )
         async_db.add(point)
         await async_db.flush()
 
         now = datetime.now()
         shield = AlarmShield(
-            point_id=point.id, alarm_level="major",
-            start_time=now, end_time=now + timedelta(hours=1),
+            point_id=point.id,
+            alarm_level="major",
+            start_time=now,
+            end_time=now + timedelta(hours=1),
             reason="filter_test",
         )
         async_db.add(shield)
         await async_db.flush()
 
         resp = await client.get(
-            "/api/v1/alarms/shields", params={"point_id": point.id},
+            "/api/v1/alarms/shields",
+            params={"point_id": point.id},
             headers=auth_headers(token),
         )
         assert resp.status_code == 200
@@ -942,14 +1006,16 @@ class TestAlarmShieldsCoverageExtra:
         now = datetime.now()
         shield = AlarmShield(
             alarm_level="critical",
-            start_time=now, end_time=now + timedelta(hours=1),
+            start_time=now,
+            end_time=now + timedelta(hours=1),
             reason="level_filter",
         )
         async_db.add(shield)
         await async_db.flush()
 
         resp = await client.get(
-            "/api/v1/alarms/shields", params={"alarm_level": "critical"},
+            "/api/v1/alarms/shields",
+            params={"alarm_level": "critical"},
             headers=auth_headers(token),
         )
         assert resp.status_code == 200
@@ -998,7 +1064,8 @@ class TestAlarmDetailCoverageExtra:
         _, token = admin_user
         _, _, alarms = await _seed_points_and_alarms(async_db)
         resp = await client.get(
-            f"/api/v1/alarms/{alarms[0].id}", headers=auth_headers(token),
+            f"/api/v1/alarms/{alarms[0].id}",
+            headers=auth_headers(token),
         )
         assert resp.status_code == 200
         data = resp.json()
@@ -1011,7 +1078,8 @@ class TestAlarmDetailCoverageExtra:
         _, _, alarms = await _seed_points_and_alarms(async_db)
         resolved = alarms[3]
         resp = await client.get(
-            f"/api/v1/alarms/{resolved.id}", headers=auth_headers(token),
+            f"/api/v1/alarms/{resolved.id}",
+            headers=auth_headers(token),
         )
         assert resp.status_code == 200
         data = resp.json()

@@ -1,7 +1,6 @@
 """节能机会自动检测服务测试 — Story 6-3"""
+
 import pytest
-from datetime import datetime, date
-from decimal import Decimal
 
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from sqlalchemy import delete, select
@@ -13,7 +12,7 @@ from app.services.opportunity_detector import (
     CATEGORY_TO_INT,
     PRIORITY_TO_STR,
 )
-from app.services.opportunity_engine import OpportunityCategory, PLUGIN_CATEGORY_MAPPING
+from app.services.opportunity_engine import OpportunityCategory
 from app.services.analysis_plugins.base import PluginPriority
 
 
@@ -209,10 +208,7 @@ class TestDetectAPI:
             async with session_factory() as session:
                 yield session
 
-        mock_admin = User(
-            id=1, username="admin", password_hash="x",
-            real_name="管理员", role="admin", is_active=True
-        )
+        mock_admin = User(id=1, username="admin", password_hash="x", real_name="管理员", role="admin", is_active=True)
 
         async def override_get_current_user():
             return mock_admin

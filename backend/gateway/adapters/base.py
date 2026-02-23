@@ -1,4 +1,5 @@
 """协议适配器基类和数据类型定义"""
+
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from typing import Any, Optional, Union
@@ -8,6 +9,7 @@ from datetime import datetime
 
 class DataQuality(Enum):
     """数据质量标记"""
+
     NORMAL = "normal"
     UNRELIABLE = "unreliable"
     ABNORMAL = "abnormal"
@@ -15,6 +17,7 @@ class DataQuality(Enum):
 
 class AdapterState(Enum):
     """适配器状态"""
+
     DISCONNECTED = "disconnected"
     CONNECTED = "connected"
     COMMUNICATION_INTERRUPTED = "communication_interrupted"
@@ -24,6 +27,7 @@ class AdapterState(Enum):
 @dataclass
 class PointConfig:
     """点位采集配置"""
+
     point_id: str
     address: str
     data_type: str
@@ -37,6 +41,7 @@ class PointConfig:
 @dataclass
 class DataSourceConfig:
     """数据源配置"""
+
     datasource_id: str
     protocol_type: str
     connection_params: dict
@@ -51,6 +56,7 @@ class DataSourceConfig:
 @dataclass
 class PointValue:
     """点位采集值"""
+
     point_id: str
     value: Any
     quality: DataQuality
@@ -60,6 +66,7 @@ class PointValue:
 @dataclass
 class ConnectionResult:
     """连接测试结果"""
+
     success: bool
     message: str
     sample_data: Optional[dict] = None
@@ -69,6 +76,7 @@ class ConnectionResult:
 @dataclass
 class AdapterStatus:
     """适配器状态"""
+
     state: AdapterState
     connected_since: Optional[datetime] = None
     last_read_time: Optional[datetime] = None
@@ -79,6 +87,7 @@ class AdapterStatus:
 @dataclass
 class NormalizedReading:
     """归一化后的读数 — 下游消费者统一契约"""
+
     point_id: str
     value: Union[float, str, bool]
     raw_value: Any

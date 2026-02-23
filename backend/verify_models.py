@@ -1,9 +1,11 @@
 """
 验证节能方案模型是否正常工作
 """
+
 import sys
 import io
-sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
+
+sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8")
 
 from app.models.energy import EnergySavingProposal, ProposalMeasure, MeasureExecutionLog
 
@@ -18,7 +20,7 @@ proposal = EnergySavingProposal(
     template_id="A1",
     template_name="峰谷套利优化方案",
     total_benefit=150.0,
-    status="pending"
+    status="pending",
 )
 print(f"\n[OK] 创建方案: {proposal.proposal_code} - {proposal.template_name}")
 
@@ -29,7 +31,7 @@ measure1 = ProposalMeasure(
     regulation_description="降低运行压力至0.6MPa",
     annual_benefit=50.0,
     is_selected=False,
-    execution_status="pending"
+    execution_status="pending",
 )
 print(f"[OK] 创建措施1: {measure1.measure_code} - {measure1.regulation_object}")
 
@@ -39,7 +41,7 @@ measure2 = ProposalMeasure(
     regulation_description="供水温度调高1℃",
     annual_benefit=100.0,
     is_selected=False,
-    execution_status="pending"
+    execution_status="pending",
 )
 print(f"[OK] 创建措施2: {measure2.measure_code} - {measure2.regulation_object}")
 
@@ -55,7 +57,7 @@ log = MeasureExecutionLog(
     power_saved=20.0,
     expected_power_saved=18.0,
     result="success",
-    result_message="措施执行成功"
+    result_message="措施执行成功",
 )
 measure1.execution_logs.append(log)
 print(f"[OK] 措施1添加执行日志: 节省功率 {log.power_saved} kW")
@@ -68,7 +70,7 @@ print(f"方案类型: {proposal.proposal_type}")
 print(f"模板ID: {proposal.template_id}")
 print(f"总收益: {proposal.total_benefit} 万元/年")
 print(f"状态: {proposal.status}")
-print(f"\n措施列表:")
+print("\n措施列表:")
 for i, m in enumerate(proposal.measures, 1):
     print(f"  {i}. {m.regulation_object} - 年收益: {m.annual_benefit} 万元")
 print(f"\n执行日志数量: {len(measure1.execution_logs)}")

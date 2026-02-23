@@ -1,4 +1,5 @@
 """数据源 API CRUD 测试 — Story 1.1 Task 7.7"""
+
 import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
@@ -84,11 +85,14 @@ class TestDataSourceAPI:
     async def test_list_datasources(self, client: AsyncClient):
         """获取数据源列表"""
         # 先创建一个
-        await client.post("/api/v1/datasources", json={
-            "name": "ds-list-test",
-            "protocol_type": "snmp_v2c",
-            "connection_config": {"community": "public"},
-        })
+        await client.post(
+            "/api/v1/datasources",
+            json={
+                "name": "ds-list-test",
+                "protocol_type": "snmp_v2c",
+                "connection_config": {"community": "public"},
+            },
+        )
         resp = await client.get("/api/v1/datasources")
         assert resp.status_code == 200
         data = resp.json()
@@ -98,11 +102,14 @@ class TestDataSourceAPI:
     @pytest.mark.asyncio
     async def test_get_datasource(self, client: AsyncClient):
         """获取数据源详情"""
-        create_resp = await client.post("/api/v1/datasources", json={
-            "name": "ds-get-test",
-            "protocol_type": "modbus_tcp",
-            "connection_config": {"ip": "10.0.0.1"},
-        })
+        create_resp = await client.post(
+            "/api/v1/datasources",
+            json={
+                "name": "ds-get-test",
+                "protocol_type": "modbus_tcp",
+                "connection_config": {"ip": "10.0.0.1"},
+            },
+        )
         ds_id = create_resp.json()["id"]
 
         resp = await client.get(f"/api/v1/datasources/{ds_id}")
@@ -118,17 +125,23 @@ class TestDataSourceAPI:
     @pytest.mark.asyncio
     async def test_update_datasource(self, client: AsyncClient):
         """更新数据源"""
-        create_resp = await client.post("/api/v1/datasources", json={
-            "name": "ds-update-test",
-            "protocol_type": "modbus_tcp",
-            "connection_config": {"ip": "10.0.0.1"},
-        })
+        create_resp = await client.post(
+            "/api/v1/datasources",
+            json={
+                "name": "ds-update-test",
+                "protocol_type": "modbus_tcp",
+                "connection_config": {"ip": "10.0.0.1"},
+            },
+        )
         ds_id = create_resp.json()["id"]
 
-        resp = await client.put(f"/api/v1/datasources/{ds_id}", json={
-            "name": "ds-updated",
-            "collection_interval": 30,
-        })
+        resp = await client.put(
+            f"/api/v1/datasources/{ds_id}",
+            json={
+                "name": "ds-updated",
+                "collection_interval": 30,
+            },
+        )
         assert resp.status_code == 200
         assert resp.json()["name"] == "ds-updated"
         assert resp.json()["collection_interval"] == 30
@@ -136,11 +149,14 @@ class TestDataSourceAPI:
     @pytest.mark.asyncio
     async def test_delete_datasource(self, client: AsyncClient):
         """删除数据源"""
-        create_resp = await client.post("/api/v1/datasources", json={
-            "name": "ds-delete-test",
-            "protocol_type": "modbus_tcp",
-            "connection_config": {"ip": "10.0.0.1"},
-        })
+        create_resp = await client.post(
+            "/api/v1/datasources",
+            json={
+                "name": "ds-delete-test",
+                "protocol_type": "modbus_tcp",
+                "connection_config": {"ip": "10.0.0.1"},
+            },
+        )
         ds_id = create_resp.json()["id"]
 
         resp = await client.delete(f"/api/v1/datasources/{ds_id}")
@@ -189,19 +205,25 @@ class TestGatewayAPI:
             "name": "网关1",
         }
         await client.post("/api/v1/gateways", json=payload)
-        resp = await client.post("/api/v1/gateways", json={
-            "gateway_id": "gw-dup",
-            "name": "网关2",
-        })
+        resp = await client.post(
+            "/api/v1/gateways",
+            json={
+                "gateway_id": "gw-dup",
+                "name": "网关2",
+            },
+        )
         assert resp.status_code == 400
 
     @pytest.mark.asyncio
     async def test_list_gateways(self, client: AsyncClient):
         """获取网关列表"""
-        await client.post("/api/v1/gateways", json={
-            "gateway_id": "gw-list",
-            "name": "列表测试",
-        })
+        await client.post(
+            "/api/v1/gateways",
+            json={
+                "gateway_id": "gw-list",
+                "name": "列表测试",
+            },
+        )
         resp = await client.get("/api/v1/gateways")
         assert resp.status_code == 200
         assert resp.json()["total"] >= 1
@@ -209,10 +231,13 @@ class TestGatewayAPI:
     @pytest.mark.asyncio
     async def test_delete_gateway(self, client: AsyncClient):
         """删除网关"""
-        create_resp = await client.post("/api/v1/gateways", json={
-            "gateway_id": "gw-del",
-            "name": "删除测试",
-        })
+        create_resp = await client.post(
+            "/api/v1/gateways",
+            json={
+                "gateway_id": "gw-del",
+                "name": "删除测试",
+            },
+        )
         gw_id = create_resp.json()["id"]
         resp = await client.delete(f"/api/v1/gateways/{gw_id}")
         assert resp.status_code == 200

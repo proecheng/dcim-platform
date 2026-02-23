@@ -1,7 +1,7 @@
 """Modbus RTU 适配器单元测试 — Story 1.3"""
+
 import asyncio
 import logging
-from datetime import datetime, timezone
 from unittest.mock import AsyncMock, MagicMock, patch, PropertyMock
 
 import pytest
@@ -9,11 +9,9 @@ from serial import SerialException
 
 from gateway.adapters.base import (
     AdapterState,
-    ConnectionResult,
     DataQuality,
     DataSourceConfig,
     PointConfig,
-    PointValue,
 )
 from gateway.adapters.registry import ADAPTER_REGISTRY
 from gateway.adapters.modbus_rtu import ModbusRtuAdapter
@@ -22,6 +20,7 @@ from gateway.adapters.modbus_rtu import ModbusRtuAdapter
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture(autouse=True)
 def _clean_registry():
@@ -71,6 +70,7 @@ def _mock_client(connected: bool = True):
 # 1. 适配器注册
 # ---------------------------------------------------------------------------
 
+
 class TestAdapterRegistration:
     """测试适配器注册到 ADAPTER_REGISTRY"""
 
@@ -82,6 +82,7 @@ class TestAdapterRegistration:
 # ---------------------------------------------------------------------------
 # 2. 连接/断开生命周期
 # ---------------------------------------------------------------------------
+
 
 class TestConnectDisconnect:
     """测试连接和断开生命周期"""
@@ -157,6 +158,7 @@ class TestConnectDisconnect:
 # 3. 串口被占用 → CONFIG_ERROR
 # ---------------------------------------------------------------------------
 
+
 class TestSerialPortBusy:
     """测试串口被占用或不存在时的错误处理"""
 
@@ -185,6 +187,7 @@ class TestSerialPortBusy:
 # ---------------------------------------------------------------------------
 # 4. 四种寄存器类型读取
 # ---------------------------------------------------------------------------
+
 
 class TestReadRegisterTypes:
     """测试 HR, IR, CO, DI 四种寄存器类型读取"""
@@ -272,6 +275,7 @@ class TestReadRegisterTypes:
 # 5. 读取超时重试 → UNRELIABLE
 # ---------------------------------------------------------------------------
 
+
 class TestReadTimeoutRetry:
     """测试读取超时重试一次，第二次仍失败返回 UNRELIABLE/ABNORMAL"""
 
@@ -281,9 +285,7 @@ class TestReadTimeoutRetry:
         MockClient.return_value = mock_instance
 
         # 两次都超时
-        mock_instance.read_holding_registers = AsyncMock(
-            side_effect=[asyncio.TimeoutError(), asyncio.TimeoutError()]
-        )
+        mock_instance.read_holding_registers = AsyncMock(side_effect=[asyncio.TimeoutError(), asyncio.TimeoutError()])
 
         adapter = ModbusRtuAdapter()
         await adapter.connect(_make_config())
@@ -304,9 +306,7 @@ class TestReadTimeoutRetry:
         good_resp.registers = [42]
 
         # 第一次超时，第二次成功
-        mock_instance.read_holding_registers = AsyncMock(
-            side_effect=[asyncio.TimeoutError(), good_resp]
-        )
+        mock_instance.read_holding_registers = AsyncMock(side_effect=[asyncio.TimeoutError(), good_resp])
 
         adapter = ModbusRtuAdapter()
         await adapter.connect(_make_config())
@@ -321,6 +321,7 @@ class TestReadTimeoutRetry:
 # ---------------------------------------------------------------------------
 # 6. CRC 连续失败 3 次 → 日志警告
 # ---------------------------------------------------------------------------
+
 
 class TestCrcFailureDetection:
     """测试 CRC 失败检测和日志警告"""
@@ -382,6 +383,7 @@ class TestCrcFailureDetection:
 # 7. 写入 (HR/CO 允许, IR/DI 拒绝, write_enabled 检查)
 # ---------------------------------------------------------------------------
 
+
 class TestWritePoint:
     """测试写入点位"""
 
@@ -391,9 +393,12 @@ class TestWritePoint:
         MockClient.return_value = mock_instance
 
         adapter = ModbusRtuAdapter()
-        config = _make_config(write_enabled=False, points=[
-            PointConfig(point_id="w1", address="HR:100", data_type="uint16"),
-        ])
+        config = _make_config(
+            write_enabled=False,
+            points=[
+                PointConfig(point_id="w1", address="HR:100", data_type="uint16"),
+            ],
+        )
         await adapter.connect(config)
 
         result = await adapter.write_point("w1", 42)
@@ -409,9 +414,12 @@ class TestWritePoint:
         mock_instance.write_register = AsyncMock(return_value=write_resp)
 
         adapter = ModbusRtuAdapter()
-        config = _make_config(write_enabled=True, points=[
-            PointConfig(point_id="w1", address="HR:100", data_type="uint16"),
-        ])
+        config = _make_config(
+            write_enabled=True,
+            points=[
+                PointConfig(point_id="w1", address="HR:100", data_type="uint16"),
+            ],
+        )
         await adapter.connect(config)
 
         result = await adapter.write_point("w1", 42)
@@ -428,9 +436,12 @@ class TestWritePoint:
         mock_instance.write_coil = AsyncMock(return_value=write_resp)
 
         adapter = ModbusRtuAdapter()
-        config = _make_config(write_enabled=True, points=[
-            PointConfig(point_id="c1", address="CO:5", data_type="bool"),
-        ])
+        config = _make_config(
+            write_enabled=True,
+            points=[
+                PointConfig(point_id="c1", address="CO:5", data_type="bool"),
+            ],
+        )
         await adapter.connect(config)
 
         result = await adapter.write_point("c1", True)
@@ -444,9 +455,12 @@ class TestWritePoint:
         MockClient.return_value = mock_instance
 
         adapter = ModbusRtuAdapter()
-        config = _make_config(write_enabled=True, points=[
-            PointConfig(point_id="ir1", address="IR:100", data_type="uint16"),
-        ])
+        config = _make_config(
+            write_enabled=True,
+            points=[
+                PointConfig(point_id="ir1", address="IR:100", data_type="uint16"),
+            ],
+        )
         await adapter.connect(config)
 
         result = await adapter.write_point("ir1", 42)
@@ -459,9 +473,12 @@ class TestWritePoint:
         MockClient.return_value = mock_instance
 
         adapter = ModbusRtuAdapter()
-        config = _make_config(write_enabled=True, points=[
-            PointConfig(point_id="di1", address="DI:0", data_type="bool"),
-        ])
+        config = _make_config(
+            write_enabled=True,
+            points=[
+                PointConfig(point_id="di1", address="DI:0", data_type="bool"),
+            ],
+        )
         await adapter.connect(config)
 
         result = await adapter.write_point("di1", True)
@@ -477,14 +494,15 @@ class TestWritePoint:
         mock_instance.write_registers = AsyncMock(return_value=write_resp)
 
         adapter = ModbusRtuAdapter()
-        config = _make_config(write_enabled=True, points=[
-            PointConfig(point_id="f1", address="HR:200:2", data_type="float32"),
-        ])
+        config = _make_config(
+            write_enabled=True,
+            points=[
+                PointConfig(point_id="f1", address="HR:200:2", data_type="float32"),
+            ],
+        )
         await adapter.connect(config)
 
-        with patch.object(
-            MockClient, "convert_to_registers", return_value=[0x4048, 0xF5C3]
-        ):
+        with patch.object(MockClient, "convert_to_registers", return_value=[0x4048, 0xF5C3]):
             result = await adapter.write_point("f1", 3.14)
             assert result is True
             mock_instance.write_registers.assert_awaited_once()
@@ -493,6 +511,7 @@ class TestWritePoint:
 # ---------------------------------------------------------------------------
 # 8. test_connection (成功、失败、10s 超时)
 # ---------------------------------------------------------------------------
+
 
 class TestTestConnection:
     """测试连接测试功能"""
@@ -521,9 +540,7 @@ class TestTestConnection:
         mock_instance = _mock_client()
         MockClient.return_value = mock_instance
 
-        mock_instance.read_holding_registers = AsyncMock(
-            side_effect=Exception("Connection refused")
-        )
+        mock_instance.read_holding_registers = AsyncMock(side_effect=Exception("Connection refused"))
 
         adapter = ModbusRtuAdapter()
         await adapter.connect(_make_config())
@@ -572,6 +589,7 @@ class TestTestConnection:
 # 9. word_order 配置传递
 # ---------------------------------------------------------------------------
 
+
 class TestWordOrder:
     """测试 word_order 配置传递到 convert_from_registers"""
 
@@ -585,10 +603,12 @@ class TestWordOrder:
         response.registers = [0x86A0, 0x0001]
         mock_instance.read_holding_registers = AsyncMock(return_value=response)
 
-        config = _make_config(connection_params={
-            "port": "COM3",
-            "word_order": "little",
-        })
+        config = _make_config(
+            connection_params={
+                "port": "COM3",
+                "word_order": "little",
+            }
+        )
 
         adapter = ModbusRtuAdapter()
         await adapter.connect(config)

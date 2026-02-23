@@ -1,4 +1,5 @@
 """视频监控 API 测试 — Story 10-1: 摄像头元数据管理"""
+
 import pytest
 
 from httpx import AsyncClient, ASGITransport
@@ -16,6 +17,7 @@ from app.api.deps import get_db, require_admin, require_operator, require_viewer
 # ============================================================
 # Fixtures
 # ============================================================
+
 
 @pytest.fixture(scope="module")
 def anyio_backend():
@@ -101,6 +103,7 @@ BASE_URL = "/api/v1/video"
 # Helpers
 # ============================================================
 
+
 async def _create_nvr(session: AsyncSession, name: str, ip: str) -> NVR:
     """直接在 DB 创建 NVR"""
     nvr = NVR(name=name, ip_address=ip, port=554, username="admin", password="pass123")
@@ -136,6 +139,7 @@ async def _create_camera(
 # ============================================================
 # Tests — NVR CRUD
 # ============================================================
+
 
 @pytest.mark.anyio
 async def test_create_nvr(client):
@@ -193,10 +197,13 @@ async def test_update_nvr(client, db_session):
     nvr = await _create_nvr(db_session, "NVR-Old", "10.0.2.1")
     await db_session.commit()
 
-    resp = await client.put(f"{BASE_URL}/nvrs/{nvr.id}", json={
-        "name": "NVR-Updated",
-        "ip_address": "10.0.2.2",
-    })
+    resp = await client.put(
+        f"{BASE_URL}/nvrs/{nvr.id}",
+        json={
+            "name": "NVR-Updated",
+            "ip_address": "10.0.2.2",
+        },
+    )
     assert resp.status_code == 200
     data = resp.json()
     assert data["name"] == "NVR-Updated"
@@ -238,6 +245,7 @@ async def test_nvr_not_found(client):
 # ============================================================
 # Tests — Camera CRUD
 # ============================================================
+
 
 @pytest.mark.anyio
 async def test_create_camera(client, db_session):
@@ -308,13 +316,16 @@ async def test_update_camera(client, db_session):
     db_session.add(old_preset)
     await db_session.commit()
 
-    resp = await client.put(f"{BASE_URL}/cameras/{camera.id}", json={
-        "name": "新名称",
-        "presets": [
-            {"preset_index": 1, "name": "新预置位A"},
-            {"preset_index": 2, "name": "新预置位B"},
-        ],
-    })
+    resp = await client.put(
+        f"{BASE_URL}/cameras/{camera.id}",
+        json={
+            "name": "新名称",
+            "presets": [
+                {"preset_index": 1, "name": "新预置位A"},
+                {"preset_index": 2, "name": "新预置位B"},
+            ],
+        },
+    )
     assert resp.status_code == 200
     data = resp.json()
     assert data["name"] == "新名称"
@@ -340,6 +351,7 @@ async def test_delete_camera(client, db_session):
 # ============================================================
 # Tests — Camera Filtering
 # ============================================================
+
 
 @pytest.mark.anyio
 async def test_filter_cameras_by_nvr(client, db_session):
@@ -390,6 +402,7 @@ async def test_filter_cameras_by_status(client, db_session):
 # Tests — Camera by Area / Device
 # ============================================================
 
+
 @pytest.mark.anyio
 async def test_get_cameras_by_area(client, db_session):
     """GET /cameras/by-area/{area_code} 按区域联动查询"""
@@ -424,6 +437,7 @@ async def test_get_cameras_by_device(client, db_session):
 # Tests — Preset Management
 # ============================================================
 
+
 @pytest.mark.anyio
 async def test_camera_presets_management(client, db_session):
     """创建摄像头含预置位，更新时替换旧预置位"""
@@ -443,13 +457,16 @@ async def test_camera_presets_management(client, db_session):
     assert len(resp.json()["presets"]) == 2
 
     # 更新为新预置位，旧的应被替换
-    resp2 = await client.put(f"{BASE_URL}/cameras/{cam_id}", json={
-        "presets": [
-            {"preset_index": 1, "name": "替换位1"},
-            {"preset_index": 2, "name": "替换位2"},
-            {"preset_index": 3, "name": "替换位3"},
-        ],
-    })
+    resp2 = await client.put(
+        f"{BASE_URL}/cameras/{cam_id}",
+        json={
+            "presets": [
+                {"preset_index": 1, "name": "替换位1"},
+                {"preset_index": 2, "name": "替换位2"},
+                {"preset_index": 3, "name": "替换位3"},
+            ],
+        },
+    )
     assert resp2.status_code == 200
     data = resp2.json()
     assert len(data["presets"]) == 3
@@ -463,8 +480,8 @@ async def test_camera_presets_management(client, db_session):
 # Helpers — Alarm/Point
 # ============================================================
 
-async def _create_point(session, point_code="AI_TH_A1_001", area_code="A1",
-                        device_id=None):
+
+async def _create_point(session, point_code="AI_TH_A1_001", area_code="A1", device_id=None):
     """创建测试点位"""
     point = Point(
         point_code=point_code,
@@ -496,6 +513,7 @@ async def _create_alarm(session, point_id):
 # ============================================================
 # Tests — GET /cameras/by-alarm/{alarm_id} (Story 10-2)
 # ============================================================
+
 
 @pytest.mark.anyio
 async def test_get_cameras_by_alarm_with_device(client, db_session):
@@ -555,56 +573,53 @@ async def test_get_cameras_by_alarm_no_cameras(client, db_session):
 # Tests — PTZ / Recording / Events (Story 10-3)
 # ============================================================
 
+
 @pytest.mark.anyio
 async def test_ptz_control(client, db_session):
     """POST /ptz/control 云台控制"""
     cam = await _create_camera(db_session, "CAM-PTZ-001", "PTZ测试摄像头")
     await db_session.commit()
-    resp = await client.post(f"{BASE_URL}/ptz/control", json={
-        "camera_id": cam.id, "action": "up", "speed": 5
-    })
+    resp = await client.post(f"{BASE_URL}/ptz/control", json={"camera_id": cam.id, "action": "up", "speed": 5})
     assert resp.status_code == 200
     data = resp.json()
     assert data["event_type"] == "ptz_control"
     assert data["trigger_source"] == "manual"
     assert data["camera_name"] == "PTZ测试摄像头"
 
+
 @pytest.mark.anyio
 async def test_call_preset(client, db_session):
     """POST /ptz/preset 调用预置位"""
     cam = await _create_camera(db_session, "CAM-PRESET-001", "预置位测试")
     await db_session.commit()
-    resp = await client.post(f"{BASE_URL}/ptz/preset", json={
-        "camera_id": cam.id, "preset_index": 1
-    })
+    resp = await client.post(f"{BASE_URL}/ptz/preset", json={"camera_id": cam.id, "preset_index": 1})
     assert resp.status_code == 200
     data = resp.json()
     assert data["event_type"] == "preset_call"
+
 
 @pytest.mark.anyio
 async def test_start_recording(client, db_session):
     """POST /recording/start 开始录像"""
     cam = await _create_camera(db_session, "CAM-REC-001", "录像测试")
     await db_session.commit()
-    resp = await client.post(f"{BASE_URL}/recording/start", json={
-        "camera_id": cam.id
-    })
+    resp = await client.post(f"{BASE_URL}/recording/start", json={"camera_id": cam.id})
     assert resp.status_code == 200
     data = resp.json()
     assert data["event_type"] == "recording_start"
     assert data["trigger_source"] == "manual"
+
 
 @pytest.mark.anyio
 async def test_stop_recording(client, db_session):
     """POST /recording/stop 停止录像"""
     cam = await _create_camera(db_session, "CAM-STOP-001", "停止录像测试")
     await db_session.commit()
-    resp = await client.post(f"{BASE_URL}/recording/stop", json={
-        "camera_id": cam.id
-    })
+    resp = await client.post(f"{BASE_URL}/recording/stop", json={"camera_id": cam.id})
     assert resp.status_code == 200
     data = resp.json()
     assert data["event_type"] == "recording_stop"
+
 
 @pytest.mark.anyio
 async def test_list_video_events(client, db_session):
@@ -618,6 +633,7 @@ async def test_list_video_events(client, db_session):
     assert resp.status_code == 200
     data = resp.json()
     assert data["total"] >= 2
+
 
 @pytest.mark.anyio
 async def test_list_video_events_filter(client, db_session):
@@ -637,6 +653,7 @@ async def test_list_video_events_filter(client, db_session):
 # Tests — Playback API (Story 10-4)
 # ============================================================
 
+
 @pytest.mark.anyio
 async def test_get_playback_info(client, db_session):
     """测试获取告警回放信息"""
@@ -644,8 +661,7 @@ async def test_get_playback_info(client, db_session):
     point = await _create_point(db_session, "PT-PLAY-001", "AREA-A", device_id=1)
     alarm = await _create_alarm(db_session, point.id)
     # 创建摄像头（关联 device_id=1）
-    camera = await _create_camera(db_session, "CAM-PLAY-001", "回放测试摄像头",
-                                  device_id=1)
+    camera = await _create_camera(db_session, "CAM-PLAY-001", "回放测试摄像头", device_id=1)
     await db_session.commit()
 
     resp = await client.get(f"{BASE_URL}/playback/alarm/{alarm.id}")
@@ -675,22 +691,26 @@ async def test_list_recording_segments(client, db_session):
 
     # 创建 recording_start 和 recording_stop 事件
     import json
+
     start_evt = VideoEvent(
-        camera_id=camera.id, event_type="recording_start",
-        trigger_source="manual", detail=json.dumps({"action": "start"}),
+        camera_id=camera.id,
+        event_type="recording_start",
+        trigger_source="manual",
+        detail=json.dumps({"action": "start"}),
     )
     db_session.add(start_evt)
     await db_session.flush()
 
     stop_evt = VideoEvent(
-        camera_id=camera.id, event_type="recording_stop",
-        trigger_source="manual", detail=json.dumps({"action": "stop"}),
+        camera_id=camera.id,
+        event_type="recording_stop",
+        trigger_source="manual",
+        detail=json.dumps({"action": "stop"}),
     )
     db_session.add(stop_evt)
     await db_session.commit()
 
-    resp = await client.get(f"{BASE_URL}/playback/segments",
-                            params={"camera_id": camera.id})
+    resp = await client.get(f"{BASE_URL}/playback/segments", params={"camera_id": camera.id})
     assert resp.status_code == 200
     data = resp.json()
     assert data["total"] >= 1
@@ -706,8 +726,7 @@ async def test_list_recording_segments_empty(client, db_session):
     camera = await _create_camera(db_session, "CAM-EMPTY-001", "空片段摄像头")
     await db_session.commit()
 
-    resp = await client.get(f"{BASE_URL}/playback/segments",
-                            params={"camera_id": camera.id})
+    resp = await client.get(f"{BASE_URL}/playback/segments", params={"camera_id": camera.id})
     assert resp.status_code == 200
     data = resp.json()
     assert data["total"] == 0

@@ -2,8 +2,6 @@
 用户管理 API 覆盖率补充测试
 覆盖 user.py 中未测试的行：40-58, 78-88, 102-141, 155-299, 320-367
 """
-import pytest
-from datetime import datetime
 
 from app.models.user import User, UserLoginHistory, UserSite
 from app.models.spatial import Site
@@ -30,18 +28,21 @@ class TestGetUsers:
         """关键词搜索（username/real_name/email）"""
         _, token = admin_user
         # 创建可搜索的用户
-        async_db.add(User(
-            username="searchable_user",
-            password_hash=get_password_hash("Test@1234"),
-            real_name="可搜索用户",
-            email="searchable@test.com",
-            role="operator",
-            is_active=True,
-        ))
+        async_db.add(
+            User(
+                username="searchable_user",
+                password_hash=get_password_hash("Test@1234"),
+                real_name="可搜索用户",
+                email="searchable@test.com",
+                role="operator",
+                is_active=True,
+            )
+        )
         await async_db.flush()
 
         resp = await client.get(
-            USERS_URL, headers=auth_headers(token),
+            USERS_URL,
+            headers=auth_headers(token),
             params={"keyword": "searchable"},
         )
         assert resp.status_code == 200
@@ -51,16 +52,19 @@ class TestGetUsers:
     async def test_list_users_role_filter(self, client, admin_user, async_db):
         """角色筛选"""
         _, token = admin_user
-        async_db.add(User(
-            username="viewer_filter_user",
-            password_hash=get_password_hash("Test@1234"),
-            role="viewer",
-            is_active=True,
-        ))
+        async_db.add(
+            User(
+                username="viewer_filter_user",
+                password_hash=get_password_hash("Test@1234"),
+                role="viewer",
+                is_active=True,
+            )
+        )
         await async_db.flush()
 
         resp = await client.get(
-            USERS_URL, headers=auth_headers(token),
+            USERS_URL,
+            headers=auth_headers(token),
             params={"role": "viewer"},
         )
         assert resp.status_code == 200
@@ -70,16 +74,19 @@ class TestGetUsers:
     async def test_list_users_is_active_filter(self, client, admin_user, async_db):
         """启用状态筛选"""
         _, token = admin_user
-        async_db.add(User(
-            username="inactive_filter_user",
-            password_hash=get_password_hash("Test@1234"),
-            role="operator",
-            is_active=False,
-        ))
+        async_db.add(
+            User(
+                username="inactive_filter_user",
+                password_hash=get_password_hash("Test@1234"),
+                role="operator",
+                is_active=False,
+            )
+        )
         await async_db.flush()
 
         resp = await client.get(
-            USERS_URL, headers=auth_headers(token),
+            USERS_URL,
+            headers=auth_headers(token),
             params={"is_active": False},
         )
         assert resp.status_code == 200
@@ -90,7 +97,8 @@ class TestGetUsers:
         """分页参数"""
         _, token = admin_user
         resp = await client.get(
-            USERS_URL, headers=auth_headers(token),
+            USERS_URL,
+            headers=auth_headers(token),
             params={"page": 1, "page_size": 2},
         )
         assert resp.status_code == 200
@@ -172,18 +180,14 @@ class TestGetUser:
         async_db.add(user)
         await async_db.flush()
 
-        resp = await client.get(
-            f"{USERS_URL}/{user.id}", headers=auth_headers(token)
-        )
+        resp = await client.get(f"{USERS_URL}/{user.id}", headers=auth_headers(token))
         assert resp.status_code == 200
         assert resp.json()["username"] == "detail_user"
 
     async def test_get_user_not_found(self, client, admin_user):
         """用户不存在"""
         _, token = admin_user
-        resp = await client.get(
-            f"{USERS_URL}/99999", headers=auth_headers(token)
-        )
+        resp = await client.get(f"{USERS_URL}/99999", headers=auth_headers(token))
         assert resp.status_code == 404
 
 
@@ -194,7 +198,8 @@ class TestCreateUser:
         """成功创建用户"""
         _, token = admin_user
         resp = await client.post(
-            USERS_URL, headers=auth_headers(token),
+            USERS_URL,
+            headers=auth_headers(token),
             json={
                 "username": "new_created_user",
                 "password": "Test@1234",
@@ -213,16 +218,19 @@ class TestCreateUser:
     async def test_create_user_duplicate_username(self, client, admin_user, async_db):
         """用户名重复"""
         _, token = admin_user
-        async_db.add(User(
-            username="dup_create_user",
-            password_hash=get_password_hash("Test@1234"),
-            role="operator",
-            is_active=True,
-        ))
+        async_db.add(
+            User(
+                username="dup_create_user",
+                password_hash=get_password_hash("Test@1234"),
+                role="operator",
+                is_active=True,
+            )
+        )
         await async_db.flush()
 
         resp = await client.post(
-            USERS_URL, headers=auth_headers(token),
+            USERS_URL,
+            headers=auth_headers(token),
             json={"username": "dup_create_user", "password": "Test@1234", "role": "operator"},
         )
         assert resp.status_code == 400
@@ -231,17 +239,20 @@ class TestCreateUser:
     async def test_create_user_duplicate_email(self, client, admin_user, async_db):
         """邮箱重复"""
         _, token = admin_user
-        async_db.add(User(
-            username="email_dup_user1",
-            password_hash=get_password_hash("Test@1234"),
-            email="dup@test.com",
-            role="operator",
-            is_active=True,
-        ))
+        async_db.add(
+            User(
+                username="email_dup_user1",
+                password_hash=get_password_hash("Test@1234"),
+                email="dup@test.com",
+                role="operator",
+                is_active=True,
+            )
+        )
         await async_db.flush()
 
         resp = await client.post(
-            USERS_URL, headers=auth_headers(token),
+            USERS_URL,
+            headers=auth_headers(token),
             json={
                 "username": "email_dup_user2",
                 "password": "Test@1234",
@@ -269,7 +280,8 @@ class TestUpdateUser:
         await async_db.flush()
 
         resp = await client.put(
-            f"{USERS_URL}/{user.id}", headers=auth_headers(token),
+            f"{USERS_URL}/{user.id}",
+            headers=auth_headers(token),
             json={"real_name": "更新后姓名", "department": "技术部"},
         )
         assert resp.status_code == 200
@@ -279,7 +291,8 @@ class TestUpdateUser:
         """更新不存在的用户"""
         _, token = admin_user
         resp = await client.put(
-            f"{USERS_URL}/99999", headers=auth_headers(token),
+            f"{USERS_URL}/99999",
+            headers=auth_headers(token),
             json={"real_name": "不存在"},
         )
         assert resp.status_code == 404
@@ -300,27 +313,21 @@ class TestDeleteUser:
         async_db.add(user)
         await async_db.flush()
 
-        resp = await client.delete(
-            f"{USERS_URL}/{user.id}", headers=auth_headers(token)
-        )
+        resp = await client.delete(f"{USERS_URL}/{user.id}", headers=auth_headers(token))
         assert resp.status_code == 200
         assert "已删除" in resp.json()["message"]
 
     async def test_delete_self_forbidden(self, client, admin_user):
         """不能删除自己"""
         user, token = admin_user
-        resp = await client.delete(
-            f"{USERS_URL}/{user.id}", headers=auth_headers(token)
-        )
+        resp = await client.delete(f"{USERS_URL}/{user.id}", headers=auth_headers(token))
         assert resp.status_code == 400
         assert "不能删除自己" in resp.json()["detail"]
 
     async def test_delete_user_not_found(self, client, admin_user):
         """删除不存在的用户"""
         _, token = admin_user
-        resp = await client.delete(
-            f"{USERS_URL}/99999", headers=auth_headers(token)
-        )
+        resp = await client.delete(f"{USERS_URL}/99999", headers=auth_headers(token))
         assert resp.status_code == 404
 
 
@@ -438,19 +445,23 @@ class TestLoginHistory:
         await async_db.flush()
 
         # 插入登录历史
-        async_db.add(UserLoginHistory(
-            user_id=user.id,
-            login_ip="127.0.0.1",
-            user_agent="test-agent",
-            status="success",
-        ))
-        async_db.add(UserLoginHistory(
-            user_id=user.id,
-            login_ip="192.168.1.1",
-            user_agent="test-agent-2",
-            status="failed",
-            fail_reason="密码错误",
-        ))
+        async_db.add(
+            UserLoginHistory(
+                user_id=user.id,
+                login_ip="127.0.0.1",
+                user_agent="test-agent",
+                status="success",
+            )
+        )
+        async_db.add(
+            UserLoginHistory(
+                user_id=user.id,
+                login_ip="192.168.1.1",
+                user_agent="test-agent-2",
+                status="failed",
+                fail_reason="密码错误",
+            )
+        )
         await async_db.flush()
 
         resp = await client.get(

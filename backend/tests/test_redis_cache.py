@@ -7,7 +7,7 @@
 import json
 import time
 from datetime import datetime
-from unittest.mock import AsyncMock, MagicMock, patch, PropertyMock
+from unittest.mock import AsyncMock, patch
 
 import pytest
 import pytest_asyncio
@@ -31,6 +31,7 @@ from app.services.cache_service import (
 # ============================================================
 # Fixtures
 # ============================================================
+
 
 @pytest_asyncio.fixture
 async def db_session():
@@ -69,6 +70,7 @@ def redis_svc(mock_pool):
 # 1. RedisService set/get 正常读写
 # ============================================================
 
+
 async def test_redis_service_set_get(redis_svc, mock_pool):
     """测试 RedisService.set/get — 正常读写"""
     mock_pool.get.return_value = "hello"
@@ -85,6 +87,7 @@ async def test_redis_service_set_get(redis_svc, mock_pool):
 # 2. RedisService set — TTL 正确设置
 # ============================================================
 
+
 async def test_redis_service_ttl(redis_svc, mock_pool):
     """测试 RedisService.set — TTL 正确设置"""
     await redis_svc.set("k", "v", ttl=120)
@@ -98,6 +101,7 @@ async def test_redis_service_ttl(redis_svc, mock_pool):
 # ============================================================
 # 3. RedisService — Redis 不可用时静默降级
 # ============================================================
+
 
 async def test_redis_service_graceful_degradation():
     """测试 RedisService — Redis 不可用时静默降级（不抛异常）"""
@@ -125,6 +129,7 @@ async def test_redis_service_graceful_degradation():
 # ============================================================
 # 4. cache_point_data — 正确写入 Redis key 和 JSON 值
 # ============================================================
+
 
 async def test_cache_point_data(redis_svc):
     """测试 cache_point_data — 正确写入 Redis key 和 JSON 值"""
@@ -154,6 +159,7 @@ async def test_cache_point_data(redis_svc):
 # 5. get_point_latest — Redis hit 时直接返回（不查 DB）
 # ============================================================
 
+
 async def test_get_point_latest_redis_hit(redis_svc, db_session):
     """测试 get_point_latest — Redis hit 时直接返回（不查 DB）"""
     cached_data = {"v": "25.6", "q": 0, "t": 1705305600, "gw": "gw-001"}
@@ -171,6 +177,7 @@ async def test_get_point_latest_redis_hit(redis_svc, db_session):
 # 6. get_point_latest — Redis miss 时查 DB 并回填缓存
 # ============================================================
 
+
 async def test_get_point_latest_redis_miss_db_hit(redis_svc, db_session):
     """测试 get_point_latest — Redis miss 时查 DB 并回填缓存"""
     redis_svc._pool.get.return_value = None  # Redis miss
@@ -178,8 +185,11 @@ async def test_get_point_latest_redis_miss_db_hit(redis_svc, db_session):
     # 在 DB 中插入数据
     ts = datetime(2024, 1, 15, 12, 0, 0)
     record = PointDataLatest(
-        point_id="p002", value="30.5", quality=0,
-        timestamp=ts, gateway_id="gw-002",
+        point_id="p002",
+        value="30.5",
+        quality=0,
+        timestamp=ts,
+        gateway_id="gw-002",
     )
     db_session.add(record)
     await db_session.commit()
@@ -199,6 +209,7 @@ async def test_get_point_latest_redis_miss_db_hit(redis_svc, db_session):
 # ============================================================
 # 7. cache_gateway_status — 正确写入 Redis key 和 JSON 值
 # ============================================================
+
 
 async def test_cache_gateway_status(redis_svc):
     """测试 cache_gateway_status — 正确写入 Redis key 和 JSON 值"""
@@ -226,6 +237,7 @@ async def test_cache_gateway_status(redis_svc):
 # 8. get_gateway_status — Redis hit / miss 两种路径
 # ============================================================
 
+
 async def test_get_gateway_status_hit_and_miss(redis_svc, db_session):
     """测试 get_gateway_status — Redis hit / miss 两种路径"""
     # --- hit 路径 ---
@@ -241,8 +253,12 @@ async def test_get_gateway_status_hit_and_miss(redis_svc, db_session):
     redis_svc._pool.set.reset_mock()
 
     gw = Gateway(
-        gateway_id="gw-002", name="测试网关", status="online",
-        cpu_usage=50.0, memory_usage=70.0, disk_usage=40.0,
+        gateway_id="gw-002",
+        name="测试网关",
+        status="online",
+        cpu_usage=50.0,
+        memory_usage=70.0,
+        disk_usage=40.0,
         last_heartbeat=datetime(2024, 1, 15, 12, 0, 0),
     )
     db_session.add(gw)
@@ -263,6 +279,7 @@ async def test_get_gateway_status_hit_and_miss(redis_svc, db_session):
 # ============================================================
 # 9. handle_point_data 集成 — 写入 DB 后同步写入缓存
 # ============================================================
+
 
 async def test_handle_point_data_calls_cache(db_session):
     """测试 handle_point_data 集成 — 写入 DB 后同步写入缓存"""
@@ -288,6 +305,7 @@ async def test_handle_point_data_calls_cache(db_session):
 # ============================================================
 # 10. handle_gateway_status 集成 — 写入 DB 后同步写入缓存
 # ============================================================
+
 
 async def test_handle_gateway_status_calls_cache(db_session):
     """测试 handle_gateway_status 集成 — 写入 DB 后同步写入缓存"""
@@ -318,6 +336,7 @@ async def test_handle_gateway_status_calls_cache(db_session):
 # 11. Redis 降级 — Redis 断开时 handle_point_data 仍正常写入 DB
 # ============================================================
 
+
 async def test_handle_point_data_degradation(db_session):
     """测试 Redis 降级 — Redis 断开时 handle_point_data 仍正常写入 DB"""
     from app.services.point_data import handle_point_data
@@ -344,9 +363,7 @@ async def test_handle_point_data_degradation(db_session):
 
     # DB 写入应正常
     assert count == 1
-    result = await db_session.execute(
-        select(PointDataLatest).where(PointDataLatest.point_id == "p-degrade-001")
-    )
+    result = await db_session.execute(select(PointDataLatest).where(PointDataLatest.point_id == "p-degrade-001"))
     record = result.scalar_one()
     assert record.value == "99.9"
 
@@ -354,6 +371,7 @@ async def test_handle_point_data_degradation(db_session):
 # ============================================================
 # 12. batch_get_point_latest — 批量获取，部分 hit 部分 miss
 # ============================================================
+
 
 async def test_batch_get_point_latest(redis_svc, db_session):
     """测试 batch_get_point_latest — 批量获取，部分 hit 部分 miss"""
@@ -364,8 +382,11 @@ async def test_batch_get_point_latest(redis_svc, db_session):
     # p002 在 DB 中
     ts = datetime(2024, 1, 15, 12, 0, 0)
     record = PointDataLatest(
-        point_id="p002", value="30.5", quality=0,
-        timestamp=ts, gateway_id="gw-002",
+        point_id="p002",
+        value="30.5",
+        quality=0,
+        timestamp=ts,
+        gateway_id="gw-002",
     )
     db_session.add(record)
     await db_session.commit()

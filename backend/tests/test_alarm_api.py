@@ -1,4 +1,5 @@
 """告警 API 测试 — Story 5.3"""
+
 import pytest
 from datetime import datetime, timedelta
 from unittest.mock import AsyncMock, patch
@@ -15,6 +16,7 @@ from app.api.deps import get_db, require_operator, require_viewer
 
 
 # --------------- fixtures ---------------
+
 
 @pytest.fixture(scope="module")
 def anyio_backend():
@@ -165,6 +167,7 @@ async def seed_data(db_session):
 
 # --------------- 确认告警测试 ---------------
 
+
 class TestAcknowledgeAlarm:
     """测试确认告警 API"""
 
@@ -197,6 +200,7 @@ class TestAcknowledgeAlarm:
 
 
 # --------------- 处理告警测试 ---------------
+
 
 class TestProcessAlarm:
     """测试处理告警 API"""
@@ -236,6 +240,7 @@ class TestProcessAlarm:
 
 # --------------- 解决告警测试 ---------------
 
+
 class TestResolveAlarm:
     """测试解决告警 API"""
 
@@ -269,16 +274,14 @@ class TestResolveAlarm:
 
 # --------------- 批量确认测试 ---------------
 
+
 class TestBatchAcknowledge:
     """测试批量确认告警 API"""
 
     @patch("app.api.v1.alarm.ws_manager.broadcast_alarm", new_callable=AsyncMock)
     async def test_batch_acknowledge(self, mock_broadcast, client, seed_data):
         """批量确认 active 告警应成功"""
-        resp = await client.put(
-            "/api/v1/alarms/batch-acknowledge",
-            json={"alarm_ids": [1, 2], "remark": "批量确认"}
-        )
+        resp = await client.put("/api/v1/alarms/batch-acknowledge", json={"alarm_ids": [1, 2], "remark": "批量确认"})
         assert resp.status_code == 200
         data = resp.json()
         assert "count" in data
@@ -292,16 +295,14 @@ class TestBatchAcknowledge:
     @patch("app.api.v1.alarm.ws_manager.broadcast_alarm", new_callable=AsyncMock)
     async def test_batch_acknowledge_resolved_alarms(self, mock_broadcast, client, seed_data):
         """批量确认已解决的告警应返回 count=0"""
-        resp = await client.put(
-            "/api/v1/alarms/batch-acknowledge",
-            json={"alarm_ids": [3]}
-        )
+        resp = await client.put("/api/v1/alarms/batch-acknowledge", json={"alarm_ids": [3]})
         assert resp.status_code == 200
         data = resp.json()
         assert data["count"] == 0
 
 
 # --------------- 统计测试 ---------------
+
 
 class TestAlarmStatistics:
     """测试告警统计 API"""

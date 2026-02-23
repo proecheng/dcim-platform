@@ -1,4 +1,5 @@
 """通信中断检测服务测试"""
+
 import pytest
 from datetime import datetime, timedelta
 from httpx import AsyncClient, ASGITransport
@@ -72,6 +73,7 @@ async def test_mark_unreliable_points(setup_db):
     async with setup_db() as session:
         # 创建设备
         from app.models.device import Device
+
         device = Device(
             device_code="DEV001",
             device_name="测试设备",
@@ -119,9 +121,7 @@ async def test_mark_unreliable_points(setup_db):
         await mark_unreliable_points(session, ds.id, quality=2)
         await session.commit()
 
-        result = await session.execute(
-            select(PointRealtime).where(PointRealtime.point_id == point.id)
-        )
+        result = await session.execute(select(PointRealtime).where(PointRealtime.point_id == point.id))
         updated_pr = result.scalar_one()
         assert updated_pr.quality == 2
 

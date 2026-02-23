@@ -1,11 +1,11 @@
 """
 测试 ProposalExecutor 服务
 """
+
 import pytest
-from datetime import datetime, date
+from datetime import date
 from decimal import Decimal
 from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 import uuid
 
@@ -30,7 +30,7 @@ class TestProposalExecutor:
             total_investment=Decimal("0"),
             status="accepted",
             analysis_start_date=date.today(),
-            analysis_end_date=date.today()
+            analysis_end_date=date.today(),
         )
         async_db.add(proposal)
         await async_db.flush()
@@ -45,7 +45,7 @@ class TestProposalExecutor:
             target_state={"power": 800, "temperature": 26},
             annual_benefit=Decimal("5.0"),
             is_selected=True,
-            execution_status="pending"
+            execution_status="pending",
         )
         measure2 = ProposalMeasure(
             proposal_id=proposal.id,
@@ -56,7 +56,7 @@ class TestProposalExecutor:
             target_state={"power": 400, "brightness": 80},
             annual_benefit=Decimal("3.0"),
             is_selected=True,
-            execution_status="pending"
+            execution_status="pending",
         )
         measure3 = ProposalMeasure(
             proposal_id=proposal.id,
@@ -67,7 +67,7 @@ class TestProposalExecutor:
             target_state={"power": 200},
             annual_benefit=Decimal("2.5"),
             is_selected=False,
-            execution_status="pending"
+            execution_status="pending",
         )
         async_db.add_all([measure1, measure2, measure3])
         await async_db.commit()

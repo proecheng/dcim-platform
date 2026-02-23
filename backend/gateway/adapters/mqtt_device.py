@@ -7,6 +7,7 @@
   - read_points() 返回缓冲区中的最新值（不清空，保留最后已知值）
   - 支持 JSON 和自定义分隔符两种消息格式
 """
+
 import asyncio
 import json
 import logging
@@ -130,6 +131,7 @@ class MqttDeviceAdapter(BaseProtocolAdapter):
             # 独立连接模式 — 自行连接 Broker
             try:
                 import aiomqtt
+
                 client_id = params.get("client_id", f"dcim-mqtt-{config.datasource_id}")
                 username = params.get("username") or None
                 password = params.get("password") or None
@@ -228,6 +230,7 @@ class MqttDeviceAdapter(BaseProtocolAdapter):
 
         try:
             import aiomqtt
+
             start = time.monotonic()
             client_id = params.get("client_id", "dcim-mqtt-test")
 
@@ -435,6 +438,7 @@ class MqttDeviceAdapter(BaseProtocolAdapter):
         while True:
             try:
                 import aiomqtt
+
                 async with aiomqtt.Client(
                     hostname=broker_host,
                     port=broker_port,

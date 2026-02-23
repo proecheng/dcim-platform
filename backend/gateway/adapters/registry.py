@@ -1,4 +1,5 @@
 """适配器注册表 — 字典映射 + 装饰器"""
+
 from typing import Type
 from .base import BaseProtocolAdapter
 
@@ -7,9 +8,11 @@ ADAPTER_REGISTRY: dict[str, Type[BaseProtocolAdapter]] = {}
 
 def register_adapter(protocol_type: str):
     """装饰器 — 注册协议适配器到 ADAPTER_REGISTRY"""
+
     def decorator(cls: Type[BaseProtocolAdapter]) -> Type[BaseProtocolAdapter]:
         ADAPTER_REGISTRY[protocol_type] = cls
         return cls
+
     return decorator
 
 

@@ -1,4 +1,5 @@
 """配电与制冷拓扑配置 API 测试 — Story 8-2"""
+
 import pytest
 
 from httpx import AsyncClient, ASGITransport
@@ -11,7 +12,10 @@ from app.models.asset import Cabinet
 from app.models.cooling import CoolingUnit
 from app.models.spatial import Site, Floor, Room, Row
 from app.models.topology_config import (
-    PowerPhaseMapping, CoolingZone, CoolingZoneCabinet, CoolingZoneUnit,
+    PowerPhaseMapping,
+    CoolingZone,
+    CoolingZoneCabinet,
+    CoolingZoneUnit,
 )
 from app.models.user import User
 from app.api.deps import get_db, require_viewer, require_operator, require_admin
@@ -21,6 +25,7 @@ from app.api.deps import get_db, require_viewer, require_operator, require_admin
 # Fixtures
 # ============================================================
 
+
 @pytest.fixture(scope="module")
 def anyio_backend():
     return "asyncio"
@@ -29,16 +34,16 @@ def anyio_backend():
 @pytest.fixture(scope="module")
 async def engine():
     eng = create_async_engine("sqlite+aiosqlite:///:memory:")
-    
+
     # 启用 SQLite 外键约束
     from sqlalchemy import event
-    
+
     @event.listens_for(eng.sync_engine, "connect")
     def set_sqlite_pragma(dbapi_connection, connection_record):
         cursor = dbapi_connection.cursor()
         cursor.execute("PRAGMA foreign_keys=ON")
         cursor.close()
-    
+
     async with eng.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
     yield eng
@@ -116,6 +121,7 @@ async def client(app):
 # 辅助函数
 # ============================================================
 
+
 async def _create_pdu_device(db_session: AsyncSession) -> Device:
     """创建 PDU 设备"""
     dev = Device(
@@ -166,6 +172,7 @@ async def _create_cooling_unit(db_session: AsyncSession, device_code: str) -> Co
 # 测试用例
 # ============================================================
 
+
 class TestPowerPhaseMappingCRUD:
     """测试1: 三相接线映射 CRUD"""
 
@@ -175,13 +182,16 @@ class TestPowerPhaseMappingCRUD:
         cab = await _create_cabinet(db_session, "CAB-PPM-01", "测试机柜1")
 
         # 创建接线映射
-        resp = await client.post("/api/v1/topology-config/power-phase", json={
-            "cabinet_id": cab.id,
-            "pdu_device_id": pdu.id,
-            "phase": "A",
-            "feed_type": "primary",
-            "rated_current": 32.0,
-        })
+        resp = await client.post(
+            "/api/v1/topology-config/power-phase",
+            json={
+                "cabinet_id": cab.id,
+                "pdu_device_id": pdu.id,
+                "phase": "A",
+                "feed_type": "primary",
+                "rated_current": 32.0,
+            },
+        )
         assert resp.status_code == 200
         data = resp.json()
         assert data["phase"] == "A"
@@ -216,30 +226,39 @@ class TestPowerPhaseUniqueConstraint:
         cab_id = cab.id
 
         # 第一次创建 primary
-        resp = await client.post("/api/v1/topology-config/power-phase", json={
-            "cabinet_id": cab_id,
-            "pdu_device_id": pdu_id,
-            "phase": "A",
-            "feed_type": "primary",
-        })
+        resp = await client.post(
+            "/api/v1/topology-config/power-phase",
+            json={
+                "cabinet_id": cab_id,
+                "pdu_device_id": pdu_id,
+                "phase": "A",
+                "feed_type": "primary",
+            },
+        )
         assert resp.status_code == 200
 
         # 第二次创建 primary → 应冲突
-        resp = await client.post("/api/v1/topology-config/power-phase", json={
-            "cabinet_id": cab_id,
-            "pdu_device_id": pdu_id,
-            "phase": "B",
-            "feed_type": "primary",
-        })
+        resp = await client.post(
+            "/api/v1/topology-config/power-phase",
+            json={
+                "cabinet_id": cab_id,
+                "pdu_device_id": pdu_id,
+                "phase": "B",
+                "feed_type": "primary",
+            },
+        )
         assert resp.status_code == 409
 
         # backup 应该可以
-        resp = await client.post("/api/v1/topology-config/power-phase", json={
-            "cabinet_id": cab_id,
-            "pdu_device_id": pdu_id,
-            "phase": "B",
-            "feed_type": "backup",
-        })
+        resp = await client.post(
+            "/api/v1/topology-config/power-phase",
+            json={
+                "cabinet_id": cab_id,
+                "pdu_device_id": pdu_id,
+                "phase": "B",
+                "feed_type": "backup",
+            },
+        )
         assert resp.status_code == 200
 
 
@@ -254,12 +273,15 @@ class TestPhaseBalanceNormal:
 
         # 分别接 A/B/C 相
         for cab, phase in [(cab_a, "A"), (cab_b, "B"), (cab_c, "C")]:
-            resp = await client.post("/api/v1/topology-config/power-phase", json={
-                "cabinet_id": cab.id,
-                "pdu_device_id": pdu.id,
-                "phase": phase,
-                "feed_type": "primary",
-            })
+            resp = await client.post(
+                "/api/v1/topology-config/power-phase",
+                json={
+                    "cabinet_id": cab.id,
+                    "pdu_device_id": pdu.id,
+                    "phase": phase,
+                    "feed_type": "primary",
+                },
+            )
             assert resp.status_code == 200
 
         # 查询不平衡度
@@ -290,12 +312,15 @@ class TestPhaseBalanceEdgeCases:
 
         # 只有一相有数据
         cab = await _create_cabinet(db_session, "CAB-EDGE-01", "边界机柜", max_power=10.0)
-        resp = await client.post("/api/v1/topology-config/power-phase", json={
-            "cabinet_id": cab.id,
-            "pdu_device_id": pdu.id,
-            "phase": "A",
-            "feed_type": "primary",
-        })
+        resp = await client.post(
+            "/api/v1/topology-config/power-phase",
+            json={
+                "cabinet_id": cab.id,
+                "pdu_device_id": pdu.id,
+                "phase": "A",
+                "feed_type": "primary",
+            },
+        )
         assert resp.status_code == 200
 
         resp = await client.get(f"/api/v1/topology-config/power-phase/pdu/{pdu.id}/balance")
@@ -315,12 +340,15 @@ class TestCoolingZoneCRUD:
         unit = await _create_cooling_unit(db_session, "AC-CZ-01")
 
         # 创建制冷区域
-        resp = await client.post("/api/v1/topology-config/cooling-zones", json={
-            "zone_name": "制冷区域A",
-            "design_capacity_kw": 100.0,
-            "cabinet_ids": [cab.id],
-            "cooling_unit_ids": [unit.id],
-        })
+        resp = await client.post(
+            "/api/v1/topology-config/cooling-zones",
+            json={
+                "zone_name": "制冷区域A",
+                "design_capacity_kw": 100.0,
+                "cabinet_ids": [cab.id],
+                "cooling_unit_ids": [unit.id],
+            },
+        )
         assert resp.status_code == 200
         data = resp.json()
         assert data["zone_code"].startswith("CZ-")
@@ -340,10 +368,13 @@ class TestCoolingZoneCRUD:
         assert resp.json()["zone_name"] == "制冷区域A"
 
         # 更新：移除机柜关联
-        resp = await client.put(f"/api/v1/topology-config/cooling-zones/{zone_id}", json={
-            "zone_name": "制冷区域A(更新)",
-            "cabinet_ids": [],
-        })
+        resp = await client.put(
+            f"/api/v1/topology-config/cooling-zones/{zone_id}",
+            json={
+                "zone_name": "制冷区域A(更新)",
+                "cabinet_ids": [],
+            },
+        )
         assert resp.status_code == 200
         assert resp.json()["zone_name"] == "制冷区域A(更新)"
         assert len(resp.json()["cabinets"]) == 0
@@ -361,11 +392,14 @@ class TestCoolingZoneCapacity:
         cab2 = await _create_cabinet(db_session, "CAB-CAP-02", "容量机柜2", max_power=30.0)
 
         # 创建制冷区域
-        resp = await client.post("/api/v1/topology-config/cooling-zones", json={
-            "zone_name": "容量测试区",
-            "design_capacity_kw": 100.0,
-            "cabinet_ids": [cab1.id, cab2.id],
-        })
+        resp = await client.post(
+            "/api/v1/topology-config/cooling-zones",
+            json={
+                "zone_name": "容量测试区",
+                "design_capacity_kw": 100.0,
+                "cabinet_ids": [cab1.id, cab2.id],
+            },
+        )
         assert resp.status_code == 200
         zone_id = resp.json()["id"]
 
@@ -398,8 +432,11 @@ class TestCabinetTopologySummary:
 
         # 创建机柜并关联到行
         cab = Cabinet(
-            cabinet_code="CAB-TOPO-01", cabinet_name="拓扑机柜",
-            total_u=42, max_power=10.0, row_id=row.id,
+            cabinet_code="CAB-TOPO-01",
+            cabinet_name="拓扑机柜",
+            total_u=42,
+            max_power=10.0,
+            row_id=row.id,
         )
         db_session.add(cab)
         await db_session.flush()
@@ -409,7 +446,10 @@ class TestCabinetTopologySummary:
         db_session.add(pdu)
         await db_session.flush()
         mapping = PowerPhaseMapping(
-            cabinet_id=cab.id, pdu_device_id=pdu.id, phase="A", feed_type="primary",
+            cabinet_id=cab.id,
+            pdu_device_id=pdu.id,
+            phase="A",
+            feed_type="primary",
         )
         db_session.add(mapping)
         await db_session.flush()
@@ -450,7 +490,10 @@ class TestCascadeDelete:
 
         # 创建接线映射
         mapping = PowerPhaseMapping(
-            cabinet_id=cab_id, pdu_device_id=pdu_id, phase="A", feed_type="primary",
+            cabinet_id=cab_id,
+            pdu_device_id=pdu_id,
+            phase="A",
+            feed_type="primary",
         )
         db_session.add(mapping)
         await db_session.flush()
@@ -464,17 +507,15 @@ class TestCascadeDelete:
 
         # 删除机柜（通过 SQL 直接删除，触发 FK CASCADE）
         from sqlalchemy import text
+
         await db_session.execute(text(f"DELETE FROM cabinets WHERE id = {cab_id}"))
         await db_session.commit()
 
         # 验证映射已被级联删除
         from sqlalchemy import select
-        result = await db_session.execute(
-            select(PowerPhaseMapping).where(PowerPhaseMapping.cabinet_id == cab_id)
-        )
+
+        result = await db_session.execute(select(PowerPhaseMapping).where(PowerPhaseMapping.cabinet_id == cab_id))
         assert result.scalars().all() == []
 
-        result = await db_session.execute(
-            select(CoolingZoneCabinet).where(CoolingZoneCabinet.cabinet_id == cab_id)
-        )
+        result = await db_session.execute(select(CoolingZoneCabinet).where(CoolingZoneCabinet.cabinet_id == cab_id))
         assert result.scalars().all() == []

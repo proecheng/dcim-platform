@@ -1,7 +1,7 @@
 """优雅降级测试 — Story 4.5"""
-import pytest
+
 import pytest_asyncio
-from unittest.mock import AsyncMock, patch, PropertyMock, MagicMock
+from unittest.mock import patch
 from httpx import AsyncClient, ASGITransport
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
@@ -47,6 +47,7 @@ def _make_token(username: str = "testadmin") -> str:
     """生成测试 JWT"""
     from app.core.config import get_settings
     from jose import jwt
+
     settings = get_settings()
     return jwt.encode({"sub": username}, settings.secret_key, algorithm=settings.algorithm)
 

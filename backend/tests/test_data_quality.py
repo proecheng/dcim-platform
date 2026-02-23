@@ -1,14 +1,13 @@
 """数据质量标记与误报防护测试 — Story 5-4"""
+
 import pytest
-from datetime import datetime
-from unittest.mock import AsyncMock, patch
 
 from httpx import AsyncClient, ASGITransport
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from sqlalchemy import delete
 
 from app.core.database import Base
-from app.engines.alarm_engine import AlarmEngine, ThresholdCache, EvaluateResult
+from app.engines.alarm_engine import AlarmEngine, ThresholdCache
 from app.models.point import Point, PointRealtime
 from app.models.user import User
 from app.api.deps import get_db, require_viewer
@@ -29,9 +28,17 @@ def engine():
 def sample_thresholds():
     """示例阈值配置（点位 100）"""
     return [
-        ThresholdCache(id=1, point_id=100, threshold_type="high",
-                       threshold_value=40.0, alarm_level="major",
-                       alarm_message="温度偏高", delay_seconds=0, dead_band=0, priority=3),
+        ThresholdCache(
+            id=1,
+            point_id=100,
+            threshold_type="high",
+            threshold_value=40.0,
+            alarm_level="major",
+            alarm_message="温度偏高",
+            delay_seconds=0,
+            dead_band=0,
+            priority=3,
+        ),
     ]
 
 

@@ -1,9 +1,10 @@
 """网关模块单元测试 — Story 1.1 Task 7.1-7.6"""
+
 import asyncio
 import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import MagicMock
 
 import pytest
 import yaml
@@ -34,6 +35,7 @@ from gateway.scheduler import CollectionScheduler
 # ============================================================
 # 7.1 BaseProtocolAdapter 接口约束
 # ============================================================
+
 
 class TestBaseProtocolAdapter:
     """测试抽象基类接口约束"""
@@ -110,6 +112,7 @@ class TestBaseProtocolAdapter:
 # 7.2 ADAPTER_REGISTRY 注册/发现（含装饰器注册）
 # ============================================================
 
+
 class TestAdapterRegistry:
     """测试适配器注册表"""
 
@@ -126,12 +129,23 @@ class TestAdapterRegistry:
 
         @register_adapter("test_protocol")
         class TestAdapter(BaseProtocolAdapter):
-            async def connect(self, config): return True
-            async def disconnect(self): pass
-            async def read_points(self, points): return {}
-            async def write_point(self, point_id, value): return True
-            async def test_connection(self): return ConnectionResult(True, "ok")
-            def get_status(self): return AdapterStatus(state=AdapterState.DISCONNECTED)
+            async def connect(self, config):
+                return True
+
+            async def disconnect(self):
+                pass
+
+            async def read_points(self, points):
+                return {}
+
+            async def write_point(self, point_id, value):
+                return True
+
+            async def test_connection(self):
+                return ConnectionResult(True, "ok")
+
+            def get_status(self):
+                return AdapterStatus(state=AdapterState.DISCONNECTED)
 
         assert "test_protocol" in ADAPTER_REGISTRY
         assert ADAPTER_REGISTRY["test_protocol"] is TestAdapter
@@ -141,12 +155,23 @@ class TestAdapterRegistry:
 
         @register_adapter("mock_proto")
         class MockAdapter(BaseProtocolAdapter):
-            async def connect(self, config): return True
-            async def disconnect(self): pass
-            async def read_points(self, points): return {}
-            async def write_point(self, point_id, value): return True
-            async def test_connection(self): return ConnectionResult(True, "ok")
-            def get_status(self): return AdapterStatus(state=AdapterState.DISCONNECTED)
+            async def connect(self, config):
+                return True
+
+            async def disconnect(self):
+                pass
+
+            async def read_points(self, points):
+                return {}
+
+            async def write_point(self, point_id, value):
+                return True
+
+            async def test_connection(self):
+                return ConnectionResult(True, "ok")
+
+            def get_status(self):
+                return AdapterStatus(state=AdapterState.DISCONNECTED)
 
         cls = get_adapter("mock_proto")
         assert cls is MockAdapter
@@ -173,12 +198,23 @@ class TestAdapterRegistry:
 
         @register_adapter("passthrough")
         class PassthroughAdapter(BaseProtocolAdapter):
-            async def connect(self, config): return True
-            async def disconnect(self): pass
-            async def read_points(self, points): return {}
-            async def write_point(self, point_id, value): return True
-            async def test_connection(self): return ConnectionResult(True, "ok")
-            def get_status(self): return AdapterStatus(state=AdapterState.DISCONNECTED)
+            async def connect(self, config):
+                return True
+
+            async def disconnect(self):
+                pass
+
+            async def read_points(self, points):
+                return {}
+
+            async def write_point(self, point_id, value):
+                return True
+
+            async def test_connection(self):
+                return ConnectionResult(True, "ok")
+
+            def get_status(self):
+                return AdapterStatus(state=AdapterState.DISCONNECTED)
 
         assert PassthroughAdapter.__name__ == "PassthroughAdapter"
 
@@ -186,6 +222,7 @@ class TestAdapterRegistry:
 # ============================================================
 # 7.3 CollectionScheduler 并发调度
 # ============================================================
+
 
 class TestCollectionScheduler:
     """测试采集调度器"""
@@ -313,12 +350,23 @@ class TestCollectionScheduler:
         ADAPTER_REGISTRY.clear()
 
         class FailAdapter(BaseProtocolAdapter):
-            async def connect(self, config): return True
-            async def disconnect(self): pass
-            async def read_points(self, points): raise ConnectionError("模拟失败")
-            async def write_point(self, point_id, value): return True
-            async def test_connection(self): return ConnectionResult(False, "fail")
-            def get_status(self): return AdapterStatus(state=AdapterState.DISCONNECTED)
+            async def connect(self, config):
+                return True
+
+            async def disconnect(self):
+                pass
+
+            async def read_points(self, points):
+                raise ConnectionError("模拟失败")
+
+            async def write_point(self, point_id, value):
+                return True
+
+            async def test_connection(self):
+                return ConnectionResult(False, "fail")
+
+            def get_status(self):
+                return AdapterStatus(state=AdapterState.DISCONNECTED)
 
         ADAPTER_REGISTRY["fail"] = FailAdapter
 
@@ -422,6 +470,7 @@ class TestCollectionScheduler:
 # 7.4 DataNormalizer 转换逻辑
 # ============================================================
 
+
 class TestDataNormalizer:
     """测试数据归一化"""
 
@@ -457,7 +506,9 @@ class TestDataNormalizer:
         config = self._make_config(
             points=[
                 PointConfig(
-                    point_id="p2", address="2", data_type="string",
+                    point_id="p2",
+                    address="2",
+                    data_type="string",
                     enum_mapping={"on": "开", "off": "关"},
                 ),
             ]
@@ -482,9 +533,7 @@ class TestDataNormalizer:
     def test_timestamp_converted_to_utc(self):
         """时间戳统一为 UTC"""
         normalizer = DataNormalizer()
-        config = self._make_config(
-            points=[PointConfig(point_id="p1", address="1", data_type="float32")]
-        )
+        config = self._make_config(points=[PointConfig(point_id="p1", address="1", data_type="float32")])
         naive_ts = datetime(2026, 1, 1, 12, 0, 0)
         raw = {
             "p1": PointValue("p1", 1.0, DataQuality.NORMAL, naive_ts),
@@ -495,9 +544,7 @@ class TestDataNormalizer:
     def test_output_is_normalized_reading(self):
         """输出类型为 NormalizedReading"""
         normalizer = DataNormalizer()
-        config = self._make_config(
-            points=[PointConfig(point_id="p1", address="1", data_type="float32")]
-        )
+        config = self._make_config(points=[PointConfig(point_id="p1", address="1", data_type="float32")])
         raw = {
             "p1": PointValue("p1", 1.0, DataQuality.NORMAL, datetime.now(timezone.utc)),
         }
@@ -508,9 +555,7 @@ class TestDataNormalizer:
     def test_quality_preserved(self):
         """数据质量标记保留"""
         normalizer = DataNormalizer()
-        config = self._make_config(
-            points=[PointConfig(point_id="p1", address="1", data_type="float32")]
-        )
+        config = self._make_config(points=[PointConfig(point_id="p1", address="1", data_type="float32")])
         raw = {
             "p1": PointValue("p1", 1.0, DataQuality.UNRELIABLE, datetime.now(timezone.utc)),
         }
@@ -523,10 +568,13 @@ class TestDataNormalizer:
         config = self._make_config(
             points=[
                 PointConfig(
-                    point_id="p_di", address="3", data_type="int16",
+                    point_id="p_di",
+                    address="3",
+                    data_type="int16",
                     is_dry_contact=True,
                     enum_mapping={"0": "关", "1": "开"},
-                    scale=10.0, offset=5.0,
+                    scale=10.0,
+                    offset=5.0,
                 ),
             ]
         )
@@ -543,6 +591,7 @@ class TestDataNormalizer:
 # ============================================================
 # 7.5 RetryPolicy 指数退避和通信中断标记
 # ============================================================
+
 
 class TestRetryPolicy:
     """测试重试策略"""
@@ -601,6 +650,7 @@ class TestRetryPolicy:
 # ============================================================
 # 7.6 ConfigLoader 从本地文件加载
 # ============================================================
+
 
 class TestConfigLoader:
     """测试配置加载器"""

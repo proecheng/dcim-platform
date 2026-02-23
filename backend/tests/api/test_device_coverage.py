@@ -1,9 +1,8 @@
 """
 设备管理 API 覆盖率测试 — 覆盖 device.py 中未测试的端点
 """
-import pytest
-from datetime import datetime
-from unittest.mock import AsyncMock, patch, PropertyMock
+
+from unittest.mock import patch
 
 from app.models.device import Device
 from app.models.point import Point, PointRealtime
@@ -13,24 +12,41 @@ from tests.conftest import auth_headers
 
 # ============== 辅助函数 ==============
 
+
 async def _seed_devices(async_db):
     """创建测试设备数据，返回设备列表"""
     devices = [
         Device(
-            device_code="UPS-COV-001", device_name="覆盖测试UPS-1",
-            device_type="UPS", area_code="A1", status="online", is_enabled=True,
+            device_code="UPS-COV-001",
+            device_name="覆盖测试UPS-1",
+            device_type="UPS",
+            area_code="A1",
+            status="online",
+            is_enabled=True,
         ),
         Device(
-            device_code="AC-COV-001", device_name="覆盖测试空调-1",
-            device_type="AC", area_code="A1", status="offline", is_enabled=True,
+            device_code="AC-COV-001",
+            device_name="覆盖测试空调-1",
+            device_type="AC",
+            area_code="A1",
+            status="offline",
+            is_enabled=True,
         ),
         Device(
-            device_code="TH-COV-001", device_name="覆盖测试温湿度-1",
-            device_type="TH", area_code="B1", status="alarm", is_enabled=True,
+            device_code="TH-COV-001",
+            device_name="覆盖测试温湿度-1",
+            device_type="TH",
+            area_code="B1",
+            status="alarm",
+            is_enabled=True,
         ),
         Device(
-            device_code="PDU-COV-001", device_name="覆盖测试PDU-1",
-            device_type="PDU", area_code="B1", status="maintenance", is_enabled=False,
+            device_code="PDU-COV-001",
+            device_name="覆盖测试PDU-1",
+            device_type="PDU",
+            area_code="B1",
+            status="maintenance",
+            is_enabled=False,
         ),
     ]
     async_db.add_all(devices)
@@ -39,6 +55,7 @@ async def _seed_devices(async_db):
 
 
 # ============== 设备列表 ==============
+
 
 class TestDeviceList:
     """设备列表查询"""
@@ -59,7 +76,8 @@ class TestDeviceList:
         _, token = admin_user
         await _seed_devices(async_db)
         resp = await client.get(
-            "/api/v1/devices", params={"keyword": "UPS"},
+            "/api/v1/devices",
+            params={"keyword": "UPS"},
             headers=auth_headers(token),
         )
         assert resp.status_code == 200
@@ -71,7 +89,8 @@ class TestDeviceList:
         _, token = admin_user
         await _seed_devices(async_db)
         resp = await client.get(
-            "/api/v1/devices", params={"device_type": "AC"},
+            "/api/v1/devices",
+            params={"device_type": "AC"},
             headers=auth_headers(token),
         )
         assert resp.status_code == 200
@@ -83,7 +102,8 @@ class TestDeviceList:
         _, token = admin_user
         await _seed_devices(async_db)
         resp = await client.get(
-            "/api/v1/devices", params={"area_code": "B1"},
+            "/api/v1/devices",
+            params={"area_code": "B1"},
             headers=auth_headers(token),
         )
         assert resp.status_code == 200
@@ -95,7 +115,8 @@ class TestDeviceList:
         _, token = admin_user
         await _seed_devices(async_db)
         resp = await client.get(
-            "/api/v1/devices", params={"status": "online"},
+            "/api/v1/devices",
+            params={"status": "online"},
             headers=auth_headers(token),
         )
         assert resp.status_code == 200
@@ -107,7 +128,8 @@ class TestDeviceList:
         _, token = admin_user
         await _seed_devices(async_db)
         resp = await client.get(
-            "/api/v1/devices", params={"page": 1, "page_size": 2},
+            "/api/v1/devices",
+            params={"page": 1, "page_size": 2},
             headers=auth_headers(token),
         )
         assert resp.status_code == 200
@@ -118,6 +140,7 @@ class TestDeviceList:
 
 
 # ============== 设备树 ==============
+
 
 class TestDeviceTree:
     """设备树结构"""
@@ -145,6 +168,7 @@ class TestDeviceTree:
 
 # ============== 设备状态汇总 ==============
 
+
 class TestDeviceStatusSummary:
     """设备状态汇总"""
 
@@ -153,7 +177,8 @@ class TestDeviceStatusSummary:
         _, token = admin_user
         await _seed_devices(async_db)
         resp = await client.get(
-            "/api/v1/devices/status-summary", headers=auth_headers(token),
+            "/api/v1/devices/status-summary",
+            headers=auth_headers(token),
         )
         assert resp.status_code == 200
         data = resp.json()
@@ -168,7 +193,8 @@ class TestDeviceStatusSummary:
         """GET /devices/status-summary — 无设备"""
         _, token = admin_user
         resp = await client.get(
-            "/api/v1/devices/status-summary", headers=auth_headers(token),
+            "/api/v1/devices/status-summary",
+            headers=auth_headers(token),
         )
         assert resp.status_code == 200
         data = resp.json()
@@ -176,6 +202,7 @@ class TestDeviceStatusSummary:
 
 
 # ============== 设备详情 ==============
+
 
 class TestDeviceDetail:
     """设备详情"""
@@ -185,7 +212,8 @@ class TestDeviceDetail:
         _, token = admin_user
         devices = await _seed_devices(async_db)
         resp = await client.get(
-            f"/api/v1/devices/{devices[0].id}", headers=auth_headers(token),
+            f"/api/v1/devices/{devices[0].id}",
+            headers=auth_headers(token),
         )
         assert resp.status_code == 200
         data = resp.json()
@@ -195,7 +223,8 @@ class TestDeviceDetail:
         """GET /devices/99999 — 不存在"""
         _, token = admin_user
         resp = await client.get(
-            "/api/v1/devices/99999", headers=auth_headers(token),
+            "/api/v1/devices/99999",
+            headers=auth_headers(token),
         )
         assert resp.status_code == 404
 
@@ -205,14 +234,18 @@ class TestDeviceDetail:
         devices = await _seed_devices(async_db)
         device = devices[0]
         point = Point(
-            point_code="UPS-COV-P1", point_name="UPS输出电压",
-            point_type="AI", device_id=device.id, device_type="UPS",
+            point_code="UPS-COV-P1",
+            point_name="UPS输出电压",
+            point_type="AI",
+            device_id=device.id,
+            device_type="UPS",
         )
         async_db.add(point)
         await async_db.flush()
 
         resp = await client.get(
-            f"/api/v1/devices/{device.id}/points", headers=auth_headers(token),
+            f"/api/v1/devices/{device.id}/points",
+            headers=auth_headers(token),
         )
         assert resp.status_code == 200
         data = resp.json()
@@ -224,7 +257,8 @@ class TestDeviceDetail:
         """GET /devices/99999/points — 设备不存在"""
         _, token = admin_user
         resp = await client.get(
-            "/api/v1/devices/99999/points", headers=auth_headers(token),
+            "/api/v1/devices/99999/points",
+            headers=auth_headers(token),
         )
         assert resp.status_code == 404
 
@@ -235,29 +269,40 @@ class TestDeviceDetail:
         device = devices[0]
 
         point = Point(
-            point_code="UPS-COV-D1", point_name="UPS电压",
-            point_type="AI", device_id=device.id, device_type="UPS", unit="V",
+            point_code="UPS-COV-D1",
+            point_name="UPS电压",
+            point_type="AI",
+            device_id=device.id,
+            device_type="UPS",
+            unit="V",
         )
         async_db.add(point)
         await async_db.flush()
 
         rt = PointRealtime(
-            point_id=point.id, value=220.5, value_text="220.5",
-            quality=0, status="normal",
+            point_id=point.id,
+            value=220.5,
+            value_text="220.5",
+            quality=0,
+            status="normal",
         )
         async_db.add(rt)
 
         alarm = Alarm(
-            alarm_no="ALM-DEV-COV-001", point_id=point.id,
-            alarm_level="major", alarm_message="电压偏高",
-            trigger_value=220.5, threshold_value=220.0,
+            alarm_no="ALM-DEV-COV-001",
+            point_id=point.id,
+            alarm_level="major",
+            alarm_message="电压偏高",
+            trigger_value=220.5,
+            threshold_value=220.0,
             status="active",
         )
         async_db.add(alarm)
         await async_db.flush()
 
         resp = await client.get(
-            f"/api/v1/devices/{device.id}/detail", headers=auth_headers(token),
+            f"/api/v1/devices/{device.id}/detail",
+            headers=auth_headers(token),
         )
         assert resp.status_code == 200
         data = resp.json()
@@ -269,12 +314,14 @@ class TestDeviceDetail:
         """GET /devices/99999/detail — 不存在"""
         _, token = admin_user
         resp = await client.get(
-            "/api/v1/devices/99999/detail", headers=auth_headers(token),
+            "/api/v1/devices/99999/detail",
+            headers=auth_headers(token),
         )
         assert resp.status_code == 404
 
 
 # ============== 设备 CRUD ==============
+
 
 class TestDeviceCRUD:
     """设备创建、更新、删除"""
@@ -302,8 +349,10 @@ class TestDeviceCRUD:
         """POST /devices — 重复编码"""
         _, token = operator_user
         device = Device(
-            device_code="DUP-DEV-001", device_name="已存在设备",
-            device_type="AC", area_code="A1",
+            device_code="DUP-DEV-001",
+            device_name="已存在设备",
+            device_type="AC",
+            area_code="A1",
         )
         async_db.add(device)
         await async_db.flush()
@@ -324,8 +373,10 @@ class TestDeviceCRUD:
         """PUT /devices/{id} — 更新设备"""
         _, token = operator_user
         device = Device(
-            device_code="UPD-DEV-001", device_name="待更新设备",
-            device_type="TH", area_code="B1",
+            device_code="UPD-DEV-001",
+            device_name="待更新设备",
+            device_type="TH",
+            area_code="B1",
         )
         async_db.add(device)
         await async_db.flush()
@@ -354,14 +405,17 @@ class TestDeviceCRUD:
         """DELETE /devices/{id} — 删除设备（无关联点位）"""
         _, token = admin_user
         device = Device(
-            device_code="DEL-DEV-001", device_name="待删除设备",
-            device_type="PDU", area_code="A1",
+            device_code="DEL-DEV-001",
+            device_name="待删除设备",
+            device_type="PDU",
+            area_code="A1",
         )
         async_db.add(device)
         await async_db.flush()
 
         resp = await client.delete(
-            f"/api/v1/devices/{device.id}", headers=auth_headers(token),
+            f"/api/v1/devices/{device.id}",
+            headers=auth_headers(token),
         )
         assert resp.status_code == 200
         assert "已删除" in resp.json()["message"]
@@ -370,21 +424,27 @@ class TestDeviceCRUD:
         """DELETE /devices/{id} — 有关联点位时拒绝删除"""
         _, token = admin_user
         device = Device(
-            device_code="DEL-DEV-002", device_name="有点位设备",
-            device_type="UPS", area_code="A1",
+            device_code="DEL-DEV-002",
+            device_name="有点位设备",
+            device_type="UPS",
+            area_code="A1",
         )
         async_db.add(device)
         await async_db.flush()
 
         point = Point(
-            point_code="DEL-P-001", point_name="关联点位",
-            point_type="AI", device_id=device.id, device_type="UPS",
+            point_code="DEL-P-001",
+            point_name="关联点位",
+            point_type="AI",
+            device_id=device.id,
+            device_type="UPS",
         )
         async_db.add(point)
         await async_db.flush()
 
         resp = await client.delete(
-            f"/api/v1/devices/{device.id}", headers=auth_headers(token),
+            f"/api/v1/devices/{device.id}",
+            headers=auth_headers(token),
         )
         assert resp.status_code == 400
         assert "点位" in resp.json()["detail"]
@@ -393,12 +453,14 @@ class TestDeviceCRUD:
         """DELETE /devices/99999 — 不存在"""
         _, token = admin_user
         resp = await client.delete(
-            "/api/v1/devices/99999", headers=auth_headers(token),
+            "/api/v1/devices/99999",
+            headers=auth_headers(token),
         )
         assert resp.status_code == 404
 
 
 # ============== 设备状态看板（补充 redis mock） ==============
+
 
 class TestDeviceStatusBoard:
     """设备状态看板"""
@@ -410,7 +472,8 @@ class TestDeviceStatusBoard:
         mock_redis.is_available = False
         await _seed_devices(async_db)
         resp = await client.get(
-            "/api/v1/devices/status-board", headers=auth_headers(token),
+            "/api/v1/devices/status-board",
+            headers=auth_headers(token),
         )
         assert resp.status_code == 200
         data = resp.json()
@@ -433,6 +496,7 @@ class TestDeviceStatusBoard:
 
 # ============== 补充覆盖率测试 ==============
 
+
 class TestDeviceListCoverageExtra:
     """补充 get_devices 的 site_id 筛选和分页 (L48, L65-68)"""
 
@@ -441,7 +505,8 @@ class TestDeviceListCoverageExtra:
         _, token = admin_user
         await _seed_devices(async_db)
         resp = await client.get(
-            "/api/v1/devices", params={"site_id": 1},
+            "/api/v1/devices",
+            params={"site_id": 1},
             headers=auth_headers(token),
         )
         assert resp.status_code == 200
@@ -465,7 +530,8 @@ class TestDeviceListCoverageExtra:
         """GET /devices — 无匹配结果"""
         _, token = admin_user
         resp = await client.get(
-            "/api/v1/devices", params={"keyword": "nonexistent_xyz"},
+            "/api/v1/devices",
+            params={"keyword": "nonexistent_xyz"},
             headers=auth_headers(token),
         )
         assert resp.status_code == 200
@@ -504,7 +570,8 @@ class TestDeviceStatusSummaryCoverageExtra:
         _, token = admin_user
         await _seed_devices(async_db)
         resp = await client.get(
-            "/api/v1/devices/status-summary", headers=auth_headers(token),
+            "/api/v1/devices/status-summary",
+            headers=auth_headers(token),
         )
         assert resp.status_code == 200
         data = resp.json()
@@ -524,14 +591,18 @@ class TestDeviceDetailCoverageExtra:
         device = devices[0]
         for i in range(3):
             p = Point(
-                point_code=f"UPS-MULTI-P{i}", point_name=f"UPS点位{i}",
-                point_type="AI", device_id=device.id, device_type="UPS",
+                point_code=f"UPS-MULTI-P{i}",
+                point_name=f"UPS点位{i}",
+                point_type="AI",
+                device_id=device.id,
+                device_type="UPS",
             )
             async_db.add(p)
         await async_db.flush()
 
         resp = await client.get(
-            f"/api/v1/devices/{device.id}/points", headers=auth_headers(token),
+            f"/api/v1/devices/{device.id}/points",
+            headers=auth_headers(token),
         )
         assert resp.status_code == 200
         data = resp.json()
@@ -543,14 +614,18 @@ class TestDeviceDetailCoverageExtra:
         devices = await _seed_devices(async_db)
         device = devices[1]
         point = Point(
-            point_code="AC-NOALM-P1", point_name="无告警点位",
-            point_type="AI", device_id=device.id, device_type="AC",
+            point_code="AC-NOALM-P1",
+            point_name="无告警点位",
+            point_type="AI",
+            device_id=device.id,
+            device_type="AC",
         )
         async_db.add(point)
         await async_db.flush()
 
         resp = await client.get(
-            f"/api/v1/devices/{device.id}/detail", headers=auth_headers(token),
+            f"/api/v1/devices/{device.id}/detail",
+            headers=auth_headers(token),
         )
         assert resp.status_code == 200
         data = resp.json()
@@ -563,21 +638,29 @@ class TestDeviceDetailCoverageExtra:
         devices = await _seed_devices(async_db)
         device = devices[0]
         point = Point(
-            point_code="UPS-RT-P1", point_name="实时数据点位",
-            point_type="AI", device_id=device.id, device_type="UPS", unit="V",
+            point_code="UPS-RT-P1",
+            point_name="实时数据点位",
+            point_type="AI",
+            device_id=device.id,
+            device_type="UPS",
+            unit="V",
         )
         async_db.add(point)
         await async_db.flush()
 
         rt = PointRealtime(
-            point_id=point.id, value=230.0, value_text="230.0",
-            quality=0, status="normal",
+            point_id=point.id,
+            value=230.0,
+            value_text="230.0",
+            quality=0,
+            status="normal",
         )
         async_db.add(rt)
         await async_db.flush()
 
         resp = await client.get(
-            f"/api/v1/devices/{device.id}/detail", headers=auth_headers(token),
+            f"/api/v1/devices/{device.id}/detail",
+            headers=auth_headers(token),
         )
         assert resp.status_code == 200
         data = resp.json()
@@ -592,7 +675,8 @@ class TestDeviceDetailCoverageExtra:
         devices = await _seed_devices(async_db)
         device = devices[3]  # PDU, disabled
         resp = await client.get(
-            f"/api/v1/devices/{device.id}/detail", headers=auth_headers(token),
+            f"/api/v1/devices/{device.id}/detail",
+            headers=auth_headers(token),
         )
         assert resp.status_code == 200
         data = resp.json()
@@ -627,8 +711,10 @@ class TestDeviceCRUDCoverageExtra:
         """PUT /devices/{id} — 更新多个字段"""
         _, token = operator_user
         device = Device(
-            device_code="UPD-MULTI-001", device_name="多字段更新",
-            device_type="AC", area_code="A1",
+            device_code="UPD-MULTI-001",
+            device_name="多字段更新",
+            device_type="AC",
+            area_code="A1",
         )
         async_db.add(device)
         await async_db.flush()
@@ -659,7 +745,8 @@ class TestDeviceStatusBoardCoverageExtra:
         mock_redis.is_available = False
         await _seed_devices(async_db)
         resp = await client.get(
-            "/api/v1/devices/status-board", headers=auth_headers(token),
+            "/api/v1/devices/status-board",
+            headers=auth_headers(token),
         )
         assert resp.status_code == 200
         data = resp.json()
@@ -680,7 +767,8 @@ class TestDeviceStatusBoardCoverageExtra:
         _, token = admin_user
         mock_redis.is_available = False
         resp = await client.get(
-            "/api/v1/devices/status-board", headers=auth_headers(token),
+            "/api/v1/devices/status-board",
+            headers=auth_headers(token),
         )
         assert resp.status_code == 200
         data = resp.json()

@@ -2,16 +2,18 @@
 5个小模块覆盖率测试
 pricing.py / vpp.py / floor_map.py / regulation.py / dispatch.py
 """
+
 import json
 import pytest
-from datetime import date, datetime
 
 from tests.conftest import auth_headers
 from app.models.floor_map import FloorMap
 from app.models.energy import (
-    PowerDevice, LoadRegulationConfig, RegulationHistory,
-    DispatchableDevice, StorageSystemConfig, PVSystemConfig,
-    PricingConfig,
+    PowerDevice,
+    LoadRegulationConfig,
+    DispatchableDevice,
+    StorageSystemConfig,
+    PVSystemConfig,
 )
 
 
@@ -79,7 +81,9 @@ class TestPricingGlobalConfig:
 
     async def test_update_nonexistent_config(self, client, admin_user):
         _, token = admin_user
-        resp = await client.put("/api/v1/pricing/global-config/99999", json={"demand_price": 40.0}, headers=auth_headers(token))
+        resp = await client.put(
+            "/api/v1/pricing/global-config/99999", json={"demand_price": 40.0}, headers=auth_headers(token)
+        )
         assert resp.status_code == 404
 
     async def test_create_config_no_auth(self, client):
@@ -242,8 +246,11 @@ class TestFloorMapFloors:
     async def test_get_floors_with_data(self, client, admin_user, async_db):
         _, token = admin_user
         fm = FloorMap(
-            floor_code="F1", floor_name="1楼", map_type="2d",
-            map_data=json.dumps({"rooms": []}), is_default=True,
+            floor_code="F1",
+            floor_name="1楼",
+            map_type="2d",
+            map_data=json.dumps({"rooms": []}),
+            is_default=True,
         )
         async_db.add(fm)
         await async_db.commit()
@@ -263,8 +270,11 @@ class TestFloorMapDetail:
     async def test_get_floor_map_2d(self, client, admin_user, async_db):
         _, token = admin_user
         fm = FloorMap(
-            floor_code="F1", floor_name="1楼", map_type="2d",
-            map_data=json.dumps({"rooms": [{"id": 1}]}), is_default=False,
+            floor_code="F1",
+            floor_name="1楼",
+            map_type="2d",
+            map_data=json.dumps({"rooms": [{"id": 1}]}),
+            is_default=False,
         )
         async_db.add(fm)
         await async_db.commit()
@@ -275,8 +285,11 @@ class TestFloorMapDetail:
     async def test_get_floor_map_3d(self, client, admin_user, async_db):
         _, token = admin_user
         fm = FloorMap(
-            floor_code="F2", floor_name="2楼", map_type="3d",
-            map_data=json.dumps({"model": "test"}), is_default=False,
+            floor_code="F2",
+            floor_name="2楼",
+            map_type="3d",
+            map_data=json.dumps({"model": "test"}),
+            is_default=False,
         )
         async_db.add(fm)
         await async_db.commit()
@@ -304,8 +317,11 @@ class TestFloorMapDefault:
     async def test_get_default_with_default_flag(self, client, admin_user, async_db):
         _, token = admin_user
         fm = FloorMap(
-            floor_code="F1", floor_name="1楼", map_type="3d",
-            map_data=json.dumps({"model": "x"}), is_default=True,
+            floor_code="F1",
+            floor_name="1楼",
+            map_type="3d",
+            map_data=json.dumps({"model": "x"}),
+            is_default=True,
         )
         async_db.add(fm)
         await async_db.commit()
@@ -316,8 +332,11 @@ class TestFloorMapDefault:
     async def test_get_default_fallback_f1(self, client, admin_user, async_db):
         _, token = admin_user
         fm = FloorMap(
-            floor_code="F1", floor_name="1楼", map_type="3d",
-            map_data=json.dumps({"model": "y"}), is_default=False,
+            floor_code="F1",
+            floor_name="1楼",
+            map_type="3d",
+            map_data=json.dumps({"model": "y"}),
+            is_default=False,
         )
         async_db.add(fm)
         await async_db.commit()
@@ -328,8 +347,11 @@ class TestFloorMapDefault:
     async def test_get_default_2d(self, client, admin_user, async_db):
         _, token = admin_user
         fm = FloorMap(
-            floor_code="F1", floor_name="1楼", map_type="2d",
-            map_data=json.dumps({"rooms": []}), is_default=True,
+            floor_code="F1",
+            floor_name="1楼",
+            map_type="2d",
+            map_data=json.dumps({"rooms": []}),
+            is_default=True,
         )
         async_db.add(fm)
         await async_db.commit()
@@ -340,8 +362,11 @@ class TestFloorMapDefault:
         _, token = admin_user
         for code, name in [("F2", "2楼"), ("B1", "地下1层"), ("F1", "1楼")]:
             fm = FloorMap(
-                floor_code=code, floor_name=name, map_type="2d",
-                map_data=json.dumps({}), is_default=False,
+                floor_code=code,
+                floor_name=name,
+                map_type="2d",
+                map_data=json.dumps({}),
+                is_default=False,
             )
             async_db.add(fm)
         await async_db.commit()
@@ -358,8 +383,11 @@ class TestFloorMapDefault:
 async def _create_power_device(db, code="DEV001", name="测试空调"):
     """创建测试用电设备"""
     dev = PowerDevice(
-        device_code=code, device_name=name, device_type="HVAC",
-        rated_power=50.0, is_enabled=True,
+        device_code=code,
+        device_name=name,
+        device_type="HVAC",
+        rated_power=50.0,
+        is_enabled=True,
     )
     db.add(dev)
     await db.flush()
@@ -369,12 +397,21 @@ async def _create_power_device(db, code="DEV001", name="测试空调"):
 async def _create_regulation_config(db, device_id, reg_type="temperature"):
     """创建测试调节配置"""
     cfg = LoadRegulationConfig(
-        device_id=device_id, regulation_type=reg_type,
-        min_value=22.0, max_value=28.0, current_value=25.0,
-        default_value=25.0, step_size=1.0, unit="℃",
-        power_factor=-0.06, base_power=50.0,
-        priority=5, comfort_impact="medium", performance_impact="low",
-        is_enabled=True, is_auto=False,
+        device_id=device_id,
+        regulation_type=reg_type,
+        min_value=22.0,
+        max_value=28.0,
+        current_value=25.0,
+        default_value=25.0,
+        step_size=1.0,
+        unit="℃",
+        power_factor=-0.06,
+        base_power=50.0,
+        priority=5,
+        comfort_impact="medium",
+        performance_impact="low",
+        is_enabled=True,
+        is_auto=False,
     )
     db.add(cfg)
     await db.flush()
@@ -569,7 +606,15 @@ class TestDispatchDevices:
 
     async def test_get_device_by_id(self, client, admin_user, async_db):
         _, token = admin_user
-        dev = DispatchableDevice(name="冷却塔", device_type="modulating", rated_power=75, min_power=20, max_power=75, priority=4, is_active=True)
+        dev = DispatchableDevice(
+            name="冷却塔",
+            device_type="modulating",
+            rated_power=75,
+            min_power=20,
+            max_power=75,
+            priority=4,
+            is_active=True,
+        )
         async_db.add(dev)
         await async_db.commit()
         resp = await client.get(f"/api/v1/dispatch/devices/{dev.id}", headers=auth_headers(token))
@@ -598,7 +643,9 @@ class TestDispatchDevices:
         assert resp.json()["name"] == "新设备"
 
     async def test_create_device_no_auth(self, client):
-        resp = await client.post("/api/v1/dispatch/devices", json={"name": "x", "device_type": "shiftable", "rated_power": 10})
+        resp = await client.post(
+            "/api/v1/dispatch/devices", json={"name": "x", "device_type": "shiftable", "rated_power": 10}
+        )
         assert resp.status_code in (401, 403)
 
     async def test_update_device(self, client, admin_user, async_db):
@@ -651,9 +698,13 @@ class TestDispatchDeviceStats:
     async def test_stats_with_data(self, client, admin_user, async_db):
         _, token = admin_user
         for i, dtype in enumerate(["shiftable", "curtailable", "modulating"]):
-            dev = DispatchableDevice(name=f"dev_{i}", device_type=dtype, rated_power=100 * (i + 1), priority=5, is_active=True)
+            dev = DispatchableDevice(
+                name=f"dev_{i}", device_type=dtype, rated_power=100 * (i + 1), priority=5, is_active=True
+            )
             async_db.add(dev)
-        async_db.add(DispatchableDevice(name="inactive", device_type="rigid", rated_power=50, priority=5, is_active=False))
+        async_db.add(
+            DispatchableDevice(name="inactive", device_type="rigid", rated_power=50, priority=5, is_active=False)
+        )
         await async_db.commit()
         resp = await client.get("/api/v1/dispatch/devices/summary/stats", headers=auth_headers(token))
         assert resp.status_code == 200
@@ -673,9 +724,16 @@ class TestDispatchStorage:
     async def test_list_storage_filter_active(self, client, admin_user, async_db):
         _, token = admin_user
         s = StorageSystemConfig(
-            name="储能1", capacity=500, max_charge_power=125, max_discharge_power=125,
-            charge_efficiency=0.94, discharge_efficiency=0.94, min_soc=0.1, max_soc=0.9,
-            cycle_cost=0.08, is_active=True,
+            name="储能1",
+            capacity=500,
+            max_charge_power=125,
+            max_discharge_power=125,
+            charge_efficiency=0.94,
+            discharge_efficiency=0.94,
+            min_soc=0.1,
+            max_soc=0.9,
+            cycle_cost=0.08,
+            is_active=True,
         )
         async_db.add(s)
         await async_db.commit()
@@ -686,7 +744,10 @@ class TestDispatchStorage:
     async def test_get_storage_by_id(self, client, admin_user, async_db):
         _, token = admin_user
         s = StorageSystemConfig(
-            name="储能2", capacity=100, max_charge_power=20, max_discharge_power=50,
+            name="储能2",
+            capacity=100,
+            max_charge_power=20,
+            max_discharge_power=50,
             is_active=True,
         )
         async_db.add(s)
@@ -702,16 +763,25 @@ class TestDispatchStorage:
     async def test_create_storage(self, client, admin_user):
         _, token = admin_user
         payload = {
-            "name": "新储能", "capacity": 200, "max_charge_power": 50, "max_discharge_power": 50,
-            "charge_efficiency": 0.95, "discharge_efficiency": 0.95, "min_soc": 0.1, "max_soc": 0.9,
-            "cycle_cost": 0.1, "is_active": True,
+            "name": "新储能",
+            "capacity": 200,
+            "max_charge_power": 50,
+            "max_discharge_power": 50,
+            "charge_efficiency": 0.95,
+            "discharge_efficiency": 0.95,
+            "min_soc": 0.1,
+            "max_soc": 0.9,
+            "cycle_cost": 0.1,
+            "is_active": True,
         }
         resp = await client.post("/api/v1/dispatch/storage", json=payload, headers=auth_headers(token))
         assert resp.status_code == 200
 
     async def test_update_storage(self, client, admin_user, async_db):
         _, token = admin_user
-        s = StorageSystemConfig(name="更新储能", capacity=300, max_charge_power=75, max_discharge_power=75, is_active=True)
+        s = StorageSystemConfig(
+            name="更新储能", capacity=300, max_charge_power=75, max_discharge_power=75, is_active=True
+        )
         async_db.add(s)
         await async_db.commit()
         resp = await client.put(f"/api/v1/dispatch/storage/{s.id}", json={"capacity": 400}, headers=auth_headers(token))
@@ -724,7 +794,9 @@ class TestDispatchStorage:
 
     async def test_delete_storage(self, client, admin_user, async_db):
         _, token = admin_user
-        s = StorageSystemConfig(name="删除储能", capacity=100, max_charge_power=20, max_discharge_power=20, is_active=True)
+        s = StorageSystemConfig(
+            name="删除储能", capacity=100, max_charge_power=20, max_discharge_power=20, is_active=True
+        )
         async_db.add(s)
         await async_db.commit()
         resp = await client.delete(f"/api/v1/dispatch/storage/{s.id}", headers=auth_headers(token))
@@ -777,7 +849,9 @@ class TestDispatchPV:
         pv = PVSystemConfig(name="更新光伏", rated_capacity=200, efficiency=0.8, is_active=True)
         async_db.add(pv)
         await async_db.commit()
-        resp = await client.put(f"/api/v1/dispatch/pv/{pv.id}", json={"rated_capacity": 250}, headers=auth_headers(token))
+        resp = await client.put(
+            f"/api/v1/dispatch/pv/{pv.id}", json={"rated_capacity": 250}, headers=auth_headers(token)
+        )
         assert resp.status_code == 200
 
     async def test_update_pv_not_found(self, client, admin_user):
@@ -812,8 +886,12 @@ class TestDispatchSummary:
 
     async def test_summary_with_data(self, client, admin_user, async_db):
         _, token = admin_user
-        async_db.add(DispatchableDevice(name="dev1", device_type="shiftable", rated_power=100, priority=5, is_active=True))
-        async_db.add(StorageSystemConfig(name="st1", capacity=500, max_charge_power=125, max_discharge_power=125, is_active=True))
+        async_db.add(
+            DispatchableDevice(name="dev1", device_type="shiftable", rated_power=100, priority=5, is_active=True)
+        )
+        async_db.add(
+            StorageSystemConfig(name="st1", capacity=500, max_charge_power=125, max_discharge_power=125, is_active=True)
+        )
         async_db.add(PVSystemConfig(name="pv1", rated_capacity=300, efficiency=0.82, is_active=True))
         await async_db.commit()
         resp = await client.get("/api/v1/dispatch/summary", headers=auth_headers(token))
@@ -835,7 +913,9 @@ class TestDispatchDemoData:
 
     async def test_init_demo_data_already_exists(self, client, admin_user, async_db):
         _, token = admin_user
-        async_db.add(DispatchableDevice(name="existing", device_type="rigid", rated_power=10, priority=1, is_active=True))
+        async_db.add(
+            DispatchableDevice(name="existing", device_type="rigid", rated_power=10, priority=1, is_active=True)
+        )
         await async_db.commit()
         resp = await client.post("/api/v1/dispatch/init-demo-data", headers=auth_headers(token))
         assert resp.status_code == 200

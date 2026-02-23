@@ -1,7 +1,8 @@
 """告警引擎单元测试 — Story 5.2"""
+
 import time
 import pytest
-from app.engines.alarm_engine import AlarmEngine, ThresholdCache, EvaluateResult
+from app.engines.alarm_engine import AlarmEngine, ThresholdCache
 
 
 @pytest.fixture
@@ -16,18 +17,50 @@ def engine():
 def sample_thresholds():
     """示例 4 级阈值配置（点位 100）"""
     return [
-        ThresholdCache(id=1, point_id=100, threshold_type="high_high",
-                       threshold_value=50.0, alarm_level="critical",
-                       alarm_message="温度超高", delay_seconds=0, dead_band=0, priority=4),
-        ThresholdCache(id=2, point_id=100, threshold_type="high",
-                       threshold_value=40.0, alarm_level="major",
-                       alarm_message="温度偏高", delay_seconds=0, dead_band=0, priority=3),
-        ThresholdCache(id=3, point_id=100, threshold_type="low",
-                       threshold_value=10.0, alarm_level="minor",
-                       alarm_message="温度偏低", delay_seconds=0, dead_band=0, priority=2),
-        ThresholdCache(id=4, point_id=100, threshold_type="low_low",
-                       threshold_value=5.0, alarm_level="info",
-                       alarm_message="温度超低", delay_seconds=0, dead_band=0, priority=1),
+        ThresholdCache(
+            id=1,
+            point_id=100,
+            threshold_type="high_high",
+            threshold_value=50.0,
+            alarm_level="critical",
+            alarm_message="温度超高",
+            delay_seconds=0,
+            dead_band=0,
+            priority=4,
+        ),
+        ThresholdCache(
+            id=2,
+            point_id=100,
+            threshold_type="high",
+            threshold_value=40.0,
+            alarm_level="major",
+            alarm_message="温度偏高",
+            delay_seconds=0,
+            dead_band=0,
+            priority=3,
+        ),
+        ThresholdCache(
+            id=3,
+            point_id=100,
+            threshold_type="low",
+            threshold_value=10.0,
+            alarm_level="minor",
+            alarm_message="温度偏低",
+            delay_seconds=0,
+            dead_band=0,
+            priority=2,
+        ),
+        ThresholdCache(
+            id=4,
+            point_id=100,
+            threshold_type="low_low",
+            threshold_value=5.0,
+            alarm_level="info",
+            alarm_message="温度超低",
+            delay_seconds=0,
+            dead_band=0,
+            priority=1,
+        ),
     ]
 
 
@@ -70,22 +103,42 @@ class TestEvaluate:
 
     def test_equal_trigger(self, engine):
         """equal 类型阈值检测"""
-        engine._thresholds = {200: [
-            ThresholdCache(id=10, point_id=200, threshold_type="equal",
-                           threshold_value=1.0, alarm_level="major",
-                           alarm_message="状态异常", delay_seconds=0, dead_band=0, priority=3),
-        ]}
+        engine._thresholds = {
+            200: [
+                ThresholdCache(
+                    id=10,
+                    point_id=200,
+                    threshold_type="equal",
+                    threshold_value=1.0,
+                    alarm_level="major",
+                    alarm_message="状态异常",
+                    delay_seconds=0,
+                    dead_band=0,
+                    priority=3,
+                ),
+            ]
+        }
         results = engine.evaluate(200, 1.0, "DI")
         assert len(results) == 1
         assert results[0].alarm_level == "major"
 
     def test_change_trigger(self, engine):
         """change 类型阈值检测 — 变化量超过阈值"""
-        engine._thresholds = {500: [
-            ThresholdCache(id=50, point_id=500, threshold_type="change",
-                           threshold_value=5.0, alarm_level="minor",
-                           alarm_message="变化过大", delay_seconds=0, dead_band=0, priority=2),
-        ]}
+        engine._thresholds = {
+            500: [
+                ThresholdCache(
+                    id=50,
+                    point_id=500,
+                    threshold_type="change",
+                    threshold_value=5.0,
+                    alarm_level="minor",
+                    alarm_message="变化过大",
+                    delay_seconds=0,
+                    dead_band=0,
+                    priority=2,
+                ),
+            ]
+        }
         # 首次无前值，不触发
         results1 = engine.evaluate(500, 20.0, "AI")
         assert len(results1) == 0
@@ -98,11 +151,21 @@ class TestEvaluate:
 
     def test_change_no_trigger_small_delta(self, engine):
         """change 类型 — 变化量小于阈值不触发"""
-        engine._thresholds = {500: [
-            ThresholdCache(id=50, point_id=500, threshold_type="change",
-                           threshold_value=5.0, alarm_level="minor",
-                           alarm_message="变化过大", delay_seconds=0, dead_band=0, priority=2),
-        ]}
+        engine._thresholds = {
+            500: [
+                ThresholdCache(
+                    id=50,
+                    point_id=500,
+                    threshold_type="change",
+                    threshold_value=5.0,
+                    alarm_level="minor",
+                    alarm_message="变化过大",
+                    delay_seconds=0,
+                    dead_band=0,
+                    priority=2,
+                ),
+            ]
+        }
         engine.evaluate(500, 20.0, "AI")
         engine._last_alarm_time.clear()
         results = engine.evaluate(500, 22.0, "AI")
@@ -116,11 +179,21 @@ class TestEvaluate:
     def test_not_loaded_no_trigger(self):
         """引擎未加载时不触发"""
         e = AlarmEngine()
-        e._thresholds = {100: [
-            ThresholdCache(id=1, point_id=100, threshold_type="high",
-                           threshold_value=40.0, alarm_level="major",
-                           alarm_message="test", delay_seconds=0, dead_band=0, priority=3),
-        ]}
+        e._thresholds = {
+            100: [
+                ThresholdCache(
+                    id=1,
+                    point_id=100,
+                    threshold_type="high",
+                    threshold_value=40.0,
+                    alarm_level="major",
+                    alarm_message="test",
+                    delay_seconds=0,
+                    dead_band=0,
+                    priority=3,
+                ),
+            ]
+        }
         results = e.evaluate(100, 50.0, "AI")
         assert len(results) == 0
 
@@ -150,12 +223,32 @@ class TestStormProtection:
 
     def test_different_points_independent(self, engine):
         """不同点位的风暴防护互不影响"""
-        th_a = [ThresholdCache(id=1, point_id=100, threshold_type="high",
-                                threshold_value=40.0, alarm_level="major",
-                                alarm_message="A高", delay_seconds=0, dead_band=0, priority=3)]
-        th_b = [ThresholdCache(id=2, point_id=200, threshold_type="high",
-                                threshold_value=40.0, alarm_level="major",
-                                alarm_message="B高", delay_seconds=0, dead_band=0, priority=3)]
+        th_a = [
+            ThresholdCache(
+                id=1,
+                point_id=100,
+                threshold_type="high",
+                threshold_value=40.0,
+                alarm_level="major",
+                alarm_message="A高",
+                delay_seconds=0,
+                dead_band=0,
+                priority=3,
+            )
+        ]
+        th_b = [
+            ThresholdCache(
+                id=2,
+                point_id=200,
+                threshold_type="high",
+                threshold_value=40.0,
+                alarm_level="major",
+                alarm_message="B高",
+                delay_seconds=0,
+                dead_band=0,
+                priority=3,
+            )
+        ]
         engine._thresholds = {100: th_a, 200: th_b}
         r1 = engine.evaluate(100, 50.0, "AI")
         assert len(r1) == 1
@@ -169,11 +262,21 @@ class TestDeadBand:
 
     def test_dead_band_no_retrigger(self, engine):
         """触发后值仍在死区范围内不应重复触发"""
-        engine._thresholds = {300: [
-            ThresholdCache(id=20, point_id=300, threshold_type="high",
-                           threshold_value=40.0, alarm_level="major",
-                           alarm_message="温度偏高", delay_seconds=0, dead_band=2.0, priority=3),
-        ]}
+        engine._thresholds = {
+            300: [
+                ThresholdCache(
+                    id=20,
+                    point_id=300,
+                    threshold_type="high",
+                    threshold_value=40.0,
+                    alarm_level="major",
+                    alarm_message="温度偏高",
+                    delay_seconds=0,
+                    dead_band=2.0,
+                    priority=3,
+                ),
+            ]
+        }
         # 首次越限触发
         results1 = engine.evaluate(300, 45.0, "AI")
         assert len(results1) == 1
@@ -185,11 +288,21 @@ class TestDeadBand:
 
     def test_dead_band_recovery_retrigger(self, engine):
         """值回到安全区域后再次越限应触发"""
-        engine._thresholds = {300: [
-            ThresholdCache(id=20, point_id=300, threshold_type="high",
-                           threshold_value=40.0, alarm_level="major",
-                           alarm_message="温度偏高", delay_seconds=0, dead_band=2.0, priority=3),
-        ]}
+        engine._thresholds = {
+            300: [
+                ThresholdCache(
+                    id=20,
+                    point_id=300,
+                    threshold_type="high",
+                    threshold_value=40.0,
+                    alarm_level="major",
+                    alarm_message="温度偏高",
+                    delay_seconds=0,
+                    dead_band=2.0,
+                    priority=3,
+                ),
+            ]
+        }
         engine.evaluate(300, 45.0, "AI")
         engine._last_alarm_time.clear()
         # 值回到安全区域（< 40 - 2 = 38）
@@ -201,11 +314,21 @@ class TestDeadBand:
 
     def test_dead_band_low_threshold(self, engine):
         """低限死区：触发后需回到 threshold + dead_band 以上才能恢复"""
-        engine._thresholds = {300: [
-            ThresholdCache(id=21, point_id=300, threshold_type="low",
-                           threshold_value=10.0, alarm_level="minor",
-                           alarm_message="温度偏低", delay_seconds=0, dead_band=2.0, priority=2),
-        ]}
+        engine._thresholds = {
+            300: [
+                ThresholdCache(
+                    id=21,
+                    point_id=300,
+                    threshold_type="low",
+                    threshold_value=10.0,
+                    alarm_level="minor",
+                    alarm_message="温度偏低",
+                    delay_seconds=0,
+                    dead_band=2.0,
+                    priority=2,
+                ),
+            ]
+        }
         # 首次越限触发
         results1 = engine.evaluate(300, 8.0, "AI")
         assert len(results1) == 1
@@ -226,22 +349,42 @@ class TestDelaySeconds:
 
     def test_delay_not_trigger_immediately(self, engine):
         """首次越限不应立即触发（开始计时）"""
-        engine._thresholds = {400: [
-            ThresholdCache(id=30, point_id=400, threshold_type="high",
-                           threshold_value=40.0, alarm_level="major",
-                           alarm_message="温度偏高", delay_seconds=10, dead_band=0, priority=3),
-        ]}
+        engine._thresholds = {
+            400: [
+                ThresholdCache(
+                    id=30,
+                    point_id=400,
+                    threshold_type="high",
+                    threshold_value=40.0,
+                    alarm_level="major",
+                    alarm_message="温度偏高",
+                    delay_seconds=10,
+                    dead_band=0,
+                    priority=3,
+                ),
+            ]
+        }
         results = engine.evaluate(400, 45.0, "AI")
         assert len(results) == 0
         assert (400, 30) in engine._delay_first_exceed
 
     def test_delay_trigger_after_elapsed(self, engine):
         """持续越限超过 delay_seconds 后应触发"""
-        engine._thresholds = {400: [
-            ThresholdCache(id=30, point_id=400, threshold_type="high",
-                           threshold_value=40.0, alarm_level="major",
-                           alarm_message="温度偏高", delay_seconds=10, dead_band=0, priority=3),
-        ]}
+        engine._thresholds = {
+            400: [
+                ThresholdCache(
+                    id=30,
+                    point_id=400,
+                    threshold_type="high",
+                    threshold_value=40.0,
+                    alarm_level="major",
+                    alarm_message="温度偏高",
+                    delay_seconds=10,
+                    dead_band=0,
+                    priority=3,
+                ),
+            ]
+        }
         engine.evaluate(400, 45.0, "AI")
         # 模拟 11 秒后
         engine._delay_first_exceed[(400, 30)] = time.time() - 11
@@ -250,11 +393,21 @@ class TestDelaySeconds:
 
     def test_delay_reset_on_recovery(self, engine):
         """值恢复正常后延迟计时器应重置"""
-        engine._thresholds = {400: [
-            ThresholdCache(id=30, point_id=400, threshold_type="high",
-                           threshold_value=40.0, alarm_level="major",
-                           alarm_message="温度偏高", delay_seconds=10, dead_band=0, priority=3),
-        ]}
+        engine._thresholds = {
+            400: [
+                ThresholdCache(
+                    id=30,
+                    point_id=400,
+                    threshold_type="high",
+                    threshold_value=40.0,
+                    alarm_level="major",
+                    alarm_message="温度偏高",
+                    delay_seconds=10,
+                    dead_band=0,
+                    priority=3,
+                ),
+            ]
+        }
         engine.evaluate(400, 45.0, "AI")
         assert (400, 30) in engine._delay_first_exceed
         # 值恢复正常
@@ -322,11 +475,21 @@ class TestResetCycleStats:
 
     def test_evaluate_populates_cycle_stats(self, engine):
         """evaluate 触发后应记录到本轮统计"""
-        engine._thresholds = {100: [
-            ThresholdCache(id=1, point_id=100, threshold_type="high",
-                           threshold_value=40.0, alarm_level="major",
-                           alarm_message="test", delay_seconds=0, dead_band=0, priority=3),
-        ]}
+        engine._thresholds = {
+            100: [
+                ThresholdCache(
+                    id=1,
+                    point_id=100,
+                    threshold_type="high",
+                    threshold_value=40.0,
+                    alarm_level="major",
+                    alarm_message="test",
+                    delay_seconds=0,
+                    dead_band=0,
+                    priority=3,
+                ),
+            ]
+        }
         engine._point_device_type = {100: "TH"}
         engine._device_type_points = {"TH": {100, 200}}
         engine.evaluate(100, 50.0, "AI")

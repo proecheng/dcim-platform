@@ -7,9 +7,9 @@
   - _detect_provider: 电力公司检测
   - _extract_pricing_items: 正则提取电价信息（带时间/不带时间/表格行）
 """
+
 import pytest
 from datetime import date
-from unittest.mock import patch, AsyncMock, MagicMock
 
 from app.services.ocr_service import (
     _get_mock_result,
@@ -17,13 +17,12 @@ from app.services.ocr_service import (
     _extract_pricing_items,
     recognize_bill,
     OcrBillResult,
-    OcrBillItem,
 )
 
 # 测试用文件魔数前缀
-JPEG_HEADER = b'\xff\xd8\xff\xe0' + b'\x00' * 100
-PNG_HEADER = b'\x89PNG\r\n\x1a\n' + b'\x00' * 100
-PDF_HEADER = b'%PDF-1.4' + b'\x00' * 100
+JPEG_HEADER = b"\xff\xd8\xff\xe0" + b"\x00" * 100
+PNG_HEADER = b"\x89PNG\r\n\x1a\n" + b"\x00" * 100
+PDF_HEADER = b"%PDF-1.4" + b"\x00" * 100
 
 
 class TestGetMockResult:

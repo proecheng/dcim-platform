@@ -1,4 +1,5 @@
 """智能故障诊断 API 测试 — Story 9-3"""
+
 import time
 from unittest.mock import patch, AsyncMock
 import pytest
@@ -18,6 +19,7 @@ from app.api.deps import get_db, require_admin, require_operator, require_viewer
 # ============================================================
 # Fixtures
 # ============================================================
+
 
 @pytest.fixture(scope="module")
 def anyio_backend():
@@ -152,7 +154,9 @@ async def seed_system_rule(db_session):
         name="系统温度规则",
         category="temperature",
         trigger_condition={"alarm_type": ["threshold"], "device_type": ["TH"]},
-        diagnosis_logic={"possible_causes": [{"cause": "系统原因", "base_confidence": 60, "suggested_actions": ["检查"]}]},
+        diagnosis_logic={
+            "possible_causes": [{"cause": "系统原因", "base_confidence": 60, "suggested_actions": ["检查"]}]
+        },
         priority=5,
         is_enabled=True,
         is_system=True,
@@ -173,7 +177,12 @@ async def seed_result(db_session, seed_rule):
         device_type="TH",
         zone="A1",
         causes=[
-            {"cause": "空调故障", "confidence": 85, "suggested_actions": ["检查空调运行状态"], "rule_code": "TEST_TEMP_01"},
+            {
+                "cause": "空调故障",
+                "confidence": 85,
+                "suggested_actions": ["检查空调运行状态"],
+                "rule_code": "TEST_TEMP_01",
+            },
             {"cause": "负载过高", "confidence": 60, "suggested_actions": ["检查机柜功率"], "rule_code": "TEST_TEMP_01"},
         ],
         diagnosis_time_ms=12,
@@ -221,16 +230,21 @@ BASE_URL = "/api/v1/diagnosis"
 async def test_diagnosis_rule_crud(client):
     """规则 CRUD API（创建、读取、更新、删除）"""
     # 创建
-    resp = await client.post(f"{BASE_URL}/rules", json={
-        "rule_code": "CRUD_TEST_01",
-        "name": "CRUD测试规则",
-        "description": "用于CRUD测试",
-        "category": "power",
-        "trigger_condition": {"alarm_type": ["threshold"], "device_type": ["UPS"]},
-        "diagnosis_logic": {"possible_causes": [{"cause": "电源故障", "base_confidence": 60, "suggested_actions": ["检查UPS"]}]},
-        "priority": 5,
-        "is_enabled": True,
-    })
+    resp = await client.post(
+        f"{BASE_URL}/rules",
+        json={
+            "rule_code": "CRUD_TEST_01",
+            "name": "CRUD测试规则",
+            "description": "用于CRUD测试",
+            "category": "power",
+            "trigger_condition": {"alarm_type": ["threshold"], "device_type": ["UPS"]},
+            "diagnosis_logic": {
+                "possible_causes": [{"cause": "电源故障", "base_confidence": 60, "suggested_actions": ["检查UPS"]}]
+            },
+            "priority": 5,
+            "is_enabled": True,
+        },
+    )
     assert resp.status_code == 200
     data = resp.json()
     rule_id = data["id"]
@@ -249,10 +263,13 @@ async def test_diagnosis_rule_crud(client):
     assert resp.json()["category"] == "power"
 
     # 更新
-    resp = await client.put(f"{BASE_URL}/rules/{rule_id}", json={
-        "name": "CRUD测试规则-已更新",
-        "priority": 8,
-    })
+    resp = await client.put(
+        f"{BASE_URL}/rules/{rule_id}",
+        json={
+            "name": "CRUD测试规则-已更新",
+            "priority": 8,
+        },
+    )
     assert resp.status_code == 200
     assert resp.json()["name"] == "CRUD测试规则-已更新"
     assert resp.json()["priority"] == 8
@@ -310,9 +327,7 @@ async def test_diagnosis_engine_match(session_factory, seed_rule):
 
     # 验证诊断结果已写入数据库
     async with session_factory() as session:
-        result = await session.execute(
-            select(DiagnosisResult).where(DiagnosisResult.alarm_id == 9999)
-        )
+        result = await session.execute(select(DiagnosisResult).where(DiagnosisResult.alarm_id == 9999))
         diag = result.scalar_one_or_none()
         assert diag is not None
         assert diag.rule_code == "TEST_TEMP_01"
@@ -351,9 +366,7 @@ async def test_diagnosis_confidence():
 
     # 置信度上限 100
     cause_high = {"cause": "测试", "base_confidence": 95}
-    confidence_cap = await engine._calculate_confidence(
-        cause_high, "critical", {}
-    )
+    confidence_cap = await engine._calculate_confidence(cause_high, "critical", {})
     assert confidence_cap == 100  # 95 + 15 = 110 → capped at 100
 
 
@@ -467,7 +480,16 @@ async def test_yaml_load():
     assert "diagnosis_logic" in first
 
     # 验证分类枚举
-    valid_categories = {"temperature", "humidity", "power", "communication", "security", "cooling", "environment", "composite"}
+    valid_categories = {
+        "temperature",
+        "humidity",
+        "power",
+        "communication",
+        "security",
+        "cooling",
+        "environment",
+        "composite",
+    }
     for rule in rules:
         assert rule["category"] in valid_categories, f"规则 {rule['rule_code']} 分类 {rule['category']} 不在枚举中"
 
@@ -479,10 +501,12 @@ async def test_manual_diagnose(app, seed_rule, seed_alarm_and_point):
 
     with patch("app.api.v1.diagnosis.diagnosis_engine") as mock_engine:
         mock_engine.reload_rules = AsyncMock()
-        mock_engine.manual_diagnose = AsyncMock(return_value={
-            "alarm_id": alarm.id,
-            "alarm_no": alarm.alarm_no,
-        })
+        mock_engine.manual_diagnose = AsyncMock(
+            return_value={
+                "alarm_id": alarm.id,
+                "alarm_no": alarm.alarm_no,
+            }
+        )
 
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as c:

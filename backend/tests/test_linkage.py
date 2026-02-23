@@ -1,4 +1,5 @@
 """联动引擎 API 测试 — Story 9-1"""
+
 import pytest
 
 from httpx import AsyncClient, ASGITransport
@@ -14,6 +15,7 @@ from app.api.deps import get_db, require_admin, require_operator, require_viewer
 # ============================================================
 # Fixtures
 # ============================================================
+
 
 @pytest.fixture(scope="module")
 def anyio_backend():
@@ -148,21 +150,24 @@ BASE_URL = "/api/v1/linkage"
 @pytest.mark.anyio
 async def test_create_policy(client):
     """创建联动策略"""
-    resp = await client.post(f"{BASE_URL}/policies", json={
-        "name": "新建测试策略",
-        "trigger_type": "alarm.triggered",
-        "trigger_condition": {"alarm_level": "major"},
-        "priority": "normal",
-        "actions": [
-            {
-                "action_type": "ALARM_NOTIFY",
-                "action_config": {"message": "测试"},
-                "sort_order": 0,
-                "timeout_seconds": 5,
-                "retry_count": 0,
-            }
-        ],
-    })
+    resp = await client.post(
+        f"{BASE_URL}/policies",
+        json={
+            "name": "新建测试策略",
+            "trigger_type": "alarm.triggered",
+            "trigger_condition": {"alarm_level": "major"},
+            "priority": "normal",
+            "actions": [
+                {
+                    "action_type": "ALARM_NOTIFY",
+                    "action_config": {"message": "测试"},
+                    "sort_order": 0,
+                    "timeout_seconds": 5,
+                    "retry_count": 0,
+                }
+            ],
+        },
+    )
     assert resp.status_code == 200
     data = resp.json()
     assert "id" in data

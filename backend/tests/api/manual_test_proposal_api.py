@@ -2,15 +2,7 @@
 手动测试 Proposal API 端点
 演示如何使用各个 API 端点
 """
-from app.api.v1.proposal import (
-    generate_proposal,
-    get_proposal,
-    get_proposals,
-    accept_proposal,
-    execute_proposal,
-    get_proposal_monitoring,
-    delete_proposal
-)
+
 from app.schemas.proposal_schema import ProposalCreate, MeasureAcceptRequest
 from app.core.database import SessionLocal
 
@@ -26,10 +18,7 @@ def test_api_endpoints():
 
         # 1. 生成方案
         print("\n1. 生成 A1 峰谷套利方案...")
-        proposal_request = ProposalCreate(
-            template_id="A1",
-            analysis_days=30
-        )
+        proposal_request = ProposalCreate(template_id="A1", analysis_days=30)
 
         # 注意: 这里不能直接调用异步函数，需要使用同步版本或者实际的HTTP请求
         print("   提示: 需要通过 HTTP 请求测试")
@@ -50,9 +39,7 @@ def test_api_endpoints():
         print("   生成方案请求:")
         print(f"     {proposal_request.dict()}")
 
-        accept_request = MeasureAcceptRequest(
-            selected_measure_ids=[1, 2, 3]
-        )
+        accept_request = MeasureAcceptRequest(selected_measure_ids=[1, 2, 3])
         print("\n   接受方案请求:")
         print(f"     {accept_request.dict()}")
 

@@ -8,6 +8,7 @@
 4. 计算预期收益
 5. 生成实施报告
 """
+
 import sys
 from pathlib import Path
 
@@ -15,18 +16,14 @@ from pathlib import Path
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
-from decimal import Decimal
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
-from app.services.template_generator import TemplateGenerator
-from app.models.energy import EnergySavingProposal, ProposalMeasure
+from app.models.energy import EnergySavingProposal
 
 
 def print_header(title: str):
     """打印标题"""
-    print("\n" + "="*80)
+    print("\n" + "=" * 80)
     print(f"  {title}")
-    print("="*80 + "\n")
+    print("=" * 80 + "\n")
 
 
 def print_proposal_summary(proposal: EnergySavingProposal):
@@ -47,11 +44,7 @@ def print_proposal_summary(proposal: EnergySavingProposal):
 def simulate_user_selection(proposal: EnergySavingProposal) -> list:
     """模拟用户选择措施（自动选择收益最高的2个）"""
     # 按收益排序
-    sorted_measures = sorted(
-        proposal.measures,
-        key=lambda m: m.annual_benefit,
-        reverse=True
-    )
+    sorted_measures = sorted(proposal.measures, key=lambda m: m.annual_benefit, reverse=True)
 
     # 选择前2个
     selected = []
@@ -71,23 +64,14 @@ def generate_implementation_report(proposals: list):
 
     # 统计
     total_proposals = len(proposals)
-    a_type_count = sum(1 for p in proposals if p.proposal_type == 'A')
-    b_type_count = sum(1 for p in proposals if p.proposal_type == 'B')
+    a_type_count = sum(1 for p in proposals if p.proposal_type == "A")
+    b_type_count = sum(1 for p in proposals if p.proposal_type == "B")
 
-    selected_measures_count = sum(
-        sum(1 for m in p.measures if m.is_selected)
-        for p in proposals
-    )
+    selected_measures_count = sum(sum(1 for m in p.measures if m.is_selected) for p in proposals)
 
-    total_benefit = sum(
-        sum(m.annual_benefit for m in p.measures if m.is_selected)
-        for p in proposals
-    )
+    total_benefit = sum(sum(m.annual_benefit for m in p.measures if m.is_selected) for p in proposals)
 
-    total_investment = sum(
-        sum(m.investment for m in p.measures if m.is_selected)
-        for p in proposals
-    )
+    total_investment = sum(sum(m.investment for m in p.measures if m.is_selected) for p in proposals)
 
     print(f"📊 方案总数: {total_proposals}")
     print(f"   - A类方案（无需投资）: {a_type_count}")
@@ -100,9 +84,9 @@ def generate_implementation_report(proposals: list):
         overall_payback = total_investment / total_benefit
         print(f"⏱️  综合投资回收期: {float(overall_payback):.1f} 年")
 
-    print("\n" + "-"*80)
+    print("\n" + "-" * 80)
     print("各方案选中措施明细:")
-    print("-"*80 + "\n")
+    print("-" * 80 + "\n")
 
     for proposal in proposals:
         selected_measures = [m for m in proposal.measures if m.is_selected]
@@ -132,9 +116,9 @@ def main():
     # db = Session()
 
     # 由于没有真实数据库连接，这里仅演示代码流程
-    print("="*80)
+    print("=" * 80)
     print("📝 演示流程（代码示例）")
-    print("="*80 + "\n")
+    print("=" * 80 + "\n")
 
     print("""
 # ==================== 步骤1: 创建生成器实例 ====================
@@ -397,9 +381,9 @@ async def toggle_measure_selection(
 print("✓ API路由定义完成")
     """)
 
-    print("\n" + "="*80)
+    print("\n" + "=" * 80)
     print("✓ 集成测试演示完成")
-    print("="*80 + "\n")
+    print("=" * 80 + "\n")
 
     print("后续步骤:")
     print("1. 准备真实数据库和基础数据")

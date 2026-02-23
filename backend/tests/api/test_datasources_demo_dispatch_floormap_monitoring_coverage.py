@@ -1,21 +1,25 @@
 """
 覆盖率测试 — datasources / demo / dispatch / floor_map / monitoring
 """
+
 import json
-import pytest
 from datetime import datetime
 from unittest.mock import AsyncMock, patch, MagicMock
 
 from app.models.gateway import DataSource
 from app.models.floor_map import FloorMap
 from app.models.energy import (
-    DispatchableDevice, StorageSystemConfig, PVSystemConfig,
-    PricingConfig, RealtimeMonitoring, MonthlyStatistics,
+    DispatchableDevice,
+    StorageSystemConfig,
+    PVSystemConfig,
+    PricingConfig,
+    RealtimeMonitoring,
 )
 from tests.conftest import auth_headers
 
 
 # ==================== 辅助函数 ====================
+
 
 async def _seed_datasource(db, **overrides) -> DataSource:
     defaults = dict(
@@ -49,8 +53,11 @@ async def _seed_floor_map(db, **overrides) -> FloorMap:
 
 async def _seed_dispatch_device(db, **overrides) -> DispatchableDevice:
     defaults = dict(
-        name="测试设备", device_type="curtailable", rated_power=100,
-        priority=5, is_active=True,
+        name="测试设备",
+        device_type="curtailable",
+        rated_power=100,
+        priority=5,
+        is_active=True,
     )
     defaults.update(overrides)
     obj = DispatchableDevice(**defaults)
@@ -61,8 +68,11 @@ async def _seed_dispatch_device(db, **overrides) -> DispatchableDevice:
 
 async def _seed_storage(db, **overrides) -> StorageSystemConfig:
     defaults = dict(
-        name="测试储能", capacity=500, max_charge_power=125,
-        max_discharge_power=125, is_active=True,
+        name="测试储能",
+        capacity=500,
+        max_charge_power=125,
+        max_discharge_power=125,
+        is_active=True,
     )
     defaults.update(overrides)
     obj = StorageSystemConfig(**defaults)
@@ -73,7 +83,9 @@ async def _seed_storage(db, **overrides) -> StorageSystemConfig:
 
 async def _seed_pv(db, **overrides) -> PVSystemConfig:
     defaults = dict(
-        name="测试光伏", rated_capacity=300, efficiency=0.85,
+        name="测试光伏",
+        rated_capacity=300,
+        efficiency=0.85,
         is_active=True,
     )
     defaults.update(overrides)
@@ -85,9 +97,12 @@ async def _seed_pv(db, **overrides) -> PVSystemConfig:
 
 async def _seed_pricing(db) -> PricingConfig:
     from datetime import date as _date
+
     obj = PricingConfig(
-        config_name="测试电价", is_enabled=True,
-        declared_demand=1000, demand_price=38,
+        config_name="测试电价",
+        is_enabled=True,
+        declared_demand=1000,
+        demand_price=38,
         effective_date=_date.today(),
     )
     db.add(obj)
@@ -96,6 +111,7 @@ async def _seed_pricing(db) -> PricingConfig:
 
 
 # ==================== DataSources ====================
+
 
 class TestDataSources:
     """数据源管理 API"""
@@ -136,7 +152,9 @@ class TestDataSources:
             "connection_config": {"host": "10.0.0.1", "port": 502},
         }
         resp = await client.post(
-            "/api/v1/datasources", json=payload, headers=auth_headers(token),
+            "/api/v1/datasources",
+            json=payload,
+            headers=auth_headers(token),
         )
         assert resp.status_code == 200
         assert resp.json()["name"] == "新数据源"
@@ -149,7 +167,9 @@ class TestDataSources:
             "connection_config": {},
         }
         resp = await client.post(
-            "/api/v1/datasources", json=payload, headers=auth_headers(token),
+            "/api/v1/datasources",
+            json=payload,
+            headers=auth_headers(token),
         )
         assert resp.status_code == 400
 
@@ -157,7 +177,8 @@ class TestDataSources:
         _, token = admin_user
         ds = await _seed_datasource(async_db)
         resp = await client.get(
-            f"/api/v1/datasources/{ds.id}", headers=auth_headers(token),
+            f"/api/v1/datasources/{ds.id}",
+            headers=auth_headers(token),
         )
         assert resp.status_code == 200
         assert resp.json()["id"] == ds.id
@@ -165,7 +186,8 @@ class TestDataSources:
     async def test_get_datasource_not_found(self, client, admin_user, async_db):
         _, token = admin_user
         resp = await client.get(
-            "/api/v1/datasources/99999", headers=auth_headers(token),
+            "/api/v1/datasources/99999",
+            headers=auth_headers(token),
         )
         assert resp.status_code == 404
 
@@ -193,14 +215,16 @@ class TestDataSources:
         _, token = admin_user
         ds = await _seed_datasource(async_db)
         resp = await client.delete(
-            f"/api/v1/datasources/{ds.id}", headers=auth_headers(token),
+            f"/api/v1/datasources/{ds.id}",
+            headers=auth_headers(token),
         )
         assert resp.status_code == 200
 
     async def test_delete_datasource_not_found(self, client, admin_user, async_db):
         _, token = admin_user
         resp = await client.delete(
-            "/api/v1/datasources/99999", headers=auth_headers(token),
+            "/api/v1/datasources/99999",
+            headers=auth_headers(token),
         )
         assert resp.status_code == 404
 
@@ -227,6 +251,7 @@ class TestDataSources:
 
 # ==================== Demo ====================
 
+
 class TestDemo:
     """演示数据 API"""
 
@@ -249,9 +274,7 @@ class TestDemo:
 
     async def test_load_demo_data(self, client, admin_user, async_db):
         _, token = admin_user
-        with patch(
-            "app.api.v1.demo.demo_data_service"
-        ) as mock_svc:
+        with patch("app.api.v1.demo.demo_data_service") as mock_svc:
             mock_svc.loading = False
             mock_svc.progress = 0
             mock_svc.progress_message = ""
@@ -265,9 +288,7 @@ class TestDemo:
 
     async def test_load_demo_data_already_loading(self, client, admin_user, async_db):
         _, token = admin_user
-        with patch(
-            "app.api.v1.demo.demo_data_service"
-        ) as mock_svc:
+        with patch("app.api.v1.demo.demo_data_service") as mock_svc:
             mock_svc.loading = True
             mock_svc.progress = 50
             mock_svc.progress_message = "加载中"
@@ -281,31 +302,28 @@ class TestDemo:
 
     async def test_unload_demo_data(self, client, admin_user, async_db):
         _, token = admin_user
-        with patch(
-            "app.api.v1.demo.demo_data_service"
-        ) as mock_svc:
-            mock_svc.unload_demo_data = AsyncMock(
-                return_value={"success": True, "message": "已卸载"}
-            )
+        with patch("app.api.v1.demo.demo_data_service") as mock_svc:
+            mock_svc.unload_demo_data = AsyncMock(return_value={"success": True, "message": "已卸载"})
             resp = await client.post(
-                "/api/v1/demo/unload", headers=auth_headers(token),
+                "/api/v1/demo/unload",
+                headers=auth_headers(token),
             )
         assert resp.status_code == 200
 
     async def test_refresh_dates(self, client, admin_user, async_db):
         _, token = admin_user
-        with patch(
-            "app.api.v1.demo.demo_data_service"
-        ) as mock_svc:
+        with patch("app.api.v1.demo.demo_data_service") as mock_svc:
             mock_svc.loading = False
             resp = await client.post(
-                "/api/v1/demo/refresh-dates", headers=auth_headers(token),
+                "/api/v1/demo/refresh-dates",
+                headers=auth_headers(token),
             )
         assert resp.status_code == 200
         assert resp.json()["code"] == 0
 
 
 # ==================== Dispatch ====================
+
 
 class TestDispatchDevices:
     """可调度设备 API"""
@@ -343,7 +361,9 @@ class TestDispatchDevices:
             "rated_power": 200,
         }
         resp = await client.post(
-            "/api/v1/dispatch/devices", json=payload, headers=auth_headers(token),
+            "/api/v1/dispatch/devices",
+            json=payload,
+            headers=auth_headers(token),
         )
         assert resp.status_code == 200
         assert resp.json()["name"] == "新设备"
@@ -352,7 +372,8 @@ class TestDispatchDevices:
         _, token = admin_user
         dev = await _seed_dispatch_device(async_db)
         resp = await client.get(
-            f"/api/v1/dispatch/devices/{dev.id}", headers=auth_headers(token),
+            f"/api/v1/dispatch/devices/{dev.id}",
+            headers=auth_headers(token),
         )
         assert resp.status_code == 200
         assert resp.json()["id"] == dev.id
@@ -360,7 +381,8 @@ class TestDispatchDevices:
     async def test_get_device_not_found(self, client, admin_user, async_db):
         _, token = admin_user
         resp = await client.get(
-            "/api/v1/dispatch/devices/99999", headers=auth_headers(token),
+            "/api/v1/dispatch/devices/99999",
+            headers=auth_headers(token),
         )
         assert resp.status_code == 404
 
@@ -379,14 +401,16 @@ class TestDispatchDevices:
         _, token = admin_user
         dev = await _seed_dispatch_device(async_db)
         resp = await client.delete(
-            f"/api/v1/dispatch/devices/{dev.id}", headers=auth_headers(token),
+            f"/api/v1/dispatch/devices/{dev.id}",
+            headers=auth_headers(token),
         )
         assert resp.status_code == 200
 
     async def test_delete_device_not_found(self, client, admin_user, async_db):
         _, token = admin_user
         resp = await client.delete(
-            "/api/v1/dispatch/devices/99999", headers=auth_headers(token),
+            "/api/v1/dispatch/devices/99999",
+            headers=auth_headers(token),
         )
         assert resp.status_code == 404
 
@@ -394,7 +418,8 @@ class TestDispatchDevices:
         _, token = admin_user
         await _seed_dispatch_device(async_db)
         resp = await client.get(
-            "/api/v1/dispatch/devices/summary/stats", headers=auth_headers(token),
+            "/api/v1/dispatch/devices/summary/stats",
+            headers=auth_headers(token),
         )
         assert resp.status_code == 200
         body = resp.json()
@@ -420,7 +445,9 @@ class TestDispatchStorage:
             "max_discharge_power": 50,
         }
         resp = await client.post(
-            "/api/v1/dispatch/storage", json=payload, headers=auth_headers(token),
+            "/api/v1/dispatch/storage",
+            json=payload,
+            headers=auth_headers(token),
         )
         assert resp.status_code == 200
         assert resp.json()["name"] == "新储能"
@@ -429,14 +456,16 @@ class TestDispatchStorage:
         _, token = admin_user
         s = await _seed_storage(async_db)
         resp = await client.get(
-            f"/api/v1/dispatch/storage/{s.id}", headers=auth_headers(token),
+            f"/api/v1/dispatch/storage/{s.id}",
+            headers=auth_headers(token),
         )
         assert resp.status_code == 200
 
     async def test_get_storage_not_found(self, client, admin_user, async_db):
         _, token = admin_user
         resp = await client.get(
-            "/api/v1/dispatch/storage/99999", headers=auth_headers(token),
+            "/api/v1/dispatch/storage/99999",
+            headers=auth_headers(token),
         )
         assert resp.status_code == 404
 
@@ -454,14 +483,16 @@ class TestDispatchStorage:
         _, token = admin_user
         s = await _seed_storage(async_db)
         resp = await client.delete(
-            f"/api/v1/dispatch/storage/{s.id}", headers=auth_headers(token),
+            f"/api/v1/dispatch/storage/{s.id}",
+            headers=auth_headers(token),
         )
         assert resp.status_code == 200
 
     async def test_delete_storage_not_found(self, client, admin_user, async_db):
         _, token = admin_user
         resp = await client.delete(
-            "/api/v1/dispatch/storage/99999", headers=auth_headers(token),
+            "/api/v1/dispatch/storage/99999",
+            headers=auth_headers(token),
         )
         assert resp.status_code == 404
 
@@ -479,7 +510,9 @@ class TestDispatchPV:
         _, token = admin_user
         payload = {"name": "新光伏", "rated_capacity": 100}
         resp = await client.post(
-            "/api/v1/dispatch/pv", json=payload, headers=auth_headers(token),
+            "/api/v1/dispatch/pv",
+            json=payload,
+            headers=auth_headers(token),
         )
         assert resp.status_code == 200
         assert resp.json()["name"] == "新光伏"
@@ -488,14 +521,16 @@ class TestDispatchPV:
         _, token = admin_user
         pv = await _seed_pv(async_db)
         resp = await client.get(
-            f"/api/v1/dispatch/pv/{pv.id}", headers=auth_headers(token),
+            f"/api/v1/dispatch/pv/{pv.id}",
+            headers=auth_headers(token),
         )
         assert resp.status_code == 200
 
     async def test_get_pv_not_found(self, client, admin_user, async_db):
         _, token = admin_user
         resp = await client.get(
-            "/api/v1/dispatch/pv/99999", headers=auth_headers(token),
+            "/api/v1/dispatch/pv/99999",
+            headers=auth_headers(token),
         )
         assert resp.status_code == 404
 
@@ -503,14 +538,16 @@ class TestDispatchPV:
         _, token = admin_user
         pv = await _seed_pv(async_db)
         resp = await client.delete(
-            f"/api/v1/dispatch/pv/{pv.id}", headers=auth_headers(token),
+            f"/api/v1/dispatch/pv/{pv.id}",
+            headers=auth_headers(token),
         )
         assert resp.status_code == 200
 
     async def test_delete_pv_not_found(self, client, admin_user, async_db):
         _, token = admin_user
         resp = await client.delete(
-            "/api/v1/dispatch/pv/99999", headers=auth_headers(token),
+            "/api/v1/dispatch/pv/99999",
+            headers=auth_headers(token),
         )
         assert resp.status_code == 404
 
@@ -530,7 +567,8 @@ class TestDispatchSummary:
     async def test_init_demo_data(self, client, admin_user, async_db):
         _, token = admin_user
         resp = await client.post(
-            "/api/v1/dispatch/init-demo-data", headers=auth_headers(token),
+            "/api/v1/dispatch/init-demo-data",
+            headers=auth_headers(token),
         )
         assert resp.status_code == 200
         assert resp.json()["created"] is True
@@ -539,13 +577,15 @@ class TestDispatchSummary:
         _, token = admin_user
         await _seed_dispatch_device(async_db)
         resp = await client.post(
-            "/api/v1/dispatch/init-demo-data", headers=auth_headers(token),
+            "/api/v1/dispatch/init-demo-data",
+            headers=auth_headers(token),
         )
         assert resp.status_code == 200
         assert resp.json()["created"] is False
 
 
 # ==================== FloorMap ====================
+
 
 class TestFloorMap:
     """楼层图 API"""
@@ -605,6 +645,7 @@ class TestFloorMap:
 
 
 # ==================== Monitoring ====================
+
 
 class TestMonitoring:
     """电费监控 API"""

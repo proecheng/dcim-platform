@@ -1,4 +1,5 @@
 """站点级数据隔离 API 测试 (Story 13-5)"""
+
 import pytest
 
 from httpx import AsyncClient, ASGITransport
@@ -16,6 +17,7 @@ from app.api.deps import get_db, require_admin, require_operator, require_viewer
 # ============================================================
 # Fixtures
 # ============================================================
+
 
 @pytest.fixture(scope="module")
 def anyio_backend():
@@ -108,12 +110,7 @@ async def seed_sites(db_session):
 @pytest.fixture
 async def seed_user(db_session):
     """创建测试用户"""
-    user = User(
-        username="operator1",
-        password_hash=get_password_hash("Test@1234"),
-        role="operator",
-        is_active=True
-    )
+    user = User(username="operator1", password_hash=get_password_hash("Test@1234"), role="operator", is_active=True)
     db_session.add(user)
     await db_session.commit()
     await db_session.refresh(user)
@@ -132,14 +129,12 @@ DEVICES_URL = "/api/v1/devices"
 # Tests
 # ============================================================
 
+
 @pytest.mark.anyio
 async def test_assign_user_sites(client, seed_sites, seed_user):
     """为用户分配站点权限"""
     site_a, site_b = seed_sites
-    resp = await client.put(
-        f"{USERS_URL}/{seed_user.id}/sites",
-        json={"site_ids": [site_a.id, site_b.id]}
-    )
+    resp = await client.put(f"{USERS_URL}/{seed_user.id}/sites", json={"site_ids": [site_a.id, site_b.id]})
     assert resp.status_code == 200
     assert "2" in resp.json()["message"]
 
@@ -169,10 +164,7 @@ async def test_update_user_sites_replaces(client, seed_sites, seed_user, db_sess
     await db_session.commit()
 
     # 替换为 site_b
-    resp = await client.put(
-        f"{USERS_URL}/{seed_user.id}/sites",
-        json={"site_ids": [site_b.id]}
-    )
+    resp = await client.put(f"{USERS_URL}/{seed_user.id}/sites", json={"site_ids": [site_b.id]})
     assert resp.status_code == 200
 
     # 验证只有 site_b
@@ -185,10 +177,7 @@ async def test_update_user_sites_replaces(client, seed_sites, seed_user, db_sess
 @pytest.mark.anyio
 async def test_assign_invalid_site(client, seed_user):
     """分配不存在的站点"""
-    resp = await client.put(
-        f"{USERS_URL}/{seed_user.id}/sites",
-        json={"site_ids": [99999]}
-    )
+    resp = await client.put(f"{USERS_URL}/{seed_user.id}/sites", json={"site_ids": [99999]})
     assert resp.status_code == 400
 
 
@@ -210,18 +199,15 @@ async def test_get_site_users(client, seed_sites, seed_user, db_session):
 async def test_device_site_filter_admin_sees_all(client, seed_sites, db_session):
     """admin 可见所有设备（不受站点限制）"""
     site_a, site_b = seed_sites
-    db_session.add(Device(
-        device_code="DEV-A1", device_name="设备A1",
-        device_type="UPS", area_code="A", site_id=site_a.id
-    ))
-    db_session.add(Device(
-        device_code="DEV-B1", device_name="设备B1",
-        device_type="AC", area_code="B", site_id=site_b.id
-    ))
-    db_session.add(Device(
-        device_code="DEV-NONE", device_name="无站点设备",
-        device_type="PDU", area_code="C", site_id=None
-    ))
+    db_session.add(
+        Device(device_code="DEV-A1", device_name="设备A1", device_type="UPS", area_code="A", site_id=site_a.id)
+    )
+    db_session.add(
+        Device(device_code="DEV-B1", device_name="设备B1", device_type="AC", area_code="B", site_id=site_b.id)
+    )
+    db_session.add(
+        Device(device_code="DEV-NONE", device_name="无站点设备", device_type="PDU", area_code="C", site_id=None)
+    )
     await db_session.commit()
 
     resp = await client.get(DEVICES_URL)
@@ -233,14 +219,12 @@ async def test_device_site_filter_admin_sees_all(client, seed_sites, db_session)
 async def test_device_site_filter_operator(client, app, seed_sites, db_session):
     """operator 仅可见授权站点设备"""
     site_a, site_b = seed_sites
-    db_session.add(Device(
-        device_code="DEV-A2", device_name="设备A2",
-        device_type="UPS", area_code="A", site_id=site_a.id
-    ))
-    db_session.add(Device(
-        device_code="DEV-B2", device_name="设备B2",
-        device_type="AC", area_code="B", site_id=site_b.id
-    ))
+    db_session.add(
+        Device(device_code="DEV-A2", device_name="设备A2", device_type="UPS", area_code="A", site_id=site_a.id)
+    )
+    db_session.add(
+        Device(device_code="DEV-B2", device_name="设备B2", device_type="AC", area_code="B", site_id=site_b.id)
+    )
     await db_session.commit()
 
     # 模拟 operator 只有 site_a 权限
@@ -260,6 +244,7 @@ async def test_device_site_filter_operator(client, app, seed_sites, db_session):
     # 恢复 admin 模式
     async def override_admin_site_ids():
         return None
+
     app.dependency_overrides[get_user_site_ids] = override_admin_site_ids
 
 
@@ -267,13 +252,16 @@ async def test_device_site_filter_operator(client, app, seed_sites, db_session):
 async def test_device_with_site_id_field(client, seed_sites, db_session):
     """设备创建时可指定 site_id"""
     site_a, _ = seed_sites
-    resp = await client.post(DEVICES_URL, json={
-        "device_code": "DEV-NEW",
-        "device_name": "新设备",
-        "device_type": "TH",
-        "area_code": "D",
-        "site_id": site_a.id
-    })
+    resp = await client.post(
+        DEVICES_URL,
+        json={
+            "device_code": "DEV-NEW",
+            "device_name": "新设备",
+            "device_type": "TH",
+            "area_code": "D",
+            "site_id": site_a.id,
+        },
+    )
     assert resp.status_code == 200
     assert resp.json()["site_id"] == site_a.id
 

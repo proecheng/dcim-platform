@@ -1,4 +1,5 @@
 """知识库管理 API 测试 — 知识库文章 CRUD"""
+
 import pytest
 
 from httpx import AsyncClient, ASGITransport
@@ -14,6 +15,7 @@ from app.api.deps import get_db, require_admin, require_operator, require_viewer
 # ============================================================
 # Fixtures
 # ============================================================
+
 
 @pytest.fixture(scope="module")
 def anyio_backend():
@@ -109,6 +111,7 @@ async def _create_knowledge(client: AsyncClient) -> dict:
 # ============================================================
 # Tests
 # ============================================================
+
 
 @pytest.mark.anyio
 async def test_create_knowledge(client):

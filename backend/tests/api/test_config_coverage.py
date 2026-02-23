@@ -1,8 +1,8 @@
 """
 系统配置 API 覆盖率测试 — 使用 conftest fixtures
 """
+
 import json
-import pytest
 from datetime import datetime, date
 
 from tests.conftest import auth_headers
@@ -93,9 +93,7 @@ class TestGetConfigs:
         await _create_config(async_db, config_group="system", config_key="name")
         await _create_config(async_db, config_group="alarm", config_key="sound")
 
-        resp = await client.get(
-            "/api/v1/configs?group=system", headers=auth_headers(token)
-        )
+        resp = await client.get("/api/v1/configs?group=system", headers=auth_headers(token))
         assert resp.status_code == 200
         data = resp.json()
         assert "system" in data
@@ -116,17 +114,22 @@ class TestUpdateConfigs:
     async def test_update_existing(self, client, admin_user, async_db):
         _, token = admin_user
         await _create_config(
-            async_db, config_group="system", config_key="app_name",
-            config_value="旧值", is_editable=True,
+            async_db,
+            config_group="system",
+            config_key="app_name",
+            config_value="旧值",
+            is_editable=True,
         )
 
         resp = await client.put(
             "/api/v1/configs",
-            json=[{
-                "config_group": "system",
-                "config_key": "app_name",
-                "config_value": "新值",
-            }],
+            json=[
+                {
+                    "config_group": "system",
+                    "config_key": "app_name",
+                    "config_value": "新值",
+                }
+            ],
             headers=auth_headers(token),
         )
         assert resp.status_code == 200
@@ -135,17 +138,22 @@ class TestUpdateConfigs:
     async def test_update_non_editable_skipped(self, client, admin_user, async_db):
         _, token = admin_user
         await _create_config(
-            async_db, config_group="system", config_key="locked",
-            config_value="不可改", is_editable=False,
+            async_db,
+            config_group="system",
+            config_key="locked",
+            config_value="不可改",
+            is_editable=False,
         )
 
         resp = await client.put(
             "/api/v1/configs",
-            json=[{
-                "config_group": "system",
-                "config_key": "locked",
-                "config_value": "尝试修改",
-            }],
+            json=[
+                {
+                    "config_group": "system",
+                    "config_key": "locked",
+                    "config_value": "尝试修改",
+                }
+            ],
             headers=auth_headers(token),
         )
         assert resp.status_code == 200
@@ -155,13 +163,15 @@ class TestUpdateConfigs:
         _, token = admin_user
         resp = await client.put(
             "/api/v1/configs",
-            json=[{
-                "config_group": "new_group",
-                "config_key": "new_key",
-                "config_value": "新配置",
-                "value_type": "string",
-                "description": "新建的配置",
-            }],
+            json=[
+                {
+                    "config_group": "new_group",
+                    "config_key": "new_key",
+                    "config_value": "新配置",
+                    "value_type": "string",
+                    "description": "新建的配置",
+                }
+            ],
             headers=auth_headers(token),
         )
         assert resp.status_code == 200
@@ -185,9 +195,7 @@ class TestGetDictionaries:
 
     async def test_get_empty(self, client, admin_user):
         _, token = admin_user
-        resp = await client.get(
-            "/api/v1/configs/dictionaries", headers=auth_headers(token)
-        )
+        resp = await client.get("/api/v1/configs/dictionaries", headers=auth_headers(token))
         assert resp.status_code == 200
         assert resp.json() == {}
 
@@ -197,9 +205,7 @@ class TestGetDictionaries:
         await _create_dictionary(async_db, dict_type="alarm_level", dict_code="major", dict_name="重要")
         await _create_dictionary(async_db, dict_type="device_type", dict_code="TH", dict_name="温湿度")
 
-        resp = await client.get(
-            "/api/v1/configs/dictionaries", headers=auth_headers(token)
-        )
+        resp = await client.get("/api/v1/configs/dictionaries", headers=auth_headers(token))
         assert resp.status_code == 200
         data = resp.json()
         assert "alarm_level" in data
@@ -225,9 +231,7 @@ class TestGetDictionaries:
         await _create_dictionary(async_db, dict_code="enabled", is_enabled=True)
         await _create_dictionary(async_db, dict_code="disabled", is_enabled=False)
 
-        resp = await client.get(
-            "/api/v1/configs/dictionaries", headers=auth_headers(token)
-        )
+        resp = await client.get("/api/v1/configs/dictionaries", headers=auth_headers(token))
         assert resp.status_code == 200
         data = resp.json()
         codes = [item["dict_code"] for items in data.values() for item in items]
@@ -244,9 +248,7 @@ class TestGetLicense:
     async def test_get_trial_default(self, client, admin_user):
         """无许可证时返回试用授权"""
         _, token = admin_user
-        resp = await client.get(
-            "/api/v1/configs/license", headers=auth_headers(token)
-        )
+        resp = await client.get("/api/v1/configs/license", headers=auth_headers(token))
         assert resp.status_code == 200
         data = resp.json()
         assert data["license_key"] == "TRIAL"
@@ -257,9 +259,7 @@ class TestGetLicense:
         _, token = admin_user
         await _create_license(async_db)
 
-        resp = await client.get(
-            "/api/v1/configs/license", headers=auth_headers(token)
-        )
+        resp = await client.get("/api/v1/configs/license", headers=auth_headers(token))
         assert resp.status_code == 200
         data = resp.json()
         assert data["license_type"] == "standard"
@@ -274,9 +274,7 @@ class TestGetLicense:
             expire_date=date(2020, 1, 1),
         )
 
-        resp = await client.get(
-            "/api/v1/configs/license", headers=auth_headers(token)
-        )
+        resp = await client.get("/api/v1/configs/license", headers=auth_headers(token))
         assert resp.status_code == 200
         assert resp.json()["status"] == "expired"
 
@@ -382,9 +380,7 @@ class TestBackupConfigs:
 
     async def test_backup_empty(self, client, admin_user):
         _, token = admin_user
-        resp = await client.get(
-            "/api/v1/configs/backup", headers=auth_headers(token)
-        )
+        resp = await client.get("/api/v1/configs/backup", headers=auth_headers(token))
         assert resp.status_code == 200
         data = resp.json()
         assert "backup_time" in data
@@ -397,9 +393,7 @@ class TestBackupConfigs:
         await _create_config(async_db, config_group="system", config_key="name", config_value="DCIM")
         await _create_dictionary(async_db, dict_type="level", dict_code="c", dict_name="紧急")
 
-        resp = await client.get(
-            "/api/v1/configs/backup", headers=auth_headers(token)
-        )
+        resp = await client.get("/api/v1/configs/backup", headers=auth_headers(token))
         assert resp.status_code == 200
         data = resp.json()
         assert len(data["configs"]) == 1
@@ -409,9 +403,7 @@ class TestBackupConfigs:
 
     async def test_backup_requires_admin(self, client, operator_user):
         _, token = operator_user
-        resp = await client.get(
-            "/api/v1/configs/backup", headers=auth_headers(token)
-        )
+        resp = await client.get("/api/v1/configs/backup", headers=auth_headers(token))
         assert resp.status_code == 403
 
 
@@ -443,9 +435,7 @@ class TestRestoreConfigs:
 
     async def test_restore_updates_existing(self, client, admin_user, async_db):
         _, token = admin_user
-        await _create_config(
-            async_db, config_group="system", config_key="name", config_value="旧值"
-        )
+        await _create_config(async_db, config_group="system", config_key="name", config_value="旧值")
 
         backup = {
             "configs": [

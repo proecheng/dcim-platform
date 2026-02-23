@@ -1,4 +1,5 @@
 """容量趋势预测 API 测试 — Story 7-6"""
+
 import pytest
 from datetime import datetime, timedelta
 
@@ -8,7 +9,9 @@ from sqlalchemy import delete
 
 from app.core.database import Base
 from app.models.capacity import (
-    CapacityHistory, CapacityType, SpaceCapacity,
+    CapacityHistory,
+    CapacityType,
+    SpaceCapacity,
 )
 from app.models.user import User
 from app.api.deps import get_db, require_viewer
@@ -17,6 +20,7 @@ from app.api.deps import get_db, require_viewer
 # ============================================================
 # Fixtures
 # ============================================================
+
 
 @pytest.fixture(scope="module")
 def anyio_backend():
@@ -86,6 +90,7 @@ async def client(app):
 # Helper
 # ============================================================
 
+
 async def _insert_history(session, cap_type, days_ago, usage_rate, total=1000.0, used=None):
     """插入一条 CapacityHistory 记录"""
     if used is None:
@@ -109,8 +114,8 @@ async def _insert_history(session, cap_type, days_ago, usage_rate, total=1000.0,
 # 测试 GET /api/v1/capacity/trend
 # ============================================================
 
-class TestCapacityTrend:
 
+class TestCapacityTrend:
     async def test_trend_empty_data(self, client: AsyncClient):
         """无数据时返回空数组"""
         resp = await client.get("/api/v1/capacity/trend", params={"type": "space"})
@@ -158,8 +163,8 @@ class TestCapacityTrend:
 # 测试 GET /api/v1/capacity/forecast
 # ============================================================
 
-class TestCapacityForecast:
 
+class TestCapacityForecast:
     async def test_forecast_demo(self, client: AsyncClient):
         """数据不足时返回 demo 数据"""
         resp = await client.get("/api/v1/capacity/forecast", params={"type": "space", "days": 30})
@@ -175,7 +180,8 @@ class TestCapacityForecast:
         """插入 30+ 天数据后返回真实预测"""
         for i in range(35):
             await _insert_history(
-                db_session, CapacityType.space,
+                db_session,
+                CapacityType.space,
                 days_ago=35 - i,
                 usage_rate=30.0 + i * 0.5,
             )
@@ -201,7 +207,8 @@ class TestCapacityForecast:
         for i in range(35):
             rate = 60.0 + i * 0.8  # 从60%到88%
             await _insert_history(
-                db_session, CapacityType.space,
+                db_session,
+                CapacityType.space,
                 days_ago=35 - i,
                 usage_rate=min(rate, 95.0),
             )
@@ -218,7 +225,8 @@ class TestCapacityForecast:
         """当前已超 80% 时立即生成建议"""
         for i in range(35):
             await _insert_history(
-                db_session, CapacityType.space,
+                db_session,
+                CapacityType.space,
                 days_ago=35 - i,
                 usage_rate=85.0 + i * 0.1,
             )

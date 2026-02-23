@@ -1,4 +1,5 @@
 """控制命令分级确认 API 测试 — Story 9-6"""
+
 import pytest
 from datetime import datetime, timedelta
 
@@ -16,6 +17,7 @@ from app.api.deps import get_db, require_admin, require_operator, require_viewer
 # ============================================================
 # Fixtures
 # ============================================================
+
 
 @pytest.fixture(scope="module")
 def anyio_backend():
@@ -41,9 +43,7 @@ async def db_session(session_factory):
     async with session_factory() as session:
         await session.execute(delete(CommandAuditLog))
         await session.execute(delete(CommandApproval))
-        await session.execute(delete(SystemConfig).where(
-            SystemConfig.config_group == "command_risk"
-        ))
+        await session.execute(delete(SystemConfig).where(SystemConfig.config_group == "command_risk"))
         await session.commit()
         yield session
 
@@ -114,6 +114,7 @@ CRITICAL_CMD = {
 # Helper
 # ============================================================
 
+
 async def _submit_critical(client) -> dict:
     """提交一个关键命令并返回响应 JSON"""
     resp = await client.post(f"{BASE_URL}/submit", json=CRITICAL_CMD)
@@ -124,6 +125,7 @@ async def _submit_critical(client) -> dict:
 # ============================================================
 # Tests — POST /submit
 # ============================================================
+
 
 @pytest.mark.anyio
 async def test_submit_normal_command(client):
@@ -150,6 +152,7 @@ async def test_submit_critical_command(client):
 # ============================================================
 # Tests — GET /approvals
 # ============================================================
+
 
 @pytest.mark.anyio
 async def test_list_approvals(client):
@@ -183,6 +186,7 @@ async def test_list_approvals_filter_status(client):
 # Tests — GET /approvals/{id}
 # ============================================================
 
+
 @pytest.mark.anyio
 async def test_get_approval_detail(client):
     """获取单个审批工单详情"""
@@ -209,6 +213,7 @@ async def test_get_approval_not_found(client):
 # ============================================================
 # Tests — POST /approvals/{id}/approve
 # ============================================================
+
 
 @pytest.mark.anyio
 async def test_approve_command(client):
@@ -246,6 +251,7 @@ async def test_approve_already_approved(client):
 # Tests — POST /approvals/{id}/reject
 # ============================================================
 
+
 @pytest.mark.anyio
 async def test_reject_command(client):
     """驳回审批工单，状态变为 rejected，包含驳回原因"""
@@ -280,6 +286,7 @@ async def test_reject_already_approved(client):
 # Tests — Approval timeout
 # ============================================================
 
+
 @pytest.mark.anyio
 async def test_approval_timeout(client, db_session):
     """超时审批工单在列表查询时被自动标记为 timeout"""
@@ -287,9 +294,7 @@ async def test_approval_timeout(client, db_session):
     approval_id = submit_data["approval_id"]
 
     # 手动将 expired_at 设为过去时间
-    result = await db_session.execute(
-        select(CommandApproval).where(CommandApproval.id == approval_id)
-    )
+    result = await db_session.execute(select(CommandApproval).where(CommandApproval.id == approval_id))
     approval = result.scalar_one()
     approval.expired_at = datetime.now() - timedelta(minutes=5)
     await db_session.commit()
@@ -305,6 +310,7 @@ async def test_approval_timeout(client, db_session):
 # ============================================================
 # Tests — GET /audit-logs
 # ============================================================
+
 
 @pytest.mark.anyio
 async def test_list_audit_logs(client):
@@ -325,6 +331,7 @@ async def test_list_audit_logs(client):
 # Tests — GET /risk-configs
 # ============================================================
 
+
 @pytest.mark.anyio
 async def test_get_risk_configs(client):
     """获取风险等级配置列表，包含默认配置"""
@@ -342,6 +349,7 @@ async def test_get_risk_configs(client):
 # ============================================================
 # Tests — PUT /risk-configs
 # ============================================================
+
 
 @pytest.mark.anyio
 async def test_update_risk_configs(client):

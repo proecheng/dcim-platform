@@ -1,4 +1,5 @@
 """连接测试功能测试 — Story 1.5"""
+
 import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -27,16 +28,20 @@ def _make_mock_adapter():
     adapter = AsyncMock()
     adapter.connect = AsyncMock(return_value=True)
     adapter.disconnect = AsyncMock()
-    adapter.test_connection = AsyncMock(return_value=ConnectionResult(
-        success=True,
-        message="连接成功",
-        latency_ms=12.5,
-        sample_data={"device_id": "test-001"},
-    ))
-    adapter.get_status = MagicMock(return_value=AdapterStatus(
-        state=AdapterState.DISCONNECTED,
-        error_message="某个错误",
-    ))
+    adapter.test_connection = AsyncMock(
+        return_value=ConnectionResult(
+            success=True,
+            message="连接成功",
+            latency_ms=12.5,
+            sample_data={"device_id": "test-001"},
+        )
+    )
+    adapter.get_status = MagicMock(
+        return_value=AdapterStatus(
+            state=AdapterState.DISCONNECTED,
+            error_message="某个错误",
+        )
+    )
     return adapter
 
 
@@ -56,6 +61,7 @@ class TestConnectionTestService:
         _setup_registry(mock_registry, "modbus_tcp", mock_adapter)
 
         from app.services.connection_test import test_datasource_connection
+
         result = await test_datasource_connection("modbus_tcp", {"ip": "1.2.3.4", "port": 502})
 
         assert result["success"] is True
@@ -67,13 +73,16 @@ class TestConnectionTestService:
     async def test_connection_failure(self, mock_registry):
         """连接成功但 test_connection 返回失败"""
         mock_adapter = _make_mock_adapter()
-        mock_adapter.test_connection = AsyncMock(return_value=ConnectionResult(
-            success=False,
-            message="设备无响应",
-        ))
+        mock_adapter.test_connection = AsyncMock(
+            return_value=ConnectionResult(
+                success=False,
+                message="设备无响应",
+            )
+        )
         _setup_registry(mock_registry, "modbus_tcp", mock_adapter)
 
         from app.services.connection_test import test_datasource_connection
+
         result = await test_datasource_connection("modbus_tcp", {"ip": "1.2.3.4", "port": 502})
 
         assert result["success"] is False
@@ -87,6 +96,7 @@ class TestConnectionTestService:
         _setup_registry(mock_registry, "modbus_tcp", mock_adapter)
 
         from app.services.connection_test import test_datasource_connection
+
         result = await test_datasource_connection("modbus_tcp", {"ip": "1.2.3.4", "port": 502})
 
         assert result["success"] is False
@@ -97,13 +107,16 @@ class TestConnectionTestService:
         """connect 返回 False, get_status.error_message 为 None → 回退到 '连接失败'"""
         mock_adapter = _make_mock_adapter()
         mock_adapter.connect = AsyncMock(return_value=False)
-        mock_adapter.get_status = MagicMock(return_value=AdapterStatus(
-            state=AdapterState.DISCONNECTED,
-            error_message=None,
-        ))
+        mock_adapter.get_status = MagicMock(
+            return_value=AdapterStatus(
+                state=AdapterState.DISCONNECTED,
+                error_message=None,
+            )
+        )
         _setup_registry(mock_registry, "modbus_tcp", mock_adapter)
 
         from app.services.connection_test import test_datasource_connection
+
         result = await test_datasource_connection("modbus_tcp", {"ip": "1.2.3.4", "port": 502})
 
         assert result["success"] is False
@@ -117,6 +130,7 @@ class TestConnectionTestService:
         _setup_registry(mock_registry, "modbus_tcp", mock_adapter)
 
         from app.services.connection_test import test_datasource_connection
+
         result = await test_datasource_connection("modbus_tcp", {"ip": "1.2.3.4", "port": 502})
 
         assert result["success"] is False
@@ -125,6 +139,7 @@ class TestConnectionTestService:
     async def test_unsupported_protocol(self):
         """不支持的协议类型 → ValueError"""
         from app.services.connection_test import test_datasource_connection
+
         with pytest.raises(ValueError, match="不支持的协议类型"):
             await test_datasource_connection("unknown_proto", {})
 
@@ -135,6 +150,7 @@ class TestConnectionTestService:
         _setup_registry(mock_registry, "modbus_tcp", mock_adapter)
 
         from app.services.connection_test import test_datasource_connection
+
         await test_datasource_connection("modbus_tcp", {"ip": "1.2.3.4", "port": 502})
 
         mock_adapter.disconnect.assert_awaited_once()
@@ -147,6 +163,7 @@ class TestConnectionTestService:
         _setup_registry(mock_registry, "modbus_tcp", mock_adapter)
 
         from app.services.connection_test import test_datasource_connection
+
         await test_datasource_connection("modbus_tcp", {"ip": "1.2.3.4", "port": 502})
 
         mock_adapter.disconnect.assert_awaited_once()
@@ -159,6 +176,7 @@ class TestConnectionTestService:
         _setup_registry(mock_registry, "modbus_tcp", mock_adapter)
 
         from app.services.connection_test import test_datasource_connection
+
         await test_datasource_connection("modbus_tcp", {"ip": "1.2.3.4", "port": 502})
 
         mock_adapter.disconnect.assert_awaited_once()
@@ -171,6 +189,7 @@ class TestConnectionTestService:
         _setup_registry(mock_registry, "modbus_tcp", mock_adapter)
 
         from app.services.connection_test import test_datasource_connection
+
         # 不应抛出异常
         result = await test_datasource_connection("modbus_tcp", {"ip": "1.2.3.4", "port": 502})
         assert result["success"] is True
@@ -183,6 +202,7 @@ class TestConnectionTestService:
         _setup_registry(mock_registry, "modbus_tcp", mock_adapter)
 
         from app.services.connection_test import test_datasource_connection
+
         result = await test_datasource_connection("modbus_tcp", {"ip": "1.2.3.4", "port": 502})
 
         assert result["success"] is False
@@ -195,6 +215,7 @@ class TestConnectionTestService:
         _setup_registry(mock_registry, "modbus_tcp", mock_adapter)
 
         from app.services.connection_test import test_datasource_connection
+
         result = await test_datasource_connection("modbus_tcp", {"ip": "1.2.3.4", "port": 502})
 
         assert isinstance(result, dict)
@@ -269,10 +290,13 @@ class TestConnectionTestAPI:
             "sample_data": None,
         }
 
-        resp = await client.post("/api/v1/datasources/test-connection", json={
-            "protocol_type": "modbus_tcp",
-            "connection_config": {"ip": "192.168.1.1", "port": 502},
-        })
+        resp = await client.post(
+            "/api/v1/datasources/test-connection",
+            json={
+                "protocol_type": "modbus_tcp",
+                "connection_config": {"ip": "192.168.1.1", "port": 502},
+            },
+        )
         assert resp.status_code == 200
         data = resp.json()
         assert data["success"] is True
@@ -283,10 +307,13 @@ class TestConnectionTestAPI:
         """POST /test-connection 不支持的协议 → 400"""
         mock_registry.__contains__ = lambda self, k: False
 
-        resp = await client.post("/api/v1/datasources/test-connection", json={
-            "protocol_type": "unknown_proto",
-            "connection_config": {},
-        })
+        resp = await client.post(
+            "/api/v1/datasources/test-connection",
+            json={
+                "protocol_type": "unknown_proto",
+                "connection_config": {},
+            },
+        )
         assert resp.status_code == 400
         assert "不支持的协议类型" in resp.json()["detail"]
 
@@ -298,10 +325,13 @@ class TestConnectionTestAPI:
 
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as ac:
-            resp = await ac.post("/api/v1/datasources/test-connection", json={
-                "protocol_type": "modbus_tcp",
-                "connection_config": {},
-            })
+            resp = await ac.post(
+                "/api/v1/datasources/test-connection",
+                json={
+                    "protocol_type": "modbus_tcp",
+                    "connection_config": {},
+                },
+            )
         assert resp.status_code == 401
 
         # 恢复
@@ -320,11 +350,14 @@ class TestConnectionTestAPI:
         }
 
         # 先创建一个数据源
-        create_resp = await client.post("/api/v1/datasources", json={
-            "name": "测试源",
-            "protocol_type": "modbus_tcp",
-            "connection_config": {"ip": "10.0.0.1", "port": 502},
-        })
+        create_resp = await client.post(
+            "/api/v1/datasources",
+            json={
+                "name": "测试源",
+                "protocol_type": "modbus_tcp",
+                "connection_config": {"ip": "10.0.0.1", "port": 502},
+            },
+        )
         ds_id = create_resp.json()["id"]
 
         resp = await client.post(f"/api/v1/datasources/{ds_id}/test-connection")
@@ -342,11 +375,14 @@ class TestConnectionTestAPI:
     async def test_api_test_existing_connection_unsupported_adapter(self, mock_registry, client):
         """POST /{id}/test-connection 协议不在 ADAPTER_REGISTRY → 400"""
         # 创建数据源时用 KNOWN_PROTOCOL_TYPES 白名单通过
-        create_resp = await client.post("/api/v1/datasources", json={
-            "name": "测试源2",
-            "protocol_type": "modbus_tcp",
-            "connection_config": {"ip": "10.0.0.2", "port": 502},
-        })
+        create_resp = await client.post(
+            "/api/v1/datasources",
+            json={
+                "name": "测试源2",
+                "protocol_type": "modbus_tcp",
+                "connection_config": {"ip": "10.0.0.2", "port": 502},
+            },
+        )
         ds_id = create_resp.json()["id"]
 
         # 但 _ADAPTER_REGISTRY 中不包含该协议
@@ -368,10 +404,13 @@ class TestConnectionTestAPI:
             "sample_data": None,
         }
 
-        await client.post("/api/v1/datasources/test-connection", json={
-            "protocol_type": "snmp_v2c",
-            "connection_config": {"host": "10.0.0.1", "community": "public"},
-        })
+        await client.post(
+            "/api/v1/datasources/test-connection",
+            json={
+                "protocol_type": "snmp_v2c",
+                "connection_config": {"host": "10.0.0.1", "community": "public"},
+            },
+        )
 
         mock_service.assert_awaited_once_with(
             "snmp_v2c",
@@ -390,10 +429,13 @@ class TestConnectionTestAPI:
             "sample_data": None,
         }
 
-        resp = await client.post("/api/v1/datasources/test-connection", json={
-            "protocol_type": "modbus_tcp",
-            "connection_config": {"ip": "192.168.1.1", "port": 502},
-        })
+        resp = await client.post(
+            "/api/v1/datasources/test-connection",
+            json={
+                "protocol_type": "modbus_tcp",
+                "connection_config": {"ip": "192.168.1.1", "port": 502},
+            },
+        )
         assert resp.status_code == 200
         data = resp.json()
         assert data["success"] is False
@@ -412,11 +454,14 @@ class TestConnectionTestAPI:
         }
 
         # 创建数据源
-        create_resp = await client.post("/api/v1/datasources", json={
-            "name": "DB配置测试",
-            "protocol_type": "modbus_tcp",
-            "connection_config": {"ip": "172.16.0.1", "port": 503},
-        })
+        create_resp = await client.post(
+            "/api/v1/datasources",
+            json={
+                "name": "DB配置测试",
+                "protocol_type": "modbus_tcp",
+                "connection_config": {"ip": "172.16.0.1", "port": 503},
+            },
+        )
         ds_id = create_resp.json()["id"]
 
         await client.post(f"/api/v1/datasources/{ds_id}/test-connection")

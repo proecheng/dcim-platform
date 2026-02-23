@@ -1,17 +1,15 @@
 """Modbus TCP 适配器单元测试 — Story 1.2"""
+
 import asyncio
-from datetime import datetime, timezone
 from unittest.mock import AsyncMock, MagicMock, patch, PropertyMock
 
 import pytest
 
 from gateway.adapters.base import (
     AdapterState,
-    ConnectionResult,
     DataQuality,
     DataSourceConfig,
     PointConfig,
-    PointValue,
 )
 from gateway.adapters.registry import ADAPTER_REGISTRY
 from gateway.adapters.modbus_tcp import (
@@ -24,6 +22,7 @@ from gateway.adapters.modbus_tcp import (
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture(autouse=True)
 def _clean_registry():
@@ -73,6 +72,7 @@ def _mock_client(connected: bool = True):
 # 1. 适配器注册
 # ---------------------------------------------------------------------------
 
+
 class TestAdapterRegistration:
     """测试适配器注册到 ADAPTER_REGISTRY"""
 
@@ -84,6 +84,7 @@ class TestAdapterRegistration:
 # ---------------------------------------------------------------------------
 # 2. 连接/断开生命周期
 # ---------------------------------------------------------------------------
+
 
 class TestConnectDisconnect:
     """测试连接和断开生命周期"""
@@ -159,6 +160,7 @@ class TestConnectDisconnect:
 # ---------------------------------------------------------------------------
 # 3. 四种寄存器类型读取
 # ---------------------------------------------------------------------------
+
 
 class TestReadRegisterTypes:
     """测试 HR, IR, CO, DI 四种寄存器类型读取"""
@@ -246,6 +248,7 @@ class TestReadRegisterTypes:
 # 4. 地址越界 → ABNORMAL
 # ---------------------------------------------------------------------------
 
+
 class TestAddressOutOfRange:
     """测试 ExceptionResponse(ILLEGAL_ADDRESS) → DataQuality.ABNORMAL"""
 
@@ -272,6 +275,7 @@ class TestAddressOutOfRange:
 # ---------------------------------------------------------------------------
 # 5. 数据类型转换
 # ---------------------------------------------------------------------------
+
 
 class TestDataTypeConversions:
     """测试各种数据类型转换"""
@@ -328,6 +332,7 @@ class TestDataTypeConversions:
 # 6. word_order 配置
 # ---------------------------------------------------------------------------
 
+
 class TestWordOrder:
     """测试 word_order 配置传递"""
 
@@ -342,23 +347,27 @@ class TestWordOrder:
         mock_instance.read_holding_registers = AsyncMock(return_value=response)
 
         # 使用 little word_order
-        config = _make_config(connection_params={
-            "host": "192.168.1.100",
-            "word_order": "little",
-        })
+        config = _make_config(
+            connection_params={
+                "host": "192.168.1.100",
+                "word_order": "little",
+            }
+        )
 
         adapter = ModbusTcpAdapter()
         await adapter.connect(config)
 
         points = [PointConfig(point_id="p_wo", address="HR:0:2", data_type="int32")]
 
-        with patch.object(
-            MockClientCls, "convert_from_registers", return_value=100000
-        ) as mock_convert:
+        with patch.object(MockClientCls, "convert_from_registers", return_value=100000) as mock_convert:
             results = await adapter.read_points(points)
             mock_convert.assert_called_once()
             call_args = mock_convert.call_args
-            assert call_args.kwargs.get("word_order") == "little" or call_args[0][2] == "little" if len(call_args[0]) > 2 else call_args.kwargs.get("word_order") == "little"
+            assert (
+                call_args.kwargs.get("word_order") == "little" or call_args[0][2] == "little"
+                if len(call_args[0]) > 2
+                else call_args.kwargs.get("word_order") == "little"
+            )
 
     @patch("gateway.adapters.modbus_tcp.AsyncModbusTcpClient")
     async def test_word_order_big_default(self, MockClientCls):
@@ -377,9 +386,7 @@ class TestWordOrder:
 
         points = [PointConfig(point_id="p_big", address="HR:0:2", data_type="uint32")]
 
-        with patch.object(
-            MockClientCls, "convert_from_registers", return_value=100000
-        ) as mock_convert:
+        with patch.object(MockClientCls, "convert_from_registers", return_value=100000) as mock_convert:
             await adapter.read_points(points)
             mock_convert.assert_called_once()
             call_args = mock_convert.call_args
@@ -390,6 +397,7 @@ class TestWordOrder:
 # 7. write_point
 # ---------------------------------------------------------------------------
 
+
 class TestWritePoint:
     """测试写入点位"""
 
@@ -399,9 +407,12 @@ class TestWritePoint:
         MockClient.return_value = mock_instance
 
         adapter = ModbusTcpAdapter()
-        config = _make_config(write_enabled=False, points=[
-            PointConfig(point_id="w1", address="HR:100", data_type="uint16"),
-        ])
+        config = _make_config(
+            write_enabled=False,
+            points=[
+                PointConfig(point_id="w1", address="HR:100", data_type="uint16"),
+            ],
+        )
         await adapter.connect(config)
 
         result = await adapter.write_point("w1", 42)
@@ -417,9 +428,12 @@ class TestWritePoint:
         mock_instance.write_register = AsyncMock(return_value=write_resp)
 
         adapter = ModbusTcpAdapter()
-        config = _make_config(write_enabled=True, points=[
-            PointConfig(point_id="w1", address="HR:100", data_type="uint16"),
-        ])
+        config = _make_config(
+            write_enabled=True,
+            points=[
+                PointConfig(point_id="w1", address="HR:100", data_type="uint16"),
+            ],
+        )
         await adapter.connect(config)
 
         result = await adapter.write_point("w1", 42)
@@ -436,9 +450,12 @@ class TestWritePoint:
         mock_instance.write_coil = AsyncMock(return_value=write_resp)
 
         adapter = ModbusTcpAdapter()
-        config = _make_config(write_enabled=True, points=[
-            PointConfig(point_id="c1", address="CO:5", data_type="bool"),
-        ])
+        config = _make_config(
+            write_enabled=True,
+            points=[
+                PointConfig(point_id="c1", address="CO:5", data_type="bool"),
+            ],
+        )
         await adapter.connect(config)
 
         result = await adapter.write_point("c1", True)
@@ -455,14 +472,15 @@ class TestWritePoint:
         mock_instance.write_registers = AsyncMock(return_value=write_resp)
 
         adapter = ModbusTcpAdapter()
-        config = _make_config(write_enabled=True, points=[
-            PointConfig(point_id="f1", address="HR:200:2", data_type="float32"),
-        ])
+        config = _make_config(
+            write_enabled=True,
+            points=[
+                PointConfig(point_id="f1", address="HR:200:2", data_type="float32"),
+            ],
+        )
         await adapter.connect(config)
 
-        with patch.object(
-            MockClient, "convert_to_registers", return_value=[0x4048, 0xF5C3]
-        ):
+        with patch.object(MockClient, "convert_to_registers", return_value=[0x4048, 0xF5C3]):
             result = await adapter.write_point("f1", 3.14)
             assert result is True
             mock_instance.write_registers.assert_awaited_once()
@@ -486,9 +504,12 @@ class TestWritePoint:
         MockClient.return_value = mock_instance
 
         adapter = ModbusTcpAdapter()
-        config = _make_config(write_enabled=True, points=[
-            PointConfig(point_id="ir1", address="IR:100", data_type="uint16"),
-        ])
+        config = _make_config(
+            write_enabled=True,
+            points=[
+                PointConfig(point_id="ir1", address="IR:100", data_type="uint16"),
+            ],
+        )
         await adapter.connect(config)
 
         result = await adapter.write_point("ir1", 42)
@@ -515,9 +536,7 @@ class TestWritePoint:
         adapter = ModbusTcpAdapter()
         await adapter.connect(config)
 
-        with patch.object(
-            MockClient, "convert_to_registers", return_value=[0xF5C3, 0x4048]
-        ) as mock_convert:
+        with patch.object(MockClient, "convert_to_registers", return_value=[0xF5C3, 0x4048]) as mock_convert:
             await adapter.write_point("f1", 3.14)
             mock_convert.assert_called_once()
             call_args = mock_convert.call_args
@@ -527,6 +546,7 @@ class TestWritePoint:
 # ---------------------------------------------------------------------------
 # 8. test_connection
 # ---------------------------------------------------------------------------
+
 
 class TestTestConnection:
     """测试连接测试功能"""
@@ -555,9 +575,7 @@ class TestTestConnection:
         mock_instance = _mock_client()
         MockClient.return_value = mock_instance
 
-        mock_instance.read_holding_registers = AsyncMock(
-            side_effect=Exception("Connection refused")
-        )
+        mock_instance.read_holding_registers = AsyncMock(side_effect=Exception("Connection refused"))
 
         adapter = ModbusTcpAdapter()
         await adapter.connect(_make_config())
@@ -606,6 +624,7 @@ class TestTestConnection:
 # ---------------------------------------------------------------------------
 # 9. 地址解析
 # ---------------------------------------------------------------------------
+
 
 class TestAddressParsing:
     """测试地址格式解析"""
@@ -671,6 +690,7 @@ class TestAddressParsing:
 # 补充: 单点失败不影响其他点位
 # ---------------------------------------------------------------------------
 
+
 class TestSinglePointFailureIsolation:
     """单点失败不应中断整个 read_points"""
 
@@ -687,9 +707,7 @@ class TestSinglePointFailureIsolation:
 
         bad_resp = ExceptionResponse(3, 0x02)
 
-        mock_instance.read_holding_registers = AsyncMock(
-            side_effect=[good_resp, bad_resp, good_resp]
-        )
+        mock_instance.read_holding_registers = AsyncMock(side_effect=[good_resp, bad_resp, good_resp])
 
         adapter = ModbusTcpAdapter()
         await adapter.connect(_make_config())
@@ -710,6 +728,7 @@ class TestSinglePointFailureIsolation:
 # ---------------------------------------------------------------------------
 # 补充: 自动类型转换标记 UNRELIABLE
 # ---------------------------------------------------------------------------
+
 
 class TestAutoConversionQuality:
     """类型转换失败后自动转 float 应标记 UNRELIABLE"""
@@ -741,6 +760,7 @@ class TestAutoConversionQuality:
 # ---------------------------------------------------------------------------
 # 补充: get_status
 # ---------------------------------------------------------------------------
+
 
 class TestGetStatus:
     """测试 get_status 返回"""

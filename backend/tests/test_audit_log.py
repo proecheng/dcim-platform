@@ -1,4 +1,5 @@
 """操作审计日志 API 测试 (Story 13-3)"""
+
 import pytest
 
 from httpx import AsyncClient, ASGITransport
@@ -14,6 +15,7 @@ from app.api.deps import get_db, require_admin
 # ============================================================
 # Fixtures
 # ============================================================
+
 
 @pytest.fixture(scope="module")
 def anyio_backend():
@@ -86,6 +88,7 @@ LOGS_URL = "/api/v1/logs"
 # Tests
 # ============================================================
 
+
 @pytest.mark.anyio
 async def test_get_operation_logs_empty(client):
     """获取操作日志 — 空列表"""
@@ -101,12 +104,7 @@ async def test_get_operation_logs_empty(client):
 async def test_get_operation_logs_with_data(client, db_session):
     """获取操作日志 — 有数据"""
     log = OperationLog(
-        user_id=1,
-        username="admin",
-        module="user",
-        action="create",
-        target_name="testuser",
-        ip_address="127.0.0.1"
+        user_id=1, username="admin", module="user", action="create", target_name="testuser", ip_address="127.0.0.1"
     )
     db_session.add(log)
     await db_session.commit()
@@ -123,10 +121,7 @@ async def test_get_operation_logs_with_data(client, db_session):
 async def test_get_operation_logs_filter_module(client, db_session):
     """按模块筛选操作日志"""
     for mod in ["user", "alarm", "config"]:
-        log = OperationLog(
-            user_id=1, username="admin",
-            module=mod, action="query"
-        )
+        log = OperationLog(user_id=1, username="admin", module=mod, action="query")
         db_session.add(log)
     await db_session.commit()
 
@@ -139,10 +134,7 @@ async def test_get_operation_logs_filter_module(client, db_session):
 @pytest.mark.anyio
 async def test_get_log_statistics(client, db_session):
     """获取日志统计"""
-    log = OperationLog(
-        user_id=1, username="admin",
-        module="user", action="create"
-    )
+    log = OperationLog(user_id=1, username="admin", module="user", action="create")
     db_session.add(log)
     await db_session.commit()
 
@@ -157,10 +149,7 @@ async def test_get_log_statistics(client, db_session):
 @pytest.mark.anyio
 async def test_export_operation_logs(client, db_session):
     """导出操作日志 CSV"""
-    log = OperationLog(
-        user_id=1, username="admin",
-        module="user", action="export"
-    )
+    log = OperationLog(user_id=1, username="admin", module="user", action="export")
     db_session.add(log)
     await db_session.commit()
 

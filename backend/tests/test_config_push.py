@@ -1,9 +1,9 @@
 """配置下发测试 — Story 2.3"""
+
 import json
 from datetime import datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy import select
@@ -18,6 +18,7 @@ from gateway.config_receiver import ConfigReceiver
 # ============================================================
 # Fixtures
 # ============================================================
+
 
 @pytest_asyncio.fixture
 async def db_session():
@@ -34,6 +35,7 @@ async def db_session():
 # Service 层测试
 # ============================================================
 
+
 class TestConfigPushService:
     """配置构建与下发服务测试"""
 
@@ -44,16 +46,24 @@ class TestConfigPushService:
         await db_session.flush()
 
         ds = DataSource(
-            name="数据源1", protocol_type="modbus_tcp", gateway_id=gw.id,
+            name="数据源1",
+            protocol_type="modbus_tcp",
+            gateway_id=gw.id,
             connection_config={"host": "127.0.0.1", "port": 502},
-            collection_interval=5, write_enabled=False, is_enabled=True,
+            collection_interval=5,
+            write_enabled=False,
+            is_enabled=True,
         )
         db_session.add(ds)
         await db_session.flush()
 
         pt = DataSourcePoint(
-            datasource_id=ds.id, point_id=100, address="40001",
-            data_type="float32", scale=1.0, offset=0.0,
+            datasource_id=ds.id,
+            point_id=100,
+            address="40001",
+            data_type="float32",
+            scale=1.0,
+            offset=0.0,
         )
         db_session.add(pt)
         await db_session.commit()
@@ -86,8 +96,11 @@ class TestConfigPushService:
         await db_session.flush()
 
         ds = DataSource(
-            name="DS1", protocol_type="modbus_tcp", gateway_id=gw.id,
-            connection_config={"host": "10.0.0.1", "port": 502}, is_enabled=True,
+            name="DS1",
+            protocol_type="modbus_tcp",
+            gateway_id=gw.id,
+            connection_config={"host": "10.0.0.1", "port": 502},
+            is_enabled=True,
         )
         db_session.add(ds)
         await db_session.commit()
@@ -118,6 +131,7 @@ class TestConfigPushService:
 # API 测试
 # ============================================================
 
+
 @pytest_asyncio.fixture
 async def api_client():
     """创建 API 测试客户端"""
@@ -144,16 +158,22 @@ async def api_client():
     # 预填测试数据
     async with session_factory() as session:
         gw = Gateway(
-            gateway_id="gw-api-cfg-001", name="API配置测试网关",
-            ip_address="192.168.1.1", status="online", site_id=1,
+            gateway_id="gw-api-cfg-001",
+            name="API配置测试网关",
+            ip_address="192.168.1.1",
+            status="online",
+            site_id=1,
             last_heartbeat=datetime.now(),
         )
         session.add(gw)
         await session.flush()
 
         ds = DataSource(
-            name="数据源1", protocol_type="modbus_tcp", gateway_id=gw.id,
-            connection_config={"host": "127.0.0.1", "port": 502}, is_enabled=True,
+            name="数据源1",
+            protocol_type="modbus_tcp",
+            gateway_id=gw.id,
+            connection_config={"host": "127.0.0.1", "port": 502},
+            is_enabled=True,
         )
         session.add(ds)
         await session.flush()
@@ -170,9 +190,7 @@ async def api_client():
         session.add(rec)
         await session.commit()
 
-    async with AsyncClient(
-        transport=ASGITransport(app=app), base_url="http://test"
-    ) as client:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         yield client, session_factory
 
     app.dependency_overrides.clear()
@@ -187,9 +205,7 @@ class TestConfigPushAPI:
         client, session_factory = api_client
 
         async with session_factory() as session:
-            result = await session.execute(
-                select(Gateway).where(Gateway.gateway_id == "gw-api-cfg-001")
-            )
+            result = await session.execute(select(Gateway).where(Gateway.gateway_id == "gw-api-cfg-001"))
             gw = result.scalar_one()
             gw_id = gw.id
 
@@ -208,9 +224,7 @@ class TestConfigPushAPI:
         client, session_factory = api_client
 
         async with session_factory() as session:
-            result = await session.execute(
-                select(Gateway).where(Gateway.gateway_id == "gw-api-cfg-001")
-            )
+            result = await session.execute(select(Gateway).where(Gateway.gateway_id == "gw-api-cfg-001"))
             gw = result.scalar_one()
             gw_id = gw.id
 
@@ -225,9 +239,7 @@ class TestConfigPushAPI:
         client, session_factory = api_client
 
         async with session_factory() as session:
-            result = await session.execute(
-                select(Gateway).where(Gateway.gateway_id == "gw-api-cfg-001")
-            )
+            result = await session.execute(select(Gateway).where(Gateway.gateway_id == "gw-api-cfg-001"))
             gw = result.scalar_one()
             gw_id = gw.id
 
@@ -244,33 +256,36 @@ class TestConfigPushAPI:
 # Gateway 侧测试
 # ============================================================
 
+
 class TestConfigReceiver:
     """远程配置接收器测试"""
 
     def test_config_receiver_parse_valid(self):
         """有效 JSON 解析为 DataSourceConfig 列表"""
         receiver = ConfigReceiver(gateway_id="gw-001")
-        payload = json.dumps({
-            "gateway_id": "gw-001",
-            "datasources": [
-                {
-                    "datasource_id": "ds-1",
-                    "protocol_type": "modbus_tcp",
-                    "connection_params": {"host": "10.0.0.1", "port": 502},
-                    "collection_interval": 10,
-                    "write_enabled": True,
-                    "points": [
-                        {
-                            "point_id": "pt-1",
-                            "address": "40001",
-                            "data_type": "float32",
-                            "scale": 1.5,
-                            "offset": 0.1,
-                        }
-                    ],
-                }
-            ],
-        })
+        payload = json.dumps(
+            {
+                "gateway_id": "gw-001",
+                "datasources": [
+                    {
+                        "datasource_id": "ds-1",
+                        "protocol_type": "modbus_tcp",
+                        "connection_params": {"host": "10.0.0.1", "port": 502},
+                        "collection_interval": 10,
+                        "write_enabled": True,
+                        "points": [
+                            {
+                                "point_id": "pt-1",
+                                "address": "40001",
+                                "data_type": "float32",
+                                "scale": 1.5,
+                                "offset": 0.1,
+                            }
+                        ],
+                    }
+                ],
+            }
+        )
 
         configs = receiver.handle_message(payload)
 
@@ -301,17 +316,19 @@ class TestConfigReceiver:
             gateway_id="gw-001",
             on_config_received=on_config,
         )
-        payload = json.dumps({
-            "gateway_id": "gw-001",
-            "datasources": [
-                {
-                    "datasource_id": "ds-cb",
-                    "protocol_type": "bacnet",
-                    "connection_params": {},
-                    "points": [],
-                }
-            ],
-        })
+        payload = json.dumps(
+            {
+                "gateway_id": "gw-001",
+                "datasources": [
+                    {
+                        "datasource_id": "ds-cb",
+                        "protocol_type": "bacnet",
+                        "connection_params": {},
+                        "points": [],
+                    }
+                ],
+            }
+        )
 
         configs = receiver.handle_message(payload)
 

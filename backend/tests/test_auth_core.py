@@ -1,9 +1,8 @@
 """
 认证 API 核心测试
 """
-import pytest
-from unittest.mock import patch, AsyncMock
-from app.models.user import User, UserSession, RolePermission
+
+from app.models.user import User, RolePermission
 from app.core.security import get_password_hash
 from tests.conftest import auth_headers
 
@@ -104,9 +103,7 @@ class TestAuthRefresh:
     async def test_refresh_token(self, client, admin_user):
         """测试刷新令牌"""
         _, token = admin_user
-        resp = await client.post(
-            "/api/v1/auth/refresh", headers=auth_headers(token)
-        )
+        resp = await client.post("/api/v1/auth/refresh", headers=auth_headers(token))
         assert resp.status_code == 200
         body = resp.json()
         assert "access_token" in body
@@ -119,9 +116,7 @@ class TestAuthLogout:
     async def test_logout(self, client, admin_user):
         """测试登出"""
         _, token = admin_user
-        resp = await client.post(
-            "/api/v1/auth/logout", headers=auth_headers(token)
-        )
+        resp = await client.post("/api/v1/auth/logout", headers=auth_headers(token))
         assert resp.status_code == 200
         assert "登出成功" in resp.json()["message"]
 
@@ -137,9 +132,7 @@ class TestAuthPermissions:
         async_db.add(perm)
         await async_db.flush()
 
-        resp = await client.get(
-            "/api/v1/auth/permissions", headers=auth_headers(token)
-        )
+        resp = await client.get("/api/v1/auth/permissions", headers=auth_headers(token))
         assert resp.status_code == 200
         body = resp.json()
         assert body["role"] == "admin"

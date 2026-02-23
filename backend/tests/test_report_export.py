@@ -1,18 +1,18 @@
 """对接报告导出测试 — Story 3.5"""
-import pytest
+
 import pytest_asyncio
 from io import BytesIO
 from openpyxl import load_workbook
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.core.database import Base
-from app.models.gateway import DataSource, DataSourcePoint
 from app.services.report_export import generate_integration_report
 
 
 # ============================================================
 # Fixtures
 # ============================================================
+
 
 @pytest_asyncio.fixture
 async def db_session():
@@ -29,16 +29,32 @@ async def db_session():
 # 测试
 # ============================================================
 
+
 class TestReportExport:
     """对接报告导出测试"""
 
     def test_generate_valid_excel(self):
         """测试生成有效 Excel 文件"""
         datasources = [
-            {"name": "DS-1", "protocol_type": "modbus_tcp", "connection_config": {"host": "192.168.1.1", "port": 502}, "status": "connected", "last_communication": "2026-01-01 12:00:00", "created_at": "2026-01-01 00:00:00", "is_enabled": True},
+            {
+                "name": "DS-1",
+                "protocol_type": "modbus_tcp",
+                "connection_config": {"host": "192.168.1.1", "port": 502},
+                "status": "connected",
+                "last_communication": "2026-01-01 12:00:00",
+                "created_at": "2026-01-01 00:00:00",
+                "is_enabled": True,
+            },
         ]
         points = [
-            {"datasource_name": "DS-1", "address": "40001", "data_type": "float32", "scale": 1.0, "offset": 0.0, "is_dry_contact": False},
+            {
+                "datasource_name": "DS-1",
+                "address": "40001",
+                "data_type": "float32",
+                "scale": 1.0,
+                "offset": 0.0,
+                "is_dry_contact": False,
+            },
         ]
         result = generate_integration_report(datasources, points)
         assert isinstance(result, bytes)
@@ -68,13 +84,50 @@ class TestReportExport:
     def test_data_filled_correctly(self):
         """测试数据正确填充"""
         datasources = [
-            {"name": "温湿度传感器", "protocol_type": "modbus_tcp", "connection_config": {"host": "10.0.0.1"}, "status": "connected", "last_communication": "2026-02-01", "created_at": "2026-01-15", "is_enabled": True},
-            {"name": "UPS监控", "protocol_type": "snmp_v2c", "connection_config": {"host": "10.0.0.2"}, "status": "disconnected", "last_communication": None, "created_at": "2026-01-20", "is_enabled": False},
+            {
+                "name": "温湿度传感器",
+                "protocol_type": "modbus_tcp",
+                "connection_config": {"host": "10.0.0.1"},
+                "status": "connected",
+                "last_communication": "2026-02-01",
+                "created_at": "2026-01-15",
+                "is_enabled": True,
+            },
+            {
+                "name": "UPS监控",
+                "protocol_type": "snmp_v2c",
+                "connection_config": {"host": "10.0.0.2"},
+                "status": "disconnected",
+                "last_communication": None,
+                "created_at": "2026-01-20",
+                "is_enabled": False,
+            },
         ]
         points = [
-            {"datasource_name": "温湿度传感器", "address": "40001", "data_type": "float32", "scale": 1.0, "offset": 0.0, "is_dry_contact": False},
-            {"datasource_name": "温湿度传感器", "address": "40003", "data_type": "uint16", "scale": 0.1, "offset": 0.0, "is_dry_contact": False},
-            {"datasource_name": "UPS监控", "address": "1.3.6.1.2.1.1.1.0", "data_type": "string", "scale": 1.0, "offset": 0.0, "is_dry_contact": True},
+            {
+                "datasource_name": "温湿度传感器",
+                "address": "40001",
+                "data_type": "float32",
+                "scale": 1.0,
+                "offset": 0.0,
+                "is_dry_contact": False,
+            },
+            {
+                "datasource_name": "温湿度传感器",
+                "address": "40003",
+                "data_type": "uint16",
+                "scale": 0.1,
+                "offset": 0.0,
+                "is_dry_contact": False,
+            },
+            {
+                "datasource_name": "UPS监控",
+                "address": "1.3.6.1.2.1.1.1.0",
+                "data_type": "string",
+                "scale": 1.0,
+                "offset": 0.0,
+                "is_dry_contact": True,
+            },
         ]
         result = generate_integration_report(datasources, points)
         wb = load_workbook(BytesIO(result))

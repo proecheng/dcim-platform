@@ -2,8 +2,8 @@
 消防分级联动策略测试
 Story 9-2
 """
+
 import pytest
-import time
 from unittest.mock import patch
 
 from httpx import AsyncClient, ASGITransport
@@ -14,14 +14,15 @@ from app.core.database import Base
 from app.models.linkage import LinkagePolicy, LinkageAction, LinkageExecution, LinkageLog
 from app.models.user import User
 from app.engines.event_bus import Event, EventPriority, get_event_bus
-from app.engines.cross_confirmation import CrossConfirmationService, FIRE_SENSOR_TYPES
-from app.services.fire_protection import load_yaml_policies, sync_to_database, reload, get_status
+from app.engines.cross_confirmation import CrossConfirmationService
+from app.services.fire_protection import load_yaml_policies, sync_to_database, reload
 from app.api.deps import get_db, require_admin, require_operator, require_viewer
 
 
 # ============================================================
 # Fixtures（与 test_linkage.py 保持一致的内存数据库模式）
 # ============================================================
+
 
 @pytest.fixture(scope="module")
 def anyio_backend():
@@ -109,23 +110,18 @@ async def client(app):
 # Test: YAML 加载（纯函数，无需数据库）
 # ============================================================
 
+
 def test_yaml_load():
     """测试 YAML 文件解析正确性"""
     policies = load_yaml_policies()
     assert len(policies) == 3, f"应有 3 条消防策略，实际 {len(policies)}"
 
     # 验证预警策略
-    warning_policies = [
-        p for p in policies
-        if p.get("trigger_condition", {}).get("fire_level") == "warning"
-    ]
+    warning_policies = [p for p in policies if p.get("trigger_condition", {}).get("fire_level") == "warning"]
     assert len(warning_policies) == 2, "应有 2 条预警级策略"
 
     # 验证联动策略
-    linkage_policies = [
-        p for p in policies
-        if p.get("trigger_condition", {}).get("fire_level") == "linkage"
-    ]
+    linkage_policies = [p for p in policies if p.get("trigger_condition", {}).get("fire_level") == "linkage"]
     assert len(linkage_policies) == 1, "应有 1 条联动级策略"
 
     # 验证联动策略有 7 个动作
@@ -141,6 +137,7 @@ def test_yaml_load():
 # ============================================================
 # Test: 数据库同步
 # ============================================================
+
 
 @pytest.mark.anyio
 async def test_sync_to_database(db_session):
@@ -164,6 +161,7 @@ async def test_sync_to_database(db_session):
 # ============================================================
 # Test: 重载
 # ============================================================
+
 
 @pytest.mark.anyio
 async def test_reload(db_session):
@@ -191,6 +189,7 @@ async def test_reload(db_session):
 # ============================================================
 # Test: 交叉确认
 # ============================================================
+
 
 @pytest.mark.anyio
 async def test_cross_confirmation():
@@ -245,6 +244,7 @@ async def test_cross_confirmation():
 # Test: 防重入
 # ============================================================
 
+
 @pytest.mark.anyio
 async def test_cross_confirmation_anti_reentrant():
     """测试 CROSS_CONFIRMED 事件不会再次进入交叉确认"""
@@ -273,6 +273,7 @@ async def test_cross_confirmation_anti_reentrant():
 # ============================================================
 # Test: 重试机制（直接操作缓存验证）
 # ============================================================
+
 
 @pytest.mark.anyio
 async def test_retry_count_in_cache(db_session):
@@ -307,6 +308,7 @@ async def test_retry_count_in_cache(db_session):
     class _FakeCtx:
         async def __aenter__(self):
             return db_session
+
         async def __aexit__(self, *args):
             pass
 
@@ -333,6 +335,7 @@ async def test_retry_count_in_cache(db_session):
 # Test: 消防策略 API
 # ============================================================
 
+
 @pytest.mark.anyio
 async def test_fire_protection_status(client):
     """测试 status 端点"""
@@ -346,13 +349,13 @@ async def test_fire_protection_status(client):
 @pytest.mark.anyio
 async def test_fire_protection_reload(client, db_session):
     """测试 reload 端点"""
-    from app.engines.linkage_engine import linkage_engine
     from app.engines import linkage_engine as le_module
 
     # patch linkage_engine.reload_policies 避免它内部调用 async_session
     class _FakeCtx:
         async def __aenter__(self):
             return db_session
+
         async def __aexit__(self, *args):
             pass
 

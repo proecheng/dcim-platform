@@ -1,6 +1,7 @@
 """
 测试节能方案 Pydantic Schemas
 """
+
 import pytest
 from decimal import Decimal
 from datetime import datetime
@@ -11,7 +12,7 @@ from app.schemas.proposal_schema import (
     MeasureAcceptRequest,
     ProposalMonitoringResponse,
     ExecutionLogResponse,
-    MeasureMonitoringResponse
+    MeasureMonitoringResponse,
 )
 
 
@@ -82,7 +83,7 @@ def test_measure_response_from_dict():
         "is_selected": False,
         "execution_status": "pending",
         "created_at": datetime.now(),
-        "updated_at": datetime.now()
+        "updated_at": datetime.now(),
     }
     schema = MeasureResponse(**data)
     assert schema.measure_code == "A1-001-M001"
@@ -99,7 +100,7 @@ def test_measure_response_minimal():
         "measure_code": "A1-001-M001",
         "regulation_object": "空压机系统",
         "created_at": datetime.now(),
-        "updated_at": datetime.now()
+        "updated_at": datetime.now(),
     }
     schema = MeasureResponse(**data)
     assert schema.id == 1
@@ -121,7 +122,7 @@ def test_proposal_response_from_dict():
         "status": "pending",
         "created_at": datetime.now(),
         "updated_at": datetime.now(),
-        "measures": []
+        "measures": [],
     }
     schema = ProposalResponse(**data)
     assert schema.proposal_code == "A1-20260124-001"
@@ -138,7 +139,7 @@ def test_proposal_response_with_measures():
         "regulation_object": "空压机系统",
         "annual_benefit": Decimal("50.00"),
         "created_at": datetime.now(),
-        "updated_at": datetime.now()
+        "updated_at": datetime.now(),
     }
 
     data = {
@@ -151,7 +152,7 @@ def test_proposal_response_with_measures():
         "status": "pending",
         "created_at": datetime.now(),
         "updated_at": datetime.now(),
-        "measures": [measure_data]
+        "measures": [measure_data],
     }
     schema = ProposalResponse(**data)
     assert len(schema.measures) == 1
@@ -168,7 +169,7 @@ def test_execution_log_response():
         "power_saved": Decimal("20.00"),
         "expected_power_saved": Decimal("18.00"),
         "result": "success",
-        "result_message": "执行成功"
+        "result_message": "执行成功",
     }
     schema = ExecutionLogResponse(**data)
     assert schema.power_saved == Decimal("20.00")
@@ -185,7 +186,7 @@ def test_measure_monitoring_response():
         "power_saved": Decimal("20.00"),
         "expected_power_saved": Decimal("18.00"),
         "result": "success",
-        "result_message": "执行成功"
+        "result_message": "执行成功",
     }
 
     data = {
@@ -196,7 +197,7 @@ def test_measure_monitoring_response():
         "actual_benefit": Decimal("45.00"),
         "execution_count": 10,
         "success_count": 9,
-        "latest_execution": log_data
+        "latest_execution": log_data,
     }
     schema = MeasureMonitoringResponse(**data)
     assert schema.measure_id == 1
@@ -213,7 +214,7 @@ def test_proposal_monitoring_response():
         "regulation_object": "空压机系统",
         "expected_benefit": Decimal("50.00"),
         "execution_count": 10,
-        "success_count": 9
+        "success_count": 9,
     }
 
     data = {
@@ -222,7 +223,7 @@ def test_proposal_monitoring_response():
         "template_name": "峰谷套利优化方案",
         "total_expected_benefit": Decimal("100.00"),
         "total_actual_benefit": Decimal("90.00"),
-        "measures": [measure_monitoring]
+        "measures": [measure_monitoring],
     }
     schema = ProposalMonitoringResponse(**data)
     assert schema.proposal_id == 1
@@ -239,7 +240,7 @@ def test_decimal_precision():
         "annual_benefit": Decimal("50.12345"),  # 高精度
         "investment": Decimal("100.99"),
         "created_at": datetime.now(),
-        "updated_at": datetime.now()
+        "updated_at": datetime.now(),
     }
     schema = MeasureResponse(**data)
     # Decimal 应该保留原始精度
@@ -257,7 +258,7 @@ def test_optional_fields():
         "actual_benefit": None,
         "execution_count": 0,
         "success_count": 0,
-        "latest_execution": None
+        "latest_execution": None,
     }
     schema = MeasureMonitoringResponse(**data)
     assert schema.expected_benefit is None

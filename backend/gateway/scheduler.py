@@ -84,8 +84,9 @@ class CollectionScheduler:
             name=f"collect-{ds_id}",
         )
         self._tasks[ds_id] = task
-        logger.info("添加数据源采集任务: %s (协议: %s, 间隔: %ds)",
-                     ds_id, config.protocol_type, config.collection_interval)
+        logger.info(
+            "添加数据源采集任务: %s (协议: %s, 间隔: %ds)", ds_id, config.protocol_type, config.collection_interval
+        )
 
     async def remove_datasource(self, datasource_id: str) -> None:
         """移除数据源并取消采集任务"""
@@ -151,7 +152,9 @@ class CollectionScheduler:
                     delay = retry.record_failure()
                     logger.warning(
                         "数据源 '%s' 连接返回 False (连续失败: %d, 下次重试: %.1fs)",
-                        ds_id, retry.failure_count, delay,
+                        ds_id,
+                        retry.failure_count,
+                        delay,
                     )
                     if retry.is_interrupted:
                         error_msg = f"数据源 '{ds_id}' 连接阶段通信中断，连续失败 {retry.failure_count} 次"
@@ -170,7 +173,10 @@ class CollectionScheduler:
                 delay = retry.record_failure()
                 logger.warning(
                     "数据源 '%s' 连接异常: %s (连续失败: %d, 下次重试: %.1fs)",
-                    ds_id, exc, retry.failure_count, delay,
+                    ds_id,
+                    exc,
+                    retry.failure_count,
+                    delay,
                 )
                 if retry.is_interrupted:
                     error_msg = f"数据源 '{ds_id}' 连接阶段通信中断，连续失败 {retry.failure_count} 次"
@@ -241,7 +247,10 @@ class CollectionScheduler:
                     delay = retry.record_failure()
                     logger.warning(
                         "数据源 '%s' 采集异常: %s (连续失败: %d, 下次重试: %.1fs)",
-                        ds_id, exc, retry.failure_count, delay,
+                        ds_id,
+                        exc,
+                        retry.failure_count,
+                        delay,
                     )
 
                     # 通信中断处理

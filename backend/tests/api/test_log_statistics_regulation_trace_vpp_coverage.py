@@ -1,34 +1,46 @@
 """
 日志/统计/负荷调节/数据追溯/VPP 五模块 API 覆盖率测试
 """
-import pytest
-from datetime import datetime, timedelta
+
+from datetime import datetime
 from unittest.mock import AsyncMock, patch, MagicMock
 
 from app.models.log import OperationLog, SystemLog, CommunicationLog
-from app.models.point import Point, PointRealtime
+from app.models.point import Point
 from app.models.device import Device
-from app.models.alarm import Alarm
 from tests.conftest import auth_headers
 
 
 # ============== 辅助函数 ==============
 
+
 async def _seed_logs(db):
     """创建日志种子数据"""
     now = datetime.now()
     op = OperationLog(
-        user_id=1, username="admin", module="point", action="create",
-        target_name="测试点位", ip_address="127.0.0.1",
-        remark="测试操作", created_at=now,
+        user_id=1,
+        username="admin",
+        module="point",
+        action="create",
+        target_name="测试点位",
+        ip_address="127.0.0.1",
+        remark="测试操作",
+        created_at=now,
     )
     sys_log = SystemLog(
-        log_level="ERROR", module="alarm", message="测试系统日志",
-        exception="TestException", created_at=now,
+        log_level="ERROR",
+        module="alarm",
+        message="测试系统日志",
+        exception="TestException",
+        created_at=now,
     )
     comm = CommunicationLog(
-        device_id=1, comm_type="request", protocol="modbus",
-        status="success", duration_ms=50, created_at=now,
+        device_id=1,
+        comm_type="request",
+        protocol="modbus",
+        status="success",
+        duration_ms=50,
+        created_at=now,
     )
     db.add_all([op, sys_log, comm])
     await db.flush()
@@ -38,12 +50,19 @@ async def _seed_logs(db):
 async def _seed_statistics_data(db):
     """创建统计模块种子数据"""
     p = Point(
-        point_code="STAT-AI-001", point_name="统计测试点位",
-        point_type="AI", device_type="UPS", area_code="A1", is_enabled=True,
+        point_code="STAT-AI-001",
+        point_name="统计测试点位",
+        point_type="AI",
+        device_type="UPS",
+        area_code="A1",
+        is_enabled=True,
     )
     d = Device(
-        device_code="STAT-DEV-001", device_name="统计测试设备",
-        device_type="UPS", status="online", area_code="A1",
+        device_code="STAT-DEV-001",
+        device_name="统计测试设备",
+        device_type="UPS",
+        status="online",
+        area_code="A1",
     )
     db.add_all([p, d])
     await db.flush()
@@ -51,6 +70,7 @@ async def _seed_statistics_data(db):
 
 
 # ============== 日志模块 ==============
+
 
 class TestLogOperations:
     """日志 API: /api/v1/logs/*"""
@@ -178,6 +198,7 @@ class TestLogOperations:
 
 # ============== 统计分析模块 ==============
 
+
 class TestStatistics:
     """统计分析 API: /api/v1/statistics/*"""
 
@@ -267,6 +288,7 @@ class TestStatistics:
 
 # ============== 负荷调节模块 ==============
 
+
 class TestRegulation:
     """负荷调节 API: /api/v1/regulation/*"""
 
@@ -275,7 +297,8 @@ class TestRegulation:
         _, token = admin_user
         with patch(
             "app.services.load_regulation.LoadRegulationService.get_configs",
-            new_callable=AsyncMock, return_value=[],
+            new_callable=AsyncMock,
+            return_value=[],
         ):
             resp = await client.get("/api/v1/regulation/configs", headers=auth_headers(token))
         assert resp.status_code == 200
@@ -286,7 +309,8 @@ class TestRegulation:
         _, token = admin_user
         with patch(
             "app.services.load_regulation.LoadRegulationService.get_config_by_id",
-            new_callable=AsyncMock, return_value=None,
+            new_callable=AsyncMock,
+            return_value=None,
         ):
             resp = await client.get("/api/v1/regulation/configs/999", headers=auth_headers(token))
         assert resp.status_code == 404
@@ -297,28 +321,48 @@ class TestRegulation:
         mock_config = MagicMock()
         mock_config.id = 1
         mock_resp = {
-            "id": 1, "device_id": 1, "regulation_type": "temperature",
-            "min_value": 18.0, "max_value": 28.0, "current_value": 24.0,
-            "default_value": 24.0, "step_size": 1.0, "unit": "℃",
-            "power_factor": 0.5, "base_power": 10.0, "priority": 5,
-            "comfort_impact": "low", "performance_impact": "none",
-            "power_curve": None, "is_enabled": True, "is_auto": False,
+            "id": 1,
+            "device_id": 1,
+            "regulation_type": "temperature",
+            "min_value": 18.0,
+            "max_value": 28.0,
+            "current_value": 24.0,
+            "default_value": 24.0,
+            "step_size": 1.0,
+            "unit": "℃",
+            "power_factor": 0.5,
+            "base_power": 10.0,
+            "priority": 5,
+            "comfort_impact": "low",
+            "performance_impact": "none",
+            "power_curve": None,
+            "is_enabled": True,
+            "is_auto": False,
             "created_at": datetime.now().isoformat(),
             "updated_at": datetime.now().isoformat(),
-            "device_name": "测试空调", "device_type": "AC", "rated_power": 10.0,
+            "device_name": "测试空调",
+            "device_type": "AC",
+            "rated_power": 10.0,
         }
-        with patch(
-            "app.services.load_regulation.LoadRegulationService.create_config",
-            new_callable=AsyncMock, return_value=mock_config,
-        ), patch(
-            "app.services.load_regulation.LoadRegulationService.get_config_by_id",
-            new_callable=AsyncMock, return_value=mock_resp,
+        with (
+            patch(
+                "app.services.load_regulation.LoadRegulationService.create_config",
+                new_callable=AsyncMock,
+                return_value=mock_config,
+            ),
+            patch(
+                "app.services.load_regulation.LoadRegulationService.get_config_by_id",
+                new_callable=AsyncMock,
+                return_value=mock_resp,
+            ),
         ):
             resp = await client.post(
                 "/api/v1/regulation/configs",
                 json={
-                    "device_id": 1, "regulation_type": "temperature",
-                    "min_value": 18.0, "max_value": 28.0,
+                    "device_id": 1,
+                    "regulation_type": "temperature",
+                    "min_value": 18.0,
+                    "max_value": 28.0,
                 },
                 headers=auth_headers(token),
             )
@@ -329,7 +373,8 @@ class TestRegulation:
         _, token = admin_user
         with patch(
             "app.services.load_regulation.LoadRegulationService.delete_config",
-            new_callable=AsyncMock, return_value=False,
+            new_callable=AsyncMock,
+            return_value=False,
         ):
             resp = await client.delete("/api/v1/regulation/configs/999", headers=auth_headers(token))
         assert resp.status_code == 404
@@ -339,7 +384,8 @@ class TestRegulation:
         _, token = admin_user
         with patch(
             "app.services.load_regulation.LoadRegulationService.simulate_regulation",
-            new_callable=AsyncMock, return_value=None,
+            new_callable=AsyncMock,
+            return_value=None,
         ):
             resp = await client.post(
                 "/api/v1/regulation/simulate",
@@ -353,7 +399,8 @@ class TestRegulation:
         _, token = admin_user
         with patch(
             "app.services.load_regulation.LoadRegulationService.apply_regulation",
-            new_callable=AsyncMock, return_value=None,
+            new_callable=AsyncMock,
+            return_value=None,
         ):
             resp = await client.post(
                 "/api/v1/regulation/apply",
@@ -367,7 +414,8 @@ class TestRegulation:
         _, token = admin_user
         with patch(
             "app.services.load_regulation.LoadRegulationService.get_history",
-            new_callable=AsyncMock, return_value=[],
+            new_callable=AsyncMock,
+            return_value=[],
         ):
             resp = await client.get("/api/v1/regulation/history", headers=auth_headers(token))
         assert resp.status_code == 200
@@ -378,13 +426,15 @@ class TestRegulation:
         _, token = admin_user
         with patch(
             "app.services.load_regulation.LoadRegulationService.get_recommendations",
-            new_callable=AsyncMock, return_value=[],
+            new_callable=AsyncMock,
+            return_value=[],
         ):
             resp = await client.get("/api/v1/regulation/recommendations", headers=auth_headers(token))
         assert resp.status_code == 200
 
 
 # ============== 数据追溯链模块 ==============
+
 
 class TestTrace:
     """数据追溯链 API: /api/v1/trace/*"""
@@ -394,7 +444,8 @@ class TestTrace:
         _, token = admin_user
         with patch(
             "app.services.data_trace_service.DataTraceService.get_trace_by_id",
-            new_callable=AsyncMock, return_value=None,
+            new_callable=AsyncMock,
+            return_value=None,
         ):
             resp = await client.get("/api/v1/trace/nonexistent-id", headers=auth_headers(token))
         assert resp.status_code == 404
@@ -404,7 +455,8 @@ class TestTrace:
         _, token = admin_user
         with patch(
             "app.services.data_trace_service.DataTraceService.get_trace_tree",
-            new_callable=AsyncMock, return_value=None,
+            new_callable=AsyncMock,
+            return_value=None,
         ):
             resp = await client.get("/api/v1/trace/nonexistent-id/tree", headers=auth_headers(token))
         assert resp.status_code == 404
@@ -431,7 +483,8 @@ class TestTrace:
         mock_trace.filter_condition = None
         with patch(
             "app.services.data_trace_service.DataTraceService.get_trace_by_id",
-            new_callable=AsyncMock, return_value=mock_trace,
+            new_callable=AsyncMock,
+            return_value=mock_trace,
         ):
             resp = await client.get("/api/v1/trace/TR-001", headers=auth_headers(token))
         assert resp.status_code == 200
@@ -442,7 +495,8 @@ class TestTrace:
         _, token = admin_user
         with patch(
             "app.services.data_trace_service.DataTraceService.get_traces_by_proposal",
-            new_callable=AsyncMock, return_value=[],
+            new_callable=AsyncMock,
+            return_value=[],
         ):
             resp = await client.get("/api/v1/trace/proposal/1", headers=auth_headers(token))
         assert resp.status_code == 200
@@ -453,7 +507,8 @@ class TestTrace:
         _, token = admin_user
         with patch(
             "app.services.data_trace_service.DataTraceService.get_traces_by_measure",
-            new_callable=AsyncMock, return_value=[],
+            new_callable=AsyncMock,
+            return_value=[],
         ):
             resp = await client.get("/api/v1/trace/measure/1", headers=auth_headers(token))
         assert resp.status_code == 200
@@ -518,7 +573,8 @@ class TestTrace:
         _, token = admin_user
         with patch(
             "app.services.data_trace_service.DataTraceService.get_template_parameters",
-            new_callable=AsyncMock, return_value=[],
+            new_callable=AsyncMock,
+            return_value=[],
         ):
             resp = await client.get("/api/v1/trace/templates/A1/params", headers=auth_headers(token))
         assert resp.status_code == 200
@@ -533,6 +589,7 @@ class TestTrace:
 
 
 # ============== VPP 方案分析模块 ==============
+
 
 class TestVPP:
     """VPP 方案分析 API: /api/v1/vpp/*"""
@@ -552,7 +609,8 @@ class TestVPP:
         mock_result = {"P_max": {"value": 100, "unit": "kW"}}
         with patch(
             "app.services.vpp_calculator.VPPCalculator.calc_load_metrics",
-            new_callable=AsyncMock, return_value=mock_result,
+            new_callable=AsyncMock,
+            return_value=mock_result,
         ):
             resp = await client.get(
                 "/api/v1/vpp/load-metrics",
@@ -568,7 +626,8 @@ class TestVPP:
         mock_result = {"market_ratio": {"value": 68.0, "unit": "%"}}
         with patch(
             "app.services.vpp_calculator.VPPCalculator.calc_cost_structure",
-            new_callable=AsyncMock, return_value=mock_result,
+            new_callable=AsyncMock,
+            return_value=mock_result,
         ):
             resp = await client.get("/api/v1/vpp/cost-structure/2025-01", headers=auth_headers(token))
         assert resp.status_code == 200
@@ -579,7 +638,8 @@ class TestVPP:
         mock_result = {"transferable_load": {"value": 4500, "unit": "kW"}}
         with patch(
             "app.services.vpp_calculator.VPPCalculator.calc_transfer_potential",
-            new_callable=AsyncMock, return_value=mock_result,
+            new_callable=AsyncMock,
+            return_value=mock_result,
         ):
             resp = await client.get("/api/v1/vpp/transfer-potential", headers=auth_headers(token))
         assert resp.status_code == 200
@@ -590,7 +650,8 @@ class TestVPP:
         mock_result = {"total_vpp_revenue": {"value": 1710000, "unit": "元/年"}}
         with patch(
             "app.services.vpp_calculator.VPPCalculator.calc_vpp_revenue",
-            new_callable=AsyncMock, return_value=mock_result,
+            new_callable=AsyncMock,
+            return_value=mock_result,
         ):
             resp = await client.get(
                 "/api/v1/vpp/vpp-revenue",
@@ -605,7 +666,8 @@ class TestVPP:
         mock_result = {"roi": {"value": 312.5, "unit": "%"}}
         with patch(
             "app.services.vpp_calculator.VPPCalculator.calc_roi",
-            new_callable=AsyncMock, return_value=mock_result,
+            new_callable=AsyncMock,
+            return_value=mock_result,
         ):
             resp = await client.get(
                 "/api/v1/vpp/roi",
@@ -620,7 +682,8 @@ class TestVPP:
         mock_result = {"summary": {"total_benefit": 5000000}}
         with patch(
             "app.services.vpp_calculator.VPPCalculator.generate_full_analysis",
-            new_callable=AsyncMock, return_value=mock_result,
+            new_callable=AsyncMock,
+            return_value=mock_result,
         ):
             resp = await client.post(
                 "/api/v1/vpp/analysis",

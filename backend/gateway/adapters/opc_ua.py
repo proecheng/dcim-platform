@@ -11,6 +11,7 @@
   每个 OpcUaAdapter 持有独立的 asyncua.Client 实例
   （OPC-UA 没有端口绑定限制，每个连接是独立的 TCP session）
 """
+
 import asyncio
 import logging
 import re
@@ -46,9 +47,7 @@ SECURITY_POLICY_MAP: dict[str, str] = {
 # ─── NodeId 验证 ──────────────────────────────────────────────
 
 # OPC-UA NodeId 格式: [ns=N;]{i=数字|s=字符串|g=GUID|b=Base64}
-_NODEID_PATTERN = re.compile(
-    r"^(ns=\d+;)?(i=\d+|s=.+|g=[0-9a-fA-F\-]+|b=[A-Za-z0-9+/=]+)$"
-)
+_NODEID_PATTERN = re.compile(r"^(ns=\d+;)?(i=\d+|s=.+|g=[0-9a-fA-F\-]+|b=[A-Za-z0-9+/=]+)$")
 
 
 def validate_node_id(address: str) -> bool:
@@ -65,6 +64,7 @@ def validate_node_id(address: str) -> bool:
 
 
 # ─── OPC-UA 适配器 ───────────────────────────────────────────
+
 
 @register_adapter("opc_ua")
 class OpcUaAdapter(BaseProtocolAdapter):
@@ -152,10 +152,7 @@ class OpcUaAdapter(BaseProtocolAdapter):
         # 验证安全策略
         if security_policy != "none" and security_policy not in SECURITY_POLICY_MAP:
             self._state = AdapterState.CONFIG_ERROR
-            self._error_message = (
-                f"不支持的安全策略: {security_policy}，"
-                f"支持: {list(SECURITY_POLICY_MAP.keys())}"
-            )
+            self._error_message = f"不支持的安全策略: {security_policy}，支持: {list(SECURITY_POLICY_MAP.keys())}"
             return False
 
         # 验证点位地址格式
@@ -193,7 +190,9 @@ class OpcUaAdapter(BaseProtocolAdapter):
             self._error_message = None
             logger.info(
                 "OPC-UA 适配器已连接: %s (auth=%s, security=%s)",
-                self._endpoint_url, auth_type, security_policy,
+                self._endpoint_url,
+                auth_type,
+                security_policy,
             )
             return True
 
@@ -250,7 +249,11 @@ class OpcUaAdapter(BaseProtocolAdapter):
         mode = mode_map.get(security_mode.lower(), ua.MessageSecurityMode.SignAndEncrypt)
 
         await self._client.set_security(
-            policy_cls, cert_path, key_path, server_cert, mode,
+            policy_cls,
+            cert_path,
+            key_path,
+            server_cert,
+            mode,
         )
 
     async def disconnect(self) -> None:
@@ -349,9 +352,7 @@ class OpcUaAdapter(BaseProtocolAdapter):
                             timestamp=datetime.now(timezone.utc),
                         )
 
-                if self._consecutive_failures >= (
-                    self._config.retry_max_failures if self._config else 5
-                ):
+                if self._consecutive_failures >= (self._config.retry_max_failures if self._config else 5):
                     self._state = AdapterState.COMMUNICATION_INTERRUPTED
 
         self._last_read_time = datetime.now(timezone.utc)
@@ -545,9 +546,7 @@ class OpcUaAdapter(BaseProtocolAdapter):
 
                     # 只递归 Object 和 Variable 节点
                     if node_class in (ua.NodeClass.Object, ua.NodeClass.Variable):
-                        entry["children"] = await self._browse_recursive(
-                            child, max_depth, current_depth + 1
-                        )
+                        entry["children"] = await self._browse_recursive(child, max_depth, current_depth + 1)
                     else:
                         entry["children"] = []
 

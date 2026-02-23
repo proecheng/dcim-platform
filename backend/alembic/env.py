@@ -1,5 +1,4 @@
 import sys
-import os
 from logging.config import fileConfig
 from pathlib import Path
 
@@ -18,6 +17,7 @@ config = context.config
 # 从 Settings 读取 DATABASE_URL（支持环境变量切换）
 # Alembic 需要同步 URL，将 async driver 转换为同步 driver
 from app.core.config import get_settings
+
 _settings = get_settings()
 _db_url = _settings.database_url
 
@@ -39,35 +39,8 @@ if config.config_file_name is not None:
 # for 'autogenerate' support
 # Import all models to register them with the Base metadata
 from app.core.database import Base
-from app.models import (
-    User, RolePermission, UserLoginHistory,
-    Device, Point, PointRealtime, PointGroup, PointGroupMember,
-    AlarmThreshold, Alarm, AlarmRule, AlarmShield, AlarmDailyStats, AlarmEscalation,
-    PointHistory, PointHistoryArchive, PointChangeLog,
-    OperationLog, SystemLog, CommunicationLog,
-    ReportTemplate, ReportRecord,
-    SystemConfig, Dictionary, License,
-    PowerDevice, EnergyHourly, EnergyDaily, EnergyMonthly,
-    ElectricityPricing, EnergySuggestion, PUEHistory,
-    AssetStatus, AssetType, Cabinet, Asset, AssetLifecycle,
-    MaintenanceRecord, AssetInventory, AssetInventoryItem,
-    CapacityType, CapacityStatus, SpaceCapacity, PowerCapacity,
-    CoolingCapacity, WeightCapacity, CapacityPlan, CapacityHistory,
-    WorkOrderStatus, WorkOrderType, WorkOrderPriority, InspectionStatus,
-    WorkOrder, WorkOrderLog, InspectionPlan, InspectionTask, KnowledgeBase,
-    FloorMap,
-    ElectricityBill, LoadCurve, ElectricityPrice, AdjustableLoad, VPPConfig
-)
 
 # Import energy models directly that are not in __init__
-from app.models.energy import (
-    Transformer, MeterPoint, DistributionPanel, DistributionCircuit,
-    PowerCurveData, DemandHistory, OverDemandEvent,
-    DeviceLoadProfile, DeviceShiftConfig,
-    LoadRegulationConfig, RegulationHistory,
-    DemandAnalysisRecord, Demand15MinData,
-    EnergySavingProposal, ProposalMeasure, MeasureExecutionLog
-)
 
 target_metadata = Base.metadata
 
@@ -115,9 +88,7 @@ def run_migrations_online() -> None:
     )
 
     with connectable.connect() as connection:
-        context.configure(
-            connection=connection, target_metadata=target_metadata
-        )
+        context.configure(connection=connection, target_metadata=target_metadata)
 
         with context.begin_transaction():
             context.run_migrations()

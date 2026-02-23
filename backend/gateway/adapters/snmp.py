@@ -1,4 +1,5 @@
 """SNMP v2c/v3 协议适配器 — 基于 pysnmp 7.x asyncio API"""
+
 import asyncio
 import logging
 import time
@@ -152,9 +153,7 @@ class SnmpAdapter(BaseProtocolAdapter):
 
         # 创建引擎和传输目标
         self._engine = SnmpEngine()
-        self._transport = await UdpTransportTarget.create(
-            (host, port), timeout=timeout, retries=0
-        )
+        self._transport = await UdpTransportTarget.create((host, port), timeout=timeout, retries=0)
 
         # 根据协议类型构建认证数据
         if config.protocol_type == "snmp_v3":
@@ -214,7 +213,8 @@ class SnmpAdapter(BaseProtocolAdapter):
                     except (IndexError, TypeError):
                         idx_info = "?"
                 self._error_message = "SNMP 协议错误: %s at %s" % (
-                    error_status.prettyPrint(), idx_info,
+                    error_status.prettyPrint(),
+                    idx_info,
                 )
                 self._state = AdapterState.DISCONNECTED
                 self._engine = None
@@ -257,9 +257,7 @@ class SnmpAdapter(BaseProtocolAdapter):
         if auth_protocol_name:
             auth_proto = AUTH_PROTOCOLS.get(auth_protocol_name.upper())
             if auth_proto is None:
-                raise ValueError(
-                    "不支持的认证协议: %s，支持: %s" % (auth_protocol_name, list(AUTH_PROTOCOLS.keys()))
-                )
+                raise ValueError("不支持的认证协议: %s，支持: %s" % (auth_protocol_name, list(AUTH_PROTOCOLS.keys())))
             if not auth_key:
                 raise ValueError("认证协议 %s 需要提供 auth_key" % auth_protocol_name)
             kwargs["authKey"] = auth_key
@@ -268,9 +266,7 @@ class SnmpAdapter(BaseProtocolAdapter):
         if priv_protocol_name:
             priv_proto = PRIV_PROTOCOLS.get(priv_protocol_name.upper())
             if priv_proto is None:
-                raise ValueError(
-                    "不支持的加密协议: %s，支持: %s" % (priv_protocol_name, list(PRIV_PROTOCOLS.keys()))
-                )
+                raise ValueError("不支持的加密协议: %s，支持: %s" % (priv_protocol_name, list(PRIV_PROTOCOLS.keys())))
             if not priv_key:
                 raise ValueError("加密协议 %s 需要提供 priv_key" % priv_protocol_name)
             kwargs["privKey"] = priv_key
@@ -372,7 +368,7 @@ class SnmpAdapter(BaseProtocolAdapter):
                     self._auth_data,
                     self._transport,
                     ContextData(),
-                    0,   # non_repeaters
+                    0,  # non_repeaters
                     25,  # max_repetitions
                     ObjectType(ObjectIdentity(oid)),
                 ):
@@ -424,6 +420,7 @@ class SnmpAdapter(BaseProtocolAdapter):
     async def test_connection(self) -> ConnectionResult:
         """测试连接 — 读取 sysDescr，超时 10 秒"""
         try:
+
             async def _test() -> ConnectionResult:
                 if self._engine is None:
                     if self._config:

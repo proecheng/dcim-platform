@@ -10,12 +10,13 @@ Converts point_history to a TimescaleDB hypertable (partitioned by recorded_at).
 - Retention policy: auto-drop after 90 days
 Only runs on PostgreSQL + TimescaleDB; skipped on SQLite.
 """
+
 from alembic import op
 import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
-revision = 'a002_timescaledb_hypertable'
-down_revision = 'a001_full_schema'
+revision = "a002_timescaledb_hypertable"
+down_revision = "a001_full_schema"
 branch_labels = None
 depends_on = None
 
@@ -23,9 +24,7 @@ depends_on = None
 def _is_timescaledb(connection) -> bool:
     """检测当前数据库是否安装了 TimescaleDB 扩展"""
     try:
-        result = connection.execute(
-            sa.text("SELECT 1 FROM pg_extension WHERE extname = 'timescaledb'")
-        )
+        result = connection.execute(sa.text("SELECT 1 FROM pg_extension WHERE extname = 'timescaledb'"))
         return result.fetchone() is not None
     except Exception:
         return False
@@ -35,7 +34,7 @@ def upgrade() -> None:
     bind = op.get_bind()
     dialect = bind.dialect.name
 
-    if dialect != 'postgresql':
+    if dialect != "postgresql":
         # SQLite: 不支持 TimescaleDB，跳过
         return
 
@@ -43,10 +42,9 @@ def upgrade() -> None:
     op.execute("CREATE EXTENSION IF NOT EXISTS timescaledb CASCADE")
 
     # 检查 point_history 表是否已经是 hypertable
-    result = bind.execute(sa.text(
-        "SELECT 1 FROM timescaledb_information.hypertables "
-        "WHERE hypertable_name = 'point_history'"
-    ))
+    result = bind.execute(
+        sa.text("SELECT 1 FROM timescaledb_information.hypertables WHERE hypertable_name = 'point_history'")
+    )
     if result.fetchone():
         # 已经是 hypertable，跳过
         return
@@ -75,23 +73,17 @@ def upgrade() -> None:
     )
 
     # 添加压缩策略 — 7 天后自动压缩
-    op.execute(
-        "SELECT add_compression_policy('point_history', INTERVAL '7 days', "
-        "if_not_exists => true)"
-    )
+    op.execute("SELECT add_compression_policy('point_history', INTERVAL '7 days', if_not_exists => true)")
 
     # 添加数据保留策略 — 90 天后自动删除
-    op.execute(
-        "SELECT add_retention_policy('point_history', INTERVAL '90 days', "
-        "if_not_exists => true)"
-    )
+    op.execute("SELECT add_retention_policy('point_history', INTERVAL '90 days', if_not_exists => true)")
 
 
 def downgrade() -> None:
     bind = op.get_bind()
     dialect = bind.dialect.name
 
-    if dialect != 'postgresql':
+    if dialect != "postgresql":
         return
 
     # 移除保留策略

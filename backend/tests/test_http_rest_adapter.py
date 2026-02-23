@@ -1,12 +1,12 @@
 """HTTP REST 适配器测试 — Story 15.2"""
+
 import asyncio
-import json
 import sys
 import os
 import importlib.util
 import types
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 # 确保 gateway 根目录在 sys.path
 _root = os.path.join(os.path.dirname(__file__), "..")
@@ -41,6 +41,7 @@ _build_json_extractor = _utils.build_json_extractor
 
 
 # ─── 辅助工厂 ─────────────────────────────────────────────────
+
 
 def _make_config(
     connection_params: dict,
@@ -79,6 +80,7 @@ def _make_points() -> list[PointConfig]:
 
 # ─── 注册表测试 ──────────────────────────────────────────────
 
+
 class TestAdapterRegistry:
     """适配器注册表"""
 
@@ -89,6 +91,7 @@ class TestAdapterRegistry:
 
 
 # ─── JSON 路径提取器测试 ─────────────────────────────────────
+
 
 class TestJsonExtractor:
     """JSON 路径提取器（与 MQTT 适配器共用逻辑）"""
@@ -112,6 +115,7 @@ class TestJsonExtractor:
 
 
 # ─── 连接配置验证测试 ────────────────────────────────────────
+
 
 class TestConnectValidation:
     """connect() 配置验证"""
@@ -140,10 +144,12 @@ class TestConnectValidation:
     async def test_basic_auth_missing_username(self):
         """Basic Auth 缺少 username 应返回 CONFIG_ERROR"""
         adapter = HttpRestAdapter()
-        config = _make_config(_default_params(
-            auth_type="basic",
-            auth_config={"password": "secret"},
-        ))
+        config = _make_config(
+            _default_params(
+                auth_type="basic",
+                auth_config={"password": "secret"},
+            )
+        )
         result = await adapter.connect(config)
         assert result is False
         assert "username" in adapter.get_status().error_message
@@ -152,10 +158,12 @@ class TestConnectValidation:
     async def test_bearer_auth_missing_token(self):
         """Bearer Token 缺少 token 应返回 CONFIG_ERROR"""
         adapter = HttpRestAdapter()
-        config = _make_config(_default_params(
-            auth_type="bearer",
-            auth_config={},
-        ))
+        config = _make_config(
+            _default_params(
+                auth_type="bearer",
+                auth_config={},
+            )
+        )
         result = await adapter.connect(config)
         assert result is False
         assert "token" in adapter.get_status().error_message
@@ -184,10 +192,12 @@ class TestConnectValidation:
     async def test_connect_success_basic_auth(self):
         """Basic Auth 连接成功"""
         adapter = HttpRestAdapter()
-        config = _make_config(_default_params(
-            auth_type="basic",
-            auth_config={"username": "admin", "password": "secret"},
-        ))
+        config = _make_config(
+            _default_params(
+                auth_type="basic",
+                auth_config={"username": "admin", "password": "secret"},
+            )
+        )
         result = await adapter.connect(config)
         assert result is True
         assert adapter.get_status().state == AdapterState.CONNECTED
@@ -197,10 +207,12 @@ class TestConnectValidation:
     async def test_connect_success_bearer_auth(self):
         """Bearer Token 连接成功"""
         adapter = HttpRestAdapter()
-        config = _make_config(_default_params(
-            auth_type="bearer",
-            auth_config={"token": "eyJhbGciOiJIUzI1NiJ9.test"},
-        ))
+        config = _make_config(
+            _default_params(
+                auth_type="bearer",
+                auth_config={"token": "eyJhbGciOiJIUzI1NiJ9.test"},
+            )
+        )
         result = await adapter.connect(config)
         assert result is True
         assert adapter.get_status().state == AdapterState.CONNECTED
@@ -208,6 +220,7 @@ class TestConnectValidation:
 
 
 # ─── 断开连接测试 ────────────────────────────────────────────
+
 
 class TestDisconnect:
     """disconnect() 测试"""
@@ -232,6 +245,7 @@ class TestDisconnect:
 
 
 # ─── read_points 测试 ────────────────────────────────────────
+
 
 class TestReadPoints:
     """read_points() 测试"""
@@ -306,9 +320,7 @@ class TestReadPoints:
         mock_response.raise_for_status = MagicMock()
         mock_response.json.return_value = {
             "status": "ok",
-            "data": {
-                "readings": {"temperature": 22.5, "humidity": 45.0}
-            },
+            "data": {"readings": {"temperature": 22.5, "humidity": 45.0}},
         }
 
         adapter._client.get = AsyncMock(return_value=mock_response)
@@ -374,9 +386,7 @@ class TestReadPoints:
         mock_response = MagicMock()
         mock_response.status_code = 200
         mock_response.raise_for_status = MagicMock()
-        mock_response.json.return_value = {
-            "sensors": [{"value": 10.0}, {"value": 20.0}]
-        }
+        mock_response.json.return_value = {"sensors": [{"value": 10.0}, {"value": 20.0}]}
 
         adapter._client.get = AsyncMock(return_value=mock_response)
 
@@ -393,6 +403,7 @@ class TestReadPoints:
         await adapter.connect(config)
 
         import httpx
+
         adapter._client.get = AsyncMock(
             side_effect=httpx.HTTPStatusError(
                 "500 Server Error",
@@ -447,6 +458,7 @@ class TestReadPoints:
 
 # ─── write_point 测试 ────────────────────────────────────────
 
+
 class TestWritePoint:
     """write_point() 测试"""
 
@@ -459,6 +471,7 @@ class TestWritePoint:
 
 
 # ─── test_connection 测试 ────────────────────────────────────
+
 
 class TestTestConnection:
     """test_connection() 测试"""
@@ -543,6 +556,7 @@ class TestTestConnection:
 
 # ─── get_status 测试 ─────────────────────────────────────────
 
+
 class TestGetStatus:
     """get_status() 测试"""
 
@@ -587,6 +601,7 @@ class TestGetStatus:
 
 # ─── 认证集成测试 ────────────────────────────────────────────
 
+
 class TestAuthIntegration:
     """认证方式集成测试"""
 
@@ -594,10 +609,12 @@ class TestAuthIntegration:
     async def test_basic_auth_client_created(self):
         """Basic Auth 创建带认证的客户端"""
         adapter = HttpRestAdapter()
-        config = _make_config(_default_params(
-            auth_type="basic",
-            auth_config={"username": "user", "password": "pass"},
-        ))
+        config = _make_config(
+            _default_params(
+                auth_type="basic",
+                auth_config={"username": "user", "password": "pass"},
+            )
+        )
         await adapter.connect(config)
         # httpx.AsyncClient 应该带有 BasicAuth
         assert adapter._client is not None
@@ -609,10 +626,12 @@ class TestAuthIntegration:
         """Bearer Token 写入请求头"""
         adapter = HttpRestAdapter()
         token = "eyJhbGciOiJIUzI1NiJ9.test_token"
-        config = _make_config(_default_params(
-            auth_type="bearer",
-            auth_config={"token": token},
-        ))
+        config = _make_config(
+            _default_params(
+                auth_type="bearer",
+                auth_config={"token": token},
+            )
+        )
         await adapter.connect(config)
         # 检查 Authorization header
         assert adapter._client is not None
@@ -624,9 +643,11 @@ class TestAuthIntegration:
     async def test_custom_headers(self):
         """自定义请求头"""
         adapter = HttpRestAdapter()
-        config = _make_config(_default_params(
-            headers={"X-API-Key": "abc123", "X-Custom": "value"},
-        ))
+        config = _make_config(
+            _default_params(
+                headers={"X-API-Key": "abc123", "X-Custom": "value"},
+            )
+        )
         await adapter.connect(config)
         assert adapter._client.headers.get("x-api-key") == "abc123"
         assert adapter._client.headers.get("x-custom") == "value"

@@ -1,4 +1,5 @@
 """工单审批流程 API 测试"""
+
 import pytest
 from datetime import datetime, timedelta
 
@@ -15,6 +16,7 @@ from app.api.deps import get_db, require_admin, require_operator, require_viewer
 # ============================================================
 # Fixtures
 # ============================================================
+
 
 @pytest.fixture(scope="module")
 def anyio_backend():
@@ -130,16 +132,14 @@ async def _create_change_order_at_accepted(client: AsyncClient) -> dict:
 # Tests
 # ============================================================
 
+
 @pytest.mark.anyio
 async def test_submit_approval(client):
     """提交审批成功"""
     order = await _create_change_order_at_accepted(client)
     order_id = order["id"]
 
-    resp = await client.post(
-        f"{WO_URL}/{order_id}/submit-approval",
-        json={"approver": "manager1", "timeout_hours": 48}
-    )
+    resp = await client.post(f"{WO_URL}/{order_id}/submit-approval", json={"approver": "manager1", "timeout_hours": 48})
     assert resp.status_code == 200
     data = resp.json()
     assert data["order_id"] == order_id
@@ -156,10 +156,7 @@ async def test_submit_approval_wrong_status(client):
     assert resp.status_code == 200
     order_id = resp.json()["id"]
 
-    resp = await client.post(
-        f"{WO_URL}/{order_id}/submit-approval",
-        json={"approver": "manager1"}
-    )
+    resp = await client.post(f"{WO_URL}/{order_id}/submit-approval", json={"approver": "manager1"})
     assert resp.status_code == 400
     assert "已接单" in resp.json()["detail"]
 
@@ -177,10 +174,7 @@ async def test_submit_approval_wrong_type(client):
     resp = await client.post(f"{WO_URL}/{order_id}/accept")
     assert resp.status_code == 200
 
-    resp = await client.post(
-        f"{WO_URL}/{order_id}/submit-approval",
-        json={"approver": "manager1"}
-    )
+    resp = await client.post(f"{WO_URL}/{order_id}/submit-approval", json={"approver": "manager1"})
     assert resp.status_code == 400
     assert "变更请求" in resp.json()["detail"]
 
@@ -191,17 +185,11 @@ async def test_submit_approval_duplicate(client):
     order = await _create_change_order_at_accepted(client)
     order_id = order["id"]
 
-    resp = await client.post(
-        f"{WO_URL}/{order_id}/submit-approval",
-        json={"approver": "manager1"}
-    )
+    resp = await client.post(f"{WO_URL}/{order_id}/submit-approval", json={"approver": "manager1"})
     assert resp.status_code == 200
 
     # 再次提交
-    resp = await client.post(
-        f"{WO_URL}/{order_id}/submit-approval",
-        json={"approver": "manager2"}
-    )
+    resp = await client.post(f"{WO_URL}/{order_id}/submit-approval", json={"approver": "manager2"})
     assert resp.status_code == 400
     assert "进行中" in resp.json()["detail"]
 
@@ -212,10 +200,7 @@ async def test_list_approvals(client):
     order = await _create_change_order_at_accepted(client)
     order_id = order["id"]
 
-    await client.post(
-        f"{WO_URL}/{order_id}/submit-approval",
-        json={"approver": "manager1"}
-    )
+    await client.post(f"{WO_URL}/{order_id}/submit-approval", json={"approver": "manager1"})
 
     resp = await client.get(APPROVAL_URL)
     assert resp.status_code == 200
@@ -230,10 +215,7 @@ async def test_list_approvals_filter_status(client):
     order = await _create_change_order_at_accepted(client)
     order_id = order["id"]
 
-    await client.post(
-        f"{WO_URL}/{order_id}/submit-approval",
-        json={"approver": "manager1"}
-    )
+    await client.post(f"{WO_URL}/{order_id}/submit-approval", json={"approver": "manager1"})
 
     resp = await client.get(APPROVAL_URL, params={"status": "待审批"})
     assert resp.status_code == 200
@@ -249,16 +231,10 @@ async def test_approve_approval(client):
     order = await _create_change_order_at_accepted(client)
     order_id = order["id"]
 
-    resp = await client.post(
-        f"{WO_URL}/{order_id}/submit-approval",
-        json={"approver": "manager1"}
-    )
+    resp = await client.post(f"{WO_URL}/{order_id}/submit-approval", json={"approver": "manager1"})
     approval_id = resp.json()["id"]
 
-    resp = await client.post(
-        f"{APPROVAL_URL}/{approval_id}/approve",
-        json={"reason": "同意变更"}
-    )
+    resp = await client.post(f"{APPROVAL_URL}/{approval_id}/approve", json={"reason": "同意变更"})
     assert resp.status_code == 200
     data = resp.json()
     assert data["status"] == "已批准"
@@ -278,16 +254,10 @@ async def test_reject_approval(client):
     order = await _create_change_order_at_accepted(client)
     order_id = order["id"]
 
-    resp = await client.post(
-        f"{WO_URL}/{order_id}/submit-approval",
-        json={"approver": "manager1"}
-    )
+    resp = await client.post(f"{WO_URL}/{order_id}/submit-approval", json={"approver": "manager1"})
     approval_id = resp.json()["id"]
 
-    resp = await client.post(
-        f"{APPROVAL_URL}/{approval_id}/reject",
-        json={"reason": "方案不完善，请补充"}
-    )
+    resp = await client.post(f"{APPROVAL_URL}/{approval_id}/reject", json={"reason": "方案不完善，请补充"})
     assert resp.status_code == 200
     data = resp.json()
     assert data["status"] == "已驳回"
@@ -305,16 +275,10 @@ async def test_reject_approval_no_reason(client):
     order = await _create_change_order_at_accepted(client)
     order_id = order["id"]
 
-    resp = await client.post(
-        f"{WO_URL}/{order_id}/submit-approval",
-        json={"approver": "manager1"}
-    )
+    resp = await client.post(f"{WO_URL}/{order_id}/submit-approval", json={"approver": "manager1"})
     approval_id = resp.json()["id"]
 
-    resp = await client.post(
-        f"{APPROVAL_URL}/{approval_id}/reject",
-        json={}
-    )
+    resp = await client.post(f"{APPROVAL_URL}/{approval_id}/reject", json={})
     assert resp.status_code == 422
 
 
@@ -324,24 +288,15 @@ async def test_approve_already_resolved(client):
     order = await _create_change_order_at_accepted(client)
     order_id = order["id"]
 
-    resp = await client.post(
-        f"{WO_URL}/{order_id}/submit-approval",
-        json={"approver": "manager1"}
-    )
+    resp = await client.post(f"{WO_URL}/{order_id}/submit-approval", json={"approver": "manager1"})
     approval_id = resp.json()["id"]
 
     # 先批准
-    resp = await client.post(
-        f"{APPROVAL_URL}/{approval_id}/approve",
-        json={}
-    )
+    resp = await client.post(f"{APPROVAL_URL}/{approval_id}/approve", json={})
     assert resp.status_code == 200
 
     # 再次批准
-    resp = await client.post(
-        f"{APPROVAL_URL}/{approval_id}/approve",
-        json={}
-    )
+    resp = await client.post(f"{APPROVAL_URL}/{approval_id}/approve", json={})
     assert resp.status_code == 400
 
 
@@ -351,15 +306,13 @@ async def test_approval_timeout(client, db_session):
     order = await _create_change_order_at_accepted(client)
     order_id = order["id"]
 
-    resp = await client.post(
-        f"{WO_URL}/{order_id}/submit-approval",
-        json={"approver": "manager1", "timeout_hours": 1}
-    )
+    resp = await client.post(f"{WO_URL}/{order_id}/submit-approval", json={"approver": "manager1", "timeout_hours": 1})
     assert resp.status_code == 200
     approval_id = resp.json()["id"]
 
     # 手动将 created_at 设为过去时间以模拟超时
-    from sqlalchemy import select, update
+    from sqlalchemy import update
+
     await db_session.execute(
         update(WorkOrderApproval)
         .where(WorkOrderApproval.id == approval_id)
@@ -381,13 +334,14 @@ async def test_approval_escalation(client, db_session):
 
     resp = await client.post(
         f"{WO_URL}/{order_id}/submit-approval",
-        json={"approver": "manager1", "timeout_hours": 1, "escalate_to": "director1"}
+        json={"approver": "manager1", "timeout_hours": 1, "escalate_to": "director1"},
     )
     assert resp.status_code == 200
     approval_id = resp.json()["id"]
 
     # 手动将 created_at 设为过去时间以模拟超时
     from sqlalchemy import update
+
     await db_session.execute(
         update(WorkOrderApproval)
         .where(WorkOrderApproval.id == approval_id)

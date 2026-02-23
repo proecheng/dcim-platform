@@ -1,4 +1,5 @@
 """干接点状态变化监测器"""
+
 import logging
 from dataclasses import dataclass
 from datetime import datetime
@@ -12,12 +13,13 @@ logger = logging.getLogger(__name__)
 @dataclass
 class DryContactEvent:
     """干接点状态变化事件"""
+
     datasource_id: str
     point_id: str
-    old_value: Any          # 归一化后的值（枚举映射后，如 "正常"/"火警"）
-    new_value: Any          # 归一化后的值
-    raw_old_value: Any      # 原始值（0/1 整数）
-    raw_new_value: Any      # 原始值
+    old_value: Any  # 归一化后的值（枚举映射后，如 "正常"/"火警"）
+    new_value: Any  # 归一化后的值
+    raw_old_value: Any  # 原始值（0/1 整数）
+    raw_new_value: Any  # 原始值
     is_fire_signal: bool
     timestamp: datetime
 
@@ -63,7 +65,9 @@ class DryContactMonitor:
                 self._last_values[key] = (reading.raw_value, reading.value)
                 logger.info(
                     "干接点 %s 初始状态: raw=%s, value=%s",
-                    reading.point_id, reading.raw_value, reading.value,
+                    reading.point_id,
+                    reading.raw_value,
+                    reading.value,
                 )
                 continue
 
@@ -86,8 +90,12 @@ class DryContactMonitor:
                 events.append(event)
                 logger.warning(
                     "干接点状态变化: %s raw=%s→%s value=%s→%s (fire_signal=%s)",
-                    reading.point_id, old_raw, reading.raw_value,
-                    old_value, reading.value, is_fire,
+                    reading.point_id,
+                    old_raw,
+                    reading.raw_value,
+                    old_value,
+                    reading.value,
+                    is_fire,
                 )
 
         return events

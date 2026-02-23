@@ -1,4 +1,5 @@
 """协议适配器公共工具函数"""
+
 import re
 from typing import Any, Callable
 

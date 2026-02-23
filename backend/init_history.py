@@ -12,135 +12,72 @@ import sqlite3
 import math
 import random
 from datetime import datetime, timedelta
-from typing import Dict, List, Tuple, Any
+from typing import Dict
 
 
 # 点位数据生成配置
 POINT_CONFIG = {
     # 温度点位 (单位: ℃)
-    'TH_AI_001': {
-        'base': 24.0,       # 基准值
-        'day_var': 2.0,     # 日间波动
-        'night_var': -1.5,  # 夜间偏移
-        'random_var': 0.5,  # 随机波动
-        'min': 18.0,
-        'max': 30.0
+    "TH_AI_001": {
+        "base": 24.0,  # 基准值
+        "day_var": 2.0,  # 日间波动
+        "night_var": -1.5,  # 夜间偏移
+        "random_var": 0.5,  # 随机波动
+        "min": 18.0,
+        "max": 30.0,
     },
     # 湿度点位 (单位: %RH)
-    'TH_AI_002': {
-        'base': 50.0,
-        'day_var': -5.0,    # 日间湿度低
-        'night_var': 5.0,   # 夜间湿度高
-        'random_var': 3.0,
-        'min': 30.0,
-        'max': 70.0
+    "TH_AI_002": {
+        "base": 50.0,
+        "day_var": -5.0,  # 日间湿度低
+        "night_var": 5.0,  # 夜间湿度高
+        "random_var": 3.0,
+        "min": 30.0,
+        "max": 70.0,
     },
     # UPS 输入电压 (单位: V)
-    'UPS_AI_001': {
-        'base': 220.0,
-        'day_var': -3.0,    # 白天负载高，电压略低
-        'night_var': 2.0,
-        'random_var': 2.0,
-        'min': 200.0,
-        'max': 240.0
+    "UPS_AI_001": {
+        "base": 220.0,
+        "day_var": -3.0,  # 白天负载高，电压略低
+        "night_var": 2.0,
+        "random_var": 2.0,
+        "min": 200.0,
+        "max": 240.0,
     },
     # UPS 输出电压 (单位: V)
-    'UPS_AI_002': {
-        'base': 220.0,
-        'day_var': 0.0,     # UPS 稳压输出
-        'night_var': 0.0,
-        'random_var': 0.5,
-        'min': 218.0,
-        'max': 222.0
+    "UPS_AI_002": {
+        "base": 220.0,
+        "day_var": 0.0,  # UPS 稳压输出
+        "night_var": 0.0,
+        "random_var": 0.5,
+        "min": 218.0,
+        "max": 222.0,
     },
     # UPS 负载率 (单位: %)
-    'UPS_AI_003': {
-        'base': 60.0,
-        'day_var': 15.0,    # 白天负载高
-        'night_var': -10.0,
-        'random_var': 5.0,
-        'min': 30.0,
-        'max': 90.0
+    "UPS_AI_003": {
+        "base": 60.0,
+        "day_var": 15.0,  # 白天负载高
+        "night_var": -10.0,
+        "random_var": 5.0,
+        "min": 30.0,
+        "max": 90.0,
     },
     # 电池容量 (单位: %)
-    'UPS_AI_004': {
-        'base': 95.0,
-        'day_var': -2.0,
-        'night_var': 2.0,
-        'random_var': 1.0,
-        'min': 85.0,
-        'max': 100.0
-    },
+    "UPS_AI_004": {"base": 95.0, "day_var": -2.0, "night_var": 2.0, "random_var": 1.0, "min": 85.0, "max": 100.0},
     # UPS 频率 (单位: Hz)
-    'UPS_AI_005': {
-        'base': 50.0,
-        'day_var': 0.0,
-        'night_var': 0.0,
-        'random_var': 0.1,
-        'min': 49.5,
-        'max': 50.5
-    },
+    "UPS_AI_005": {"base": 50.0, "day_var": 0.0, "night_var": 0.0, "random_var": 0.1, "min": 49.5, "max": 50.5},
     # UPS 温度 (单位: ℃)
-    'UPS_AI_006': {
-        'base': 35.0,
-        'day_var': 3.0,
-        'night_var': -2.0,
-        'random_var': 1.0,
-        'min': 25.0,
-        'max': 45.0
-    },
+    "UPS_AI_006": {"base": 35.0, "day_var": 3.0, "night_var": -2.0, "random_var": 1.0, "min": 25.0, "max": 45.0},
     # PDU 电流 (单位: A)
-    'PDU_AI_001': {
-        'base': 80.0,
-        'day_var': 20.0,
-        'night_var': -15.0,
-        'random_var': 5.0,
-        'min': 40.0,
-        'max': 120.0
-    },
-    'PDU_AI_002': {
-        'base': 75.0,
-        'day_var': 18.0,
-        'night_var': -12.0,
-        'random_var': 5.0,
-        'min': 40.0,
-        'max': 110.0
-    },
-    'PDU_AI_003': {
-        'base': 78.0,
-        'day_var': 19.0,
-        'night_var': -14.0,
-        'random_var': 5.0,
-        'min': 40.0,
-        'max': 115.0
-    },
+    "PDU_AI_001": {"base": 80.0, "day_var": 20.0, "night_var": -15.0, "random_var": 5.0, "min": 40.0, "max": 120.0},
+    "PDU_AI_002": {"base": 75.0, "day_var": 18.0, "night_var": -12.0, "random_var": 5.0, "min": 40.0, "max": 110.0},
+    "PDU_AI_003": {"base": 78.0, "day_var": 19.0, "night_var": -14.0, "random_var": 5.0, "min": 40.0, "max": 115.0},
     # PDU 总功率 (单位: kW)
-    'PDU_AI_004': {
-        'base': 150.0,
-        'day_var': 40.0,
-        'night_var': -30.0,
-        'random_var': 10.0,
-        'min': 80.0,
-        'max': 220.0
-    },
+    "PDU_AI_004": {"base": 150.0, "day_var": 40.0, "night_var": -30.0, "random_var": 10.0, "min": 80.0, "max": 220.0},
     # 空调送风温度 (单位: ℃)
-    'AC_AI_001': {
-        'base': 16.0,
-        'day_var': 1.0,
-        'night_var': -0.5,
-        'random_var': 0.5,
-        'min': 12.0,
-        'max': 20.0
-    },
+    "AC_AI_001": {"base": 16.0, "day_var": 1.0, "night_var": -0.5, "random_var": 0.5, "min": 12.0, "max": 20.0},
     # 空调回风温度 (单位: ℃)
-    'AC_AI_002': {
-        'base': 26.0,
-        'day_var': 2.0,
-        'night_var': -1.5,
-        'random_var': 0.8,
-        'min': 20.0,
-        'max': 32.0
-    },
+    "AC_AI_002": {"base": 26.0, "day_var": 2.0, "night_var": -1.5, "random_var": 0.8, "min": 20.0, "max": 32.0},
 }
 
 # DI 点位状态变化概率（每小时）
@@ -150,9 +87,9 @@ DI_CHANGE_PROBABILITY = 0.02
 def get_point_config(point_code: str) -> Dict[str, float]:
     """根据点位编码获取配置"""
     # 提取点位类型 (如 TH_AI_001 从 A1_TH_AI_001 中提取)
-    parts = point_code.split('_')
+    parts = point_code.split("_")
     if len(parts) >= 4:
-        point_type = '_'.join(parts[1:])  # TH_AI_001
+        point_type = "_".join(parts[1:])  # TH_AI_001
         if point_type in POINT_CONFIG:
             return POINT_CONFIG[point_type]
 
@@ -162,14 +99,7 @@ def get_point_config(point_code: str) -> Dict[str, float]:
             return POINT_CONFIG[key]
 
     # 默认配置
-    return {
-        'base': 50.0,
-        'day_var': 5.0,
-        'night_var': -3.0,
-        'random_var': 2.0,
-        'min': 0.0,
-        'max': 100.0
-    }
+    return {"base": 50.0, "day_var": 5.0, "night_var": -3.0, "random_var": 2.0, "min": 0.0, "max": 100.0}
 
 
 def generate_ai_value(config: Dict[str, float], timestamp: datetime, prev_value: float = None) -> float:
@@ -181,25 +111,25 @@ def generate_ai_value(config: Dict[str, float], timestamp: datetime, prev_value:
     day_factor = math.sin((hour - 2) * math.pi / 12)  # -1 到 1
 
     if day_factor > 0:
-        day_offset = config['day_var'] * day_factor
+        day_offset = config["day_var"] * day_factor
     else:
-        day_offset = config['night_var'] * abs(day_factor)
+        day_offset = config["night_var"] * abs(day_factor)
 
     # 随机波动
-    random_offset = random.uniform(-config['random_var'], config['random_var'])
+    random_offset = random.uniform(-config["random_var"], config["random_var"])
 
     # 计算最终值
-    value = config['base'] + day_offset + random_offset
+    value = config["base"] + day_offset + random_offset
 
     # 如果有前一个值，添加平滑过渡
     if prev_value is not None:
         # 限制变化幅度，使数据更平滑
-        max_change = config['random_var'] * 0.5
+        max_change = config["random_var"] * 0.5
         if abs(value - prev_value) > max_change:
             value = prev_value + max_change * (1 if value > prev_value else -1)
 
     # 限制在范围内
-    value = max(config['min'], min(config['max'], value))
+    value = max(config["min"], min(config["max"], value))
 
     return round(value, 2)
 
@@ -215,7 +145,7 @@ def generate_di_value(prev_value: int, timestamp: datetime) -> int:
 class HistoryDataGenerator:
     """历史数据生成器"""
 
-    def __init__(self, db_path: str = 'dcim.db'):
+    def __init__(self, db_path: str = "dcim.db"):
         self.db_path = db_path
         self.conn = None
         self.points = []
@@ -254,10 +184,13 @@ class HistoryDataGenerator:
         before_count = cursor.fetchone()[0]
 
         # 删除旧数据
-        cursor.execute("""
+        cursor.execute(
+            """
             DELETE FROM point_history
             WHERE recorded_at < ?
-        """, (cutoff_time.isoformat(),))
+        """,
+            (cutoff_time.isoformat(),),
+        )
 
         self.conn.commit()
 
@@ -283,7 +216,7 @@ class HistoryDataGenerator:
         total_intervals = (days * 24 * 60) // interval_minutes
         total_records = len(self.points) * total_intervals
 
-        print(f"\n开始生成历史数据...")
+        print("\n开始生成历史数据...")
         print(f"时间范围: {start_time.strftime('%Y-%m-%d %H:%M')} 到 {now.strftime('%Y-%m-%d %H:%M')}")
         print(f"数据间隔: {interval_minutes} 分钟")
         print(f"预计生成: {total_records:,} 条记录")
@@ -295,9 +228,9 @@ class HistoryDataGenerator:
 
         # 为每个点位生成数据
         for point in self.points:
-            point_id = point['id']
-            point_code = point['point_code']
-            point_type = point['point_type']
+            point_id = point["id"]
+            point_code = point["point_code"]
+            point_type = point["point_type"]
 
             config = get_point_config(point_code)
             prev_value = None
@@ -305,22 +238,22 @@ class HistoryDataGenerator:
             # 从 start_time 开始，每隔 interval_minutes 分钟生成一条记录
             current_time = start_time
             while current_time < now:
-                if point_type == 'AI':
+                if point_type == "AI":
                     value = generate_ai_value(config, current_time, prev_value)
                     prev_value = value
-                elif point_type == 'DI':
+                elif point_type == "DI":
                     if prev_value is None:
                         prev_value = 0
                     value = generate_di_value(int(prev_value), current_time)
                     prev_value = value
-                elif point_type == 'AO':
+                elif point_type == "AO":
                     # AO 点位通常是设定值，变化较少
                     if prev_value is None:
-                        prev_value = config['base']
+                        prev_value = config["base"]
                     if random.random() < 0.001:  # 极低概率变化
-                        prev_value = config['base'] + random.uniform(-2, 2)
+                        prev_value = config["base"] + random.uniform(-2, 2)
                     value = prev_value
-                elif point_type == 'DO':
+                elif point_type == "DO":
                     # DO 点位状态
                     if prev_value is None:
                         prev_value = 1  # 默认开启
@@ -328,28 +261,33 @@ class HistoryDataGenerator:
                         prev_value = 1 - int(prev_value)
                     value = int(prev_value)
                 else:
-                    value = config['base']
+                    value = config["base"]
 
                 # 添加到批次
-                batch_data.append((
-                    point_id,
-                    round(value, 2),
-                    0,  # quality = 0 (good)
-                    current_time.isoformat()
-                ))
+                batch_data.append(
+                    (
+                        point_id,
+                        round(value, 2),
+                        0,  # quality = 0 (good)
+                        current_time.isoformat(),
+                    )
+                )
 
                 # 批量插入
                 if len(batch_data) >= batch_size:
-                    cursor.executemany("""
+                    cursor.executemany(
+                        """
                         INSERT INTO point_history (point_id, value, quality, recorded_at)
                         VALUES (?, ?, ?, ?)
-                    """, batch_data)
+                    """,
+                        batch_data,
+                    )
                     self.conn.commit()
                     insert_count += len(batch_data)
 
                     # 显示进度
                     progress = (insert_count / total_records) * 100
-                    print(f"\r进度: {progress:.1f}% ({insert_count:,}/{total_records:,})", end='', flush=True)
+                    print(f"\r进度: {progress:.1f}% ({insert_count:,}/{total_records:,})", end="", flush=True)
 
                     batch_data = []
 
@@ -357,10 +295,13 @@ class HistoryDataGenerator:
 
         # 插入剩余数据
         if batch_data:
-            cursor.executemany("""
+            cursor.executemany(
+                """
                 INSERT INTO point_history (point_id, value, quality, recorded_at)
                 VALUES (?, ?, ?, ?)
-            """, batch_data)
+            """,
+                batch_data,
+            )
             self.conn.commit()
             insert_count += len(batch_data)
 
@@ -439,7 +380,7 @@ def main():
     if len(sys.argv) > 1:
         db_path = sys.argv[1]
     else:
-        db_path = os.path.join(os.path.dirname(__file__), 'dcim.db')
+        db_path = os.path.join(os.path.dirname(__file__), "dcim.db")
 
     db_path = os.path.abspath(db_path)
     print(f"数据库路径: {db_path}")

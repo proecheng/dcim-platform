@@ -1,8 +1,7 @@
 """点位批量导入与预校验测试 — Story 3.2"""
-import io
-from unittest.mock import AsyncMock
 
-import pytest
+import io
+
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 from openpyxl import Workbook
@@ -11,12 +10,13 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from app.core.database import Base, get_db
 from app.main import app
 from app.models.gateway import DataSource, DataSourcePoint
-from app.services.point_import import parse_excel, validate_points, import_points
+from app.services.point_import import validate_points, import_points
 
 
 # ============================================================
 # 辅助函数
 # ============================================================
+
 
 def create_test_excel(rows: list[list]) -> bytes:
     """创建测试用 Excel 文件"""
@@ -89,11 +89,14 @@ async def client(async_db):
 
 async def create_datasource(client: AsyncClient) -> int:
     """创建测试数据源，返回 ID"""
-    resp = await client.post("/api/v1/datasources", json={
-        "name": "测试数据源",
-        "protocol_type": "modbus_tcp",
-        "connection_config": {"host": "192.168.1.1", "port": 502},
-    })
+    resp = await client.post(
+        "/api/v1/datasources",
+        json={
+            "name": "测试数据源",
+            "protocol_type": "modbus_tcp",
+            "connection_config": {"host": "192.168.1.1", "port": 502},
+        },
+    )
     return resp.json()["id"]
 
 
@@ -101,20 +104,24 @@ async def create_datasource(client: AsyncClient) -> int:
 # 服务层测试
 # ============================================================
 
+
 class TestValidatePoints:
     """校验服务测试"""
 
     async def test_valid_excel(self, async_db):
         """测试1: 正常 Excel 校验通过"""
-        excel_data = create_test_excel([
-            ["address", "data_type", "scale", "offset"],
-            ["40001", "int16", 1.0, 0.0],
-            ["40002", "float32", 0.1, 0.0],
-        ])
+        excel_data = create_test_excel(
+            [
+                ["address", "data_type", "scale", "offset"],
+                ["40001", "int16", 1.0, 0.0],
+                ["40002", "float32", 0.1, 0.0],
+            ]
+        )
         async with async_db() as session:
             # 创建数据源
             ds = DataSource(
-                name="测试源", protocol_type="modbus_tcp",
+                name="测试源",
+                protocol_type="modbus_tcp",
                 connection_config={"host": "127.0.0.1", "port": 502},
             )
             session.add(ds)
@@ -129,14 +136,17 @@ class TestValidatePoints:
 
     async def test_duplicate_address_in_excel(self, async_db):
         """测试2: Excel 内部地址重复检测"""
-        excel_data = create_test_excel([
-            ["address", "data_type"],
-            ["40001", "int16"],
-            ["40001", "float32"],
-        ])
+        excel_data = create_test_excel(
+            [
+                ["address", "data_type"],
+                ["40001", "int16"],
+                ["40001", "float32"],
+            ]
+        )
         async with async_db() as session:
             ds = DataSource(
-                name="测试源", protocol_type="modbus_tcp",
+                name="测试源",
+                protocol_type="modbus_tcp",
                 connection_config={"host": "127.0.0.1", "port": 502},
             )
             session.add(ds)
@@ -150,13 +160,16 @@ class TestValidatePoints:
 
     async def test_duplicate_address_in_db(self, async_db):
         """测试3: 与数据库已有地址冲突检测"""
-        excel_data = create_test_excel([
-            ["address", "data_type"],
-            ["40001", "int16"],
-        ])
+        excel_data = create_test_excel(
+            [
+                ["address", "data_type"],
+                ["40001", "int16"],
+            ]
+        )
         async with async_db() as session:
             ds = DataSource(
-                name="测试源", protocol_type="modbus_tcp",
+                name="测试源",
+                protocol_type="modbus_tcp",
                 connection_config={"host": "127.0.0.1", "port": 502},
             )
             session.add(ds)
@@ -165,7 +178,9 @@ class TestValidatePoints:
 
             # 预先插入一个同地址的点位
             existing_point = DataSourcePoint(
-                datasource_id=ds.id, address="40001", data_type="int16",
+                datasource_id=ds.id,
+                address="40001",
+                data_type="int16",
             )
             session.add(existing_point)
             await session.commit()
@@ -177,13 +192,16 @@ class TestValidatePoints:
 
     async def test_invalid_data_type(self, async_db):
         """测试4: 无效数据类型"""
-        excel_data = create_test_excel([
-            ["address", "data_type"],
-            ["40001", "invalid_type"],
-        ])
+        excel_data = create_test_excel(
+            [
+                ["address", "data_type"],
+                ["40001", "invalid_type"],
+            ]
+        )
         async with async_db() as session:
             ds = DataSource(
-                name="测试源", protocol_type="modbus_tcp",
+                name="测试源",
+                protocol_type="modbus_tcp",
                 connection_config={"host": "127.0.0.1", "port": 502},
             )
             session.add(ds)
@@ -197,13 +215,16 @@ class TestValidatePoints:
 
     async def test_invalid_scale_offset(self, async_db):
         """测试5: scale/offset 非数值"""
-        excel_data = create_test_excel([
-            ["address", "data_type", "scale", "offset"],
-            ["40001", "int16", "abc", "xyz"],
-        ])
+        excel_data = create_test_excel(
+            [
+                ["address", "data_type", "scale", "offset"],
+                ["40001", "int16", "abc", "xyz"],
+            ]
+        )
         async with async_db() as session:
             ds = DataSource(
-                name="测试源", protocol_type="modbus_tcp",
+                name="测试源",
+                protocol_type="modbus_tcp",
                 connection_config={"host": "127.0.0.1", "port": 502},
             )
             session.add(ds)
@@ -217,12 +238,15 @@ class TestValidatePoints:
 
     async def test_empty_excel(self, async_db):
         """测试6: 空文件/无数据行"""
-        excel_data = create_test_excel([
-            ["address", "data_type"],
-        ])
+        excel_data = create_test_excel(
+            [
+                ["address", "data_type"],
+            ]
+        )
         async with async_db() as session:
             ds = DataSource(
-                name="测试源", protocol_type="modbus_tcp",
+                name="测试源",
+                protocol_type="modbus_tcp",
                 connection_config={"host": "127.0.0.1", "port": 502},
             )
             session.add(ds)
@@ -239,15 +263,18 @@ class TestImportPoints:
 
     async def test_import_success(self, async_db):
         """测试7: 校验通过后批量插入"""
-        excel_data = create_test_excel([
-            ["address", "data_type", "scale", "offset"],
-            ["40001", "int16", 1.0, 0.0],
-            ["40002", "float32", 0.1, 0.0],
-            ["40003", "bool", None, None],
-        ])
+        excel_data = create_test_excel(
+            [
+                ["address", "data_type", "scale", "offset"],
+                ["40001", "int16", 1.0, 0.0],
+                ["40002", "float32", 0.1, 0.0],
+                ["40003", "bool", None, None],
+            ]
+        )
         async with async_db() as session:
             ds = DataSource(
-                name="测试源", protocol_type="modbus_tcp",
+                name="测试源",
+                protocol_type="modbus_tcp",
                 connection_config={"host": "127.0.0.1", "port": 502},
             )
             session.add(ds)
@@ -260,17 +287,19 @@ class TestImportPoints:
 
             # 验证数据库中确实有 3 条记录
             from sqlalchemy import select, func
-            count = (await session.execute(
-                select(func.count()).select_from(DataSourcePoint).where(
-                    DataSourcePoint.datasource_id == ds.id
+
+            count = (
+                await session.execute(
+                    select(func.count()).select_from(DataSourcePoint).where(DataSourcePoint.datasource_id == ds.id)
                 )
-            )).scalar()
+            ).scalar()
             assert count == 3
 
 
 # ============================================================
 # API 端点测试
 # ============================================================
+
 
 class TestPointImportAPI:
     """点位导入 API 端点测试"""
@@ -292,7 +321,13 @@ class TestPointImportAPI:
         large_content = b"x" * (10 * 1024 * 1024 + 1)
         resp = await client.post(
             f"/api/v1/datasources/{ds_id}/points/validate",
-            files={"file": ("test.xlsx", large_content, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")},
+            files={
+                "file": (
+                    "test.xlsx",
+                    large_content,
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                )
+            },
         )
         assert resp.status_code == 400
         assert "10MB" in resp.json()["detail"]

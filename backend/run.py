@@ -1,6 +1,7 @@
 """
 启动脚本 - 初始化点位并启动服务
 """
+
 import asyncio
 import sys
 import os

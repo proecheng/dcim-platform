@@ -1,4 +1,5 @@
 """能效报告导出测试 — Story 6-5"""
+
 import json
 import pytest
 from datetime import datetime, date
@@ -11,8 +12,14 @@ from openpyxl import load_workbook
 
 from app.core.database import Base
 from app.models.energy import (
-    PUEHistory, EnergyMonthly, EnergyDaily, ElectricityPricing,
-    EnergyOpportunity, ExecutionPlan, ExecutionResult, PowerDevice,
+    PUEHistory,
+    EnergyMonthly,
+    EnergyDaily,
+    ElectricityPricing,
+    EnergyOpportunity,
+    ExecutionPlan,
+    ExecutionResult,
+    PowerDevice,
 )
 from app.models.report import ReportRecord
 from app.services.energy_report_service import EnergyReportService
@@ -23,6 +30,7 @@ from app.services.energy_report_pdf import generate_energy_report_pdf
 # ============================================================
 # Fixtures
 # ============================================================
+
 
 @pytest.fixture(scope="module")
 def anyio_backend():
@@ -79,29 +87,47 @@ def _sample_report_data() -> dict:
         },
         "cost_comparison": {
             "current_month": {
-                "total_energy": 50000.0, "total_cost": 45000.0,
-                "peak_energy": 20000.0, "peak_cost": 22000.0,
-                "normal_energy": 18000.0, "normal_cost": 14400.0,
-                "valley_energy": 12000.0, "valley_cost": 8600.0,
+                "total_energy": 50000.0,
+                "total_cost": 45000.0,
+                "peak_energy": 20000.0,
+                "peak_cost": 22000.0,
+                "normal_energy": 18000.0,
+                "normal_cost": 14400.0,
+                "valley_energy": 12000.0,
+                "valley_cost": 8600.0,
             },
             "last_month": {
-                "total_energy": 48000.0, "total_cost": 43000.0,
-                "peak_energy": 19000.0, "peak_cost": 20900.0,
-                "normal_energy": 17000.0, "normal_cost": 13600.0,
-                "valley_energy": 12000.0, "valley_cost": 8500.0,
+                "total_energy": 48000.0,
+                "total_cost": 43000.0,
+                "peak_energy": 19000.0,
+                "peak_cost": 20900.0,
+                "normal_energy": 17000.0,
+                "normal_cost": 13600.0,
+                "valley_energy": 12000.0,
+                "valley_cost": 8500.0,
             },
             "last_year_month": {
-                "total_energy": 52000.0, "total_cost": 47000.0,
-                "peak_energy": 21000.0, "peak_cost": 23100.0,
-                "normal_energy": 19000.0, "normal_cost": 15200.0,
-                "valley_energy": 12000.0, "valley_cost": 8700.0,
+                "total_energy": 52000.0,
+                "total_cost": 47000.0,
+                "peak_energy": 21000.0,
+                "peak_cost": 23100.0,
+                "normal_energy": 19000.0,
+                "normal_cost": 15200.0,
+                "valley_energy": 12000.0,
+                "valley_cost": 8700.0,
             },
             "yoy_change_rate": -4.26,
             "mom_change_rate": 4.65,
         },
         "energy_saving": {
             "details": [
-                {"title": "空调优化", "category": 2, "saving_kwh": 1200.0, "saving_cost": 960.0, "achievement_rate": 85.0},
+                {
+                    "title": "空调优化",
+                    "category": 2,
+                    "saving_kwh": 1200.0,
+                    "saving_cost": 960.0,
+                    "achievement_rate": 85.0,
+                },
             ],
             "total_saving_kwh": 1200.0,
             "total_saving_cost": 960.0,
@@ -122,7 +148,6 @@ def _sample_report_data() -> dict:
 
 
 class TestEnergyReport:
-
     # 1. 基本数据生成
     async def test_generate_report_data_basic(self, db: AsyncSession):
         """插入测试数据，验证4个section全部存在"""
@@ -132,8 +157,17 @@ class TestEnergyReport:
         dev = PowerDevice(device_code="TEST-001", device_name="测试设备", device_type="UPS")
         db.add(dev)
         await db.flush()
-        db.add(EnergyDaily(device_id=dev.id, stat_date=date(2026, 1, 15),
-                           total_energy=500, peak_energy=200, normal_energy=200, valley_energy=100, energy_cost=400))
+        db.add(
+            EnergyDaily(
+                device_id=dev.id,
+                stat_date=date(2026, 1, 15),
+                total_energy=500,
+                peak_energy=200,
+                normal_energy=200,
+                valley_energy=100,
+                energy_cost=400,
+            )
+        )
         await db.commit()
 
         data = await EnergyReportService.generate_report_data(db, 2026, 1)
@@ -158,11 +192,14 @@ class TestEnergyReport:
     async def test_pue_trend_daily_aggregation(self, db: AsyncSession):
         """同一天4条PUE记录应聚合为1条日均值"""
         for hour in [0, 6, 12, 18]:
-            db.add(PUEHistory(
-                record_time=datetime(2026, 2, 10, hour, 0),
-                total_power=100, it_power=60,
-                pue=1.4 + hour * 0.01,
-            ))
+            db.add(
+                PUEHistory(
+                    record_time=datetime(2026, 2, 10, hour, 0),
+                    total_power=100,
+                    it_power=60,
+                    pue=1.4 + hour * 0.01,
+                )
+            )
         await db.commit()
 
         data = await EnergyReportService.generate_report_data(db, 2026, 2)
@@ -178,11 +215,21 @@ class TestEnergyReport:
         dev = PowerDevice(device_code="COST-M-001", device_name="费用设备", device_type="UPS")
         db.add(dev)
         await db.flush()
-        db.add(EnergyMonthly(
-            device_id=dev.id, stat_year=2026, stat_month=3,
-            total_energy=10000, peak_energy=4000, normal_energy=4000, valley_energy=2000,
-            energy_cost=8000, peak_cost=4400, normal_cost=3200, valley_cost=1400,
-        ))
+        db.add(
+            EnergyMonthly(
+                device_id=dev.id,
+                stat_year=2026,
+                stat_month=3,
+                total_energy=10000,
+                peak_energy=4000,
+                normal_energy=4000,
+                valley_energy=2000,
+                energy_cost=8000,
+                peak_cost=4400,
+                normal_cost=3200,
+                valley_cost=1400,
+            )
+        )
         await db.commit()
 
         data = await EnergyReportService.generate_report_data(db, 2026, 3)
@@ -198,23 +245,50 @@ class TestEnergyReport:
         dev = PowerDevice(device_code="COST-D-001", device_name="日费设备", device_type="HVAC")
         db.add(dev)
         await db.flush()
-        db.add(EnergyDaily(
-            device_id=dev.id, stat_date=date(2026, 4, 10),
-            total_energy=1000, peak_energy=400, normal_energy=400, valley_energy=200,
-            energy_cost=0,
-        ))
-        db.add(ElectricityPricing(
-            pricing_name="峰时", period_type="peak", start_time="10:00", end_time="12:00",
-            price=1.1, effective_date=date(2026, 1, 1), is_enabled=True,
-        ))
-        db.add(ElectricityPricing(
-            pricing_name="平时", period_type="flat", start_time="08:00", end_time="10:00",
-            price=0.8, effective_date=date(2026, 1, 1), is_enabled=True,
-        ))
-        db.add(ElectricityPricing(
-            pricing_name="谷时", period_type="valley", start_time="23:00", end_time="07:00",
-            price=0.4, effective_date=date(2026, 1, 1), is_enabled=True,
-        ))
+        db.add(
+            EnergyDaily(
+                device_id=dev.id,
+                stat_date=date(2026, 4, 10),
+                total_energy=1000,
+                peak_energy=400,
+                normal_energy=400,
+                valley_energy=200,
+                energy_cost=0,
+            )
+        )
+        db.add(
+            ElectricityPricing(
+                pricing_name="峰时",
+                period_type="peak",
+                start_time="10:00",
+                end_time="12:00",
+                price=1.1,
+                effective_date=date(2026, 1, 1),
+                is_enabled=True,
+            )
+        )
+        db.add(
+            ElectricityPricing(
+                pricing_name="平时",
+                period_type="flat",
+                start_time="08:00",
+                end_time="10:00",
+                price=0.8,
+                effective_date=date(2026, 1, 1),
+                is_enabled=True,
+            )
+        )
+        db.add(
+            ElectricityPricing(
+                pricing_name="谷时",
+                period_type="valley",
+                start_time="23:00",
+                end_time="07:00",
+                price=0.4,
+                effective_date=date(2026, 1, 1),
+                is_enabled=True,
+            )
+        )
         await db.commit()
 
         data = await EnergyReportService.generate_report_data(db, 2026, 4)
@@ -229,7 +303,9 @@ class TestEnergyReport:
     async def test_energy_saving_json_parsing(self, db: AsyncSession):
         """ExecutionResult 的 JSON energy_before/after 应正确解析求和"""
         opp = EnergyOpportunity(
-            category=2, title="空调优化", status="completed",
+            category=2,
+            title="空调优化",
+            status="completed",
             potential_saving=Decimal("5000"),
             created_at=datetime(2026, 5, 10),
         )
@@ -242,10 +318,12 @@ class TestEnergyReport:
             plan_id=plan.id,
             actual_saving=Decimal("800"),
             achievement_rate=Decimal("90.00"),
-            energy_before=json.dumps([{"date": "2026-01-01", "energy": 500, "cost": 400},
-                                       {"date": "2026-01-02", "energy": 480, "cost": 384}]),
-            energy_after=json.dumps([{"date": "2026-01-01", "energy": 400, "cost": 320},
-                                      {"date": "2026-01-02", "energy": 390, "cost": 312}]),
+            energy_before=json.dumps(
+                [{"date": "2026-01-01", "energy": 500, "cost": 400}, {"date": "2026-01-02", "energy": 480, "cost": 384}]
+            ),
+            energy_after=json.dumps(
+                [{"date": "2026-01-01", "energy": 400, "cost": 320}, {"date": "2026-01-02", "energy": 390, "cost": 312}]
+            ),
             status="completed",
         )
         db.add(result)
@@ -266,23 +344,53 @@ class TestEnergyReport:
         db.add(dev)
         await db.flush()
         # 当前月 2026-6
-        db.add(EnergyMonthly(device_id=dev.id, stat_year=2026, stat_month=6,
-                             total_energy=10000, energy_cost=8000,
-                             peak_energy=4000, peak_cost=4400,
-                             normal_energy=4000, normal_cost=3200,
-                             valley_energy=2000, valley_cost=1400))
+        db.add(
+            EnergyMonthly(
+                device_id=dev.id,
+                stat_year=2026,
+                stat_month=6,
+                total_energy=10000,
+                energy_cost=8000,
+                peak_energy=4000,
+                peak_cost=4400,
+                normal_energy=4000,
+                normal_cost=3200,
+                valley_energy=2000,
+                valley_cost=1400,
+            )
+        )
         # 上月 2026-5
-        db.add(EnergyMonthly(device_id=dev.id, stat_year=2026, stat_month=5,
-                             total_energy=9000, energy_cost=7200,
-                             peak_energy=3600, peak_cost=3960,
-                             normal_energy=3600, normal_cost=2880,
-                             valley_energy=1800, valley_cost=1260))
+        db.add(
+            EnergyMonthly(
+                device_id=dev.id,
+                stat_year=2026,
+                stat_month=5,
+                total_energy=9000,
+                energy_cost=7200,
+                peak_energy=3600,
+                peak_cost=3960,
+                normal_energy=3600,
+                normal_cost=2880,
+                valley_energy=1800,
+                valley_cost=1260,
+            )
+        )
         # 去年同月 2025-6
-        db.add(EnergyMonthly(device_id=dev.id, stat_year=2025, stat_month=6,
-                             total_energy=11000, energy_cost=8800,
-                             peak_energy=4400, peak_cost=4840,
-                             normal_energy=4400, normal_cost=3520,
-                             valley_energy=2200, valley_cost=1540))
+        db.add(
+            EnergyMonthly(
+                device_id=dev.id,
+                stat_year=2025,
+                stat_month=6,
+                total_energy=11000,
+                energy_cost=8800,
+                peak_energy=4400,
+                peak_cost=4840,
+                normal_energy=4400,
+                normal_cost=3520,
+                valley_energy=2200,
+                valley_cost=1540,
+            )
+        )
         await db.commit()
 
         data = await EnergyReportService.generate_report_data(db, 2026, 6)
@@ -356,6 +464,7 @@ class TestEnergyReport:
         await db.commit()
 
         from sqlalchemy import select as sa_select
+
         stmt = sa_select(ReportRecord).where(ReportRecord.report_type == "energy_efficiency")
         rows = (await db.execute(stmt)).scalars().all()
         assert len(rows) >= 1

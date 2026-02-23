@@ -1,14 +1,13 @@
 """实时数据 Redis 优先读取测试 — Story 4.1"""
-import pytest
+
 import pytest_asyncio
 import json
-from unittest.mock import AsyncMock, patch, MagicMock
-from datetime import datetime
+from unittest.mock import AsyncMock, patch
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.core.database import Base
 from app.models.point import Point, PointRealtime
-from app.services.datasource_bridge import sync_point_data, link_datasource_to_point
+from app.services.datasource_bridge import sync_point_data
 
 
 @pytest_asyncio.fixture
@@ -71,9 +70,8 @@ class TestDatasourceBridge:
 
         # 验证 PointRealtime 已更新
         from sqlalchemy import select
-        result = await db_session.execute(
-            select(PointRealtime).where(PointRealtime.point_id == sample_point.id)
-        )
+
+        result = await db_session.execute(select(PointRealtime).where(PointRealtime.point_id == sample_point.id))
         rt = result.scalar_one()
         assert rt.value == 28.3
         assert rt.status == "normal"
@@ -116,9 +114,8 @@ class TestDatasourceBridge:
 
         # 数据库仍然更新成功
         from sqlalchemy import select
-        result = await db_session.execute(
-            select(PointRealtime).where(PointRealtime.point_id == sample_point.id)
-        )
+
+        result = await db_session.execute(select(PointRealtime).where(PointRealtime.point_id == sample_point.id))
         rt = result.scalar_one()
         assert rt.value == 26.0
 
@@ -137,9 +134,8 @@ class TestDatasourceBridge:
             )
 
         from sqlalchemy import select
-        result = await db_session.execute(
-            select(PointRealtime).where(PointRealtime.point_id == sample_point.id)
-        )
+
+        result = await db_session.execute(select(PointRealtime).where(PointRealtime.point_id == sample_point.id))
         rt = result.scalar_one()
         assert rt.alarm_level == "critical"
         assert rt.status == "alarm"

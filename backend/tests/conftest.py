@@ -1,18 +1,19 @@
 """
 Pytest 配置和 fixtures
 """
+
 import pytest
 import uuid
 from datetime import datetime, timedelta, timezone
 from sqlalchemy import create_engine, event
 from sqlalchemy.orm import sessionmaker
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
+from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.pool import StaticPool
 from httpx import AsyncClient, ASGITransport
 from jose import jwt as jose_jwt
 
 from app.core.database import Base, get_db
-from app.core.security import get_password_hash, create_access_token
+from app.core.security import get_password_hash
 from app.core.config import get_settings
 
 # 确保所有模型在 create_all 之前被导入
@@ -20,6 +21,7 @@ import app.models  # noqa: F401
 
 
 # ==================== 同步 fixtures (旧测试文件依赖，迁移后移除) ====================
+
 
 @pytest.fixture(scope="session")
 def engine():
@@ -152,25 +154,19 @@ async def client(async_db):
 @pytest.fixture(scope="function")
 async def admin_user(async_db):
     """创建测试管理员用户并返回 (user, token)"""
-    return await _create_user_with_token(
-        async_db, "test_admin", "admin", "测试管理员", "admin@test.local"
-    )
+    return await _create_user_with_token(async_db, "test_admin", "admin", "测试管理员", "admin@test.local")
 
 
 @pytest.fixture(scope="function")
 async def operator_user(async_db):
     """创建测试操作员用户并返回 (user, token)"""
-    return await _create_user_with_token(
-        async_db, "test_operator", "operator", "测试操作员", "operator@test.local"
-    )
+    return await _create_user_with_token(async_db, "test_operator", "operator", "测试操作员", "operator@test.local")
 
 
 @pytest.fixture(scope="function")
 async def viewer_user(async_db):
     """创建测试只读用户并返回 (user, token)"""
-    return await _create_user_with_token(
-        async_db, "test_viewer", "viewer", "测试只读用户", "viewer@test.local"
-    )
+    return await _create_user_with_token(async_db, "test_viewer", "viewer", "测试只读用户", "viewer@test.local")
 
 
 def auth_headers(token: str) -> dict:

@@ -1,4 +1,5 @@
 """BACnet/IP 适配器测试 — Story 15.3"""
+
 import asyncio
 import sys
 import os
@@ -43,6 +44,7 @@ _network_manager = _bacnet._network_manager
 
 # ─── 辅助工厂 ─────────────────────────────────────────────────
 
+
 def _make_config(
     connection_params: dict,
     points: list[PointConfig] | None = None,
@@ -80,6 +82,7 @@ def _make_points() -> list[PointConfig]:
 
 # ─── 注册表测试 ──────────────────────────────────────────────
 
+
 class TestAdapterRegistry:
     """适配器注册表"""
 
@@ -90,6 +93,7 @@ class TestAdapterRegistry:
 
 
 # ─── parse_point_address 测试 ────────────────────────────────
+
 
 class TestParsePointAddress:
     """parse_point_address() 测试"""
@@ -154,6 +158,7 @@ class TestParsePointAddress:
 
 
 # ─── connect 配置验证测试 ────────────────────────────────────
+
 
 class TestConnectValidation:
     """connect() 配置验证"""
@@ -220,6 +225,7 @@ class TestConnectValidation:
 
 # ─── disconnect 测试 ─────────────────────────────────────────
 
+
 class TestDisconnect:
     """disconnect() 测试"""
 
@@ -254,6 +260,7 @@ class TestDisconnect:
 
 
 # ─── read_points 测试 ────────────────────────────────────────
+
 
 class TestReadPoints:
     """read_points() 测试"""
@@ -415,6 +422,7 @@ class TestReadPoints:
 
 # ─── write_point 测试 ────────────────────────────────────────
 
+
 class TestWritePoint:
     """write_point() 测试"""
 
@@ -489,9 +497,7 @@ class TestWritePoint:
     async def test_write_timeout(self):
         """写入超时返回 False"""
         adapter = BacnetIpAdapter()
-        config = _make_config(
-            _default_params(timeout=0.01), points=_make_points(), write_enabled=True
-        )
+        config = _make_config(_default_params(timeout=0.01), points=_make_points(), write_enabled=True)
 
         mock_network = MagicMock()
         mock_network.write = AsyncMock(side_effect=asyncio.TimeoutError())
@@ -509,6 +515,7 @@ class TestWritePoint:
 
 
 # ─── test_connection 测试 ────────────────────────────────────
+
 
 class TestTestConnection:
     """test_connection() 测试"""
@@ -570,6 +577,7 @@ class TestTestConnection:
 
 # ─── get_status 测试 ─────────────────────────────────────────
 
+
 class TestGetStatus:
     """get_status() 测试"""
 
@@ -605,6 +613,7 @@ class TestGetStatus:
 
 
 # ─── _BacnetNetworkManager 测试 ──────────────────────────────
+
 
 class TestBacnetNetworkManager:
     """_BacnetNetworkManager 引用计数测试"""
@@ -671,6 +680,7 @@ class TestBacnetNetworkManager:
 
 # ─── discover_devices 测试 ───────────────────────────────────
 
+
 class TestDiscoverDevices:
     """discover_devices() 测试"""
 
@@ -684,6 +694,7 @@ class TestDiscoverDevices:
 
 # ─── browse_objects 测试 ─────────────────────────────────────
 
+
 class TestBrowseObjects:
     """browse_objects() 测试"""
 
@@ -696,6 +707,7 @@ class TestBrowseObjects:
 
 
 # ─── 重复 connect 引用泄漏测试 (B3) ─────────────────────────
+
 
 class TestRepeatedConnect:
     """重复 connect() 不先 disconnect() 的引用计数安全"""
@@ -724,6 +736,7 @@ class TestRepeatedConnect:
 
 
 # ─── write_point None 值防护测试 (I4) ────────────────────────
+
 
 class TestWritePointNone:
     """write_point 写入 None 值防护"""

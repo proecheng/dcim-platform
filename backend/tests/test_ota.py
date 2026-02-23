@@ -1,7 +1,8 @@
 """OTA 升级服务测试 — Story 15.5"""
+
 import pytest
 from datetime import datetime
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock
 
 from app.models.gateway import Gateway, FirmwarePackage, OtaTask, OtaTaskGateway
 from app.services.ota_service import OtaService, ota_service
@@ -9,6 +10,7 @@ from tests.conftest import auth_headers
 
 
 # ==================== Fixtures ====================
+
 
 @pytest.fixture
 async def firmware(async_db):
@@ -49,6 +51,7 @@ async def gateways(async_db):
 
 
 # ==================== OtaService 单元测试 ====================
+
 
 class TestAssignBatches:
     """批次分配逻辑"""
@@ -253,14 +256,18 @@ class TestHandleOtaStatus:
             created_by="admin",
             db=async_db,
         )
-        await ota_service.handle_ota_status({
-            "task_id": task.task_id,
-            "gw_id": "gw-000",
-            "status": "downloading",
-            "progress": 30,
-        }, async_db)
+        await ota_service.handle_ota_status(
+            {
+                "task_id": task.task_id,
+                "gw_id": "gw-000",
+                "status": "downloading",
+                "progress": 30,
+            },
+            async_db,
+        )
 
         from sqlalchemy import select
+
         result = await async_db.execute(
             select(OtaTaskGateway).where(
                 OtaTaskGateway.task_id == task.task_id,
@@ -287,25 +294,25 @@ class TestHandleOtaStatus:
         mock_publish = AsyncMock()
         await ota_service.start_task(task.task_id, mock_publish, async_db)
 
-        await ota_service.handle_ota_status({
-            "task_id": task.task_id,
-            "gw_id": "gw-000",
-            "status": "success",
-            "progress": 100,
-        }, async_db)
+        await ota_service.handle_ota_status(
+            {
+                "task_id": task.task_id,
+                "gw_id": "gw-000",
+                "status": "success",
+                "progress": 100,
+            },
+            async_db,
+        )
 
         # 检查网关版本已更新
         from sqlalchemy import select
-        result = await async_db.execute(
-            select(Gateway).where(Gateway.gateway_id == "gw-000")
-        )
+
+        result = await async_db.execute(select(Gateway).where(Gateway.gateway_id == "gw-000"))
         gw = result.scalar_one()
         assert gw.version == "2.1.0"
 
         # 检查任务成功计数
-        result = await async_db.execute(
-            select(OtaTask).where(OtaTask.task_id == task.task_id)
-        )
+        result = await async_db.execute(select(OtaTask).where(OtaTask.task_id == task.task_id))
         t = result.scalar_one()
         assert t.success_count == 1
 
@@ -324,17 +331,19 @@ class TestHandleOtaStatus:
         mock_publish = AsyncMock()
         await ota_service.start_task(task.task_id, mock_publish, async_db)
 
-        await ota_service.handle_ota_status({
-            "task_id": task.task_id,
-            "gw_id": "gw-001",
-            "status": "failed",
-            "error": "校验失败",
-        }, async_db)
+        await ota_service.handle_ota_status(
+            {
+                "task_id": task.task_id,
+                "gw_id": "gw-001",
+                "status": "failed",
+                "error": "校验失败",
+            },
+            async_db,
+        )
 
         from sqlalchemy import select
-        result = await async_db.execute(
-            select(OtaTask).where(OtaTask.task_id == task.task_id)
-        )
+
+        result = await async_db.execute(select(OtaTask).where(OtaTask.task_id == task.task_id))
         t = result.scalar_one()
         assert t.fail_count == 1
 
@@ -366,9 +375,8 @@ class TestCancelTask:
         await ota_service.cancel_task(task.task_id, mock_publish, async_db)
 
         from sqlalchemy import select
-        result = await async_db.execute(
-            select(OtaTask).where(OtaTask.task_id == task.task_id)
-        )
+
+        result = await async_db.execute(select(OtaTask).where(OtaTask.task_id == task.task_id))
         t = result.scalar_one()
         assert t.status == "cancelled"
 
@@ -386,9 +394,8 @@ class TestCancelTask:
         )
         # 手动设置为 completed
         from sqlalchemy import update
-        await async_db.execute(
-            update(OtaTask).where(OtaTask.task_id == task.task_id).values(status="completed")
-        )
+
+        await async_db.execute(update(OtaTask).where(OtaTask.task_id == task.task_id).values(status="completed"))
         await async_db.commit()
 
         with pytest.raises(ValueError, match="任务已结束"):
@@ -415,9 +422,8 @@ class TestPauseResume:
         await ota_service.pause_task(task.task_id, async_db)
 
         from sqlalchemy import select
-        result = await async_db.execute(
-            select(OtaTask).where(OtaTask.task_id == task.task_id)
-        )
+
+        result = await async_db.execute(select(OtaTask).where(OtaTask.task_id == task.task_id))
         t = result.scalar_one()
         assert t.status == "paused"
 
@@ -456,9 +462,8 @@ class TestPauseResume:
         await ota_service.resume_task(task.task_id, mock_publish, async_db)
 
         from sqlalchemy import select
-        result = await async_db.execute(
-            select(OtaTask).where(OtaTask.task_id == task.task_id)
-        )
+
+        result = await async_db.execute(select(OtaTask).where(OtaTask.task_id == task.task_id))
         t = result.scalar_one()
         assert t.status == "running"
 
@@ -499,17 +504,19 @@ class TestAutoFailThreshold:
 
         # 让所有网关失败 (100% > 30% 阈值)
         for gw in gateways:
-            await ota_service.handle_ota_status({
-                "task_id": task.task_id,
-                "gw_id": gw.gateway_id,
-                "status": "failed",
-                "error": "测试失败",
-            }, async_db)
+            await ota_service.handle_ota_status(
+                {
+                    "task_id": task.task_id,
+                    "gw_id": gw.gateway_id,
+                    "status": "failed",
+                    "error": "测试失败",
+                },
+                async_db,
+            )
 
         from sqlalchemy import select
-        result = await async_db.execute(
-            select(OtaTask).where(OtaTask.task_id == task.task_id)
-        )
+
+        result = await async_db.execute(select(OtaTask).where(OtaTask.task_id == task.task_id))
         t = result.scalar_one()
         # 应该被自动暂停或标记为 failed
         assert t.status in ("paused", "failed")
@@ -517,18 +524,23 @@ class TestAutoFailThreshold:
 
 # ==================== API 集成测试 ====================
 
+
 class TestFirmwareAPI:
     """固件包 API"""
 
     async def test_create_firmware(self, client, admin_user):
         _, token = admin_user
-        resp = await client.post("/api/v1/ota/firmware", json={
-            "version": "1.0.0",
-            "filename": "gw-1.0.0.bin",
-            "file_size": 5000000,
-            "checksum_sha256": "d" * 64,
-            "download_url": "https://example.com/gw-1.0.0.bin",
-        }, headers=auth_headers(token))
+        resp = await client.post(
+            "/api/v1/ota/firmware",
+            json={
+                "version": "1.0.0",
+                "filename": "gw-1.0.0.bin",
+                "file_size": 5000000,
+                "checksum_sha256": "d" * 64,
+                "download_url": "https://example.com/gw-1.0.0.bin",
+            },
+            headers=auth_headers(token),
+        )
         assert resp.status_code == 200
         data = resp.json()
         assert data["version"] == "1.0.0"
@@ -549,26 +561,34 @@ class TestFirmwareAPI:
 
     async def test_list_firmware(self, client, admin_user):
         _, token = admin_user
-        await client.post("/api/v1/ota/firmware", json={
-            "version": "1.0.0",
-            "filename": "gw-1.0.0.bin",
-            "file_size": 5000000,
-            "checksum_sha256": "f" * 64,
-            "download_url": "https://example.com/gw-1.0.0.bin",
-        }, headers=auth_headers(token))
+        await client.post(
+            "/api/v1/ota/firmware",
+            json={
+                "version": "1.0.0",
+                "filename": "gw-1.0.0.bin",
+                "file_size": 5000000,
+                "checksum_sha256": "f" * 64,
+                "download_url": "https://example.com/gw-1.0.0.bin",
+            },
+            headers=auth_headers(token),
+        )
         resp = await client.get("/api/v1/ota/firmware", headers=auth_headers(token))
         assert resp.status_code == 200
         assert len(resp.json()) >= 1
 
     async def test_delete_firmware(self, client, admin_user):
         _, token = admin_user
-        create_resp = await client.post("/api/v1/ota/firmware", json={
-            "version": "9.9.9",
-            "filename": "gw-9.9.9.bin",
-            "file_size": 1000,
-            "checksum_sha256": "0" * 64,
-            "download_url": "https://example.com/gw-9.9.9.bin",
-        }, headers=auth_headers(token))
+        create_resp = await client.post(
+            "/api/v1/ota/firmware",
+            json={
+                "version": "9.9.9",
+                "filename": "gw-9.9.9.bin",
+                "file_size": 1000,
+                "checksum_sha256": "0" * 64,
+                "download_url": "https://example.com/gw-9.9.9.bin",
+            },
+            headers=auth_headers(token),
+        )
         fw_id = create_resp.json()["id"]
         resp = await client.delete(f"/api/v1/ota/firmware/{fw_id}", headers=auth_headers(token))
         assert resp.status_code == 200
@@ -600,11 +620,15 @@ class TestTaskAPI:
         async_db.add(gw)
         await async_db.flush()
 
-        resp = await client.post("/api/v1/ota/tasks", json={
-            "firmware_id": fw.id,
-            "gateway_ids": [gw.id],
-            "strategy": "immediate",
-        }, headers=auth_headers(token))
+        resp = await client.post(
+            "/api/v1/ota/tasks",
+            json={
+                "firmware_id": fw.id,
+                "gateway_ids": [gw.id],
+                "strategy": "immediate",
+            },
+            headers=auth_headers(token),
+        )
         assert resp.status_code == 200
         data = resp.json()
         assert data["status"] == "pending"
@@ -623,6 +647,7 @@ class TestTaskAPI:
 
 
 # ==================== Momus 修复验证测试 ====================
+
 
 class TestVersionComparison:
     """I2: 语义版本比较"""
@@ -674,12 +699,11 @@ class TestBatchProgression:
         mock_publish.reset_mock()
 
         # 第一个网关成功 → 应触发第二批
-        await ota_service._check_batch_completion(
-            task.task_id, async_db, mqtt_publish_fn=mock_publish
-        )
+        await ota_service._check_batch_completion(task.task_id, async_db, mqtt_publish_fn=mock_publish)
         # 还有进行中的（batch 0 的网关还没上报），不应触发
         # 模拟 batch 0 的网关上报 success
         from sqlalchemy import select, update
+
         tg_result = await async_db.execute(
             select(OtaTaskGateway).where(
                 OtaTaskGateway.task_id == task.task_id,
@@ -687,22 +711,12 @@ class TestBatchProgression:
             )
         )
         tg0 = tg_result.scalar_one()
-        await async_db.execute(
-            update(OtaTaskGateway).where(OtaTaskGateway.id == tg0.id).values(
-                status="success"
-            )
-        )
-        await async_db.execute(
-            update(OtaTask).where(OtaTask.task_id == task.task_id).values(
-                success_count=1
-            )
-        )
+        await async_db.execute(update(OtaTaskGateway).where(OtaTaskGateway.id == tg0.id).values(status="success"))
+        await async_db.execute(update(OtaTask).where(OtaTask.task_id == task.task_id).values(success_count=1))
         await async_db.commit()
 
         # 现在 batch 0 完成，应触发 batch 1
-        await ota_service._check_batch_completion(
-            task.task_id, async_db, mqtt_publish_fn=mock_publish
-        )
+        await ota_service._check_batch_completion(task.task_id, async_db, mqtt_publish_fn=mock_publish)
         assert mock_publish.call_count >= 1  # 第二批已发送
 
 
@@ -726,9 +740,8 @@ class TestCancelGatewayStatus:
         await ota_service.cancel_task(task.task_id, mock_publish, async_db)
 
         from sqlalchemy import select
-        result = await async_db.execute(
-            select(OtaTaskGateway).where(OtaTaskGateway.task_id == task.task_id)
-        )
+
+        result = await async_db.execute(select(OtaTaskGateway).where(OtaTaskGateway.task_id == task.task_id))
         for tg in result.scalars().all():
             assert tg.status == "cancelled"
 
@@ -749,14 +762,18 @@ class TestInvalidStatusRejected:
             db=async_db,
         )
         # 发送无效状态不应崩溃，也不应更新数据库
-        await ota_service.handle_ota_status({
-            "task_id": task.task_id,
-            "gw_id": "gw-000",
-            "status": "hacked",
-            "progress": 100,
-        }, async_db)
+        await ota_service.handle_ota_status(
+            {
+                "task_id": task.task_id,
+                "gw_id": "gw-000",
+                "status": "hacked",
+                "progress": 100,
+            },
+            async_db,
+        )
 
         from sqlalchemy import select
+
         result = await async_db.execute(
             select(OtaTaskGateway).where(
                 OtaTaskGateway.task_id == task.task_id,

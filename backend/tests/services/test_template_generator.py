@@ -2,21 +2,19 @@
 测试模板生成器服务
 验证6种模板的生成功能
 """
+
 import pytest
 from decimal import Decimal
 from datetime import datetime, timedelta
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
 
 from app.services.template_generator import TemplateGenerator
 from app.models.energy import (
     EnergySavingProposal,
-    ProposalMeasure,
     EnergyDaily,
     DemandHistory,
     MeterPoint,
     PowerDevice,
-    DeviceShiftConfig
+    DeviceShiftConfig,
 )
 
 
@@ -32,12 +30,7 @@ class TestTemplateGenerator:
     async def setup_basic_data(self, async_db):
         """设置基础测试数据"""
         # 创建计量点
-        meter_point = MeterPoint(
-            meter_code="M001",
-            meter_name="总表",
-            declared_demand=5000,
-            is_enabled=True
-        )
+        meter_point = MeterPoint(meter_code="M001", meter_name="总表", declared_demand=5000, is_enabled=True)
         async_db.add(meter_point)
         await async_db.flush()
 
@@ -53,7 +46,7 @@ class TestTemplateGenerator:
                 normal_energy=18000,
                 valley_energy=12000,
                 max_power=3000,
-                avg_power=2083
+                avg_power=2083,
             )
             async_db.add(energy_daily)
 
@@ -67,7 +60,7 @@ class TestTemplateGenerator:
             declared_demand=5000,
             max_demand=4200,
             avg_demand=3500,
-            demand_95th=4000
+            demand_95th=4000,
         )
         async_db.add(demand_history)
 
@@ -78,17 +71,14 @@ class TestTemplateGenerator:
             device_type="PUMP",
             rated_power=160,
             efficiency=92,
-            is_enabled=True
+            is_enabled=True,
         )
         async_db.add(device1)
         await async_db.flush()
 
         # 创建设备转移配置
         shift_config = DeviceShiftConfig(
-            device_id=device1.id,
-            is_shiftable=True,
-            shiftable_power_ratio=0.5,
-            shift_notice_time=10
+            device_id=device1.id, is_shiftable=True, shiftable_power_ratio=0.5, shift_notice_time=10
         )
         async_db.add(shift_config)
 
@@ -119,12 +109,7 @@ class TestTemplateGenerator:
             await generator.generate_proposal("INVALID_ID", 30)
 
     @pytest.mark.asyncio
-    async def test_generate_a1_peak_valley_proposal(
-        self,
-        generator: TemplateGenerator,
-        async_db,
-        setup_basic_data
-    ):
+    async def test_generate_a1_peak_valley_proposal(self, generator: TemplateGenerator, async_db, setup_basic_data):
         """测试A1-峰谷套利优化方案生成"""
         proposal = await generator.generate_proposal("A1", analysis_days=30)
 
@@ -164,12 +149,7 @@ class TestTemplateGenerator:
         assert "总电量" in proposal.current_situation
 
     @pytest.mark.asyncio
-    async def test_generate_a2_demand_control_proposal(
-        self,
-        generator: TemplateGenerator,
-        async_db,
-        setup_basic_data
-    ):
+    async def test_generate_a2_demand_control_proposal(self, generator: TemplateGenerator, async_db, setup_basic_data):
         """测试A2-需量控制方案生成"""
         proposal = await generator.generate_proposal("A2", analysis_days=30)
 
@@ -193,10 +173,7 @@ class TestTemplateGenerator:
 
     @pytest.mark.asyncio
     async def test_generate_a3_equipment_optimization_proposal(
-        self,
-        generator: TemplateGenerator,
-        async_db,
-        setup_basic_data
+        self, generator: TemplateGenerator, async_db, setup_basic_data
     ):
         """测试A3-设备运行优化方案生成"""
         proposal = await generator.generate_proposal("A3", analysis_days=30)
@@ -216,12 +193,7 @@ class TestTemplateGenerator:
         assert any("照明" in obj for obj in measure_objects)
 
     @pytest.mark.asyncio
-    async def test_generate_a4_vpp_response_proposal(
-        self,
-        generator: TemplateGenerator,
-        async_db,
-        setup_basic_data
-    ):
+    async def test_generate_a4_vpp_response_proposal(self, generator: TemplateGenerator, async_db, setup_basic_data):
         """测试A4-VPP需求响应方案生成"""
         proposal = await generator.generate_proposal("A4", analysis_days=30)
 
@@ -243,12 +215,7 @@ class TestTemplateGenerator:
         assert "总容量" in proposal.current_situation
 
     @pytest.mark.asyncio
-    async def test_generate_a5_load_scheduling_proposal(
-        self,
-        generator: TemplateGenerator,
-        async_db,
-        setup_basic_data
-    ):
+    async def test_generate_a5_load_scheduling_proposal(self, generator: TemplateGenerator, async_db, setup_basic_data):
         """测试A5-负荷调度优化方案生成"""
         proposal = await generator.generate_proposal("A5", analysis_days=30)
 
@@ -268,10 +235,7 @@ class TestTemplateGenerator:
 
     @pytest.mark.asyncio
     async def test_generate_b1_equipment_upgrade_proposal(
-        self,
-        generator: TemplateGenerator,
-        async_db,
-        setup_basic_data
+        self, generator: TemplateGenerator, async_db, setup_basic_data
     ):
         """测试B1-设备改造升级方案生成"""
         proposal = await generator.generate_proposal("B1", analysis_days=30)
@@ -302,12 +266,7 @@ class TestTemplateGenerator:
             assert "投资回收期" in measure.calculation_formula
 
     @pytest.mark.asyncio
-    async def test_proposal_code_generation(
-        self,
-        generator: TemplateGenerator,
-        async_db,
-        setup_basic_data
-    ):
+    async def test_proposal_code_generation(self, generator: TemplateGenerator, async_db, setup_basic_data):
         """测试方案编号生成"""
         # 生成第一个方案
         proposal1 = await generator.generate_proposal("A1", 30)
@@ -334,12 +293,7 @@ class TestTemplateGenerator:
         assert seq2 == seq1 + 1
 
     @pytest.mark.asyncio
-    async def test_measure_structure(
-        self,
-        generator: TemplateGenerator,
-        async_db,
-        setup_basic_data
-    ):
+    async def test_measure_structure(self, generator: TemplateGenerator, async_db, setup_basic_data):
         """测试措施结构完整性"""
         proposal = await generator.generate_proposal("A1", 30)
 
@@ -365,12 +319,7 @@ class TestTemplateGenerator:
             assert measure.annual_benefit >= 0
 
     @pytest.mark.asyncio
-    async def test_proposal_current_situation(
-        self,
-        generator: TemplateGenerator,
-        async_db,
-        setup_basic_data
-    ):
+    async def test_proposal_current_situation(self, generator: TemplateGenerator, async_db, setup_basic_data):
         """测试方案当前状况数据"""
         # A1方案应包含峰谷数据
         a1_proposal = await generator.generate_proposal("A1", 30)
@@ -390,12 +339,7 @@ class TestTemplateGenerator:
         assert "负荷率" in a5_proposal.current_situation
 
     @pytest.mark.asyncio
-    async def test_analysis_dates(
-        self,
-        generator: TemplateGenerator,
-        async_db,
-        setup_basic_data
-    ):
+    async def test_analysis_dates(self, generator: TemplateGenerator, async_db, setup_basic_data):
         """测试分析日期设置"""
         analysis_days = 60
         proposal = await generator.generate_proposal("A1", analysis_days)
@@ -409,12 +353,7 @@ class TestTemplateGenerator:
         assert date_diff >= analysis_days - 1  # 允许1天误差
 
     @pytest.mark.asyncio
-    async def test_all_templates_generate_successfully(
-        self,
-        generator: TemplateGenerator,
-        async_db,
-        setup_basic_data
-    ):
+    async def test_all_templates_generate_successfully(self, generator: TemplateGenerator, async_db, setup_basic_data):
         """测试所有6种模板都能成功生成"""
         template_ids = ["A1", "A2", "A3", "A4", "A5", "B1"]
 
@@ -456,15 +395,13 @@ class TestMeasureGeneration:
             template_id="A1",
             template_name="测试方案",
             analysis_start_date=datetime.now().date(),
-            analysis_end_date=datetime.now().date()
+            analysis_end_date=datetime.now().date(),
         )
         return proposal
 
     @pytest.mark.asyncio
     async def test_heat_treatment_shift_measure(
-        self,
-        generator: TemplateGenerator,
-        mock_proposal: EnergySavingProposal
+        self, generator: TemplateGenerator, mock_proposal: EnergySavingProposal
     ):
         """测试热处理工序转移措施"""
         measure = await generator._generate_measure_heat_treatment_shift(mock_proposal, 30)
@@ -476,19 +413,11 @@ class TestMeasureGeneration:
 
     @pytest.mark.asyncio
     async def test_demand_reduction_measure(
-        self,
-        generator: TemplateGenerator,
-        mock_proposal: EnergySavingProposal,
-        async_db
+        self, generator: TemplateGenerator, mock_proposal: EnergySavingProposal, async_db
     ):
         """测试需量降低措施"""
         # 创建需量数据
-        meter_point = MeterPoint(
-            meter_code="M001",
-            meter_name="测试表",
-            declared_demand=5000,
-            is_enabled=True
-        )
+        meter_point = MeterPoint(meter_code="M001", meter_name="测试表", declared_demand=5000, is_enabled=True)
         async_db.add(meter_point)
         await async_db.flush()
 
@@ -496,7 +425,7 @@ class TestMeasureGeneration:
             meter_point_id=meter_point.id,
             stat_year=datetime.now().year,
             stat_month=datetime.now().month,
-            demand_95th=4000
+            demand_95th=4000,
         )
         async_db.add(demand_history)
         await async_db.commit()
@@ -508,11 +437,7 @@ class TestMeasureGeneration:
         assert measure.investment == Decimal("0")
 
     @pytest.mark.asyncio
-    async def test_led_retrofit_measure(
-        self,
-        generator: TemplateGenerator,
-        mock_proposal: EnergySavingProposal
-    ):
+    async def test_led_retrofit_measure(self, generator: TemplateGenerator, mock_proposal: EnergySavingProposal):
         """测试LED改造措施"""
         mock_proposal.proposal_type = "B"
         measure = await generator._generate_measure_led_retrofit(mock_proposal)

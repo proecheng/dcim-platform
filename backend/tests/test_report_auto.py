@@ -1,4 +1,5 @@
 """自动运行报表 API 测试 (Story 12-1)"""
+
 import pytest
 
 from httpx import AsyncClient, ASGITransport
@@ -16,6 +17,7 @@ from app.api.deps import get_db, require_admin, require_operator, require_viewer
 # ============================================================
 # Fixtures
 # ============================================================
+
 
 @pytest.fixture(scope="module")
 def anyio_backend():
@@ -102,6 +104,7 @@ RECORDS_URL = "/api/v1/reports/records"
 # Tests
 # ============================================================
 
+
 @pytest.mark.anyio
 async def test_auto_generate_daily(client):
     """自动生成日报"""
@@ -154,10 +157,7 @@ async def test_auto_generate_saves_record(client):
     resp = await client.get(RECORDS_URL)
     assert resp.status_code == 200
     items = resp.json()["items"]
-    assert any(
-        r["report_type"] == "daily" and r["status"] == "completed"
-        for r in items
-    )
+    assert any(r["report_type"] == "daily" and r["status"] == "completed" for r in items)
 
 
 @pytest.mark.anyio
@@ -174,10 +174,7 @@ async def test_auto_generate_comparison(client):
 @pytest.mark.anyio
 async def test_schedule_crud_create(client):
     """创建报表调度"""
-    resp = await client.post(SCHEDULES_URL, json={
-        "name": "每日报表",
-        "report_type": "daily"
-    })
+    resp = await client.post(SCHEDULES_URL, json={"name": "每日报表", "report_type": "daily"})
     assert resp.status_code == 200
     data = resp.json()
     assert "id" in data
@@ -189,10 +186,7 @@ async def test_schedule_crud_create(client):
 @pytest.mark.anyio
 async def test_schedule_crud_list(client):
     """获取报表调度列表"""
-    resp = await client.post(SCHEDULES_URL, json={
-        "name": "列表测试",
-        "report_type": "weekly"
-    })
+    resp = await client.post(SCHEDULES_URL, json={"name": "列表测试", "report_type": "weekly"})
     assert resp.status_code == 200
     schedule_id = resp.json()["id"]
 
@@ -205,17 +199,11 @@ async def test_schedule_crud_list(client):
 @pytest.mark.anyio
 async def test_schedule_crud_update(client):
     """更新报表调度"""
-    resp = await client.post(SCHEDULES_URL, json={
-        "name": "待更新",
-        "report_type": "daily"
-    })
+    resp = await client.post(SCHEDULES_URL, json={"name": "待更新", "report_type": "daily"})
     assert resp.status_code == 200
     schedule_id = resp.json()["id"]
 
-    resp = await client.put(f"{SCHEDULES_URL}/{schedule_id}", json={
-        "name": "更新名称",
-        "is_enabled": False
-    })
+    resp = await client.put(f"{SCHEDULES_URL}/{schedule_id}", json={"name": "更新名称", "is_enabled": False})
     assert resp.status_code == 200
     data = resp.json()
     assert data["name"] == "更新名称"
@@ -225,10 +213,7 @@ async def test_schedule_crud_update(client):
 @pytest.mark.anyio
 async def test_schedule_crud_delete(client):
     """删除报表调度"""
-    resp = await client.post(SCHEDULES_URL, json={
-        "name": "待删除",
-        "report_type": "monthly"
-    })
+    resp = await client.post(SCHEDULES_URL, json={"name": "待删除", "report_type": "monthly"})
     assert resp.status_code == 200
     schedule_id = resp.json()["id"]
 
@@ -243,10 +228,7 @@ async def test_schedule_crud_delete(client):
 @pytest.mark.anyio
 async def test_schedule_create_invalid_type(client):
     """创建调度时使用无效报表类型"""
-    resp = await client.post(SCHEDULES_URL, json={
-        "name": "test",
-        "report_type": "invalid"
-    })
+    resp = await client.post(SCHEDULES_URL, json={"name": "test", "report_type": "invalid"})
     assert resp.status_code == 422
 
 
@@ -400,7 +382,9 @@ async def test_device_health_list_empty(client):
 async def test_device_health_list_after_calculate(client, db_session):
     """计算后获取健康度列表"""
     # 插入测试设备
-    device = Device(device_name="测试设备A", device_type="UPS", device_code="TEST-A-001", area_code="A01", status="online")
+    device = Device(
+        device_name="测试设备A", device_type="UPS", device_code="TEST-A-001", area_code="A01", status="online"
+    )
     db_session.add(device)
     await db_session.commit()
     await db_session.refresh(device)
@@ -432,7 +416,9 @@ async def test_device_health_single_not_found(client):
 @pytest.mark.anyio
 async def test_device_health_filter_level(client, db_session):
     """按健康等级筛选"""
-    device = Device(device_name="筛选设备", device_type="空调", device_code="FILTER-001", area_code="A01", status="online")
+    device = Device(
+        device_name="筛选设备", device_type="空调", device_code="FILTER-001", area_code="A01", status="online"
+    )
     db_session.add(device)
     await db_session.commit()
 

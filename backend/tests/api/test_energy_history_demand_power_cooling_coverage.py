@@ -1,25 +1,30 @@
 """
 Energy/History/Demand/Power/Cooling API coverage tests
 """
-import pytest
-from datetime import datetime, timedelta, date
-from unittest.mock import patch, AsyncMock
 
-from app.models.energy import PowerDevice, EnergyDaily, EnergyMonthly, PUEHistory
-from app.models.point import Point, PointRealtime
+from datetime import datetime, timedelta, date
+
+from app.models.energy import PowerDevice
+from app.models.point import Point
 from app.models.device import Device
-from app.models.history import PointHistory, PointHistoryArchive, PointChangeLog
+from app.models.history import PointHistory
 from app.models.power import UPSDevice, BatteryGroup
-from app.models.cooling import CoolingGroup, CoolingUnit, ColdAisle
+from app.models.cooling import CoolingGroup
 from tests.conftest import auth_headers
 
 
 # ============== Seed helpers ==============
 
+
 async def _seed_power_device(db, code="PD-TEST-001", name="Test Device", dtype="IT"):
     dev = PowerDevice(
-        device_code=code, device_name=name, device_type=dtype,
-        rated_power=100.0, phase_type="3P", is_enabled=True, is_it_load=(dtype == "IT"),
+        device_code=code,
+        device_name=name,
+        device_type=dtype,
+        rated_power=100.0,
+        phase_type="3P",
+        is_enabled=True,
+        is_it_load=(dtype == "IT"),
     )
     db.add(dev)
     await db.flush()
@@ -53,8 +58,8 @@ async def _seed_history(db, point_id, count=5):
 
 # ============== Energy API Tests ==============
 
-class TestEnergyDevices:
 
+class TestEnergyDevices:
     async def test_get_devices_empty(self, client, admin_user, async_db):
         _, token = admin_user
         resp = await client.get("/api/v1/energy/devices", headers=auth_headers(token))
@@ -65,8 +70,11 @@ class TestEnergyDevices:
     async def test_create_device(self, client, admin_user, async_db):
         _, token = admin_user
         payload = {
-            "device_code": "PD-NEW-001", "device_name": "New Device",
-            "device_type": "IT", "rated_power": 50.0, "phase_type": "3P",
+            "device_code": "PD-NEW-001",
+            "device_name": "New Device",
+            "device_type": "IT",
+            "rated_power": 50.0,
+            "phase_type": "3P",
         }
         resp = await client.post("/api/v1/energy/devices", json=payload, headers=auth_headers(token))
         assert resp.status_code == 200
@@ -119,7 +127,6 @@ class TestEnergyDevices:
 
 
 class TestEnergyRealtime:
-
     async def test_get_realtime_power(self, client, admin_user, async_db):
         _, token = admin_user
         await _seed_power_device(async_db)
@@ -144,7 +151,6 @@ class TestEnergyRealtime:
 
 
 class TestEnergyPUE:
-
     async def test_get_current_pue(self, client, admin_user, async_db):
         _, token = admin_user
         resp = await client.get("/api/v1/energy/pue", headers=auth_headers(token))
@@ -152,16 +158,13 @@ class TestEnergyPUE:
 
     async def test_get_pue_trend(self, client, admin_user, async_db):
         _, token = admin_user
-        resp = await client.get(
-            "/api/v1/energy/pue/trend", params={"period": "day"}, headers=auth_headers(token)
-        )
+        resp = await client.get("/api/v1/energy/pue/trend", params={"period": "day"}, headers=auth_headers(token))
         assert resp.status_code == 200
         body = resp.json()
         assert "data" in body
 
 
 class TestEnergyStatistics:
-
     async def test_get_daily_statistics(self, client, admin_user, async_db):
         _, token = admin_user
         today = date.today()
@@ -217,8 +220,8 @@ class TestEnergyStatistics:
 
 # ============== History API Tests ==============
 
-class TestHistoryAPI:
 
+class TestHistoryAPI:
     async def test_get_point_history(self, client, admin_user, async_db):
         _, token = admin_user
         pt = await _seed_point(async_db)
@@ -290,8 +293,8 @@ class TestHistoryAPI:
 
 # ============== Demand API Tests ==============
 
-class TestDemandAPI:
 
+class TestDemandAPI:
     async def test_get_demand_comparison(self, client, admin_user, async_db):
         _, token = admin_user
         resp = await client.get("/api/v1/demand/comparison", headers=auth_headers(token))
@@ -329,8 +332,8 @@ class TestDemandAPI:
 
 # ============== Power API Tests ==============
 
-class TestPowerOverview:
 
+class TestPowerOverview:
     async def test_get_power_overview(self, client, admin_user, async_db):
         _, token = admin_user
         resp = await client.get("/api/v1/power/overview", headers=auth_headers(token))
@@ -340,7 +343,6 @@ class TestPowerOverview:
 
 
 class TestPowerUPS:
-
     async def test_list_ups_empty(self, client, admin_user, async_db):
         _, token = admin_user
         resp = await client.get("/api/v1/power/ups", headers=auth_headers(token))
@@ -399,7 +401,6 @@ class TestPowerUPS:
 
 
 class TestPowerBatteries:
-
     async def test_list_batteries_empty(self, client, admin_user, async_db):
         _, token = admin_user
         resp = await client.get("/api/v1/power/batteries", headers=auth_headers(token))
@@ -453,7 +454,6 @@ class TestPowerBatteries:
 
 
 class TestPowerCabinetsPDUs:
-
     async def test_list_cabinets(self, client, admin_user, async_db):
         _, token = admin_user
         resp = await client.get("/api/v1/power/cabinets", headers=auth_headers(token))
@@ -467,8 +467,8 @@ class TestPowerCabinetsPDUs:
 
 # ============== Cooling API Tests ==============
 
-class TestCoolingOverview:
 
+class TestCoolingOverview:
     async def test_get_cooling_overview(self, client, admin_user, async_db):
         _, token = admin_user
         resp = await client.get("/api/v1/cooling/overview", headers=auth_headers(token))
@@ -478,7 +478,6 @@ class TestCoolingOverview:
 
 
 class TestCoolingGroups:
-
     async def test_list_groups_empty(self, client, admin_user, async_db):
         _, token = admin_user
         resp = await client.get("/api/v1/cooling/groups", headers=auth_headers(token))
@@ -531,7 +530,6 @@ class TestCoolingGroups:
 
 
 class TestCoolingUnits:
-
     async def test_list_units_empty(self, client, admin_user, async_db):
         _, token = admin_user
         resp = await client.get("/api/v1/cooling/units", headers=auth_headers(token))
@@ -563,7 +561,6 @@ class TestCoolingUnits:
 
 
 class TestColdAisles:
-
     async def test_list_cold_aisles(self, client, admin_user, async_db):
         _, token = admin_user
         resp = await client.get("/api/v1/cooling/cold-aisles", headers=auth_headers(token))

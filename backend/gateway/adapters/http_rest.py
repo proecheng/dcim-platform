@@ -9,6 +9,7 @@
   - 支持自定义请求头和请求体
   - 使用 httpx 异步 HTTP 客户端
 """
+
 import asyncio
 import logging
 import time
@@ -165,7 +166,10 @@ class HttpRestAdapter(BaseProtocolAdapter):
             self._error_message = None
             logger.info(
                 "HTTP REST 适配器已启动: %s %s%s (auth=%s)",
-                self._method, self._base_url, self._endpoint, self._auth_type,
+                self._method,
+                self._base_url,
+                self._endpoint,
+                self._auth_type,
             )
             return True
 
@@ -243,7 +247,9 @@ class HttpRestAdapter(BaseProtocolAdapter):
                 except (KeyError, IndexError, TypeError) as e:
                     logger.warning(
                         "点位 %s 数据提取失败 (address=%s): %s",
-                        point.point_id, point.address, e,
+                        point.point_id,
+                        point.address,
+                        e,
                     )
                     results[point.point_id] = PointValue(
                         point_id=point.point_id,
@@ -271,9 +277,7 @@ class HttpRestAdapter(BaseProtocolAdapter):
                     )
 
             # 连续失败过多，标记通信中断
-            if self._consecutive_failures >= (
-                self._config.retry_max_failures if self._config else 5
-            ):
+            if self._consecutive_failures >= (self._config.retry_max_failures if self._config else 5):
                 self._state = AdapterState.COMMUNICATION_INTERRUPTED
 
         self._last_read_time = datetime.now(timezone.utc)

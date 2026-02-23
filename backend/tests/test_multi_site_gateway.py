@@ -1,4 +1,5 @@
 """多站点网关接入测试 — Story 16.3"""
+
 import pytest
 from datetime import datetime
 from unittest.mock import AsyncMock, patch, MagicMock
@@ -14,6 +15,7 @@ from tests.conftest import auth_headers
 
 
 # ==================== Fixtures ====================
+
 
 @pytest.fixture
 async def site_a(async_db):
@@ -64,6 +66,7 @@ async def gateway_with_site(async_db, site_a):
 
 # ==================== _resolve_site_id 测试 ====================
 
+
 class TestResolveSiteId:
     """site_id 解析与验证"""
 
@@ -95,6 +98,7 @@ class TestResolveSiteId:
 
 # ==================== 网关自动注册绑定 site_id ====================
 
+
 class TestGatewayRegistrationSiteId:
     """网关注册/心跳的 site_id 绑定"""
 
@@ -104,9 +108,7 @@ class TestGatewayRegistrationSiteId:
         payload = {"gw_id": "gw-new-01", "name": "新网关", "ip": "10.0.1.1"}
         await handle_gateway_status(payload, async_db, site_id=str(site_a.id))
 
-        result = await async_db.execute(
-            select(Gateway).where(Gateway.gateway_id == "gw-new-01")
-        )
+        result = await async_db.execute(select(Gateway).where(Gateway.gateway_id == "gw-new-01"))
         gw = result.scalar_one()
         assert gw.site_id == site_a.id
         assert gw.status == "online"
@@ -117,9 +119,7 @@ class TestGatewayRegistrationSiteId:
         payload = {"gw_id": "gw-new-02", "name": "新网关2"}
         await handle_gateway_status(payload, async_db, site_id="99999")
 
-        result = await async_db.execute(
-            select(Gateway).where(Gateway.gateway_id == "gw-new-02")
-        )
+        result = await async_db.execute(select(Gateway).where(Gateway.gateway_id == "gw-new-02"))
         gw = result.scalar_one()
         assert gw.site_id is None
         assert gw.status == "online"
@@ -130,9 +130,7 @@ class TestGatewayRegistrationSiteId:
         payload = {"gw_id": "gw-new-03", "name": "新网关3"}
         await handle_gateway_status(payload, async_db)
 
-        result = await async_db.execute(
-            select(Gateway).where(Gateway.gateway_id == "gw-new-03")
-        )
+        result = await async_db.execute(select(Gateway).where(Gateway.gateway_id == "gw-new-03"))
         gw = result.scalar_one()
         assert gw.site_id is None
 
@@ -142,9 +140,7 @@ class TestGatewayRegistrationSiteId:
         payload = {"gw_id": gateway_no_site.gateway_id, "name": "孤立网关"}
         await handle_gateway_status(payload, async_db, site_id=str(site_a.id))
 
-        result = await async_db.execute(
-            select(Gateway).where(Gateway.gateway_id == gateway_no_site.gateway_id)
-        )
+        result = await async_db.execute(select(Gateway).where(Gateway.gateway_id == gateway_no_site.gateway_id))
         gw = result.scalar_one()
         assert gw.site_id == site_a.id
 
@@ -154,9 +150,7 @@ class TestGatewayRegistrationSiteId:
         payload = {"gw_id": gateway_with_site.gateway_id, "name": "已绑定网关"}
         await handle_gateway_status(payload, async_db, site_id=str(site_b.id))
 
-        result = await async_db.execute(
-            select(Gateway).where(Gateway.gateway_id == gateway_with_site.gateway_id)
-        )
+        result = await async_db.execute(select(Gateway).where(Gateway.gateway_id == gateway_with_site.gateway_id))
         gw = result.scalar_one()
         # 保持原 site_id，不被覆盖
         assert gw.site_id == site_a.id
@@ -167,15 +161,14 @@ class TestGatewayRegistrationSiteId:
         payload = {"gw_id": gateway_with_site.gateway_id, "name": "已绑定网关"}
         await handle_gateway_status(payload, async_db, site_id=str(site_a.id))
 
-        result = await async_db.execute(
-            select(Gateway).where(Gateway.gateway_id == gateway_with_site.gateway_id)
-        )
+        result = await async_db.execute(select(Gateway).where(Gateway.gateway_id == gateway_with_site.gateway_id))
         gw = result.scalar_one()
         assert gw.site_id == site_a.id
         assert gw.status == "online"
 
 
 # ==================== 点位数据处理 site_id ====================
+
 
 class TestPointDataSiteId:
     """点位数据处理的 site_id 传递"""
@@ -206,6 +199,7 @@ class TestPointDataSiteId:
 
 
 # ==================== 断点续传去重 ====================
+
 
 class TestDedupService:
     """断点续传消息去重"""
@@ -263,6 +257,7 @@ class TestDedupService:
 
 
 # ==================== 网关站点分配 API ====================
+
 
 class TestGatewayAssignSiteAPI:
     """PUT /api/v1/gateways/{id}/site 端点"""
@@ -324,6 +319,7 @@ class TestGatewayAssignSiteAPI:
 
 # ==================== MQTT 消息路由 site_id 传递 ====================
 
+
 class TestMqttMessageRouting:
     """MQTT _handle_message 中 site_id 传递"""
 
@@ -337,8 +333,10 @@ class TestMqttMessageRouting:
         mock_message.topic = "dcim/42/gw/gw-test/status"
         mock_message.payload = b'{"gw_id": "gw-test", "name": "test"}'
 
-        with patch("app.mqtt.client.handle_gateway_status", new_callable=AsyncMock) as mock_handler, \
-             patch("app.mqtt.client.async_session") as mock_session_ctx:
+        with (
+            patch("app.mqtt.client.handle_gateway_status", new_callable=AsyncMock) as mock_handler,
+            patch("app.mqtt.client.async_session") as mock_session_ctx,
+        ):
             mock_db = AsyncMock()
             mock_session_ctx.return_value.__aenter__ = AsyncMock(return_value=mock_db)
             mock_session_ctx.return_value.__aexit__ = AsyncMock(return_value=False)
@@ -359,8 +357,10 @@ class TestMqttMessageRouting:
         mock_message.topic = "dcim/7/gw/gw-test/data"
         mock_message.payload = b'{"gw_id": "gw-test", "points": []}'
 
-        with patch("app.mqtt.client.handle_point_data", new_callable=AsyncMock) as mock_handler, \
-             patch("app.mqtt.client.async_session") as mock_session_ctx:
+        with (
+            patch("app.mqtt.client.handle_point_data", new_callable=AsyncMock) as mock_handler,
+            patch("app.mqtt.client.async_session") as mock_session_ctx,
+        ):
             mock_db = AsyncMock()
             mock_session_ctx.return_value.__aenter__ = AsyncMock(return_value=mock_db)
             mock_session_ctx.return_value.__aexit__ = AsyncMock(return_value=False)

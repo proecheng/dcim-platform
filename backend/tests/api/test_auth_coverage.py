@@ -2,7 +2,7 @@
 认证 API 覆盖率补充测试
 覆盖 auth.py 中未测试的行：39-44, 65, 107-195, 260, 267-301, 318, 333, 346, 365-380
 """
-import pytest
+
 from datetime import datetime, timedelta
 
 from app.models.user import User, UserLoginHistory, PasswordHistory
@@ -19,19 +19,19 @@ class TestPasswordPolicyFromConfig:
         _, token = admin_user
         # 插入自定义密码策略
         for key, val in [("min_length", "12"), ("history_count", "3")]:
-            async_db.add(SystemConfig(
-                config_group="password_policy",
-                config_key=key,
-                config_value=val,
-                value_type="int",
-                description=f"测试-{key}",
-                is_editable=True,
-            ))
+            async_db.add(
+                SystemConfig(
+                    config_group="password_policy",
+                    config_key=key,
+                    config_value=val,
+                    value_type="int",
+                    description=f"测试-{key}",
+                    is_editable=True,
+                )
+            )
         await async_db.flush()
 
-        resp = await client.get(
-            "/api/v1/auth/password-policy", headers=auth_headers(token)
-        )
+        resp = await client.get("/api/v1/auth/password-policy", headers=auth_headers(token))
         assert resp.status_code == 200
         data = resp.json()
         assert data["min_length"] == 12
@@ -43,9 +43,7 @@ class TestPasswordPolicyFromConfig:
     async def test_policy_default_when_no_config(self, client, admin_user):
         """无 SystemConfig 记录时返回默认策略"""
         _, token = admin_user
-        resp = await client.get(
-            "/api/v1/auth/password-policy", headers=auth_headers(token)
-        )
+        resp = await client.get("/api/v1/auth/password-policy", headers=auth_headers(token))
         assert resp.status_code == 200
         data = resp.json()
         assert data["min_length"] == 8
@@ -56,6 +54,7 @@ class TestRateLimiter:
 
     def test_rate_limiter_allows_within_limit(self):
         from app.api.v1.auth import RateLimiter
+
         limiter = RateLimiter(max_attempts=3, window_seconds=60)
         assert limiter.is_allowed("key1") is True
         assert limiter.is_allowed("key1") is True
@@ -63,6 +62,7 @@ class TestRateLimiter:
 
     def test_rate_limiter_blocks_over_limit(self):
         from app.api.v1.auth import RateLimiter
+
         limiter = RateLimiter(max_attempts=2, window_seconds=60)
         limiter.is_allowed("key2")
         limiter.is_allowed("key2")
@@ -70,6 +70,7 @@ class TestRateLimiter:
 
     def test_rate_limiter_remaining_time(self):
         from app.api.v1.auth import RateLimiter
+
         limiter = RateLimiter(max_attempts=2, window_seconds=60)
         # 空 key 返回 0
         assert limiter.get_remaining_time("empty") == 0
@@ -84,6 +85,7 @@ class TestLoginRateLimitBranch:
     async def test_login_rate_limit_returns_429(self, client, async_db):
         """超过速率限制返回 429"""
         from app.api.v1.auth import login_limiter
+
         login_limiter.attempts.clear()
 
         user = User(
@@ -122,6 +124,7 @@ class TestLoginHistoryAndPasswordExpiry:
     async def test_login_records_history_on_failure(self, client, async_db):
         """登录失败时记录历史"""
         from app.api.v1.auth import login_limiter
+
         login_limiter.attempts.clear()
 
         user = User(
@@ -141,9 +144,8 @@ class TestLoginHistoryAndPasswordExpiry:
         )
 
         from sqlalchemy import select
-        result = await async_db.execute(
-            select(UserLoginHistory).where(UserLoginHistory.user_id == user_id)
-        )
+
+        result = await async_db.execute(select(UserLoginHistory).where(UserLoginHistory.user_id == user_id))
         records = result.scalars().all()
         assert len(records) >= 1
         assert records[0].status == "failed"
@@ -151,6 +153,7 @@ class TestLoginHistoryAndPasswordExpiry:
     async def test_login_success_updates_user_info(self, client, async_db):
         """登录成功后更新 last_login_at 和 login_count"""
         from app.api.v1.auth import login_limiter
+
         login_limiter.attempts.clear()
 
         user = User(
@@ -176,6 +179,7 @@ class TestLoginHistoryAndPasswordExpiry:
     async def test_login_password_expired_warning(self, client, async_db):
         """密码过期时返回警告"""
         from app.api.v1.auth import login_limiter
+
         login_limiter.attempts.clear()
 
         user = User(
@@ -199,6 +203,7 @@ class TestLoginHistoryAndPasswordExpiry:
     async def test_login_password_not_expired(self, client, async_db):
         """密码未过期时无警告"""
         from app.api.v1.auth import login_limiter
+
         login_limiter.attempts.clear()
 
         user = User(
@@ -242,10 +247,12 @@ class TestChangePassword:
         """新密码与历史密码相同时拒绝"""
         user, token = admin_user
         # 插入历史密码
-        async_db.add(PasswordHistory(
-            user_id=user.id,
-            password_hash=get_password_hash("ReusedPwd@1"),
-        ))
+        async_db.add(
+            PasswordHistory(
+                user_id=user.id,
+                password_hash=get_password_hash("ReusedPwd@1"),
+            )
+        )
         await async_db.flush()
 
         resp = await client.put(
@@ -344,9 +351,7 @@ class TestGetPermissions:
     async def test_get_permissions_empty(self, client, admin_user):
         """无权限记录时返回空列表"""
         _, token = admin_user
-        resp = await client.get(
-            "/api/v1/auth/permissions", headers=auth_headers(token)
-        )
+        resp = await client.get("/api/v1/auth/permissions", headers=auth_headers(token))
         assert resp.status_code == 200
         body = resp.json()
         assert body["role"] == "admin"
@@ -369,9 +374,7 @@ class TestLogoutAndRefresh:
     async def test_refresh_returns_new_token(self, client, admin_user):
         """刷新返回新 token"""
         _, token = admin_user
-        resp = await client.post(
-            "/api/v1/auth/refresh", headers=auth_headers(token)
-        )
+        resp = await client.post("/api/v1/auth/refresh", headers=auth_headers(token))
         assert resp.status_code == 200
         body = resp.json()
         assert body["access_token"] != token
@@ -380,9 +383,7 @@ class TestLogoutAndRefresh:
     async def test_logout_with_token(self, client, admin_user):
         """已认证用户登出成功（覆盖行 208）"""
         _, token = admin_user
-        resp = await client.post(
-            "/api/v1/auth/logout", headers=auth_headers(token)
-        )
+        resp = await client.post("/api/v1/auth/logout", headers=auth_headers(token))
         assert resp.status_code == 200
         assert resp.json()["message"] == "登出成功"
 
@@ -393,9 +394,7 @@ class TestGetMe:
     async def test_get_me_success(self, client, admin_user):
         """获取当前用户信息"""
         user, token = admin_user
-        resp = await client.get(
-            "/api/v1/auth/me", headers=auth_headers(token)
-        )
+        resp = await client.get("/api/v1/auth/me", headers=auth_headers(token))
         assert resp.status_code == 200
         body = resp.json()
         assert body["username"] == user.username
@@ -409,6 +408,7 @@ class TestLoginDisabledUser:
     async def test_login_disabled_user_returns_403(self, client, async_db):
         """禁用用户登录返回 403"""
         from app.api.v1.auth import login_limiter
+
         login_limiter.attempts.clear()
 
         user = User(
@@ -436,6 +436,7 @@ class TestSessionKick:
         """超过 MAX_SESSIONS 时踢出最早的会话"""
         from app.api.v1.auth import login_limiter
         from app.models.user import UserSession
+
         login_limiter.attempts.clear()
 
         user = User(
@@ -451,11 +452,13 @@ class TestSessionKick:
 
         # 预先创建 4 个活跃会话（超过 MAX_SESSIONS=3）
         for i in range(4):
-            async_db.add(UserSession(
-                user_id=user.id,
-                token_jti=f"pre_session_{i}",
-                is_active=True,
-            ))
+            async_db.add(
+                UserSession(
+                    user_id=user.id,
+                    token_jti=f"pre_session_{i}",
+                    is_active=True,
+                )
+            )
         await async_db.flush()
 
         # 再次登录，应触发踢出逻辑

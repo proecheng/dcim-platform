@@ -6,13 +6,13 @@
   - POST /api/v1/energy/ocr/bill — 不支持的文件格式
   - POST /api/v1/energy/ocr/bill — 未认证请求
 """
+
 import pytest
-from io import BytesIO
 from tests.conftest import auth_headers
 
 # 测试用文件魔数前缀
-JPEG_HEADER = b'\xff\xd8\xff\xe0' + b'\x00' * 100
-PNG_HEADER = b'\x89PNG\r\n\x1a\n' + b'\x00' * 100
+JPEG_HEADER = b"\xff\xd8\xff\xe0" + b"\x00" * 100
+PNG_HEADER = b"\x89PNG\r\n\x1a\n" + b"\x00" * 100
 
 
 class TestOcrBillEndpoint:

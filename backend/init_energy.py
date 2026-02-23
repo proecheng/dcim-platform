@@ -2,14 +2,21 @@
 能源数据初始化脚本 - 初始化配电系统相关数据
 包括变压器、计量点、配电柜、回路、用电设备、需量数据
 """
+
 import asyncio
 import random
 from datetime import datetime, timedelta
 from app.core.database import async_session, init_db
 from app.models.energy import (
-    Transformer, MeterPoint, DistributionPanel, DistributionCircuit,
-    PowerDevice, EnergyHourly, EnergyDaily, PUEHistory,
-    ElectricityPricing, Demand15MinData
+    Transformer,
+    MeterPoint,
+    DistributionPanel,
+    DistributionCircuit,
+    PowerDevice,
+    EnergyHourly,
+    EnergyDaily,
+    PUEHistory,
+    ElectricityPricing,
 )
 
 
@@ -23,7 +30,7 @@ TRANSFORMERS = [
         "voltage_low": 0.4,
         "efficiency": 98.5,
         "location": "配电室A",
-        "status": "running"
+        "status": "running",
     },
     {
         "transformer_code": "TR-002",
@@ -33,8 +40,8 @@ TRANSFORMERS = [
         "voltage_low": 0.4,
         "efficiency": 98.0,
         "location": "配电室B",
-        "status": "running"
-    }
+        "status": "running",
+    },
 ]
 
 # 计量点配置
@@ -47,7 +54,7 @@ METER_POINTS = [
         "declared_demand": 800,
         "demand_type": "kW",
         "customer_no": "GD20240001",
-        "customer_name": "数据中心总表"
+        "customer_name": "数据中心总表",
     },
     {
         "meter_code": "M002",
@@ -57,7 +64,7 @@ METER_POINTS = [
         "declared_demand": 500,
         "demand_type": "kW",
         "customer_no": "GD20240002",
-        "customer_name": "IT设备分表"
+        "customer_name": "IT设备分表",
     },
     {
         "meter_code": "M003",
@@ -67,49 +74,242 @@ METER_POINTS = [
         "declared_demand": 300,
         "demand_type": "kW",
         "customer_no": "GD20240003",
-        "customer_name": "空调系统分表"
-    }
+        "customer_name": "空调系统分表",
+    },
 ]
 
 # 配电柜配置
 DISTRIBUTION_PANELS = [
-    {"panel_code": "MDP-001", "panel_name": "主配电柜", "panel_type": "main", "rated_current": 2000, "location": "配电室A", "area_code": "A1"},
-    {"panel_code": "ATS-001", "panel_name": "ATS切换柜", "panel_type": "sub", "rated_current": 1600, "location": "配电室A", "area_code": "A1", "parent_code": "MDP-001"},
-    {"panel_code": "UPS-IN-001", "panel_name": "UPS输入柜", "panel_type": "ups_input", "rated_current": 800, "location": "UPS室", "area_code": "A1", "parent_code": "ATS-001"},
-    {"panel_code": "UPS-OUT-001", "panel_name": "UPS输出柜", "panel_type": "ups_output", "rated_current": 600, "location": "UPS室", "area_code": "A1"},
-    {"panel_code": "PDU-A1-001", "panel_name": "A1区列头柜1", "panel_type": "sub", "rated_current": 250, "location": "机房A1区", "area_code": "A1", "parent_code": "UPS-OUT-001"},
-    {"panel_code": "PDU-A1-002", "panel_name": "A1区列头柜2", "panel_type": "sub", "rated_current": 250, "location": "机房A1区", "area_code": "A1", "parent_code": "UPS-OUT-001"},
-    {"panel_code": "AC-PANEL-001", "panel_name": "空调配电柜", "panel_type": "sub", "rated_current": 400, "location": "配电室B", "area_code": "B1", "parent_code": "MDP-001"},
+    {
+        "panel_code": "MDP-001",
+        "panel_name": "主配电柜",
+        "panel_type": "main",
+        "rated_current": 2000,
+        "location": "配电室A",
+        "area_code": "A1",
+    },
+    {
+        "panel_code": "ATS-001",
+        "panel_name": "ATS切换柜",
+        "panel_type": "sub",
+        "rated_current": 1600,
+        "location": "配电室A",
+        "area_code": "A1",
+        "parent_code": "MDP-001",
+    },
+    {
+        "panel_code": "UPS-IN-001",
+        "panel_name": "UPS输入柜",
+        "panel_type": "ups_input",
+        "rated_current": 800,
+        "location": "UPS室",
+        "area_code": "A1",
+        "parent_code": "ATS-001",
+    },
+    {
+        "panel_code": "UPS-OUT-001",
+        "panel_name": "UPS输出柜",
+        "panel_type": "ups_output",
+        "rated_current": 600,
+        "location": "UPS室",
+        "area_code": "A1",
+    },
+    {
+        "panel_code": "PDU-A1-001",
+        "panel_name": "A1区列头柜1",
+        "panel_type": "sub",
+        "rated_current": 250,
+        "location": "机房A1区",
+        "area_code": "A1",
+        "parent_code": "UPS-OUT-001",
+    },
+    {
+        "panel_code": "PDU-A1-002",
+        "panel_name": "A1区列头柜2",
+        "panel_type": "sub",
+        "rated_current": 250,
+        "location": "机房A1区",
+        "area_code": "A1",
+        "parent_code": "UPS-OUT-001",
+    },
+    {
+        "panel_code": "AC-PANEL-001",
+        "panel_name": "空调配电柜",
+        "panel_type": "sub",
+        "rated_current": 400,
+        "location": "配电室B",
+        "area_code": "B1",
+        "parent_code": "MDP-001",
+    },
 ]
 
 # 配电回路配置
 DISTRIBUTION_CIRCUITS = [
-    {"circuit_code": "C-A1-01", "circuit_name": "A1机柜列1回路", "panel_code": "PDU-A1-001", "load_type": "IT", "rated_current": 63, "is_shiftable": False},
-    {"circuit_code": "C-A1-02", "circuit_name": "A1机柜列2回路", "panel_code": "PDU-A1-001", "load_type": "IT", "rated_current": 63, "is_shiftable": False},
-    {"circuit_code": "C-A1-03", "circuit_name": "A1机柜列3回路", "panel_code": "PDU-A1-002", "load_type": "IT", "rated_current": 63, "is_shiftable": False},
-    {"circuit_code": "C-AC-01", "circuit_name": "精密空调1回路", "panel_code": "AC-PANEL-001", "load_type": "AC", "rated_current": 100, "is_shiftable": True, "shift_priority": 1},
-    {"circuit_code": "C-AC-02", "circuit_name": "精密空调2回路", "panel_code": "AC-PANEL-001", "load_type": "AC", "rated_current": 100, "is_shiftable": True, "shift_priority": 2},
-    {"circuit_code": "C-LIGHT", "circuit_name": "照明回路", "panel_code": "MDP-001", "load_type": "LIGHT", "rated_current": 32, "is_shiftable": True, "shift_priority": 3},
+    {
+        "circuit_code": "C-A1-01",
+        "circuit_name": "A1机柜列1回路",
+        "panel_code": "PDU-A1-001",
+        "load_type": "IT",
+        "rated_current": 63,
+        "is_shiftable": False,
+    },
+    {
+        "circuit_code": "C-A1-02",
+        "circuit_name": "A1机柜列2回路",
+        "panel_code": "PDU-A1-001",
+        "load_type": "IT",
+        "rated_current": 63,
+        "is_shiftable": False,
+    },
+    {
+        "circuit_code": "C-A1-03",
+        "circuit_name": "A1机柜列3回路",
+        "panel_code": "PDU-A1-002",
+        "load_type": "IT",
+        "rated_current": 63,
+        "is_shiftable": False,
+    },
+    {
+        "circuit_code": "C-AC-01",
+        "circuit_name": "精密空调1回路",
+        "panel_code": "AC-PANEL-001",
+        "load_type": "AC",
+        "rated_current": 100,
+        "is_shiftable": True,
+        "shift_priority": 1,
+    },
+    {
+        "circuit_code": "C-AC-02",
+        "circuit_name": "精密空调2回路",
+        "panel_code": "AC-PANEL-001",
+        "load_type": "AC",
+        "rated_current": 100,
+        "is_shiftable": True,
+        "shift_priority": 2,
+    },
+    {
+        "circuit_code": "C-LIGHT",
+        "circuit_name": "照明回路",
+        "panel_code": "MDP-001",
+        "load_type": "LIGHT",
+        "rated_current": 32,
+        "is_shiftable": True,
+        "shift_priority": 3,
+    },
 ]
 
 # 用电设备配置
 POWER_DEVICES = [
     # IT设备
-    {"device_code": "SRV-001", "device_name": "服务器机柜1", "device_type": "IT", "rated_power": 20, "is_it_load": True, "area_code": "A1", "circuit_code": "C-A1-01"},
-    {"device_code": "SRV-002", "device_name": "服务器机柜2", "device_type": "IT", "rated_power": 20, "is_it_load": True, "area_code": "A1", "circuit_code": "C-A1-01"},
-    {"device_code": "SRV-003", "device_name": "服务器机柜3", "device_type": "IT", "rated_power": 25, "is_it_load": True, "area_code": "A1", "circuit_code": "C-A1-02"},
-    {"device_code": "SRV-004", "device_name": "服务器机柜4", "device_type": "IT", "rated_power": 25, "is_it_load": True, "area_code": "A1", "circuit_code": "C-A1-02"},
-    {"device_code": "NET-001", "device_name": "网络机柜1", "device_type": "IT", "rated_power": 10, "is_it_load": True, "area_code": "A1", "circuit_code": "C-A1-03"},
-    {"device_code": "STO-001", "device_name": "存储机柜1", "device_type": "IT", "rated_power": 30, "is_it_load": True, "area_code": "A1", "circuit_code": "C-A1-03"},
+    {
+        "device_code": "SRV-001",
+        "device_name": "服务器机柜1",
+        "device_type": "IT",
+        "rated_power": 20,
+        "is_it_load": True,
+        "area_code": "A1",
+        "circuit_code": "C-A1-01",
+    },
+    {
+        "device_code": "SRV-002",
+        "device_name": "服务器机柜2",
+        "device_type": "IT",
+        "rated_power": 20,
+        "is_it_load": True,
+        "area_code": "A1",
+        "circuit_code": "C-A1-01",
+    },
+    {
+        "device_code": "SRV-003",
+        "device_name": "服务器机柜3",
+        "device_type": "IT",
+        "rated_power": 25,
+        "is_it_load": True,
+        "area_code": "A1",
+        "circuit_code": "C-A1-02",
+    },
+    {
+        "device_code": "SRV-004",
+        "device_name": "服务器机柜4",
+        "device_type": "IT",
+        "rated_power": 25,
+        "is_it_load": True,
+        "area_code": "A1",
+        "circuit_code": "C-A1-02",
+    },
+    {
+        "device_code": "NET-001",
+        "device_name": "网络机柜1",
+        "device_type": "IT",
+        "rated_power": 10,
+        "is_it_load": True,
+        "area_code": "A1",
+        "circuit_code": "C-A1-03",
+    },
+    {
+        "device_code": "STO-001",
+        "device_name": "存储机柜1",
+        "device_type": "IT",
+        "rated_power": 30,
+        "is_it_load": True,
+        "area_code": "A1",
+        "circuit_code": "C-A1-03",
+    },
     # UPS
-    {"device_code": "UPS-001", "device_name": "UPS主机1", "device_type": "UPS", "rated_power": 200, "is_it_load": False, "area_code": "A1"},
-    {"device_code": "UPS-002", "device_name": "UPS主机2", "device_type": "UPS", "rated_power": 200, "is_it_load": False, "area_code": "A1"},
+    {
+        "device_code": "UPS-001",
+        "device_name": "UPS主机1",
+        "device_type": "UPS",
+        "rated_power": 200,
+        "is_it_load": False,
+        "area_code": "A1",
+    },
+    {
+        "device_code": "UPS-002",
+        "device_name": "UPS主机2",
+        "device_type": "UPS",
+        "rated_power": 200,
+        "is_it_load": False,
+        "area_code": "A1",
+    },
     # 空调
-    {"device_code": "AC-001", "device_name": "精密空调1", "device_type": "AC", "rated_power": 50, "is_it_load": False, "area_code": "B1", "circuit_code": "C-AC-01"},
-    {"device_code": "AC-002", "device_name": "精密空调2", "device_type": "AC", "rated_power": 50, "is_it_load": False, "area_code": "B1", "circuit_code": "C-AC-02"},
-    {"device_code": "AC-003", "device_name": "精密空调3", "device_type": "AC", "rated_power": 45, "is_it_load": False, "area_code": "B1", "circuit_code": "C-AC-02"},
+    {
+        "device_code": "AC-001",
+        "device_name": "精密空调1",
+        "device_type": "AC",
+        "rated_power": 50,
+        "is_it_load": False,
+        "area_code": "B1",
+        "circuit_code": "C-AC-01",
+    },
+    {
+        "device_code": "AC-002",
+        "device_name": "精密空调2",
+        "device_type": "AC",
+        "rated_power": 50,
+        "is_it_load": False,
+        "area_code": "B1",
+        "circuit_code": "C-AC-02",
+    },
+    {
+        "device_code": "AC-003",
+        "device_name": "精密空调3",
+        "device_type": "AC",
+        "rated_power": 45,
+        "is_it_load": False,
+        "area_code": "B1",
+        "circuit_code": "C-AC-02",
+    },
     # 照明
-    {"device_code": "LIGHT-001", "device_name": "机房照明", "device_type": "LIGHT", "rated_power": 5, "is_it_load": False, "area_code": "A1", "circuit_code": "C-LIGHT"},
+    {
+        "device_code": "LIGHT-001",
+        "device_name": "机房照明",
+        "device_type": "LIGHT",
+        "rated_power": 5,
+        "is_it_load": False,
+        "area_code": "A1",
+        "circuit_code": "C-LIGHT",
+    },
 ]
 
 # 电价配置
@@ -199,10 +399,7 @@ async def init_energy_data():
 
         # 6. 创建电价配置
         for ep in ELECTRICITY_PRICING:
-            pricing = ElectricityPricing(
-                **ep,
-                effective_date=datetime.now().date()
-            )
+            pricing = ElectricityPricing(**ep, effective_date=datetime.now().date())
             session.add(pricing)
         print(f"  创建 {len(ELECTRICITY_PRICING)} 条电价配置")
 
@@ -281,7 +478,7 @@ async def generate_demand_15min_data(session, meter_point_map):
                         demand_ratio=round(demand / declared_demand * 100, 2),
                         is_peak_period=is_peak,
                         time_period=time_period,
-                        is_over_declared=is_over
+                        is_over_declared=is_over,
                     )
                     records.append(record)
 
@@ -294,6 +491,7 @@ async def generate_hourly_energy_data(session):
     print("  生成小时能耗数据...")
 
     from sqlalchemy import select
+
     result = await session.execute(select(PowerDevice))
     devices = result.scalars().all()
 
@@ -320,7 +518,7 @@ async def generate_hourly_energy_data(session):
                     total_energy=round(power, 2),
                     max_power=round(power * 1.1, 2),
                     avg_power=round(power, 2),
-                    min_power=round(power * 0.9, 2)
+                    min_power=round(power * 0.9, 2),
                 )
                 records.append(record)
 
@@ -333,6 +531,7 @@ async def generate_daily_energy_data(session):
     print("  生成日能耗数据...")
 
     from sqlalchemy import select
+
     result = await session.execute(select(PowerDevice))
     devices = result.scalars().all()
 
@@ -359,7 +558,7 @@ async def generate_daily_energy_data(session):
                 valley_energy=round(daily_energy * 0.2, 2),
                 max_power=round(rated_power * 0.95, 2),
                 avg_power=round(rated_power * 0.7, 2),
-                energy_cost=round(daily_energy * 0.8, 2)
+                energy_cost=round(daily_energy * 0.8, 2),
             )
             records.append(record)
 
@@ -396,7 +595,7 @@ async def generate_pue_history(session):
                 cooling_power=round(cooling_power, 2),
                 ups_loss=round(total_power * 0.03, 2),
                 lighting_power=round(random.uniform(3, 8), 2),
-                other_power=round(random.uniform(5, 15), 2)
+                other_power=round(random.uniform(5, 15), 2),
             )
             records.append(record)
 
@@ -423,6 +622,7 @@ async def main():
         sys.path.insert(0, str(Path(__file__).parent))
 
         from init_device_regulation import init_device_regulation_configs
+
         # 在从 init_energy.py 调用时，使用非交互模式
         await init_device_regulation_configs(force=False, interactive=False)
 

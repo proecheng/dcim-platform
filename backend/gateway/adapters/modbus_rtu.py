@@ -1,4 +1,5 @@
 """Modbus RTU 串口协议适配器 — 基于 pymodbus 3.x AsyncModbusSerialClient"""
+
 import asyncio
 import logging
 import time
@@ -22,7 +23,7 @@ from .base import (
     PointValue,
 )
 from .registry import register_adapter
-from .modbus_tcp import _parse_address, _convert_value, _READ_METHODS, _DEFAULT_COUNT, _ILLEGAL_ADDRESS
+from .modbus_tcp import _parse_address, _convert_value, _READ_METHODS, _ILLEGAL_ADDRESS
 
 logger = logging.getLogger(__name__)
 
@@ -278,9 +279,7 @@ class ModbusRtuAdapter(BaseProtocolAdapter):
                     if dt is None:
                         logger.error("不支持的多寄存器写入类型: %s", point_cfg.data_type)
                         return False
-                    regs = AsyncModbusSerialClient.convert_to_registers(
-                        value, dt, word_order=self._word_order
-                    )
+                    regs = AsyncModbusSerialClient.convert_to_registers(value, dt, word_order=self._word_order)
                     response = await self._client.write_registers(addr, regs, slave=self._device_id)
             else:
                 logger.error("不支持写入 %s 类型寄存器", reg_type)
@@ -300,6 +299,7 @@ class ModbusRtuAdapter(BaseProtocolAdapter):
     async def test_connection(self) -> ConnectionResult:
         """测试连接 — 读取保持寄存器 0，超时 10 秒"""
         try:
+
             async def _test() -> ConnectionResult:
                 # 如果未连接，先尝试连接
                 if self._client is None or not self._client.connected:

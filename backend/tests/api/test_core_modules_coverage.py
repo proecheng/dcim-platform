@@ -1,12 +1,13 @@
 """
 Core modules coverage tests: point / threshold / history / statistics / log
 """
+
 import pytest
 import uuid
 from datetime import datetime, timedelta
 from tests.conftest import auth_headers
 
-from app.models.point import Point, PointRealtime, PointGroup, PointGroupMember
+from app.models.point import Point, PointRealtime
 from app.models.alarm import AlarmThreshold, Alarm
 from app.models.history import PointHistory, PointHistoryArchive, PointChangeLog
 from app.models.device import Device
@@ -16,12 +17,24 @@ from app.models.log import OperationLog, SystemLog, CommunicationLog
 
 # ======================== helpers ========================
 
-async def _mk_point(db, code="PT-001", name="test-temp", ptype="AI", dtype="TH",
-                    area="A1", unit="C", enabled=True, **kw):
-    p = Point(point_code=code, point_name=name, point_type=ptype,
-              device_type=dtype, area_code=area, unit=unit, is_enabled=enabled,
-              min_range=kw.pop("min_range", 0), max_range=kw.pop("max_range", 100),
-              precision=2, collect_interval=10, **kw)
+
+async def _mk_point(
+    db, code="PT-001", name="test-temp", ptype="AI", dtype="TH", area="A1", unit="C", enabled=True, **kw
+):
+    p = Point(
+        point_code=code,
+        point_name=name,
+        point_type=ptype,
+        device_type=dtype,
+        area_code=area,
+        unit=unit,
+        is_enabled=enabled,
+        min_range=kw.pop("min_range", 0),
+        max_range=kw.pop("max_range", 100),
+        precision=2,
+        collect_interval=10,
+        **kw,
+    )
     db.add(p)
     await db.flush()
     return p
@@ -35,37 +48,38 @@ async def _mk_realtime(db, pid, value=25.0, status="normal"):
 
 
 async def _mk_history(db, pid, value=25.0, mins_ago=0):
-    h = PointHistory(point_id=pid, value=value, quality=0,
-                     recorded_at=datetime.now() - timedelta(minutes=mins_ago))
+    h = PointHistory(point_id=pid, value=value, quality=0, recorded_at=datetime.now() - timedelta(minutes=mins_ago))
     db.add(h)
     await db.flush()
     return h
 
 
-async def _mk_device(db, code="DEV-001", name="UPS-1", dtype="UPS", area="A1",
-                     status="online"):
-    d = Device(device_code=code, device_name=name, device_type=dtype,
-               area_code=area, status=status)
+async def _mk_device(db, code="DEV-001", name="UPS-1", dtype="UPS", area="A1", status="online"):
+    d = Device(device_code=code, device_name=name, device_type=dtype, area_code=area, status=status)
     db.add(d)
     await db.flush()
     return d
 
 
-async def _mk_alarm(db, pid, level="minor", status="active", duration=None,
-                    created_at=None):
-    a = Alarm(alarm_no=f"ALM-{uuid.uuid4().hex[:8]}", point_id=pid,
-              alarm_level=level, alarm_message="test alarm", status=status,
-              duration_seconds=duration,
-              created_at=created_at or datetime.now())
+async def _mk_alarm(db, pid, level="minor", status="active", duration=None, created_at=None):
+    a = Alarm(
+        alarm_no=f"ALM-{uuid.uuid4().hex[:8]}",
+        point_id=pid,
+        alarm_level=level,
+        alarm_message="test alarm",
+        status=status,
+        duration_seconds=duration,
+        created_at=created_at or datetime.now(),
+    )
     db.add(a)
     await db.flush()
     return a
 
 
 async def _mk_threshold(db, pid, ttype="high", value=80.0, level="major"):
-    t = AlarmThreshold(point_id=pid, threshold_type=ttype,
-                       threshold_value=value, alarm_level=level,
-                       alarm_message="threshold alarm")
+    t = AlarmThreshold(
+        point_id=pid, threshold_type=ttype, threshold_value=value, alarm_level=level, alarm_message="threshold alarm"
+    )
     db.add(t)
     await db.flush()
     return t
@@ -79,11 +93,15 @@ async def _mk_power_device(db, code="PD-001", name="UPS-dev-1", dtype="UPS"):
 
 
 async def _mk_op_log(db, **kw):
-    log = OperationLog(user_id=kw.get("user_id", 1), username=kw.get("username", "admin"),
-                       module=kw.get("module", "point"), action=kw.get("action", "create"),
-                       target_name=kw.get("target_name", "test"),
-                       ip_address=kw.get("ip_address", "127.0.0.1"),
-                       remark=kw.get("remark", "test op"))
+    log = OperationLog(
+        user_id=kw.get("user_id", 1),
+        username=kw.get("username", "admin"),
+        module=kw.get("module", "point"),
+        action=kw.get("action", "create"),
+        target_name=kw.get("target_name", "test"),
+        ip_address=kw.get("ip_address", "127.0.0.1"),
+        remark=kw.get("remark", "test op"),
+    )
     db.add(log)
     await db.flush()
     return log
@@ -97,26 +115,31 @@ async def _mk_sys_log(db, level="INFO", module="system", message="test log"):
 
 
 async def _mk_comm_log(db, device_id=1, status="success", protocol="modbus"):
-    log = CommunicationLog(device_id=device_id, comm_type="request",
-                           protocol=protocol, status=status, duration_ms=50)
+    log = CommunicationLog(device_id=device_id, comm_type="request", protocol=protocol, status=status, duration_ms=50)
     db.add(log)
     await db.flush()
     return log
 
 
 async def _mk_archive(db, pid, atype="hourly", value_avg=25.0, mins_ago=0):
-    a = PointHistoryArchive(point_id=pid, archive_type=atype,
-                            value_avg=value_avg, value_min=20.0, value_max=30.0,
-                            sample_count=10,
-                            recorded_at=datetime.now() - timedelta(minutes=mins_ago))
+    a = PointHistoryArchive(
+        point_id=pid,
+        archive_type=atype,
+        value_avg=value_avg,
+        value_min=20.0,
+        value_max=30.0,
+        sample_count=10,
+        recorded_at=datetime.now() - timedelta(minutes=mins_ago),
+    )
     db.add(a)
     await db.flush()
     return a
 
 
 async def _mk_change_log(db, pid, old_val=0, new_val=1):
-    c = PointChangeLog(point_id=pid, old_value=old_val, new_value=new_val,
-                       change_type="alarm", changed_at=datetime.now())
+    c = PointChangeLog(
+        point_id=pid, old_value=old_val, new_value=new_val, change_type="alarm", changed_at=datetime.now()
+    )
     db.add(c)
     await db.flush()
     return c
@@ -226,15 +249,19 @@ class TestPointGroups:
 
     async def test_create_group(self, client, operator_user):
         _, token = operator_user
-        r = await client.post("/api/v1/points/groups", headers=auth_headers(token),
-                              json={"group_name": "TestGroup", "group_type": "custom", "sort_order": 1})
+        r = await client.post(
+            "/api/v1/points/groups",
+            headers=auth_headers(token),
+            json={"group_name": "TestGroup", "group_type": "custom", "sort_order": 1},
+        )
         assert r.status_code == 200
         assert r.json()["group_name"] == "TestGroup"
 
     async def test_get_groups_after_create(self, client, operator_user):
         _, token = operator_user
-        await client.post("/api/v1/points/groups", headers=auth_headers(token),
-                          json={"group_name": "G1", "group_type": "area"})
+        await client.post(
+            "/api/v1/points/groups", headers=auth_headers(token), json={"group_name": "G1", "group_type": "area"}
+        )
         r = await client.get("/api/v1/points/groups", headers=auth_headers(token))
         assert r.status_code == 200
         assert len(r.json()) >= 1
@@ -283,20 +310,34 @@ class TestPointCRUD:
 
     async def test_create_point(self, client, operator_user):
         _, token = operator_user
-        r = await client.post("/api/v1/points", headers=auth_headers(token), json={
-            "point_code": "NEW-001", "point_name": "new-point", "point_type": "AI",
-            "device_type": "TH", "area_code": "A1"
-        })
+        r = await client.post(
+            "/api/v1/points",
+            headers=auth_headers(token),
+            json={
+                "point_code": "NEW-001",
+                "point_name": "new-point",
+                "point_type": "AI",
+                "device_type": "TH",
+                "area_code": "A1",
+            },
+        )
         assert r.status_code == 200
         assert r.json()["point_code"] == "NEW-001"
 
     async def test_create_point_duplicate_code(self, client, operator_user, async_db):
         _, token = operator_user
         await _mk_point(async_db, "DUP-001", "existing")
-        r = await client.post("/api/v1/points", headers=auth_headers(token), json={
-            "point_code": "DUP-001", "point_name": "dup", "point_type": "AI",
-            "device_type": "TH", "area_code": "A1"
-        })
+        r = await client.post(
+            "/api/v1/points",
+            headers=auth_headers(token),
+            json={
+                "point_code": "DUP-001",
+                "point_name": "dup",
+                "point_type": "AI",
+                "device_type": "TH",
+                "area_code": "A1",
+            },
+        )
         assert r.status_code == 400
 
     async def test_get_point_detail(self, client, viewer_user, async_db):
@@ -309,15 +350,13 @@ class TestPointCRUD:
     async def test_update_point(self, client, operator_user, async_db):
         _, token = operator_user
         p = await _mk_point(async_db, "UPD-001", "old-name")
-        r = await client.put(f"/api/v1/points/{p.id}", headers=auth_headers(token),
-                             json={"point_name": "new-name"})
+        r = await client.put(f"/api/v1/points/{p.id}", headers=auth_headers(token), json={"point_name": "new-name"})
         assert r.status_code == 200
         assert r.json()["point_name"] == "new-name"
 
     async def test_update_point_not_found(self, client, operator_user):
         _, token = operator_user
-        r = await client.put("/api/v1/points/99999", headers=auth_headers(token),
-                             json={"point_name": "x"})
+        r = await client.put("/api/v1/points/99999", headers=auth_headers(token), json={"point_name": "x"})
         assert r.status_code == 404
 
     async def test_delete_point(self, client, admin_user, async_db):
@@ -364,23 +403,20 @@ class TestPointLinkDevice:
         _, token = operator_user
         p = await _mk_point(async_db, "LNK-001", "power-sensor", dtype="PDU")
         pd = await _mk_power_device(async_db, "PD-LNK1", "power-dev")
-        r = await client.put(f"/api/v1/points/{p.id}/link-device?energy_device_id={pd.id}",
-                             headers=auth_headers(token))
+        r = await client.put(f"/api/v1/points/{p.id}/link-device?energy_device_id={pd.id}", headers=auth_headers(token))
         assert r.status_code == 200
         assert r.json()["point_id"] == p.id
 
     async def test_link_device_point_not_found(self, client, operator_user, async_db):
         _, token = operator_user
         pd = await _mk_power_device(async_db, "PD-LNK2", "pd2")
-        r = await client.put(f"/api/v1/points/99999/link-device?energy_device_id={pd.id}",
-                             headers=auth_headers(token))
+        r = await client.put(f"/api/v1/points/99999/link-device?energy_device_id={pd.id}", headers=auth_headers(token))
         assert r.status_code == 404
 
     async def test_link_device_device_not_found(self, client, operator_user, async_db):
         _, token = operator_user
         p = await _mk_point(async_db, "LNK-002", "pt2")
-        r = await client.put(f"/api/v1/points/{p.id}/link-device?energy_device_id=99999",
-                             headers=auth_headers(token))
+        r = await client.put(f"/api/v1/points/{p.id}/link-device?energy_device_id=99999", headers=auth_headers(token))
         assert r.status_code == 404
 
     async def test_unlink_device(self, client, operator_user, async_db):
@@ -485,19 +521,21 @@ class TestThresholdCreate:
     async def test_create(self, client, operator_user, async_db):
         _, token = operator_user
         p = await _mk_point(async_db, "TH-C1", "pt-c1")
-        r = await client.post("/api/v1/thresholds", headers=auth_headers(token), json={
-            "point_id": p.id, "threshold_type": "high",
-            "threshold_value": 80.0, "alarm_level": "major"
-        })
+        r = await client.post(
+            "/api/v1/thresholds",
+            headers=auth_headers(token),
+            json={"point_id": p.id, "threshold_type": "high", "threshold_value": 80.0, "alarm_level": "major"},
+        )
         assert r.status_code == 200
         assert r.json()["threshold_value"] == 80.0
 
     async def test_create_point_not_found(self, client, operator_user):
         _, token = operator_user
-        r = await client.post("/api/v1/thresholds", headers=auth_headers(token), json={
-            "point_id": 99999, "threshold_type": "high",
-            "threshold_value": 80.0, "alarm_level": "major"
-        })
+        r = await client.post(
+            "/api/v1/thresholds",
+            headers=auth_headers(token),
+            json={"point_id": 99999, "threshold_type": "high", "threshold_value": 80.0, "alarm_level": "major"},
+        )
         assert r.status_code == 404
 
 
@@ -507,20 +545,32 @@ class TestThresholdBatch:
         _, token = operator_user
         p1 = await _mk_point(async_db, "TH-B1", "pt-b1")
         p2 = await _mk_point(async_db, "TH-B2", "pt-b2")
-        r = await client.post("/api/v1/thresholds/batch", headers=auth_headers(token), json={
-            "point_ids": [p1.id, p2.id], "threshold_type": "high",
-            "threshold_value": 80.0, "alarm_level": "major"
-        })
+        r = await client.post(
+            "/api/v1/thresholds/batch",
+            headers=auth_headers(token),
+            json={
+                "point_ids": [p1.id, p2.id],
+                "threshold_type": "high",
+                "threshold_value": 80.0,
+                "alarm_level": "major",
+            },
+        )
         assert r.status_code == 200
         assert r.json()["success_count"] == 2
 
     async def test_batch_create_with_missing_point(self, client, operator_user, async_db):
         _, token = operator_user
         p1 = await _mk_point(async_db, "TH-BM1", "pt-bm1")
-        r = await client.post("/api/v1/thresholds/batch", headers=auth_headers(token), json={
-            "point_ids": [p1.id, 99999], "threshold_type": "high",
-            "threshold_value": 80.0, "alarm_level": "major"
-        })
+        r = await client.post(
+            "/api/v1/thresholds/batch",
+            headers=auth_headers(token),
+            json={
+                "point_ids": [p1.id, 99999],
+                "threshold_type": "high",
+                "threshold_value": 80.0,
+                "alarm_level": "major",
+            },
+        )
         assert r.status_code == 200
         assert r.json()["success_count"] == 1
         assert r.json()["error_count"] == 1
@@ -534,9 +584,7 @@ class TestThresholdCopy:
         p2 = await _mk_point(async_db, "TH-CP2", "tgt-pt")
         await _mk_threshold(async_db, p1.id, ttype="high", value=80.0)
         r = await client.post(
-            f"/api/v1/thresholds/copy?source_point_id={p1.id}",
-            headers=auth_headers(token),
-            json=[p2.id]
+            f"/api/v1/thresholds/copy?source_point_id={p1.id}", headers=auth_headers(token), json=[p2.id]
         )
         assert r.status_code == 200
         assert "1" in str(r.json().get("message", ""))
@@ -546,9 +594,7 @@ class TestThresholdCopy:
         p1 = await _mk_point(async_db, "TH-CN1", "empty-src")
         p2 = await _mk_point(async_db, "TH-CN2", "tgt2")
         r = await client.post(
-            f"/api/v1/thresholds/copy?source_point_id={p1.id}",
-            headers=auth_headers(token),
-            json=[p2.id]
+            f"/api/v1/thresholds/copy?source_point_id={p1.id}", headers=auth_headers(token), json=[p2.id]
         )
         assert r.status_code == 404
 
@@ -568,42 +614,50 @@ class TestThresholdFourLevel:
     async def test_set_four_level(self, client, operator_user, async_db):
         _, token = operator_user
         p = await _mk_point(async_db, "TH-4L1", "pt-4l")
-        r = await client.put(f"/api/v1/thresholds/point/{p.id}/four-level",
-                             headers=auth_headers(token), json={
-            "high_high": {"value": 100}, "high": {"value": 80},
-            "low": {"value": 20}, "low_low": {"value": 10},
-            "delay_seconds": 5, "dead_band": 1.0
-        })
+        r = await client.put(
+            f"/api/v1/thresholds/point/{p.id}/four-level",
+            headers=auth_headers(token),
+            json={
+                "high_high": {"value": 100},
+                "high": {"value": 80},
+                "low": {"value": 20},
+                "low_low": {"value": 10},
+                "delay_seconds": 5,
+                "dead_band": 1.0,
+            },
+        )
         assert r.status_code == 200
         assert len(r.json()) == 4
 
     async def test_set_four_level_partial(self, client, operator_user, async_db):
         _, token = operator_user
         p = await _mk_point(async_db, "TH-4L2", "pt-4l2")
-        r = await client.put(f"/api/v1/thresholds/point/{p.id}/four-level",
-                             headers=auth_headers(token), json={
-            "high": {"value": 80}, "low": {"value": 20}
-        })
+        r = await client.put(
+            f"/api/v1/thresholds/point/{p.id}/four-level",
+            headers=auth_headers(token),
+            json={"high": {"value": 80}, "low": {"value": 20}},
+        )
         assert r.status_code == 200
         assert len(r.json()) == 2
 
     async def test_set_four_level_not_found(self, client, operator_user):
         _, token = operator_user
-        r = await client.put("/api/v1/thresholds/point/99999/four-level",
-                             headers=auth_headers(token), json={
-            "high": {"value": 80}
-        })
+        r = await client.put(
+            "/api/v1/thresholds/point/99999/four-level", headers=auth_headers(token), json={"high": {"value": 80}}
+        )
         assert r.status_code == 404
 
     async def test_set_four_level_upsert(self, client, operator_user, async_db):
         _, token = operator_user
         p = await _mk_point(async_db, "TH-4L3", "pt-4l3")
         # First set
-        await client.put(f"/api/v1/thresholds/point/{p.id}/four-level",
-                         headers=auth_headers(token), json={"high": {"value": 80}})
+        await client.put(
+            f"/api/v1/thresholds/point/{p.id}/four-level", headers=auth_headers(token), json={"high": {"value": 80}}
+        )
         # Upsert with new value
-        r = await client.put(f"/api/v1/thresholds/point/{p.id}/four-level",
-                             headers=auth_headers(token), json={"high": {"value": 90}})
+        r = await client.put(
+            f"/api/v1/thresholds/point/{p.id}/four-level", headers=auth_headers(token), json={"high": {"value": 90}}
+        )
         assert r.status_code == 200
         vals = [t["threshold_value"] for t in r.json()]
         assert 90.0 in vals
@@ -615,24 +669,24 @@ class TestThresholdBatchByDeviceType:
         _, token = operator_user
         await _mk_point(async_db, "TH-BD1", "ups-ai1", ptype="AI", dtype="UPS")
         await _mk_point(async_db, "TH-BD2", "ups-ai2", ptype="AI", dtype="UPS")
-        r = await client.post("/api/v1/thresholds/batch-by-device-type",
-                              headers=auth_headers(token), json={
-            "device_type": "UPS",
-            "thresholds": {
-                "high_high": {"value": 100}, "high": {"value": 80},
-                "delay_seconds": 0, "dead_band": 0
-            }
-        })
+        r = await client.post(
+            "/api/v1/thresholds/batch-by-device-type",
+            headers=auth_headers(token),
+            json={
+                "device_type": "UPS",
+                "thresholds": {"high_high": {"value": 100}, "high": {"value": 80}, "delay_seconds": 0, "dead_band": 0},
+            },
+        )
         assert r.status_code == 200
         assert r.json()["success_count"] == 2
 
     async def test_batch_by_device_type_no_points(self, client, operator_user):
         _, token = operator_user
-        r = await client.post("/api/v1/thresholds/batch-by-device-type",
-                              headers=auth_headers(token), json={
-            "device_type": "NONEXIST",
-            "thresholds": {"high": {"value": 80}}
-        })
+        r = await client.post(
+            "/api/v1/thresholds/batch-by-device-type",
+            headers=auth_headers(token),
+            json={"device_type": "NONEXIST", "thresholds": {"high": {"value": 80}}},
+        )
         assert r.status_code == 200
         assert r.json()["success_count"] == 0
 
@@ -643,15 +697,17 @@ class TestThresholdUpdateDelete:
         _, token = operator_user
         p = await _mk_point(async_db, "TH-U1", "pt-u1")
         t = await _mk_threshold(async_db, p.id)
-        r = await client.put(f"/api/v1/thresholds/{t.id}", headers=auth_headers(token),
-                             json={"threshold_value": 95.0, "alarm_level": "critical"})
+        r = await client.put(
+            f"/api/v1/thresholds/{t.id}",
+            headers=auth_headers(token),
+            json={"threshold_value": 95.0, "alarm_level": "critical"},
+        )
         assert r.status_code == 200
         assert r.json()["threshold_value"] == 95.0
 
     async def test_update_not_found(self, client, operator_user):
         _, token = operator_user
-        r = await client.put("/api/v1/thresholds/99999", headers=auth_headers(token),
-                             json={"threshold_value": 95.0})
+        r = await client.put("/api/v1/thresholds/99999", headers=auth_headers(token), json={"threshold_value": 95.0})
         assert r.status_code == 404
 
     async def test_delete(self, client, operator_user, async_db):
@@ -700,8 +756,7 @@ class TestHistoryHourly:
         _, token = viewer_user
         p = await _mk_point(async_db, "HI-H1", "hist-hourly")
         await _mk_archive(async_db, p.id, atype="hourly", value_avg=25.0, mins_ago=30)
-        r = await client.get(f"/api/v1/history/{p.id}?granularity=hour",
-                             headers=auth_headers(token))
+        r = await client.get(f"/api/v1/history/{p.id}?granularity=hour", headers=auth_headers(token))
         assert r.status_code == 200
         assert r.json()["total"] == 1
         assert r.json()["items"][0]["value"] == 25.0
@@ -722,8 +777,7 @@ class TestHistoryTrend:
         _, token = viewer_user
         p = await _mk_point(async_db, "HI-T2", "trend-dur")
         await _mk_history(async_db, p.id, 25.0, mins_ago=30)
-        r = await client.get(f"/api/v1/history/{p.id}/trend?duration=60",
-                             headers=auth_headers(token))
+        r = await client.get(f"/api/v1/history/{p.id}/trend?duration=60", headers=auth_headers(token))
         assert r.status_code == 200
 
     async def test_trend_not_found(self, client, viewer_user):
@@ -774,8 +828,7 @@ class TestHistoryCompare:
         p2 = await _mk_point(async_db, "HI-CM2", "cmp2")
         await _mk_history(async_db, p1.id, 25.0, mins_ago=5)
         await _mk_history(async_db, p2.id, 30.0, mins_ago=5)
-        r = await client.get(f"/api/v1/history/compare?point_ids={p1.id},{p2.id}",
-                             headers=auth_headers(token))
+        r = await client.get(f"/api/v1/history/compare?point_ids={p1.id},{p2.id}", headers=auth_headers(token))
         # Route shadowing: /{point_id} matches before /compare
         assert r.status_code == 422
 
@@ -809,8 +862,7 @@ class TestHistoryExport:
         _, token = operator_user
         p = await _mk_point(async_db, "HI-EX1", "export-hist")
         await _mk_history(async_db, p.id, 25.0, mins_ago=5)
-        r = await client.get(f"/api/v1/history/export?point_id={p.id}&format=csv",
-                             headers=auth_headers(token))
+        r = await client.get(f"/api/v1/history/export?point_id={p.id}&format=csv", headers=auth_headers(token))
         assert r.status_code == 422
 
     async def test_export_json(self, client, operator_user, async_db):
@@ -818,15 +870,13 @@ class TestHistoryExport:
         _, token = operator_user
         p = await _mk_point(async_db, "HI-EX2", "export-json")
         await _mk_history(async_db, p.id, 25.0, mins_ago=5)
-        r = await client.get(f"/api/v1/history/export?point_id={p.id}&format=json",
-                             headers=auth_headers(token))
+        r = await client.get(f"/api/v1/history/export?point_id={p.id}&format=json", headers=auth_headers(token))
         assert r.status_code == 422
 
     async def test_export_not_found(self, client, operator_user):
         """Route shadowed by /{point_id} — 'export' can't parse as int → 422."""
         _, token = operator_user
-        r = await client.get("/api/v1/history/export?point_id=99999&format=csv",
-                             headers=auth_headers(token))
+        r = await client.get("/api/v1/history/export?point_id=99999&format=csv", headers=auth_headers(token))
         assert r.status_code == 422
 
 
@@ -836,8 +886,7 @@ class TestHistoryCleanup:
         _, token = admin_user
         p = await _mk_point(async_db, "HI-CL1", "cleanup-pt")
         # Create old record (40 days ago)
-        old = PointHistory(point_id=p.id, value=10.0, quality=0,
-                           recorded_at=datetime.now() - timedelta(days=40))
+        old = PointHistory(point_id=p.id, value=10.0, quality=0, recorded_at=datetime.now() - timedelta(days=40))
         async_db.add(old)
         await async_db.flush()
         r = await client.delete("/api/v1/history/cleanup?days=30", headers=auth_headers(token))
@@ -931,8 +980,7 @@ class TestStatisticsAvailability:
 class TestStatisticsComparison:
     async def test_comparison_alarm(self, client, viewer_user):
         _, token = viewer_user
-        r = await client.get("/api/v1/statistics/comparison?metric=alarm",
-                             headers=auth_headers(token))
+        r = await client.get("/api/v1/statistics/comparison?metric=alarm", headers=auth_headers(token))
         assert r.status_code == 200
         data = r.json()
         assert data["metric"] == "alarm"
@@ -941,8 +989,7 @@ class TestStatisticsComparison:
 
     async def test_comparison_energy(self, client, viewer_user):
         _, token = viewer_user
-        r = await client.get("/api/v1/statistics/comparison?metric=energy",
-                             headers=auth_headers(token))
+        r = await client.get("/api/v1/statistics/comparison?metric=energy", headers=auth_headers(token))
         assert r.status_code == 200
         data = r.json()
         assert data["metric"] == "energy"
@@ -961,8 +1008,7 @@ class TestLogOperations:
 
     async def test_operations_with_data(self, client, admin_user, async_db):
         _, token = admin_user
-        await _mk_op_log(async_db, module="point", action="create", target_name="PT-001",
-                         remark="created point")
+        await _mk_op_log(async_db, module="point", action="create", target_name="PT-001", remark="created point")
         r = await client.get("/api/v1/logs/operations", headers=auth_headers(token))
         assert r.status_code == 200
         assert r.json()["total"] >= 1
@@ -971,8 +1017,7 @@ class TestLogOperations:
         user, token = admin_user
         await _mk_op_log(async_db, user_id=user.id, username="test_admin")
         await _mk_op_log(async_db, user_id=9999, username="other", action="delete")
-        r = await client.get(f"/api/v1/logs/operations?user_id={user.id}",
-                             headers=auth_headers(token))
+        r = await client.get(f"/api/v1/logs/operations?user_id={user.id}", headers=auth_headers(token))
         assert r.status_code == 200
         assert r.json()["total"] >= 1
 
@@ -994,8 +1039,7 @@ class TestLogOperations:
     async def test_operations_filter_keyword(self, client, admin_user, async_db):
         _, token = admin_user
         await _mk_op_log(async_db, target_name="special-target", remark="unique remark xyz")
-        r = await client.get("/api/v1/logs/operations?keyword=special-target",
-                             headers=auth_headers(token))
+        r = await client.get("/api/v1/logs/operations?keyword=special-target", headers=auth_headers(token))
         assert r.status_code == 200
         assert r.json()["total"] >= 1
 
@@ -1005,8 +1049,7 @@ class TestLogOperations:
         now = datetime.now()
         start = (now - timedelta(hours=1)).isoformat()
         end = (now + timedelta(hours=1)).isoformat()
-        r = await client.get(f"/api/v1/logs/operations?start_time={start}&end_time={end}",
-                             headers=auth_headers(token))
+        r = await client.get(f"/api/v1/logs/operations?start_time={start}&end_time={end}", headers=auth_headers(token))
         assert r.status_code == 200
 
 
@@ -1043,8 +1086,7 @@ class TestLogSystems:
     async def test_systems_filter_keyword(self, client, admin_user, async_db):
         _, token = admin_user
         await _mk_sys_log(async_db, message="unique-keyword-abc123")
-        r = await client.get("/api/v1/logs/systems?keyword=unique-keyword-abc123",
-                             headers=auth_headers(token))
+        r = await client.get("/api/v1/logs/systems?keyword=unique-keyword-abc123", headers=auth_headers(token))
         assert r.status_code == 200
         assert r.json()["total"] >= 1
 
@@ -1068,8 +1110,7 @@ class TestLogCommunications:
         _, token = admin_user
         await _mk_comm_log(async_db, device_id=42, status="success")
         await _mk_comm_log(async_db, device_id=43, status="failed")
-        r = await client.get("/api/v1/logs/communications?device_id=42",
-                             headers=auth_headers(token))
+        r = await client.get("/api/v1/logs/communications?device_id=42", headers=auth_headers(token))
         assert r.status_code == 200
         assert r.json()["total"] >= 1
 
@@ -1077,8 +1118,7 @@ class TestLogCommunications:
         _, token = admin_user
         await _mk_comm_log(async_db, device_id=50, status="failed")
         await _mk_comm_log(async_db, device_id=51, status="success")
-        r = await client.get("/api/v1/logs/communications?status=failed",
-                             headers=auth_headers(token))
+        r = await client.get("/api/v1/logs/communications?status=failed", headers=auth_headers(token))
         assert r.status_code == 200
         assert r.json()["total"] >= 1
 
@@ -1102,8 +1142,7 @@ class TestLogExport:
     async def test_export_communication(self, client, admin_user, async_db):
         _, token = admin_user
         await _mk_comm_log(async_db)
-        r = await client.get("/api/v1/logs/export?log_type=communication",
-                             headers=auth_headers(token))
+        r = await client.get("/api/v1/logs/export?log_type=communication", headers=auth_headers(token))
         assert r.status_code == 200
         assert "text/csv" in r.headers.get("content-type", "")
 

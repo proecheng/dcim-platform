@@ -1,4 +1,5 @@
 """数据备份与系统健康 API 测试 (Story 13-4)"""
+
 import pytest
 
 from httpx import AsyncClient, ASGITransport
@@ -14,6 +15,7 @@ from app.api.deps import get_db, require_admin, require_viewer
 # ============================================================
 # Fixtures
 # ============================================================
+
 
 @pytest.fixture(scope="module")
 def anyio_backend():
@@ -90,6 +92,7 @@ SYSTEM_URL = "/api/v1/system"
 # Tests
 # ============================================================
 
+
 @pytest.mark.anyio
 async def test_system_health(client):
     """获取系统健康状态"""
@@ -118,11 +121,10 @@ async def test_get_backup_config_default(client):
 @pytest.mark.anyio
 async def test_update_backup_config(client):
     """更新备份配置"""
-    resp = await client.put(f"{SYSTEM_URL}/backup/config", params={
-        "auto_backup_enabled": True,
-        "backup_time": "03:30",
-        "retention_count": 14
-    })
+    resp = await client.put(
+        f"{SYSTEM_URL}/backup/config",
+        params={"auto_backup_enabled": True, "backup_time": "03:30", "retention_count": 14},
+    )
     assert resp.status_code == 200
 
     # 验证更新
@@ -147,7 +149,5 @@ async def test_list_backups_empty(client):
 @pytest.mark.anyio
 async def test_restore_backup_not_found(client):
     """恢复不存在的备份 — 404"""
-    resp = await client.post(f"{SYSTEM_URL}/backup/restore", params={
-        "backup_name": "nonexistent.db"
-    })
+    resp = await client.post(f"{SYSTEM_URL}/backup/restore", params={"backup_name": "nonexistent.db"})
     assert resp.status_code == 404

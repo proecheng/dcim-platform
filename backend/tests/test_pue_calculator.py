@@ -1,7 +1,7 @@
 """PUE 计算服务测试 — Story 6-1"""
+
 import pytest
 from datetime import datetime, timedelta
-from unittest.mock import AsyncMock, patch, MagicMock
 
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from sqlalchemy import delete
@@ -53,16 +53,22 @@ class TestCalculateRealtimePUE:
         """有 IT 负载时正确计算 PUE"""
         # 创建 IT 设备
         it_device = PowerDevice(
-            device_code="IT-001", device_name="服务器1",
-            device_type="IT", rated_power=100.0,
-            is_it_load=True, is_enabled=True,
+            device_code="IT-001",
+            device_name="服务器1",
+            device_type="IT",
+            rated_power=100.0,
+            is_it_load=True,
+            is_enabled=True,
             power_point_id=1001,
         )
         # 创建 AC 设备
         ac_device = PowerDevice(
-            device_code="AC-001", device_name="空调1",
-            device_type="AC", rated_power=50.0,
-            is_it_load=False, is_enabled=True,
+            device_code="AC-001",
+            device_name="空调1",
+            device_type="AC",
+            rated_power=50.0,
+            is_it_load=False,
+            is_enabled=True,
             power_point_id=1002,
         )
         db_session.add_all([it_device, ac_device])
@@ -70,11 +76,15 @@ class TestCalculateRealtimePUE:
 
         # 创建实时数据
         rt_it = PointRealtime(
-            point_id=1001, value=80.0, quality=0,
+            point_id=1001,
+            value=80.0,
+            quality=0,
             updated_at=datetime.now(),
         )
         rt_ac = PointRealtime(
-            point_id=1002, value=30.0, quality=0,
+            point_id=1002,
+            value=30.0,
+            quality=0,
             updated_at=datetime.now(),
         )
         db_session.add_all([rt_it, rt_ac])
@@ -94,16 +104,21 @@ class TestCalculateRealtimePUE:
         """IT 负载为 0 时返回 None"""
         # 只创建 AC 设备（无 IT 负载）
         ac_device = PowerDevice(
-            device_code="AC-002", device_name="空调2",
-            device_type="AC", rated_power=50.0,
-            is_it_load=False, is_enabled=True,
+            device_code="AC-002",
+            device_name="空调2",
+            device_type="AC",
+            rated_power=50.0,
+            is_it_load=False,
+            is_enabled=True,
             power_point_id=2001,
         )
         db_session.add(ac_device)
         await db_session.flush()
 
         rt_ac = PointRealtime(
-            point_id=2001, value=30.0, quality=0,
+            point_id=2001,
+            value=30.0,
+            quality=0,
             updated_at=datetime.now(),
         )
         db_session.add(rt_ac)
@@ -119,26 +134,36 @@ class TestCalculateRealtimePUE:
     async def test_pue_skip_quality_2(self, db_session):
         """quality==2 (中断) 的点位应被跳过"""
         it_device = PowerDevice(
-            device_code="IT-003", device_name="服务器3",
-            device_type="IT", rated_power=100.0,
-            is_it_load=True, is_enabled=True,
+            device_code="IT-003",
+            device_name="服务器3",
+            device_type="IT",
+            rated_power=100.0,
+            is_it_load=True,
+            is_enabled=True,
             power_point_id=3001,
         )
         bad_device = PowerDevice(
-            device_code="IT-004", device_name="服务器4",
-            device_type="IT", rated_power=100.0,
-            is_it_load=True, is_enabled=True,
+            device_code="IT-004",
+            device_name="服务器4",
+            device_type="IT",
+            rated_power=100.0,
+            is_it_load=True,
+            is_enabled=True,
             power_point_id=3002,
         )
         db_session.add_all([it_device, bad_device])
         await db_session.flush()
 
         rt_good = PointRealtime(
-            point_id=3001, value=80.0, quality=0,
+            point_id=3001,
+            value=80.0,
+            quality=0,
             updated_at=datetime.now(),
         )
         rt_bad = PointRealtime(
-            point_id=3002, value=90.0, quality=2,  # 中断
+            point_id=3002,
+            value=90.0,
+            quality=2,  # 中断
             updated_at=datetime.now(),
         )
         db_session.add_all([rt_good, rt_bad])
@@ -154,26 +179,36 @@ class TestCalculateRealtimePUE:
     async def test_pue_unreliable_count(self, db_session):
         """quality==1 或数据过期的点位计入 unreliable_count"""
         it_device = PowerDevice(
-            device_code="IT-005", device_name="服务器5",
-            device_type="IT", rated_power=100.0,
-            is_it_load=True, is_enabled=True,
+            device_code="IT-005",
+            device_name="服务器5",
+            device_type="IT",
+            rated_power=100.0,
+            is_it_load=True,
+            is_enabled=True,
             power_point_id=4001,
         )
         stale_device = PowerDevice(
-            device_code="IT-006", device_name="服务器6",
-            device_type="IT", rated_power=100.0,
-            is_it_load=True, is_enabled=True,
+            device_code="IT-006",
+            device_name="服务器6",
+            device_type="IT",
+            rated_power=100.0,
+            is_it_load=True,
+            is_enabled=True,
             power_point_id=4002,
         )
         db_session.add_all([it_device, stale_device])
         await db_session.flush()
 
         rt_uncertain = PointRealtime(
-            point_id=4001, value=80.0, quality=1,  # 不可靠
+            point_id=4001,
+            value=80.0,
+            quality=1,  # 不可靠
             updated_at=datetime.now(),
         )
         rt_stale = PointRealtime(
-            point_id=4002, value=70.0, quality=0,
+            point_id=4002,
+            value=70.0,
+            quality=0,
             updated_at=datetime.now() - timedelta(seconds=400),  # 过期
         )
         db_session.add_all([rt_uncertain, rt_stale])
@@ -189,26 +224,36 @@ class TestCalculateRealtimePUE:
     async def test_ups_loss_calculation(self, db_session):
         """UPS 损耗 = max(0, ups_total - it_power)"""
         it_device = PowerDevice(
-            device_code="IT-007", device_name="服务器7",
-            device_type="IT", rated_power=100.0,
-            is_it_load=True, is_enabled=True,
+            device_code="IT-007",
+            device_name="服务器7",
+            device_type="IT",
+            rated_power=100.0,
+            is_it_load=True,
+            is_enabled=True,
             power_point_id=5001,
         )
         ups_device = PowerDevice(
-            device_code="UPS-001", device_name="UPS1",
-            device_type="UPS", rated_power=120.0,
-            is_it_load=False, is_enabled=True,
+            device_code="UPS-001",
+            device_name="UPS1",
+            device_type="UPS",
+            rated_power=120.0,
+            is_it_load=False,
+            is_enabled=True,
             power_point_id=5002,
         )
         db_session.add_all([it_device, ups_device])
         await db_session.flush()
 
         rt_it = PointRealtime(
-            point_id=5001, value=80.0, quality=0,
+            point_id=5001,
+            value=80.0,
+            quality=0,
             updated_at=datetime.now(),
         )
         rt_ups = PointRealtime(
-            point_id=5002, value=90.0, quality=0,
+            point_id=5002,
+            value=90.0,
+            quality=0,
             updated_at=datetime.now(),
         )
         db_session.add_all([rt_it, rt_ups])
@@ -223,9 +268,12 @@ class TestCalculateRealtimePUE:
     async def test_no_power_point_id_skipped(self, db_session):
         """没有 power_point_id 的设备不参与计算"""
         device_no_point = PowerDevice(
-            device_code="IT-008", device_name="服务器8",
-            device_type="IT", rated_power=100.0,
-            is_it_load=True, is_enabled=True,
+            device_code="IT-008",
+            device_name="服务器8",
+            device_type="IT",
+            rated_power=100.0,
+            is_it_load=True,
+            is_enabled=True,
             power_point_id=None,  # 无关联点位
         )
         db_session.add(device_no_point)
@@ -247,26 +295,36 @@ class TestWritePUEHistory:
     async def test_write_pue_history_valid(self, db_session):
         """PUE 有效时正确写入 PUEHistory"""
         it_device = PowerDevice(
-            device_code="IT-H01", device_name="服务器H1",
-            device_type="IT", rated_power=100.0,
-            is_it_load=True, is_enabled=True,
+            device_code="IT-H01",
+            device_name="服务器H1",
+            device_type="IT",
+            rated_power=100.0,
+            is_it_load=True,
+            is_enabled=True,
             power_point_id=6001,
         )
         ac_device = PowerDevice(
-            device_code="AC-H01", device_name="空调H1",
-            device_type="AC", rated_power=50.0,
-            is_it_load=False, is_enabled=True,
+            device_code="AC-H01",
+            device_name="空调H1",
+            device_type="AC",
+            rated_power=50.0,
+            is_it_load=False,
+            is_enabled=True,
             power_point_id=6002,
         )
         db_session.add_all([it_device, ac_device])
         await db_session.flush()
 
         rt_it = PointRealtime(
-            point_id=6001, value=80.0, quality=0,
+            point_id=6001,
+            value=80.0,
+            quality=0,
             updated_at=datetime.now(),
         )
         rt_ac = PointRealtime(
-            point_id=6002, value=30.0, quality=0,
+            point_id=6002,
+            value=30.0,
+            quality=0,
             updated_at=datetime.now(),
         )
         db_session.add_all([rt_it, rt_ac])
@@ -276,6 +334,7 @@ class TestWritePUEHistory:
 
         # 验证写入
         from sqlalchemy import select
+
         result = await db_session.execute(select(PUEHistory))
         records = result.scalars().all()
         assert len(records) >= 1
@@ -290,16 +349,21 @@ class TestWritePUEHistory:
         """IT 负载为 0 时不写入 PUEHistory"""
         # 只有 AC 设备
         ac_device = PowerDevice(
-            device_code="AC-H02", device_name="空调H2",
-            device_type="AC", rated_power=50.0,
-            is_it_load=False, is_enabled=True,
+            device_code="AC-H02",
+            device_name="空调H2",
+            device_type="AC",
+            rated_power=50.0,
+            is_it_load=False,
+            is_enabled=True,
             power_point_id=7001,
         )
         db_session.add(ac_device)
         await db_session.flush()
 
         rt_ac = PointRealtime(
-            point_id=7001, value=30.0, quality=0,
+            point_id=7001,
+            value=30.0,
+            quality=0,
             updated_at=datetime.now(),
         )
         db_session.add(rt_ac)
@@ -307,15 +371,12 @@ class TestWritePUEHistory:
 
         # 记录写入前的数量
         from sqlalchemy import select, func
-        count_before = (await db_session.execute(
-            select(func.count(PUEHistory.id))
-        )).scalar()
+
+        count_before = (await db_session.execute(select(func.count(PUEHistory.id)))).scalar()
 
         await write_pue_history(db_session)
 
-        count_after = (await db_session.execute(
-            select(func.count(PUEHistory.id))
-        )).scalar()
+        count_after = (await db_session.execute(select(func.count(PUEHistory.id)))).scalar()
 
         assert count_after == count_before
 

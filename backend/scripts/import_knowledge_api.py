@@ -4,9 +4,7 @@
 知识库文档导入脚本 - 通过API方式导入
 """
 
-import os
 import re
-import sys
 import json
 import urllib.request
 import urllib.error
@@ -69,10 +67,10 @@ def login():
 
 
 def extract_title(content, filename):
-    match = re.search(r'^#\s+(.+)$', content, re.MULTILINE)
+    match = re.search(r"^#\s+(.+)$", content, re.MULTILINE)
     if match:
         return match.group(1).strip()
-    return Path(filename).stem.replace('-', ' ').title()
+    return Path(filename).stem.replace("-", " ").title()
 
 
 def get_category(file_path):
@@ -125,7 +123,7 @@ def main():
         print(f"  category: {category}")
 
         if title in existing_titles:
-            print(f"  => SKIP (already exists)")
+            print("  => SKIP (already exists)")
             skipped += 1
             continue
 
@@ -135,7 +133,7 @@ def main():
             "content": content,
             "tags": tags,
             "is_published": True,
-            "author": "system-import"
+            "author": "system-import",
         }
 
         result = api_request("POST", "/operation/knowledge", data=payload, token=token)
@@ -143,9 +141,9 @@ def main():
             print(f"  => OK (id={result.get('id')})")
             imported += 1
         else:
-            print(f"  => FAILED")
+            print("  => FAILED")
 
-    print(f"\n=== Done ===")
+    print("\n=== Done ===")
     print(f"Imported: {imported}")
     print(f"Skipped: {skipped}")
 

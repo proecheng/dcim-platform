@@ -1,11 +1,12 @@
 """OPC-UA 适配器测试 — Story 15.4"""
+
 import asyncio
 import sys
 import os
 import importlib.util
 import types
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch, PropertyMock
+from unittest.mock import AsyncMock, MagicMock, patch
 from datetime import datetime, timezone
 
 # 确保 gateway 根目录在 sys.path
@@ -41,6 +42,7 @@ SECURITY_POLICY_MAP = _opc_ua.SECURITY_POLICY_MAP
 
 
 # === 辅助工厂 ===
+
 
 def _make_config(
     connection_params: dict,
@@ -105,17 +107,20 @@ def _mock_asyncua():
 
 def _patch_asyncua(mock_au):
     """返回 patch.dict 上下文管理器"""
-    return patch.dict("sys.modules", {
-        "asyncua": mock_au,
-        "asyncua.crypto": MagicMock(),
-        "asyncua.crypto.security_policies": MagicMock(),
-    })
+    return patch.dict(
+        "sys.modules",
+        {
+            "asyncua": mock_au,
+            "asyncua.crypto": MagicMock(),
+            "asyncua.crypto.security_policies": MagicMock(),
+        },
+    )
 
 
 # === validate_node_id 测试 ===
 
-class TestValidateNodeId:
 
+class TestValidateNodeId:
     def test_valid_numeric(self):
         assert validate_node_id("ns=2;i=1001") is True
 
@@ -149,8 +154,8 @@ class TestValidateNodeId:
 
 # === 注册表测试 ===
 
-class TestAdapterRegistry:
 
+class TestAdapterRegistry:
     def test_opc_ua_registered(self):
         assert "opc_ua" in ADAPTER_REGISTRY
         assert ADAPTER_REGISTRY["opc_ua"] is OpcUaAdapter
@@ -158,8 +163,8 @@ class TestAdapterRegistry:
 
 # === connect 测试 ===
 
-class TestConnect:
 
+class TestConnect:
     @pytest.mark.asyncio
     async def test_connect_success_anonymous(self):
         mock_au, mock_client, _ = _mock_asyncua()
@@ -296,8 +301,8 @@ class TestConnect:
 
 # === disconnect 测试 ===
 
-class TestDisconnect:
 
+class TestDisconnect:
     @pytest.mark.asyncio
     async def test_disconnect_resets_state(self):
         mock_au, mock_client, _ = _mock_asyncua()
@@ -325,8 +330,8 @@ class TestDisconnect:
 
 # === read_points 测试 ===
 
-class TestReadPoints:
 
+class TestReadPoints:
     @pytest.mark.asyncio
     async def test_batch_read_success(self):
         mock_au, mock_client, _ = _mock_asyncua()
@@ -369,12 +374,14 @@ class TestReadPoints:
         mock_au, mock_client, mock_node = _mock_asyncua()
         mock_client.read_values = AsyncMock(side_effect=Exception("batch fail"))
         call_count = 0
+
         async def side_effect_read():
             nonlocal call_count
             call_count += 1
             if call_count == 1:
                 return 25.5
             raise Exception("node error")
+
         mock_node.read_value = AsyncMock(side_effect=side_effect_read)
         with _patch_asyncua(mock_au):
             adapter = OpcUaAdapter()
@@ -394,7 +401,9 @@ class TestReadPoints:
         with _patch_asyncua(mock_au):
             adapter = OpcUaAdapter()
             config = _make_config(
-                _default_params(), points=_make_points(), retry_max_failures=3,
+                _default_params(),
+                points=_make_points(),
+                retry_max_failures=3,
             )
             await adapter.connect(config)
             for _ in range(3):
@@ -409,7 +418,9 @@ class TestReadPoints:
         with _patch_asyncua(mock_au):
             adapter = OpcUaAdapter()
             config = _make_config(
-                _default_params(), points=_make_points(), retry_max_failures=99,
+                _default_params(),
+                points=_make_points(),
+                retry_max_failures=99,
             )
             await adapter.connect(config)
             results = await adapter.read_points(_make_points())
@@ -446,15 +457,17 @@ class TestReadPoints:
 
 # === write_point 测试 ===
 
-class TestWritePoint:
 
+class TestWritePoint:
     @pytest.mark.asyncio
     async def test_write_success(self):
         mock_au, mock_client, mock_node = _mock_asyncua()
         with _patch_asyncua(mock_au):
             adapter = OpcUaAdapter()
             config = _make_config(
-                _default_params(), points=_make_points(), write_enabled=True,
+                _default_params(),
+                points=_make_points(),
+                write_enabled=True,
             )
             await adapter.connect(config)
             result = await adapter.write_point("temp_01", 30.0)
@@ -467,7 +480,9 @@ class TestWritePoint:
         with _patch_asyncua(mock_au):
             adapter = OpcUaAdapter()
             config = _make_config(
-                _default_params(), points=_make_points(), write_enabled=False,
+                _default_params(),
+                points=_make_points(),
+                write_enabled=False,
             )
             await adapter.connect(config)
             result = await adapter.write_point("temp_01", 30.0)
@@ -486,7 +501,9 @@ class TestWritePoint:
         with _patch_asyncua(mock_au):
             adapter = OpcUaAdapter()
             config = _make_config(
-                _default_params(), points=_make_points(), write_enabled=True,
+                _default_params(),
+                points=_make_points(),
+                write_enabled=True,
             )
             await adapter.connect(config)
             result = await adapter.write_point("nonexistent", 30.0)
@@ -498,7 +515,9 @@ class TestWritePoint:
         with _patch_asyncua(mock_au):
             adapter = OpcUaAdapter()
             config = _make_config(
-                _default_params(), points=_make_points(), write_enabled=True,
+                _default_params(),
+                points=_make_points(),
+                write_enabled=True,
             )
             await adapter.connect(config)
             result = await adapter.write_point("temp_01", None)
@@ -511,7 +530,9 @@ class TestWritePoint:
         with _patch_asyncua(mock_au):
             adapter = OpcUaAdapter()
             config = _make_config(
-                _default_params(), points=_make_points(), write_enabled=True,
+                _default_params(),
+                points=_make_points(),
+                write_enabled=True,
             )
             await adapter.connect(config)
             result = await adapter.write_point("temp_01", 30.0)
@@ -524,7 +545,9 @@ class TestWritePoint:
         with _patch_asyncua(mock_au):
             adapter = OpcUaAdapter()
             config = _make_config(
-                _default_params(), points=_make_points(), write_enabled=True,
+                _default_params(),
+                points=_make_points(),
+                write_enabled=True,
             )
             await adapter.connect(config)
             result = await adapter.write_point("temp_01", 30.0)
@@ -533,8 +556,8 @@ class TestWritePoint:
 
 # === test_connection 测试 ===
 
-class TestTestConnection:
 
+class TestTestConnection:
     @pytest.mark.asyncio
     async def test_success_with_latency(self):
         mock_au, mock_client, mock_node = _mock_asyncua()
@@ -579,8 +602,8 @@ class TestTestConnection:
 
 # === get_status 测试 ===
 
-class TestGetStatus:
 
+class TestGetStatus:
     def test_initial_state(self):
         adapter = OpcUaAdapter()
         status = adapter.get_status()
@@ -604,8 +627,8 @@ class TestGetStatus:
 
 # === browse_nodes 测试 ===
 
-class TestBrowseNodes:
 
+class TestBrowseNodes:
     @pytest.mark.asyncio
     async def test_browse_success(self):
         mock_au, mock_client, mock_node = _mock_asyncua()
@@ -640,8 +663,8 @@ class TestBrowseNodes:
 
 # === subscribe/unsubscribe 测试 ===
 
-class TestSubscription:
 
+class TestSubscription:
     @pytest.mark.asyncio
     async def test_subscribe_success(self):
         mock_au, mock_client, _ = _mock_asyncua()

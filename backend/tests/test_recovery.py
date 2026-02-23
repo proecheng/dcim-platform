@@ -1,4 +1,5 @@
 """联动恢复引擎 API 测试 — Story 9-4"""
+
 import pytest
 from unittest.mock import patch, AsyncMock
 
@@ -8,8 +9,12 @@ from sqlalchemy import select, delete
 
 from app.core.database import Base
 from app.models.linkage import (
-    LinkagePolicy, LinkageAction, LinkageExecution, LinkageLog,
-    LinkageRecovery, LinkageRecoveryLog,
+    LinkagePolicy,
+    LinkageAction,
+    LinkageExecution,
+    LinkageLog,
+    LinkageRecovery,
+    LinkageRecoveryLog,
 )
 from app.models.user import User
 from app.api.deps import get_db, require_admin, require_operator, require_viewer
@@ -19,6 +24,7 @@ from app.engines.recovery_engine import RecoveryEngine, RECOVERY_COMMAND_MAP, RE
 # ============================================================
 # Fixtures
 # ============================================================
+
 
 @pytest.fixture(scope="module")
 def anyio_backend():
@@ -174,14 +180,9 @@ BASE_URL = "/api/v1/linkage"
 @pytest.mark.anyio
 async def test_generate_recovery_steps_basic(seed_execution, db_session):
     """生成恢复步骤: 仅成功日志生成步骤, ALARM_NOTIFY 跳过, 失败日志跳过, 按 RECOVERY_ORDER 排序"""
-    result = await db_session.execute(
-        select(LinkageLog).where(LinkageLog.execution_id == seed_execution.id)
-    )
+    result = await db_session.execute(select(LinkageLog).where(LinkageLog.execution_id == seed_execution.id))
     logs = result.scalars().all()
-    log_dicts = [
-        {"action_type": l.action_type, "action_config": l.action_config, "status": l.status}
-        for l in logs
-    ]
+    log_dicts = [{"action_type": l.action_type, "action_config": l.action_config, "status": l.status} for l in logs]
 
     engine = RecoveryEngine()
     steps = engine.generate_recovery_steps(log_dicts)
@@ -221,7 +222,11 @@ async def test_generate_recovery_steps_video_popup_skipped():
     engine = RecoveryEngine()
     logs = [
         {"action_type": "VIDEO_POPUP", "action_config": {"camera_id": "cam01"}, "status": "success"},
-        {"action_type": "MQTT_COMMAND", "action_config": {"command": "shutdown", "target_type": "HVAC"}, "status": "success"},
+        {
+            "action_type": "MQTT_COMMAND",
+            "action_config": {"command": "shutdown", "target_type": "HVAC"},
+            "status": "success",
+        },
     ]
     steps = engine.generate_recovery_steps(logs)
     assert len(steps) == 1
@@ -257,6 +262,7 @@ async def test_recovery_order():
 # ============================================================
 # Tests — API 集成测试
 # ============================================================
+
 
 @pytest.mark.anyio
 async def test_list_recoverable_executions(client, seed_execution):

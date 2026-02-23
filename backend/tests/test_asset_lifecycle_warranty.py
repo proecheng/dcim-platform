@@ -1,4 +1,5 @@
 """资产生命周期 & 保修预警测试 — Story 7-3"""
+
 import pytest
 from datetime import date, timedelta
 
@@ -7,19 +8,29 @@ from sqlalchemy import delete
 
 from app.core.database import Base
 from app.models.asset import (
-    Asset, Cabinet, AssetLifecycle, AssetType, AssetStatus,
-    MaintenanceRecord, AssetInventory, AssetInventoryItem,
+    Asset,
+    Cabinet,
+    AssetLifecycle,
+    AssetType,
+    AssetStatus,
+    MaintenanceRecord,
+    AssetInventory,
+    AssetInventoryItem,
 )
 from app.models.user import User
 from app.schemas.asset import AssetCreate, AssetUpdate
 from app.api.v1.asset import (
-    create_asset, update_asset, get_asset_lifecycle, get_warranty_alerts,
+    create_asset,
+    update_asset,
+    get_asset_lifecycle,
+    get_warranty_alerts,
 )
 
 
 # ============================================================
 # Fixtures
 # ============================================================
+
 
 @pytest.fixture(scope="module")
 def anyio_backend():
@@ -72,8 +83,8 @@ async def user(db: AsyncSession):
 # 测试
 # ============================================================
 
-class TestAssetLifecycleWarranty:
 
+class TestAssetLifecycleWarranty:
     # ---- 生命周期测试 ----
 
     async def test_create_asset_auto_lifecycle(self, db: AsyncSession, user: User):
@@ -154,8 +165,8 @@ class TestAssetLifecycleWarranty:
         today = date.today()
         for i, delta in enumerate([15, 45, 75]):
             asset = Asset(
-                asset_code=f"WA-{i+1:03d}",
-                asset_name=f"预警测试资产{i+1}",
+                asset_code=f"WA-{i + 1:03d}",
+                asset_name=f"预警测试资产{i + 1}",
                 asset_type=AssetType.server,
                 status=AssetStatus.in_use,
                 warranty_end=today + timedelta(days=delta),

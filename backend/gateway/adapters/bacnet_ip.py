@@ -13,6 +13,7 @@
   - 通过模块级单例 + 引用计数管理生命周期
   - 多个 BacnetIpAdapter 共享同一个 BAC0 网络实例
 """
+
 import asyncio
 import inspect
 import logging
@@ -79,10 +80,7 @@ def parse_point_address(address: str) -> tuple[str, int, str]:
     """
     parts = address.split(":")
     if len(parts) < 2 or len(parts) > 3:
-        raise ValueError(
-            f"无效 BACnet 地址格式: {address}，"
-            f"期望 {{object_type}}:{{instance}}[:{{property}}]"
-        )
+        raise ValueError(f"无效 BACnet 地址格式: {address}，期望 {{object_type}}:{{instance}}[:{{property}}]")
 
     raw_type = parts[0]
     # 支持缩写
@@ -104,6 +102,7 @@ def parse_point_address(address: str) -> tuple[str, int, str]:
 
 
 # ─── BAC0 网络实例单例管理 ───────────────────────────────────
+
 
 class _BacnetNetworkManager:
     """BAC0 网络实例单例管理器 — 引用计数控制生命周期
@@ -131,6 +130,7 @@ class _BacnetNetworkManager:
             if self._network is None:
                 try:
                     import BAC0
+
                     self._ip = ip or None
                     self._port = port
                     # BAC0.start() 是 async context manager，但也可直接 await
@@ -174,6 +174,7 @@ _network_manager = _BacnetNetworkManager()
 
 
 # ─── BACnet/IP 适配器 ───────────────────────────────────────
+
 
 @register_adapter("bacnet_ip")
 class BacnetIpAdapter(BaseProtocolAdapter):
@@ -262,7 +263,8 @@ class BacnetIpAdapter(BaseProtocolAdapter):
         self._error_message = None
         logger.info(
             "BACnet/IP 适配器已连接: device=%d, address=%s",
-            self._device_instance, self._device_address or "(auto-discover)",
+            self._device_instance,
+            self._device_address or "(auto-discover)",
         )
         return True
 
@@ -322,9 +324,7 @@ class BacnetIpAdapter(BaseProtocolAdapter):
                         timestamp=datetime.now(timezone.utc),
                     )
 
-            if self._consecutive_failures >= (
-                self._config.retry_max_failures if self._config else 5
-            ):
+            if self._consecutive_failures >= (self._config.retry_max_failures if self._config else 5):
                 self._state = AdapterState.COMMUNICATION_INTERRUPTED
 
         self._last_read_time = datetime.now(timezone.utc)
@@ -548,11 +548,13 @@ class BacnetIpAdapter(BaseProtocolAdapter):
             result = []
             if devices:
                 for dev in devices:
-                    result.append({
-                        "device_instance": getattr(dev, "device_id", None) or getattr(dev, "instance", None),
-                        "address": str(getattr(dev, "address", "")),
-                        "name": str(getattr(dev, "name", "")),
-                    })
+                    result.append(
+                        {
+                            "device_instance": getattr(dev, "device_id", None) or getattr(dev, "instance", None),
+                            "address": str(getattr(dev, "address", "")),
+                            "name": str(getattr(dev, "name", "")),
+                        }
+                    )
             return result
         except Exception as e:
             logger.warning("BACnet 设备发现失败: %s", e)
@@ -585,18 +587,18 @@ class BacnetIpAdapter(BaseProtocolAdapter):
                         # 尝试读取对象名称
                         try:
                             name = await asyncio.wait_for(
-                                self._network.read(
-                                    f"{addr} {obj_type_str} {obj_instance} objectName"
-                                ),
+                                self._network.read(f"{addr} {obj_type_str} {obj_instance} objectName"),
                                 timeout=3.0,
                             )
                         except Exception:
                             name = ""
-                        result.append({
-                            "object_type": obj_type_str,
-                            "instance": obj_instance,
-                            "name": str(name) if name else "",
-                        })
+                        result.append(
+                            {
+                                "object_type": obj_type_str,
+                                "instance": obj_instance,
+                                "name": str(name) if name else "",
+                            }
+                        )
             return result
         except Exception as e:
             logger.warning("BACnet 对象浏览失败: %s", e)

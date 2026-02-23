@@ -1,4 +1,5 @@
 """智能选址推荐 API 测试 — Story 8-3"""
+
 import pytest
 
 from httpx import AsyncClient, ASGITransport
@@ -16,6 +17,7 @@ from app.api.deps import get_db, require_viewer
 # ============================================================
 # Fixtures
 # ============================================================
+
 
 @pytest.fixture(scope="module")
 def anyio_backend():
@@ -85,20 +87,40 @@ async def client(app):
 @pytest.fixture
 async def seed_cabinets(db_session):
     cab1 = Cabinet(
-        id=1, cabinet_code="A-01", cabinet_name="A区机柜01",
-        location="A区/1F/Room1", total_u=42, max_power=10.0, max_weight=500.0,
+        id=1,
+        cabinet_code="A-01",
+        cabinet_name="A区机柜01",
+        location="A区/1F/Room1",
+        total_u=42,
+        max_power=10.0,
+        max_weight=500.0,
     )
     cab2 = Cabinet(
-        id=2, cabinet_code="A-02", cabinet_name="A区机柜02",
-        location="A区/1F/Room1", total_u=42, max_power=5.0, max_weight=300.0,
+        id=2,
+        cabinet_code="A-02",
+        cabinet_name="A区机柜02",
+        location="A区/1F/Room1",
+        total_u=42,
+        max_power=5.0,
+        max_weight=300.0,
     )
     cab3 = Cabinet(
-        id=3, cabinet_code="B-01", cabinet_name="B区机柜01",
-        location="B区/2F/Room2", total_u=42, max_power=20.0, max_weight=1000.0,
+        id=3,
+        cabinet_code="B-01",
+        cabinet_name="B区机柜01",
+        location="B区/2F/Room2",
+        total_u=42,
+        max_power=20.0,
+        max_weight=1000.0,
     )
     cab4 = Cabinet(
-        id=4, cabinet_code="C-01", cabinet_name="C区机柜01",
-        location="C区/3F/Room3", total_u=42, max_power=None, max_weight=None,
+        id=4,
+        cabinet_code="C-01",
+        cabinet_name="C区机柜01",
+        location="C区/3F/Room3",
+        total_u=42,
+        max_power=None,
+        max_weight=None,
     )
     db_session.add_all([cab1, cab2, cab3, cab4])
     await db_session.commit()
@@ -108,8 +130,12 @@ async def seed_cabinets(db_session):
 @pytest.fixture
 async def seed_assets(db_session, seed_cabinets):
     a1 = Asset(
-        asset_code="SRV-001", asset_name="服务器1", asset_type="server",
-        cabinet_id=1, u_position=1, u_height=30,
+        asset_code="SRV-001",
+        asset_name="服务器1",
+        asset_type="server",
+        cabinet_id=1,
+        u_position=1,
+        u_height=30,
     )
     db_session.add(a1)
     await db_session.commit()
@@ -240,10 +266,13 @@ async def test_smart_site_confidence(client, seed_cabinets, seed_pdu_device, see
 
 @pytest.mark.anyio
 async def test_smart_site_custom_weights(client, seed_cabinets):
-    resp = await client.post(URL, json={
-        "required_u": 1,
-        "weights": {"space": 50, "power": 50, "phase_balance": 50, "temperature": 50, "cooling": 50}
-    })
+    resp = await client.post(
+        URL,
+        json={
+            "required_u": 1,
+            "weights": {"space": 50, "power": 50, "phase_balance": 50, "temperature": 50, "cooling": 50},
+        },
+    )
     assert resp.status_code == 200
 
 

@@ -1,7 +1,6 @@
 """
 告警升级规则 API 覆盖率测试 — 使用 conftest fixtures
 """
-import pytest
 
 from tests.conftest import auth_headers
 from app.models.alarm import AlarmEscalation
@@ -58,9 +57,7 @@ class TestListEscalations:
         await _create_rule(async_db, source_level="minor", target_level="major")
         await _create_rule(async_db, source_level="major", target_level="critical")
 
-        resp = await client.get(
-            "/api/v1/escalations?source_level=minor", headers=auth_headers(token)
-        )
+        resp = await client.get("/api/v1/escalations?source_level=minor", headers=auth_headers(token))
         assert resp.status_code == 200
         data = resp.json()
         assert data["total"] == 1
@@ -71,9 +68,7 @@ class TestListEscalations:
         await _create_rule(async_db, is_enabled=True, rule_name="启用")
         await _create_rule(async_db, is_enabled=False, rule_name="禁用")
 
-        resp = await client.get(
-            "/api/v1/escalations?is_enabled=true", headers=auth_headers(token)
-        )
+        resp = await client.get("/api/v1/escalations?is_enabled=true", headers=auth_headers(token))
         assert resp.status_code == 200
         assert resp.json()["total"] == 1
         assert resp.json()["items"][0]["rule_name"] == "启用"
@@ -83,9 +78,7 @@ class TestListEscalations:
         for i in range(5):
             await _create_rule(async_db, rule_name=f"规则{i}")
 
-        resp = await client.get(
-            "/api/v1/escalations?page=2&page_size=2", headers=auth_headers(token)
-        )
+        resp = await client.get("/api/v1/escalations?page=2&page_size=2", headers=auth_headers(token))
         assert resp.status_code == 200
         data = resp.json()
         assert data["total"] == 5
@@ -165,17 +158,13 @@ class TestGetEscalation:
         _, token = admin_user
         rule = await _create_rule(async_db, rule_name="详情测试")
 
-        resp = await client.get(
-            f"/api/v1/escalations/{rule.id}", headers=auth_headers(token)
-        )
+        resp = await client.get(f"/api/v1/escalations/{rule.id}", headers=auth_headers(token))
         assert resp.status_code == 200
         assert resp.json()["rule_name"] == "详情测试"
 
     async def test_get_not_found(self, client, admin_user):
         _, token = admin_user
-        resp = await client.get(
-            "/api/v1/escalations/99999", headers=auth_headers(token)
-        )
+        resp = await client.get("/api/v1/escalations/99999", headers=auth_headers(token))
         assert resp.status_code == 404
 
 
@@ -245,23 +234,17 @@ class TestDeleteEscalation:
         _, token = admin_user
         rule = await _create_rule(async_db)
 
-        resp = await client.delete(
-            f"/api/v1/escalations/{rule.id}", headers=auth_headers(token)
-        )
+        resp = await client.delete(f"/api/v1/escalations/{rule.id}", headers=auth_headers(token))
         assert resp.status_code == 200
         assert "已删除" in resp.json()["message"]
 
         # 确认已删除
-        resp2 = await client.get(
-            f"/api/v1/escalations/{rule.id}", headers=auth_headers(token)
-        )
+        resp2 = await client.get(f"/api/v1/escalations/{rule.id}", headers=auth_headers(token))
         assert resp2.status_code == 404
 
     async def test_delete_not_found(self, client, admin_user):
         _, token = admin_user
-        resp = await client.delete(
-            "/api/v1/escalations/99999", headers=auth_headers(token)
-        )
+        resp = await client.delete("/api/v1/escalations/99999", headers=auth_headers(token))
         assert resp.status_code == 404
 
 
@@ -275,9 +258,7 @@ class TestToggleEscalation:
         _, token = admin_user
         rule = await _create_rule(async_db, is_enabled=True)
 
-        resp = await client.put(
-            f"/api/v1/escalations/{rule.id}/toggle", headers=auth_headers(token)
-        )
+        resp = await client.put(f"/api/v1/escalations/{rule.id}/toggle", headers=auth_headers(token))
         assert resp.status_code == 200
         assert resp.json()["is_enabled"] is False
 
@@ -285,21 +266,18 @@ class TestToggleEscalation:
         _, token = admin_user
         rule = await _create_rule(async_db, is_enabled=False)
 
-        resp = await client.put(
-            f"/api/v1/escalations/{rule.id}/toggle", headers=auth_headers(token)
-        )
+        resp = await client.put(f"/api/v1/escalations/{rule.id}/toggle", headers=auth_headers(token))
         assert resp.status_code == 200
         assert resp.json()["is_enabled"] is True
 
     async def test_toggle_not_found(self, client, admin_user):
         _, token = admin_user
-        resp = await client.put(
-            "/api/v1/escalations/99999/toggle", headers=auth_headers(token)
-        )
+        resp = await client.put("/api/v1/escalations/99999/toggle", headers=auth_headers(token))
         assert resp.status_code == 404
 
 
 # ============== 补充覆盖率测试 ==============
+
 
 class TestListEscalationsCoverageExtra:
     """补充升级规则列表 (L37-40, L63-64)"""
@@ -429,7 +407,8 @@ class TestDeleteEscalationCoverageExtra:
         rule = await _create_rule(async_db, is_enabled=False, rule_name="disabled_del")
 
         resp = await client.delete(
-            f"/api/v1/escalations/{rule.id}", headers=auth_headers(token),
+            f"/api/v1/escalations/{rule.id}",
+            headers=auth_headers(token),
         )
         assert resp.status_code == 200
         assert "已删除" in resp.json()["message"]
@@ -444,13 +423,15 @@ class TestToggleEscalationCoverageExtra:
         rule = await _create_rule(async_db, is_enabled=True)
 
         resp1 = await client.put(
-            f"/api/v1/escalations/{rule.id}/toggle", headers=auth_headers(token),
+            f"/api/v1/escalations/{rule.id}/toggle",
+            headers=auth_headers(token),
         )
         assert resp1.status_code == 200
         assert resp1.json()["is_enabled"] is False
 
         resp2 = await client.put(
-            f"/api/v1/escalations/{rule.id}/toggle", headers=auth_headers(token),
+            f"/api/v1/escalations/{rule.id}/toggle",
+            headers=auth_headers(token),
         )
         assert resp2.status_code == 200
         assert resp2.json()["is_enabled"] is True
@@ -461,7 +442,8 @@ class TestToggleEscalationCoverageExtra:
         rule = await _create_rule(async_db)
 
         resp = await client.put(
-            f"/api/v1/escalations/{rule.id}/toggle", headers=auth_headers(token),
+            f"/api/v1/escalations/{rule.id}/toggle",
+            headers=auth_headers(token),
         )
         assert resp.status_code == 403
 
@@ -473,14 +455,18 @@ class TestGetEscalationCoverageExtra:
         """GET /escalations/{id} — 验证所有字段"""
         _, token = admin_user
         rule = await _create_rule(
-            async_db, rule_name="detail_check",
-            source_level="minor", target_level="major",
-            timeout_minutes=45, notify_user_ids="1,2,3",
+            async_db,
+            rule_name="detail_check",
+            source_level="minor",
+            target_level="major",
+            timeout_minutes=45,
+            notify_user_ids="1,2,3",
             description="detail_desc",
         )
 
         resp = await client.get(
-            f"/api/v1/escalations/{rule.id}", headers=auth_headers(token),
+            f"/api/v1/escalations/{rule.id}",
+            headers=auth_headers(token),
         )
         assert resp.status_code == 200
         data = resp.json()

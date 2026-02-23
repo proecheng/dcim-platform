@@ -1,15 +1,16 @@
 """密码策略管理 API 测试 (Story 13-6)"""
+
 import pytest
 
 from datetime import datetime, timedelta
 from httpx import AsyncClient, ASGITransport
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
-from sqlalchemy import delete, update
+from sqlalchemy import delete
 
 from app.core.database import Base
 from app.models.user import User, PasswordHistory
 from app.models.config import SystemConfig
-from app.core.security import get_password_hash, verify_password
+from app.core.security import get_password_hash
 from app.api.deps import get_db, get_current_user, require_admin
 from app.api.v1.auth import login_limiter
 from app.schemas.user import validate_password_complexity
@@ -18,6 +19,7 @@ from app.schemas.user import validate_password_complexity
 # ============================================================
 # Fixtures
 # ============================================================
+
 
 @pytest.fixture(scope="module")
 def anyio_backend():
@@ -99,6 +101,7 @@ AUTH_URL = "/api/v1/auth"
 # Tests — 密码复杂度
 # ============================================================
 
+
 def test_password_complexity_3_of_4_passes():
     """至少3类字符通过"""
     # 大写 + 小写 + 数字 (3类，无特殊字符)
@@ -122,6 +125,7 @@ def test_password_complexity_too_short():
 # Tests — 密码策略配置
 # ============================================================
 
+
 @pytest.mark.anyio
 async def test_get_password_policy_default(client):
     """获取默认密码策略"""
@@ -137,12 +141,10 @@ async def test_get_password_policy_default(client):
 @pytest.mark.anyio
 async def test_update_password_policy(client):
     """更新密码策略"""
-    resp = await client.put(f"{AUTH_URL}/password-policy", json={
-        "min_length": 10,
-        "min_categories": 4,
-        "history_count": 3,
-        "expire_days": 60
-    })
+    resp = await client.put(
+        f"{AUTH_URL}/password-policy",
+        json={"min_length": 10, "min_categories": 4, "history_count": 3, "expire_days": 60},
+    )
     assert resp.status_code == 200
     data = resp.json()
     assert data["min_length"] == 10
@@ -158,22 +160,21 @@ async def test_update_password_policy(client):
 # Tests — 密码历史
 # ============================================================
 
+
 @pytest.mark.anyio
 async def test_change_password_records_history(client, mock_admin, db_session):
     """修改密码后记录历史"""
-    resp = await client.put(f"{AUTH_URL}/password", json={
-        "old_password": "OldPass@123",
-        "new_password": "NewPass@456",
-        "confirm_password": "NewPass@456"
-    })
+    resp = await client.put(
+        f"{AUTH_URL}/password",
+        json={"old_password": "OldPass@123", "new_password": "NewPass@456", "confirm_password": "NewPass@456"},
+    )
     assert resp.status_code == 200
 
     # 验证历史记录已保存
     from sqlalchemy import select, func
+
     count_result = await db_session.execute(
-        select(func.count(PasswordHistory.id)).where(
-            PasswordHistory.user_id == mock_admin.id
-        )
+        select(func.count(PasswordHistory.id)).where(PasswordHistory.user_id == mock_admin.id)
     )
     assert count_result.scalar() >= 1
 
@@ -183,18 +184,14 @@ async def test_change_password_reuse_blocked(client, mock_admin, db_session):
     """不能重用最近5次密码"""
     # 先在历史中插入一条记录
     old_hash = get_password_hash("ReusedPwd@1")
-    db_session.add(PasswordHistory(
-        user_id=mock_admin.id,
-        password_hash=old_hash
-    ))
+    db_session.add(PasswordHistory(user_id=mock_admin.id, password_hash=old_hash))
     await db_session.commit()
 
     # 尝试使用相同密码
-    resp = await client.put(f"{AUTH_URL}/password", json={
-        "old_password": "OldPass@123",
-        "new_password": "ReusedPwd@1",
-        "confirm_password": "ReusedPwd@1"
-    })
+    resp = await client.put(
+        f"{AUTH_URL}/password",
+        json={"old_password": "OldPass@123", "new_password": "ReusedPwd@1", "confirm_password": "ReusedPwd@1"},
+    )
     assert resp.status_code == 400
     assert "最近" in resp.json()["detail"]
 
@@ -202,6 +199,7 @@ async def test_change_password_reuse_blocked(client, mock_admin, db_session):
 # ============================================================
 # Tests — 密码过期提醒
 # ============================================================
+
 
 @pytest.mark.anyio
 async def test_login_password_expired_warning(app, db_session):
@@ -213,7 +211,7 @@ async def test_login_password_expired_warning(app, db_session):
         password_hash=get_password_hash("Test@1234"),
         role="operator",
         is_active=True,
-        password_changed_at=old_date
+        password_changed_at=old_date,
     )
     db_session.add(user)
     await db_session.commit()
@@ -224,10 +222,7 @@ async def test_login_password_expired_warning(app, db_session):
 
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as c:
-        resp = await c.post(
-            f"{AUTH_URL}/login",
-            data={"username": "expired_user", "password": "Test@1234"}
-        )
+        resp = await c.post(f"{AUTH_URL}/login", data={"username": "expired_user", "password": "Test@1234"})
         assert resp.status_code == 200
         data = resp.json()
         assert data["password_expired_warning"] is not None
@@ -242,7 +237,7 @@ async def test_login_password_not_expired(app, db_session):
         password_hash=get_password_hash("Test@1234"),
         role="operator",
         is_active=True,
-        password_changed_at=datetime.now()
+        password_changed_at=datetime.now(),
     )
     db_session.add(user)
     await db_session.commit()
@@ -252,9 +247,6 @@ async def test_login_password_not_expired(app, db_session):
 
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as c:
-        resp = await c.post(
-            f"{AUTH_URL}/login",
-            data={"username": "fresh_user", "password": "Test@1234"}
-        )
+        resp = await c.post(f"{AUTH_URL}/login", data={"username": "fresh_user", "password": "Test@1234"})
         assert resp.status_code == 200
         assert resp.json()["password_expired_warning"] is None

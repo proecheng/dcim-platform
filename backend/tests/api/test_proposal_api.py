@@ -2,13 +2,11 @@
 Proposal API 端点测试
 测试节能方案相关的所有 API 端点
 """
+
 import pytest
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
 from decimal import Decimal
 import uuid
 
-from app.core.database import Base
 from app.models.energy import EnergySavingProposal, ProposalMeasure, MeasureExecutionLog
 
 
@@ -18,6 +16,7 @@ def generate_unique_code(prefix: str = "A1") -> str:
 
 
 # ==================== 测试数据准备 ====================
+
 
 def create_test_proposal(db_session):
     """创建测试用的方案数据"""
@@ -35,8 +34,8 @@ def create_test_proposal(db_session):
             "高峰电量": 30000,
             "平段电量": 40000,
             "低谷电量": 15000,
-            "深谷电量": 5000
-        }
+            "深谷电量": 5000,
+        },
     )
     db_session.add(proposal)
     db_session.flush()
@@ -49,7 +48,7 @@ def create_test_proposal(db_session):
         regulation_description="将预热工序从尖峰时段调整至平段",
         annual_benefit=Decimal("5.94"),
         investment=Decimal("0"),
-        is_selected=False
+        is_selected=False,
     )
 
     measure2 = ProposalMeasure(
@@ -59,7 +58,7 @@ def create_test_proposal(db_session):
         regulation_description="辅助设备错峰运行",
         annual_benefit=Decimal("2.30"),
         investment=Decimal("0"),
-        is_selected=False
+        is_selected=False,
     )
 
     measure3 = ProposalMeasure(
@@ -69,7 +68,7 @@ def create_test_proposal(db_session):
         regulation_description="空压机储气罐充气策略优化",
         annual_benefit=Decimal("3.16"),
         investment=Decimal("0"),
-        is_selected=False
+        is_selected=False,
     )
 
     db_session.add_all([measure1, measure2, measure3])
@@ -88,7 +87,7 @@ def create_accepted_proposal(db_session):
         template_name="需量控制方案",
         total_benefit=Decimal("10.00"),
         total_investment=Decimal("0"),
-        status="accepted"
+        status="accepted",
     )
     db_session.add(proposal)
     db_session.flush()
@@ -100,7 +99,7 @@ def create_accepted_proposal(db_session):
         regulation_description="降低申报需量",
         annual_benefit=Decimal("10.00"),
         investment=Decimal("0"),
-        is_selected=True
+        is_selected=True,
     )
     db_session.add(measure)
     db_session.commit()
@@ -118,7 +117,7 @@ def create_executing_proposal_with_logs(db_session):
         template_name="设备运行优化方案",
         total_benefit=Decimal("8.50"),
         total_investment=Decimal("0"),
-        status="executing"
+        status="executing",
     )
     db_session.add(proposal)
     db_session.flush()
@@ -131,13 +130,14 @@ def create_executing_proposal_with_logs(db_session):
         annual_benefit=Decimal("8.50"),
         investment=Decimal("0"),
         is_selected=True,
-        execution_status="executing"
+        execution_status="executing",
     )
     db_session.add(measure)
     db_session.flush()
 
     # 添加执行日志
     from datetime import datetime
+
     log1 = MeasureExecutionLog(
         measure_id=measure.id,
         execution_time=datetime.now(),
@@ -146,7 +146,7 @@ def create_executing_proposal_with_logs(db_session):
         power_saved=Decimal("40"),
         expected_power_saved=Decimal("40"),
         result="success",
-        result_message="执行成功"
+        result_message="执行成功",
     )
     log2 = MeasureExecutionLog(
         measure_id=measure.id,
@@ -156,7 +156,7 @@ def create_executing_proposal_with_logs(db_session):
         power_saved=Decimal("35"),
         expected_power_saved=Decimal("40"),
         result="success",
-        result_message="执行成功"
+        result_message="执行成功",
     )
     db_session.add_all([log1, log2])
     db_session.commit()
@@ -166,15 +166,14 @@ def create_executing_proposal_with_logs(db_session):
 
 # ==================== 单元测试 ====================
 
+
 class TestProposalAPI:
     """Proposal API 测试类"""
 
     def test_get_proposal_not_found(self, db_session):
         """测试获取不存在的方案"""
         # 查询不存在的ID
-        proposal = db_session.query(EnergySavingProposal).filter(
-            EnergySavingProposal.id == 99999
-        ).first()
+        proposal = db_session.query(EnergySavingProposal).filter(EnergySavingProposal.id == 99999).first()
         assert proposal is None
 
     def test_get_proposal_by_id(self, db_session):
@@ -183,9 +182,7 @@ class TestProposalAPI:
         proposal = create_test_proposal(db_session)
 
         # 查询
-        result = db_session.query(EnergySavingProposal).filter(
-            EnergySavingProposal.id == proposal.id
-        ).first()
+        result = db_session.query(EnergySavingProposal).filter(EnergySavingProposal.id == proposal.id).first()
 
         assert result is not None
         assert result.proposal_code.startswith("A1-")
@@ -208,9 +205,7 @@ class TestProposalAPI:
         create_accepted_proposal(db_session)
 
         # 按模板ID过滤
-        proposals = db_session.query(EnergySavingProposal).filter(
-            EnergySavingProposal.template_id == "A1"
-        ).all()
+        proposals = db_session.query(EnergySavingProposal).filter(EnergySavingProposal.template_id == "A1").all()
 
         assert all(p.template_id == "A1" for p in proposals)
 
@@ -220,9 +215,7 @@ class TestProposalAPI:
         create_accepted_proposal(db_session)
 
         # 按状态过滤
-        proposals = db_session.query(EnergySavingProposal).filter(
-            EnergySavingProposal.status == "accepted"
-        ).all()
+        proposals = db_session.query(EnergySavingProposal).filter(EnergySavingProposal.status == "accepted").all()
 
         assert all(p.status == "accepted" for p in proposals)
 
@@ -238,9 +231,7 @@ class TestProposalAPI:
             measure.is_selected = measure.id in measure_ids
 
         proposal.status = "accepted"
-        proposal.total_benefit = sum(
-            m.annual_benefit for m in proposal.measures if m.is_selected
-        )
+        proposal.total_benefit = sum(m.annual_benefit for m in proposal.measures if m.is_selected)
 
         db_session.commit()
         db_session.refresh(proposal)
@@ -280,9 +271,7 @@ class TestProposalAPI:
         db_session.commit()
 
         # 验证已删除
-        result = db_session.query(EnergySavingProposal).filter(
-            EnergySavingProposal.id == proposal_id
-        ).first()
+        result = db_session.query(EnergySavingProposal).filter(EnergySavingProposal.id == proposal_id).first()
 
         assert result is None
 
@@ -296,9 +285,7 @@ class TestProposalAPI:
         db_session.commit()
 
         # 验证措施也被删除
-        remaining_measures = db_session.query(ProposalMeasure).filter(
-            ProposalMeasure.id.in_(measure_ids)
-        ).all()
+        remaining_measures = db_session.query(ProposalMeasure).filter(ProposalMeasure.id.in_(measure_ids)).all()
 
         assert len(remaining_measures) == 0
 
@@ -314,9 +301,7 @@ class TestProposalMonitoring:
         selected_measures = [m for m in proposal.measures if m.is_selected]
 
         for measure in selected_measures:
-            logs = db_session.query(MeasureExecutionLog).filter(
-                MeasureExecutionLog.measure_id == measure.id
-            ).all()
+            logs = db_session.query(MeasureExecutionLog).filter(MeasureExecutionLog.measure_id == measure.id).all()
 
             execution_count = len(logs)
             success_count = len([l for l in logs if l.result == "success"])
@@ -336,9 +321,7 @@ class TestProposalMonitoring:
             if not measure.is_selected:
                 continue
 
-            logs = db_session.query(MeasureExecutionLog).filter(
-                MeasureExecutionLog.measure_id == measure.id
-            ).all()
+            logs = db_session.query(MeasureExecutionLog).filter(MeasureExecutionLog.measure_id == measure.id).all()
 
             total_saved = sum(l.power_saved or Decimal("0") for l in logs)
             # 假设平均电价0.5元/kWh

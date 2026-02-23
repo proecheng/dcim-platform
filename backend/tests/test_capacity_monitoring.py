@@ -1,4 +1,5 @@
 """容量监控 — 按区域统计 & 预警列表测试 — Story 7-4"""
+
 import pytest
 
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
@@ -6,7 +7,10 @@ from sqlalchemy import delete
 
 from app.core.database import Base
 from app.models.capacity import (
-    SpaceCapacity, PowerCapacity, CoolingCapacity, WeightCapacity,
+    SpaceCapacity,
+    PowerCapacity,
+    CoolingCapacity,
+    WeightCapacity,
     CapacityStatus,
 )
 from app.models.user import User
@@ -19,6 +23,7 @@ from app.api.v1.capacity import (
 # ============================================================
 # Fixtures
 # ============================================================
+
 
 @pytest.fixture(scope="module")
 def anyio_backend():
@@ -69,43 +74,73 @@ async def viewer(db: AsyncSession):
 async def seed_data(db: AsyncSession):
     """插入测试数据：两个区域各有四维容量记录"""
     # A区/1F/Room1
-    db.add(SpaceCapacity(
-        name="A区空间1", location="A区/1F/Room1",
-        total_u_positions=100, used_u_positions=80,
-        warning_threshold=80, critical_threshold=95,
-        status=CapacityStatus.warning,
-    ))
-    db.add(PowerCapacity(
-        name="A区电力1", location="A区/1F/Room1",
-        total_capacity_kw=500, used_capacity_kw=400,
-        warning_threshold=70, critical_threshold=85,
-        status=CapacityStatus.warning,
-    ))
-    db.add(CoolingCapacity(
-        name="A区制冷1", location="A区/1F/Room1",
-        total_cooling_kw=300, used_cooling_kw=100,
-        warning_threshold=75, critical_threshold=90,
-        status=CapacityStatus.normal,
-    ))
-    db.add(WeightCapacity(
-        name="A区承重1", location="A区/1F/Room1",
-        total_weight_kg=5000, used_weight_kg=4800,
-        warning_threshold=80, critical_threshold=95,
-        status=CapacityStatus.critical,
-    ))
+    db.add(
+        SpaceCapacity(
+            name="A区空间1",
+            location="A区/1F/Room1",
+            total_u_positions=100,
+            used_u_positions=80,
+            warning_threshold=80,
+            critical_threshold=95,
+            status=CapacityStatus.warning,
+        )
+    )
+    db.add(
+        PowerCapacity(
+            name="A区电力1",
+            location="A区/1F/Room1",
+            total_capacity_kw=500,
+            used_capacity_kw=400,
+            warning_threshold=70,
+            critical_threshold=85,
+            status=CapacityStatus.warning,
+        )
+    )
+    db.add(
+        CoolingCapacity(
+            name="A区制冷1",
+            location="A区/1F/Room1",
+            total_cooling_kw=300,
+            used_cooling_kw=100,
+            warning_threshold=75,
+            critical_threshold=90,
+            status=CapacityStatus.normal,
+        )
+    )
+    db.add(
+        WeightCapacity(
+            name="A区承重1",
+            location="A区/1F/Room1",
+            total_weight_kg=5000,
+            used_weight_kg=4800,
+            warning_threshold=80,
+            critical_threshold=95,
+            status=CapacityStatus.critical,
+        )
+    )
     # B区/2F/Room2
-    db.add(SpaceCapacity(
-        name="B区空间1", location="B区/2F/Room2",
-        total_u_positions=200, used_u_positions=50,
-        warning_threshold=80, critical_threshold=95,
-        status=CapacityStatus.normal,
-    ))
-    db.add(PowerCapacity(
-        name="B区电力1", location="B区/2F/Room2",
-        total_capacity_kw=1000, used_capacity_kw=950,
-        warning_threshold=70, critical_threshold=85,
-        status=CapacityStatus.critical,
-    ))
+    db.add(
+        SpaceCapacity(
+            name="B区空间1",
+            location="B区/2F/Room2",
+            total_u_positions=200,
+            used_u_positions=50,
+            warning_threshold=80,
+            critical_threshold=95,
+            status=CapacityStatus.normal,
+        )
+    )
+    db.add(
+        PowerCapacity(
+            name="B区电力1",
+            location="B区/2F/Room2",
+            total_capacity_kw=1000,
+            used_capacity_kw=950,
+            warning_threshold=70,
+            critical_threshold=85,
+            status=CapacityStatus.critical,
+        )
+    )
     await db.commit()
 
 
@@ -113,14 +148,16 @@ async def seed_data(db: AsyncSession):
 # 测试
 # ============================================================
 
-class TestCapacityMonitoring:
 
+class TestCapacityMonitoring:
     # ---- 按区域统计 ----
 
     async def test_statistics_by_location(self, db: AsyncSession, viewer: User, seed_data):
         """默认 dimension=area，应返回 items 列表，按区域聚合"""
         resp = await get_capacity_statistics_by_location(
-            dimension="area", db=db, _=viewer,
+            dimension="area",
+            db=db,
+            _=viewer,
         )
         items = resp["items"]
         assert isinstance(items, list)
@@ -137,7 +174,9 @@ class TestCapacityMonitoring:
     async def test_statistics_by_location_dimension(self, db: AsyncSession, viewer: User, seed_data):
         """dimension=floor 应按楼层聚合"""
         resp = await get_capacity_statistics_by_location(
-            dimension="floor", db=db, _=viewer,
+            dimension="floor",
+            db=db,
+            _=viewer,
         )
         items = resp["items"]
         assert isinstance(items, list)

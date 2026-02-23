@@ -1,11 +1,12 @@
 """
 剩余 API 模块覆盖率测试 — 覆盖 optimization, execution, system_health, realtime 等未测试端点
 """
-import pytest
+
 from tests.conftest import auth_headers
 
 
 # ============== 系统健康 /api/v1/system ==============
+
 
 class TestSystemHealth:
     """系统健康状态 API 测试"""
@@ -43,6 +44,7 @@ class TestSystemHealth:
 
 # ============== 实时数据 /api/v1/realtime ==============
 
+
 class TestRealtime:
     """实时数据 API 测试"""
 
@@ -78,6 +80,7 @@ class TestRealtime:
 
 # ============== 执行管理 /api/v1/execution ==============
 
+
 class TestExecution:
     """执行管理 API 测试"""
 
@@ -112,6 +115,7 @@ class TestExecution:
 
 
 # ============== 日前调度优化 /api/v1/optimization ==============
+
 
 class TestOptimization:
     """日前调度优化 API 测试"""
@@ -156,6 +160,7 @@ class TestOptimization:
 
 # ============== 统计分析 /api/v1/statistics ==============
 
+
 class TestStatistics:
     """统计分析 API 测试"""
 
@@ -191,6 +196,7 @@ class TestStatistics:
 
 # ============== 电价配置 /api/v1/pricing ==============
 
+
 class TestPricing:
     """电价配置 API 测试"""
 
@@ -225,6 +231,7 @@ class TestPricing:
 
 # ============== 电费监控 /api/v1/monitoring ==============
 
+
 class TestMonitoring:
     """电费监控 API 测试"""
 
@@ -247,6 +254,7 @@ class TestMonitoring:
 
 
 # ============== 楼层图 /api/v1/floor-map ==============
+
 
 class TestFloorMap:
     """楼层图 API 测试"""
@@ -271,6 +279,7 @@ class TestFloorMap:
 
 
 # ============== 需量 API ==============
+
 
 class TestDemand:
     """需量嵌入式 API 测试"""

@@ -1,7 +1,7 @@
 """设备详情聚合 API 测试 — Story 4.2"""
+
 import pytest
 import pytest_asyncio
-from datetime import datetime
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
@@ -17,6 +17,7 @@ from app.main import app
 # ============================================================
 # Fixtures
 # ============================================================
+
 
 @pytest_asyncio.fixture
 async def async_db():
@@ -123,6 +124,7 @@ async def seed_device_with_points(async_db):
 # ============================================================
 # 测试
 # ============================================================
+
 
 class TestDeviceDetail:
     """设备详情聚合 API 测试"""

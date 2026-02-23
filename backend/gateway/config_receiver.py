@@ -1,4 +1,5 @@
 """远程配置接收。实现 Story: 2.3"""
+
 import json
 import logging
 from typing import Any, Callable, Optional

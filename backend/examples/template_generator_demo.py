@@ -2,22 +2,17 @@
 模板生成器使用示例
 演示如何使用 TemplateGenerator 生成6种类型的节能方案
 """
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
-from app.services.template_generator import TemplateGenerator
-from app.core.database import Base
-import json
 
 
 def print_proposal_summary(proposal):
     """打印方案摘要"""
-    print("\n" + "="*80)
+    print("\n" + "=" * 80)
     print(f"方案编号: {proposal.proposal_code}")
     print(f"方案类型: {proposal.proposal_type} - {proposal.template_name}")
     print(f"分析周期: {proposal.analysis_start_date} 至 {proposal.analysis_end_date}")
     print(f"总收益: {proposal.total_benefit} 万元/年")
     print(f"总投资: {proposal.total_investment} 万元")
-    print("="*80)
+    print("=" * 80)
 
     print("\n【当前状况】")
     for key, value in proposal.current_situation.items():
@@ -31,16 +26,16 @@ def print_proposal_summary(proposal):
         print(f"    年收益: {measure.annual_benefit} 万元")
         print(f"    投资: {measure.investment} 万元")
 
-        print(f"\n    当前状态:")
+        print("\n    当前状态:")
         for key, value in measure.current_state.items():
             print(f"      • {key}: {value}")
 
-        print(f"\n    目标状态:")
+        print("\n    目标状态:")
         for key, value in measure.target_state.items():
             print(f"      • {key}: {value}")
 
-        print(f"\n    计算公式:")
-        for line in measure.calculation_formula.split('\n'):
+        print("\n    计算公式:")
+        for line in measure.calculation_formula.split("\n"):
             if line.strip():
                 print(f"      {line}")
 
@@ -298,9 +293,9 @@ print(f"B类方案投资回收期: {total_investment_b / total_benefit_b if tota
 
 if __name__ == "__main__":
     demo_template_generation()
-    print("\n" + "="*80 + "\n")
+    print("\n" + "=" * 80 + "\n")
     demo_measure_selection()
-    print("\n" + "="*80 + "\n")
+    print("\n" + "=" * 80 + "\n")
     demo_api_integration()
-    print("\n" + "="*80 + "\n")
+    print("\n" + "=" * 80 + "\n")
     demo_batch_generation()

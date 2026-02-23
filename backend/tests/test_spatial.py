@@ -1,4 +1,5 @@
 """空间拓扑 API 测试 — Story 8-1"""
+
 import pytest
 from io import BytesIO
 
@@ -11,12 +12,20 @@ from app.core.database import Base
 from app.models.spatial import Site, Floor, Room, Row, LayoutTemplate
 from app.models.asset import Cabinet
 from app.models.user import User
-from app.api.deps import get_db, require_viewer, require_operator, get_current_user, get_user_site_ids, require_site_access
+from app.api.deps import (
+    get_db,
+    require_viewer,
+    require_operator,
+    get_current_user,
+    get_user_site_ids,
+    require_site_access,
+)
 
 
 # ============================================================
 # Fixtures
 # ============================================================
+
 
 @pytest.fixture(scope="module")
 def anyio_backend():
@@ -97,15 +106,16 @@ async def client(app):
 # 测试用例
 # ============================================================
 
+
 class TestSiteCRUD:
     """站点 CRUD 测试"""
 
     async def test_site_crud(self, client: AsyncClient):
         """创建、查询、更新、删除站点"""
         # 创建
-        resp = await client.post("/api/v1/spatial/sites", json={
-            "site_code": "S001", "site_name": "北京站点", "address": "北京市"
-        })
+        resp = await client.post(
+            "/api/v1/spatial/sites", json={"site_code": "S001", "site_name": "北京站点", "address": "北京市"}
+        )
         assert resp.status_code == 200
         site = resp.json()
         assert site["site_code"] == "S001"
@@ -124,9 +134,7 @@ class TestSiteCRUD:
         assert len(resp.json()) >= 1
 
         # 更新
-        resp = await client.put(f"/api/v1/spatial/sites/{site_id}", json={
-            "site_name": "北京站点(更新)"
-        })
+        resp = await client.put(f"/api/v1/spatial/sites/{site_id}", json={"site_name": "北京站点(更新)"})
         assert resp.status_code == 200
         assert resp.json()["site_name"] == "北京站点(更新)"
 
@@ -141,15 +149,13 @@ class TestFloorCRUD:
     async def test_floor_crud(self, client: AsyncClient):
         """创建、查询楼层"""
         # 先创建站点
-        resp = await client.post("/api/v1/spatial/sites", json={
-            "site_code": "S-F01", "site_name": "测试站点"
-        })
+        resp = await client.post("/api/v1/spatial/sites", json={"site_code": "S-F01", "site_name": "测试站点"})
         site_id = resp.json()["id"]
 
         # 创建楼层
-        resp = await client.post("/api/v1/spatial/floors", json={
-            "floor_code": "F1", "floor_name": "一楼", "site_id": site_id
-        })
+        resp = await client.post(
+            "/api/v1/spatial/floors", json={"floor_code": "F1", "floor_name": "一楼", "site_id": site_id}
+        )
         assert resp.status_code == 200
         floor = resp.json()
         assert floor["floor_code"] == "F1"
@@ -166,20 +172,18 @@ class TestRoomCRUD:
     async def test_room_crud(self, client: AsyncClient):
         """创建、查询房间（含 grid_cols/grid_rows）"""
         # 创建站点 → 楼层
-        resp = await client.post("/api/v1/spatial/sites", json={
-            "site_code": "S-R01", "site_name": "测试站点"
-        })
+        resp = await client.post("/api/v1/spatial/sites", json={"site_code": "S-R01", "site_name": "测试站点"})
         site_id = resp.json()["id"]
-        resp = await client.post("/api/v1/spatial/floors", json={
-            "floor_code": "F1", "floor_name": "一楼", "site_id": site_id
-        })
+        resp = await client.post(
+            "/api/v1/spatial/floors", json={"floor_code": "F1", "floor_name": "一楼", "site_id": site_id}
+        )
         floor_id = resp.json()["id"]
 
         # 创建房间
-        resp = await client.post("/api/v1/spatial/rooms", json={
-            "room_code": "RM01", "room_name": "机房A",
-            "floor_id": floor_id, "grid_cols": 30, "grid_rows": 25
-        })
+        resp = await client.post(
+            "/api/v1/spatial/rooms",
+            json={"room_code": "RM01", "room_name": "机房A", "floor_id": floor_id, "grid_cols": 30, "grid_rows": 25},
+        )
         assert resp.status_code == 200
         room = resp.json()
         assert room["grid_cols"] == 30
@@ -197,24 +201,22 @@ class TestRowCRUD:
     async def test_row_crud(self, client: AsyncClient):
         """创建、查询行"""
         # 创建站点 → 楼层 → 房间
-        resp = await client.post("/api/v1/spatial/sites", json={
-            "site_code": "S-RW01", "site_name": "测试站点"
-        })
+        resp = await client.post("/api/v1/spatial/sites", json={"site_code": "S-RW01", "site_name": "测试站点"})
         site_id = resp.json()["id"]
-        resp = await client.post("/api/v1/spatial/floors", json={
-            "floor_code": "F1", "floor_name": "一楼", "site_id": site_id
-        })
+        resp = await client.post(
+            "/api/v1/spatial/floors", json={"floor_code": "F1", "floor_name": "一楼", "site_id": site_id}
+        )
         floor_id = resp.json()["id"]
-        resp = await client.post("/api/v1/spatial/rooms", json={
-            "room_code": "RM01", "room_name": "机房A", "floor_id": floor_id
-        })
+        resp = await client.post(
+            "/api/v1/spatial/rooms", json={"room_code": "RM01", "room_name": "机房A", "floor_id": floor_id}
+        )
         room_id = resp.json()["id"]
 
         # 创建行
-        resp = await client.post("/api/v1/spatial/rows", json={
-            "row_code": "R1", "row_name": "第一排",
-            "room_id": room_id, "aisle_type": "cold"
-        })
+        resp = await client.post(
+            "/api/v1/spatial/rows",
+            json={"row_code": "R1", "row_name": "第一排", "room_id": room_id, "aisle_type": "cold"},
+        )
         assert resp.status_code == 200
         row = resp.json()
         assert row["aisle_type"] == "cold"
@@ -231,24 +233,22 @@ class TestSpatialTree:
     async def test_spatial_tree(self, client: AsyncClient):
         """创建完整层级后查询 tree"""
         # 创建完整层级
-        resp = await client.post("/api/v1/spatial/sites", json={
-            "site_code": "S-T01", "site_name": "树测试站点"
-        })
+        resp = await client.post("/api/v1/spatial/sites", json={"site_code": "S-T01", "site_name": "树测试站点"})
         site_id = resp.json()["id"]
 
-        resp = await client.post("/api/v1/spatial/floors", json={
-            "floor_code": "F1", "floor_name": "一楼", "site_id": site_id
-        })
+        resp = await client.post(
+            "/api/v1/spatial/floors", json={"floor_code": "F1", "floor_name": "一楼", "site_id": site_id}
+        )
         floor_id = resp.json()["id"]
 
-        resp = await client.post("/api/v1/spatial/rooms", json={
-            "room_code": "RM01", "room_name": "机房A", "floor_id": floor_id
-        })
+        resp = await client.post(
+            "/api/v1/spatial/rooms", json={"room_code": "RM01", "room_name": "机房A", "floor_id": floor_id}
+        )
         room_id = resp.json()["id"]
 
-        resp = await client.post("/api/v1/spatial/rows", json={
-            "row_code": "R1", "row_name": "第一排", "room_id": room_id
-        })
+        resp = await client.post(
+            "/api/v1/spatial/rows", json={"row_code": "R1", "row_name": "第一排", "room_id": room_id}
+        )
         assert resp.status_code == 200
 
         # 查询树
@@ -268,21 +268,19 @@ class TestCabinetPosition:
     async def test_cabinet_position(self, client: AsyncClient, db_session):
         """更新机柜位置"""
         # 创建层级
-        resp = await client.post("/api/v1/spatial/sites", json={
-            "site_code": "S-CP01", "site_name": "位置测试"
-        })
+        resp = await client.post("/api/v1/spatial/sites", json={"site_code": "S-CP01", "site_name": "位置测试"})
         site_id = resp.json()["id"]
-        resp = await client.post("/api/v1/spatial/floors", json={
-            "floor_code": "F1", "floor_name": "一楼", "site_id": site_id
-        })
+        resp = await client.post(
+            "/api/v1/spatial/floors", json={"floor_code": "F1", "floor_name": "一楼", "site_id": site_id}
+        )
         floor_id = resp.json()["id"]
-        resp = await client.post("/api/v1/spatial/rooms", json={
-            "room_code": "RM01", "room_name": "机房A", "floor_id": floor_id
-        })
+        resp = await client.post(
+            "/api/v1/spatial/rooms", json={"room_code": "RM01", "room_name": "机房A", "floor_id": floor_id}
+        )
         room_id = resp.json()["id"]
-        resp = await client.post("/api/v1/spatial/rows", json={
-            "row_code": "R1", "row_name": "第一排", "room_id": room_id
-        })
+        resp = await client.post(
+            "/api/v1/spatial/rows", json={"row_code": "R1", "row_name": "第一排", "room_id": room_id}
+        )
         row_id = resp.json()["id"]
 
         # 直接创建机柜
@@ -292,9 +290,10 @@ class TestCabinetPosition:
         cab_id = cab.id
 
         # 更新位置
-        resp = await client.put(f"/api/v1/spatial/cabinets/{cab_id}/position", json={
-            "row_id": row_id, "aisle_type": "cold", "grid_x": 5, "grid_y": 3
-        })
+        resp = await client.put(
+            f"/api/v1/spatial/cabinets/{cab_id}/position",
+            json={"row_id": row_id, "aisle_type": "cold", "grid_x": 5, "grid_y": 3},
+        )
         assert resp.status_code == 200
 
 
@@ -304,13 +303,11 @@ class TestCascadeDeleteProtection:
     async def test_cascade_delete_protection(self, client: AsyncClient):
         """删除含子实体的父实体返回 400"""
         # 创建站点 → 楼层
-        resp = await client.post("/api/v1/spatial/sites", json={
-            "site_code": "S-DEL01", "site_name": "删除测试"
-        })
+        resp = await client.post("/api/v1/spatial/sites", json={"site_code": "S-DEL01", "site_name": "删除测试"})
         site_id = resp.json()["id"]
-        resp = await client.post("/api/v1/spatial/floors", json={
-            "floor_code": "F1", "floor_name": "一楼", "site_id": site_id
-        })
+        resp = await client.post(
+            "/api/v1/spatial/floors", json={"floor_code": "F1", "floor_name": "一楼", "site_id": site_id}
+        )
         assert resp.status_code == 200
 
         # 尝试删除站点 → 应返回 400
@@ -340,17 +337,15 @@ class TestTemplateApply:
     async def test_template_apply(self, client: AsyncClient):
         """应用模板到房间"""
         # 创建层级
-        resp = await client.post("/api/v1/spatial/sites", json={
-            "site_code": "S-TPL01", "site_name": "模板测试"
-        })
+        resp = await client.post("/api/v1/spatial/sites", json={"site_code": "S-TPL01", "site_name": "模板测试"})
         site_id = resp.json()["id"]
-        resp = await client.post("/api/v1/spatial/floors", json={
-            "floor_code": "F1", "floor_name": "一楼", "site_id": site_id
-        })
+        resp = await client.post(
+            "/api/v1/spatial/floors", json={"floor_code": "F1", "floor_name": "一楼", "site_id": site_id}
+        )
         floor_id = resp.json()["id"]
-        resp = await client.post("/api/v1/spatial/rooms", json={
-            "room_code": "RM-TPL", "room_name": "模板机房", "floor_id": floor_id
-        })
+        resp = await client.post(
+            "/api/v1/spatial/rooms", json={"room_code": "RM-TPL", "room_name": "模板机房", "floor_id": floor_id}
+        )
         room_id = resp.json()["id"]
 
         # 获取模板列表，找到 single_row
@@ -359,10 +354,7 @@ class TestTemplateApply:
         single_row_tpl = [t for t in templates if t["template_code"] == "single_row"][0]
 
         # 应用模板
-        resp = await client.post(
-            f"/api/v1/spatial/templates/{single_row_tpl['id']}/apply",
-            json={"room_id": room_id}
-        )
+        resp = await client.post(f"/api/v1/spatial/templates/{single_row_tpl['id']}/apply", json={"room_id": room_id})
         assert resp.status_code == 200
         result = resp.json()
         assert result["created_rows"] == 1
@@ -370,10 +362,7 @@ class TestTemplateApply:
         assert result["skipped_cabinets"] == 0
 
         # 再次应用 → 机柜应全部跳过
-        resp = await client.post(
-            f"/api/v1/spatial/templates/{single_row_tpl['id']}/apply",
-            json={"room_id": room_id}
-        )
+        resp = await client.post(f"/api/v1/spatial/templates/{single_row_tpl['id']}/apply", json={"room_id": room_id})
         assert resp.status_code == 200
         result2 = resp.json()
         assert result2["created_rows"] == 0
@@ -389,11 +378,21 @@ class TestExcelImport:
         # 创建临时 xlsx
         wb = openpyxl.Workbook()
         ws = wb.active
-        ws.append([
-            "站点编码", "楼层编码", "房间编码", "行编码",
-            "通道类型", "机柜编码", "机柜名称", "列号",
-            "总U数", "最大功率", "最大承重",
-        ])
+        ws.append(
+            [
+                "站点编码",
+                "楼层编码",
+                "房间编码",
+                "行编码",
+                "通道类型",
+                "机柜编码",
+                "机柜名称",
+                "列号",
+                "总U数",
+                "最大功率",
+                "最大承重",
+            ]
+        )
         ws.append(["IMP-S1", "IMP-F1", "IMP-RM1", "IMP-R1", "cold", "IMP-CAB-01", "导入机柜1", "A01", 42, 5.0, 500])
         ws.append(["IMP-S1", "IMP-F1", "IMP-RM1", "IMP-R1", "cold", "IMP-CAB-02", "导入机柜2", "A02", 42, 5.0, 500])
 

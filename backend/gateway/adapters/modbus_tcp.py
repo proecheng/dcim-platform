@@ -1,4 +1,5 @@
 """Modbus TCP 协议适配器 — 基于 pymodbus 3.x 异步 API"""
+
 import asyncio
 import logging
 import time
@@ -92,24 +93,16 @@ def _convert_value(registers_or_bits: list, data_type: str, word_order: str = "b
         return registers_or_bits[0]
 
     if data_type == "int32":
-        return AsyncModbusTcpClient.convert_from_registers(
-            registers_or_bits, DATATYPE.INT32, word_order=word_order
-        )
+        return AsyncModbusTcpClient.convert_from_registers(registers_or_bits, DATATYPE.INT32, word_order=word_order)
 
     if data_type == "uint32":
-        return AsyncModbusTcpClient.convert_from_registers(
-            registers_or_bits, DATATYPE.UINT32, word_order=word_order
-        )
+        return AsyncModbusTcpClient.convert_from_registers(registers_or_bits, DATATYPE.UINT32, word_order=word_order)
 
     if data_type == "float32":
-        return AsyncModbusTcpClient.convert_from_registers(
-            registers_or_bits, DATATYPE.FLOAT32, word_order=word_order
-        )
+        return AsyncModbusTcpClient.convert_from_registers(registers_or_bits, DATATYPE.FLOAT32, word_order=word_order)
 
     if data_type == "string":
-        return AsyncModbusTcpClient.convert_from_registers(
-            registers_or_bits, DATATYPE.STRING, string_encoding="utf-8"
-        )
+        return AsyncModbusTcpClient.convert_from_registers(registers_or_bits, DATATYPE.STRING, string_encoding="utf-8")
 
     raise ValueError(f"不支持的数据类型: {data_type}")
 
@@ -309,9 +302,7 @@ class ModbusTcpAdapter(BaseProtocolAdapter):
                     if dt is None:
                         logger.error("不支持的多寄存器写入类型: %s", point_cfg.data_type)
                         return False
-                    regs = AsyncModbusTcpClient.convert_to_registers(
-                        value, dt, word_order=self._word_order
-                    )
+                    regs = AsyncModbusTcpClient.convert_to_registers(value, dt, word_order=self._word_order)
                     response = await self._client.write_registers(addr, regs, slave=self._device_id)
             else:
                 logger.error("不支持写入 %s 类型寄存器", reg_type)
@@ -331,6 +322,7 @@ class ModbusTcpAdapter(BaseProtocolAdapter):
     async def test_connection(self) -> ConnectionResult:
         """测试连接 — 读取保持寄存器 0，超时 10 秒"""
         try:
+
             async def _test() -> ConnectionResult:
                 # 如果未连接，先尝试连接
                 if self._client is None or not self._client.connected:

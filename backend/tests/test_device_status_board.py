@@ -1,7 +1,8 @@
 """设备状态看板 API 测试 — Story 4.3"""
+
 import pytest
 import pytest_asyncio
-from unittest.mock import AsyncMock, patch, PropertyMock
+from unittest.mock import AsyncMock, patch
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
@@ -15,6 +16,7 @@ from app.main import app
 # ============================================================
 # Fixtures
 # ============================================================
+
 
 @pytest_asyncio.fixture
 async def async_db():
@@ -58,11 +60,25 @@ async def seed_devices(async_db):
     """创建多区域多类型设备"""
     async with async_db() as session:
         devices = [
-            Device(device_code="UPS-A1-001", device_name="A1区UPS-1", device_type="UPS", area_code="A1", status="online"),
-            Device(device_code="UPS-A1-002", device_name="A1区UPS-2", device_type="UPS", area_code="A1", status="offline"),
-            Device(device_code="AC-A1-001", device_name="A1区空调-1", device_type="AC", area_code="A1", status="online"),
-            Device(device_code="UPS-B1-001", device_name="B1区UPS-1", device_type="UPS", area_code="B1", status="alarm"),
-            Device(device_code="TH-B1-001", device_name="B1区温湿度-1", device_type="TH", area_code="B1", status="maintenance"),
+            Device(
+                device_code="UPS-A1-001", device_name="A1区UPS-1", device_type="UPS", area_code="A1", status="online"
+            ),
+            Device(
+                device_code="UPS-A1-002", device_name="A1区UPS-2", device_type="UPS", area_code="A1", status="offline"
+            ),
+            Device(
+                device_code="AC-A1-001", device_name="A1区空调-1", device_type="AC", area_code="A1", status="online"
+            ),
+            Device(
+                device_code="UPS-B1-001", device_name="B1区UPS-1", device_type="UPS", area_code="B1", status="alarm"
+            ),
+            Device(
+                device_code="TH-B1-001",
+                device_name="B1区温湿度-1",
+                device_type="TH",
+                area_code="B1",
+                status="maintenance",
+            ),
         ]
         session.add_all(devices)
         await session.commit()
@@ -72,6 +88,7 @@ async def seed_devices(async_db):
 # ============================================================
 # 测试
 # ============================================================
+
 
 class TestDeviceStatusBoard:
     """设备状态看板 API 测试"""

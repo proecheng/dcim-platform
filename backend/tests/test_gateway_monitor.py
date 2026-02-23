@@ -1,7 +1,7 @@
 """网关状态监控测试 — Story 2.2"""
+
 from datetime import datetime, timedelta
 
-import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy import select
@@ -25,6 +25,7 @@ from app.services.gateway_registration import (
 # Fixtures
 # ============================================================
 
+
 @pytest_asyncio.fixture
 async def db_session():
     engine = create_async_engine("sqlite+aiosqlite://", echo=True)
@@ -40,6 +41,7 @@ async def db_session():
 # Service 层测试
 # ============================================================
 
+
 class TestGatewayMonitorService:
     """网关监控服务测试"""
 
@@ -48,9 +50,7 @@ class TestGatewayMonitorService:
         await record_status_change("gw-001", "offline", "online", db_session)
         await db_session.commit()
 
-        result = await db_session.execute(
-            select(GatewayEvent).where(GatewayEvent.gateway_id == "gw-001")
-        )
+        result = await db_session.execute(select(GatewayEvent).where(GatewayEvent.gateway_id == "gw-001"))
         event = result.scalar_one()
         assert event.event_type == "status_change"
         assert event.old_status == "offline"
@@ -76,9 +76,7 @@ class TestGatewayMonitorService:
         await check_resource_warnings("gw-003", {"cpu": 50.0, "mem": 60.0, "disk": 30.0}, db_session)
         await db_session.commit()
 
-        result = await db_session.execute(
-            select(GatewayEvent).where(GatewayEvent.gateway_id == "gw-003")
-        )
+        result = await db_session.execute(select(GatewayEvent).where(GatewayEvent.gateway_id == "gw-003"))
         assert result.scalar_one_or_none() is None
 
     async def test_check_resource_warnings_cooldown_dedup(self, db_session):
@@ -105,9 +103,7 @@ class TestGatewayMonitorService:
         await db_session.commit()
 
         # 将第一条事件的 created_at 改为 6 分钟前
-        result = await db_session.execute(
-            select(GatewayEvent).where(GatewayEvent.gateway_id == "gw-005")
-        )
+        result = await db_session.execute(select(GatewayEvent).where(GatewayEvent.gateway_id == "gw-005"))
         event = result.scalar_one()
         event.created_at = datetime.now() - timedelta(seconds=RESOURCE_WARNING_COOLDOWN + 60)
         await db_session.commit()
@@ -129,6 +125,7 @@ class TestGatewayMonitorService:
 # ============================================================
 # 集成测试
 # ============================================================
+
 
 class TestGatewayMonitorIntegration:
     """网关监控集成测试"""
@@ -214,11 +211,19 @@ class TestGatewayMonitorIntegration:
 # API 测试
 # ============================================================
 
+
 @pytest_asyncio.fixture
 async def api_client():
     """创建 API 测试客户端"""
     from app.main import app
-    from app.api.deps import get_db, require_viewer, require_operator, require_admin, get_current_user, get_user_site_ids
+    from app.api.deps import (
+        get_db,
+        require_viewer,
+        require_operator,
+        require_admin,
+        get_current_user,
+        get_user_site_ids,
+    )
     from app.models.user import User
 
     engine = create_async_engine("sqlite+aiosqlite://", echo=True)
@@ -242,11 +247,16 @@ async def api_client():
     # 预填测试数据
     async with session_factory() as session:
         gw1 = Gateway(
-            gateway_id="gw-api-001", name="测试网关A", ip_address="192.168.1.1",
-            status="online", last_heartbeat=datetime.now(),
+            gateway_id="gw-api-001",
+            name="测试网关A",
+            ip_address="192.168.1.1",
+            status="online",
+            last_heartbeat=datetime.now(),
         )
         gw2 = Gateway(
-            gateway_id="gw-api-002", name="测试网关B", ip_address="10.0.0.1",
+            gateway_id="gw-api-002",
+            name="测试网关B",
+            ip_address="10.0.0.1",
             status="offline",
         )
         session.add_all([gw1, gw2])
@@ -254,7 +264,9 @@ async def api_client():
 
         # 为 gw1 添加数据源和点位
         ds = DataSource(
-            name="数据源1", protocol_type="modbus_tcp", gateway_id=gw1.id,
+            name="数据源1",
+            protocol_type="modbus_tcp",
+            gateway_id=gw1.id,
             connection_config={"host": "127.0.0.1", "port": 502},
         )
         session.add(ds)
@@ -266,15 +278,15 @@ async def api_client():
 
         # 添加事件
         evt = GatewayEvent(
-            gateway_id="gw-api-001", event_type="status_change",
-            old_status="offline", new_status="online",
+            gateway_id="gw-api-001",
+            event_type="status_change",
+            old_status="offline",
+            new_status="online",
         )
         session.add(evt)
         await session.commit()
 
-    async with AsyncClient(
-        transport=ASGITransport(app=app), base_url="http://test"
-    ) as client:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         yield client, session_factory
 
     app.dependency_overrides.clear()
@@ -299,9 +311,7 @@ class TestGatewayMonitorAPI:
         client, session_factory = api_client
         # 查找 gw1 的 id
         async with session_factory() as session:
-            result = await session.execute(
-                select(Gateway).where(Gateway.gateway_id == "gw-api-001")
-            )
+            result = await session.execute(select(Gateway).where(Gateway.gateway_id == "gw-api-001"))
             gw = result.scalar_one()
             gw_id = gw.id
 
@@ -315,9 +325,7 @@ class TestGatewayMonitorAPI:
         """GET /{id}/events 返回分页事件"""
         client, session_factory = api_client
         async with session_factory() as session:
-            result = await session.execute(
-                select(Gateway).where(Gateway.gateway_id == "gw-api-001")
-            )
+            result = await session.execute(select(Gateway).where(Gateway.gateway_id == "gw-api-001"))
             gw = result.scalar_one()
             gw_id = gw.id
 

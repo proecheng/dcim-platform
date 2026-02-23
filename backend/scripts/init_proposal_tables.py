@@ -2,25 +2,29 @@
 初始化节能方案表并生成示例数据
 运行: python scripts/init_proposal_tables.py
 """
+
 import sys
 import asyncio
 import io
-sys.path.insert(0, 'D:\\mytest1\\backend')
-sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
+
+sys.path.insert(0, "D:\\mytest1\\backend")
+sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8")
 
 from app.core.database import engine, async_session, Base
-from app.models.energy import EnergySavingProposal, ProposalMeasure, MeasureExecutionLog
+from app.models.energy import EnergySavingProposal, ProposalMeasure
 from datetime import datetime, timedelta
 from sqlalchemy import select
+
 
 async def init_tables():
     """创建数据库表"""
     print("正在创建数据库表...")
     # 导入所有模型确保它们被注册
-    from app.models import energy
+
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
     print("[OK] 数据库表创建完成")
+
 
 async def generate_sample_proposals():
     """生成6种模板的示例方案（简化版）"""
@@ -35,7 +39,7 @@ async def generate_sample_proposals():
                 "A3": {"name": "设备运行优化方案", "type": "A", "benefit": 35.7},
                 "A4": {"name": "VPP需求响应方案", "type": "A", "benefit": 28.9},
                 "A5": {"name": "负荷调度优化方案", "type": "A", "benefit": 45.2},
-                "B1": {"name": "设备改造升级方案", "type": "B", "benefit": 125.6}
+                "B1": {"name": "设备改造升级方案", "type": "B", "benefit": 125.6},
             }
 
             for template_id, config in templates_config.items():
@@ -54,7 +58,7 @@ async def generate_sample_proposals():
                         current_situation={},
                         analysis_start_date=(datetime.now() - timedelta(days=30)).date(),
                         analysis_end_date=datetime.now().date(),
-                        status="pending"
+                        status="pending",
                     )
 
                     db.add(proposal)
@@ -74,7 +78,7 @@ async def generate_sample_proposals():
                             annual_benefit=config["benefit"] / 3,
                             investment=0 if config["type"] == "A" else 280.0 / 3,
                             is_selected=False,
-                            execution_status="pending"
+                            execution_status="pending",
                         )
                         db.add(measure)
 
@@ -85,13 +89,15 @@ async def generate_sample_proposals():
                     print(f"  [!] {template_id}: 生成失败 - {str(e)}")
                     await db.rollback()
                     import traceback
+
                     traceback.print_exc()
 
-            print(f"\n[OK] 示例方案生成完成")
+            print("\n[OK] 示例方案生成完成")
             print("提示: 这些是简化的示例数据，完整方案请通过API生成")
 
         finally:
             await db.close()
+
 
 async def verify_deployment():
     """验证部署"""
@@ -100,9 +106,8 @@ async def verify_deployment():
         try:
             # Count proposals with eager loading
             from sqlalchemy.orm import selectinload
-            result = await db.execute(
-                select(EnergySavingProposal).options(selectinload(EnergySavingProposal.measures))
-            )
+
+            result = await db.execute(select(EnergySavingProposal).options(selectinload(EnergySavingProposal.measures)))
             proposals = result.scalars().all()
             count = len(proposals)
             print(f"  - 方案总数: {count}")
@@ -115,6 +120,7 @@ async def verify_deployment():
 
         finally:
             await db.close()
+
 
 async def main():
     print("=" * 50)
@@ -130,6 +136,7 @@ async def main():
     print("  GET  /api/v1/proposals/           - 获取方案列表")
     print("  POST /api/v1/proposals/generate   - 生成新方案")
     print("=" * 50)
+
 
 if __name__ == "__main__":
     asyncio.run(main())

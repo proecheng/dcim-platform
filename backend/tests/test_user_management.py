@@ -1,4 +1,5 @@
 """用户管理 API 测试 (Story 13-1)"""
+
 import pytest
 
 from httpx import AsyncClient, ASGITransport
@@ -7,13 +8,13 @@ from sqlalchemy import delete
 
 from app.core.database import Base
 from app.models.user import User
-from app.core.security import get_password_hash
 from app.api.deps import get_db, require_admin, require_operator, require_viewer
 
 
 # ============================================================
 # Fixtures
 # ============================================================
+
 
 @pytest.fixture(scope="module")
 def anyio_backend():
@@ -94,17 +95,21 @@ USERS_URL = "/api/v1/users"
 # Tests
 # ============================================================
 
+
 @pytest.mark.anyio
 async def test_create_user(client):
     """创建用户"""
-    resp = await client.post(USERS_URL, json={
-        "username": "testuser1",
-        "password": "Test@1234",
-        "real_name": "测试用户1",
-        "email": "test1@example.com",
-        "role": "operator",
-        "department": "运维部"
-    })
+    resp = await client.post(
+        USERS_URL,
+        json={
+            "username": "testuser1",
+            "password": "Test@1234",
+            "real_name": "测试用户1",
+            "email": "test1@example.com",
+            "role": "operator",
+            "department": "运维部",
+        },
+    )
     assert resp.status_code == 200
     data = resp.json()
     assert data["username"] == "testuser1"
@@ -116,27 +121,15 @@ async def test_create_user(client):
 @pytest.mark.anyio
 async def test_create_user_duplicate(client):
     """创建重复用户名"""
-    await client.post(USERS_URL, json={
-        "username": "dupuser",
-        "password": "Test@1234",
-        "role": "viewer"
-    })
-    resp = await client.post(USERS_URL, json={
-        "username": "dupuser",
-        "password": "Test@1234",
-        "role": "viewer"
-    })
+    await client.post(USERS_URL, json={"username": "dupuser", "password": "Test@1234", "role": "viewer"})
+    resp = await client.post(USERS_URL, json={"username": "dupuser", "password": "Test@1234", "role": "viewer"})
     assert resp.status_code == 400
 
 
 @pytest.mark.anyio
 async def test_list_users(client):
     """获取用户列表"""
-    await client.post(USERS_URL, json={
-        "username": "listuser1",
-        "password": "Test@1234",
-        "role": "operator"
-    })
+    await client.post(USERS_URL, json={"username": "listuser1", "password": "Test@1234", "role": "operator"})
     resp = await client.get(USERS_URL)
     assert resp.status_code == 200
     data = resp.json()
@@ -148,16 +141,8 @@ async def test_list_users(client):
 @pytest.mark.anyio
 async def test_list_users_filter_role(client):
     """按角色筛选用户"""
-    await client.post(USERS_URL, json={
-        "username": "adminuser",
-        "password": "Test@1234",
-        "role": "admin"
-    })
-    await client.post(USERS_URL, json={
-        "username": "vieweruser",
-        "password": "Test@1234",
-        "role": "viewer"
-    })
+    await client.post(USERS_URL, json={"username": "adminuser", "password": "Test@1234", "role": "admin"})
+    await client.post(USERS_URL, json={"username": "vieweruser", "password": "Test@1234", "role": "viewer"})
     resp = await client.get(USERS_URL, params={"role": "admin"})
     assert resp.status_code == 200
     for item in resp.json()["items"]:
@@ -167,17 +152,12 @@ async def test_list_users_filter_role(client):
 @pytest.mark.anyio
 async def test_update_user(client):
     """更新用户"""
-    create_resp = await client.post(USERS_URL, json={
-        "username": "updateuser",
-        "password": "Test@1234",
-        "role": "operator"
-    })
+    create_resp = await client.post(
+        USERS_URL, json={"username": "updateuser", "password": "Test@1234", "role": "operator"}
+    )
     user_id = create_resp.json()["id"]
 
-    resp = await client.put(f"{USERS_URL}/{user_id}", json={
-        "real_name": "更新姓名",
-        "department": "技术部"
-    })
+    resp = await client.put(f"{USERS_URL}/{user_id}", json={"real_name": "更新姓名", "department": "技术部"})
     assert resp.status_code == 200
     assert resp.json()["real_name"] == "更新姓名"
     assert resp.json()["department"] == "技术部"
@@ -186,11 +166,9 @@ async def test_update_user(client):
 @pytest.mark.anyio
 async def test_delete_user(client):
     """删除用户"""
-    create_resp = await client.post(USERS_URL, json={
-        "username": "deleteuser",
-        "password": "Test@1234",
-        "role": "viewer"
-    })
+    create_resp = await client.post(
+        USERS_URL, json={"username": "deleteuser", "password": "Test@1234", "role": "viewer"}
+    )
     user_id = create_resp.json()["id"]
 
     resp = await client.delete(f"{USERS_URL}/{user_id}")
@@ -203,11 +181,9 @@ async def test_delete_user(client):
 @pytest.mark.anyio
 async def test_toggle_user_status(client):
     """启用/禁用用户"""
-    create_resp = await client.post(USERS_URL, json={
-        "username": "toggleuser",
-        "password": "Test@1234",
-        "role": "operator"
-    })
+    create_resp = await client.post(
+        USERS_URL, json={"username": "toggleuser", "password": "Test@1234", "role": "operator"}
+    )
     user_id = create_resp.json()["id"]
 
     resp = await client.put(f"{USERS_URL}/{user_id}/status", params={"is_active": False})
@@ -223,11 +199,9 @@ async def test_batch_delete_users(client):
     """批量删除用户"""
     ids = []
     for i in range(3):
-        resp = await client.post(USERS_URL, json={
-            "username": f"batchdel{i}",
-            "password": "Test@1234",
-            "role": "viewer"
-        })
+        resp = await client.post(
+            USERS_URL, json={"username": f"batchdel{i}", "password": "Test@1234", "role": "viewer"}
+        )
         ids.append(resp.json()["id"])
 
     resp = await client.post(f"{USERS_URL}/batch-delete", json=ids)
@@ -251,15 +225,10 @@ async def test_batch_delete_cannot_delete_self(client, mock_admin):
 @pytest.mark.anyio
 async def test_reset_password(client):
     """重置密码"""
-    create_resp = await client.post(USERS_URL, json={
-        "username": "resetpwduser",
-        "password": "Test@1234",
-        "role": "operator"
-    })
+    create_resp = await client.post(
+        USERS_URL, json={"username": "resetpwduser", "password": "Test@1234", "role": "operator"}
+    )
     user_id = create_resp.json()["id"]
 
-    resp = await client.put(
-        f"{USERS_URL}/{user_id}/reset-password",
-        params={"new_password": "NewPass@123"}
-    )
+    resp = await client.put(f"{USERS_URL}/{user_id}/reset-password", params={"new_password": "NewPass@123"})
     assert resp.status_code == 200

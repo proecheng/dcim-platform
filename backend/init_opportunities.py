@@ -2,15 +2,19 @@
 节能机会测试数据初始化脚本
 初始化节能机会、措施、执行计划、任务等测试数据
 """
+
 import asyncio
 import random
 from datetime import datetime, timedelta
 from decimal import Decimal
-from app.core.database import async_session, init_db, engine, Base
+from app.core.database import async_session, engine, Base
 from app.models.energy import (
-    EnergyOpportunity, OpportunityMeasure,
-    ExecutionPlan, ExecutionTask, ExecutionResult,
-    PricingConfig, PowerDevice, LoadRegulationConfig
+    EnergyOpportunity,
+    OpportunityMeasure,
+    ExecutionPlan,
+    ExecutionTask,
+    ExecutionResult,
+    PricingConfig,
 )
 
 
@@ -33,8 +37,8 @@ OPPORTUNITIES = [
             "avg_demand_12m": 520,
             "demand_unit_price": 28,
             "monthly_saving": 1400,
-            "risk_level": "low"
-        }
+            "risk_level": "low",
+        },
     },
     {
         "category": 1,
@@ -51,8 +55,8 @@ OPPORTUNITIES = [
             "valley_price": 0.4,
             "price_diff": 0.8,
             "shiftable_devices": [5, 6, 7],
-            "daily_saving": 120
-        }
+            "daily_saving": 120,
+        },
     },
     {
         "category": 1,
@@ -67,8 +71,8 @@ OPPORTUNITIES = [
             "target_pf": 0.95,
             "penalty_rate": 0.05,
             "monthly_bill": 50000,
-            "monthly_saving": 1500
-        }
+            "monthly_saving": 1500,
+        },
     },
     # 类别2: 设备运行优化
     {
@@ -85,8 +89,8 @@ OPPORTUNITIES = [
             "cooling_power": 150,
             "energy_reduction_rate": 0.15,
             "comfort_impact": "low",
-            "affected_devices": [1, 2, 3]
-        }
+            "affected_devices": [1, 2, 3],
+        },
     },
     {
         "category": 2,
@@ -100,8 +104,8 @@ OPPORTUNITIES = [
             "current_usage_hours": 12,
             "optimized_hours": 8,
             "lighting_power": 30,
-            "reduction_rate": 0.33
-        }
+            "reduction_rate": 0.33,
+        },
     },
     {
         "category": 2,
@@ -111,11 +115,7 @@ OPPORTUNITIES = [
         "potential_saving": Decimal("8500"),
         "confidence": Decimal("0.78"),
         "source_plugin": "ups_optimizer",
-        "analysis_data": {
-            "current_efficiency": 0.92,
-            "target_efficiency": 0.95,
-            "ups_loss_reduction": 0.03
-        }
+        "analysis_data": {"current_efficiency": 0.92, "target_efficiency": 0.95, "ups_loss_reduction": 0.03},
     },
     # 类别3: 设备改造升级
     {
@@ -131,8 +131,8 @@ OPPORTUNITIES = [
             "upgrade_cost": 150000,
             "annual_saving": 36000,
             "payback_years": 4.2,
-            "energy_reduction_rate": 0.30
-        }
+            "energy_reduction_rate": 0.30,
+        },
     },
     {
         "category": 3,
@@ -142,12 +142,7 @@ OPPORTUNITIES = [
         "potential_saving": Decimal("24000"),
         "confidence": Decimal("0.80"),
         "source_plugin": "equipment_upgrade",
-        "analysis_data": {
-            "equipment_type": "SVG",
-            "capacity": 200,
-            "upgrade_cost": 80000,
-            "payback_years": 3.3
-        }
+        "analysis_data": {"equipment_type": "SVG", "capacity": 200, "upgrade_cost": 80000, "payback_years": 3.3},
     },
     # 类别4: 综合能效提升
     {
@@ -162,13 +157,14 @@ OPPORTUNITIES = [
             "demand_saving": 28800,
             "peak_valley_saving": 43800,
             "operation_saving": 12400,
-            "components": ["demand", "peak_valley", "hvac"]
-        }
-    }
+            "components": ["demand", "peak_valley", "hvac"],
+        },
+    },
 ]
 
 
 # ==================== 措施模板 ====================
+
 
 def get_measures_for_opportunity(opp_data: dict, opp_id: int) -> list:
     """根据机会类型生成措施列表"""
@@ -187,7 +183,7 @@ def get_measures_for_opportunity(opp_data: dict, opp_id: int) -> list:
                 "target_state": {"declared_demand": 750},
                 "execution_mode": "manual",
                 "annual_benefit": 28800,
-                "sort_order": 1
+                "sort_order": 1,
             },
             {
                 "opportunity_id": opp_id,
@@ -198,8 +194,8 @@ def get_measures_for_opportunity(opp_data: dict, opp_id: int) -> list:
                 "target_state": {"alert_threshold": 720},
                 "execution_mode": "auto",
                 "annual_benefit": 0,
-                "sort_order": 2
-            }
+                "sort_order": 2,
+            },
         ]
     elif category == 1 and "peak_valley" in opp_data.get("source_plugin", ""):
         # 峰谷套利措施
@@ -214,7 +210,7 @@ def get_measures_for_opportunity(opp_data: dict, opp_id: int) -> list:
                 "execution_mode": "auto",
                 "annual_benefit": 30000,
                 "selected_devices": [5, 6],
-                "sort_order": 1
+                "sort_order": 1,
             },
             {
                 "opportunity_id": opp_id,
@@ -225,8 +221,8 @@ def get_measures_for_opportunity(opp_data: dict, opp_id: int) -> list:
                 "target_state": {"charge_period": "valley"},
                 "execution_mode": "manual",
                 "annual_benefit": 13800,
-                "sort_order": 2
-            }
+                "sort_order": 2,
+            },
         ]
     elif category == 2 and "hvac" in opp_data.get("source_plugin", ""):
         # 空调温度优化措施
@@ -241,7 +237,7 @@ def get_measures_for_opportunity(opp_data: dict, opp_id: int) -> list:
                 "execution_mode": "auto",
                 "annual_benefit": 18000,
                 "selected_devices": [1],
-                "sort_order": 1
+                "sort_order": 1,
             },
             {
                 "opportunity_id": opp_id,
@@ -253,7 +249,7 @@ def get_measures_for_opportunity(opp_data: dict, opp_id: int) -> list:
                 "execution_mode": "auto",
                 "annual_benefit": 17000,
                 "selected_devices": [2],
-                "sort_order": 2
+                "sort_order": 2,
             },
             {
                 "opportunity_id": opp_id,
@@ -265,8 +261,8 @@ def get_measures_for_opportunity(opp_data: dict, opp_id: int) -> list:
                 "execution_mode": "auto",
                 "annual_benefit": 17000,
                 "selected_devices": [3],
-                "sort_order": 3
-            }
+                "sort_order": 3,
+            },
         ]
     else:
         # 通用措施
@@ -280,7 +276,7 @@ def get_measures_for_opportunity(opp_data: dict, opp_id: int) -> list:
                 "target_state": {},
                 "execution_mode": "manual",
                 "annual_benefit": float(opp_data["potential_saving"]) * 0.8,
-                "sort_order": 1
+                "sort_order": 1,
             }
         ]
 
@@ -304,13 +300,13 @@ PRICING_CONFIG = {
         {"min": 0.95, "max": 1.0, "adjustment": -0.75},
         {"min": 0.90, "max": 0.95, "adjustment": 0},
         {"min": 0.85, "max": 0.90, "adjustment": 1.5},
-        {"min": 0, "max": 0.85, "adjustment": 3.0}
+        {"min": 0, "max": 0.85, "adjustment": 3.0},
     ],
     "transmission_fee": 0.15,
     "government_fund": 0.05,
     "auxiliary_fee": 0.02,
     "other_fee": 0.0,
-    "is_enabled": True
+    "is_enabled": True,
 }
 
 
@@ -329,9 +325,8 @@ async def init_pricing_config():
     async with async_session() as session:
         # 检查是否已存在
         from sqlalchemy import select
-        result = await session.execute(
-            select(PricingConfig).where(PricingConfig.is_enabled == True)
-        )
+
+        result = await session.execute(select(PricingConfig).where(PricingConfig.is_enabled == True))
         existing = result.scalar_one_or_none()
 
         if existing:
@@ -371,7 +366,7 @@ async def init_opportunities():
                 confidence=opp_data.get("confidence", Decimal("0.80")),
                 source_plugin=opp_data.get("source_plugin"),
                 analysis_data=opp_data.get("analysis_data"),
-                discovered_at=datetime.now() - timedelta(days=random.randint(1, 30))
+                discovered_at=datetime.now() - timedelta(days=random.randint(1, 30)),
             )
             session.add(opp)
             await session.flush()
@@ -410,21 +405,21 @@ async def init_execution_plans(opportunity_ids: list):
                 "expected_saving": Decimal("28800"),
                 "status": "completed",
                 "started_at": datetime.now() - timedelta(days=20),
-                "completed_at": datetime.now() - timedelta(days=15)
+                "completed_at": datetime.now() - timedelta(days=15),
             },
             {
                 "opportunity_id": opportunity_ids[1] if len(opportunity_ids) > 1 else 2,
                 "plan_name": "峰谷套利执行计划",
                 "expected_saving": Decimal("43800"),
                 "status": "executing",
-                "started_at": datetime.now() - timedelta(days=5)
+                "started_at": datetime.now() - timedelta(days=5),
             },
             {
                 "opportunity_id": opportunity_ids[3] if len(opportunity_ids) > 3 else 4,
                 "plan_name": "空调温度优化执行计划",
                 "expected_saving": Decimal("52000"),
-                "status": "pending"
-            }
+                "status": "pending",
+            },
         ]
 
         for plan_data in plans_data:
@@ -443,7 +438,7 @@ async def init_execution_plans(opportunity_ids: list):
                     "execution_mode": "manual",
                     "status": "completed" if plan.status in ["completed", "executing"] else "pending",
                     "executed_at": datetime.now() - timedelta(days=18) if plan.status == "completed" else None,
-                    "sort_order": 1
+                    "sort_order": 1,
                 },
                 {
                     "plan_id": plan.id,
@@ -451,9 +446,11 @@ async def init_execution_plans(opportunity_ids: list):
                     "task_name": "设备参数调节",
                     "target_object": "相关设备",
                     "execution_mode": "auto",
-                    "status": "completed" if plan.status == "completed" else ("executing" if plan.status == "executing" else "pending"),
+                    "status": "completed"
+                    if plan.status == "completed"
+                    else ("executing" if plan.status == "executing" else "pending"),
                     "executed_at": datetime.now() - timedelta(days=16) if plan.status == "completed" else None,
-                    "sort_order": 2
+                    "sort_order": 2,
                 },
                 {
                     "plan_id": plan.id,
@@ -463,8 +460,8 @@ async def init_execution_plans(opportunity_ids: list):
                     "execution_mode": "manual",
                     "status": "completed" if plan.status == "completed" else "pending",
                     "executed_at": datetime.now() - timedelta(days=15) if plan.status == "completed" else None,
-                    "sort_order": 3
-                }
+                    "sort_order": 3,
+                },
             ]
 
             for task_data in tasks:
@@ -483,7 +480,7 @@ async def init_execution_plans(opportunity_ids: list):
                     energy_before={"total_energy": 15000, "avg_power": 625},
                     energy_after={"total_energy": 13500, "avg_power": 562},
                     status="completed",
-                    analysis_conclusion="执行效果良好，基本达成预期目标"
+                    analysis_conclusion="执行效果良好，基本达成预期目标",
                 )
                 session.add(tracking)
 
@@ -502,11 +499,7 @@ async def update_opportunity_status():
         plans = result.scalars().all()
 
         for plan in plans:
-            status_map = {
-                "pending": "ready",
-                "executing": "executing",
-                "completed": "completed"
-            }
+            status_map = {"pending": "ready", "executing": "executing", "completed": "completed"}
             new_status = status_map.get(plan.status, "discovered")
 
             await session.execute(

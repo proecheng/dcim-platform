@@ -1,9 +1,9 @@
 """干接点状态变化监测器单元测试 — Story 1.6"""
+
 import asyncio
 import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 import yaml
@@ -28,6 +28,7 @@ from gateway.scheduler import CollectionScheduler
 # ============================================================
 # 辅助工具
 # ============================================================
+
 
 def _make_point(
     point_id: str = "di-1",
@@ -81,6 +82,7 @@ def _make_reading(
 # ============================================================
 # DryContactMonitor 核心测试
 # ============================================================
+
 
 class TestDryContactMonitor:
     """干接点监测器核心逻辑"""
@@ -311,6 +313,7 @@ class TestDryContactMonitor:
 # CollectionScheduler 集成测试
 # ============================================================
 
+
 class TestSchedulerDryContact:
     """调度器干接点集成"""
 
@@ -395,9 +398,7 @@ class TestSchedulerDryContact:
         # 验证 monitor 有状态
         # 移除后应清除
         await scheduler.remove_datasource("ds-1")
-        assert not any(
-            k.startswith("ds-1:") for k in scheduler._dry_contact_monitor._last_values
-        )
+        assert not any(k.startswith("ds-1:") for k in scheduler._dry_contact_monitor._last_values)
         await scheduler.stop()
 
     @pytest.mark.asyncio
@@ -436,6 +437,7 @@ class TestSchedulerDryContact:
 # ============================================================
 # ConfigLoader fire_signal 解析测试
 # ============================================================
+
 
 class TestConfigLoaderFireSignal:
     """配置加载器 fire_signal 字段解析"""

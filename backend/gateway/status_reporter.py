@@ -1,4 +1,5 @@
 """状态上报心跳 30s。实现 Story: 2.1"""
+
 import asyncio
 import json
 import logging
@@ -11,6 +12,7 @@ logger = logging.getLogger(__name__)
 # psutil 可选依赖
 try:
     import psutil
+
     _HAS_PSUTIL = True
 except ImportError:
     _HAS_PSUTIL = False
@@ -71,6 +73,7 @@ class StatusReporter:
     def _get_ip(self) -> str:
         """获取本机 IP（尽力而为）"""
         import socket
+
         try:
             s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
             s.connect(("8.8.8.8", 80))

@@ -8,6 +8,7 @@ import os
 # Add backend to path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+
 async def init_data():
     """Initialize VPP test data"""
     print("=" * 50)
@@ -22,6 +23,7 @@ async def init_data():
 
     print("\n[OK] VPP test data initialized successfully!")
 
+
 async def verify_data():
     """Verify VPP data was created"""
     print("\n" + "=" * 50)
@@ -30,10 +32,7 @@ async def verify_data():
 
     from app.core.database import async_session
     from sqlalchemy import select, func
-    from app.models.vpp_data import (
-        ElectricityBill, LoadCurve, ElectricityPrice,
-        AdjustableLoad, VPPConfig
-    )
+    from app.models.vpp_data import ElectricityBill, LoadCurve, ElectricityPrice, AdjustableLoad, VPPConfig
 
     async with async_session() as db:
         # Count records in each table
@@ -50,6 +49,7 @@ async def verify_data():
         print(f"  vpp_configs: {configs.scalar()} records")
 
     print("\n[OK] VPP data verification complete!")
+
 
 async def test_calculator():
     """Test VPP Calculator"""
@@ -72,11 +72,8 @@ async def test_calculator():
 
         # Test load metrics
         print("\nB. Testing calc_load_metrics(2025-10-01 to 2025-10-30)...")
-        result = await calculator.calc_load_metrics(
-            date(2025, 10, 1),
-            date(2025, 10, 30)
-        )
-        if 'P_max' in result:
+        result = await calculator.calc_load_metrics(date(2025, 10, 1), date(2025, 10, 30))
+        if "P_max" in result:
             print(f"    P_max: {result['P_max'].get('value')} {result['P_max'].get('unit')}")
             print(f"    P_avg: {result['P_avg'].get('value')} {result['P_avg'].get('unit')}")
             print(f"    Load rate: {result['load_rate'].get('value')}")
@@ -86,15 +83,22 @@ async def test_calculator():
         # Test transfer potential
         print("\nD. Testing calc_transfer_potential()...")
         result = await calculator.calc_transfer_potential()
-        print(f"    Transferable load: {result['transferable_load'].get('value')} {result['transferable_load'].get('unit')}")
-        print(f"    Annual benefit: {result['annual_transfer_benefit'].get('value')} {result['annual_transfer_benefit'].get('unit')}")
+        print(
+            f"    Transferable load: {result['transferable_load'].get('value')} {result['transferable_load'].get('unit')}"
+        )
+        print(
+            f"    Annual benefit: {result['annual_transfer_benefit'].get('value')} {result['annual_transfer_benefit'].get('unit')}"
+        )
 
         # Test VPP revenue
         print("\nF. Testing calc_vpp_revenue(5290)...")
         result = await calculator.calc_vpp_revenue(5290)
-        print(f"    Total VPP revenue: {result['total_vpp_revenue'].get('value')} {result['total_vpp_revenue'].get('unit')}")
+        print(
+            f"    Total VPP revenue: {result['total_vpp_revenue'].get('value')} {result['total_vpp_revenue'].get('unit')}"
+        )
 
     print("\n[OK] VPP Calculator tests complete!")
+
 
 async def main():
     try:
@@ -107,9 +111,11 @@ async def main():
     except Exception as e:
         print(f"\n[ERROR] Test failed: {e}")
         import traceback
+
         traceback.print_exc()
         return 1
     return 0
+
 
 if __name__ == "__main__":
     exit_code = asyncio.run(main())

@@ -1,8 +1,8 @@
 """
 大楼点位初始化脚本 - 初始化约250个监控点位
 """
+
 import asyncio
-from datetime import datetime
 from app.core.database import async_session, init_db
 from app.models import Point, PointRealtime, AlarmThreshold
 from app.data.building_points import get_all_points, get_threshold_for_point
@@ -15,6 +15,7 @@ async def init_building_points():
     async with async_session() as session:
         # 检查是否已初始化
         from sqlalchemy import select, func
+
         result = await session.execute(select(func.count(Point.id)))
         existing_count = result.scalar()
 

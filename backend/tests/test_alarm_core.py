@@ -1,11 +1,11 @@
 """
 告警管理 API 核心测试
 """
+
 import pytest
 from unittest.mock import patch, AsyncMock
-from datetime import datetime
 
-from app.models.alarm import Alarm, AlarmRule
+from app.models.alarm import Alarm
 from app.models.point import Point
 from tests.conftest import auth_headers
 
@@ -49,53 +49,37 @@ class TestAlarmList:
     async def test_get_alarms_empty(self, client, admin_user):
         """测试空告警列表"""
         _, token = admin_user
-        resp = await client.get(
-            "/api/v1/alarms", headers=auth_headers(token)
-        )
+        resp = await client.get("/api/v1/alarms", headers=auth_headers(token))
         assert resp.status_code == 200
         body = resp.json()
         assert body["total"] == 0
         assert body["items"] == []
 
-    async def test_get_alarms_with_data(
-        self, client, admin_user, sample_alarm
-    ):
+    async def test_get_alarms_with_data(self, client, admin_user, sample_alarm):
         """测试有数据的告警列表"""
         _, token = admin_user
-        resp = await client.get(
-            "/api/v1/alarms", headers=auth_headers(token)
-        )
+        resp = await client.get("/api/v1/alarms", headers=auth_headers(token))
         assert resp.status_code == 200
         body = resp.json()
         assert body["total"] >= 1
         assert len(body["items"]) >= 1
         assert body["items"][0]["alarm_no"] == "ALM-20260101-001"
 
-    async def test_get_alarms_filter_status(
-        self, client, admin_user, sample_alarm
-    ):
+    async def test_get_alarms_filter_status(self, client, admin_user, sample_alarm):
         """测试按状态筛选"""
         _, token = admin_user
-        resp = await client.get(
-            "/api/v1/alarms?status=active", headers=auth_headers(token)
-        )
+        resp = await client.get("/api/v1/alarms?status=active", headers=auth_headers(token))
         assert resp.status_code == 200
         assert resp.json()["total"] >= 1
 
-        resp2 = await client.get(
-            "/api/v1/alarms?status=resolved", headers=auth_headers(token)
-        )
+        resp2 = await client.get("/api/v1/alarms?status=resolved", headers=auth_headers(token))
         assert resp2.status_code == 200
         assert resp2.json()["total"] == 0
 
-    async def test_get_alarms_filter_level(
-        self, client, admin_user, sample_alarm
-    ):
+    async def test_get_alarms_filter_level(self, client, admin_user, sample_alarm):
         """测试按级别筛选"""
         _, token = admin_user
-        resp = await client.get(
-            "/api/v1/alarms?level=major", headers=auth_headers(token)
-        )
+        resp = await client.get("/api/v1/alarms?level=major", headers=auth_headers(token))
         assert resp.status_code == 200
         assert resp.json()["total"] >= 1
 
@@ -108,9 +92,7 @@ class TestAlarmList:
 class TestAlarmDetail:
     """告警详情测试"""
 
-    async def test_get_alarm_detail(
-        self, client, admin_user, sample_alarm
-    ):
+    async def test_get_alarm_detail(self, client, admin_user, sample_alarm):
         """测试获取告警详情"""
         _, token = admin_user
         resp = await client.get(
@@ -125,9 +107,7 @@ class TestAlarmDetail:
     async def test_get_alarm_not_found(self, client, admin_user):
         """测试告警不存在"""
         _, token = admin_user
-        resp = await client.get(
-            "/api/v1/alarms/99999", headers=auth_headers(token)
-        )
+        resp = await client.get("/api/v1/alarms/99999", headers=auth_headers(token))
         assert resp.status_code == 404
 
 
@@ -135,9 +115,7 @@ class TestAlarmAcknowledge:
     """告警确认测试"""
 
     @patch("app.services.websocket.ws_manager.broadcast_alarm", new_callable=AsyncMock)
-    async def test_acknowledge_alarm(
-        self, mock_broadcast, client, admin_user, sample_alarm
-    ):
+    async def test_acknowledge_alarm(self, mock_broadcast, client, admin_user, sample_alarm):
         """测试确认告警"""
         _, token = admin_user
         resp = await client.put(
@@ -150,9 +128,7 @@ class TestAlarmAcknowledge:
         mock_broadcast.assert_called_once()
 
     @patch("app.services.websocket.ws_manager.broadcast_alarm", new_callable=AsyncMock)
-    async def test_acknowledge_already_acknowledged(
-        self, mock_broadcast, client, admin_user, async_db, sample_point
-    ):
+    async def test_acknowledge_already_acknowledged(self, mock_broadcast, client, admin_user, async_db, sample_point):
         """测试重复确认"""
         _, token = admin_user
         alarm = Alarm(
@@ -178,9 +154,7 @@ class TestAlarmResolve:
     """告警解决测试"""
 
     @patch("app.services.websocket.ws_manager.broadcast_alarm", new_callable=AsyncMock)
-    async def test_resolve_alarm(
-        self, mock_broadcast, client, admin_user, sample_alarm
-    ):
+    async def test_resolve_alarm(self, mock_broadcast, client, admin_user, sample_alarm):
         """测试解决告警"""
         _, token = admin_user
         resp = await client.put(
@@ -193,9 +167,7 @@ class TestAlarmResolve:
         mock_broadcast.assert_called_once()
 
     @patch("app.services.websocket.ws_manager.broadcast_alarm", new_callable=AsyncMock)
-    async def test_resolve_already_resolved(
-        self, mock_broadcast, client, admin_user, async_db, sample_point
-    ):
+    async def test_resolve_already_resolved(self, mock_broadcast, client, admin_user, async_db, sample_point):
         """测试重复解决"""
         _, token = admin_user
         alarm = Alarm(
@@ -223,9 +195,7 @@ class TestAlarmCount:
     async def test_get_alarm_count(self, client, admin_user, sample_alarm):
         """测试获取告警计数"""
         _, token = admin_user
-        resp = await client.get(
-            "/api/v1/alarms/count", headers=auth_headers(token)
-        )
+        resp = await client.get("/api/v1/alarms/count", headers=auth_headers(token))
         assert resp.status_code == 200
         body = resp.json()
         assert "critical" in body
@@ -237,14 +207,10 @@ class TestAlarmCount:
 class TestAlarmStatistics:
     """告警统计测试"""
 
-    async def test_get_alarm_statistics(
-        self, client, admin_user, sample_alarm
-    ):
+    async def test_get_alarm_statistics(self, client, admin_user, sample_alarm):
         """测试获取告警统计"""
         _, token = admin_user
-        resp = await client.get(
-            "/api/v1/alarms/statistics", headers=auth_headers(token)
-        )
+        resp = await client.get("/api/v1/alarms/statistics", headers=auth_headers(token))
         assert resp.status_code == 200
         body = resp.json()
         assert "total" in body
@@ -255,14 +221,10 @@ class TestAlarmStatistics:
 class TestAlarmActiveList:
     """活动告警测试"""
 
-    async def test_get_active_alarms(
-        self, client, admin_user, sample_alarm
-    ):
+    async def test_get_active_alarms(self, client, admin_user, sample_alarm):
         """测试获取活动告警"""
         _, token = admin_user
-        resp = await client.get(
-            "/api/v1/alarms/active", headers=auth_headers(token)
-        )
+        resp = await client.get("/api/v1/alarms/active", headers=auth_headers(token))
         assert resp.status_code == 200
         body = resp.json()
         assert isinstance(body, list)
@@ -273,9 +235,7 @@ class TestBatchAcknowledge:
     """批量确认测试"""
 
     @patch("app.services.websocket.ws_manager.broadcast_alarm", new_callable=AsyncMock)
-    async def test_batch_acknowledge(
-        self, mock_broadcast, client, admin_user, sample_alarm
-    ):
+    async def test_batch_acknowledge(self, mock_broadcast, client, admin_user, sample_alarm):
         """测试批量确认告警"""
         _, token = admin_user
         resp = await client.put(

@@ -1,4 +1,5 @@
 """离线缓存测试 — Story 2.4"""
+
 import os
 import tempfile
 import time
@@ -142,8 +143,8 @@ async def test_check_storage_low_cleans_uploaded(mock_disk, cache):
 
     # 第一次: 空间不足, 第二次(清理后): 空间充足
     mock_disk.side_effect = [
-        (100_000_000, 95_000_000, 5_000_000),   # 5% free
-        (100_000_000, 85_000_000, 15_000_000),   # 15% free after cleanup
+        (100_000_000, 95_000_000, 5_000_000),  # 5% free
+        (100_000_000, 85_000_000, 15_000_000),  # 15% free after cleanup
     ]
     result = await cache.check_storage(min_free_pct=10.0)
     assert result["cleaned_uploaded"] == 5

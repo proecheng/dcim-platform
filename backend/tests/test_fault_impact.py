@@ -1,4 +1,5 @@
 """故障影响分析 API 测试 — Story 8-4"""
+
 import pytest
 
 from httpx import AsyncClient, ASGITransport
@@ -17,6 +18,7 @@ from app.api.deps import get_db, require_viewer
 # ============================================================
 # Fixtures
 # ============================================================
+
 
 @pytest.fixture(scope="module")
 def anyio_backend():
@@ -96,12 +98,22 @@ async def seed_pdu_device(db_session):
 @pytest.fixture
 async def seed_cabinets(db_session):
     cab1 = Cabinet(
-        id=101, cabinet_code="FI-A01", cabinet_name="故障测试机柜01",
-        location="A区/1F", total_u=42, max_power=10.0, max_weight=500.0,
+        id=101,
+        cabinet_code="FI-A01",
+        cabinet_name="故障测试机柜01",
+        location="A区/1F",
+        total_u=42,
+        max_power=10.0,
+        max_weight=500.0,
     )
     cab2 = Cabinet(
-        id=102, cabinet_code="FI-A02", cabinet_name="故障测试机柜02",
-        location="A区/1F", total_u=42, max_power=5.0, max_weight=300.0,
+        id=102,
+        cabinet_code="FI-A02",
+        cabinet_name="故障测试机柜02",
+        location="A区/1F",
+        total_u=42,
+        max_power=5.0,
+        max_weight=300.0,
     )
     db_session.add_all([cab1, cab2])
     await db_session.commit()
@@ -120,12 +132,20 @@ async def seed_phase_mapping(db_session, seed_cabinets, seed_pdu_device):
 @pytest.fixture
 async def seed_assets(db_session, seed_cabinets):
     a1 = Asset(
-        asset_code="FI-SRV-001", asset_name="故障测试服务器1", asset_type="server",
-        cabinet_id=101, u_position=1, u_height=2,
+        asset_code="FI-SRV-001",
+        asset_name="故障测试服务器1",
+        asset_type="server",
+        cabinet_id=101,
+        u_position=1,
+        u_height=2,
     )
     a2 = Asset(
-        asset_code="FI-SRV-002", asset_name="故障测试服务器2", asset_type="server",
-        cabinet_id=101, u_position=3, u_height=2,
+        asset_code="FI-SRV-002",
+        asset_name="故障测试服务器2",
+        asset_type="server",
+        cabinet_id=101,
+        u_position=3,
+        u_height=2,
     )
     db_session.add_all([a1, a2])
     await db_session.commit()
@@ -162,10 +182,13 @@ URL = "/api/v1/topology-config/fault-impact-analysis"
 @pytest.mark.anyio
 async def test_fault_impact_pdu_basic(client, seed_pdu_device, seed_cabinets, seed_phase_mapping, seed_assets):
     """PDU 故障基本分析: 验证响应结构和受影响机柜"""
-    resp = await client.post(URL, json={
-        "fault_source_type": "pdu",
-        "fault_source_id": 801,
-    })
+    resp = await client.post(
+        URL,
+        json={
+            "fault_source_type": "pdu",
+            "fault_source_id": 801,
+        },
+    )
     assert resp.status_code == 200
     data = resp.json()
 
@@ -195,30 +218,39 @@ async def test_fault_impact_pdu_basic(client, seed_pdu_device, seed_cabinets, se
 @pytest.mark.anyio
 async def test_fault_impact_pdu_not_found(client):
     """不存在的 PDU → 404"""
-    resp = await client.post(URL, json={
-        "fault_source_type": "pdu",
-        "fault_source_id": 99999,
-    })
+    resp = await client.post(
+        URL,
+        json={
+            "fault_source_type": "pdu",
+            "fault_source_id": 99999,
+        },
+    )
     assert resp.status_code == 404
 
 
 @pytest.mark.anyio
 async def test_fault_impact_invalid_type(client):
     """无效的 fault_source_type → 400"""
-    resp = await client.post(URL, json={
-        "fault_source_type": "invalid",
-        "fault_source_id": 1,
-    })
+    resp = await client.post(
+        URL,
+        json={
+            "fault_source_type": "invalid",
+            "fault_source_id": 1,
+        },
+    )
     assert resp.status_code == 400
 
 
 @pytest.mark.anyio
 async def test_fault_impact_pdu_no_mapping(client, seed_pdu_device):
     """PDU 存在但无 PowerPhaseMapping → 200 + 空 affected_cabinets"""
-    resp = await client.post(URL, json={
-        "fault_source_type": "pdu",
-        "fault_source_id": 801,
-    })
+    resp = await client.post(
+        URL,
+        json={
+            "fault_source_type": "pdu",
+            "fault_source_id": 801,
+        },
+    )
     assert resp.status_code == 200
     data = resp.json()
     assert len(data["affected_cabinets"]) == 0
@@ -228,12 +260,17 @@ async def test_fault_impact_pdu_no_mapping(client, seed_pdu_device):
 
 
 @pytest.mark.anyio
-async def test_fault_impact_dual_feed(client, seed_cabinets, seed_pdu_device, seed_backup_pdu, seed_dual_feed, seed_assets):
+async def test_fault_impact_dual_feed(
+    client, seed_cabinets, seed_pdu_device, seed_backup_pdu, seed_dual_feed, seed_assets
+):
     """双路供电: 机柜101有 primary+backup → degraded, 机柜102只有 primary → power_loss"""
-    resp = await client.post(URL, json={
-        "fault_source_type": "pdu",
-        "fault_source_id": 801,
-    })
+    resp = await client.post(
+        URL,
+        json={
+            "fault_source_type": "pdu",
+            "fault_source_id": 801,
+        },
+    )
     assert resp.status_code == 200
     data = resp.json()
 

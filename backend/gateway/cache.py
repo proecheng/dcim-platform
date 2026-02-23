@@ -1,4 +1,5 @@
 """SQLite 本地缓存 + 断点续传。实现 Story: 2.4"""
+
 import logging
 import shutil
 import time
@@ -10,6 +11,7 @@ logger = logging.getLogger(__name__)
 # aiosqlite 可选依赖
 try:
     import aiosqlite
+
     _HAS_AIOSQLITE = True
 except ImportError:
     _HAS_AIOSQLITE = False
@@ -87,9 +89,7 @@ class OfflineCache:
         for row_id, topic, payload in rows:
             try:
                 await publish_fn(topic, payload)
-                await self._db.execute(
-                    "UPDATE upload_queue SET uploaded = 1 WHERE id = ?", (row_id,)
-                )
+                await self._db.execute("UPDATE upload_queue SET uploaded = 1 WHERE id = ?", (row_id,))
                 uploaded_count += 1
             except Exception:
                 logger.warning("缓存上传失败，停止当前批次 (已上传 %d 条)", uploaded_count)
@@ -169,9 +169,7 @@ class OfflineCache:
         """获取缓存统计"""
         if not self._db:
             raise RuntimeError("缓存未打开")
-        cursor = await self._db.execute(
-            "SELECT uploaded, COUNT(*) FROM upload_queue GROUP BY uploaded"
-        )
+        cursor = await self._db.execute("SELECT uploaded, COUNT(*) FROM upload_queue GROUP BY uploaded")
         rows = await cursor.fetchall()
         stats = {"pending_count": 0, "uploaded_count": 0, "total_count": 0}
         for uploaded, count in rows:

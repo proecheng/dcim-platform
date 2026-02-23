@@ -16,6 +16,7 @@ from app.models.log import OperationLog
 # Fixtures
 # ============================================================
 
+
 @pytest_asyncio.fixture
 async def db_session():
     engine = create_async_engine("sqlite+aiosqlite://", echo=False)
@@ -49,6 +50,7 @@ async def sample_datasource(db_session):
 # Tests
 # ============================================================
 
+
 @pytest.mark.asyncio
 async def test_toggle_write_permission_success(db_session, sample_datasource):
     """测试切换写入权限成功（false → true）"""
@@ -60,7 +62,9 @@ async def test_toggle_write_permission_success(db_session, sample_datasource):
     new_value = not old_value
 
     await db_session.execute(
-        update(DataSource).where(DataSource.id == ds.id).values(
+        update(DataSource)
+        .where(DataSource.id == ds.id)
+        .values(
             write_enabled=new_value,
             updated_at=datetime.now(),
         )
@@ -94,9 +98,7 @@ async def test_operation_log_recorded(db_session, sample_datasource):
     ds = sample_datasource
 
     # 切换写入权限并记录日志
-    await db_session.execute(
-        update(DataSource).where(DataSource.id == ds.id).values(write_enabled=True)
-    )
+    await db_session.execute(update(DataSource).where(DataSource.id == ds.id).values(write_enabled=True))
     log = OperationLog(
         user_id=1,
         username="test_user",
@@ -131,8 +133,6 @@ async def test_operation_log_recorded(db_session, sample_datasource):
 @pytest.mark.asyncio
 async def test_toggle_nonexistent_datasource(db_session):
     """测试数据源不存在时的处理"""
-    result = await db_session.execute(
-        select(DataSource).where(DataSource.id == 99999)
-    )
+    result = await db_session.execute(select(DataSource).where(DataSource.id == 99999))
     ds = result.scalar_one_or_none()
     assert ds is None  # 数据源不存在，API 层应返回 404

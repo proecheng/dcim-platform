@@ -1,7 +1,8 @@
 """数据归一化层"""
+
 import logging
 from datetime import timezone
-from .adapters.base import PointValue, DataSourceConfig, NormalizedReading, DataQuality
+from .adapters.base import PointValue, DataSourceConfig, NormalizedReading
 
 logger = logging.getLogger(__name__)
 
@@ -22,7 +23,11 @@ class DataNormalizer:
 
             # 缩放和偏移转换
             try:
-                if point_config.is_dry_contact and point_config.enum_mapping and str(raw.value) in point_config.enum_mapping:
+                if (
+                    point_config.is_dry_contact
+                    and point_config.enum_mapping
+                    and str(raw.value) in point_config.enum_mapping
+                ):
                     # 干接点类型优先走枚举映射（值通常是 0/1 整数）
                     value = point_config.enum_mapping[str(raw.value)]
                 elif isinstance(raw.value, (int, float)):
@@ -42,13 +47,15 @@ class DataNormalizer:
             else:
                 ts = ts.astimezone(timezone.utc)
 
-            readings.append(NormalizedReading(
-                point_id=point_id,
-                value=value,
-                raw_value=raw.value,
-                quality=raw.quality,
-                timestamp=ts,
-                datasource_id=config.datasource_id,
-            ))
+            readings.append(
+                NormalizedReading(
+                    point_id=point_id,
+                    value=value,
+                    raw_value=raw.value,
+                    quality=raw.quality,
+                    timestamp=ts,
+                    datasource_id=config.datasource_id,
+                )
+            )
 
         return readings

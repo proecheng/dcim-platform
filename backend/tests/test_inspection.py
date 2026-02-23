@@ -1,4 +1,5 @@
 """巡检计划与任务 API 测试 — 巡检全生命周期"""
+
 import pytest
 
 from httpx import AsyncClient, ASGITransport
@@ -6,7 +7,7 @@ from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sess
 from sqlalchemy import delete
 
 from app.core.database import Base
-from app.models.operation import InspectionPlan, InspectionTask, InspectionStatus
+from app.models.operation import InspectionPlan, InspectionTask
 from app.models.user import User
 from app.api.deps import get_db, require_admin, require_operator, require_viewer
 
@@ -14,6 +15,7 @@ from app.api.deps import get_db, require_admin, require_operator, require_viewer
 # ============================================================
 # Fixtures
 # ============================================================
+
 
 @pytest.fixture(scope="module")
 def anyio_backend():
@@ -120,6 +122,7 @@ async def _create_task(client: AsyncClient, plan_id: int) -> dict:
 # 巡检计划测试
 # ============================================================
 
+
 @pytest.mark.anyio
 async def test_create_plan(client):
     """POST /plans 创建巡检计划，验证 name 和 is_active"""
@@ -208,6 +211,7 @@ async def test_delete_plan(client):
 # ============================================================
 # 巡检任务测试
 # ============================================================
+
 
 @pytest.mark.anyio
 async def test_create_task(client):

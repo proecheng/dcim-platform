@@ -1,10 +1,10 @@
 """MQTT 数据上报链路测试 — Story 2.5"""
+
 import json
 import time
 from datetime import datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import pytest
 import pytest_asyncio
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
@@ -29,11 +29,15 @@ async def db_session():
 
 # ---- 1. format_point_data 格式验证 ----
 
+
 def test_format_point_data():
     readings = [
         NormalizedReading(
-            point_id="p001", value=25.6, raw_value=25.6,
-            quality=DataQuality.NORMAL, timestamp=datetime(2024, 1, 1, 12, 0, 0),
+            point_id="p001",
+            value=25.6,
+            raw_value=25.6,
+            quality=DataQuality.NORMAL,
+            timestamp=datetime(2024, 1, 1, 12, 0, 0),
             datasource_id="ds-1",
         ),
     ]
@@ -48,12 +52,14 @@ def test_format_point_data():
 
 # ---- 2. format_point_data 空列表 ----
 
+
 def test_format_point_data_empty():
     msg = format_point_data("gw-001", [])
     assert msg["points"] == []
 
 
 # ---- 3. 连接状态下 publish 调用 client ----
+
 
 async def test_gateway_mqtt_client_publish_connected():
     client = GatewayMqttClient(gateway_id="gw-001")
@@ -65,6 +71,7 @@ async def test_gateway_mqtt_client_publish_connected():
 
 # ---- 4. 断开状态下 publish 降级到缓存 ----
 
+
 async def test_gateway_mqtt_client_publish_disconnected_with_cache():
     mock_cache = AsyncMock()
     client = GatewayMqttClient(gateway_id="gw-001", cache=mock_cache)
@@ -73,6 +80,7 @@ async def test_gateway_mqtt_client_publish_disconnected_with_cache():
 
 
 # ---- 5. 新点位插入 ----
+
 
 async def test_handle_point_data_new_points(db_session):
     payload = {
@@ -92,6 +100,7 @@ async def test_handle_point_data_new_points(db_session):
 
 # ---- 6. 已有点位更新 ----
 
+
 async def test_handle_point_data_update_existing(db_session):
     # First insert
     payload1 = {"gw_id": "gw-001", "points": [{"id": "p001", "v": 10.0, "q": 0, "t": int(time.time())}]}
@@ -106,12 +115,14 @@ async def test_handle_point_data_update_existing(db_session):
 
 # ---- 7. 无效 payload 返回 0 ----
 
+
 async def test_handle_point_data_invalid_payload(db_session):
     count = await handle_point_data({"points": []}, db_session)
     assert count == 0
 
 
 # ---- 8. MqttService data topic 路由 ----
+
 
 async def test_mqtt_service_data_topic_routing():
     """验证 MqttService 将 data topic 路由到 handle_point_data"""
@@ -120,10 +131,7 @@ async def test_mqtt_service_data_topic_routing():
     service = MqttService()
     message = MagicMock()
     message.topic = "dcim/1/gw/gw-001/data"
-    message.payload = json.dumps({
-        "gw_id": "gw-001",
-        "points": [{"id": "p1", "v": 1.0, "q": 0, "t": 1000}]
-    }).encode()
+    message.payload = json.dumps({"gw_id": "gw-001", "points": [{"id": "p1", "v": 1.0, "q": 0, "t": 1000}]}).encode()
 
     with patch("app.mqtt.client.handle_point_data", new_callable=AsyncMock) as mock_handler:
         with patch("app.mqtt.client.async_session") as mock_session_factory:

@@ -1,8 +1,8 @@
 """网关自动注册测试 — Story 2.1"""
+
 from datetime import datetime, timedelta
 from unittest.mock import patch, MagicMock
 
-import pytest
 import pytest_asyncio
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
@@ -22,6 +22,7 @@ from gateway.status_reporter import StatusReporter
 # Fixtures
 # ============================================================
 
+
 @pytest_asyncio.fixture
 async def db_session():
     engine = create_async_engine("sqlite+aiosqlite://", echo=True)
@@ -36,6 +37,7 @@ async def db_session():
 # ============================================================
 # StatusReporter 测试
 # ============================================================
+
 
 class TestStatusReporter:
     """StatusReporter 单元测试"""
@@ -93,6 +95,7 @@ class TestStatusReporter:
 # gateway_registration 服务测试
 # ============================================================
 
+
 class TestGatewayRegistration:
     """网关自动注册服务测试"""
 
@@ -110,9 +113,7 @@ class TestGatewayRegistration:
         }
         await handle_gateway_status(payload, db_session)
 
-        result = await db_session.execute(
-            select(Gateway).where(Gateway.gateway_id == "gw-new-001")
-        )
+        result = await db_session.execute(select(Gateway).where(Gateway.gateway_id == "gw-new-001"))
         gw = result.scalar_one()
         assert gw.status == "online"
         assert gw.name == "新网关"
@@ -143,9 +144,7 @@ class TestGatewayRegistration:
         }
         await handle_gateway_status(payload, db_session)
 
-        result = await db_session.execute(
-            select(Gateway).where(Gateway.gateway_id == "gw-exist-001")
-        )
+        result = await db_session.execute(select(Gateway).where(Gateway.gateway_id == "gw-exist-001"))
         updated = result.scalar_one()
         assert updated.status == "online"
         assert updated.name == "新名称"
@@ -172,9 +171,7 @@ class TestGatewayRegistration:
         }
         await handle_gateway_status(payload, db_session)
 
-        result = await db_session.execute(
-            select(Gateway).where(Gateway.gateway_id == "gw-cap-001")
-        )
+        result = await db_session.execute(select(Gateway).where(Gateway.gateway_id == "gw-cap-001"))
         gw = result.scalar_one()
         assert gw.capabilities == ["modbus_tcp", "bacnet"]
 
@@ -192,9 +189,7 @@ class TestGatewayRegistration:
         count = await check_gateway_heartbeats(db_session)
         assert count == 1
 
-        result = await db_session.execute(
-            select(Gateway).where(Gateway.gateway_id == "gw-stale-001")
-        )
+        result = await db_session.execute(select(Gateway).where(Gateway.gateway_id == "gw-stale-001"))
         updated = result.scalar_one()
         assert updated.status == "offline"
 
@@ -212,9 +207,7 @@ class TestGatewayRegistration:
         count = await check_gateway_heartbeats(db_session)
         assert count == 0
 
-        result = await db_session.execute(
-            select(Gateway).where(Gateway.gateway_id == "gw-fresh-001")
-        )
+        result = await db_session.execute(select(Gateway).where(Gateway.gateway_id == "gw-fresh-001"))
         gw = result.scalar_one()
         assert gw.status == "online"
 
@@ -232,9 +225,7 @@ class TestGatewayRegistration:
         count = await check_gateway_heartbeats(db_session)
         assert count == 1
 
-        result = await db_session.execute(
-            select(Gateway).where(Gateway.gateway_id == "gw-null-hb")
-        )
+        result = await db_session.execute(select(Gateway).where(Gateway.gateway_id == "gw-null-hb"))
         updated = result.scalar_one()
         assert updated.status == "offline"
 
@@ -242,6 +233,7 @@ class TestGatewayRegistration:
 # ============================================================
 # MqttService 测试
 # ============================================================
+
 
 class TestMqttService:
     """MqttService 单元测试"""
@@ -261,12 +253,14 @@ class TestMqttService:
 # Settings 测试
 # ============================================================
 
+
 class TestMqttSettings:
     """MQTT 配置默认值测试"""
 
     def test_mqtt_settings_defaults(self):
         """Settings 包含 MQTT 默认配置"""
         from app.core.config import Settings
+
         s = Settings()
         assert s.mqtt_enabled is True
         assert s.mqtt_host == "localhost"

@@ -1,10 +1,11 @@
 """
 能源管理 API 核心测试
 """
-import pytest
-from datetime import date, datetime, timedelta
 
-from app.models.energy import PowerDevice, EnergyDaily, ElectricityPricing
+import pytest
+from datetime import date, timedelta
+
+from app.models.energy import PowerDevice, ElectricityPricing
 from tests.conftest import auth_headers
 
 
@@ -46,29 +47,21 @@ class TestEnergyDevices:
     async def test_get_devices_empty(self, client, admin_user):
         """测试空设备列表"""
         _, token = admin_user
-        resp = await client.get(
-            "/api/v1/energy/devices", headers=auth_headers(token)
-        )
+        resp = await client.get("/api/v1/energy/devices", headers=auth_headers(token))
         assert resp.status_code == 200
         body = resp.json()
         assert "data" in body
 
-    async def test_get_devices_with_data(
-        self, client, admin_user, sample_power_device
-    ):
+    async def test_get_devices_with_data(self, client, admin_user, sample_power_device):
         """测试有数据的设备列表"""
         _, token = admin_user
-        resp = await client.get(
-            "/api/v1/energy/devices", headers=auth_headers(token)
-        )
+        resp = await client.get("/api/v1/energy/devices", headers=auth_headers(token))
         assert resp.status_code == 200
         body = resp.json()
         assert len(body["data"]) >= 1
         assert body["data"][0]["device_code"] == "PD-TEST-001"
 
-    async def test_get_device_detail(
-        self, client, admin_user, sample_power_device
-    ):
+    async def test_get_device_detail(self, client, admin_user, sample_power_device):
         """测试获取设备详情"""
         _, token = admin_user
         resp = await client.get(
@@ -105,9 +98,7 @@ class TestEnergyDevices:
         body = resp.json()
         assert body["data"]["device_code"] == "PD-NEW-001"
 
-    async def test_create_device_duplicate_code(
-        self, client, admin_user, sample_power_device
-    ):
+    async def test_create_device_duplicate_code(self, client, admin_user, sample_power_device):
         """测试创建重复编码设备"""
         _, token = admin_user
         resp = await client.post(
@@ -122,9 +113,7 @@ class TestEnergyDevices:
         )
         assert resp.status_code == 400
 
-    async def test_delete_device(
-        self, client, admin_user, sample_power_device
-    ):
+    async def test_delete_device(self, client, admin_user, sample_power_device):
         """测试删除设备"""
         _, token = admin_user
         resp = await client.delete(
@@ -142,14 +131,10 @@ class TestEnergyDevices:
 class TestEnergyRealtime:
     """实时电力数据测试"""
 
-    async def test_get_realtime_power(
-        self, client, admin_user, sample_power_device
-    ):
+    async def test_get_realtime_power(self, client, admin_user, sample_power_device):
         """测试获取实时电力数据"""
         _, token = admin_user
-        resp = await client.get(
-            "/api/v1/energy/realtime", headers=auth_headers(token)
-        )
+        resp = await client.get("/api/v1/energy/realtime", headers=auth_headers(token))
         assert resp.status_code == 200
         body = resp.json()
         assert "data" in body
@@ -175,9 +160,7 @@ class TestEnergyPUE:
     async def test_get_current_pue(self, client, admin_user):
         """测试获取当前 PUE"""
         _, token = admin_user
-        resp = await client.get(
-            "/api/v1/energy/pue", headers=auth_headers(token)
-        )
+        resp = await client.get("/api/v1/energy/pue", headers=auth_headers(token))
         assert resp.status_code == 200
         body = resp.json()
         data = body["data"]
