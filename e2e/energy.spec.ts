@@ -30,12 +30,12 @@ test.describe('用电监控测试', () => {
   })
 
   test('能耗统计页面加载成功', async ({ page }) => {
-    await page.goto('/power/statistics')
+    await page.goto('/energy/statistics')
     await page.waitForLoadState('networkidle')
     await page.waitForTimeout(1000)
 
     // 页面不应重定向到登录页
-    expect(page.url()).toContain('/power/statistics')
+    expect(page.url()).toContain('/energy/statistics')
 
     // 页面应有内容（表格、图表或卡片）
     const hasContent = await page.locator('.el-table, .el-card, canvas, .chart-container').first().isVisible().catch(() => false)

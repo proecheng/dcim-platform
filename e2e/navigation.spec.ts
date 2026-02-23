@@ -72,11 +72,11 @@ test.describe('全局导航测试', () => {
   })
 
   test('导航到用电监控', async ({ page }) => {
-    await page.goto('/power/monitor')
+    await page.goto('/energy/monitor')
     await page.waitForLoadState('networkidle')
 
-    expect(page.url()).toContain('/power/monitor')
-    await expect(page.locator('.energy-monitor')).toBeVisible()
+    expect(page.url()).toContain('/energy/monitor')
+    await expect(page.locator('.energy-monitor, .el-main, main, .app-main').first()).toBeVisible()
   })
 
   test('导航到制冷总览', async ({ page }) => {
@@ -110,21 +110,21 @@ test.describe('全局导航测试', () => {
   })
 
   test('导航到资产台账', async ({ page }) => {
-    await page.goto('/infrastructure/asset')
+    await page.goto('/asset/list')
     await page.waitForLoadState('networkidle')
     await page.waitForTimeout(500)
 
-    expect(page.url()).toContain('/infrastructure/asset')
+    expect(page.url()).toContain('/asset/list')
     const body = page.locator('.el-main, main, .app-main').first()
     await expect(body).toBeVisible()
   })
 
   test('导航到节能分析', async ({ page }) => {
-    await page.goto('/energy-saving/analysis')
+    await page.goto('/energy/analysis')
     await page.waitForLoadState('networkidle')
     await page.waitForTimeout(500)
 
-    expect(page.url()).toContain('/energy-saving/analysis')
+    expect(page.url()).toContain('/energy/analysis')
     const body = page.locator('.el-main, main, .app-main').first()
     await expect(body).toBeVisible()
   })

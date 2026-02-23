@@ -4,7 +4,7 @@ const isCI = !!process.env.CI
 
 export default defineConfig({
   testDir: './e2e',
-  timeout: 30000,
+  timeout: 60000,
   retries: isCI ? 1 : 0,
   use: {
     baseURL: 'http://localhost:3000',

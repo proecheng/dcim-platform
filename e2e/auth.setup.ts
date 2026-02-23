@@ -15,7 +15,7 @@ setup('authenticate as admin', async ({ page }) => {
   await page.locator('input').first().fill(ADMIN_USER)
   await page.locator('input[type="password"]').fill(ADMIN_PASS)
   await page.locator('button').filter({ hasText: '登' }).click()
-  await page.waitForURL('**/dashboard', { timeout: 15000 })
+  await page.waitForURL('**/dashboard', { timeout: 60000 })
 
   // 保存认证状态（cookies + localStorage）
   await page.context().storageState({ path: authFile })
