@@ -4,14 +4,14 @@ inputDocuments: [_bmad-output/planning-artifacts/prd.md, _bmad-output/planning-a
 workflowType: 'architecture'
 project_name: 'DCIM'
 user_name: 'proecheng'
-date: '2026-02-15'
+date: '2026-02-23'
 ---
 
 # Architecture Decision Document - DCIM 算力中心智能监控系统
 
 **Author:** proecheng
 **Date:** 2026-02-15
-**Status:** 完整版（基于 PRD 2026-02-15 全面重建）
+**Status:** 完整版（V3.1.0 更新，基于实际代码状态校准 2026-02-23）
 
 ---
 
@@ -36,6 +36,7 @@ date: '2026-02-15'
 | WebSocket | websockets | 12.0 | 实时数据推送 |
 | 定时任务 | APScheduler | 3.10.4 | 数据模拟器、定时统计 |
 | ML (可选) | PyTorch | 2.0+ | 条件加载，未安装时跳过 |
+| OCR (可选) | PaddleOCR | — | 电费单识别，可选安装，未安装时降级为 mock | Phase 2 |
 
 ### 1.2 IoT 采集层
 
@@ -207,6 +208,17 @@ gateway/
 - **高可用部署**：拆分为独立 MQTT 消费者服务，通过 Redis 与 FastAPI 通信
 - EMQX 共享订阅（`$share/group/topic`）支持多消费者实例负载均衡
 
+
+### 2.7 V3.1.0 新增服务组件
+
+| 服务 | 文件 | 说明 |
+|------|------|------|
+| DeviceSyncService | `services/device_sync.py` | 设备与点位双向同步，模板变更自动同步到关联设备 |
+| AdaptiveOptimizationService | `services/adaptive_optimization_service.py` | 自适应节能优化，基于历史数据动态调整策略 |
+| OCRService | `services/ocr_service.py` | 电费单 OCR 识别，PaddleOCR 可选，未安装时自动降级为 mock |
+| SystemHealthService | `api/v1/system_health.py` | 健康检查端点（DB/Redis/EMQX）、结构化 JSON 日志、性能指标 |
+| MenuService | 前端路由重构 | 三区域菜单架构（监控/管理/配置）+ RBAC 动态过滤 |
+
 ---
 
 ## 3. 数据架构
@@ -313,32 +325,70 @@ Site (站点)
 | alarms | `/ws/alarms?token=xxx` | 告警通知 |
 | system | `/ws/system?token=xxx` | 系统状态 |
 
-### 4.3 API 模块列表
+### 4.3 API 模块列表（V3.1.0 实际状态：47 个模块）
 
-**现有模块（29 个）：** auth, user, device, point, realtime, alarm, threshold, energy, regulation, pricing, demand, monitoring, topology, proposal, opportunities, execution, asset, operation, report, statistics, config, log, capacity, vpp, websocket, bigscreen, dispatch, load-shifting, schedule
+| 分类 | 模块 | 路径前缀 | 说明 |
+|------|------|---------|------|
+| 认证与用户 | auth | `/api/v1/auth` | 登录/登出/刷新令牌 |
+| | users | `/api/v1/users` | 用户管理、RBAC |
+| | sessions | `/api/v1/sessions` | 并发会话管理 |
+| | password_policy | `/api/v1/password-policy` | 密码策略配置 |
+| 设备与点位 | devices | `/api/v1/devices` | 设备 CRUD、模板关联 |
+| | points | `/api/v1/points` | 点位管理、数据质量 |
+| | datasources | `/api/v1/datasources` | 数据源 CRUD、连接测试、批量导入 |
+| | device_templates | `/api/v1/device-templates` | 设备模板 CRUD |
+| | device_sync | `/api/v1/device-sync` | 设备双向同步 |
+| 实时监控 | realtime | `/api/v1/realtime` | 实时数据（Redis 缓存） |
+| | monitoring | `/api/v1/monitoring` | 六大子系统仪表盘 |
+| | websocket | `/ws/*` | WebSocket 通道管理 |
+| 告警管理 | alarms | `/api/v1/alarms` | 告警 CRUD、批量操作 |
+| | thresholds | `/api/v1/thresholds` | 阈值配置 |
+| | escalation | `/api/v1/escalation` | 告警升级规则 |
+| | drift | `/api/v1/drift` | 传感器漂移检测 |
+| 能源管理 | energy | `/api/v1/energy` | 用电监控、PUE、统计 |
+| | pricing | `/api/v1/pricing` | 电价管理 |
+| | demand | `/api/v1/demand` | 需量管理 |
+| | regulation | `/api/v1/regulation` | 需量调控 |
+| | ocr | `/api/v1/ocr` | 电费单 OCR 识别（可选 PaddleOCR） |
+| 节能优化 | opportunities | `/api/v1/opportunities` | 节能机会发现 |
+| | proposals | `/api/v1/proposals` | 节能方案管理 |
+| | execution | `/api/v1/execution` | 方案执行追踪 |
+| | optimization | `/api/v1/optimization` | 自适应优化服务 |
+| | load_shifting | `/api/v1/load-shifting` | 负荷转移 |
+| | vpp | `/api/v1/vpp` | 虚拟电厂 |
+| | schedule | `/api/v1/schedule` | 调度计划 |
+| 资产与容量 | assets | `/api/v1/assets` | 资产台账、生命周期 |
+| | capacity | `/api/v1/capacity` | 四维容量监控 |
+| 拓扑与空间 | topology | `/api/v1/topology` | 物理拓扑配置 |
+| | topology_config | `/api/v1/topology-config` | 拓扑配置管理 |
+| | floor_map | `/api/v1/floor-map` | 楼层平面图 |
+| | cooling | `/api/v1/cooling` | 制冷拓扑 |
+| 联动与诊断 | linkage | `/api/v1/linkage` | 联动策略 CRUD、执行日志 |
+| | dispatch | `/api/v1/dispatch` | 告警自动派单 |
+| | command | `/api/v1/command` | 控制命令下发 |
+| | trace | `/api/v1/trace` | 事件追溯 |
+| 视频监控 | video | `/api/v1/video` | 摄像头/NVR/PTZ 控制 |
+| 网关管理 | gateways | `/api/v1/gateways` | 网关状态、远程配置、OTA |
+| | ota | `/api/v1/ota` | 网关 OTA 升级 |
+| 运维管理 | operations | `/api/v1/operations` | 工单、巡检、知识库 |
+| 系统管理 | configs | `/api/v1/configs` | 系统配置 |
+| | logs | `/api/v1/logs` | 操作审计日志 |
+| | statistics | `/api/v1/statistics` | 统计分析 |
+| | reports | `/api/v1/reports` | 报表管理、PDF 导出 |
+| | system_health | `/api/v1/system-health` | 健康检查、性能指标 |
+| | history | `/api/v1/history` | 历史数据查询 |
+| 大屏与展示 | bigscreen | `/api/v1/bigscreen` | 大屏数据聚合 |
+| 多站点 | sites | `/api/v1/sites` | 站点 CRUD、切换 |
+| 数据质量 | data_quality | `/api/v1/data-quality` | 质量状态、漂移统计 |
 
-**新增模块（8 个）：**
-
-| 模块 | 路径前缀 | 核心端点 | 阶段 |
-|------|---------|---------|------|
-| 数据源管理 | `/api/v1/datasources` | CRUD、连接测试、点位批量导入（Excel）、导入预校验、写入权限管理 | MVP |
-| 网关管理 | `/api/v1/gateways` | 网关列表、状态查看、远程配置下发、重启、OTA 升级触发 | MVP |
-| 设备模板 | `/api/v1/device-templates` | CRUD、按厂商/型号查询、从模板创建数据源 | MVP |
-| 联动策略 | `/api/v1/linkage` | 策略 CRUD、启用/禁用、手动触发测试、执行日志、恢复流程 | Phase 2 |
-| 视频监控 | `/api/v1/video` | 摄像头 CRUD、NVR 管理、联动录像事件、云台控制指令转发 | Phase 2 |
-| 物理拓扑 | `/api/v1/topology/physical` | 空间/制冷/三相拓扑配置、智能选址推荐 | Phase 2 |
-| 站点管理 | `/api/v1/sites` | 站点 CRUD、站点切换、跨站点汇总 | 推广阶段 |
-| 数据质量 | `/api/v1/data-quality` | 点位质量状态查询、漂移检测结果、质量统计 | MVP 基础版 |
-
-**现有模块扩展：**
-
+**现有模块扩展（V3.1.0 新增）：**
 | 模块 | 扩展内容 |
 |------|---------|
-| `/api/v1/devices` | 新增 `template_id` 关联、按网关/数据源筛选、批量操作 |
-| `/api/v1/points` | 新增 `data_quality` 字段返回、按网关/数据源筛选 |
-| `/api/v1/alarms` | 新增联动策略关联、告警升级规则配置 |
-| `/api/v1/realtime` | 数据源从 Redis 缓存读取（替代直接查库） |
-
+| devices | 新增 `template_id` 关联、双向同步、按网关/数据源筛选 |
+| points | 新增 `data_quality` 字段、按网关/数据源筛选 |
+| alarms | 新增联动策略关联、告警升级规则配置 |
+| realtime | 数据源从 Redis 缓存读取（替代直接查库） |
+| bigscreen | 新增设备历史弹窗、楼层 3D 场景 |
 ### 4.4 点位批量导入预校验
 
 - 方式：同步校验（Excel 通常几百到几千行，计算量不大）

@@ -1,5 +1,5 @@
 ---
-stepsCompleted: ['step-01-init', 'step-02-discovery', 'step-03-success', 'step-04-journeys', 'step-05-domain', 'step-06-innovation', 'step-07-project-type', 'step-08-scoping', 'step-09-functional', 'step-10-nonfunctional', 'step-11-polish', 'step-12-complete']
+stepsCompleted: ['step-01-init', 'step-02-discovery', 'step-03-success', 'step-04-journeys', 'step-05-domain', 'step-06-innovation', 'step-07-project-type', 'step-08-scoping', 'step-09-functional', 'step-10-nonfunctional', 'step-11-polish', 'step-12-complete', 'step-13-v3.1-supplement']
 classification:
   projectType: 'IoT Platform + Web App'
   domain: '数据中心动力环境综合管理（供配电系统、制冷系统、环境监控系统、安防与消防系统、智能基础设施、能效与运维管理）'
@@ -860,7 +860,19 @@ DCIM 算力中心智能监控系统是一个 IoT Platform + Web App 混合型产
 - FR89: 系统所有页面采用 2.5D 轻度透视效果，通过 CSS perspective + rotateX/Y 实现微妙的空间层次感
 - FR90: 统计卡片区域采用弧形倾斜排列（nth-child 递进 rotateY），hover 时浮起 + 发光反馈
 - FR91: 数据表格区域具有微妙的景深效果（rotateX 0.5°），行 hover 时轻微浮起
-- FR92: 所有 2.5D 效果通过 SCSS mixin 系统实现，各页面仅需 1 行 @include 即可启用，支持 prefers-reduced-motion 降级
+ FR92: 所有 2.5D 效果通过 SCSS mixin 系统实现，各页面仅需 1 行 @include 即可启用，支持 prefers-reduced-motion 降级
+
+### V3.1 补充功能（2026-02-23 实施后新增）
+
+> 📌 以下 FR 为 V3.1.0 实施过程中新增的功能，未在原始 PRD 规划中，但在开发过程中识别为必要功能并已实现。
+
+ FR93: 能源管理员可以通过上传电费单图片（国家电网/南方电网格式），系统自动 OCR 识别并提取分时电价数据，支持人工确认后自动填充电价配置（PaddleOCR 可选，未安装时降级为 mock 模式）
+ FR94: 系统前端导航菜单按三区划分（监控域/管理域/配置域），根据用户 RBAC 角色自动过滤可见菜单项
+ FR95: 系统提供配电拓扑与设备台账的双向同步服务（DeviceSyncService），配电柜/PDU 可关联已有设备资产，数据变更自动同步
+ FR96: 系统提供运维基础设施：健康检查端点（`/api/v1/system-health/health`，检测 DB/Redis/MQTT/WebSocket 状态）、结构化 JSON 日志、全局错误追踪、关键性能指标暴露
+ FR97: 大屏展示页支持点击设备弹出历史数据趋势图（ECharts 趋势图 + 阈值线 + 时间范围切换）
+ FR98: 大屏展示页支持 3D 楼层场景加载（Three.js 程序化生成机柜模型 + 状态着色 + WebGL 不可用时降级为 2D）
+ FR99: 系统提供自适应优化服务，根据历史运行数据自动调整节能策略参数
 
 ## 非功能需求
 
