@@ -244,7 +244,7 @@
     </el-dialog>
 
     <!-- 导入点位对话框 -->
-    <el-dialog v-model="importDialogVisible" title="批量导入点位" width="650px" @close="resetImportState">
+    <el-dialog v-model="importDialogVisible" title="批量导入点位" width="650px" @closed="resetImportState">
       <div>
         <p style="margin-bottom: 12px; color: #909399; font-size: 13px;">
           上传 .xlsx 格式的点位配置文件，系统将自动校验数据有效性。

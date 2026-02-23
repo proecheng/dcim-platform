@@ -4,7 +4,7 @@
     :title="dialogTitle"
     width="720px"
     destroy-on-close
-    @close="handleClose"
+    @closed="handleClose"
   >
     <el-tabs v-model="activeTab">
       <!-- 配置下发标签页 -->

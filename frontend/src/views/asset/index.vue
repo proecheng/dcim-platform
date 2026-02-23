@@ -477,7 +477,7 @@
       title="批量导入资产"
       width="650px"
       destroy-on-close
-      @close="resetImport"
+      @closed="resetImport"
     >
       <div class="import-section">
         <el-upload
