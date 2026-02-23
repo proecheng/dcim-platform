@@ -302,7 +302,7 @@
     </div>
 
     <!-- 添加节点对话框 -->
-    <el-dialog v-model="showAddDialog" title="添加节点" width="560px" class="topology-dialog">
+    <el-dialog append-to-body v-model="showAddDialog" title="添加节点" width="560px" class="topology-dialog">
       <!-- 参考节点信息 -->
       <el-alert type="info" :closable="false" style="margin-bottom: 16px;">
         <template #title>
@@ -466,7 +466,7 @@
     </el-dialog>
 
     <!-- 导入对话框 -->
-    <el-dialog v-model="showImportDialog" title="导入拓扑数据" width="500px" class="topology-dialog">
+    <el-dialog append-to-body v-model="showImportDialog" title="导入拓扑数据" width="500px" class="topology-dialog">
       <el-alert type="warning" :closable="false" style="margin-bottom: 16px;">
         <template #title>导入将覆盖现有数据，请谨慎操作</template>
       </el-alert>
@@ -493,7 +493,7 @@
     </el-dialog>
 
     <!-- 点位编辑对话框 -->
-    <el-dialog v-model="showPointDialog" :title="editingPoint ? '编辑点位' : '新增点位'" width="600px" class="topology-dialog">
+    <el-dialog append-to-body v-model="showPointDialog" :title="editingPoint ? '编辑点位' : '新增点位'" width="600px" class="topology-dialog">
       <el-form ref="pointFormRef" :model="pointForm" :rules="pointRules" label-width="100px" size="default">
         <el-form-item label="点位编码" prop="point_code">
           <el-input v-model="pointForm.point_code" :disabled="!!editingPoint" />

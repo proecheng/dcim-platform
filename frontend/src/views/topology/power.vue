@@ -106,7 +106,7 @@
     </el-row>
 
     <!-- 添加/编辑接线对话框 -->
-    <el-dialog
+    <el-dialog append-to-body
       v-model="mappingDialogVisible"
       :title="isEditMapping ? '编辑接线' : '添加接线'"
       width="520px"

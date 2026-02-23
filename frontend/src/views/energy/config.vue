@@ -13,7 +13,7 @@
           <el-table-column prop="transformer_name" label="名称" min-width="150" />
           <el-table-column prop="rated_capacity" label="额定容量(kVA)" width="130" />
           <el-table-column prop="voltage_high" label="高压侧(kV)" width="100" />
-          <el-table-column prop="voltage_low" label="低压侧(V)" width="100" />
+          <el-table-column prop="voltage_low" label="低压侧(kV)" width="100" />
           <el-table-column prop="location" label="位置" min-width="120" />
           <el-table-column prop="status" label="状态" width="90">
             <template #default="{ row }">
@@ -452,7 +452,7 @@
     </el-tabs>
 
     <!-- 变压器对话框 -->
-    <el-dialog v-model="dialogs.transformer" :title="transformerForm.id ? '编辑变压器' : '新增变压器'" width="500px">
+    <el-dialog append-to-body v-model="dialogs.transformer" :title="transformerForm.id ? '编辑变压器' : '新增变压器'" width="500px">
       <el-form :model="transformerForm" label-width="100px">
         <el-form-item label="编码" required>
           <el-input v-model="transformerForm.transformer_code" :disabled="!!transformerForm.id" />
@@ -466,7 +466,7 @@
         <el-form-item label="高压侧(kV)">
           <el-input-number v-model="transformerForm.voltage_high" :min="0" style="width: 100%" />
         </el-form-item>
-        <el-form-item label="低压侧(V)">
+        <el-form-item label="低压侧(kV)">
           <el-input-number v-model="transformerForm.voltage_low" :min="0" style="width: 100%" />
         </el-form-item>
         <el-form-item label="位置">
@@ -480,7 +480,7 @@
     </el-dialog>
 
     <!-- 计量点对话框 -->
-    <el-dialog v-model="dialogs.meter" :title="meterForm.id ? '编辑计量点' : '新增计量点'" width="500px">
+    <el-dialog append-to-body v-model="dialogs.meter" :title="meterForm.id ? '编辑计量点' : '新增计量点'" width="500px">
       <el-form :model="meterForm" label-width="100px">
         <el-form-item label="编码" required>
           <el-input v-model="meterForm.meter_code" :disabled="!!meterForm.id" />
@@ -514,7 +514,7 @@
     </el-dialog>
 
     <!-- 配电柜对话框 -->
-    <el-dialog v-model="dialogs.panel" :title="panelForm.id ? '编辑配电柜' : '新增配电柜'" width="500px">
+    <el-dialog append-to-body v-model="dialogs.panel" :title="panelForm.id ? '编辑配电柜' : '新增配电柜'" width="500px">
       <el-form :model="panelForm" label-width="100px">
         <el-form-item label="编码" required>
           <el-input v-model="panelForm.panel_code" :disabled="!!panelForm.id" />
@@ -551,7 +551,7 @@
     </el-dialog>
 
     <!-- 配电回路对话框 -->
-    <el-dialog v-model="dialogs.circuit" :title="circuitForm.id ? '编辑回路' : '新增回路'" width="500px">
+    <el-dialog append-to-body v-model="dialogs.circuit" :title="circuitForm.id ? '编辑回路' : '新增回路'" width="500px">
       <el-form :model="circuitForm" label-width="100px">
         <el-form-item label="编码" required>
           <el-input v-model="circuitForm.circuit_code" :disabled="!!circuitForm.id" />
@@ -590,7 +590,7 @@
     </el-dialog>
 
     <!-- 电价配置对话框 -->
-    <el-dialog v-model="dialogs.pricing" :title="pricingForm.id ? '编辑电价时段' : '新增电价时段'" width="500px">
+    <el-dialog append-to-body v-model="dialogs.pricing" :title="pricingForm.id ? '编辑电价时段' : '新增电价时段'" width="500px">
       <el-form :model="pricingForm" label-width="100px">
         <el-form-item label="时段名称" required>
           <el-input v-model="pricingForm.pricing_name" placeholder="如：尖峰时段1" />
@@ -627,7 +627,7 @@
     </el-dialog>
 
     <!-- 需量配置对话框 -->
-    <el-dialog v-model="dialogs.demand" title="配置申报需量" width="500px">
+    <el-dialog append-to-body v-model="dialogs.demand" title="配置申报需量" width="500px">
       <el-form :model="demandForm" label-width="120px">
         <el-form-item label="变压器">
           <el-input :value="demandForm.transformer_name" disabled />
@@ -663,7 +663,7 @@
     </el-dialog>
 
     <!-- 计量点需量配置对话框 -->
-    <el-dialog v-model="dialogs.meterDemand" title="配置计量点需量" width="500px">
+    <el-dialog append-to-body v-model="dialogs.meterDemand" title="配置计量点需量" width="500px">
       <el-form :model="meterDemandForm" label-width="120px">
         <el-form-item label="计量点名称">
           <el-input :value="meterDemandForm.meter_name" disabled />
@@ -698,7 +698,7 @@
     </el-dialog>
 
     <!-- 转移配置调整对话框 -->
-    <el-dialog v-model="dialogs.ratio" title="调整转移配置" width="520px">
+    <el-dialog append-to-body v-model="dialogs.ratio" title="调整转移配置" width="520px">
       <el-form :model="ratioForm" label-width="120px">
         <el-form-item label="设备名称">
           <el-input :value="ratioForm.device_name" disabled />
@@ -747,7 +747,7 @@
     />
 
     <!-- 电费单 OCR 识别结果确认对话框 -->
-    <el-dialog
+    <el-dialog append-to-body
       v-model="ocrDialogVisible"
       title="电费单识别结果确认"
       width="900px"
@@ -965,12 +965,12 @@ const hasRatioChanges = computed(() =>
 type TagType = 'success' | 'warning' | 'danger' | 'info' | 'primary'
 
 const getStatusType = (status: string): TagType => {
-  const map: Record<string, TagType> = { normal: 'success', warning: 'warning', fault: 'danger', offline: 'info' }
+  const map: Record<string, TagType> = { normal: 'success', running: 'success', warning: 'warning', fault: 'danger', offline: 'info' }
   return map[status] || 'info'
 }
 
 const getStatusText = (status: string) => {
-  const map: Record<string, string> = { normal: '正常', warning: '告警', fault: '故障', offline: '离线' }
+  const map: Record<string, string> = { normal: '正常', running: '运行中', warning: '告警', fault: '故障', offline: '离线' }
   return map[status] || status
 }
 

@@ -139,7 +139,7 @@
     </div>
 
     <!-- 站点对话框 -->
-    <el-dialog v-model="siteDialogVisible" :title="isEdit ? '编辑站点' : '添加站点'" width="480px" @close="resetForm">
+    <el-dialog append-to-body v-model="siteDialogVisible" :title="isEdit ? '编辑站点' : '添加站点'" width="480px" @close="resetForm">
       <el-form ref="siteFormRef" :model="siteForm" :rules="siteRules" label-width="80px">
         <el-form-item label="站点编码" prop="site_code">
           <el-input v-model="siteForm.site_code" placeholder="请输入站点编码" />
@@ -161,7 +161,7 @@
     </el-dialog>
 
     <!-- 楼层对话框 -->
-    <el-dialog v-model="floorDialogVisible" :title="isEdit ? '编辑楼层' : '添加楼层'" width="480px" @close="resetForm">
+    <el-dialog append-to-body v-model="floorDialogVisible" :title="isEdit ? '编辑楼层' : '添加楼层'" width="480px" @close="resetForm">
       <el-form ref="floorFormRef" :model="floorForm" :rules="floorRules" label-width="80px">
         <el-form-item label="楼层编码" prop="floor_code">
           <el-input v-model="floorForm.floor_code" placeholder="请输入楼层编码" />
@@ -180,7 +180,7 @@
     </el-dialog>
 
     <!-- 房间对话框 -->
-    <el-dialog v-model="roomDialogVisible" :title="isEdit ? '编辑房间' : '添加房间'" width="520px" @close="resetForm">
+    <el-dialog append-to-body v-model="roomDialogVisible" :title="isEdit ? '编辑房间' : '添加房间'" width="520px" @close="resetForm">
       <el-form ref="roomFormRef" :model="roomForm" :rules="roomRules" label-width="100px">
         <el-form-item label="房间编码" prop="room_code">
           <el-input v-model="roomForm.room_code" placeholder="请输入房间编码" />
@@ -208,7 +208,7 @@
     </el-dialog>
 
     <!-- 列对话框 -->
-    <el-dialog v-model="rowDialogVisible" :title="isEdit ? '编辑列' : '添加列'" width="480px" @close="resetForm">
+    <el-dialog append-to-body v-model="rowDialogVisible" :title="isEdit ? '编辑列' : '添加列'" width="480px" @close="resetForm">
       <el-form ref="rowFormRef" :model="rowForm" :rules="rowRules" label-width="80px">
         <el-form-item label="列编码" prop="row_code">
           <el-input v-model="rowForm.row_code" placeholder="请输入列编码" />

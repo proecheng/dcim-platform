@@ -157,7 +157,7 @@
     </el-card>
 
     <!-- 新建/编辑工单对话框 -->
-    <el-dialog
+    <el-dialog append-to-body
       v-model="createDialogVisible"
       :title="isEdit ? '编辑工单' : '新建工单'"
       width="600px"
@@ -234,7 +234,7 @@
     </el-dialog>
 
     <!-- 工单详情对话框 -->
-    <el-dialog
+    <el-dialog append-to-body
       v-model="detailDialogVisible"
       title="工单详情"
       width="700px"
@@ -296,7 +296,7 @@
     </el-dialog>
 
     <!-- 添加日志对话框 -->
-    <el-dialog
+    <el-dialog append-to-body
       v-model="addLogDialogVisible"
       title="添加日志"
       width="500px"
@@ -335,7 +335,7 @@
     </el-dialog>
 
     <!-- 完成工单对话框 -->
-    <el-dialog
+    <el-dialog append-to-body
       v-model="completeDialogVisible"
       title="完成工单"
       width="500px"

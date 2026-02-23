@@ -134,7 +134,7 @@
     </el-card>
 
     <!-- 添加/编辑阈值对话框（含可视化预览） -->
-    <el-dialog
+    <el-dialog append-to-body
       v-model="dialogVisible"
       :title="isEdit ? '编辑阈值规则' : '新增阈值规则'"
       width="900px"
@@ -202,7 +202,7 @@
     </el-dialog>
 
     <!-- 按设备类型批量配置对话框 -->
-    <el-dialog v-model="batchByTypeVisible" title="按设备类型批量配置阈值" width="500px">
+    <el-dialog append-to-body v-model="batchByTypeVisible" title="按设备类型批量配置阈值" width="500px">
       <el-form :model="batchForm" label-width="100px">
         <el-form-item label="设备类型">
           <el-select v-model="batchForm.device_type" placeholder="请选择" style="width: 100%">

@@ -116,7 +116,7 @@
     </el-tabs>
 
     <!-- NVR 新增/编辑对话框 -->
-    <el-dialog v-model="nvrDialogVisible" :title="nvrForm.id ? '编辑NVR' : '新增NVR'" width="560px">
+    <el-dialog append-to-body v-model="nvrDialogVisible" :title="nvrForm.id ? '编辑NVR' : '新增NVR'" width="560px">
       <el-form ref="nvrFormRef" :model="nvrForm" :rules="nvrRules" label-width="100px">
         <el-form-item label="名称" prop="name">
           <el-input v-model="nvrForm.name" placeholder="请输入NVR名称" />
@@ -153,7 +153,7 @@
     </el-dialog>
 
     <!-- 摄像头 新增/编辑对话框 -->
-    <el-dialog v-model="camDialogVisible" :title="camForm.id ? '编辑摄像头' : '新增摄像头'" width="640px">
+    <el-dialog append-to-body v-model="camDialogVisible" :title="camForm.id ? '编辑摄像头' : '新增摄像头'" width="640px">
       <el-form ref="camFormRef" :model="camForm" :rules="camRules" label-width="100px">
         <el-form-item label="名称" prop="name">
           <el-input v-model="camForm.name" placeholder="摄像头名称" />

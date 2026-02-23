@@ -84,7 +84,7 @@
     </el-card>
 
     <!-- 新建/编辑对话框 -->
-    <el-dialog
+    <el-dialog append-to-body
       v-model="editDialogVisible"
       :title="isEdit ? '编辑文章' : '新建文章'"
       width="650px"
@@ -136,7 +136,7 @@
     </el-dialog>
 
     <!-- 查看对话框 -->
-    <el-dialog
+    <el-dialog append-to-body
       v-model="viewDialogVisible"
       title="文章详情"
       width="700px"

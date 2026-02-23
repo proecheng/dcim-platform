@@ -167,7 +167,7 @@
     </el-row>
 
     <!-- 拒绝对话框 -->
-    <el-dialog v-model="rejectDialogVisible" title="拒绝建议" width="400px">
+    <el-dialog append-to-body v-model="rejectDialogVisible" title="拒绝建议" width="400px">
       <el-form :model="rejectForm" label-width="80px">
         <el-form-item label="拒绝原因">
           <el-input v-model="rejectForm.remark" type="textarea" :rows="3" placeholder="请输入拒绝原因" />
@@ -180,7 +180,7 @@
     </el-dialog>
 
     <!-- 完成对话框 -->
-    <el-dialog v-model="completeDialogVisible" title="完成建议" width="400px">
+    <el-dialog append-to-body v-model="completeDialogVisible" title="完成建议" width="400px">
       <el-form :model="completeForm" label-width="100px">
         <el-form-item label="实际节能">
           <el-input-number v-model="completeForm.actual_saving" :min="0" style="width: 100%;" />
@@ -197,7 +197,7 @@
     </el-dialog>
 
     <!-- V2.3: 模板列表对话框 -->
-    <el-dialog v-model="showTemplates" title="节能建议模板" width="700px">
+    <el-dialog append-to-body v-model="showTemplates" title="节能建议模板" width="700px">
       <el-table :data="templates" stripe border max-height="400">
         <el-table-column prop="name" label="模板名称" width="150" />
         <el-table-column prop="category" label="类别" width="100">

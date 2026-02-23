@@ -125,7 +125,7 @@
     </el-card>
 
     <!-- 编辑对话框 -->
-    <el-dialog v-model="dialogVisible" :title="editMode ? '编辑点位' : '新增点位'" width="600px">
+    <el-dialog append-to-body v-model="dialogVisible" :title="editMode ? '编辑点位' : '新增点位'" width="600px">
       <el-form ref="formRef" :model="form" :rules="rules" label-width="100px">
         <el-form-item label="点位编码" prop="point_code">
           <el-input v-model="form.point_code" :disabled="editMode" />
@@ -191,7 +191,7 @@
     </el-dialog>
 
     <!-- 关联设备对话框 -->
-    <el-dialog v-model="linkDialogVisible" title="关联用能设备" width="650px">
+    <el-dialog append-to-body v-model="linkDialogVisible" title="关联用能设备" width="650px">
       <div class="link-dialog-content">
         <el-input
           v-model="deviceSearchKeyword"

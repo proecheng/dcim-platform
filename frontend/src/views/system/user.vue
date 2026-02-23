@@ -122,7 +122,7 @@
     </el-card>
 
     <!-- 新建/编辑对话框 -->
-    <el-dialog
+    <el-dialog append-to-body
       v-model="dialogVisible"
       :title="isEdit ? '编辑用户' : '新建用户'"
       width="520px"
@@ -179,7 +179,7 @@
     </el-dialog>
 
     <!-- 重置密码对话框 -->
-    <el-dialog
+    <el-dialog append-to-body
       v-model="resetPwdVisible"
       title="重置密码"
       width="420px"

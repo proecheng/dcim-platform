@@ -124,7 +124,7 @@
     </el-card>
 
     <!-- 添加/编辑升级规则对话框 -->
-    <el-dialog
+    <el-dialog append-to-body
       v-model="dialogVisible"
       :title="isEdit ? '编辑升级规则' : '新增升级规则'"
       width="860px"

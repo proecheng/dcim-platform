@@ -91,7 +91,7 @@
     </el-card>
 
     <!-- 创建/编辑模板对话框 -->
-    <el-dialog v-model="dialogVisible" :title="editMode ? '编辑模板' : '新增模板'" width="600px">
+    <el-dialog append-to-body v-model="dialogVisible" :title="editMode ? '编辑模板' : '新增模板'" width="600px">
       <el-form ref="formRef" :model="form" :rules="rules" label-width="100px">
         <el-form-item label="名称" prop="name">
           <el-input v-model="form.name" placeholder="请输入模板名称" />
@@ -126,7 +126,7 @@
     </el-dialog>
 
     <!-- 从模板创建数据源对话框 -->
-    <el-dialog v-model="dsDialogVisible" title="从模板创建数据源" width="600px">
+    <el-dialog append-to-body v-model="dsDialogVisible" title="从模板创建数据源" width="600px">
       <el-form ref="dsFormRef" :model="dsForm" :rules="dsRules" label-width="100px">
         <el-form-item label="模板名称">
           <span>{{ dsForm.templateName }}</span>

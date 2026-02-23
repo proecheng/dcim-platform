@@ -260,7 +260,7 @@
     </el-card>
 
     <!-- 新增/编辑对话框 -->
-    <el-dialog
+    <el-dialog append-to-body
       v-model="dialogVisible"
       :title="isEdit ? '编辑资产' : '新增资产'"
       width="700px"
@@ -411,7 +411,7 @@
     </el-dialog>
 
     <!-- 维护记录对话框 -->
-    <el-dialog
+    <el-dialog append-to-body
       v-model="maintenanceDialogVisible"
       title="新建维护记录"
       width="500px"
@@ -470,7 +470,7 @@
     </el-dialog>
 
     <!-- 导入对话框 -->
-    <el-dialog
+    <el-dialog append-to-body
       v-model="importDialogVisible"
       title="批量导入资产"
       width="650px"
@@ -541,7 +541,7 @@
     </el-dialog>
 
     <!-- 资产详情对话框 -->
-    <el-dialog
+    <el-dialog append-to-body
       v-model="detailDialogVisible"
       title="资产详情"
       width="800px"

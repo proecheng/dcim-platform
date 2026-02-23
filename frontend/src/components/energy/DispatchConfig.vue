@@ -180,7 +180,7 @@
     </el-tabs>
 
     <!-- 设备编辑对话框 -->
-    <el-dialog
+    <el-dialog append-to-body
       v-model="deviceDialog.visible"
       :title="deviceDialog.isEdit ? '编辑设备' : '添加设备'"
       width="600px"
@@ -261,7 +261,7 @@
     </el-dialog>
 
     <!-- 储能编辑对话框 -->
-    <el-dialog
+    <el-dialog append-to-body
       v-model="storageDialog.visible"
       :title="storageDialog.isEdit ? '编辑储能' : '添加储能'"
       width="500px"
@@ -305,7 +305,7 @@
     </el-dialog>
 
     <!-- 光伏编辑对话框 -->
-    <el-dialog
+    <el-dialog append-to-body
       v-model="pvDialog.visible"
       :title="pvDialog.isEdit ? '编辑光伏' : '添加光伏'"
       width="500px"

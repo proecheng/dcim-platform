@@ -156,7 +156,7 @@ onMounted(() => {
       style="margin-top: 12px;"
     />
 
-    <el-dialog :title="dialogMode === 'create' ? '新建规则' : '编辑规则'" v-model="dialogVisible">
+    <el-dialog append-to-body :title="dialogMode === 'create' ? '新建规则' : '编辑规则'" v-model="dialogVisible">
       <el-form :model="currentRule" ref="ruleForm" label-width="120px">
         <el-form-item label="规则编码" prop="rule_code">
           <el-input v-model="currentRule.rule_code" :disabled="dialogMode === 'edit'" />

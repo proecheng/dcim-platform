@@ -182,7 +182,7 @@
     </el-card>
 
     <!-- 模拟结果对话框 -->
-    <el-dialog v-model="simulateDialogVisible" title="调节模拟" width="500px">
+    <el-dialog append-to-body v-model="simulateDialogVisible" title="调节模拟" width="500px">
       <div v-if="simulateResult" class="simulate-result">
         <div class="result-item">
           <span class="label">设备:</span>
@@ -230,7 +230,7 @@
     </el-dialog>
 
     <!-- 新增配置对话框 -->
-    <el-dialog v-model="createDialogVisible" title="新增调节配置" width="500px">
+    <el-dialog append-to-body v-model="createDialogVisible" title="新增调节配置" width="500px">
       <el-form :model="createForm" label-width="100px">
         <el-form-item label="设备" required>
           <el-select v-model="createForm.device_id" placeholder="选择设备" style="width: 100%">

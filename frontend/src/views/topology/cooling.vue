@@ -37,7 +37,7 @@
     </div>
 
     <!-- 新增/编辑制冷区域对话框 -->
-    <el-dialog
+    <el-dialog append-to-body
       v-model="zoneDialogVisible"
       :title="isEditZone ? '编辑制冷区域' : '新增制冷区域'"
       width="720px"
@@ -95,7 +95,7 @@
     </el-dialog>
 
     <!-- 容量查看对话框 -->
-    <el-dialog v-model="capacityDialogVisible" title="制冷区域容量" width="480px">
+    <el-dialog append-to-body v-model="capacityDialogVisible" title="制冷区域容量" width="480px">
       <div v-if="capacityData" class="capacity-detail">
         <div class="capacity-row">
           <span class="capacity-label">区域名称</span>

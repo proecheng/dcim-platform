@@ -1,5 +1,5 @@
 <template>
-  <el-dialog
+  <el-dialog append-to-body
     v-model="visible"
     title="演示数据管理"
     width="500px"

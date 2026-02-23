@@ -42,7 +42,7 @@
     </el-card>
 
     <!-- 新增/编辑对话框 -->
-    <el-dialog
+    <el-dialog append-to-body
       v-model="dialogVisible"
       :title="isEdit ? '编辑机柜' : '新增机柜'"
       width="600px"
@@ -131,7 +131,7 @@
     </el-dialog>
 
     <!-- U位图对话框 -->
-    <el-dialog
+    <el-dialog append-to-body
       v-model="usageDialogVisible"
       :title="`${currentCabinet?.cabinet_name || ''} - U位图`"
       width="800px"

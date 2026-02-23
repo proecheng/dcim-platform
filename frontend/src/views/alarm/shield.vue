@@ -126,7 +126,7 @@
     </el-card>
 
     <!-- 添加/编辑屏蔽策略对话框 -->
-    <el-dialog v-model="dialogVisible" :title="isEdit ? '编辑屏蔽策略' : '新增屏蔽策略'" width="680px" top="5vh">
+    <el-dialog append-to-body v-model="dialogVisible" :title="isEdit ? '编辑屏蔽策略' : '新增屏蔽策略'" width="680px" top="5vh">
       <el-form ref="formRef" :model="form" :rules="formRules" label-width="100px">
         <el-form-item label="策略名称" prop="name">
           <el-input v-model="form.name" placeholder="请输入策略名称" />

@@ -520,7 +520,7 @@
     </el-tabs>
 
     <!-- 告警规则对话框 -->
-    <el-dialog
+    <el-dialog append-to-body
       v-model="ruleDialogVisible"
       :title="isEditRule ? '编辑告警规则' : '新增告警规则'"
       width="600px"
@@ -571,7 +571,7 @@
     </el-dialog>
 
     <!-- 告警屏蔽对话框 -->
-    <el-dialog
+    <el-dialog append-to-body
       v-model="shieldDialogVisible"
       title="新增告警屏蔽"
       width="600px"
@@ -631,7 +631,7 @@
     </el-dialog>
 
     <!-- 确认告警对话框 -->
-    <el-dialog v-model="ackDialogVisible" title="确认告警" width="500px">
+    <el-dialog append-to-body v-model="ackDialogVisible" title="确认告警" width="500px">
       <el-form label-width="80px">
         <el-form-item label="备注">
           <el-input
@@ -649,7 +649,7 @@
     </el-dialog>
 
     <!-- 处理告警对话框 -->
-    <el-dialog v-model="processDialogVisible" title="处理告警" width="500px">
+    <el-dialog append-to-body v-model="processDialogVisible" title="处理告警" width="500px">
       <el-form label-width="80px">
         <el-form-item label="处理描述">
           <el-input
@@ -667,7 +667,7 @@
     </el-dialog>
 
     <!-- 解除告警对话框 -->
-    <el-dialog v-model="resolveDialogVisible" title="解除告警" width="500px">
+    <el-dialog append-to-body v-model="resolveDialogVisible" title="解除告警" width="500px">
       <el-form label-width="80px">
         <el-form-item label="解决类型">
           <el-select v-model="resolveType">
@@ -691,7 +691,7 @@
     </el-dialog>
 
     <!-- 批量确认对话框 -->
-    <el-dialog v-model="batchAckDialogVisible" title="批量确认告警" width="500px">
+    <el-dialog append-to-body v-model="batchAckDialogVisible" title="批量确认告警" width="500px">
       <p>即将确认 {{ selectedIds.length }} 条告警</p>
       <el-form label-width="80px">
         <el-form-item label="备注">
@@ -710,7 +710,7 @@
     </el-dialog>
 
     <!-- 升级规则对话框 -->
-    <el-dialog
+    <el-dialog append-to-body
       v-model="escalationDialogVisible"
       :title="isEditEscalation ? '编辑升级规则' : '新增升级规则'"
       width="600px"
@@ -761,7 +761,7 @@
     </el-dialog>
 
     <!-- 阈值规则对话框 -->
-    <el-dialog
+    <el-dialog append-to-body
       v-model="thresholdDialogVisible"
       :title="isEditThreshold ? '编辑阈值规则' : '新增阈值规则'"
       width="600px"

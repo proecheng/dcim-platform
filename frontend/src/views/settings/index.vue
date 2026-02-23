@@ -265,7 +265,7 @@
     </el-card>
 
     <!-- 阈值编辑对话框 -->
-    <el-dialog v-model="thresholdDialogVisible" :title="thresholdEditMode ? '编辑阈值' : '新增阈值'" width="500px">
+    <el-dialog append-to-body v-model="thresholdDialogVisible" :title="thresholdEditMode ? '编辑阈值' : '新增阈值'" width="500px">
       <el-form ref="thresholdFormRef" :model="thresholdForm" :rules="thresholdRules" label-width="100px">
         <el-form-item label="选择点位" prop="point_id">
           <el-select v-model="thresholdForm.point_id" filterable :disabled="thresholdEditMode" style="width: 100%;">
@@ -307,7 +307,7 @@
     </el-dialog>
 
     <!-- 4级阈值配置对话框 -->
-    <el-dialog v-model="fourLevelDialogVisible" title="4级阈值配置" width="720px">
+    <el-dialog append-to-body v-model="fourLevelDialogVisible" title="4级阈值配置" width="720px">
       <el-form :model="fourLevelForm" label-width="100px">
         <el-form-item label="选择点位" required>
           <el-select v-model="fourLevelForm.point_id" filterable placeholder="请选择AI点位"
@@ -364,7 +364,7 @@
     </el-dialog>
 
     <!-- 按设备类型批量配置对话框 -->
-    <el-dialog v-model="batchDeviceTypeDialogVisible" title="按设备类型批量配置阈值" width="720px">
+    <el-dialog append-to-body v-model="batchDeviceTypeDialogVisible" title="按设备类型批量配置阈值" width="720px">
       <el-form :model="batchDeviceTypeForm" label-width="100px">
         <el-form-item label="设备类型" required>
           <el-select v-model="batchDeviceTypeForm.device_type" placeholder="请选择设备类型"

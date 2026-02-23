@@ -125,7 +125,7 @@
     </el-card>
 
     <!-- 新建/编辑对话框 -->
-    <el-dialog
+    <el-dialog append-to-body
       v-model="dialogVisible"
       :title="isEdit ? '编辑站点' : '新建站点'"
       width="560px"

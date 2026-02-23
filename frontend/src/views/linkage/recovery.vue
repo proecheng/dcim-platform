@@ -94,7 +94,7 @@
     </el-card>
 
     <!-- 恢复操作对话框 -->
-    <el-dialog v-model="recoveryDialogVisible" title="联动恢复" width="500px">
+    <el-dialog append-to-body v-model="recoveryDialogVisible" title="联动恢复" width="500px">
       <div v-if="selectedExecution" class="recovery-dialog-body">
         <el-descriptions :column="1" border size="small">
           <el-descriptions-item label="事件ID">{{ selectedExecution.event_id }}</el-descriptions-item>

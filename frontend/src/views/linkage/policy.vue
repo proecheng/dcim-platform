@@ -110,7 +110,7 @@
     </el-card>
 
     <!-- 新建/编辑对话框 -->
-    <el-dialog
+    <el-dialog append-to-body
       v-model="dialogVisible"
       :title="isEdit ? '编辑联动策略' : '新建联动策略'"
       width="720px"

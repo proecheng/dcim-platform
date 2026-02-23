@@ -117,7 +117,7 @@
     </el-card>
 
     <!-- 添加/编辑复合规则对话框 -->
-    <el-dialog
+    <el-dialog append-to-body
       v-model="dialogVisible"
       :title="isEdit ? '编辑复合规则' : '新增复合规则'"
       width="960px"

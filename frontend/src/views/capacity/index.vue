@@ -414,7 +414,7 @@
     </el-card>
 
     <!-- 空间容量对话框 -->
-    <el-dialog
+    <el-dialog append-to-body
       v-model="spaceDialogVisible"
       :title="isEdit ? '编辑空间容量' : '新增空间容量'"
       width="500px"
@@ -466,7 +466,7 @@
     </el-dialog>
 
     <!-- 电力容量对话框 -->
-    <el-dialog
+    <el-dialog append-to-body
       v-model="powerDialogVisible"
       :title="isEdit ? '编辑电力容量' : '新增电力容量'"
       width="500px"
@@ -521,7 +521,7 @@
     </el-dialog>
 
     <!-- 制冷容量对话框 -->
-    <el-dialog
+    <el-dialog append-to-body
       v-model="coolingDialogVisible"
       :title="isEdit ? '编辑制冷容量' : '新增制冷容量'"
       width="500px"
@@ -574,7 +574,7 @@
     </el-dialog>
 
     <!-- 上架评估对话框 -->
-    <el-dialog
+    <el-dialog append-to-body
       v-model="planDialogVisible"
       :title="isEdit ? '编辑上架评估' : '新建上架评估'"
       width="1000px"
@@ -718,7 +718,7 @@
     </el-dialog>
 
     <!-- 承重容量对话框 -->
-    <el-dialog
+    <el-dialog append-to-body
       v-model="weightDialogVisible"
       :title="isEdit ? '编辑承重容量' : '新增承重容量'"
       width="500px"
@@ -761,7 +761,7 @@
     </el-dialog>
 
     <!-- 覆盖机柜对话框 -->
-    <el-dialog v-model="overrideDialogVisible" title="选择目标机柜" width="700px">
+    <el-dialog append-to-body v-model="overrideDialogVisible" title="选择目标机柜" width="700px">
       <el-table :data="cabinetList" v-loading="cabinetLoading" size="small" border stripe max-height="400">
         <el-table-column prop="cabinet_code" label="编码" width="120" />
         <el-table-column prop="cabinet_name" label="名称" width="150" />

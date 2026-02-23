@@ -1,5 +1,5 @@
 <template>
-  <el-dialog
+  <el-dialog append-to-body
     v-model="visible"
     title="视频监控 - 告警联动"
     :width="dialogWidth"
