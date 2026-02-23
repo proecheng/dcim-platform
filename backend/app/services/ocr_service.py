@@ -68,9 +68,9 @@ _PERIOD_NAME_MAP: dict[str, str] = {
 
 # 文件魔数（magic bytes）映射
 _FILE_MAGIC_BYTES = {
-    b'\xff\xd8\xff': 'image/jpeg',      # JPEG
-    b'\x89PNG': 'image/png',            # PNG (\x89\x50\x4e\x47)
-    b'%PDF': 'application/pdf',          # PDF
+    b"\xff\xd8\xff": "image/jpeg",  # JPEG
+    b"\x89PNG": "image/png",  # PNG (\x89\x50\x4e\x47)
+    b"%PDF": "application/pdf",  # PDF
 }
 
 
@@ -81,17 +81,17 @@ def _validate_file_magic(file_bytes: bytes, filename: str) -> Optional[str]:
     同时校验文件扩展名和魔数，防止恶意文件伪装
     """
     if len(file_bytes) < 4:
-        return '文件内容过短，无法识别文件类型'
+        return "文件内容过短，无法识别文件类型"
 
     header = file_bytes[:4]
     matched = False
     for magic, mime_type in _FILE_MAGIC_BYTES.items():
-        if header[:len(magic)] == magic:
+        if header[: len(magic)] == magic:
             matched = True
             break
 
     if not matched:
-        return '文件内容与声明的格式不匹配，请上传真实的 JPG/PNG/PDF 文件'
+        return "文件内容与声明的格式不匹配，请上传真实的 JPG/PNG/PDF 文件"
 
     return None
 
@@ -250,7 +250,7 @@ async def recognize_bill(file_bytes: bytes, filename: str) -> OcrBillResult:
         return OcrBillResult(
             success=False,
             confidence=0,
-            provider='unknown',
+            provider="unknown",
             items=[],
             error_message=magic_error,
         )
