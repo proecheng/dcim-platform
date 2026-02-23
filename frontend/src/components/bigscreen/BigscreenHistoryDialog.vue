@@ -70,7 +70,7 @@
             </div>
             <div v-else-if="noData" class="empty-state">
               <el-icon :size="48"><DataLine /></el-icon>
-              <span>暂无历史数据</span>
+              <span>{{ noDataHint }}</span>
             </div>
             <div v-else ref="chartRef" class="trend-chart"></div>
           </div>
@@ -137,6 +137,7 @@ const aiPoints = ref<PointRealtimeItem[]>([])
 const selectedPointIds = ref<Set<number>>(new Set())
 const trendDataMap = ref<Map<number, TrendData[]>>(new Map())
 const thresholdMap = ref<Map<number, ThresholdInfo[]>>(new Map())
+const noDataHint = ref('暂无历史数据')
 
 // ==================== 计算属性 ====================
 
@@ -190,11 +191,12 @@ async function loadDeviceInfo() {
     // 尝试将 deviceId 解析为数字 id
     const numericId = parseInt(props.deviceId, 10)
     if (isNaN(numericId)) {
-      // deviceId 是字符串编码（如 "A-01"），使用 store 中的数据作为 fallback
+      // deviceId 是字符串编码（如 "A-01"），无法查询历史数据
       deviceName.value = props.deviceId
       deviceType.value = '机柜'
       deviceStatus.value = 'normal'
       aiPoints.value = []
+      noDataHint.value = '该设备暂不支持历史数据查看（非数字 ID）'
       return
     }
 
@@ -202,6 +204,7 @@ async function loadDeviceInfo() {
     deviceName.value = detail.device.device_name
     deviceType.value = detail.device.device_type
     deviceStatus.value = detail.device.status
+    noDataHint.value = '暂无历史数据'
 
     // 筛选 AI 类型点位
     aiPoints.value = detail.points.filter(p => p.point_type === 'AI')

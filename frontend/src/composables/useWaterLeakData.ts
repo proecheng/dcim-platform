@@ -81,19 +81,13 @@ export function useWaterLeakData() {
     try {
       const now = new Date()
       const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000)
-      // 获取水浸传感器的 point_id 列表
-      const pointIds = wlSensors.value.map(s => s.point_id)
-      if (pointIds.length === 0) {
-        recentAlarmCount.value = 0
-        return
-      }
       const res = await getAlarmList({
         start_time: yesterday.toISOString(),
         end_time: now.toISOString(),
+        device_type: 'WL', // 按水浸传感器设备类型过滤
         page: 1,
         page_size: 1, // 只需要 total 数
       })
-      // 从总数中估算（API 不支持按多个 point_id 批量筛选，使用总告警数作为近似值）
       recentAlarmCount.value = res.total ?? 0
     } catch (e) {
       console.error('最近告警数据加载失败', e)

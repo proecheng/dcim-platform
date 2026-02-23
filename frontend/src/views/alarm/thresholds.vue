@@ -304,6 +304,9 @@ async function loadData() {
     if (filters.thresholdType) baseParams.threshold_type = filters.thresholdType
     if (typeof filters.isEnabled === 'boolean') baseParams.is_enabled = filters.isEnabled
 
+    // ⚠️ 技术债务 [CR-09]: 当前方案为前端全量加载 + 内存聚合分页。
+    // 当点位数 × 4 级阈值超过数千条时会产生性能瓶颈（多次 API 请求 + 大量内存占用）。
+    // 后续应由后端提供按 point_id 聚合的分页 API，支持服务端筛选和排序。
     // 分页加载全部数据用于前端聚合（后端 page_size 上限 100）
     let allItems: ThresholdInfo[] = []
     let page = 1

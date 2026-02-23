@@ -162,7 +162,7 @@
             {{ row.ip_address || '--' }}
           </template>
         </el-table-column>
-        <el-table-column label="能力标签" min-width="140">
+        <el-table-column label="协议能力" min-width="140">
           <template #default="{ row }">
             <template v-if="row.capabilities && Object.keys(row.capabilities).length">
               <el-tag
@@ -306,7 +306,7 @@ const statCards = computed(() => [
     valueClass: 'warning',
   },
   {
-    label: '平均负载',
+    label: '平均 CPU',
     value: avgThroughput.value,
     icon: DataLine,
     iconBg: 'rgba(64, 158, 255, 0.15)',
@@ -642,15 +642,22 @@ async function handleBatchPush() {
   let successCount = 0
   let failCount = 0
 
-  // 串行下发，避免 MQTT 拥塞
-  for (const gw of onlineEnabled) {
-    try {
-      await pushGatewayConfig(gw.id)
-      successCount++
-    } catch {
-      failCount++
+  // 并发下发（限制 3 并发，避免 MQTT 拥塞）
+  const CONCURRENCY = 3
+  const queue = [...onlineEnabled]
+  const executing = new Set<Promise<void>>()
+
+  for (const gw of queue) {
+    const task = pushGatewayConfig(gw.id)
+      .then(() => { successCount++ })
+      .catch(() => { failCount++ })
+      .finally(() => { executing.delete(task) })
+    executing.add(task)
+    if (executing.size >= CONCURRENCY) {
+      await Promise.race(executing)
     }
   }
+  await Promise.all(executing)
 
   batchPushing.value = false
 

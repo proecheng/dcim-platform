@@ -16,15 +16,21 @@
         <el-button size="small" @click="addCondition">
           <el-icon><Plus /></el-icon> 条件
         </el-button>
-        <el-button
-          v-if="depth < MAX_DEPTH"
-          size="small"
-          type="warning"
-          plain
-          @click="addSubGroup"
+        <el-tooltip
+          :content="depth >= maxDepth ? '已达最大嵌套层数' : ''"
+          :disabled="depth < maxDepth"
+          placement="top"
         >
-          <el-icon><FolderAdd /></el-icon> 子组
-        </el-button>
+          <el-button
+            size="small"
+            type="warning"
+            plain
+            :disabled="depth >= maxDepth"
+            @click="addSubGroup"
+          >
+            <el-icon><FolderAdd /></el-icon> 子组
+          </el-button>
+        </el-tooltip>
         <el-button
           v-if="depth > 0"
           size="small"
@@ -105,6 +111,7 @@
           :group="child"
           :point-options="pointOptions"
           :depth="depth + 1"
+          :max-depth="maxDepth"
           @update:group="(val: ConditionGroup) => updateChildGroup(idx, val)"
           @remove="removeChild(idx)"
         />
@@ -139,13 +146,15 @@ interface ConditionGroup {
   children: (ConditionItem | ConditionGroup)[]
 }
 
-const MAX_DEPTH = 2 // 最大嵌套深度（0-based，共3层）
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   group: ConditionGroup
   pointOptions: PointInfo[]
   depth: number
-}>()
+  maxDepth?: number
+}>(), {
+  maxDepth: 2
+})
 
 const emit = defineEmits<{
   remove: []

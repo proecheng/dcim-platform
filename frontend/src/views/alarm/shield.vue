@@ -591,12 +591,17 @@ async function submitForm() {
       reason: JSON.stringify(meta)
     }
 
-    // 如果是编辑，先删除旧的再创建新的（API 不支持 update）
+    // 编辑模式: 先创建新记录，成功后再删除旧记录（避免删除成功但创建失败导致数据丢失）
     if (isEdit.value && editingId.value) {
-      await deleteAlarmShield(editingId.value)
+      await createAlarmShield(data)
+      try {
+        await deleteAlarmShield(editingId.value)
+      } catch (delErr) {
+        console.warn('旧屏蔽策略删除失败（新策略已创建），可能产生重复记录', delErr)
+      }
+    } else {
+      await createAlarmShield(data)
     }
-
-    await createAlarmShield(data)
     ElMessage.success(isEdit.value ? '更新成功' : '创建成功')
     dialogVisible.value = false
     loadData()
@@ -616,8 +621,7 @@ async function handleTerminate(row: ShieldRow) {
       '终止确认',
       { type: 'warning', confirmButtonText: '确认终止', cancelButtonText: '取消' }
     )
-    // 终止 = 删除旧的 + 创建一个已过期的（end_time 设为当前）
-    await deleteAlarmShield(row.id)
+    // 终止 = 先创建已过期记录，再删除旧记录（避免数据丢失）
     const meta = parseMeta(row.raw)
     await createAlarmShield({
       point_id: row.raw.point_id,
@@ -626,6 +630,11 @@ async function handleTerminate(row: ShieldRow) {
       end_time: new Date().toISOString(),
       reason: JSON.stringify(meta)
     })
+    try {
+      await deleteAlarmShield(row.id)
+    } catch (delErr) {
+      console.warn('旧屏蔽策略删除失败（终止记录已创建），可能产生重复记录', delErr)
+    }
     ElMessage.success('已终止屏蔽策略')
     loadData()
   } catch (e) {

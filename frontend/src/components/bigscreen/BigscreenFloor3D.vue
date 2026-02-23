@@ -462,20 +462,16 @@ function clearSceneObjects() {
   })
   for (const obj of toRemove) {
     scene.remove(obj)
-    if (obj instanceof THREE.Mesh) {
-      obj.geometry.dispose()
-      if (Array.isArray(obj.material)) {
-        obj.material.forEach(m => m.dispose())
-      } else {
-        obj.material.dispose()
-      }
+    // Mesh / LineSegments / GridHelper 均需 dispose geometry + material
+    if ('geometry' in obj && (obj as THREE.Mesh).geometry) {
+      ;(obj as THREE.Mesh).geometry.dispose()
     }
-    if (obj instanceof THREE.LineSegments) {
-      obj.geometry.dispose()
-      if (Array.isArray(obj.material)) {
-        obj.material.forEach(m => m.dispose())
-      } else {
-        obj.material.dispose()
+    if ('material' in obj) {
+      const mat = (obj as THREE.Mesh).material
+      if (Array.isArray(mat)) {
+        mat.forEach(m => m.dispose())
+      } else if (mat) {
+        mat.dispose()
       }
     }
   }
@@ -620,6 +616,7 @@ onUnmounted(() => {
 
   // 释放Three.js资源
   clearSceneObjects()
+  if (scene) scene.fog = null
   controls?.dispose()
   renderer?.dispose()
   if (renderer?.domElement && containerRef.value?.contains(renderer.domElement)) {

@@ -100,6 +100,7 @@ export function useSmokeInfraredData() {
       const res = await getAlarmList({
         start_time: yesterday.toISOString(),
         end_time: now.toISOString(),
+        device_type: 'SM', // 按烟雾/红外传感器设备类型过滤
         page: 1,
         page_size: 1,
       })
