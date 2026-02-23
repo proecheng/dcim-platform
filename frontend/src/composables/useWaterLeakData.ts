@@ -139,6 +139,8 @@ export function useWaterLeakData() {
   onUnmounted(() => {
     stopPolling()
     realtimeWs.off('realtime', handleWsMessage)
+    wsConnected.value = false
+    // 注意: 不调用 realtimeWs.close()，因为它是全局单例，close 会影响其他页面
   })
 
   return {

@@ -2,9 +2,10 @@
 告警相关 Schema
 """
 
+import json
 from typing import Optional, Dict, List
 from datetime import datetime
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, field_validator, model_validator
 
 
 class AlarmInfo(BaseModel):
@@ -152,6 +153,30 @@ class AlarmRuleBase(BaseModel):
     alarm_message: Optional[str] = None
     is_enabled: bool = True
 
+    @field_validator('condition_expr', mode='before')
+    @classmethod
+    def validate_condition_expr(cls, v):
+        """校验 condition_expr 是合法的条件树 JSON"""
+        if v is None:
+            return v
+        if not isinstance(v, str):
+            raise ValueError('condition_expr 必须是 JSON 字符串')
+        try:
+            parsed = json.loads(v)
+        except json.JSONDecodeError:
+            raise ValueError('condition_expr 不是合法的 JSON')
+        # 校验顶层结构
+        if not isinstance(parsed, dict):
+            raise ValueError('condition_expr 必须是 JSON 对象')
+        if parsed.get('type') not in ('group', 'condition'):
+            raise ValueError('condition_expr.type 必须是 group 或 condition')
+        if parsed['type'] == 'group':
+            if 'logic' not in parsed or parsed['logic'] not in ('AND', 'OR'):
+                raise ValueError('条件组的 logic 必须是 AND 或 OR')
+            if 'children' not in parsed or not isinstance(parsed['children'], list):
+                raise ValueError('条件组必须包含 children 数组')
+        return v
+
 
 class AlarmRuleCreate(AlarmRuleBase):
     """创建告警规则"""
@@ -168,6 +193,29 @@ class AlarmRuleUpdate(BaseModel):
     alarm_level: Optional[str] = None
     alarm_message: Optional[str] = None
     is_enabled: Optional[bool] = None
+
+    @field_validator('condition_expr', mode='before')
+    @classmethod
+    def validate_condition_expr(cls, v):
+        """校验 condition_expr 是合法的条件树 JSON"""
+        if v is None:
+            return v
+        if not isinstance(v, str):
+            raise ValueError('condition_expr 必须是 JSON 字符串')
+        try:
+            parsed = json.loads(v)
+        except json.JSONDecodeError:
+            raise ValueError('condition_expr 不是合法的 JSON')
+        if not isinstance(parsed, dict):
+            raise ValueError('condition_expr 必须是 JSON 对象')
+        if parsed.get('type') not in ('group', 'condition'):
+            raise ValueError('condition_expr.type 必须是 group 或 condition')
+        if parsed['type'] == 'group':
+            if 'logic' not in parsed or parsed['logic'] not in ('AND', 'OR'):
+                raise ValueError('条件组的 logic 必须是 AND 或 OR')
+            if 'children' not in parsed or not isinstance(parsed['children'], list):
+                raise ValueError('条件组必须包含 children 数组')
+        return v
 
 
 class AlarmRuleInfo(AlarmRuleBase):
@@ -213,8 +261,6 @@ class AlarmShieldInfo(AlarmShieldBase):
 
 
 # 告警升级相关 Schema
-from pydantic import field_validator, model_validator
-
 LEVEL_ORDER = {"info": 0, "minor": 1, "major": 2, "critical": 3}
 
 
@@ -228,6 +274,7 @@ class AlarmEscalationBase(BaseModel):
     notify_user_ids: List[int] = []
     is_enabled: bool = True
     description: Optional[str] = None
+    escalation_chain: Optional[str] = None
 
     @model_validator(mode="after")
     def validate_level_order(self):
@@ -255,6 +302,7 @@ class AlarmEscalationUpdate(BaseModel):
     notify_user_ids: Optional[List[int]] = None
     is_enabled: Optional[bool] = None
     description: Optional[str] = None
+    escalation_chain: Optional[str] = None
 
 
 class AlarmEscalationInfo(AlarmEscalationBase):

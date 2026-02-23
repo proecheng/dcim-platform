@@ -375,14 +375,15 @@ function levelLabel(level: string): string {
   return map[level] || level
 }
 
-/** 从 description 字段解析升级链长度 */
+/** 从 escalation_chain 字段解析升级链长度（兼容旧 description） */
 function getChainLength(row: AlarmEscalationInfo): number {
-  if (!row.description) return 1
+  const chainStr = row.escalation_chain || row.description
+  if (!chainStr) return 1
   try {
-    const chain = JSON.parse(row.description)
+    const chain = JSON.parse(chainStr)
     if (Array.isArray(chain)) return chain.length
   } catch {
-    // description 不是 JSON，说明只有单节点
+    // 不是 JSON，说明只有单节点
   }
   return 1
 }
@@ -466,11 +467,12 @@ function handleEdit(row: AlarmEscalationInfo) {
   form.sourceLevel = row.source_level
   form.targetLevel = row.target_level
 
-  // 从 description 反序列化升级链
+  // 从 escalation_chain 反序列化升级链（兼容旧 description）
   let chain: EscalationNode[] = []
-  if (row.description) {
+  const chainStr = row.escalation_chain || row.description
+  if (chainStr) {
     try {
-      const parsed = JSON.parse(row.description)
+      const parsed = JSON.parse(chainStr)
       if (Array.isArray(parsed)) {
         chain = parsed.map((n: Record<string, unknown>) => ({
           id: (n.id as string) || crypto.randomUUID(),
@@ -481,7 +483,7 @@ function handleEdit(row: AlarmEscalationInfo) {
         }))
       }
     } catch {
-      // description 不是 JSON
+      // 不是 JSON
     }
   }
 
@@ -541,7 +543,8 @@ async function submitForm() {
       target_level: form.targetLevel,
       notify_user_ids: allUserIds,
       is_enabled: true,
-      description: JSON.stringify(form.chain)
+      description: '',
+      escalation_chain: JSON.stringify(form.chain)
     }
 
     if (isEdit.value && editingId.value) {

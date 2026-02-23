@@ -323,6 +323,7 @@ function getConditionCount(row: AlarmRuleInfo): number {
     const root = JSON.parse(row.condition_expr) as ConditionGroup
     return countConditions(root)
   } catch {
+    console.warn('条件表达式解析失败:', row.rule_name)
     return 0
   }
 }
@@ -339,7 +340,8 @@ function getRelatedPoints(row: AlarmRuleInfo): string {
     const names = collectPointNames(root)
     return names.length ? names.join(', ') : '-'
   } catch {
-    return '-'
+    console.warn('条件表达式解析失败:', row.rule_name)
+    return '(数据异常)'
   }
 }
 
@@ -438,6 +440,7 @@ function handleEdit(row: AlarmRuleInfo) {
     try {
       form.rootGroup = JSON.parse(row.condition_expr) as ConditionGroup
     } catch {
+      ElMessage.warning('条件表达式数据异常，已重置为默认条件')
       form.rootGroup = createEmptyGroup()
     }
   } else {

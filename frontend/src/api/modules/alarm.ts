@@ -314,6 +314,7 @@ export interface AlarmEscalationInfo {
   notify_user_ids: number[]
   is_enabled: boolean
   description: string | null
+  escalation_chain: string | null
   created_at: string | null
   updated_at: string | null
 }
@@ -326,6 +327,7 @@ export interface AlarmEscalationCreateParams {
   notify_user_ids: number[]
   is_enabled?: boolean
   description?: string
+  escalation_chain?: string
 }
 
 export interface AlarmEscalationUpdateParams {
@@ -336,6 +338,7 @@ export interface AlarmEscalationUpdateParams {
   notify_user_ids?: number[]
   is_enabled?: boolean
   description?: string
+  escalation_chain?: string
 }
 
 export function getEscalations(params?: { source_level?: string; is_enabled?: boolean; page?: number; page_size?: number }) {

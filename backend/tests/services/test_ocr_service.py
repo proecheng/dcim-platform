@@ -3,7 +3,7 @@
 
 覆盖:
   - _get_mock_result: mock 模式返回数据结构验证
-  - recognize_bill: 文件类型校验、文件大小校验、mock 模式调用
+  - recognize_bill: 文件类型校验、文件大小校验、魔数校验、mock 模式调用
   - _detect_provider: 电力公司检测
   - _extract_pricing_items: 正则提取电价信息（带时间/不带时间/表格行）
 """
@@ -19,6 +19,11 @@ from app.services.ocr_service import (
     OcrBillResult,
     OcrBillItem,
 )
+
+# 测试用文件魔数前缀
+JPEG_HEADER = b'\xff\xd8\xff\xe0' + b'\x00' * 100
+PNG_HEADER = b'\x89PNG\r\n\x1a\n' + b'\x00' * 100
+PDF_HEADER = b'%PDF-1.4' + b'\x00' * 100
 
 
 class TestGetMockResult:
@@ -162,8 +167,14 @@ class TestRecognizeBill:
     @pytest.mark.asyncio
     async def test_valid_extensions_accepted(self):
         """JPG/PNG/PDF 格式应被接受（进入 mock 模式）"""
-        for ext in [".jpg", ".jpeg", ".png", ".pdf"]:
-            result = await recognize_bill(b"small file", f"test{ext}")
+        test_data = {
+            ".jpg": JPEG_HEADER,
+            ".jpeg": JPEG_HEADER,
+            ".png": PNG_HEADER,
+            ".pdf": PDF_HEADER,
+        }
+        for ext, data in test_data.items():
+            result = await recognize_bill(data, f"test{ext}")
             # 在 mock 模式下应返回成功
             assert result.success is True
 
@@ -178,14 +189,14 @@ class TestRecognizeBill:
     @pytest.mark.asyncio
     async def test_file_exactly_10mb(self):
         """恰好 10MB 的文件应被接受"""
-        data = b"x" * (10 * 1024 * 1024)
+        data = JPEG_HEADER + b"x" * (10 * 1024 * 1024 - len(JPEG_HEADER))
         result = await recognize_bill(data, "test.jpg")
         assert result.success is True
 
     @pytest.mark.asyncio
     async def test_mock_mode_returns_valid_data(self):
         """mock 模式应返回完整的五时段数据"""
-        result = await recognize_bill(b"test image data", "bill.jpg")
+        result = await recognize_bill(JPEG_HEADER, "bill.jpg")
         assert result.success is True
         assert result.provider == "国家电网"
         assert len(result.items) == 5
@@ -193,8 +204,8 @@ class TestRecognizeBill:
     @pytest.mark.asyncio
     async def test_case_insensitive_extension(self):
         """文件扩展名大小写不敏感"""
-        result = await recognize_bill(b"test", "bill.JPG")
+        result = await recognize_bill(JPEG_HEADER, "bill.JPG")
         assert result.success is True
 
-        result = await recognize_bill(b"test", "bill.Png")
+        result = await recognize_bill(PNG_HEADER, "bill.Png")
         assert result.success is True

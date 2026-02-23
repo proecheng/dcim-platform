@@ -10,6 +10,10 @@ import pytest
 from io import BytesIO
 from tests.conftest import auth_headers
 
+# 测试用文件魔数前缀
+JPEG_HEADER = b'\xff\xd8\xff\xe0' + b'\x00' * 100
+PNG_HEADER = b'\x89PNG\r\n\x1a\n' + b'\x00' * 100
+
 
 class TestOcrBillEndpoint:
     """电费单 OCR 识别 API 测试"""
@@ -19,7 +23,7 @@ class TestOcrBillEndpoint:
         """上传 JPG 文件，mock 模式应返回五时段电价数据"""
         _, token = admin_user
         # 构造 multipart 文件上传
-        files = {"file": ("bill.jpg", b"fake image content", "image/jpeg")}
+        files = {"file": ("bill.jpg", JPEG_HEADER, "image/jpeg")}
         resp = await client.post(
             "/api/v1/energy/ocr/bill",
             files=files,
@@ -38,7 +42,7 @@ class TestOcrBillEndpoint:
     async def test_ocr_bill_png_accepted(self, client, admin_user, async_db):
         """PNG 格式也应被接受"""
         _, token = admin_user
-        files = {"file": ("bill.png", b"fake png data", "image/png")}
+        files = {"file": ("bill.png", PNG_HEADER, "image/png")}
         resp = await client.post(
             "/api/v1/energy/ocr/bill",
             files=files,
@@ -74,7 +78,7 @@ class TestOcrBillEndpoint:
     async def test_ocr_bill_response_item_fields(self, client, admin_user, async_db):
         """验证返回的电价条目包含所有必要字段"""
         _, token = admin_user
-        files = {"file": ("bill.jpg", b"fake", "image/jpeg")}
+        files = {"file": ("bill.jpg", JPEG_HEADER, "image/jpeg")}
         resp = await client.post(
             "/api/v1/energy/ocr/bill",
             files=files,

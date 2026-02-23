@@ -128,5 +128,6 @@ class AlarmEscalation(Base):
     notify_user_ids = Column(String(500), default="", comment="通知对象(逗号分隔用户ID)")
     is_enabled = Column(Boolean, default=True, comment="是否启用")
     description = Column(Text, comment="规则描述")
+    escalation_chain = Column(Text, comment="升级链JSON(节点数组)")
     created_at = Column(DateTime, default=datetime.now, comment="创建时间")
     updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now, comment="更新时间")

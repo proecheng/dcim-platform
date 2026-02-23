@@ -66,6 +66,35 @@ _PERIOD_NAME_MAP: dict[str, str] = {
     "深谷": "深谷时段",
 }
 
+# 文件魔数（magic bytes）映射
+_FILE_MAGIC_BYTES = {
+    b'\xff\xd8\xff': 'image/jpeg',      # JPEG
+    b'\x89PNG': 'image/png',            # PNG (\x89\x50\x4e\x47)
+    b'%PDF': 'application/pdf',          # PDF
+}
+
+
+def _validate_file_magic(file_bytes: bytes, filename: str) -> Optional[str]:
+    """
+    校验文件魔数，返回错误信息或 None（通过）
+
+    同时校验文件扩展名和魔数，防止恶意文件伪装
+    """
+    if len(file_bytes) < 4:
+        return '文件内容过短，无法识别文件类型'
+
+    header = file_bytes[:4]
+    matched = False
+    for magic, mime_type in _FILE_MAGIC_BYTES.items():
+        if header[:len(magic)] == magic:
+            matched = True
+            break
+
+    if not matched:
+        return '文件内容与声明的格式不匹配，请上传真实的 JPG/PNG/PDF 文件'
+
+    return None
+
 
 @lru_cache(maxsize=1)
 def _get_paddle_ocr() -> object:
@@ -213,6 +242,17 @@ async def recognize_bill(file_bytes: bytes, filename: str) -> OcrBillResult:
             provider="unknown",
             items=[],
             error_message="文件大小不能超过10MB",
+        )
+
+    # 校验文件魔数
+    magic_error = _validate_file_magic(file_bytes, filename)
+    if magic_error:
+        return OcrBillResult(
+            success=False,
+            confidence=0,
+            provider='unknown',
+            items=[],
+            error_message=magic_error,
         )
 
     if _paddle_available:

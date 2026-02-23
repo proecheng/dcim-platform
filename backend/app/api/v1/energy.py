@@ -4214,6 +4214,10 @@ async def ocr_bill(
     file_bytes = await file.read()
     filename = file.filename or "unknown.jpg"
 
+    # 前置文件大小检查（避免大文件进入 OCR 服务）
+    if len(file_bytes) > 10 * 1024 * 1024:
+        raise HTTPException(status_code=413, detail="文件大小不能超过10MB")
+
     result = await recognize_bill(file_bytes, filename)
 
     if not result.success:
