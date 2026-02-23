@@ -418,7 +418,6 @@
       v-model="spaceDialogVisible"
       :title="isEdit ? '编辑空间容量' : '新增空间容量'"
       width="500px"
-      destroy-on-close
     >
       <el-form
         ref="spaceFormRef"
@@ -471,7 +470,6 @@
       v-model="powerDialogVisible"
       :title="isEdit ? '编辑电力容量' : '新增电力容量'"
       width="500px"
-      destroy-on-close
     >
       <el-form
         ref="powerFormRef"
@@ -527,7 +525,6 @@
       v-model="coolingDialogVisible"
       :title="isEdit ? '编辑制冷容量' : '新增制冷容量'"
       width="500px"
-      destroy-on-close
     >
       <el-form
         ref="coolingFormRef"
@@ -581,7 +578,6 @@
       v-model="planDialogVisible"
       :title="isEdit ? '编辑上架评估' : '新建上架评估'"
       width="1000px"
-      destroy-on-close
     >
       <el-form
         ref="planFormRef"
@@ -726,7 +722,6 @@
       v-model="weightDialogVisible"
       :title="isEdit ? '编辑承重容量' : '新增承重容量'"
       width="500px"
-      destroy-on-close
     >
       <el-form
         ref="weightFormRef"
@@ -766,7 +761,7 @@
     </el-dialog>
 
     <!-- 覆盖机柜对话框 -->
-    <el-dialog v-model="overrideDialogVisible" title="选择目标机柜" width="700px" destroy-on-close>
+    <el-dialog v-model="overrideDialogVisible" title="选择目标机柜" width="700px">
       <el-table :data="cabinetList" v-loading="cabinetLoading" size="small" border stripe max-height="400">
         <el-table-column prop="cabinet_code" label="编码" width="120" />
         <el-table-column prop="cabinet_name" label="名称" width="150" />

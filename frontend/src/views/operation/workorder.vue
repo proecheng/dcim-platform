@@ -161,7 +161,6 @@
       v-model="createDialogVisible"
       :title="isEdit ? '编辑工单' : '新建工单'"
       width="600px"
-      destroy-on-close
     >
       <el-form
         ref="createFormRef"
@@ -239,7 +238,6 @@
       v-model="detailDialogVisible"
       title="工单详情"
       width="700px"
-      destroy-on-close
     >
       <el-descriptions :column="2" border>
         <el-descriptions-item label="工单编号">{{ currentOrder?.order_no }}</el-descriptions-item>
@@ -302,7 +300,6 @@
       v-model="addLogDialogVisible"
       title="添加日志"
       width="500px"
-      destroy-on-close
     >
       <el-form
         ref="logFormRef"
@@ -342,7 +339,6 @@
       v-model="completeDialogVisible"
       title="完成工单"
       width="500px"
-      destroy-on-close
     >
       <el-form
         ref="completeFormRef"

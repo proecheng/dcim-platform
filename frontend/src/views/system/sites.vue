@@ -129,7 +129,6 @@
       v-model="dialogVisible"
       :title="isEdit ? '编辑站点' : '新建站点'"
       width="560px"
-      destroy-on-close
     >
       <el-form
         ref="formRef"

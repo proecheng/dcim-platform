@@ -1,9 +1,9 @@
 <template>
-  <el-dialog
+    <el-dialog
     v-model="visible"
     :title="dialogTitle"
     width="720px"
-    destroy-on-close
+      
     @closed="handleClose"
   >
     <el-tabs v-model="activeTab">

@@ -114,7 +114,7 @@
       v-model="dialogVisible"
       :title="isEdit ? '编辑联动策略' : '新建联动策略'"
       width="720px"
-      destroy-on-close
+      
     >
       <el-form ref="formRef" :model="form" :rules="formRules" label-width="100px">
         <el-form-item label="策略名称" prop="name">

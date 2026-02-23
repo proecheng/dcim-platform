@@ -107,7 +107,7 @@
     </el-card>
 
     <!-- 新建/编辑计划对话框 -->
-    <el-dialog v-model="planDialogVisible" :title="editingPlan ? '编辑巡检计划' : '新建巡检计划'" width="600px" destroy-on-close>
+    <el-dialog v-model="planDialogVisible" :title="editingPlan ? '编辑巡检计划' : '新建巡检计划'" width="600px">
       <el-form ref="planFormRef" :model="planForm" :rules="planRules" label-width="100px">
         <el-form-item label="计划名称" prop="name">
           <el-input v-model="planForm.name" placeholder="请输入计划名称" />
@@ -148,7 +148,7 @@
     </el-dialog>
 
     <!-- 完成巡检对话框 -->
-    <el-dialog v-model="completeDialogVisible" title="完成巡检任务" width="500px" destroy-on-close>
+    <el-dialog v-model="completeDialogVisible" title="完成巡检任务" width="500px">
       <el-form label-width="80px">
         <el-form-item label="巡检结果">
           <el-input v-model="completeForm.result" type="textarea" :rows="4" placeholder="请输入巡检结果" />

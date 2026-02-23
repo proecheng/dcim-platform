@@ -126,7 +126,7 @@
       v-model="dialogVisible"
       :title="isEdit ? '编辑用户' : '新建用户'"
       width="520px"
-      destroy-on-close
+      
     >
       <el-form
         ref="formRef"
@@ -183,7 +183,6 @@
       v-model="resetPwdVisible"
       title="重置密码"
       width="420px"
-      destroy-on-close
     >
       <el-form
         ref="resetPwdFormRef"

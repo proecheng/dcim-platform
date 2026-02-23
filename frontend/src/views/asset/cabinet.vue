@@ -46,7 +46,6 @@
       v-model="dialogVisible"
       :title="isEdit ? '编辑机柜' : '新增机柜'"
       width="600px"
-      destroy-on-close
     >
       <el-form
         ref="formRef"
@@ -136,7 +135,6 @@
       v-model="usageDialogVisible"
       :title="`${currentCabinet?.cabinet_name || ''} - U位图`"
       width="800px"
-      destroy-on-close
     >
       <div class="usage-container" v-if="currentUsage">
         <div class="usage-summary">

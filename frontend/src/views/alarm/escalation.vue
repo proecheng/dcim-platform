@@ -128,7 +128,6 @@
       v-model="dialogVisible"
       :title="isEdit ? '编辑升级规则' : '新增升级规则'"
       width="860px"
-      destroy-on-close
       top="4vh"
     >
       <el-form ref="formRef" :model="form" :rules="formRules" label-width="100px">

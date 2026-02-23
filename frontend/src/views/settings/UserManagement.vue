@@ -115,7 +115,7 @@
     />
 
     <!-- 新增/编辑用户对话框 -->
-    <el-dialog v-model="dialogVisible" :title="isEdit ? '编辑用户' : '新增用户'" width="520px" :destroy-on-close="true">
+    <el-dialog v-model="dialogVisible" :title="isEdit ? '编辑用户' : '新增用户'" width="520px">
       <el-form ref="formRef" :model="form" :rules="formRules" label-width="80px">
         <el-form-item label="用户名" prop="username">
           <el-input v-model="form.username" :disabled="isEdit" placeholder="3-50个字符" />
@@ -155,7 +155,7 @@
     </el-dialog>
 
     <!-- 重置密码对话框 -->
-    <el-dialog v-model="resetPwdVisible" title="重置密码" width="420px" :destroy-on-close="true">
+    <el-dialog v-model="resetPwdVisible" title="重置密码" width="420px">
       <el-form ref="resetPwdFormRef" :model="pwdForm" :rules="pwdRules" label-width="80px">
         <el-form-item label="新密码" prop="password">
           <el-input v-model="pwdForm.password" type="password" show-password placeholder="≥8位，含大小写+数字+特殊字符" />

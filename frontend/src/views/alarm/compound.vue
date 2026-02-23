@@ -121,8 +121,7 @@
       v-model="dialogVisible"
       :title="isEdit ? '编辑复合规则' : '新增复合规则'"
       width="960px"
-      destroy-on-close
-      top="4vh"
+    top="4vh"
     >
       <el-form ref="formRef" :model="form" :rules="formRules" label-width="90px">
         <!-- 基本信息 -->

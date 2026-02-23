@@ -6,7 +6,6 @@
     :close-on-click-modal="!status.loading"
     :close-on-press-escape="!status.loading"
     :show-close="!status.loading"
-    destroy-on-close
   >
     <div class="demo-loader">
       <!-- 状态显示 -->

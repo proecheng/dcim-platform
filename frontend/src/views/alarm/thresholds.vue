@@ -138,7 +138,7 @@
       v-model="dialogVisible"
       :title="isEdit ? '编辑阈值规则' : '新增阈值规则'"
       width="900px"
-      destroy-on-close
+      
       @opened="initChart"
       @closed="disposeChart"
     >

@@ -264,7 +264,6 @@
       v-model="dialogVisible"
       :title="isEdit ? '编辑资产' : '新增资产'"
       width="700px"
-      destroy-on-close
     >
       <el-form
         ref="formRef"
@@ -416,7 +415,6 @@
       v-model="maintenanceDialogVisible"
       title="新建维护记录"
       width="500px"
-      destroy-on-close
     >
       <el-form
         ref="maintenanceFormRef"
@@ -476,7 +474,6 @@
       v-model="importDialogVisible"
       title="批量导入资产"
       width="650px"
-      destroy-on-close
       @closed="resetImport"
     >
       <div class="import-section">
@@ -548,7 +545,6 @@
       v-model="detailDialogVisible"
       title="资产详情"
       width="800px"
-      destroy-on-close
     >
       <el-tabs v-model="detailActiveTab">
         <el-tab-pane label="基本信息" name="info">

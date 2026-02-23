@@ -4,7 +4,6 @@
     title="确认执行方案"
     width="520px"
     :close-on-click-modal="false"
-    destroy-on-close
   >
     <el-form ref="formRef" :model="formData" :rules="rules" label-width="100px">
       <el-form-item label="方案名称" prop="planName">

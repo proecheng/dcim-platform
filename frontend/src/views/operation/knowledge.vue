@@ -88,7 +88,6 @@
       v-model="editDialogVisible"
       :title="isEdit ? '编辑文章' : '新建文章'"
       width="650px"
-      destroy-on-close
     >
       <el-form
         ref="editFormRef"
@@ -141,7 +140,6 @@
       v-model="viewDialogVisible"
       title="文章详情"
       width="700px"
-      destroy-on-close
     >
       <div class="article-view" v-if="currentArticle">
         <h2 class="article-title">{{ currentArticle.title }}</h2>

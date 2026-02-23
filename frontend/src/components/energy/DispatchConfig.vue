@@ -184,7 +184,6 @@
       v-model="deviceDialog.visible"
       :title="deviceDialog.isEdit ? '编辑设备' : '添加设备'"
       width="600px"
-      destroy-on-close
     >
       <el-form :model="deviceForm" label-width="120px" ref="deviceFormRef">
         <el-form-item label="设备名称" prop="name" required>
@@ -266,7 +265,6 @@
       v-model="storageDialog.visible"
       :title="storageDialog.isEdit ? '编辑储能' : '添加储能'"
       width="500px"
-      destroy-on-close
     >
       <el-form :model="storageForm" label-width="130px">
         <el-form-item label="系统名称" required>
@@ -311,7 +309,6 @@
       v-model="pvDialog.visible"
       :title="pvDialog.isEdit ? '编辑光伏' : '添加光伏'"
       width="500px"
-      destroy-on-close
     >
       <el-form :model="pvForm" label-width="120px">
         <el-form-item label="系统名称" required>
