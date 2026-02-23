@@ -118,7 +118,7 @@ $transition-25d: cubic-bezier(0.25, 0.46, 0.45, 0.94);
 
 // ── 组件层 E：入场动画 ──────────────────────────────────
 @mixin enter-stagger($animation: fadeInDepthSubtle, $duration: 0.5s, $stagger: $enter-stagger-25d) {
-  > * {
+  > *:not(.el-overlay) {
     @for $i from 1 through 12 {
       &:nth-child(#{$i}) {
         animation: #{$animation} #{$duration} ease-out both;
