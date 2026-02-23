@@ -28,9 +28,8 @@ export default defineConfig({
       output: {
         manualChunks: {
           'echarts': ['echarts'],
-          'element-plus': ['element-plus', '@element-plus/icons-vue'],
           'three': ['three'],
-          'vue-vendor': ['vue', 'vue-router', 'pinia'],
+          'vue-vendor': ['vue', 'vue-router', 'pinia', 'element-plus', '@element-plus/icons-vue'],
         }
       }
     }
