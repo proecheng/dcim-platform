@@ -524,6 +524,7 @@ async function handleSubmitResetPwd() {
 
 // ===== 表单重置 =====
 function resetForm() {
+  formRef.value?.clearValidate()
   Object.assign(form, {
     username: '',
     password: '',
@@ -540,6 +541,7 @@ function resetForm() {
 }
 
 function handleResetPwdClose() {
+  resetPwdFormRef.value?.clearValidate()
   pwdForm.password = ''
   pwdForm.confirmPassword = ''
   nextTick(() => {

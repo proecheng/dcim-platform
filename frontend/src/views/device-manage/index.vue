@@ -474,6 +474,7 @@ async function handleDelete(row: DeviceInfo) {
 
 // ===== 表单重置 =====
 function resetForm() {
+  formRef.value?.clearValidate()
   Object.assign(form, {
     device_code: '',
     device_name: '',
