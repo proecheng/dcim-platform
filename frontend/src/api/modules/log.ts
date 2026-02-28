@@ -1,5 +1,6 @@
 /**
  * 日志查询 API
+ * @module log
  */
 import request from '@/utils/request'
 import type { PageParams, PageResponse, TimeRangeParams, ExportParams } from './types'
@@ -59,6 +60,7 @@ export interface LogStatistics {
  */
 export function getOperationLogs(params?: PageParams & TimeRangeParams & {
   user_id?: number
+  username?: string
   module?: string
   action?: string
   keyword?: string
