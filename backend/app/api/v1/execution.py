@@ -8,6 +8,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from ..deps import get_db, get_current_user, require_viewer, require_admin
 from ...models.user import User
@@ -24,6 +25,68 @@ from ...schemas.energy import (
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+
+# ========== 辅助函数 ==========
+
+
+async def _generate_tasks_from_opportunity(db: AsyncSession, plan: ExecutionPlan) -> int:
+    """
+    从 opportunity 的 analysis_data 自动生成执行任务
+
+    当计划开始执行时发现没有任务，自动根据关联的节能机会配置生成任务
+    """
+    analysis_data = plan.opportunity.analysis_data
+    source_plugin = plan.opportunity.source_plugin
+    task_count = 0
+    period_names = {"sharp": "尖峰", "peak": "峰时", "flat": "平时", "valley": "谷时", "deep_valley": "深谷"}
+
+    if source_plugin == "peak_valley_optimizer":
+        # 负荷转移方案：为每个设备的每条规则创建任务
+        device_rules = analysis_data.get("device_rules", [])
+        for device_rule in device_rules:
+            device_name = device_rule.get("device_name", "未知设备")
+            device_id = device_rule.get("device_id")
+            rules = device_rule.get("rules", [])
+            for rule_idx, rule in enumerate(rules):
+                source_name = period_names.get(rule.get("source_period", ""), rule.get("source_period", ""))
+                target_name = period_names.get(rule.get("target_period", ""), rule.get("target_period", ""))
+                task = ExecutionTask(
+                    plan_id=plan.id,
+                    task_type="load_shift",
+                    task_name=f"{device_name} - {source_name}转{target_name}",
+                    target_object=f"device:{device_id}" if device_id else None,
+                    execution_mode="manual",
+                    parameters={
+                        "device_id": device_id,
+                        "device_name": device_name,
+                        "source_period": rule.get("source_period"),
+                        "target_period": rule.get("target_period"),
+                        "power": rule.get("power"),
+                        "hours": rule.get("hours"),
+                        "rule_index": rule_idx,
+                    },
+                    status="pending",
+                    sort_order=task_count,
+                )
+                db.add(task)
+                task_count += 1
+    else:
+        # 其他类型的方案：创建一个通用执行任务
+        task = ExecutionTask(
+            plan_id=plan.id,
+            task_type=source_plugin or "general",
+            task_name=f"执行{plan.plan_name}",
+            execution_mode="manual",
+            parameters=analysis_data,
+            status="pending",
+            sort_order=0,
+        )
+        db.add(task)
+        task_count = 1
+
+    await db.flush()
+    return task_count
 
 
 # ========== 请求模型 ==========
@@ -204,6 +267,8 @@ async def list_plans(
                     "plan_name": item.plan_name,
                     "expected_saving": float(item.expected_saving) if item.expected_saving else 0,
                     "status": item.status,
+                    "started_at": item.started_at.isoformat() if item.started_at else None,
+                    "completed_at": item.completed_at.isoformat() if item.completed_at else None,
                     "created_at": item.created_at.isoformat() if item.created_at else None,
                     "updated_at": item.updated_at.isoformat() if item.updated_at else None,
                 }
@@ -238,7 +303,11 @@ async def update_plan_status(
     from ...models.energy import ExecutionPlan
     from datetime import datetime
 
-    result = await db.execute(select(ExecutionPlan).where(ExecutionPlan.id == plan_id))
+    result = await db.execute(
+        select(ExecutionPlan)
+        .options(selectinload(ExecutionPlan.tasks), selectinload(ExecutionPlan.opportunity))
+        .where(ExecutionPlan.id == plan_id)
+    )
     plan = result.scalar_one_or_none()
 
     if not plan:
@@ -248,8 +317,13 @@ async def update_plan_status(
     plan.status = request.status
     plan.updated_at = datetime.now()
 
-    if request.status == "executing" and not plan.started_at:
-        plan.started_at = datetime.now()
+    if request.status == "executing":
+        if not plan.started_at:
+            plan.started_at = datetime.now()
+        # 如果计划没有任务，自动从 opportunity 的 analysis_data 生成任务
+        if len(plan.tasks) == 0 and plan.opportunity and plan.opportunity.analysis_data:
+            task_count = await _generate_tasks_from_opportunity(db, plan)
+            logger.info(f"计划 {plan_id} 自动生成了 {task_count} 个执行任务")
     elif request.status == "completed" and not plan.completed_at:
         plan.completed_at = datetime.now()
 
@@ -258,8 +332,7 @@ async def update_plan_status(
 
     await db.commit()
 
-    return {"message": "状态更新成功", "plan_id": plan_id, "old_status": old_status, "new_status": plan.status}
-
+    return ResponseModel(code=0, message="状态更新成功", data={"plan_id": plan_id, "old_status": old_status, "new_status": plan.status})
 
 @router.get("/plans/{plan_id}/checklist", summary="生成执行清单")
 async def get_checklist(plan_id: int, db: AsyncSession = Depends(get_db), _: User = Depends(require_viewer)):

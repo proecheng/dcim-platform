@@ -418,42 +418,42 @@ async def delete_power_device(
 ):
     """删除用电设备。无 force 参数时返回影响分析；force=true 时执行级联删除。"""
     from ...services.device_lifecycle import DeviceLifecycleService
-    
+
     result = await db.execute(select(PowerDevice).where(PowerDevice.id == device_id))
     power_device = result.scalar_one_or_none()
     if not power_device:
         raise HTTPException(status_code=404, detail="设备不存在")
-    
+
     lifecycle = DeviceLifecycleService(db)
-    
+
     if not force:
         # 返回影响分析，让前端确认
         impact = await lifecycle.analyze_power_device_delete_impact(device_id)
         return impact
-    
+
     # 执行级联删除
     # 1. 检查是否有子设备（阻断）
     children = await db.execute(select(PowerDevice).where(PowerDevice.parent_device_id == device_id))
     if children.scalars().first():
         raise HTTPException(status_code=400, detail="该设备有下级设备，无法删除")
-    
+
     # 2. 删除关联数据
     from ...models.energy import (
         EnergyHourly, EnergyDaily, EnergyMonthly,
         DeviceLoadProfile, DeviceShiftConfig, LoadRegulationConfig
     )
-    
+
     await db.execute(delete(EnergyHourly).where(EnergyHourly.device_id == device_id))
     await db.execute(delete(EnergyDaily).where(EnergyDaily.device_id == device_id))
     await db.execute(delete(EnergyMonthly).where(EnergyMonthly.device_id == device_id))
     await db.execute(delete(DeviceLoadProfile).where(DeviceLoadProfile.device_id == device_id))
     await db.execute(delete(DeviceShiftConfig).where(DeviceShiftConfig.device_id == device_id))
     await db.execute(delete(LoadRegulationConfig).where(LoadRegulationConfig.device_id == device_id))
-    
+
     # 3. 删除 PowerDevice 本身
     await db.execute(delete(PowerDevice).where(PowerDevice.id == device_id))
     await db.commit()
-    
+
     return ResponseModel(message="删除成功")
 
 

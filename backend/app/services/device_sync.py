@@ -493,12 +493,12 @@ class DeviceSyncService:
 
         # 4. Device → PowerDevice (反向: 已有 UPS/AC/PDU 设备但无 PowerDevice)
         created_power_for_devices = 0
-        
+
         # 先构建 circuit_code -> circuit_id 映射
         from ..models.energy import DistributionCircuit
         circuit_result = await self.db.execute(select(DistributionCircuit))
         circuit_map = {c.circuit_code: c.id for c in circuit_result.scalars().all()}
-        
+
         for dev_type, power_type in self.DEVICE_TO_POWER_TYPE_MAP.items():
             devs = (
                 (
@@ -523,7 +523,7 @@ class DeviceSyncService:
                 if not existing_pd:
                     # 智能分配 circuit_id
                     circuit_id = self._infer_circuit_id(dev, circuit_map)
-                    
+
                     pd = PowerDevice(
                         device_code=dev.device_code,
                         device_name=dev.device_name,
@@ -543,7 +543,7 @@ class DeviceSyncService:
                     # 补充已有设备缺失的额定功率
                     existing_pd.rated_power = self.DEFAULT_RATED_POWER.get(power_type, 20.0)
                     existing_pd.updated_at = datetime.now()
-                    
+
                 # 补充已有设备缺失的 circuit_id
                 if existing_pd and not existing_pd.circuit_id:
                     circuit_id = self._infer_circuit_id(dev, circuit_map)
@@ -642,11 +642,11 @@ class DeviceSyncService:
             "created_cooling_extensions": created_cooling_ext,
             "created_cold_aisle_extensions": created_cold_aisle_ext,
         }
-    
+
     def _infer_circuit_id(self, device: Device, circuit_map: dict) -> Optional[int]:
         """
         根据设备编码和类型智能推断应该绑定的回路ID
-        
+
         规则:
         - UPS-F1-XX → C-F1-UPS-01
         - UPS-F2-XX → C-F2-UPS-01
@@ -660,7 +660,7 @@ class DeviceSyncService:
         """
         code = device.device_code
         dev_type = device.device_type
-        
+
         # UPS 设备
         if dev_type == "UPS":
             if code.startswith("UPS-F1-"):
@@ -669,7 +669,7 @@ class DeviceSyncService:
                 return circuit_map.get("C-F2-UPS-01")
             elif code.startswith("UPS-F3-") or code.startswith("F3-UPS-"):
                 return circuit_map.get("C-F3-UPS-01")
-        
+
         # 制冷设备
         elif dev_type == "AC":
             if code.startswith("CH-"):
@@ -692,7 +692,7 @@ class DeviceSyncService:
                 return circuit_map.get("C-AC-01")
             elif code.startswith("AC-B"):
                 return circuit_map.get("C-AC-02")
-        
+
         # PDU/IT 设备
         elif dev_type in ("PDU", "IT"):
             area = device.area_code or ""
@@ -701,9 +701,9 @@ class DeviceSyncService:
                 return circuit_map.get("C-A1-01")
             elif "B1" in area or "B" in code:
                 return circuit_map.get("C-B1-01")
-        
+
         # 照明
         elif dev_type == "LIGHT":
             return circuit_map.get("C-LIGHT")
-        
+
         return None

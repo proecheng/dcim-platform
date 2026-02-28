@@ -6,17 +6,18 @@ from datetime import datetime
 from typing import Optional, List
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, update, delete
+from sqlalchemy import select, func, update
 
 from ..deps import get_db, require_viewer, require_operator, require_admin, get_user_site_ids
 from ...models.user import User
 from ...models.device import Device
 from ...models.point import Point, PointRealtime
 from ...models.alarm import Alarm
-from ...schemas.device import DeviceCreate, DeviceUpdate, DeviceInfo, DeviceStatusSummary
+from ...schemas.device import DeviceCreate, DeviceUpdate, DeviceInfo, DeviceStatusSummary, DeviceDeleteImpact
 from ...schemas.common import PageResponse
 from ...core.redis import redis_service
 from ...services.device_sync import DeviceSyncService
+from ...services.device_lifecycle import DeviceLifecycleService
 
 router = APIRouter()
 
@@ -325,6 +326,10 @@ async def create_device(data: DeviceCreate, db: AsyncSession = Depends(get_db), 
     sync = DeviceSyncService(db)
     await sync.on_device_created(device)
 
+    # 自动创建扩展记录（UPSDevice / CoolingUnit / ColdAisle）
+    lifecycle = DeviceLifecycleService(db)
+    await lifecycle.on_device_created(device)
+
     await db.commit()
     await db.refresh(device)
 
@@ -362,28 +367,42 @@ async def update_device(
     return DeviceInfo.model_validate(device)
 
 
-@router.delete("/{device_id}", summary="删除设备")
-async def delete_device(device_id: int, db: AsyncSession = Depends(get_db), _: User = Depends(require_admin)):
+@router.get("/{device_id}/delete-impact", response_model=DeviceDeleteImpact, summary="删除影响分析")
+async def get_delete_impact(device_id: int, db: AsyncSession = Depends(get_db), _: User = Depends(require_viewer)):
     """
-    删除设备（同时删除关联点位）
+    分析删除设备将影响哪些关联数据
+    """
+    lifecycle = DeviceLifecycleService(db)
+    impact = await lifecycle.analyze_delete_impact(device_id)
+    if impact is None:
+        raise HTTPException(status_code=404, detail="设备不存在")
+    return impact
+
+
+@router.delete("/{device_id}", summary="删除设备")
+async def delete_device(
+    device_id: int,
+    force: bool = Query(False, description="强制级联删除"),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_admin),
+):
+    """
+    删除设备。无 force 参数时返回影响分析；force=true 时执行级联删除。
     """
     result = await db.execute(select(Device).where(Device.id == device_id))
     device = result.scalar_one_or_none()
     if not device:
         raise HTTPException(status_code=404, detail="设备不存在")
 
-    # 检查是否有关联点位
-    point_count_result = await db.execute(select(func.count(Point.id)).where(Point.device_id == device_id))
-    point_count = point_count_result.scalar()
+    lifecycle = DeviceLifecycleService(db)
 
-    if point_count > 0:
-        raise HTTPException(status_code=400, detail=f"设备下有 {point_count} 个点位，请先删除点位")
+    if not force:
+        # 返回影响分析，让前端确认
+        impact = await lifecycle.analyze_delete_impact(device_id)
+        return impact
 
-    # 双向同步: Device 删除 → 禁用拓扑节点
-    sync = DeviceSyncService(db)
-    await sync.on_device_deleted(device)
-
-    await db.execute(delete(Device).where(Device.id == device_id))
+    # 执行级联删除
+    deleted = await lifecycle.cascade_delete(device_id)
     await db.commit()
 
-    return {"message": "设备已删除"}
+    return {"message": "设备已删除", "deleted": deleted}

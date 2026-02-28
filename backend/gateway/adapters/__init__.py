@@ -20,31 +20,31 @@ from .registry import (
 
 # 触发 @register_adapter 装饰器 — 缺少可选依赖时静默跳过
 try:
-    from . import modbus_tcp
+    from . import modbus_tcp  # noqa: F401
 except ImportError:
     pass
 try:
-    from . import modbus_rtu
+    from . import modbus_rtu  # noqa: F401
 except ImportError:
     pass
 try:
-    from . import snmp
+    from . import snmp  # noqa: F401
 except ImportError:
     pass
 try:
-    from . import mqtt_device
+    from . import mqtt_device  # noqa: F401
 except ImportError:
     pass
 try:
-    from . import http_rest
+    from . import http_rest  # noqa: F401
 except ImportError:
     pass
 try:
-    from . import bacnet_ip
+    from . import bacnet_ip  # noqa: F401
 except ImportError:
     pass
 try:
-    from . import opc_ua
+    from . import opc_ua  # noqa: F401
 except ImportError:
     pass
 

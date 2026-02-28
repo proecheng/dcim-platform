@@ -385,7 +385,7 @@ async def get_monthly_history(
     - 优先从 monthly_statistics 表获取数据
     - 若无数据，返回默认值
     """
-    now = datetime.now()
+    datetime.now()
 
     # 获取配置
     declared_demand, _demand_price = await _get_declared_demand(db)

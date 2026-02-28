@@ -18,7 +18,6 @@ from ..models.cooling import CoolingUnit, ColdAisle
 from ..models.energy import DistributionPanel, PowerDevice
 from ..models.report import DeviceHealthScore
 from ..models.topology_config import PowerPhaseMapping
-from .device_sync import DeviceSyncService
 
 logger = logging.getLogger(__name__)
 
@@ -40,7 +39,7 @@ class DeviceLifecycleService:
 
         # 获取该设备下所有点位 ID
         point_ids_result = await self.db.execute(
-            select(Point.id).where(Point.device_id == device_id)
+            select(Point.id).where(Point.device_id == device_id)  # noqa: F823
         )
         point_ids = [row[0] for row in point_ids_result.all()]
 
@@ -201,7 +200,7 @@ class DeviceLifecycleService:
                 "count": wo_count,
                 "action": "warn",  # 软关联，仅警告
             })
-        
+
         # 14. 控制命令软关联（CommandApproval.target_device_id）
         from ..models.command import CommandApproval
         ca_count = (await self.db.execute(
@@ -214,7 +213,7 @@ class DeviceLifecycleService:
                 "count": ca_count,
                 "action": "warn",
             })
-        
+
         # 15. 点位能源设备软关联（Point.energy_device_id）
         if point_ids:
             # 查找关联到 PowerDevice 的点位
@@ -223,7 +222,7 @@ class DeviceLifecycleService:
                 select(PowerDevice.id).where(PowerDevice.monitor_device_id == device_id)
             )
             power_device_ids = [row[0] for row in pd_result.all()]
-            
+
             if power_device_ids:
                 energy_point_count = (await self.db.execute(
                     select(func.count(Point.id)).where(Point.energy_device_id.in_(power_device_ids))
@@ -354,17 +353,17 @@ class DeviceLifecycleService:
         # 13. 软关联警告（不删除，仅记录）
         from ..models.operation import WorkOrder
         from ..models.command import CommandApproval
-        
+
         wo_count = (await self.db.execute(
             select(func.count(WorkOrder.id)).where(WorkOrder.device_id == device_id)
         )).scalar() or 0
         deleted["work_orders_soft_ref"] = wo_count
-        
+
         ca_count = (await self.db.execute(
             select(func.count(CommandApproval.id)).where(CommandApproval.target_device_id == device_id)
         )).scalar() or 0
         deleted["command_approvals_soft_ref"] = ca_count
-        
+
         # 14. 删除 Device 本身
         await self.db.execute(delete(Device).where(Device.id == device_id))
         deleted["device"] = 1
@@ -421,17 +420,17 @@ class DeviceLifecycleService:
         # UPSDevice/CoolingUnit/ColdAisle 没有独立的 name 字段需要同步
         # 拓扑侧的同步已由 DeviceSyncService.on_device_updated() 处理
         pass
-    
+
     async def analyze_power_device_delete_impact(self, power_device_id: int) -> dict:
         """分析 PowerDevice 删除影响，与 Device 删除保持一致的检查逻辑"""
-        
+
         result = await self.db.execute(select(PowerDevice).where(PowerDevice.id == power_device_id))
         power_device = result.scalar_one_or_none()
         if not power_device:
             return None
-        
+
         impacts = []
-        
+
         # 1. 子设备（parent_device_id）
         child_count = (await self.db.execute(
             select(func.count(PowerDevice.id)).where(PowerDevice.parent_device_id == power_device_id)
@@ -443,10 +442,10 @@ class DeviceLifecycleService:
                 "count": child_count,
                 "action": "block",  # 阻断删除
             })
-        
+
         # 2. 能耗数据（EnergyHourly/Daily/Monthly）
         from ..models.energy import EnergyHourly, EnergyDaily, EnergyMonthly
-        
+
         hourly_count = (await self.db.execute(
             select(func.count(EnergyHourly.id)).where(EnergyHourly.device_id == power_device_id)
         )).scalar() or 0
@@ -456,7 +455,7 @@ class DeviceLifecycleService:
         monthly_count = (await self.db.execute(
             select(func.count(EnergyMonthly.id)).where(EnergyMonthly.device_id == power_device_id)
         )).scalar() or 0
-        
+
         total_energy = hourly_count + daily_count + monthly_count
         if total_energy > 0:
             impacts.append({
@@ -465,7 +464,7 @@ class DeviceLifecycleService:
                 "count": total_energy,
                 "action": "delete",
             })
-        
+
         # 3. 负载配置（DeviceLoadProfile）
         from ..models.energy import DeviceLoadProfile
         profile_count = (await self.db.execute(
@@ -478,7 +477,7 @@ class DeviceLifecycleService:
                 "count": profile_count,
                 "action": "delete",
             })
-        
+
         # 4. 转移配置（DeviceShiftConfig）
         from ..models.energy import DeviceShiftConfig
         shift_count = (await self.db.execute(
@@ -491,7 +490,7 @@ class DeviceLifecycleService:
                 "count": shift_count,
                 "action": "delete",
             })
-        
+
         # 5. 调节配置（LoadRegulationConfig）
         from ..models.energy import LoadRegulationConfig
         reg_count = (await self.db.execute(
@@ -504,7 +503,7 @@ class DeviceLifecycleService:
                 "count": reg_count,
                 "action": "delete",
             })
-        
+
         # 6. 关联的 Device（monitor_device_id）
         if power_device.monitor_device_id:
             impacts.append({
@@ -513,9 +512,9 @@ class DeviceLifecycleService:
                 "count": 1,
                 "action": "unlink",  # 解除关联，不删除
             })
-        
+
         total_affected = sum(item["count"] for item in impacts)
-        
+
         return {
             "power_device_id": power_device.id,
             "device_code": power_device.device_code,
