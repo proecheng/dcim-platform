@@ -170,8 +170,6 @@
       @deleted="handleDeviceDeleted"
     />
   </div>
-    </el-dialog>
-  </div>
 </template>
 
 <script setup lang="ts">

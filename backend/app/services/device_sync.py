@@ -681,7 +681,7 @@ class DeviceSyncService:
                 return circuit_map.get("C-F3-PDU-GENERIC")
             elif code.startswith("PDU-F4-"):
                 return circuit_map.get("C-F4-PDU-GENERIC")
-            
+
             # 旧的 A1/B1 区域 PDU
             area = device.area_code or ""
             if "A1" in area or "A" in code:
@@ -694,7 +694,7 @@ class DeviceSyncService:
             # 冷通道 CA-XX → C-CA-GENERIC (通用回路)
             if code.startswith("CA-"):
                 return circuit_map.get("C-CA-GENERIC")
-            
+
             # 水泵 PMP-F1-XX
             if code.startswith("PMP-"):
                 # 冷冻水泵 01-04
@@ -706,24 +706,24 @@ class DeviceSyncService:
                 # 其他水泵 → 通用回路
                 else:
                     return circuit_map.get("C-PMP-GENERIC")
-            
+
             # 室外机 AC-OUT-XX → C-AC-OUT-GENERIC
             if code.startswith("AC-OUT-"):
                 return circuit_map.get("C-AC-OUT-GENERIC")
-            
+
             # 冷机 CH-XX → C-CH-01
             if code.startswith("CH-"):
                 return circuit_map.get("C-CH-01")
-            
+
             # 冷却塔 CT-XX → C-CT-01
             if code.startswith("CT-"):
                 return circuit_map.get("C-CT-01")
-            
+
             # 楼层空调 F1-AC-XX → C-F1-AC-01
             for floor in ["F1", "F2", "F3", "F4"]:
                 if code.startswith(f"{floor}-AC-"):
                     return circuit_map.get(f"C-{floor}-AC-01")
-            
+
             # 精密空调 AC-A/B → C-AC-01/02
             if code.startswith("AC-A"):
                 return circuit_map.get("C-AC-01")
@@ -734,11 +734,11 @@ class DeviceSyncService:
             for floor in ["F2", "F3", "F4"]:
                 if code.startswith(f"CA-{floor}-"):
                     return circuit_map.get(f"C-{floor}-CA-01")
-            
+
             # 区域冷通道 CA-A01 → C-CA-A-01
             if code.startswith("CA-A"):
                 return circuit_map.get("C-CA-A-01")
-            
+
             # 水泵 PMP-F1-XX
             if code.startswith("PMP-"):
                 # 冷冻水泵 01-04
@@ -755,24 +755,24 @@ class DeviceSyncService:
                         return circuit_map.get(f"C-PMP-{circuit_suffix}")
                     except (ValueError, IndexError):
                         return circuit_map.get("C-PMP-01")
-            
+
             # 室外机 AC-OUT-XX → C-AC-OUT-01
             if code.startswith("AC-OUT-"):
                 return circuit_map.get("C-AC-OUT-01")
-            
+
             # 冷机 CH-XX → C-CH-01
             if code.startswith("CH-"):
                 return circuit_map.get("C-CH-01")
-            
+
             # 冷却塔 CT-XX → C-CT-01
             if code.startswith("CT-"):
                 return circuit_map.get("C-CT-01")
-            
+
             # 楼层空调 F1-AC-XX → C-F1-AC-01
             for floor in ["F1", "F2", "F3", "F4"]:
                 if code.startswith(f"{floor}-AC-"):
                     return circuit_map.get(f"C-{floor}-AC-01")
-            
+
             # 精密空调 AC-A/B → C-AC-01/02
             if code.startswith("AC-A"):
                 return circuit_map.get("C-AC-01")
