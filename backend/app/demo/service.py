@@ -118,10 +118,11 @@ METER_POINTS = [
 ]
 
 DISTRIBUTION_PANELS = [
-    # 原有配电柜
+    # ===== A区配电链路 (TR-001 → M001/M002) =====
+    # 编码与供配电监控系统 power_seed.py 保持一致
     {
-        "panel_code": "MDP-001",
-        "panel_name": "主配电柜",
+        "panel_code": "CAB-A01",
+        "panel_name": "A区主配电柜",
         "panel_type": "main",
         "rated_current": 2000,
         "location": "配电室A",
@@ -135,7 +136,7 @@ DISTRIBUTION_PANELS = [
         "rated_current": 1600,
         "location": "配电室A",
         "area_code": "A1",
-        "parent_code": "MDP-001",
+        "parent_code": "CAB-A01",
         "meter_point_code": "M001",
     },
     {
@@ -158,46 +159,26 @@ DISTRIBUTION_PANELS = [
         "meter_point_code": "M002",
     },
     {
-        "panel_code": "PDU-A1-001",
-        "panel_name": "A1区列头柜1",
+        "panel_code": "PDU-F2-01",
+        "panel_name": "F2 列头柜1",
         "panel_type": "sub",
         "rated_current": 250,
-        "location": "机房A1区",
-        "area_code": "A1",
+        "location": "F2机房",
+        "area_code": "F2",
         "parent_code": "UPS-OUT-001",
         "meter_point_code": "M002",
     },
     {
-        "panel_code": "PDU-A1-002",
-        "panel_name": "A1区列头柜2",
+        "panel_code": "PDU-F2-02",
+        "panel_name": "F2 列头柜2",
         "panel_type": "sub",
         "rated_current": 250,
-        "location": "机房A1区",
-        "area_code": "A1",
+        "location": "F2机房",
+        "area_code": "F2",
         "parent_code": "UPS-OUT-001",
         "meter_point_code": "M002",
     },
-    {
-        "panel_code": "AC-PANEL-001",
-        "panel_name": "空调配电柜",
-        "panel_type": "sub",
-        "rated_current": 400,
-        "location": "配电室B",
-        "area_code": "B1",
-        "parent_code": "MDP-001",
-        "meter_point_code": "M003",
-    },
-    # 新增: B1制冷系统配电柜
-    {
-        "panel_code": "COOLING-PANEL-001",
-        "panel_name": "制冷系统配电柜",
-        "panel_type": "sub",
-        "rated_current": 800,
-        "location": "B1制冷机房",
-        "area_code": "B1",
-        "meter_point_code": "M003",
-    },
-    # 新增: F1楼层配电柜
+    # F1/F2/F3楼层配电柜
     {
         "panel_code": "F1-PANEL-001",
         "panel_name": "F1配电柜",
@@ -208,7 +189,6 @@ DISTRIBUTION_PANELS = [
         "parent_code": "UPS-OUT-001",
         "meter_point_code": "M002",
     },
-    # 新增: F2楼层配电柜
     {
         "panel_code": "F2-PANEL-001",
         "panel_name": "F2配电柜",
@@ -219,7 +199,6 @@ DISTRIBUTION_PANELS = [
         "parent_code": "UPS-OUT-001",
         "meter_point_code": "M002",
     },
-    # 新增: F3楼层配电柜
     {
         "panel_code": "F3-PANEL-001",
         "panel_name": "F3配电柜",
@@ -230,14 +209,64 @@ DISTRIBUTION_PANELS = [
         "parent_code": "UPS-OUT-001",
         "meter_point_code": "M002",
     },
+    # ===== B区配电链路 (TR-002 → M003) =====
+    {
+        "panel_code": "CAB-B01",
+        "panel_name": "B区主配电柜",
+        "panel_type": "main",
+        "rated_current": 1600,
+        "location": "配电室B",
+        "area_code": "B1",
+        "meter_point_code": "M003",
+    },
+    {
+        "panel_code": "PDU-F3-01",
+        "panel_name": "F3 列头柜1",
+        "panel_type": "sub",
+        "rated_current": 250,
+        "location": "F3机房",
+        "area_code": "F3",
+        "parent_code": "CAB-B01",
+        "meter_point_code": "M003",
+    },
+    {
+        "panel_code": "PDU-F3-02",
+        "panel_name": "F3 列头柜2",
+        "panel_type": "sub",
+        "rated_current": 250,
+        "location": "F3机房",
+        "area_code": "F3",
+        "parent_code": "CAB-B01",
+        "meter_point_code": "M003",
+    },
+    {
+        "panel_code": "AC-PANEL-001",
+        "panel_name": "空调配电柜",
+        "panel_type": "sub",
+        "rated_current": 400,
+        "location": "配电室B",
+        "area_code": "B1",
+        "parent_code": "CAB-B01",
+        "meter_point_code": "M003",
+    },
+    {
+        "panel_code": "COOLING-PANEL-001",
+        "panel_name": "制冷系统配电柜",
+        "panel_type": "sub",
+        "rated_current": 800,
+        "location": "B1制冷机房",
+        "area_code": "B1",
+        "parent_code": "CAB-B01",
+        "meter_point_code": "M003",
+    },
 ]
 
 DISTRIBUTION_CIRCUITS = [
-    # 原有回路
+    # ===== A区回路 =====
     {
         "circuit_code": "C-A1-01",
         "circuit_name": "A1机柜列1回路",
-        "panel_code": "PDU-A1-001",
+        "panel_code": "PDU-F2-01",
         "load_type": "IT",
         "rated_current": 63,
         "is_shiftable": False,
@@ -245,7 +274,7 @@ DISTRIBUTION_CIRCUITS = [
     {
         "circuit_code": "C-A1-02",
         "circuit_name": "A1机柜列2回路",
-        "panel_code": "PDU-A1-001",
+        "panel_code": "PDU-F2-01",
         "load_type": "IT",
         "rated_current": 63,
         "is_shiftable": False,
@@ -253,7 +282,33 @@ DISTRIBUTION_CIRCUITS = [
     {
         "circuit_code": "C-A1-03",
         "circuit_name": "A1机柜列3回路",
-        "panel_code": "PDU-A1-002",
+        "panel_code": "PDU-F2-02",
+        "load_type": "IT",
+        "rated_current": 63,
+        "is_shiftable": False,
+    },
+    {
+        "circuit_code": "C-LIGHT",
+        "circuit_name": "照明回路",
+        "panel_code": "CAB-A01",
+        "load_type": "LIGHT",
+        "rated_current": 32,
+        "is_shiftable": True,
+        "shift_priority": 3,
+    },
+    # ===== B区回路 =====
+    {
+        "circuit_code": "C-B1-01",
+        "circuit_name": "B1机柜列1回路",
+        "panel_code": "PDU-F3-01",
+        "load_type": "IT",
+        "rated_current": 63,
+        "is_shiftable": False,
+    },
+    {
+        "circuit_code": "C-B1-02",
+        "circuit_name": "B1机柜列2回路",
+        "panel_code": "PDU-F3-02",
         "load_type": "IT",
         "rated_current": 63,
         "is_shiftable": False,
@@ -275,15 +330,6 @@ DISTRIBUTION_CIRCUITS = [
         "rated_current": 100,
         "is_shiftable": True,
         "shift_priority": 2,
-    },
-    {
-        "circuit_code": "C-LIGHT",
-        "circuit_name": "照明回路",
-        "panel_code": "MDP-001",
-        "load_type": "LIGHT",
-        "rated_current": 32,
-        "is_shiftable": True,
-        "shift_priority": 3,
     },
     # 新增: B1制冷系统回路
     {
@@ -434,26 +480,28 @@ POWER_DEVICES = [
         "area_code": "A1",
         "circuit_code": "C-A1-03",
     },
-    # 原有UPS
+    # UPS (编码统一为 datacenter_seed 格式)
     {
-        "device_code": "UPS-001",
-        "device_name": "UPS主机1",
+        "device_code": "UPS-F1-01",
+        "device_name": "F1 1号UPS",
         "device_type": "UPS",
         "rated_power": 200,
         "is_it_load": False,
-        "area_code": "A1",
+        "area_code": "F1",
+        "circuit_code": "C-F1-UPS-01",
     },
     {
-        "device_code": "UPS-002",
-        "device_name": "UPS主机2",
+        "device_code": "UPS-F1-02",
+        "device_name": "F1 2号UPS",
         "device_type": "UPS",
-        "rated_power": 200,
+        "rated_power": 120,
         "is_it_load": False,
-        "area_code": "A1",
+        "area_code": "F1",
+        "circuit_code": "C-F1-UPS-01",
     },
-    # 原有空调
+    # 精密空调（编码统一）
     {
-        "device_code": "AC-001",
+        "device_code": "AC-A01",
         "device_name": "精密空调1",
         "device_type": "AC",
         "rated_power": 50,
@@ -462,7 +510,7 @@ POWER_DEVICES = [
         "circuit_code": "C-AC-01",
     },
     {
-        "device_code": "AC-002",
+        "device_code": "AC-A02",
         "device_name": "精密空调2",
         "device_type": "AC",
         "rated_power": 50,
@@ -471,7 +519,7 @@ POWER_DEVICES = [
         "circuit_code": "C-AC-02",
     },
     {
-        "device_code": "AC-003",
+        "device_code": "AC-B01",
         "device_name": "精密空调3",
         "device_type": "AC",
         "rated_power": 45,
@@ -489,10 +537,10 @@ POWER_DEVICES = [
         "area_code": "A1",
         "circuit_code": "C-LIGHT",
     },
-    # ===== 新增: B1制冷系统设备 (与点位B1_CH_*, B1_CT_*, B1_CHWP_*, B1_CWP_*对应) =====
+    # ===== B1制冷系统设备（编码统一为 datacenter_seed 格式） =====
     # 冷水机组 (对应点位: B1_CH_AI_001~006, B1_CH_AI_011~016)
     {
-        "device_code": "CH-001",
+        "device_code": "CH-F1-01",
         "device_name": "1#冷水机组",
         "device_type": "CHILLER",
         "rated_power": 350,
@@ -501,7 +549,7 @@ POWER_DEVICES = [
         "circuit_code": "C-CH-01",
     },
     {
-        "device_code": "CH-002",
+        "device_code": "CH-F1-02",
         "device_name": "2#冷水机组",
         "device_type": "CHILLER",
         "rated_power": 350,
@@ -511,7 +559,7 @@ POWER_DEVICES = [
     },
     # 冷却塔 (对应点位: B1_CT_AI_001~004)
     {
-        "device_code": "CT-001",
+        "device_code": "CT-F1-01",
         "device_name": "1#冷却塔",
         "device_type": "CT",
         "rated_power": 30,
@@ -520,7 +568,7 @@ POWER_DEVICES = [
         "circuit_code": "C-CT-01",
     },
     {
-        "device_code": "CT-002",
+        "device_code": "CT-F1-02",
         "device_name": "2#冷却塔",
         "device_type": "CT",
         "rated_power": 30,
@@ -530,7 +578,7 @@ POWER_DEVICES = [
     },
     # 冷冻水泵 (对应点位: B1_CHWP_AI_001~004)
     {
-        "device_code": "CHWP-001",
+        "device_code": "PMP-F1-01",
         "device_name": "1#冷冻水泵",
         "device_type": "PUMP",
         "rated_power": 45,
@@ -539,7 +587,7 @@ POWER_DEVICES = [
         "circuit_code": "C-CHWP-01",
     },
     {
-        "device_code": "CHWP-002",
+        "device_code": "PMP-F1-02",
         "device_name": "2#冷冻水泵",
         "device_type": "PUMP",
         "rated_power": 45,
@@ -549,7 +597,7 @@ POWER_DEVICES = [
     },
     # 冷却水泵 (对应点位: B1_CWP_AI_001~004)
     {
-        "device_code": "CWP-001",
+        "device_code": "PMP-F1-07",
         "device_name": "1#冷却水泵",
         "device_type": "PUMP",
         "rated_power": 37,
@@ -558,7 +606,7 @@ POWER_DEVICES = [
         "circuit_code": "C-CWP-01",
     },
     {
-        "device_code": "CWP-002",
+        "device_code": "PMP-F1-08",
         "device_name": "2#冷却水泵",
         "device_type": "PUMP",
         "rated_power": 37,
@@ -566,11 +614,11 @@ POWER_DEVICES = [
         "area_code": "B1",
         "circuit_code": "C-CWP-01",
     },
-    # ===== 新增: F1楼层设备 (与点位F1_UPS_*, F1_AC_*对应) =====
+    # ===== F1楼层设备 (与点位F1_UPS_*, F1_AC_*对应) =====
     # F1 UPS (对应点位: F1_UPS_AI_0011~0015, F1_UPS_AI_0021~0025)
     {
-        "device_code": "F1-UPS-001",
-        "device_name": "F1 UPS-1",
+        "device_code": "UPS-F1-03",
+        "device_name": "F1 3号UPS",
         "device_type": "UPS",
         "rated_power": 100,
         "is_it_load": False,
@@ -578,8 +626,8 @@ POWER_DEVICES = [
         "circuit_code": "C-F1-UPS-01",
     },
     {
-        "device_code": "F1-UPS-002",
-        "device_name": "F1 UPS-2",
+        "device_code": "UPS-F1-04",
+        "device_name": "F1 4号UPS",
         "device_type": "UPS",
         "rated_power": 100,
         "is_it_load": False,
@@ -805,13 +853,29 @@ class DemoDataService:
                     self._update_progress(8, "清理旧演示数据...", progress_callback)
                     await self._clear_demo_data()
 
+                # Phase 1.5: 重建基础种子数据（站点/楼层/设备）
+                self._update_progress(9, "重建基础设备数据...", progress_callback)
+                from .seeds.datacenter_seed import seed_datacenter
+                from .seeds.power_seed import seed_power_devices
+                from .seeds.cooling_seed import seed_cooling_devices
+                await seed_datacenter()
+                await seed_power_devices()
+                await seed_cooling_devices()
+
                 # Phase 2: 创建点位 (10-35%)
                 self._update_progress(10, "创建监控点位...", progress_callback)
                 point_count = await self._create_points(progress_callback)
 
-                # Phase 3: 创建配电系统 (35-45%)
+                # Phase 3: 创建配电系统 (35-43%)
                 self._update_progress(35, "创建配电系统...", progress_callback)
                 await self._create_distribution_system(progress_callback)
+
+                # Phase 3.5: 设备双向同步 (43-45%)
+                self._update_progress(43, "同步设备关联...", progress_callback)
+                from ..services.device_sync import DeviceSyncService
+                async with async_session() as sync_session:
+                    sync = DeviceSyncService(sync_session)
+                    await sync.migrate_existing_data()
 
                 # Phase 4: 生成历史数据 (45-85%)
                 self._update_progress(45, "生成历史数据...", progress_callback)
@@ -1047,12 +1111,89 @@ class DemoDataService:
             # 11. 清理楼层图数据
             await session.execute(delete(FloorMap))
 
-            # 12. 清理设备和空间拓扑（卸载后系统完全空白）
+            # 12. 清理供配电/制冷扩展表（必须在删除 Device 之前，有 FK 引用）
+            try:
+                from ..models.power import UPSDevice, BatteryGroup
+                from ..models.cooling import CoolingUnit, ColdAisle, CoolingGroup
+                await session.execute(delete(BatteryGroup))
+                await session.execute(delete(UPSDevice))
+                await session.execute(delete(ColdAisle))
+                await session.execute(delete(CoolingUnit))
+                await session.execute(delete(CoolingGroup))
+            except Exception:
+                pass
+
+            # 13. 清理设备和空间拓扑（卸载后系统完全空白）
             await session.execute(delete(Device))
             await session.execute(delete(Row))
             await session.execute(delete(Room))
             await session.execute(delete(Floor))
             await session.execute(delete(Site))
+
+            # 14. 清理联动策略和动作（消防策略 YAML 同步创建的）
+            try:
+                from ..models.linkage import LinkageAction, LinkagePolicy, LinkageExecution
+                await session.execute(delete(LinkageExecution))
+                await session.execute(delete(LinkageAction))
+                await session.execute(delete(LinkagePolicy))
+            except Exception:
+                pass
+
+            # 15. 清理诊断规则和结果（诊断规则 YAML 同步创建的）
+            try:
+                from ..models.diagnosis import DiagnosisRule, DiagnosisResult
+                await session.execute(delete(DiagnosisResult))
+                await session.execute(delete(DiagnosisRule))
+            except Exception:
+                pass
+
+            # 16. 清理知识库
+            try:
+                from ..models.operation import KnowledgeBase
+                await session.execute(delete(KnowledgeBase))
+            except Exception:
+                pass
+
+            # 17. 清理非 admin 用户（保留管理员）
+            from ..models import User
+            await session.execute(delete(User).where(User.username != "admin"))
+
+            # 18. 清理操作日志和系统日志
+            try:
+                from ..models.log import OperationLog, SystemLog
+                await session.execute(delete(OperationLog))
+                await session.execute(delete(SystemLog))
+            except Exception:
+                pass
+
+            # 19. 清理命令审计日志
+            try:
+                from ..models.command import CommandAuditLog
+                await session.execute(delete(CommandAuditLog))
+            except Exception:
+                pass
+
+            # 20. 清理数据源和网关（测试残留）
+            try:
+                from ..models.gateway import DataSourcePoint, DataSource, GatewayEvent, Gateway, DeviceTemplate
+                await session.execute(delete(DataSourcePoint))
+                await session.execute(delete(DataSource))
+                await session.execute(delete(GatewayEvent))
+                await session.execute(delete(Gateway))
+                await session.execute(delete(DeviceTemplate))
+            except Exception:
+                pass
+
+            # 21. 清理工单和巡检（测试残留）
+            try:
+                from ..models.operation import WorkOrderLog, WorkOrderApproval, WorkOrder, InspectionTask, InspectionPlan
+                await session.execute(delete(WorkOrderLog))
+                await session.execute(delete(WorkOrderApproval))
+                await session.execute(delete(WorkOrder))
+                await session.execute(delete(InspectionTask))
+                await session.execute(delete(InspectionPlan))
+            except Exception:
+                pass
 
             await session.commit()
 
@@ -1261,26 +1402,26 @@ class DemoDataService:
             "NET-001": {"prefix": "A1_NET_AI_", "power": "001", "current": "002", "energy": "003"},
             # 存储机柜 STO-001 -> A1_STO_AI_001~003
             "STO-001": {"prefix": "A1_STO_AI_", "power": "001", "current": "002", "energy": "003"},
-            # UPS主机 UPS-001/002 -> A1_UPS_AI_001~008
-            "UPS-001": {"prefix": "A1_UPS_AI_", "power": "002", "current": "003"},  # 输出功率
-            "UPS-002": {"prefix": "A1_UPS_AI_", "power": "006", "current": "007"},
+            # UPS主机（统一编码）
+            "UPS-F1-01": {"prefix": "A1_UPS_AI_", "power": "002", "current": "003"},  # 输出功率
+            "UPS-F1-02": {"prefix": "A1_UPS_AI_", "power": "006", "current": "007"},
             # 照明 LIGHT-001 -> A1_LIGHT_AI_001~003
             "LIGHT-001": {"prefix": "A1_LIGHT_AI_", "power": "001", "current": "002"},
-            # 冷水机组 CH-001/002 -> B1_CH_AI_005/015 (功率), B1_CH_AI_007/017 (电流)
-            "CH-001": {"prefix": "B1_CH_AI_", "power": "005", "current": "007"},
-            "CH-002": {"prefix": "B1_CH_AI_", "power": "015", "current": "017"},
-            # 冷却塔 CT-001/002 -> B1_CT_AI_005/006 (功率)
-            "CT-001": {"prefix": "B1_CT_AI_", "power": "005"},
-            "CT-002": {"prefix": "B1_CT_AI_", "power": "006"},
-            # 冷冻水泵 CHWP-001/002 -> B1_CHWP_AI_005/006 (功率), B1_CHWP_AI_002/004 (电流)
-            "CHWP-001": {"prefix": "B1_CHWP_AI_", "power": "005", "current": "002"},
-            "CHWP-002": {"prefix": "B1_CHWP_AI_", "power": "006", "current": "004"},
-            # 冷却水泵 CWP-001/002 -> B1_CWP_AI_005/006 (功率), B1_CWP_AI_002/004 (电流)
-            "CWP-001": {"prefix": "B1_CWP_AI_", "power": "005", "current": "002"},
-            "CWP-002": {"prefix": "B1_CWP_AI_", "power": "006", "current": "004"},
-            # F1/F2/F3 UPS -> F*_UPS_AI_*
-            "F1-UPS-001": {"prefix": "F1_UPS_AI_", "power": "0013"},  # 负载率作为功率指标
-            "F1-UPS-002": {"prefix": "F1_UPS_AI_", "power": "0023"},
+            # 冷水机组（统一编码）
+            "CH-F1-01": {"prefix": "B1_CH_AI_", "power": "005", "current": "007"},
+            "CH-F1-02": {"prefix": "B1_CH_AI_", "power": "015", "current": "017"},
+            # 冷却塔（统一编码）
+            "CT-F1-01": {"prefix": "B1_CT_AI_", "power": "005"},
+            "CT-F1-02": {"prefix": "B1_CT_AI_", "power": "006"},
+            # 冷冻水泵（统一编码）
+            "PMP-F1-01": {"prefix": "B1_CHWP_AI_", "power": "005", "current": "002"},
+            "PMP-F1-02": {"prefix": "B1_CHWP_AI_", "power": "006", "current": "004"},
+            # 冷却水泵（统一编码）
+            "PMP-F1-07": {"prefix": "B1_CWP_AI_", "power": "005", "current": "002"},
+            "PMP-F1-08": {"prefix": "B1_CWP_AI_", "power": "006", "current": "004"},
+            # F1 UPS（统一编码）
+            "UPS-F1-03": {"prefix": "F1_UPS_AI_", "power": "0013"},  # 负载率作为功率指标
+            "UPS-F1-04": {"prefix": "F1_UPS_AI_", "power": "0023"},
             "F2-UPS-001": {"prefix": "F2_UPS_AI_", "power": "0013"},
             "F2-UPS-002": {"prefix": "F2_UPS_AI_", "power": "0023"},
             "F3-UPS-001": {"prefix": "F3_UPS_AI_", "power": "0013"},

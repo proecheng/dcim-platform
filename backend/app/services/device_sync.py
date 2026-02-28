@@ -17,6 +17,7 @@ from sqlalchemy import select
 from ..models.device import Device
 from ..models.energy import DistributionPanel, PowerDevice
 from ..models.power import UPSDevice
+from ..models.cooling import CoolingUnit, ColdAisle
 
 # 防循环重入标志 (per-coroutine，不会跨请求泄漏)
 _syncing: contextvars.ContextVar[bool] = contextvars.ContextVar("_device_syncing", default=False)
@@ -37,6 +38,10 @@ class DeviceSyncService:
         "PDU": "PDU",
         "IT_SERVER": "IT",
         "IT_STORAGE": "IT",
+        "CHILLER": "AC",
+        "CT": "AC",
+        "PUMP": "AC",
+        "LIGHT": "LIGHT",
     }
 
     # Device.device_type → 拓扑 PowerDevice.device_type
@@ -45,13 +50,25 @@ class DeviceSyncService:
         "AC": "HVAC",
         "PDU": "PDU",
         "IT": "IT_SERVER",
+        "PRECISION_AC_INDOOR": "HVAC",
+        "PRECISION_AC_OUTDOOR": "HVAC",
+        "COLD_AISLE": "HVAC",
     }
 
     # 映射到 DistributionPanel 的 Device 类型
     PANEL_DEVICE_TYPES = {"CABINET"}
 
     # 映射到 PowerDevice 的 Device 类型
-    POWER_DEVICE_TYPES = {"UPS", "PDU", "AC", "IT"}
+    POWER_DEVICE_TYPES = {"UPS", "PDU", "AC", "IT", "PRECISION_AC_INDOOR", "PRECISION_AC_OUTDOOR", "COLD_AISLE"}
+
+    # Device 自动同步到 PowerDevice 时的默认额定功率 (kW)
+    DEFAULT_RATED_POWER = {
+        "UPS": 200.0,
+        "PDU": 22.0,      # 32A × 380V × 0.9功率因数 / 1000 ≈ 10.9kW/相, 三相约22kW
+        "HVAC": 50.0,
+        "IT_SERVER": 20.0,
+        "IT_STORAGE": 30.0,
+    }
 
     def __init__(self, db: AsyncSession):
         self.db = db
@@ -503,6 +520,7 @@ class DeviceSyncService:
                         device_code=dev.device_code,
                         device_name=dev.device_name,
                         device_type=power_type,
+                        rated_power=self.DEFAULT_RATED_POWER.get(power_type, 20.0),
                         area_code=dev.area_code or "A1",
                         monitor_device_id=dev.id,
                         is_enabled=True,
@@ -512,6 +530,89 @@ class DeviceSyncService:
                     self.db.add(pd)
                     await self.db.flush()
                     created_power_for_devices += 1
+                elif not existing_pd.rated_power:
+                    # 补充已有设备缺失的额定功率
+                    existing_pd.rated_power = self.DEFAULT_RATED_POWER.get(power_type, 20.0)
+                    existing_pd.updated_at = datetime.now()
+
+        # 5. 为所有已有 Device 补全扩展记录 (UPSDevice / CoolingUnit / ColdAisle)
+        created_ups_ext = 0
+        created_cooling_ext = 0
+        created_cold_aisle_ext = 0
+
+        # 5a. UPS → UPSDevice
+        ups_devices = (
+            await self.db.execute(
+                select(Device).where(Device.device_type == "UPS", Device.is_enabled == True)
+            )
+        ).scalars().all()
+        for dev in ups_devices:
+            existing = (
+                await self.db.execute(select(UPSDevice).where(UPSDevice.device_id == dev.id))
+            ).scalar_one_or_none()
+            if not existing:
+                # 尝试从 PowerDevice 获取额定功率
+                pd_match = (
+                    await self.db.execute(
+                        select(PowerDevice).where(PowerDevice.monitor_device_id == dev.id)
+                    )
+                ).scalar_one_or_none()
+                rated = pd_match.rated_power if pd_match and pd_match.rated_power else 200.0
+                ups = UPSDevice(
+                    device_id=dev.id,
+                    rated_capacity=rated,
+                    created_at=datetime.now(),
+                    updated_at=datetime.now(),
+                )
+                self.db.add(ups)
+                created_ups_ext += 1
+
+        # 5b. AC/PRECISION_AC_INDOOR/PRECISION_AC_OUTDOOR → CoolingUnit
+        ac_types = ("AC", "PRECISION_AC_INDOOR", "PRECISION_AC_OUTDOOR")
+        for ac_type in ac_types:
+            ac_devs = (
+                await self.db.execute(
+                    select(Device).where(Device.device_type == ac_type, Device.is_enabled == True)
+                )
+            ).scalars().all()
+            for dev in ac_devs:
+                existing = (
+                    await self.db.execute(select(CoolingUnit).where(CoolingUnit.device_id == dev.id))
+                ).scalar_one_or_none()
+                if not existing:
+                    unit_type = "outdoor" if ac_type == "PRECISION_AC_OUTDOOR" else "indoor"
+                    cu = CoolingUnit(
+                        device_id=dev.id,
+                        unit_type=unit_type,
+                        created_at=datetime.now(),
+                        updated_at=datetime.now(),
+                    )
+                    self.db.add(cu)
+                    created_cooling_ext += 1
+
+        # 5c. COLD_AISLE → ColdAisle
+        ca_devs = (
+            await self.db.execute(
+                select(Device).where(Device.device_type == "COLD_AISLE", Device.is_enabled == True)
+            )
+        ).scalars().all()
+        for dev in ca_devs:
+            existing = (
+                await self.db.execute(select(ColdAisle).where(ColdAisle.device_id == dev.id))
+            ).scalar_one_or_none()
+            if not existing:
+                ca = ColdAisle(
+                    device_id=dev.id,
+                    aisle_code=dev.device_code,
+                    aisle_name=dev.device_name,
+                    created_at=datetime.now(),
+                    updated_at=datetime.now(),
+                )
+                self.db.add(ca)
+                created_cold_aisle_ext += 1
+
+        if created_ups_ext or created_cooling_ext or created_cold_aisle_ext:
+            await self.db.flush()
 
         await self.db.commit()
 
@@ -522,4 +623,7 @@ class DeviceSyncService:
             "created_devices_for_power": created_devices_for_power,
             "created_panels_for_devices": created_panels_for_devices,
             "created_power_for_devices": created_power_for_devices,
+            "created_ups_extensions": created_ups_ext,
+            "created_cooling_extensions": created_cooling_ext,
+            "created_cold_aisle_extensions": created_cold_aisle_ext,
         }
