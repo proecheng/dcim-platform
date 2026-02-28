@@ -47,8 +47,8 @@ class Settings(BaseSettings):
     data_retention_days: int = 30
 
     # 模拟模式配置
-    simulation_enabled: bool = True  # 是否启用模拟数据
-    demo_enabled: bool = True  # 演示模式开关（替代 simulation_enabled，过渡期两者等价）
+    simulation_enabled: bool = False  # 是否启用模拟数据
+    demo_enabled: bool = False  # 演示模式开关（替代 simulation_enabled，过渡期两者等价）
     simulation_interval: int = 5  # 模拟数据生成间隔(秒)
 
     # 授权配置

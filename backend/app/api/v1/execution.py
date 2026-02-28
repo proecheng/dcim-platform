@@ -332,7 +332,10 @@ async def update_plan_status(
 
     await db.commit()
 
-    return ResponseModel(code=0, message="状态更新成功", data={"plan_id": plan_id, "old_status": old_status, "new_status": plan.status})
+    return ResponseModel(
+        code=0, message="状态更新成功", data={"plan_id": plan_id, "old_status": old_status, "new_status": plan.status}
+    )
+
 
 @router.get("/plans/{plan_id}/checklist", summary="生成执行清单")
 async def get_checklist(plan_id: int, db: AsyncSession = Depends(get_db), _: User = Depends(require_viewer)):

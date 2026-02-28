@@ -978,6 +978,7 @@ class DemoDataService:
                 from .seeds.datacenter_seed import seed_datacenter
                 from .seeds.power_seed import seed_power_devices
                 from .seeds.cooling_seed import seed_cooling_devices
+
                 await seed_datacenter()
                 await seed_power_devices()
                 await seed_cooling_devices()
@@ -993,6 +994,7 @@ class DemoDataService:
                 # Phase 3.5: 设备双向同步 (43-45%)
                 self._update_progress(43, "同步设备关联...", progress_callback)
                 from ..services.device_sync import DeviceSyncService
+
                 async with async_session() as sync_session:
                     sync = DeviceSyncService(sync_session)
                     await sync.migrate_existing_data()
@@ -1235,6 +1237,7 @@ class DemoDataService:
             try:
                 from ..models.power import UPSDevice, BatteryGroup
                 from ..models.cooling import CoolingUnit, ColdAisle, CoolingGroup
+
                 await session.execute(delete(BatteryGroup))
                 await session.execute(delete(UPSDevice))
                 await session.execute(delete(ColdAisle))
@@ -1253,6 +1256,7 @@ class DemoDataService:
             # 14. 清理联动策略和动作（消防策略 YAML 同步创建的）
             try:
                 from ..models.linkage import LinkageAction, LinkagePolicy, LinkageExecution
+
                 await session.execute(delete(LinkageExecution))
                 await session.execute(delete(LinkageAction))
                 await session.execute(delete(LinkagePolicy))
@@ -1262,6 +1266,7 @@ class DemoDataService:
             # 15. 清理诊断规则和结果（诊断规则 YAML 同步创建的）
             try:
                 from ..models.diagnosis import DiagnosisRule, DiagnosisResult
+
                 await session.execute(delete(DiagnosisResult))
                 await session.execute(delete(DiagnosisRule))
             except Exception:
@@ -1270,17 +1275,20 @@ class DemoDataService:
             # 16. 清理知识库
             try:
                 from ..models.operation import KnowledgeBase
+
                 await session.execute(delete(KnowledgeBase))
             except Exception:
                 pass
 
             # 17. 清理非 admin 用户（保留管理员）
             from ..models import User
+
             await session.execute(delete(User).where(User.username != "admin"))
 
             # 18. 清理操作日志和系统日志
             try:
                 from ..models.log import OperationLog, SystemLog
+
                 await session.execute(delete(OperationLog))
                 await session.execute(delete(SystemLog))
             except Exception:
@@ -1289,6 +1297,7 @@ class DemoDataService:
             # 19. 清理命令审计日志
             try:
                 from ..models.command import CommandAuditLog
+
                 await session.execute(delete(CommandAuditLog))
             except Exception:
                 pass
@@ -1296,6 +1305,7 @@ class DemoDataService:
             # 20. 清理数据源和网关（测试残留）
             try:
                 from ..models.gateway import DataSourcePoint, DataSource, GatewayEvent, Gateway, DeviceTemplate
+
                 await session.execute(delete(DataSourcePoint))
                 await session.execute(delete(DataSource))
                 await session.execute(delete(GatewayEvent))
@@ -1306,7 +1316,14 @@ class DemoDataService:
 
             # 21. 清理工单和巡检（测试残留）
             try:
-                from ..models.operation import WorkOrderLog, WorkOrderApproval, WorkOrder, InspectionTask, InspectionPlan
+                from ..models.operation import (
+                    WorkOrderLog,
+                    WorkOrderApproval,
+                    WorkOrder,
+                    InspectionTask,
+                    InspectionPlan,
+                )
+
                 await session.execute(delete(WorkOrderLog))
                 await session.execute(delete(WorkOrderApproval))
                 await session.execute(delete(WorkOrder))
@@ -1319,6 +1336,7 @@ class DemoDataService:
 
             # 失效入库管道缓存
             from ..services.ingest_pipeline import invalidate_point_cache
+
             invalidate_point_cache()
 
     async def _create_points(self, progress_callback) -> int:

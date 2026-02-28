@@ -37,22 +37,28 @@ async def get_power_overview(
     _: User = Depends(require_viewer),
 ):
     """获取供配电系统总览统计"""
-    # UPS统计
-    ups_total_r = await db.execute(select(func.count(Device.id)).where(Device.device_type == "UPS"))
+    # UPS统计 — 基于 UPSDevice 扩展表（与 UPS 监控页一致）
+    ups_total_r = await db.execute(select(func.count(UPSDevice.id)))
     ups_total = ups_total_r.scalar() or 0
 
     ups_online_r = await db.execute(
-        select(func.count(Device.id)).where(Device.device_type == "UPS", Device.status == "online")
+        select(func.count(UPSDevice.id))
+        .select_from(UPSDevice.__table__.join(Device.__table__, Device.id == UPSDevice.device_id))
+        .where(Device.status == "online")
     )
     ups_online = ups_online_r.scalar() or 0
 
     ups_offline_r = await db.execute(
-        select(func.count(Device.id)).where(Device.device_type == "UPS", Device.status == "offline")
+        select(func.count(UPSDevice.id))
+        .select_from(UPSDevice.__table__.join(Device.__table__, Device.id == UPSDevice.device_id))
+        .where(Device.status == "offline")
     )
     ups_offline = ups_offline_r.scalar() or 0
 
     ups_alarm_r = await db.execute(
-        select(func.count(Device.id)).where(Device.device_type == "UPS", Device.status == "alarm")
+        select(func.count(UPSDevice.id))
+        .select_from(UPSDevice.__table__.join(Device.__table__, Device.id == UPSDevice.device_id))
+        .where(Device.status == "alarm")
     )
     ups_alarm = ups_alarm_r.scalar() or 0
 
@@ -132,7 +138,7 @@ async def get_power_overview(
 # ==================== UPS设备 CRUD ====================
 
 
-@router.get("/ups", response_model=PageResponse[UPSDeviceInfo], summary="UPS设备列表")
+@router.get("/ups", summary="UPS设备列表")
 async def list_ups_devices(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
@@ -140,21 +146,45 @@ async def list_ups_devices(
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_viewer),
 ):
-    """获取UPS设备列表（分页）"""
-    query = select(UPSDevice)
+    """获取UPS设备列表（分页），关联 Device 表返回编码/名称/状态"""
+    query = select(UPSDevice, Device).outerjoin(Device, Device.id == UPSDevice.device_id)
     if ups_type:
         query = query.where(UPSDevice.ups_type == ups_type)
 
-    count_q = select(func.count()).select_from(query.subquery())
+    count_q = select(func.count()).select_from(
+        select(UPSDevice.id).where(UPSDevice.ups_type == ups_type).subquery()
+        if ups_type
+        else select(UPSDevice.id).subquery()
+    )
     total = (await db.execute(count_q)).scalar() or 0
 
     query = query.order_by(UPSDevice.id)
     query = query.offset((page - 1) * page_size).limit(page_size)
     result = await db.execute(query)
-    items = result.scalars().all()
+    rows = result.all()
+
+    items = []
+    for ups, device in rows:
+        item = {
+            **UPSDeviceInfo.model_validate(ups).model_dump(),
+            "device_code": device.device_code if device else None,
+            "device_name": device.device_name if device else None,
+            "area_code": device.area_code if device else None,
+            "status": device.status if device else "offline",
+        }
+        # 从关联点位获取负载率
+        if device:
+            lr = await db.execute(
+                select(PointRealtime.value)
+                .select_from(PointRealtime.__table__.join(Point.__table__, PointRealtime.point_id == Point.id))
+                .where(Point.device_id == device.id, Point.point_code.like("%_load_rate"))
+            )
+            load_val = lr.scalar()
+            item["load_rate"] = round(float(load_val), 1) if load_val is not None else None
+        items.append(item)
 
     return PageResponse(
-        items=[UPSDeviceInfo.model_validate(i) for i in items],
+        items=items,
         total=total,
         page=page,
         page_size=page_size,
@@ -190,7 +220,7 @@ async def get_ups_device(
             {
                 "id": p.id,
                 "code": p.point_code,
-                "name": p.point_name,
+                "point_name": p.point_name,
                 "type": p.point_type,
                 "unit": p.unit,
                 "value": pr.value if pr else None,
@@ -202,6 +232,10 @@ async def get_ups_device(
     return {
         "ups": UPSDeviceInfo.model_validate(ups),
         "device": DeviceInfo.model_validate(device) if device else None,
+        "device_code": device.device_code if device else None,
+        "device_name": device.device_name if device else None,
+        "ups_type": ups.ups_type,
+        "rated_capacity": ups.rated_capacity,
         "points": points_data,
     }
 
@@ -339,7 +373,7 @@ async def get_battery_group(
                 {
                     "id": p.id,
                     "code": p.point_code,
-                    "name": p.point_name,
+                    "point_name": p.point_name,
                     "type": p.point_type,
                     "unit": p.unit,
                     "value": pr.value if pr else None,

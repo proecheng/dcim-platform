@@ -37,9 +37,7 @@ async def handle_point_data(payload: dict, db: AsyncSession, *, site_id: str | N
     point_ids_str = [pt.get("id") for pt in points if pt.get("id")]
     mapping: dict[str, int] = {}
     if point_ids_str:
-        result = await db.execute(
-            select(Point.id, Point.point_code).where(Point.point_code.in_(point_ids_str))
-        )
+        result = await db.execute(select(Point.id, Point.point_code).where(Point.point_code.in_(point_ids_str)))
         mapping = {row[1]: row[0] for row in result.all()}
 
     # 分离: 已映射的走统一管道，未映射的走原始写入
@@ -62,23 +60,27 @@ async def handle_point_data(payload: dict, db: AsyncSession, *, site_id: str | N
                 value_float = float(value_raw)
             except (ValueError, TypeError):
                 value_float = 0.0
-            pipeline_points.append(IngestPoint(
-                point_id=mapping[point_id_str],
-                value=value_float,
-                quality=quality,
-                timestamp=timestamp,
-                gateway_id=gw_id,
-                point_key=point_id_str,
-                source="mqtt",
-            ))
+            pipeline_points.append(
+                IngestPoint(
+                    point_id=mapping[point_id_str],
+                    value=value_float,
+                    quality=quality,
+                    timestamp=timestamp,
+                    gateway_id=gw_id,
+                    point_key=point_id_str,
+                    source="mqtt",
+                )
+            )
         else:
             # 未映射 → 仅写 PointDataLatest
-            unmapped_points.append({
-                "id": point_id_str,
-                "v": str(value_raw),
-                "q": quality,
-                "ts": timestamp,
-            })
+            unmapped_points.append(
+                {
+                    "id": point_id_str,
+                    "v": str(value_raw),
+                    "q": quality,
+                    "ts": timestamp,
+                }
+            )
 
     count = 0
 
@@ -90,9 +92,7 @@ async def handle_point_data(payload: dict, db: AsyncSession, *, site_id: str | N
     # 原始写入未映射点位
     for pt in unmapped_points:
         point_id = pt["id"]
-        existing = await db.execute(
-            select(PointDataLatest).where(PointDataLatest.point_id == point_id)
-        )
+        existing = await db.execute(select(PointDataLatest).where(PointDataLatest.point_id == point_id))
         if existing.scalar_one_or_none():
             await db.execute(
                 update(PointDataLatest)
@@ -124,6 +124,12 @@ async def handle_point_data(payload: dict, db: AsyncSession, *, site_id: str | N
     if seq is not None:
         await mark_processed(gw_id, seq)
 
-    logger.debug("点位数据处理: site=%s, gw=%s, %d 条 (管道=%d, 原始=%d)",
-                 site_id, gw_id, count, len(pipeline_points), len(unmapped_points))
+    logger.debug(
+        "点位数据处理: site=%s, gw=%s, %d 条 (管道=%d, 原始=%d)",
+        site_id,
+        gw_id,
+        count,
+        len(pipeline_points),
+        len(unmapped_points),
+    )
     return count

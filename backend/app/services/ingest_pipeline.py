@@ -207,9 +207,7 @@ async def _batch_upsert_realtime(
     point_ids = [pt.point_id for pt in points]
 
     # 查询已存在的 PointRealtime 记录
-    existing_result = await session.execute(
-        select(PointRealtime.point_id).where(PointRealtime.point_id.in_(point_ids))
-    )
+    existing_result = await session.execute(select(PointRealtime.point_id).where(PointRealtime.point_id.in_(point_ids)))
     existing_ids = {row[0] for row in existing_result.all()}
 
     # 分离: 需要 UPDATE 的 vs 需要 INSERT 的
@@ -225,9 +223,7 @@ async def _batch_upsert_realtime(
 
             value_cases = " ".join(f"WHEN {pt.point_id} THEN {pt.value}" for pt in batch)
             quality_cases = " ".join(f"WHEN {pt.point_id} THEN {pt.quality}" for pt in batch)
-            status_cases = " ".join(
-                f"WHEN {pt.point_id} THEN '{pt.status}'" for pt in batch
-            )
+            status_cases = " ".join(f"WHEN {pt.point_id} THEN '{pt.status}'" for pt in batch)
 
             id_list = ",".join(str(pid) for pid in ids)
             sql = text(f"""
@@ -311,11 +307,7 @@ async def _batch_insert_history(
     now: datetime,
 ) -> None:
     """批量插入 PointHistory（仅 AI 类型）"""
-    ai_points = [
-        pt
-        for pt in points
-        if _point_meta_cache.get(pt.point_id, {}).get("point_type") == "AI"
-    ]
+    ai_points = [pt for pt in points if _point_meta_cache.get(pt.point_id, {}).get("point_type") == "AI"]
     if not ai_points:
         return
 
@@ -350,9 +342,7 @@ async def _evaluate_alarms(
 
     # 批量查询所有涉及点位的活动告警
     eval_ids = [pt.point_id for pt in eval_points]
-    active_result = await session.execute(
-        select(Alarm).where(Alarm.point_id.in_(eval_ids), Alarm.status == "active")
-    )
+    active_result = await session.execute(select(Alarm).where(Alarm.point_id.in_(eval_ids), Alarm.status == "active"))
     active_alarms_by_point: dict[int, list] = {}
     for alarm in active_result.scalars().all():
         active_alarms_by_point.setdefault(alarm.point_id, []).append(alarm)
@@ -394,11 +384,13 @@ async def _evaluate_alarms(
                     threshold_value=triggered.threshold_value,
                 )
                 alarms_to_create.append(alarm)
-                alarm_events.append({
-                    "alarm": alarm,
-                    "point_meta": meta,
-                    "triggered": triggered,
-                })
+                alarm_events.append(
+                    {
+                        "alarm": alarm,
+                        "point_meta": meta,
+                        "triggered": triggered,
+                    }
+                )
         else:
             # 值安全 → 自动恢复
             if alarm_engine.is_value_safe(pt.point_id, pt.value):
@@ -418,21 +410,23 @@ async def _evaluate_alarms(
             meta = evt["point_meta"]
             triggered = evt["triggered"]
             try:
-                await ws_manager.broadcast_alarm({
-                    "action": "new",
-                    "id": alarm.id,
-                    "alarm_no": alarm.alarm_no,
-                    "point_id": alarm.point_id,
-                    "point_code": meta["point_code"],
-                    "point_name": meta["point_name"],
-                    "alarm_level": alarm.alarm_level,
-                    "alarm_type": alarm.alarm_type,
-                    "alarm_message": alarm.alarm_message,
-                    "trigger_value": alarm.trigger_value,
-                    "threshold_value": alarm.threshold_value,
-                    "status": "active",
-                    "created_at": datetime.now().isoformat(),
-                })
+                await ws_manager.broadcast_alarm(
+                    {
+                        "action": "new",
+                        "id": alarm.id,
+                        "alarm_no": alarm.alarm_no,
+                        "point_id": alarm.point_id,
+                        "point_code": meta["point_code"],
+                        "point_name": meta["point_name"],
+                        "alarm_level": alarm.alarm_level,
+                        "alarm_type": alarm.alarm_type,
+                        "alarm_message": alarm.alarm_message,
+                        "trigger_value": alarm.trigger_value,
+                        "threshold_value": alarm.threshold_value,
+                        "status": "active",
+                        "created_at": datetime.now().isoformat(),
+                    }
+                )
             except Exception as e:
                 logger.warning("告警 WS 广播失败: %s", e)
 
@@ -488,16 +482,18 @@ async def _evaluate_alarms(
             if alarm.created_at:
                 alarm.duration_seconds = int((now - alarm.created_at).total_seconds())
             try:
-                await ws_manager.broadcast_alarm({
-                    "action": "resolve",
-                    "id": alarm.id,
-                    "alarm_no": alarm.alarm_no,
-                    "point_id": alarm.point_id,
-                    "alarm_level": alarm.alarm_level,
-                    "status": "resolved",
-                    "resolve_type": "auto",
-                    "resolved_at": now.isoformat(),
-                })
+                await ws_manager.broadcast_alarm(
+                    {
+                        "action": "resolve",
+                        "id": alarm.id,
+                        "alarm_no": alarm.alarm_no,
+                        "point_id": alarm.point_id,
+                        "alarm_level": alarm.alarm_level,
+                        "status": "resolved",
+                        "resolve_type": "auto",
+                        "resolved_at": now.isoformat(),
+                    }
+                )
             except Exception:
                 pass
             # Redis 告警统计递减
@@ -556,14 +552,16 @@ async def _update_redis_cache(points: list[IngestPoint], now: datetime) -> None:
         if meta.get("point_type") == "DI":
             value_text = "告警" if pt.value == 1 else "正常"
 
-        cache_data = _json.dumps({
-            "value": pt.value if meta.get("point_type") == "AI" else int(pt.value),
-            "value_text": value_text,
-            "quality": pt.quality,
-            "status": pt.status,
-            "alarm_level": None,
-            "updated_at": now.isoformat(),
-        })
+        cache_data = _json.dumps(
+            {
+                "value": pt.value if meta.get("point_type") == "AI" else int(pt.value),
+                "value_text": value_text,
+                "quality": pt.quality,
+                "status": pt.status,
+                "alarm_level": None,
+                "updated_at": now.isoformat(),
+            }
+        )
         try:
             await redis_service.set(f"point:{pt.point_id}:latest", cache_data, ttl=60)
         except Exception:
@@ -573,8 +571,6 @@ async def _update_redis_cache(points: list[IngestPoint], now: datetime) -> None:
         device_id = meta.get("device_id")
         if device_id:
             try:
-                await redis_service.set(
-                    f"device:{device_id}:online", now.isoformat(), ttl=60
-                )
+                await redis_service.set(f"device:{device_id}:online", now.isoformat(), ttl=60)
             except Exception:
                 pass

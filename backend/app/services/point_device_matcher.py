@@ -30,6 +30,7 @@ class PointDeviceMatcher:
     }
 
     # 设备编码到点位前缀的已知映射（作为 fallback）
+    # 编码已统一为 datacenter_seed 的 {PREFIX}-{FLOOR}-{SEQ:02d} 格式
     LEGACY_MAPPING_RULES = {
         # 服务器机柜 SRV-001~004 -> A1_SRV_AI_001~012
         "SRV-001": {"prefix": "A1_SRV_AI_", "power": "001", "current": "002", "energy": "003"},
@@ -40,26 +41,26 @@ class PointDeviceMatcher:
         "NET-001": {"prefix": "A1_NET_AI_", "power": "001", "current": "002", "energy": "003"},
         # 存储机柜 STO-001 -> A1_STO_AI_001~003
         "STO-001": {"prefix": "A1_STO_AI_", "power": "001", "current": "002", "energy": "003"},
-        # UPS主机 UPS-001/002 -> A1_UPS_AI_001~008
-        "UPS-001": {"prefix": "A1_UPS_AI_", "power": "002", "current": "003"},
-        "UPS-002": {"prefix": "A1_UPS_AI_", "power": "006", "current": "007"},
+        # UPS主机（统一编码）
+        "UPS-F1-01": {"prefix": "A1_UPS_AI_", "power": "002", "current": "003"},
+        "UPS-F1-02": {"prefix": "A1_UPS_AI_", "power": "006", "current": "007"},
         # 照明 LIGHT-001 -> A1_LIGHT_AI_001~003
         "LIGHT-001": {"prefix": "A1_LIGHT_AI_", "power": "001", "current": "002"},
-        # 冷水机组 CH-001/002 -> B1_CH_AI_005/015 (功率), B1_CH_AI_007/017 (电流)
-        "CH-001": {"prefix": "B1_CH_AI_", "power": "005", "current": "007"},
-        "CH-002": {"prefix": "B1_CH_AI_", "power": "015", "current": "017"},
-        # 冷却塔 CT-001/002 -> B1_CT_AI_005/006 (功率)
-        "CT-001": {"prefix": "B1_CT_AI_", "power": "005"},
-        "CT-002": {"prefix": "B1_CT_AI_", "power": "006"},
-        # 冷冻水泵 CHWP-001/002 -> B1_CHWP_AI_005/006 (功率), B1_CHWP_AI_002/004 (电流)
-        "CHWP-001": {"prefix": "B1_CHWP_AI_", "power": "005", "current": "002"},
-        "CHWP-002": {"prefix": "B1_CHWP_AI_", "power": "006", "current": "004"},
-        # 冷却水泵 CWP-001/002 -> B1_CWP_AI_005/006 (功率), B1_CWP_AI_002/004 (电流)
-        "CWP-001": {"prefix": "B1_CWP_AI_", "power": "005", "current": "002"},
-        "CWP-002": {"prefix": "B1_CWP_AI_", "power": "006", "current": "004"},
-        # F1/F2/F3 UPS -> F*_UPS_AI_*
-        "F1-UPS-001": {"prefix": "F1_UPS_AI_", "power": "0013"},
-        "F1-UPS-002": {"prefix": "F1_UPS_AI_", "power": "0023"},
+        # 冷水机组（统一编码）
+        "CH-F1-01": {"prefix": "B1_CH_AI_", "power": "005", "current": "007"},
+        "CH-F1-02": {"prefix": "B1_CH_AI_", "power": "015", "current": "017"},
+        # 冷却塔（统一编码）
+        "CT-F1-01": {"prefix": "B1_CT_AI_", "power": "005"},
+        "CT-F1-02": {"prefix": "B1_CT_AI_", "power": "006"},
+        # 冷冻水泵（统一编码）
+        "PMP-F1-01": {"prefix": "B1_CHWP_AI_", "power": "005", "current": "002"},
+        "PMP-F1-02": {"prefix": "B1_CHWP_AI_", "power": "006", "current": "004"},
+        # 冷却水泵（统一编码）
+        "PMP-F1-07": {"prefix": "B1_CWP_AI_", "power": "005", "current": "002"},
+        "PMP-F1-08": {"prefix": "B1_CWP_AI_", "power": "006", "current": "004"},
+        # F1 UPS（统一编码）
+        "UPS-F1-03": {"prefix": "F1_UPS_AI_", "power": "0013"},
+        "UPS-F1-04": {"prefix": "F1_UPS_AI_", "power": "0023"},
         "F2-UPS-001": {"prefix": "F2_UPS_AI_", "power": "0013"},
         "F2-UPS-002": {"prefix": "F2_UPS_AI_", "power": "0023"},
         "F3-UPS-001": {"prefix": "F3_UPS_AI_", "power": "0013"},

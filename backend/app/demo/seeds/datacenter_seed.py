@@ -199,16 +199,15 @@ PT_WATER: list[tuple[str, str, str, str, float, float]] = [
 
 # ==================== 设备布局定义 ====================
 # (prefix, name_template, device_type, floor_codes, counts_per_floor, point_template, manufacturer, model)
-DEVICE_LAYOUT: list[tuple[
-    str, str, str, list[str], list[int],
-    list[tuple[str, str, str, str, float, float]], str, str
-]] = [
+DEVICE_LAYOUT: list[
+    tuple[str, str, str, list[str], list[int], list[tuple[str, str, str, str, float, float]], str, str]
+] = [
     # --- F1 供配电 ---
-    ("HV", "{}高压柜{}号", "PDU", ["F1"], [4], PT_HV_CABINET, "施耐德", "SM6-24kV"),
-    ("TX", "{}变压器{}号", "PDU", ["F1"], [4], PT_TRANSFORMER, "西门子", "GEAFOL-1600kVA"),
-    ("LV", "{}低压柜{}号", "PDU", ["F1"], [8], PT_LV_CABINET, "ABB", "MNS3.0"),
-    ("UPS", "{}UPS{}号", "UPS", ["F1"], [8], PT_UPS, "华为", "UPS5000-E-200kVA"),
-    ("BAT", "{}电池组{}号", "UPS", ["F1"], [16], PT_BATTERY, "双登", "6-GFM-100Ah"),
+    ("HV", "{}高压柜{}号", "HV_CABINET", ["F1"], [4], PT_HV_CABINET, "施耐德", "SM6-24kV"),
+    ("TX", "{}变压器{}号", "TRANSFORMER", ["F1"], [4], PT_TRANSFORMER, "西门子", "GEAFOL-1600kVA"),
+    ("LV", "{}低压柜{}号", "LV_CABINET", ["F1"], [8], PT_LV_CABINET, "ABB", "MNS3.0"),
+    ("UPS", "{} {}号UPS", "UPS", ["F1"], [8], PT_UPS, "华为", "UPS5000-E-200kVA"),
+    ("BAT", "{}电池组{}号", "BATTERY", ["F1"], [16], PT_BATTERY, "双登", "6-GFM-100Ah"),
     # --- F1 制冷 ---
     ("CH", "{}冷机{}号", "AC", ["F1"], [6], PT_CHILLER, "约克", "YVWA-400TR"),
     ("PMP", "{}水泵{}号", "AC", ["F1"], [12], PT_PUMP, "格兰富", "NB65-200"),
@@ -224,8 +223,8 @@ DEVICE_LAYOUT: list[tuple[
 ]
 
 
-
 # ==================== 辅助函数 ====================
+
 
 def _mid_value(min_r: float, max_r: float) -> float:
     """计算量程中间值作为初始值"""
@@ -234,13 +233,12 @@ def _mid_value(min_r: float, max_r: float) -> float:
 
 # ==================== 主种子函数 ====================
 
+
 async def seed_datacenter() -> None:
     """创建4层算力中心完整种子数据（幂等）"""
     async with async_session() as session:
         # --- 幂等性检查 ---
-        result = await session.execute(
-            select(Site).where(Site.site_code == "SZ-DC-01")
-        )
+        result = await session.execute(select(Site).where(Site.site_code == "SZ-DC-01"))
         if result.scalar_one_or_none():
             logger.info("算力中心种子数据已存在，跳过")
             return
@@ -280,8 +278,7 @@ async def seed_datacenter() -> None:
         pending_realtimes: list[tuple[int, float, str]] = []  # (point_id, init_val, pt_type)
         batch_counter = 0
 
-        for (prefix, name_tpl, dev_type, floor_codes, counts,
-             pt_template, manufacturer, model_name) in DEVICE_LAYOUT:
+        for prefix, name_tpl, dev_type, floor_codes, counts, pt_template, manufacturer, model_name in DEVICE_LAYOUT:
             seq = 0  # 全局序号
             for floor_code, count in zip(floor_codes, counts):
                 area_code = floor_code
@@ -367,5 +364,9 @@ async def seed_datacenter() -> None:
         await session.commit()
         logger.info(
             "算力中心种子数据创建完成: 站点1个, 楼层%d, 房间%d, 设备%d, 点位%d, 实时值%d",
-            len(FLOORS), room_count, total_devices, total_points, rt_count,
+            len(FLOORS),
+            room_count,
+            total_devices,
+            total_points,
+            rt_count,
         )

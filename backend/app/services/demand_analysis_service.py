@@ -558,4 +558,3 @@ class DemandAnalysisService:
                 "risk_level": rec["risk_level"],
             },
         }
-

@@ -86,3 +86,22 @@ class DeviceStatusSummary(BaseModel):
     alarm: int = 0
     maintenance: int = 0
     by_type: Dict[str, int] = {}
+
+
+class DeleteImpactItem(BaseModel):
+    """删除影响项"""
+
+    table_name: str
+    display_name: str
+    count: int
+    action: str  # "delete" | "unlink"
+
+
+class DeviceDeleteImpact(BaseModel):
+    """删除影响分析"""
+
+    device_id: int
+    device_code: str
+    device_name: str
+    impacts: list[DeleteImpactItem]
+    total_affected_records: int

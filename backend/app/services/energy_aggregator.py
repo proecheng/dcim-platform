@@ -1,7 +1,7 @@
 """
 能耗数据聚合服务
 从 PointHistory 聚合到 EnergyHourly / EnergyDaily / EnergyMonthly
-仅在 simulation_enabled == False 时由定时任务调用
+由定时任务定期调用
 """
 
 import logging

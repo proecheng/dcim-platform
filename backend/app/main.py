@@ -223,14 +223,17 @@ async def lifespan(app: FastAPI):
     # 加载告警引擎阈值缓存
     await alarm_engine.load_thresholds()
 
-    # 同步消防策略 YAML 到数据库（Story 9-2）
-    try:
-        from .services.fire_protection import sync_to_database as fp_sync
+    # 同步消防策略 YAML 到数据库（Story 9-2） — 仅演示模式
+    from .demo.config import is_demo_enabled
 
-        async with async_session() as session:
-            await fp_sync(session)
-    except Exception as e:
-        logger.warning("消防策略同步失败: %s", e)
+    if is_demo_enabled():
+        try:
+            from .services.fire_protection import sync_to_database as fp_sync
+
+            async with async_session() as session:
+                await fp_sync(session)
+        except Exception as e:
+            logger.warning("消防策略同步失败: %s", e)
 
     # 加载联动引擎策略缓存并订阅事件
     await linkage_engine.load_policies()
@@ -243,18 +246,18 @@ async def lifespan(app: FastAPI):
 
     await event_bus.subscribe("linkage", linkage_engine.on_event)
 
-    # 同步诊断规则 YAML 到数据库并启动诊断引擎（Story 9-3）
-    try:
-        from .services.diagnosis_loader import sync_to_database as diag_sync
+    # 同步诊断规则 YAML 到数据库并启动诊断引擎（Story 9-3） — 仅演示模式
+    if is_demo_enabled():
+        try:
+            from .services.diagnosis_loader import sync_to_database as diag_sync
 
-        async with async_session() as session:
-            await diag_sync(session)
-    except Exception as e:
-        logger.warning("诊断规则同步失败: %s", e)
+            async with async_session() as session:
+                await diag_sync(session)
+        except Exception as e:
+            logger.warning("诊断规则同步失败: %s", e)
 
     await diagnosis_engine.load_rules()
     await event_bus.subscribe("linkage", diagnosis_engine.on_alarm_event)
-
 
     # 启动告警引擎定时刷新（每 30 秒检查阈值版本）
     async def _alarm_engine_refresh_loop():

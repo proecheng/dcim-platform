@@ -64,7 +64,7 @@ class DeviceSyncService:
     # Device 自动同步到 PowerDevice 时的默认额定功率 (kW)
     DEFAULT_RATED_POWER = {
         "UPS": 200.0,
-        "PDU": 22.0,      # 32A × 380V × 0.9功率因数 / 1000 ≈ 10.9kW/相, 三相约22kW
+        "PDU": 22.0,  # 32A × 380V × 0.9功率因数 / 1000 ≈ 10.9kW/相, 三相约22kW
         "HVAC": 50.0,
         "IT_SERVER": 20.0,
         "IT_STORAGE": 30.0,
@@ -496,6 +496,7 @@ class DeviceSyncService:
 
         # 先构建 circuit_code -> circuit_id 映射
         from ..models.energy import DistributionCircuit
+
         circuit_result = await self.db.execute(select(DistributionCircuit))
         circuit_map = {c.circuit_code: c.id for c in circuit_result.scalars().all()}
 
@@ -557,10 +558,10 @@ class DeviceSyncService:
 
         # 5a. UPS → UPSDevice
         ups_devices = (
-            await self.db.execute(
-                select(Device).where(Device.device_type == "UPS", Device.is_enabled == True)
-            )
-        ).scalars().all()
+            (await self.db.execute(select(Device).where(Device.device_type == "UPS", Device.is_enabled == True)))
+            .scalars()
+            .all()
+        )
         for dev in ups_devices:
             existing = (
                 await self.db.execute(select(UPSDevice).where(UPSDevice.device_id == dev.id))
@@ -568,9 +569,7 @@ class DeviceSyncService:
             if not existing:
                 # 尝试从 PowerDevice 获取额定功率
                 pd_match = (
-                    await self.db.execute(
-                        select(PowerDevice).where(PowerDevice.monitor_device_id == dev.id)
-                    )
+                    await self.db.execute(select(PowerDevice).where(PowerDevice.monitor_device_id == dev.id))
                 ).scalar_one_or_none()
                 rated = pd_match.rated_power if pd_match and pd_match.rated_power else 200.0
                 ups = UPSDevice(
@@ -586,10 +585,10 @@ class DeviceSyncService:
         ac_types = ("AC", "PRECISION_AC_INDOOR", "PRECISION_AC_OUTDOOR")
         for ac_type in ac_types:
             ac_devs = (
-                await self.db.execute(
-                    select(Device).where(Device.device_type == ac_type, Device.is_enabled == True)
-                )
-            ).scalars().all()
+                (await self.db.execute(select(Device).where(Device.device_type == ac_type, Device.is_enabled == True)))
+                .scalars()
+                .all()
+            )
             for dev in ac_devs:
                 existing = (
                     await self.db.execute(select(CoolingUnit).where(CoolingUnit.device_id == dev.id))
@@ -607,10 +606,10 @@ class DeviceSyncService:
 
         # 5c. COLD_AISLE → ColdAisle
         ca_devs = (
-            await self.db.execute(
-                select(Device).where(Device.device_type == "COLD_AISLE", Device.is_enabled == True)
-            )
-        ).scalars().all()
+            (await self.db.execute(select(Device).where(Device.device_type == "COLD_AISLE", Device.is_enabled == True)))
+            .scalars()
+            .all()
+        )
         for dev in ca_devs:
             existing = (
                 await self.db.execute(select(ColdAisle).where(ColdAisle.device_id == dev.id))

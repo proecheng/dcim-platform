@@ -36,6 +36,21 @@ async def startup() -> None:
     await seed_cooling_devices()
     logger.info("演示模块: 种子数据已初始化")
 
+    # 双向同步: 拓扑节点 ↔ 动环设备 (通过 device_code 匹配关联)
+    from ..services.device_sync import DeviceSyncService
+    from ..core.database import async_session
+
+    async with async_session() as session:
+        sync = DeviceSyncService(session)
+        result = await sync.migrate_existing_data()
+        logger.info(
+            "演示模块: 设备同步完成 - 关联配电柜 %d, 关联用电设备 %d, 新建设备(配电柜) %d, 新建设备(用电) %d",
+            result.get("linked_panels", 0),
+            result.get("linked_power_devices", 0),
+            result.get("created_devices_for_panels", 0),
+            result.get("created_devices_for_power", 0),
+        )
+
     # 启动数据模拟器
     from .engine import simulator
 

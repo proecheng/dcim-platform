@@ -16,11 +16,12 @@ logger = logging.getLogger(__name__)
 
 
 # ========== UPS设备定义 ==========
+# 编码统一为 datacenter_seed 的 {PREFIX}-{FLOOR}-{SEQ:02d} 格式
 UPS_DEVICES = [
     {
-        "device_code": "UPS-A01",
-        "device_name": "A区1号UPS",
-        "area_code": "A1",
+        "device_code": "UPS-F1-01",
+        "device_name": "F1 1号UPS",
+        "area_code": "F1",
         "manufacturer": "华为",
         "model": "UPS5000-E-200kVA",
         "ups_type": "modular",
@@ -31,9 +32,9 @@ UPS_DEVICES = [
         "bypass_enabled": True,
     },
     {
-        "device_code": "UPS-A02",
-        "device_name": "A区2号UPS",
-        "area_code": "A2",
+        "device_code": "UPS-F1-02",
+        "device_name": "F1 2号UPS",
+        "area_code": "F1",
         "manufacturer": "华为",
         "model": "UPS5000-E-120kVA",
         "ups_type": "standalone",
@@ -64,35 +65,36 @@ CABINET_DEVICES = [
 ]
 
 # ========== PDU定义 ==========
+# 编码统一为 datacenter_seed 的 {PREFIX}-{FLOOR}-{SEQ:02d} 格式
 PDU_DEVICES = [
     {
-        "device_code": "PDU-A01",
-        "device_name": "A1区列头柜1",
-        "area_code": "A1",
+        "device_code": "PDU-F2-01",
+        "device_name": "F2 列头柜1",
+        "area_code": "F2",
         "manufacturer": "台达",
         "model": "PDU-32A-3P",
         "rated_power": 22.0,
     },
     {
-        "device_code": "PDU-A02",
-        "device_name": "A1区列头柜2",
-        "area_code": "A1",
+        "device_code": "PDU-F2-02",
+        "device_name": "F2 列头柜2",
+        "area_code": "F2",
         "manufacturer": "台达",
         "model": "PDU-32A-3P",
         "rated_power": 22.0,
     },
     {
-        "device_code": "PDU-B01",
-        "device_name": "B1区列头柜1",
-        "area_code": "B1",
+        "device_code": "PDU-F3-01",
+        "device_name": "F3 列头柜1",
+        "area_code": "F3",
         "manufacturer": "台达",
         "model": "PDU-32A-3P",
         "rated_power": 22.0,
     },
     {
-        "device_code": "PDU-B02",
-        "device_name": "B1区列头柜2",
-        "area_code": "B1",
+        "device_code": "PDU-F3-02",
+        "device_name": "F3 列头柜2",
+        "area_code": "F3",
         "manufacturer": "台达",
         "model": "PDU-32A-3P",
         "rated_power": 22.0,
@@ -408,11 +410,33 @@ def _create_point(device_id: int, device_type: str, device_code: str, pt: dict, 
     )
 
 
+async def _find_or_create_device(session, code: str, name: str, dtype: str, area: str, **kwargs) -> Device:
+    """查找已有 Device（由 datacenter_seed 创建），不存在则新建"""
+    result = await session.execute(select(Device).where(Device.device_code == code))
+    device = result.scalar_one_or_none()
+    if device:
+        return device
+    device = Device(
+        device_code=code,
+        device_name=name,
+        device_type=dtype,
+        area_code=area,
+        install_date=kwargs.get("install_date", date(2025, 6, 1)),
+        manufacturer=kwargs.get("manufacturer"),
+        model=kwargs.get("model"),
+        status="online",
+        is_enabled=True,
+    )
+    session.add(device)
+    await session.flush()
+    return device
+
+
 async def seed_power_devices():
     """种子数据：创建供配电设备及关联点位"""
     async with async_session() as session:
-        # 检查是否已有UPS-A01设备，避免重复创建
-        existing = await session.execute(select(Device).where(Device.device_code == "UPS-A01"))
+        # 检查是否已有 UPSDevice 扩展记录，避免重复创建
+        existing = await session.execute(select(UPSDevice).limit(1))
         if existing.scalar_one_or_none():
             logger.info("供配电种子数据已存在，跳过")
             return
@@ -422,33 +446,32 @@ async def seed_power_devices():
         # ===== 1. 创建UPS设备 =====
         for ups_def in UPS_DEVICES:
             code = ups_def["device_code"]
-            # 创建Device记录
-            device = Device(
-                device_code=code,
-                device_name=ups_def["device_name"],
-                device_type="UPS",
-                area_code=ups_def["area_code"],
+            # 查找已有 Device 或新建
+            device = await _find_or_create_device(
+                session,
+                code,
+                ups_def["device_name"],
+                "UPS",
+                ups_def["area_code"],
                 manufacturer=ups_def.get("manufacturer"),
                 model=ups_def.get("model"),
-                install_date=date(2025, 6, 1),
-                status="online",
-                is_enabled=True,
             )
-            session.add(device)
-            await session.flush()
 
-            # 创建UPSDevice扩展记录
-            ups_ext = UPSDevice(
-                device_id=device.id,
-                ups_type=ups_def["ups_type"],
-                rated_capacity=ups_def["rated_capacity"],
-                rated_voltage=ups_def["rated_voltage"],
-                phase_count=ups_def["phase_count"],
-                battery_group_count=ups_def["battery_group_count"],
-                bypass_enabled=ups_def["bypass_enabled"],
-            )
-            session.add(ups_ext)
-            await session.flush()
+            # 创建UPSDevice扩展记录（仅当不存在时）
+            ups_result = await session.execute(select(UPSDevice).where(UPSDevice.device_id == device.id))
+            ups_ext = ups_result.scalar_one_or_none()
+            if not ups_ext:
+                ups_ext = UPSDevice(
+                    device_id=device.id,
+                    ups_type=ups_def["ups_type"],
+                    rated_capacity=ups_def["rated_capacity"],
+                    rated_voltage=ups_def["rated_voltage"],
+                    phase_count=ups_def["phase_count"],
+                    battery_group_count=ups_def["battery_group_count"],
+                    bypass_enabled=ups_def["bypass_enabled"],
+                )
+                session.add(ups_ext)
+                await session.flush()
 
             # 创建UPS点位
             for idx, pt in enumerate(_ups_points(code)):
@@ -494,19 +517,15 @@ async def seed_power_devices():
         # ===== 2. 创建配电柜 =====
         for cab_def in CABINET_DEVICES:
             code = cab_def["device_code"]
-            device = Device(
-                device_code=code,
-                device_name=cab_def["device_name"],
-                device_type="CABINET",
-                area_code=cab_def["area_code"],
+            device = await _find_or_create_device(
+                session,
+                code,
+                cab_def["device_name"],
+                "CABINET",
+                cab_def["area_code"],
                 manufacturer=cab_def.get("manufacturer"),
                 model=cab_def.get("model"),
-                install_date=date(2025, 6, 1),
-                status="online",
-                is_enabled=True,
             )
-            session.add(device)
-            await session.flush()
 
             for idx, pt in enumerate(_cabinet_points(code)):
                 session.add(_create_point(device.id, "CABINET", code, pt, idx))
@@ -514,19 +533,15 @@ async def seed_power_devices():
         # ===== 3. 创建PDU =====
         for pdu_def in PDU_DEVICES:
             code = pdu_def["device_code"]
-            device = Device(
-                device_code=code,
-                device_name=pdu_def["device_name"],
-                device_type="PDU",
-                area_code=pdu_def["area_code"],
+            device = await _find_or_create_device(
+                session,
+                code,
+                pdu_def["device_name"],
+                "PDU",
+                pdu_def["area_code"],
                 manufacturer=pdu_def.get("manufacturer"),
                 model=pdu_def.get("model"),
-                install_date=date(2025, 6, 1),
-                status="online",
-                is_enabled=True,
             )
-            session.add(device)
-            await session.flush()
 
             for idx, pt in enumerate(_pdu_points(code)):
                 session.add(_create_point(device.id, "PDU", code, pt, idx))

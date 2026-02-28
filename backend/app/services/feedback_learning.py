@@ -349,5 +349,3 @@ def get_feedback_learner() -> FeedbackLearner:
     if _learner_instance is None:
         _learner_instance = FeedbackLearner()
     return _learner_instance
-
-

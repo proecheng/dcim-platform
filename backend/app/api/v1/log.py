@@ -25,6 +25,7 @@ async def get_operation_logs(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     user_id: Optional[int] = Query(None, description="用户ID"),
+    username: Optional[str] = Query(None, description="用户名（模糊匹配）"),
     module: Optional[str] = Query(None, description="模块"),
     action: Optional[str] = Query(None, description="操作类型"),
     start_time: Optional[datetime] = Query(None),
@@ -40,6 +41,8 @@ async def get_operation_logs(
 
     if user_id:
         query = query.where(OperationLog.user_id == user_id)
+    if username:
+        query = query.where(OperationLog.username.contains(username))
     if module:
         query = query.where(OperationLog.module == module)
     if action:

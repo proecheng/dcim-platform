@@ -462,8 +462,12 @@ async def delete_power_device(
 
     # 2. 删除关联数据
     from ...models.energy import (
-        EnergyHourly, EnergyDaily, EnergyMonthly,
-        DeviceLoadProfile, DeviceShiftConfig, LoadRegulationConfig
+        EnergyHourly,
+        EnergyDaily,
+        EnergyMonthly,
+        DeviceLoadProfile,
+        DeviceShiftConfig,
+        LoadRegulationConfig,
     )
 
     await db.execute(delete(EnergyHourly).where(EnergyHourly.device_id == device_id))
@@ -542,10 +546,18 @@ async def get_realtime_power(
             device_code=device.device_code,
             device_name=device.device_name,
             device_type=device.device_type,
-            voltage_a=None, voltage_b=None, voltage_c=None,
-            current_a=None, current_b=None, current_c=None,
-            active_power=None, reactive_power=None, apparent_power=None,
-            power_factor=None, frequency=None, total_energy=None,
+            voltage_a=None,
+            voltage_b=None,
+            voltage_c=None,
+            current_a=None,
+            current_b=None,
+            current_c=None,
+            active_power=None,
+            reactive_power=None,
+            apparent_power=None,
+            power_factor=None,
+            frequency=None,
+            total_energy=None,
             load_rate=None,
             status="normal",
             update_time=datetime.now(),
@@ -615,10 +627,18 @@ async def get_device_realtime_power(
         device_code=device.device_code,
         device_name=device.device_name,
         device_type=device.device_type,
-        voltage_a=None, voltage_b=None, voltage_c=None,
-        current_a=None, current_b=None, current_c=None,
-        active_power=None, reactive_power=None, apparent_power=None,
-        power_factor=None, frequency=None, total_energy=None,
+        voltage_a=None,
+        voltage_b=None,
+        voltage_c=None,
+        current_a=None,
+        current_b=None,
+        current_c=None,
+        active_power=None,
+        reactive_power=None,
+        apparent_power=None,
+        power_factor=None,
+        frequency=None,
+        total_energy=None,
         load_rate=None,
         status="normal",
         update_time=datetime.now(),
@@ -786,9 +806,17 @@ async def get_energy_summary(
     if stats[0] is None:
         # 无数据返回零值
         summary = EnergyStat(
-            total_energy=0, peak_energy=0, normal_energy=0, valley_energy=0,
-            total_cost=0, peak_cost=0, normal_cost=0, valley_cost=0,
-            avg_power=0, max_power=0, avg_pue=0,
+            total_energy=0,
+            peak_energy=0,
+            normal_energy=0,
+            valley_energy=0,
+            total_cost=0,
+            peak_cost=0,
+            normal_cost=0,
+            valley_cost=0,
+            avg_power=0,
+            max_power=0,
+            avg_pue=0,
         )
     else:
         total = stats[0] or 0
@@ -1012,15 +1040,25 @@ async def get_energy_comparison(
 
     # 无数据时返回零值对比
     zero_stat = EnergyStat(
-        total_energy=0, peak_energy=0, normal_energy=0, valley_energy=0,
-        total_cost=0, peak_cost=0, normal_cost=0, valley_cost=0,
-        avg_power=0, max_power=0, avg_pue=0,
+        total_energy=0,
+        peak_energy=0,
+        normal_energy=0,
+        valley_energy=0,
+        total_cost=0,
+        peak_cost=0,
+        normal_cost=0,
+        valley_cost=0,
+        avg_power=0,
+        max_power=0,
+        avg_pue=0,
     )
     comparison = EnergyComparison(
         current_period=zero_stat,
         previous_period=zero_stat,
-        energy_change=0, energy_change_rate=0,
-        cost_change=0, cost_change_rate=0,
+        energy_change=0,
+        energy_change_rate=0,
+        cost_change=0,
+        cost_change_rate=0,
     )
     return ResponseModel(data=comparison)
 
@@ -2455,7 +2493,9 @@ async def get_power_curve(
                 meter_point_id=meter_point_id,
                 device_id=device_id,
                 data=[],
-                max_power=0, avg_power=0, max_demand=0,
+                max_power=0,
+                avg_power=0,
+                max_demand=0,
             )
         )
 

@@ -135,12 +135,14 @@ class DataSimulator:
                     else:
                         new_value = 0
                     self.value_cache[point.id] = new_value
-                    ingest_points.append(IngestPoint(
-                        point_id=point.id,
-                        value=float(new_value),
-                        quality=0,
-                        source="demo",
-                    ))
+                    ingest_points.append(
+                        IngestPoint(
+                            point_id=point.id,
+                            value=float(new_value),
+                            quality=0,
+                            source="demo",
+                        )
+                    )
                 except Exception as e:
                     logger.warning("生成点位 %s 模拟值失败: %s", point.point_code, e)
 
@@ -189,6 +191,7 @@ class DataSimulator:
     async def start(self, interval: int = None):
         """启动数据采集"""
         from ..core.config import get_settings
+
         settings = get_settings()
 
         if self.running:
