@@ -7,9 +7,6 @@
   - DemandAnalysisService.calculate_optimal_demand: 建议需量计算
   - DemandAnalysisService.generate_recommendation: 优化建议生成
   - DemandAnalysisService.analyze: 完整分析入口
-  - DemandAnalysisService.generate_mock_demand_curve: 模拟需量曲线
-  - DemandAnalysisService.generate_mock_hourly_load: 模拟小时负荷
-  - DemandAnalysisService.generate_mock_power_factor: 模拟功率因数
 """
 
 import pytest
@@ -205,46 +202,3 @@ class TestAnalyze:
         assert result["has_opportunity"] is False
         assert result["statistics"] is None
 
-
-class TestMockDataGeneration:
-    """模拟数据生成测试"""
-
-    def test_generate_mock_demand_curve(self):
-        """生成需量曲线模拟数据"""
-        data = DemandAnalysisService.generate_mock_demand_curve(meter_point_id=1, months=12)
-        assert len(data) == 12
-        for item in data:
-            assert "month" in item
-            assert "max_demand" in item
-            assert "avg_demand" in item
-            assert item["max_demand"] > 0
-
-    def test_generate_mock_hourly_load(self):
-        """生成24小时负荷模拟数据"""
-        from datetime import date
-
-        period_map = {h: "flat" for h in range(24)}
-        data = DemandAnalysisService.generate_mock_hourly_load(
-            meter_point_id=1, target_date=date(2026, 1, 15), period_map=period_map
-        )
-        assert len(data) == 24
-        for item in data:
-            assert "hour" in item
-            assert "power" in item
-            assert "period" in item
-
-    def test_generate_mock_power_factor(self):
-        """生成功率因数趋势模拟数据"""
-        data = DemandAnalysisService.generate_mock_power_factor(meter_point_id=1, days=30)
-        assert len(data) == 30
-        for item in data:
-            assert "date" in item
-            assert "power_factor" in item
-            assert 0.85 <= item["power_factor"] <= 1.0
-            assert item["status"] in ["good", "warning", "bad"]
-
-    def test_deterministic_output(self):
-        """相同参数应产生相同结果"""
-        data1 = DemandAnalysisService.generate_mock_demand_curve(meter_point_id=5, months=6)
-        data2 = DemandAnalysisService.generate_mock_demand_curve(meter_point_id=5, months=6)
-        assert data1 == data2

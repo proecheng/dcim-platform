@@ -4,7 +4,6 @@
 覆盖:
   - DemandAnalysisService.analyze_demand_config: 需量配置分析（有历史数据/无历史数据）
   - DemandAnalysisService._calculate_recommended_demand: 推荐需量计算
-  - DemandAnalysisService._generate_mock_analysis: 模拟分析数据
   - LoadShiftAnalysisService.analyze_load_shift: 负荷转移分析
   - LoadShiftAnalysisService._get_peak_valley_distribution: 峰谷分布
   - LoadShiftAnalysisService._generate_shift_suggestions: 转移建议生成
@@ -67,8 +66,8 @@ class TestAnalyzeDemandConfig:
         assert "不存在" in result["error"]
 
     @pytest.mark.asyncio
-    async def test_mock_analysis_when_no_history(self, async_db):
-        """无历史数据时生成模拟分析"""
+    async def test_no_analysis_when_no_history(self, async_db):
+        """无历史数据时返回错误提示"""
         from app.models.energy import MeterPoint
 
         mp = MeterPoint(
@@ -82,10 +81,8 @@ class TestAnalyzeDemandConfig:
         await async_db.flush()
 
         result = await DemandAnalysisService.analyze_demand_config(async_db, meter_point_id=mp.id)
-        # 无历史数据应返回模拟分析
-        assert result["meter_point_id"] == mp.id
-        assert result["current_config"]["declared_demand"] == 800
-        assert "_note" in result or "模拟" in result.get("analysis_period", "")
+        # 无历史数据应返回错误提示（mock已移除）
+        assert "error" in result
 
     @pytest.mark.asyncio
     async def test_analysis_with_history_data(self, async_db):

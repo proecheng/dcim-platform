@@ -18,7 +18,7 @@ class Settings(BaseSettings):
 
     # 应用信息
     app_name: str = "算力中心智能监控系统"
-    app_version: str = "1.0.0"
+    app_version: str = "3.0.0"
     debug: bool = True  # 开发阶段默认开启，正式发布前改为 False
 
     # 服务器配置
@@ -48,6 +48,7 @@ class Settings(BaseSettings):
 
     # 模拟模式配置
     simulation_enabled: bool = True  # 是否启用模拟数据
+    demo_enabled: bool = True  # 演示模式开关（替代 simulation_enabled，过渡期两者等价）
     simulation_interval: int = 5  # 模拟数据生成间隔(秒)
 
     # 授权配置

@@ -399,13 +399,9 @@ async def get_learning_metrics(
     - Bias: 偏差
     - 准确率
     """
-    from app.services.feedback_learning import get_feedback_learner, generate_sample_history
+    from app.services.feedback_learning import get_feedback_learner
 
     learner = get_feedback_learner()
-
-    # 如果没有历史数据，生成样本数据
-    if len(learner.deviation_history) < 100:
-        generate_sample_history(30)
 
     # 解析日期
     start = None
@@ -471,13 +467,9 @@ async def get_optimization_report(
     - 预测质量评估
     - 改进建议
     """
-    from app.services.feedback_learning import get_feedback_learner, generate_sample_history
+    from app.services.feedback_learning import get_feedback_learner
 
     learner = get_feedback_learner()
-
-    # 确保有历史数据
-    if len(learner.deviation_history) < 100:
-        generate_sample_history(30)
 
     # 解析月份
     if month:

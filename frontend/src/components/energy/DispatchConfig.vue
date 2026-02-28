@@ -356,7 +356,7 @@ import {
   createPVSystem,
   updatePVSystem,
   deletePVSystem,
-  initDemoData,
+  initDispatchDemoData,
   deviceTypeLabels,
   deviceTypeDescriptions,
   type DispatchableDevice,
@@ -429,7 +429,7 @@ onMounted(() => {
 async function initDemo() {
   loading.initDemo = true
   try {
-    const res = await initDemoData()
+    const res = await initDispatchDemoData()
     if (res.data?.created) {
       ElMessage.success('演示数据初始化成功')
       // 重新加载所有数据

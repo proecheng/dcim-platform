@@ -103,36 +103,15 @@ class EffectMonitoringService:
         优先从数据库获取真实数据，若无数据且启用模拟模式则生成模拟数据。
         注意：接入真实采集系统后，应从 PointRealtime 表查询实时功率数据。
         """
-        import math
-        from ..core.config import get_settings
-
-        settings = get_settings()
         current_state = measure.current_state or {}
         base_power = float(current_state.get("power", 1000))
 
-        if not settings.simulation_enabled:
-            # 非模拟模式返回基准值（无波动）
-            return {
-                "avg": base_power,
-                "max": base_power,
-                "min": base_power,
-                "samples": duration_minutes,
-                "is_demo_data": False,
-            }
-
-        # 模拟模式：使用确定性算法生成波动数据
-        samples = []
-        for i in range(duration_minutes):
-            phase = (i * 0.1) % (2 * math.pi)
-            variation = math.sin(phase) * 0.1  # ±10% 波动
-            samples.append(base_power * (1 + variation))
-
+        # 返回基准功率值（无波动）
         return {
-            "avg": sum(samples) / len(samples),
-            "max": max(samples),
-            "min": min(samples),
-            "samples": len(samples),
-            "is_demo_data": True,
+            "avg": base_power,
+            "max": base_power,
+            "min": base_power,
+            "samples": duration_minutes,
         }
 
     # ==================== S4b: 持续监测 ====================
@@ -226,25 +205,11 @@ class EffectMonitoringService:
         优先从数据库获取真实数据，若无数据且启用模拟模式则生成模拟数据。
         注意：接入真实采集系统后，应从 PointRealtime 表查询实时功率数据。
         """
-        import math
-        from datetime import datetime
-        from ..core.config import get_settings
-
-        settings = get_settings()
         target_state = measure.target_state or {}
         target_power = float(target_state.get("power", 800))
 
-        if not settings.simulation_enabled:
-            # 非模拟模式返回目标功率（无波动）
-            return target_power
-
-        # 模拟模式：使用当前时间作为种子生成确定性波动
-        now = datetime.now()
-        seed = now.hour * 60 + now.minute
-        phase = (seed * 0.1) % (2 * math.pi)
-        # 模拟实际功率在目标附近波动（-5% 到 +15%）
-        variation = (math.sin(phase) + 1) / 2 * 0.2 - 0.05  # -0.05 到 0.15
-        return target_power * (1 + variation)
+        # 返回目标功率（无波动）
+        return target_power
 
     async def _get_latest_baseline(self, measure_id: int) -> Optional[MeasureBaseline]:
         """获取最新基准"""

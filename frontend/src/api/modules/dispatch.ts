@@ -274,11 +274,11 @@ export function getDispatchSummary() {
   return request.get<ResponseModel<DispatchSummary>>('/v1/dispatch/summary')
 }
 
-/** 初始化演示数据 */
-export function initDemoData() {
+/** 初始化可调度资源演示数据 */
+export function initDispatchDemoData() {
   return request.post<ResponseModel<{
     message: string
     created: boolean
     data?: { devices: number; storage: number; pv: number }
-  }>>('/v1/dispatch/init-demo-data')
+  }>>('/v1/demo/init-dispatch-data')
 }

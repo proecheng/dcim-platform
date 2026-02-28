@@ -17,9 +17,7 @@ from .core.security import get_password_hash
 from .models import User
 from .api.v1 import api_router
 from .services.websocket import ws_manager
-from .services.simulator import simulator
-from .services.power_seed import seed_power_devices
-from .services.cooling_seed import seed_cooling_devices
+from .demo.lifecycle import startup as demo_startup, shutdown as demo_shutdown
 from .core.redis import redis_service
 from .engines.alarm_engine import alarm_engine
 from .engines.linkage_engine import linkage_engine
@@ -216,8 +214,7 @@ async def lifespan(app: FastAPI):
     await init_db()
     await init_default_data()
     await init_default_configs()
-    await seed_power_devices()
-    await seed_cooling_devices()
+    await demo_startup()
 
     # 连接 Redis 缓存
     if settings.redis_enabled:
@@ -258,8 +255,6 @@ async def lifespan(app: FastAPI):
     await diagnosis_engine.load_rules()
     await event_bus.subscribe("linkage", diagnosis_engine.on_alarm_event)
 
-    # 启动数据模拟器（后台任务）
-    simulator_task = asyncio.create_task(simulator.start(interval=5))
 
     # 启动告警引擎定时刷新（每 30 秒检查阈值版本）
     async def _alarm_engine_refresh_loop():
@@ -300,54 +295,51 @@ async def lifespan(app: FastAPI):
     async def _pue_history_loop():
         await asyncio.sleep(10)  # 启动后短暂等待
         # 先执行一次
-        if not settings.simulation_enabled:
+        try:
+            async with async_session() as session:
+                await write_pue_history(session)
+        except Exception as e:
+            logger.warning("PUE历史写入失败: %s", e)
+        while True:
+            await asyncio.sleep(900)  # 15分钟
             try:
                 async with async_session() as session:
                     await write_pue_history(session)
             except Exception as e:
                 logger.warning("PUE历史写入失败: %s", e)
-        while True:
-            await asyncio.sleep(900)  # 15分钟
-            if not settings.simulation_enabled:
-                try:
-                    async with async_session() as session:
-                        await write_pue_history(session)
-                except Exception as e:
-                    logger.warning("PUE历史写入失败: %s", e)
 
     pue_history_task = asyncio.create_task(_pue_history_loop())
 
-    # 启动能耗数据聚合定时任务（仅在非模拟模式下）
+    # 启动能耗数据聚合定时任务
     async def _energy_aggregation_loop():
         await asyncio.sleep(30)  # 启动后等待
         _last_daily_date = None
         _last_monthly_key = None
         while True:
-            if not settings.simulation_enabled:
-                # 小时聚合（每次循环都执行）
+            # 小时聚合（每次循环都执行）
+            try:
+                async with async_session() as session:
+                    await aggregate_hourly(session)
+            except Exception as e:
+                logger.warning("小时能耗聚合失败: %s", e)
+            # 日聚合（每天执行一次，聚合前一天）
+            today = datetime.now().date()
+            if _last_daily_date != today:
                 try:
                     async with async_session() as session:
-                        await aggregate_hourly(session)
+                        await aggregate_daily(session)
+                    _last_daily_date = today
                 except Exception as e:
-                    logger.warning("小时能耗聚合失败: %s", e)
-                # 日聚合（每天执行一次，聚合前一天）
-                today = datetime.now().date()
-                if _last_daily_date != today:
-                    try:
-                        async with async_session() as session:
-                            await aggregate_daily(session)
-                        _last_daily_date = today
-                    except Exception as e:
-                        logger.warning("日能耗聚合失败: %s", e)
-                # 月聚合（每月执行一次，聚合上月）
-                month_key = (today.year, today.month)
-                if _last_monthly_key != month_key:
-                    try:
-                        async with async_session() as session:
-                            await aggregate_monthly(session)
-                        _last_monthly_key = month_key
-                    except Exception as e:
-                        logger.warning("月能耗聚合失败: %s", e)
+                    logger.warning("日能耗聚合失败: %s", e)
+            # 月聚合（每月执行一次，聚合上月）
+            month_key = (today.year, today.month)
+            if _last_monthly_key != month_key:
+                try:
+                    async with async_session() as session:
+                        await aggregate_monthly(session)
+                    _last_monthly_key = month_key
+                except Exception as e:
+                    logger.warning("月能耗聚合失败: %s", e)
             await asyncio.sleep(1800)  # 30分钟检查一次
 
     energy_agg_task = asyncio.create_task(_energy_aggregation_loop())
@@ -393,7 +385,6 @@ async def lifespan(app: FastAPI):
     print(f"{'=' * 50}")
     print(f"{settings.app_name} v{settings.app_version} 启动成功")
     print(f"{'=' * 50}")
-    print("数据模拟器已启动，每5秒采集一次")
     print("告警引擎已加载阈值缓存")
     print("联动引擎已加载策略缓存")
     print("通信监控已启动，每30秒检查一次")
@@ -411,9 +402,8 @@ async def lifespan(app: FastAPI):
 
     yield
 
-    # 停止模拟器和刷新任务
-    simulator.stop()
-    simulator_task.cancel()
+    # 关闭演示模块
+    await demo_shutdown()
     refresh_task.cancel()
     comm_monitor_task.cancel()
     escalation_task.cancel()

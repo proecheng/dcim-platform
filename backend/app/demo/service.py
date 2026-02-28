@@ -11,6 +11,8 @@ from sqlalchemy import select, update, delete, func
 
 from ..core.database import async_session, init_db
 from ..models import Point, PointRealtime, PointHistory, AlarmThreshold, PUEHistory, FloorMap
+from ..models.device import Device
+from ..models.spatial import Site, Floor, Room, Row
 from ..models.energy import (
     Transformer,
     MeterPoint,
@@ -50,8 +52,8 @@ from ..models.energy import (
 )
 from ..models.alarm import Alarm
 from ..data.building_points import get_all_points, get_threshold_for_point
-from .floor_map_generator import FloorMapGenerator, FLOOR_CONFIG
-from .point_device_matcher import PointDeviceMatcher
+from ..services.floor_map_generator import FloorMapGenerator, FLOOR_CONFIG
+from ..services.point_device_matcher import PointDeviceMatcher
 
 import logging
 
@@ -748,18 +750,8 @@ class DemoDataService:
             result = await session.execute(select(func.count(Point.id)))
             point_count = result.scalar() or 0
 
-            # 检查是否有模拟数据标记
-            # 演示数据点位编码以B1_/F1_/F2_/F3_/A1_开头
-            result = await session.execute(
-                select(func.count(Point.id)).where(
-                    Point.point_code.like("B1_%")
-                    | Point.point_code.like("F1_%")
-                    | Point.point_code.like("F2_%")
-                    | Point.point_code.like("F3_%")
-                    | Point.point_code.like("A1_%")
-                )
-            )
-            demo_point_count = result.scalar() or 0
+            # 检查是否有演示数据（所有点位都是demo系统创建的）
+            demo_point_count = point_count
 
             # 检查历史数据
             result = await session.execute(select(func.count(PointHistory.id)))
@@ -986,25 +978,10 @@ class DemoDataService:
             # 删除所有历史数据（演示数据产生的）
             await session.execute(delete(PointHistory))
 
-            # 获取演示点位ID (包含新增的A1_开头的点位)
-            result = await session.execute(
-                select(Point.id).where(
-                    Point.point_code.like("B1_%")
-                    | Point.point_code.like("F1_%")
-                    | Point.point_code.like("F2_%")
-                    | Point.point_code.like("F3_%")
-                    | Point.point_code.like("A1_%")
-                )
-            )
-            demo_point_ids = [r[0] for r in result.fetchall()]
-
-            if demo_point_ids:
-                # 删除告警阈值
-                await session.execute(delete(AlarmThreshold).where(AlarmThreshold.point_id.in_(demo_point_ids)))
-                # 删除实时数据
-                await session.execute(delete(PointRealtime).where(PointRealtime.point_id.in_(demo_point_ids)))
-                # 删除点位
-                await session.execute(delete(Point).where(Point.id.in_(demo_point_ids)))
+            # 卸载后系统完全空白，删除所有点位相关数据
+            await session.execute(delete(AlarmThreshold))
+            await session.execute(delete(PointRealtime))
+            await session.execute(delete(Point))
 
             # ========== 清理告警数据（模拟器产生的）==========
             await session.execute(delete(Alarm))
@@ -1070,7 +1047,18 @@ class DemoDataService:
             # 11. 清理楼层图数据
             await session.execute(delete(FloorMap))
 
+            # 12. 清理设备和空间拓扑（卸载后系统完全空白）
+            await session.execute(delete(Device))
+            await session.execute(delete(Row))
+            await session.execute(delete(Room))
+            await session.execute(delete(Floor))
+            await session.execute(delete(Site))
+
             await session.commit()
+
+            # 失效入库管道缓存
+            from ..services.ingest_pipeline import invalidate_point_cache
+            invalidate_point_cache()
 
     async def _create_points(self, progress_callback) -> int:
         """创建点位"""

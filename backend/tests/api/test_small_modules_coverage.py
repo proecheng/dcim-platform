@@ -906,7 +906,7 @@ class TestDispatchSummary:
 class TestDispatchDemoData:
     async def test_init_demo_data(self, client, admin_user):
         _, token = admin_user
-        resp = await client.post("/api/v1/dispatch/init-demo-data", headers=auth_headers(token))
+        resp = await client.post("/api/v1/demo/init-dispatch-data", headers=auth_headers(token))
         assert resp.status_code == 200
         data = resp.json()
         assert data["created"] is True
@@ -917,12 +917,12 @@ class TestDispatchDemoData:
             DispatchableDevice(name="existing", device_type="rigid", rated_power=10, priority=1, is_active=True)
         )
         await async_db.commit()
-        resp = await client.post("/api/v1/dispatch/init-demo-data", headers=auth_headers(token))
+        resp = await client.post("/api/v1/demo/init-dispatch-data", headers=auth_headers(token))
         assert resp.status_code == 200
         assert resp.json()["created"] is False
 
     async def test_init_demo_data_no_auth(self, client):
-        resp = await client.post("/api/v1/dispatch/init-demo-data")
+        resp = await client.post("/api/v1/demo/init-dispatch-data")
         assert resp.status_code in (401, 403)
 
     async def test_viewer_cannot_create_device(self, client, viewer_user):

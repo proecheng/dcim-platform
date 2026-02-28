@@ -2,10 +2,7 @@
 电费监控 API - v1
 实时需量监控、预警、月度统计
 
-数据来源策略:
-1. 优先从数据库获取真实数据
-2. 若无真实数据且 SIMULATION_ENABLED=True，使用 demo_provider 提供的模拟数据
-3. 若无真实数据且 SIMULATION_ENABLED=False，返回空数据或默认值
+数据来源: 从数据库获取真实数据，无数据时返回默认值
 """
 
 from typing import Optional, List
@@ -18,8 +15,6 @@ from sqlalchemy import select, desc
 from ..deps import get_db, require_viewer
 from ...models.user import User
 from ...models.energy import RealtimeMonitoring, MonthlyStatistics, PricingConfig, Demand15MinData
-from ...services.demo_data_provider import demo_provider
-from ...core.config import get_settings
 
 router = APIRouter()
 
@@ -143,14 +138,13 @@ async def get_realtime_status(db: AsyncSession = Depends(get_db), _: User = Depe
 
     数据来源:
     - 优先从 realtime_monitoring 表获取最新数据
-    - 若无数据且启用模拟模式，使用 demo_provider 提供的模拟数据
+    - 若无数据，返回默认值
     """
-    settings = get_settings()
     now = datetime.now()
     year_month = now.strftime("%Y-%m")
 
     # 获取配置
-    declared_demand, _ = await _get_declared_demand(db)
+    declared_demand, _demand_price = await _get_declared_demand(db)
     demand_target = declared_demand
 
     # 尝试从数据库获取真实数据
@@ -203,27 +197,21 @@ async def get_realtime_status(db: AsyncSession = Depends(get_db), _: User = Depe
             is_demo_data=False,
         )
 
-    # 无真实数据，检查是否启用模拟模式
-    if settings.simulation_enabled:
-        # 使用 demo_provider 获取模拟数据
-        demo_data = demo_provider.get_demo_demand_status(declared_demand, now)
-        return DemandStatus(**demo_data)
-    else:
-        # 返回默认值（非模拟模式下无数据）
-        return DemandStatus(
-            current_power=0,
-            window_avg_power=0,
-            demand_target=round(demand_target, 1),
-            declared_demand=round(declared_demand, 1),
-            utilization_ratio=0,
-            remaining_capacity=round(demand_target, 1),
-            alert_level="normal",
-            month_max_demand=0,
-            month_max_time=None,
-            trend="stable",
-            timestamp=now.strftime("%Y-%m-%d %H:%M:%S"),
-            is_demo_data=False,
-        )
+    # 返回默认值（无数据）
+    return DemandStatus(
+        current_power=0,
+        window_avg_power=0,
+        demand_target=round(demand_target, 1),
+        declared_demand=round(declared_demand, 1),
+        utilization_ratio=0,
+        remaining_capacity=round(demand_target, 1),
+        alert_level="normal",
+        month_max_demand=0,
+        month_max_time=None,
+        trend="stable",
+        timestamp=now.strftime("%Y-%m-%d %H:%M:%S"),
+        is_demo_data=False,
+    )
 
 
 @router.get("/realtime/alerts", response_model=List[DemandAlert], summary="获取当前预警列表")
@@ -281,14 +269,13 @@ async def get_realtime_curve(
 
     数据来源:
     - 优先从 demand_15min_data 表获取历史数据
-    - 若无数据且启用模拟模式，使用 demo_provider 提供的模拟数据
+    - 若无数据，返回默认值
     """
-    settings = get_settings()
     now = datetime.now()
     start_time = now - timedelta(hours=hours)
 
     # 获取配置
-    declared_demand, _ = await _get_declared_demand(db)
+    declared_demand, _demand_price = await _get_declared_demand(db)
 
     # 尝试从数据库获取真实数据
     result = await db.execute(
@@ -329,18 +316,8 @@ async def get_realtime_curve(
             "is_demo_data": False,
         }
 
-    # 无真实数据，检查是否启用模拟模式
-    if settings.simulation_enabled:
-        data_points = demo_provider.get_demo_realtime_curve(declared_demand, hours, now)
-        return {
-            "data": data_points,
-            "demand_target": declared_demand,
-            "time_range": f"最近{hours}小时",
-            "is_demo_data": True,
-        }
-    else:
-        # 返回空数据
-        return {"data": [], "demand_target": declared_demand, "time_range": f"最近{hours}小时", "is_demo_data": False}
+    # 返回空数据
+    return {"data": [], "demand_target": declared_demand, "time_range": f"最近{hours}小时", "is_demo_data": False}
 
 
 # ==================== 月度统计 API ====================
@@ -352,9 +329,8 @@ async def get_current_month_summary(db: AsyncSession = Depends(get_db), _: User 
 
     数据来源:
     - 优先从 monthly_statistics 表获取数据
-    - 若无数据且启用模拟模式，使用 demo_provider 提供的模拟数据
+    - 若无数据，返回默认值
     """
-    settings = get_settings()
     now = datetime.now()
     year_month = now.strftime("%Y-%m")
 
@@ -381,25 +357,20 @@ async def get_current_month_summary(db: AsyncSession = Depends(get_db), _: User 
             is_demo_data=False,
         )
 
-    # 无真实数据，检查是否启用模拟模式
-    if settings.simulation_enabled:
-        demo_data = demo_provider.get_demo_monthly_summary(declared_demand, demand_price, now)
-        return MonthlyBillSummary(**demo_data)
-    else:
-        # 返回默认值
-        return MonthlyBillSummary(
-            year_month=year_month,
-            total_energy=0,
-            max_demand=0,
-            demand_target=declared_demand,
-            energy_cost=0,
-            demand_cost=0,
-            power_factor_adjustment=0,
-            total_cost=0,
-            optimized_saving=0,
-            cost_breakdown={},
-            is_demo_data=False,
-        )
+    # 返回默认值
+    return MonthlyBillSummary(
+        year_month=year_month,
+        total_energy=0,
+        max_demand=0,
+        demand_target=declared_demand,
+        energy_cost=0,
+        demand_cost=0,
+        power_factor_adjustment=0,
+        total_cost=0,
+        optimized_saving=0,
+        cost_breakdown={},
+        is_demo_data=False,
+    )
 
 
 @router.get("/monthly/history", summary="获取历史月度电费")
@@ -412,13 +383,12 @@ async def get_monthly_history(
 
     数据来源:
     - 优先从 monthly_statistics 表获取数据
-    - 若无数据且启用模拟模式，使用 demo_provider 提供的模拟数据
+    - 若无数据，返回默认值
     """
-    settings = get_settings()
     now = datetime.now()
 
     # 获取配置
-    declared_demand, _ = await _get_declared_demand(db)
+    declared_demand, _demand_price = await _get_declared_demand(db)
 
     # 尝试从数据库获取真实数据
     result = await db.execute(select(MonthlyStatistics).order_by(desc(MonthlyStatistics.year_month)).limit(months))
@@ -443,12 +413,7 @@ async def get_monthly_history(
 
         return {"data": history, "months": len(history), "is_demo_data": False}
 
-    # 无真实数据，检查是否启用模拟模式
-    if settings.simulation_enabled:
-        history = demo_provider.get_demo_monthly_history(declared_demand, months, now)
-        return {"data": history, "months": months, "is_demo_data": True}
-    else:
-        return {"data": [], "months": 0, "is_demo_data": False}
+    return {"data": [], "months": 0, "is_demo_data": False}
 
 
 # ==================== 需量趋势分析 ====================
@@ -464,17 +429,15 @@ async def get_daily_demand_trend(
 
     数据来源:
     - 优先从 demand_15min_data 表获取数据
-    - 若无数据且启用模拟模式，使用 demo_provider 提供的模拟数据
+    - 若无数据，返回默认值
     """
-    settings = get_settings()
-
     if date_str:
         target_date = datetime.strptime(date_str, "%Y-%m-%d")
     else:
         target_date = datetime.now()
 
     # 获取配置
-    declared_demand, _ = await _get_declared_demand(db)
+    declared_demand, _demand_price = await _get_declared_demand(db)
 
     # 尝试从数据库获取真实数据
     day_start = target_date.replace(hour=0, minute=0, second=0, microsecond=0)
@@ -513,20 +476,15 @@ async def get_daily_demand_trend(
             "is_demo_data": False,
         }
 
-    # 无真实数据，检查是否启用模拟模式
-    if settings.simulation_enabled:
-        demo_data = demo_provider.get_demo_daily_demand_trend(declared_demand, target_date)
-        return demo_data
-    else:
-        return {
-            "date": target_date.strftime("%Y-%m-%d"),
-            "declared_demand": declared_demand,
-            "max_demand": 0,
-            "max_demand_time": None,
-            "avg_demand": 0,
-            "data": [],
-            "is_demo_data": False,
-        }
+    return {
+        "date": target_date.strftime("%Y-%m-%d"),
+        "declared_demand": declared_demand,
+        "max_demand": 0,
+        "max_demand_time": None,
+        "avg_demand": 0,
+        "data": [],
+        "is_demo_data": False,
+    }
 
 
 # ==================== 实时调度控制 API ====================
@@ -572,14 +530,12 @@ async def get_dispatch_status(db: AsyncSession = Depends(get_db), _: User = Depe
 
     数据来源:
     - 优先从实时监控数据获取当前功率
-    - 若无数据且启用模拟模式，使用 demo_provider 提供的模拟数据
+    - 若无数据，返回默认值
     """
     from app.services.realtime_dispatch import get_dispatch_controller
 
-    get_settings()
-
     # 获取配置
-    declared_demand, _ = await _get_declared_demand(db)
+    declared_demand, _demand_price = await _get_declared_demand(db)
     demand_target = declared_demand
 
     controller = get_dispatch_controller(demand_target)
@@ -684,32 +640,4 @@ async def complete_dispatch_command(
         "code": 0,
         "message": "success",
         "data": {"command_id": command_id, "status": "completed" if success else "failed"},
-    }
-
-
-@router.get("/dispatch/simulation", summary="模拟实时监控")
-async def simulate_monitoring(
-    minutes: int = Query(5, description="模拟分钟数", ge=1, le=30),
-    db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_viewer),
-):
-    """
-    运行实时监控模拟
-
-    用于演示和测试实时调度功能
-    注意：此 API 仅用于演示目的，始终使用模拟数据
-    """
-    from app.services.realtime_dispatch import simulate_realtime_monitoring
-
-    results = simulate_realtime_monitoring(minutes)
-
-    return {
-        "code": 0,
-        "message": "success",
-        "data": {
-            "duration_minutes": minutes,
-            "data_points": len(results),
-            "results": results,
-            "is_demo_data": True,  # 此 API 始终使用模拟数据
-        },
     }

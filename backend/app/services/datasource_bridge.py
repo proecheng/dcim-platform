@@ -19,7 +19,7 @@ async def sync_point_data(
     status: str = "normal",
     alarm_level: Optional[str] = None,
 ) -> None:
-    """将采集数据同步到 PointRealtime 表和 Redis 缓存
+    """将采集数据通过统一入库管道同步到所有表
 
     Args:
         session: 数据库会话
@@ -29,39 +29,16 @@ async def sync_point_data(
         status: 状态 (normal/alarm/offline)
         alarm_level: 告警级别
     """
-    now = datetime.now()
+    from .ingest_pipeline import IngestPoint, process_payload
 
-    # 更新 PointRealtime
-    await session.execute(
-        update(PointRealtime)
-        .where(PointRealtime.point_id == point_id)
-        .values(
-            value=value,
-            raw_value=value,
-            quality=quality,
-            status=status,
-            alarm_level=alarm_level,
-            updated_at=now,
-        )
+    pt = IngestPoint(
+        point_id=point_id,
+        value=value,
+        quality=quality,
+        status=status,
+        source="bridge",
     )
-    await session.commit()
-
-    # 写入 Redis 缓存
-    if redis_service.is_available:
-        try:
-            cache_data = json.dumps(
-                {
-                    "value": value,
-                    "value_text": str(value),
-                    "quality": quality,
-                    "status": status,
-                    "alarm_level": alarm_level,
-                    "updated_at": now.isoformat(),
-                }
-            )
-            await redis_service.set(f"point:{point_id}:latest", cache_data, ttl=60)
-        except Exception:
-            pass  # Redis 缓存写入失败不影响数据桥接
+    await process_payload([pt], session=session)
 
 
 async def link_datasource_to_point(

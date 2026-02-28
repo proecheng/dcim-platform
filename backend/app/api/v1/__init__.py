@@ -22,7 +22,7 @@ from .regulation import router as regulation_router
 from .asset import router as asset_router
 from .capacity import router as capacity_router
 from .operation import router as operation_router
-from .demo import router as demo_router
+from ...demo.router import router as demo_router
 from .floor_map import router as floor_map_router
 from .proposal import router as proposal_router
 from .vpp import router as vpp_router

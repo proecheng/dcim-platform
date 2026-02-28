@@ -5,10 +5,10 @@
 from datetime import date
 from sqlalchemy import select
 
-from ..core.database import async_session
-from ..models.device import Device
-from ..models.point import Point
-from ..models.power import UPSDevice, BatteryGroup
+from ...core.database import async_session
+from ...models.device import Device
+from ...models.point import Point
+from ...models.power import UPSDevice, BatteryGroup
 
 import logging
 
@@ -71,6 +71,7 @@ PDU_DEVICES = [
         "area_code": "A1",
         "manufacturer": "台达",
         "model": "PDU-32A-3P",
+        "rated_power": 22.0,
     },
     {
         "device_code": "PDU-A02",
@@ -78,6 +79,7 @@ PDU_DEVICES = [
         "area_code": "A1",
         "manufacturer": "台达",
         "model": "PDU-32A-3P",
+        "rated_power": 22.0,
     },
     {
         "device_code": "PDU-B01",
@@ -85,6 +87,7 @@ PDU_DEVICES = [
         "area_code": "B1",
         "manufacturer": "台达",
         "model": "PDU-32A-3P",
+        "rated_power": 22.0,
     },
     {
         "device_code": "PDU-B02",
@@ -92,6 +95,7 @@ PDU_DEVICES = [
         "area_code": "B1",
         "manufacturer": "台达",
         "model": "PDU-32A-3P",
+        "rated_power": 22.0,
     },
 ]
 

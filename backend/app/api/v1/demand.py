@@ -157,38 +157,17 @@ async def get_demand_curve_mini(
     records = result.scalars().all()
 
     if not records:
-        # [V2.9] 使用统一的模拟数据生成方法
-        mock_data = DemandAnalysisService.generate_mock_demand_curve(
-            meter_point_id=meter_point_id,
-            months=months,
-            base_demand=650.0,
-            declared_demand=DemandAnalysisService.DEFAULT_DECLARED_DEMAND,
-        )
-
-        data = [
-            DemandCurvePoint(
-                month=d["month"],
-                max_demand=d["max_demand"],
-                avg_demand=d["avg_demand"],
-                declared_demand=d["declared_demand"],
-            )
-            for d in mock_data
-        ]
-
-        max_value = max(d["max_demand"] for d in mock_data)
-        max_month = next(d["month"] for d in mock_data if d["max_demand"] == max_value)
-
+        # 无数据时返回空结果
         return ResponseModel(
             code=0,
             message="success",
             data=DemandCurveMiniData(
-                data=data,
-                max_value=max_value,
-                max_month=max_month,
+                data=[],
+                max_value=0,
+                max_month="",
                 declared_demand=DemandAnalysisService.DEFAULT_DECLARED_DEMAND,
             ),
         )
-
     # 处理真实数据
     data = []
     max_value = 0
@@ -315,19 +294,8 @@ async def get_load_period_distribution(
             period_stats[period]["hours"] += 1
             period_stats[period]["power_sum"] += power
     else:
-        # [V2.9] 使用统一的模拟数据生成方法
-        mock_data = DemandAnalysisService.generate_mock_hourly_load(
-            meter_point_id=meter_point_id, target_date=target_date, period_map=period_map
-        )
-
-        for d in mock_data:
-            hourly_data.append(HourlyLoadPoint(hour=d["hour"], power=d["power"], period=d["period"]))
-
-            period = d["period"]
-            period_stats[period]["kwh"] += d["power"]
-            period_stats[period]["hours"] += 1
-            period_stats[period]["power_sum"] += d["power"]
-
+        # 无数据时保持 hourly_data 为空，不生成模拟数据
+        pass
     # 计算时段汇总
     period_summary = {}
     for period, stats in period_stats.items():
@@ -420,11 +388,8 @@ async def get_power_factor_trend(
                 }
             )
     else:
-        # [V2.9] 使用统一的模拟数据生成方法
-        data = DemandAnalysisService.generate_mock_power_factor(
-            meter_point_id=meter_point_id, days=days, baseline=baseline
-        )
-
+        # 无数据时保持 data 为空，不生成模拟数据
+        pass
     # 统计
     pf_values = [d["power_factor"] for d in data]
     avg_pf = sum(pf_values) / len(pf_values) if pf_values else 0

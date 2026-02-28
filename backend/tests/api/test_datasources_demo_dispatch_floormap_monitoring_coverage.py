@@ -258,7 +258,7 @@ class TestDemo:
     async def test_get_demo_status(self, client, admin_user, async_db):
         _, token = admin_user
         with patch(
-            "app.services.demo_data_service.demo_data_service.check_demo_data_status",
+            "app.demo.service.demo_data_service.check_demo_data_status",
             new_callable=AsyncMock,
             return_value={"loaded": False, "records": 0},
         ):
@@ -274,7 +274,7 @@ class TestDemo:
 
     async def test_load_demo_data(self, client, admin_user, async_db):
         _, token = admin_user
-        with patch("app.api.v1.demo.demo_data_service") as mock_svc:
+        with patch("app.demo.router.demo_data_service") as mock_svc:
             mock_svc.loading = False
             mock_svc.progress = 0
             mock_svc.progress_message = ""
@@ -288,7 +288,7 @@ class TestDemo:
 
     async def test_load_demo_data_already_loading(self, client, admin_user, async_db):
         _, token = admin_user
-        with patch("app.api.v1.demo.demo_data_service") as mock_svc:
+        with patch("app.demo.router.demo_data_service") as mock_svc:
             mock_svc.loading = True
             mock_svc.progress = 50
             mock_svc.progress_message = "加载中"
@@ -302,7 +302,7 @@ class TestDemo:
 
     async def test_unload_demo_data(self, client, admin_user, async_db):
         _, token = admin_user
-        with patch("app.api.v1.demo.demo_data_service") as mock_svc:
+        with patch("app.demo.router.demo_data_service") as mock_svc:
             mock_svc.unload_demo_data = AsyncMock(return_value={"success": True, "message": "已卸载"})
             resp = await client.post(
                 "/api/v1/demo/unload",
@@ -312,7 +312,7 @@ class TestDemo:
 
     async def test_refresh_dates(self, client, admin_user, async_db):
         _, token = admin_user
-        with patch("app.api.v1.demo.demo_data_service") as mock_svc:
+        with patch("app.demo.router.demo_data_service") as mock_svc:
             mock_svc.loading = False
             resp = await client.post(
                 "/api/v1/demo/refresh-dates",
@@ -567,7 +567,7 @@ class TestDispatchSummary:
     async def test_init_demo_data(self, client, admin_user, async_db):
         _, token = admin_user
         resp = await client.post(
-            "/api/v1/dispatch/init-demo-data",
+            "/api/v1/demo/init-dispatch-data",
             headers=auth_headers(token),
         )
         assert resp.status_code == 200
@@ -577,7 +577,7 @@ class TestDispatchSummary:
         _, token = admin_user
         await _seed_dispatch_device(async_db)
         resp = await client.post(
-            "/api/v1/dispatch/init-demo-data",
+            "/api/v1/demo/init-dispatch-data",
             headers=auth_headers(token),
         )
         assert resp.status_code == 200
@@ -651,15 +651,13 @@ class TestMonitoring:
     """电费监控 API"""
 
     async def test_realtime_status_no_data(self, client, admin_user, async_db):
-        """无实时数据且模拟关闭 → 返回默认值"""
+        """无实时数据 → 返回默认值"""
         _, token = admin_user
         await _seed_pricing(async_db)
-        with patch("app.api.v1.monitoring.get_settings") as mock_settings:
-            mock_settings.return_value = MagicMock(simulation_enabled=False)
-            resp = await client.get(
-                "/api/v1/monitoring/realtime/status",
-                headers=auth_headers(token),
-            )
+        resp = await client.get(
+            "/api/v1/monitoring/realtime/status",
+            headers=auth_headers(token),
+        )
         assert resp.status_code == 200
         body = resp.json()
         assert body["alert_level"] == "normal"
@@ -680,12 +678,10 @@ class TestMonitoring:
         async_db.add(rm)
         await async_db.flush()
 
-        with patch("app.api.v1.monitoring.get_settings") as mock_settings:
-            mock_settings.return_value = MagicMock(simulation_enabled=False)
-            resp = await client.get(
-                "/api/v1/monitoring/realtime/status",
-                headers=auth_headers(token),
-            )
+        resp = await client.get(
+            "/api/v1/monitoring/realtime/status",
+            headers=auth_headers(token),
+        )
         assert resp.status_code == 200
         body = resp.json()
         assert body["current_power"] == 800.0
@@ -694,40 +690,34 @@ class TestMonitoring:
         """正常状态 → 无预警"""
         _, token = admin_user
         await _seed_pricing(async_db)
-        with patch("app.api.v1.monitoring.get_settings") as mock_settings:
-            mock_settings.return_value = MagicMock(simulation_enabled=False)
-            resp = await client.get(
-                "/api/v1/monitoring/realtime/alerts",
-                headers=auth_headers(token),
-            )
+        resp = await client.get(
+            "/api/v1/monitoring/realtime/alerts",
+            headers=auth_headers(token),
+        )
         assert resp.status_code == 200
         assert isinstance(resp.json(), list)
 
     async def test_realtime_curve_empty(self, client, admin_user, async_db):
-        """无数据且模拟关闭 → 空曲线"""
+        """无数据 → 空曲线"""
         _, token = admin_user
         await _seed_pricing(async_db)
-        with patch("app.api.v1.monitoring.get_settings") as mock_settings:
-            mock_settings.return_value = MagicMock(simulation_enabled=False)
-            resp = await client.get(
-                "/api/v1/monitoring/realtime/curve",
-                params={"hours": 1},
-                headers=auth_headers(token),
-            )
+        resp = await client.get(
+            "/api/v1/monitoring/realtime/curve",
+            params={"hours": 1},
+            headers=auth_headers(token),
+        )
         assert resp.status_code == 200
         body = resp.json()
         assert body["data"] == []
 
     async def test_monthly_current_no_data(self, client, admin_user, async_db):
-        """无月度数据且模拟关闭 → 默认值"""
+        """无月度数据 → 默认值"""
         _, token = admin_user
         await _seed_pricing(async_db)
-        with patch("app.api.v1.monitoring.get_settings") as mock_settings:
-            mock_settings.return_value = MagicMock(simulation_enabled=False)
-            resp = await client.get(
-                "/api/v1/monitoring/monthly/current",
-                headers=auth_headers(token),
-            )
+        resp = await client.get(
+            "/api/v1/monitoring/monthly/current",
+            headers=auth_headers(token),
+        )
         assert resp.status_code == 200
         body = resp.json()
         assert body["total_energy"] == 0
@@ -735,24 +725,20 @@ class TestMonitoring:
     async def test_monthly_history_empty(self, client, admin_user, async_db):
         _, token = admin_user
         await _seed_pricing(async_db)
-        with patch("app.api.v1.monitoring.get_settings") as mock_settings:
-            mock_settings.return_value = MagicMock(simulation_enabled=False)
-            resp = await client.get(
-                "/api/v1/monitoring/monthly/history",
-                params={"months": 3},
-                headers=auth_headers(token),
-            )
+        resp = await client.get(
+            "/api/v1/monitoring/monthly/history",
+            params={"months": 3},
+            headers=auth_headers(token),
+        )
         assert resp.status_code == 200
         assert resp.json()["data"] == []
 
     async def test_daily_demand_trend_empty(self, client, admin_user, async_db):
         _, token = admin_user
         await _seed_pricing(async_db)
-        with patch("app.api.v1.monitoring.get_settings") as mock_settings:
-            mock_settings.return_value = MagicMock(simulation_enabled=False)
-            resp = await client.get(
-                "/api/v1/monitoring/demand/daily-trend",
-                headers=auth_headers(token),
-            )
+        resp = await client.get(
+            "/api/v1/monitoring/demand/daily-trend",
+            headers=auth_headers(token),
+        )
         assert resp.status_code == 200
         assert resp.json()["data"] == []

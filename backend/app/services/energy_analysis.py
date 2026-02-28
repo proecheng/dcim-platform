@@ -53,15 +53,14 @@ class DemandAnalysisService:
         demand_history = demand_result.scalars().all()
 
         if not demand_history:
-            # 生成模拟数据进行分析
-            return await DemandAnalysisService._generate_mock_analysis(meter_point)
+            return {"error": "无需量历史数据，无法进行分析"}
 
         # 计算统计指标
         max_demands = [h.max_demand for h in demand_history if h.max_demand]
         avg_demands = [h.avg_demand for h in demand_history if h.avg_demand]
 
         if not max_demands:
-            return await DemandAnalysisService._generate_mock_analysis(meter_point)
+            return {"error": "无有效需量数据，无法进行分析"}
 
         max_demand = max(max_demands)
         avg_demand = sum(avg_demands) / len(avg_demands) if avg_demands else 0
@@ -188,78 +187,6 @@ class DemandAnalysisService:
         optimal = math.ceil(optimal / 5) * 5
 
         return optimal
-
-    @staticmethod
-    async def _generate_mock_analysis(meter_point: MeterPoint) -> Dict[str, Any]:
-        """生成模拟分析数据（无历史数据时使用）"""
-        declared_demand = meter_point.declared_demand or 800
-        # 模拟数据：假设实际使用约85%
-        simulated_max = declared_demand * 0.85
-        simulated_avg = declared_demand * 0.65
-        simulated_95th = declared_demand * 0.82
-
-        recommended_demand = DemandAnalysisService._calculate_recommended_demand(
-            simulated_max, simulated_95th, simulated_avg
-        )
-
-        demand_price = 38.0
-        current_cost = declared_demand * demand_price
-        recommended_cost = recommended_demand * demand_price
-
-        return {
-            "meter_point_id": meter_point.id,
-            "meter_code": meter_point.meter_code,
-            "meter_name": meter_point.meter_name,
-            "analysis_period": "模拟数据",
-            "current_config": {"declared_demand": declared_demand, "demand_type": meter_point.demand_type},
-            "statistics": {
-                "max_demand": round(simulated_max, 1),
-                "avg_demand": round(simulated_avg, 1),
-                "demand_95th": round(simulated_95th, 1),
-                "utilization_rate": 85.0,
-                "over_declared_times": 0,
-                "surplus_capacity": round(declared_demand - simulated_max, 1),
-            },
-            "recommendation": {
-                "status": "can_optimize",
-                "status_text": "可优化（模拟数据）",
-                "recommended_demand": round(recommended_demand, 0),
-                "adjustment": round(recommended_demand - declared_demand, 0),
-                "adjustment_ratio": round((recommended_demand - declared_demand) / declared_demand * 100, 1),
-            },
-            "cost_analysis": {
-                "current_monthly_cost": round(current_cost, 2),
-                "recommended_monthly_cost": round(recommended_cost, 2),
-                "monthly_saving": round(current_cost - recommended_cost, 2),
-                "annual_saving": round((current_cost - recommended_cost) * 12, 2),
-                "demand_price": demand_price,
-            },
-            "optimization_options": [
-                {
-                    "name": "conservative",
-                    "label": "保守方案",
-                    "demand": round(simulated_max * 1.1, 0),
-                    "monthly_cost": round(simulated_max * 1.1 * demand_price, 2),
-                    "risk_level": "极低",
-                },
-                {
-                    "name": "recommended",
-                    "label": "推荐方案",
-                    "demand": round(recommended_demand, 0),
-                    "monthly_cost": round(recommended_cost, 2),
-                    "risk_level": "低",
-                },
-                {
-                    "name": "aggressive",
-                    "label": "激进方案",
-                    "demand": round(simulated_95th, 0),
-                    "monthly_cost": round(simulated_95th * demand_price, 2),
-                    "risk_level": "中",
-                },
-            ],
-            "history": [],
-            "_note": "无历史数据，使用模拟值分析",
-        }
 
 
 class LoadShiftAnalysisService:
