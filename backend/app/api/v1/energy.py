@@ -30,7 +30,6 @@ from ...models.energy import (
 )
 from ...schemas.common import ResponseModel
 from ...services.pue_calculator import calculate_realtime_pue
-from ...core.config import get_settings as _get_energy_settings
 from ...schemas.energy import (
     PowerDeviceCreate,
     PowerDeviceUpdate,
@@ -89,7 +88,6 @@ from ...schemas.energy import (
     TransformerWithMeterPointsResponse,
 )
 
-from ...utils.deterministic import _deterministic_ratio, _deterministic_offset, _device_seed, _time_seed, _date_seed
 from ...services.pricing_service import PricingService
 
 router = APIRouter()
@@ -453,34 +451,17 @@ async def get_realtime_power(
     devices = result.scalars().all()
 
     power_data = []
-    for idx, device in enumerate(devices):
-        # 从 PointRealtime 获取实时数据（如果有对应的电力点位）
-        # [V2.11] 使用确定性模拟数据
-        base_power = device.rated_power or 10.0
-        seed = _device_seed(device.id)
-
+    for device in devices:
         data = RealtimePowerData(
             device_id=device.id,
             device_code=device.device_code,
             device_name=device.device_name,
             device_type=device.device_type,
-            voltage_a=380 + _deterministic_offset(seed, 5),
-            voltage_b=380 + _deterministic_offset(seed + 1, 5) if device.phase_type == "3P" else None,
-            voltage_c=380 + _deterministic_offset(seed + 2, 5) if device.phase_type == "3P" else None,
-            current_a=base_power * 1.52 * _deterministic_ratio(seed + 3, 0.5, 0.9),
-            current_b=base_power * 1.52 * _deterministic_ratio(seed + 4, 0.5, 0.9)
-            if device.phase_type == "3P"
-            else None,
-            current_c=base_power * 1.52 * _deterministic_ratio(seed + 5, 0.5, 0.9)
-            if device.phase_type == "3P"
-            else None,
-            active_power=base_power * _deterministic_ratio(seed + 6, 0.5, 0.9),
-            reactive_power=base_power * 0.2 * _deterministic_ratio(seed + 7, 0.5, 1.0),
-            apparent_power=base_power * 1.1 * _deterministic_ratio(seed + 8, 0.5, 0.9),
-            power_factor=_deterministic_ratio(seed + 9, 0.85, 0.98),
-            frequency=50 + _deterministic_offset(seed + 10, 0.1),
-            total_energy=base_power * 24 * 30 * _deterministic_ratio(seed + 11, 0.5, 1.0),
-            load_rate=_deterministic_ratio(seed + 12, 0.4, 0.85) if device.rated_power else None,
+            voltage_a=None, voltage_b=None, voltage_c=None,
+            current_a=None, current_b=None, current_c=None,
+            active_power=None, reactive_power=None, apparent_power=None,
+            power_factor=None, frequency=None, total_energy=None,
+            load_rate=None,
             status="normal",
             update_time=datetime.now(),
         )
@@ -492,80 +473,7 @@ async def get_realtime_power(
 @router.get("/realtime/summary", response_model=ResponseModel[RealtimePowerSummary], summary="获取电力汇总")
 async def get_power_summary(db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     """获取实时电力汇总（总功率、IT功率、制冷功率、PUE等）"""
-    settings = _get_energy_settings()
-
-    # 真实数据模式
-    if not settings.simulation_enabled:
-        pue_result = await calculate_realtime_pue(db)
-
-        # 获取今日能耗
-        today = date.today()
-        today_result = await db.execute(
-            select(func.sum(EnergyDaily.total_energy), func.sum(EnergyDaily.energy_cost)).where(
-                EnergyDaily.stat_date == today
-            )
-        )
-        today_stats = today_result.first()
-        today_energy = today_stats[0] if (today_stats and today_stats[0] is not None) else 0.0
-        today_cost = today_stats[1] if (today_stats and today_stats[1] is not None) else 0.0
-
-        # 获取本月能耗
-        month_result = await db.execute(
-            select(func.sum(EnergyDaily.total_energy), func.sum(EnergyDaily.energy_cost)).where(
-                EnergyDaily.stat_date >= date(today.year, today.month, 1), EnergyDaily.stat_date <= today
-            )
-        )
-        month_stats = month_result.first()
-        month_energy = month_stats[0] if (month_stats and month_stats[0] is not None) else 0.0
-        month_cost = month_stats[1] if (month_stats and month_stats[1] is not None) else 0.0
-
-        summary = RealtimePowerSummary(
-            total_power=pue_result.total_power,
-            it_power=pue_result.it_power,
-            cooling_power=pue_result.cooling_power,
-            ups_power=round(pue_result.ups_loss, 2),
-            other_power=round(
-                max(0, pue_result.total_power - pue_result.it_power - pue_result.cooling_power - pue_result.ups_loss), 2
-            ),
-            current_pue=pue_result.current_pue,
-            today_energy=round(today_energy, 2),
-            today_cost=round(today_cost, 2),
-            month_energy=round(month_energy, 2),
-            month_cost=round(month_cost, 2),
-            data_source=pue_result.data_source,
-        )
-        return ResponseModel(data=summary)
-
-    # 模拟数据模式（保留现有逻辑）
-    result = await db.execute(select(PowerDevice).where(PowerDevice.is_enabled == True))
-    devices = result.scalars().all()
-
-    # [V2.11] 使用确定性计算替代 random
-    total_power = 0.0
-    it_power = 0.0
-    cooling_power = 0.0
-    ups_power = 0.0
-    other_power = 0.0
-
-    for device in devices:
-        seed = _device_seed(device.id)
-        base_power = (device.rated_power or 10.0) * _deterministic_ratio(seed, 0.5, 0.9)
-
-        if device.device_type == "IT":
-            it_power += base_power
-        elif device.device_type == "AC":
-            cooling_power += base_power
-        elif device.device_type == "UPS":
-            ups_power += base_power
-        elif device.device_type == "MAIN":
-            total_power = base_power * 10  # 主进线
-        else:
-            other_power += base_power
-
-    if total_power == 0:
-        total_power = it_power + cooling_power + ups_power + other_power
-
-    current_pue = total_power / it_power if it_power > 0 else 1.0
+    pue_result = await calculate_realtime_pue(db)
 
     # 获取今日能耗
     today = date.today()
@@ -575,8 +483,8 @@ async def get_power_summary(db: AsyncSession = Depends(get_db), current_user: Us
         )
     )
     today_stats = today_result.first()
-    today_energy = today_stats[0] or total_power * datetime.now().hour
-    today_cost = today_stats[1] or today_energy * 0.8
+    today_energy = today_stats[0] if (today_stats and today_stats[0] is not None) else 0.0
+    today_cost = today_stats[1] if (today_stats and today_stats[1] is not None) else 0.0
 
     # 获取本月能耗
     month_result = await db.execute(
@@ -585,23 +493,24 @@ async def get_power_summary(db: AsyncSession = Depends(get_db), current_user: Us
         )
     )
     month_stats = month_result.first()
-    month_energy = month_stats[0] or today_energy * today.day
-    month_cost = month_stats[1] or month_energy * 0.8
+    month_energy = month_stats[0] if (month_stats and month_stats[0] is not None) else 0.0
+    month_cost = month_stats[1] if (month_stats and month_stats[1] is not None) else 0.0
 
     summary = RealtimePowerSummary(
-        total_power=round(total_power, 2),
-        it_power=round(it_power, 2),
-        cooling_power=round(cooling_power, 2),
-        ups_power=round(ups_power, 2),
-        other_power=round(other_power, 2),
-        current_pue=round(current_pue, 2),
+        total_power=pue_result.total_power,
+        it_power=pue_result.it_power,
+        cooling_power=pue_result.cooling_power,
+        ups_power=round(pue_result.ups_loss, 2),
+        other_power=round(
+            max(0, pue_result.total_power - pue_result.it_power - pue_result.cooling_power - pue_result.ups_loss), 2
+        ),
+        current_pue=pue_result.current_pue,
         today_energy=round(today_energy, 2),
         today_cost=round(today_cost, 2),
         month_energy=round(month_energy, 2),
         month_cost=round(month_cost, 2),
-        data_source="simulation",
+        data_source=pue_result.data_source,
     )
-
     return ResponseModel(data=summary)
 
 
@@ -616,28 +525,16 @@ async def get_device_realtime_power(
     if not device:
         raise HTTPException(status_code=404, detail="设备不存在")
 
-    # [V2.11] 使用确定性模拟数据
-    base_power = device.rated_power or 10.0
-    seed = _device_seed(device.id)
-
     data = RealtimePowerData(
         device_id=device.id,
         device_code=device.device_code,
         device_name=device.device_name,
         device_type=device.device_type,
-        voltage_a=380 + _deterministic_offset(seed, 5),
-        voltage_b=380 + _deterministic_offset(seed + 1, 5) if device.phase_type == "3P" else None,
-        voltage_c=380 + _deterministic_offset(seed + 2, 5) if device.phase_type == "3P" else None,
-        current_a=base_power * 1.52 * _deterministic_ratio(seed + 3, 0.5, 0.9),
-        current_b=base_power * 1.52 * _deterministic_ratio(seed + 4, 0.5, 0.9) if device.phase_type == "3P" else None,
-        current_c=base_power * 1.52 * _deterministic_ratio(seed + 5, 0.5, 0.9) if device.phase_type == "3P" else None,
-        active_power=base_power * _deterministic_ratio(seed + 6, 0.5, 0.9),
-        reactive_power=base_power * 0.2 * _deterministic_ratio(seed + 7, 0.5, 1.0),
-        apparent_power=base_power * 1.1 * _deterministic_ratio(seed + 8, 0.5, 0.9),
-        power_factor=_deterministic_ratio(seed + 9, 0.85, 0.98),
-        frequency=50 + _deterministic_offset(seed + 10, 0.1),
-        total_energy=base_power * 24 * 30 * _deterministic_ratio(seed + 11, 0.5, 1.0),
-        load_rate=_deterministic_ratio(seed + 12, 0.4, 0.85) if device.rated_power else None,
+        voltage_a=None, voltage_b=None, voltage_c=None,
+        current_a=None, current_b=None, current_c=None,
+        active_power=None, reactive_power=None, apparent_power=None,
+        power_factor=None, frequency=None, total_energy=None,
+        load_rate=None,
         status="normal",
         update_time=datetime.now(),
     )
@@ -651,74 +548,21 @@ async def get_device_realtime_power(
 @router.get("/pue", response_model=ResponseModel[PUEData], summary="获取当前PUE")
 async def get_current_pue(db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     """获取当前PUE值及功率分布"""
-    settings = _get_energy_settings()
-
-    # 真实数据模式
-    if not settings.simulation_enabled:
-        pue_result = await calculate_realtime_pue(db)
-        pue_data = PUEData(
-            current_pue=pue_result.current_pue,
-            total_power=pue_result.total_power,
-            it_power=pue_result.it_power,
-            cooling_power=pue_result.cooling_power,
-            ups_loss=pue_result.ups_loss,
-            lighting_power=0.0,
-            other_power=round(
-                max(0, pue_result.total_power - pue_result.it_power - pue_result.cooling_power - pue_result.ups_loss), 2
-            ),
-            update_time=datetime.now(),
-            data_source=pue_result.data_source,
-            unreliable_count=pue_result.unreliable_count,
-        )
-        return ResponseModel(data=pue_data)
-
-    # 模拟数据模式（保留现有逻辑）
-    result = await db.execute(select(PowerDevice).where(PowerDevice.is_enabled == True))
-    devices = result.scalars().all()
-
-    # [V2.11] 使用确定性计算替代 random
-    total_power = 0.0
-    it_power = 0.0
-    cooling_power = 0.0
-    ups_loss = 0.0
-    lighting_power = 0.0
-    other_power = 0.0
-
-    for device in devices:
-        seed = _device_seed(device.id)
-        base_power = (device.rated_power or 10.0) * _deterministic_ratio(seed, 0.5, 0.9)
-
-        if device.is_it_load or device.device_type == "IT":
-            it_power += base_power
-        elif device.device_type == "AC":
-            cooling_power += base_power
-        elif device.device_type == "UPS":
-            ups_loss += base_power * 0.05  # UPS损耗约5%
-        elif device.device_type == "MAIN":
-            total_power = base_power * 10
-        else:
-            other_power += base_power
-
-    # 照明估算
-    lighting_power = total_power * 0.02 if total_power > 0 else 5.0
-
-    if total_power == 0:
-        total_power = it_power + cooling_power + ups_loss + lighting_power + other_power
-
-    current_pue = total_power / it_power if it_power > 0 else 1.5
-
+    pue_result = await calculate_realtime_pue(db)
     pue_data = PUEData(
-        current_pue=round(current_pue, 3),
-        total_power=round(total_power, 2),
-        it_power=round(it_power, 2),
-        cooling_power=round(cooling_power, 2),
-        ups_loss=round(ups_loss, 2),
-        lighting_power=round(lighting_power, 2),
-        other_power=round(other_power, 2),
+        current_pue=pue_result.current_pue,
+        total_power=pue_result.total_power,
+        it_power=pue_result.it_power,
+        cooling_power=pue_result.cooling_power,
+        ups_loss=pue_result.ups_loss,
+        lighting_power=0.0,
+        other_power=round(
+            max(0, pue_result.total_power - pue_result.it_power - pue_result.cooling_power - pue_result.ups_loss), 2
+        ),
         update_time=datetime.now(),
-        data_source="simulation",
+        data_source=pue_result.data_source,
+        unreliable_count=pue_result.unreliable_count,
     )
-
     return ResponseModel(data=pue_data)
 
 
@@ -762,33 +606,7 @@ async def get_pue_trend(
     )
     history = result.scalars().all()
 
-    # 如果没有历史数据，生成模拟数据
-    if not history:
-        # [V2.11] 使用确定性模拟数据
-        data_list = []
-        current = start_time
-        idx = 0
-        while current <= end_time:
-            seed = _time_seed(current, idx)
-            pue = 1.4 + _deterministic_offset(seed, 0.25)  # 1.15-1.65
-            total = 500 + _deterministic_offset(seed + 1, 50)  # 450-550
-            it = total / pue
-            data_list.append(
-                PUEHistoryItem(
-                    record_time=current, pue=round(pue, 3), total_power=round(total, 2), it_power=round(it, 2)
-                )
-            )
-            if period == "hour":
-                current += timedelta(hours=1)
-            elif period == "day":
-                current += timedelta(days=1)
-            elif period == "week":
-                current += timedelta(days=7)
-            else:
-                current += timedelta(days=30)
-            idx += 1
-    else:
-        data_list = [PUEHistoryItem.model_validate(h) for h in history]
+    data_list = [PUEHistoryItem.model_validate(h) for h in history] if history else []
 
     pue_values = [d.pue for d in data_list]
     avg_pue = sum(pue_values) / len(pue_values) if pue_values else 0
@@ -815,7 +633,6 @@ async def get_daily_statistics(
     current_user: User = Depends(get_current_user),
 ):
     """获取日能耗统计数据"""
-    settings = _get_energy_settings()
     query = select(EnergyDaily).where(EnergyDaily.stat_date >= start_date, EnergyDaily.stat_date <= end_date)
 
     if device_id:
@@ -825,43 +642,9 @@ async def get_daily_statistics(
     result = await db.execute(query)
     daily_data = result.scalars().all()
 
-    # 真实数据模式：有数据直接返回，无数据返回空列表
-    if not settings.simulation_enabled:
-        if daily_data:
-            return ResponseModel(data=[EnergyDailyData.model_validate(d) for d in daily_data])
-        return ResponseModel(data=[])
-
-    # 模拟模式：有真实数据优先返回，无数据生成模拟数据
     if daily_data:
         return ResponseModel(data=[EnergyDailyData.model_validate(d) for d in daily_data])
-
-    # 如果没有数据，生成模拟数据
-    # [V2.11] 使用确定性模拟数据
-    data_list = []
-    current_date = start_date
-    while current_date <= end_date:
-        seed = _date_seed(current_date)
-        total = 1000 + _deterministic_offset(seed, 200)
-        peak = total * 0.4
-        normal = total * 0.35
-        valley = total * 0.25
-        data = EnergyDailyData(
-            id=0,
-            device_id=device_id or 1,
-            stat_date=current_date,
-            total_energy=round(total, 2),
-            peak_energy=round(peak, 2),
-            normal_energy=round(normal, 2),
-            valley_energy=round(valley, 2),
-            max_power=round(total / 20, 2),
-            avg_power=round(total / 24, 2),
-            max_power_time=datetime.combine(current_date, datetime.min.time()) + timedelta(hours=14),
-            energy_cost=round(peak * 1.2 + normal * 0.8 + valley * 0.4, 2),
-            pue=round(1.4 + _deterministic_offset(seed + 1, 0.15), 2),
-        )
-        data_list.append(data)
-        current_date += timedelta(days=1)
-    return ResponseModel(data=data_list)
+    return ResponseModel(data=[])
 
 
 @router.get("/statistics/monthly", response_model=ResponseModel[List[EnergyMonthlyData]], summary="获取月能耗统计")
@@ -873,7 +656,6 @@ async def get_monthly_statistics(
     current_user: User = Depends(get_current_user),
 ):
     """获取月能耗统计数据"""
-    settings = _get_energy_settings()
     query = select(EnergyMonthly).where(EnergyMonthly.stat_year == year)
 
     if device_id:
@@ -883,48 +665,9 @@ async def get_monthly_statistics(
     result = await db.execute(query)
     monthly_data = result.scalars().all()
 
-    # 真实数据模式
-    if not settings.simulation_enabled:
-        if monthly_data:
-            return ResponseModel(data=[EnergyMonthlyData.model_validate(d) for d in monthly_data])
-        return ResponseModel(data=[])
-
-    # 模拟模式：有真实数据优先返回
     if monthly_data:
         return ResponseModel(data=[EnergyMonthlyData.model_validate(d) for d in monthly_data])
-
-    # 如果没有数据，生成模拟数据
-    # [V2.11] 使用确定性模拟数据
-    data_list = []
-    for month in range(1, 13):
-        seed = year * 100 + month
-        total = 30000 + _deterministic_offset(seed, 5000)
-        peak = total * 0.4
-        normal = total * 0.35
-        valley = total * 0.25
-        peak_cost = peak * 1.2
-        normal_cost = normal * 0.8
-        valley_cost = valley * 0.4
-        data = EnergyMonthlyData(
-            id=0,
-            device_id=device_id or 1,
-            stat_year=year,
-            stat_month=month,
-            total_energy=round(total, 2),
-            peak_energy=round(peak, 2),
-            normal_energy=round(normal, 2),
-            valley_energy=round(valley, 2),
-            max_power=round(total / 500, 2),
-            avg_power=round(total / 720, 2),
-            max_power_date=date(year, month, 15),
-            energy_cost=round(peak_cost + normal_cost + valley_cost, 2),
-            peak_cost=round(peak_cost, 2),
-            normal_cost=round(normal_cost, 2),
-            valley_cost=round(valley_cost, 2),
-            avg_pue=round(1.45 + _deterministic_offset(seed + 1, 0.125), 2),
-        )
-        data_list.append(data)
-    return ResponseModel(data=data_list)
+    return ResponseModel(data=[])
 
 
 @router.get("/statistics/summary", response_model=ResponseModel[EnergyStat], summary="获取能耗汇总")
@@ -938,7 +681,6 @@ async def get_energy_summary(
     current_user: User = Depends(get_current_user),
 ):
     """获取能耗汇总统计"""
-    _get_energy_settings()
     query = select(
         func.sum(EnergyDaily.total_energy),
         func.sum(EnergyDaily.peak_energy),
@@ -956,31 +698,12 @@ async def get_energy_summary(
     result = await db.execute(query)
     stats = result.first()
 
-    # 如果没有数据，返回模拟数据
-    days = (end_date - start_date).days + 1
     if stats[0] is None:
-        # [V2.11] 使用确定性模拟数据
-        seed = _date_seed(start_date)
-        total = 1000 * days + _deterministic_offset(seed, 500)
-        peak = total * 0.4
-        normal = total * 0.35
-        valley = total * 0.25
-        peak_cost = peak * 1.2
-        normal_cost = normal * 0.8
-        valley_cost = valley * 0.4
-
+        # 无数据返回零值
         summary = EnergyStat(
-            total_energy=round(total, 2),
-            peak_energy=round(peak, 2),
-            normal_energy=round(normal, 2),
-            valley_energy=round(valley, 2),
-            total_cost=round(peak_cost + normal_cost + valley_cost, 2),
-            peak_cost=round(peak_cost, 2),
-            normal_cost=round(normal_cost, 2),
-            valley_cost=round(valley_cost, 2),
-            avg_power=round(total / (days * 24), 2),
-            max_power=round(total / (days * 20), 2),
-            avg_pue=1.45,
+            total_energy=0, peak_energy=0, normal_energy=0, valley_energy=0,
+            total_cost=0, peak_cost=0, normal_cost=0, valley_cost=0,
+            avg_power=0, max_power=0, avg_pue=0,
         )
     else:
         total = stats[0] or 0
@@ -1025,165 +748,81 @@ async def get_energy_trend(
     current_user: User = Depends(get_current_user),
 ):
     """获取能耗趋势数据"""
-    settings = _get_energy_settings()
-
-    # 真实数据模式：查询数据库
-    if not settings.simulation_enabled:
-        data_list = []
-        total_energy = 0.0
-        total_cost = 0.0
-        has_data = False
-
-        if granularity == "daily":
-            query = select(EnergyDaily).where(EnergyDaily.stat_date >= start_date, EnergyDaily.stat_date <= end_date)
-            if device_id:
-                query = query.where(EnergyDaily.device_id == device_id)
-            query = query.order_by(EnergyDaily.stat_date)
-            result = await db.execute(query)
-            records = result.scalars().all()
-            if records:
-                has_data = True
-                for r in records:
-                    energy = r.total_energy or 0
-                    cost = r.energy_cost or 0
-                    total_energy += energy
-                    total_cost += cost
-                    data_list.append(
-                        EnergyTrendItem(
-                            time_label=r.stat_date.strftime("%Y-%m-%d"),
-                            energy=round(energy, 2),
-                            cost=round(cost, 2),
-                            power=round(r.avg_power or 0, 2),
-                        )
-                    )
-
-        elif granularity == "monthly":
-            query = select(EnergyMonthly).where(EnergyMonthly.stat_year == start_date.year)
-            if device_id:
-                query = query.where(EnergyMonthly.device_id == device_id)
-            query = query.order_by(EnergyMonthly.stat_month)
-            result = await db.execute(query)
-            records = result.scalars().all()
-            if records:
-                has_data = True
-                for r in records:
-                    energy = r.total_energy or 0
-                    cost = r.energy_cost or 0
-                    total_energy += energy
-                    total_cost += cost
-                    data_list.append(
-                        EnergyTrendItem(
-                            time_label=f"{r.stat_year}-{r.stat_month:02d}",
-                            energy=round(energy, 2),
-                            cost=round(cost, 2),
-                            power=round(r.avg_power or 0, 2),
-                        )
-                    )
-
-        else:  # hourly
-            start_dt = datetime.combine(start_date, datetime.min.time())
-            end_dt = datetime.combine(end_date, datetime.max.time())
-            query = select(EnergyHourly).where(EnergyHourly.stat_time >= start_dt, EnergyHourly.stat_time <= end_dt)
-            if device_id:
-                query = query.where(EnergyHourly.device_id == device_id)
-            query = query.order_by(EnergyHourly.stat_time).limit(168)
-            result = await db.execute(query)
-            records = result.scalars().all()
-            if records:
-                has_data = True
-                for r in records:
-                    energy = r.total_energy or 0
-                    cost = energy * 0.8  # hourly 表无 cost 字段，用估算
-                    total_energy += energy
-                    total_cost += cost
-                    data_list.append(
-                        EnergyTrendItem(
-                            time_label=r.stat_time.strftime("%Y-%m-%d %H:00"),
-                            energy=round(energy, 2),
-                            cost=round(cost, 2),
-                            power=round(r.avg_power or 0, 2),
-                        )
-                    )
-
-        if has_data:
-            trend = EnergyTrend(
-                granularity=granularity,
-                data=data_list,
-                total_energy=round(total_energy, 2),
-                total_cost=round(total_cost, 2),
-                data_source="realtime",
-            )
-            return ResponseModel(data=trend)
-        # 无数据时 fallback 到模拟逻辑
-
-    # 模拟数据模式（或真实模式无数据 fallback）
-    # [V2.11] 使用确定性模拟数据
     data_list = []
     total_energy = 0.0
     total_cost = 0.0
 
     if granularity == "daily":
-        current = start_date
-        idx = 0
-        while current <= end_date:
-            seed = _date_seed(current, idx)
-            energy = 1000 + _deterministic_offset(seed, 200)
-            cost = energy * 0.8
+        query = select(EnergyDaily).where(EnergyDaily.stat_date >= start_date, EnergyDaily.stat_date <= end_date)
+        if device_id:
+            query = query.where(EnergyDaily.device_id == device_id)
+        query = query.order_by(EnergyDaily.stat_date)
+        result = await db.execute(query)
+        records = result.scalars().all()
+        for r in records:
+            energy = r.total_energy or 0
+            cost = r.energy_cost or 0
             total_energy += energy
             total_cost += cost
             data_list.append(
                 EnergyTrendItem(
-                    time_label=current.strftime("%Y-%m-%d"),
+                    time_label=r.stat_date.strftime("%Y-%m-%d"),
                     energy=round(energy, 2),
                     cost=round(cost, 2),
-                    power=round(energy / 24, 2),
+                    power=round(r.avg_power or 0, 2),
                 )
             )
-            current += timedelta(days=1)
-            idx += 1
+
     elif granularity == "monthly":
-        year = start_date.year
-        for month in range(1, 13):
-            seed = year * 100 + month
-            energy = 30000 + _deterministic_offset(seed, 5000)
-            cost = energy * 0.8
+        query = select(EnergyMonthly).where(EnergyMonthly.stat_year == start_date.year)
+        if device_id:
+            query = query.where(EnergyMonthly.device_id == device_id)
+        query = query.order_by(EnergyMonthly.stat_month)
+        result = await db.execute(query)
+        records = result.scalars().all()
+        for r in records:
+            energy = r.total_energy or 0
+            cost = r.energy_cost or 0
             total_energy += energy
             total_cost += cost
             data_list.append(
                 EnergyTrendItem(
-                    time_label=f"{year}-{month:02d}",
+                    time_label=f"{r.stat_year}-{r.stat_month:02d}",
                     energy=round(energy, 2),
                     cost=round(cost, 2),
-                    power=round(energy / 720, 2),
+                    power=round(r.avg_power or 0, 2),
                 )
             )
+
     else:  # hourly
-        current = datetime.combine(start_date, datetime.min.time())
-        end = datetime.combine(end_date, datetime.max.time())
-        idx = 0
-        while current <= end:
-            seed = _time_seed(current, idx)
-            energy = 40 + _deterministic_offset(seed, 10)
-            cost = energy * 0.8
+        start_dt = datetime.combine(start_date, datetime.min.time())
+        end_dt = datetime.combine(end_date, datetime.max.time())
+        query = select(EnergyHourly).where(EnergyHourly.stat_time >= start_dt, EnergyHourly.stat_time <= end_dt)
+        if device_id:
+            query = query.where(EnergyHourly.device_id == device_id)
+        query = query.order_by(EnergyHourly.stat_time).limit(168)
+        result = await db.execute(query)
+        records = result.scalars().all()
+        for r in records:
+            energy = r.total_energy or 0
+            cost = energy * 0.8  # hourly 表无 cost 字段，用估算
             total_energy += energy
             total_cost += cost
             data_list.append(
                 EnergyTrendItem(
-                    time_label=current.strftime("%Y-%m-%d %H:00"),
+                    time_label=r.stat_time.strftime("%Y-%m-%d %H:00"),
                     energy=round(energy, 2),
                     cost=round(cost, 2),
-                    power=round(energy, 2),
+                    power=round(r.avg_power or 0, 2),
                 )
             )
-            current += timedelta(hours=1)
-            idx += 1
-            if len(data_list) > 168:  # 最多一周的小时数据
-                break
 
     trend = EnergyTrend(
-        granularity=granularity, data=data_list, total_energy=round(total_energy, 2), total_cost=round(total_cost, 2)
+        granularity=granularity,
+        data=data_list,
+        total_energy=round(total_energy, 2),
+        total_cost=round(total_cost, 2),
     )
-
     return ResponseModel(data=trend)
 
 
@@ -1196,162 +835,108 @@ async def get_energy_comparison(
     current_user: User = Depends(get_current_user),
 ):
     """获取能耗环比/同比对比"""
-    settings = _get_energy_settings()
     today = date.today()
 
-    # 真实数据模式
-    if not settings.simulation_enabled:
-        # 计算本期/上期时间范围
-        if period == "day":
-            cur_start = cur_end = today
-            if comparison_type == "yoy":
-                prev_start = prev_end = today.replace(year=today.year - 1)
-            else:
-                prev_start = prev_end = today - timedelta(days=1)
-        elif period == "week":
-            cur_start = today - timedelta(days=today.weekday())
-            cur_end = today
-            if comparison_type == "yoy":
-                prev_start = cur_start.replace(year=cur_start.year - 1)
-                prev_end = cur_end.replace(year=cur_end.year - 1)
-            else:
-                prev_end = cur_start - timedelta(days=1)
-                prev_start = prev_end - timedelta(days=6)
-        else:  # month
-            cur_start = today.replace(day=1)
-            cur_end = today
-            if comparison_type == "yoy":
-                prev_start = cur_start.replace(year=cur_start.year - 1)
-                prev_end = cur_end.replace(year=cur_end.year - 1)
-            else:
-                prev_end = cur_start - timedelta(days=1)
-                prev_start = prev_end.replace(day=1)
+    # 计算本期/上期时间范围
+    if period == "day":
+        cur_start = cur_end = today
+        if comparison_type == "yoy":
+            prev_start = prev_end = today.replace(year=today.year - 1)
+        else:
+            prev_start = prev_end = today - timedelta(days=1)
+    elif period == "week":
+        cur_start = today - timedelta(days=today.weekday())
+        cur_end = today
+        if comparison_type == "yoy":
+            prev_start = cur_start.replace(year=cur_start.year - 1)
+            prev_end = cur_end.replace(year=cur_end.year - 1)
+        else:
+            prev_end = cur_start - timedelta(days=1)
+            prev_start = prev_end - timedelta(days=6)
+    else:  # month
+        cur_start = today.replace(day=1)
+        cur_end = today
+        if comparison_type == "yoy":
+            prev_start = cur_start.replace(year=cur_start.year - 1)
+            prev_end = cur_end.replace(year=cur_end.year - 1)
+        else:
+            prev_end = cur_start - timedelta(days=1)
+            prev_start = prev_end.replace(day=1)
 
-        async def _query_period_stat(s_date, e_date):
-            q = select(
-                func.sum(EnergyDaily.total_energy),
-                func.sum(EnergyDaily.peak_energy),
-                func.sum(EnergyDaily.normal_energy),
-                func.sum(EnergyDaily.valley_energy),
-                func.sum(EnergyDaily.energy_cost),
-                func.avg(EnergyDaily.avg_power),
-                func.max(EnergyDaily.max_power),
-                func.avg(EnergyDaily.pue),
-            ).where(EnergyDaily.stat_date >= s_date, EnergyDaily.stat_date <= e_date)
-            if device_id:
-                q = q.where(EnergyDaily.device_id == device_id)
-            r = await db.execute(q)
-            return r.first()
+    async def _query_period_stat(s_date, e_date):
+        q = select(
+            func.sum(EnergyDaily.total_energy),
+            func.sum(EnergyDaily.peak_energy),
+            func.sum(EnergyDaily.normal_energy),
+            func.sum(EnergyDaily.valley_energy),
+            func.sum(EnergyDaily.energy_cost),
+            func.avg(EnergyDaily.avg_power),
+            func.max(EnergyDaily.max_power),
+            func.avg(EnergyDaily.pue),
+        ).where(EnergyDaily.stat_date >= s_date, EnergyDaily.stat_date <= e_date)
+        if device_id:
+            q = q.where(EnergyDaily.device_id == device_id)
+        r = await db.execute(q)
+        return r.first()
 
-        cur_stats = await _query_period_stat(cur_start, cur_end)
-        prev_stats = await _query_period_stat(prev_start, prev_end)
+    cur_stats = await _query_period_stat(cur_start, cur_end)
+    prev_stats = await _query_period_stat(prev_start, prev_end)
 
-        if cur_stats[0] is not None and prev_stats[0] is not None:
-            pricing_service = PricingService(db)
-            prices = await pricing_service.get_all_prices()
-            pp = prices.get("peak_price", 1.2)
-            np_ = prices.get("normal_price", 0.8)
-            vp = prices.get("valley_price", 0.4)
+    if cur_stats[0] is not None and prev_stats[0] is not None:
+        pricing_service = PricingService(db)
+        prices = await pricing_service.get_all_prices()
+        pp = prices.get("peak_price", 1.2)
+        np_ = prices.get("normal_price", 0.8)
+        vp = prices.get("valley_price", 0.4)
 
-            def _build_stat(s):
-                t = s[0] or 0
-                pk = s[1] or 0
-                nm = s[2] or 0
-                vl = s[3] or 0
-                max((cur_end - cur_start).days + 1, 1)
-                return EnergyStat(
-                    total_energy=round(t, 2),
-                    peak_energy=round(pk, 2),
-                    normal_energy=round(nm, 2),
-                    valley_energy=round(vl, 2),
-                    total_cost=round(s[4] or 0, 2),
-                    peak_cost=round(pk * pp, 2),
-                    normal_cost=round(nm * np_, 2),
-                    valley_cost=round(vl * vp, 2),
-                    avg_power=round(s[5] or 0, 2),
-                    max_power=round(s[6] or 0, 2),
-                    avg_pue=round(s[7] or 1.5, 2),
-                    data_source="realtime",
-                )
-
-            c_stat = _build_stat(cur_stats)
-            p_stat = _build_stat(prev_stats)
-            e_change = c_stat.total_energy - p_stat.total_energy
-            e_rate = e_change / p_stat.total_energy if p_stat.total_energy > 0 else 0
-            cost_change = c_stat.total_cost - p_stat.total_cost
-            cost_rate = cost_change / p_stat.total_cost if p_stat.total_cost > 0 else 0
-
-            comparison = EnergyComparison(
-                current_period=c_stat,
-                previous_period=p_stat,
-                energy_change=round(e_change, 2),
-                energy_change_rate=round(e_rate, 4),
-                cost_change=round(cost_change, 2),
-                cost_change_rate=round(cost_rate, 4),
-                data_source="realtime",
+        def _build_stat(s):
+            t = s[0] or 0
+            pk = s[1] or 0
+            nm = s[2] or 0
+            vl = s[3] or 0
+            return EnergyStat(
+                total_energy=round(t, 2),
+                peak_energy=round(pk, 2),
+                normal_energy=round(nm, 2),
+                valley_energy=round(vl, 2),
+                total_cost=round(s[4] or 0, 2),
+                peak_cost=round(pk * pp, 2),
+                normal_cost=round(nm * np_, 2),
+                valley_cost=round(vl * vp, 2),
+                avg_power=round(s[5] or 0, 2),
+                max_power=round(s[6] or 0, 2),
+                avg_pue=round(s[7] or 0, 2),
             )
-            return ResponseModel(data=comparison)
-        # 无数据 fallback 到模拟
 
-    # 模拟数据模式
-    # [V2.11] 使用确定性模拟数据
-    seed = _date_seed(today)
+        c_stat = _build_stat(cur_stats)
+        p_stat = _build_stat(prev_stats)
+        e_change = c_stat.total_energy - p_stat.total_energy
+        e_rate = e_change / p_stat.total_energy if p_stat.total_energy > 0 else 0
+        cost_change = c_stat.total_cost - p_stat.total_cost
+        cost_rate = cost_change / p_stat.total_cost if p_stat.total_cost > 0 else 0
 
-    # 生成模拟数据
-    current_total = 30000 + _deterministic_offset(seed, 3000)
-    current_peak = current_total * 0.4
-    current_normal = current_total * 0.35
-    current_valley = current_total * 0.25
-    current_cost = current_peak * 1.2 + current_normal * 0.8 + current_valley * 0.4
+        comparison = EnergyComparison(
+            current_period=c_stat,
+            previous_period=p_stat,
+            energy_change=round(e_change, 2),
+            energy_change_rate=round(e_rate, 4),
+            cost_change=round(cost_change, 2),
+            cost_change_rate=round(cost_rate, 4),
+        )
+        return ResponseModel(data=comparison)
 
-    if comparison_type == "yoy":  # 同比
-        change_rate = _deterministic_offset(seed + 1, 0.15)
-    else:  # 环比
-        change_rate = _deterministic_offset(seed + 2, 0.1)
-
-    prev_total = current_total / (1 + change_rate)
-    prev_peak = prev_total * 0.4
-    prev_normal = prev_total * 0.35
-    prev_valley = prev_total * 0.25
-    prev_cost = prev_peak * 1.2 + prev_normal * 0.8 + prev_valley * 0.4
-
-    current_stat = EnergyStat(
-        total_energy=round(current_total, 2),
-        peak_energy=round(current_peak, 2),
-        normal_energy=round(current_normal, 2),
-        valley_energy=round(current_valley, 2),
-        total_cost=round(current_cost, 2),
-        peak_cost=round(current_peak * 1.2, 2),
-        normal_cost=round(current_normal * 0.8, 2),
-        valley_cost=round(current_valley * 0.4, 2),
-        avg_power=round(current_total / 720, 2),
-        max_power=round(current_total / 500, 2),
-        avg_pue=1.45,
+    # 无数据时返回零值对比
+    zero_stat = EnergyStat(
+        total_energy=0, peak_energy=0, normal_energy=0, valley_energy=0,
+        total_cost=0, peak_cost=0, normal_cost=0, valley_cost=0,
+        avg_power=0, max_power=0, avg_pue=0,
     )
-
-    prev_stat = EnergyStat(
-        total_energy=round(prev_total, 2),
-        peak_energy=round(prev_peak, 2),
-        normal_energy=round(prev_normal, 2),
-        valley_energy=round(prev_valley, 2),
-        total_cost=round(prev_cost, 2),
-        peak_cost=round(prev_peak * 1.2, 2),
-        normal_cost=round(prev_normal * 0.8, 2),
-        valley_cost=round(prev_valley * 0.4, 2),
-        avg_power=round(prev_total / 720, 2),
-        max_power=round(prev_total / 500, 2),
-        avg_pue=1.48,
-    )
-
     comparison = EnergyComparison(
-        current_period=current_stat,
-        previous_period=prev_stat,
-        energy_change=round(current_total - prev_total, 2),
-        energy_change_rate=round(change_rate, 4),
-        cost_change=round(current_cost - prev_cost, 2),
-        cost_change_rate=round((current_cost - prev_cost) / prev_cost if prev_cost > 0 else 0, 4),
+        current_period=zero_stat,
+        previous_period=zero_stat,
+        energy_change=0, energy_change_rate=0,
+        cost_change=0, cost_change_rate=0,
     )
-
     return ResponseModel(data=comparison)
 
 
@@ -1366,7 +951,6 @@ async def get_daily_cost(
     current_user: User = Depends(get_current_user),
 ):
     """获取日电费统计（尖峰/高峰/平段/低谷/深谷五时段电费）"""
-    settings = _get_energy_settings()
     result = await db.execute(
         select(EnergyDaily)
         .where(EnergyDaily.stat_date >= start_date, EnergyDaily.stat_date <= end_date)
@@ -1381,35 +965,8 @@ async def get_daily_cost(
     np_ = prices.get("normal_price", 0.8)
     vp = prices.get("valley_price", 0.4)
 
-    # [V2.11] 使用确定性模拟数据
     if not daily_data:
-        # 真实模式无数据返回空
-        if not settings.simulation_enabled:
-            return ResponseModel(data={"items": []})
-        # 生成模拟数据
-        data_list = []
-        current = start_date
-        while current <= end_date:
-            seed = _date_seed(current)
-            total = 1000 + _deterministic_offset(seed, 200)
-            peak = total * 0.4
-            normal = total * 0.35
-            valley = total * 0.25
-            data_list.append(
-                {
-                    "date": current.isoformat(),
-                    "total_energy": round(total, 2),
-                    "peak_energy": round(peak, 2),
-                    "normal_energy": round(normal, 2),
-                    "valley_energy": round(valley, 2),
-                    "peak_cost": round(peak * 1.2, 2),
-                    "normal_cost": round(normal * 0.8, 2),
-                    "valley_cost": round(valley * 0.4, 2),
-                    "total_cost": round(peak * 1.2 + normal * 0.8 + valley * 0.4, 2),
-                }
-            )
-            current += timedelta(days=1)
-        return ResponseModel(data={"items": data_list})
+        return ResponseModel(data={"items": []})
 
     data_list = []
     for d in daily_data:
@@ -1438,7 +995,6 @@ async def get_monthly_cost(
     current_user: User = Depends(get_current_user),
 ):
     """获取月电费统计"""
-    settings = _get_energy_settings()
     query = select(EnergyMonthly).where(EnergyMonthly.stat_year == year)
     if month:
         query = query.where(EnergyMonthly.stat_month == month)
@@ -1447,35 +1003,8 @@ async def get_monthly_cost(
     result = await db.execute(query)
     monthly_data = result.scalars().all()
 
-    # [V2.11] 使用确定性模拟数据
     if not monthly_data:
-        # 真实模式无数据返回空
-        if not settings.simulation_enabled:
-            return ResponseModel(data={"items": []})
-        # 生成模拟数据
-        data_list = []
-        months = [month] if month else range(1, 13)
-        for m in months:
-            seed = year * 100 + m
-            total = 30000 + _deterministic_offset(seed, 5000)
-            peak = total * 0.4
-            normal = total * 0.35
-            valley = total * 0.25
-            data_list.append(
-                {
-                    "year": year,
-                    "month": m,
-                    "total_energy": round(total, 2),
-                    "peak_energy": round(peak, 2),
-                    "normal_energy": round(normal, 2),
-                    "valley_energy": round(valley, 2),
-                    "peak_cost": round(peak * 1.2, 2),
-                    "normal_cost": round(normal * 0.8, 2),
-                    "valley_cost": round(valley * 0.4, 2),
-                    "total_cost": round(peak * 1.2 + normal * 0.8 + valley * 0.4, 2),
-                }
-            )
-        return ResponseModel(data={"items": data_list})
+        return ResponseModel(data={"items": []})
 
     data_list = []
     for d in monthly_data:
@@ -2006,23 +1535,17 @@ async def get_distribution_diagram(db: AsyncSession = Depends(get_db), current_u
     if not devices:
         raise HTTPException(status_code=404, detail="暂无配电设备数据")
 
-    # [V2.11] 使用确定性模拟数据
-
-    # 构建设备节点字典
+    # 构建设备节点字典（无实时数据时功率为0）
     node_dict = {}
     for device in devices:
-        seed = _device_seed(device.id)
-        base_power = (device.rated_power or 10.0) * _deterministic_ratio(seed, 0.5, 0.9)
-        load_rate = base_power / device.rated_power if device.rated_power else None
-
         node = DistributionNode(
             device_id=device.id,
             device_code=device.device_code,
             device_name=device.device_name,
             device_type=device.device_type,
-            power=round(base_power, 2),
-            load_rate=round(load_rate, 2) if load_rate else None,
-            status="normal" if (load_rate or 0) < 0.8 else "warning",
+            power=0,
+            load_rate=None,
+            status="normal",
             children=[],
         )
         node_dict[device.id] = node
@@ -2076,34 +1599,8 @@ async def export_daily_data(
     )
     daily_data = result.scalars().all()
 
-    # [V2.11] 使用确定性模拟数据
-
-    # 如果没有数据，生成模拟数据
-    if not daily_data:
-        data_list = []
-        current = start_date
-        while current <= end_date:
-            seed = _date_seed(current)
-            total = 1000 + _deterministic_offset(seed, 200)
-            peak = total * 0.4
-            normal = total * 0.35
-            valley = total * 0.25
-            data_list.append(
-                {
-                    "日期": current.isoformat(),
-                    "总电量(kWh)": round(total, 2),
-                    "峰时电量(kWh)": round(peak, 2),
-                    "平时电量(kWh)": round(normal, 2),
-                    "谷时电量(kWh)": round(valley, 2),
-                    "最大功率(kW)": round(total / 20, 2),
-                    "平均功率(kW)": round(total / 24, 2),
-                    "电费(元)": round(peak * 1.2 + normal * 0.8 + valley * 0.4, 2),
-                    "PUE": round(1.4 + _deterministic_offset(seed + 1, 0.15), 2),
-                }
-            )
-            current += timedelta(days=1)
-    else:
-        data_list = []
+    data_list = []
+    if daily_data:
         for d in daily_data:
             data_list.append(
                 {
@@ -2185,35 +1682,8 @@ async def export_monthly_data(
     )
     monthly_data = result.scalars().all()
 
-    # [V2.11] 使用确定性模拟数据
-
-    if not monthly_data:
-        data_list = []
-        for month in range(1, 13):
-            seed = year * 100 + month
-            total = 30000 + _deterministic_offset(seed, 5000)
-            peak = total * 0.4
-            normal = total * 0.35
-            valley = total * 0.25
-            data_list.append(
-                {
-                    "年份": year,
-                    "月份": month,
-                    "总电量(kWh)": round(total, 2),
-                    "峰时电量(kWh)": round(peak, 2),
-                    "平时电量(kWh)": round(normal, 2),
-                    "谷时电量(kWh)": round(valley, 2),
-                    "最大功率(kW)": round(total / 500, 2),
-                    "平均功率(kW)": round(total / 720, 2),
-                    "峰时电费(元)": round(peak * 1.2, 2),
-                    "平时电费(元)": round(normal * 0.8, 2),
-                    "谷时电费(元)": round(valley * 0.4, 2),
-                    "总电费(元)": round(peak * 1.2 + normal * 0.8 + valley * 0.4, 2),
-                    "平均PUE": round(1.45 + _deterministic_offset(seed + 1, 0.125), 2),
-                }
-            )
-    else:
-        data_list = []
+    data_list = []
+    if monthly_data:
         for d in monthly_data:
             data_list.append(
                 {
@@ -2894,69 +2364,13 @@ async def get_power_curve(
     result = await db.execute(query)
     curve_data = result.scalars().all()
 
-    # 如果没有数据，生成模拟数据
-    # [V2.11] 使用确定性模拟数据
     if not curve_data:
-        data_list = []
-        current = start_time
-        max_power = 0.0
-        total_power = 0.0
-        max_demand = 0.0
-        count = 0
-        idx = 0
-
-        while current <= end_time:
-            hour = current.hour
-            seed = _time_seed(current, idx)
-
-            # 根据时段确定负载系数（确定性）
-            if 10 <= hour < 12 or 19 <= hour < 21:
-                time_period = "sharp"
-                load_factor = _deterministic_ratio(seed, 0.85, 1.0)
-            elif 8 <= hour < 10 or 12 <= hour < 14 or 17 <= hour < 19 or 21 <= hour < 23:
-                time_period = "peak"
-                load_factor = _deterministic_ratio(seed, 0.7, 0.9)
-            elif 0 <= hour < 7:
-                time_period = "valley"
-                load_factor = _deterministic_ratio(seed, 0.3, 0.5)
-            else:
-                time_period = "flat"
-                load_factor = _deterministic_ratio(seed, 0.5, 0.7)
-
-            base_power = 100  # 基准功率
-            power = base_power * load_factor
-            demand = power * _deterministic_ratio(seed + 1, 0.95, 1.05)
-
-            max_power = max(max_power, power)
-            max_demand = max(max_demand, demand)
-            total_power += power
-            count += 1
-
-            data_list.append(
-                PowerCurvePoint(
-                    timestamp=current,
-                    meter_point_id=meter_point_id,
-                    device_id=device_id,
-                    active_power=round(power, 2),
-                    reactive_power=round(power * 0.2, 2),
-                    power_factor=round(_deterministic_ratio(seed + 2, 0.85, 0.95), 3),
-                    demand_15min=round(demand, 2),
-                    time_period=time_period,
-                )
-            )
-            current += timedelta(minutes=15)
-            idx += 1
-
-        avg_power = total_power / count if count > 0 else 0
-
         return ResponseModel(
             data=PowerCurveResponse(
                 meter_point_id=meter_point_id,
                 device_id=device_id,
-                data=data_list,
-                max_power=round(max_power, 2),
-                avg_power=round(avg_power, 2),
-                max_demand=round(max_demand, 2),
+                data=[],
+                max_power=0, avg_power=0, max_demand=0,
             )
         )
 
@@ -3121,8 +2535,6 @@ async def analyze_device_shift(db: AsyncSession = Depends(get_db), current_user:
     shift_configs_result = await db.execute(select(DeviceShiftConfig))
     shift_configs = {sc.device_id: sc for sc in shift_configs_result.scalars().all()}
 
-    # [V2.11] 使用确定性模拟数据
-
     device_potentials = []
     total_shiftable_power = 0.0
     total_potential_saving = 0.0
@@ -3130,7 +2542,6 @@ async def analyze_device_shift(db: AsyncSession = Depends(get_db), current_user:
 
     for device in devices:
         config = shift_configs.get(device.id)
-        seed = _device_seed(device.id)
 
         # 判断是否可转移
         is_shiftable = (
@@ -3140,37 +2551,20 @@ async def analyze_device_shift(db: AsyncSession = Depends(get_db), current_user:
         )
         is_critical = config.is_critical if config else device.is_critical
 
-        # 计算当前功率和可转移功率
         rated_power = device.rated_power or 10.0
-        current_power = rated_power * _deterministic_ratio(seed, 0.5, 0.9)
         shiftable_ratio = config.shiftable_power_ratio if config else (0.5 if is_shiftable else 0)
-        # V2.7 FIX: 可调节容量基于额定功率计算，与配电配置页面保持一致
-        # 修改前: shiftable_power = current_power * shiftable_ratio (随机值)
-        # 修改后: shiftable_power = rated_power * shiftable_ratio (固定值)
         shiftable_power = rated_power * shiftable_ratio
 
-        # 计算5时段用电比例（确定性模拟数据）
-        # 确保5个时段占比之和为100%
-        if is_shiftable:
-            # 可转移设备：高价时段占比较高
-            sharp_ratio = _deterministic_ratio(seed + 1, 0.08, 0.15)
-            peak_ratio = _deterministic_ratio(seed + 2, 0.30, 0.40)
-            flat_ratio = _deterministic_ratio(seed + 3, 0.25, 0.35)
-            valley_ratio = _deterministic_ratio(seed + 4, 0.10, 0.18)
-        else:
-            # 不可转移设备：分布相对均匀
-            sharp_ratio = _deterministic_ratio(seed + 1, 0.05, 0.10)
-            peak_ratio = _deterministic_ratio(seed + 2, 0.25, 0.35)
-            flat_ratio = _deterministic_ratio(seed + 3, 0.30, 0.40)
-            valley_ratio = _deterministic_ratio(seed + 4, 0.12, 0.20)
-
-        # 深谷占比为剩余部分，确保总和为100%
-        deep_valley_ratio = max(0, 1.0 - sharp_ratio - peak_ratio - flat_ratio - valley_ratio)
+        # 无实时数据时，使用均匀分布估算时段比例
+        sharp_ratio = 0.10
+        peak_ratio = 0.30
+        flat_ratio = 0.30
+        valley_ratio = 0.15
+        deep_valley_ratio = 0.15
 
         # 计算节省潜力（基于5时段价差）
-        # 尖峰1.4, 峰时1.0, 平时0.65, 谷时0.35, 深谷0.2
-        high_cost_ratio = sharp_ratio + peak_ratio  # 高价时段占比
-        low_cost_ratio = valley_ratio + deep_valley_ratio  # 低价时段占比
+        high_cost_ratio = sharp_ratio + peak_ratio
+        low_cost_ratio = valley_ratio + deep_valley_ratio
         avg_high_price = (1.4 * sharp_ratio + 1.0 * peak_ratio) / high_cost_ratio if high_cost_ratio > 0 else 1.0
         avg_low_price = (0.35 * valley_ratio + 0.2 * deep_valley_ratio) / low_cost_ratio if low_cost_ratio > 0 else 0.3
         price_diff = avg_high_price - avg_low_price
@@ -3191,7 +2585,7 @@ async def analyze_device_shift(db: AsyncSession = Depends(get_db), current_user:
                 device_name=device.device_name,
                 device_type=device.device_type,
                 rated_power=round(rated_power, 2),
-                current_power=round(current_power, 2),
+                current_power=0,
                 is_shiftable=is_shiftable,
                 shiftable_power=round(shiftable_power, 2),
                 sharp_energy_ratio=round(sharp_ratio * 100, 1),
