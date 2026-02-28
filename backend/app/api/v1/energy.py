@@ -3,6 +3,7 @@
 """
 
 from typing import Optional, List, Dict, Any
+import json
 from datetime import date, datetime, timedelta
 from io import BytesIO
 from fastapi import APIRouter, Depends, Query, HTTPException, UploadFile, File
@@ -12,6 +13,7 @@ from sqlalchemy import select, func, update, delete
 
 from ..deps import get_db, get_current_user, require_admin, require_operator, require_viewer
 from ...models.user import User
+from ...models.log import OperationLog
 from ...models.energy import (
     PowerDevice,
     EnergyHourly,
@@ -473,6 +475,40 @@ async def delete_power_device(
 
     # 3. 删除 PowerDevice 本身
     await db.execute(delete(PowerDevice).where(PowerDevice.id == device_id))
+
+    # 4. 记录审计日志
+    deleted_info = {
+        "device_id": device_id,
+        "device_code": power_device.device_code,
+        "device_name": power_device.device_name,
+        "device_type": power_device.device_type,
+        "rated_power": power_device.rated_power,
+        "circuit_no": power_device.circuit_no,
+    }
+
+    cascade_summary = {
+        "energy_hourly": "已删除",
+        "energy_daily": "已删除",
+        "energy_monthly": "已删除",
+        "device_load_profile": "已删除",
+        "device_shift_config": "已删除",
+        "load_regulation_config": "已删除",
+    }
+
+    audit_log = OperationLog(
+        user_id=current_user.id,
+        username=current_user.username,
+        module="energy",
+        action="delete",
+        target_type="power_device",
+        target_id=device_id,
+        target_name=f"{power_device.device_name} ({power_device.device_code})",
+        old_value=json.dumps(deleted_info, ensure_ascii=False),
+        new_value=json.dumps({"deleted": True, "force": force}, ensure_ascii=False),
+        remark=f"级联删除设备及关联数据: {json.dumps(cascade_summary, ensure_ascii=False)}",
+    )
+    db.add(audit_log)
+
     await db.commit()
 
     return ResponseModel(message="删除成功")

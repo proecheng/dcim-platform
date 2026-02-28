@@ -45,7 +45,11 @@ export interface DashboardData {
     online_points: number
     alarm_count: number
     device_count: number
+    power?: number  // 当前总功率 (kW)
+    ac_running?: number  // 空调运行台数
+    temperature?: number  // 当前温度 (°C)
   }
+  device_status?: Record<string, number>  // 设备状态统计
   realtime: RealtimeData[]
   alarms: any[]
   trends: {

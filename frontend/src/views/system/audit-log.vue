@@ -29,6 +29,8 @@
                 <el-option label="告警" value="alarm" />
                 <el-option label="配置" value="config" />
                 <el-option label="报表" value="report" />
+                <el-option label="能源管理" value="energy" />
+                <el-option label="数据源" value="datasource" />
               </el-select>
               <el-select v-model="opFilter.action" placeholder="全部操作" clearable style="width: 130px;">
                 <el-option label="全部" value="" />
@@ -255,6 +257,7 @@ async function loadOperationLogs() {
       page_size: opPageSize.value,
       start_time: opFilter.timeRange?.[0] || undefined,
       end_time: opFilter.timeRange?.[1] || undefined,
+      username: opFilter.username || undefined,
       keyword: opFilter.keyword || undefined,
       module: opFilter.module || undefined,
       action: opFilter.action || undefined,

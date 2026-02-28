@@ -327,8 +327,8 @@ export function updatePowerDevice(deviceId: number, data: PowerDeviceUpdate) {
 }
 
 /** 删除用电设备 */
-export function deletePowerDevice(deviceId: number) {
-  return request.delete<ResponseModel>(`/v1/energy/devices/${deviceId}`)
+export function deletePowerDevice(deviceId: number, params?: { force?: boolean }) {
+  return request.delete<ResponseModel<any>>(`/v1/energy/devices/${deviceId}`, { params })
 }
 
 /** 获取实时电力数据 */
@@ -1645,6 +1645,7 @@ export interface RatioRecommendation {
   data_days: number
   has_change: boolean
   calculation_details?: {
+    error?: string  // 计算失败时的错误信息
     avg_power: number
     max_power: number
     min_power: number
@@ -1655,7 +1656,6 @@ export interface RatioRecommendation {
     raw_ratio: number
   }
 }
-
 /** ratio推荐响应 */
 export interface RatioRecommendationResponse {
   total_devices: number
