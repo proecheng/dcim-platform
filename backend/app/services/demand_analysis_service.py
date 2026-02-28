@@ -13,7 +13,7 @@ Unified Demand Analysis Service
 import math
 import logging
 from typing import Dict, List, Optional, Any
-from datetime import datetime, timedelta, date
+from datetime import datetime
 from dataclasses import dataclass
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, and_
