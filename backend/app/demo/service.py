@@ -422,6 +422,126 @@ DISTRIBUTION_CIRCUITS = [
         "is_shiftable": True,
         "shift_priority": 10,
     },
+    # ===== F2楼层PDU回路 =====
+    {
+        "circuit_code": "C-F2-PDU-01",
+        "circuit_name": "F2 PDU回路1",
+        "panel_code": "F2-PANEL-001",
+        "load_type": "IT",
+        "rated_current": 200,
+        "is_shiftable": False,
+    },
+    {
+        "circuit_code": "C-F2-PDU-02",
+        "circuit_name": "F2 PDU回路2",
+        "panel_code": "F2-PANEL-002",
+        "load_type": "IT",
+        "rated_current": 200,
+        "is_shiftable": False,
+    },
+    # ===== F2楼层冷通道回路 =====
+    {
+        "circuit_code": "C-F2-CA-01",
+        "circuit_name": "F2 冷通道回路",
+        "panel_code": "F2-PANEL-003",
+        "load_type": "AC",
+        "rated_current": 150,
+        "is_shiftable": True,
+        "shift_priority": 11,
+    },
+    # ===== F3楼层PDU回路 =====
+    {
+        "circuit_code": "C-F3-PDU-01",
+        "circuit_name": "F3 PDU回路1",
+        "panel_code": "F3-PANEL-001",
+        "load_type": "IT",
+        "rated_current": 200,
+        "is_shiftable": False,
+    },
+    {
+        "circuit_code": "C-F3-PDU-02",
+        "circuit_name": "F3 PDU回路2",
+        "panel_code": "F3-PANEL-002",
+        "load_type": "IT",
+        "rated_current": 200,
+        "is_shiftable": False,
+    },
+    # ===== F3楼层冷通道回路 =====
+    {
+        "circuit_code": "C-F3-CA-01",
+        "circuit_name": "F3 冷通道回路",
+        "panel_code": "F3-PANEL-003",
+        "load_type": "AC",
+        "rated_current": 150,
+        "is_shiftable": True,
+        "shift_priority": 12,
+    },
+    # ===== F4楼层PDU回路 =====
+    {
+        "circuit_code": "C-F4-PDU-01",
+        "circuit_name": "F4 PDU回路1",
+        "panel_code": "F4-PANEL-001",
+        "load_type": "IT",
+        "rated_current": 200,
+        "is_shiftable": False,
+    },
+    {
+        "circuit_code": "C-F4-PDU-02",
+        "circuit_name": "F4 PDU回路2",
+        "panel_code": "F4-PANEL-002",
+        "load_type": "IT",
+        "rated_current": 200,
+        "is_shiftable": False,
+    },
+    # ===== F4楼层冷通道回路 =====
+    {
+        "circuit_code": "C-F4-CA-01",
+        "circuit_name": "F4 冷通道回路",
+        "panel_code": "F4-PANEL-003",
+        "load_type": "AC",
+        "rated_current": 150,
+        "is_shiftable": True,
+        "shift_priority": 13,
+    },
+    # ===== 水泵回路（扩展）=====
+    {
+        "circuit_code": "C-PMP-01",
+        "circuit_name": "水泵回路1",
+        "panel_code": "COOLING-PANEL-002",
+        "load_type": "AC",
+        "rated_current": 80,
+        "is_shiftable": True,
+        "shift_priority": 14,
+    },
+    {
+        "circuit_code": "C-PMP-02",
+        "circuit_name": "水泵回路2",
+        "panel_code": "COOLING-PANEL-002",
+        "load_type": "AC",
+        "rated_current": 80,
+        "is_shiftable": True,
+        "shift_priority": 15,
+    },
+    # ===== 室外机回路 =====
+    {
+        "circuit_code": "C-AC-OUT-01",
+        "circuit_name": "室外机回路",
+        "panel_code": "AC-PANEL-002",
+        "load_type": "AC",
+        "rated_current": 100,
+        "is_shiftable": True,
+        "shift_priority": 16,
+    },
+    # ===== A区冷通道回路 =====
+    {
+        "circuit_code": "C-CA-A-01",
+        "circuit_name": "A区冷通道回路",
+        "panel_code": "AC-PANEL-003",
+        "load_type": "AC",
+        "rated_current": 100,
+        "is_shiftable": True,
+        "shift_priority": 17,
+    },
 ]
 
 POWER_DEVICES = [

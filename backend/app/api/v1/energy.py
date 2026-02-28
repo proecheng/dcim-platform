@@ -170,6 +170,27 @@ async def create_power_device(
             raise HTTPException(status_code=400, detail="上级设备不存在")
 
     new_device = PowerDevice(**device.model_dump())
+    
+    # 自动推断并绑定 circuit_id
+    if not new_device.circuit_id:
+        from ...services.device_sync import DeviceSyncService
+        from ...models.energy import DistributionCircuit
+        
+        # 获取所有回路映射
+        circuits_result = await db.execute(select(DistributionCircuit))
+        circuits = circuits_result.scalars().all()
+        circuit_map = {c.circuit_code: c.id for c in circuits}
+        
+        # 使用 DeviceSyncService 的推断逻辑
+        sync_service = DeviceSyncService(db)
+        inferred_circuit_id = sync_service._infer_circuit_id(new_device, circuit_map)
+        
+        if inferred_circuit_id:
+            new_device.circuit_id = inferred_circuit_id
+            print(f"[自动绑定] 设备 {new_device.device_code} 绑定到回路 ID {inferred_circuit_id}")
+        else:
+            print(f"[警告] 设备 {new_device.device_code} 无法自动推断 circuit_id，请手动指定")
+    
     db.add(new_device)
     await db.commit()
     await db.refresh(new_device)
