@@ -159,11 +159,24 @@
         <el-button type="primary" :loading="submitLoading" @click="handleSubmit">确定</el-button>
       </template>
     </el-dialog>
+
+    <!-- 删除确认对话框 -->
+    <DeleteConfirmDialog
+      :visible="showDeleteDialog"
+      :device-id="deleteDeviceId"
+      :device-name="deleteDeviceName"
+      :delete-api="deleteDeviceApi"
+      @update:visible="showDeleteDialog = $event"
+      @deleted="handleDeviceDeleted"
+    />
+  </div>
+    </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
 import { Plus } from '@element-plus/icons-vue'
+import DeleteConfirmDialog from '@/components/common/DeleteConfirmDialog.vue'
 import {
   getDeviceList,
   createDevice,
@@ -181,6 +194,10 @@ const router = useRouter()
 const deviceTypeOptions = [
   { label: 'UPS', value: 'UPS' },
   { label: 'PDU', value: 'PDU' },
+  { label: '高压柜', value: 'HV_CABINET' },
+  { label: '变压器', value: 'TRANSFORMER' },
+  { label: '低压柜', value: 'LV_CABINET' },
+  { label: '电池组', value: 'BATTERY' },
   { label: '精密空调(室内)', value: 'PRECISION_AC_INDOOR' },
   { label: '精密空调(室外)', value: 'PRECISION_AC_OUTDOOR' },
   { label: '空调', value: 'AC' },
@@ -225,6 +242,10 @@ function getDeviceTypeLabel(type: string): string {
 const deviceTypeTagMap: Record<string, TagType> = {
   UPS: 'danger',
   PDU: 'warning',
+  HV_CABINET: 'danger',
+  TRANSFORMER: 'danger',
+  LV_CABINET: 'warning',
+  BATTERY: 'warning',
   PRECISION_AC_INDOOR: 'primary',
   PRECISION_AC_OUTDOOR: 'primary',
   AC: 'primary',
@@ -275,6 +296,12 @@ const isEdit = ref(false)
 const submitLoading = ref(false)
 const formRef = ref()
 const editingId = ref(0)
+
+// 删除确认对话框状态
+const showDeleteDialog = ref(false)
+const deleteDeviceId = ref(0)
+const deleteDeviceName = ref('')
+const deleteDeviceApi = deleteDevice
 
 const form = reactive({
   device_code: '',
@@ -450,26 +477,17 @@ async function handleToggleEnabled(row: DeviceInfo): Promise<boolean> {
 }
 
 // ===== 删除 =====
-async function handleDelete(row: DeviceInfo) {
-  try {
-    await ElMessageBox.confirm(
-      `确定删除设备「${row.device_name}」？此操作不可恢复。`,
-      '确认删除',
-      { type: 'warning', confirmButtonText: '删除', cancelButtonText: '取消' }
-    )
-    await deleteDevice(row.id)
-    ElMessage.success('删除成功')
-    loadData()
-    loadStats()
-  } catch (e: unknown) {
-    if (e !== 'cancel') {
-      const err = e as { response?: { data?: { detail?: string } } }
-      const detail = err?.response?.data?.detail
-      if (detail) {
-        ElMessage.error(detail)
-      }
-    }
-  }
+function handleDelete(row: DeviceInfo) {
+  deleteDeviceId.value = row.id
+  deleteDeviceName.value = `${row.device_name} (${row.device_code})`
+  showDeleteDialog.value = true
+}
+
+function handleDeviceDeleted(id: number) {
+  void id
+  ElMessage.success('设备删除成功')
+  loadData()
+  loadStats()
 }
 
 // ===== 表单重置 =====
