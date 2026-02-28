@@ -3,7 +3,7 @@
 分析计划与实际执行偏差，自动调整预测参数，生成优化效果报告
 """
 
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import List, Dict, Optional
 from dataclasses import dataclass
 import numpy as np

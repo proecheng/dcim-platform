@@ -4,7 +4,6 @@
 
 import asyncio
 import random
-from datetime import datetime
 from typing import Dict
 from sqlalchemy import select, func
 

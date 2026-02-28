@@ -1,14 +1,12 @@
 """数据源桥接服务 — 将 DataSourcePoint 采集数据同步到 Point/PointRealtime — Story 4.1"""
 
-import json
 from datetime import datetime
 from typing import Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update
 
-from ..models.point import Point, PointRealtime
+from ..models.point import Point
 from ..models.gateway import DataSourcePoint
-from ..core.redis import redis_service
 
 
 async def sync_point_data(

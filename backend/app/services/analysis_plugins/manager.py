@@ -324,7 +324,7 @@ class PluginManager:
                         location=device.location or "",
                     )
                 )
-        except Exception as e:
+        except Exception:
             # 无数据时返回空列表，不生成模拟数据
             device_data = []
         return device_data
@@ -352,7 +352,7 @@ class PluginManager:
                         total_power=record.total_power or 75,
                     )
                 )
-        except Exception as e:
+        except Exception:
             # 无数据时返回空列表，不生成模拟数据
             environment_data = []
         return environment_data
