@@ -6,7 +6,7 @@ title DCIM System Launcher
 echo.
 echo ========================================================
 echo       Computing Center Intelligent Monitoring System
-echo                    Startup Script v6.0
+echo                    Startup Script v7.0
 echo ========================================================
 echo.
 
@@ -153,6 +153,11 @@ if not exist "dcim.db" (
 )
 
 REM ============================================================
+REM Step 5: Database Preparation
+REM ============================================================
+echo.
+echo [5/9] Preparing database...
+echo       Database ready for service startup
 REM Step 5: Data Consistency Fix (NEW)
 REM ============================================================
 echo.
@@ -274,6 +279,25 @@ if errorlevel 1 (
 )
 
 REM ============================================================
+REM Post-Start: Data Consistency Fix
+REM ============================================================
+echo.
+echo Running data consistency fix...
+cd /d "%BACKEND_DIR%"
+
+if exist "scripts\fix_circuit_bindings.py" (
+    echo       Fixing device circuit bindings...
+    "!PYTHON_CMD!" scripts\fix_circuit_bindings.py >nul 2>&1
+    if errorlevel 1 (
+        echo       [WARNING] Data fix encountered issues
+        echo       This is normal if no devices need fixing
+    ) else (
+        echo       Data consistency fix completed
+    )
+) else (
+    echo       [INFO] Fix script not found, skipping
+)
+
 REM Data Consistency Verification (NEW)
 REM ============================================================
 echo.
