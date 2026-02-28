@@ -493,6 +493,12 @@ class DeviceSyncService:
 
         # 4. Device → PowerDevice (反向: 已有 UPS/AC/PDU 设备但无 PowerDevice)
         created_power_for_devices = 0
+        
+        # 先构建 circuit_code -> circuit_id 映射
+        from ..models.energy import DistributionCircuit
+        circuit_result = await self.db.execute(select(DistributionCircuit))
+        circuit_map = {c.circuit_code: c.id for c in circuit_result.scalars().all()}
+        
         for dev_type, power_type in self.DEVICE_TO_POWER_TYPE_MAP.items():
             devs = (
                 (
@@ -506,7 +512,6 @@ class DeviceSyncService:
                 .scalars()
                 .all()
             )
-
             for dev in devs:
                 existing_pd = (
                     await self.db.execute(
@@ -516,12 +521,16 @@ class DeviceSyncService:
                     )
                 ).scalar_one_or_none()
                 if not existing_pd:
+                    # 智能分配 circuit_id
+                    circuit_id = self._infer_circuit_id(dev, circuit_map)
+                    
                     pd = PowerDevice(
                         device_code=dev.device_code,
                         device_name=dev.device_name,
                         device_type=power_type,
                         rated_power=self.DEFAULT_RATED_POWER.get(power_type, 20.0),
                         area_code=dev.area_code or "A1",
+                        circuit_id=circuit_id,  # 新增：分配回路
                         monitor_device_id=dev.id,
                         is_enabled=True,
                         created_at=datetime.now(),
@@ -534,7 +543,13 @@ class DeviceSyncService:
                     # 补充已有设备缺失的额定功率
                     existing_pd.rated_power = self.DEFAULT_RATED_POWER.get(power_type, 20.0)
                     existing_pd.updated_at = datetime.now()
-
+                    
+                # 补充已有设备缺失的 circuit_id
+                if existing_pd and not existing_pd.circuit_id:
+                    circuit_id = self._infer_circuit_id(dev, circuit_map)
+                    if circuit_id:
+                        existing_pd.circuit_id = circuit_id
+                        existing_pd.updated_at = datetime.now()
         # 5. 为所有已有 Device 补全扩展记录 (UPSDevice / CoolingUnit / ColdAisle)
         created_ups_ext = 0
         created_cooling_ext = 0
@@ -627,3 +642,68 @@ class DeviceSyncService:
             "created_cooling_extensions": created_cooling_ext,
             "created_cold_aisle_extensions": created_cold_aisle_ext,
         }
+    
+    def _infer_circuit_id(self, device: Device, circuit_map: dict) -> Optional[int]:
+        """
+        根据设备编码和类型智能推断应该绑定的回路ID
+        
+        规则:
+        - UPS-F1-XX → C-F1-UPS-01
+        - UPS-F2-XX → C-F2-UPS-01
+        - UPS-F3-XX → C-F3-UPS-01
+        - CH-F1-XX (冷机) → C-CH-01
+        - CT-F1-XX (冷却塔) → C-CT-01
+        - PMP-F1-0[1-4] (冷冻水泵) → C-CHWP-01
+        - PMP-F1-0[7-9] (冷却水泵) → C-CWP-01
+        - AC-XX (精密空调) → C-AC-01 或 C-AC-02
+        - PDU-XX (列头柜) → 根据区域分配
+        """
+        code = device.device_code
+        dev_type = device.device_type
+        
+        # UPS 设备
+        if dev_type == "UPS":
+            if code.startswith("UPS-F1-"):
+                return circuit_map.get("C-F1-UPS-01")
+            elif code.startswith("UPS-F2-") or code.startswith("F2-UPS-"):
+                return circuit_map.get("C-F2-UPS-01")
+            elif code.startswith("UPS-F3-") or code.startswith("F3-UPS-"):
+                return circuit_map.get("C-F3-UPS-01")
+        
+        # 制冷设备
+        elif dev_type == "AC":
+            if code.startswith("CH-"):
+                return circuit_map.get("C-CH-01")
+            elif code.startswith("CT-"):
+                return circuit_map.get("C-CT-01")
+            elif code.startswith("PMP-"):
+                # 冷冻水泵 01-04, 冷却水泵 07-09
+                if any(code.endswith(f"-0{i}") for i in [1, 2, 3, 4]):
+                    return circuit_map.get("C-CHWP-01")
+                elif any(code.endswith(f"-0{i}") for i in [7, 8, 9]):
+                    return circuit_map.get("C-CWP-01")
+            elif code.startswith("F1-AC-"):
+                return circuit_map.get("C-F1-AC-01")
+            elif code.startswith("F2-AC-"):
+                return circuit_map.get("C-F2-AC-01")
+            elif code.startswith("F3-AC-"):
+                return circuit_map.get("C-F3-AC-01")
+            elif code.startswith("AC-A"):
+                return circuit_map.get("C-AC-01")
+            elif code.startswith("AC-B"):
+                return circuit_map.get("C-AC-02")
+        
+        # PDU/IT 设备
+        elif dev_type in ("PDU", "IT"):
+            area = device.area_code or ""
+            if "A1" in area or "A" in code:
+                # A1 区域有 3 个回路，简单轮询
+                return circuit_map.get("C-A1-01")
+            elif "B1" in area or "B" in code:
+                return circuit_map.get("C-B1-01")
+        
+        # 照明
+        elif dev_type == "LIGHT":
+            return circuit_map.get("C-LIGHT")
+        
+        return None

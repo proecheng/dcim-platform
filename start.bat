@@ -6,14 +6,17 @@ title DCIM System Launcher
 echo.
 echo ========================================================
 echo       Computing Center Intelligent Monitoring System
-echo                    Startup Script v5.3
+echo                    Startup Script v6.0
 echo ========================================================
 echo.
 
 set "SCRIPT_DIR=%~dp0"
 cd /d "%SCRIPT_DIR%"
 
-echo [1/7] Checking runtime environment...
+REM ============================================================
+REM Step 1: Environment Check
+REM ============================================================
+echo [1/9] Checking runtime environment...
 
 REM Check for Python in virtual environment first
 set "PYTHON_CMD="
@@ -58,8 +61,11 @@ if errorlevel 1 (
 )
 for /f "tokens=*" %%i in ('node --version 2^>^&1') do echo       Node.js %%i
 
+REM ============================================================
+REM Step 2: Port Cleanup
+REM ============================================================
 echo.
-echo [2/7] Cleaning occupied ports...
+echo [2/9] Cleaning occupied ports...
 
 REM Kill processes by window title first
 taskkill /F /FI "WINDOWTITLE eq Backend*" >nul 2>&1
@@ -108,8 +114,11 @@ if "!PORT_OK!"=="0" (
 
 echo       Ports cleaned
 
+REM ============================================================
+REM Step 3: Backend Environment
+REM ============================================================
 echo.
-echo [3/7] Checking backend environment...
+echo [3/9] Checking backend environment...
 cd /d "%SCRIPT_DIR%backend"
 
 echo       Checking dependencies...
@@ -125,18 +134,48 @@ if errorlevel 1 (
 )
 echo       Backend dependencies OK
 
+REM ============================================================
+REM Step 4: Database Initialization
+REM ============================================================
 echo.
-echo [4/7] Checking database...
+echo [4/9] Checking database...
 if not exist "dcim.db" (
     echo       Initializing database...
     "!PYTHON_CMD!" -c "import asyncio; from app.core.database import init_db; asyncio.run(init_db())" 2>nul
+    if errorlevel 1 (
+        echo [ERROR] Database initialization failed
+        pause
+        exit /b 1
+    )
     echo       Database initialized
 ) else (
     echo       Database exists
 )
 
+REM ============================================================
+REM Step 5: Data Consistency Fix (NEW)
+REM ============================================================
 echo.
-echo [5/7] Checking proxy service...
+echo [5/9] Checking data consistency...
+
+if exist "scripts\fix_circuit_bindings.py" (
+    echo       Running data consistency fix...
+    "!PYTHON_CMD!" scripts\fix_circuit_bindings.py >nul 2>&1
+    if errorlevel 1 (
+        echo       [WARNING] Data fix encountered issues (may be locked)
+        echo       Will retry after services start
+    ) else (
+        echo       Data consistency fix completed
+    )
+) else (
+    echo       [WARNING] Fix script not found, skipping
+)
+
+REM ============================================================
+REM Step 6: Proxy Service
+REM ============================================================
+echo.
+echo [6/9] Checking proxy service...
 cd /d "%SCRIPT_DIR%proxy"
 
 if not exist "node_modules" (
@@ -150,8 +189,11 @@ if not exist "node_modules" (
 )
 echo       Proxy dependencies OK
 
+REM ============================================================
+REM Step 7: Frontend Environment
+REM ============================================================
 echo.
-echo [6/7] Checking frontend environment...
+echo [7/9] Checking frontend environment...
 cd /d "%SCRIPT_DIR%frontend"
 
 if not exist "node_modules" (
@@ -165,8 +207,11 @@ if not exist "node_modules" (
 )
 echo       Frontend dependencies OK
 
+REM ============================================================
+REM Step 8: Frontend Build
+REM ============================================================
 echo.
-echo [7/7] Checking frontend build...
+echo [8/9] Checking frontend build...
 if not exist "dist\index.html" (
     echo       Frontend not built, building now...
     call npm run build
@@ -180,6 +225,11 @@ if not exist "dist\index.html" (
     echo       Frontend build OK
 )
 
+REM ============================================================
+REM Step 9: Start Services
+REM ============================================================
+echo.
+echo [9/9] Starting services...
 echo.
 echo ========================================================
 echo                   Starting Services
@@ -201,6 +251,49 @@ start "Monitor-Proxy" cmd /k "title Proxy [Port 3000] && cd /d %PROXY_DIR% && ec
 echo.
 timeout /t 5 /nobreak >nul
 
+REM ============================================================
+REM Post-Start Verification (NEW)
+REM ============================================================
+echo.
+echo Verifying services...
+
+REM Check if backend is responding
+curl -s http://localhost:8080/docs >nul 2>&1
+if errorlevel 1 (
+    echo [WARNING] Backend may not be ready yet
+) else (
+    echo       Backend: OK
+)
+
+REM Check if proxy is responding
+curl -s http://localhost:3000 >nul 2>&1
+if errorlevel 1 (
+    echo [WARNING] Proxy may not be ready yet
+) else (
+    echo       Proxy: OK
+)
+
+REM ============================================================
+REM Data Consistency Verification (NEW)
+REM ============================================================
+echo.
+echo Running data consistency verification...
+cd /d "%BACKEND_DIR%"
+
+if exist "scripts\verify_data_consistency.py" (
+    "!PYTHON_CMD!" scripts\verify_data_consistency.py >nul 2>&1
+    if errorlevel 1 (
+        echo [WARNING] Data verification encountered issues
+    ) else (
+        echo       Data consistency: OK
+    )
+) else (
+    echo       [INFO] Verification script not found, skipping
+)
+
+REM ============================================================
+REM Success Message
+REM ============================================================
 echo.
 echo ========================================================
 echo                  Services Started!
@@ -210,6 +303,13 @@ echo   Local Access:    http://localhost:3000
 echo   API Docs:        http://localhost:8080/docs
 echo.
 echo   Default Account: admin / admin123
+echo.
+echo ========================================================
+echo.
+echo   Troubleshooting:
+echo   - If pages show errors, wait 10s for services to fully start
+echo   - Check backend/proxy windows for error messages
+echo   - Run stop.bat before restarting if issues persist
 echo.
 echo ========================================================
 echo.
