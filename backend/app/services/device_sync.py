@@ -8,6 +8,7 @@ Device ↔ Topology 双向同步
 """
 
 import contextvars
+import logging
 from datetime import datetime
 from typing import Optional, Tuple
 
@@ -22,6 +23,8 @@ from ..models.cooling import CoolingUnit, ColdAisle
 # 防循环重入标志 (per-coroutine，不会跨请求泄漏)
 _syncing: contextvars.ContextVar[bool] = contextvars.ContextVar("_device_syncing", default=False)
 
+# 日志记录器
+logger = logging.getLogger(__name__)
 
 class DeviceSyncService:
     """设备双向同步服务"""
@@ -663,9 +666,41 @@ class DeviceSyncService:
         """
         code = device.device_code
         dev_type = device.device_type
+
         # 边界情况: 检查 code 是否为 None 或空
         if not code:
+            logger.warning(
+                f"Device {device.id} (type: {dev_type}) has no device_code, cannot infer circuit"
+            )
             return None
+
+        # 按设备类型分发到专门的推断方法
+        result = None
+        if dev_type == "UPS":
+            result = self._infer_ups_circuit(code, circuit_map)
+        elif dev_type == "PDU":
+            result = self._infer_pdu_circuit(code, device.area_code, circuit_map)
+        elif dev_type in ("AC", "HVAC"):
+            result = self._infer_hvac_circuit(code, circuit_map)
+        elif dev_type == "IT":
+            result = self._infer_it_circuit(code, device.area_code, circuit_map)
+        elif dev_type == "LIGHT":
+            result = circuit_map.get("C-LIGHT")
+
+        # 记录推断结果
+        if result is None:
+            logger.debug(
+                f"No circuit found for device {code} "
+                f"(type: {dev_type}, area: {device.area_code})"
+            )
+        else:
+            # 查找回路名称
+            circuit_code = next((k for k, v in circuit_map.items() if v == result), "?")
+            logger.debug(
+                f"Inferred circuit for device {code}: {circuit_code} (id: {result})"
+            )
+
+        return result
         # 按设备类型分发到专门的推断方法
         if dev_type == "UPS":
             return self._infer_ups_circuit(code, circuit_map)
