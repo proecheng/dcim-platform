@@ -19,7 +19,7 @@ export interface WaterLeakZoneGroup {
 }
 
 export function useWaterLeakData() {
-  const allData = ref<RealtimeData[]>([])
+  const allData = ref<Map<number, RealtimeData>>(new Map())
   const recentAlarmCount = ref(0)
   const loading = ref(false)
   const wsConnected = ref(false)
@@ -27,7 +27,7 @@ export function useWaterLeakData() {
 
   // 筛选水浸传感器（device_type === 'WL'）
   const wlSensors = computed(() =>
-    allData.value.filter(d => d.device_type === 'WL')
+    Array.from(allData.value.values()).filter(d => d.device_type === 'WL')
   )
 
   // ── 统计数据 ──
@@ -68,7 +68,9 @@ export function useWaterLeakData() {
   async function fetchData() {
     loading.value = true
     try {
-      allData.value = await getAllRealtimeData()
+      const dataArray = await getAllRealtimeData()
+      allData.value.clear()
+      dataArray.forEach(d => allData.value.set(d.point_id, d))
     } catch (e) {
       console.error('水浸传感器数据加载失败', e)
     } finally {
@@ -98,12 +100,7 @@ export function useWaterLeakData() {
   function handleWsMessage(message: Record<string, unknown>) {
     if (message.type === 'realtime' && message.data) {
       const data = message.data as RealtimeData
-      const idx = allData.value.findIndex(d => d.point_id === data.point_id)
-      if (idx >= 0) {
-        allData.value[idx] = data
-      } else {
-        allData.value.push(data)
-      }
+      allData.value.set(data.point_id, data) // O(1) 更新
     }
   }
 

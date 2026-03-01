@@ -4,6 +4,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, watch, shallowRef, computed } from 'vue'
+import { useDebounceFn } from '@vueuse/core'
 import echarts, { type EChartsOption } from '@/utils/echarts'
 
 interface Props {
@@ -156,19 +157,20 @@ const updateChart = () => {
   }
 }
 
-const resizeChart = () => {
+const debouncedResize = useDebounceFn(() => {
   chartInstance.value?.resize()
-}
+}, 200)
+const resizeChart = debouncedResize
 
 watch(() => props.value, updateChart)
 
 onMounted(() => {
   initChart()
-  window.addEventListener('resize', resizeChart)
+  window.addEventListener('resize', debouncedResize)
 })
 
 onUnmounted(() => {
-  window.removeEventListener('resize', resizeChart)
+  window.removeEventListener('resize', debouncedResize)
   chartInstance.value?.dispose()
 })
 

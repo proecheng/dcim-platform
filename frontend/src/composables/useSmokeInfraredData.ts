@@ -24,7 +24,7 @@ export interface SmokeIRZoneGroup {
 }
 
 export function useSmokeInfraredData() {
-  const allData = ref<RealtimeData[]>([])
+  const allData = ref<Map<number, RealtimeData>>(new Map())
   const recentAlarmCount = ref(0)
   const firePolicies = ref<LinkagePolicy[]>([])
   const loading = ref(false)
@@ -33,7 +33,7 @@ export function useSmokeInfraredData() {
 
   // 筛选烟雾+红外传感器
   const siSensors = computed(() =>
-    allData.value.filter(d => d.device_type === 'SMOKE' || d.device_type === 'IR')
+    Array.from(allData.value.values()).filter(d => d.device_type === 'SMOKE' || d.device_type === 'IR')
   )
 
   // ── 按类型分别统计 ──
@@ -84,7 +84,9 @@ export function useSmokeInfraredData() {
   async function fetchData() {
     loading.value = true
     try {
-      allData.value = await getAllRealtimeData()
+      const dataArray = await getAllRealtimeData()
+      allData.value.clear()
+      dataArray.forEach(d => allData.value.set(d.point_id, d))
     } catch (e) {
       console.error('烟雾/红外传感器数据加载失败', e)
     } finally {
@@ -128,12 +130,7 @@ export function useSmokeInfraredData() {
   function handleWsMessage(message: Record<string, unknown>) {
     if (message.type === 'realtime' && message.data) {
       const data = message.data as RealtimeData
-      const idx = allData.value.findIndex(d => d.point_id === data.point_id)
-      if (idx >= 0) {
-        allData.value[idx] = data
-      } else {
-        allData.value.push(data)
-      }
+      allData.value.set(data.point_id, data) // O(1) 更新
     }
   }
 

@@ -33,7 +33,7 @@ export interface HeatmapPoint {
 }
 
 export function useTemperatureData() {
-  const allData = ref<RealtimeData[]>([])
+  const allData = ref<Map<number, RealtimeData>>(new Map())
   const driftPointIds = ref<Set<number>>(new Set())
   const loading = ref(false)
   const wsConnected = ref(false)
@@ -41,15 +41,15 @@ export function useTemperatureData() {
 
   // 筛选温湿度传感器（device_type === 'TH'）
   const thSensors = computed(() =>
-    allData.value.filter(d => d.device_type === 'TH')
+    Array.from(allData.value.values()).filter(d => d.device_type === 'TH')
   )
 
   const tempSensors = computed(() =>
-    thSensors.value.filter(d => d.unit === '°C')
+    thSensors.value.filter(d => d.unit === '°C' || d.unit === '℃')
   )
 
   const humiditySensors = computed(() =>
-    thSensors.value.filter(d => d.unit === '%')
+    thSensors.value.filter(d => d.unit === '%' || d.unit === '%RH')
   )
 
   // ── 统计数据 ──
@@ -80,8 +80,8 @@ export function useTemperatureData() {
     })
 
     return Array.from(map.entries()).map(([areaCode, sensors]) => {
-      const temps = sensors.filter(s => s.unit === '°C')
-      const humids = sensors.filter(s => s.unit === '%')
+      const temps = sensors.filter(s => s.unit === '°C' || s.unit === '℃')
+      const humids = sensors.filter(s => s.unit === '%' || s.unit === '%RH')
       const validTemps = temps.filter(s => s.value != null && s.status !== 'offline')
       const validHumids = humids.filter(s => s.value != null && s.status !== 'offline')
 
@@ -127,7 +127,9 @@ export function useTemperatureData() {
   async function fetchData() {
     loading.value = true
     try {
-      allData.value = await getAllRealtimeData()
+      const dataArray = await getAllRealtimeData()
+      allData.value.clear()
+      dataArray.forEach(d => allData.value.set(d.point_id, d))
     } catch (e) {
       console.error('温湿度数据加载失败', e)
     } finally {
@@ -157,12 +159,7 @@ export function useTemperatureData() {
   function handleWsMessage(message: Record<string, unknown>) {
     if (message.type === 'realtime' && message.data) {
       const data = message.data as RealtimeData
-      const idx = allData.value.findIndex(d => d.point_id === data.point_id)
-      if (idx >= 0) {
-        allData.value[idx] = data
-      } else {
-        allData.value.push(data)
-      }
+      allData.value.set(data.point_id, data) // O(1) 更新
     }
   }
 

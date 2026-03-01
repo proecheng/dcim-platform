@@ -272,6 +272,7 @@ import {
 } from '@/api/modules/gateway'
 import { useWebSocket } from '@/composables/useWebSocket'
 import GatewayConfigDialog from './GatewayConfigDialog.vue'
+import { useDebounceFn } from '@vueuse/core'
 
 // ── 统计数据 ──
 const summary = ref<GatewaySummary>({ total: 0, online: 0, offline: 0 })
@@ -520,6 +521,9 @@ const { on, off, isConnected } = useWebSocket({
   autoConnect: true,
 })
 
+// 节流 loadSummary，避免高频 WebSocket 消息触发大量请求
+const debouncedLoadSummary = useDebounceFn(loadSummary, 2000)
+
 function handleGatewayStatusMessage(message: { type: string; data?: { gateway_id?: string; status?: string } }) {
   if (message.type !== 'gateway_status' || !message.data) return
   const { gateway_id, status } = message.data
@@ -532,8 +536,8 @@ function handleGatewayStatusMessage(message: { type: string; data?: { gateway_id
     target.last_heartbeat = new Date().toISOString()
   }
 
-  // 刷新汇总
-  loadSummary()
+  // 节流刷新汇总
+  debouncedLoadSummary()
 }
 
 // 轮询降级
