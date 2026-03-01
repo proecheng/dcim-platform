@@ -663,131 +663,124 @@ class DeviceSyncService:
         """
         code = device.device_code
         dev_type = device.device_type
-
-        # UPS 设备
+        # 边界情况: 检查 code 是否为 None 或空
+        if not code:
+            return None
+        # 按设备类型分发到专门的推断方法
         if dev_type == "UPS":
-            # UPS-F1-XX → C-F1-UPS-01
-            for floor in ["F1", "F2", "F3", "F4"]:
-                if code.startswith(f"UPS-{floor}-") or code.startswith(f"{floor}-UPS-"):
-                    return circuit_map.get(f"C-{floor}-UPS-01")
-
-        # PDU 设备
+            return self._infer_ups_circuit(code, circuit_map)
         elif dev_type == "PDU":
-            # PDU-F2-XX → C-F2-PDU-GENERIC
-            if code.startswith("PDU-F2-"):
-                return circuit_map.get("C-F2-PDU-GENERIC")
-            elif code.startswith("PDU-F3-"):
-                return circuit_map.get("C-F3-PDU-GENERIC")
-            elif code.startswith("PDU-F4-"):
-                return circuit_map.get("C-F4-PDU-GENERIC")
-
-            # 旧的 A1/B1 区域 PDU
-            area = device.area_code or ""
-            if "A1" in area or "A" in code:
-                return circuit_map.get("C-A1-01")
-            elif "B1" in area or "B" in code:
-                return circuit_map.get("C-B1-01")
-
-        # HVAC 设备 (制冷、空调、水泵等)
+            return self._infer_pdu_circuit(code, device.area_code, circuit_map)
         elif dev_type in ("AC", "HVAC"):
-            # 冷通道 CA-XX → C-CA-GENERIC (通用回路)
-            if code.startswith("CA-"):
-                return circuit_map.get("C-CA-GENERIC")
-
-            # 水泵 PMP-F1-XX
-            if code.startswith("PMP-"):
-                # 冷冻水泵 01-04
-                if any(code.endswith(f"-0{i}") for i in [1, 2, 3, 4]):
-                    return circuit_map.get("C-CHWP-01")
-                # 冷却水泵 07-09
-                elif any(code.endswith(f"-0{i}") for i in [7, 8, 9]):
-                    return circuit_map.get("C-CWP-01")
-                # 其他水泵 → 通用回路
-                else:
-                    return circuit_map.get("C-PMP-GENERIC")
-
-            # 室外机 AC-OUT-XX → C-AC-OUT-GENERIC
-            if code.startswith("AC-OUT-"):
-                return circuit_map.get("C-AC-OUT-GENERIC")
-
-            # 冷机 CH-XX → C-CH-01
-            if code.startswith("CH-"):
-                return circuit_map.get("C-CH-01")
-
-            # 冷却塔 CT-XX → C-CT-01
-            if code.startswith("CT-"):
-                return circuit_map.get("C-CT-01")
-
-            # 楼层空调 F1-AC-XX → C-F1-AC-01
-            for floor in ["F1", "F2", "F3", "F4"]:
-                if code.startswith(f"{floor}-AC-"):
-                    return circuit_map.get(f"C-{floor}-AC-01")
-
-            # 精密空调 AC-A/B → C-AC-01/02
-            if code.startswith("AC-A"):
-                return circuit_map.get("C-AC-01")
-            elif code.startswith("AC-B"):
-                return circuit_map.get("C-AC-02")
-        elif dev_type in ("AC", "HVAC"):
-            # 冷通道 CA-F2-XX → C-F2-CA-01
-            for floor in ["F2", "F3", "F4"]:
-                if code.startswith(f"CA-{floor}-"):
-                    return circuit_map.get(f"C-{floor}-CA-01")
-
-            # 区域冷通道 CA-A01 → C-CA-A-01
-            if code.startswith("CA-A"):
-                return circuit_map.get("C-CA-A-01")
-
-            # 水泵 PMP-F1-XX
-            if code.startswith("PMP-"):
-                # 冷冻水泵 01-04
-                if any(code.endswith(f"-0{i}") for i in [1, 2, 3, 4]):
-                    return circuit_map.get("C-CHWP-01")
-                # 冷却水泵 07-09
-                elif any(code.endswith(f"-0{i}") for i in [7, 8, 9]):
-                    return circuit_map.get("C-CWP-01")
-                # 其他水泵 05-06, 10-12 → 轮询分配
-                else:
-                    try:
-                        num = int(code.split("-")[-1])
-                        circuit_suffix = "01" if num % 2 == 1 else "02"
-                        return circuit_map.get(f"C-PMP-{circuit_suffix}")
-                    except (ValueError, IndexError):
-                        return circuit_map.get("C-PMP-01")
-
-            # 室外机 AC-OUT-XX → C-AC-OUT-01
-            if code.startswith("AC-OUT-"):
-                return circuit_map.get("C-AC-OUT-01")
-
-            # 冷机 CH-XX → C-CH-01
-            if code.startswith("CH-"):
-                return circuit_map.get("C-CH-01")
-
-            # 冷却塔 CT-XX → C-CT-01
-            if code.startswith("CT-"):
-                return circuit_map.get("C-CT-01")
-
-            # 楼层空调 F1-AC-XX → C-F1-AC-01
-            for floor in ["F1", "F2", "F3", "F4"]:
-                if code.startswith(f"{floor}-AC-"):
-                    return circuit_map.get(f"C-{floor}-AC-01")
-
-            # 精密空调 AC-A/B → C-AC-01/02
-            if code.startswith("AC-A"):
-                return circuit_map.get("C-AC-01")
-            elif code.startswith("AC-B"):
-                return circuit_map.get("C-AC-02")
-
-        # IT 设备
+            return self._infer_hvac_circuit(code, circuit_map)
         elif dev_type == "IT":
-            area = device.area_code or ""
-            if "A1" in area or "A" in code:
-                return circuit_map.get("C-A1-01")
-            elif "B1" in area or "B" in code:
-                return circuit_map.get("C-B1-01")
-
-        # 照明
+            return self._infer_it_circuit(code, device.area_code, circuit_map)
         elif dev_type == "LIGHT":
             return circuit_map.get("C-LIGHT")
+        return None
 
+    def _infer_ups_circuit(self, code: str, circuit_map: dict) -> Optional[int]:
+        """UPS 设备回路推断"""
+        # UPS-F1-XX 或 F1-UPS-XX → C-F1-UPS-01
+        for floor in ["F1", "F2", "F3", "F4"]:
+            if code.startswith(f"UPS-{floor}-") or code.startswith(f"{floor}-UPS-"):
+                return circuit_map.get(f"C-{floor}-UPS-01")
+        return None
+
+    def _infer_pdu_circuit(
+        self, code: str, area_code: Optional[str], circuit_map: dict
+    ) -> Optional[int]:
+        """PDU 设备回路推断"""
+        # 优先级1: 楼层 PDU (PDU-F2-XX → C-F2-PDU-GENERIC)
+        if code.startswith("PDU-F2-"):
+            return circuit_map.get("C-F2-PDU-GENERIC")
+        elif code.startswith("PDU-F3-"):
+            return circuit_map.get("C-F3-PDU-GENERIC")
+        elif code.startswith("PDU-F4-"):
+            return circuit_map.get("C-F4-PDU-GENERIC")
+
+        # 优先级2: 旧的 A1/B1 区域 PDU
+        area = area_code or ""
+        if "A1" in area or "A" in code:
+            return circuit_map.get("C-A1-01")
+        elif "B1" in area or "B" in code:
+            return circuit_map.get("C-B1-01")
+
+        return None
+
+    def _infer_hvac_circuit(self, code: str, circuit_map: dict) -> Optional[int]:
+        """
+        HVAC 设备回路推断 (制冷、空调、水泵等)
+
+        优先级顺序 (从高到低):
+        1. 楼层特定设备 (CA-F2-XX, F1-AC-XX)
+        2. 区域特定设备 (CA-A01)
+        3. 设备编号特定规则 (PMP-F1-01~04, AC-A/B)
+        4. 通用回路 (CA-XX, AC-OUT-XX, PMP-XX)
+        """
+        # 优先级1: 楼层冷通道 CA-F2-XX → C-F2-CA-01
+        for floor in ["F2", "F3", "F4"]:
+            if code.startswith(f"CA-{floor}-"):
+                return circuit_map.get(f"C-{floor}-CA-01")
+
+        # 优先级2: 区域冷通道 CA-A01 → C-CA-A-01
+        if code.startswith("CA-A"):
+            return circuit_map.get("C-CA-A-01")
+
+        # 优先级3: 通用冷通道 CA-XX → C-CA-GENERIC
+        if code.startswith("CA-"):
+            return circuit_map.get("C-CA-GENERIC")
+
+        # 水泵 PMP-XX
+        if code.startswith("PMP-"):
+            # 冷冻水泵 01-04 → C-CHWP-01
+            if any(code.endswith(f"-0{i}") for i in [1, 2, 3, 4]):
+                return circuit_map.get("C-CHWP-01")
+            # 冷却水泵 07-09 → C-CWP-01
+            elif any(code.endswith(f"-0{i}") for i in [7, 8, 9]):
+                return circuit_map.get("C-CWP-01")
+            # 其他水泵 05-06, 10-12 → 轮询分配 C-PMP-01/02
+            else:
+                try:
+                    num = int(code.split("-")[-1])
+                    circuit_suffix = "01" if num % 2 == 1 else "02"
+                    return circuit_map.get(f"C-PMP-{circuit_suffix}")
+                except (ValueError, IndexError):
+                    # 无法解析编号，使用通用回路
+                    return circuit_map.get("C-PMP-GENERIC")
+
+        # 室外机 AC-OUT-XX → C-AC-OUT-01
+        if code.startswith("AC-OUT-"):
+            return circuit_map.get("C-AC-OUT-01")
+
+        # 冷机 CH-XX → C-CH-01
+        if code.startswith("CH-"):
+            return circuit_map.get("C-CH-01")
+
+        # 冷却塔 CT-XX → C-CT-01
+        if code.startswith("CT-"):
+            return circuit_map.get("C-CT-01")
+
+        # 楼层空调 F1-AC-XX → C-F1-AC-01
+        for floor in ["F1", "F2", "F3", "F4"]:
+            if code.startswith(f"{floor}-AC-"):
+                return circuit_map.get(f"C-{floor}-AC-01")
+
+        # 精密空调 AC-A/B → C-AC-01/02
+        if code.startswith("AC-A"):
+            return circuit_map.get("C-AC-01")
+        elif code.startswith("AC-B"):
+            return circuit_map.get("C-AC-02")
+
+        return None
+
+    def _infer_it_circuit(
+        self, code: str, area_code: Optional[str], circuit_map: dict
+    ) -> Optional[int]:
+        """IT 设备回路推断"""
+        area = area_code or ""
+        if "A1" in area or "A" in code:
+            return circuit_map.get("C-A1-01")
+        elif "B1" in area or "B" in code:
+            return circuit_map.get("C-B1-01")
         return None

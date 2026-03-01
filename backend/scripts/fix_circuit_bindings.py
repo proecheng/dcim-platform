@@ -68,8 +68,14 @@ async def fix_circuit_bindings():
 
         print("\n开始修复...")
         for pd in unbound_devices:
-            circuit_id = sync_service._infer_circuit_id(pd, circuit_map)
-
+            # 创建一个临时对象来模拟 Device 接口
+            class MockDevice:
+                def __init__(self, device_code, device_type, area_code):
+                    self.device_code = device_code
+                    self.device_type = device_type
+                    self.area_code = area_code
+            mock_device = MockDevice(pd.device_code, pd.device_type, pd.area_code)
+            circuit_id = sync_service._infer_circuit_id(mock_device, circuit_map)
             if circuit_id:
                 pd.circuit_id = circuit_id
                 pd.updated_at = datetime.now()
@@ -80,7 +86,6 @@ async def fix_circuit_bindings():
                 print(f"  ⚠ {pd.device_code} ({pd.device_type}): 无法推断回路")
                 failed_count += 1
                 failed_devices.append((pd.device_code, pd.device_type))
-
         # 5. 提交更改
         await session.commit()
 
@@ -88,7 +93,7 @@ async def fix_circuit_bindings():
         print(f"  成功: {fixed_count} 个")
         print(f"  失败: {failed_count} 个")
         print(f"  总计: {len(unbound_devices)} 个")
-        
+
         if failed_devices:
             print("\n失败设备详情:")
             for code, dtype in failed_devices:
