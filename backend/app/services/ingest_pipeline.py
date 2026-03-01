@@ -12,7 +12,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import List, Optional, Sequence
 
-from sqlalchemy import select, update, text
+from sqlalchemy import select, update, text, bindparam
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..core.database import async_session
@@ -23,6 +23,9 @@ from ..models.gateway import PointDataLatest
 from ..services.websocket import ws_manager
 
 logger = logging.getLogger(__name__)
+
+
+ALLOWED_STATUS = {"normal", "offline", "alarm", "unknown", "fault", "maintenance"}
 
 
 # ── 标准载荷 DTO ──────────────────────────────────────────────
@@ -204,6 +207,12 @@ async def _batch_upsert_realtime(
     if not points:
         return
 
+    # 状态白名单校验，避免非法值进入 SQL/缓存链路
+    for pt in points:
+        if pt.status not in ALLOWED_STATUS:
+            logger.warning("非法状态值: %s，使用默认值 'unknown'", pt.status)
+            pt.status = "unknown"
+
     point_ids = [pt.point_id for pt in points]
 
     # 查询已存在的 PointRealtime 记录
@@ -221,21 +230,40 @@ async def _batch_upsert_realtime(
             batch = to_update[i : i + batch_size]
             ids = [pt.point_id for pt in batch]
 
-            value_cases = " ".join(f"WHEN {pt.point_id} THEN {pt.value}" for pt in batch)
-            quality_cases = " ".join(f"WHEN {pt.point_id} THEN {pt.quality}" for pt in batch)
-            status_cases = " ".join(f"WHEN {pt.point_id} THEN '{pt.status}'" for pt in batch)
+            params: dict[str, object] = {"now": now}
+            value_cases_parts: list[str] = []
+            quality_cases_parts: list[str] = []
+            status_cases_parts: list[str] = []
+            id_placeholders: list[str] = []
 
-            id_list = ",".join(str(pid) for pid in ids)
-            sql = text(f"""
+            for idx, pt in enumerate(batch):
+                pid_key = f"pid_{idx}"
+                value_key = f"value_{idx}"
+                quality_key = f"quality_{idx}"
+                status_key = f"status_{idx}"
+
+                params[pid_key] = pt.point_id
+                params[value_key] = pt.value
+                params[quality_key] = pt.quality
+                params[status_key] = pt.status
+
+                value_cases_parts.append(f"WHEN :{pid_key} THEN :{value_key}")
+                quality_cases_parts.append(f"WHEN :{pid_key} THEN :{quality_key}")
+                status_cases_parts.append(f"WHEN :{pid_key} THEN :{status_key}")
+                id_placeholders.append(f":{pid_key}")
+
+            sql = text(
+                f"""
                 UPDATE point_realtime SET
-                    value = CASE point_id {value_cases} END,
-                    raw_value = CASE point_id {value_cases} END,
-                    quality = CASE point_id {quality_cases} END,
-                    status = CASE point_id {status_cases} END,
+                    value = CASE point_id {' '.join(value_cases_parts)} END,
+                    raw_value = CASE point_id {' '.join(value_cases_parts)} END,
+                    quality = CASE point_id {' '.join(quality_cases_parts)} END,
+                    status = CASE point_id {' '.join(status_cases_parts)} END,
                     updated_at = :now
-                WHERE point_id IN ({id_list})
-            """)
-            await session.execute(sql, {"now": now})
+                WHERE point_id IN ({', '.join(id_placeholders)})
+                """
+            )
+            await session.execute(sql, params)
 
     # 批量 INSERT
     if to_insert:
@@ -277,28 +305,38 @@ async def _batch_upsert_latest(
     )
     existing_keys = {row[0] for row in existing_result.all()}
 
+    update_rows: list[dict[str, object]] = []
+    insert_rows: list[dict[str, object]] = []
+
     for pt, key in zip(points, point_keys):
+        row = {
+            "value": str(pt.value),
+            "quality": pt.quality,
+            "timestamp": pt.timestamp or now,
+            "gateway_id": pt.gateway_id or "",
+            "updated_at": now,
+        }
         if key in existing_keys:
-            await session.execute(
-                update(PointDataLatest)
-                .where(PointDataLatest.point_id == key)
-                .values(
-                    value=str(pt.value),
-                    quality=pt.quality,
-                    timestamp=pt.timestamp,
-                    gateway_id=pt.gateway_id or "",
-                    updated_at=now,
-                )
-            )
+            update_rows.append({"b_point_id": key, **row})
         else:
-            record = PointDataLatest(
-                point_id=key,
-                value=str(pt.value),
-                quality=pt.quality,
-                timestamp=pt.timestamp,
-                gateway_id=pt.gateway_id or "",
-            )
-            session.add(record)
+            insert_rows.append({"point_id": key, **row})
+
+    if update_rows:
+        await session.execute(
+            update(PointDataLatest)
+            .where(PointDataLatest.point_id == bindparam("b_point_id"))
+            .values(
+                value=bindparam("value"),
+                quality=bindparam("quality"),
+                timestamp=bindparam("timestamp"),
+                gateway_id=bindparam("gateway_id"),
+                updated_at=bindparam("updated_at"),
+            ),
+            update_rows,
+        )
+
+    if insert_rows:
+        await session.execute(PointDataLatest.__table__.insert(), insert_rows)
 
 
 async def _batch_insert_history(
@@ -312,7 +350,7 @@ async def _batch_insert_history(
         return
 
     for pt in ai_points:
-        session.add(PointHistory(point_id=pt.point_id, value=pt.value))
+        session.add(PointHistory(point_id=pt.point_id, value=pt.value, recorded_at=pt.timestamp or now))
 
 
 # ── Phase 2: 告警评估 ──────────────────────────────────────────

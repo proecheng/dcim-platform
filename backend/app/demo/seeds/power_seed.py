@@ -386,7 +386,7 @@ def _pdu_points(code: str):
     return points
 
 
-def _create_point(device_id: int, device_type: str, device_code: str, pt: dict, sort_idx: int):
+def _create_point(device_id, device_type: str, device_code: str, area_code: str, pt: dict, sort_idx: int):
     """创建Point对象"""
     point_code = f"{device_code}_{pt['suffix']}"
     return Point(
@@ -395,7 +395,7 @@ def _create_point(device_id: int, device_type: str, device_code: str, pt: dict, 
         point_type=pt["type"],
         device_id=device_id,
         device_type=device_type,
-        area_code="A1",
+        area_code=area_code,
         unit=pt["unit"],
         data_type="float" if pt["type"] == "AI" else "int",
         min_range=pt["min"],
@@ -475,7 +475,7 @@ async def seed_power_devices():
 
             # 创建UPS点位
             for idx, pt in enumerate(_ups_points(code)):
-                session.add(_create_point(device.id, "UPS", code, pt, idx))
+                session.add(_create_point(device.id, "UPS", code, ups_def["area_code"], pt, idx))
 
             # 创建电池组 + 点位
             for g in range(1, ups_def["battery_group_count"] + 1):
@@ -528,7 +528,7 @@ async def seed_power_devices():
             )
 
             for idx, pt in enumerate(_cabinet_points(code)):
-                session.add(_create_point(device.id, "CABINET", code, pt, idx))
+                session.add(_create_point(device.id, "CABINET", code, cab_def["area_code"], pt, idx))
 
         # ===== 3. 创建PDU =====
         for pdu_def in PDU_DEVICES:
@@ -544,7 +544,7 @@ async def seed_power_devices():
             )
 
             for idx, pt in enumerate(_pdu_points(code)):
-                session.add(_create_point(device.id, "PDU", code, pt, idx))
+                session.add(_create_point(device.id, "PDU", code, pdu_def["area_code"], pt, idx))
 
         await session.commit()
         logger.info("供配电种子数据创建完成")

@@ -6,7 +6,7 @@ import asyncio
 import json
 import random
 from datetime import datetime, timedelta
-from typing import Optional, Callable
+from typing import Optional, Callable, cast
 from sqlalchemy import select, update, delete, func
 
 from ..core.database import async_session, init_db
@@ -1158,163 +1158,151 @@ class DemoDataService:
     async def _clear_demo_data(self):
         """清理演示数据 - 清理所有相关表"""
         async with async_session() as session:
-            # ========== 清理点位相关数据 ==========
-            # 注意：演示系统中，历史数据都是由演示数据生成器创建的，所以全部清除
+            errors = []
+            warnings = []
 
-            # 删除所有历史数据（演示数据产生的）
-            await session.execute(delete(PointHistory))
+            async def _execute_delete(stmt, label: str):
+                try:
+                    await session.execute(stmt)
+                except Exception as e:
+                    errors.append(f"清理 {label} 失败: {str(e)}")
+                    logger.error("清理 %s 失败: %s", label, e, exc_info=True)
 
-            # 卸载后系统完全空白，删除所有点位相关数据
-            await session.execute(delete(AlarmThreshold))
-            await session.execute(delete(PointRealtime))
-            await session.execute(delete(Point))
+            mandatory_deletes = [
+                (delete(PointHistory), "PointHistory"),
+                (delete(AlarmThreshold), "AlarmThreshold"),
+                (delete(PointRealtime), "PointRealtime"),
+                (delete(Point), "Point"),
+                (delete(Alarm), "Alarm"),
+                (delete(ExecutionResult), "ExecutionResult"),
+                (delete(ExecutionTask), "ExecutionTask"),
+                (delete(ExecutionPlan), "ExecutionPlan"),
+                (delete(MeasureExecutionLog), "MeasureExecutionLog"),
+                (delete(OpportunityMeasure), "OpportunityMeasure"),
+                (delete(ProposalMeasure), "ProposalMeasure"),
+                (delete(EnergyOpportunity), "EnergyOpportunity"),
+                (delete(EnergySavingProposal), "EnergySavingProposal"),
+                (delete(EnergySuggestion), "EnergySuggestion"),
+                (delete(RegulationHistory), "RegulationHistory"),
+                (delete(LoadRegulationConfig), "LoadRegulationConfig"),
+                (delete(DispatchSchedule), "DispatchSchedule"),
+                (delete(DispatchableDevice), "DispatchableDevice"),
+                (delete(DemandAnalysisRecord), "DemandAnalysisRecord"),
+                (delete(Demand15MinData), "Demand15MinData"),
+                (delete(OverDemandEvent), "OverDemandEvent"),
+                (delete(DemandHistory), "DemandHistory"),
+                (delete(DeviceShiftConfig), "DeviceShiftConfig"),
+                (delete(DeviceLoadProfile), "DeviceLoadProfile"),
+                (delete(PowerCurveData), "PowerCurveData"),
+                (delete(OptimizationResult), "OptimizationResult"),
+                (delete(MonthlyStatistics), "MonthlyStatistics"),
+                (delete(RealtimeMonitoring), "RealtimeMonitoring"),
+                (delete(EnergyMonthly), "EnergyMonthly"),
+                (delete(EnergyDaily), "EnergyDaily"),
+                (delete(EnergyHourly), "EnergyHourly"),
+                (delete(PUEHistory), "PUEHistory"),
+                (delete(PricingConfig), "PricingConfig"),
+                (delete(ElectricityPricing), "ElectricityPricing"),
+                (delete(StorageSystemConfig), "StorageSystemConfig"),
+                (delete(PVSystemConfig), "PVSystemConfig"),
+                (delete(PowerDevice), "PowerDevice"),
+                (delete(DistributionCircuit), "DistributionCircuit"),
+                (delete(DistributionPanel), "DistributionPanel"),
+                (delete(MeterPoint), "MeterPoint"),
+                (delete(Transformer), "Transformer"),
+                (delete(FloorMap), "FloorMap"),
+                (delete(Device), "Device"),
+                (delete(Row), "Row"),
+                (delete(Room), "Room"),
+                (delete(Floor), "Floor"),
+                (delete(Site), "Site"),
+            ]
 
-            # ========== 清理告警数据（模拟器产生的）==========
-            await session.execute(delete(Alarm))
+            for stmt, label in mandatory_deletes:
+                await _execute_delete(stmt, label)
 
-            # ========== 清理能源管理相关数据（按依赖顺序删除）==========
-
-            # 1. 清理执行相关表（最底层）
-            await session.execute(delete(ExecutionResult))
-            await session.execute(delete(ExecutionTask))
-            await session.execute(delete(ExecutionPlan))
-
-            # 2. 清理措施相关表
-            await session.execute(delete(MeasureExecutionLog))
-            await session.execute(delete(OpportunityMeasure))
-            await session.execute(delete(ProposalMeasure))
-
-            # 3. 清理方案/机会表
-            await session.execute(delete(EnergyOpportunity))
-            await session.execute(delete(EnergySavingProposal))
-            await session.execute(delete(EnergySuggestion))
-
-            # 4. 清理调节/调度表
-            await session.execute(delete(RegulationHistory))
-            await session.execute(delete(LoadRegulationConfig))
-            await session.execute(delete(DispatchSchedule))
-            await session.execute(delete(DispatchableDevice))
-
-            # 5. 清理需量分析表
-            await session.execute(delete(DemandAnalysisRecord))
-            await session.execute(delete(Demand15MinData))
-            await session.execute(delete(OverDemandEvent))
-            await session.execute(delete(DemandHistory))
-
-            # 6. 清理设备负荷/曲线表
-            await session.execute(delete(DeviceShiftConfig))
-            await session.execute(delete(DeviceLoadProfile))
-            await session.execute(delete(PowerCurveData))
-
-            # 7. 清理能耗统计表
-            await session.execute(delete(OptimizationResult))
-            await session.execute(delete(MonthlyStatistics))
-            await session.execute(delete(RealtimeMonitoring))
-            await session.execute(delete(EnergyMonthly))
-            await session.execute(delete(EnergyDaily))
-            await session.execute(delete(EnergyHourly))
-            await session.execute(delete(PUEHistory))
-
-            # 8. 清理电价配置表
-            await session.execute(delete(PricingConfig))
-            await session.execute(delete(ElectricityPricing))
-
-            # 9. 清理系统配置表
-            await session.execute(delete(StorageSystemConfig))
-            await session.execute(delete(PVSystemConfig))
-
-            # 10. 清理配电系统（按层级顺序删除）
-            await session.execute(delete(PowerDevice))
-            await session.execute(delete(DistributionCircuit))
-            await session.execute(delete(DistributionPanel))
-            await session.execute(delete(MeterPoint))
-            await session.execute(delete(Transformer))
-
-            # 11. 清理楼层图数据
-            await session.execute(delete(FloorMap))
-
-            # 12. 清理供配电/制冷扩展表（必须在删除 Device 之前，有 FK 引用）
+            # 供配电/制冷扩展表
             try:
                 from ..models.power import UPSDevice, BatteryGroup
                 from ..models.cooling import CoolingUnit, ColdAisle, CoolingGroup
 
-                await session.execute(delete(BatteryGroup))
-                await session.execute(delete(UPSDevice))
-                await session.execute(delete(ColdAisle))
-                await session.execute(delete(CoolingUnit))
-                await session.execute(delete(CoolingGroup))
-            except Exception:
-                pass
+                await _execute_delete(delete(BatteryGroup), "BatteryGroup")
+                await _execute_delete(delete(UPSDevice), "UPSDevice")
+                await _execute_delete(delete(ColdAisle), "ColdAisle")
+                await _execute_delete(delete(CoolingUnit), "CoolingUnit")
+                await _execute_delete(delete(CoolingGroup), "CoolingGroup")
+            except Exception as e:
+                warnings.append(f"加载供配电/制冷扩展模型失败: {str(e)}")
+                logger.warning("加载供配电/制冷扩展模型失败: %s", e, exc_info=True)
 
-            # 13. 清理设备和空间拓扑（卸载后系统完全空白）
-            await session.execute(delete(Device))
-            await session.execute(delete(Row))
-            await session.execute(delete(Room))
-            await session.execute(delete(Floor))
-            await session.execute(delete(Site))
-
-            # 14. 清理联动策略和动作（消防策略 YAML 同步创建的）
+            # 联动策略
             try:
                 from ..models.linkage import LinkageAction, LinkagePolicy, LinkageExecution
 
-                await session.execute(delete(LinkageExecution))
-                await session.execute(delete(LinkageAction))
-                await session.execute(delete(LinkagePolicy))
-            except Exception:
-                pass
+                await _execute_delete(delete(LinkageExecution), "LinkageExecution")
+                await _execute_delete(delete(LinkageAction), "LinkageAction")
+                await _execute_delete(delete(LinkagePolicy), "LinkagePolicy")
+            except Exception as e:
+                warnings.append(f"加载联动模型失败: {str(e)}")
+                logger.warning("加载联动模型失败: %s", e, exc_info=True)
 
-            # 15. 清理诊断规则和结果（诊断规则 YAML 同步创建的）
+            # 诊断规则
             try:
                 from ..models.diagnosis import DiagnosisRule, DiagnosisResult
 
-                await session.execute(delete(DiagnosisResult))
-                await session.execute(delete(DiagnosisRule))
-            except Exception:
-                pass
+                await _execute_delete(delete(DiagnosisResult), "DiagnosisResult")
+                await _execute_delete(delete(DiagnosisRule), "DiagnosisRule")
+            except Exception as e:
+                warnings.append(f"加载诊断模型失败: {str(e)}")
+                logger.warning("加载诊断模型失败: %s", e, exc_info=True)
 
-            # 16. 清理知识库
+            # 知识库
             try:
                 from ..models.operation import KnowledgeBase
 
-                await session.execute(delete(KnowledgeBase))
-            except Exception:
-                pass
+                await _execute_delete(delete(KnowledgeBase), "KnowledgeBase")
+            except Exception as e:
+                warnings.append(f"加载知识库模型失败: {str(e)}")
+                logger.warning("加载知识库模型失败: %s", e, exc_info=True)
 
-            # 17. 清理非 admin 用户（保留管理员）
+            # 用户（保留 admin）
             from ..models import User
 
-            await session.execute(delete(User).where(User.username != "admin"))
+            await _execute_delete(delete(User).where(User.username != "admin"), "User(非admin)")
 
-            # 18. 清理操作日志和系统日志
+            # 日志
             try:
                 from ..models.log import OperationLog, SystemLog
 
-                await session.execute(delete(OperationLog))
-                await session.execute(delete(SystemLog))
-            except Exception:
-                pass
+                await _execute_delete(delete(OperationLog), "OperationLog")
+                await _execute_delete(delete(SystemLog), "SystemLog")
+            except Exception as e:
+                warnings.append(f"加载系统日志模型失败: {str(e)}")
+                logger.warning("加载系统日志模型失败: %s", e, exc_info=True)
 
-            # 19. 清理命令审计日志
+            # 命令审计
             try:
                 from ..models.command import CommandAuditLog
 
-                await session.execute(delete(CommandAuditLog))
-            except Exception:
-                pass
+                await _execute_delete(delete(CommandAuditLog), "CommandAuditLog")
+            except Exception as e:
+                warnings.append(f"加载命令审计模型失败: {str(e)}")
+                logger.warning("加载命令审计模型失败: %s", e, exc_info=True)
 
-            # 20. 清理数据源和网关（测试残留）
+            # 数据源和网关
             try:
                 from ..models.gateway import DataSourcePoint, DataSource, GatewayEvent, Gateway, DeviceTemplate
 
-                await session.execute(delete(DataSourcePoint))
-                await session.execute(delete(DataSource))
-                await session.execute(delete(GatewayEvent))
-                await session.execute(delete(Gateway))
-                await session.execute(delete(DeviceTemplate))
-            except Exception:
-                pass
+                await _execute_delete(delete(DataSourcePoint), "DataSourcePoint")
+                await _execute_delete(delete(DataSource), "DataSource")
+                await _execute_delete(delete(GatewayEvent), "GatewayEvent")
+                await _execute_delete(delete(Gateway), "Gateway")
+                await _execute_delete(delete(DeviceTemplate), "DeviceTemplate")
+            except Exception as e:
+                warnings.append(f"加载网关模型失败: {str(e)}")
+                logger.warning("加载网关模型失败: %s", e, exc_info=True)
 
-            # 21. 清理工单和巡检（测试残留）
+            # 工单与巡检
             try:
                 from ..models.operation import (
                     WorkOrderLog,
@@ -1324,15 +1312,24 @@ class DemoDataService:
                     InspectionPlan,
                 )
 
-                await session.execute(delete(WorkOrderLog))
-                await session.execute(delete(WorkOrderApproval))
-                await session.execute(delete(WorkOrder))
-                await session.execute(delete(InspectionTask))
-                await session.execute(delete(InspectionPlan))
-            except Exception:
-                pass
+                await _execute_delete(delete(WorkOrderLog), "WorkOrderLog")
+                await _execute_delete(delete(WorkOrderApproval), "WorkOrderApproval")
+                await _execute_delete(delete(WorkOrder), "WorkOrder")
+                await _execute_delete(delete(InspectionTask), "InspectionTask")
+                await _execute_delete(delete(InspectionPlan), "InspectionPlan")
+            except Exception as e:
+                warnings.append(f"加载工单/巡检模型失败: {str(e)}")
+                logger.warning("加载工单/巡检模型失败: %s", e, exc_info=True)
+
+            if errors:
+                await session.rollback()
+                error_msg = "; ".join(errors)
+                raise RuntimeError(f"卸载演示数据失败: {error_msg}")
 
             await session.commit()
+
+            if warnings:
+                logger.warning("卸载完成，但有警告: %s", "; ".join(warnings))
 
             # 失效入库管道缓存
             from ..services.ingest_pipeline import invalidate_point_cache
@@ -1440,7 +1437,11 @@ class DemoDataService:
             for c in DISTRIBUTION_CIRCUITS:
                 data = c.copy()
                 panel_code = data.pop("panel_code")
-                data["panel_id"] = panel_map.get(panel_code)
+                panel_id = panel_map.get(panel_code)
+                if panel_id is None:
+                    logger.error("配电回路 %s 引用了不存在的 panel_code=%s", data.get("circuit_code"), panel_code)
+                    raise ValueError(f"配电回路引用了不存在的配电柜: {panel_code}")
+                data["panel_id"] = panel_id
                 circuit = DistributionCircuit(**data)
                 session.add(circuit)
                 await session.flush()
@@ -1478,9 +1479,10 @@ class DemoDataService:
                 await session.flush()
 
                 # 双向同步：设置点位的 energy_device_id
-                point_count = await PointDeviceMatcher.sync_bidirectional_relations(
+                device_id = cast(int, device.id)
+                point_count = await PointDeviceMatcher.sync_bidirectional_relations(  # type: ignore
                     session,
-                    device.id,
+                    device_id,
                     point_ids["power_point_id"],
                     point_ids["current_point_id"],
                     point_ids["energy_point_id"],
@@ -1521,79 +1523,6 @@ class DemoDataService:
         for p in points:
             point_map[p.point_code] = {"id": p.id, "name": p.point_name, "unit": p.unit}
         return point_map
-
-    def _find_matching_points(self, device_code: str, device_name: str, area_code: str, point_map: dict) -> dict:
-        """
-        根据设备编码和名称查找匹配的点位
-        返回: {"power_point_id": id, "current_point_id": id, "energy_point_id": id}
-        """
-        result = {"power_point_id": None, "current_point_id": None, "energy_point_id": None}
-
-        # 设备编码到点位前缀的映射规则
-        mapping_rules = {
-            # 服务器机柜 SRV-001~004 -> A1_SRV_AI_001~012
-            "SRV-001": {"prefix": "A1_SRV_AI_", "power": "001", "current": "002", "energy": "003"},
-            "SRV-002": {"prefix": "A1_SRV_AI_", "power": "004", "current": "005", "energy": "006"},
-            "SRV-003": {"prefix": "A1_SRV_AI_", "power": "007", "current": "008", "energy": "009"},
-            "SRV-004": {"prefix": "A1_SRV_AI_", "power": "010", "current": "011", "energy": "012"},
-            # 网络机柜 NET-001 -> A1_NET_AI_001~003
-            "NET-001": {"prefix": "A1_NET_AI_", "power": "001", "current": "002", "energy": "003"},
-            # 存储机柜 STO-001 -> A1_STO_AI_001~003
-            "STO-001": {"prefix": "A1_STO_AI_", "power": "001", "current": "002", "energy": "003"},
-            # UPS主机（统一编码）
-            "UPS-F1-01": {"prefix": "A1_UPS_AI_", "power": "002", "current": "003"},  # 输出功率
-            "UPS-F1-02": {"prefix": "A1_UPS_AI_", "power": "006", "current": "007"},
-            # 照明 LIGHT-001 -> A1_LIGHT_AI_001~003
-            "LIGHT-001": {"prefix": "A1_LIGHT_AI_", "power": "001", "current": "002"},
-            # 冷水机组（统一编码）
-            "CH-F1-01": {"prefix": "B1_CH_AI_", "power": "005", "current": "007"},
-            "CH-F1-02": {"prefix": "B1_CH_AI_", "power": "015", "current": "017"},
-            # 冷却塔（统一编码）
-            "CT-F1-01": {"prefix": "B1_CT_AI_", "power": "005"},
-            "CT-F1-02": {"prefix": "B1_CT_AI_", "power": "006"},
-            # 冷冻水泵（统一编码）
-            "PMP-F1-01": {"prefix": "B1_CHWP_AI_", "power": "005", "current": "002"},
-            "PMP-F1-02": {"prefix": "B1_CHWP_AI_", "power": "006", "current": "004"},
-            # 冷却水泵（统一编码）
-            "PMP-F1-07": {"prefix": "B1_CWP_AI_", "power": "005", "current": "002"},
-            "PMP-F1-08": {"prefix": "B1_CWP_AI_", "power": "006", "current": "004"},
-            # F1 UPS（统一编码）
-            "UPS-F1-03": {"prefix": "F1_UPS_AI_", "power": "0013"},  # 负载率作为功率指标
-            "UPS-F1-04": {"prefix": "F1_UPS_AI_", "power": "0023"},
-            "F2-UPS-001": {"prefix": "F2_UPS_AI_", "power": "0013"},
-            "F2-UPS-002": {"prefix": "F2_UPS_AI_", "power": "0023"},
-            "F3-UPS-001": {"prefix": "F3_UPS_AI_", "power": "0013"},
-            # F1/F2/F3 精密空调使用回风温度点位 (用于状态监控)
-            "F1-AC-001": {"prefix": "F1_AC_AI_", "power": "0011"},
-            "F1-AC-002": {"prefix": "F1_AC_AI_", "power": "0021"},
-            "F1-AC-003": {"prefix": "F1_AC_AI_", "power": "0031"},
-            "F1-AC-004": {"prefix": "F1_AC_AI_", "power": "0041"},
-            "F2-AC-001": {"prefix": "F2_AC_AI_", "power": "0011"},
-            "F2-AC-002": {"prefix": "F2_AC_AI_", "power": "0021"},
-            "F2-AC-003": {"prefix": "F2_AC_AI_", "power": "0031"},
-            "F2-AC-004": {"prefix": "F2_AC_AI_", "power": "0041"},
-            "F3-AC-001": {"prefix": "F3_AC_AI_", "power": "0011"},
-            "F3-AC-002": {"prefix": "F3_AC_AI_", "power": "0021"},
-            # 原有精密空调 AC-001~003 没有专用点位，暂不关联
-        }
-
-        rule = mapping_rules.get(device_code)
-        if rule:
-            prefix = rule["prefix"]
-            if rule.get("power"):
-                point_code = f"{prefix}{rule['power']}"
-                if point_code in point_map:
-                    result["power_point_id"] = point_map[point_code]["id"]
-            if rule.get("current"):
-                point_code = f"{prefix}{rule['current']}"
-                if point_code in point_map:
-                    result["current_point_id"] = point_map[point_code]["id"]
-            if rule.get("energy"):
-                point_code = f"{prefix}{rule['energy']}"
-                if point_code in point_map:
-                    result["energy_point_id"] = point_map[point_code]["id"]
-
-        return result
 
     async def _generate_demand_data(self, progress_callback):
         """生成15分钟需量数据"""

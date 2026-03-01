@@ -117,6 +117,15 @@ class DataSimulator:
             result = await session.execute(select(Point).where(Point.is_enabled == True))
             points = result.scalars().all()
 
+            # 预取 AO/DO 点位实时值，避免逐点查询导致 N+1
+            ao_do_ids = [point.id for point in points if point.point_type in ["AO", "DO"]]
+            realtime_value_map: dict[int, float] = {}
+            if ao_do_ids:
+                realtime_result = await session.execute(
+                    select(PointRealtime.point_id, PointRealtime.value).where(PointRealtime.point_id.in_(ao_do_ids))
+                )
+                realtime_value_map = {row[0]: float(row[1] or 0) for row in realtime_result.all()}
+
             # 生成模拟值
             ingest_points: list[IngestPoint] = []
             for point in points:
@@ -127,11 +136,7 @@ class DataSimulator:
                     elif point.point_type == "DI":
                         new_value = self.generate_di_value(point)
                     elif point.point_type in ["AO", "DO"]:
-                        rt_result = await session.execute(
-                            select(PointRealtime).where(PointRealtime.point_id == point.id)
-                        )
-                        realtime = rt_result.scalar_one_or_none()
-                        new_value = realtime.value if realtime else 0
+                        new_value = realtime_value_map.get(point.id, 0)
                     else:
                         new_value = 0
                     self.value_cache[point.id] = new_value

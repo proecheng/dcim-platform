@@ -346,7 +346,7 @@ def _cold_aisle_points(code: str):
     ]
 
 
-def _create_point(device_id: int, device_type: str, device_code: str, pt: dict, sort_idx: int):
+def _create_point(device_id, device_type: str, device_code: str, area_code: str, pt: dict, sort_idx: int):
     """创建Point对象"""
     point_code = f"{device_code}_{pt['suffix']}"
     return Point(
@@ -355,7 +355,7 @@ def _create_point(device_id: int, device_type: str, device_code: str, pt: dict, 
         point_type=pt["type"],
         device_id=device_id,
         device_type=device_type,
-        area_code="A1",
+        area_code=area_code,
         unit=pt["unit"],
         data_type="float" if pt["type"] == "AI" else "int",
         min_range=pt["min"],
@@ -425,7 +425,14 @@ async def seed_cooling_devices():
 
             # 创建点位
             for idx, pt in enumerate(_ac_points(ac_data["device_code"])):
-                point = _create_point(device.id, "PRECISION_AC_INDOOR", ac_data["device_code"], pt, idx)
+                point = _create_point(
+                    device.id,
+                    "PRECISION_AC_INDOOR",
+                    ac_data["device_code"],
+                    ac_data["area_code"],
+                    pt,
+                    idx,
+                )
                 session.add(point)
 
             logger.info(f"创建室内空调: {ac_data['device_code']}")
@@ -456,7 +463,14 @@ async def seed_cooling_devices():
             session.add(ac_unit)
 
             for idx, pt in enumerate(_outdoor_ac_points(ac_data["device_code"])):
-                point = _create_point(device.id, "PRECISION_AC_OUTDOOR", ac_data["device_code"], pt, idx)
+                point = _create_point(
+                    device.id,
+                    "PRECISION_AC_OUTDOOR",
+                    ac_data["device_code"],
+                    ac_data["area_code"],
+                    pt,
+                    idx,
+                )
                 session.add(point)
 
             logger.info(f"创建室外机: {ac_data['device_code']}")
@@ -486,7 +500,14 @@ async def seed_cooling_devices():
             session.add(aisle)
 
             for idx, pt in enumerate(_cold_aisle_points(ca_data["device_code"])):
-                point = _create_point(device.id, "COLD_AISLE", ca_data["device_code"], pt, idx)
+                point = _create_point(
+                    device.id,
+                    "COLD_AISLE",
+                    ca_data["device_code"],
+                    ca_data["area_code"],
+                    pt,
+                    idx,
+                )
                 session.add(point)
 
             logger.info(f"创建冷通道: {ca_data['device_code']}")
