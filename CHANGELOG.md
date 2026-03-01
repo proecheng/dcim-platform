@@ -2,6 +2,98 @@
 
 本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/) 规范。
 
+## [3.2.0] - 2026-03-01
+
+### 重大重构：演示系统完全解耦
+
+演示系统从核心代码中完全解耦，成为独立可选模块，支持按需加载、日期刷新、完整卸载。
+
+#### 架构改进
+- **独立模块化**: 演示代码迁移到 `backend/app/demo/` 独立目录
+- **条件加载**: 通过 `DEMO_ENABLED` 环境变量控制，默认关闭
+- **统一入库管道**: 演示数据通过 `ingest_pipeline.py` 与 MQTT 共用入库逻辑
+- **虚拟 Gateway 模式**: 模拟数据标记 `gateway_id="demo-gateway"`，走真实采集链路
+- **双向同步服务**: `DeviceSyncService` 自动同步拓扑节点 ↔ 动环设备
+
+#### 新增功能
+- **按需加载 API**: `POST /api/v1/demo/load` 支持日期偏移参数
+  - 加载当前日期数据: `POST /api/v1/demo/load`
+  - 加载 30 天前数据: `POST /api/v1/demo/load?date_offset_days=-30`
+  - 加载未来数据: `POST /api/v1/demo/load?date_offset_days=7`
+- **完整卸载 API**: `DELETE /api/v1/demo/unload` 清理 72 张表 + Redis 缓存
+- **状态查询 API**: `GET /api/v1/demo/status` 查看演示数据加载状态
+- **日期刷新 API**: `POST /api/v1/demo/refresh-date` 更新历史数据时间戳
+
+#### 演示数据规模
+- **空间拓扑**: 1 站点、4 楼层、8 房间、16 列
+- **设备数量**: 628 台（UPS 8、配电柜 40、PDU 320、空调 80、传感器 180）
+- **采集点数**: 2830 点（AI 2650、DI 180）
+- **更新频率**: 每 5 秒（可配置）
+
+#### 破坏性变更
+- `SIMULATION_ENABLED` 环境变量已弃用，改用 `DEMO_ENABLED`
+- 演示数据不再自动加载，需手动调用 API 加载
+- 旧版模拟器代码已移除（`app/services/simulation.py`）
+
+#### 升级指南
+```bash
+# 1. 更新环境变量
+# .env 文件
+DEMO_ENABLED=true  # 替代 SIMULATION_ENABLED
+
+# 2. 启动服务后加载演示数据
+curl -X POST "http://localhost:8080/api/v1/demo/load" \
+  -H "Authorization: Bearer <token>"
+
+# 3. 卸载演示数据（可选）
+curl -X DELETE "http://localhost:8080/api/v1/demo/unload" \
+  -H "Authorization: Bearer <token>"
+```
+
+#### 技术债务清理
+- 移除 `app/services/simulation.py` 旧模拟器
+- 移除 `app/api/v1/simulation.py` 旧 API 路由
+- 清理 `main.py` 中的模拟器启动逻辑
+- 统一数据入库流程，消除重复代码
+
+### 文档完善
+- 新增 [部署指南](docs/deployment-guide.md)
+  - 环境要求、依赖安装、配置说明
+  - Docker 部署、生产环境最佳实践
+  - 常见部署问题排查
+- 新增 [故障排查手册](docs/troubleshooting-guide.md)
+  - 17 个常见问题分类诊断
+  - 日志分析方法、性能调优建议
+  - 紧急恢复流程
+- 新增 [测试指南](docs/testing-guide.md)
+  - 后端 pytest 测试框架（1350+ 用例）
+  - 前端 Vitest 测试框架（1182 用例）
+  - E2E Playwright 测试、性能测试
+- 新增 [贡献指南](docs/contributing-guide.md)
+  - 代码规范（Python PEP 8、TypeScript Airbnb）
+  - Git 工作流程、提交信息规范
+  - Pull Request 流程、代码审查标准
+- 更新 [演示系统架构文档](docs/demo-architecture.md)
+  - 统一入库管道架构图
+  - 演示模块生命周期流程
+  - API 使用示例
+
+### 已知问题
+- 演示数据加载时间较长（约 30-60 秒），大规模数据场景需优化
+- 日期刷新功能仅更新时间戳，不重新生成数据
+- 卸载操作不可逆，需谨慎使用
+
+### 性能优化
+- 演示数据批量插入优化，减少数据库事务次数
+- Redis 缓存策略优化，减少重复查询
+- WebSocket 推送频率限制，避免前端卡顿
+
+### 测试覆盖
+- 新增演示系统单元测试（`tests/demo/`）
+- 新增演示 API 集成测试
+- 新增演示数据加载/卸载 E2E 测试
+
+
 ## [3.1.0] - 2026-02-23
 
 全部 23 个 Epic / 101 个 Story 开发完毕。新增 Epic 18-23（Phase 2 补充），替换全部 PlaceholderView 占位页面为完整业务页面；新增监控运维基础设施、全面性能优化、自动化测试补全。
