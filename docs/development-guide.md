@@ -341,3 +341,135 @@ cd backend
 alembic upgrade head
 # 或删除 dcim.db 重启后端自动重建
 ```
+
+## 演示模式
+
+### 启用/禁用演示模式
+
+演示模式提供完整的 4 层楼数据中心模拟环境（628 台设备、2830 个采集点）。
+
+**环境变量配置**:
+```env
+# 启用演示模式（二选一）
+DEMO_ENABLED=true
+SIMULATION_ENABLED=true
+
+# 模拟器间隔（秒）
+SIMULATION_INTERVAL=5
+```
+
+**检查演示模式状态**:
+```bash
+# 查看演示数据状态
+curl -X GET "http://localhost:8080/api/v1/demo/status" \
+  -H "Authorization: Bearer <token>"
+```
+
+### 演示数据管理
+
+**加载演示数据**:
+```bash
+# 加载当前日期数据
+curl -X POST "http://localhost:8080/api/v1/demo/load" \
+  -H "Authorization: Bearer <token>"
+
+# 加载 30 天前数据（演示历史场景）
+curl -X POST "http://localhost:8080/api/v1/demo/load?date_offset_days=-30" \
+  -H "Authorization: Bearer <token>"
+```
+
+**卸载演示数据**:
+```bash
+# 清理所有演示数据（72 张表 + Redis 缓存）
+curl -X DELETE "http://localhost:8080/api/v1/demo/unload" \
+  -H "Authorization: Bearer <token>"
+```
+
+**刷新日期**:
+```bash
+# 将所有时间戳向前偏移 30 天
+curl -X POST "http://localhost:8080/api/v1/demo/refresh-dates?date_offset_days=-30" \
+  -H "Authorization: Bearer <token>"
+```
+
+### 演示数据特征
+
+| 特征 | 说明 |
+|------|------|
+| 空间拓扑 | 1 站点、4 楼层、8 房间、16 列 |
+| 设备数量 | 628 台（UPS 8、配电柜 40、PDU 320、空调 80、传感器 180） |
+| 采集点数 | 2830 点（AI 2650、DI 180） |
+| 数据来源 | 虚拟网关 `demo-gateway` |
+| 更新频率 | 每 5 秒 |
+| AI 点位 | 量程内 ±2% 波动 |
+| DI 点位 | 0.5% 概率触发告警 |
+
+### 添加新的演示设备类型
+
+1. 在 `backend/app/demo/seeds/` 创建新的种子文件
+2. 定义设备配置数据
+3. 实现种子函数
+4. 在 `demo/lifecycle.py` 中调用
+
+**示例**:
+```python
+# backend/app/demo/seeds/security_seed.py
+async def seed_security_devices():
+    """初始化安防设备"""
+    async with async_session() as session:
+        # 检查是否已存在
+        result = await session.execute(
+            select(Device).where(Device.device_type == "CAMERA")
+        )
+        if result.first():
+            return
+        
+        # 创建设备
+        for floor in range(1, 5):
+            device = Device(
+                device_code=f"CAM-{floor}F-01",
+                device_name=f"{floor}F 摄像头",
+                device_type="CAMERA",
+            )
+            session.add(device)
+        
+        await session.commit()
+```
+
+### 扩展数据生成算法
+
+在 `backend/app/demo/engine.py` 的 `DataSimulator` 类中扩展:
+
+```python
+def generate_ai_value(self, point: Point, current_value: float = None) -> float:
+    """生成模拟量输入值"""
+    # 添加新的设备类型逻辑
+    if "摄像头在线率" in point.point_name:
+        current_value = 98 + random.uniform(-2, 2)
+    elif "视频码率" in point.point_name:
+        current_value = 4000 + random.uniform(-500, 500)
+    
+    # 模拟小幅波动
+    variation = (max_val - min_val) * 0.02
+    delta = random.uniform(-variation, variation)
+    new_value = current_value + delta
+    
+    return round(new_value, 2)
+```
+
+### 测试演示功能
+
+**单元测试**:
+```bash
+pytest tests/demo/test_engine.py
+pytest tests/demo/test_lifecycle.py
+```
+
+**API 测试**:
+```bash
+pytest tests/api/test_demo.py::test_load_demo_data
+pytest tests/api/test_demo.py::test_unload_demo_data
+```
+
+详细架构说明参见 [演示系统架构文档](demo-architecture.md)。
+

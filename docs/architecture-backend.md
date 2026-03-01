@@ -363,3 +363,148 @@ results = await manager.run_all(data)
 8. WebSocket JWT 认证: token 通过 query 参数传递，而非 header (浏览器 WebSocket API 限制)
 9. 数据模拟器内置: 开发/演示环境自动生成模拟数据，无需外部数据源
 10. 分析插件架构: 基于注册表的插件模式，支持动态添加新的分析算法
+11. 统一入库管道: 所有数据源通过 `ingest_pipeline.py` 统一入库，确保逻辑一致性
+12. 演示模块解耦: 演示模块完全独立，通过条件加载实现，不影响生产环境
+13. 虚拟 Gateway 模式: 演示数据通过 `demo-gateway` 标识，走真实采集链路
+## 演示模块架构
+### 模块结构
+演示模块完全解耦，独立于核心功能，通过条件加载实现:
+```
+backend/app/demo/
+├── __init__.py           # 模块导出
+├── config.py             # 配置检查 (is_demo_enabled)
+├── lifecycle.py          # 生命周期钩子 (startup/shutdown)
+├── engine.py             # 数据模拟器 (DataSimulator)
+├── service.py            # 演示数据服务 (DemoDataService)
+├── router.py             # API 路由 (/api/v1/demo)
+└── seeds/                # 种子数据生成器
+    ├── datacenter_seed.py  # 空间拓扑 (站点/楼层/房间/列)
+    ├── power_seed.py       # 供配电设备 (UPS/配电柜/PDU)
+    └── cooling_seed.py     # 制冷设备 (空调/传感器)
+```
+### 生命周期管理
+演示模块通过 `lifecycle.py` 提供启动/关闭钩子，由 `main.py` 条件调用:
+```python
+# main.py
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # 启动
+    await init_db()
+    await init_default_data()
+    
+    # 条件启动演示模块
+    from app.demo.config import is_demo_enabled
+    if is_demo_enabled():
+        from app.demo import lifecycle
+        await lifecycle.startup()
+    
+    yield
+    
+    # 关闭
+    if is_demo_enabled():
+        await lifecycle.shutdown()
+```
+### 虚拟 Gateway 模式
+演示数据通过虚拟网关 `demo-gateway` 标识，走真实采集链路:
+```python
+# demo/engine.py
+async def _generate_and_ingest(self):
+    from ..services.ingest_pipeline import process_payload, IngestPoint
+    
+    points = []
+    for point in all_points:
+        value = self.generate_ai_value(point, current_value)
+        points.append(
+            IngestPoint(
+                point_id=point.id,
+                value=value,
+                quality=0,
+                timestamp=datetime.now(),
+                status="normal",
+                gateway_id="demo-gateway",  # 虚拟网关标识
+                point_key=point.point_code,
+                source="demo",  # 来源标识
+            )
+        )
+    
+    # 统一入库管道
+    result = await process_payload(points)
+```
+### 4 层楼数据模型
+演示系统提供完整的 4 层楼数据中心模拟环境:
+| 设备类型 | 数量 | 采集点数 | 说明 |
+|---------|------|---------|------|
+| UPS | 8 台 | 96 点 | 每台 12 点 |
+| 配电柜 | 40 台 | 400 点 | 每台 10 点 |
+| PDU | 320 台 | 960 点 | 每台 3 点 |
+| 精密空调 | 80 台 | 800 点 | 每台 10 点 |
+| 温湿度传感器 | 160 台 | 480 点 | 每台 3 点 |
+| 漏水传感器 | 20 台 | 20 点 | 每台 1 点 |
+| **总计** | **628 台** | **2830 点** | |
+详细架构说明参见 [演示系统架构文档](demo-architecture.md)。
+## 统一入库管道
+### 架构设计
+所有数据源（MQTT、DemoEngine、DataSourceBridge）统一通过 `ingest_pipeline.py` 入库，确保逻辑一致性。
+```
+MQTT Broker → MQTT Handler → IngestPoint DTO
+DemoEngine → IngestPoint DTO
+DataSourceBridge → IngestPoint DTO
+                ↓
+    ingest_pipeline.process_payload()
+                ↓
+    PointDataLatest + PointRealtime + PointHistory
+                ↓
+            commit
+                ↓
+    告警引擎 → WebSocket → Redis → 联动引擎
+```
+### IngestPoint DTO
+标准化的单点数据载荷:
+```python
+@dataclass
+class IngestPoint:
+    point_id: int              # Point 表主键
+    value: float               # 数值
+    quality: int = 0           # 数据质量 (0=好, 1=不确定, 2=坏)
+    timestamp: Optional[datetime] = None  # 采集时间
+    status: str = "normal"     # 状态
+    gateway_id: Optional[str] = None  # 网关 ID
+    point_key: Optional[str] = None   # 原始点位标识
+    source: str = "unknown"    # 来源标识: mqtt / demo / bridge
+```
+### 入库流程
+1. 加载点位元数据缓存（首次调用时）
+2. 批量写入 `PointDataLatest`（最新值，按 gateway_id + point_key 去重）
+3. 批量写入 `PointRealtime`（实时值，按 point_id 去重）
+4. 批量写入 `PointHistory`（历史值，全部保留）
+5. commit 事务
+6. 触发告警引擎检查阈值
+7. 触发 WebSocket 推送
+8. 触发 Redis 缓存更新
+9. 触发联动引擎执行
+### 点位元数据缓存
+内存缓存 `_point_meta_cache` 存储点位基本属性，避免每次查库:
+```python
+async def _ensure_point_cache(session: AsyncSession) -> None:
+    """加载点位元数据缓存（首次调用时加载，后续跳过）"""
+    global _cache_loaded
+    if _cache_loaded:
+        return
+    result = await session.execute(
+        select(
+            Point.id,
+            Point.point_code,
+            Point.point_name,
+            Point.point_type,
+            Point.device_type,
+            Point.device_id,
+            Point.area_code,
+            Point.unit,
+            Point.is_enabled,
+        )
+    )
+    for row in result.all():
+        _point_meta_cache[row[0]] = {...}
+    _cache_loaded = True
+```
+缓存失效函数 `invalidate_point_cache()` 在点位配置变更时调用。

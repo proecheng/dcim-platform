@@ -26,7 +26,7 @@
  | asset | (内置) | 资产管理 | 25 | 资产/机柜/生命周期/盘点 |
  | capacity | (内置) | 容量管理 | 31 | 四维容量/规划/历史/趋势 |
  | operation | (内置) | 运维管理 | 41 | 工单/巡检/知识库 |
- | demo | (内置) | 演示数据 | 5 | 演示数据加载/重置 |
+ | | demo | /demo | 演示数据 | 5 | 演示数据加载/卸载/刷新 |
  | floor_map | /floor-map | 楼层图 | 3 | 楼层图 CRUD |
  | proposal | (内置) | 方案管理 | 33 | 节能方案 CRUD |
  | vpp | /vpp | VPP方案分析 | 7 | VPP 分析/配置 |
@@ -360,4 +360,120 @@ username=admin&password=admin123
 ### 认证头
 ```
 Authorization: Bearer <access_token>
+```
+
+## 演示数据管理 (/api/v1/demo)
+
+| 方法 | 路径 | 说明 | 参数 |
+|------|------|------|------|
+| POST | /demo/load | 加载演示数据 | `date_offset_days` (可选, 日期偏移天数) |
+| DELETE | /demo/unload | 卸载演示数据 | 无 |
+| POST | /demo/refresh-dates | 刷新日期 | `date_offset_days` (必填, 日期偏移天数) |
+| GET | /demo/status | 演示数据状态 | 无 |
+| GET | /demo/stats | 演示数据统计 | 无 |
+
+### 加载演示数据
+
+```bash
+# 加载当前日期数据
+POST /api/v1/demo/load
+
+# 加载 30 天前数据（演示历史场景）
+POST /api/v1/demo/load?date_offset_days=-30
+
+# 加载 7 天后数据（演示未来场景）
+POST /api/v1/demo/load?date_offset_days=7
+```
+
+响应格式:
+```json
+{
+  "status": "success",
+  "message": "演示数据加载完成",
+  "stats": {
+    "sites": 1,
+    "floors": 4,
+    "rooms": 8,
+    "rows": 16,
+    "devices": 628,
+    "points": 2830,
+    "thresholds": 2830,
+    "date_offset_days": 0
+  }
+}
+```
+
+### 卸载演示数据
+
+```bash
+DELETE /api/v1/demo/unload
+```
+
+清理范围（72 张表）:
+- 空间拓扑: Site, Floor, Room, Row, Cabinet
+- 设备: Device, Point, PointRealtime, PointHistory, PointDataLatest
+- 告警: Alarm, AlarmThreshold, AlarmRule, AlarmShield
+- 能源: Transformer, MeterPoint, DistributionPanel, PowerDevice, EnergyHourly, EnergyDaily, EnergyMonthly, PUEHistory 等 40+ 张表
+- 资产: Asset, AssetLifecycle, MaintenanceRecord
+- 运维: WorkOrder, InspectionPlan, KnowledgeBase
+- 容量: SpaceCapacity, PowerCapacity, CoolingCapacity, WeightCapacity
+- 拓扑: TopologyNode, TopologyEdge, PDUPhaseConfig
+- 联动: LinkagePolicy, LinkageExecution, DiagnosisRule
+- 视频: NVR, Camera, VideoEvent
+- Redis 缓存: `realtime:*`, `alarm:*`, `energy:*`
+
+### 刷新日期
+
+```bash
+# 将所有时间戳向前偏移 30 天
+POST /api/v1/demo/refresh-dates?date_offset_days=-30
+```
+
+影响范围:
+- PointHistory.timestamp
+- Alarm.alarm_time, resolved_time
+- EnergyHourly/Daily/Monthly.timestamp
+- PUEHistory.timestamp
+- WorkOrder.created_at, updated_at
+- 其他所有时间戳字段
+
+### 查询状态
+
+```bash
+GET /api/v1/demo/status
+```
+
+响应格式:
+```json
+{
+  "demo_enabled": true,
+  "simulator_running": true,
+  "data_loaded": true,
+  "gateway_id": "demo-gateway",
+  "last_update": "2026-03-01T12:34:56"
+}
+```
+
+### 查询统计
+
+```bash
+GET /api/v1/demo/stats
+```
+
+响应格式:
+```json
+{
+  "sites": 1,
+  "floors": 4,
+  "rooms": 8,
+  "rows": 16,
+  "cabinets": 160,
+  "devices": 628,
+  "points": 2830,
+  "ai_points": 2650,
+  "di_points": 180,
+  "thresholds": 2830,
+  "realtime_data": 2830,
+  "history_records": 1234567
+}
 ```

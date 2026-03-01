@@ -151,6 +151,38 @@ docker-compose logs -f
 # 停止服务
 docker-compose down
 ```
+## 演示模式
+系统内置完整的 4 层楼数据中心模拟环境，支持按需加载、日期刷新、完整卸载。
+| 特征 | 说明 |
+|------|------|
+| 空间拓扑 | 1 站点、4 楼层、8 房间、16 列 |
+| 设备数量 | 628 台（UPS 8、配电柜 40、PDU 320、空调 80、传感器 180） |
+| 采集点数 | 2830 点（AI 2650、DI 180） |
+| 数据来源 | 虚拟网关 `demo-gateway` |
+| 更新频率 | 每 5 秒 |
+### 启用演示模式
+```env
+# .env 文件
+DEMO_ENABLED=true
+SIMULATION_ENABLED=true
+SIMULATION_INTERVAL=5
+```
+### 加载演示数据
+```bash
+# 加载当前日期数据
+curl -X POST "http://localhost:8080/api/v1/demo/load" \
+  -H "Authorization: Bearer <token>"
+# 加载 30 天前数据（演示历史场景）
+curl -X POST "http://localhost:8080/api/v1/demo/load?date_offset_days=-30" \
+  -H "Authorization: Bearer <token>"
+```
+### 卸载演示数据
+```bash
+# 清理所有演示数据（72 张表 + Redis 缓存）
+curl -X DELETE "http://localhost:8080/api/v1/demo/unload" \
+  -H "Authorization: Bearer <token>"
+```
+详细说明参见 [docs/demo-architecture.md](docs/demo-architecture.md)。
 
 ## 访问地址
 
