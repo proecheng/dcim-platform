@@ -38,6 +38,27 @@ export interface UPSDeviceInfo {
   status?: string
 }
 
+export interface UPSDeviceCreate {
+  device_id: number
+  ups_type: string
+  rated_capacity: number
+  rated_voltage: number
+  phase_count: number
+  battery_group_count?: number
+  bypass_enabled?: boolean
+  description?: string | null
+}
+
+export interface UPSDeviceUpdate {
+  ups_type?: string
+  rated_capacity?: number
+  rated_voltage?: number
+  phase_count?: number
+  battery_group_count?: number
+  bypass_enabled?: boolean
+  description?: string | null
+}
+
 export interface BatteryGroupInfo {
   id: number
   ups_device_id: number
@@ -50,6 +71,27 @@ export interface BatteryGroupInfo {
   description: string | null
   created_at: string
   updated_at: string
+}
+
+export interface BatteryGroupCreate {
+  ups_device_id: number
+  group_name: string
+  battery_type: string
+  rated_capacity: number
+  rated_voltage: number
+  cell_count: number
+  install_date?: string | null
+  description?: string | null
+}
+
+export interface BatteryGroupUpdate {
+  group_name?: string
+  battery_type?: string
+  rated_capacity?: number
+  rated_voltage?: number
+  cell_count?: number
+  install_date?: string | null
+  description?: string | null
 }
 
 export interface PointRealtimeValue {
@@ -77,6 +119,21 @@ export function getUPSDetail(id: number) {
   return request.get<any>(`/v1/power/ups/${id}`)
 }
 
+/** 创建 UPS 设备 */
+export function createUPS(data: UPSDeviceCreate) {
+  return request.post<any>('/v1/power/ups', data)
+}
+
+/** 更新 UPS 设备 */
+export function updateUPS(id: number, data: UPSDeviceUpdate) {
+  return request.put<any>(`/v1/power/ups/${id}`, data)
+}
+
+/** 删除 UPS 设备 */
+export function deleteUPS(id: number) {
+  return request.delete<any>(`/v1/power/ups/${id}`)
+}
+
 /** 获取电池组列表 */
 export function getBatteryList(params?: { page?: number; page_size?: number }) {
   return request.get<any>('/v1/power/batteries', { params })
@@ -85,6 +142,21 @@ export function getBatteryList(params?: { page?: number; page_size?: number }) {
 /** 获取电池组详情 */
 export function getBatteryDetail(id: number) {
   return request.get<any>(`/v1/power/batteries/${id}`)
+}
+
+/** 创建电池组 */
+export function createBatteryGroup(data: BatteryGroupCreate) {
+  return request.post<any>('/v1/power/batteries', data)
+}
+
+/** 更新电池组 */
+export function updateBatteryGroup(id: number, data: BatteryGroupUpdate) {
+  return request.put<any>(`/v1/power/batteries/${id}`, data)
+}
+
+/** 删除电池组 */
+export function deleteBatteryGroup(id: number) {
+  return request.delete<any>(`/v1/power/batteries/${id}`)
 }
 
 /** 获取配电柜列表 */

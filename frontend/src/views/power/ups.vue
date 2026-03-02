@@ -33,12 +33,23 @@
       <template #header>
         <div class="card-header">
           <span>UPS设备列表</span>
-          <el-button type="primary" link @click="loadData">
-            <el-icon><Refresh /></el-icon> 刷新
-          </el-button>
+          <div class="header-actions">
+            <el-button type="primary" link @click="openCreateDialog">新增UPS</el-button>
+            <el-button type="primary" link @click="loadData">
+              <el-icon><Refresh /></el-icon> 刷新
+            </el-button>
+          </div>
         </div>
       </template>
-      <el-table :data="upsList" stripe border v-loading="loading">
+      <el-table
+        :data="upsList"
+        stripe
+        border
+        v-loading="loading"
+        @row-click="openDetail"
+        highlight-current-row
+        style="cursor: pointer;"
+      >
         <el-table-column prop="device_code" label="设备编码" width="140" />
         <el-table-column prop="device_name" label="设备名称" min-width="150" />
         <el-table-column prop="ups_type" label="类型" width="100">
@@ -68,9 +79,10 @@
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="120" fixed="right" align="center">
+        <el-table-column label="操作" width="170" fixed="right" align="center">
           <template #default="{ row }">
-            <el-button type="primary" link @click="openDetail(row)">查看详情</el-button>
+            <el-button link type="primary" @click.stop="openEditDialog(row)">编辑</el-button>
+            <el-button link type="danger" @click.stop="confirmDelete(row)">删除</el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -111,16 +123,89 @@
       </template>
       <el-empty v-else description="暂无详情数据" />
     </el-drawer>
+
+    <!-- 新增弹窗 -->
+    <el-dialog v-model="createDialogVisible" title="新增UPS设备" width="560px">
+      <el-form :model="createForm" label-width="120px">
+        <el-form-item label="关联设备" required>
+          <el-select v-model="createForm.device_id" filterable style="width: 100%;" placeholder="请选择设备">
+            <el-option v-for="dev in deviceOptions" :key="dev.id" :label="dev.label" :value="dev.id" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="UPS类型" required>
+          <el-select v-model="createForm.ups_type" style="width: 100%;">
+            <el-option label="模块化" value="modular" />
+            <el-option label="单机" value="standalone" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="额定容量(kVA)">
+          <el-input-number v-model="createForm.rated_capacity" :min="1" style="width: 100%;" />
+        </el-form-item>
+        <el-form-item label="额定电压(V)">
+          <el-input-number v-model="createForm.rated_voltage" :min="1" style="width: 100%;" />
+        </el-form-item>
+        <el-form-item label="相数">
+          <el-input-number v-model="createForm.phase_count" :min="1" :max="3" style="width: 100%;" />
+        </el-form-item>
+        <el-form-item label="电池组数量">
+          <el-input-number v-model="createForm.battery_group_count" :min="0" style="width: 100%;" />
+        </el-form-item>
+        <el-form-item label="旁路功能">
+          <el-switch v-model="createForm.bypass_enabled" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="createDialogVisible = false">取消</el-button>
+        <el-button type="primary" :loading="saving" @click="submitCreate">确定</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 编辑弹窗 -->
+    <el-dialog v-model="editDialogVisible" title="编辑UPS设备" width="560px">
+      <el-form :model="editForm" label-width="120px">
+        <el-form-item label="UPS类型" required>
+          <el-select v-model="editForm.ups_type" style="width: 100%;">
+            <el-option label="模块化" value="modular" />
+            <el-option label="单机" value="standalone" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="额定容量(kVA)">
+          <el-input-number v-model="editForm.rated_capacity" :min="1" style="width: 100%;" />
+        </el-form-item>
+        <el-form-item label="额定电压(V)">
+          <el-input-number v-model="editForm.rated_voltage" :min="1" style="width: 100%;" />
+        </el-form-item>
+        <el-form-item label="相数">
+          <el-input-number v-model="editForm.phase_count" :min="1" :max="3" style="width: 100%;" />
+        </el-form-item>
+        <el-form-item label="电池组数量">
+          <el-input-number v-model="editForm.battery_group_count" :min="0" style="width: 100%;" />
+        </el-form-item>
+        <el-form-item label="旁路功能">
+          <el-switch v-model="editForm.bypass_enabled" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="editDialogVisible = false">取消</el-button>
+        <el-button type="primary" :loading="saving" @click="submitEdit">保存</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
 import { Refresh } from '@element-plus/icons-vue'
-import { getUPSList, getUPSDetail } from '@/api/modules/power'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { getUPSList, getUPSDetail, createUPS, updateUPS, deleteUPS } from '@/api/modules/power'
+import { getDeviceList } from '@/api/modules/device'
 
 const loading = ref(false)
 const drawerVisible = ref(false)
 const detailLoading = ref(false)
+const saving = ref(false)
+const createDialogVisible = ref(false)
+const editDialogVisible = ref(false)
+const editingId = ref<number | null>(null)
 
 interface UPSItem {
   id: number
@@ -152,13 +237,35 @@ interface DetailParam {
   unit: string
   status: string
 }
+interface DeviceOption {
+  id: number
+  label: string
+}
 
 const upsList = ref<UPSItem[]>([])
 const detail = ref<UPSDetailData | null>(null)
 const detailParams = ref<DetailParam[]>([])
+const createForm = reactive({
+  device_id: undefined as number | undefined,
+  ups_type: 'modular',
+  rated_capacity: 200,
+  rated_voltage: 380,
+  phase_count: 3,
+  battery_group_count: 1,
+  bypass_enabled: true
+})
+const editForm = reactive({
+  ups_type: 'modular',
+  rated_capacity: 200,
+  rated_voltage: 380,
+  phase_count: 3,
+  battery_group_count: 1,
+  bypass_enabled: true
+})
+const deviceOptions = ref<DeviceOption[]>([])
 
 const mockUPSList: UPSItem[] = [
-  { id: 1, device_code: 'UPS-A01', device_name: 'A栋主UPS', ups_type: 'modular', rated_capacity: 200, load_rate: 58.3, status: 'normal' },
+  { id: 1, device_code: 'UPS-F1-01', device_name: 'F1 1号UPS', ups_type: 'modular', rated_capacity: 200, load_rate: 58.3, status: 'normal' },
   { id: 2, device_code: 'UPS-B01', device_name: 'B栋主UPS', ups_type: 'standalone', rated_capacity: 120, load_rate: 72.1, status: 'normal' }
 ]
 
@@ -208,9 +315,6 @@ async function loadData() {
   } finally {
     loading.value = false
   }
-  if (upsList.value.length === 0) {
-    upsList.value = mockUPSList
-  }
 }
 
 async function openDetail(row: UPSItem) {
@@ -231,7 +335,7 @@ async function openDetail(row: UPSItem) {
         status: p.status || 'normal'
       }))
     } else {
-      detailParams.value = mockDetailParams
+      detailParams.value = []
     }
   } catch {
     console.warn('UPS详情API未就绪，使用模拟数据')
@@ -241,9 +345,119 @@ async function openDetail(row: UPSItem) {
     detailLoading.value = false
   }
 }
+async function loadDeviceOptions() {
+  try {
+    const res = await getDeviceList({ page: 1, page_size: 100, device_type: 'UPS' })
+    const data = res as { items?: Array<{ id: number; device_name?: string; device_code?: string }> }
+    deviceOptions.value = (data.items ?? []).map(item => ({
+      id: item.id,
+      label: `${item.device_name ?? 'UPS'} (${item.device_code ?? '-'})`
+    }))
+  } catch {
+    deviceOptions.value = []
+  }
+}
+function openCreateDialog() {
+  createForm.device_id = undefined
+  createForm.ups_type = 'modular'
+  createForm.rated_capacity = 200
+  createForm.rated_voltage = 380
+  createForm.phase_count = 3
+  createForm.battery_group_count = 1
+  createForm.bypass_enabled = true
+  createDialogVisible.value = true
+}
+async function submitCreate() {
+  if (!createForm.device_id) {
+    ElMessage.warning('请选择关联设备')
+    return
+  }
+  saving.value = true
+  try {
+    await createUPS({
+      device_id: createForm.device_id,
+      ups_type: createForm.ups_type,
+      rated_capacity: createForm.rated_capacity,
+      rated_voltage: createForm.rated_voltage,
+      phase_count: createForm.phase_count,
+      battery_group_count: createForm.battery_group_count,
+      bypass_enabled: createForm.bypass_enabled
+    })
+    ElMessage.success('新增UPS设备成功')
+    createDialogVisible.value = false
+    await loadData()
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : '新增失败'
+    ElMessage.error(message)
+  } finally {
+    saving.value = false
+  }
+}
+function openEditDialog(row: UPSItem) {
+  editingId.value = row.id
+  editForm.ups_type = row.ups_type
+  editForm.rated_capacity = row.rated_capacity
+  editForm.rated_voltage = 380
+  editForm.phase_count = 3
+  editForm.battery_group_count = 1
+  editForm.bypass_enabled = true
+  editDialogVisible.value = true
+}
+async function submitEdit() {
+  if (!editingId.value) {
+    ElMessage.warning('编辑信息不完整')
+    return
+  }
+  saving.value = true
+  try {
+    await updateUPS(editingId.value, {
+      ups_type: editForm.ups_type,
+      rated_capacity: editForm.rated_capacity,
+      rated_voltage: editForm.rated_voltage,
+      phase_count: editForm.phase_count,
+      battery_group_count: editForm.battery_group_count,
+      bypass_enabled: editForm.bypass_enabled
+    })
+    ElMessage.success('编辑UPS设备成功')
+    editDialogVisible.value = false
+    await loadData()
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : '编辑失败'
+    ElMessage.error(message)
+  } finally {
+    saving.value = false
+  }
+}
+async function confirmDelete(row: UPSItem) {
+  const message = [
+    `确定删除UPS设备「${row.device_name}」吗？`,
+    '',
+    '此操作将同时删除关联的电池组和点位数据。'
+  ].join('<br/>')
+  try {
+    await ElMessageBox.confirm(message, '删除确认', {
+      type: 'warning',
+      confirmButtonText: '确定删除',
+      cancelButtonText: '取消',
+      dangerouslyUseHTMLString: true
+    })
+    saving.value = true
+    await deleteUPS(row.id)
+    ElMessage.success('删除UPS设备成功')
+    await loadData()
+  } catch (error: unknown) {
+    if (error !== 'cancel') {
+      const messageText = error instanceof Error ? error.message : '删除失败'
+      ElMessage.error(messageText)
+    }
+  } finally {
+    saving.value = false
+  }
+}
 
-onMounted(() => {
-  loadData()
+onMounted(async () => {
+  await loadDeviceOptions()
+  await loadData()
 })
 </script>
 
@@ -292,6 +506,11 @@ onMounted(() => {
     justify-content: space-between;
     align-items: center;
     color: var(--text-primary);
+  }
+  .header-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
   }
 
   .text-muted {
