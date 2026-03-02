@@ -26,8 +26,13 @@ def _get_period_type_for_hour(hour: int, pricing_records) -> str:
     for p in pricing_records:
         start = p.start_time
         end = p.end_time
-        # 处理跨日时段（如 23:00 - 07:00）
-        if start <= end:
+        
+        # 将 00:00 视为 24:00 以正确处理跨日时段
+        if end == "00:00":
+            end = "24:00"
+        
+        # 处理跨日时段（如 22:00 - 24:00）
+        if start < end:
             if start <= time_str < end:
                 pt = p.period_type.lower()
                 if pt in ("sharp", "peak"):
@@ -37,6 +42,7 @@ def _get_period_type_for_hour(hour: int, pricing_records) -> str:
                 else:
                     return "normal"
         else:
+            # 跨日时段（如 23:00 - 07:00，但这种情况现在不应该出现）
             if time_str >= start or time_str < end:
                 pt = p.period_type.lower()
                 if pt in ("sharp", "peak"):

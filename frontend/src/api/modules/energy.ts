@@ -434,6 +434,14 @@ export function getPricingList(params?: { is_enabled?: boolean }) {
   return request.get<ResponseModel<ElectricityPricing[]>>('/v1/energy/pricing', { params })
 }
 
+/**
+ * 兼容旧调用名：获取电价时段列表
+ * @deprecated 请优先使用 getPricingList
+ */
+export function getElectricityPricings(params?: { is_enabled?: boolean }) {
+  return getPricingList(params)
+}
+
 /** 创建电价配置 */
 export function createPricing(data: ElectricityPricingCreate) {
   return request.post<ResponseModel<ElectricityPricing>>('/v1/energy/pricing', data)
@@ -2435,4 +2443,89 @@ export function getUnlinkedDevices(nodeType: 'panel' | 'device') {
   return request.get<ResponseModel<{ items: UnlinkedDevice[]; total: number }>>('/v1/topology/unlinked-devices', {
     params: { node_type: nodeType },
   })
+}
+// ==================== 电价方案管理 ====================
+/** 电价方案 */
+export interface PricingScheme {
+  id: number
+  scheme_name: string
+  description?: string
+  is_active: boolean
+  effective_date: string
+  expire_date?: string
+  validation_result?: SchemeValidationResult
+  validation_time?: string
+  created_at: string
+  updated_at: string
+}
+/** 方案校验结果 */
+export interface SchemeValidationResult {
+  valid: boolean
+  coverage: number
+  conflicts: Array<{
+    interval1: [number, number]
+    interval2: [number, number]
+  }>
+  gaps: Array<[number, number]>
+}
+/** 创建电价方案 */
+export interface PricingSchemeCreate {
+  scheme_name: string
+  description?: string
+  effective_date: string
+  expire_date?: string
+  pricing_ids: number[]
+}
+/** 更新电价方案 */
+export interface PricingSchemeUpdate {
+  scheme_name?: string
+  description?: string
+  effective_date?: string
+  expire_date?: string
+  pricing_ids?: number[]
+}
+/** 方案审计日志 */
+export interface PricingSchemeAuditLog {
+  id: number
+  scheme_id: number
+  action: 'created' | 'updated' | 'activated' | 'deactivated' | 'auto_deactivated' | 'deleted'
+  user_id?: number
+  changes?: Record<string, any>
+  timestamp: string
+}
+/** 获取电价方案列表 */
+export function getPricingSchemes(params?: PageParams) {
+  return request.get<ResponseModel<PricingScheme[]>>('/v1/energy/pricing-schemes', { params })
+}
+/** 获取单个电价方案 */
+export function getPricingScheme(id: number) {
+  return request.get<ResponseModel<PricingScheme>>(`/v1/energy/pricing-schemes/${id}`)
+}
+/** 创建电价方案 */
+export function createPricingScheme(data: PricingSchemeCreate) {
+  return request.post<ResponseModel<{ id: number }>>('/v1/energy/pricing-schemes', data)
+}
+/** 更新电价方案 */
+export function updatePricingScheme(id: number, data: PricingSchemeUpdate) {
+  return request.put<ResponseModel<void>>(`/v1/energy/pricing-schemes/${id}`, data)
+}
+/** 删除电价方案 */
+export function deletePricingScheme(id: number) {
+  return request.delete<ResponseModel<void>>(`/v1/energy/pricing-schemes/${id}`)
+}
+/** 校验电价方案 */
+export function validatePricingScheme(id: number) {
+  return request.post<ResponseModel<SchemeValidationResult>>(`/v1/energy/pricing-schemes/${id}/validate`)
+}
+/** 激活电价方案 */
+export function activatePricingScheme(id: number) {
+  return request.post<ResponseModel<void>>(`/v1/energy/pricing-schemes/${id}/activate`)
+}
+/** 停用电价方案 */
+export function deactivatePricingScheme(id: number) {
+  return request.post<ResponseModel<{ warning: string }>>(`/v1/energy/pricing-schemes/${id}/deactivate`)
+}
+/** 获取方案审计日志 */
+export function getPricingSchemeAuditLogs(schemeId: number, params?: PageParams) {
+  return request.get<ResponseModel<PricingSchemeAuditLog[]>>(`/v1/energy/pricing-schemes/${schemeId}/audit-logs`, { params })
 }

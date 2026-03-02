@@ -674,51 +674,15 @@ const loadLoadPeriodData = async () => {
       hourlyLoadData.value = res.data.hourly_data || []
       console.log('[analysis.vue] hourlyLoadData updated:', hourlyLoadData.value.length, 'points')
     } else {
-      console.warn('[analysis.vue] API returned no data, using mock data')
-      generateMockHourlyData()
+      console.warn('[analysis.vue] API returned no data')
+      hourlyLoadData.value = []
     }
   } catch (e) {
-    console.error('[analysis.vue] 加载负荷分布数据失败, using mock data:', e)
-    // Generate mock data as fallback for development
-    generateMockHourlyData()
+    console.error('[analysis.vue] 加载负荷分布数据失败:', e)
+    hourlyLoadData.value = []
   }
 }
 
-// 生成模拟24小时负荷数据（用于开发测试，仅在 API 无数据时使用）
-// 使用确定性算法生成数据，避免每次刷新数据变化
-const generateMockHourlyData = () => {
-  const periods: Array<'sharp' | 'peak' | 'flat' | 'valley' | 'deep_valley'> = []
-
-  // 定义时段划分 (0-23小时)
-  const periodMap: Record<number, 'sharp' | 'peak' | 'flat' | 'valley' | 'deep_valley'> = {
-    0: 'deep_valley', 1: 'deep_valley', 2: 'deep_valley', 3: 'deep_valley',
-    4: 'valley', 5: 'valley', 6: 'valley', 7: 'valley',
-    8: 'flat', 9: 'peak', 10: 'peak', 11: 'sharp',
-    12: 'peak', 13: 'flat', 14: 'flat', 15: 'flat',
-    16: 'flat', 17: 'peak', 18: 'sharp', 19: 'peak',
-    20: 'peak', 21: 'flat', 22: 'valley', 23: 'valley'
-  }
-
-  // 使用确定性负荷曲线（典型数据中心日负荷曲线）
-  const typicalLoadFactors = [
-    0.55, 0.52, 0.50, 0.48, // 0-3点: 深谷
-    0.52, 0.55, 0.60, 0.65, // 4-7点: 谷时渐升
-    0.75, 0.82, 0.88, 0.95, // 8-11点: 平/峰/尖
-    0.90, 0.80, 0.78, 0.80, // 12-15点: 峰/平
-    0.82, 0.88, 0.95, 0.90, // 16-19点: 平/峰/尖
-    0.85, 0.75, 0.65, 0.58  // 20-23点: 峰/平/谷
-  ]
-
-  const basePower = 200 // 基准功率 kW
-
-  hourlyLoadData.value = Array.from({ length: 24 }, (_, hour) => ({
-    hour,
-    power: Math.round(basePower * typicalLoadFactors[hour] * 10) / 10, // 使用典型负荷因子
-    period: periodMap[hour]
-  }))
-
-  console.log('[analysis.vue] Generated deterministic mock hourly data:', hourlyLoadData.value.length, 'points')
-}
 
 const handleShiftPlanChange = (plan: {
   shiftPower: number
@@ -1091,8 +1055,7 @@ async function loadCurveData() {
 
     // 如果API没有返回数据，生成模拟数据用于开发测试
     if (curveData.value.length === 0) {
-      console.warn('[analysis.vue] No curve data from API, generating mock data')
-      generateMockCurveData()
+      console.warn('[analysis.vue] No curve data from API')
     }
 
     // 更新峰值分析中的申报需量
@@ -1106,50 +1069,14 @@ async function loadCurveData() {
     updateDemandChart()
   } catch (e) {
     console.error('加载需量曲线失败', e)
-    // API失败时也生成模拟数据用于开发测试
-    generateMockCurveData()
+    // API失败时清空数据
+    curveData.value = []
     updateDemandChart()
   } finally {
     loading.value.curve = false
   }
 }
 
-// 生成模拟15分钟需量曲线数据（仅在 API 无数据时使用）
-// 使用确定性算法生成数据
-function generateMockCurveData() {
-  const baseDate = curveDate.value || new Date().toISOString().split('T')[0]
-  const declaredDemand = peakAnalysis.value?.declared_demand || 500
-  const points: Demand15MinDataPoint[] = []
-
-  for (let hour = 0; hour < 24; hour++) {
-    for (let min = 0; min < 60; min += 15) {
-      const timestamp = `${baseDate} ${hour.toString().padStart(2, '0')}:${min.toString().padStart(2, '0')}:00`
-      // 模拟一天的负荷曲线：凌晨低、白天高、晚上中等
-      let basePower = 200
-      if (hour >= 8 && hour < 12) basePower = 400  // 上午高峰
-      if (hour >= 12 && hour < 14) basePower = 350 // 午休
-      if (hour >= 14 && hour < 18) basePower = 420 // 下午高峰
-      if (hour >= 18 && hour < 22) basePower = 300 // 晚间
-      if (hour >= 22 || hour < 6) basePower = 150  // 深夜
-
-      // 使用确定性波动代替 Math.random()
-      // 基于小时和分钟生成周期性波动
-      const slot = hour * 4 + min / 15
-      const variation = Math.sin(slot * 0.3) * 50 // ±50 kW 的确定性波动
-      const power = Math.max(50, basePower + variation)
-
-      points.push({
-        timestamp,
-        average_power: power,
-        rolling_demand: power * (1 + Math.sin(slot * 0.5) * 0.05), // ±5% 确定性波动
-        is_over_declared: power > declaredDemand
-      })
-    }
-  }
-
-  curveData.value = points
-  console.log('[analysis.vue] Generated deterministic mock curve data:', points.length, 'points')
-}
 
 async function loadPeakAnalysis() {
   if (!selectedMeterPointId.value) return
@@ -1183,65 +1110,14 @@ async function loadAggregatedCurve() {
     }
   } catch (e) {
     console.error('加载聚合需量曲线失败', e)
-    // API失败时生成模拟数据
-    generateMockAggregatedData()
+    // API失败时清空数据
+    aggregatedCurveData.value = null
     updateAggregatedDemandChart()
   } finally {
     loading.value.curve = false
   }
 }
 
-// 生成模拟聚合曲线数据
-function generateMockAggregatedData() {
-  const declaredDemand = peakAnalysis.value?.declared_demand || 500
-  const points = []
-
-  for (let slot = 0; slot < 96; slot++) {
-    const hour = Math.floor(slot / 4)
-    const minute = (slot % 4) * 15
-
-    // 使用确定性负荷曲线
-    let baseFactor = 0.6
-    if (hour >= 8 && hour < 12) baseFactor = 0.85  // 上午高峰
-    if (hour >= 12 && hour < 14) baseFactor = 0.75 // 午休
-    if (hour >= 14 && hour < 18) baseFactor = 0.88 // 下午高峰
-    if (hour >= 18 && hour < 22) baseFactor = 0.70 // 晚间
-    if (hour >= 22 || hour < 6) baseFactor = 0.50  // 深夜
-
-    const avgDemand = declaredDemand * baseFactor
-    points.push({
-      slot,
-      time: `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`,
-      avg_demand: avgDemand,
-      max_demand: avgDemand * 1.15,
-      min_demand: avgDemand * 0.85,
-      over_declared_ratio: baseFactor > 0.85 ? 5 : 0,
-      data_count: analysisDays.value * (baseFactor > 0.5 ? 1 : 0.8)
-    })
-  }
-
-  aggregatedCurveData.value = {
-    meter_point_id: selectedMeterPointId.value!,
-    meter_name: meterPoints.value.find(m => m.id === selectedMeterPointId.value)?.meter_name || '',
-    declared_demand: declaredDemand,
-    analysis_period: {
-      start: new Date(Date.now() - analysisDays.value * 86400000).toISOString(),
-      end: new Date().toISOString(),
-      requested_days: analysisDays.value,
-      actual_days: Math.floor(analysisDays.value * 0.9)
-    },
-    statistics: {
-      max_demand: declaredDemand * 0.88,
-      avg_demand: declaredDemand * 0.72,
-      utilization_rate: 88,
-      over_declared_count: 0,
-      over_declared_ratio: 0,
-      total_data_points: 96 * analysisDays.value
-    },
-    aggregated_points: points
-  }
-  console.log('[analysis.vue] Generated mock aggregated data')
-}
 
 // 切换分析天数时重新加载数据
 function onAnalysisDaysChange() {

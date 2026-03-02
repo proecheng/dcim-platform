@@ -81,7 +81,7 @@ METER_POINTS = [
 # 配电柜配置
 DISTRIBUTION_PANELS = [
     {
-        "panel_code": "MDP-001",
+        "panel_code": "CAB-A01",
         "panel_name": "主配电柜",
         "panel_type": "main",
         "rated_current": 2000,
@@ -95,7 +95,7 @@ DISTRIBUTION_PANELS = [
         "rated_current": 1600,
         "location": "配电室A",
         "area_code": "A1",
-        "parent_code": "MDP-001",
+        "parent_code": "CAB-A01",
     },
     {
         "panel_code": "UPS-IN-001",
@@ -115,7 +115,7 @@ DISTRIBUTION_PANELS = [
         "area_code": "A1",
     },
     {
-        "panel_code": "PDU-A1-001",
+        "panel_code": "PDU-A01",
         "panel_name": "A1区列头柜1",
         "panel_type": "sub",
         "rated_current": 250,
@@ -124,7 +124,7 @@ DISTRIBUTION_PANELS = [
         "parent_code": "UPS-OUT-001",
     },
     {
-        "panel_code": "PDU-A1-002",
+        "panel_code": "PDU-A02",
         "panel_name": "A1区列头柜2",
         "panel_type": "sub",
         "rated_current": 250,
@@ -139,7 +139,7 @@ DISTRIBUTION_PANELS = [
         "rated_current": 400,
         "location": "配电室B",
         "area_code": "B1",
-        "parent_code": "MDP-001",
+        "parent_code": "CAB-A01",
     },
 ]
 
@@ -148,7 +148,7 @@ DISTRIBUTION_CIRCUITS = [
     {
         "circuit_code": "C-A1-01",
         "circuit_name": "A1机柜列1回路",
-        "panel_code": "PDU-A1-001",
+        "panel_code": "PDU-A01",
         "load_type": "IT",
         "rated_current": 63,
         "is_shiftable": False,
@@ -156,7 +156,7 @@ DISTRIBUTION_CIRCUITS = [
     {
         "circuit_code": "C-A1-02",
         "circuit_name": "A1机柜列2回路",
-        "panel_code": "PDU-A1-001",
+        "panel_code": "PDU-A01",
         "load_type": "IT",
         "rated_current": 63,
         "is_shiftable": False,
@@ -164,7 +164,7 @@ DISTRIBUTION_CIRCUITS = [
     {
         "circuit_code": "C-A1-03",
         "circuit_name": "A1机柜列3回路",
-        "panel_code": "PDU-A1-002",
+        "panel_code": "PDU-A02",
         "load_type": "IT",
         "rated_current": 63,
         "is_shiftable": False,
@@ -190,7 +190,7 @@ DISTRIBUTION_CIRCUITS = [
     {
         "circuit_code": "C-LIGHT",
         "circuit_name": "照明回路",
-        "panel_code": "MDP-001",
+        "panel_code": "CAB-A01",
         "load_type": "LIGHT",
         "rated_current": 32,
         "is_shiftable": True,
@@ -257,18 +257,18 @@ POWER_DEVICES = [
     },
     # UPS
     {
-        "device_code": "UPS-001",
-        "device_name": "UPS主机1",
+        "device_code": "UPS-A01",
+        "device_name": "A区1号UPS",
         "device_type": "UPS",
         "rated_power": 200,
         "is_it_load": False,
         "area_code": "A1",
     },
     {
-        "device_code": "UPS-002",
-        "device_name": "UPS主机2",
+        "device_code": "UPS-A02",
+        "device_name": "A区2号UPS",
         "device_type": "UPS",
-        "rated_power": 200,
+        "rated_power": 120,
         "is_it_load": False,
         "area_code": "A1",
     },

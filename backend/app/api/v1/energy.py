@@ -88,6 +88,12 @@ from ...schemas.energy import (
     # 需量配置层级展示
     MeterPointDemandInfo,
     TransformerWithMeterPointsResponse,
+    # 电价方案管理
+    PricingSchemeCreate,
+    PricingSchemeUpdate,
+    PricingSchemeResponse,
+    SchemeValidationResult,
+    PricingSchemeAuditLogResponse,
 )
 
 from ...services.pricing_service import PricingService
@@ -3775,4 +3781,240 @@ async def ocr_bill(
             items=items,
             raw_text=result.raw_text,
         ).model_dump(),
+    )
+# ==================== 电价方案管理 API ====================
+@router.get("/pricing-schemes", response_model=ResponseModel)
+async def get_pricing_schemes(
+    skip: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=1000),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """获取电价方案列表"""
+    from ...models.energy import PricingScheme
+    from ...schemas.energy import PricingSchemeResponse
+    
+    result = await db.execute(
+        select(PricingScheme)
+        .order_by(PricingScheme.created_at.desc())
+        .offset(skip)
+        .limit(limit)
+    )
+    schemes = result.scalars().all()
+    
+    return ResponseModel(
+        code=200,
+        message="获取成功",
+        data=[PricingSchemeResponse.model_validate(s).model_dump() for s in schemes]
+    )
+@router.get("/pricing-schemes/{scheme_id}", response_model=ResponseModel)
+async def get_pricing_scheme(
+    scheme_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """获取单个电价方案详情"""
+    from ...models.energy import PricingScheme
+    from ...schemas.energy import PricingSchemeResponse
+    
+    scheme = await db.get(PricingScheme, scheme_id)
+    
+    if not scheme:
+        raise HTTPException(status_code=404, detail="方案不存在")
+    
+    return ResponseModel(
+        code=200,
+        message="获取成功",
+        data=PricingSchemeResponse.model_validate(scheme).model_dump()
+    )
+@router.post("/pricing-schemes", response_model=ResponseModel)
+async def create_pricing_scheme(
+    scheme_data: PricingSchemeCreate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_admin)
+):
+    """创建电价方案"""
+    from ...services.pricing_service import PricingService
+    from ...schemas.energy import PricingSchemeCreate
+    
+    service = PricingService(db)
+    
+    # 提取 pricing_ids
+    pricing_ids = scheme_data.pricing_ids
+    scheme_dict = scheme_data.model_dump(exclude={'pricing_ids'})
+    
+    scheme_id = await service.create_scheme(
+        scheme_data=scheme_dict,
+        pricing_ids=pricing_ids,
+        user_id=current_user.id
+    )
+    
+    await db.commit()
+    
+    return ResponseModel(
+        code=200,
+        message="创建成功",
+        data={"id": scheme_id}
+    )
+@router.put("/pricing-schemes/{scheme_id}", response_model=ResponseModel)
+async def update_pricing_scheme(
+    scheme_id: int,
+    scheme_data: PricingSchemeUpdate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_admin)
+):
+    """更新电价方案"""
+    from ...models.energy import PricingScheme, SchemePricingRelation, PricingSchemeAuditLog
+    from ...schemas.energy import PricingSchemeUpdate
+    
+    scheme = await db.get(PricingScheme, scheme_id)
+    
+    if not scheme:
+        raise HTTPException(status_code=404, detail="方案不存在")
+    
+    # 禁止修改激活方案
+    if scheme.is_active:
+        raise HTTPException(status_code=400, detail="无法修改激活方案，请先停用")
+    
+    async with db.begin():
+        # 更新基本信息
+        update_data = scheme_data.model_dump(exclude_unset=True, exclude={'pricing_ids'})
+        for key, value in update_data.items():
+            setattr(scheme, key, value)
+        
+        # 更新时段关联
+        if scheme_data.pricing_ids is not None:
+            # 删除旧关联
+            await db.execute(
+                delete(SchemePricingRelation).where(SchemePricingRelation.scheme_id == scheme_id)
+            )
+            
+            # 创建新关联
+            for pricing_id in scheme_data.pricing_ids:
+                relation = SchemePricingRelation(
+                    scheme_id=scheme_id,
+                    pricing_id=pricing_id
+                )
+                db.add(relation)
+        
+        # 记录审计日志
+        audit_log = PricingSchemeAuditLog(
+            scheme_id=scheme_id,
+            action="updated",
+            user_id=current_user.id,
+            changes=scheme_data.model_dump(exclude_unset=True)
+        )
+        db.add(audit_log)
+    
+    return ResponseModel(code=200, message="更新成功")
+@router.delete("/pricing-schemes/{scheme_id}", response_model=ResponseModel)
+async def delete_pricing_scheme(
+    scheme_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_admin)
+):
+    """删除电价方案"""
+    from ...models.energy import PricingScheme
+    
+    scheme = await db.get(PricingScheme, scheme_id)
+    
+    if not scheme:
+        raise HTTPException(status_code=404, detail="方案不存在")
+    
+    # 禁止删除激活方案
+    if scheme.is_active:
+        raise HTTPException(
+            status_code=400,
+            detail="无法删除激活方案，请先激活其他方案或停用当前方案"
+        )
+    
+    await db.delete(scheme)
+    await db.commit()
+    
+    return ResponseModel(code=200, message="删除成功")
+@router.post("/pricing-schemes/{scheme_id}/validate", response_model=ResponseModel)
+async def validate_pricing_scheme(
+    scheme_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """校验电价方案"""
+    from ...services.pricing_service import PricingService
+    from ...schemas.energy import SchemeValidationResult
+    
+    service = PricingService(db)
+    validation = await service.validate_scheme(scheme_id)
+    
+    return ResponseModel(
+        code=200,
+        message="校验完成",
+        data=SchemeValidationResult(**validation).model_dump()
+    )
+@router.post("/pricing-schemes/{scheme_id}/activate", response_model=ResponseModel)
+async def activate_pricing_scheme(
+    scheme_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_admin)
+):
+    """激活电价方案"""
+    from ...services.pricing_service import PricingService
+    from ...core.redis_lock import get_redis_client
+    
+    service = PricingService(db)
+    
+    # 尝试获取 Redis 客户端
+    try:
+        redis_client = await get_redis_client()
+    except Exception:
+        redis_client = None  # Redis 不可用时降级
+    
+    await service.activate_scheme(scheme_id, current_user.id, redis_client)
+    await db.commit()
+    
+    return ResponseModel(code=200, message="激活成功")
+@router.post("/pricing-schemes/{scheme_id}/deactivate", response_model=ResponseModel)
+async def deactivate_pricing_scheme(
+    scheme_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_admin)
+):
+    """停用电价方案"""
+    from ...services.pricing_service import PricingService
+    
+    service = PricingService(db)
+    await service.deactivate_scheme(scheme_id, current_user.id)
+    await db.commit()
+    
+    return ResponseModel(
+        code=200,
+        message="方案已停用，系统进入兼容模式",
+        data={
+            "warning": "请确保已启用的时段覆盖完整24小时，否则计费功能可能受影响"
+        }
+    )
+@router.get("/pricing-schemes/{scheme_id}/audit-logs", response_model=ResponseModel)
+async def get_scheme_audit_logs(
+    scheme_id: int,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=1000),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """获取方案审计日志"""
+    from ...models.energy import PricingSchemeAuditLog
+    from ...schemas.energy import PricingSchemeAuditLogResponse
+    
+    result = await db.execute(
+        select(PricingSchemeAuditLog)
+        .where(PricingSchemeAuditLog.scheme_id == scheme_id)
+        .order_by(PricingSchemeAuditLog.timestamp.desc())
+        .offset(skip)
+        .limit(limit)
+    )
+    logs = result.scalars().all()
+    
+    return ResponseModel(
+        code=200,
+        message="获取成功",
+        data=[PricingSchemeAuditLogResponse.model_validate(log).model_dump() for log in logs]
     )

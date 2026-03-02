@@ -396,7 +396,21 @@ async function startPlan(plan: ExecutionPlan) {
     const res = await updatePlanStatus(plan.id, { status: 'executing' })
     if (res.code === 0) {
       ElMessage.success('计划已开始执行')
-      loadPlans()
+      await loadPlans()
+      loadStats()
+      // 自动打开计划详情，让用户查看并执行任务
+      const updatedPlan = plans.value.find(p => p.id === plan.id)
+      if (updatedPlan) {
+        const detailRes = await getExecutionPlanDetail(updatedPlan.id)
+        if (detailRes.code === 0 && detailRes.data) {
+          currentPlan.value = detailRes.data
+          detailVisible.value = true
+          // 如果计划没有任务，提示用户
+          if (detailRes.data.task_stats.total === 0) {
+            ElMessage.warning('该计划暂无执行任务，请检查计划配置')
+          }
+        }
+      }
     }
   } catch {
     // cancelled

@@ -1440,3 +1440,62 @@ class OptimizationResult(Base):
     result_data = Column(JSON, comment="详细结果 JSON")
 
     created_at = Column(DateTime, default=datetime.now, comment="创建时间")
+
+
+# ==================== 电价方案管理模型 ====================
+
+
+class PricingScheme(Base):
+    """电价方案表"""
+
+    __tablename__ = "pricing_schemes"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    scheme_name = Column(String(100), nullable=False, comment="方案名称")
+    description = Column(Text, comment="方案说明")
+    is_active = Column(Boolean, default=False, nullable=False, comment="是否激活（全局唯一）")
+    effective_date = Column(Date, nullable=False, comment="生效日期")
+    expire_date = Column(Date, comment="失效日期")
+    
+    # 校验结果缓存
+    validation_result = Column(JSON, comment="校验结果缓存")
+    validation_time = Column(DateTime, comment="校验时间")
+    
+    created_at = Column(DateTime, default=datetime.now, comment="创建时间")
+    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now, comment="更新时间")
+
+    # 关系
+    pricing_relations = relationship("SchemePricingRelation", back_populates="scheme", cascade="all, delete-orphan")
+    audit_logs = relationship("PricingSchemeAuditLog", back_populates="scheme", cascade="all, delete-orphan")
+
+
+class SchemePricingRelation(Base):
+    """方案-时段关联表"""
+
+    __tablename__ = "scheme_pricing_relations"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    scheme_id = Column(Integer, ForeignKey("pricing_schemes.id", ondelete="CASCADE"), nullable=False, comment="方案ID")
+    pricing_id = Column(Integer, ForeignKey("electricity_pricing.id", ondelete="CASCADE"), nullable=False, comment="时段ID")
+    created_at = Column(DateTime, default=datetime.now, comment="创建时间")
+
+    # 关系
+    scheme = relationship("PricingScheme", back_populates="pricing_relations")
+    pricing = relationship("ElectricityPricing")
+
+
+class PricingSchemeAuditLog(Base):
+    """电价方案审计日志表"""
+
+    __tablename__ = "pricing_scheme_audit_logs"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    scheme_id = Column(Integer, ForeignKey("pricing_schemes.id", ondelete="CASCADE"), nullable=False, comment="方案ID")
+    action = Column(String(20), nullable=False, comment="操作: created/updated/activated/deactivated/deleted")
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), comment="操作用户ID")
+    changes = Column(JSON, comment="变更内容")
+    timestamp = Column(DateTime, default=datetime.now, comment="操作时间")
+
+    # 关系
+    scheme = relationship("PricingScheme", back_populates="audit_logs")
+    user = relationship("User")

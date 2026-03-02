@@ -618,6 +618,12 @@ import {
   type DeviceLinkedPointsResponse,
   type UnlinkedDevice
 } from '@/api/modules/energy'
+import {
+  notifyPduTopologyChanged,
+  subscribePduTopologyChanged,
+  notifyPanelTopologyChanged,
+  subscribePanelTopologyChanged
+} from '@/utils/pduSync'
 
 // 扩展节点类型，增加 grid 和 point
 type ExtendedNodeType = TopologyNodeTypeEnum | 'grid' | 'point'
@@ -757,6 +763,16 @@ const contextMenuVisible = ref(false)
 const contextMenuX = ref(0)
 const contextMenuY = ref(0)
 const contextMenuNode = ref<any>(null)
+let unsubscribePduSync: (() => void) | null = null
+let unsubscribePanelSync: (() => void) | null = null
+
+function isPduNode(node: any): boolean {
+  if (!node || node.type !== 'device') return false
+  const deviceType = String(node.rawData?.device_type ?? '').toUpperCase()
+  const deviceCode = String(node.code ?? '').toUpperCase()
+  const deviceName = String(node.label ?? '').toUpperCase()
+  return deviceType === 'PDU' || deviceCode.includes('PDU') || deviceName.includes('PDU')
+}
 
 // 计算属性 - 计算实际要添加的节点类型
 const actualNodeType = computed<ExtendedNodeType>(() => {
@@ -1324,6 +1340,9 @@ const handleDeleteNode = async (data: any) => {
 
   const childCount = countChildren(data)
   let message = `确定要删除 ${getNodeTypeName(data.type)} "${data.label}" 吗？`
+  if (isPduNode(data)) {
+    message += '<br/><br/>此操作将同时影响：<br/>1) 配电拓扑页中的该PDU节点<br/>2) 机柜PDU监控页中的该PDU记录<br/>3) 该PDU下级点位（如存在）'
+  }
   if (childCount > 0) {
     message += `<br/><br/><span style="color: var(--el-color-warning);">⚠️ 该节点下有 <strong>${childCount}</strong> 个子节点，将一并删除！</span>`
   }
@@ -1356,6 +1375,11 @@ const handleDeleteNode = async (data: any) => {
         selectedNode.value = null
       }
       await loadTopology()
+      if (isPduNode(data)) {
+        notifyPduTopologyChanged('topology', 'delete')
+      } else if (data.type === 'panel') {
+        notifyPanelTopologyChanged('topology', 'delete')
+      }
     } else {
       // 处理包装和非包装的错误消息
       const errorMsg = res.message || (res as any).detail || '删除失败'
@@ -1420,6 +1444,11 @@ const handleSaveNode = async () => {
     if (isSuccess) {
       ElMessage.success('保存成功')
       await loadTopology()
+      if (isPduNode(selectedNode.value)) {
+        notifyPduTopologyChanged('topology', 'update')
+      } else if (selectedNode.value?.type === 'panel') {
+        notifyPanelTopologyChanged('topology', 'update')
+      }
     } else {
       // 处理包装和非包装的错误消息
       const errorMsg = res.message || (res as any).detail || '保存失败'
@@ -1568,6 +1597,15 @@ const handleConfirmAdd = async () => {
       ElMessage.success('添加成功')
       showAddDialog.value = false
       await loadTopology()
+      if (nodeType === 'device') {
+        const createdDeviceType = String(createData.device_type ?? '').toUpperCase()
+        const createdCode = String(createData.device_code ?? '').toUpperCase()
+        if (createdDeviceType === 'PDU' || createdCode.includes('PDU')) {
+          notifyPduTopologyChanged('topology', 'create')
+        }
+      } else if (nodeType === 'panel') {
+        notifyPanelTopologyChanged('topology', 'create')
+      }
     } else {
       // 处理包装和非包装的错误消息
       const errorMsg = res.message || (res as any).detail || '添加失败'
@@ -1639,10 +1677,18 @@ const handleClickOutside = () => {
 
 onMounted(() => {
   loadTopology()
+  unsubscribePduSync = subscribePduTopologyChanged(() => {
+    loadTopology()
+  })
+  unsubscribePanelSync = subscribePanelTopologyChanged(() => {
+    loadTopology()
+  })
   document.addEventListener('click', handleClickOutside)
 })
 
 onUnmounted(() => {
+  unsubscribePduSync?.()
+  unsubscribePanelSync?.()
   document.removeEventListener('click', handleClickOutside)
 })
 

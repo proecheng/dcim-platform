@@ -476,65 +476,17 @@ async function loadDashboard() {
       dashboard.value = res.data
       console.log('[monitor.vue] dashboard.value updated:', dashboard.value)
     } else {
-      console.warn('[monitor.vue] API returned no data or error code, using mock data')
-      // 使用模拟数据
-      generateMockDashboardData()
+      console.warn('[monitor.vue] API returned no data or error code')
+      dashboard.value = {}
     }
     updateDemandChart()
   } catch (e) {
     console.error('加载仪表盘数据失败', e)
-    // API 失败时使用模拟数据
-    generateMockDashboardData()
+    dashboard.value = {}
     updateDemandChart()
   }
 }
 
-// 生成模拟仪表盘数据
-function generateMockDashboardData() {
-  dashboard.value = {
-    realtime: {
-      total_power: 450,
-      it_power: 280,
-      cooling_power: 130,
-      other_power: 40,
-      today_energy: 8500,
-      month_energy: 185000
-    },
-    efficiency: {
-      pue: 1.65,
-      pue_target: 1.5,
-      pue_trend: 'stable',
-      cooling_ratio: 28.9,
-      it_ratio: 62.2
-    },
-    demand: {
-      current_demand: 380,
-      declared_demand: 500,
-      utilization_rate: 76,
-      max_today: 420,
-      over_declared_risk: false
-    },
-    suggestions: {
-      pending_count: 5,
-      high_priority_count: 2,
-      potential_saving_kwh: 3500,
-      potential_saving_cost: 2800
-    },
-    cost: {
-      today_cost: 12500,
-      month_cost: 285000,
-      peak_ratio: 35,
-      valley_ratio: 25,
-      avg_price: 0.85
-    },
-    trends: {
-      power_1h: Array.from({ length: 60 }, (_, i) => 420 + Math.sin(i / 10) * 50),
-      pue_24h: Array.from({ length: 24 }, (_, i) => 1.6 + Math.sin(i / 4) * 0.2),
-      demand_24h: Array.from({ length: 96 }, (_, i) => 350 + Math.sin(i / 12) * 100)
-    }
-  }
-  console.log('[monitor.vue] Using mock dashboard data:', dashboard.value)
-}
 
 // 图表主题色常量
 const chartColors = {

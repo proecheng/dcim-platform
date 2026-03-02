@@ -635,3 +635,399 @@ class PricingService:
         )
 
         return {"current_bill": current_bill["total"], "optimized_bill": optimized_bill["total"], "savings": savings}
+
+    # ==================== 电价方案管理 ====================
+
+    async def validate_scheme(self, scheme_id: int) -> Dict[str, Any]:
+        """
+        校验电价方案的完整性
+        
+        Args:
+            scheme_id: 方案ID
+            
+        Returns:
+            Dict: 校验结果
+            {
+                'valid': bool,  # 是否有效
+                'coverage': float,  # 覆盖小时数
+                'conflicts': List[tuple],  # 冲突列表
+                'gaps': List[tuple]  # 缺失时段列表
+            }
+        """
+        from sqlalchemy import select
+        from ..models.energy import PricingScheme, SchemePricingRelation, ElectricityPricing
+        
+        # 获取方案关联的所有时段
+        result = await self.db.execute(
+            select(ElectricityPricing)
+            .join(SchemePricingRelation, SchemePricingRelation.pricing_id == ElectricityPricing.id)
+            .where(SchemePricingRelation.scheme_id == scheme_id)
+        )
+        pricings = result.scalars().all()
+        
+        if not pricings:
+            return {
+                'valid': False,
+                'coverage': 0.0,
+                'conflicts': [],
+                'gaps': [(0, 1440)]  # 全天缺失
+            }
+        
+        # 转换为分钟区间
+        intervals = []
+        for p in pricings:
+            start_min = self._time_to_minutes(p.start_time)
+            end_min = self._time_to_minutes(p.end_time)
+            
+            # 处理跨日时段
+            if end_min < start_min:
+                intervals.append((start_min, 1440))  # 当天部分
+                intervals.append((0, end_min))  # 次日部分
+            else:
+                intervals.append((start_min, end_min))
+        
+        # 检测冲突
+        conflicts = self._detect_conflicts(intervals)
+        
+        # 合并区间
+        merged = self._merge_intervals(intervals)
+        
+        # 计算覆盖率
+        coverage = sum(end - start for start, end in merged) / 60.0
+        
+        # 检测缺失
+        gaps = self._detect_gaps(merged)
+        
+        return {
+            'valid': len(conflicts) == 0 and len(gaps) == 0,
+            'coverage': round(coverage, 2),
+            'conflicts': conflicts,
+            'gaps': gaps
+        }
+
+    def _time_to_minutes(self, time_str: str) -> int:
+        """将时间字符串转换为分钟数"""
+        h, m = map(int, time_str.split(':'))
+        return h * 60 + m
+
+    def _minutes_to_time(self, minutes: int) -> str:
+        """将分钟数转换为时间字符串"""
+        h = minutes // 60
+        m = minutes % 60
+        return f"{h:02d}:{m:02d}"
+
+    def _detect_conflicts(self, intervals: List[tuple]) -> List[tuple]:
+        """检测区间冲突"""
+        conflicts = []
+        sorted_intervals = sorted(intervals)
+        
+        for i in range(len(sorted_intervals)):
+            for j in range(i + 1, len(sorted_intervals)):
+                start1, end1 = sorted_intervals[i]
+                start2, end2 = sorted_intervals[j]
+                
+                # 检查重叠（左闭右开）
+                if start2 < end1:
+                    conflicts.append((
+                        (start1, end1),
+                        (start2, end2)
+                    ))
+        
+        return conflicts
+
+    def _merge_intervals(self, intervals: List[tuple]) -> List[tuple]:
+        """合并重叠区间"""
+        if not intervals:
+            return []
+        
+        sorted_intervals = sorted(intervals)
+        merged = [sorted_intervals[0]]
+        
+        for current in sorted_intervals[1:]:
+            last = merged[-1]
+            
+            # 如果当前区间与上一个区间重叠或相邻
+            if current[0] <= last[1]:
+                # 合并
+                merged[-1] = (last[0], max(last[1], current[1]))
+            else:
+                merged.append(current)
+        
+        return merged
+
+    def _detect_gaps(self, merged_intervals: List[tuple]) -> List[tuple]:
+        """检测缺失时段"""
+        if not merged_intervals:
+            return [(0, 1440)]
+        
+        gaps = []
+        
+        # 检查开头
+        if merged_intervals[0][0] > 0:
+            gaps.append((0, merged_intervals[0][0]))
+        
+        # 检查中间
+        for i in range(len(merged_intervals) - 1):
+            gap_start = merged_intervals[i][1]
+            gap_end = merged_intervals[i + 1][0]
+            
+            if gap_start < gap_end:
+                gaps.append((gap_start, gap_end))
+        
+        # 检查结尾
+        if merged_intervals[-1][1] < 1440:
+            gaps.append((merged_intervals[-1][1], 1440))
+        
+        return gaps
+
+    async def create_scheme(self, scheme_data: Dict[str, Any], pricing_ids: List[int], user_id: int) -> int:
+        """
+        创建电价方案
+        
+        Args:
+            scheme_data: 方案数据
+            pricing_ids: 关联的时段ID列表
+            user_id: 创建用户ID
+            
+        Returns:
+            int: 新创建的方案ID
+        """
+        from ..models.energy import PricingScheme, SchemePricingRelation, PricingSchemeAuditLog
+        
+        async with self.db.begin():
+            # 创建方案
+            scheme = PricingScheme(**scheme_data)
+            self.db.add(scheme)
+            await self.db.flush()  # 获取ID
+            
+            # 关联时段
+            for pricing_id in pricing_ids:
+                relation = SchemePricingRelation(
+                    scheme_id=scheme.id,
+                    pricing_id=pricing_id
+                )
+                self.db.add(relation)
+            
+            # 记录审计日志
+            audit_log = PricingSchemeAuditLog(
+                scheme_id=scheme.id,
+                action="created",
+                user_id=user_id,
+                changes={
+                    "scheme_name": scheme_data.get('scheme_name'),
+                    "pricing_ids": pricing_ids
+                }
+            )
+            self.db.add(audit_log)
+        
+        return scheme.id
+
+    async def activate_scheme(self, scheme_id: int, user_id: int, redis_client=None):
+        """
+        激活电价方案（使用分布式锁防止竞态条件）
+        
+        Args:
+            scheme_id: 方案ID
+            user_id: 操作用户ID
+            redis_client: Redis客户端（可选）
+        """
+        from ..models.energy import PricingScheme, PricingSchemeAuditLog
+        from ..core.redis_lock import RedisLock
+        from fastapi import HTTPException
+        from sqlalchemy import update, func
+        
+        # 如果提供了Redis客户端，使用分布式锁
+        if redis_client:
+            lock = RedisLock(redis_client)
+            async with lock.acquire("pricing_scheme_activation", timeout=10):
+                await self._do_activate_scheme(scheme_id, user_id)
+        else:
+            # 无Redis时直接执行（开发环境）
+            await self._do_activate_scheme(scheme_id, user_id)
+
+    async def _do_activate_scheme(self, scheme_id: int, user_id: int):
+        """执行方案激活的核心逻辑"""
+        from ..models.energy import PricingScheme, PricingSchemeAuditLog
+        from fastapi import HTTPException
+        from sqlalchemy import update, func, select
+        
+        async with self.db.begin():
+            # 1. 校验方案完整性
+            validation = await self.validate_scheme(scheme_id)
+            if not validation['valid']:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"方案校验失败：覆盖率{validation['coverage']}小时，"
+                           f"冲突{len(validation['conflicts'])}处，缺失{len(validation['gaps'])}处"
+                )
+            
+            # 2. 检查生效日期
+            result = await self.db.execute(
+                select(PricingScheme).where(PricingScheme.id == scheme_id)
+            )
+            scheme = result.scalar_one_or_none()
+            
+            if not scheme:
+                raise HTTPException(status_code=404, detail="方案不存在")
+            
+            today = date.today()
+            
+            if scheme.effective_date > today:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"方案尚未生效，生效日期：{scheme.effective_date}"
+                )
+            
+            if scheme.expire_date and scheme.expire_date < today:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"方案已过期，失效日期：{scheme.expire_date}"
+                )
+            
+            # 3. 停用所有方案
+            await self.db.execute(
+                update(PricingScheme).values(is_active=False)
+            )
+            
+            # 4. 激活目标方案
+            await self.db.execute(
+                update(PricingScheme)
+                .where(PricingScheme.id == scheme_id)
+                .values(
+                    is_active=True,
+                    validation_result=validation,
+                    validation_time=datetime.now(),
+                    updated_at=datetime.now()
+                )
+            )
+            
+            # 5. 验证唯一性（双重保险）
+            result = await self.db.execute(
+                select(func.count())
+                .select_from(PricingScheme)
+                .where(PricingScheme.is_active == True)
+            )
+            active_count = result.scalar()
+            
+            if active_count != 1:
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"激活失败：检测到{active_count}个激活方案"
+                )
+            
+            # 6. 记录审计日志
+            audit_log = PricingSchemeAuditLog(
+                scheme_id=scheme_id,
+                action="activated",
+                user_id=user_id,
+                changes={
+                    "activated_at": datetime.now().isoformat(),
+                    "validation": validation
+                }
+            )
+            self.db.add(audit_log)
+
+    async def deactivate_scheme(self, scheme_id: int, user_id: int):
+        """
+        停用电价方案
+        
+        Args:
+            scheme_id: 方案ID
+            user_id: 操作用户ID
+        """
+        from ..models.energy import PricingScheme, PricingSchemeAuditLog
+        from fastapi import HTTPException
+        from sqlalchemy import update, select
+        
+        async with self.db.begin():
+            result = await self.db.execute(
+                select(PricingScheme).where(PricingScheme.id == scheme_id)
+            )
+            scheme = result.scalar_one_or_none()
+            
+            if not scheme:
+                raise HTTPException(status_code=404, detail="方案不存在")
+            
+            if not scheme.is_active:
+                raise HTTPException(status_code=400, detail="方案未激活")
+            
+            # 停用方案
+            await self.db.execute(
+                update(PricingScheme)
+                .where(PricingScheme.id == scheme_id)
+                .values(is_active=False, updated_at=datetime.now())
+            )
+            
+            # 记录审计日志
+            audit_log = PricingSchemeAuditLog(
+                scheme_id=scheme_id,
+                action="deactivated",
+                user_id=user_id,
+                changes={"deactivated_at": datetime.now().isoformat()}
+            )
+            self.db.add(audit_log)
+
+    async def check_and_invalidate_schemes(self, pricing_id: int, user_id: int) -> Optional[str]:
+        """
+        检查时段编辑是否影响激活方案，如果影响则自动停用
+        
+        Args:
+            pricing_id: 被编辑的时段ID
+            user_id: 操作用户ID
+            
+        Returns:
+            Optional[str]: 如果方案被停用，返回方案名称
+        """
+        from ..models.energy import PricingScheme, SchemePricingRelation, PricingSchemeAuditLog
+        from sqlalchemy import select, update
+        
+        # 查找激活方案
+        result = await self.db.execute(
+            select(PricingScheme).where(PricingScheme.is_active == True)
+        )
+        active_scheme = result.scalar_one_or_none()
+        
+        if not active_scheme:
+            return None
+        
+        # 检查该时段是否在激活方案中
+        result = await self.db.execute(
+            select(SchemePricingRelation).where(
+                and_(
+                    SchemePricingRelation.scheme_id == active_scheme.id,
+                    SchemePricingRelation.pricing_id == pricing_id
+                )
+            )
+        )
+        
+        if not result.scalar_one_or_none():
+            return None
+        
+        # 重新校验方案
+        validation = await self.validate_scheme(active_scheme.id)
+        
+        if not validation['valid']:
+            # 方案失效，自动停用
+            async with self.db.begin():
+                await self.db.execute(
+                    update(PricingScheme)
+                    .where(PricingScheme.id == active_scheme.id)
+                    .values(is_active=False, updated_at=datetime.now())
+                )
+                
+                # 记录审计日志
+                audit_log = PricingSchemeAuditLog(
+                    scheme_id=active_scheme.id,
+                    action="auto_deactivated",
+                    user_id=user_id,
+                    changes={
+                        "reason": "pricing_edited",
+                        "pricing_id": pricing_id,
+                        "validation": validation
+                    }
+                )
+                self.db.add(audit_log)
+            
+            return active_scheme.scheme_name
+        
+        return None

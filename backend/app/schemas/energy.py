@@ -2140,3 +2140,68 @@ class OcrBillResultSchema(BaseModel):
     items: List[OcrBillItemSchema] = Field(default_factory=list, description="识别的电价条目")
     raw_text: Optional[str] = Field(None, description="原始 OCR 文本（调试用）")
     error_message: Optional[str] = Field(None, description="错误信息")
+
+
+# ==================== 电价方案管理 Schema ====================
+
+
+class PricingSchemeBase(BaseModel):
+    """电价方案基础Schema"""
+    
+    scheme_name: str = Field(..., description="方案名称", max_length=100)
+    description: Optional[str] = Field(None, description="方案说明")
+    effective_date: date = Field(..., description="生效日期")
+    expire_date: Optional[date] = Field(None, description="失效日期")
+
+
+class PricingSchemeCreate(PricingSchemeBase):
+    """创建电价方案"""
+    
+    pricing_ids: List[int] = Field(..., description="时段ID列表")
+
+
+class PricingSchemeUpdate(BaseModel):
+    """更新电价方案"""
+    
+    scheme_name: Optional[str] = Field(None, description="方案名称", max_length=100)
+    description: Optional[str] = Field(None, description="方案说明")
+    effective_date: Optional[date] = Field(None, description="生效日期")
+    expire_date: Optional[date] = Field(None, description="失效日期")
+    pricing_ids: Optional[List[int]] = Field(None, description="时段ID列表")
+
+
+class PricingSchemeResponse(PricingSchemeBase):
+    """电价方案响应"""
+    
+    id: int
+    is_active: bool = Field(..., description="是否激活")
+    validation_result: Optional[dict] = Field(None, description="校验结果")
+    validation_time: Optional[datetime] = Field(None, description="校验时间")
+    created_at: datetime
+    updated_at: datetime
+    
+    class Config:
+        from_attributes = True
+
+
+class SchemeValidationResult(BaseModel):
+    """方案校验结果"""
+    
+    valid: bool = Field(..., description="是否有效")
+    coverage: float = Field(..., description="覆盖小时数 0-24")
+    conflicts: List[dict] = Field(default_factory=list, description="冲突列表")
+    gaps: List[dict] = Field(default_factory=list, description="缺失时段列表")
+
+
+class PricingSchemeAuditLogResponse(BaseModel):
+    """方案审计日志响应"""
+    
+    id: int
+    scheme_id: int
+    action: str = Field(..., description="操作类型")
+    user_id: Optional[int]
+    changes: Optional[dict]
+    timestamp: datetime
+    
+    class Config:
+        from_attributes = True

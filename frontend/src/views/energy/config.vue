@@ -133,6 +133,9 @@
           <el-button type="primary" @click="showPricingDialog()">
             <el-icon><Plus /></el-icon>新增时段
           </el-button>
+          <el-button type="success" @click="showSchemeManager">
+            <el-icon><Setting /></el-icon>方案管理
+          </el-button>
           <el-upload
             ref="uploadRef"
             :auto-upload="false"
@@ -839,14 +842,20 @@
         </el-button>
       </template>
     </el-dialog>
+    <!-- 电价方案管理器 -->
+    <PricingSchemeManager
+      v-model="schemeManagerVisible"
+      @scheme-activated="loadPricingList"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, reactive, onMounted, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Plus, Upload, Edit, Check, Refresh } from '@element-plus/icons-vue'
+import { Plus, Upload, Edit, Check, Refresh, Setting } from '@element-plus/icons-vue'
 import DeviceShiftDetailDrawer from '@/components/energy/DeviceShiftDetailDrawer.vue'
+import PricingSchemeManager from '@/components/energy/PricingSchemeManager.vue'
 import {
   getTransformers, createTransformer, updateTransformer, deleteTransformer,
   getMeterPoints, createMeterPoint, updateMeterPoint, deleteMeterPoint,
@@ -930,6 +939,8 @@ const ocrEditItems = ref<OcrBillItem[]>([])
 const hasLowConfidenceItems = computed(() =>
   ocrEditItems.value.some(item => item.confidence < 80)
 )
+// 电价方案管理
+const schemeManagerVisible = ref(false)
 
 // 需量配置计算属性
 const totalCapacity = computed(() =>
@@ -1117,6 +1128,9 @@ const showPricingDialog = (row?: ElectricityPricing) => {
     }
   }
   dialogs.pricing = true
+}
+const showSchemeManager = () => {
+  schemeManagerVisible.value = true
 }
 
 const handleSaveTransformer = async () => {

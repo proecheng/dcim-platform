@@ -76,7 +76,21 @@
       <!-- 约束条件可视化 -->
       <div class="constraints-section" v-if="device?.calculation_details">
         <div class="section-title">约束条件分析</div>
-        <div class="constraint-list">
+
+        <!-- 错误提示：calculation_details 只有 error 字段时 -->
+        <el-alert
+          v-if="device.calculation_details.error"
+          type="warning"
+          :closable="false"
+          show-icon
+          style="margin-bottom: 12px;"
+        >
+          <template #title>无法计算约束条件</template>
+          {{ device.calculation_details.error }}。请在设备管理中补充额定功率后重新分析。
+        </el-alert>
+
+        <!-- 正常约束条件列表 -->
+        <div class="constraint-list" v-if="constraintItems.length > 0">
           <div
             v-for="(c, idx) in constraintItems"
             :key="idx"
@@ -100,7 +114,7 @@
           </div>
         </div>
       </div>
-    </div>
+    </div> <!-- end drawer-content -->
 
     <!-- 底部操作按钮 -->
     <template #footer>
