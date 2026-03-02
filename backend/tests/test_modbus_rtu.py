@@ -619,7 +619,7 @@ class TestWordOrder:
             "gateway.adapters.modbus_tcp.AsyncModbusTcpClient.convert_from_registers",
             return_value=100000,
         ) as mock_convert:
-            results = await adapter.read_points(points)
+            await adapter.read_points(points)
             mock_convert.assert_called_once()
             call_args = mock_convert.call_args
             assert call_args.kwargs.get("word_order") == "little"

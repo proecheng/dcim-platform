@@ -726,13 +726,22 @@ class DeviceSyncService:
         self, code: str, area_code: Optional[str], circuit_map: dict
     ) -> Optional[int]:
         """PDU 设备回路推断"""
-        # 优先级1: 楼层 PDU (PDU-F2-XX → C-F2-PDU-GENERIC)
-        if code.startswith("PDU-F2-"):
-            return circuit_map.get("C-F2-PDU-GENERIC")
-        elif code.startswith("PDU-F3-"):
-            return circuit_map.get("C-F3-PDU-GENERIC")
-        elif code.startswith("PDU-F4-"):
-            return circuit_map.get("C-F4-PDU-GENERIC")
+        # 优先级1: 楼层 PDU（按编号奇偶分配到 01/02 回路）
+        for floor in ["F2", "F3", "F4"]:
+            prefix = f"PDU-{floor}-"
+            if code.startswith(prefix):
+                suffix = code[len(prefix):]
+                try:
+                    index = int(suffix)
+                    circuit_suffix = "01" if index % 2 == 1 else "02"
+                except ValueError:
+                    circuit_suffix = "01"
+
+                return (
+                    circuit_map.get(f"C-{floor}-PDU-{circuit_suffix}")
+                    or circuit_map.get(f"C-{floor}-PDU-01")
+                    or circuit_map.get(f"C-{floor}-UPS-01")
+                )
 
         # 优先级2: 旧的 A1/B1 区域 PDU
         area = area_code or ""

@@ -360,7 +360,7 @@ class TestWordOrder:
         points = [PointConfig(point_id="p_wo", address="HR:0:2", data_type="int32")]
 
         with patch.object(MockClientCls, "convert_from_registers", return_value=100000) as mock_convert:
-            results = await adapter.read_points(points)
+            await adapter.read_points(points)
             mock_convert.assert_called_once()
             call_args = mock_convert.call_args
             assert (

@@ -233,7 +233,7 @@ class TestCalculateRealtimePUE:
             power_point_id=5001,
         )
         ups_device = PowerDevice(
-            device_code="UPS-001",
+            device_code="UPS-F1-01",
             device_name="UPS1",
             device_type="UPS",
             rated_power=120.0,

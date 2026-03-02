@@ -88,7 +88,7 @@ for /f "tokens=5" %%a in ('netstat -ano ^| findstr ":3000" ^| findstr "LISTENING
 )
 
 echo       Waiting for ports to release...
-timeout /t 3 /nobreak >nul
+call :sleep 3
 
 REM Verify ports are free
 set "PORT_OK=1"
@@ -106,10 +106,10 @@ if not errorlevel 1 (
 if "!PORT_OK!"=="0" (
     echo.
     echo       Retrying port cleanup...
-    timeout /t 2 /nobreak >nul
+    call :sleep 2
     for /f "tokens=5" %%a in ('netstat -ano ^| findstr ":8080" ^| findstr "LISTENING"') do taskkill /F /PID %%a >nul 2>&1
     for /f "tokens=5" %%a in ('netstat -ano ^| findstr ":3000" ^| findstr "LISTENING"') do taskkill /F /PID %%a >nul 2>&1
-    timeout /t 2 /nobreak >nul
+    call :sleep 2
 )
 
 echo       Ports cleaned
@@ -245,16 +245,16 @@ set "BACKEND_DIR=%SCRIPT_DIR%backend"
 set "PROXY_DIR=%SCRIPT_DIR%proxy"
 
 echo Starting backend service (port 8080)...
-start "Monitor-Backend" cmd /k "title Backend [Port 8080] && cd /d %BACKEND_DIR% && echo Starting backend... && "%PYTHON_CMD%" -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8080"
+start "Monitor-Backend" cmd /k "title Backend [Port 8080] && cd /d %BACKEND_DIR% && echo Starting backend... && "%PYTHON_CMD%" -m uvicorn app.main:app --host 0.0.0.0 --port 8080"
 
 echo Waiting for backend to start...
-timeout /t 6 /nobreak >nul
+call :sleep 6
 
 echo Starting proxy service (port 3000)...
 start "Monitor-Proxy" cmd /k "title Proxy [Port 3000] && cd /d %PROXY_DIR% && echo Starting proxy... && node server.js"
 
 echo.
-timeout /t 5 /nobreak >nul
+call :sleep 5
 
 REM ============================================================
 REM Post-Start Verification (NEW)
@@ -345,3 +345,15 @@ echo.
 echo Press any key to close this launcher window...
 echo (Service windows will keep running)
 pause >nul
+
+goto :eof
+
+:sleep
+set "_secs=%~1"
+if "!_secs!"=="" set "_secs=1"
+timeout /t !_secs! /nobreak >nul 2>&1
+if errorlevel 1 (
+    set /a _ping_secs=!_secs!+1
+    ping 127.0.0.1 -n !_ping_secs! >nul 2>&1
+)
+exit /b 0

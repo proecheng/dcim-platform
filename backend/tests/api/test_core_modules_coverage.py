@@ -911,7 +911,7 @@ class TestStatisticsOverview:
     async def test_overview_with_data(self, client, viewer_user, async_db):
         _, token = viewer_user
         p = await _mk_point(async_db, "ST-O1", "stat-pt")
-        d = await _mk_device(async_db, "ST-D1", "stat-dev", "UPS", "A1")
+        await _mk_device(async_db, "ST-D1", "stat-dev", "UPS", "A1")
         await _mk_alarm(async_db, p.id, level="minor", status="active")
         await _mk_realtime(async_db, p.id, value=25.0, status="normal")
         r = await client.get("/api/v1/statistics/overview", headers=auth_headers(token))

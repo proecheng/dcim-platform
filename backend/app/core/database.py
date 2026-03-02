@@ -6,6 +6,7 @@
 
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from sqlalchemy.orm import DeclarativeBase
+from sqlalchemy import text
 from .config import get_settings
 
 settings = get_settings()
@@ -18,7 +19,6 @@ def _build_engine_kwargs() -> dict:
         "echo": settings.debug,
         "future": True,
     }
-
     if url.startswith("postgresql") or url.startswith("postgres"):
         # PostgreSQL 连接池配置
         kwargs.update(
@@ -30,7 +30,19 @@ def _build_engine_kwargs() -> dict:
                 "pool_pre_ping": True,  # 连接健康检查
             }
         )
-
+    elif url.startswith("sqlite"):
+        # SQLite 并发优化配置 + WAL 模式
+        kwargs.update(
+            {
+                "connect_args": {
+                    "timeout": 60,  # 增加超时时间到 60 秒
+                    "check_same_thread": False,
+                },
+                "pool_size": 5,
+                "max_overflow": 10,
+                "pool_pre_ping": True,  # 连接健康检查
+            }
+        )
     return kwargs
 
 
@@ -63,10 +75,15 @@ async def get_db():
 
 
 async def init_db():
-    """初始化数据库 — 创建所有表"""
+    """初始化数据库 — 创建所有表并启用 SQLite WAL 模式"""
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 
+        # 如果是 SQLite，启用 WAL 模式以支持并发读写
+        if settings.database_url.startswith("sqlite"):
+            await conn.execute(text("PRAGMA journal_mode=WAL"))
+            await conn.execute(text("PRAGMA synchronous=NORMAL"))
+            await conn.execute(text("PRAGMA cache_size=-64000"))  # 64MB 缓存
 
 def is_postgresql() -> bool:
     """判断当前是否使用 PostgreSQL"""

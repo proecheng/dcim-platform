@@ -52,7 +52,7 @@ REM Step 3: Wait for Cleanup
 REM ============================================================
 echo.
 echo [3/4] Waiting for cleanup...
-timeout /t 2 /nobreak >nul
+call :sleep 2
 
 REM ============================================================
 REM Step 4: Verify Ports are Free
@@ -76,7 +76,7 @@ if not errorlevel 1 (
 
 if "!ALL_CLEAR!"=="0" (
     echo       Waiting for final cleanup...
-    timeout /t 2 /nobreak >nul
+    call :sleep 2
     
     REM Final verification
     set "FINAL_CHECK=1"
@@ -114,3 +114,15 @@ echo ========================================================
 echo.
 
 pause
+
+goto :eof
+
+:sleep
+set "_secs=%~1"
+if "!_secs!"=="" set "_secs=1"
+timeout /t !_secs! /nobreak >nul 2>&1
+if errorlevel 1 (
+    set /a _ping_secs=!_secs!+1
+    ping 127.0.0.1 -n !_ping_secs! >nul 2>&1
+)
+exit /b 0

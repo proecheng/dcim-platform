@@ -259,6 +259,106 @@ DISTRIBUTION_PANELS = [
         "parent_code": "CAB-B01",
         "meter_point_code": "M003",
     },
+    {
+        "panel_code": "F2-PANEL-002",
+        "panel_name": "F2配电柜2",
+        "panel_type": "sub",
+        "rated_current": 400,
+        "location": "F2机房",
+        "area_code": "F2",
+        "parent_code": "UPS-OUT-001",
+        "meter_point_code": "M002",
+    },
+    {
+        "panel_code": "F2-PANEL-003",
+        "panel_name": "F2冷通道配电柜",
+        "panel_type": "sub",
+        "rated_current": 300,
+        "location": "F2机房",
+        "area_code": "F2",
+        "parent_code": "UPS-OUT-001",
+        "meter_point_code": "M002",
+    },
+    {
+        "panel_code": "F3-PANEL-002",
+        "panel_name": "F3配电柜2",
+        "panel_type": "sub",
+        "rated_current": 300,
+        "location": "F3机房",
+        "area_code": "F3",
+        "parent_code": "UPS-OUT-001",
+        "meter_point_code": "M002",
+    },
+    {
+        "panel_code": "F3-PANEL-003",
+        "panel_name": "F3冷通道配电柜",
+        "panel_type": "sub",
+        "rated_current": 250,
+        "location": "F3机房",
+        "area_code": "F3",
+        "parent_code": "UPS-OUT-001",
+        "meter_point_code": "M002",
+    },
+    {
+        "panel_code": "F4-PANEL-001",
+        "panel_name": "F4配电柜1",
+        "panel_type": "sub",
+        "rated_current": 300,
+        "location": "F4机房",
+        "area_code": "F4",
+        "parent_code": "UPS-OUT-001",
+        "meter_point_code": "M002",
+    },
+    {
+        "panel_code": "F4-PANEL-002",
+        "panel_name": "F4配电柜2",
+        "panel_type": "sub",
+        "rated_current": 300,
+        "location": "F4机房",
+        "area_code": "F4",
+        "parent_code": "UPS-OUT-001",
+        "meter_point_code": "M002",
+    },
+    {
+        "panel_code": "F4-PANEL-003",
+        "panel_name": "F4冷通道配电柜",
+        "panel_type": "sub",
+        "rated_current": 250,
+        "location": "F4机房",
+        "area_code": "F4",
+        "parent_code": "UPS-OUT-001",
+        "meter_point_code": "M002",
+    },
+    {
+        "panel_code": "AC-PANEL-002",
+        "panel_name": "空调出线配电柜",
+        "panel_type": "sub",
+        "rated_current": 400,
+        "location": "B1制冷机房",
+        "area_code": "B1",
+        "parent_code": "CAB-B01",
+        "meter_point_code": "M003",
+    },
+    {
+        "panel_code": "AC-PANEL-003",
+        "panel_name": "冷通道空调配电柜",
+        "panel_type": "sub",
+        "rated_current": 300,
+        "location": "B1制冷机房",
+        "area_code": "B1",
+        "parent_code": "CAB-B01",
+        "meter_point_code": "M003",
+    },
+    {
+        "panel_code": "COOLING-PANEL-002",
+        "panel_name": "制冷泵组配电柜",
+        "panel_type": "sub",
+        "rated_current": 600,
+        "location": "B1制冷机房",
+        "area_code": "B1",
+        "parent_code": "CAB-B01",
+        "meter_point_code": "M003",
+    },
 ]
 
 DISTRIBUTION_CIRCUITS = [
@@ -961,7 +1061,19 @@ class DemoDataService:
             self.loading = True
             self.progress = 0
             self.progress_message = "初始化..."
-
+            # 停止实时模拟器以避免数据库锁冲突
+            from .engine import simulator
+            from .lifecycle import _simulator_task
+            was_running = simulator.running
+            if was_running:
+                simulator.stop()
+                # 等待模拟器任务真正停止
+                if _simulator_task and not _simulator_task.done():
+                    try:
+                        await asyncio.wait_for(_simulator_task, timeout=10)
+                    except (asyncio.TimeoutError, asyncio.CancelledError):
+                        pass
+                await asyncio.sleep(2)  # 额外等待确保所有写入完成
             try:
                 await init_db()
 
@@ -1031,6 +1143,10 @@ class DemoDataService:
                 return {"success": False, "message": str(e)}
             finally:
                 self.loading = False
+                # 重启模拟器
+                from .engine import simulator
+                if not simulator.running:
+                    asyncio.create_task(simulator.start())
 
     async def sync_device_point_relations(self) -> dict:
         """
@@ -1090,6 +1206,20 @@ class DemoDataService:
             self.progress = 0
             self.progress_message = "正在卸载..."
 
+            # 停止实时模拟器以避免数据库锁冲突
+            from .engine import simulator
+            from .lifecycle import _simulator_task
+            was_running = simulator.running
+            if was_running:
+                simulator.stop()
+                # 等待模拟器任务真正停止
+                if _simulator_task and not _simulator_task.done():
+                    try:
+                        await asyncio.wait_for(_simulator_task, timeout=10)
+                    except (asyncio.TimeoutError, asyncio.CancelledError):
+                        pass
+                await asyncio.sleep(2)  # 额外等待确保所有写入完成
+
             try:
                 await self._clear_demo_data()
                 self.is_loaded = False
@@ -1098,6 +1228,9 @@ class DemoDataService:
                 return {"success": False, "message": str(e)}
             finally:
                 self.loading = False
+                # 重启模拟器
+                if was_running:
+                    asyncio.create_task(simulator.start())
 
     async def refresh_dates(self) -> dict:
         """刷新历史数据日期到最近30天（后台任务）"""
@@ -1584,6 +1717,8 @@ class DemoDataService:
     async def _generate_history(self, days: int, progress_callback) -> int:
         """生成历史数据"""
         from ..services.history_generator import HistoryGenerator
+        import asyncio
+        from sqlalchemy.exc import OperationalError
 
         generator = HistoryGenerator(days=days)
         total_hours = days * 24
@@ -1594,7 +1729,7 @@ class DemoDataService:
 
             total_records = 0
             batch_records = []
-            batch_size = 1000
+            batch_size = 1000  # 减小批量大小，加快单次提交速度
 
             for i, point in enumerate(points):
                 records = generator.generate_point_history(point, total_hours)
@@ -1603,10 +1738,23 @@ class DemoDataService:
                     batch_records.append(PointHistory(**r))
 
                     if len(batch_records) >= batch_size:
-                        session.add_all(batch_records)
-                        await session.commit()
-                        total_records += len(batch_records)
-                        batch_records = []
+                        # 重试机制：最多重试3次
+                        for retry in range(3):
+                            try:
+                                session.add_all(batch_records)
+                                await session.commit()
+                                total_records += len(batch_records)
+                                batch_records = []
+                                break
+                            except OperationalError as e:
+                                if "database is locked" in str(e) and retry < 2:
+                                    # 数据库锁定，等待后重试
+                                    await asyncio.sleep(2 + retry * 2)  # 2s, 4s, 6s 递增等待
+                                    await session.rollback()
+                                    continue
+                                else:
+                                    # 最后一次重试失败，抛出异常
+                                    raise
 
                         # 更新进度 45-85%
                         progress = 45 + int((total_records / (len(points) * total_hours)) * 40)
@@ -1615,9 +1763,20 @@ class DemoDataService:
                         )
 
             if batch_records:
-                session.add_all(batch_records)
-                await session.commit()
-                total_records += len(batch_records)
+                # 最后一批数据，也使用重试机制
+                for retry in range(3):
+                    try:
+                        session.add_all(batch_records)
+                        await session.commit()
+                        total_records += len(batch_records)
+                        break
+                    except OperationalError as e:
+                        if "database is locked" in str(e) and retry < 2:
+                            await asyncio.sleep(2 + retry * 2)  # 2s, 4s, 6s 递增等待
+                            await session.rollback()
+                            continue
+                        else:
+                            raise
 
             return total_records
 

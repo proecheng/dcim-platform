@@ -141,7 +141,7 @@ class TestEnergyComparisonEffect:
         await db_session.flush()
 
         completed_at = datetime.now() - timedelta(days=10)
-        plan = _create_plan(db_session, opp.id, completed_at=completed_at)
+        _create_plan(db_session, opp.id, completed_at=completed_at)
         await db_session.flush()
 
         tracking_start = completed_at.date()

@@ -522,7 +522,7 @@ async def test_get_cameras_by_alarm_with_device(client, db_session):
     point = await _create_point(db_session, "AI_TH_A1_010", "A1", device_id=100)
     alarm = await _create_alarm(db_session, point.id)
     # 创建摄像头关联到 device_id=100
-    cam = await _create_camera(db_session, "CAM-DEV-100", "设备摄像头", device_id=100)
+    await _create_camera(db_session, "CAM-DEV-100", "设备摄像头", device_id=100)
     await db_session.commit()
 
     resp = await client.get(f"{BASE_URL}/cameras/by-alarm/{alarm.id}")
@@ -539,7 +539,7 @@ async def test_get_cameras_by_alarm_with_area(client, db_session):
     point = await _create_point(db_session, "AI_TH_B1_001", "B1", device_id=None)
     alarm = await _create_alarm(db_session, point.id)
     # 创建区域摄像头
-    cam = await _create_camera(db_session, "CAM-AREA-B1", "B1区域摄像头", area_code="B1")
+    await _create_camera(db_session, "CAM-AREA-B1", "B1区域摄像头", area_code="B1")
     await db_session.commit()
 
     resp = await client.get(f"{BASE_URL}/cameras/by-alarm/{alarm.id}")
@@ -661,7 +661,7 @@ async def test_get_playback_info(client, db_session):
     point = await _create_point(db_session, "PT-PLAY-001", "AREA-A", device_id=1)
     alarm = await _create_alarm(db_session, point.id)
     # 创建摄像头（关联 device_id=1）
-    camera = await _create_camera(db_session, "CAM-PLAY-001", "回放测试摄像头", device_id=1)
+    await _create_camera(db_session, "CAM-PLAY-001", "回放测试摄像头", device_id=1)
     await db_session.commit()
 
     resp = await client.get(f"{BASE_URL}/playback/alarm/{alarm.id}")

@@ -364,7 +364,7 @@ class TestMqttServiceTopicMatching:
         with open(_mqtt_client_path, encoding="utf-8") as f:
             source = f.read()
         # 提取 _topic_matches 函数体
-        tree = ast.parse(source)
+        ast.parse(source)
         # 简单实现: 直接复制逻辑
         self._topic_matches = self._topic_matches_impl
 

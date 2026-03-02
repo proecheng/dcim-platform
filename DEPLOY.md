@@ -1,6 +1,6 @@
 # 算力中心智能监控系统 - 部署指南
 
-> 版本: V3.0 | 日期: 2026-02-22
+> 版本: V3.0 | 日期: 2026-02-24
 
 ---
 
@@ -26,7 +26,7 @@
 
 | 项目 | 说明 |
 |------|------|
-| 采集周期 | 默认每 10 秒采集一次（`COLLECT_INTERVAL` 控制） |
+| 采集周期 | 默认每 10 秒采集一次（`COLLECT_INTERVAL` 控制），模拟数据间隔 5 秒（`SIMULATION_INTERVAL` 控制） |
 | AI 点位 | 在量程范围内小幅波动（±2%），模拟真实传感器数据 |
 | DI 点位 | 有 0.5% 概率触发状态变化，模拟开关量告警 |
 | 数据存储 | 自动保存到 `point_history` 表 |
@@ -45,22 +45,33 @@ mytest1/
 │   ├── app/                    # 后端应用代码（必需）
 │   ├── alembic/                # 数据库迁移脚本（必需）
 │   ├── alembic.ini             # Alembic 配置（必需）
+│   ├── gateway/                # 采集网关模块（必需，含多协议适配器）
+│   │   ├── adapters/           # 协议适配器（Modbus/SNMP/MQTT/HTTP/BACnet/OPC-UA）
+│   │   ├── mqtt_client.py      # MQTT 客户端
+│   │   ├── scheduler.py        # 采集调度器
+│   │   └── requirements.txt    # 网关额外依赖
 │   ├── requirements.txt        # Python 依赖清单（必需）
+│   ├── requirements-ml.txt     # 机器学习可选依赖（可选，需 torch）
+│   ├── .env.example            # 后端环境变量模板
 │   ├── Dockerfile              # 后端容器构建文件
 │   └── dcim.db                 # SQLite 数据库（可选，首次启动自动创建）
 ├── frontend/
 │   ├── src/                    # 前端源码（开发时需要）
 │   ├── dist/                   # 前端构建产物（部署必需，需先执行 npm run build）
-│   ├── nginx.conf              # Nginx 配置模板
+│   ├── nginx.conf              # Nginx 配置模板（Docker 部署用）
 │   ├── Dockerfile              # 前端容器构建文件
 │   └── package.json            # 前端依赖清单
 ├── proxy/
-│   ├── server.js               # Express 代理服务（Windows 一键启动使用）
+│   ├── server.js               # Express 代理服务（一键启动使用）
 │   └── package.json            # 代理依赖清单
+├── deploy/
+│   └── nginx/
+│       ├── dcim.conf           # 生产 Nginx HTTPS 配置模板
+│       └── deploy-https.sh     # HTTPS 部署脚本
 ├── docker-compose.yml          # Docker Compose 编排文件
-├── .env                        # 环境变量配置（需手动创建）
+├── .env.example                # Docker Compose 环境变量模板
 ├── start.bat                   # Windows 一键启动脚本
-├── start.sh                    # Linux 一键启动脚本
+├── start.sh                    # Linux/Mac 一键启动脚本
 └── stop.bat                    # Windows 停止脚本
 ```
 
@@ -246,36 +257,40 @@ docker compose up -d --build
 
 ---
 
-### 方式二：Windows 一键启动
+### 方式二：一键启动（Windows / Linux / Mac）
 
 适用于开发测试和演示环境，使用 SQLite 数据库 + Express 代理。
 
 #### 前置条件
-
 - Python 3.9+
 - Node.js 18+
-
 #### 启动
 
+**Windows：**
 ```batch
 REM 停止已有服务
 stop.bat
-
-REM 一键启动（内置端口清理逻辑）
 start.bat
 ```
 
-#### 访问地址
+**Linux / Mac：**
 
+```bash
+chmod +x start.sh
+./start.sh
+```
+
+> `start.bat` 和 `start.sh` 行为一致：自动检查环境、清理端口、安装依赖、初始化数据库、构建前端、启动后端 + 代理服务。
+
+#### 访问地址
 | 服务 | 地址 |
 |------|------|
 | 系统入口 | http://localhost:3000 |
 | 大屏展示 | http://localhost:3000/bigscreen |
 | API 文档 | http://localhost:8080/docs |
-
 默认管理员账户：`admin` / `admin123`
 
-> 注意：`start.bat` 使用静态文件模式，修改前端代码后需手动执行 `cd frontend && npm run build` 并强制刷新浏览器（Ctrl+Shift+R）。开发前端建议使用 `cd frontend && npm run dev`（端口 5173，自动热更新）。
+> 注意：一键启动使用静态文件模式，修改前端代码后需手动执行 `cd frontend && npm run build` 并强制刷新浏览器（Ctrl+Shift+R）。开发前端建议使用 `cd frontend && npm run dev`（端口 5173，自动热更新）。
 
 ---
 
@@ -428,21 +443,22 @@ sudo systemctl reload nginx
 ---
 
 ## Nginx 配置
+### Docker 部署（自动配置）
+
+Docker Compose 部署时，Nginx 配置已内置在 `frontend/nginx.conf` 中，无需手动配置。该配置通过 Docker 内部网络代理到 `backend:8080`。
+
+### 手动部署（HTTP）
 
 创建配置文件 `/etc/nginx/sites-available/dcim`：
-
 ```nginx
 server {
     listen 80;
     server_name your-domain.com;
     root /opt/mytest1/frontend/dist;
     index index.html;
-
-    # 前端 SPA 路由 —— 所有路径回退到 index.html
     location / {
         try_files $uri $uri/ /index.html;
     }
-
     # API 反向代理
     location /api/ {
         proxy_pass http://127.0.0.1:8080/api/;
@@ -451,7 +467,6 @@ server {
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
     }
-
     # WebSocket 代理
     location /ws/ {
         proxy_pass http://127.0.0.1:8080/ws/;
@@ -461,13 +476,11 @@ server {
         proxy_set_header Host $host;
         proxy_read_timeout 86400;
     }
-
     # 静态资源长期缓存
     location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2)$ {
         expires 1y;
         add_header Cache-Control "public, immutable";
     }
-
     # Gzip 压缩
     gzip on;
     gzip_types text/plain text/css application/json application/javascript;
@@ -477,11 +490,25 @@ server {
 
 ### HTTPS 配置（生产环境推荐）
 
-使用 Certbot 获取免费 SSL 证书：
+项目已提供生产级 HTTPS 配置模板 `deploy/nginx/dcim.conf`，包含：
 
+- HTTP → HTTPS 自动重定向
+- TLS 1.2/1.3 安全参数
+- HSTS、X-Content-Type-Options、X-Frame-Options 安全头
+- WebSocket (WSS) 转发
+
+使用方法：
 ```bash
+# 复制配置并修改域名
+sudo cp deploy/nginx/dcim.conf /etc/nginx/conf.d/dcim.conf
+sudo vi /etc/nginx/conf.d/dcim.conf  # 将 dcim.powerlab.cn 替换为你的域名
+
+# 申请 SSL 证书
 sudo apt install certbot python3-certbot-nginx
 sudo certbot --nginx -d your-domain.com
+# 验证并重载
+sudo nginx -t
+sudo systemctl reload nginx
 ```
 
 ---
@@ -538,40 +565,52 @@ TimescaleDB 为 `point_history` 等时序数据表提供自动分区和高效查
 ---
 
 ## 环境变量说明
+下表列出所有环境变量。“代码默认值”为 `config.py` 中的硬编码默认，“Docker 默认值”为 `docker-compose.yml` 中覆盖的值。
 
+### 后端应用变量（config.py 读取）
+
+| 变量名 | 代码默认值 | Docker 默认值 | 说明 |
+|--------|------------|--------------|------|
+| `APP_NAME` | 算力中心智能监控系统 | 同左 | 应用名称 |
+| `APP_VERSION` | 3.0.0 | 3.0.0 | 应用版本 |
+| `DEBUG` | true | false | 调试模式（生产环境必须为 false） |
+| `HOST` | 0.0.0.0 | — | 服务监听地址 |
+| `PORT` | 8080 | — | 服务监听端口 |
+| `DATABASE_URL` | sqlite+aiosqlite:///./dcim.db | postgresql+asyncpg://... | 数据库连接字符串 |
+| `TIMESCALEDB_ENABLED` | false | true | 是否启用 TimescaleDB 扩展 |
+| `SECRET_KEY` | （随机生成） | change-this-to-a-secure-random-key | JWT 签名密钥（生产环境必须修改） |
+| `ALGORITHM` | HS256 | HS256 | JWT 签名算法 |
+| `ACCESS_TOKEN_EXPIRE_MINUTES` | 480 | 30 | 访问令牌过期时间（分钟，生产建议 30） |
+| `REFRESH_TOKEN_EXPIRE_DAYS` | 7 | 7 | 刷新令牌过期时间（天） |
+| `CORS_ORIGINS` | http://localhost:5173,http://localhost:3000 | http://localhost:3000 | 允许的跨域来源（逗号分隔） |
+| `COLLECT_INTERVAL` | 10 | 10 | 数据采集间隔（秒） |
+| `DATA_RETENTION_DAYS` | 30 | 30 | 历史数据保留天数 |
+| `SIMULATION_ENABLED` | true | true | 是否启用数据模拟器 |
+| `SIMULATION_INTERVAL` | 5 | — | 模拟数据生成间隔（秒） |
+| `LICENSE_KEY` | DEMO-0000-0000-0000 | — | 授权密钥 |
+| `MAX_POINTS` | 100 | 100 | 最大监控点位数 |
+| `REDIS_ENABLED` | true | true | 是否启用 Redis 缓存 |
+| `REDIS_URL` | redis://localhost:6379/0 | redis://redis:6379/0 | Redis 连接地址 |
+| `MQTT_ENABLED` | true | true | 是否启用 MQTT |
+| `MQTT_HOST` | localhost | emqx | MQTT 代理地址 |
+| `MQTT_PORT` | 1883 | 1883 | MQTT 端口 |
+| `MQTT_USERNAME` | （空） | （空） | MQTT 用户名 |
+| `MQTT_PASSWORD` | （空） | （空） | MQTT 密码 |
+| `MQTT_CLIENT_ID` | dcim-backend | — | MQTT 客户端 ID |
+
+### Docker Compose 专用变量（仅 docker-compose.yml 使用）
 | 变量名 | 默认值 | 说明 |
 |--------|--------|------|
-| `APP_NAME` | 算力中心智能监控系统 | 应用名称 |
-| `DEBUG` | false | 调试模式（生产环境必须为 false） |
-| `DATABASE_URL` | sqlite+aiosqlite:///./dcim.db | 数据库连接字符串 |
-| `TIMESCALEDB_ENABLED` | true | 是否启用 TimescaleDB 扩展 |
-| `SECRET_KEY` | change-this-to-a-secure-random-key | JWT 签名密钥（生产环境必须修改） |
-| `ALGORITHM` | HS256 | JWT 签名算法 |
-| `ACCESS_TOKEN_EXPIRE_MINUTES` | 30 | 访问令牌过期时间（分钟） |
-| `REFRESH_TOKEN_EXPIRE_DAYS` | 7 | 刷新令牌过期时间（天） |
-| `CORS_ORIGINS` | http://localhost:3000 | 允许的跨域来源（逗号分隔） |
-| `REDIS_ENABLED` | true | 是否启用 Redis 缓存 |
-| `REDIS_URL` | redis://redis:6379/0 | Redis 连接地址 |
-| `MQTT_ENABLED` | true | 是否启用 MQTT |
-| `MQTT_HOST` | emqx | MQTT 代理地址 |
-| `MQTT_PORT` | 1883 | MQTT 端口 |
-| `MQTT_USERNAME` | （空） | MQTT 用户名 |
-| `MQTT_PASSWORD` | （空） | MQTT 密码 |
-| `SIMULATION_ENABLED` | true | 是否启用数据模拟器 |
-| `COLLECT_INTERVAL` | 10 | 数据采集间隔（秒） |
-| `DATA_RETENTION_DAYS` | 30 | 历史数据保留天数 |
-| `MAX_POINTS` | 100 | 最大监控点位数 |
-| `BACKEND_PORT` | 8080 | 后端服务端口 |
-| `NGINX_PORT` | 3000 | 前端服务端口 |
-| `POSTGRES_PORT` | 5432 | PostgreSQL 端口 |
+| `BACKEND_PORT` | 8080 | 后端对外端口映射 |
+| `NGINX_PORT` | 3000 | 前端对外端口映射 |
 | `POSTGRES_DB` | dcim | 数据库名称 |
 | `POSTGRES_USER` | dcim | 数据库用户名 |
 | `POSTGRES_PASSWORD` | dcim_password | 数据库密码（生产环境必须修改） |
-| `REDIS_PORT` | 6379 | Redis 端口 |
+| `POSTGRES_PORT` | 5432 | PostgreSQL 对外端口映射 |
+| `REDIS_PORT` | 6379 | Redis 对外端口映射 |
+| `MQTT_WS_PORT` | 8083 | MQTT WebSocket 端口 |
 | `EMQX_DASHBOARD_PORT` | 18083 | EMQX 管理面板端口 |
-
 ---
-
 ## 安全配置
 
 ### 生产环境必须执行的安全措施
@@ -770,6 +809,21 @@ alembic upgrade head
 # 重启后端，自动创建表和初始数据
 ```
 
+### 4.1 Alembic 迁移报多 head 错误
+
+如果 `alembic upgrade head` 报错 "Multiple head revisions"：
+
+```bash
+# 查看当前 head
+alembic heads
+
+# 合并多个 head
+alembic merge heads -m "merge multiple heads"
+
+# 再执行迁移
+alembic upgrade head
+```
+
 ### 5. Docker 构建失败
 
 ```bash
@@ -812,4 +866,4 @@ docker exec -it dcim-postgres psql -U dcim -c "SELECT extname FROM pg_extension;
 
 ---
 
-*最后更新: 2026-02-22*
+*最后更新: 2026-02-24*

@@ -526,7 +526,7 @@ class TestSiteAccessPermission:
         viewer, viewer_token = viewer_user
 
         site1 = await create_site(client, admin_token, site_code="LIST-S1", site_name="列表站点1")
-        site2 = await create_site(client, admin_token, site_code="LIST-S2", site_name="列表站点2")
+        await create_site(client, admin_token, site_code="LIST-S2", site_name="列表站点2")
 
         # 给 viewer 分配站点1权限
         from app.models.user import UserSite
@@ -755,7 +755,7 @@ class TestSiteSummary:
         viewer, viewer_token = viewer_user
 
         site1 = await create_site(client, admin_token, site_code="SUMV-S1", site_name="汇总V站点1")
-        site2 = await create_site(client, admin_token, site_code="SUMV-S2", site_name="汇总V站点2")
+        await create_site(client, admin_token, site_code="SUMV-S2", site_name="汇总V站点2")
 
         # 给 viewer 分配站点1权限
         from app.models.user import UserSite

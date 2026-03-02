@@ -4,7 +4,7 @@
 
 import json
 from datetime import datetime
-from unittest.mock import AsyncMock, patch, MagicMock
+from unittest.mock import AsyncMock, patch
 
 from app.models.gateway import DataSource
 from app.models.floor_map import FloorMap

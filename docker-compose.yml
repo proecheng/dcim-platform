@@ -74,7 +74,7 @@ services:
     environment:
       # 应用
       APP_NAME: ${APP_NAME:-算力中心智能监控系统}
-      APP_VERSION: "2.0.0"
+      APP_VERSION: "3.0.0"
       DEBUG: ${DEBUG:-false}
       # 数据库 — PostgreSQL + TimescaleDB
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-dcim}:${POSTGRES_PASSWORD:-dcim_password}@postgres:5432/${POSTGRES_DB:-dcim}
