@@ -720,18 +720,18 @@ async function loadAssets() {
     if (filters.keyword) params.keyword = filters.keyword
 
     const res = await getAssets(params)
-    if (res.data) {
-      if (Array.isArray(res.data)) {
-        assets.value = res.data
-        pagination.total = res.data.length
-      } else {
-        assets.value = (res.data as any).items || []
-        pagination.total = (res.data as any).total || 0
-      }
+    // 响应拦截器已解包 response.data，res 即后端返回的数据本体
+    if (Array.isArray(res)) {
+      assets.value = res as unknown as Asset[]
+      pagination.total = res.length
+    } else if (res && typeof res === 'object') {
+      assets.value = (res as any).items || (res as any).data || []
+      pagination.total = (res as any).total || assets.value.length
     }
   } catch (e) {
     console.error('加载资产列表失败', e)
     ElMessage.error('加载资产列表失败')
+    assets.value = []
   } finally {
     loading.value = false
   }
@@ -741,11 +741,22 @@ async function loadAssets() {
 async function loadStatistics() {
   try {
     const res = await getAssetStatistics()
-    if (res.data) {
-      statistics.value = res.data
+    // 响应拦截器已解包，res 即 AssetStatistics 对象
+    if (res && typeof res === 'object') {
+      const data = (res as any).data || res
+      statistics.value = data
     }
   } catch (e) {
     console.error('加载统计数据失败', e)
+    // API 失败时使用兜底默认值，保证卡片不显示异常
+    statistics.value = {
+      total_count: 0,
+      by_status: {},
+      by_type: {},
+      by_department: {},
+      total_value: 0,
+      warranty_expiring_count: 0
+    }
   }
 }
 
@@ -952,7 +963,9 @@ async function handlePreview() {
   importLoading.value = true
   try {
     const res = await importAssets(importFile.value, 'preview')
-    importResult.value = res.data as any
+    // 响应拦截器已解包，res 即后端返回的预校验结果
+    const data = (res as any)?.data || res
+    importResult.value = data as any
   } catch (e) {
     console.error('预校验失败', e)
     ElMessage.error('预校验失败')
@@ -982,7 +995,9 @@ async function handleConfirmImport() {
 async function handleDownloadTemplate() {
   try {
     const res = await downloadImportTemplate()
-    const blob = new Blob([res.data], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
+    // 响应拦截器已解包，res 即 blob 数据本体
+    const blobData = (res as any)?.data || res
+    const blob = new Blob([blobData], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
     const url = window.URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
@@ -1002,7 +1017,9 @@ async function handleExport() {
       status: filters.status || undefined,
       keyword: filters.keyword || undefined
     })
-    const blob = new Blob([res.data], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
+    // 响应拦截器已解包，res 即 blob 数据本体
+    const blobData = (res as any)?.data || res
+    const blob = new Blob([blobData], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
     const url = window.URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
@@ -1087,7 +1104,14 @@ watch(() => detailActiveTab.value, async (tab) => {
     maintenanceLoading.value = true
     try {
       const res = await getMaintenanceRecords({ asset_id: detailAsset.value.id })
-      maintenanceRecords.value = Array.isArray(res) ? res : (res as any).data || []
+      // 响应拦截器已解包，res 可能是数组或含 data/items 的对象
+      if (Array.isArray(res)) {
+        maintenanceRecords.value = res
+      } else if (res && typeof res === 'object') {
+        maintenanceRecords.value = (res as any).data || (res as any).items || []
+      } else {
+        maintenanceRecords.value = []
+      }
     } catch (e) {
       console.error('加载维护记录失败', e)
       maintenanceRecords.value = []
@@ -1101,9 +1125,25 @@ watch(() => detailActiveTab.value, async (tab) => {
 async function loadWarrantyAlerts() {
   try {
     const res = await getWarrantyAlerts()
-    warrantyAlerts.value = res as any
+    // 响应拦截器已解包，res 即 WarrantyAlertResponse 对象
+    const data = (res as any)?.data || res
+    if (data && typeof data === 'object') {
+      warrantyAlerts.value = {
+        within_30_days: data.within_30_days || [],
+        within_60_days: data.within_60_days || [],
+        within_90_days: data.within_90_days || [],
+        total_count: data.total_count || 0
+      }
+    }
   } catch (e) {
     console.error('加载保修预警失败', e)
+    // API 失败时使用兜底默认值
+    warrantyAlerts.value = {
+      within_30_days: [],
+      within_60_days: [],
+      within_90_days: [],
+      total_count: 0
+    }
   }
 }
 

@@ -281,16 +281,34 @@ async function loadData() {
     tableData.value = result.items || []
     pagination.total = result.total || 0
 
-    // 统计
+    // 统计 - 使用 API 返回的 total 作为总数，子项统计需单独请求
     stats.total = result.total || 0
-    stats.enabled = tableData.value.filter(r => r.is_enabled).length
-    stats.disabled = tableData.value.filter(r => !r.is_enabled).length
-    stats.andCount = tableData.value.filter(r => r.rule_type === 'and').length
+    loadStats()
   } catch (e) {
     console.error('加载规则失败', e)
     ElMessage.error('加载复合规则列表失败')
   } finally {
     loading.value = false
+  }
+}
+
+/** 加载统计数据 - 通过不同筛选条件的 API 请求获取准确的全量统计 */
+async function loadStats() {
+  try {
+    const [enabledRes, disabledRes, andRes] = await Promise.all([
+      getAlarmRules({ page: 1, page_size: 1, is_enabled: true }),
+      getAlarmRules({ page: 1, page_size: 1, is_enabled: false }),
+      getAlarmRules({ page: 1, page_size: 1, rule_type: 'and' })
+    ])
+    stats.enabled = enabledRes.total || 0
+    stats.disabled = disabledRes.total || 0
+    stats.andCount = andRes.total || 0
+  } catch (e) {
+    // 统计加载失败时降级为当前页数据
+    console.warn('加载统计数据失败，降级为当前页统计', e)
+    stats.enabled = tableData.value.filter(r => r.is_enabled).length
+    stats.disabled = tableData.value.filter(r => !r.is_enabled).length
+    stats.andCount = tableData.value.filter(r => r.rule_type === 'and').length
   }
 }
 

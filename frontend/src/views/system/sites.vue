@@ -259,9 +259,9 @@ function statusLabel(status: string): string {
   return map[status] || status
 }
 
-// 初始化
-onMounted(() => {
-  loadSites()
+// 初始化：先加载站点列表，再加载汇总（汇总降级依赖站点列表数据）
+onMounted(async () => {
+  await loadSites()
   loadSummary()
 })
 
@@ -287,7 +287,17 @@ async function loadSummary() {
     const res = await getSiteSummary()
     summaryData.value = (res as unknown as { data?: SiteSummaryResponse }).data ?? res
   } catch (e) {
-    console.error('加载站点汇总失败', e)
+    console.error('加载站点汇总失败，从站点列表计算', e)
+    // 从已加载的站点列表计算汇总数据作为降级方案
+    if (siteList.value.length > 0) {
+      summaryData.value = {
+        total_sites: siteList.value.length,
+        total_devices: siteList.value.reduce((sum, s) => sum + (s.device_count || 0), 0),
+        total_gateways: siteList.value.reduce((sum, s) => sum + (s.gateway_count || 0), 0),
+        total_alarms: 0,
+        sites: [],
+      }
+    }
   }
 }
 
@@ -333,8 +343,11 @@ function handleEdit(row: Site) {
 
 // 提交表单
 async function handleSubmit() {
-  const valid = await formRef.value?.validate()
-  if (!valid) return
+  try {
+    await formRef.value?.validate()
+  } catch {
+    return // 表单校验不通过
+  }
 
   submitting.value = true
   try {

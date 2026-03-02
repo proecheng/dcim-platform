@@ -93,10 +93,32 @@ export function updateDevice(id: number, data: DeviceUpdateParams): Promise<Devi
 }
 
 /**
- * 删除设备
+ * 删除影响分析
  */
-export function deleteDevice(id: number): Promise<void> {
-  return request.delete(`/v1/devices/${id}`)
+export interface DeleteImpactItem {
+  table_name: string
+  display_name: string
+  count: number
+  action: 'delete' | 'unlink'
+}
+
+export interface DeviceDeleteImpact {
+  device_id: number
+  device_code: string
+  device_name: string
+  impacts: DeleteImpactItem[]
+  total_affected_records: number
+}
+
+export function getDeleteImpact(id: number): Promise<DeviceDeleteImpact> {
+  return request.get(`/v1/devices/${id}/delete-impact`)
+}
+
+/**
+ * 删除设备（支持 force 参数）
+ */
+export function deleteDevice(id: number, force = false): Promise<void> {
+  return request.delete(`/v1/devices/${id}`, { params: { force } })
 }
 
 /**

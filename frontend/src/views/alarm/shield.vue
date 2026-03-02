@@ -594,15 +594,22 @@ async function submitForm() {
     // 编辑模式: 先创建新记录，成功后再删除旧记录（避免删除成功但创建失败导致数据丢失）
     if (isEdit.value && editingId.value) {
       await createAlarmShield(data)
+      let deleteOldFailed = false
       try {
         await deleteAlarmShield(editingId.value)
       } catch (delErr) {
+        deleteOldFailed = true
         console.warn('旧屏蔽策略删除失败（新策略已创建），可能产生重复记录', delErr)
+      }
+      if (deleteOldFailed) {
+        ElMessage.warning('更新成功，但旧策略删除失败，请手动检查是否存在重复记录')
+      } else {
+        ElMessage.success('更新成功')
       }
     } else {
       await createAlarmShield(data)
+      ElMessage.success('创建成功')
     }
-    ElMessage.success(isEdit.value ? '更新成功' : '创建成功')
     dialogVisible.value = false
     loadData()
   } catch (e) {
@@ -630,12 +637,18 @@ async function handleTerminate(row: ShieldRow) {
       end_time: new Date().toISOString(),
       reason: JSON.stringify(meta)
     })
+    let deleteOldFailed = false
     try {
       await deleteAlarmShield(row.id)
     } catch (delErr) {
+      deleteOldFailed = true
       console.warn('旧屏蔽策略删除失败（终止记录已创建），可能产生重复记录', delErr)
     }
-    ElMessage.success('已终止屏蔽策略')
+    if (deleteOldFailed) {
+      ElMessage.warning('已终止屏蔽策略，但旧策略删除失败，请手动检查是否存在重复记录')
+    } else {
+      ElMessage.success('已终止屏蔽策略')
+    }
     loadData()
   } catch (e) {
     if (e !== 'cancel') {

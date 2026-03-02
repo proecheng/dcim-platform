@@ -98,7 +98,7 @@ async function loadData() {
 }
 
 function goDetail(id: number) {
-  router.push(`/device-manage/detail/${id}`)
+  router.push({ name: 'DeviceDetail', params: { id } })
 }
 
 onMounted(() => {

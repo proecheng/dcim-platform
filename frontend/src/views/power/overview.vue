@@ -163,10 +163,6 @@ onMounted(async () => {
   } finally {
     loading.value = false
   }
-  // 如果关键字段缺失，回退到模拟数据
-  if (overview.value.ups_total === undefined) {
-    overview.value = mockData
-  }
 })
 </script>
 

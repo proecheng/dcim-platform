@@ -83,7 +83,7 @@
               {{ currentPoint?.unit }}
             </el-descriptions-item>
             <el-descriptions-item label="标准差">
-              {{ statistics.std_dev.toFixed(4) }}
+              {{ statistics.std_dev != null ? statistics.std_dev.toFixed(4) : '-' }}
             </el-descriptions-item>
             <el-descriptions-item label="变化率">
               <el-tag v-if="statistics.change_rate !== null && statistics.change_rate !== undefined"

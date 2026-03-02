@@ -145,9 +145,6 @@ async function loadData() {
   } finally {
     loading.value = false
   }
-  if (groupList.value.length === 0) {
-    groupList.value = mockGroupList
-  }
 }
 
 async function openDetail(row: GroupItem) {
@@ -166,9 +163,6 @@ async function openDetail(row: GroupItem) {
     memberUnits.value = mockMemberUnits
   } finally {
     detailLoading.value = false
-  }
-  if (memberUnits.value.length === 0) {
-    memberUnits.value = mockMemberUnits
   }
 }
 

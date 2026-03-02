@@ -189,9 +189,6 @@ async function loadData() {
   } finally {
     loading.value = false
   }
-  if (unitList.value.length === 0) {
-    unitList.value = mockOutdoorList
-  }
 }
 
 async function openDetail(row: OutdoorUnit) {
@@ -212,7 +209,7 @@ async function openDetail(row: OutdoorUnit) {
         status: p.status || 'normal'
       }))
     } else {
-      detailParams.value = mockOutdoorDetailParams
+      detailParams.value = []
     }
   } catch {
     console.warn('室外机详情API未就绪，使用模拟数据')

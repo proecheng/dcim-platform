@@ -91,7 +91,7 @@
         </el-table-column>
         <el-table-column label="通知人数" width="90" align="center">
           <template #default="{ row }">
-            <el-tag size="small">{{ (row.notify_user_ids || []).length }}</el-tag>
+            <el-tag size="small">{{ getChainUserCount(row) }}</el-tag>
           </template>
         </el-table-column>
         <el-table-column label="启用" width="80" align="center">
@@ -338,17 +338,38 @@ async function loadData() {
     tableData.value = items
     pagination.total = result.total || result.data?.total || 0
 
-    // 统计
+    // 统计 - 使用 API 返回的 total 作为总数，子项统计需单独请求
     stats.total = pagination.total
-    stats.enabled = items.filter((r: AlarmEscalationInfo) => r.is_enabled).length
-    stats.disabled = items.filter((r: AlarmEscalationInfo) => !r.is_enabled).length
-    const levels = new Set(items.map((r: AlarmEscalationInfo) => r.source_level))
-    stats.levelCount = levels.size
+    loadStats()
   } catch (e) {
     console.error('加载升级规则失败', e)
     ElMessage.error('加载升级规则列表失败')
   } finally {
     loading.value = false
+  }
+}
+
+/** 加载统计数据 - 通过不同筛选条件的 API 请求获取准确的全量统计 */
+async function loadStats() {
+  try {
+    const [enabledRes, disabledRes] = await Promise.all([
+      getEscalations({ page: 1, page_size: 1, is_enabled: true }),
+      getEscalations({ page: 1, page_size: 1, is_enabled: false })
+    ])
+    stats.enabled = enabledRes.total || enabledRes.data?.total || 0
+    stats.disabled = disabledRes.total || disabledRes.data?.total || 0
+    // 告警级别数需要从全量数据中统计（page_size 足够大以覆盖所有记录）
+    const allRes = await getEscalations({ page: 1, page_size: 100 })
+    const allItems: AlarmEscalationInfo[] = allRes.items || allRes.data?.items || []
+    const levels = new Set(allItems.map((r: AlarmEscalationInfo) => r.source_level))
+    stats.levelCount = levels.size
+  } catch (e) {
+    // 统计加载失败时降级为当前页数据
+    console.warn('加载统计数据失败，降级为当前页统计', e)
+    stats.enabled = tableData.value.filter((r: AlarmEscalationInfo) => r.is_enabled).length
+    stats.disabled = tableData.value.filter((r: AlarmEscalationInfo) => !r.is_enabled).length
+    const levels = new Set(tableData.value.map((r: AlarmEscalationInfo) => r.source_level))
+    stats.levelCount = levels.size
   }
 }
 
@@ -385,6 +406,30 @@ function getChainLength(row: AlarmEscalationInfo): number {
     // 不是 JSON，说明只有单节点
   }
   return 1
+}
+
+/** 从 escalation_chain 解析各层级的通知人总数（去重），保留层级粒度 */
+function getChainUserCount(row: AlarmEscalationInfo): number {
+  const chainStr = row.escalation_chain || row.description
+  if (!chainStr) {
+    // 无升级链数据，回退到顶层 notify_user_ids
+    return (row.notify_user_ids || []).length
+  }
+  try {
+    const chain = JSON.parse(chainStr)
+    if (Array.isArray(chain)) {
+      const allIds = new Set<number>()
+      for (const node of chain) {
+        if (Array.isArray(node.notify_user_ids)) {
+          node.notify_user_ids.forEach((id: number) => allIds.add(id))
+        }
+      }
+      return allIds.size
+    }
+  } catch {
+    // 不是 JSON
+  }
+  return (row.notify_user_ids || []).length
 }
 
 // ==================== 启用/禁用 ====================
@@ -530,17 +575,18 @@ async function submitForm() {
 
   submitting.value = true
   try {
-    // 合并所有节点的通知人
-    const allUserIds = [...new Set(form.chain.flatMap(n => n.notify_user_ids))]
-    // 取第一个节点的超时时间作为顶层字段
-    const firstTimeout = form.chain[0].timeout_minutes
+    // 取第一个节点的超时时间和通知人作为顶层字段（保持向后兼容）
+    // 各节点的完整通知人配置保存在 escalation_chain 中，保留层级粒度
+    const firstNode = form.chain[0]
+    const firstTimeout = firstNode.timeout_minutes
+    const firstNodeUserIds = [...firstNode.notify_user_ids]
 
     const data: AlarmEscalationCreateParams = {
       rule_name: form.ruleName,
       source_level: form.sourceLevel,
       timeout_minutes: firstTimeout,
       target_level: form.targetLevel,
-      notify_user_ids: allUserIds,
+      notify_user_ids: firstNodeUserIds,
       is_enabled: true,
       description: '',
       escalation_chain: JSON.stringify(form.chain)

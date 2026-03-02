@@ -118,7 +118,7 @@ const sensorData = computed(() =>
 
 const avgTemp = computed(() => {
   const temps = sensorData.value.filter(
-    (d) => d.device_type === 'TH' && d.unit === '°C' && d.value != null
+    (d) => d.device_type === 'TH' && (d.unit === '°C' || d.unit === '℃') && d.value != null
   )
   if (!temps.length) return '--'
   const avg = temps.reduce((s, d) => s + (d.value ?? 0), 0) / temps.length
@@ -127,7 +127,7 @@ const avgTemp = computed(() => {
 
 const avgHumidity = computed(() => {
   const hums = sensorData.value.filter(
-    (d) => d.device_type === 'TH' && d.unit === '%' && d.value != null
+    (d) => d.device_type === 'TH' && (d.unit === '%' || d.unit === '%RH') && d.value != null
   )
   if (!hums.length) return '--'
   const avg = hums.reduce((s, d) => s + (d.value ?? 0), 0) / hums.length

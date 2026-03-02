@@ -130,9 +130,6 @@ async function loadData() {
   } finally {
     loading.value = false
   }
-  if (aisleList.value.length === 0) {
-    aisleList.value = mockAisleList
-  }
 }
 
 async function openDetail(row: AisleItem) {
@@ -144,7 +141,7 @@ async function openDetail(row: AisleItem) {
     const res = await getColdAisleDetail(row.id)
     const data = res?.data ?? res
     currentAisle.value = data as AisleItem
-    skylightList.value = data?.skylights ?? mockSkylights
+    skylightList.value = data?.skylights ?? []
   } catch {
     console.warn('冷通道详情API未就绪，使用模拟数据')
     currentAisle.value = row

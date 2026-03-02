@@ -222,7 +222,7 @@ import { ref, onMounted, onUnmounted, markRaw } from 'vue'
 import { Monitor, CircleCheck, Warning, Remove } from '@element-plus/icons-vue'
 import { Lightning, FullScreen, Refresh, Coin } from '@element-plus/icons-vue'
 import { IceCream, Sunny, Lock, OfficeBuilding, Opportunity } from '@element-plus/icons-vue'
-import { getAllRealtimeData, getRealtimeSummary, type RealtimeData } from '@/api/modules/realtime'
+import { getAllRealtimeData, getRealtimeSummary, getDashboardData, type RealtimeData } from '@/api/modules/realtime'
 import { getActiveAlarms } from '@/api/modules/alarm'
 import { getEnergyDashboard, type EnergyDashboardData } from '@/api/modules/energy'
 // V2.3 增强版能源卡片组件
@@ -288,11 +288,32 @@ async function refreshData() {
     realtimeData.value = realtimeRes
     activeAlarms.value = alarmsRes.slice(0, 10)
 
+    // 更新6大域概览卡片的动态状态
+    try {
+      const dashRes = await getDashboardData()
+      const ov = dashRes?.overview
+      if (ov) {
+        const alarmCount = ov.alarm_count || 0
+        domainOverview.value[0].stat = ov.power != null ? `${ov.power}kW` : '运行中'
+        domainOverview.value[1].stat = `${ov.ac_running || 0}台运行`
+        domainOverview.value[2].stat = ov.temperature != null ? `${ov.temperature}°C` : '运行中'
+        domainOverview.value[3].stat = alarmCount > 0 ? `${alarmCount}条告警` : '正常'
+        const ds = dashRes.device_status || {}
+        const totalDevices = Object.values(ds).reduce((a: number, b: any) => a + (b || 0), 0)
+        domainOverview.value[4].stat = totalDevices > 0 ? `${totalDevices}台设备` : '运行中'
+      }
+    } catch (e) {
+      console.warn('仪表盘概览数据加载失败', e)
+    }
+
     // 加载能源仪表盘数据 (V2.3)
     try {
       const energyRes = await getEnergyDashboard()
       if (energyRes.code === 0 && energyRes.data) {
         energyData.value = energyRes.data
+        // 更新节能中心卡片状态
+        const pue = energyRes.data.efficiency?.pue
+        domainOverview.value[5].stat = pue != null ? `PUE ${pue.toFixed(2)}` : '运行中'
       }
     } catch (e) {
       console.warn('能源仪表盘数据加载失败，可能API未就绪', e)

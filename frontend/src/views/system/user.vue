@@ -401,8 +401,11 @@ function handleEdit(row: UserInfo) {
 
 // 提交表单
 async function handleSubmit() {
-  const valid = await formRef.value?.validate()
-  if (!valid) return
+  try {
+    await formRef.value?.validate()
+  } catch {
+    return // 表单校验不通过
+  }
 
   submitting.value = true
   try {
@@ -493,8 +496,11 @@ function handleResetPassword(row: UserInfo) {
 }
 
 async function submitResetPassword() {
-  const valid = await resetPwdFormRef.value?.validate()
-  if (!valid) return
+  try {
+    await resetPwdFormRef.value?.validate()
+  } catch {
+    return // 表单校验不通过
+  }
 
   if (!resetPwdUserId.value) return
   submitting.value = true

@@ -370,9 +370,15 @@ async function handleSensorClick(sensor: RealtimeData) {
   }
 }
 
-// ── 消防联动策略匹配 ──
+// ── 消防联动策略匹配（按传感器区域过滤） ──
 const matchedFirePolicies = computed(() => {
-  return firePolicies.value
+  if (!selectedSensor.value) return []
+  const sensorArea = selectedSensor.value.area_code
+  return firePolicies.value.filter((p: any) => {
+    // 按区域匹配：策略的 area_code 与传感器所在区域一致，或策略未限定区域（全局策略）
+    if (!p.area_code) return true
+    return p.area_code === sensorArea
+  })
 })
 
 // ── 底部表格筛选 ──

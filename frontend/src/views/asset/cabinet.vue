@@ -363,16 +363,16 @@ async function loadCabinets() {
   loading.value = true
   try {
     const res = await getCabinets()
-    if (res.data) {
-      if (Array.isArray(res.data)) {
-        cabinets.value = res.data
-      } else {
-        cabinets.value = (res.data as any).items || []
-      }
+    // 响应拦截器已解包 response.data，res 即后端返回的数据本体
+    if (Array.isArray(res)) {
+      cabinets.value = res as unknown as Cabinet[]
+    } else if (res && typeof res === 'object') {
+      cabinets.value = (res as any).items || (res as any).data || []
     }
   } catch (e) {
     console.error('加载机柜列表失败', e)
     ElMessage.error('加载机柜列表失败')
+    cabinets.value = []
   } finally {
     loading.value = false
   }
@@ -413,12 +413,25 @@ async function viewUsage(row: Cabinet) {
 
   try {
     const res = await getCabinetUsage(row.id)
-    if (res) {
-      currentUsage.value = res as unknown as CabinetUsage
+    // 响应拦截器已解包，res 可能是 CabinetUsage 或含 data 的包装对象
+    const data = (res as any)?.data || res
+    if (data && typeof data === 'object') {
+      currentUsage.value = data as unknown as CabinetUsage
     }
   } catch (e) {
     console.error('获取机柜使用情况失败', e)
     ElMessage.error('获取机柜使用情况失败')
+    // API 失败时使用基于机柜行数据的兜底值，保证 U 位图弹框仍可展示空机柜
+    currentUsage.value = {
+      cabinet_id: row.id,
+      cabinet_name: row.cabinet_name,
+      total_u: row.total_u || 42,
+      used_u: row.used_u || 0,
+      available_u: row.available_u || (row.total_u || 42),
+      usage_rate: 0,
+      u_map: {},
+      assets: []
+    }
   }
 }
 

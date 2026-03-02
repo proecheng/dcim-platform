@@ -34,7 +34,7 @@
           <el-icon><Back /></el-icon>
         </div>
         <div class="time">{{ currentTime }}</div>
-        <div class="title">XX数据中心机房</div>
+        <div class="title">{{ siteStore.currentSiteName || '算力中心机房' }}</div>
         <div class="mode-selector">
           <el-dropdown @command="handleModeChange">
             <span class="mode-label">
@@ -56,11 +56,11 @@
         <ThemeSelector :showLabel="false" />
         <div class="kpi pue">
           <span class="label">PUE</span>
-          <span class="value">{{ store.energy.pue.toFixed(2) }}</span>
+          <span class="value">{{ (store.energy?.pue ?? 0).toFixed(2) }}</span>
         </div>
-        <div class="kpi alarm" :class="{ 'has-alarm': store.alarmCount > 0 }">
+        <div class="kpi alarm" :class="{ 'has-alarm': (store.alarmCount ?? 0) > 0 }">
           <el-icon><Bell /></el-icon>
-          <span class="value">{{ store.alarmCount }}</span>
+          <span class="value">{{ store.alarmCount ?? 0 }}</span>
         </div>
       </div>
 
@@ -163,11 +163,10 @@
 
       <!-- 右键菜单 -->
       <ContextMenu
-        :visible="contextMenuVisible"
+        v-model:visible="contextMenuVisible"
         :x="contextMenuX"
         :y="contextMenuY"
         :items="contextMenuItems"
-        @close="contextMenuVisible = false"
         @select="handleContextMenuSelect"
       />
 
@@ -200,6 +199,7 @@ import Floor2DView from '@/components/bigscreen/Floor2DView.vue'
 import type { MapData2D } from '@/api/modules/floorMap'
 import type { BigscreenAlarm } from '@/types/bigscreen'
 import { useBigscreenStore } from '@/stores/bigscreen'
+import { useSiteStore } from '@/stores/site'
 import { getDefaultLayout } from '@/api/modules/bigscreen'
 import { setupBasicScene } from '@/utils/three/sceneSetup'
 import { useRaycaster } from '@/composables/bigscreen/useRaycaster'
@@ -217,6 +217,7 @@ import BigscreenFloor3D from '@/components/bigscreen/BigscreenFloor3D.vue'
 import type { SceneMode } from '@/types/bigscreen'
 
 const store = useBigscreenStore()
+const siteStore = useSiteStore()
 const router = useRouter()
 const threeSceneRef = ref<InstanceType<typeof ThreeScene> | null>(null)
 const isSceneReady = ref(false)
@@ -251,11 +252,11 @@ const contextMenuVisible = ref(false)
 const contextMenuX = ref(0)
 const contextMenuY = ref(0)
 const contextMenuItems = computed(() => [
-  { key: 'overview', label: '全景视角', icon: 'View' },
-  { key: 'topDown', label: '俯视视角', icon: 'TopRight' },
-  { key: 'divider1', divider: true },
-  { key: 'heatmap', label: store.layers.heatmap ? '关闭热力图' : '开启热力图', icon: 'Sunny' },
-  { key: 'fullscreen', label: document.fullscreenElement ? '退出全屏' : '全屏显示', icon: 'FullScreen' }
+  { action: 'overview', label: '全景视角', icon: 'View' },
+  { action: 'topDown', label: '俯视视角', icon: 'TopRight' },
+  { divider: true },
+  { action: 'heatmap', label: store.layers.heatmap ? '关闭热力图' : '开启热力图', icon: 'Sunny' },
+  { action: 'fullscreen', label: document.fullscreenElement ? '退出全屏' : '全屏显示', icon: 'FullScreen' }
 ])
 
 // 当前时间
@@ -536,6 +537,9 @@ function handleFloorElementClick(element: any) {
 onMounted(() => {
   updateTime()
   timeTimer = window.setInterval(updateTime, 1000)
+
+  // 加载站点信息（用于标题显示）
+  siteStore.fetchSites()
 
   // 初始化键盘快捷键
   const keyboardShortcuts = useKeyboardShortcuts({

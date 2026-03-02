@@ -96,7 +96,7 @@
               <span class="unlink-btn" @click="handleUnlink(row)">取消关联</span>
             </div>
             <span v-else-if="row.energy_device_id" class="linked-device" style="color: #909399; font-style: italic;">设备已删除</span>
-            <span v-else class="link-btn" @click="handleLink(row)">关联设备</span>
+            <el-button v-else class="link-btn" type="success" link @click="handleLink(row)">关联设备</el-button>
           </template>
         </el-table-column>
         <el-table-column prop="unit" label="单位" width="60" />
@@ -207,6 +207,7 @@
 
         <el-table
           :data="deviceSearchResults"
+          v-loading="deviceSearchLoading"
           highlight-current-row
           @current-change="onDeviceSelect"
           max-height="320"
@@ -319,6 +320,7 @@ const linkingPoint = ref<Point | null>(null)
 const deviceSearchKeyword = ref('')
 const deviceSearchResults = ref<PowerDevice[]>([])
 const selectedDevice = ref<PowerDevice | null>(null)
+const deviceSearchLoading = ref(false)
 let searchTimer: ReturnType<typeof setTimeout> | null = null
 
 onMounted(() => {
@@ -470,6 +472,7 @@ function handleLink(row: Point) {
   deviceSearchResults.value = []
   selectedDevice.value = null
   linkDialogVisible.value = true
+  void searchDevices()
 }
 
 function onSearchInput() {
@@ -481,18 +484,96 @@ function onSearchInput() {
 
 async function searchDevices() {
   const keyword = deviceSearchKeyword.value.trim()
-  if (!keyword) {
-    deviceSearchResults.value = []
-    return
+
+  const params: Record<string, any> = {
+    is_enabled: true
   }
+
+  if (keyword) {
+    params.keyword = keyword
+  }
+
+  const point = linkingPoint.value
+  const areaCode = point?.area_code && point.area_code !== 'ALL' ? point.area_code : null
+  if (areaCode) {
+    params.area_code = areaCode
+  }
+
+  const normalizedType = normalizePointDeviceType(point?.device_type)
+  if (normalizedType) {
+    params.device_type = normalizedType
+  }
+
   try {
-    const res = await getPowerDevices({ keyword })
-    const data = (res as any)?.data ?? res
-    deviceSearchResults.value = Array.isArray(data) ? data : []
+    deviceSearchLoading.value = true
+    let results = await fetchPowerDevices(params)
+
+    // 区域过滤无结果时，自动回退到仅按用途/关键词查询
+    if (results.length === 0 && areaCode) {
+      const fallbackParams = { ...params }
+      delete fallbackParams.area_code
+      results = await fetchPowerDevices(fallbackParams)
+    }
+
+    // 用途过滤无结果时，再回退到仅按关键词/启用状态查询
+    if (results.length === 0 && normalizedType) {
+      const broadParams = {
+        is_enabled: true,
+        ...(keyword ? { keyword } : {})
+      }
+      results = await fetchPowerDevices(broadParams)
+    }
+
+    deviceSearchResults.value = results
   } catch (e) {
     console.error('搜索设备失败', e)
     deviceSearchResults.value = []
+  } finally {
+    deviceSearchLoading.value = false
   }
+}
+
+async function fetchPowerDevices(params: Record<string, any>): Promise<PowerDevice[]> {
+  const res = await getPowerDevices(params)
+  const payload = typeof res === 'object' && res !== null && 'data' in res
+    ? (res as { data: unknown }).data
+    : res
+
+  if (Array.isArray(payload)) {
+    return payload
+  }
+
+  if (typeof payload === 'object' && payload !== null && 'data' in payload) {
+    const nestedData = (payload as { data?: unknown }).data
+    if (Array.isArray(nestedData)) {
+      return nestedData
+    }
+  }
+
+  if (typeof payload === 'object' && payload !== null && 'items' in payload) {
+    const nestedItems = (payload as { items?: unknown }).items
+    if (Array.isArray(nestedItems)) {
+      return nestedItems
+    }
+  }
+
+  return []
+}
+
+function normalizePointDeviceType(pointDeviceType?: string): string | null {
+  if (!pointDeviceType || pointDeviceType === 'ALL') {
+    return null
+  }
+
+  if (pointDeviceType === 'PRECISION_AC_INDOOR' || pointDeviceType === 'PRECISION_AC_OUTDOOR') {
+    return 'AC'
+  }
+
+  if (pointDeviceType === 'PDB') {
+    return null
+  }
+
+  return pointDeviceType
 }
 
 function onDeviceSelect(row: PowerDevice | null) {

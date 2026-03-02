@@ -213,9 +213,6 @@ async function loadData() {
   } finally {
     loading.value = false
   }
-  if (unitList.value.length === 0) {
-    unitList.value = mockUnitList
-  }
 }
 
 async function openDetail(row: ACUnit) {
@@ -236,7 +233,7 @@ async function openDetail(row: ACUnit) {
         status: p.status || 'normal'
       }))
     } else {
-      detailParams.value = mockDetailParams
+      detailParams.value = []
     }
   } catch {
     console.warn('精密空调详情API未就绪，使用模拟数据')
