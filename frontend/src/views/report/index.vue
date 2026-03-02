@@ -57,7 +57,7 @@
         </el-row>
 
         <el-divider content-position="left">点位统计</el-divider>
-        <el-table :data="dailyReport.points || []" stripe border max-height="400">
+        <el-table :data="dailyReport.points || []" stripe border max-height="400" empty-text="暂无点位数据">
           <el-table-column prop="code" label="点位编码" width="150" />
           <el-table-column prop="name" label="点位名称" min-width="150" />
           <el-table-column prop="unit" label="单位" width="80" />
@@ -124,7 +124,7 @@
         <div ref="weeklyChartRef" style="height: 300px;"></div>
 
         <el-divider content-position="left">每日明细</el-divider>
-        <el-table :data="weeklyReport.daily_alarms || []" stripe border>
+        <el-table :data="weeklyReport.daily_alarms || []" stripe border empty-text="暂无每日明细数据">
           <el-table-column prop="date" label="日期" width="120" />
           <el-table-column prop="weekday" label="星期" width="100" />
           <el-table-column prop="alarm_count" label="告警次数" width="120" />
@@ -233,7 +233,7 @@
         </el-form>
 
         <el-divider content-position="left">历史报表记录</el-divider>
-        <el-table :data="reportRecords" stripe border v-loading="loading">
+        <el-table :data="reportRecords" stripe border v-loading="loading" empty-text="暂无历史报表记录">
           <el-table-column prop="report_name" label="报表名称" min-width="200" />
           <el-table-column prop="report_type" label="类型" width="100">
             <template #default="{ row }">
