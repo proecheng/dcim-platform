@@ -364,12 +364,40 @@ async def get_daily_report(
     from ...models.history import PointHistory
     from ...models.alarm import Alarm
 
-    # 获取所有启用的点位
-    points_result = await db.execute(select(Point).where(Point.is_enabled == True))
+    # 查询有历史数据的 AI 类型点位
+    # 先获取有历史数据的点位 ID
+    history_point_ids_result = await db.execute(
+        select(PointHistory.point_id).distinct().where(
+            and_(
+                PointHistory.recorded_at >= start_time,
+                PointHistory.recorded_at < end_time,
+            )
+        ).limit(100)
+    )
+    history_point_ids = [row[0] for row in history_point_ids_result.all()]
+    
+    if not history_point_ids:
+        # 如果没有历史数据，返回空结果
+        return {
+            "date": start_time.strftime("%Y-%m-%d"),
+            "title": f"{start_time.strftime('%Y-%m-%d')} 日报",
+            "points": [],
+            "alarms": {},
+            "alarm_total": 0,
+        }
+    
+    # 获取这些点位的详细信息
+    points_result = await db.execute(
+        select(Point).where(
+            Point.id.in_(history_point_ids),
+            Point.is_enabled == True,
+            Point.point_type == 'AI'
+        ).limit(50)
+    )
     points = points_result.scalars().all()
 
     point_stats = []
-    for point in points[:20]:  # 限制数量
+    for point in points:
         stats_result = await db.execute(
             select(func.min(PointHistory.value), func.max(PointHistory.value), func.avg(PointHistory.value)).where(
                 and_(
