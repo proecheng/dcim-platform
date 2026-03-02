@@ -25,9 +25,9 @@ export function useWaterLeakData() {
   const wsConnected = ref(false)
   let pollingTimer: number | null = null
 
-  // 筛选水浸传感器（device_type === 'WL'）
+  // 筛选水浸传感器（device_type === 'WATER'）
   const wlSensors = computed(() =>
-    Array.from(allData.value.values()).filter(d => d.device_type === 'WL')
+    Array.from(allData.value.values()).filter(d => d.device_type === 'WATER')
   )
 
   // ── 统计数据 ──
@@ -86,7 +86,7 @@ export function useWaterLeakData() {
       const res = await getAlarmList({
         start_time: yesterday.toISOString(),
         end_time: now.toISOString(),
-        device_type: 'WL', // 按水浸传感器设备类型过滤
+        device_type: 'WATER', // 按水浸传感器设备类型过滤
         page: 1,
         page_size: 1, // 只需要 total 数
       })

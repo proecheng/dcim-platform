@@ -21,6 +21,8 @@
 
     <!-- 区域分组卡片 -->
     <el-row :gutter="16" class="zone-row">
+      <el-col :xs="24" :sm="12" :md="8" :lg="6" v-for="zone in zoneGroups" :key="zone.areaCode">
+    <el-row :gutter="16" class="zone-row">
       <el-col :span="6" v-for="zone in zoneGroups" :key="zone.areaCode">
         <el-card
           shadow="hover"
@@ -198,7 +200,8 @@
           </div>
         </div>
       </template>
-      <el-table :data="filteredTableData" stripe height="420" v-loading="loading" :row-class-name="tableRowClass">
+      <el-empty v-if="!loading && filteredTableData.length === 0" description="暂无水浸传感器数据" :image-size="80" />
+      <el-table v-else :data="filteredTableData" stripe height="420" v-loading="loading" :row-class-name="tableRowClass">
         <el-table-column prop="point_name" label="传感器名称" min-width="180" show-overflow-tooltip />
         <el-table-column prop="area_code" label="区域" width="100" />
         <el-table-column label="当前状态" width="120">
