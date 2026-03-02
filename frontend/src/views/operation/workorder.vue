@@ -86,7 +86,7 @@
       </div>
 
       <!-- 数据表格 -->
-      <el-table :data="workOrderList" stripe border v-loading="loading">
+      <el-table :data="workOrderList" stripe border v-loading="loading" empty-text="暂无工单数据">
         <el-table-column prop="order_no" label="工单编号" width="140" />
         <el-table-column prop="title" label="标题" min-width="180" show-overflow-tooltip />
         <el-table-column prop="order_type" label="类型" width="100">

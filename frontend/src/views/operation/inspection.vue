@@ -20,7 +20,7 @@
             </el-select>
             <el-button type="primary" @click="showPlanDialog()">新建计划</el-button>
           </div>
-          <el-table :data="planList" stripe border v-loading="planLoading">
+          <el-table :data="planList" stripe border v-loading="planLoading" empty-text="暂无巡检计划数据">
             <el-table-column prop="name" label="计划名称" min-width="150" show-overflow-tooltip />
             <el-table-column label="巡检频率" width="100">
               <template #default="{ row }">
@@ -66,7 +66,7 @@
               <el-option v-for="p in planList" :key="p.id" :label="p.name" :value="p.id" />
             </el-select>
           </div>
-          <el-table :data="taskList" stripe border v-loading="taskLoading">
+          <el-table :data="taskList" stripe border v-loading="taskLoading" empty-text="暂无巡检任务数据">
             <el-table-column prop="task_no" label="任务编号" width="160" />
             <el-table-column label="关联计划" min-width="140" show-overflow-tooltip>
               <template #default="{ row }">{{ row.plan_name || '--' }}</template>

@@ -30,7 +30,7 @@
       </div>
 
       <!-- 数据表格 -->
-      <el-table :data="knowledgeList" stripe border v-loading="loading">
+      <el-table :data="knowledgeList" stripe border v-loading="loading" empty-text="暂无知识库文章">
         <el-table-column prop="title" label="标题" min-width="200" show-overflow-tooltip />
         <el-table-column prop="category" label="分类" width="120">
           <template #default="{ row }">
