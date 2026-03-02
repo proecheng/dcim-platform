@@ -22,8 +22,6 @@
     <!-- 区域分组卡片 -->
     <el-row :gutter="16" class="zone-row">
       <el-col :xs="24" :sm="12" :md="8" :lg="6" v-for="zone in zoneGroups" :key="zone.areaCode">
-    <el-row :gutter="16" class="zone-row">
-      <el-col :span="6" v-for="zone in zoneGroups" :key="zone.areaCode">
         <el-card
           shadow="hover"
           class="zone-card"
