@@ -1,6 +1,6 @@
 ---
 name: 'design-thinking'
-description: 'Guide human-centered design processes using empathy-driven methodologies. This workflow walks through the design thinking phases - Empathize, Define, Ideate, Prototype, and Test - to create solutions deeply rooted in user needs.'
+description: 'Guide human-centered design processes using empathy-driven methodologies. Use when the user says ""lets run design thinking"" or ""I want to apply design thinking""'
 ---
 
 Execute the BMAD 'design-thinking' workflow.

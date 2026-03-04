@@ -1,6 +1,6 @@
 ---
 name: 'game-brief'
-description: 'Interactive game brief creation workflow that guides users through defining their game vision with multiple input sources and conversational collaboration'
+description: 'Game vision definition workflow. Use when the user says ""lets create a game brief"" or ""I want to define my game vision""'
 ---
 
 Execute the BMAD 'game-brief' workflow.

@@ -1,6 +1,6 @@
 ---
 name: 'validate-prd'
-description: 'Validate an existing PRD against BMAD standards - comprehensive review for completeness, clarity, and quality'
+description: 'Validate a PRD against standards. Use when the user says ""validate this PRD"" or ""run PRD validation""'
 ---
 
 Execute the BMAD 'validate-prd' workflow.

@@ -123,7 +123,29 @@ const routes: RouteRecordRaw[] = [
           { path: 'analysis', name: 'EnergyAnalysis', component: () => import('@/views/energy/analysis.vue'), meta: { title: '节能分析', icon: 'Opportunity' } },
           { path: 'regulation', name: 'EnergyRegulation', component: () => import('@/views/energy/regulation.vue'), meta: { title: '负荷调节', icon: 'Operation' } },
           { path: 'execution', name: 'EnergyExecution', component: () => import('@/views/energy/execution.vue'), meta: { title: '执行管理', icon: 'VideoPlay' } },
-          { path: 'report', name: 'EnergyReport', component: () => import('@/views/energy/report.vue'), meta: { title: '能效报告', icon: 'Document' } }
+          { path: 'report', name: 'EnergyReport', component: () => import('@/views/energy/report.vue'), meta: { title: '能效报告', icon: 'Document' } },
+          {
+            path: 'shift',
+            name: 'Shift',
+            redirect: '/energy/shift/dashboard',
+            meta: { title: '负荷转移', icon: 'Operation' },
+            children: [
+              { path: 'dashboard', name: 'ShiftDashboard', component: () => import('@/views/energy/shift/ShiftDashboard.vue'), meta: { title: '转移仪表盘', icon: 'DataBoard' } },
+              { path: 'list', name: 'ShiftPlanList', component: () => import('@/views/energy/shift/ShiftPlanList.vue'), meta: { title: '计划列表', icon: 'Document' } },
+              { path: 'create', name: 'ShiftPlanCreate', component: () => import('@/views/energy/shift/ShiftPlanCreate.vue'), meta: { title: '新建计划', icon: 'Plus' } },
+              { path: 'edit/:id', name: 'ShiftPlanEdit', component: () => import('@/views/energy/shift/ShiftPlanCreate.vue'), meta: { title: '编辑计划', icon: 'Edit', hidden: true } },
+              { path: 'detail/:id', name: 'ShiftPlanDetail', component: () => import('@/views/energy/shift/ShiftPlanDetail.vue'), meta: { title: '计划详情', icon: 'View', hidden: true } },
+              { path: 'opportunities', name: 'ShiftOpportunityList', component: () => import('@/views/energy/shift/ShiftOpportunityList.vue'), meta: { title: '转移机会', icon: 'Opportunity' } },
+              { path: 'opportunity/:id', name: 'ShiftOpportunityDetail', component: () => import('@/views/energy/shift/ShiftOpportunityDetail.vue'), meta: { title: '机会详情', icon: 'View', hidden: true } },
+              { path: 'executions', name: 'ShiftExecutionList', component: () => import('@/views/energy/shift/ShiftExecutionList.vue'), meta: { title: '执行记录', icon: 'List' } },
+              { path: 'execution/:id', name: 'ShiftExecutionDetail', component: () => import('@/views/energy/shift/ShiftExecutionDetail.vue'), meta: { title: '执行详情', icon: 'View', hidden: true } },
+              { path: 'monitor/:id', name: 'ShiftExecutionMonitor', component: () => import('@/views/energy/shift/ShiftExecutionMonitor.vue'), meta: { title: '实时监控', icon: 'Monitor', hidden: true } },
+              { path: 'cooling-config', name: 'CoolingLinkageConfig', component: () => import('@/views/energy/shift/CoolingLinkageConfig.vue'), meta: { title: '制冷联动配置', icon: 'Setting' } },
+              { path: 'cooling-monitor', name: 'CoolingLinkageMonitor', component: () => import('@/views/energy/shift/CoolingLinkageMonitor.vue'), meta: { title: '制冷状态监控', icon: 'Monitor' } },
+              { path: 'constraints', name: 'ShiftConstraintConfig', component: () => import('@/views/energy/shift/ShiftConstraintConfig.vue'), meta: { title: '约束管理', icon: 'Lock' } },
+              { path: 'reports', name: 'ShiftReports', component: () => import('@/views/energy/shift/ShiftReports.vue'), meta: { title: '收益报表', icon: 'Document' } },
+            ]
+          },
         ]
       },
 

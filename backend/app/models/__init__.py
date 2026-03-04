@@ -91,12 +91,22 @@ from .trace import (
 )
 from .gateway import Gateway, DataSource, DataSourcePoint, MqttAclRule
 from .spatial import Site, Floor, Room, Row, LayoutTemplate
-from .topology_config import PowerPhaseMapping, CoolingZone, CoolingZoneCabinet, CoolingZoneUnit
+from .topology_config import PowerPhaseMapping, CoolingZone, CoolingZoneCabinet, CoolingZoneUnit, CabinetTemperatureSensor, CabinetITLoad
 from .linkage import LinkagePolicy, LinkageAction, LinkageExecution, LinkageLog, LinkageRecovery, LinkageRecoveryLog
 from .diagnosis import DiagnosisRule, DiagnosisResult
 from .command import CommandApproval, CommandAuditLog
 from .drift import DriftDetectionResult
 from .video import NVR, Camera, CameraPreset, VideoEvent
+from .load_shift import (
+    ShiftPlan,
+    ShiftExecution,
+    ShiftConstraint,
+    ShiftOpportunity,
+    ShiftAnalysisRecord,
+    CoolingLinkageConfig,
+    CoolingLinkageRecord,
+    DeviceLifespanImpact,
+)
 
 __all__ = [
     # 用户
@@ -240,6 +250,8 @@ __all__ = [
     "CoolingZone",
     "CoolingZoneCabinet",
     "CoolingZoneUnit",
+    "CabinetTemperatureSensor",
+    "CabinetITLoad",
     # 联动引擎
     "LinkagePolicy",
     "LinkageAction",
@@ -260,4 +272,13 @@ __all__ = [
     "Camera",
     "CameraPreset",
     "VideoEvent",
+    # 负荷转移
+    "ShiftPlan",
+    "ShiftExecution",
+    "ShiftConstraint",
+    "ShiftOpportunity",
+    "ShiftAnalysisRecord",
+    "CoolingLinkageConfig",
+    "CoolingLinkageRecord",
+    "DeviceLifespanImpact",
 ]

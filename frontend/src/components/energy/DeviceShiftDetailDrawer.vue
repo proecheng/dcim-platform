@@ -55,20 +55,16 @@
       <!-- 24小时典型日功率曲线图 -->
       <div class="chart-section">
         <div class="section-header">
-          <div class="section-title">24小时典型日功率曲线</div>
+          <div class="section-title">
+            {{ chartMode === 'trend' ? `${profileDays}天功率趋势` : '24小时典型日功率曲线' }}
+          </div>
           <el-radio-group v-model="profileDays" size="small" @change="reloadProfile">
             <el-radio-button :value="30">30天</el-radio-button>
             <el-radio-button :value="90">90天</el-radio-button>
           </el-radio-group>
         </div>
-        <div class="chart-info" v-if="profile">
-          <template v-if="profile.summary.has_real_data">
-            基于过去 {{ profile.data_days }} 天历史数据
-          </template>
-          <template v-else>
-            暂无历史数据
-            <el-tag type="warning" size="small" style="margin-left: 8px;">模拟数据</el-tag>
-          </template>
+        <div class="chart-info" v-if="trendData">
+          基于过去 {{ trendData.days }} 天历史数据，共 {{ trendData.trend_data.length }} 个数据点
         </div>
         <div ref="chartRef" class="power-chart"></div>
       </div>
@@ -88,6 +84,32 @@
           <template #title>无法计算约束条件</template>
           {{ device.calculation_details.error }}。请在设备管理中补充额定功率后重新分析。
         </el-alert>
+
+        <!-- 警告信息 -->
+        <el-alert
+          v-if="device.calculation_details.warnings && device.calculation_details.warnings.length > 0"
+          type="warning"
+          :closable="false"
+          show-icon
+          style="margin-bottom: 12px;"
+        >
+          <template #title>注意事项</template>
+          <ul style="margin: 0; padding-left: 20px;">
+            <li v-for="(warning, idx) in device.calculation_details.warnings" :key="idx">
+              {{ warning }}
+            </li>
+          </ul>
+        </el-alert>
+
+        <!-- 限制因素说明 -->
+        <div v-if="device.calculation_details.limiting_factor" style="margin-bottom: 12px; padding: 8px; background: rgba(24,144,255,0.1); border-radius: 4px; font-size: 13px;">
+          <strong>限制因素：</strong>
+          <span style="color: #1890ff;">
+            {{ device.calculation_details.limiting_factor === 'temperature' ? '温度约束' : 
+               device.calculation_details.limiting_factor === 'redundancy' ? '冗余约束' :
+               device.calculation_details.limiting_factor === 'pue' ? 'PUE约束' : '设备特性约束' }}
+          </span>
+        </div>
 
         <!-- 正常约束条件列表 -->
         <div class="constraint-list" v-if="constraintItems.length > 0">
@@ -137,8 +159,10 @@ import { ref, watch, computed, onUnmounted, nextTick } from 'vue'
 import * as echarts from 'echarts'
 import {
   getDeviceTypicalDayProfile,
+  getDevicePowerTrend,
   type TypicalDayProfileResponse,
-  type RatioRecommendation
+  type PowerTrendResponse,
+type RatioRecommendation
 } from '@/api/modules/energy'
 
 const props = defineProps<{
@@ -152,12 +176,20 @@ const emit = defineEmits<{
 }>()
 
 const drawerVisible = computed({
-  get: () => props.visible,
-  set: () => emit('close')
+  get: () => {
+    console.log('[DeviceShiftDetailDrawer] drawerVisible get:', props.visible)
+    return props.visible
+  },
+  set: () => {
+    console.log('[DeviceShiftDetailDrawer] drawerVisible set - emitting close')
+    emit('close')
+  }
 })
 
 const loading = ref(false)
 const profile = ref<TypicalDayProfileResponse | null>(null)
+const trendData = ref<PowerTrendResponse | null>(null)
+const chartMode = ref<'typical' | 'trend'>('trend')  // 默认显示趋势图
 const profileDays = ref(30)
 const chartRef = ref<HTMLElement>()
 let chart: echarts.ECharts | null = null
@@ -179,34 +211,51 @@ const constraintItems = computed(() => {
   if (!details?.constraints) return []
 
   const constraints = details.constraints
-  const minVal = Math.min(...constraints)
+  const limitingFactor = details.limiting_factor
 
-  return [
-    {
-      name: '最低功率约束',
-      value: constraints[0] || 0,
-      description: `设备维持最低运行功率 ${details.min_power} kW 后的可转移空间`,
-      isBinding: constraints[0] === minVal
-    },
-    {
-      name: '负荷波动空间',
-      value: constraints[1] || 0,
-      description: `历史最大功率(${details.max_power}kW)与平均功率(${details.avg_power}kW)之差`,
-      isBinding: constraints[1] === minVal
-    },
-    {
-      name: '峰时可转移潜力',
-      value: constraints[2] || 0,
-      description: `峰时用电占比 ${(details.peak_ratio * 100).toFixed(1)}% × 柔性系数 ${details.flexibility_factor}`,
-      isBinding: constraints[2] === minVal
-    },
-    {
-      name: '设备类型上限',
-      value: constraints[3] || 0,
-      description: `该类型设备的安全转移比例上限为 ${(details.type_max_ratio * 100).toFixed(0)}%`,
-      isBinding: constraints[3] === minVal
-    }
-  ]
+  const items = []
+  
+  // 温度约束
+  if (constraints.temperature && constraints.temperature.max_ratio !== null) {
+    items.push({
+      name: '温度约束',
+      value: constraints.temperature.max_ratio,
+      description: constraints.temperature.reason || '确保机柜温度不超限（ASHRAE 18-27℃）',
+      isBinding: limitingFactor === 'temperature'
+    })
+  }
+  
+  // 冗余约束
+  if (constraints.redundancy && constraints.redundancy.max_ratio !== null) {
+    items.push({
+      name: '冗余约束',
+      value: constraints.redundancy.max_ratio,
+      description: constraints.redundancy.reason || '确保N+1冗余，设备故障时系统仍可运行',
+      isBinding: limitingFactor === 'redundancy'
+    })
+  }
+  
+  // PUE 约束
+  if (constraints.pue && constraints.pue.max_ratio !== null) {
+    items.push({
+      name: 'PUE约束',
+      value: constraints.pue.max_ratio,
+      description: constraints.pue.reason || '保持数据中心能效在合理范围（1.2-2.0）',
+      isBinding: limitingFactor === 'pue'
+    })
+  }
+  
+  // 设备特性约束
+  if (constraints.device && constraints.device.max_ratio !== null) {
+    items.push({
+      name: '设备特性约束',
+      value: constraints.device.max_ratio,
+      description: constraints.device.reason || '设备启停特性、最小运行时间等',
+      isBinding: limitingFactor === 'device'
+    })
+  }
+
+  return items
 })
 
 // 颜色常量
@@ -362,19 +411,119 @@ function buildChart() {
   chart.setOption(option)
 }
 
-// 重新加载功率Profile（切换天数时）
+// 构建趋势图表（30/90天）
+function buildTrendChart() {
+  if (!chartRef.value || !trendData.value) return
+
+  if (chart) {
+    chart.dispose()
+  }
+
+  chart = echarts.init(chartRef.value)
+
+  const data = trendData.value.trend_data
+  const ratedPower = trendData.value.rated_power
+
+  const dates = data.map(d => d.date.substring(5))  // 只显示 MM-DD
+  const avgPowers = data.map(d => d.avg_power)
+  const maxPowers = data.map(d => d.max_power)
+  const minPowers = data.map(d => d.min_power)
+
+  const option: echarts.EChartsOption = {
+    tooltip: {
+      trigger: 'axis',
+      formatter: (params: any) => {
+        if (!Array.isArray(params) || params.length === 0) return ''
+        const date = params[0].axisValue
+        const point = data[params[0].dataIndex]
+        let html = `<b>${point.date}</b><br/>`
+        html += `平均功率: ${point.avg_power.toFixed(2)} kW<br/>`
+        html += `最大功率: ${point.max_power.toFixed(2)} kW<br/>`
+        html += `最小功率: ${point.min_power.toFixed(2)} kW<br/>`
+        html += `总能耗: ${point.energy.toFixed(2)} kWh`
+        return html
+      }
+    },
+    legend: {
+      data: ['平均功率', '功率包络(最大)', '功率包络(最小)', '额定功率'],
+      bottom: 0,
+      textStyle: { fontSize: 11 }
+    },
+    grid: { top: 30, right: 20, bottom: 50, left: 60 },
+    xAxis: {
+      type: 'category',
+      data: dates,
+      axisLabel: {
+        interval: Math.floor(dates.length / 10),  // 自动调整间隔
+        fontSize: 11,
+        rotate: 45
+      }
+    },
+    yAxis: {
+      type: 'value',
+      name: '功率 (kW)',
+      nameTextStyle: { fontSize: 11 },
+      axisLabel: { fontSize: 11 }
+    },
+    series: [
+      // 功率包络区域
+      {
+        name: '功率包络(最大)',
+        type: 'line',
+        data: maxPowers,
+        lineStyle: { width: 0 },
+        symbol: 'none',
+        stack: 'envelope',
+        areaStyle: { color: 'rgba(24,144,255,0.15)' }
+      },
+      {
+        name: '功率包络(最小)',
+        type: 'line',
+        data: minPowers,
+        lineStyle: { width: 0 },
+        symbol: 'none',
+        stack: 'envelope-base'
+      },
+      // 平均功率曲线
+      {
+        name: '平均功率',
+        type: 'line',
+        data: avgPowers,
+        lineStyle: { color: '#1890ff', width: 2 },
+        itemStyle: { color: '#1890ff' },
+        symbol: 'circle',
+        symbolSize: 3
+      },
+      // 额定功率参考线
+      {
+        name: '额定功率',
+        type: 'line',
+        data: dates.map(() => ratedPower),
+        lineStyle: { color: '#ff4d4f', width: 1.5, type: 'dashed' },
+        symbol: 'none',
+        itemStyle: { color: '#ff4d4f' }
+      }
+    ]
+  }
+
+  chart.setOption(option)
+}
+
+
+// 重新加载功率数据（切换天数时）
 async function reloadProfile() {
   if (!props.device) return
   loading.value = true
   try {
-    const res = await getDeviceTypicalDayProfile(props.device.device_id, profileDays.value)
+    // 调用新的趋势 API
+    const res = await getDevicePowerTrend(props.device.device_id, profileDays.value)
     if (res.code === 0 && res.data) {
-      profile.value = res.data
+      trendData.value = res.data
       await nextTick()
-      buildChart()
+      buildTrendChart()
     }
   } catch (e) {
-    console.error('加载设备功率Profile失败:', e)
+    console.error('加载设备功率趋势失败:', e)
   } finally {
     loading.value = false
   }
@@ -383,20 +532,20 @@ async function reloadProfile() {
 // 监听设备变化，加载数据
 watch(() => props.device, async (newDevice) => {
   if (!newDevice) {
-    profile.value = null
+    trendData.value = null
     return
   }
 
   loading.value = true
   try {
-    const res = await getDeviceTypicalDayProfile(newDevice.device_id, profileDays.value)
+    const res = await getDevicePowerTrend(newDevice.device_id, profileDays.value)
     if (res.code === 0 && res.data) {
-      profile.value = res.data
+      trendData.value = res.data
       await nextTick()
-      buildChart()
+      buildTrendChart()
     }
   } catch (e) {
-    console.error('加载设备功率Profile失败:', e)
+    console.error('加载设备功率趋势失败:', e)
   } finally {
     loading.value = false
   }

@@ -8,16 +8,16 @@ nextStepFile: './step-03c-aggregate.md'
 
 ## STEP GOAL
 
-Launch parallel subprocesses to generate API and E2E tests simultaneously for maximum performance.
+Launch parallel subprocesses to generate tests simultaneously for maximum performance. Subprocess selection depends on `{detected_stack}`.
 
 ## MANDATORY EXECUTION RULES
 
 - 📖 Read the entire step file before acting
 - ✅ Speak in `{communication_language}`
-- ✅ Launch TWO subprocesses in PARALLEL
-- ✅ Wait for BOTH subprocesses to complete
+- ✅ Launch subprocesses in PARALLEL based on `{detected_stack}`
+- ✅ Wait for ALL launched subprocesses to complete
 - ❌ Do NOT generate tests sequentially (use subprocesses)
-- ❌ Do NOT proceed until both subprocesses finish
+- ❌ Do NOT proceed until all subprocesses finish
 
 ---
 
@@ -48,7 +48,7 @@ Launch parallel subprocesses to generate API and E2E tests simultaneously for ma
 const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
 ```
 
-**Prepare input context for both subprocesses:**
+**Prepare input context for subprocesses:**
 
 ```javascript
 const subprocessContext = {
@@ -57,7 +57,10 @@ const subprocessContext = {
   config: {
     test_framework: config.test_framework,
     use_playwright_utils: config.tea_use_playwright_utils,
-    browser_automation: config.tea_browser_automation  // "auto" | "cli" | "mcp" | "none"
+    use_pactjs_utils: config.tea_use_pactjs_utils,
+    pact_mcp: config.tea_pact_mcp,  // "mcp" | "none"
+    browser_automation: config.tea_browser_automation,  // "auto" | "cli" | "mcp" | "none"
+    detected_stack: '{detected_stack}'  // "frontend" | "backend" | "fullstack"
   },
   timestamp: timestamp
 };
@@ -65,7 +68,32 @@ const subprocessContext = {
 
 ---
 
-### 2. Launch Subprocess A: API Test Generation
+### 2. Subprocess Dispatch Matrix
+
+**Select subprocesses based on `{detected_stack}`:**
+
+| `{detected_stack}` | Subprocess A (API) | Subprocess B (E2E) | Subprocess B-backend |
+| ------------------ | ------------------ | ------------------ | -------------------- |
+| `frontend`         | Launch             | Launch             | Skip                 |
+| `backend`          | Launch             | Skip               | Launch               |
+| `fullstack`        | Launch             | Launch             | Launch               |
+
+---
+
+### Contract Test Generation Note
+
+When `use_pactjs_utils` is enabled, the API test generation subprocess (step-03a) also generates:
+
+- **Consumer contract tests**: Using `createProviderState` for type-safe provider states
+- **Provider verification tests**: Using `buildVerifierOptions` for one-call verifier setup
+- **Message contract tests**: Using `buildMessageVerifierOptions` if async/Kafka patterns detected
+- **Helper files**: Request filter setup with `createRequestFilter`, shared state constants
+
+When `pact_mcp` is `"mcp"`, the subprocess can use SmartBear MCP tools to fetch existing provider states and generate tests informed by broker data.
+
+---
+
+### 3. Launch Subprocess A: API Test Generation (always)
 
 **Launch subprocess in parallel:**
 
@@ -84,7 +112,9 @@ const subprocessContext = {
 
 ---
 
-### 3. Launch Subprocess B: E2E Test Generation
+### 4. Launch Subprocess B: E2E Test Generation (frontend/fullstack only)
+
+**If {detected_stack} is `frontend` or `fullstack`:**
 
 **Launch subprocess in parallel:**
 
@@ -101,62 +131,125 @@ const subprocessContext = {
 ⏳ Status: Running in parallel...
 ```
 
+**If {detected_stack} is `backend`:** Skip this subprocess.
+
 ---
 
-### 4. Wait for Both Subprocesses to Complete
+### 5. Launch Subprocess B-backend: Backend Test Generation (backend/fullstack only)
 
-**Monitor subprocess execution:**
+**If {detected_stack} is `backend` or `fullstack`:**
+
+**Launch subprocess in parallel:**
+
+- **Subprocess File:** `./step-03b-subprocess-backend.md`
+- **Output File:** `/tmp/tea-automate-backend-tests-${timestamp}.json`
+- **Context:** Pass `subprocessContext`
+- **Execution:** PARALLEL (non-blocking)
+
+**System Action:**
+
+```
+🚀 Launching Subprocess B-backend: Backend Test Generation
+📝 Output: /tmp/tea-automate-backend-tests-${timestamp}.json
+⏳ Status: Running in parallel...
+```
+
+**If {detected_stack} is `frontend`:** Skip this subprocess.
+
+---
+
+### 6. Wait for All Subprocesses to Complete
+
+**Monitor subprocess execution based on `{detected_stack}`:**
 
 ```
 ⏳ Waiting for subprocesses to complete...
   ├── Subprocess A (API): Running... ⟳
-  └── Subprocess B (E2E): Running... ⟳
+  ├── Subprocess B (E2E): Running... ⟳       [if frontend/fullstack]
+  └── Subprocess B-backend: Running... ⟳     [if backend/fullstack]
 
 [... time passes ...]
 
   ├── Subprocess A (API): Complete ✅
-  └── Subprocess B (E2E): Complete ✅
+  ├── Subprocess B (E2E): Complete ✅         [if frontend/fullstack]
+  └── Subprocess B-backend: Complete ✅       [if backend/fullstack]
 
 ✅ All subprocesses completed successfully!
 ```
 
-**Verify both outputs exist:**
+**Verify outputs exist (based on `{detected_stack}`):**
 
 ```javascript
 const apiOutputExists = fs.existsSync(`/tmp/tea-automate-api-tests-${timestamp}.json`);
-const e2eOutputExists = fs.existsSync(`/tmp/tea-automate-e2e-tests-${timestamp}.json`);
 
-if (!apiOutputExists || !e2eOutputExists) {
-  throw new Error('One or both subprocess outputs missing!');
+// Check based on detected_stack
+if (detected_stack === 'frontend' || detected_stack === 'fullstack') {
+  const e2eOutputExists = fs.existsSync(`/tmp/tea-automate-e2e-tests-${timestamp}.json`);
+  if (!e2eOutputExists) throw new Error('E2E subprocess output missing!');
 }
+if (detected_stack === 'backend' || detected_stack === 'fullstack') {
+  const backendOutputExists = fs.existsSync(`/tmp/tea-automate-backend-tests-${timestamp}.json`);
+  if (!backendOutputExists) throw new Error('Backend subprocess output missing!');
+}
+if (!apiOutputExists) throw new Error('API subprocess output missing!');
 ```
 
 ---
 
-### 5. Performance Report
+### Subprocess Output Schema Contract
+
+Both `step-03b-subprocess-e2e.md` and `step-03b-subprocess-backend.md` MUST write JSON to their output file with identical schema:
+
+```json
+{
+  "subprocessType": "e2e | backend",
+  "testsGenerated": [
+    {
+      "file": "path/to/test-file",
+      "content": "[full test file content]",
+      "description": "Test description",
+      "priority_coverage": { "P0": 0, "P1": 0, "P2": 0, "P3": 0 }
+    }
+  ],
+  "coverageSummary": {
+    "totalTests": 0,
+    "testLevels": ["unit", "integration", "api", "e2e"],
+    "fixtureNeeds": []
+  },
+  "status": "complete | partial"
+}
+```
+
+The aggregate step reads whichever output file(s) exist based on `{detected_stack}`.
+
+---
+
+### 7. Performance Report
 
 **Display performance metrics:**
 
 ```
 🚀 Performance Report:
-- Execution Mode: PARALLEL (2 subprocesses)
+- Execution Mode: PARALLEL (subprocesses based on {detected_stack})
+- Stack Type: {detected_stack}
 - API Test Generation: ~X minutes
-- E2E Test Generation: ~Y minutes
-- Total Elapsed: ~max(X, Y) minutes
-- Sequential Would Take: ~(X + Y) minutes
-- Performance Gain: ~50% faster!
+- E2E Test Generation: ~Y minutes       [if frontend/fullstack]
+- Backend Test Generation: ~Z minutes    [if backend/fullstack]
+- Total Elapsed: ~max(X, Y, Z) minutes
+- Sequential Would Take: ~(X + Y + Z) minutes
+- Performance Gain: ~40-70% faster!
 ```
 
 ---
 
-### 6. Proceed to Aggregation
+### 8. Proceed to Aggregation
 
 **Load aggregation step:**
 Load next step: `{nextStepFile}`
 
 The aggregation step (3C) will:
 
-- Read both subprocess outputs
+- Read all subprocess outputs (based on `{detected_stack}`)
 - Write all test files to disk
 - Generate shared fixtures and helpers
 - Calculate summary statistics
@@ -168,13 +261,14 @@ The aggregation step (3C) will:
 Proceed to Step 3C (Aggregation) when:
 
 - ✅ Subprocess A (API tests) completed successfully
-- ✅ Subprocess B (E2E tests) completed successfully
-- ✅ Both output files exist and are valid JSON
+- ✅ Subprocess B (E2E tests) completed successfully [if frontend/fullstack]
+- ✅ Subprocess B-backend (Backend tests) completed successfully [if backend/fullstack]
+- ✅ All expected output files exist and are valid JSON
 - ✅ Performance metrics displayed
 
 **Do NOT proceed if:**
 
-- ❌ One or both subprocesses failed
+- ❌ Any launched subprocess failed
 - ❌ Output files missing or corrupted
 - ❌ Timeout occurred (subprocesses took too long)
 
@@ -184,15 +278,15 @@ Proceed to Step 3C (Aggregation) when:
 
 ### ✅ SUCCESS:
 
-- Both subprocesses launched successfully
-- Both subprocesses completed without errors
+- All required subprocesses launched successfully (based on `{detected_stack}`)
+- All subprocesses completed without errors
 - Output files generated and valid
-- Parallel execution achieved ~50% performance gain
+- Parallel execution achieved ~40-70% performance gain
 
 ### ❌ SYSTEM FAILURE:
 
 - Failed to launch subprocesses
-- One or both subprocesses failed
+- One or more subprocesses failed
 - Output files missing or invalid
 - Attempted sequential generation instead of parallel
 

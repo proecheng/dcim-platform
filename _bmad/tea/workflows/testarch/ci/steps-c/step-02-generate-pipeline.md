@@ -2,7 +2,6 @@
 name: 'step-02-generate-pipeline'
 description: 'Generate CI pipeline configuration'
 nextStepFile: './step-03-configure-quality-gates.md'
-pipelineOutputFile: '{project-root}/.github/workflows/test.yml'
 outputFile: '{test_artifacts}/ci-pipeline-progress.md'
 ---
 
@@ -36,16 +35,20 @@ Create platform-specific CI configuration with test execution, sharding, burn-in
 
 **CRITICAL:** Follow this sequence exactly. Do not skip, reorder, or improvise.
 
-## 1. Select Template
+## 1. Resolve Output Path and Select Template
 
-Choose template based on platform:
+Determine the pipeline output file path based on the detected `ci_platform`:
 
-- GitHub Actions → `.github/workflows/test.yml`
-- GitLab CI → `.gitlab-ci.yml`
-- Circle CI → `.circleci/config.yml`
-- Jenkins → `Jenkinsfile`
+| CI Platform      | Output Path                                 | Template File                                       |
+| ---------------- | ------------------------------------------- | --------------------------------------------------- |
+| `github-actions` | `{project-root}/.github/workflows/test.yml` | `{installed_path}/github-actions-template.yaml`     |
+| `gitlab-ci`      | `{project-root}/.gitlab-ci.yml`             | `{installed_path}/gitlab-ci-template.yaml`          |
+| `jenkins`        | `{project-root}/Jenkinsfile`                | `{installed_path}/jenkins-pipeline-template.groovy` |
+| `azure-devops`   | `{project-root}/azure-pipelines.yml`        | `{installed_path}/azure-pipelines-template.yaml`    |
+| `harness`        | `{project-root}/.harness/pipeline.yaml`     | `{installed_path}/harness-pipeline-template.yaml`   |
+| `circle-ci`      | `{project-root}/.circleci/config.yml`       | _(no template; generate from first principles)_     |
 
-Use templates from `{installed_path}` when available (e.g., `github-actions-template.yaml`, `gitlab-ci-template.yaml`).
+Use templates from `{installed_path}` when available. Adapt the template to the project's `test_stack_type` and `test_framework`.
 
 ---
 
@@ -55,6 +58,7 @@ Include stages:
 
 - lint
 - test (parallel shards)
+- contract-test (if `tea_use_pactjs_utils` enabled)
 - burn-in (flaky detection)
 - report (aggregate + publish)
 
@@ -65,9 +69,62 @@ Include stages:
 - Parallel sharding enabled
 - CI retries configured
 - Capture artifacts (HTML report, JUnit XML, traces/videos on failure)
-- Cache dependencies (node_modules / pnpm / npm cache)
+- Cache dependencies (language-appropriate: node_modules, .venv, .m2, go module cache, NuGet, bundler)
 
-Write the selected pipeline configuration to `{pipelineOutputFile}` (or adjust the path if a non-GitHub platform was chosen).
+Write the selected pipeline configuration to the resolved output path from step 1. Adjust test commands based on `test_stack_type` and `test_framework`:
+
+- **Frontend/Fullstack**: Include browser install, E2E/component test commands, Playwright/Cypress artifacts
+- **Backend (Node.js)**: Use `npm test` or framework-specific commands (`vitest`, `jest`), skip browser install
+- **Backend (Python)**: Use `pytest` with coverage (`pytest --cov`), install via `pip install -r requirements.txt` or `poetry install`
+- **Backend (Java/Kotlin)**: Use `mvn test` or `gradle test`, cache `.m2/repository` or `.gradle/caches`
+- **Backend (Go)**: Use `go test ./...` with coverage (`-coverprofile`), cache Go modules
+- **Backend (C#/.NET)**: Use `dotnet test` with coverage, restore NuGet packages
+- **Backend (Ruby)**: Use `bundle exec rspec` with coverage, cache `vendor/bundle`
+
+### Contract Testing Pipeline (if `tea_use_pactjs_utils` enabled)
+
+When `tea_use_pactjs_utils` is enabled, add a `contract-test` stage after `test`:
+
+**Required env block** (add to the generated pipeline):
+
+```yaml
+env:
+  PACT_BROKER_BASE_URL: ${{ secrets.PACT_BROKER_BASE_URL }}
+  PACT_BROKER_TOKEN: ${{ secrets.PACT_BROKER_TOKEN }}
+  GITHUB_SHA: ${{ github.sha }} # auto-set by GitHub Actions
+  GITHUB_BRANCH: ${{ github.head_ref || github.ref_name }} # NOT auto-set — must be defined explicitly
+```
+
+> **Note:** `GITHUB_SHA` is auto-set by GitHub Actions, but `GITHUB_BRANCH` is **not** — it must be derived from `github.head_ref` (for PRs) or `github.ref_name` (for pushes). The pactjs-utils library reads both from `process.env`.
+
+1. **Consumer test + publish**: Run consumer contract tests, then publish pacts to broker
+   - `npm run test:contract:consumer`
+   - `npx pact-broker publish ./pacts --consumer-app-version=$GITHUB_SHA --branch=$GITHUB_BRANCH`
+   - Only publish on PR and main branch pushes
+
+2. **Provider verification**: Run provider verification against published pacts
+   - `npm run test:contract:provider`
+   - `buildVerifierOptions` auto-reads `PACT_BROKER_BASE_URL`, `PACT_BROKER_TOKEN`, `GITHUB_SHA`, `GITHUB_BRANCH`
+   - Verification results published to broker when `CI=true`
+
+3. **Can-I-Deploy gate**: Block deployment if contracts are incompatible
+   - `npx pact-broker can-i-deploy --pacticipant=<ServiceName> --version=$GITHUB_SHA --to-environment=production`
+   - Add `--retry-while-unknown 6 --retry-interval 10` for async verification
+
+4. **Webhook job**: Add `repository_dispatch` trigger for `pact_changed` event
+   - Provider verification runs when consumers publish new pacts
+   - Ensures compatibility is checked on both consumer and provider changes
+
+5. **Breaking change handling**: When `PACT_BREAKING_CHANGE=true` env var is set:
+   - Provider test passes `includeMainAndDeployed: false` to `buildVerifierOptions` — verifies only matching branch
+   - Coordinate with consumer team before removing the flag
+
+6. **Record deployment**: After successful deployment, record version in broker
+   - `npx pact-broker record-deployment --pacticipant=<ServiceName> --version=$GITHUB_SHA --environment=production`
+
+Required CI secrets: `PACT_BROKER_BASE_URL`, `PACT_BROKER_TOKEN`
+
+**If `tea_pact_mcp` is `"mcp"`:** Reference the SmartBear MCP `Can I Deploy` and `Matrix` tools for pipeline guidance in `pact-mcp.md`.
 
 ---
 

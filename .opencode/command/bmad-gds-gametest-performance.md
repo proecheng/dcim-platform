@@ -1,6 +1,6 @@
 ---
 name: 'gametest-performance'
-description: 'Design performance testing strategy for frame rate, memory, and loading times'
+description: 'Performance test strategy designer. Use when the user says ""lets create a performance test plan""'
 ---
 
 Execute the BMAD 'gametest-performance' workflow.

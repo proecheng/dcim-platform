@@ -26,6 +26,7 @@ websockets==12.0
 # Tools
 python-dotenv==1.0.0
 apscheduler==3.10.4
+scipy>=1.11.0  # 用于多设备协同优化算法
 
 # Data export
 openpyxl==3.1.2

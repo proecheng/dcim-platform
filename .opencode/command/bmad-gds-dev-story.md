@@ -1,6 +1,6 @@
 ---
 name: 'dev-story'
-description: 'Execute a story by implementing tasks/subtasks, writing tests, validating, and updating the story file per acceptance criteria'
+description: 'Story implementation and testing workflow. Use when the user says ""lets implement story tasks"" or ""lets write tests for story""'
 ---
 
 Execute the BMAD 'dev-story' workflow.

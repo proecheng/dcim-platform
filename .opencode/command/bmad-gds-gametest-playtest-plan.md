@@ -1,6 +1,6 @@
 ---
 name: 'gametest-playtest-plan'
-description: 'Create structured playtesting sessions for gameplay validation and user feedback'
+description: 'Playtest session planner. Use when the user says ""lets create a playtest plan"" or ""I want to schedule gameplay testing""'
 ---
 
 Execute the BMAD 'gametest-playtest-plan' workflow.

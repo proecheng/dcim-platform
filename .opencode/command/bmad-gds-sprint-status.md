@@ -1,6 +1,6 @@
 ---
 name: 'sprint-status'
-description: 'Summarize sprint-status.yaml for game project, surface risks, and route to the right implementation workflow.'
+description: 'Sprint status summary and risk surfacing. Use when the user says ""Summarize sprint-status.yaml for game project and surface risks""'
 ---
 
 Execute the BMAD 'sprint-status' workflow.

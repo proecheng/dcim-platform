@@ -1,6 +1,6 @@
 ---
 name: 'problem-solving'
-description: 'Apply systematic problem-solving methodologies to crack complex challenges. This workflow guides through problem diagnosis, root cause analysis, creative solution generation, evaluation, and implementation planning using proven frameworks.'
+description: 'Apply systematic problem-solving methodologies to complex challenges. Use when the user says ""guide me through structured problem solving"" or ""I want to crack this challenge with guided problem solving techniques""'
 ---
 
 Execute the BMAD 'problem-solving' workflow.

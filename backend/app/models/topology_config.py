@@ -69,3 +69,40 @@ class CoolingZoneUnit(Base):
     cooling_unit_id = Column(
         Integer, ForeignKey("cooling_units.id", ondelete="CASCADE"), nullable=False, comment="空调ID"
     )
+
+    is_primary = Column(Integer, default=1, comment="是否主空调: 1=主, 0=备")
+    created_at = Column(DateTime, default=datetime.now, comment="创建时间")
+    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now, comment="更新时间")
+
+
+class CabinetTemperatureSensor(Base):
+    """机柜温度传感器配置"""
+
+    __tablename__ = "cabinet_temperature_sensors"
+    __table_args__ = (UniqueConstraint("cabinet_id", "sensor_location", name="uq_cabinet_sensor_location"),)
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    cabinet_id = Column(Integer, ForeignKey("cabinets.id", ondelete="CASCADE"), nullable=False, comment="机柜ID")
+    point_id = Column(Integer, ForeignKey("points.id", ondelete="SET NULL"), nullable=True, comment="温度点位ID")
+    sensor_location = Column(String(20), nullable=False, comment="传感器位置: inlet/outlet/ambient")
+    temp_warning_threshold = Column(Float, default=27.0, comment="温度告警阈值(℃)")
+    temp_critical_threshold = Column(Float, default=32.0, comment="温度严重告警阈值(℃)")
+    description = Column(Text, nullable=True, comment="描述")
+    created_at = Column(DateTime, default=datetime.now, comment="创建时间")
+    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now, comment="更新时间")
+
+
+class CabinetITLoad(Base):
+    """机柜IT负载监控配置"""
+
+    __tablename__ = "cabinet_it_loads"
+    __table_args__ = (UniqueConstraint("cabinet_id", name="uq_cabinet_it_load"),)
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    cabinet_id = Column(Integer, ForeignKey("cabinets.id", ondelete="CASCADE"), nullable=False, comment="机柜ID")
+    power_point_id = Column(Integer, ForeignKey("points.id", ondelete="SET NULL"), nullable=True, comment="功率点位ID")
+    rated_power_kw = Column(Float, nullable=True, comment="额定功率(kW)")
+    design_load_kw = Column(Float, nullable=True, comment="设计负载(kW)")
+    description = Column(Text, nullable=True, comment="描述")
+    created_at = Column(DateTime, default=datetime.now, comment="创建时间")
+    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now, comment="更新时间")

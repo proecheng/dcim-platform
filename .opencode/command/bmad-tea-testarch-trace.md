@@ -1,6 +1,6 @@
 ---
 name: 'testarch-trace'
-description: 'Generate requirements-to-tests traceability matrix, analyze coverage, and make quality gate decision (PASS/CONCERNS/FAIL/WAIVED)'
+description: 'Generate traceability matrix and quality gate decision. Use when the user says ""lets create traceability matrix"" or ""I want to analyze test coverage""'
 ---
 
 Execute the BMAD 'testarch-trace' workflow.

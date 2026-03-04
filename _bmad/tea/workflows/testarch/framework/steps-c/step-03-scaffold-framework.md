@@ -39,16 +39,40 @@ Generate the test directory structure, configuration files, fixtures, factories,
 
 ## 1. Create Directory Structure
 
-Create:
+Use `{detected_stack}` from Step 1 to determine directory layout.
+
+**If {detected_stack} is `frontend` or `fullstack`:**
 
 - `{test_dir}/e2e/`
 - `{test_dir}/support/fixtures/`
 - `{test_dir}/support/helpers/`
 - `{test_dir}/support/page-objects/` (optional)
 
+**If {detected_stack} is `backend` or `fullstack`:**
+
+Create the idiomatic test directory for the detected language:
+
+- **Python (pytest)**: `tests/` with `conftest.py`, `tests/unit/`, `tests/integration/`, `tests/api/`
+- **Java/Kotlin (JUnit)**: `src/test/java/` mirroring `src/main/java/` package structure, with `unit/`, `integration/`, `api/` sub-packages
+- **Go**: `*_test.go` files alongside source files (Go convention), plus `testdata/` for fixtures
+- **C#/.NET (xUnit)**: `tests/` project with `Unit/`, `Integration/`, `Api/` directories
+- **Ruby (RSpec)**: `spec/` with `spec/unit/`, `spec/integration/`, `spec/api/`, `spec/support/`
+- **Rust**: `tests/` for integration tests, inline `#[cfg(test)]` modules for unit tests
+
+**If `config.tea_use_pactjs_utils` is enabled** (and `{detected_stack}` is `backend` or `fullstack`):
+
+Create contract testing directory structure:
+
+- `pact/http/consumer/` — consumer contract tests
+- `pact/http/provider/` — provider verification tests and state handlers
+- `pact/http/helpers/` — shared helpers (request filter, state constants)
+- `pact/message/` — message/Kafka contract tests (if async patterns detected)
+
 ---
 
 ## 2. Generate Framework Config
+
+**If {detected_stack} is `frontend` or `fullstack`:**
 
 Create `playwright.config.ts` or `cypress.config.ts` with:
 
@@ -60,14 +84,37 @@ Create `playwright.config.ts` or `cypress.config.ts` with:
 
 Use TypeScript if `use_typescript: true`.
 
+**If {detected_stack} is `backend` or `fullstack`:**
+
+Create the idiomatic test config for the detected framework:
+
+- **pytest**: `pyproject.toml` `[tool.pytest.ini_options]` or `pytest.ini` with markers, test paths, coverage settings
+- **JUnit**: `build.gradle`/`pom.xml` test configuration with JUnit 5 dependencies, Surefire/Failsafe plugins
+- **Go test**: no config file needed (Go convention); optionally create `Makefile` test targets
+- **xUnit**: `.csproj` test project with xUnit and coverlet dependencies
+- **RSpec**: `.rspec` config file with `spec_helper.rb` and `rails_helper.rb` (if Rails)
+
 ---
 
-## 3. Environment & Node
+## 3. Environment Setup
 
-Create:
+Create `.env.example` with `TEST_ENV`, `BASE_URL`, `API_URL`.
 
-- `.env.example` with `TEST_ENV`, `BASE_URL`, `API_URL`
+**Stack-conditional environment files:**
+
+**If {detected_stack} is `frontend` or `fullstack` (Node.js):**
+
 - `.nvmrc` using current LTS Node (prefer Node 24+)
+
+**If {detected_stack} is `backend`:**
+
+Create the idiomatic version file for the detected language:
+
+- **Python**: `.python-version` with current stable Python (prefer 3.12+)
+- **Java**: `.java-version` or `JAVA_HOME` documentation in `.env.example`
+- **Go**: Go version is already in `go.mod` (no additional file needed)
+- **C#/.NET**: `global.json` with SDK version if not already present
+- **Ruby**: `.ruby-version` with current stable Ruby
 
 ---
 
@@ -84,6 +131,19 @@ Read `{config_source}` and use `{knowledgeIndex}` to load fragments based on `co
 
 - `fixture-architecture.md`, `data-factories.md`, `network-first.md`, `playwright-config.md`, `test-quality.md`
 
+**If Pact.js Utils enabled** (`config.tea_use_pactjs_utils`):
+
+- `pactjs-utils-overview.md`, `pactjs-utils-consumer-helpers.md`, `pactjs-utils-provider-verifier.md`, `pactjs-utils-request-filter.md`, `contract-testing.md`
+- Recommend installing `@seontechnologies/pactjs-utils` and `@pact-foundation/pact`
+
+**If Pact.js Utils disabled but contract testing relevant:**
+
+- `contract-testing.md`
+
+**If Pact MCP enabled** (`config.tea_pact_mcp` is `"mcp"`):
+
+- `pact-mcp.md`
+
 Implement:
 
 - Fixture index with `mergeTests`
@@ -94,6 +154,8 @@ Implement:
 
 ## 5. Sample Tests & Helpers
 
+**If {detected_stack} is `frontend` or `fullstack`:**
+
 Create example tests in `{test_dir}/e2e/` demonstrating:
 
 - Given/When/Then format
@@ -101,11 +163,32 @@ Create example tests in `{test_dir}/e2e/` demonstrating:
 - Factory usage
 - Network interception pattern (if applicable)
 
+**If {detected_stack} is `backend` or `fullstack`:**
+
+Create example tests in the idiomatic location for the detected language:
+
+- **Python**: `tests/test_example.py` with pytest fixtures, parametrize, and factory usage
+- **Java**: `src/test/java/.../ExampleTest.java` with JUnit 5 annotations, `@BeforeEach` setup
+- **Go**: `example_test.go` alongside source with table-driven tests and `testify` assertions
+- **C#/.NET**: `tests/ExampleTests.cs` with xUnit `[Fact]`/`[Theory]` and fixture injection
+- **Ruby**: `spec/example_spec.rb` with RSpec `describe`/`context`/`it` and factory_bot
+
 Create helpers for:
 
 - API clients (if needed)
-- Network utilities
+- Network utilities (frontend/fullstack only)
 - Auth helpers
+- Test data factories (language-idiomatic patterns)
+
+**If `config.tea_use_pactjs_utils` is enabled** (and `{detected_stack}` is `backend` or `fullstack`):
+
+Create contract test samples in `pact/` directory:
+
+- **Consumer test**: Example using `PactV3` + `createProviderState` for type-safe provider states
+- **Provider verification test**: Example using `buildVerifierOptions` + `createRequestFilter`
+- **Helpers**: Request filter setup (`pact/http/helpers/request-filter.ts`), shared state constants (`pact/http/helpers/states.ts`)
+- **Vitest configs** (if vitest detected): `vitest.consumer.config.mts` and `vitest.provider.config.mts` for separated test execution
+- **package.json scripts**: `test:contract:consumer`, `test:contract:provider`, `pact:publish`, `pact:can-deploy`
 
 ---
 

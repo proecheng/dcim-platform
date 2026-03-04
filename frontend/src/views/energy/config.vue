@@ -845,7 +845,7 @@
     <!-- 电价方案管理器 -->
     <PricingSchemeManager
       v-model="schemeManagerVisible"
-      @scheme-activated="loadPricingList"
+      @scheme-activated="loadPricing"
     />
   </div>
 </template>
@@ -1501,8 +1501,12 @@ const handleAcceptOneRatio = async (row: RatioRecommendation) => {
 }
 
 const handleShiftDeviceRowClick = (row: RatioRecommendation) => {
+  console.log('[DEBUG] handleShiftDeviceRowClick called', row)
+  console.log('[DEBUG] Before - shiftDetailDrawerVisible:', shiftDetailDrawerVisible.value)
   selectedShiftDevice.value = row
   shiftDetailDrawerVisible.value = true
+  console.log('[DEBUG] After - shiftDetailDrawerVisible:', shiftDetailDrawerVisible.value)
+  console.log('[DEBUG] selectedShiftDevice:', selectedShiftDevice.value)
 }
 
 const handleAcceptFromDrawer = async (device: RatioRecommendation) => {

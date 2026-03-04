@@ -1,4 +1,4 @@
-description = """Create the next user story from epics+stories with enhanced context analysis and direct ready-for-dev marking"""
+description = """User story creation from epics. Use when the user says ""lets create a user story"" or ""I want to create a user story"""""
 prompt = """
 Execute the BMAD 'create-story' workflow.
 

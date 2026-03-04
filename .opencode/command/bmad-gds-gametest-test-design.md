@@ -1,6 +1,6 @@
 ---
 name: 'gametest-test-design'
-description: 'Create comprehensive game test scenarios covering gameplay, progression, and quality requirements'
+description: 'Game test scenario creator. Use when the user says ""lets create game test scenarios""'
 ---
 
 Execute the BMAD 'gametest-test-design' workflow.

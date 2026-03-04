@@ -1,6 +1,6 @@
 ---
 name: 'code-review'
-description: 'Perform an ADVERSARIAL Senior Developer code review that finds 3-10 specific problems in every story. Challenges everything: code quality, test coverage, architecture compliance, security, performance. NEVER accepts `looks good` - must find minimum issues and can auto-fix with user approval.'
+description: 'Perform adversarial code review finding specific issues. Use when the user says ""run code review"" or ""review this code""'
 ---
 
 Execute the BMAD 'code-review' workflow.

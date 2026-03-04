@@ -43,6 +43,11 @@ Use `{knowledgeIndex}` to load `ci-burn-in.md` guidance:
 - Run N-iteration burn-in for flaky detection
 - Gate promotion based on burn-in stability
 
+**Stack-conditional burn-in:**
+
+- **Frontend or Fullstack** (`test_stack_type` is `frontend` or `fullstack`): Enable burn-in by default. Burn-in targets UI flakiness (race conditions, selector instability, timing issues).
+- **Backend only** (`test_stack_type` is `backend`): Skip burn-in by default. Backend tests (unit, integration, API) are deterministic and rarely exhibit UI-related flakiness. If the user explicitly requests burn-in for backend, honor that override.
+
 ---
 
 ## 2. Quality Gates
@@ -52,6 +57,13 @@ Define:
 - Minimum pass rates (P0 = 100%, P1 ≥ 95%)
 - Fail CI on critical test failures
 - Optional: require traceability or nfr-assess output before release
+
+**Contract testing gate** (if `tea_use_pactjs_utils` is enabled):
+
+- **can-i-deploy must pass** before any deployment to staging or production
+- Block the deployment pipeline if contract verification fails
+- Treat consumer pact publishing failures as CI failures (contracts must stay up-to-date)
+- Provider verification must pass for all consumer pacts before merge
 
 ---
 

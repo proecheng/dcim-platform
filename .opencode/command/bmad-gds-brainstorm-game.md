@@ -1,6 +1,6 @@
 ---
 name: 'brainstorm-game'
-description: 'Facilitate game brainstorming sessions with game-specific context, guidance, and game design techniques.'
+description: 'Game concept ideation with guided design techniques. Use when the user says ""lets create game design ideas"" or ""I want to brainstorm game concepts""'
 ---
 
 Execute the BMAD 'brainstorm-game' workflow.

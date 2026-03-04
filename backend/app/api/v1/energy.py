@@ -4018,3 +4018,39 @@ async def get_scheme_audit_logs(
         message="获取成功",
         data=[PricingSchemeAuditLogResponse.model_validate(log).model_dump() for log in logs]
     )
+
+
+@router.get(
+    "/devices/{device_id}/power-trend",
+    response_model=ResponseModel[Dict[str, Any]],
+    summary="获取设备功率趋势曲线"
+)
+async def get_device_power_trend(
+    device_id: int,
+    days: int = Query(default=30, ge=1, le=365, description="查询天数"),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_viewer)
+):
+    """
+    获取设备功率趋势曲线
+    
+    Args:
+        device_id: 设备ID
+        days: 查询天数（1-365）
+    
+    Returns:
+        每日功率统计数据
+    """
+    from ...services.device_regulation_service import DeviceRegulationService
+    
+    service = DeviceRegulationService(db)
+    trend_data = await service.get_device_power_trend(device_id, days)
+    
+    if trend_data is None:
+        raise HTTPException(status_code=404, detail="设备不存在或无历史数据")
+    
+    return ResponseModel(
+        code=200,
+        message="获取成功",
+        data=trend_data
+    )

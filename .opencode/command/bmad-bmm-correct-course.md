@@ -1,6 +1,6 @@
 ---
 name: 'correct-course'
-description: 'Navigate significant changes during sprint execution by analyzing impact, proposing solutions, and routing for implementation'
+description: 'Manage significant changes during sprint execution. Use when the user says ""correct course"" or ""propose sprint change""'
 ---
 
 Execute the BMAD 'correct-course' workflow.

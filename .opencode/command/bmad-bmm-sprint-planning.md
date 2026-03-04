@@ -1,6 +1,6 @@
 ---
 name: 'sprint-planning'
-description: 'Generate and manage the sprint status tracking file for Phase 4 implementation, extracting all epics and stories from epic files and tracking their status through the development lifecycle'
+description: 'Generate sprint status tracking from epics. Use when the user says ""run sprint planning"" or ""generate sprint plan""'
 ---
 
 Execute the BMAD 'sprint-planning' workflow.

@@ -1,6 +1,6 @@
 ---
 name: 'retrospective'
-description: 'Run after epic completion to review overall success, extract lessons learned, and explore if new information emerged that might impact the next epic'
+description: 'Post-epic review and lessons learned. Use when the user says ""lets run a retrospective"" or ""execute epic completion review""'
 ---
 
 Execute the BMAD 'retrospective' workflow.

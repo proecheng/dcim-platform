@@ -1,7 +1,7 @@
 # Test Architect workflow: ci
 name: testarch-ci
-description: "Scaffold CI/CD quality pipeline with test execution, burn-in loops, and artifact collection"
-author: "BMad"
+# prettier-ignore
+description: 'Scaffold CI/CD quality pipeline with test execution. Use when the user says "lets setup CI pipeline" or "I want to create quality gates"'
 
 # Critical variables from config
 config_source: "{project-root}/_bmad/tea/config.yaml"
@@ -19,11 +19,13 @@ validation: "{installed_path}/checklist.md"
 
 # Variables and inputs
 variables:
-  ci_platform: "auto" # auto, github-actions, gitlab-ci, circle-ci, jenkins - user can override
+  ci_platform: "auto" # auto, github-actions, gitlab-ci, circle-ci, jenkins, azure-devops, harness - user can override
   test_dir: "{project-root}/tests" # Root test directory
+  test_stack_type: "auto" # auto, frontend, backend, fullstack - detected or user override
+  test_framework: "auto" # auto, playwright, cypress, jest, vitest - detected or user override
 
-# Output configuration
-default_output_file: "{project-root}/.github/workflows/test.yml" # GitHub Actions default
+# Output configuration (resolved dynamically based on ci_platform detection)
+default_output_file: "{project-root}/.github/workflows/test.yml" # GitHub Actions default; overridden per platform
 
 # Required tools
 required_tools:
@@ -44,4 +46,3 @@ execution_hints:
   interactive: false # Minimize prompts, auto-detect when possible
   autonomous: true # Proceed without user input unless blocked
   iterative: true
-

@@ -1955,6 +1955,41 @@ export function getDeviceTypicalDayProfile(deviceId: number, days: number = 30) 
   )
 }
 
+/** 设备功率趋势数据点（30/90天） */
+export interface PowerTrendPoint {
+  date: string
+  avg_power: number
+  max_power: number
+  min_power: number
+  energy: number
+}
+
+/** 设备功率趋势响应 */
+export interface PowerTrendResponse {
+  device_id: number
+  device_name: string
+  device_type: string
+  rated_power: number
+  days: number
+  trend_data: PowerTrendPoint[]
+  summary: {
+    avg_power: number
+    max_power: number
+    min_power: number
+    total_energy: number
+    has_real_data: boolean
+  }
+}
+
+/** 获取设备功率趋势（30/90天） */
+export function getDevicePowerTrend(deviceId: number, days: number = 30) {
+  return request.get<ResponseModel<PowerTrendResponse>>(
+    `/v1/energy/devices/${deviceId}/power-trend`,
+    { params: { days } }
+  )
+}
+
+
 /** 获取可调节参数设备列表 */
 export function getAdjustableDevices() {
   return request.get<ResponseModel<AdjustableDevicesResponse>>('/v1/energy/devices/adjustable')

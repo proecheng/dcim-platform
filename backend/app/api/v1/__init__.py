@@ -17,6 +17,7 @@ from .log import router as log_router
 from .statistics import router as statistics_router
 from .config import router as config_router
 from .energy import router as energy_router
+from .test_endpoint import router as test_router
 from .power import router as power_router
 from .regulation import router as regulation_router
 from .asset import router as asset_router
@@ -50,6 +51,7 @@ from .command import router as command_router
 from .drift import router as drift_router
 from .video import router as video_router
 from .ota import router as ota_router
+from .shift import router as shift_router
 
 # 深度学习节能优化模块 (需要安装 torch)
 try:
@@ -74,6 +76,7 @@ api_router.include_router(log_router, prefix="/logs", tags=["日志"])
 api_router.include_router(statistics_router, prefix="/statistics", tags=["统计分析"])
 api_router.include_router(config_router, prefix="/configs", tags=["系统配置"])
 api_router.include_router(energy_router, prefix="/energy", tags=["用电管理"])
+api_router.include_router(test_router, tags=["测试"])
 api_router.include_router(power_router, prefix="/power", tags=["供配电管理"])
 api_router.include_router(regulation_router, prefix="/regulation", tags=["负荷调节"])
 api_router.include_router(asset_router)
@@ -107,6 +110,7 @@ api_router.include_router(command_router, prefix="/command", tags=["控制命令
 api_router.include_router(drift_router, prefix="/drift", tags=["漂移检测"])
 api_router.include_router(video_router, prefix="/video", tags=["视频监控"])
 api_router.include_router(ota_router, prefix="/ota", tags=["OTA升级"])
+api_router.include_router(shift_router, prefix="/energy/shift", tags=["负荷转移"])
 
 # 深度学习节能优化API
 if _ml_available:

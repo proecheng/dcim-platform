@@ -1,6 +1,6 @@
 ---
 name: 'edit-prd'
-description: 'Edit and improve an existing PRD - enhance clarity, completeness, and quality'
+description: 'Edit an existing PRD. Use when the user says ""edit this PRD"".'
 ---
 
 Execute the BMAD 'edit-prd' workflow.
