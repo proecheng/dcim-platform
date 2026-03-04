@@ -110,7 +110,7 @@ interface StatCard {
 }
 
 const statCards: StatCard[] = [
-  { key: 'ac_total', label: 'AC总数', icon: IceCream, iconBg: 'rgba(24, 144, 255, 0.15)', valueClass: 'primary', route: '/cooling/indoor' },
+  { key: 'ac_total', label: '制冷设备总数', icon: IceCream, iconBg: 'rgba(24, 144, 255, 0.15)', valueClass: 'primary', route: '/cooling/indoor' },
   { key: 'ac_running', label: '运行中', icon: CircleCheck, iconBg: 'rgba(82, 196, 26, 0.15)', valueClass: 'success', route: '/cooling/indoor' },
   { key: 'ac_stopped', label: '已停止', icon: SwitchButton, iconBg: 'rgba(144, 147, 153, 0.15)', valueClass: 'info', route: '/cooling/indoor' },
   { key: 'ac_alarm', label: '告警', icon: WarningFilled, iconBg: 'rgba(245, 34, 45, 0.15)', valueClass: 'danger', route: '/cooling/indoor' },

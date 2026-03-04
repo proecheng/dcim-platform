@@ -5,8 +5,8 @@
       <el-col :span="8">
         <el-card shadow="hover" class="summary-card">
           <div class="summary-content">
-            <span class="summary-label">AC总数</span>
-            <span class="summary-value primary">{{ unitList.length }}</span>
+            <span class="summary-label">室内机总数</span>
+            <span class="summary-value primary">{{ totalCount }}</span>
           </div>
         </el-card>
       </el-col>
@@ -153,6 +153,7 @@ interface DetailParam {
 }
 
 const unitList = ref<ACUnit[]>([])
+const totalCount = ref(0)  // 总数
 const detail = ref<ACDetailData | null>(null)
 const detailParams = ref<DetailParam[]>([])
 
@@ -207,6 +208,7 @@ async function loadData() {
     const res = await getCoolingUnitList({ unit_type: 'indoor' })
     const data = res?.data ?? res
     unitList.value = Array.isArray(data) ? data : (data?.items ?? [])
+    totalCount.value = data?.total ?? unitList.value.length
   } catch {
     console.warn('精密空调列表API未就绪，使用模拟数据')
     unitList.value = mockUnitList
