@@ -1,0 +1,245 @@
+import { test, expect } from '@playwright/test';
+
+// Playwright E2E 测试：资产、运维、系统与采集配置页面的基础加载与可见性
+// 说明：使用全局 storageState 进行认证，无需在测试中指定 storageState
+// 注意：URL 路径基于项目配置的 baseURL，直接传入相对路径进行导航
+
+// 工具函数：判断页面是否存在主要内容区域
+const hasMainContent = async (page: any) => {
+  const mainVisible = await page.locator('.el-main').isVisible().catch(() => false);
+  if (mainVisible) return true;
+  const mainTagVisible = await page.locator('main').isVisible().catch(() => false);
+  if (mainTagVisible) return true;
+  const appMainVisible = await page.locator('.app-main').isVisible().catch(() => false);
+  return appMainVisible || mainTagVisible;
+};
+
+// 资产与容量域
+test.describe('资产与容量', () => {
+  test('资产台账 /asset/list 页面加载、URL 正确、可见表格区域', async ({ page }) => {
+    await page.goto('/asset/list');
+    await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(1000);
+    await expect(page).toHaveURL(/\/asset\/list(\?|$)/);
+    const mainOk = await hasMainContent(page);
+    expect(mainOk).toBeTruthy();
+    const hasTable = await page.locator('table').first().isVisible().catch(() => false);
+    const hasElTable = await page.locator('.el-table').first().isVisible().catch(() => false);
+    const hasCard = await page.locator('.el-card').first().isVisible().catch(() => false);
+    const uiVisible = hasTable || hasElTable || hasCard;
+    expect(uiVisible).toBeTruthy();
+  });
+
+  test('机柜管理 /asset/cabinet 页面加载、URL 正确、可见卡片或表格', async ({ page }) => {
+    await page.goto('/asset/cabinet');
+    await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(1000);
+    await expect(page).toHaveURL(/\/asset\/cabinet(\?|$)/);
+    const mainOk = await hasMainContent(page);
+    expect(mainOk).toBeTruthy();
+    const uiVisible = await Promise.resolve(
+      (await page.locator('.el-table').first().isVisible().catch(() => false)) ||
+      (await page.locator('.el-card').first().isVisible().catch(() => false)) ||
+      (await page.locator('table').first().isVisible().catch(() => false))
+    );
+    expect(uiVisible).toBeTruthy();
+  });
+
+  test('容量管理 /asset/capacity 页面加载、URL 正确、可见表单/内容区域', async ({ page }) => {
+    await page.goto('/asset/capacity');
+    await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(1000);
+    await expect(page).toHaveURL(/\/asset\/capacity(\?|$)/);
+    const mainOk = await hasMainContent(page);
+    expect(mainOk).toBeTruthy();
+    const hasForm = await page.locator('form').first().isVisible().catch(() => false);
+    const hasCard = await page.locator('.el-card').first().isVisible().catch(() => false);
+    expect(hasForm || hasCard).toBeTruthy();
+  });
+
+  test('空间拓扑 /asset/spatial 页面加载、URL 正确、可见区域', async ({ page }) => {
+    await page.goto('/asset/spatial');
+    await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(1000);
+    await expect(page).toHaveURL(/\/asset\/spatial(\?|$)/);
+    const mainOk = await hasMainContent(page);
+    expect(mainOk).toBeTruthy();
+    const hasElTable = await page.locator('.el-table').first().isVisible().catch(() => false);
+    const hasCard = await page.locator('.el-card').first().isVisible().catch(() => false);
+    expect(hasElTable || hasCard).toBeTruthy();
+  });
+});
+
+// 运维管理域
+test.describe('运维管理', () => {
+  test('工单管理 /operation/workorder 页面加载、URL 正确、可见表格', async ({ page }) => {
+    await page.goto('/operation/workorder');
+    await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(1000);
+    await expect(page).toHaveURL(/\/operation\/workorder(\?|$)/);
+    const mainOk = await hasMainContent(page);
+    expect(mainOk).toBeTruthy();
+    const tableVis = await page.locator('table').first().isVisible().catch(() => false);
+    const elTableVis = await page.locator('.el-table').first().isVisible().catch(() => false);
+    expect(tableVis || elTableVis).toBeTruthy();
+  });
+
+  test('巡检管理 /operation/inspection 页面加载、URL 正确、可见卡片/表格', async ({ page }) => {
+    await page.goto('/operation/inspection');
+    await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(1000);
+    await expect(page).toHaveURL(/\/operation\/inspection(\?|$)/);
+    const mainOk = await hasMainContent(page);
+    expect(mainOk).toBeTruthy();
+    const hasElTable = await page.locator('.el-table').first().isVisible().catch(() => false);
+    const hasCard = await page.locator('.el-card').first().isVisible().catch(() => false);
+    expect(hasElTable || hasCard).toBeTruthy();
+  });
+
+  test('知识库 /operation/knowledge 页面加载、URL 正确、可见区域', async ({ page }) => {
+    await page.goto('/operation/knowledge');
+    await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(1000);
+    await expect(page).toHaveURL(/\/operation\/knowledge(\?|$)/);
+    const mainOk = await hasMainContent(page);
+    expect(mainOk).toBeTruthy();
+    const hasTable = await page.locator('table').first().isVisible().catch(() => false);
+    const hasCard = await page.locator('.el-card').first().isVisible().catch(() => false);
+    expect(hasTable || hasCard).toBeTruthy();
+  });
+
+  test('报表分析 /operation/reports 页面加载、URL 正确、可见区域', async ({ page }) => {
+    await page.goto('/operation/reports');
+    await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(1000);
+    await expect(page).toHaveURL(/\/operation\/reports(\?|$)/);
+    const mainOk = await hasMainContent(page);
+    expect(mainOk).toBeTruthy();
+    const hasTable = await page.locator('table').first().isVisible().catch(() => false);
+    const hasCard = await page.locator('.el-card').first().isVisible().catch(() => false);
+    expect(hasTable || hasCard).toBeTruthy();
+  });
+
+  test('历史数据 /operation/history 页面加载、URL 正确、可见区域', async ({ page }) => {
+    await page.goto('/operation/history');
+    await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(1000);
+    await expect(page).toHaveURL(/\/operation\/history(\?|$)/);
+    const mainOk = await hasMainContent(page);
+    expect(mainOk).toBeTruthy();
+    const elTable = await page.locator('.el-table').first().isVisible().catch(() => false);
+    const table = await page.locator('table').first().isVisible().catch(() => false);
+    expect(elTable || table).toBeTruthy();
+  });
+});
+
+// 系统管理域
+test.describe('系统管理', () => {
+  test('用户管理 /system/users 页面加载、URL 正确、基础加载验证', async ({ page }) => {
+    await page.goto('/system/users');
+    await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(1000);
+    await expect(page).toHaveURL(/\/system\/users(\?|$)/);
+    const mainOk = await hasMainContent(page);
+    expect(mainOk).toBeTruthy();
+    // 基础加载校验
+    const hasTable = await page.locator('table').first().isVisible().catch(() => false);
+    const hasCard = await page.locator('.el-card').first().isVisible().catch(() => false);
+    expect(hasTable || hasCard).toBeTruthy();
+  });
+
+  test('站点管理 /system/sites 页面加载、URL 正确、可见区域', async ({ page }) => {
+    await page.goto('/system/sites');
+    await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(1000);
+    await expect(page).toHaveURL(/\/system\/sites(\?|$)/);
+    const mainOk = await hasMainContent(page);
+    expect(mainOk).toBeTruthy();
+    const hasTable = await page.locator('table').first().isVisible().catch(() => false);
+    const hasCard = await page.locator('.el-card').first().isVisible().catch(() => false);
+    expect(hasTable || hasCard).toBeTruthy();
+  });
+
+  test('操作审计 /system/audit-log 页面加载、URL 正确、可见区域', async ({ page }) => {
+    await page.goto('/system/audit-log');
+    await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(1000);
+    await expect(page).toHaveURL(/\/system\/audit-log(\?|$)/);
+    const mainOk = await hasMainContent(page);
+    expect(mainOk).toBeTruthy();
+    const hasTable = await page.locator('table').first().isVisible().catch(() => false);
+    expect(hasTable).toBeTruthy();
+  });
+
+  test('系统设置 /system/settings 页面加载、URL 正确、可见区域', async ({ page }) => {
+    await page.goto('/system/settings');
+    await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(1000);
+    await expect(page).toHaveURL(/\/system\/settings(\?|$)/);
+    const mainOk = await hasMainContent(page);
+    expect(mainOk).toBeTruthy();
+    const hasCard = await page.locator('.el-card').first().isVisible().catch(() => false);
+    const hasForm = await page.locator('form').first().isVisible().catch(() => false);
+    expect(hasCard || hasForm).toBeTruthy();
+  });
+
+  test('智能选址 /system/site-selection 页面加载、URL 正确、可见区域', async ({ page }) => {
+    await page.goto('/system/site-selection');
+    await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(1000);
+    await expect(page).toHaveURL(/\/system\/site-selection(\?|$)/);
+    const mainOk = await hasMainContent(page);
+    expect(mainOk).toBeTruthy();
+    const hasTable = await page.locator('table').first().isVisible().catch(() => false);
+    const hasCard = await page.locator('.el-card').first().isVisible().catch(() => false);
+    expect(hasTable || hasCard).toBeTruthy();
+  });
+});
+
+// 采集配置域
+test.describe('采集配置', () => {
+  test('设备管理 /collection/device-manage 页面加载、URL 正确、可见区域', async ({ page }) => {
+    await page.goto('/collection/device-manage');
+    await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(1000);
+    await expect(page).toHaveURL(/\/collection\/device-manage(\?|$)/);
+    const mainOk = await hasMainContent(page);
+    expect(mainOk).toBeTruthy();
+    const hasTable = await page.locator('table').first().isVisible().catch(() => false);
+    const hasElTable = await page.locator('.el-table').first().isVisible().catch(() => false);
+    expect(hasTable || hasElTable).toBeTruthy();
+  });
+
+  test('数据源管理 /collection/datasources 页面加载、URL 正确、可见区域', async ({ page }) => {
+    await page.goto('/collection/datasources');
+    await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(1000);
+    await expect(page).toHaveURL(/\/collection\/datasources(\?|$)/);
+    const mainOk = await hasMainContent(page);
+    expect(mainOk).toBeTruthy();
+    const hasTable = await page.locator('table').first().isVisible().catch(() => false);
+    expect(hasTable).toBeTruthy();
+  });
+
+  test('设备模板 /collection/device-templates 页面加载、URL 正确、可见区域', async ({ page }) => {
+    await page.goto('/collection/device-templates');
+    await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(1000);
+    await expect(page).toHaveURL(/\/collection\/device-templates(\?|$)/);
+    const mainOk = await hasMainContent(page);
+    expect(mainOk).toBeTruthy();
+    const hasTable = await page.locator('table').first().isVisible().catch(() => false);
+    expect(hasTable).toBeTruthy();
+  });
+
+  test('网关管理 /collection/gateway 页面加载、URL 正确、可见区域', async ({ page }) => {
+    await page.goto('/collection/gateway');
+    await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(1000);
+    await expect(page).toHaveURL(/\/collection\/gateway(\?|$)/);
+    const mainOk = await hasMainContent(page);
+    expect(mainOk).toBeTruthy();
+    const hasCard = await page.locator('.el-card').first().isVisible().catch(() => false);
+    expect(hasCard).toBeTruthy();
+  });
+});

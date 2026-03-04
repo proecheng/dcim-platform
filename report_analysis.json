@@ -1,0 +1,77 @@
+{
+  "api_requests": [
+    {
+      "url": "http://localhost:3000/api/v1/auth/login",
+      "status": 200,
+      "method": "POST",
+      "content_type": "application/json"
+    },
+    {
+      "url": "http://localhost:3000/api/v1/auth/me",
+      "status": 200,
+      "method": "GET",
+      "content_type": "application/json"
+    },
+    {
+      "url": "http://localhost:3000/api/v1/auth/permissions",
+      "status": 200,
+      "method": "GET",
+      "content_type": "application/json"
+    },
+    {
+      "url": "http://localhost:3000/api/v1/spatial/sites",
+      "status": 200,
+      "method": "GET",
+      "content_type": "application/json"
+    },
+    {
+      "url": "http://localhost:3000/api/v1/alarms/active",
+      "status": 200,
+      "method": "GET",
+      "content_type": "application/json"
+    },
+    {
+      "url": "http://localhost:3000/api/v1/alarms/count",
+      "status": 200,
+      "method": "GET",
+      "content_type": "application/json"
+    },
+    {
+      "url": "http://localhost:3000/api/v1/realtime/summary",
+      "status": 200,
+      "method": "GET",
+      "content_type": "application/json"
+    },
+    {
+      "url": "http://localhost:3000/api/v1/realtime",
+      "status": 200,
+      "method": "GET",
+      "content_type": "application/json"
+    },
+    {
+      "url": "http://localhost:3000/api/v1/auth/me",
+      "status": 200,
+      "method": "GET",
+      "content_type": "application/json"
+    },
+    {
+      "url": "http://localhost:3000/api/v1/spatial/sites",
+      "status": 200,
+      "method": "GET",
+      "content_type": "application/json"
+    },
+    {
+      "url": "http://localhost:3000/api/v1/alarms/count",
+      "status": 200,
+      "method": "GET",
+      "content_type": "application/json"
+    },
+    {
+      "url": "http://localhost:3000/api/v1/reports/daily?date=2026-03-01",
+      "status": 200,
+      "method": "GET",
+      "content_type": "application/json"
+    }
+  ],
+  "console_logs": []
+}
