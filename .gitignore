@@ -57,6 +57,7 @@ htmlcov/
 *.tmp
 *.temp
 .cache/
+tmp/
 tmpclaude-*
 nul
 _backend_stderr.log
@@ -76,6 +77,13 @@ _build_*.py
 .opencode/
 .sisyphus/
 .ruff_cache/
+token.txt
+Dmytest1backend.env
+
+# SQLite 运行/备份临时文件
+*.db-wal
+*.db-shm
+*.db.backup
 
 # 参考文档（大文件，不入库）
 docs/ref/
