@@ -60,7 +60,7 @@
             <el-button :icon="Coin" @click="showDemoLoader = true">
               演示数据
             </el-button>
-            <el-button :icon="Refresh" @click="refreshData">
+            <el-button :icon="Refresh" @click="handleManualRefresh">
               刷新数据
             </el-button>
           </div>
@@ -154,7 +154,7 @@
           <template #header>
             <div class="card-header">
               <span>实时数据</span>
-              <el-button type="primary" link @click="refreshData">刷新</el-button>
+              <el-button type="primary" link @click="handleManualRefresh">刷新</el-button>
             </div>
           </template>
           <el-table :data="realtimeData" height="400" stripe>
@@ -218,7 +218,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, markRaw } from 'vue'
+import { ref, onMounted, onUnmounted, onActivated, onDeactivated, markRaw } from 'vue'
 import { Monitor, CircleCheck, Warning, Remove } from '@element-plus/icons-vue'
 import { Lightning, FullScreen, Refresh, Coin } from '@element-plus/icons-vue'
 import { IceCream, Sunny, Lock, OfficeBuilding, Opportunity } from '@element-plus/icons-vue'
@@ -247,7 +247,34 @@ const realtimeData = ref<RealtimeData[]>([])
 const activeAlarms = ref<AlarmItem[]>([])
 const energyData = ref<EnergyDashboardData | null>(null)
 const showDemoLoader = ref(false)
+const isRefreshing = ref(false)
 let timer: number | null = null
+let isPageVisible = true
+
+const DASHBOARD_REFRESH_INTERVAL_MS = 15000
+const DASHBOARD_CACHE_TTL_MS = 20000
+const MAX_REALTIME_ROWS = 200
+const DASHBOARD_CACHE_KEY = 'dcim:dashboard:cache:v2'
+
+interface DashboardCachePayload {
+  savedAt: number
+  summary: { total: number; normal: number; alarm: number; offline: number }
+  realtimeData: RealtimeData[]
+  activeAlarms: AlarmItem[]
+  energyData: EnergyDashboardData | null
+  domainStats: string[]
+}
+
+type DashboardRaw = Awaited<ReturnType<typeof getDashboardData>>
+type SummaryRaw = Awaited<ReturnType<typeof getRealtimeSummary>>
+
+function unwrapApiData<T>(payload: unknown): T {
+  const maybeObj = payload as { data?: T }
+  if (maybeObj && typeof maybeObj === 'object' && 'data' in maybeObj && maybeObj.data !== undefined) {
+    return maybeObj.data
+  }
+  return payload as T
+}
 
 // 6大域概览数据
 const domainOverview = ref([
@@ -260,67 +287,198 @@ const domainOverview = ref([
 ])
 
 onMounted(() => {
-  refreshData()
-  // 每10秒刷新一次
-  timer = window.setInterval(refreshData, 10000)
+  applyCachedDashboardData()
+  refreshData({ force: true })
+  startAutoRefresh()
+  document.addEventListener('visibilitychange', handleVisibilityChange)
+})
+
+onActivated(() => {
+  if (isPageVisible) {
+    refreshData({ force: false })
+    startAutoRefresh()
+  }
+})
+
+onDeactivated(() => {
+  stopAutoRefresh()
 })
 
 onUnmounted(() => {
-  if (timer) {
-    clearInterval(timer)
-  }
+  stopAutoRefresh()
+  document.removeEventListener('visibilitychange', handleVisibilityChange)
 })
 
-async function refreshData() {
+function startAutoRefresh() {
+  stopAutoRefresh()
+  if (!isPageVisible) return
+  timer = window.setInterval(() => {
+    refreshData({ force: false })
+  }, DASHBOARD_REFRESH_INTERVAL_MS)
+}
+
+function stopAutoRefresh() {
+  if (timer) {
+    clearInterval(timer)
+    timer = null
+  }
+}
+
+function handleVisibilityChange() {
+  isPageVisible = document.visibilityState === 'visible'
+  if (isPageVisible) {
+    refreshData({ force: false })
+    startAutoRefresh()
+  } else {
+    stopAutoRefresh()
+  }
+}
+
+function applyDashboardOverviewStat(dashRes: DashboardRaw) {
+  const ov = dashRes?.overview
+  if (!ov) return
+
+  const alarmCount = ov.alarm_count || 0
+  domainOverview.value[0].stat = ov.power != null ? `${ov.power}kW` : '运行中'
+  domainOverview.value[1].stat = `${ov.ac_running || 0}台运行`
+  domainOverview.value[2].stat = ov.temperature != null ? `${ov.temperature}°C` : '运行中'
+  domainOverview.value[3].stat = alarmCount > 0 ? `${alarmCount}条告警` : '正常'
+
+  const ds = dashRes.device_status || {}
+  const totalDevices = Object.values(ds).reduce((sum: number, value) => sum + Number(value || 0), 0)
+  domainOverview.value[4].stat = totalDevices > 0 ? `${totalDevices}台设备` : '运行中'
+}
+
+function mapSummaryData(summaryRes: SummaryRaw) {
+  const raw = unwrapApiData<Record<string, unknown>>(summaryRes)
+
+  const total = Number(raw?.total_points ?? raw?.total ?? 0)
+  const normal = Number(raw?.online_points ?? raw?.normal_count ?? raw?.normal ?? 0)
+  const alarm = Number(raw?.alarm_points ?? raw?.alarm_count ?? raw?.alarm ?? 0)
+  const offline = Number(raw?.offline_points ?? raw?.offline_count ?? raw?.offline ?? 0)
+
+  summary.value = {
+    total,
+    normal,
+    alarm,
+    offline
+  }
+}
+
+function loadDashboardCache(): DashboardCachePayload | null {
   try {
-    const [summaryRes, realtimeRes, alarmsRes] = await Promise.all([
+    const cacheRaw = sessionStorage.getItem(DASHBOARD_CACHE_KEY)
+    if (!cacheRaw) return null
+    const cache = JSON.parse(cacheRaw) as DashboardCachePayload
+    if (!cache?.savedAt) return null
+    if (Date.now() - cache.savedAt > DASHBOARD_CACHE_TTL_MS) return null
+    return cache
+  } catch {
+    return null
+  }
+}
+
+function saveDashboardCache() {
+  try {
+    const payload: DashboardCachePayload = {
+      savedAt: Date.now(),
+      summary: { ...summary.value },
+      realtimeData: [...realtimeData.value],
+      activeAlarms: [...activeAlarms.value],
+      energyData: energyData.value,
+      domainStats: domainOverview.value.map(item => item.stat)
+    }
+    sessionStorage.setItem(DASHBOARD_CACHE_KEY, JSON.stringify(payload))
+  } catch {
+    // 忽略缓存写入失败，避免影响主流程
+  }
+}
+
+function applyCachedDashboardData() {
+  const cache = loadDashboardCache()
+  if (!cache) return
+
+  summary.value = cache.summary
+  realtimeData.value = cache.realtimeData.slice(0, MAX_REALTIME_ROWS)
+  activeAlarms.value = cache.activeAlarms.slice(0, 10)
+  energyData.value = cache.energyData
+  cache.domainStats.forEach((stat, index) => {
+    if (domainOverview.value[index]) {
+      domainOverview.value[index].stat = stat
+    }
+  })
+}
+
+async function refreshData(options: { force?: boolean } = {}) {
+  const forceRefresh = options.force === true
+  if (isRefreshing.value) return
+  if (!forceRefresh && !isPageVisible) return
+
+  isRefreshing.value = true
+  try {
+    const [summaryRes, realtimeRes, alarmsRes, dashboardRes, energyRes] = await Promise.allSettled([
       getRealtimeSummary(),
       getAllRealtimeData(),
-      getActiveAlarms()
+      getActiveAlarms(),
+      getDashboardData(),
+      getEnergyDashboard()
     ])
-    // 映射后端字段名到前端期望的字段名
-    summary.value = {
-      total: summaryRes.total_points || 0,
-      normal: summaryRes.online_points || 0,
-      alarm: summaryRes.alarm_points || 0,
-      offline: summaryRes.offline_points || 0
-    }
-    realtimeData.value = realtimeRes
-    activeAlarms.value = alarmsRes.slice(0, 10)
 
-    // 更新6大域概览卡片的动态状态
-    try {
-      const dashRes = await getDashboardData()
-      const ov = dashRes?.overview
-      if (ov) {
-        const alarmCount = ov.alarm_count || 0
-        domainOverview.value[0].stat = ov.power != null ? `${ov.power}kW` : '运行中'
-        domainOverview.value[1].stat = `${ov.ac_running || 0}台运行`
-        domainOverview.value[2].stat = ov.temperature != null ? `${ov.temperature}°C` : '运行中'
-        domainOverview.value[3].stat = alarmCount > 0 ? `${alarmCount}条告警` : '正常'
-        const ds = dashRes.device_status || {}
-        const totalDevices = Object.values(ds).reduce((a: number, b: any) => a + (b || 0), 0)
-        domainOverview.value[4].stat = totalDevices > 0 ? `${totalDevices}台设备` : '运行中'
-      }
-    } catch (e) {
-      console.warn('仪表盘概览数据加载失败', e)
+    if (summaryRes.status === 'fulfilled') {
+      mapSummaryData(summaryRes.value)
     }
 
-    // 加载能源仪表盘数据 (V2.3)
-    try {
-      const energyRes = await getEnergyDashboard()
-      if (energyRes.code === 0 && energyRes.data) {
-        energyData.value = energyRes.data
-        // 更新节能中心卡片状态
-        const pue = energyRes.data.efficiency?.pue
-        domainOverview.value[5].stat = pue != null ? `PUE ${pue.toFixed(2)}` : '运行中'
-      }
-    } catch (e) {
-      console.warn('能源仪表盘数据加载失败，可能API未就绪', e)
+    if (realtimeRes.status === 'fulfilled') {
+      const realtimePayload = unwrapApiData<RealtimeData[]>(realtimeRes.value)
+      realtimeData.value = (Array.isArray(realtimePayload) ? realtimePayload : []).slice(0, MAX_REALTIME_ROWS)
     }
+
+    if (alarmsRes.status === 'fulfilled') {
+      const alarmPayload = unwrapApiData<AlarmItem[]>(alarmsRes.value)
+      activeAlarms.value = (Array.isArray(alarmPayload) ? alarmPayload : []).slice(0, 10)
+    }
+
+    if (dashboardRes.status === 'fulfilled') {
+      const dashData = unwrapApiData<DashboardRaw>(dashboardRes.value)
+      applyDashboardOverviewStat(dashData)
+
+      if (summary.value.total === 0 && dashData?.overview?.total_points) {
+        summary.value = {
+          total: dashData.overview.total_points || 0,
+          normal: dashData.overview.online_points || 0,
+          alarm: dashData.overview.alarm_count || 0,
+          offline: Math.max(0, (dashData.overview.total_points || 0) - (dashData.overview.online_points || 0))
+        }
+      }
+
+      if (realtimeData.value.length === 0 && Array.isArray(dashData?.realtime)) {
+        realtimeData.value = dashData.realtime.slice(0, MAX_REALTIME_ROWS)
+      }
+
+      if (activeAlarms.value.length === 0 && Array.isArray(dashData?.alarms)) {
+        activeAlarms.value = dashData.alarms.slice(0, 10)
+      }
+    }
+
+    if (energyRes.status === 'fulfilled') {
+      const energyPayload = unwrapApiData<EnergyDashboardData>(energyRes.value)
+      if (energyPayload) {
+        energyData.value = energyPayload
+      }
+      const pue = energyData.value?.efficiency?.pue
+      domainOverview.value[5].stat = pue != null ? `PUE ${pue.toFixed(2)}` : '运行中'
+    }
+
+    saveDashboardCache()
   } catch (e) {
     console.error('刷新数据失败', e)
+  } finally {
+    isRefreshing.value = false
   }
+}
+
+function handleManualRefresh() {
+  refreshData({ force: true })
 }
 
 type TagType = 'success' | 'warning' | 'info' | 'primary' | 'danger'
