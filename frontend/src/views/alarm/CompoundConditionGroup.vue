@@ -128,6 +128,7 @@
 <script setup lang="ts">
 import { Plus, FolderAdd, Delete, Close } from '@element-plus/icons-vue'
 import type { PointInfo } from '@/api/modules/point'
+import { generateUUID } from '@/utils/uuid'
 
 // ==================== 条件树类型 ====================
 interface ConditionItem {
@@ -176,7 +177,7 @@ function addCondition() {
     children: [
       ...props.group.children,
       {
-        id: crypto.randomUUID(),
+        id: generateUUID(),
         type: 'condition',
         pointId: undefined,
         pointName: '',
@@ -193,7 +194,7 @@ function addSubGroup() {
     children: [
       ...props.group.children,
       {
-        id: crypto.randomUUID(),
+        id: generateUUID(),
         type: 'group',
         logic: 'AND',
         children: []

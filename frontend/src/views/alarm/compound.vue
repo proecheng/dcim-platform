@@ -44,7 +44,7 @@
           </el-select>
         </el-form-item>
         <el-form-item>
-          <el-button type="primary" @click="loadData">查询</el-button>
+          <el-button type="primary" @click="handleQuery">查询</el-button>
           <el-button @click="resetFilters">重置</el-button>
         </el-form-item>
       </el-form>
@@ -213,6 +213,7 @@ import {
 } from '@/api/modules/alarm'
 import { getPointList, type PointInfo } from '@/api/modules/point'
 import ConditionGroupEditor from './CompoundConditionGroup.vue'
+import { generateUUID } from '@/utils/uuid'
 
 // ==================== 条件树类型 ====================
 interface ConditionItem {
@@ -312,6 +313,41 @@ async function loadStats() {
   }
 }
 
+/** 验证条件树 - 返回错误信息，无错误返回 null */
+function validateConditionTree(node: ConditionGroup | ConditionItem, depth = 0): string | null {
+  // 防止无限嵌套
+  if (depth > 10) {
+    return '条件嵌套层数过深（最多 10 层）'
+  }
+  if (node.type === 'condition') {
+    // 验证条件项
+    if (!node.pointId) {
+      return '存在未选择点位的条件'
+    }
+    if (node.threshold === undefined || node.threshold === null) {
+      return '存在未设置阈值的条件'
+    }
+    if (!node.operator) {
+      return '存在未选择运算符的条件'
+    }
+    return null
+  }
+  // 验证组
+  if (node.children.length === 0) {
+    return '存在空的条件组，请添加条件或删除该组'
+  }
+  // 递归验证子节点
+  for (const child of node.children) {
+    const error = validateConditionTree(child, depth + 1)
+    if (error) return error
+  }
+  return null
+}
+/** 查询按钮点击 - 重置分页到第一页 */
+function handleQuery() {
+  pagination.page = 1
+  loadData()
+}
 function resetFilters() {
   filters.ruleType = ''
   filters.isEnabled = undefined
@@ -354,7 +390,11 @@ function getRelatedPoints(row: AlarmRuleInfo): string {
   if (!row.condition_expr) return '-'
   try {
     const root = JSON.parse(row.condition_expr) as ConditionGroup
-    const names = collectPointNames(root)
+    const ids = collectPointIds(root)
+    // 使用 pointId 从 pointOptions 中查找名称
+    const names = ids
+      .map(id => pointOptions.value.find(p => p.id === id)?.point_name)
+      .filter((name): name is string => !!name)
     return names.length ? names.join(', ') : '-'
   } catch {
     console.warn('条件表达式解析失败:', row.rule_name)
@@ -362,15 +402,15 @@ function getRelatedPoints(row: AlarmRuleInfo): string {
   }
 }
 
-function collectPointNames(node: ConditionGroup | ConditionItem): string[] {
+function collectPointIds(node: ConditionGroup | ConditionItem): number[] {
   if (node.type === 'condition') {
-    return node.pointName ? [node.pointName] : []
+    return node.pointId ? [node.pointId] : []
   }
-  const names: string[] = []
+  const ids: number[] = []
   for (const child of node.children) {
-    names.push(...collectPointNames(child))
+    ids.push(...collectPointIds(child))
   }
-  return [...new Set(names)]
+  return [...new Set(ids)]
 }
 
 // ==================== 启用/禁用 ====================
@@ -414,7 +454,7 @@ const formRef = ref()
 
 function createEmptyGroup(): ConditionGroup {
   return {
-    id: crypto.randomUUID(),
+    id: generateUUID(),
     type: 'group',
     logic: 'AND',
     children: []
@@ -474,6 +514,13 @@ async function submitForm() {
   const valid = await formRef.value?.validate().catch(() => false)
   if (!valid) return
 
+  // 验证条件表达式
+  const validationError = validateConditionTree(form.rootGroup)
+  if (validationError) {
+    ElMessage.error(validationError)
+    return
+  }
+
   submitting.value = true
   try {
     const conditionExpr = JSON.stringify(form.rootGroup)
@@ -483,7 +530,7 @@ async function submitForm() {
       condition_expr: conditionExpr,
       alarm_level: form.alarmLevel,
       alarm_message: form.alarmMessage,
-      is_enabled: true
+      is_enabled: isEdit.value ? (editingId.value ? tableData.value.find(r => r.id === editingId.value)?.is_enabled ?? true : true) : true
     }
 
     if (isEdit.value && editingId.value) {
@@ -509,19 +556,19 @@ const testResult = ref<boolean | null>(null)
 
 const testPointIds = computed<number[]>(() => {
   const ids = new Set<number>()
-  collectPointIds(form.rootGroup, ids)
+  collectPointIdsForTest(form.rootGroup, ids)
   return Array.from(ids)
 })
 
 const hasConditions = computed(() => testPointIds.value.length > 0)
 
-function collectPointIds(node: ConditionGroup | ConditionItem, ids: Set<number>) {
+function collectPointIdsForTest(node: ConditionGroup | ConditionItem, ids: Set<number>) {
   if (node.type === 'condition') {
     if (node.pointId != null) ids.add(node.pointId)
     return
   }
   for (const child of node.children) {
-    collectPointIds(child, ids)
+    collectPointIdsForTest(child, ids)
   }
 }
 
