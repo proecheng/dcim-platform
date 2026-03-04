@@ -6,7 +6,7 @@ from datetime import datetime
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, update, delete
+from sqlalchemy import select, func, update, delete, or_
 
 from ..deps import get_db, require_viewer, require_operator, require_admin
 from ...models.user import User
@@ -102,7 +102,13 @@ async def get_power_overview(
             func.avg(PointRealtime.value),
         )
         .select_from(PointRealtime.__table__.join(Point.__table__, PointRealtime.point_id == Point.id))
-        .where(Point.point_code.like("%_load_rate"))
+        .where(
+            or_(
+                Point.point_code.like("%_load_rate"),
+                Point.point_code.like("%-Load"),
+                Point.point_code.like("%-load"),
+            )
+        )
     )
     load_row = load_r.first()
     total_load_kw = 0.0
@@ -114,7 +120,12 @@ async def get_power_overview(
     power_r = await db.execute(
         select(func.sum(PointRealtime.value))
         .select_from(PointRealtime.__table__.join(Point.__table__, PointRealtime.point_id == Point.id))
-        .where(Point.point_code.like("%_total_power"))
+        .where(
+            or_(
+                Point.point_code.like("%_total_power"),
+                Point.point_code.like("%-P"),
+            )
+        )
     )
     power_val = power_r.scalar()
     if power_val is not None:
@@ -527,6 +538,7 @@ async def get_cabinet_branches(
 
     branches = []
     for c in circuits:
+        breaker_enabled = c.__dict__.get("is_enabled", False) is True
         branches.append(
             {
                 "branch_name": c.circuit_name,
@@ -537,7 +549,7 @@ async def get_cabinet_branches(
                 "current": None,
                 "voltage": None,
                 "power": None,
-                "breaker_status": "on" if c.is_enabled else "off",
+                "breaker_status": "on" if breaker_enabled else "off",
             }
         )
 
