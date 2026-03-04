@@ -6,7 +6,7 @@
         <el-card shadow="hover" class="summary-card">
           <div class="summary-content">
             <span class="summary-label">冷通道总数</span>
-            <span class="summary-value primary">{{ aisleList.length }}</span>
+            <span class="summary-value primary">{{ totalCount }}</span>
           </div>
         </el-card>
       </el-col>
@@ -99,6 +99,7 @@ interface SkylightItem {
 }
 
 const aisleList = ref<AisleItem[]>([])
+const totalCount = ref(0)  // 总数
 const currentAisle = ref<AisleItem | null>(null)
 const skylightList = ref<SkylightItem[]>([])
 
@@ -124,6 +125,7 @@ async function loadData() {
     const res = await getColdAisleList()
     const data = res?.data ?? res
     aisleList.value = Array.isArray(data) ? data : (data?.items ?? [])
+    totalCount.value = data?.total ?? aisleList.value.length
   } catch {
     console.warn('冷通道列表API未就绪，使用模拟数据')
     aisleList.value = mockAisleList

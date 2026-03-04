@@ -6,7 +6,7 @@
         <el-card shadow="hover" class="summary-card">
           <div class="summary-content">
             <span class="summary-label">室外机总数</span>
-            <span class="summary-value primary">{{ unitList.length }}</span>
+            <span class="summary-value primary">{{ totalCount }}</span>
           </div>
         </el-card>
       </el-col>
@@ -147,6 +147,7 @@ interface DetailParam {
 }
 
 const unitList = ref<OutdoorUnit[]>([])
+const totalCount = ref(0)  // 总数
 const detail = ref<OutdoorDetailData | null>(null)
 const detailParams = ref<DetailParam[]>([])
 
@@ -183,6 +184,7 @@ async function loadData() {
     const res = await getCoolingUnitList({ unit_type: 'outdoor' })
     const data = res?.data ?? res
     unitList.value = Array.isArray(data) ? data : (data?.items ?? [])
+    totalCount.value = data?.total ?? unitList.value.length
   } catch {
     console.warn('室外机列表API未就绪，使用模拟数据')
     unitList.value = mockOutdoorList

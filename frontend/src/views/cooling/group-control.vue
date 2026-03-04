@@ -6,7 +6,7 @@
         <el-card shadow="hover" class="summary-card">
           <div class="summary-content">
             <span class="summary-label">群控组总数</span>
-            <span class="summary-value primary">{{ groupList.length }}</span>
+            <span class="summary-value primary">{{ totalCount }}</span>
           </div>
         </el-card>
       </el-col>
@@ -113,6 +113,7 @@ interface MemberUnit {
 }
 
 const groupList = ref<GroupItem[]>([])
+const totalCount = ref(0)  // 总数
 const currentGroup = ref<GroupItem | null>(null)
 const memberUnits = ref<MemberUnit[]>([])
 
@@ -139,6 +140,7 @@ async function loadData() {
     const res = await getCoolingGroupList()
     const data = res?.data ?? res
     groupList.value = Array.isArray(data) ? data : (data?.items ?? [])
+    totalCount.value = data?.total ?? groupList.value.length
   } catch {
     console.warn('群控组列表API未就绪，使用模拟数据')
     groupList.value = mockGroupList

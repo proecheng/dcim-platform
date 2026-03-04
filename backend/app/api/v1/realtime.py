@@ -298,11 +298,14 @@ async def get_dashboard_data(db: AsyncSession = Depends(get_db), _: User = Depen
     if ups:
         overview["ups_load"] = round(ups, 1)
 
-    # 空调运行数量
+    # 空调运行数量（使用 Device.status 统计）
+    from ...models.device import Device
     ac_result = await db.execute(
-        select(func.count(PointRealtime.point_id))
-        .join(Point)
-        .where(Point.device_type == "AC", Point.point_type == "DI", PointRealtime.value == 1)
+        select(func.count(Device.id))
+        .where(
+            Device.device_type.in_(["AC", "PRECISION_AC_INDOOR", "PRECISION_AC_OUTDOOR"]),
+            Device.status == "running"
+        )
     )
     overview["ac_running"] = ac_result.scalar() or 0
 

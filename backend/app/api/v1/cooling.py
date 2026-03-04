@@ -44,7 +44,7 @@ async def get_cooling_overview(db: AsyncSession = Depends(get_db), _: User = Dep
     # 空调统计
     ac_result = await db.execute(
         select(Device.status, func.count(Device.id))
-        .where(Device.device_type.in_(["PRECISION_AC_INDOOR", "PRECISION_AC_OUTDOOR"]))
+        .where(Device.device_type.in_(["AC", "PRECISION_AC_INDOOR", "PRECISION_AC_OUTDOOR"]))
         .group_by(Device.status)
     )
     ac_stats = {row[0]: row[1] for row in ac_result.all()}
@@ -117,6 +117,7 @@ async def get_cooling_units(
         select(CoolingUnit, Device, CoolingGroup)
         .join(Device, CoolingUnit.device_id == Device.id)
         .outerjoin(CoolingGroup, CoolingUnit.group_id == CoolingGroup.id)
+        .where(Device.device_type.in_(["AC", "PRECISION_AC_INDOOR", "PRECISION_AC_OUTDOOR"]))
     )
 
     if unit_type:

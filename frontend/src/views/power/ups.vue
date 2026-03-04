@@ -6,7 +6,7 @@
         <el-card shadow="hover" class="summary-card">
           <div class="summary-content">
             <span class="summary-label">UPS总数</span>
-            <span class="summary-value primary">{{ upsList.length }}</span>
+            <span class="summary-value primary">{{ totalCount }}</span>
           </div>
         </el-card>
       </el-col>
@@ -243,6 +243,7 @@ interface DeviceOption {
 }
 
 const upsList = ref<UPSItem[]>([])
+const totalCount = ref(0)  // UPS总数
 const detail = ref<UPSDetailData | null>(null)
 const detailParams = ref<DetailParam[]>([])
 const createForm = reactive({
@@ -309,6 +310,7 @@ async function loadData() {
     const res = await getUPSList()
     const data = res?.data ?? res
     upsList.value = Array.isArray(data) ? data : (data?.items ?? [])
+    totalCount.value = data?.total ?? upsList.value.length
   } catch {
     console.warn('UPS列表API未就绪，使用模拟数据')
     upsList.value = mockUPSList
