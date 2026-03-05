@@ -3,7 +3,7 @@
  * 封装温湿度传感器数据获取、区域分组、统计计算
  * 预留热力图升级接口
  */
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { type RealtimeData } from '@/api/modules/realtime'
 import { getDriftResults, type DriftDetectionResult } from '@/api/modules/drift'
 import { useRealtimeStore } from '@/stores/realtime'

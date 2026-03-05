@@ -376,19 +376,21 @@ function applyCachedDashboardData() {
   const cache = loadDashboardCache()
   if (!cache) return
 
-  // 恢复缓存数据到 store
-  if (cache.summary) {
-    realtimeStore.setSummary({
-      total_points: cache.summary.total,
-      online_points: cache.summary.normal,
-      alarm_points: cache.summary.alarm,
-      offline_points: cache.summary.offline,
-      by_type: {},
-      by_area: {},
-    })
-  }
-  if (cache.realtimeData?.length) {
-    realtimeStore.setAllData(cache.realtimeData.slice(0, MAX_REALTIME_ROWS))
+  // 仅在 store 为空时恢复缓存，避免覆盖 MainLayout useRealtime() 已加载的新鲜数据
+  if (realtimeStore.totalPoints === 0) {
+    if (cache.summary) {
+      realtimeStore.setSummary({
+        total_points: cache.summary.total,
+        online_points: cache.summary.normal,
+        alarm_points: cache.summary.alarm,
+        offline_points: cache.summary.offline,
+        by_type: {},
+        by_area: {},
+      })
+    }
+    if (cache.realtimeData?.length) {
+      realtimeStore.setAllData(cache.realtimeData.slice(0, MAX_REALTIME_ROWS))
+    }
   }
   energyData.value = cache.energyData
   cache.domainStats.forEach((stat, index) => {

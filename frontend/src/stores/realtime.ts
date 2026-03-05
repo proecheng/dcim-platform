@@ -48,9 +48,10 @@ export const useRealtimeStore = defineStore('realtime', () => {
     loading.value = true
     try {
       const data = await getAllRealtimeData(pointIds ? { point_ids: pointIds } : undefined)
-      // 全量替换（非增量）以保证准确性
-      dataMap.value.clear()
-      data.forEach(d => dataMap.value.set(d.point_id, d))
+      // API 成功后才替换数据，避免 API 失败时清空导致页面空白
+      const newMap = new Map<number, RealtimeData>()
+      data.forEach(d => newMap.set(d.point_id, d))
+      dataMap.value = newMap
       lastUpdateTime.value = new Date()
     } finally {
       loading.value = false
@@ -85,10 +86,11 @@ export const useRealtimeStore = defineStore('realtime', () => {
     lastUpdateTime.value = new Date()
   }
 
-  // 设置全部数据（外部整体替换）
+  // 设置全部数据（外部整体替换）— 单次赋值减少响应触发
   function setAllData(data: RealtimeData[]) {
-    dataMap.value.clear()
-    data.forEach(d => dataMap.value.set(d.point_id, d))
+    const newMap = new Map<number, RealtimeData>()
+    data.forEach(d => newMap.set(d.point_id, d))
+    dataMap.value = newMap
     lastUpdateTime.value = new Date()
   }
 
