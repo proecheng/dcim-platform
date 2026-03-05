@@ -324,5 +324,5 @@ development_status:
   28-1-data-source-tracking-through-pipeline: done
   28-2-demo-config-separation-and-minimal-seed: done
   28-3-main-system-demo-code-decoupling: done
-  28-4-demo-data-safe-unload-and-tagging: backlog
+  28-4-demo-data-safe-unload-and-tagging: ready-for-dev
   epic-28-retrospective: optional
