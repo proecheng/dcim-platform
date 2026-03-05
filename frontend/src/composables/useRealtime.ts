@@ -3,10 +3,11 @@
  *
  * Story 27.2: 状态委托给 RealtimeStore (SSOT)，
  * composable 负责 WS 订阅、轮询、生命周期管理。
+ * Story 27.5: WebSocket 连接管理统一到 useWebSocketManager
  */
 import { computed, onMounted, onUnmounted, watch } from 'vue'
 import { storeToRefs } from 'pinia'
-import { useWebSocket } from './useWebSocket'
+import { useWebSocketManager } from './useWebSocketManager'
 import { useRealtimeStore, type RealtimeData } from '@/stores/realtime'
 
 interface UseRealtimeOptions {
@@ -25,15 +26,10 @@ export function useRealtime(options: UseRealtimeOptions = {}) {
   } = options
 
   const store = useRealtimeStore()
+  const wsManager = useWebSocketManager()
   const { realtimeData, summary, loading, lastUpdateTime, alarmPoints, offlinePoints } = storeToRefs(store)
 
   let pollingTimer: number | null = null
-
-  // WebSocket 连接
-  const { isConnected, subscribe, on, off, connect, disconnect } = useWebSocket({
-    url: '/ws/realtime',
-    autoConnect: false
-  })
 
   // 获取所有实时数据 - 委托给 store
   const fetchRealtimeData = async () => {
@@ -45,11 +41,12 @@ export function useRealtime(options: UseRealtimeOptions = {}) {
     await store.fetchSummary()
   }
 
-  // 开始轮询
+  // 开始轮询（WebSocket 断开时的兜底）
   const startPolling = () => {
     stopPolling()
     pollingTimer = window.setInterval(() => {
-      if (!isConnected.value) {
+      // 只在 WebSocket 未连接时轮询
+      if (!wsManager.isConnected('realtime')) {
         store.fetchAllData(pointIds)
       }
     }, pollingInterval)
@@ -70,29 +67,14 @@ export function useRealtime(options: UseRealtimeOptions = {}) {
     }
   }
 
-  // 订阅实时数据
+  // 订阅实时数据（MainLayout 已预连接，这里只注册处理器）
   const subscribeRealtime = () => {
-    if (!isConnected.value) {
-      connect()
-    }
-
-    on('realtime', handleRealtimeMessage)
-
-    subscribe({
+    wsManager.on('realtime', 'realtime', handleRealtimeMessage)
+    wsManager.subscribe('realtime', {
       channels: ['realtime'],
       filters: pointIds ? { point_ids: pointIds } : undefined
     })
   }
-
-  // 监听 WebSocket 连接状态
-  watch(isConnected, (connected) => {
-    store.setWsConnected(connected)
-    if (connected) {
-      stopPolling()
-    } else {
-      startPolling()
-    }
-  })
 
   onMounted(() => {
     if (autoFetch) {
@@ -103,15 +85,13 @@ export function useRealtime(options: UseRealtimeOptions = {}) {
     if (autoSubscribe) {
       subscribeRealtime()
     }
-    // 无条件启动轮询作为安全网。轮询 handler 内有 !isConnected 守卫，
-    // WS 连接成功后 watch(isConnected) 会 stopPolling()。
+    // 无条件启动轮询作为安全网（WebSocket 管理器保证连接，轮询作为兜底）
     startPolling()
   })
 
   onUnmounted(() => {
     stopPolling()
-    off('realtime', handleRealtimeMessage)
-    disconnect()
+    wsManager.off('realtime', 'realtime', handleRealtimeMessage)
   })
 
   return {
@@ -121,7 +101,6 @@ export function useRealtime(options: UseRealtimeOptions = {}) {
     lastUpdateTime,
     alarmPoints,
     offlinePoints,
-    isConnected,
     getPointData: store.getPointData,
     getDataByType: store.getDataByType,
     getDataByArea: store.getDataByArea,

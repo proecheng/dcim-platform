@@ -3,7 +3,7 @@
  */
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { storeToRefs } from 'pinia'
-import { useWebSocket } from './useWebSocket'
+import { useWebSocketManager } from './useWebSocketManager'
 import { useSound } from './useSound'
 import { ElNotification } from 'element-plus'
 import {
@@ -35,6 +35,7 @@ export function useAlarm(options: UseAlarmOptions = {}) {
   const { play: playAlarmSound, stop: stopAlarmSound } = useSound()
   const alarmStore = useAlarmStore()
   const appStore = useAppStore()
+  const wsManager = useWebSocketManager()
   const { activeAlarms, alarmCount, loading } = storeToRefs(alarmStore)
 
   // Web Audio API 兜底：当 mp3 文件不存在时使用合成音
@@ -63,12 +64,6 @@ export function useAlarm(options: UseAlarmOptions = {}) {
       console.warn('Web Audio API 告警提示音播放失败:', e)
     }
   }
-
-  // WebSocket 连接
-  const { isConnected, subscribe, on, off, connect, disconnect } = useWebSocket({
-    url: '/ws/alarms',
-    autoConnect: false
-  })
 
   // 获取活动告警（委托给 AlarmStore）
   const fetchActiveAlarms = async () => {
@@ -187,15 +182,10 @@ export function useAlarm(options: UseAlarmOptions = {}) {
     }
   }
 
-  // 订阅告警
+  // 订阅告警（MainLayout 已预连接，这里只注册处理器）
   const subscribeAlarms = () => {
-    if (!isConnected.value) {
-      connect()
-    }
-
-    on('alarm', handleAlarmMessage)
-
-    subscribe({
+    wsManager.on('alarms', 'alarm', handleAlarmMessage)
+    wsManager.subscribe('alarms', {
       channels: ['alarms']
     })
   }
@@ -242,10 +232,8 @@ export function useAlarm(options: UseAlarmOptions = {}) {
     }
   })
 
-  // TODO: Story 27.5 - 迁移到 WebSocketManager 后移除此清理逻辑
   onUnmounted(() => {
-    off('alarm', handleAlarmMessage)
-    disconnect()
+    wsManager.off('alarms', 'alarm', handleAlarmMessage)
     stopAlarmSound()
   })
 
@@ -259,7 +247,6 @@ export function useAlarm(options: UseAlarmOptions = {}) {
     minorAlarms,
     hasActiveAlarms,
     hasCriticalAlarms,
-    isConnected,
     fetchActiveAlarms,
     fetchAlarmCount,
     ackAlarm,

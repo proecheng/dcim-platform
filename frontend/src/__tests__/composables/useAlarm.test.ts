@@ -25,26 +25,21 @@ vi.mock('@/api/modules/auth', () => ({
   getPermissions: vi.fn()
 }))
 
-// Mock WebSocket composable
+// Mock WebSocket Manager
 const mockWsConnect = vi.fn()
 const mockWsDisconnect = vi.fn()
 const mockWsSubscribe = vi.fn()
 const mockWsOn = vi.fn()
 const mockWsOff = vi.fn()
 
-vi.mock('@/composables/useWebSocket', () => ({
-  useWebSocket: vi.fn().mockReturnValue({
-    isConnected: { value: false },
+vi.mock('@/composables/useWebSocketManager', () => ({
+  useWebSocketManager: vi.fn().mockReturnValue({
     connect: mockWsConnect,
     disconnect: mockWsDisconnect,
     subscribe: mockWsSubscribe,
     on: mockWsOn,
     off: mockWsOff,
-    send: vi.fn(),
-    unsubscribe: vi.fn(),
-    lastMessage: { value: null },
-    error: { value: null },
-    client: {}
+    send: vi.fn()
   })
 }))
 
@@ -207,9 +202,10 @@ describe('useAlarm', () => {
     expect(acknowledgeAlarm).toHaveBeenCalledTimes(2)
   })
 
-  it('组件卸载时断开连接', async () => {
+  // Story 27.5: WebSocket 管理器统一管理连接，composable 只移除处理器
+  it('组件卸载时移除消息处理器', async () => {
     const { wrapper } = await setupAlarm()
     wrapper.unmount()
-    expect(mockWsDisconnect).toHaveBeenCalled()
+    expect(mockWsOff).toHaveBeenCalled()
   })
 })

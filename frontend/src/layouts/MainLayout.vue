@@ -245,6 +245,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, provide } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
+import { useWebSocketManager } from '@/composables/useWebSocketManager'
 import {
   Monitor, Cpu, Bell, TrendCharts, Setting, Document,
   Expand, Fold, UserFilled, ArrowDown,
@@ -296,6 +297,11 @@ async function handleMenuSelect(index: string) {
 onMounted(async () => {
   // 初始化应用设置（包含 localStorage 迁移逻辑）
   appStore.initFromStorage()
+
+  // 初始化 WebSocket 管理器，预连接常用通道
+  const wsManager = useWebSocketManager()
+  wsManager.connect('alarms')
+  wsManager.connect('realtime')
 
   // 获取用户信息
   if (userStore.token && !userStore.userInfo) {
