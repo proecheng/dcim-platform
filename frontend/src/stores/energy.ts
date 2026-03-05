@@ -1,8 +1,15 @@
 /**
  * 用电管理状态管理
+ *
+ * Story 27.3: 能源数据 SSOT (Single Source of Truth)
  */
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
+import {
+  getRealtimePower,
+  getPowerSummary,
+  getCurrentPUE,
+} from '@/api/modules/energy'
 import type {
   RealtimePowerData,
   RealtimePowerSummary,
@@ -36,6 +43,9 @@ export const useEnergyStore = defineStore('energy', () => {
   // WebSocket连接状态
   const wsConnected = ref(false)
 
+  // 加载状态（防重入）
+  const loading = ref(false)
+
   // 计算属性
   const powerDataList = computed(() => Array.from(realtimePowerData.value.values()))
 
@@ -67,20 +77,19 @@ export const useEnergyStore = defineStore('energy', () => {
     lastUpdateTime.value = new Date()
   }
 
-  // 批量更新电力数据
+  // 批量更新电力数据 — 单次替换减少 N 次响应触发
   function updatePowerDataBatch(dataList: RealtimePowerData[]) {
-    dataList.forEach(data => {
-      realtimePowerData.value.set(data.device_id, data)
-    })
+    const newMap = new Map(realtimePowerData.value)
+    dataList.forEach(data => newMap.set(data.device_id, data))
+    realtimePowerData.value = newMap
     lastUpdateTime.value = new Date()
   }
 
-  // 设置全部电力数据
+  // 设置全部电力数据 — new Map + 单次赋值，避免 clear-before-fill 数据空白
   function setAllPowerData(dataList: RealtimePowerData[]) {
-    realtimePowerData.value.clear()
-    dataList.forEach(data => {
-      realtimePowerData.value.set(data.device_id, data)
-    })
+    const newMap = new Map<number, RealtimePowerData>()
+    dataList.forEach(data => newMap.set(data.device_id, data))
+    realtimePowerData.value = newMap
     lastUpdateTime.value = new Date()
   }
 
@@ -144,9 +153,9 @@ export const useEnergyStore = defineStore('energy', () => {
     wsConnected.value = connected
   }
 
-  // 清空数据
+  // 清空数据 — 替换引用以确保触发响应式更新
   function clearData() {
-    realtimePowerData.value.clear()
+    realtimePowerData.value = new Map()
     powerSummary.value = null
     pueData.value = null
     suggestions.value = []
@@ -154,8 +163,48 @@ export const useEnergyStore = defineStore('energy', () => {
     lastUpdateTime.value = null
   }
 
-  // 重新加载数据（Story 27.3 实现）
-  async function reload() { /* Story 27.3 实现 */ }
+  // 重新加载数据（带防重入锁，返回 false 表示被跳过）
+  async function reload(): Promise<boolean> {
+    if (loading.value) return false
+    loading.value = true
+    try {
+      const [powerRes, summaryRes, pueRes] = await Promise.allSettled([
+        getRealtimePower(),
+        getPowerSummary(),
+        getCurrentPUE(),
+      ])
+      let anySuccess = false
+      if (powerRes.status === 'fulfilled') {
+        const res = powerRes.value as any
+        if (res.code === 0 && res.data) {
+          setAllPowerData(res.data)
+          anySuccess = true
+        }
+      }
+      if (summaryRes.status === 'fulfilled') {
+        const res = summaryRes.value as any
+        if (res.code === 0 && res.data) {
+          setPowerSummary(res.data)
+          anySuccess = true
+        }
+      }
+      if (pueRes.status === 'fulfilled') {
+        const res = pueRes.value as any
+        if (res.code === 0 && res.data) {
+          setPUEData(res.data)
+          anySuccess = true
+        }
+      }
+      if (anySuccess) {
+        lastUpdateTime.value = new Date()
+      }
+      return true
+    } catch {
+      return true
+    } finally {
+      loading.value = false
+    }
+  }
 
   return {
     // 状态
@@ -167,6 +216,7 @@ export const useEnergyStore = defineStore('energy', () => {
     distributionDiagram,
     lastUpdateTime,
     wsConnected,
+    loading,
 
     // 计算属性
     powerDataList,

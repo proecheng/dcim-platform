@@ -3,6 +3,7 @@ import { ref, onMounted, onUnmounted } from 'vue'
 import { useBigscreenStore } from '@/stores/bigscreen'
 import { useAlarmStore } from '@/stores/alarm'
 import { useRealtimeStore } from '@/stores/realtime'
+import { useEnergyStore } from '@/stores/energy'
 import type { DeviceRealtimeData, BigscreenAlarm } from '@/types/bigscreen'
 import { getEnergyDashboard } from '@/api/modules/energy'
 
@@ -75,6 +76,35 @@ export function useBigscreenData(options: DataFetchOptions = {}) {
       }
 
       store.updateEnergy(data)
+
+      // 回退写入 EnergyStore（仅在 Store 为空时），确保能源数据 SSOT 统一
+      const energyStore = useEnergyStore()
+      if (!energyStore.powerSummary && dashboard.realtime) {
+        energyStore.setPowerSummary({
+          total_power: dashboard.realtime.total_power || 0,
+          it_power: dashboard.realtime.it_power || 0,
+          cooling_power: dashboard.realtime.cooling_power || 0,
+          ups_power: 0,
+          other_power: dashboard.realtime.other_power || 0,
+          current_pue: dashboard.efficiency?.pue ?? null,
+          today_energy: dashboard.realtime.today_energy || 0,
+          today_cost: dashboard.cost?.today_cost || 0,
+          month_energy: dashboard.realtime.month_energy || 0,
+          month_cost: dashboard.cost?.month_cost || 0,
+        })
+      }
+      if (!energyStore.pueData && dashboard.efficiency?.pue != null) {
+        energyStore.setPUEData({
+          current_pue: dashboard.efficiency.pue,
+          total_power: dashboard.realtime?.total_power || 0,
+          it_power: dashboard.realtime?.it_power || 0,
+          cooling_power: dashboard.realtime?.cooling_power || 0,
+          ups_loss: 0,
+          lighting_power: 0,
+          other_power: dashboard.realtime?.other_power || 0,
+          update_time: new Date().toISOString(),
+        })
+      }
     } catch (e) {
       console.error('Failed to fetch energy data:', e)
     }

@@ -444,6 +444,34 @@ async function refreshData(options: { force?: boolean } = {}) {
       const energyPayload = unwrapApiData<EnergyDashboardData>(energyRes.value)
       if (energyPayload) {
         energyData.value = energyPayload
+        // 回退：仅在 reload() 尚未写入时，用 dashboard 聚合数据填充 EnergyStore
+        const eStore = useEnergyStore()
+        if (!eStore.powerSummary && energyPayload.realtime) {
+          eStore.setPowerSummary({
+            total_power: energyPayload.realtime.total_power || 0,
+            it_power: energyPayload.realtime.it_power || 0,
+            cooling_power: energyPayload.realtime.cooling_power || 0,
+            ups_power: 0,
+            other_power: energyPayload.realtime.other_power || 0,
+            current_pue: energyPayload.efficiency?.pue ?? null,
+            today_energy: energyPayload.realtime.today_energy || 0,
+            today_cost: energyPayload.cost?.today_cost || 0,
+            month_energy: energyPayload.realtime.month_energy || 0,
+            month_cost: energyPayload.cost?.month_cost || 0,
+          })
+        }
+        if (!eStore.pueData && energyPayload.efficiency?.pue != null) {
+          eStore.setPUEData({
+            current_pue: energyPayload.efficiency.pue,
+            total_power: energyPayload.realtime?.total_power || 0,
+            it_power: energyPayload.realtime?.it_power || 0,
+            cooling_power: energyPayload.realtime?.cooling_power || 0,
+            ups_loss: 0,
+            lighting_power: 0,
+            other_power: energyPayload.realtime?.other_power || 0,
+            update_time: new Date().toISOString(),
+          })
+        }
       }
       const pue = energyData.value?.efficiency?.pue
       domainOverview.value[5].stat = pue != null ? `PUE ${pue.toFixed(2)}` : '运行中'

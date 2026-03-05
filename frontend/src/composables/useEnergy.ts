@@ -36,8 +36,9 @@ export function useEnergy() {
   // 轮询定时器
   let pollTimer: number | null = null
 
-  // 加载实时电力数据
+  // 加载实时电力数据（带防重入守卫）
   async function loadRealtimePower(params?: { device_type?: string; area_code?: string }) {
+    if (loading.value) return
     try {
       loading.value = true
       error.value = null
