@@ -76,6 +76,7 @@ async def get_point_history(
                 "raw_value": h.value,
                 "value": h.value,
                 "quality": h.quality,
+                "source": h.source,
                 "created_at": h.recorded_at.isoformat() if h.recorded_at else None,
             }
             for h in history

@@ -1,6 +1,6 @@
 # Story 27.1: 告警数据链路统一（方案 A）
 
-Status: ready-for-dev
+Status: done
 
 ## Story
 

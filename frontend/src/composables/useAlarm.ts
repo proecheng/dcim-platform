@@ -7,8 +7,6 @@ import { useWebSocket } from './useWebSocket'
 import { useSound } from './useSound'
 import { ElNotification } from 'element-plus'
 import {
-  getActiveAlarms,
-  getAlarmCount,
   acknowledgeAlarm,
   resolveAlarm,
   type AlarmInfo,

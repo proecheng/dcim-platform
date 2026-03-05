@@ -102,6 +102,7 @@ async def handle_point_data(payload: dict, db: AsyncSession, *, site_id: str | N
                     quality=pt["q"],
                     timestamp=pt["ts"],
                     gateway_id=gw_id,
+                    source="mqtt",
                     updated_at=datetime.now(),
                 )
             )
@@ -112,6 +113,7 @@ async def handle_point_data(payload: dict, db: AsyncSession, *, site_id: str | N
                 quality=pt["q"],
                 timestamp=pt["ts"],
                 gateway_id=gw_id,
+                source="mqtt",
             )
             db.add(record)
         await cache_point_data(point_id, pt["v"], pt["q"], pt["ts"], gw_id)

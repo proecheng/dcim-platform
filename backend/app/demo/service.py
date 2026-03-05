@@ -1501,6 +1501,7 @@ class DemoDataService:
                         point_id=point.id,
                         value=0,
                         status="normal",
+                        source="demo",
                     )
                     session.add(realtime)
 

@@ -94,37 +94,6 @@ export const useAlarmStore = defineStore('alarm', () => {
     localStorage.setItem('alarm_sound_enabled', String(soundEnabled.value))
   }
 
-  function handleWsMessage(data: any) {
-    const { action } = data
-    switch (action) {
-      case 'new':
-        addAlarm(data.data)
-        break
-      case 'ack':
-        updateAlarm(data.data.id, { status: 'acknowledged', ...data.data })
-        break
-      case 'update':
-        if (data.data?.id) updateAlarm(data.data.id, data.data)
-        break
-      case 'resolve':
-        updateAlarm(data.data.id, { status: 'resolved', ...data.data })
-        break
-      case 'batch_ack':
-        if (data.data?.alarm_ids) {
-          for (const id of data.data.alarm_ids) {
-            updateAlarm(id, { status: 'acknowledged' })
-          }
-        }
-        break
-      case 'escalate':
-        updateAlarm(data.data.id, {
-          alarm_level: data.data.alarm_level,
-          escalated_from: data.data.previous_level
-        })
-        break
-    }
-  }
-
   return {
     activeAlarms,
     alarmCount,
@@ -135,6 +104,5 @@ export const useAlarmStore = defineStore('alarm', () => {
     removeAlarm,
     updateAlarm,
     toggleSound,
-    handleWsMessage
   }
 })

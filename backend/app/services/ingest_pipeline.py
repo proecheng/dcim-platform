@@ -240,6 +240,7 @@ async def _batch_upsert_realtime(
             value_cases_parts: list[str] = []
             quality_cases_parts: list[str] = []
             status_cases_parts: list[str] = []
+            source_cases_parts: list[str] = []
             id_placeholders: list[str] = []
 
             for idx, pt in enumerate(batch):
@@ -247,15 +248,18 @@ async def _batch_upsert_realtime(
                 value_key = f"value_{idx}"
                 quality_key = f"quality_{idx}"
                 status_key = f"status_{idx}"
+                source_key = f"source_{idx}"
 
                 params[pid_key] = pt.point_id
                 params[value_key] = pt.value
                 params[quality_key] = pt.quality
                 params[status_key] = pt.status
+                params[source_key] = pt.source
 
                 value_cases_parts.append(f"WHEN :{pid_key} THEN :{value_key}")
                 quality_cases_parts.append(f"WHEN :{pid_key} THEN :{quality_key}")
                 status_cases_parts.append(f"WHEN :{pid_key} THEN :{status_key}")
+                source_cases_parts.append(f"WHEN :{pid_key} THEN :{source_key}")
                 id_placeholders.append(f":{pid_key}")
 
             sql = text(
@@ -265,6 +269,7 @@ async def _batch_upsert_realtime(
                     raw_value = CASE point_id {' '.join(value_cases_parts)} END,
                     quality = CASE point_id {' '.join(quality_cases_parts)} END,
                     status = CASE point_id {' '.join(status_cases_parts)} END,
+                    source = CASE point_id {' '.join(source_cases_parts)} END,
                     updated_at = :now
                 WHERE point_id IN ({', '.join(id_placeholders)})
                 """

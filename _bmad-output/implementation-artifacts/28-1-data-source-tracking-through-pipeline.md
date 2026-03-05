@@ -1,6 +1,6 @@
 # Story 28.1: 数据来源标记贯穿统一管道（方案 G）
 
-Status: ready-for-dev
+Status: done
 
 ## Story
 

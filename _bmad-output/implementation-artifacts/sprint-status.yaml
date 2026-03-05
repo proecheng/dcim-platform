@@ -309,7 +309,7 @@ development_status:
   # Epic 27: 前端数据链路统一 (MVP 月1-3)
   # 优先级: 27.1(P0)→27.2(P0)→27.5(P1) 核心路径
   epic-27: in-progress
-  27-1-alarm-data-link-unification: ready-for-dev
+  27-1-alarm-data-link-unification: done
   27-2-realtime-data-link-unification: backlog
   27-3-energy-data-link-unification: backlog
   27-4-alarm-sound-toggle-unification: backlog
@@ -320,7 +320,7 @@ development_status:
   # Epic 28: Demo 系统解耦与数据隔离 (MVP 月1-3)
   # 优先级: 28.2(P0)→28.3(P1) 核心路径
   epic-28: in-progress
-  28-1-data-source-tracking-through-pipeline: ready-for-dev
+  28-1-data-source-tracking-through-pipeline: done
   28-2-demo-config-separation-and-minimal-seed: backlog
   28-3-main-system-demo-code-decoupling: backlog
   28-4-demo-data-safe-unload-and-tagging: backlog

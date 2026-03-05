@@ -258,7 +258,6 @@ import {
 } from '@element-plus/icons-vue'
 import { storeToRefs } from 'pinia'
 import { useUserStore, useAlarmStore } from '@/stores'
-import { getAlarmCount } from '@/api/alarm'
 import DegradationBanner from '@/components/common/DegradationBanner.vue'
 import AlarmSoundToggle from '@/components/common/AlarmSoundToggle.vue'
 import VideoPopup from '@/components/video/VideoPopup.vue'
@@ -298,12 +297,11 @@ onMounted(async () => {
     await userStore.fetchUserInfo()
   }
 
-  // 获取告警数量
+  // 通过 AlarmStore 统一加载告警数据
   try {
-    const count = await getAlarmCount()
-    alarmStore.alarmCount = count
+    await alarmStore.fetchActiveAlarms()
   } catch (e) {
-    console.error('获取告警数量失败', e)
+    console.error('获取告警数据失败', e)
   }
 })
 
