@@ -95,9 +95,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, computed } from 'vue'
+import { computed, onMounted } from 'vue'
 import { Sunny, Monitor, CircleCheck, Warning } from '@element-plus/icons-vue'
-import { getAllRealtimeData, type RealtimeData } from '@/api/modules/realtime'
+import { type RealtimeData } from '@/api/modules/realtime'
+import { useRealtimeStore } from '@/stores/realtime'
 import DataQualityTag from '@/components/common/DataQualityTag.vue'
 
 const ENV_DEVICE_TYPES = ['TH', 'WATER', 'SMOKE']
@@ -108,12 +109,11 @@ const deviceTypeLabels: Record<string, string> = {
   SMOKE: '烟雾',
 }
 
-const loading = ref(false)
-const allData = ref<RealtimeData[]>([])
-let timer: number | null = null
+const realtimeStore = useRealtimeStore()
+const loading = computed(() => realtimeStore.loading)
 
 const sensorData = computed(() =>
-  allData.value.filter((d) => ENV_DEVICE_TYPES.includes(d.device_type))
+  realtimeStore.realtimeData.filter((d) => ENV_DEVICE_TYPES.includes(d.device_type))
 )
 
 const avgTemp = computed(() => {
@@ -153,23 +153,17 @@ function qualityRowClass({ row }: { row: RealtimeData }) {
 }
 
 async function fetchData() {
-  loading.value = true
   try {
-    allData.value = await getAllRealtimeData()
+    await realtimeStore.fetchAllData()
   } catch (e) {
     console.error('环境监控数据加载失败', e)
-  } finally {
-    loading.value = false
   }
 }
 
 onMounted(() => {
-  fetchData()
-  timer = window.setInterval(fetchData, 10000)
-})
-
-onUnmounted(() => {
-  if (timer) clearInterval(timer)
+  if (realtimeStore.totalPoints === 0) {
+    fetchData()
+  }
 })
 </script>
 

@@ -90,9 +90,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, computed } from 'vue'
+import { computed, onMounted } from 'vue'
 import { Lock, CircleCheck, Warning, Remove } from '@element-plus/icons-vue'
-import { getAllRealtimeData, type RealtimeData } from '@/api/modules/realtime'
+import { useRealtimeStore } from '@/stores/realtime'
 
 const SEC_DEVICE_TYPES = ['DOOR', 'SMOKE', 'IR']
 
@@ -102,12 +102,11 @@ const deviceTypeLabels: Record<string, string> = {
   IR: '红外',
 }
 
-const loading = ref(false)
-const allData = ref<RealtimeData[]>([])
-let timer: number | null = null
+const realtimeStore = useRealtimeStore()
+const loading = computed(() => realtimeStore.loading)
 
 const sensorData = computed(() =>
-  allData.value.filter((d) => SEC_DEVICE_TYPES.includes(d.device_type))
+  realtimeStore.realtimeData.filter((d) => SEC_DEVICE_TYPES.includes(d.device_type))
 )
 
 const totalCount = computed(() => sensorData.value.length)
@@ -127,23 +126,17 @@ function statusText(status: string) {
 }
 
 async function fetchData() {
-  loading.value = true
   try {
-    allData.value = await getAllRealtimeData()
+    await realtimeStore.fetchAllData()
   } catch (e) {
     console.error('安防监控数据加载失败', e)
-  } finally {
-    loading.value = false
   }
 }
 
 onMounted(() => {
-  fetchData()
-  timer = window.setInterval(fetchData, 10000)
-})
-
-onUnmounted(() => {
-  if (timer) clearInterval(timer)
+  if (realtimeStore.totalPoints === 0) {
+    fetchData()
+  }
 })
 </script>
 

@@ -1,9 +1,14 @@
 /**
- * 实时数据状态管理
+ * 实时数据状态管理 - 单一事实来源 (SSOT)
+ *
+ * Story 27.2: 所有页面的实时点位数据从此 Store 读取，
+ * useRealtime composable 负责 WS/轮询，但状态写入此 Store。
  */
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import type { RealtimeData, RealtimeSummary } from '@/api/modules/realtime'
+import { getAllRealtimeData, getRealtimeSummary, type RealtimeData, type RealtimeSummary } from '@/api/modules/realtime'
+
+export type { RealtimeData, RealtimeSummary }
 
 export const useRealtimeStore = defineStore('realtime', () => {
   // 实时数据映射表
@@ -18,6 +23,9 @@ export const useRealtimeStore = defineStore('realtime', () => {
   // WebSocket 连接状态
   const wsConnected = ref(false)
 
+  // 加载状态（防重入）
+  const loading = ref(false)
+
   // 计算属性
   const realtimeData = computed(() => Array.from(dataMap.value.values()))
   const totalPoints = computed(() => dataMap.value.size)
@@ -26,19 +34,58 @@ export const useRealtimeStore = defineStore('realtime', () => {
   const alarmCount = computed(() => alarmPoints.value.length)
   const offlineCount = computed(() => offlinePoints.value.length)
 
-  // 更新单个点位数据
+  // 简化汇总（供 dashboard 使用）
+  const simpleSummary = computed(() => ({
+    total: summary.value?.total_points ?? totalPoints.value,
+    normal: summary.value?.online_points ?? (totalPoints.value - alarmCount.value - offlineCount.value),
+    alarm: summary.value?.alarm_points ?? alarmCount.value,
+    offline: summary.value?.offline_points ?? offlineCount.value,
+  }))
+
+  // 从 API 加载全量实时数据（带防重入锁）
+  async function fetchAllData(pointIds?: number[]) {
+    if (loading.value) return
+    loading.value = true
+    try {
+      const data = await getAllRealtimeData(pointIds ? { point_ids: pointIds } : undefined)
+      // 全量替换（非增量）以保证准确性
+      dataMap.value.clear()
+      data.forEach(d => dataMap.value.set(d.point_id, d))
+      lastUpdateTime.value = new Date()
+    } finally {
+      loading.value = false
+    }
+  }
+
+  // 从 API 加载汇总数据
+  async function fetchSummary() {
+    try {
+      summary.value = await getRealtimeSummary()
+    } catch (e) {
+      console.error('获取实时汇总失败:', e)
+    }
+  }
+
+  // 加载全部（数据+汇总）
+  async function reload() {
+    await Promise.all([fetchAllData(), fetchSummary()])
+  }
+
+  // 更新单个点位数据（WS 推送用）
   function updatePoint(data: RealtimeData) {
     dataMap.value.set(data.point_id, data)
     lastUpdateTime.value = new Date()
   }
 
-  // 批量更新数据
+  // 批量更新数据（WS 批量推送用）— 单次替换 Map 减少 N 次响应触发
   function updatePoints(data: RealtimeData[]) {
-    data.forEach(d => dataMap.value.set(d.point_id, d))
+    const newMap = new Map(dataMap.value)
+    data.forEach(d => newMap.set(d.point_id, d))
+    dataMap.value = newMap
     lastUpdateTime.value = new Date()
   }
 
-  // 设置全部数据
+  // 设置全部数据（外部整体替换）
   function setAllData(data: RealtimeData[]) {
     dataMap.value.clear()
     data.forEach(d => dataMap.value.set(d.point_id, d))
@@ -77,20 +124,22 @@ export const useRealtimeStore = defineStore('realtime', () => {
     lastUpdateTime.value = null
   }
 
-  // 重新加载数据（Story 27.2 实现）
-  async function reload() { /* Story 27.2 实现 */ }
-
   return {
     dataMap,
     summary,
     lastUpdateTime,
     wsConnected,
+    loading,
     realtimeData,
     totalPoints,
     alarmPoints,
     offlinePoints,
     alarmCount,
     offlineCount,
+    simpleSummary,
+    fetchAllData,
+    fetchSummary,
+    reload,
     updatePoint,
     updatePoints,
     setAllData,
@@ -100,6 +149,5 @@ export const useRealtimeStore = defineStore('realtime', () => {
     getDataByArea,
     setWsConnected,
     clearData,
-    reload
   }
 })

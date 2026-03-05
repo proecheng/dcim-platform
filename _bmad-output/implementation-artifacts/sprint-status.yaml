@@ -310,7 +310,7 @@ development_status:
   # 优先级: 27.1(P0)→27.2(P0)→27.5(P1) 核心路径
   epic-27: in-progress
   27-1-alarm-data-link-unification: done
-  27-2-realtime-data-link-unification: backlog
+  27-2-realtime-data-link-unification: done
   27-3-energy-data-link-unification: backlog
   27-4-alarm-sound-toggle-unification: backlog
   27-5-websocket-single-connection-manager: backlog

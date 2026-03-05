@@ -2,8 +2,8 @@
 import { ref, onMounted, onUnmounted } from 'vue'
 import { useBigscreenStore } from '@/stores/bigscreen'
 import { useAlarmStore } from '@/stores/alarm'
+import { useRealtimeStore } from '@/stores/realtime'
 import type { DeviceRealtimeData, BigscreenAlarm } from '@/types/bigscreen'
-import { getRealtimeSummary, getAllRealtimeData } from '@/api/modules/realtime'
 import { getEnergyDashboard } from '@/api/modules/energy'
 
 export interface DataFetchOptions {
@@ -15,6 +15,7 @@ export function useBigscreenData(options: DataFetchOptions = {}) {
   const { refreshInterval = 5000, enableRealtime = true } = options
 
   const store = useBigscreenStore()
+  const realtimeStore = useRealtimeStore()
   const isLoading = ref(false)
   const error = ref<string | null>(null)
   const lastUpdate = ref<Date | null>(null)
@@ -22,15 +23,18 @@ export function useBigscreenData(options: DataFetchOptions = {}) {
   let refreshTimer: number | null = null
   let currentInterval = refreshInterval
 
-  // 获取环境数据
+  // 获取环境数据（从 RealtimeStore 读取）
   async function fetchEnvironmentData() {
     try {
-      const summary = await getRealtimeSummary()
+      // 确保 store 有数据
+      if (realtimeStore.totalPoints === 0) {
+        await realtimeStore.reload()
+      }
 
-      // 从实时数据中提取温湿度
-      const realtimeData = await getAllRealtimeData()
-      const tempPoints = realtimeData.filter(p => p.point_code.includes('_TH_') && p.point_code.includes('_001'))
-      const humidPoints = realtimeData.filter(p => p.point_code.includes('_TH_') && p.point_code.includes('_002'))
+      // 从 store 中提取温湿度
+      const allData = realtimeStore.realtimeData
+      const tempPoints = allData.filter(p => p.point_code.includes('_TH_') && p.point_code.includes('_001'))
+      const humidPoints = allData.filter(p => p.point_code.includes('_TH_') && p.point_code.includes('_002'))
 
       const temps = tempPoints.map(p => p.value).filter(v => v > 0)
       const humids = humidPoints.map(p => p.value).filter(v => v > 0)
@@ -86,16 +90,20 @@ export function useBigscreenData(options: DataFetchOptions = {}) {
     }
   }
 
-  // 获取设备实时数据
+  // 获取设备实时数据（从 RealtimeStore 读取）
   async function fetchDeviceData() {
     try {
-      const realtimeData = await getAllRealtimeData()
+      // 确保 store 有数据
+      if (realtimeStore.totalPoints === 0) {
+        await realtimeStore.fetchAllData()
+      }
+      const allRealtimeData = realtimeStore.realtimeData
 
       if (store.layout) {
         for (const module of store.layout.modules) {
           for (const cabinet of module.cabinets) {
             // 根据机柜ID查找关联的点位数据
-            const relatedPoints = realtimeData.filter(p =>
+            const relatedPoints = allRealtimeData.filter(p =>
               p.point_code.startsWith(cabinet.id.replace('-', '_'))
             )
 

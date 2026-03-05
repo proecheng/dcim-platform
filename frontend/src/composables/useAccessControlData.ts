@@ -3,11 +3,11 @@
  * 封装门禁设备数据获取、统计计算、出入事件记录获取
  * 门禁设备为 DI 类型（干接点信号），device_type === 'DOOR'
  */
-import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
-import { getAllRealtimeData, type RealtimeData } from '@/api/modules/realtime'
+import { ref, computed, onMounted } from 'vue'
+import { type RealtimeData } from '@/api/modules/realtime'
 import { getAlarmList, type AlarmInfo } from '@/api/modules/alarm'
 import { getLinkagePolicies, type LinkagePolicy } from '@/api/modules/linkage'
-import { realtimeWs } from '@/api/websocket'
+import { useRealtimeStore } from '@/stores/realtime'
 
 /** 门禁事件类型 */
 export type AccessEventType = 'card_open' | 'remote_open' | 'anomaly_open' | 'fire_linkage_open'
@@ -123,13 +123,13 @@ function extractPerson(msg: string): string {
 }
 
 export function useAccessControlData() {
-  const allData = ref<Map<number, RealtimeData>>(new Map())
-  const loading = ref(false)
+  const realtimeStore = useRealtimeStore()
+  const allData = computed(() => realtimeStore.dataMap)
+  const loading = computed(() => realtimeStore.loading)
   const eventsLoading = ref(false)
-  const wsConnected = ref(false)
+  const wsConnected = computed(() => realtimeStore.wsConnected)
   const firePolicies = ref<LinkagePolicy[]>([])
   const eventRecords = ref<AlarmInfo[]>([])
-  let pollingTimer: number | null = null
 
   // ── 筛选门禁设备 ──
   const doorDevices = computed<DoorDevice[]>(() =>
@@ -179,17 +179,12 @@ export function useAccessControlData() {
     })
   )
 
-  // ── 数据获取 ──
+  // ── 数据获取（委托给 store）──
   async function fetchData() {
-    loading.value = true
     try {
-      const dataArray = await getAllRealtimeData()
-      allData.value.clear()
-      dataArray.forEach(d => allData.value.set(d.point_id, d))
+      await realtimeStore.fetchAllData()
     } catch (e) {
       console.error('门禁设备数据加载失败', e)
-    } finally {
-      loading.value = false
     }
   }
 
@@ -244,42 +239,14 @@ export function useAccessControlData() {
     }
   }
 
-  // ── WebSocket 实时更新 ──
-  function handleWsMessage(message: Record<string, unknown>) {
-    if (message.type === 'realtime' && message.data) {
-      const data = message.data as RealtimeData
-      allData.value.set(data.point_id, data) // O(1) 更新
-    }
-  }
-
-  function startPolling() {
-    stopPolling()
-    pollingTimer = window.setInterval(fetchData, 10000)
-  }
-
-  function stopPolling() {
-    if (pollingTimer) {
-      clearInterval(pollingTimer)
-      pollingTimer = null
-    }
-  }
+  // WS/轮询由 RealtimeStore + useRealtime composable 统一管理
 
   onMounted(() => {
-    fetchData()
+    if (realtimeStore.totalPoints === 0) {
+      fetchData()
+    }
     fetchTodayEventCount()
     fetchFirePolicies()
-    startPolling()
-
-    realtimeWs.connect()
-    realtimeWs.on('realtime', handleWsMessage)
-    wsConnected.value = true
-  })
-
-  onUnmounted(() => {
-    stopPolling()
-    realtimeWs.off('realtime', handleWsMessage)
-    wsConnected.value = false
-    // 注意: 不调用 realtimeWs.close()，因为它是全局单例，close 会影响其他页面
   })
 
   return {

@@ -4,9 +4,9 @@
  * 预留热力图升级接口
  */
 import { ref, computed, onMounted, onUnmounted } from 'vue'
-import { getAllRealtimeData, type RealtimeData } from '@/api/modules/realtime'
+import { type RealtimeData } from '@/api/modules/realtime'
 import { getDriftResults, type DriftDetectionResult } from '@/api/modules/drift'
-import { realtimeWs } from '@/api/websocket'
+import { useRealtimeStore } from '@/stores/realtime'
 
 /** 区域分组数据 */
 export interface ZoneGroup {
@@ -33,11 +33,12 @@ export interface HeatmapPoint {
 }
 
 export function useTemperatureData() {
-  const allData = ref<Map<number, RealtimeData>>(new Map())
+  const realtimeStore = useRealtimeStore()
+  // 从 store 读取数据（SSOT）
+  const allData = computed(() => realtimeStore.dataMap)
   const driftPointIds = ref<Set<number>>(new Set())
-  const loading = ref(false)
-  const wsConnected = ref(false)
-  let pollingTimer: number | null = null
+  const loading = computed(() => realtimeStore.loading)
+  const wsConnected = computed(() => realtimeStore.wsConnected)
 
   // 筛选温湿度传感器（device_type === 'TH'）
   const thSensors = computed(() =>
@@ -123,17 +124,12 @@ export function useTemperatureData() {
     return driftPointIds.value.has(pointId)
   }
 
-  // ── 数据获取 ──
+  // ── 数据获取（委托给 store）──
   async function fetchData() {
-    loading.value = true
     try {
-      const dataArray = await getAllRealtimeData()
-      allData.value.clear()
-      dataArray.forEach(d => allData.value.set(d.point_id, d))
+      await realtimeStore.fetchAllData()
     } catch (e) {
       console.error('温湿度数据加载失败', e)
-    } finally {
-      loading.value = false
     }
   }
 
@@ -155,42 +151,14 @@ export function useTemperatureData() {
     }
   }
 
-  // ── WebSocket 实时更新 ──
-  function handleWsMessage(message: Record<string, unknown>) {
-    if (message.type === 'realtime' && message.data) {
-      const data = message.data as RealtimeData
-      allData.value.set(data.point_id, data) // O(1) 更新
-    }
-  }
-
-  function startPolling() {
-    stopPolling()
-    pollingTimer = window.setInterval(fetchData, 10000)
-  }
-
-  function stopPolling() {
-    if (pollingTimer) {
-      clearInterval(pollingTimer)
-      pollingTimer = null
-    }
-  }
+  // WS/轮询由 RealtimeStore + useRealtime composable 统一管理
 
   onMounted(() => {
-    fetchData()
+    // 如果 store 还没有数据，触发一次加载
+    if (realtimeStore.totalPoints === 0) {
+      fetchData()
+    }
     fetchDriftData()
-    startPolling()
-
-    // WebSocket 订阅
-    realtimeWs.connect()
-    realtimeWs.on('realtime', handleWsMessage)
-    wsConnected.value = true
-  })
-
-  onUnmounted(() => {
-    stopPolling()
-    realtimeWs.off('realtime', handleWsMessage)
-    wsConnected.value = false
-    // 注意: 不调用 realtimeWs.close()，因为它是全局单例，close 会影响其他页面
   })
 
   return {

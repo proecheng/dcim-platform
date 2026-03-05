@@ -218,11 +218,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, onActivated, onDeactivated, markRaw } from 'vue'
+import { ref, computed, onMounted, onUnmounted, onActivated, onDeactivated, markRaw } from 'vue'
 import { Monitor, CircleCheck, Warning, Remove } from '@element-plus/icons-vue'
 import { Lightning, FullScreen, Refresh, Coin } from '@element-plus/icons-vue'
 import { IceCream, Sunny, Lock, OfficeBuilding, Opportunity } from '@element-plus/icons-vue'
-import { getAllRealtimeData, getRealtimeSummary, getDashboardData, type RealtimeData } from '@/api/modules/realtime'
+import { getDashboardData, type RealtimeData } from '@/api/modules/realtime'
 import { getEnergyDashboard, type EnergyDashboardData } from '@/api/modules/energy'
 import { useAlarmStore } from '@/stores/alarm'
 import { useRealtimeStore } from '@/stores/realtime'
@@ -237,9 +237,10 @@ import SuggestionsCard from '@/components/energy/SuggestionsCard.vue'
 import DemoDataLoader from '@/components/DemoDataLoader.vue'
 
 const alarmStore = useAlarmStore()
+const realtimeStore = useRealtimeStore()
 
-const summary = ref({ total: 0, normal: 0, alarm: 0, offline: 0 })
-const realtimeData = ref<RealtimeData[]>([])
+const summary = computed(() => realtimeStore.simpleSummary)
+const realtimeData = computed(() => realtimeStore.realtimeData.slice(0, MAX_REALTIME_ROWS))
 const energyData = ref<EnergyDashboardData | null>(null)
 const showDemoLoader = ref(false)
 const isRefreshing = ref(false)
@@ -260,7 +261,6 @@ interface DashboardCachePayload {
 }
 
 type DashboardRaw = Awaited<ReturnType<typeof getDashboardData>>
-type SummaryRaw = Awaited<ReturnType<typeof getRealtimeSummary>>
 
 function unwrapApiData<T>(payload: unknown): T {
   const maybeObj = payload as { data?: T }
@@ -343,21 +343,6 @@ function applyDashboardOverviewStat(dashRes: DashboardRaw) {
   domainOverview.value[4].stat = totalDevices > 0 ? `${totalDevices}台设备` : '运行中'
 }
 
-function mapSummaryData(summaryRes: SummaryRaw) {
-  const raw = unwrapApiData<Record<string, unknown>>(summaryRes)
-
-  const total = Number(raw?.total_points ?? raw?.total ?? 0)
-  const normal = Number(raw?.online_points ?? raw?.normal_count ?? raw?.normal ?? 0)
-  const alarm = Number(raw?.alarm_points ?? raw?.alarm_count ?? raw?.alarm ?? 0)
-  const offline = Number(raw?.offline_points ?? raw?.offline_count ?? raw?.offline ?? 0)
-
-  summary.value = {
-    total,
-    normal,
-    alarm,
-    offline
-  }
-}
 
 function loadDashboardCache(): DashboardCachePayload | null {
   try {
@@ -376,8 +361,8 @@ function saveDashboardCache() {
   try {
     const payload: DashboardCachePayload = {
       savedAt: Date.now(),
-      summary: { ...summary.value },
-      realtimeData: [...realtimeData.value],
+      summary: { ...realtimeStore.simpleSummary },
+      realtimeData: realtimeStore.realtimeData.slice(0, MAX_REALTIME_ROWS),
       energyData: energyData.value,
       domainStats: domainOverview.value.map(item => item.stat)
     }
@@ -391,8 +376,20 @@ function applyCachedDashboardData() {
   const cache = loadDashboardCache()
   if (!cache) return
 
-  summary.value = cache.summary
-  realtimeData.value = cache.realtimeData.slice(0, MAX_REALTIME_ROWS)
+  // 恢复缓存数据到 store
+  if (cache.summary) {
+    realtimeStore.setSummary({
+      total_points: cache.summary.total,
+      online_points: cache.summary.normal,
+      alarm_points: cache.summary.alarm,
+      offline_points: cache.summary.offline,
+      by_type: {},
+      by_area: {},
+    })
+  }
+  if (cache.realtimeData?.length) {
+    realtimeStore.setAllData(cache.realtimeData.slice(0, MAX_REALTIME_ROWS))
+  }
   energyData.value = cache.energyData
   cache.domainStats.forEach((stat, index) => {
     if (domainOverview.value[index]) {
@@ -408,42 +405,34 @@ async function refreshData(options: { force?: boolean } = {}) {
 
   isRefreshing.value = true
   try {
-    const [summaryRes, realtimeRes, _alarmsRes, dashboardRes, energyRes] = await Promise.allSettled([
-      getRealtimeSummary(),
-      getAllRealtimeData(),
+    const [_realtimeRes, _alarmsRes, dashboardRes, energyRes] = await Promise.allSettled([
+      realtimeStore.reload(),
       alarmStore.fetchActiveAlarms(),
       getDashboardData(),
       getEnergyDashboard()
     ])
 
-    // 同时触发其他 Store 刷新（占位，Story 27.2/27.3 实现）
-    useRealtimeStore().reload()
     useEnergyStore().reload()
-
-    if (summaryRes.status === 'fulfilled') {
-      mapSummaryData(summaryRes.value)
-    }
-
-    if (realtimeRes.status === 'fulfilled') {
-      const realtimePayload = unwrapApiData<RealtimeData[]>(realtimeRes.value)
-      realtimeData.value = (Array.isArray(realtimePayload) ? realtimePayload : []).slice(0, MAX_REALTIME_ROWS)
-    }
 
     if (dashboardRes.status === 'fulfilled') {
       const dashData = unwrapApiData<DashboardRaw>(dashboardRes.value)
       applyDashboardOverviewStat(dashData)
 
-      if (summary.value.total === 0 && dashData?.overview?.total_points) {
-        summary.value = {
-          total: dashData.overview.total_points || 0,
-          normal: dashData.overview.online_points || 0,
-          alarm: dashData.overview.alarm_count || 0,
-          offline: Math.max(0, (dashData.overview.total_points || 0) - (dashData.overview.online_points || 0))
-        }
+      // 如果 store 还没有数据，用 dashboard 返回的 realtime 数据填充
+      if (realtimeStore.totalPoints === 0 && Array.isArray(dashData?.realtime)) {
+        realtimeStore.setAllData(dashData.realtime)
       }
 
-      if (realtimeData.value.length === 0 && Array.isArray(dashData?.realtime)) {
-        realtimeData.value = dashData.realtime.slice(0, MAX_REALTIME_ROWS)
+      // 如果 store 汇总还没加载，用 dashboard overview 填充
+      if (!realtimeStore.summary && dashData?.overview?.total_points) {
+        realtimeStore.setSummary({
+          total_points: dashData.overview.total_points || 0,
+          online_points: dashData.overview.online_points || 0,
+          alarm_points: dashData.overview.alarm_count || 0,
+          offline_points: Math.max(0, (dashData.overview.total_points || 0) - (dashData.overview.online_points || 0)),
+          by_type: {},
+          by_area: {},
+        })
       }
     }
 

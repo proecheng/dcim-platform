@@ -1,9 +1,13 @@
 /**
  * 实时数据组合式函数
+ *
+ * Story 27.2: 状态委托给 RealtimeStore (SSOT)，
+ * composable 负责 WS 订阅、轮询、生命周期管理。
  */
-import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
+import { computed, onMounted, onUnmounted, watch } from 'vue'
+import { storeToRefs } from 'pinia'
 import { useWebSocket } from './useWebSocket'
-import { getAllRealtimeData, getRealtimeSummary, type RealtimeData, type RealtimeSummary } from '@/api/modules/realtime'
+import { useRealtimeStore, type RealtimeData } from '@/stores/realtime'
 
 interface UseRealtimeOptions {
   autoFetch?: boolean
@@ -20,14 +24,10 @@ export function useRealtime(options: UseRealtimeOptions = {}) {
     pointIds
   } = options
 
-  const realtimeData = ref<Map<number, RealtimeData>>(new Map())
-  const summary = ref<RealtimeSummary | null>(null)
-  const loading = ref(false)
-  const error = ref<Error | null>(null)
-  const lastUpdateTime = ref<Date | null>(null)
+  const store = useRealtimeStore()
+  const { realtimeData, summary, loading, lastUpdateTime, alarmPoints, offlinePoints } = storeToRefs(store)
 
   let pollingTimer: number | null = null
-  let wsConnected = false
 
   // WebSocket 连接
   const { isConnected, subscribe, on, off, connect, disconnect } = useWebSocket({
@@ -35,38 +35,22 @@ export function useRealtime(options: UseRealtimeOptions = {}) {
     autoConnect: false
   })
 
-  // 获取所有实时数据
+  // 获取所有实时数据 - 委托给 store
   const fetchRealtimeData = async () => {
-    loading.value = true
-    try {
-      const data = await getAllRealtimeData({ point_ids: pointIds })
-      data.forEach(item => {
-        realtimeData.value.set(item.point_id, item)
-      })
-      lastUpdateTime.value = new Date()
-      error.value = null
-    } catch (e) {
-      error.value = e as Error
-    } finally {
-      loading.value = false
-    }
+    await store.fetchAllData(pointIds)
   }
 
-  // 获取汇总数据
+  // 获取汇总数据 - 委托给 store
   const fetchSummary = async () => {
-    try {
-      summary.value = await getRealtimeSummary()
-    } catch (e) {
-      console.error('获取汇总数据失败:', e)
-    }
+    await store.fetchSummary()
   }
 
   // 开始轮询
   const startPolling = () => {
     stopPolling()
     pollingTimer = window.setInterval(() => {
-      if (!wsConnected) {
-        fetchRealtimeData()
+      if (!isConnected.value) {
+        store.fetchAllData(pointIds)
       }
     }, pollingInterval)
   }
@@ -79,12 +63,10 @@ export function useRealtime(options: UseRealtimeOptions = {}) {
     }
   }
 
-  // 处理 WebSocket 消息
+  // 处理 WebSocket 消息 - 写入 store
   const handleRealtimeMessage = (message: any) => {
     if (message.type === 'realtime' && message.data) {
-      const data = message.data as RealtimeData
-      realtimeData.value.set(data.point_id, data)
-      lastUpdateTime.value = new Date()
+      store.updatePoint(message.data as RealtimeData)
     }
   }
 
@@ -102,39 +84,12 @@ export function useRealtime(options: UseRealtimeOptions = {}) {
     })
   }
 
-  // 根据点位 ID 获取数据
-  const getPointData = (pointId: number): RealtimeData | undefined => {
-    return realtimeData.value.get(pointId)
-  }
-
-  // 根据类型获取数据
-  const getDataByType = (type: 'AI' | 'DI' | 'AO' | 'DO'): RealtimeData[] => {
-    return Array.from(realtimeData.value.values()).filter(d => d.point_type === type)
-  }
-
-  // 根据区域获取数据
-  const getDataByArea = (areaCode: string): RealtimeData[] => {
-    return Array.from(realtimeData.value.values()).filter(d => d.area_code === areaCode)
-  }
-
-  // 获取告警点位
-  const alarmPoints = computed(() => {
-    return Array.from(realtimeData.value.values()).filter(d => d.status === 'alarm')
-  })
-
-  // 获取离线点位
-  const offlinePoints = computed(() => {
-    return Array.from(realtimeData.value.values()).filter(d => d.status === 'offline')
-  })
-
   // 监听 WebSocket 连接状态
   watch(isConnected, (connected) => {
-    wsConnected = connected
+    store.setWsConnected(connected)
     if (connected) {
-      // WebSocket 连接成功，减少轮询频率
       stopPolling()
     } else {
-      // WebSocket 断开，恢复轮询
       startPolling()
     }
   })
@@ -159,17 +114,16 @@ export function useRealtime(options: UseRealtimeOptions = {}) {
   })
 
   return {
-    realtimeData: computed(() => Array.from(realtimeData.value.values())),
-    summary: computed(() => summary.value),
-    loading: computed(() => loading.value),
-    error: computed(() => error.value),
-    lastUpdateTime: computed(() => lastUpdateTime.value),
+    realtimeData,
+    summary,
+    loading,
+    lastUpdateTime,
     alarmPoints,
     offlinePoints,
     isConnected,
-    getPointData,
-    getDataByType,
-    getDataByArea,
+    getPointData: store.getPointData,
+    getDataByType: store.getDataByType,
+    getDataByArea: store.getDataByArea,
     fetchRealtimeData,
     fetchSummary,
     startPolling,

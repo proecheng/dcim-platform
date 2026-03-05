@@ -263,8 +263,10 @@ import AlarmSoundToggle from '@/components/common/AlarmSoundToggle.vue'
 import VideoPopup from '@/components/video/VideoPopup.vue'
 import SiteSwitcher from '@/components/common/SiteSwitcher.vue'
 import { useDataQuality } from '@/composables/useDataQuality'
+import { useRealtime } from '@/composables/useRealtime'
 
 useDataQuality()
+useRealtime()
 
 const router = useRouter()
 const route = useRoute()
