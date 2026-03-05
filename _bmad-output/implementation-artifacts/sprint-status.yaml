@@ -311,7 +311,7 @@ development_status:
   epic-27: in-progress
   27-1-alarm-data-link-unification: done
   27-2-realtime-data-link-unification: done
-  27-3-energy-data-link-unification: backlog
+  27-3-energy-data-link-unification: done
   27-4-alarm-sound-toggle-unification: backlog
   27-5-websocket-single-connection-manager: backlog
   27-6-site-filter-propagation: backlog

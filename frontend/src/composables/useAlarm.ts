@@ -13,6 +13,7 @@ import {
   type AlarmCount
 } from '@/api/modules/alarm'
 import { useAlarmStore, type Alarm } from '@/stores/alarm'
+import { useAppStore } from '@/stores/app'
 
 interface UseAlarmOptions {
   autoFetch?: boolean
@@ -33,6 +34,7 @@ export function useAlarm(options: UseAlarmOptions = {}) {
 
   const { play: playAlarmSound, stop: stopAlarmSound } = useSound()
   const alarmStore = useAlarmStore()
+  const appStore = useAppStore()
   const { activeAlarms, alarmCount, loading } = storeToRefs(alarmStore)
 
   // Web Audio API 兜底：当 mp3 文件不存在时使用合成音
@@ -88,9 +90,9 @@ export function useAlarm(options: UseAlarmOptions = {}) {
     // 添加到 AlarmStore（Store 会自动更新计数）
     alarmStore.addAlarm(alarm as unknown as Alarm)
 
-    // 播放声音（检查 store 中的声音开关）
+    // 播放声音（检查 appStore 中的声音开关）
     if (playSound) {
-      if (alarmStore.soundEnabled) {
+      if (appStore.alarmSoundEnabled) {
         const soundMap: Record<string, string> = {
           critical: '/sounds/alarm_critical.mp3',
           major: '/sounds/alarm_major.mp3',

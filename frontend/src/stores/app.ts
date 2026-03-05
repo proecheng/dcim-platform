@@ -134,6 +134,15 @@ export const useAppStore = defineStore('app', () => {
 
   // 从本地存储初始化
   function initFromStorage() {
+    // 一次性迁移：alarm_sound_enabled → alarm_sound
+    const oldKey = 'alarm_sound_enabled'
+    const newKey = 'alarm_sound'
+    const oldValue = localStorage.getItem(oldKey)
+    if (oldValue !== null && localStorage.getItem(newKey) === null) {
+      localStorage.setItem(newKey, oldValue)
+      localStorage.removeItem(oldKey)
+    }
+
     const collapsed = localStorage.getItem('sidebar_collapsed')
     if (collapsed !== null) {
       sidebarCollapsed.value = collapsed === 'true'

@@ -188,6 +188,24 @@ describe('useAppStore', () => {
     expect(store.refreshInterval).toBe(5)
   })
 
+  it('initFromStorage 迁移旧 alarm_sound_enabled 到 alarm_sound', () => {
+    localStorage.setItem('alarm_sound_enabled', 'false')
+    const store = useAppStore()
+    store.initFromStorage()
+    expect(store.alarmSoundEnabled).toBe(false)
+    expect(localStorage.getItem('alarm_sound')).toBe('false')
+    expect(localStorage.getItem('alarm_sound_enabled')).toBeNull()
+  })
+
+  it('initFromStorage 迁移时不覆盖已有的 alarm_sound', () => {
+    localStorage.setItem('alarm_sound_enabled', 'false')
+    localStorage.setItem('alarm_sound', 'true')
+    const store = useAppStore()
+    store.initFromStorage()
+    expect(store.alarmSoundEnabled).toBe(true)
+    expect(localStorage.getItem('alarm_sound')).toBe('true')
+  })
+
   it('settings 计算属性聚合所有设置项', () => {
     const store = useAppStore()
     store.setTheme('dark')

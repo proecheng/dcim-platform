@@ -294,6 +294,9 @@ async function handleMenuSelect(index: string) {
 }
 
 onMounted(async () => {
+  // 初始化应用设置（包含 localStorage 迁移逻辑）
+  appStore.initFromStorage()
+
   // 获取用户信息
   if (userStore.token && !userStore.userInfo) {
     await userStore.fetchUserInfo()

@@ -101,12 +101,4 @@ describe('useAlarmStore', () => {
     store.updateAlarm(999, { status: 'resolved' })
     expect(store.activeAlarms).toHaveLength(1)
   })
-
-  it('toggleSound 切换声音开关并持久化', () => {
-    const store = useAlarmStore()
-    const initial = store.soundEnabled
-    store.toggleSound()
-    expect(store.soundEnabled).toBe(!initial)
-    expect(localStorage.setItem).toHaveBeenCalledWith('alarm_sound_enabled', String(!initial))
-  })
 })

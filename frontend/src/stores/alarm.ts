@@ -36,8 +36,6 @@ export const useAlarmStore = defineStore('alarm', () => {
     info: 0,
     total: 0
   })
-  // 声音开关（从 localStorage 读取，默认开启）
-  const soundEnabled = ref(localStorage.getItem('alarm_sound_enabled') !== 'false')
   const loading = ref(false)
 
   async function fetchActiveAlarms() {
@@ -89,20 +87,13 @@ export const useAlarmStore = defineStore('alarm', () => {
     }
   }
 
-  function toggleSound() {
-    soundEnabled.value = !soundEnabled.value
-    localStorage.setItem('alarm_sound_enabled', String(soundEnabled.value))
-  }
-
   return {
     activeAlarms,
     alarmCount,
-    soundEnabled,
     loading,
     fetchActiveAlarms,
     addAlarm,
     removeAlarm,
     updateAlarm,
-    toggleSound,
   }
 })
