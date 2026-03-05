@@ -9,6 +9,7 @@ Device ↔ Topology 双向同步
 
 import contextvars
 import logging
+import re
 from datetime import datetime
 from typing import Optional, Tuple
 
@@ -645,89 +646,69 @@ class DeviceSyncService:
             "created_cold_aisle_extensions": created_cold_aisle_ext,
         }
 
-    def _infer_circuit_id(self, device: Device, circuit_map: dict) -> Optional[int]:
-        """
-        根据设备编码和类型智能推断应该绑定的回路ID
+    @staticmethod
+    def _extract_floors_from_circuits(circuit_map: dict) -> list:
+        """从回路编码中提取楼层列表（替代硬编码 ["F1","F2","F3","F4"]）"""
+        floors = set()
+        for code in circuit_map:
+            m = re.match(r"C-(F\d+)-", code)
+            if m:
+                floors.add(m.group(1))
+        return sorted(floors)
 
-        规则：
-        - UPS-FX-XX → C-FX-UPS-01
-        - PDU-FX-XX → C-FX-PDU-01/02 (轮询)
-        - CA-FX-XX (冷通道) → C-FX-CA-01
-        - PMP-F1-0[1-4] (冷冻水泵) → C-CHWP-01
-        - PMP-F1-0[7-9] (冷却水泵) → C-CWP-01
-        - PMP-F1-XX (其他水泵) → C-PMP-01/02 (轮询)
-        - AC-OUT-XX (室外机) → C-AC-OUT-01
-        - CA-AXX (区域冷通道) → C-CA-A-01
-        - CH-XX (冷机) → C-CH-01
-        - CT-XX (冷却塔) → C-CT-01
-        - AC-A/B (精密空调) → C-AC-01/02
-        - FX-AC-XX (楼层空调) → C-FX-AC-01
-        - LIGHT → C-LIGHT
+    def _infer_circuit_id(self, device: Device, circuit_map: dict) -> Optional[int]:
+        """根据设备编码和类型智能推断应该绑定的回路ID
+
+        楼层列表从 circuit_map 键动态提取，不再硬编码。
         """
         code = device.device_code
         dev_type = device.device_type
 
-        # 边界情况: 检查 code 是否为 None 或空
         if not code:
             logger.warning(
                 f"Device {device.id} (type: {dev_type}) has no device_code, cannot infer circuit"
             )
             return None
 
-        # 按设备类型分发到专门的推断方法
+        floors = self._extract_floors_from_circuits(circuit_map)
+
         result = None
         if dev_type == "UPS":
-            result = self._infer_ups_circuit(code, circuit_map)
+            result = self._infer_ups_circuit(code, circuit_map, floors)
         elif dev_type == "PDU":
-            result = self._infer_pdu_circuit(code, device.area_code, circuit_map)
+            result = self._infer_pdu_circuit(code, device.area_code, circuit_map, floors)
         elif dev_type in ("AC", "HVAC"):
-            result = self._infer_hvac_circuit(code, circuit_map)
+            result = self._infer_hvac_circuit(code, circuit_map, floors)
         elif dev_type == "IT":
             result = self._infer_it_circuit(code, device.area_code, circuit_map)
         elif dev_type == "LIGHT":
             result = circuit_map.get("C-LIGHT")
 
-        # 记录推断结果
         if result is None:
             logger.debug(
                 f"No circuit found for device {code} "
                 f"(type: {dev_type}, area: {device.area_code})"
             )
         else:
-            # 查找回路名称
             circuit_code = next((k for k, v in circuit_map.items() if v == result), "?")
             logger.debug(
                 f"Inferred circuit for device {code}: {circuit_code} (id: {result})"
             )
 
         return result
-        # 按设备类型分发到专门的推断方法
-        if dev_type == "UPS":
-            return self._infer_ups_circuit(code, circuit_map)
-        elif dev_type == "PDU":
-            return self._infer_pdu_circuit(code, device.area_code, circuit_map)
-        elif dev_type in ("AC", "HVAC"):
-            return self._infer_hvac_circuit(code, circuit_map)
-        elif dev_type == "IT":
-            return self._infer_it_circuit(code, device.area_code, circuit_map)
-        elif dev_type == "LIGHT":
-            return circuit_map.get("C-LIGHT")
-        return None
 
-    def _infer_ups_circuit(self, code: str, circuit_map: dict) -> Optional[int]:
+    def _infer_ups_circuit(self, code: str, circuit_map: dict, floors: list) -> Optional[int]:
         """UPS 设备回路推断"""
-        # UPS-F1-XX 或 F1-UPS-XX → C-F1-UPS-01
-        for floor in ["F1", "F2", "F3", "F4"]:
+        for floor in floors:
             if code.startswith(f"UPS-{floor}-") or code.startswith(f"{floor}-UPS-"):
                 return circuit_map.get(f"C-{floor}-UPS-01")
         return None
 
     def _infer_pdu_circuit(
-        self, code: str, area_code: Optional[str], circuit_map: dict
+        self, code: str, area_code: Optional[str], circuit_map: dict, floors: list
     ) -> Optional[int]:
         """PDU 设备回路推断"""
-        # 优先级1: 楼层 PDU（按编号奇偶分配到 01/02 回路）
-        for floor in ["F2", "F3", "F4"]:
+        for floor in floors:
             prefix = f"PDU-{floor}-"
             if code.startswith(prefix):
                 suffix = code[len(prefix):]
@@ -752,18 +733,10 @@ class DeviceSyncService:
 
         return None
 
-    def _infer_hvac_circuit(self, code: str, circuit_map: dict) -> Optional[int]:
-        """
-        HVAC 设备回路推断 (制冷、空调、水泵等)
-
-        优先级顺序 (从高到低):
-        1. 楼层特定设备 (CA-F2-XX, F1-AC-XX)
-        2. 区域特定设备 (CA-A01)
-        3. 设备编号特定规则 (PMP-F1-01~04, AC-A/B)
-        4. 通用回路 (CA-XX, AC-OUT-XX, PMP-XX)
-        """
-        # 优先级1: 楼层冷通道 CA-F2-XX → C-F2-CA-01
-        for floor in ["F2", "F3", "F4"]:
+    def _infer_hvac_circuit(self, code: str, circuit_map: dict, floors: list) -> Optional[int]:
+        """HVAC 设备回路推断 (制冷、空调、水泵等)"""
+        # 楼层冷通道 CA-F2-XX → C-F2-CA-01
+        for floor in floors:
             if code.startswith(f"CA-{floor}-"):
                 return circuit_map.get(f"C-{floor}-CA-01")
 
@@ -806,7 +779,7 @@ class DeviceSyncService:
             return circuit_map.get("C-CT-01")
 
         # 楼层空调 F1-AC-XX → C-F1-AC-01
-        for floor in ["F1", "F2", "F3", "F4"]:
+        for floor in floors:
             if code.startswith(f"{floor}-AC-"):
                 return circuit_map.get(f"C-{floor}-AC-01")
 

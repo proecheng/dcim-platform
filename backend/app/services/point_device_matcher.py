@@ -7,7 +7,8 @@ Point-Device Smart Matching Engine
 
 import re
 import logging
-from typing import Dict, Optional, Any
+from threading import RLock
+from typing import Dict, Optional, Any, Set
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update
 
@@ -15,6 +16,69 @@ from ..models.point import Point
 from ..models.energy import PowerDevice
 
 logger = logging.getLogger(__name__)
+
+
+class MatcherRegistry:
+    """点位匹配规则注册表（线程安全）
+
+    Story 28.3: 支持动态注册和卸载规则，实现 Demo 与主系统解耦
+    """
+    _rules: Dict[str, Dict] = {}
+    _lock = RLock()
+    _registered_sources: Set[str] = set()
+
+    @classmethod
+    def register(cls, rules: Dict[str, Dict], source: str = "default"):
+        """注册自定义规则（自动添加 _source 标记）
+
+        Args:
+            rules: 规则字典
+            source: 规则来源标识（用于后续卸载）
+        """
+        with cls._lock:
+            for key, value in rules.items():
+                rule_copy = value.copy()
+                rule_copy["_source"] = source
+                cls._rules[key] = rule_copy
+            cls._registered_sources.add(source)
+            logger.debug(f"注册规则来源 '{source}': {len(rules)} 条规则")
+
+    @classmethod
+    def unregister(cls, source: str):
+        """卸载指定来源的规则
+
+        Args:
+            source: 规则来源标识
+        """
+        with cls._lock:
+            keys_to_remove = [
+                k for k, v in cls._rules.items()
+                if v.get("_source") == source
+            ]
+            for key in keys_to_remove:
+                del cls._rules[key]
+            cls._registered_sources.discard(source)
+            logger.debug(f"卸载规则来源 '{source}': {len(keys_to_remove)} 条规则")
+
+    @classmethod
+    def clear(cls):
+        """清空所有规则（用于测试）"""
+        with cls._lock:
+            cls._rules.clear()
+            cls._registered_sources.clear()
+
+    @classmethod
+    def get_rule(cls, point_code: str) -> Optional[Dict]:
+        """获取单个规则（返回副本避免修改）"""
+        with cls._lock:
+            rule = cls._rules.get(point_code)
+            return rule.copy() if rule else None
+
+    @classmethod
+    def has_rules(cls) -> bool:
+        """检查是否有注册的规则"""
+        with cls._lock:
+            return len(cls._rules) > 0
 
 
 class PointDeviceMatcher:
@@ -27,54 +91,6 @@ class PointDeviceMatcher:
         "energy": ["电能", "电量", "累计电量", "energy", "kWh"],
         "voltage": ["电压", "voltage", "输入电压", "输出电压"],
         "power_factor": ["功率因数", "power factor", "cos", "pf"],
-    }
-
-    # 设备编码到点位前缀的已知映射（作为 fallback）
-    # 编码已统一为 datacenter_seed 的 {PREFIX}-{FLOOR}-{SEQ:02d} 格式
-    LEGACY_MAPPING_RULES = {
-        # 服务器机柜 SRV-001~004 -> A1_SRV_AI_001~012
-        "SRV-001": {"prefix": "A1_SRV_AI_", "power": "001", "current": "002", "energy": "003"},
-        "SRV-002": {"prefix": "A1_SRV_AI_", "power": "004", "current": "005", "energy": "006"},
-        "SRV-003": {"prefix": "A1_SRV_AI_", "power": "007", "current": "008", "energy": "009"},
-        "SRV-004": {"prefix": "A1_SRV_AI_", "power": "010", "current": "011", "energy": "012"},
-        # 网络机柜 NET-001 -> A1_NET_AI_001~003
-        "NET-001": {"prefix": "A1_NET_AI_", "power": "001", "current": "002", "energy": "003"},
-        # 存储机柜 STO-001 -> A1_STO_AI_001~003
-        "STO-001": {"prefix": "A1_STO_AI_", "power": "001", "current": "002", "energy": "003"},
-        # UPS主机（统一编码）
-        "UPS-F1-01": {"prefix": "A1_UPS_AI_", "power": "002", "current": "003"},
-        "UPS-F1-02": {"prefix": "A1_UPS_AI_", "power": "006", "current": "007"},
-        # 照明 LIGHT-001 -> A1_LIGHT_AI_001~003
-        "LIGHT-001": {"prefix": "A1_LIGHT_AI_", "power": "001", "current": "002"},
-        # 冷水机组（统一编码）
-        "CH-F1-01": {"prefix": "B1_CH_AI_", "power": "005", "current": "007"},
-        "CH-F1-02": {"prefix": "B1_CH_AI_", "power": "015", "current": "017"},
-        # 冷却塔（统一编码）
-        "CT-F1-01": {"prefix": "B1_CT_AI_", "power": "005"},
-        "CT-F1-02": {"prefix": "B1_CT_AI_", "power": "006"},
-        # 冷冻水泵（统一编码）
-        "PMP-F1-01": {"prefix": "B1_CHWP_AI_", "power": "005", "current": "002"},
-        "PMP-F1-02": {"prefix": "B1_CHWP_AI_", "power": "006", "current": "004"},
-        # 冷却水泵（统一编码）
-        "PMP-F1-07": {"prefix": "B1_CWP_AI_", "power": "005", "current": "002"},
-        "PMP-F1-08": {"prefix": "B1_CWP_AI_", "power": "006", "current": "004"},
-        # F1 UPS（统一编码）
-        "UPS-F1-03": {"prefix": "F1_UPS_AI_", "power": "0013"},
-        "UPS-F1-04": {"prefix": "F1_UPS_AI_", "power": "0023"},
-        "F2-UPS-001": {"prefix": "F2_UPS_AI_", "power": "0013"},
-        "F2-UPS-002": {"prefix": "F2_UPS_AI_", "power": "0023"},
-        "F3-UPS-001": {"prefix": "F3_UPS_AI_", "power": "0013"},
-        # F1/F2/F3 精密空调使用回风温度点位
-        "F1-AC-001": {"prefix": "F1_AC_AI_", "power": "0011"},
-        "F1-AC-002": {"prefix": "F1_AC_AI_", "power": "0021"},
-        "F1-AC-003": {"prefix": "F1_AC_AI_", "power": "0031"},
-        "F1-AC-004": {"prefix": "F1_AC_AI_", "power": "0041"},
-        "F2-AC-001": {"prefix": "F2_AC_AI_", "power": "0011"},
-        "F2-AC-002": {"prefix": "F2_AC_AI_", "power": "0021"},
-        "F2-AC-003": {"prefix": "F2_AC_AI_", "power": "0031"},
-        "F2-AC-004": {"prefix": "F2_AC_AI_", "power": "0041"},
-        "F3-AC-001": {"prefix": "F3_AC_AI_", "power": "0011"},
-        "F3-AC-002": {"prefix": "F3_AC_AI_", "power": "0021"},
     }
 
     # 设备类型到点位前缀类型的映射
@@ -153,23 +169,24 @@ class PointDeviceMatcher:
             "energy_point_id": None,
         }
 
-        # 首先尝试使用遗留映射规则（保证向后兼容）
-        legacy_rule = cls.LEGACY_MAPPING_RULES.get(device_code)
+        # 首先尝试使用注册的规则（支持 Demo 动态注册）
+        legacy_rule = MatcherRegistry.get_rule(device_code)
         if legacy_rule:
-            prefix = legacy_rule["prefix"]
-            for field, suffix in [
-                ("power", "power_point_id"),
-                ("current", "current_point_id"),
-                ("energy", "energy_point_id"),
-            ]:
-                if field in legacy_rule:
-                    point_code = f"{prefix}{legacy_rule[field]}"
-                    if point_code in point_map:
-                        result[suffix] = point_map[point_code]["id"]
+            prefix = legacy_rule.get("prefix")
+            if prefix:
+                for field, suffix in [
+                    ("power", "power_point_id"),
+                    ("current", "current_point_id"),
+                    ("energy", "energy_point_id"),
+                ]:
+                    if field in legacy_rule:
+                        point_code = f"{prefix}{legacy_rule[field]}"
+                        if point_code in point_map:
+                            result[suffix] = point_map[point_code]["id"]
 
-            # 如果遗留规则已找到至少一个点位，直接返回
-            if any(result.values()):
-                return result
+                # 如果注册规则已找到至少一个点位，直接返回
+                if any(result.values()):
+                    return result
 
         # 智能匹配：根据设备编码和区域推导点位前缀
         prefix = cls.derive_point_prefix(device_code, "", area_code)

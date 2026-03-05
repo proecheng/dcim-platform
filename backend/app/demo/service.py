@@ -51,7 +51,7 @@ from ..models.energy import (
     OptimizationResult,
 )
 from ..models.alarm import Alarm
-from ..data.building_points import get_all_points, get_threshold_for_point
+from .data.building_points import get_all_points, get_threshold_for_point
 from ..services.floor_map_generator import FloorMapGenerator, FLOOR_CONFIG
 from ..services.point_device_matcher import PointDeviceMatcher
 

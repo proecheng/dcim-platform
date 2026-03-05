@@ -5,7 +5,7 @@
 import asyncio
 from app.core.database import async_session, init_db
 from app.models import Point, PointRealtime, AlarmThreshold
-from app.data.building_points import get_all_points, get_threshold_for_point
+from app.demo.data.building_points import get_all_points, get_threshold_for_point
 
 
 async def init_building_points():
