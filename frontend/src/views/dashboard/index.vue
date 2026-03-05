@@ -407,8 +407,10 @@ async function refreshData(options: { force?: boolean } = {}) {
 
   isRefreshing.value = true
   try {
+    // 非 force 模式下跳过 realtimeStore.reload()，因为 MainLayout 的全局轮询已持续更新 store
+    const realtimeReload = forceRefresh ? realtimeStore.reload() : Promise.resolve()
     const [_realtimeRes, _alarmsRes, dashboardRes, energyRes] = await Promise.allSettled([
-      realtimeStore.reload(),
+      realtimeReload,
       alarmStore.fetchActiveAlarms(),
       getDashboardData(),
       getEnergyDashboard()

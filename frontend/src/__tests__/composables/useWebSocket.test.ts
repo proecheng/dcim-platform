@@ -124,8 +124,12 @@ describe('useWebSocket', () => {
   it('off 移除消息处理器', async () => {
     const { result } = await setup()
     const handler = vi.fn()
+    // 先 on 注册（内部会创建 wrapper 并存入 handlerMap），再 off 移除
+    result.on('test', handler)
+    mockOff.mockClear()
     result.off('test', handler)
-    expect(mockOff).toHaveBeenCalledWith('test', handler)
+    // off 应该传入 wrapper（非原始 handler），且确实调用了 wsClient.off
+    expect(mockOff).toHaveBeenCalledWith('test', expect.any(Function))
   })
 
   it('autoConnect=true 时自动连接', async () => {

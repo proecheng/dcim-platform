@@ -42,9 +42,9 @@ export const useRealtimeStore = defineStore('realtime', () => {
     offline: summary.value?.offline_points ?? offlineCount.value,
   }))
 
-  // 从 API 加载全量实时数据（带防重入锁）
-  async function fetchAllData(pointIds?: number[]) {
-    if (loading.value) return
+  // 从 API 加载全量实时数据（带防重入锁，返回 false 表示被跳过）
+  async function fetchAllData(pointIds?: number[]): Promise<boolean> {
+    if (loading.value) return false
     loading.value = true
     try {
       const data = await getAllRealtimeData(pointIds ? { point_ids: pointIds } : undefined)
@@ -53,6 +53,9 @@ export const useRealtimeStore = defineStore('realtime', () => {
       data.forEach(d => newMap.set(d.point_id, d))
       dataMap.value = newMap
       lastUpdateTime.value = new Date()
+      return true
+    } catch {
+      return false
     } finally {
       loading.value = false
     }
@@ -72,7 +75,9 @@ export const useRealtimeStore = defineStore('realtime', () => {
     await Promise.all([fetchAllData(), fetchSummary()])
   }
 
-  // 更新单个点位数据（WS 推送用）
+  // 更新单个点位数据（WS 推送用）— 原地修改 Map（Vue 3 reactive 追踪 Map.set）
+  // 注意：Vue 3 ref() 对 Map 做深度响应式代理，.set() 能触发依赖更新。
+  // 此处不使用 new Map 复制模式，因为 WS 高频推送时每条消息都复制整个 Map 代价太大。
   function updatePoint(data: RealtimeData) {
     dataMap.value.set(data.point_id, data)
     lastUpdateTime.value = new Date()
@@ -119,9 +124,9 @@ export const useRealtimeStore = defineStore('realtime', () => {
     wsConnected.value = connected
   }
 
-  // 清空数据
+  // 清空数据 — 替换引用以确保触发响应式更新
   function clearData() {
-    dataMap.value.clear()
+    dataMap.value = new Map()
     summary.value = null
     lastUpdateTime.value = null
   }

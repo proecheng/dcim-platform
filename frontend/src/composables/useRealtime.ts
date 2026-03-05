@@ -103,7 +103,8 @@ export function useRealtime(options: UseRealtimeOptions = {}) {
     if (autoSubscribe) {
       subscribeRealtime()
     }
-
+    // 无条件启动轮询作为安全网。轮询 handler 内有 !isConnected 守卫，
+    // WS 连接成功后 watch(isConnected) 会 stopPolling()。
     startPolling()
   })
 
