@@ -111,6 +111,7 @@ class PointDataLatest(Base):
     quality = Column(Integer, default=0, comment="质量码: 0=正常, 1=不可靠, 2=异常")
     timestamp = Column(DateTime, comment="采集时间")
     gateway_id = Column(String(50), comment="来源网关")
+    source = Column(String(20), default="unknown", server_default="unknown", comment="数据来源: demo/mqtt/bridge/unknown")
     updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now, comment="更新时间")
 
 

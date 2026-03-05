@@ -1488,8 +1488,10 @@ class DemoDataService:
                         data_type=p.get("data_type", "float" if point_type == "AI" else "boolean"),
                         min_range=p.get("min_range"),
                         max_range=p.get("max_range"),
-                        collect_interval=p.get("collect_interval", 10),
+                        collect_interval=p.get("collect_interval", 60),  # 优化：默认60秒
+                        store_interval=p.get("store_interval", 300),  # 新增：默认5分钟降采样
                         is_enabled=True,
+                        source="demo",
                     )
                     session.add(point)
                     await session.flush()
@@ -1732,7 +1734,9 @@ class DemoDataService:
             batch_size = 1000  # 减小批量大小，加快单次提交速度
 
             for i, point in enumerate(points):
-                records = generator.generate_point_history(point, total_hours)
+                # 历史数据固定 15 分钟间隔，实时数据由 ingest_pipeline 降采样到 5 分钟
+                store_interval = 900  # 15 分钟
+                records = generator.generate_point_history(point, total_hours, store_interval)
 
                 for r in records:
                     batch_records.append(PointHistory(**r))

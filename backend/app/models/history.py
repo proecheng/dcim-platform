@@ -20,6 +20,7 @@ class PointHistory(Base):
     min_value = Column(Float, comment="周期内最小值")
     max_value = Column(Float, comment="周期内最大值")
     avg_value = Column(Float, comment="周期内平均值")
+    source = Column(String(20), default="unknown", server_default="unknown", comment="数据来源: demo/mqtt/bridge/demo_backfill/unknown")
     recorded_at = Column(DateTime, default=datetime.now, comment="记录时间")
 
     __table_args__ = (

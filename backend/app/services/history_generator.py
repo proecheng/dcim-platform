@@ -1,5 +1,9 @@
 """
 历史数据生成器 - 生成30天的模拟历史数据
+
+历史数据生成器直接写入 PointHistory，绕过 process_payload()
+原因：历史回填不应触发告警评估和 WebSocket 推送
+source 标记为 "demo_backfill" 以区分于实时管道数据
 """
 
 import asyncio
@@ -42,8 +46,14 @@ class HistoryGenerator:
         cycle = math.sin(2 * math.pi * day_offset / 30)
         return base_value * (1 + 0.05 * cycle)
 
-    def generate_point_history(self, point: Point, hours: int) -> List[Dict]:
-        """生成单个点位的历史数据"""
+    def generate_point_history(self, point: Point, hours: int, store_interval: int = 900) -> List[Dict]:
+        """生成单个点位的历史数据
+        
+        Args:
+            point: 点位对象
+            hours: 生成小时数
+            store_interval: 存储间隔（秒），默认 900 秒（15 分钟）
+        """
         records = []
 
         # 根据点位类型确定基础值和波动范围
@@ -69,8 +79,14 @@ class HistoryGenerator:
             base_value = 0
             variation = 0
 
-        for h in range(hours):
-            record_time = self.base_time - timedelta(hours=hours - h)
+        # 计算总时间跨度（秒）和记录数
+        total_seconds = hours * 3600
+        num_records = total_seconds // store_interval
+
+        for i in range(num_records):
+            # 从最早时间开始，按 store_interval 递增
+            seconds_offset = i * store_interval
+            record_time = self.base_time - timedelta(seconds=total_seconds - seconds_offset)
             day_offset = (self.base_time - record_time).days
             hour = record_time.hour
 
@@ -90,6 +106,7 @@ class HistoryGenerator:
                     "value": value,
                     "quality": 0,
                     "recorded_at": record_time,
+                    "source": "demo_backfill",
                 }
             )
 

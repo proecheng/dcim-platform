@@ -40,6 +40,14 @@
                 />
               </el-select>
             </el-form-item>
+            <el-form-item label="数据来源">
+              <el-select v-model="filters.data_source" placeholder="全部" clearable>
+                <el-option label="模拟数据" value="demo" />
+                <el-option label="MQTT" value="mqtt" />
+                <el-option label="网关" value="bridge" />
+                <el-option label="未知" value="unknown" />
+              </el-select>
+            </el-form-item>
             <el-form-item>
               <el-button type="primary" @click="loadAlarms">查询</el-button>
               <el-button @click="resetFilters">重置</el-button>
@@ -94,6 +102,18 @@
                 <el-tag :type="getStatusTagType(row.status)" size="small">
                   {{ getStatusText(row.status) }}
                 </el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column prop="data_source" label="来源" width="90">
+              <template #default="{ row }">
+                <el-tag
+                  v-if="row.data_source"
+                  :type="sourceTagType(row.data_source)"
+                  size="small"
+                >
+                  {{ sourceText(row.data_source) }}
+                </el-tag>
+                <span v-else>-</span>
               </template>
             </el-table-column>
             <el-table-column prop="created_at" label="告警时间" width="180" />
@@ -857,7 +877,8 @@ const pagination = reactive({
 const filters = reactive({
   status: '',
   level: '',
-  device_type: ''
+  device_type: '',
+  data_source: ''
 })
 
 // 设备类型选项（从点位列表提取去重）
@@ -901,6 +922,7 @@ async function loadAlarms() {
     if (filters.status) params.status = filters.status
     if (filters.level) params.alarm_level = filters.level
     if (filters.device_type) params.device_type = filters.device_type
+    if (filters.data_source) params.data_source = filters.data_source
     const result = await getAlarmList(params)
     alarms.value = result.items || []
     pagination.total = result.total || 0
@@ -922,6 +944,7 @@ function resetFilters() {
   filters.status = ''
   filters.level = ''
   filters.device_type = ''
+  filters.data_source = ''
   pagination.page = 1
   loadAlarms()
 }
@@ -1685,6 +1708,26 @@ function formatDuration(seconds: number | null | undefined): string {
   const hours = Math.floor(seconds / 3600)
   const mins = Math.floor((seconds % 3600) / 60)
   return `${hours}小时${mins}分`
+}
+
+function sourceTagType(source: string): TagType {
+  const map: Record<string, TagType> = {
+    demo: 'warning',
+    mqtt: 'success',
+    bridge: 'info',
+    unknown: 'info',
+  }
+  return map[source] || 'info'
+}
+
+function sourceText(source: string): string {
+  const map: Record<string, string> = {
+    demo: '模拟',
+    mqtt: 'MQTT',
+    bridge: '网关',
+    unknown: '未知',
+  }
+  return map[source] || source
 }
 
 function getThresholdTypeTagType(type: string): TagType {

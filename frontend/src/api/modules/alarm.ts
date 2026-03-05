@@ -84,6 +84,7 @@ export function getAlarmList(params?: PageParams & TimeRangeParams & {
   point_id?: number
   device_type?: string
   keyword?: string
+  data_source?: string
 }): Promise<PageResponse<AlarmInfo>> {
   return request.get('/v1/alarms', { params })
 }

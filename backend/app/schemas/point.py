@@ -142,6 +142,7 @@ class PointHistoryResponse(BaseModel):
     point_id: int
     value: float
     quality: int
+    source: Optional[str] = None
     recorded_at: datetime
 
 

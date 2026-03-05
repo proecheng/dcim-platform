@@ -65,6 +65,7 @@ class Alarm(Base):
     escalated_from = Column(String(20), comment="升级前告警级别")
     escalation_remark = Column(Text, comment="升级备注")
     last_escalated_at = Column(DateTime, comment="最后升级时间")
+    data_source = Column(String(20), default="unknown", server_default="unknown", comment="触发数据来源: demo/mqtt/bridge/unknown")
     created_at = Column(DateTime, default=datetime.now, comment="创建时间")
 
 

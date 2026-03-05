@@ -26,6 +26,7 @@ async def get_point_history(
     start_time: Optional[datetime] = Query(None),
     end_time: Optional[datetime] = Query(None),
     granularity: Optional[str] = Query("raw", description="聚合间隔: raw/minute/hour/day"),
+    source: Optional[str] = Query(None, description="数据来源过滤: demo/mqtt/bridge/demo_backfill"),
     page: int = Query(1, ge=1),
     page_size: int = Query(100, ge=1, le=1000),
     db: AsyncSession = Depends(get_db),
@@ -48,15 +49,16 @@ async def get_point_history(
 
     if granularity == "raw":
         # 原始数据
+        conditions = [
+            PointHistory.point_id == point_id,
+            PointHistory.recorded_at >= start_time,
+            PointHistory.recorded_at <= end_time,
+        ]
+        if source:
+            conditions.append(PointHistory.source == source)
         query = (
             select(PointHistory)
-            .where(
-                and_(
-                    PointHistory.point_id == point_id,
-                    PointHistory.recorded_at >= start_time,
-                    PointHistory.recorded_at <= end_time,
-                )
-            )
+            .where(and_(*conditions))
             .order_by(PointHistory.recorded_at.desc())
         )
 

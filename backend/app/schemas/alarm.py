@@ -39,6 +39,7 @@ class AlarmInfo(BaseModel):
     escalated_from: Optional[str] = None
     escalation_remark: Optional[str] = None
     last_escalated_at: Optional[datetime] = None
+    data_source: Optional[str] = None
     created_at: Optional[datetime] = None
 
 

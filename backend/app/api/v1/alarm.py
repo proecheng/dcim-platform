@@ -49,6 +49,7 @@ async def get_alarms(
     start_time: Optional[datetime] = Query(None, description="开始时间"),
     end_time: Optional[datetime] = Query(None, description="结束时间"),
     keyword: Optional[str] = Query(None, description="关键词"),
+    data_source: Optional[str] = Query(None, description="数据来源过滤: demo/mqtt/bridge"),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_viewer),
 ):
@@ -71,6 +72,8 @@ async def get_alarms(
         query = query.where(Alarm.created_at <= end_time)
     if keyword:
         query = query.where(Alarm.alarm_message.contains(keyword))
+    if data_source:
+        query = query.where(Alarm.data_source == data_source)
 
     count_query = select(func.count()).select_from(query.subquery())
     total = (await db.execute(count_query)).scalar()

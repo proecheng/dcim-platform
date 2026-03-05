@@ -47,6 +47,8 @@ class Point(Base):
     scale_factor = Column(Float, default=1.0, comment="比例因子")
     offset = Column(Float, default=0.0, comment="偏移量")
 
+    source = Column(String(20), default="manual", server_default="manual", comment="数据来源: demo/mqtt/bridge/manual")
+
     created_at = Column(DateTime, default=datetime.now, comment="创建时间")
     updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now, comment="更新时间")
 
@@ -63,6 +65,7 @@ class PointRealtime(Base):
     quality = Column(Integer, default=0, comment="数据质量: 0=好 1=不确定 2=坏")
     status = Column(String(20), default="normal", comment="状态: normal/alarm/offline")
     alarm_level = Column(String(20), comment="当前告警级别")
+    source = Column(String(20), default="unknown", server_default="unknown", comment="数据来源: demo/mqtt/bridge/unknown")
     change_count = Column(Integer, default=0, comment="变化次数")
     last_change_at = Column(DateTime, comment="最后变化时间")
     updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now, comment="更新时间")

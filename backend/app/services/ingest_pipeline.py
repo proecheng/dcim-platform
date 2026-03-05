@@ -62,6 +62,9 @@ class IngestResult:
 _point_meta_cache: dict[int, dict] = {}
 _cache_loaded = False
 
+# 降采样缓存: point_id → 最后一次存储时间
+_last_store_time: dict[int, datetime] = {}
+
 
 async def _ensure_point_cache(session: AsyncSession) -> None:
     """加载点位元数据缓存（首次调用时加载，后续跳过）"""
@@ -79,6 +82,7 @@ async def _ensure_point_cache(session: AsyncSession) -> None:
             Point.area_code,
             Point.unit,
             Point.is_enabled,
+            Point.store_interval,  # 新增：存储间隔
         )
     )
     for row in result.all():
@@ -91,6 +95,7 @@ async def _ensure_point_cache(session: AsyncSession) -> None:
             "area_code": row[6],
             "unit": row[7],
             "is_enabled": row[8],
+            "store_interval": row[9] or 300,  # 默认5分钟
         }
     _cache_loaded = True
     logger.info("点位元数据缓存已加载: %d 条", len(_point_meta_cache))
@@ -100,6 +105,7 @@ def invalidate_point_cache() -> None:
     """使点位缓存失效（点位配置变更时调用）"""
     global _cache_loaded
     _point_meta_cache.clear()
+    _last_store_time.clear()  # 清空降采样缓存
     _cache_loaded = False
 
 
@@ -279,6 +285,7 @@ async def _batch_upsert_realtime(
                 quality=pt.quality,
                 status=pt.status,
                 value_text=value_text,
+                source=pt.source,
             )
             session.add(record)
 
@@ -314,6 +321,7 @@ async def _batch_upsert_latest(
             "quality": pt.quality,
             "timestamp": pt.timestamp or now,
             "gateway_id": pt.gateway_id or "",
+            "source": pt.source,
             "updated_at": now,
         }
         if key in existing_keys:
@@ -330,6 +338,7 @@ async def _batch_upsert_latest(
                 quality=bindparam("quality"),
                 timestamp=bindparam("timestamp"),
                 gateway_id=bindparam("gateway_id"),
+                source=bindparam("source"),
                 updated_at=bindparam("updated_at"),
             ),
             update_rows,
@@ -344,14 +353,29 @@ async def _batch_insert_history(
     session: AsyncSession,
     now: datetime,
 ) -> None:
-    """批量插入 PointHistory（仅 AI 类型）"""
+    """批量插入 PointHistory（仅 AI 类型，按 store_interval 降采样）"""
     ai_points = [pt for pt in points if _point_meta_cache.get(pt.point_id, {}).get("point_type") == "AI"]
     if not ai_points:
         return
 
     for pt in ai_points:
-        session.add(PointHistory(point_id=pt.point_id, value=pt.value, recorded_at=pt.timestamp or now))
-
+        point_id = pt.point_id
+        timestamp = pt.timestamp or now
+        
+        # 获取点位的 store_interval 配置
+        meta = _point_meta_cache.get(point_id, {})
+        store_interval = meta.get("store_interval", 300)  # 默认5分钟
+        
+        # 检查是否需要存储（降采样）
+        last_stored = _last_store_time.get(point_id)
+        if last_stored:
+            elapsed = (timestamp - last_stored).total_seconds()
+            if elapsed < store_interval:
+                continue  # 跳过，未到存储间隔
+        
+        # 写入历史
+        session.add(PointHistory(point_id=point_id, value=pt.value, recorded_at=timestamp, source=pt.source))
+        _last_store_time[point_id] = timestamp
 
 # ── Phase 2: 告警评估 ──────────────────────────────────────────
 
@@ -420,6 +444,7 @@ async def _evaluate_alarms(
                     alarm_message=alarm_msg,
                     trigger_value=pt.value,
                     threshold_value=triggered.threshold_value,
+                    data_source=pt.source,
                 )
                 alarms_to_create.append(alarm)
                 alarm_events.append(
@@ -574,6 +599,7 @@ async def _broadcast_realtime(points: list[IngestPoint]) -> None:
             "value": pt.value if meta.get("point_type") == "AI" else int(pt.value),
             "unit": meta.get("unit", ""),
             "status": pt.status,
+            "source": pt.source,
             "timestamp": (pt.timestamp or datetime.now()).isoformat(),
         }
         await ws_manager.broadcast_realtime(data)
@@ -596,6 +622,7 @@ async def _update_redis_cache(points: list[IngestPoint], now: datetime) -> None:
                 "value_text": value_text,
                 "quality": pt.quality,
                 "status": pt.status,
+                "source": pt.source,
                 "alarm_level": None,
                 "updated_at": now.isoformat(),
             }
