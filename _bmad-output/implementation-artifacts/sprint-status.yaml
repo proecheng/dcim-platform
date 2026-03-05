@@ -312,7 +312,8 @@ development_status:
   27-1-alarm-data-link-unification: done
   27-2-realtime-data-link-unification: done
   27-3-energy-data-link-unification: done
-  27-4-alarm-sound-toggle-unification: backlog
+  27-4-alarm-sound-toggle-unification: done
+  27-5-websocket-single-connection-manager: backlog
   27-5-websocket-single-connection-manager: backlog
   27-6-site-filter-propagation: backlog
   epic-27-retrospective: optional
