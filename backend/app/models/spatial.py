@@ -4,6 +4,7 @@
 
 from datetime import datetime
 from sqlalchemy import (
+    Boolean,
     Column,
     Integer,
     String,
@@ -35,6 +36,7 @@ class Site(Base):
     status = Column(String(20), default="active", comment="状态: active/inactive/maintenance")
     description = Column(Text, comment="描述")
     data_source = Column(String(50), comment="数据来源: seed/demo/real")
+    is_demo = Column(Boolean, default=False, nullable=False, comment="是否为演示数据")
     created_at = Column(DateTime, default=datetime.now, comment="创建时间")
     updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now, comment="更新时间")
 
@@ -54,6 +56,7 @@ class Floor(Base):
     site_id = Column(Integer, ForeignKey("sites.id"), nullable=False, comment="所属站点ID")
     sort_order = Column(Integer, default=0, comment="排序")
     data_source = Column(String(50), comment="数据来源: seed/demo/real")
+    is_demo = Column(Boolean, default=False, nullable=False, comment="是否为演示数据")
     created_at = Column(DateTime, default=datetime.now, comment="创建时间")
     updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now, comment="更新时间")
 
@@ -77,6 +80,7 @@ class Room(Base):
     area_sqm = Column(Float, comment="面积(平方米)")
     description = Column(Text, comment="描述")
     data_source = Column(String(50), comment="数据来源: seed/demo/real")
+    is_demo = Column(Boolean, default=False, nullable=False, comment="是否为演示数据")
     created_at = Column(DateTime, default=datetime.now, comment="创建时间")
     updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now, comment="更新时间")
 
@@ -97,6 +101,7 @@ class Row(Base):
     room_id = Column(Integer, ForeignKey("rooms.id"), nullable=False, comment="所属房间ID")
     aisle_type = Column(String(10), default="none", comment="通道类型: cold/hot/none")
     sort_order = Column(Integer, default=0, comment="排序")
+    is_demo = Column(Boolean, default=False, nullable=False, comment="是否为演示数据")
     created_at = Column(DateTime, default=datetime.now, comment="创建时间")
     updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now, comment="更新时间")
 

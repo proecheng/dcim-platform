@@ -24,6 +24,7 @@ class AlarmThreshold(Base):
     dead_band = Column(Float, default=0, comment="死区(回差)")
     is_enabled = Column(Boolean, default=True, comment="是否启用")
     priority = Column(Integer, default=0, comment="优先级")
+    is_demo = Column(Boolean, default=False, nullable=False, comment="是否为演示数据")
     created_at = Column(DateTime, default=datetime.now, comment="创建时间")
     updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now, comment="更新时间")
 

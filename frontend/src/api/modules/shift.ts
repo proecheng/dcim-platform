@@ -42,6 +42,23 @@ export function checkConstraints(data: any) {
   return request.post('/v1/energy/shift/analysis/constraints', data)
 }
 
+// ========== 约束管理接口 ==========
+export function getShiftConstraints() {
+  return request.get('/v1/energy/shift/constraints')
+}
+
+export function createShiftConstraint(data: any) {
+  return request.post('/v1/energy/shift/constraints', data)
+}
+
+export function updateShiftConstraint(id: number, data: any) {
+  return request.put(`/v1/energy/shift/constraints/${id}`, data)
+}
+
+export function deleteShiftConstraint(id: number) {
+  return request.delete(`/v1/energy/shift/constraints/${id}`)
+}
+
 export function analyzeBenefit(data: any) {
   return request.post('/v1/energy/shift/analysis/benefit', data)
 }

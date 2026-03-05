@@ -5,20 +5,21 @@ import request from '@/utils/request'
 import type { PageParams, PageResponse } from './types'
 
 export interface ThresholdInfo {
-  id: number
-  point_id: number
-  point_code: string
-  point_name: string
-  threshold_type: 'high_high' | 'high' | 'low' | 'low_low' | 'equal' | 'change'
-  threshold_value: number
-  alarm_level: 'critical' | 'major' | 'minor' | 'info'
-  alarm_message: string
-  delay_seconds: number
-  dead_band: number
-  is_enabled: boolean
-  priority: number
-  created_at: string
-  updated_at: string
+id: number
+point_id: number
+  point_code?: string  // 修复：改为可选
+  point_name?: string  // 修复：改为可选
+  device_type?: string  // 修复：添加device_type字段
+threshold_type: 'high_high' | 'high' | 'low' | 'low_low' | 'equal' | 'change'
+  threshold_value?: number  // 修复：改为可选
+alarm_level: 'critical' | 'major' | 'minor' | 'info'
+  alarm_message?: string  // 修复：改为可选
+delay_seconds: number
+dead_band: number
+is_enabled: boolean
+priority: number
+  created_at?: string  // 修复：改为可选
+  updated_at?: string  // 修复：改为可选
 }
 
 export interface ThresholdCreateParams {
@@ -51,10 +52,11 @@ export interface ThresholdCopyParams {
  * 获取阈值配置列表
  */
 export function getThresholdList(params?: PageParams & {
-  point_id?: number
-  threshold_type?: string
-  alarm_level?: string
+point_id?: number
+threshold_type?: string
+alarm_level?: string
   is_enabled?: boolean
+  device_type?: string  // 修复：添加device_type筛选参数
 }): Promise<PageResponse<ThresholdInfo>> {
   return request.get('/v1/thresholds', { params })
 }

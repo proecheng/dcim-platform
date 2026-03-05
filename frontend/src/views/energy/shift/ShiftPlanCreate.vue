@@ -74,6 +74,19 @@
           <span style="margin-left: 10px">kW</span>
         </el-form-item>
 
+        <el-form-item label="约束预检">
+          <el-alert
+            v-if="constraintPreview"
+            :type="constraintPreview.is_valid ? 'success' : 'error'"
+            :title="constraintPreview.is_valid ? '约束校验通过' : '约束校验未通过'"
+            :description="constraintPreviewMessage"
+            show-icon
+            :closable="false"
+            style="width: 600px"
+          />
+          <el-button v-else type="info" :loading="previewLoading" @click="runConstraintPreview">执行预检</el-button>
+        </el-form-item>
+
         <el-form-item label="选择设备" prop="selected_devices">
           <el-button type="primary" @click="deviceSelectorVisible = true">选择设备</el-button>
           <span style="margin-left: 10px">已选 {{ form.selected_devices.length }} 个设备</span>
@@ -136,11 +149,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, watch, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import type { FormInstance, FormRules } from 'element-plus'
-import { getShiftPlan, createShiftPlan, updateShiftPlan, analyzeFeasibility } from '@/api/modules/shift'
+import { getShiftPlan, createShiftPlan, updateShiftPlan, analyzeFeasibility, checkConstraints } from '@/api/modules/shift'
 import DeviceSelector from './components/DeviceSelector.vue'
 import ConstraintCheckResult from './components/ConstraintCheckResult.vue'
 
@@ -154,6 +167,8 @@ const analyzing = ref(false)
 const deviceSelectorVisible = ref(false)
 const analysisResultVisible = ref(false)
 const analysisResult = ref<any>(null)
+const previewLoading = ref(false)
+const constraintPreview = ref<any>(null)
 
 const form = reactive({
   plan_name: '',
@@ -177,6 +192,49 @@ const rules: FormRules = {
   start_time: [{ required: true, message: '请选择开始时间', trigger: 'change' }],
   end_time: [{ required: true, message: '请选择结束时间', trigger: 'change' }],
   target_shift_power: [{ required: true, message: '请输入目标转移功率', trigger: 'blur' }],
+}
+
+const constraintPreviewMessage = computed(() => {
+  if (!constraintPreview.value) return ''
+  const v = constraintPreview.value
+  const violations = Array.isArray(v.violated_constraints) ? v.violated_constraints : []
+  const warnings = Array.isArray(v.warnings) ? v.warnings : []
+  if (violations.length > 0) {
+    const first = violations[0]
+    const suggest = first?.suggested_max_shift_power
+    if (typeof suggest === 'number') {
+      return `${first.message}；建议最大转移功率：${suggest.toFixed(2)} kW`
+    }
+    return first?.message || `存在 ${violations.length} 项约束冲突`
+  }
+  if (warnings.length > 0) {
+    return warnings[0]
+  }
+  return '当前配置满足约束要求'
+})
+
+const canPreview = () => {
+  return !!(form.shift_date && form.shift_from_period && form.shift_to_period && form.target_shift_power > 0)
+}
+
+const runConstraintPreview = async () => {
+  if (!canPreview()) return
+  previewLoading.value = true
+  try {
+    const res = await checkConstraints({
+      shift_date: form.shift_date,
+      shift_from_period: form.shift_from_period,
+      shift_to_period: form.shift_to_period,
+      target_shift_power: form.target_shift_power,
+      selected_devices: form.selected_devices,
+    })
+    constraintPreview.value = res?.data || null
+  } catch (error: any) {
+    constraintPreview.value = null
+    ElMessage.warning(error.message || '约束预检失败')
+  } finally {
+    previewLoading.value = false
+  }
 }
 
 const loadPlan = async () => {
@@ -209,6 +267,11 @@ const handleSubmit = async () => {
 
     submitting.value = true
     try {
+      await runConstraintPreview()
+      if (constraintPreview.value?.is_valid === false) {
+        ElMessage.error('约束预检未通过，请先修正目标功率或设备选择')
+        return
+      }
       if (isEdit.value) {
         await updateShiftPlan(Number(route.params.id), form)
         ElMessage.success('更新成功')
@@ -255,6 +318,19 @@ onMounted(() => {
     loadPlan()
   }
 })
+
+let previewTimer: number | null = null
+watch(
+  () => [form.shift_date, form.shift_from_period, form.shift_to_period, form.target_shift_power, form.selected_devices.length],
+  () => {
+    constraintPreview.value = null
+    if (previewTimer) window.clearTimeout(previewTimer)
+    if (!canPreview()) return
+    previewTimer = window.setTimeout(() => {
+      runConstraintPreview()
+    }, 400)
+  }
+)
 </script>
 
 <style scoped lang="scss">

@@ -80,6 +80,12 @@
         <el-descriptions-item label="设备寿命">
           限制设备启停次数和运行间隔，减少频繁启停对设备寿命的影响（15-25% 寿命损失）。
         </el-descriptions-item>
+        <el-descriptions-item label="算力中心负载占比">
+          约束 IT 负载占比区间，并按制冷/其他可转移系数计算最大可转移功率，避免超出算力中心可调节空间。
+        </el-descriptions-item>
+        <el-descriptions-item label="UPS容量约束">
+          校验转移后峰值功率不超过 UPS 容量上限（容量×安全系数），超限时可自动降功率或拒绝执行。
+        </el-descriptions-item>
       </el-descriptions>
     </el-card>
   </div>
@@ -89,6 +95,13 @@
 import { ref, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import ConstraintEditor from '@/components/energy/shift/ConstraintEditor.vue'
+import {
+  getShiftConstraints,
+  createShiftConstraint,
+  updateShiftConstraint,
+  deleteShiftConstraint,
+  getShiftableDevices,
+} from '@/api/modules/shift'
 
 interface Constraint {
   id?: number
@@ -113,48 +126,23 @@ const currentConstraint = ref<Constraint>({
   priority: 'medium',
   enabled: true
 })
-const availableDevices = ref<Array<{ id: number; name: string }>>([])
+const availableDevices = ref<Array<{ id: number; name: string; rated_power?: number }>>([])
 
 const fetchConstraints = async () => {
   loading.value = true
   try {
-    // TODO: 调用 API 获取约束列表
-    // const res = await getShiftConstraints()
-    // constraints.value = res.data
-    
-    // 模拟数据
-    constraints.value = [
-      {
-        id: 1,
-        type: 'phase_balance',
-        name: '三相平衡约束',
-        description: '确保配电系统三相负载平衡，不平衡度不超过 10%',
-        params: { max_imbalance: 10, check_scope: 'entire_system' },
-        priority: 'high',
-        enabled: true,
-        created_at: '2026-03-01 10:00:00'
-      },
-      {
-        id: 2,
-        type: 'device_lifetime',
-        name: '设备寿命保护',
-        description: '限制设备每天启停次数不超过 5 次',
-        params: { max_start_stop_count: 5, min_run_interval: 30, lifetime_loss_factor: 0.2 },
-        priority: 'high',
-        enabled: true,
-        created_at: '2026-03-01 10:05:00'
-      },
-      {
-        id: 3,
-        type: 'time',
-        name: '工作日时间限制',
-        description: '仅在工作日 8:00-18:00 允许负荷转移',
-        params: { time_range: ['08:00', '18:00'], weekdays: [1, 2, 3, 4, 5] },
-        priority: 'medium',
-        enabled: true,
-        created_at: '2026-03-01 10:10:00'
-      }
-    ]
+    const res = await getShiftConstraints()
+    const list = res?.data?.data || res?.data || []
+    constraints.value = list.map((item: any) => ({
+      id: item.id,
+      type: item.type,
+      name: item.name,
+      description: item.description || '',
+      params: item.constraint_config || item.params || {},
+      priority: toPriorityLabel(item.priority),
+      enabled: Boolean(item.enabled),
+      created_at: item.created_at,
+    }))
   } catch (error: any) {
     ElMessage.error(error.message || '获取约束列表失败')
   } finally {
@@ -164,17 +152,13 @@ const fetchConstraints = async () => {
 
 const fetchDevices = async () => {
   try {
-    // TODO: 调用 API 获取可转移设备列表
-    // const res = await getShiftableDevices()
-    // availableDevices.value = res.data
-    
-    // 模拟数据
-    availableDevices.value = [
-      { id: 1, name: 'UPS-1' },
-      { id: 2, name: 'UPS-2' },
-      { id: 3, name: '空调-1' },
-      { id: 4, name: '空调-2' }
-    ]
+    const res = await getShiftableDevices()
+    const list = res?.data?.data || res?.data || []
+    availableDevices.value = (Array.isArray(list) ? list : list.items || []).map((d: any) => ({
+      id: d.id,
+      name: d.device_name || d.name || `设备-${d.id}`,
+      rated_power: Number(d.rated_power || 0),
+    }))
   } catch (error: any) {
     ElMessage.error(error.message || '获取设备列表失败')
   }
@@ -201,12 +185,20 @@ const handleEdit = (row: Constraint) => {
 
 const handleSaveConstraint = async (constraint: Constraint) => {
   try {
-    // TODO: 调用 API 保存约束
-    // if (constraint.id) {
-    //   await updateShiftConstraint(constraint.id, constraint)
-    // } else {
-    //   await createShiftConstraint(constraint)
-    // }
+    const payload = {
+      name: constraint.name,
+      type: constraint.type,
+      description: constraint.description,
+      constraint_config: constraint.params || {},
+      priority: toPriorityNumber(constraint.priority),
+      enabled: constraint.enabled,
+    }
+
+    if (constraint.id) {
+      await updateShiftConstraint(constraint.id, payload)
+    } else {
+      await createShiftConstraint(payload)
+    }
     
     ElMessage.success('保存成功')
     dialogVisible.value = false
@@ -218,8 +210,8 @@ const handleSaveConstraint = async (constraint: Constraint) => {
 
 const handleToggle = async (row: Constraint) => {
   try {
-    // TODO: 调用 API 更新约束状态
-    // await updateShiftConstraint(row.id, { enabled: row.enabled })
+    if (!row.id) return
+    await updateShiftConstraint(row.id, { enabled: row.enabled })
     
     ElMessage.success(row.enabled ? '已启用' : '已禁用')
   } catch (error: any) {
@@ -236,8 +228,8 @@ const handleDelete = async (row: Constraint) => {
       type: 'warning'
     })
     
-    // TODO: 调用 API 删除约束
-    // await deleteShiftConstraint(row.id)
+    if (!row.id) return
+    await deleteShiftConstraint(row.id)
     
     ElMessage.success('删除成功')
     await fetchConstraints()
@@ -248,14 +240,18 @@ const handleDelete = async (row: Constraint) => {
   }
 }
 
+type TagType = '' | 'primary' | 'success' | 'warning' | 'info' | 'danger'
+
 const getTypeColor = (type: string) => {
-  const map: Record<string, string> = {
+  const map: Record<string, TagType> = {
     device: 'primary',
     time: 'success',
     power: 'warning',
     phase_balance: 'danger',
     temperature: 'info',
-    device_lifetime: ''
+    device_lifetime: '',
+    datacenter_load: 'success',
+    ups_capacity: 'danger',
   }
   return map[type] || ''
 }
@@ -267,27 +263,47 @@ const getTypeLabel = (type: string) => {
     power: '功率约束',
     phase_balance: '三相平衡',
     temperature: '温度约束',
-    device_lifetime: '设备寿命'
+    device_lifetime: '设备寿命',
+    datacenter_load: '算力中心负载占比',
+    ups_capacity: 'UPS容量约束',
   }
   return map[type] || type
 }
 
 const getPriorityColor = (priority: string) => {
-  const map: Record<string, string> = {
+  const p = toPriorityLabel(priority)
+  const map: Record<string, TagType> = {
     high: 'danger',
     medium: 'warning',
     low: 'info'
   }
-  return map[priority] || ''
+  return map[p] || ''
 }
 
 const getPriorityLabel = (priority: string) => {
+  const p = toPriorityLabel(priority)
   const map: Record<string, string> = {
     high: '高',
     medium: '中',
     low: '低'
   }
-  return map[priority] || priority
+  return map[p] || p
+}
+
+const toPriorityLabel = (priority: string | number | undefined) => {
+  if (typeof priority === 'number') {
+    if (priority <= 3) return 'high'
+    if (priority <= 6) return 'medium'
+    return 'low'
+  }
+  return priority || 'medium'
+}
+
+const toPriorityNumber = (priority: string | number) => {
+  if (typeof priority === 'number') return priority
+  if (priority === 'high') return 1
+  if (priority === 'low') return 9
+  return 5
 }
 
 onMounted(() => {

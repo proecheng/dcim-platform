@@ -246,7 +246,7 @@ async def seed_datacenter() -> None:
         logger.info("开始创建算力中心种子数据...")
 
         # ===== 1. 创建站点 =====
-        site = Site(**SITE)
+        site = Site(**SITE, is_demo=True)
         session.add(site)
         await session.flush()
         site_id: int = site.id  # type: ignore[assignment]
@@ -320,8 +320,8 @@ async def seed_datacenter() -> None:
                             min_range=min_r,
                             max_range=max_r,
                             precision=2 if pt_type == "AI" else 0,
-                            collect_interval=5,
-                            store_interval=60,
+                            collect_interval=60,
+                            store_interval=300,
                             is_enabled=True,
                             scale_factor=1.0,
                             sort_order=idx,

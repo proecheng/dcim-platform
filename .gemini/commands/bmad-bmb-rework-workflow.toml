@@ -1,4 +1,4 @@
-description = """Rework a Workflow to a V6 Compliant Version"""
+description = 'Rework a Workflow to a V6 Compliant Version'
 prompt = """
 Execute the BMAD 'rework-workflow' workflow.
 

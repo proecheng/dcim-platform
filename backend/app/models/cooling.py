@@ -3,7 +3,7 @@
 """
 
 from datetime import datetime
-from sqlalchemy import Column, Integer, String, Float, Text, DateTime, ForeignKey
+from sqlalchemy import Column, Integer, String, Float, Text, DateTime, ForeignKey, Boolean
 
 from ..core.database import Base
 
@@ -17,6 +17,7 @@ class CoolingGroup(Base):
     group_name = Column(String(100), nullable=False, comment="群控组名称")
     group_mode = Column(String(20), default="independent", comment="模式: independent/linked")
     description = Column(Text, comment="描述")
+    is_demo = Column(Boolean, default=False, nullable=False, comment="是否为演示数据")
     created_at = Column(DateTime, default=datetime.now, comment="创建时间")
     updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now, comment="更新时间")
 
@@ -35,6 +36,7 @@ class CoolingUnit(Base):
     fan_count = Column(Integer, default=2, comment="风机数量")
     group_id = Column(Integer, ForeignKey("cooling_groups.id"), nullable=True, comment="群控组ID")
     description = Column(Text, comment="描述")
+    is_demo = Column(Boolean, default=False, nullable=False, comment="是否为演示数据")
     created_at = Column(DateTime, default=datetime.now, comment="创建时间")
     updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now, comment="更新时间")
 
@@ -51,5 +53,6 @@ class ColdAisle(Base):
     skylight_count = Column(Integer, default=2, comment="天窗数量")
     location = Column(String(100), comment="位置描述")
     description = Column(Text, comment="描述")
+    is_demo = Column(Boolean, default=False, nullable=False, comment="是否为演示数据")
     created_at = Column(DateTime, default=datetime.now, comment="创建时间")
     updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now, comment="更新时间")

@@ -1,4 +1,4 @@
-description = """Technical game systems architecture design. Use when the user says ""lets create a game architecture"" or ""I want to design technical game systems"""""
+description = 'Technical game systems architecture design. Use when the user says "lets create a game architecture" or "I want to design technical game systems"'
 prompt = """
 Execute the BMAD 'game-architecture' workflow.
 

@@ -1,4 +1,4 @@
-description = """Sprint status tracking file generator. Use when the user says ""I want to generate sprint status"" or ""lets create sprint tracking"""""
+description = 'Sprint status tracking file generator. Use when the user says "I want to generate sprint status" or "lets create sprint tracking"'
 prompt = """
 Execute the BMAD 'sprint-planning' workflow.
 

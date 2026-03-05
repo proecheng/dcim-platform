@@ -52,7 +52,7 @@
             {{ status.loading ? '加载中...' : '加载演示数据' }}
           </el-button>
           <div class="action-hint">
-            加载约330个监控点位和30天历史数据
+            加载约 {{ estimatedPoints }} 个监控点位和30天历史数据
           </div>
         </template>
         <template v-else>

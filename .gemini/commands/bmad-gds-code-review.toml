@@ -1,4 +1,4 @@
-description = """Adversarial game dev code review. Use when the user says ""lets review this code for game dev issues"""""
+description = 'Adversarial game dev code review. Use when the user says "lets review this code for game dev issues"'
 prompt = """
 Execute the BMAD 'code-review' workflow.
 

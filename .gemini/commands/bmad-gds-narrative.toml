@@ -1,4 +1,4 @@
-description = """Story-driven narrative design documentation. Use when the user says ""lets create a narrative design document"""""
+description = 'Story-driven narrative design documentation. Use when the user says "lets create a narrative design document"'
 prompt = """
 Execute the BMAD 'narrative' workflow.
 

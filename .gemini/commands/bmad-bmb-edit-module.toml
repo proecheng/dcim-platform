@@ -1,4 +1,4 @@
-description = """Edit existing BMAD modules while maintaining coherence"""
+description = 'Edit existing BMAD modules while maintaining coherence'
 prompt = """
 Execute the BMAD 'edit-module' workflow.
 

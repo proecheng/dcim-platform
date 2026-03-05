@@ -401,8 +401,8 @@ def _create_point(device_id, device_type: str, device_code: str, area_code: str,
         min_range=pt["min"],
         max_range=pt["max"],
         precision=2 if pt["type"] == "AI" else 0,
-        collect_interval=5,
-        store_interval=60,
+        collect_interval=60,
+        store_interval=300,
         is_enabled=True,
         register_address=pt.get("addr"),
         scale_factor=1.0,
@@ -421,7 +421,7 @@ async def _find_or_create_device(session, code: str, name: str, dtype: str, area
         device_name=name,
         device_type=dtype,
         area_code=area,
-        install_date=kwargs.get("install_date", date(2025, 6, 1)),
+        install_date=kwargs.get("install_date", date(2025, 6, 1, is_demo=True)),
         manufacturer=kwargs.get("manufacturer"),
         model=kwargs.get("model"),
         status="online",
@@ -469,7 +469,7 @@ async def seed_power_devices():
                     phase_count=ups_def["phase_count"],
                     battery_group_count=ups_def["battery_group_count"],
                     bypass_enabled=ups_def["bypass_enabled"],
-                )
+                , is_demo=True)
                 session.add(ups_ext)
                 await session.flush()
 
@@ -505,8 +505,8 @@ async def seed_power_devices():
                         min_range=pt["min"],
                         max_range=pt["max"],
                         precision=2 if pt["type"] == "AI" else 0,
-                        collect_interval=5,
-                        store_interval=60,
+                        collect_interval=60,
+                        store_interval=300,
                         is_enabled=True,
                         register_address=pt.get("addr"),
                         scale_factor=1.0,

@@ -1,4 +1,4 @@
-description = """Edit existing BMAD workflows while maintaining integrity"""
+description = 'Edit existing BMAD workflows while maintaining integrity'
 prompt = """
 Execute the BMAD 'edit-workflow' workflow.
 

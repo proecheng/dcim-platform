@@ -1,5 +1,5 @@
 ---
-stepsCompleted: [tech-stack, architecture-pattern, data-architecture, api-design, deployment, protocol-adapters, linkage-engine, video-integration, physical-topology, nfr-support, demo-module, ingest-pipeline, architecture-update, device-binding]
+stepsCompleted: [tech-stack, architecture-pattern, data-architecture, api-design, deployment, protocol-adapters, linkage-engine, video-integration, physical-topology, nfr-support, demo-module, ingest-pipeline, architecture-update, device-binding, intelligent-diagnosis]
 inputDocuments: [_bmad-output/planning-artifacts/prd.md, _bmad-output/planning-artifacts/product-brief.md, docs/project-knowledge/project-context.md, docs/project-knowledge/backend-architecture.md, docs/project-knowledge/frontend-architecture.md, docs/project-knowledge/integration-architecture.md]
 workflowType: 'architecture'
 project_name: 'DCIM'
@@ -11,7 +11,7 @@ date: '2026-03-01'
 
 **Author:** proecheng
 **Date:** 2026-02-15
-**Status:** 完整版（V3.2.0 更新，新增演示系统模块化、统一数据管线、设备双向绑定、已知技术债务 2026-03-01）
+**Status:** 完整版（V4.0.0 更新，新增智能诊断系统架构 2026-03-05；V3.2.0 演示系统模块化、统一数据管线、设备双向绑定 2026-03-01）
 
 ---
 
@@ -37,6 +37,9 @@ date: '2026-03-01'
 | 定时任务 | APScheduler | 3.10.4 | 数据模拟器、定时统计 |
 | ML (可选) | PyTorch | 2.0+ | 条件加载，未安装时跳过 |
 | OCR (可选) | PaddleOCR | — | 电费单识别，可选安装，未安装时降级为 mock | Phase 2 |
+| 图计算 | NetworkX | 3.2+ | 故障树/因果图建模、图遍历、概率传播（内存图计算，无需外部图数据库） | Phase 2 |
+| 异常检测 | scikit-learn | 1.4+ | Isolation Forest 对抗样本检测、训练数据质量校验 | Phase 2b |
+| HMAC 签名 | Python hmac + hashlib | 内置 | 故障树配置完整性校验（HMAC-SHA-256） | Phase 2a |
 
 ### 1.2 IoT 采集层
 
@@ -84,9 +87,10 @@ date: '2026-03-01'
 │  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────────┐  │
 │  │ REST API │ │WebSocket │ │ 联动引擎 │ │ 告警引擎 │ │ 节能分析插件 │  │
 │  └──────────┘ └──────────┘ └──────────┘ └──────────┘ └──────────────┘  │
-│  ┌──────────┐ ┌──────────┐ ┌──────────────────────────────────────────┐ │
-│  │ 数据质量 │ │ 定时任务 │ │         MQTT 客户端（订阅网关数据）       │ │
-│  └──────────┘ └──────────┘ └──────────────────────────────────────────┘ │
+│  ┌──────────┐ ┌──────────┐ ┌───────────────┐ ┌────────────────────────┐│
+│  │ 数据质量 │ │ 定时任务 │ │ 诊断推理引擎  │ │ MQTT 客户端（网关数据）  ││
+│  │          │ │          │ │ L1/L2/L3分级  │ │                        ││
+│  └──────────┘ └──────────┘ └───────────────┘ └────────────────────────┘│
 └──────────┬──────────┬──────────────────────┬────────────────────────────┘
            │          │                      │
            ▼          ▼                      ▼
@@ -115,7 +119,7 @@ date: '2026-03-01'
 | 层级 | 职责 | 关键组件 |
 |------|------|----------|
 | 前端层 | 用户交互、数据展示、视频播放 | Vue 3 SPA + WebSocket 客户端 + HLS 播放器 |
-| 应用服务层 | 业务逻辑、API、实时处理 | FastAPI + 内嵌 MQTT 客户端 + 联动引擎 + 告警引擎 |
+| 应用服务层 | 业务逻辑、API、实时处理、智能诊断 | FastAPI + 内嵌 MQTT 客户端 + 联动引擎 + 告警引擎 + 诊断推理引擎 |
 | 消息通信层 | 网关与后端解耦通信 | EMQX Broker，MQTT QoS 1（数据）/ QoS 2（控制） |
 | 数据缓存层 | 实时数据热缓存、事件总线 | Redis（最新点位值、会话、Pub/Sub） |
 | 时序存储层 | 海量点位历史数据 | TimescaleDB hypertable，自动分区+压缩 |
@@ -135,7 +139,16 @@ app/
 ├── engines/        # 引擎层
 │   ├── alarm_engine.py      # 告警引擎
 │   ├── linkage_engine.py    # 联动引擎
-│   └── data_quality.py      # 数据质量检测
+│   ├── data_quality.py      # 数据质量检测
+│   └── diagnosis/           # 智能诊断引擎（Phase 2）
+│       ├── engine.py         # 诊断调度器（L1/L2/L3 分级路由）
+│       ├── rule_engine.py    # L1 规则引擎
+│       ├── fault_tree.py     # L2 故障树推理（NetworkX）
+│       ├── bayesian.py       # L3 贝叶斯深度分析
+│       ├── causal_graph.py   # 全局因果图（跨系统级联）
+│       ├── evidence.py       # 证据收集+时间窗口管理
+│       ├── circuit_breaker.py # 熔断降级控制器
+│       └── explainer.py      # 可解释性（证据链+敏感性分析）
 ├── mqtt/           # MQTT 层
 │   ├── client.py            # MQTT 客户端（订阅/发布）
 │   └── handlers.py          # 消息处理器
@@ -247,6 +260,11 @@ gateway/
 | **视频监控** | Camera, NVR, VideoEvent | 摄像头元数据、NVR 连接、联动录像事件 |
 | **物理拓扑** | SpatialTopology, CoolingTopology, PowerPhaseMapping | 空间层级、空调覆盖、三相接线 |
 | **站点管理** | Site | 多站点标识、行级数据隔离 |
+| **故障树** | FaultTree, FaultTreeVersion, FaultTreeNode, FaultTreeEdge | 故障树定义、版本管理、节点（root/intermediate/leaf）、门（AND/OR）、概率参数 |
+| **因果图** | CausalGraph, CausalEdge | 跨系统全局因果图（配电→暖通→IT→业务四层），复用故障树节点 |
+| **诊断引擎** | DiagnosisSession, DiagnosisEvidence, DiagnosisResult, DiagnosisAuditLog | 推理会话、证据收集、根因结果（含置信度、推理路径）、审计日志 |
+| **闭环学习** | DiagnosisAnnotation, ProbabilityAdjustmentLog | 运维标注（准确/不准确/未知）、概率自动调参记录 |
+| **电气扩展** | SensorMetadata, BreakerProfile, BatterySOHRecord | 传感器元数据（CT/PT变比、精度、校准）、断路器特性库、电池健康度记录 |
 
 ### 3.2 现有模型扩展字段
 
@@ -866,6 +884,11 @@ Cabinet 是三个拓扑的交汇点。
 | 审计日志 | 同库 + 行级安全 | 满足等保二级 |
 | 生产前端 | Nginx | 性能远超 Express |
 | 开发环境 | 应用本地 + 基础设施 Docker | 开发体验优先 |
+| 图计算引擎 | NetworkX（内存） | 故障树≤1000节点，无需外部图数据库，降低运维复杂度 |
+| 故障树存储 | PostgreSQL JSON + 关系表 | 复用现有DB，递归CTE遍历，NetworkX运行时加载 |
+| 推理调度 | 进程内异步（asyncio） | 2人团队无需维护独立消息队列，APScheduler管理定时任务 |
+| 诊断降级 | 熔断器模式 | 响应>10s或错误率>10%自动回退L1规则引擎 |
+| 配置签名 | HMAC-SHA-256 | 轻量级完整性校验，密钥环境变量注入 |
 
 ---
 
@@ -1580,7 +1603,871 @@ Device 表 (动环设备) ←→ 拓扑表 (业务实体)
 
 ---
 
+## 18. 智能诊断系统架构（V4.0.0 新增）
+
+> 对应 PRD FR34-1 至 FR34-42，分阶段实施。本节描述智能诊断系统的整体架构设计。
+
+### 18.1 架构总览
+
+```
+                        ┌─────────────────────────────────────────┐
+                        │            诊断 API 层                    │
+                        │  /api/v1/diagnosis/*                     │
+                        │  诊断触发 | 结果查询 | 故障树管理 | 标注   │
+                        └──────────────┬──────────────────────────┘
+                                       │
+                        ┌──────────────▼──────────────────────────┐
+                        │         诊断调度器 (DiagnosisEngine)      │
+                        │                                          │
+                        │  告警事件 ──→ 级别路由 ──→ L1/L2/L3      │
+                        │              │                           │
+                        │         熔断控制器                        │
+                        │  (响应>10s OR 错误率>10% → 降级L1)       │
+                        └──┬───────────┬───────────┬──────────────┘
+                           │           │           │
+                    ┌──────▼──┐ ┌──────▼──┐ ┌──────▼──────┐
+                    │L1 规则  │ │L2 故障树│ │L3 贝叶斯    │
+                    │引擎     │ │推理     │ │深度分析     │
+                    │(<1s)   │ │(<5s)   │ │(<30s)      │
+                    │        │ │NetworkX│ │历史数据+    │
+                    │规则匹配│ │概率传播 │ │统计推理     │
+                    └────────┘ └────────┘ └────────────┘
+                                  │
+                    ┌─────────────▼───────────────────────┐
+                    │         证据收集器 (Evidence)         │
+                    │                                      │
+                    │  时间窗口管理（按设备类型差异化）       │
+                    │  电气: 5min | 温度: 30min | 湿度: 60min│
+                    │  多传感器融合                          │
+                    │  传感器精度加权                        │
+                    └─────────────┬───────────────────────┘
+                                  │
+                    ┌─────────────▼───────────────────────┐
+                    │         数据源                        │
+                    │                                      │
+                    │  Redis (最新点位值)                    │
+                    │  TimescaleDB (历史趋势)               │
+                    │  PostgreSQL (故障树/因果图/配置)       │
+                    └─────────────────────────────────────┘
+```
+
+### 18.2 分级推理架构
+
+#### L1 规则引擎（FR34-1）
+
+- **实现**: Python 规则匹配，内存中执行
+- **输入**: 告警事件 + Redis 最新点位值
+- **规则格式**: JSON 规则集（条件→结论），存储在 PostgreSQL，启动时加载到内存
+- **覆盖**: Top 20 高频故障中 ≥12 类（60%）
+- **性能**: < 1 秒
+- **示例规则**:
+
+```python
+{
+    "rule_id": "R001",
+    "name": "UPS电池低压",
+    "conditions": [
+        {"point_type": "UPS_BATTERY_VOLTAGE", "operator": "<", "value": 44.0},
+        {"point_type": "UPS_STATUS", "operator": "==", "value": "ON_BATTERY"}
+    ],
+    "logic": "AND",
+    "conclusion": "UPS电池组电压过低，可能需要更换电池",
+    "confidence": 0.85,
+    "suggested_actions": ["检查电池组内阻", "联系维保更换电池"]
+}
+```
+
+#### L2 故障树推理（FR34-2, FR34-5~12）
+
+- **实现**: NetworkX 有向无环图（DAG），PostgreSQL 存储，运行时加载到内存
+- **故障树存储**:
+
+```
+PostgreSQL 表结构:
+  fault_tree:          id, name, version, status(draft/active/archived), hmac_signature, created_at
+  fault_tree_node:     id, tree_id, node_type(root/intermediate/leaf), gate_type(AND/OR/NULL),
+                       name, description, prior_probability, evidence_point_id
+  fault_tree_edge:     id, tree_id, parent_node_id, child_node_id
+
+运行时:
+  启动/版本切换时 → 从 DB 加载 → 构建 NetworkX DiGraph → 内存缓存
+  1000 节点故障树加载 < 2秒
+```
+
+- **概率传播**（FR34-10）:
+  - OR 门: P = 1 - ∏(1 - P(child_i))
+  - AND 门: P = ∏ P(child_i)
+  - 叶节点概率来源: 传感器证据（实时）或先验概率（配置）
+
+- **证据收集**（FR34-9）: 按设备类型的差异化时间窗口（FR34-29），查询 Redis（最新值）+ TimescaleDB（窗口内历史）
+
+- **结果输出**（FR34-11）:
+  - 置信度 > 80%: WebSocket 推送弹窗 + 声音
+  - 60-80%: 诊断面板"建议"区域展示
+  - < 60%: 仅记录日志，面板显示"暂无高置信度结论"
+
+#### L3 贝叶斯深度分析（FR34-3）
+
+- **实现**: 在 L2 故障树推理基础上，增加逆向贝叶斯更新（后验概率计算）
+- **算法**: 基于故障树 DAG 结构的简化贝叶斯推理（非完整贝叶斯网络），不引入额外库（复用 NetworkX + numpy）
+- **与 L2 的区别**: L2 仅做正向概率传播（叶→根），L3 额外执行：
+  1. **逆向推理**: 已知根节点异常，反向推算各叶节点的后验概率（贝叶斯定理 P(cause|effect) = P(effect|cause)×P(cause)/P(effect)）
+  2. **历史频率校正**: 查询 TimescaleDB 近 90 天同类故障频率，替代先验概率
+  3. **多传感器融合**（FR34-32）: 聚合同区域多点位数据，计算温度分布标准差/压差等派生证据
+  4. **时序关联**: 检测证据时间序列的先后关系（如：电压下降 → 5分钟后温度上升），强化因果链置信度
+- **额外数据源**: TimescaleDB 历史数据（趋势分析 FR34-31）、`diagnosis_annotation` 运维标注统计
+- **覆盖**: Top 20 全部场景（100%），并可扩展至已建模的其他故障场景
+- **性能**: < 30 秒（主要耗时在 TimescaleDB 历史查询，通过连续聚合视图加速）
+
+```python
+# L3 逆向贝叶斯推理伪代码
+async def l3_bayesian_analysis(tree: nx.DiGraph, root_node: str, evidence: dict) -> dict:
+    # Step 1: L2 正向传播（复用）
+    forward_result = propagate_probabilities(tree, evidence)
+
+    # Step 2: 历史频率校正
+    historical_freq = await query_historical_frequency(root_node, days=90)
+    if historical_freq and historical_freq.sample_count >= 50:
+        # 用历史频率替代先验概率
+        tree.nodes[root_node]['prior_probability'] = historical_freq.frequency
+
+    # Step 3: 逆向推理 — 对每个叶节点计算后验概率
+    posterior = {}
+    for leaf in get_leaf_nodes(tree):
+        p_effect_given_cause = forward_result[root_node]  # P(effect|cause)
+        p_cause = tree.nodes[leaf].get('prior_probability', 0.5)
+        p_effect = forward_result.get(root_node, 0.5)
+        if p_effect > 0:
+            posterior[leaf] = (p_effect_given_cause * p_cause) / p_effect
+
+    # Step 4: 多传感器融合增强
+    fusion_evidence = compute_sensor_fusion(evidence)
+
+    # Step 5: 综合排序，输出 Top N 根因候选
+    return rank_root_causes(posterior, fusion_evidence)
+```
+
+#### L1/L2/L3 包含关系
+
+L1 ⊂ L2 ⊂ L3: 高级别引擎能处理低级别的所有场景。当 L2/L3 不可用时，自动降级到 L1。
+
+#### 并发控制与任务调度
+
+诊断引擎使用 asyncio 内置机制管理并发，不引入独立消息队列（适配 2 人团队运维能力）:
+
+```python
+class DiagnosisScheduler:
+    def __init__(self):
+        self.semaphore = asyncio.Semaphore(10)  # 最大 10 个并发推理
+        self.queue = asyncio.PriorityQueue(maxsize=50)  # 优先级队列，超出丢弃
+
+    async def submit(self, alarm_event: AlarmEvent):
+        # 优先级: 紧急=0, 重要=1, 次要=2, 提示=3（数值越小越优先）
+        priority = {"critical": 0, "major": 1, "minor": 2, "info": 3}[alarm_event.level]
+        try:
+            self.queue.put_nowait((priority, alarm_event))
+        except asyncio.QueueFull:
+            # 队列满 → 丢弃最低优先级任务，插入当前任务
+            logger.warning(f"诊断队列已满，丢弃低优先级任务")
+            # 或直接降级到 L1 快速返回
+
+    async def _worker(self):
+        while True:
+            priority, event = await self.queue.get()
+            async with self.semaphore:
+                await self._execute_diagnosis(event, priority)
+```
+
+- **并发上限**: 10 个任务同时推理（`asyncio.Semaphore(10)`）
+- **排队策略**: `asyncio.PriorityQueue` 按告警级别排序，紧急告警优先
+- **队列溢出**: 队列容量 50，溢出时丢弃最低优先级任务或直接 L1 快速返回
+- **超时控制**: 每个推理任务设置 `asyncio.wait_for` 超时（L1: 2s, L2: 10s, L3: 60s），超时触发熔断
+
+### 18.3 告警引擎 → 诊断引擎集成
+
+告警引擎是诊断引擎的主要触发源。集成方式为**进程内异步调用**（非消息队列），复用现有 Redis Pub/Sub 事件总线:
+
+```
+告警引擎 (alarm_engine.py)
+    │
+    ├─ 阈值越限检测 → 生成 Alarm 记录
+    │
+    ├─ Redis Pub/Sub 发布 "alarm:new" 事件
+    │       │
+    │       ├─ 联动引擎订阅（现有逻辑，不变）
+    │       │
+    │       └─ 诊断引擎订阅（新增）
+    │           └→ DiagnosisScheduler.submit(alarm_event)
+    │               → 优先级队列 → L1/L2/L3 推理
+    │
+    └─ 诊断引擎完成推理后:
+        ├─ 写入 diagnosis_result 表
+        ├─ WebSocket 推送:
+        │   复用 /ws/alarms 通道，消息类型 "diagnosis_result"
+        │   前端 alarm Store 新增 diagnosis 处理分支
+        └─ 高置信度结果可触发联动（作为新的联动条件类型）
+```
+
+**关键设计决策**:
+- **触发方式**: 订阅 Redis `alarm:new` 频道（与联动引擎并行，互不阻塞）
+- **WebSocket 通道**: 复用 `/ws/alarms`，新增消息类型 `diagnosis_result`（避免新增 WebSocket 端点）
+- **定向推送**: 诊断结果附带 `target_roles` 字段（如 `["operator", "admin"]`），前端 Store 根据当前用户角色过滤显示
+- **手动触发**: `/api/v1/diagnosis/trigger` 端点支持运维人员主动对某台设备发起诊断（不依赖告警）
+
+### 18.4 故障树管理架构（FR34-5~8, FR34-16）
+
+#### 版本管理（FR34-6）
+
+```
+故障树生命周期:
+  draft → reviewed → active → archived
+         ↑                    │
+         └────── rollback ────┘
+
+版本切换流程:
+  1. 新版本创建（draft）
+  2. 管理员审批（reviewed）
+  3. HMAC-SHA-256 签名生成（密钥从环境变量读取）
+  4. 激活前验证签名 → 通过则替换内存中的 NetworkX 图
+  5. 签名失败 → 拒绝加载，保持旧版本，触发安全告警
+
+A/B 测试（Phase 2b+，非 Phase 2a 范围）:
+  两个版本同时标记为 active，配置分流比例（如 90:10）
+  DiagnosisScheduler 按比例路由请求到不同版本的 NetworkX 图
+  两个版本的诊断结果都写入 diagnosis_result（附带 tree_version 字段）
+  运行 2 周后，管理员在误判分析报告中对比两版本准确率
+  人工决定切换或回滚（不自动切换）
+```
+
+#### 完整性校验（FR34-16）
+
+```python
+# 签名生成与验证
+import hmac
+import hashlib
+import json
+
+def sign_fault_tree(tree_config: dict, secret_key: bytes) -> str:
+    """生成故障树配置的 HMAC-SHA-256 签名"""
+    payload: bytes = json.dumps(tree_config, sort_keys=True).encode("utf-8")
+    return hmac.new(key=secret_key, msg=payload, digestmod=hashlib.sha256).hexdigest()
+
+def verify_fault_tree(tree_config: dict, signature: str, secret_key: bytes) -> bool:
+    """验证故障树配置签名，使用恒定时间比较防止时序攻击"""
+    expected: str = sign_fault_tree(tree_config, secret_key)
+    return hmac.compare_digest(expected, signature)
+
+# 密钥管理: 环境变量 FAULT_TREE_HMAC_KEY
+# 密钥轮换: 新密钥签名所有活跃版本后再废弃旧密钥
+```
+
+#### 图形化编辑（FR34-8）
+
+- **Phase 2a（JSON 编辑 + 只读可视化）**:
+  - 故障树配置通过 JSON 表单编辑（Element Plus 表单组件），管理员填写节点列表和边关系
+  - 只读可视化: ECharts graph 图渲染故障树结构（仅展示，不可交互编辑）
+  - 此阶段工作量小，适配 2 人团队
+- **Phase 3+（交互式图编辑，可选）**:
+  - 引入 vue-flow（基于 reactflow 的 Vue 3 移植）实现拖拽式节点编辑、连线
+  - 评估时机: Phase 2a 上线后，根据管理员使用反馈决定是否投入开发
+- **验证**（FR34-7）: 保存时后端验证 DAG（无孤立节点、无循环依赖、所有叶节点有概率值或关联点位）
+
+### 18.5 配电拓扑级联分析（FR34-13~15）
+
+复用现有配电拓扑数据模型（Transformer → DistributionPanel → Circuit → PowerDevice），实际拓扑跨 4 张表，因此采用 **NetworkX 配电子图遍历**（而非单表递归 CTE）:
+
+```python
+# 启动时构建配电拓扑 NetworkX 图（复用因果图的配电层子图）
+async def build_power_topology_graph(session: AsyncSession) -> nx.DiGraph:
+    graph = nx.DiGraph()
+    # 从 4 张表加载拓扑关系
+    transformers = await session.execute(select(Transformer))
+    panels = await session.execute(select(DistributionPanel))
+    circuits = await session.execute(select(Circuit))
+    power_devices = await session.execute(select(PowerDevice))
+
+    for t in transformers.scalars():
+        graph.add_node(f"T-{t.id}", type="transformer", name=t.name)
+    for p in panels.scalars():
+        graph.add_node(f"P-{p.id}", type="panel", name=p.name)
+        graph.add_edge(f"T-{p.transformer_id}", f"P-{p.id}")
+    for c in circuits.scalars():
+        graph.add_node(f"C-{c.id}", type="circuit", name=c.name)
+        graph.add_edge(f"P-{c.panel_id}", f"C-{c.id}")
+    for d in power_devices.scalars():
+        graph.add_node(f"D-{d.id}", type="device", name=d.device_name)
+        if d.circuit_id:
+            graph.add_edge(f"C-{d.circuit_id}", f"D-{d.id}")
+    return graph
+
+# 向下级联: PDU故障 → 受影响机柜/设备
+def get_downstream_impact(graph: nx.DiGraph, fault_node: str) -> list:
+    return [graph.nodes[n] for n in nx.descendants(graph, fault_node)]
+
+# 向上溯源: 末端设备 → 追溯上游配电设备
+def get_upstream_source(graph: nx.DiGraph, device_node: str) -> list:
+    return [graph.nodes[n] for n in nx.ancestors(graph, device_node)]
+```
+
+配电拓扑图启动时加载到内存，设备/拓扑变更时通过 DeviceSyncService 事件触发增量更新。
+
+### 18.6 全局因果图架构（FR34-27~28）
+
+#### 四层因果传播链
+
+```
+Layer 1: 供配电层          Layer 2: 暖通层
+┌──────────────────┐      ┌──────────────────┐
+│ 市电 → 变压器     │─────→│ 空调主机          │
+│ → UPS → PDU      │      │ → 冷冻水泵        │
+│ → ATS 切换       │      │ → 冷却塔          │
+└──────────────────┘      └──────────────────┘
+         │                         │
+         ▼                         ▼
+Layer 3: IT设备层           Layer 4: 业务服务层
+┌──────────────────┐      ┌──────────────────┐
+│ 服务器/存储/网络   │─────→│ 业务应用          │
+│ 机柜温度          │      │ SLA 影响评估       │
+└──────────────────┘      └──────────────────┘
+```
+
+#### 实现方案
+
+- **存储**: 在 PostgreSQL 中用 `causal_graph` 和 `causal_edge` 表定义跨系统传播边
+- **运行时**: NetworkX DiGraph 加载因果图（故障树子图 + 跨系统边的超集）
+- **构建**: 初始因果图由专家联合构建，新增设备类型需专家审批后通过管理界面扩展
+- **版本管理**: 纳入故障树版本管理体系（FR34-6），变更需审批+签名
+- **与故障树同步策略**: 因果图引用故障树节点 ID（外键），不复制节点数据。当故障树版本更新时:
+  1. 因果图中引用的节点 ID 不变（故障树新版本保留旧节点 ID 映射）
+  2. 若故障树新增/删除节点影响跨系统边，需同步更新因果图（系统在故障树激活时自动检测断裂边并告警）
+  3. 因果图独立版本号（`causal_graph.version`），与故障树版本为多对多关系，通过 `causal_graph_tree_version` 关联表记录
+
+#### 级联影响分析
+
+```python
+# 向下预测: 配电设备故障 → 预测受影响的暖通/IT/业务
+def predict_downstream_impact(fault_node_id: str, graph: nx.DiGraph) -> list:
+    return list(nx.descendants(graph, fault_node_id))
+
+# 向上溯源: 末端异常 → 追溯上游根因
+def trace_upstream_causes(symptom_node_id: str, graph: nx.DiGraph) -> list:
+    return list(nx.ancestors(graph, symptom_node_id))
+```
+
+### 18.7 电气专业参数扩展架构（FR34-22~26）
+
+#### 电气参数节点（FR34-22）
+
+故障树叶节点可关联电气参数点位，超出阈值时自动作为证据:
+
+| 参数 | 阈值 | 点位类型 |
+|------|------|---------|
+| 三相不平衡度 | < 10% | `PHASE_IMBALANCE` |
+| 谐波畸变率 THD | < 5% | `THD` |
+| 功率因数 | > 0.9 | `POWER_FACTOR` |
+
+#### 电池 SOH 算法（FR34-23）
+
+> **注意**: 以下为初期简化线性模型，权重 0.6/0.4 为行业经验初始值。正式上线前需基于试点 UPS 电池实际运行数据校准权重参数。后续可参考 IEC 62620 / IEEE 1188 标准改进为非线性老化模型。
+
+```python
+# 简化 SOH 估算模型（初期版本，权重可配置）
+SOH_WEIGHTS = {"resistance": 0.6, "cycle": 0.4}  # 从 system_config 加载，支持热更新
+
+def estimate_soh(internal_resistance_mohm: float, rated_resistance_mohm: float,
+                 cycle_count: int, rated_cycles: int,
+                 weights: dict = SOH_WEIGHTS) -> float:
+    """返回 0-100% 的 SOH 值。权重从配置表加载，可基于实际数据校准。"""
+    resistance_factor = max(0, 1 - (internal_resistance_mohm - rated_resistance_mohm)
+                           / rated_resistance_mohm)
+    cycle_factor = max(0, 1 - cycle_count / rated_cycles)
+    return round((resistance_factor * weights["resistance"]
+                  + cycle_factor * weights["cycle"]) * 100, 1)
+```
+
+- SOH 计算结果写入 `battery_soh_record` 表（含计算时使用的权重版本，便于回溯）
+- 同时更新故障树证据（低 SOH 增加 UPS 故障概率）和设备健康度评估（FR75）
+- 权重校准流程: 积累 ≥ 20 块电池的 SOH 预测值与实际更换记录对比 → 计算误差 → 调整权重
+
+#### N+X 冗余拓扑（FR34-24）
+
+- 在配电拓扑模型中标记冗余路径（`redundancy_type: N+1/2N/2(N+1)`）
+- 推理时检查故障设备是否有活跃备用路径
+- 有备用路径 → 降低故障影响等级，标记为"受控故障"
+- 无备用路径 → 正常故障告警
+
+#### 传感器元数据（FR34-25）
+
+```
+sensor_metadata 表:
+  point_id              → 关联点位
+  ct_pt_ratio           → CT/PT 变比
+  accuracy_class        → 精度等级 (0.2/0.5/1.0)
+  calibration_date      → 最近校准日期
+  calibration_result    → 校准结果
+  calibration_interval_days → 校准周期（天），默认 365（1年），精密仪表可设为 180
+
+推理时:
+  精度等级 0.2 → 证据权重 1.0
+  精度等级 0.5 → 证据权重 0.9
+  精度等级 1.0 → 证据权重 0.8
+  超过 calibration_interval_days → 证据权重 0.6 + 触发校准提醒告警
+```
+
+#### 断路器保护逻辑库（FR34-26）
+
+```
+breaker_profile 表:
+  breaker_id      → 关联断路器设备
+  trip_curve_type → 脱扣曲线类型 (B/C/D)
+  rated_current   → 额定电流
+  rated_trip_time → 额定动作时间
+
+推理逻辑:
+  过流告警 + 断路器动作时间在特性曲线范围内 → 判定为"保护动作"（非故障）
+  过流告警 + 断路器未动作或动作时间异常 → 判定为"设备故障"
+```
+
+### 18.8 暖通专业增强架构（FR34-29~32）
+
+#### 差异化时间窗口（FR34-29）
+
+配置存储在 `system_config` 表（JSON），按设备类型映射:
+
+```json
+{
+  "diagnosis_time_windows": {
+    "ELECTRICAL": 300,
+    "TEMPERATURE": 1800,
+    "HUMIDITY": 3600,
+    "PRESSURE": 600,
+    "default": 1800
+  }
+}
+```
+
+#### 动态告警阈值（FR34-30）
+
+动态阈值通过**配置表驱动的规则引擎**实现，不硬编码调整逻辑:
+
+```json
+// system_config 表中的动态阈值规则配置
+{
+  "dynamic_threshold_rules": [
+    {
+      "condition": "outdoor_temp > 35",
+      "adjustment": "+1.0",
+      "description": "夏季室外高温允许回风温度升高"
+    },
+    {
+      "condition": "it_load_percent > 80",
+      "adjustment": "+0.5",
+      "description": "高负载时允许温度升高"
+    },
+    {
+      "condition": "season == 'winter'",
+      "adjustment": "-0.5",
+      "description": "冬季降低温度上限"
+    }
+  ],
+  "safety_boundary_percent": 20,
+  "log_every_adjustment": true
+}
+```
+
+```python
+def calculate_dynamic_threshold(
+    static_threshold: float,
+    context: dict,  # {"outdoor_temp": 36.5, "it_load_percent": 85, "season": "summer"}
+    rules: list[dict]  # 从 system_config 加载
+) -> tuple[float, float]:
+    """配置驱动的动态阈值计算，不超过静态阈值的 ±20%"""
+    total_adjustment = 0.0
+    boundary = static_threshold * 0.2  # ±20% 安全边界
+    for rule in rules:
+        if evaluate_condition(rule["condition"], context):
+            total_adjustment += float(rule["adjustment"])
+    total_adjustment = max(-boundary, min(total_adjustment, boundary))
+    return (static_threshold - abs(total_adjustment), static_threshold + total_adjustment)
+```
+
+管理员可通过 `/api/v1/diagnosis/config` 端点修改规则，无需代码变更。
+
+#### 趋势分析（FR34-31）
+
+- 使用 TimescaleDB 连续聚合视图计算 7 天移动平均
+- APScheduler 定时任务（每小时）检测趋势:
+  - 连续 3 天移动平均单调递增/递减 → 触发趋势预警
+  - 预警级别低于阈值告警，不触发声音通知
+
+#### 多传感器融合（FR34-32）
+
+```python
+# 气流均匀性判断
+def assess_airflow_uniformity(temperatures: list[float]) -> dict:
+    std_dev = statistics.stdev(temperatures)
+    return {
+        "uniformity": "good" if std_dev < 2.0 else "poor" if std_dev > 5.0 else "moderate",
+        "std_dev": round(std_dev, 2),
+        "is_evidence": std_dev > 5.0  # 标准差>5℃作为故障证据
+    }
+```
+
+### 18.9 熔断降级架构（FR34-41~42）
+
+#### 熔断器状态机
+
+```
+CLOSED (正常) ──错误率>10% OR 超时>10s──→ OPEN (熔断，降级L1)
+     ↑                                         │
+     │                                    30秒冷却期
+     │                                         │
+     └──── 试探成功 ←──── HALF_OPEN (试探) ←───┘
+```
+
+#### 降级策略
+
+| 故障场景 | 降级行为 | 恢复策略 |
+|---------|---------|---------|
+| L2/L3 推理超时 | 降级到 L1 规则引擎 | 30 秒后试探恢复 |
+| NetworkX 图加载失败 | 降级到 L1 | 重新加载故障树 |
+| PostgreSQL 诊断表不可用 | 诊断结果写入 Redis 暂存 | DB 恢复后批量写入 |
+| Redis 不可用 | 直接查询 TimescaleDB | Redis 恢复后自动切换 |
+
+#### 灾难恢复演练（FR34-42）
+
+通过 APScheduler 季度定时任务触发混沌注入:
+
+**演练场景**:
+1. 临时停止诊断引擎进程/线程 → 验证 L1 降级
+2. 模拟 DB 连接超时 → 验证 Redis 暂存
+3. 模拟网络分区 → 验证边缘独立推理（愿景阶段）
+4. 生成演练报告: 恢复时间、降级成功率、数据完整性
+
+**安全防护措施**:
+- **演练窗口**: 仅在管理员配置的低峰时段执行（默认: 周日凌晨 02:00-04:00）
+- **一键终止**: 管理员可通过 `/api/v1/diagnosis/chaos/stop` 立即终止演练，恢复正常模式
+- **真实告警保护**: 演练期间所有真实告警自动走 L1 规则引擎（跳过被注入故障的 L2/L3），确保基本诊断能力不中断
+- **演练标记**: 演练期间的所有诊断结果标记 `is_drill=true`，不计入准确率统计
+- **前置审批**: 演练计划需管理员在 `/api/v1/diagnosis/chaos/schedule` 中确认后才执行
+
+### 18.10 闭环学习架构（FR34-19~21）
+
+#### 标注流程
+
+```
+诊断结果 → 运维标注（准确/不准确/未知）
+                    │
+                    ├─ 不准确 → 必须填写实际根因
+                    │           └→ 监控标注偏差（2σ 异常检测）
+                    │
+                    └→ 累计到 diagnosis_annotation 表
+                       └→ 当节点标注 ≥ 50 次:
+                          统计实际概率 → 对比当前先验概率
+                          调整幅度 ≤ ±10% → 生成审批工单
+                          管理员审批 → 生效/拒绝（支持一键回滚）
+```
+
+#### 时间窗口自适应（FR34-21）
+
+- 基于 `diagnosis_annotation` 中"准确"标注的故障持续时间统计
+- 计算 P50/P90 作为窗口建议值
+- 调整范围: 1 分钟 ~ 120 分钟
+- 调整后通知管理员
+
+### 18.11 安全加固架构（FR34-35~37）
+
+#### 对抗样本检测（FR34-35）
+
+- 使用 scikit-learn Isolation Forest 对训练数据执行异常检测
+- 新标注数据入库前检查: 异常分数 > 阈值 → 降低权重或拒绝入库
+- 定期（月度）对全量标注数据执行批量检测
+
+#### 结果分级展示（FR34-36）
+
+| 角色 | 展示内容 |
+|------|---------|
+| operator（运维） | 结论 + 建议操作 + 置信度等级（高/中/低） |
+| engineer（高级工程师） | 完整推理路径 + 概率详情 + 证据列表 |
+| admin（管理员） | 全部信息 + 审计日志 + 参数调整入口 |
+
+基于现有 RBAC 三级角色体系（FR77），在诊断 API 响应中根据角色过滤字段。
+
+#### SBOM 管理（FR34-37）
+
+- 维护 `requirements.txt` / `package.json` 的依赖清单
+- 集成 GitHub Dependabot 或 `pip-audit` 定期扫描
+- 关键算法库（NetworkX, scikit-learn）漏洞触发系统告警
+
+### 18.12 可解释性架构（FR34-38~40）
+
+#### 证据链（FR34-38）
+
+每次诊断结果附带结构化证据链:
+
+```json
+{
+  "diagnosis_id": "D-20260305-001",
+  "root_cause": "空调制冷效率下降",
+  "confidence": 0.82,
+  "evidence_chain": [
+    {"step": 1, "rule": "温度超限", "point": "T-A01-01", "value": 29.5, "threshold": 28.0, "timestamp": "2026-03-05T14:23:15Z"},
+    {"step": 2, "rule": "回风温差异常", "point": "T-A01-RETURN", "value": 3.2, "expected": ">5.0", "timestamp": "2026-03-05T14:23:15Z"},
+    {"step": 3, "gate": "AND", "probability": 0.82, "timestamp": "2026-03-05T14:23:16Z"}
+  ],
+  "audit_trail": {
+    "triggered_by": "alarm_id_12345",
+    "engine_level": "L2",
+    "inference_time_ms": 1230,
+    "fault_tree_version": "v2.1.0"
+  }
+}
+```
+
+#### 简化反事实分析（FR34-39）
+
+对 Top 3 关键证据执行敏感性分析:
+- 逐一移除每个证据，重新计算根因概率
+- 输出: "若温度传感器 T-A01-01 读数正常，根因判断将变为'送风系统异常'（置信度 0.65→0.45）"
+- 计算复杂度: 3 次额外推理（可接受）
+
+#### 误判分析报告（FR34-40）
+
+- APScheduler 月度定时任务
+- 统计维度: 误判类型（误报/漏报）、高频误判故障树节点、设备类型分布
+- 输出: Markdown 报告，存储在 `system_report` 表
+
+### 18.13 边缘推理架构（FR34-33~34，愿景阶段）
+
+> 边缘推理为愿景阶段功能，当前架构预留接口但不实现。
+
+#### 预留设计
+
+- 网关层预留 `diagnosis_handler` 接口
+- 协议: 中心节点通过 MQTT 下发规则子集到边缘
+- 边缘执行 L1 规则匹配，复杂场景上报中心
+- 多节点一致性: 中心节点作为仲裁者，边缘结果冲突时以中心为准
+
+### 18.14 诊断系统 API 设计
+
+| 端点 | 方法 | 说明 | 角色 |
+|------|------|------|------|
+| `/api/v1/diagnosis/trigger` | POST | 手动触发诊断（自动触发由告警引擎调用） | operator+ |
+| `/api/v1/diagnosis/sessions` | GET | 查询诊断历史 | operator+ |
+| `/api/v1/diagnosis/sessions/{id}` | GET | 诊断详情（按角色分级展示） | operator+ |
+| `/api/v1/diagnosis/sessions/{id}/annotate` | POST | 标注诊断结果 | operator+ |
+| `/api/v1/fault-trees` | GET/POST | 故障树列表/创建 | admin |
+| `/api/v1/fault-trees/{id}` | GET/PUT/DELETE | 故障树详情/编辑/删除 | admin |
+| `/api/v1/fault-trees/{id}/versions` | GET/POST | 版本列表/创建新版本 | admin |
+| `/api/v1/fault-trees/{id}/versions/{vid}/activate` | POST | 激活版本（含签名验证） | admin |
+| `/api/v1/fault-trees/{id}/versions/{vid}/rollback` | POST | 回滚版本 | admin |
+| `/api/v1/causal-graph` | GET/PUT | 因果图查询/编辑（需专家审批） | admin |
+| `/api/v1/diagnosis/reports/monthly` | GET | 月度误判分析报告 | admin |
+| `/api/v1/diagnosis/config` | GET/PUT | 诊断配置（时间窗口、阈值等） | admin |
+| `/api/v1/sensors/metadata` | GET/PUT | 传感器元数据管理 | admin |
+| `/api/v1/breakers/profiles` | GET/POST/PUT | 断路器特性库管理 | admin |
+
+### 18.15 诊断数据流
+
+```
+告警引擎检测到越限
+    │
+    ▼
+诊断调度器接收告警事件
+    │
+    ├─ 检查熔断器状态 ─→ OPEN → 执行 L1 规则引擎 → 返回结果
+    │
+    ├─ 根据告警级别选择推理级别:
+    │     紧急告警 → L2 (默认)
+    │     重要告警 → L2
+    │     次要告警 → L1
+    │     提示告警 → L1
+    │     (用户可手动覆盖级别选择)
+    │
+    ▼
+证据收集器
+    ├─ 查询 Redis: 最新点位值
+    ├─ 查询 TimescaleDB: 时间窗口内历史数据
+    ├─ 查询传感器元数据: 精度加权
+    └─ 查询断路器特性: 保护动作判别
+    │
+    ▼
+推理引擎执行
+    ├─ L1: 规则匹配 → 直接输出
+    ├─ L2: NetworkX 故障树遍历 → 概率传播 → 根因路径
+    └─ L3: L2 + 历史趋势分析 + 多传感器融合 + 贝叶斯增强
+    │
+    ▼
+结果处理
+    ├─ 写入 diagnosis_session + diagnosis_result
+    ├─ 写入 diagnosis_audit_log
+    ├─ 根据置信度通过 WebSocket 推送（复用 /ws/alarms 通道）:
+    │     > 80% → 消息类型 "diagnosis_alert"，前端弹窗 + 声音
+    │     60-80% → 消息类型 "diagnosis_suggestion"，诊断面板建议区
+    │     < 60% → 仅写入日志，不推送 WebSocket
+    │
+    │   WebSocket 消息格式:
+    │   {
+    │     "type": "diagnosis_alert" | "diagnosis_suggestion",
+    │     "target_roles": ["operator", "admin"],
+    │     "data": { diagnosis_id, root_cause, confidence, evidence_chain }
+    │   }
+    │   前端 alarm Store 新增 diagnosis 消息处理分支，
+    │   根据 target_roles 与当前用户角色匹配决定是否显示
+    │
+    └─ 返回结构化结果（含证据链）
+```
+
+### 18.16 NFR 架构支撑（诊断相关）
+
+| NFR 指标 | 架构支撑 |
+|---------|---------|
+| L1 < 1s | 规则集内存缓存，纯 Python 匹配 |
+| L2 < 5s | NetworkX 内存图遍历，≤1000 节点 |
+| L3 < 30s | 异步并发查询 TimescaleDB + 推理计算 |
+| 并发 10 任务 | asyncio.Semaphore(10) + PriorityQueue(50)，紧急告警优先，溢出降级 L1 |
+| 可用率 99.9% | 熔断降级到 L1，L1 无外部依赖（纯内存） |
+| 故障树加载 < 2s | 启动时预加载，版本切换时热替换 |
+| 配置完整性 | HMAC-SHA-256 签名，密钥环境变量注入 |
+| 审计合规 | 全链路审计日志，RBAC 分级展示 |
+
+---
+
+## 19. 前端数据流规范（V4.0.0 新增）
+
+> 详细审查报告见 `docs/data-flow-audit.md`
+
+### 19.1 单一事实来源原则
+
+每个数据实体必须有且仅有一个 Pinia Store 作为事实来源。禁止在 composable 或组件中通过 `ref()` 维护与 Store 重叠的状态副本。
+
+```
+Backend (REST + WS) → API Module (无状态) → Pinia Store (唯一状态) → Composable (无状态工具) → View
+```
+
+### 19.2 数据实体归属表
+
+| 数据实体 | 唯一归属 Store | 禁止在其他位置持有 |
+|----------|---------------|-------------------|
+| 活动告警列表 + 计数 | AlarmStore | composable ref, BigscreenStore, 页面局部 ref |
+| 实时点位值 | RealtimeStore | composable ref, BigscreenStore.deviceData |
+| PUE / 功率 / 电量 | EnergyStore | BigscreenStore.energy |
+| 告警声音开关 | AppStore (`alarmSoundEnabled`) | AlarmStore.soundEnabled |
+| 当前站点 | SiteStore | 无冲突 |
+| 大屏 UI 状态 | BigscreenStore | 仅限场景/布局/图层等 UI 状态 |
+
+### 19.3 WebSocket 单连接管理
+
+- 每个 WS 通道（realtime/alarms/system/linkage）最多维持 1 个连接
+- 连接由 `useWebSocketManager.ts` 单例 composable 统一管理，生命周期绑定到应用（App.vue / MainLayout）而非组件
+- 各 Store 通过管理器注册消息处理器（`manager.subscribe('alarms', handler)`），Store 自身不创建 WS 连接
+- 管理器负责自动重连（指数退避）和心跳保活
+
+### 19.4 站点过滤贯穿规范
+
+- API 请求拦截器自动注入 `site_id`（从 `useSiteStore().currentSiteId` 读取）
+- 切换站点时 `siteStore.switchSite()` 触发相关 Store 的 `reload()` action
+
+### 19.5 Composable 职责边界
+
+- **允许:** 格式化函数、业务逻辑封装、声音/通知等副作用、从 Store 读取 computed
+- **禁止:** 通过 `ref()` 持有与 Store 重叠的数据、独立创建 WebSocket 连接、绕过 Store 直接调 API 并在 ref 中缓存结果
+
+---
+
+## 20. Demo 系统与数据隔离规范（V4.0.0 新增）
+
+> 详细审查报告见 `docs/demo-system-audit.md`
+
+### 20.1 数据来源标记贯穿原则
+
+所有通过 `process_payload()` 统一管道入库的数据必须保留来源标识（`source` 字段），从入口到存储层全链路不丢弃：
+
+- **数据库层:** PointHistory、Alarm 表增加 `source` 列
+- **WebSocket 推送:** 消息体包含 `source` 字段
+- **Redis 缓存:** 缓存值 JSON 包含 `source` 字段
+- **API 查询:** 告警、历史数据 API 支持按 `source` 过滤
+
+### 20.2 Demo 与主系统分离
+
+| 关注点 | 规范 |
+|--------|------|
+| 配置项 | `seed_enabled`（最小种子）、`demo_enabled`（完整演示）、`simulation_enabled`（模拟器）三项独立控制 |
+| 数据标记 | Demo 创建的 Device/Point 记录标记 `is_demo=True`，卸载时仅删除标记记录 |
+| 编码依赖 | 主系统服务（point_device_matcher、device_sync）不得硬编码 demo 特定的设备编码或楼层列表 |
+| 最小种子 | 非 demo 模式下提供最小化种子（Site + 基础 Floor/Room + 默认配置），确保系统基本可用 |
+
+### 20.3 数据源枚举值
+
+| source 值 | 含义 | 写入方 |
+|-----------|------|--------|
+| `mqtt` | MQTT 网关采集 | point_data.py |
+| `demo` | 模拟器实时生成 | demo/engine.py |
+| `demo_backfill` | 历史数据回填 | history_generator.py |
+| `bridge` | DataSource 桥接 | datasource_bridge.py |
+| `manual` | 用户手动录入/API | 各 CRUD 接口 |
+| `unknown` | 未标记来源（兼容旧数据） | 默认值 |
+
+---
+
 ## 附录: 架构变更日志
+
+### V4.0.0 (2026-03-05)
+
+**重大变更**:
+
+1. **智能诊断系统架构（Section 18）**
+   - 新增分级推理架构（L1规则引擎/L2故障树/L3贝叶斯），对应 PRD FR34-1~42
+   - 故障树管理: NetworkX 内存图 + PostgreSQL 持久化 + HMAC-SHA-256 签名
+   - 全局因果图: 配电→暖通→IT→业务四层级联传播链
+   - 电气专业扩展: 三相不平衡/THD/功率因数/电池SOH/N+X冗余/断路器特性
+   - 暖通专业增强: 差异化时间窗口/动态阈值/趋势分析/多传感器融合
+   - 熔断降级: 熔断器状态机 + L1保底 + 灾难恢复演练
+   - 闭环学习: 运维标注→概率自动调参→管理员审批
+   - 安全加固: 对抗样本检测/分级展示/SBOM管理
+   - 可解释性: 证据链/反事实分析/误判报告
+
+2. **技术栈扩展**
+   - 新增 NetworkX 3.2+（图计算）
+   - 新增 scikit-learn 1.4+（异常检测）
+   - HMAC-SHA-256（Python 内置 hmac+hashlib）
+
+3. **数据模型扩展**
+   - 6 个新数据模型分组（故障树、因果图、诊断引擎、闭环学习、电气扩展）
+   - 15+ 新表
+
+4. **前端数据流规范（Section 19）**
+   - 基于棕地代码审查，制定单一事实来源(SSOT)规范
+   - 识别并解决告警/实时/能源数据在多个 Store+Composable 间的割裂问题
+   - WebSocket 单连接管理、站点过滤贯穿、Composable 职责边界
+
+5. **Demo 系统与数据隔离规范（Section 20）**
+   - 基于 demo 系统深度审查，制定数据来源标记贯穿原则
+   - Demo 与主系统配置分离（seed/demo/simulation 三项独立）
+   - 数据源枚举标准化（mqtt/demo/bridge/manual/unknown）
+   - 主系统代码禁止硬依赖 demo 特定编码
+
+4. **诊断 API**
+   - 15 个新 REST 端点（/api/v1/diagnosis/*, /api/v1/fault-trees/*, /api/v1/causal-graph 等）
+
+5. **对抗性审查修复（15项）**
+   - [P0] L3 贝叶斯引擎补全: 逆向推理算法、历史频率校正、伪代码
+   - [P0] 并发控制: asyncio.Semaphore + PriorityQueue + 溢出降级策略
+   - [P0] 告警→诊断集成: Redis Pub/Sub 订阅 alarm:new、WebSocket 复用 /ws/alarms
+   - [P1] A/B 测试推迟到 Phase 2b+，补充人工决策流程
+   - [P1] 动态阈值改为配置表驱动规则引擎（不硬编码）
+   - [P1] SOH 算法标注为简化模型，权重可配置，需实际数据校准
+   - [P1] 因果图↔故障树同步策略: 外键引用、断裂边检测、多对多版本关联
+   - [P1] 配电级联分析改用 NetworkX 子图遍历（跨 4 表，非单表递归 CTE）
+   - [P1] 混沌工程演练安全防护: 演练窗口、一键终止、真实告警保护
+   - [P1] 图形化编辑分阶段: Phase 2a JSON+只读可视化，Phase 3+ vue-flow
+   - [P1] WebSocket 消息格式定义: type/target_roles/data 结构
+   - [P2] 证据链补充 timestamp 字段
+   - [P2] 传感器校准周期: calibration_interval_days 字段，默认 365 天
+   - [P2] HMAC 代码类型注解和中文注释
+   - [P2] 修正错别字"场障树"→"故障树"
+
+---
 
 ### V3.2.0 (2026-02-28)
 
@@ -1837,10 +2724,10 @@ TODO [生产集成计划]:
 
 ---
 
-**文档版本**: V3.2.0  
-**最后更新**: 2026-03-01  
-**更新人**: proecheng  
-**变更类型**: 架构重大变更 - 演示系统模块化 + 统一数据管线 + 代码质量修复
+**文档版本**: V4.0.0
+**最后更新**: 2026-03-05
+**更新人**: proecheng
+**变更类型**: 架构重大变更 - 新增智能诊断系统架构（FR34-1~42）
 
 ---
 

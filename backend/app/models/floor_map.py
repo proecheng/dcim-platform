@@ -17,5 +17,6 @@ class FloorMap(Base):
     map_data = Column(Text, nullable=False, comment="图数据 JSON格式")
     thumbnail = Column(Text, comment="缩略图 Base64")
     is_default = Column(Boolean, default=False, comment="是否默认显示")
+    is_demo = Column(Boolean, default=False, nullable=False, comment="是否为演示数据")
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())

@@ -1,4 +1,4 @@
-description = """Create a new BMAD workflow with proper structure and best practices"""
+description = 'Create a new BMAD workflow with proper structure and best practices'
 prompt = """
 Execute the BMAD 'create-workflow' workflow.
 

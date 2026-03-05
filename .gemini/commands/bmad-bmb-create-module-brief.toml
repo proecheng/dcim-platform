@@ -1,4 +1,4 @@
-description = """Create product brief for BMAD module development"""
+description = 'Create product brief for BMAD module development'
 prompt = """
 Execute the BMAD 'create-module-brief' workflow.
 

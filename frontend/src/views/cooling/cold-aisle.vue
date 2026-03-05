@@ -20,14 +20,38 @@
       </el-col>
     </el-row>
 
-    <!-- 冷通道列表 -->
+    <!-- 筛选和冷通道列表 -->
     <el-card shadow="hover" class="table-card">
       <template #header>
         <div class="card-header">
           <span>冷通道列表</span>
-          <el-button type="primary" link @click="loadData">
-            <el-icon><Refresh /></el-icon> 刷新
-          </el-button>
+          <div class="header-actions">
+            <el-input
+              v-model="searchKeyword"
+              placeholder="搜索通道编码/名称"
+              clearable
+              style="width: 200px; margin-right: 8px;"
+              @clear="handleSearch"
+              @keyup.enter="handleSearch"
+            >
+              <template #prefix>
+                <el-icon><Search /></el-icon>
+              </template>
+            </el-input>
+            <el-select
+              v-model="filterSkylightStatus"
+              placeholder="天窗状态"
+              clearable
+              style="width: 120px; margin-right: 8px;"
+              @change="handleSearch"
+            >
+              <el-option label="全部关闭" value="closed" />
+              <el-option label="有开启" value="open" />
+            </el-select>
+            <el-button type="primary" link @click="loadData">
+              <el-icon><Refresh /></el-icon> 刷新
+            </el-button>
+          </div>
         </div>
       </template>
       <el-table :data="aisleList" stripe border v-loading="loading">
@@ -47,6 +71,17 @@
           </template>
         </el-table-column>
       </el-table>
+      <el-pagination
+        v-if="totalCount > 0"
+        v-model:current-page="currentPage"
+        v-model:page-size="pageSize"
+        :total="totalCount"
+        :page-sizes="[10, 20, 50, 100]"
+        layout="total, sizes, prev, pager, next, jumper"
+        @size-change="handleSizeChange"
+        @current-change="handlePageChange"
+        style="margin-top: 16px; justify-content: flex-end;"
+      />
       <el-empty v-if="!loading && aisleList.length === 0" description="暂无冷通道数据" />
     </el-card>
 
@@ -77,12 +112,16 @@
 </template>
 
 <script setup lang="ts">
-import { Refresh } from '@element-plus/icons-vue'
+import { Refresh, Search } from '@element-plus/icons-vue'
 import { getColdAisleList, getColdAisleDetail } from '@/api/modules/cooling'
 
 const loading = ref(false)
 const drawerVisible = ref(false)
 const detailLoading = ref(false)
+const currentPage = ref(1)
+const pageSize = ref(20)
+const searchKeyword = ref('')
+const filterSkylightStatus = ref('')
 
 interface AisleItem {
   id: number
@@ -122,13 +161,24 @@ const skylightOpenCount = computed(() =>
 async function loadData() {
   loading.value = true
   try {
-    const res = await getColdAisleList()
+    const params: Record<string, unknown> = {
+      page: currentPage.value,
+      page_size: pageSize.value
+    }
+    if (searchKeyword.value) {
+      params.keyword = searchKeyword.value
+    }
+    if (filterSkylightStatus.value) {
+      params.skylight_status = filterSkylightStatus.value
+    }
+    const res = await getColdAisleList(params)
     const data = res?.data ?? res
     aisleList.value = Array.isArray(data) ? data : (data?.items ?? [])
     totalCount.value = data?.total ?? aisleList.value.length
   } catch {
     console.warn('冷通道列表API未就绪，使用模拟数据')
     aisleList.value = mockAisleList
+    totalCount.value = mockAisleList.length
   } finally {
     loading.value = false
   }
@@ -151,6 +201,17 @@ async function openDetail(row: AisleItem) {
   } finally {
     detailLoading.value = false
   }
+}
+function handleSearch() {
+  currentPage.value = 1
+  loadData()
+}
+function handlePageChange() {
+  loadData()
+}
+function handleSizeChange() {
+  currentPage.value = 1
+  loadData()
 }
 
 onMounted(() => {
@@ -203,6 +264,10 @@ onMounted(() => {
     justify-content: space-between;
     align-items: center;
     color: var(--text-primary);
+    .header-actions {
+      display: flex;
+      align-items: center;
+    }
   }
 
   .section-title {

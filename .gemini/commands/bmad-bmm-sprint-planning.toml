@@ -1,4 +1,4 @@
-description = """Generate sprint status tracking from epics. Use when the user says ""run sprint planning"" or ""generate sprint plan"""""
+description = 'Generate sprint status tracking from epics. Use when the user says "run sprint planning" or "generate sprint plan"'
 prompt = """
 Execute the BMAD 'sprint-planning' workflow.
 

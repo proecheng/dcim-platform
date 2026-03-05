@@ -1,4 +1,4 @@
-description = """Game vision definition workflow. Use when the user says ""lets create a game brief"" or ""I want to define my game vision"""""
+description = 'Game vision definition workflow. Use when the user says "lets create a game brief" or "I want to define my game vision"'
 prompt = """
 Execute the BMAD 'game-brief' workflow.
 

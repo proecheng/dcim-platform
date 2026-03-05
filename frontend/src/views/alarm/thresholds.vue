@@ -27,6 +27,19 @@
         </el-card>
       </el-col>
     </el-row>
+
+    <!-- 阈值级别说明 -->
+    <el-alert type="info" :closable="false" style="margin-bottom: 16px;">
+      <template #title>阈值触发逻辑说明</template>
+      <p>系统使用3级阈值：<el-tag type="warning" size="small">次要</el-tag> <el-tag type="danger" size="small">重要</el-tag> <el-tag type="danger" size="small" effect="dark">紧急</el-tag></p>
+      <p style="margin-top: 8px;">
+        <strong>阈值类型：</strong>
+        <el-tag size="small" type="danger">高限</el-tag> 表示实时值<strong>超过</strong>阈值时触发告警（如温度过高）。
+        <el-tag size="small" type="primary" style="margin-left: 8px;">低限</el-tag> 表示实时值<strong>低于</strong>阈值时触发告警（如温度过低）。
+      </p>
+    </el-alert>
+
+    <!-- 工具栏 -->
     <!-- 工具栏 -->
     <el-card shadow="hover" class="toolbar-card">
       <el-form :inline="true" class="filter-form">
@@ -50,7 +63,7 @@
           </el-select>
         </el-form-item>
         <el-form-item>
-          <el-button type="primary" @click="loadData">查询</el-button>
+          <el-button type="primary" @click="handleQuery">查询</el-button>
           <el-button @click="resetFilters">重置</el-button>
         </el-form-item>
       </el-form>
@@ -84,9 +97,9 @@
             <el-tag size="small">{{ row.device_type || '-' }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="提示阈值" width="90" align="center">
+        <el-table-column label="提示阈值（未启用）" width="110" align="center">
           <template #default="{ row }">
-            <span class="threshold-val info">{{ formatThVal(row.info_value) }}</span>
+            <span class="threshold-val info" style="color: #909399;">{{ formatThVal(row.info_value) }}</span>
           </template>
         </el-table-column>
         <el-table-column label="次要阈值" width="90" align="center">
@@ -163,17 +176,25 @@
               </el-select>
             </el-form-item>
             <el-divider content-position="left">4级阈值配置</el-divider>
-            <el-form-item label="紧急(高高)">
-              <el-input-number v-model="form.critical" :precision="2" style="width: 100%" @change="updateChartLines" />
+            <el-form-item>
+              <el-alert type="warning" :closable="false" show-icon style="margin-bottom: 12px;">
+                <strong>高限阈值：</strong>实时值<strong>超过</strong>阈值时触发告警。<strong>低限阈值：</strong>实时值<strong>低于</strong>阈值时触发告警。
+              </el-alert>
             </el-form-item>
-            <el-form-item label="重要(高)">
-              <el-input-number v-model="form.major" :precision="2" style="width: 100%" @change="updateChartLines" />
+            <el-form-item label="紧急阈值（高限）">
+              <el-input-number v-model="form.critical" :precision="2" style="width: 100%" placeholder="超过此值触发紧急告警" @change="updateChartLines" />
             </el-form-item>
-            <el-form-item label="次要(低)">
-              <el-input-number v-model="form.minor" :precision="2" style="width: 100%" @change="updateChartLines" />
+            <el-form-item label="重要阈值（高限）">
+              <el-input-number v-model="form.major" :precision="2" style="width: 100%" placeholder="超过此值触发重要告警" @change="updateChartLines" />
             </el-form-item>
-            <el-form-item label="提示(低低)">
-              <el-input-number v-model="form.info" :precision="2" style="width: 100%" @change="updateChartLines" />
+            <el-form-item label="次要阈值（低限）">
+              <el-input-number v-model="form.minor" :precision="2" style="width: 100%" placeholder="低于此值触发次要告警" @change="updateChartLines" />
+            </el-form-item>
+            <el-form-item label="提示阈值（低限）">
+              <el-alert type="info" :closable="false" style="margin-bottom: 8px; font-size: 12px;">
+                注意：系统当前未启用提示级别，此字段仅供未来扩展使用。
+              </el-alert>
+              <el-input-number v-model="form.info" :precision="2" style="width: 100%" placeholder="低于此值触发提示告警（未启用）" @change="updateChartLines" disabled />
             </el-form-item>
             <el-divider content-position="left">高级设置</el-divider>
             <el-form-item label="延迟秒数">
@@ -299,6 +320,9 @@ async function loadPointOptions() {
 // ==================== 数据加载与聚合 ====================
 async function loadData() {
   loading.value = true
+  pagination.page = 1  // 修复：筛选时重置到第1页
+  loading.value = true
+  loading.value = true
   try {
     const baseParams: Record<string, string | number | boolean> = {}
     if (filters.thresholdType) baseParams.threshold_type = filters.thresholdType
@@ -352,7 +376,7 @@ function aggregateAndFilter() {
         point_id: th.point_id,
         point_name: th.point_name || point?.point_name || '',
         point_code: th.point_code || point?.point_code || '',
-        device_type: point?.device_type || '',
+        device_type: th.device_type || point?.device_type || '',  // 修复：优先使用API返回的device_type
         info_value: null,
         minor_value: null,
         major_value: null,
@@ -396,6 +420,12 @@ function aggregateAndFilter() {
   pagination.total = rows.length
   const start = (pagination.page - 1) * pagination.pageSize
   tableData.value = rows.slice(start, start + pagination.pageSize)
+}
+
+// 修复：查询时重置分页
+function handleQuery() {
+  pagination.page = 1
+  loadData()
 }
 
 function resetFilters() {
@@ -521,16 +551,39 @@ function handleAdd() {
   dialogVisible.value = true
 }
 
-function handleEdit(row: ThresholdRow) {
+async function handleEdit(row: ThresholdRow) {
   isEdit.value = true
   editingPointId.value = row.point_id
   form.point_id = row.point_id
-  form.critical = row.critical_value ?? undefined
-  form.major = row.major_value ?? undefined
-  form.minor = row.minor_value ?? undefined
-  form.info = row.info_value ?? undefined
-  form.delay_seconds = 0
-  form.dead_band = 0
+  
+  // 修复：拉取点位全量阈值，避免筛选后数据不全
+  try {
+    const allThresholds = await getPointThresholds(row.point_id)
+    
+    // 按threshold_type和alarm_level映射回填
+    form.critical = allThresholds.find(t => t.threshold_type === 'high_high' || (t.threshold_type === 'high' && t.alarm_level === 'critical'))?.threshold_value ?? undefined
+    form.major = allThresholds.find(t => t.threshold_type === 'high' && t.alarm_level === 'major')?.threshold_value ?? undefined
+    form.minor = allThresholds.find(t => t.threshold_type === 'low' && t.alarm_level === 'minor')?.threshold_value ?? undefined
+    form.info = allThresholds.find(t => t.threshold_type === 'low_low' || (t.threshold_type === 'low' && t.alarm_level === 'info'))?.threshold_value ?? undefined
+    
+    // 优先使用high_high的delay_seconds和dead_band，其次是high
+    const priorityThreshold = allThresholds.find(t => t.threshold_type === 'high_high') || 
+                              allThresholds.find(t => t.threshold_type === 'high') ||
+                              allThresholds[0]
+    form.delay_seconds = priorityThreshold?.delay_seconds ?? 0
+    form.dead_band = priorityThreshold?.dead_band ?? 0
+  } catch (e) {
+    console.error('加载点位阈值失败:', e)
+    // 失败时使用聚合行数据
+    form.critical = row.critical_value ?? undefined
+    form.major = row.major_value ?? undefined
+    form.minor = row.minor_value ?? undefined
+    form.info = row.info_value ?? undefined
+    const existingThreshold = rawThresholds.value.find(t => t.point_id === row.point_id)
+    form.delay_seconds = existingThreshold?.delay_seconds ?? 0
+    form.dead_band = existingThreshold?.dead_band ?? 0
+  }
+  
   dialogVisible.value = true
   // 加载趋势数据
   loadTrendData(row.point_id)
@@ -540,14 +593,21 @@ async function submitForm() {
   const valid = await formRef.value?.validate().catch(() => false)
   if (!valid) return
   if (!form.point_id) return
+  
+  // 修复：校验至少填写一个阈值
+  if (form.critical == null && form.major == null && form.minor == null && form.info == null) {
+    ElMessage.warning('请至少配置一个阈值')
+    return
+  }
 
   submitting.value = true
   try {
+    // 修复：不强制enabled=true，让后端保持原状态
     const data = {
-      high_high: form.critical != null ? { value: form.critical, enabled: true } : undefined,
-      high: form.major != null ? { value: form.major, enabled: true } : undefined,
-      low: form.minor != null ? { value: form.minor, enabled: true } : undefined,
-      low_low: form.info != null ? { value: form.info, enabled: true } : undefined,
+      high_high: form.critical != null ? { value: form.critical } : undefined,
+      high: form.major != null ? { value: form.major } : undefined,
+      low: form.minor != null ? { value: form.minor } : undefined,
+      low_low: form.info != null ? { value: form.info } : undefined,
       delay_seconds: form.delay_seconds,
       dead_band: form.dead_band
     }

@@ -1,4 +1,4 @@
-description = """Run validation check on BMAD workflows against best practices"""
+description = 'Run validation check on BMAD workflows against best practices'
 prompt = """
 Execute the BMAD 'validate-workflow' workflow.
 

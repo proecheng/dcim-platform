@@ -4046,8 +4046,20 @@ async def get_device_power_trend(
     service = DeviceRegulationService(db)
     trend_data = await service.get_device_power_trend(device_id, days)
     
+    # 修复：即使没有历史数据，也返回空结果而不是404错误
     if trend_data is None:
-        raise HTTPException(status_code=404, detail="设备不存在或无历史数据")
+        # 返回空数据结构，前端可以正常显示抽屉框
+        return ResponseModel(
+            code=200,
+            message="设备暂无历史数据",
+            data={
+                "device_id": device_id,
+                "rated_power": 0,
+                "days": days,
+                "trend_data": [],
+                "has_real_data": False
+            }
+        )
     
     return ResponseModel(
         code=200,

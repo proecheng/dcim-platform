@@ -70,6 +70,20 @@ async def unload_demo_data():
     return {"code": 0 if result["success"] else 1, **result}
 
 
+@router.get("/unload-preview")
+async def unload_preview(_: User = Depends(require_admin)):
+    """预览将要删除的 demo 数据统计"""
+    stats = await demo_data_service.get_demo_data_stats()
+    return {"code": 0, "success": True, "data": {"stats": stats}}
+
+
+@router.get("/stats")
+async def get_stats(_: User = Depends(require_admin)):
+    """获取当前 demo 数据统计"""
+    stats = await demo_data_service.get_demo_data_stats()
+    return {"code": 0, "success": True, "data": {"stats": stats}}
+
+
 @router.post("/refresh-dates")
 async def refresh_dates(background_tasks: BackgroundTasks):
     """刷新历史数据日期到最近30天（后台任务）"""

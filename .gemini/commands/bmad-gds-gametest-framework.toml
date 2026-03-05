@@ -1,4 +1,4 @@
-description = """Game test framework initializer. Use when the user says ""lets create a test framework"" or ""initialize game testing infrastructure"""""
+description = 'Game test framework initializer. Use when the user says "lets create a test framework" or "initialize game testing infrastructure"'
 prompt = """
 Execute the BMAD 'gametest-framework' workflow.
 

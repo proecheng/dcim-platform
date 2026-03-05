@@ -39,6 +39,7 @@ class Transformer(Base):
     demand_type = Column(String(10), default="kW", comment="需量单位: kW/kVA")
     demand_warning_ratio = Column(Float, default=0.9, comment="需量预警比例 0-1")
 
+    is_demo = Column(Boolean, default=False, nullable=False, comment="是否为演示数据")
     created_at = Column(DateTime, default=datetime.now, comment="创建时间")
     updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now, comment="更新时间")
 
@@ -81,6 +82,7 @@ class MeterPoint(Base):
     status = Column(String(20), default="normal", comment="状态: normal/fault/offline")
     is_enabled = Column(Boolean, default=True, comment="是否启用")
     remark = Column(Text, comment="备注")
+    is_demo = Column(Boolean, default=False, nullable=False, comment="是否为演示数据")
     created_at = Column(DateTime, default=datetime.now, comment="创建时间")
     updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now, comment="更新时间")
 
@@ -113,6 +115,7 @@ class DistributionPanel(Base):
 
     status = Column(String(20), default="running", comment="状态: running/fault/maintenance")
     is_enabled = Column(Boolean, default=True, comment="是否启用")
+    is_demo = Column(Boolean, default=False, nullable=False, comment="是否为演示数据")
     created_at = Column(DateTime, default=datetime.now, comment="创建时间")
     updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now, comment="更新时间")
 
@@ -146,6 +149,7 @@ class DistributionCircuit(Base):
     min_runtime_hours = Column(Float, comment="最小运行时长要求 小时")
 
     is_enabled = Column(Boolean, default=True, comment="是否启用")
+    is_demo = Column(Boolean, default=False, nullable=False, comment="是否为演示数据")
     created_at = Column(DateTime, default=datetime.now, comment="创建时间")
     updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now, comment="更新时间")
 
@@ -344,6 +348,7 @@ class PowerDevice(Base):
     area_code = Column(String(10), comment="区域代码")
     description = Column(Text, comment="描述")
     is_enabled = Column(Boolean, default=True, comment="是否启用")
+    is_demo = Column(Boolean, default=False, nullable=False, comment="是否为演示数据")
     created_at = Column(DateTime, default=datetime.now, comment="创建时间")
     updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now, comment="更新时间")
 
@@ -430,6 +435,7 @@ class ElectricityPricing(Base):
     expire_date = Column(Date, comment="失效日期")
     is_enabled = Column(Boolean, default=True, comment="是否启用")
     data_source = Column(String(50), comment="数据来源: seed/demo/real")
+    is_demo = Column(Boolean, default=False, nullable=False, comment="是否为演示数据")
     created_at = Column(DateTime, default=datetime.now, comment="创建时间")
     updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now, comment="更新时间")
 

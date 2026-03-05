@@ -11,6 +11,7 @@ from sqlalchemy import select
 from ..deps import get_db, get_current_user, require_operator
 from ...models.user import User
 from ...models.load_shift import ShiftPlan
+from ...models.energy import PowerDevice, DeviceShiftConfig
 from ...schemas.load_shift import (
     # Plan schemas
     ShiftPlanCreate,
@@ -488,8 +489,52 @@ async def get_shiftable_devices(
     Get shiftable devices with potential
     获取可转移设备及潜力
     """
-    # Placeholder - to be implemented with shift_device_service
-    return []
+    devices_result = await db.execute(
+        select(PowerDevice).where(PowerDevice.is_enabled == True).order_by(PowerDevice.device_type, PowerDevice.device_name)
+    )
+    devices = devices_result.scalars().all()
+
+    if not devices:
+        return []
+
+    config_result = await db.execute(select(DeviceShiftConfig))
+    configs = {c.device_id: c for c in config_result.scalars().all()}
+
+    items: List[DeviceShiftPotentialResponse] = []
+    for d in devices:
+        cfg = configs.get(d.id)
+        is_shiftable = bool(cfg.is_shiftable) if cfg is not None else True
+
+        rated_power = float(d.rated_power or 0.0)
+        avg_load_ratio = float(d.avg_load_rate or 60.0) / 100.0
+        current_power = rated_power * avg_load_ratio
+
+        shiftable_ratio = float(cfg.shiftable_power_ratio) if cfg is not None and cfg.shiftable_power_ratio is not None else 0.2
+        shiftable_power = max(0.0, current_power * shiftable_ratio) if is_shiftable else 0.0
+
+        constraints: List[str] = []
+        if cfg is not None and bool(cfg.is_critical):
+            constraints.append("critical_device")
+        if cfg is not None and cfg.max_ramp_rate is not None:
+            constraints.append(f"max_ramp_rate:{cfg.max_ramp_rate}")
+
+        items.append(
+            DeviceShiftPotentialResponse(
+                device_id=d.id,
+                device_name=d.device_name,
+                device_type=d.device_type,
+                rated_power=rated_power,
+                current_power=round(current_power, 2),
+                shift_potential=round(shiftable_power, 2),
+                is_shiftable=is_shiftable,
+                shift_score=round(min(1.0, shiftable_ratio if is_shiftable else 0.0), 2),
+                constraints=constraints,
+                last_shift_time=None,
+                shift_count_today=0,
+            )
+        )
+
+    return items
 
 
 @router.get("/devices/{device_id}/potential", response_model=DeviceShiftPotentialResponse)

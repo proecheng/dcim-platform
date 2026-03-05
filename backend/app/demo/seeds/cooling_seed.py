@@ -361,8 +361,8 @@ def _create_point(device_id, device_type: str, device_code: str, area_code: str,
         min_range=pt["min"],
         max_range=pt["max"],
         precision=2 if pt["type"] == "AI" else 0,
-        collect_interval=5,
-        store_interval=60,
+        collect_interval=60,
+        store_interval=300,
         is_enabled=True,
         register_address=pt.get("addr"),
         scale_factor=1.0,
@@ -405,7 +405,7 @@ async def seed_cooling_devices():
                 manufacturer=ac_data["manufacturer"],
                 model=ac_data["model"],
                 status="running",
-                install_date=date.today(),
+                install_date=date.today(, is_demo=True),
             )
             session.add(device)
             await session.flush()
@@ -447,7 +447,7 @@ async def seed_cooling_devices():
                 manufacturer=ac_data["manufacturer"],
                 model=ac_data["model"],
                 status="running",
-                install_date=date.today(),
+                install_date=date.today(, is_demo=True),
             )
             session.add(device)
             await session.flush()
@@ -485,7 +485,7 @@ async def seed_cooling_devices():
                 manufacturer=ca_data["manufacturer"],
                 model=ca_data["model"],
                 status="running",
-                install_date=date.today(),
+                install_date=date.today(, is_demo=True),
             )
             session.add(device)
             await session.flush()

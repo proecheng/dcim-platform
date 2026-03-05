@@ -48,6 +48,7 @@ class Point(Base):
     offset = Column(Float, default=0.0, comment="偏移量")
 
     source = Column(String(20), default="manual", server_default="manual", comment="数据来源: demo/mqtt/bridge/manual")
+    is_demo = Column(Boolean, default=False, nullable=False, comment="是否为演示数据")
 
     created_at = Column(DateTime, default=datetime.now, comment="创建时间")
     updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now, comment="更新时间")

@@ -234,6 +234,33 @@ class ShiftConstraint(Base):
     # 备注
     remark = Column(Text, comment="备注")
 
+    @property
+    def constraint_config(self) -> dict:
+        """兼容读取：统一使用 constraint_config 访问约束参数。"""
+        return self.constraint_params or {}
+
+    @constraint_config.setter
+    def constraint_config(self, value: dict):
+        self.constraint_params = value or {}
+
+    @property
+    def description(self) -> str | None:
+        """兼容字段：description 映射到 remark。"""
+        return self.remark
+
+    @description.setter
+    def description(self, value: str | None):
+        self.remark = value
+
+    @property
+    def is_active(self) -> bool:
+        """兼容字段：is_active 映射到 is_enabled。"""
+        return bool(self.is_enabled)
+
+    @is_active.setter
+    def is_active(self, value: bool):
+        self.is_enabled = bool(value)
+
 
 class ShiftOpportunity(Base):
     """负荷转移机会分析表

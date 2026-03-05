@@ -9,6 +9,8 @@
           <el-option label="三相平衡" value="phase_balance" />
           <el-option label="温度约束" value="temperature" />
           <el-option label="设备寿命" value="device_lifetime" />
+          <el-option label="算力中心负载占比" value="datacenter_load" />
+          <el-option label="UPS容量约束" value="ups_capacity" />
         </el-select>
       </el-form-item>
 
@@ -124,6 +126,75 @@
         </el-form-item>
       </template>
 
+      <!-- 算力中心负载占比约束 -->
+      <template v-if="constraint.type === 'datacenter_load'">
+        <el-form-item label="IT负载占比范围">
+          <el-input-number v-model="constraint.params.it_load_ratio_min" :min="0.5" :max="0.95" :step="0.01" :precision="2" />
+          <span style="margin: 0 8px">~</span>
+          <el-input-number v-model="constraint.params.it_load_ratio_max" :min="0.5" :max="0.95" :step="0.01" :precision="2" />
+        </el-form-item>
+        <el-form-item label="制冷占比">
+          <el-input-number v-model="constraint.params.cooling_ratio" :min="0" :max="1" :step="0.01" :precision="2" />
+        </el-form-item>
+        <el-form-item label="配电占比">
+          <el-input-number v-model="constraint.params.distribution_ratio" :min="0" :max="1" :step="0.01" :precision="2" />
+        </el-form-item>
+        <el-form-item label="其他占比">
+          <el-input-number v-model="constraint.params.other_ratio" :min="0" :max="1" :step="0.01" :precision="2" />
+        </el-form-item>
+        <el-form-item label="制冷可转移系数">
+          <el-input-number v-model="constraint.params.cooling_transferable_ratio" :min="0" :max="1" :step="0.01" :precision="2" />
+        </el-form-item>
+        <el-form-item label="其他可转移系数">
+          <el-input-number v-model="constraint.params.other_transferable_ratio" :min="0" :max="1" :step="0.01" :precision="2" />
+        </el-form-item>
+        <el-form-item label="总功率估值">
+          <el-input-number v-model="constraint.params.total_power" :min="0" :step="10" />
+          <span style="margin-left: 10px">kW</span>
+        </el-form-item>
+        <el-alert
+          v-if="datacenterPreview"
+          :type="datacenterPreview.ratioSumValid ? 'success' : 'warning'"
+          :title="`可转移上限约 ${datacenterPreview.maxTransferPower.toFixed(1)} kW`"
+          :description="`占比合计(按上限近似): ${(datacenterPreview.ratioSum * 100).toFixed(1)}%`"
+          show-icon
+          :closable="false"
+        />
+      </template>
+
+      <!-- UPS容量约束 -->
+      <template v-if="constraint.type === 'ups_capacity'">
+        <el-form-item label="UPS设备">
+          <el-select v-model="constraint.params.ups_device_ids" multiple placeholder="请选择UPS设备">
+            <el-option v-for="device in availableDevices" :key="device.id" :label="device.name" :value="device.id" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="安全系数">
+          <el-input-number v-model="constraint.params.safety_factor" :min="0.1" :max="0.99" :step="0.01" :precision="2" />
+        </el-form-item>
+        <el-form-item label="当前负载估值">
+          <el-input-number v-model="constraint.params.current_load" :min="0" :step="10" />
+          <span style="margin-left: 10px">kW</span>
+        </el-form-item>
+        <el-form-item label="目标转移功率">
+          <el-input-number v-model="constraint.params.target_shift_power" :min="0" :step="10" />
+          <span style="margin-left: 10px">kW</span>
+        </el-form-item>
+        <el-form-item label="超限策略">
+          <el-switch v-model="constraint.params.auto_adjust" active-text="自动降功率" />
+          <span style="margin: 0 12px"></span>
+          <el-switch v-model="constraint.params.reject_on_exceed" active-text="超限直接拒绝" />
+        </el-form-item>
+        <el-alert
+          v-if="upsPreview"
+          :type="upsPreview.overload ? 'error' : 'success'"
+          :title="upsPreview.overload ? '容量超限' : '容量充足'"
+          :description="`转移后峰值 ${upsPreview.projected.toFixed(1)} kW / 允许上限 ${upsPreview.allowed.toFixed(1)} kW`"
+          show-icon
+          :closable="false"
+        />
+      </template>
+
       <el-form-item label="约束优先级">
         <el-radio-group v-model="constraint.priority">
           <el-radio label="high">高</el-radio>
@@ -159,7 +230,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, watch } from 'vue'
+import { ref, reactive, watch, computed } from 'vue'
 import { ElMessage } from 'element-plus'
 
 interface Constraint {
@@ -174,7 +245,7 @@ interface Constraint {
 
 const props = defineProps<{
   modelValue?: Constraint
-  availableDevices?: Array<{ id: number; name: string }>
+  availableDevices?: Array<{ id: number; name: string; rated_power?: number }>
 }>()
 
 const emit = defineEmits<{
@@ -215,9 +286,77 @@ watch(
 
 const handleTypeChange = () => {
   // 重置参数
-  constraint.params = {}
+  switch (constraint.type) {
+    case 'datacenter_load':
+      constraint.params = {
+        it_load_ratio_min: 0.6,
+        it_load_ratio_max: 0.8,
+        cooling_ratio: 0.2,
+        distribution_ratio: 0.04,
+        other_ratio: 0.06,
+        cooling_transferable_ratio: 0.4,
+        other_transferable_ratio: 0.6,
+        total_power: 1000,
+      }
+      break
+    case 'ups_capacity':
+      constraint.params = {
+        ups_device_ids: [],
+        safety_factor: 0.8,
+        current_load: 500,
+        target_shift_power: 100,
+        auto_adjust: true,
+        reject_on_exceed: true,
+      }
+      break
+    default:
+      constraint.params = {}
+  }
   validationResult.value = null
 }
+
+const datacenterPreview = computed(() => {
+  if (constraint.type !== 'datacenter_load') return null
+  const p = constraint.params || {}
+  const totalPower = Number(p.total_power || 1000)
+  const coolingRatio = Number(p.cooling_ratio ?? 0.2)
+  const otherRatio = Number(p.other_ratio ?? 0.06)
+  const coolingTransferableRatio = Number(p.cooling_transferable_ratio ?? 0.4)
+  const otherTransferableRatio = Number(p.other_transferable_ratio ?? 0.6)
+  const maxTransferPower = totalPower * (coolingRatio * coolingTransferableRatio + otherRatio * otherTransferableRatio)
+  const ratioSum =
+    Number(p.it_load_ratio_max ?? 0.8) +
+    Number(p.cooling_ratio ?? 0.2) +
+    Number(p.distribution_ratio ?? 0.04) +
+    Number(p.other_ratio ?? 0.06)
+  return {
+    totalPower,
+    maxTransferPower,
+    ratioSum,
+    ratioSumValid: Math.abs(ratioSum - 1) < 0.15,
+  }
+})
+
+const upsPreview = computed(() => {
+  if (constraint.type !== 'ups_capacity') return null
+  const p = constraint.params || {}
+  const selectedIds: number[] = Array.isArray(p.ups_device_ids) ? p.ups_device_ids : []
+  const selected = (props.availableDevices || []).filter((d) => selectedIds.includes(d.id))
+  const totalUpsCapacity = selected.reduce((sum, d) => sum + Number(d.rated_power || 100), 0)
+  const safetyFactor = Number(p.safety_factor ?? 0.8)
+  const currentLoad = Number(p.current_load ?? 500)
+  const targetShiftPower = Number(p.target_shift_power ?? 100)
+  const allowed = totalUpsCapacity * safetyFactor
+  const projected = currentLoad + targetShiftPower
+  return {
+    totalUpsCapacity,
+    safetyFactor,
+    currentLoad,
+    projected,
+    allowed,
+    overload: projected > allowed,
+  }
+})
 
 const handleSave = () => {
   if (!constraint.type) {
@@ -288,6 +427,21 @@ const handleValidate = () => {
         if (!constraint.params.max_start_stop_count || constraint.params.max_start_stop_count <= 0) {
           valid = false
           message = '请设置最大启停次数'
+        }
+        break
+      case 'datacenter_load':
+        if (constraint.params.it_load_ratio_min >= constraint.params.it_load_ratio_max) {
+          valid = false
+          message = 'IT负载占比最小值必须小于最大值'
+        }
+        break
+      case 'ups_capacity':
+        if (!constraint.params.ups_device_ids || constraint.params.ups_device_ids.length === 0) {
+          valid = false
+          message = '请至少选择一个UPS设备'
+        } else if (!constraint.params.safety_factor || constraint.params.safety_factor <= 0 || constraint.params.safety_factor >= 1) {
+          valid = false
+          message = '安全系数必须在 0~1 之间'
         }
         break
     }

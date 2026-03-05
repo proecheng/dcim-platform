@@ -1,4 +1,4 @@
-description = """Run validation checks in MAX-PARALLEL mode against a workflow requires a tool that supports Parallel Sub-Processes"""
+description = 'Run validation checks in MAX-PARALLEL mode against a workflow requires a tool that supports Parallel Sub-Processes'
 prompt = """
 Execute the BMAD 'validate-max-parallel-workflow' workflow.
 

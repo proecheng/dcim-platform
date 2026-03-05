@@ -1,4 +1,4 @@
-description = """Validate existing BMAD agents and offer to improve deficiencies"""
+description = 'Validate existing BMAD agents and offer to improve deficiencies'
 prompt = """
 Execute the BMAD 'validate-agent' workflow.
 

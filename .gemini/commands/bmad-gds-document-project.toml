@@ -1,4 +1,4 @@
-description = """Brownfield project documentation scanner. Use when the user says ""lets create project documentation"" or ""I want to document a brownfield project"""""
+description = 'Brownfield project documentation scanner. Use when the user says "lets create project documentation" or "I want to document a brownfield project"'
 prompt = """
 Execute the BMAD 'document-project' workflow.
 

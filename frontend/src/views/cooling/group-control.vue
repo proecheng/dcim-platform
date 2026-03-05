@@ -28,14 +28,38 @@
       </el-col>
     </el-row>
 
-    <!-- 群控组列表 -->
+    <!-- 筛选和群控组列表 -->
     <el-card shadow="hover" class="table-card">
       <template #header>
         <div class="card-header">
           <span>群控组列表</span>
-          <el-button type="primary" link @click="loadData">
-            <el-icon><Refresh /></el-icon> 刷新
-          </el-button>
+          <div class="header-actions">
+            <el-input
+              v-model="searchKeyword"
+              placeholder="搜索组名称"
+              clearable
+              style="width: 200px; margin-right: 8px;"
+              @clear="handleSearch"
+              @keyup.enter="handleSearch"
+            >
+              <template #prefix>
+                <el-icon><Search /></el-icon>
+              </template>
+            </el-input>
+            <el-select
+              v-model="filterMode"
+              placeholder="模式筛选"
+              clearable
+              style="width: 120px; margin-right: 8px;"
+              @change="handleSearch"
+            >
+              <el-option label="联动" value="linked" />
+              <el-option label="独立" value="independent" />
+            </el-select>
+            <el-button type="primary" link @click="loadData">
+              <el-icon><Refresh /></el-icon> 刷新
+            </el-button>
+          </div>
         </div>
       </template>
       <el-table :data="groupList" stripe border v-loading="loading">
@@ -55,6 +79,17 @@
           </template>
         </el-table-column>
       </el-table>
+      <el-pagination
+        v-if="totalCount > 0"
+        v-model:current-page="currentPage"
+        v-model:page-size="pageSize"
+        :total="totalCount"
+        :page-sizes="[10, 20, 50, 100]"
+        layout="total, sizes, prev, pager, next, jumper"
+        @size-change="handleSizeChange"
+        @current-change="handlePageChange"
+        style="margin-top: 16px; justify-content: flex-end;"
+      />
       <el-empty v-if="!loading && groupList.length === 0" description="暂无群控组数据" />
     </el-card>
 
@@ -91,12 +126,16 @@
 </template>
 
 <script setup lang="ts">
-import { Refresh } from '@element-plus/icons-vue'
+import { Refresh, Search } from '@element-plus/icons-vue'
 import { getCoolingGroupList, getCoolingUnitList } from '@/api/modules/cooling'
 
 const loading = ref(false)
 const drawerVisible = ref(false)
 const detailLoading = ref(false)
+const currentPage = ref(1)
+const pageSize = ref(20)
+const searchKeyword = ref('')
+const filterMode = ref('')
 
 interface GroupItem {
   id: number
@@ -137,13 +176,24 @@ const independentCount = computed(() =>
 async function loadData() {
   loading.value = true
   try {
-    const res = await getCoolingGroupList()
+    const params: Record<string, unknown> = {
+      page: currentPage.value,
+      page_size: pageSize.value
+    }
+    if (searchKeyword.value) {
+      params.keyword = searchKeyword.value
+    }
+    if (filterMode.value) {
+      params.group_mode = filterMode.value
+    }
+    const res = await getCoolingGroupList(params)
     const data = res?.data ?? res
     groupList.value = Array.isArray(data) ? data : (data?.items ?? [])
     totalCount.value = data?.total ?? groupList.value.length
   } catch {
     console.warn('群控组列表API未就绪，使用模拟数据')
     groupList.value = mockGroupList
+    totalCount.value = mockGroupList.length
   } finally {
     loading.value = false
   }
@@ -166,6 +216,17 @@ async function openDetail(row: GroupItem) {
   } finally {
     detailLoading.value = false
   }
+}
+function handleSearch() {
+  currentPage.value = 1
+  loadData()
+}
+function handlePageChange() {
+  loadData()
+}
+function handleSizeChange() {
+  currentPage.value = 1
+  loadData()
 }
 
 onMounted(() => {
@@ -218,6 +279,10 @@ onMounted(() => {
     justify-content: space-between;
     align-items: center;
     color: var(--text-primary);
+    .header-actions {
+      display: flex;
+      align-items: center;
+    }
   }
 
   .section-title {

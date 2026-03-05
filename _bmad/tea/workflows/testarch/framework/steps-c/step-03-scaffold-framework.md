@@ -1,6 +1,6 @@
 ---
 name: 'step-03-scaffold-framework'
-description: 'Create directory structure, config, fixtures, factories, and sample tests'
+description: 'Create framework scaffold with adaptive orchestration (agent-team, subagent, or sequential)'
 nextStepFile: './step-04-docs-and-scripts.md'
 knowledgeIndex: '{project-root}/_bmad/tea/testarch/tea-index.csv'
 outputFile: '{test_artifacts}/framework-setup-progress.md'
@@ -10,13 +10,15 @@ outputFile: '{test_artifacts}/framework-setup-progress.md'
 
 ## STEP GOAL
 
-Generate the test directory structure, configuration files, fixtures, factories, helpers, and sample tests.
+Generate the test directory structure, configuration files, fixtures, factories, helpers, and sample tests using deterministic mode selection with runtime fallback.
 
 ## MANDATORY EXECUTION RULES
 
 - 📖 Read the entire step file before acting
 - ✅ Speak in `{communication_language}`
 - ✅ Apply knowledge base patterns where required
+- ✅ Resolve execution mode from explicit user request first, then config
+- ✅ Apply fallback rules deterministically when requested mode is unsupported
 
 ---
 
@@ -36,6 +38,81 @@ Generate the test directory structure, configuration files, fixtures, factories,
 ## MANDATORY SEQUENCE
 
 **CRITICAL:** Follow this sequence exactly. Do not skip, reorder, or improvise.
+
+## 0. Resolve Execution Mode (User Override First)
+
+```javascript
+const parseBooleanFlag = (value, defaultValue = true) => {
+  if (typeof value === 'string') {
+    const normalized = value.trim().toLowerCase();
+    if (['false', '0', 'off', 'no'].includes(normalized)) return false;
+    if (['true', '1', 'on', 'yes'].includes(normalized)) return true;
+  }
+  if (value === undefined || value === null) return defaultValue;
+  return Boolean(value);
+};
+
+const orchestrationContext = {
+  config: {
+    execution_mode: config.tea_execution_mode || 'auto', // "auto" | "subagent" | "agent-team" | "sequential"
+    capability_probe: parseBooleanFlag(config.tea_capability_probe, true), // supports booleans and "false"/"true" strings
+  },
+  timestamp: new Date().toISOString().replace(/[:.]/g, '-'),
+};
+
+const normalizeUserExecutionMode = (mode) => {
+  if (typeof mode !== 'string') return null;
+  const normalized = mode.trim().toLowerCase().replace(/[-_]/g, ' ').replace(/\s+/g, ' ');
+
+  if (normalized === 'auto') return 'auto';
+  if (normalized === 'sequential') return 'sequential';
+  if (normalized === 'subagent' || normalized === 'sub agent' || normalized === 'subagents' || normalized === 'sub agents') {
+    return 'subagent';
+  }
+  if (normalized === 'agent team' || normalized === 'agent teams' || normalized === 'agentteam') {
+    return 'agent-team';
+  }
+
+  return null;
+};
+
+const normalizeConfigExecutionMode = (mode) => {
+  if (mode === 'subagent') return 'subagent';
+  if (mode === 'auto' || mode === 'sequential' || mode === 'subagent' || mode === 'agent-team') {
+    return mode;
+  }
+  return null;
+};
+
+// Explicit user instruction in the active run takes priority over config.
+const explicitModeFromUser = normalizeUserExecutionMode(runtime.getExplicitExecutionModeHint?.() || null);
+
+const requestedMode = explicitModeFromUser || normalizeConfigExecutionMode(orchestrationContext.config.execution_mode) || 'auto';
+const probeEnabled = orchestrationContext.config.capability_probe;
+
+const supports = { subagent: false, agentTeam: false };
+if (probeEnabled) {
+  supports.subagent = runtime.canLaunchSubagents?.() === true;
+  supports.agentTeam = runtime.canLaunchAgentTeams?.() === true;
+}
+
+let resolvedMode = requestedMode;
+if (requestedMode === 'auto') {
+  if (supports.agentTeam) resolvedMode = 'agent-team';
+  else if (supports.subagent) resolvedMode = 'subagent';
+  else resolvedMode = 'sequential';
+} else if (probeEnabled && requestedMode === 'agent-team' && !supports.agentTeam) {
+  resolvedMode = supports.subagent ? 'subagent' : 'sequential';
+} else if (probeEnabled && requestedMode === 'subagent' && !supports.subagent) {
+  resolvedMode = 'sequential';
+}
+```
+
+Resolution precedence:
+
+1. Explicit user request in this run (`agent team` => `agent-team`; `subagent` => `subagent`; `sequential`; `auto`)
+2. `tea_execution_mode` from config
+3. Runtime capability fallback (when probing enabled)
 
 ## 1. Create Directory Structure
 
@@ -192,7 +269,21 @@ Create contract test samples in `pact/` directory:
 
 ---
 
-### 6. Save Progress
+### 6. Orchestration Notes for This Step
+
+For this step, treat these work units as parallelizable when `resolvedMode` is `agent-team` or `subagent`:
+
+- Worker A: directory + framework config + env setup (sections 1-3)
+- Worker B: fixtures + factories (section 4)
+- Worker C: sample tests + helpers (section 5)
+
+In parallel-capable modes, runtime decides worker scheduling and concurrency.
+
+If `resolvedMode` is `sequential`, execute sections 1→5 in order.
+
+Regardless of mode, outputs must be identical in structure and quality.
+
+### 7. Save Progress
 
 **Save this step's accumulated work to `{outputFile}`.**
 

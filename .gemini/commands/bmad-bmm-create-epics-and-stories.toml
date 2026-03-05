@@ -1,4 +1,4 @@
-description = """Break requirements into epics and user stories. Use when the user says ""create the epics and stories list"""""
+description = 'Break requirements into epics and user stories. Use when the user says "create the epics and stories list"'
 prompt = """
 Execute the BMAD 'create-epics-and-stories' workflow.
 

@@ -1,4 +1,4 @@
-description = """Create a complete BMAD module with agents, workflows, and infrastructure"""
+description = 'Create a complete BMAD module with agents, workflows, and infrastructure'
 prompt = """
 Execute the BMAD 'create-module' workflow.
 

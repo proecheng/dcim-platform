@@ -1,4 +1,4 @@
-description = """Sprint change impact analysis and planning. Use when the user says ""I want to analyze and plan significant sprint changes"""""
+description = 'Sprint change impact analysis and planning. Use when the user says "I want to analyze and plan significant sprint changes"'
 prompt = """
 Execute the BMAD 'correct-course' workflow.
 

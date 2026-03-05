@@ -66,7 +66,9 @@
         <div class="chart-info" v-if="trendData">
           基于过去 {{ trendData.days }} 天历史数据，共 {{ trendData.trend_data.length }} 个数据点
         </div>
-        <div ref="chartRef" class="power-chart"></div>
+        <!-- 空数据提示 -->
+        <el-empty v-if="trendData && trendData.trend_data.length === 0" description="该设备暂无历史数据" :image-size="120" />
+        <div v-else ref="chartRef" class="power-chart"></div>
       </div>
 
       <!-- 约束条件可视化 -->
@@ -549,7 +551,7 @@ watch(() => props.device, async (newDevice) => {
   } finally {
     loading.value = false
   }
-}, { immediate: true })
+}, { immediate: false })  // 修复：移除immediate，避免组件创建时执行
 
 // resize
 watch(() => props.visible, (v) => {

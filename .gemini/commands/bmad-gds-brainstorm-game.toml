@@ -1,4 +1,4 @@
-description = """Game concept ideation with guided design techniques. Use when the user says ""lets create game design ideas"" or ""I want to brainstorm game concepts"""""
+description = 'Game concept ideation with guided design techniques. Use when the user says "lets create game design ideas" or "I want to brainstorm game concepts"'
 prompt = """
 Execute the BMAD 'brainstorm-game' workflow.
 

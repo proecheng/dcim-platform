@@ -1,4 +1,4 @@
-description = """Edit existing BMAD agents while maintaining compliance"""
+description = 'Edit existing BMAD agents while maintaining compliance'
 prompt = """
 Execute the BMAD 'edit-agent' workflow.
 

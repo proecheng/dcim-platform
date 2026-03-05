@@ -23,6 +23,16 @@ export function unloadDemoData() {
   return request.post('/v1/demo/unload', null, { timeout: 60000 })
 }
 
+// 预览卸载 - 获取将要删除的 demo 数据统计
+export function unloadDemoDataPreview() {
+  return request.get('/v1/demo/unload-preview')
+}
+
+// 获取 demo 数据统计
+export function getDemoDataStats() {
+  return request.get('/v1/demo/stats')
+}
+
 // 刷新历史数据日期
 export function refreshDemoDataDates() {
   return request.post('/v1/demo/refresh-dates')

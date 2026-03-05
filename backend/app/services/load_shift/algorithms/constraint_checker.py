@@ -23,6 +23,43 @@ class ConstraintChecker:
     def __init__(self, db: AsyncSession):
         self.db = db
 
+    @staticmethod
+    def _cfg(constraint: ShiftConstraint) -> Dict[str, Any]:
+        """统一读取约束配置，兼容旧字段。"""
+        cfg = getattr(constraint, "constraint_config", None)
+        if isinstance(cfg, dict):
+            return cfg
+        old_cfg = getattr(constraint, "constraint_params", None)
+        return old_cfg if isinstance(old_cfg, dict) else {}
+
+    @staticmethod
+    def _estimate_device_power(device: PowerDevice) -> float:
+        """估算设备当前功率（无实时点位时回退到额定功率×负载率）。"""
+        rated = float(device.rated_power or 0)
+        if rated <= 0:
+            return 0.0
+        if device.avg_load_rate is not None:
+            return rated * max(0.0, min(float(device.avg_load_rate) / 100.0, 1.5))
+        return rated * 0.6
+
+    @staticmethod
+    def _device_bucket(device: PowerDevice) -> str:
+        """将设备归类到 IT/COOLING/DISTRIBUTION/OTHER。"""
+        dtype = (device.device_type or "").upper()
+
+        if dtype in {"IT", "IT_SERVER", "IT_STORAGE", "NETWORK_SWITCH", "CORE_ROUTER"}:
+            return "it"
+        if dtype in {"AC", "HVAC", "CHILLER", "COOLING_TOWER", "CT", "PUMP", "PRECISION_AC_INDOOR", "PRECISION_AC_OUTDOOR"}:
+            return "cooling"
+        if dtype in {"UPS", "PDU", "PDB", "DISTRIBUTION", "SWITCHGEAR", "TRANSFORMER"}:
+            return "distribution"
+        return "other"
+
+    async def _load_all_enabled_devices(self) -> List[PowerDevice]:
+        """加载全站启用设备，用于站级约束（IT占比、UPS容量）计算。"""
+        result = await self.db.execute(select(PowerDevice).where(PowerDevice.is_enabled == True))
+        return result.scalars().all()
+
     async def check_all_constraints(
         self,
         request: FeasibilityAnalysisRequest,
@@ -393,34 +430,168 @@ class ConstraintChecker:
         violations = []
         warnings = []
         
-        # Get safety constraints
+        # 兼容三类来源：
+        # 1) SAFETY（旧模型）
+        # 2) DATACENTER_LOAD（新模型：IT占比）
+        # 3) UPS_CAPACITY（新模型：UPS容量）
         safety_constraints = [c for c in constraints if c.constraint_type == ConstraintType.SAFETY]
-        
-        # Check safety_factor (already checked in power constraints)
-        # This is a placeholder for additional safety checks
-        
-        # Check UPS capacity
-        for constraint in safety_constraints:
-            if "min_ups_capacity_ratio" in constraint.constraint_config:
-                min_ups_ratio = constraint.constraint_config["min_ups_capacity_ratio"]
-                # TODO: Query actual UPS capacity and calculate ratio
-                # For now, just add a warning
-                warnings.append(
-                    f"需要验证 UPS 容量比例是否满足最小要求 {min_ups_ratio}"
+        dc_constraints = [c for c in constraints if c.constraint_type == ConstraintType.DATACENTER_LOAD]
+        ups_constraints = [c for c in constraints if c.constraint_type == ConstraintType.UPS_CAPACITY]
+
+        all_devices = await self._load_all_enabled_devices()
+        selected_device_ids = {d.id for d in devices}
+
+        # 站级功率分解
+        total_power = 0.0
+        it_power = 0.0
+        cooling_power = 0.0
+        distribution_power = 0.0
+        other_power = 0.0
+        ups_capacity = 0.0
+
+        for dev in all_devices:
+            p = self._estimate_device_power(dev)
+            total_power += p
+
+            bucket = self._device_bucket(dev)
+            if bucket == "it":
+                it_power += p
+            elif bucket == "cooling":
+                cooling_power += p
+            elif bucket == "distribution":
+                distribution_power += p
+            else:
+                other_power += p
+
+            if (dev.device_type or "").upper() == "UPS":
+                ups_capacity += float(dev.rated_power or 0.0)
+
+        # 对转移目标按“加法保守估计”做峰值校验
+        projected_peak_power = total_power + float(request.target_shift_power)
+
+        # ---------- IT 负载占比 + 最大可转移功率 ----------
+        merged_dc_constraints = dc_constraints + [
+            c for c in safety_constraints if "max_it_load_ratio" in self._cfg(c)
+        ]
+
+        for constraint in merged_dc_constraints:
+            cfg = self._cfg(constraint)
+
+            # 比例配置：优先显式配置，否则用实时占比估计
+            current_cooling_ratio = (cooling_power / total_power) if total_power > 0 else 0.0
+            current_other_ratio = (other_power / total_power) if total_power > 0 else 0.0
+            current_it_ratio = (it_power / total_power) if total_power > 0 else 0.0
+
+            it_min = float(cfg.get("it_load_ratio_min", 0.60))
+            it_max = float(cfg.get("it_load_ratio_max", cfg.get("max_it_load_ratio", 0.80)))
+            cooling_ratio = float(cfg.get("cooling_ratio", current_cooling_ratio))
+            other_ratio = float(cfg.get("other_ratio", current_other_ratio))
+            cooling_transferable_ratio = float(cfg.get("cooling_transferable_ratio", 0.40))
+            other_transferable_ratio = float(cfg.get("other_transferable_ratio", 0.60))
+
+            max_transfer_power = total_power * (
+                cooling_ratio * cooling_transferable_ratio + other_ratio * other_transferable_ratio
+            )
+
+            # IT占比边界校验
+            if total_power > 0 and (current_it_ratio < it_min or current_it_ratio > it_max):
+                violations.append(
+                    {
+                        "constraint_id": constraint.id,
+                        "constraint_name": constraint.constraint_name,
+                        "constraint_type": "datacenter_load",
+                        "violation_type": "it_load_ratio_out_of_range",
+                        "message": (
+                            f"IT负载占比 {current_it_ratio:.2%} 不在允许区间 [{it_min:.2%}, {it_max:.2%}]"
+                        ),
+                        "current_value": round(current_it_ratio, 4),
+                        "limit_value": {"min": it_min, "max": it_max},
+                    }
                 )
-        
-        # Check IT load ratio
-        for constraint in safety_constraints:
-            if "max_it_load_ratio" in constraint.constraint_config:
-                max_it_ratio = constraint.constraint_config["max_it_load_ratio"]
-                # TODO: Query actual IT load and calculate ratio
-                # For now, just add a warning
-                warnings.append(
-                    f"需要验证 IT 负载比例是否低于最大限制 {max_it_ratio}"
+
+            # 最大可转移功率校验
+            if request.target_shift_power > max_transfer_power:
+                violations.append(
+                    {
+                        "constraint_id": constraint.id,
+                        "constraint_name": constraint.constraint_name,
+                        "constraint_type": "datacenter_load",
+                        "violation_type": "max_transfer_power_exceeded",
+                        "message": (
+                            f"目标转移功率 {request.target_shift_power:.2f} kW 超过算力中心可转移上限 "
+                            f"{max_transfer_power:.2f} kW"
+                        ),
+                        "current_value": float(request.target_shift_power),
+                        "limit_value": round(max_transfer_power, 2),
+                        "suggested_max_shift_power": round(max_transfer_power, 2),
+                    }
                 )
-        
+
+        # ---------- UPS 容量约束 ----------
+        merged_ups_constraints = ups_constraints + [
+            c for c in safety_constraints if "min_ups_capacity_ratio" in self._cfg(c)
+        ]
+
+        for constraint in merged_ups_constraints:
+            cfg = self._cfg(constraint)
+
+            # 两套参数兼容：
+            # - 新：safety_factor（默认0.8）
+            # - 旧：min_ups_capacity_ratio（最小剩余比例） -> 转换为 safety_factor=1-ratio
+            safety_factor = cfg.get("safety_factor")
+            if safety_factor is None:
+                min_ups_ratio = float(cfg.get("min_ups_capacity_ratio", 0.2))
+                safety_factor = 1.0 - min_ups_ratio
+            safety_factor = float(safety_factor)
+            safety_factor = max(0.1, min(0.99, safety_factor))
+
+            max_allowed_ups_load = ups_capacity * safety_factor
+            overload = projected_peak_power > max_allowed_ups_load if ups_capacity > 0 else True
+            suggested_max_shift_power = max(0.0, max_allowed_ups_load - total_power)
+
+            auto_adjust = bool(cfg.get("auto_adjust", True))
+            reject_on_exceed = bool(cfg.get("reject_on_exceed", True))
+
+            if overload:
+                if reject_on_exceed:
+                    violations.append(
+                        {
+                            "constraint_id": constraint.id,
+                            "constraint_name": constraint.constraint_name,
+                            "constraint_type": "ups_capacity",
+                            "violation_type": "ups_capacity_exceeded",
+                            "message": (
+                                f"转移后峰值 {projected_peak_power:.2f} kW 超过 UPS 允许上限 "
+                                f"{max_allowed_ups_load:.2f} kW（安全系数 {safety_factor:.2f}）"
+                            ),
+                            "current_value": round(projected_peak_power, 2),
+                            "limit_value": round(max_allowed_ups_load, 2),
+                            "suggested_max_shift_power": round(suggested_max_shift_power, 2),
+                        }
+                    )
+                elif auto_adjust:
+                    warnings.append(
+                        (
+                            f"UPS容量接近上限，建议将目标转移功率从 {request.target_shift_power:.2f} kW "
+                            f"调整为 {suggested_max_shift_power:.2f} kW"
+                        )
+                    )
+
         return {
             "is_valid": len(violations) == 0,
             "violations": violations,
-            "warnings": warnings
+            "warnings": warnings,
+            "load_breakdown": {
+                "total_power": round(total_power, 2),
+                "it_power": round(it_power, 2),
+                "cooling_power": round(cooling_power, 2),
+                "distribution_power": round(distribution_power, 2),
+                "other_power": round(other_power, 2),
+                "it_ratio": round((it_power / total_power), 4) if total_power > 0 else 0.0,
+            },
+            "ups_check": {
+                "ups_capacity": round(ups_capacity, 2),
+                "projected_peak_power": round(projected_peak_power, 2),
+            },
+            "selected_devices_count": len(selected_device_ids),
         }

@@ -1,4 +1,4 @@
-description = """Post-epic review and lessons learned. Use when the user says ""lets run a retrospective"" or ""execute epic completion review"""""
+description = 'Post-epic review and lessons learned. Use when the user says "lets run a retrospective" or "execute epic completion review"'
 prompt = """
 Execute the BMAD 'retrospective' workflow.
 

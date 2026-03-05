@@ -1,4 +1,4 @@
-description = """Assess NFRs like performance security and reliability. Use when the user says ""lets assess NFRs"" or ""I want to evaluate non-functional requirements"""""
+description = 'Assess NFRs like performance security and reliability. Use when the user says "lets assess NFRs" or "I want to evaluate non-functional requirements"'
 prompt = """
 Execute the BMAD 'testarch-nfr' workflow.
 

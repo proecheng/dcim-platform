@@ -55,6 +55,8 @@ class ConstraintType(str, Enum):
     COOLING = "cooling"     # 制冷约束
     SAFETY = "safety"       # 安全约束
     ELECTRICAL = "electrical"  # 电气约束
+    DATACENTER_LOAD = "datacenter_load"  # 算力中心负载占比约束
+    UPS_CAPACITY = "ups_capacity"  # UPS 容量约束
 
 
 class OpportunityStatus(str, Enum):

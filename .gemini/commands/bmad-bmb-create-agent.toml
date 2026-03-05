@@ -1,4 +1,4 @@
-description = """Create a new BMAD agent with best practices and compliance"""
+description = 'Create a new BMAD agent with best practices and compliance'
 prompt = """
 Execute the BMAD 'create-agent' workflow.
 
