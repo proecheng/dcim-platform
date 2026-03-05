@@ -1,5 +1,6 @@
 // frontend/src/stores/bigscreen.ts
 import { defineStore } from 'pinia'
+import { useAlarmStore } from '@/stores/alarm'
 import type {
   SceneMode,
   DataCenterLayout,
@@ -32,9 +33,6 @@ interface BigscreenState {
 
   // 选中的设备
   selectedDeviceId: string | null
-
-  // 活动告警
-  activeAlarms: BigscreenAlarm[]
 
   // 环境数据
   environment: {
@@ -74,7 +72,6 @@ export const useBigscreenStore = defineStore('bigscreen', {
       airflow: false
     },
     selectedDeviceId: null,
-    activeAlarms: [],
     environment: {
       temperature: { max: 0, avg: 0, min: 0 },
       humidity: { max: 0, avg: 0, min: 0 }
@@ -108,12 +105,29 @@ export const useBigscreenStore = defineStore('bigscreen', {
       return state.deviceData[deviceId] || null
     },
 
-    // 获取告警数量
-    alarmCount: (state) => state.activeAlarms.length,
+    // 活动告警（从 AlarmStore 派生，统一数据源）
+    activeAlarms(): BigscreenAlarm[] {
+      const alarmStore = useAlarmStore()
+      return alarmStore.activeAlarms.map(alarm => ({
+        id: alarm.id,
+        deviceId: alarm.point_code || String(alarm.point_id || ''),
+        deviceName: alarm.point_name || '',
+        level: alarm.alarm_level as BigscreenAlarm['level'],
+        message: alarm.alarm_message || '',
+        value: alarm.trigger_value,
+        threshold: alarm.threshold_value,
+        createdAt: alarm.created_at,
+      }))
+    },
 
-    // 获取严重告警数量
-    criticalAlarmCount: (state) => {
-      return state.activeAlarms.filter(a => a.level === 'critical').length
+    // 获取告警数量（从 AlarmStore 派生）
+    alarmCount(): number {
+      return useAlarmStore().alarmCount.total
+    },
+
+    // 获取严重告警数量（从 AlarmStore 派生）
+    criticalAlarmCount(): number {
+      return useAlarmStore().alarmCount.critical
     },
 
     // 是否有选中设备
@@ -141,8 +155,10 @@ export const useBigscreenStore = defineStore('bigscreen', {
       return configs[state.mode]
     },
 
-    // 最近告警列表
-    recentAlarms: (state) => state.activeAlarms.slice(0, 10)
+    // 最近告警列表（从 activeAlarms getter 派生）
+    recentAlarms(): BigscreenAlarm[] {
+      return this.activeAlarms.slice(0, 10)
+    }
   },
 
   actions: {
@@ -180,11 +196,6 @@ export const useBigscreenStore = defineStore('bigscreen', {
     // 设置选中设备
     selectDevice(deviceId: string | null) {
       this.selectedDeviceId = deviceId
-    },
-
-    // 更新告警列表
-    setAlarms(alarms: BigscreenAlarm[]) {
-      this.activeAlarms = alarms
     },
 
     // 更新环境数据

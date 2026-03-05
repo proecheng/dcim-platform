@@ -31,6 +31,7 @@ export interface AlarmInfo {
   escalation_count?: number
   escalated_from?: string | null
   escalation_remark?: string | null
+  data_source?: string
 }
 
 export interface AlarmCount {

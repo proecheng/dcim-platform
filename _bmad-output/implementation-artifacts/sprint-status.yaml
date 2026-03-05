@@ -1,4 +1,4 @@
-# generated: 2026-02-21
+# generated: 2026-03-05
 # project: DCIM
 # project_key: NOKEY
 # tracking_system: file-system
@@ -29,14 +29,29 @@
 # - SM typically creates next story after previous one is 'done' to incorporate learnings
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 #
+# PRE-BMAD STORIES:
+# =================
+# Epic 13 (13-3, 13-4), Epic 14 (14-3~14-6), Epic 15 (15-1~15-5),
+# Epic 16 (16-1~16-3), Epic 17 (17-1~17-4), Epic 22 (22-2)
+# 这些 Story 在 BMAD 流程引入前已实现，代码已验证通过，
+# 但未创建独立的 story 文件。状态保持 done，无需补建文件。
+#
 # PRIORITY (Epic 18-23):
 # ======================
 # P0: Epic 21 (网关管理), Epic 22 (站点管理)
 # P1: Epic 18 (环境监控), Epic 20 (告警规则增强)
 # P2: Epic 19 (安防消防)
 # P3: Epic 23 (大屏+OCR)
+#
+# PRIORITY (Epic 24-28):
+# ======================
+# P0: Epic 27 (前端数据链路统一) — 27.1→27.2→27.5 核心路径
+# P0: Epic 28 (Demo系统解耦) — 28.2→28.3 核心路径
+# P1: Epic 24 (智能诊断核心引擎)
+# P2: Epic 25 (智能诊断专业扩展)
+# P3: Epic 26 (智能诊断高级功能)
 
-generated: 2026-02-21
+generated: 2026-03-05
 project: DCIM
 project_key: NOKEY
 tracking_system: file-system
@@ -233,6 +248,7 @@ development_status:
   # Epic 22: 站点管理前端 (P0)
   epic-22: done
   22-1-site-management-crud-and-switching: done
+  22-2-global-site-switcher-and-permission-filtering: done  # pre-BMAD, 无 story 文件
   epic-22-retrospective: done
 
   # Epic 23: 大屏增强与能源 OCR (P3)
@@ -241,3 +257,71 @@ development_status:
   23-2-bigscreen-3d-floor-scene-loading: done
   23-3-electricity-bill-ocr-recognition: done
   epic-23-retrospective: done
+
+  # ============================================================
+  # 智能诊断系统 (Epic 24-26)
+  # 新增于 2026-03-05，基于 PRD FR34-1~42 + Architecture V4.0.0 Section 18
+  # ============================================================
+
+  # Epic 24: 智能诊断核心引擎 (Phase 2a 月7-8)
+  epic-24: backlog
+  24-1-fault-tree-model-management: backlog
+  24-2-l1-rule-engine-threshold-diagnosis: backlog
+  24-3-l2-fault-tree-forward-inference: backlog
+  24-4-l3-bayesian-reverse-inference: backlog
+  24-5-alarm-diagnosis-integration: backlog
+  24-6-diagnosis-result-storage-and-query: backlog
+  24-7-diagnosis-frontend-result-display: backlog
+  24-8-diagnosis-rbac-and-audit: backlog
+  epic-24-retrospective: optional
+
+  # Epic 25: 智能诊断专业扩展 (Phase 2b 月9-10)
+  epic-25: backlog
+  25-1-electrical-professional-extension: backlog
+  25-2-hvac-professional-enhancement: backlog
+  25-3-global-causal-graph-cascade: backlog
+  25-4-fault-tree-graphical-editor: backlog
+  25-5-dynamic-threshold-rule-engine: backlog
+  25-6-circuit-breaker-degradation-mechanism: backlog
+  25-7-diagnosis-concurrent-control: backlog
+  25-8-diagnostic-explainability-evidence-chain: backlog
+  epic-25-retrospective: optional
+
+  # Epic 26: 智能诊断高级功能 (Phase 3 月11-12+)
+  epic-26: backlog
+  26-1-counterfactual-analysis: backlog
+  26-2-misdiagnosis-feedback-report: backlog
+  26-3-closed-loop-learning-probability-tuning: backlog
+  26-4-performance-monitoring-dashboard: backlog
+  26-5-ab-testing-and-gradual-rollout: backlog
+  26-6-fault-tree-version-management: backlog
+  26-7-disaster-recovery-drill: backlog
+  26-8-edge-inference-reservation-and-sbom: backlog
+  26-9-training-data-anomaly-detection: backlog
+  26-10-hmac-key-management: backlog
+  epic-26-retrospective: optional
+
+  # ============================================================
+  # 数据链路整改 (Epic 27-28)
+  # 新增于 2026-03-05，基于数据链路审查 + Demo 系统审查
+  # ============================================================
+
+  # Epic 27: 前端数据链路统一 (MVP 月1-3)
+  # 优先级: 27.1(P0)→27.2(P0)→27.5(P1) 核心路径
+  epic-27: in-progress
+  27-1-alarm-data-link-unification: ready-for-dev
+  27-2-realtime-data-link-unification: backlog
+  27-3-energy-data-link-unification: backlog
+  27-4-alarm-sound-toggle-unification: backlog
+  27-5-websocket-single-connection-manager: backlog
+  27-6-site-filter-propagation: backlog
+  epic-27-retrospective: optional
+
+  # Epic 28: Demo 系统解耦与数据隔离 (MVP 月1-3)
+  # 优先级: 28.2(P0)→28.3(P1) 核心路径
+  epic-28: in-progress
+  28-1-data-source-tracking-through-pipeline: ready-for-dev
+  28-2-demo-config-separation-and-minimal-seed: backlog
+  28-3-main-system-demo-code-decoupling: backlog
+  28-4-demo-data-safe-unload-and-tagging: backlog
+  epic-28-retrospective: optional

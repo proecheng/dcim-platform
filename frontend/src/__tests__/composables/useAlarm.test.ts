@@ -141,9 +141,10 @@ describe('useAlarm', () => {
     expect(result.error.value).toBeNull()
   })
 
-  it('fetchAlarmCount 加载告警计数', async () => {
+  it('fetchAlarmCount — 计数由 fetchActiveAlarms 自动更新', async () => {
     const { result } = await setupAlarm()
-    await result.fetchAlarmCount()
+    await result.fetchActiveAlarms()
+    // 计数由 AlarmStore 从 activeAlarms 自动计算
     expect(result.alarmCount.value.total).toBe(2)
     expect(result.alarmCount.value.critical).toBe(1)
     expect(result.alarmCount.value.major).toBe(1)

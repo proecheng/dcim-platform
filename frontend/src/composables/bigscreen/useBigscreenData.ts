@@ -1,9 +1,9 @@
 // frontend/src/composables/bigscreen/useBigscreenData.ts
 import { ref, onMounted, onUnmounted } from 'vue'
 import { useBigscreenStore } from '@/stores/bigscreen'
+import { useAlarmStore } from '@/stores/alarm'
 import type { DeviceRealtimeData, BigscreenAlarm } from '@/types/bigscreen'
 import { getRealtimeSummary, getAllRealtimeData } from '@/api/modules/realtime'
-import { getActiveAlarms } from '@/api/modules/alarm'
 import { getEnergyDashboard } from '@/api/modules/energy'
 
 export interface DataFetchOptions {
@@ -79,21 +79,8 @@ export function useBigscreenData(options: DataFetchOptions = {}) {
   // 获取告警数据
   async function fetchAlarmData() {
     try {
-      const activeAlarms = await getActiveAlarms()
-
-      const alarms: BigscreenAlarm[] = activeAlarms.map(alarm => ({
-        id: alarm.id,
-        deviceId: alarm.point_code.split('_').slice(0, 2).join('-'),
-        deviceName: alarm.point_name,
-        level: alarm.alarm_level as 'critical' | 'major' | 'minor' | 'warning' | 'info',
-        message: alarm.alarm_message,
-        value: alarm.trigger_value,
-        threshold: alarm.threshold_value,
-        time: new Date(alarm.created_at).getTime(),
-        createdAt: alarm.created_at
-      }))
-
-      store.setAlarms(alarms)
+      // 告警数据由 AlarmStore 统一管理，BigscreenStore.activeAlarms getter 自动派生
+      await useAlarmStore().fetchActiveAlarms()
     } catch (e) {
       console.error('Failed to fetch alarm data:', e)
     }

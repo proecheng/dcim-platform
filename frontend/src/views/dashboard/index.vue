@@ -192,9 +192,9 @@
               <el-button type="primary" link @click="$router.push('/alarms')">查看全部</el-button>
             </div>
           </template>
-          <div class="alarm-list">
+          <div v-loading="alarmStore.loading" class="alarm-list">
             <div
-              v-for="alarm in activeAlarms"
+              v-for="alarm in alarmStore.activeAlarms.slice(0, 10)"
               :key="alarm.id"
               class="alarm-item"
               :class="'level-' + alarm.alarm_level"
@@ -206,7 +206,7 @@
               <div class="alarm-message">{{ alarm.alarm_message }}</div>
               <div class="alarm-time">{{ alarm.created_at }}</div>
             </div>
-            <el-empty v-if="activeAlarms.length === 0" description="暂无告警" />
+            <el-empty v-if="alarmStore.activeAlarms.length === 0" description="暂无告警" />
           </div>
         </el-card>
       </el-col>
@@ -223,8 +223,10 @@ import { Monitor, CircleCheck, Warning, Remove } from '@element-plus/icons-vue'
 import { Lightning, FullScreen, Refresh, Coin } from '@element-plus/icons-vue'
 import { IceCream, Sunny, Lock, OfficeBuilding, Opportunity } from '@element-plus/icons-vue'
 import { getAllRealtimeData, getRealtimeSummary, getDashboardData, type RealtimeData } from '@/api/modules/realtime'
-import { getActiveAlarms } from '@/api/modules/alarm'
 import { getEnergyDashboard, type EnergyDashboardData } from '@/api/modules/energy'
+import { useAlarmStore } from '@/stores/alarm'
+import { useRealtimeStore } from '@/stores/realtime'
+import { useEnergyStore } from '@/stores/energy'
 // V2.3 增强版能源卡片组件
 import InteractivePowerCard from '@/components/energy/InteractivePowerCard.vue'
 import PUEIndicatorCard from '@/components/energy/PUEIndicatorCard.vue'
@@ -234,17 +236,10 @@ import SuggestionsCard from '@/components/energy/SuggestionsCard.vue'
 // 演示数据加载组件
 import DemoDataLoader from '@/components/DemoDataLoader.vue'
 
-interface AlarmItem {
-  id: number
-  alarm_level: string
-  point_name: string
-  alarm_message: string
-  created_at: string
-}
+const alarmStore = useAlarmStore()
 
 const summary = ref({ total: 0, normal: 0, alarm: 0, offline: 0 })
 const realtimeData = ref<RealtimeData[]>([])
-const activeAlarms = ref<AlarmItem[]>([])
 const energyData = ref<EnergyDashboardData | null>(null)
 const showDemoLoader = ref(false)
 const isRefreshing = ref(false)
@@ -260,7 +255,6 @@ interface DashboardCachePayload {
   savedAt: number
   summary: { total: number; normal: number; alarm: number; offline: number }
   realtimeData: RealtimeData[]
-  activeAlarms: AlarmItem[]
   energyData: EnergyDashboardData | null
   domainStats: string[]
 }
@@ -384,7 +378,6 @@ function saveDashboardCache() {
       savedAt: Date.now(),
       summary: { ...summary.value },
       realtimeData: [...realtimeData.value],
-      activeAlarms: [...activeAlarms.value],
       energyData: energyData.value,
       domainStats: domainOverview.value.map(item => item.stat)
     }
@@ -400,7 +393,6 @@ function applyCachedDashboardData() {
 
   summary.value = cache.summary
   realtimeData.value = cache.realtimeData.slice(0, MAX_REALTIME_ROWS)
-  activeAlarms.value = cache.activeAlarms.slice(0, 10)
   energyData.value = cache.energyData
   cache.domainStats.forEach((stat, index) => {
     if (domainOverview.value[index]) {
@@ -416,13 +408,17 @@ async function refreshData(options: { force?: boolean } = {}) {
 
   isRefreshing.value = true
   try {
-    const [summaryRes, realtimeRes, alarmsRes, dashboardRes, energyRes] = await Promise.allSettled([
+    const [summaryRes, realtimeRes, _alarmsRes, dashboardRes, energyRes] = await Promise.allSettled([
       getRealtimeSummary(),
       getAllRealtimeData(),
-      getActiveAlarms(),
+      alarmStore.fetchActiveAlarms(),
       getDashboardData(),
       getEnergyDashboard()
     ])
+
+    // 同时触发其他 Store 刷新（占位，Story 27.2/27.3 实现）
+    useRealtimeStore().reload()
+    useEnergyStore().reload()
 
     if (summaryRes.status === 'fulfilled') {
       mapSummaryData(summaryRes.value)
@@ -431,11 +427,6 @@ async function refreshData(options: { force?: boolean } = {}) {
     if (realtimeRes.status === 'fulfilled') {
       const realtimePayload = unwrapApiData<RealtimeData[]>(realtimeRes.value)
       realtimeData.value = (Array.isArray(realtimePayload) ? realtimePayload : []).slice(0, MAX_REALTIME_ROWS)
-    }
-
-    if (alarmsRes.status === 'fulfilled') {
-      const alarmPayload = unwrapApiData<AlarmItem[]>(alarmsRes.value)
-      activeAlarms.value = (Array.isArray(alarmPayload) ? alarmPayload : []).slice(0, 10)
     }
 
     if (dashboardRes.status === 'fulfilled') {
@@ -453,10 +444,6 @@ async function refreshData(options: { force?: boolean } = {}) {
 
       if (realtimeData.value.length === 0 && Array.isArray(dashData?.realtime)) {
         realtimeData.value = dashData.realtime.slice(0, MAX_REALTIME_ROWS)
-      }
-
-      if (activeAlarms.value.length === 0 && Array.isArray(dashData?.alarms)) {
-        activeAlarms.value = dashData.alarms.slice(0, 10)
       }
     }
 

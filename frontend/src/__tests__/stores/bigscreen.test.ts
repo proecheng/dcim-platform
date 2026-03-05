@@ -4,12 +4,18 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { setActivePinia, createPinia } from 'pinia'
 import { useBigscreenStore } from '@/stores/bigscreen'
+import { useAlarmStore } from '@/stores/alarm'
 
 // Mock bigscreen types
 vi.mock('@/types/bigscreen', async () => {
   const actual = await vi.importActual<Record<string, unknown>>('@/types/bigscreen')
   return { ...actual }
 })
+
+// Mock alarm API（AlarmStore 依赖）
+vi.mock('@/api/modules/alarm', () => ({
+  getActiveAlarms: vi.fn().mockResolvedValue([])
+}))
 
 describe('useBigscreenStore', () => {
   beforeEach(() => {
@@ -92,13 +98,17 @@ describe('useBigscreenStore', () => {
     expect(store.hasSelectedDevice).toBe(false)
   })
 
-  it('setAlarms 更新告警列表', () => {
+  it('activeAlarms 从 AlarmStore 派生', () => {
     const store = useBigscreenStore()
-    const alarms = [
-      { id: '1', level: 'critical', message: '温度过高', deviceId: 'dev-1', timestamp: '2026-01-01' },
-      { id: '2', level: 'major', message: '湿度异常', deviceId: 'dev-2', timestamp: '2026-01-01' }
-    ]
-    store.setAlarms(alarms as any)
+    const alarmStore = useAlarmStore()
+    alarmStore.addAlarm({
+      id: 1, point_code: 'A1_SRV_AI_01', point_name: '服务器温度',
+      alarm_level: 'critical', alarm_message: '温度过高', status: 'active', created_at: '2026-01-01'
+    })
+    alarmStore.addAlarm({
+      id: 2, point_code: 'A1_UPS_AI_01', point_name: 'UPS电压',
+      alarm_level: 'major', alarm_message: '湿度异常', status: 'active', created_at: '2026-01-01'
+    })
     expect(store.activeAlarms).toHaveLength(2)
     expect(store.alarmCount).toBe(2)
     expect(store.criticalAlarmCount).toBe(1)
@@ -149,10 +159,13 @@ describe('useBigscreenStore', () => {
 
   it('recentAlarms getter 返回最近10条告警', () => {
     const store = useBigscreenStore()
-    const alarms = Array.from({ length: 15 }, (_, i) => ({
-      id: String(i), level: 'minor', message: `告警${i}`, deviceId: 'dev-1', timestamp: '2026-01-01'
-    }))
-    store.setAlarms(alarms as any)
+    const alarmStore = useAlarmStore()
+    for (let i = 0; i < 15; i++) {
+      alarmStore.addAlarm({
+        id: i + 1, point_code: `DEV_${i}`, point_name: `设备${i}`,
+        alarm_level: 'minor', alarm_message: `告警${i}`, status: 'active', created_at: '2026-01-01'
+      })
+    }
     expect(store.recentAlarms).toHaveLength(10)
   })
 

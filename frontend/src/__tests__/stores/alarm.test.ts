@@ -58,12 +58,12 @@ describe('useAlarmStore', () => {
     expect(store.activeAlarms[0].point_name).toBe('第二条')
   })
 
-  it('addAlarm 超过 200 条时截断', () => {
+  it('addAlarm 超过 1000 条时截断', () => {
     const store = useAlarmStore()
-    for (let i = 1; i <= 210; i++) {
+    for (let i = 1; i <= 1010; i++) {
       store.addAlarm(makeAlarm({ id: i }))
     }
-    expect(store.activeAlarms.length).toBeLessThanOrEqual(200)
+    expect(store.activeAlarms.length).toBeLessThanOrEqual(1000)
   })
 
   it('removeAlarm 移除告警并更新计数', () => {

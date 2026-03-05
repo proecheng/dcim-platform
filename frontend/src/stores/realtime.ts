@@ -77,6 +77,9 @@ export const useRealtimeStore = defineStore('realtime', () => {
     lastUpdateTime.value = null
   }
 
+  // 重新加载数据（Story 27.2 实现）
+  async function reload() { /* Story 27.2 实现 */ }
+
   return {
     dataMap,
     summary,
@@ -96,6 +99,7 @@ export const useRealtimeStore = defineStore('realtime', () => {
     getDataByType,
     getDataByArea,
     setWsConnected,
-    clearData
+    clearData,
+    reload
   }
 })

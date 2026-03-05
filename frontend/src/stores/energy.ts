@@ -154,6 +154,9 @@ export const useEnergyStore = defineStore('energy', () => {
     lastUpdateTime.value = null
   }
 
+  // 重新加载数据（Story 27.3 实现）
+  async function reload() { /* Story 27.3 实现 */ }
+
   return {
     // 状态
     realtimePowerData,
@@ -191,6 +194,7 @@ export const useEnergyStore = defineStore('energy', () => {
     getDevicePower,
     getPowerByType,
     setWsConnected,
-    clearData
+    clearData,
+    reload
   }
 })

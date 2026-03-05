@@ -2,6 +2,7 @@
  * 告警组合式函数
  */
 import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { storeToRefs } from 'pinia'
 import { useWebSocket } from './useWebSocket'
 import { useSound } from './useSound'
 import { ElNotification } from 'element-plus'
@@ -13,7 +14,7 @@ import {
   type AlarmInfo,
   type AlarmCount
 } from '@/api/modules/alarm'
-import { useAlarmStore } from '@/stores/alarm'
+import { useAlarmStore, type Alarm } from '@/stores/alarm'
 
 interface UseAlarmOptions {
   autoFetch?: boolean
@@ -30,13 +31,11 @@ export function useAlarm(options: UseAlarmOptions = {}) {
     showNotification = true
   } = options
 
-  const activeAlarms = ref<AlarmInfo[]>([])
-  const alarmCount = ref<AlarmCount>({ critical: 0, major: 0, minor: 0, info: 0, total: 0 })
-  const loading = ref(false)
   const error = ref<Error | null>(null)
 
   const { play: playAlarmSound, stop: stopAlarmSound } = useSound()
   const alarmStore = useAlarmStore()
+  const { activeAlarms, alarmCount, loading } = storeToRefs(alarmStore)
 
   // Web Audio API 兜底：当 mp3 文件不存在时使用合成音
   let audioContext: AudioContext | null = null
@@ -71,39 +70,25 @@ export function useAlarm(options: UseAlarmOptions = {}) {
     autoConnect: false
   })
 
-  // 获取活动告警
+  // 获取活动告警（委托给 AlarmStore）
   const fetchActiveAlarms = async () => {
-    loading.value = true
     try {
-      activeAlarms.value = await getActiveAlarms()
+      await alarmStore.fetchActiveAlarms()
       error.value = null
     } catch (e) {
       error.value = e as Error
-    } finally {
-      loading.value = false
     }
   }
 
-  // 获取告警计数
+  // 获取告警计数（现由 Store 自动维护，保留接口兼容）
   const fetchAlarmCount = async () => {
-    try {
-      alarmCount.value = await getAlarmCount()
-    } catch (e) {
-      console.error('获取告警计数失败:', e)
-    }
+    // alarmCount 已由 AlarmStore.fetchActiveAlarms() 自动更新
   }
 
   // 处理新告警
   const handleNewAlarm = (alarm: AlarmInfo) => {
-    // 添加到列表
-    activeAlarms.value.unshift(alarm)
-
-    // 更新计数 — 仅对已知级别递增，防止意外 key 写入
-    const validLevels = ['critical', 'major', 'minor', 'info'] as const
-    alarmCount.value.total++
-    if (validLevels.includes(alarm.alarm_level as typeof validLevels[number])) {
-      alarmCount.value[alarm.alarm_level as keyof Omit<AlarmCount, 'total'>]++
-    }
+    // 添加到 AlarmStore（Store 会自动更新计数）
+    alarmStore.addAlarm(alarm as unknown as Alarm)
 
     // 播放声音（检查 store 中的声音开关）
     if (playSound) {
@@ -145,26 +130,14 @@ export function useAlarm(options: UseAlarmOptions = {}) {
     }
   }
 
-  // 处理告警确认
+  // 处理告警确认（委托给 AlarmStore）
   const handleAlarmAck = (alarmId: number) => {
-    const index = activeAlarms.value.findIndex(a => a.id === alarmId)
-    if (index !== -1) {
-      activeAlarms.value[index].status = 'acknowledged'
-    }
+    alarmStore.updateAlarm(alarmId, { status: 'acknowledged' })
   }
 
-  // 处理告警解决
+  // 处理告警解决（委托给 AlarmStore）
   const handleAlarmResolve = (alarmId: number) => {
-    const index = activeAlarms.value.findIndex(a => a.id === alarmId)
-    if (index !== -1) {
-      const alarm = activeAlarms.value[index]
-      activeAlarms.value.splice(index, 1)
-
-      // 更新计数（下限保护，防止负数）
-      alarmCount.value.total = Math.max(0, alarmCount.value.total - 1)
-      const levelKey = alarm.alarm_level as keyof AlarmCount
-      alarmCount.value[levelKey] = Math.max(0, alarmCount.value[levelKey] - 1)
-    }
+    alarmStore.updateAlarm(alarmId, { status: 'resolved' })
 
     // 如果没有紧急告警了，停止声音
     if (!activeAlarms.value.some(a => a.alarm_level === 'critical' && a.status === 'active')) {
@@ -172,7 +145,7 @@ export function useAlarm(options: UseAlarmOptions = {}) {
     }
   }
 
-  // 处理 WebSocket 消息
+  // 处理 WebSocket 消息（所有状态操作委托给 AlarmStore）
   const handleAlarmMessage = (message: any) => {
     if (message.type !== 'alarm') return
 
@@ -183,47 +156,34 @@ export function useAlarm(options: UseAlarmOptions = {}) {
         handleNewAlarm(data)
         break
       case 'ack':
-        handleAlarmAck(data.id)
         alarmStore.updateAlarm(data.id, { status: 'acknowledged', ...data })
         window.dispatchEvent(new Event('alarm-status-changed'))
         break
       case 'update':
         if (data.id) {
-          const idx = activeAlarms.value.findIndex(a => a.id === data.id)
-          if (idx !== -1) {
-            Object.assign(activeAlarms.value[idx], data)
-          }
           alarmStore.updateAlarm(data.id, data)
         }
         window.dispatchEvent(new Event('alarm-status-changed'))
         break
       case 'resolve':
         handleAlarmResolve(data.id)
-        alarmStore.updateAlarm(data.id, { status: 'resolved', ...data })
         window.dispatchEvent(new Event('alarm-status-changed'))
         break
       case 'batch_ack':
         if (data.alarm_ids && Array.isArray(data.alarm_ids)) {
           for (const id of data.alarm_ids) {
-            handleAlarmAck(id)
             alarmStore.updateAlarm(id, { status: 'acknowledged' })
           }
         }
         window.dispatchEvent(new Event('alarm-status-changed'))
         break
-      case 'escalate': {
-        const idx = activeAlarms.value.findIndex(a => a.id === data.id)
-        if (idx !== -1) {
-          activeAlarms.value[idx].alarm_level = data.alarm_level
-          activeAlarms.value[idx].escalated_from = data.previous_level
-        }
+      case 'escalate':
         alarmStore.updateAlarm(data.id, {
           alarm_level: data.alarm_level,
           escalated_from: data.previous_level
         })
         window.dispatchEvent(new Event('alarm-status-changed'))
         break
-      }
     }
   }
 
@@ -259,16 +219,16 @@ export function useAlarm(options: UseAlarmOptions = {}) {
     }
   }
 
-  // 按级别获取告警
+  // 按级别获取告警（从 AlarmStore 派生）
   const getAlarmsByLevel = (level: string) => {
-    return activeAlarms.value.filter(a => a.alarm_level === level)
+    return alarmStore.activeAlarms.filter(a => a.alarm_level === level)
   }
 
-  // 计算属性
-  const criticalAlarms = computed(() => getAlarmsByLevel('critical'))
-  const majorAlarms = computed(() => getAlarmsByLevel('major'))
-  const minorAlarms = computed(() => getAlarmsByLevel('minor'))
-  const hasActiveAlarms = computed(() => activeAlarms.value.length > 0)
+  // 计算属性（从 AlarmStore 派生）
+  const criticalAlarms = computed(() => alarmStore.activeAlarms.filter(a => a.alarm_level === 'critical'))
+  const majorAlarms = computed(() => alarmStore.activeAlarms.filter(a => a.alarm_level === 'major'))
+  const minorAlarms = computed(() => alarmStore.activeAlarms.filter(a => a.alarm_level === 'minor'))
+  const hasActiveAlarms = computed(() => alarmStore.activeAlarms.length > 0)
   const hasCriticalAlarms = computed(() => criticalAlarms.value.length > 0)
 
   onMounted(() => {
@@ -282,6 +242,7 @@ export function useAlarm(options: UseAlarmOptions = {}) {
     }
   })
 
+  // TODO: Story 27.5 - 迁移到 WebSocketManager 后移除此清理逻辑
   onUnmounted(() => {
     off('alarm', handleAlarmMessage)
     disconnect()
@@ -289,9 +250,9 @@ export function useAlarm(options: UseAlarmOptions = {}) {
   })
 
   return {
-    activeAlarms: computed(() => activeAlarms.value),
-    alarmCount: computed(() => alarmCount.value),
-    loading: computed(() => loading.value),
+    activeAlarms,
+    alarmCount,
+    loading,
     error: computed(() => error.value),
     criticalAlarms,
     majorAlarms,

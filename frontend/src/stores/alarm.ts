@@ -1,8 +1,10 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
+import { getActiveAlarms } from '@/api/modules/alarm'
 
 export interface Alarm {
   id: number
+  point_id?: number
   point_code: string
   point_name: string
   alarm_level: string
@@ -22,6 +24,7 @@ export interface Alarm {
   escalation_count?: number
   escalated_from?: string | null
   escalation_remark?: string | null
+  data_source?: string
 }
 
 export const useAlarmStore = defineStore('alarm', () => {
@@ -35,14 +38,27 @@ export const useAlarmStore = defineStore('alarm', () => {
   })
   // 声音开关（从 localStorage 读取，默认开启）
   const soundEnabled = ref(localStorage.getItem('alarm_sound_enabled') !== 'false')
+  const loading = ref(false)
+
+  async function fetchActiveAlarms() {
+    if (loading.value) return
+    loading.value = true
+    try {
+      const alarms = await getActiveAlarms()
+      activeAlarms.value = alarms as unknown as Alarm[]
+      updateCount()
+    } finally {
+      loading.value = false
+    }
+  }
 
   function addAlarm(alarm: Alarm) {
     // 去重：相同 id 不重复添加
     if (alarm.id && activeAlarms.value.some(a => a.id === alarm.id)) return
     activeAlarms.value.unshift(alarm)
     // 限制列表长度，防止内存溢出
-    if (activeAlarms.value.length > 200) {
-      activeAlarms.value = activeAlarms.value.slice(0, 200)
+    if (activeAlarms.value.length > 1000) {
+      activeAlarms.value = activeAlarms.value.slice(0, 1000)
     }
     updateCount()
   }
@@ -78,13 +94,47 @@ export const useAlarmStore = defineStore('alarm', () => {
     localStorage.setItem('alarm_sound_enabled', String(soundEnabled.value))
   }
 
+  function handleWsMessage(data: any) {
+    const { action } = data
+    switch (action) {
+      case 'new':
+        addAlarm(data.data)
+        break
+      case 'ack':
+        updateAlarm(data.data.id, { status: 'acknowledged', ...data.data })
+        break
+      case 'update':
+        if (data.data?.id) updateAlarm(data.data.id, data.data)
+        break
+      case 'resolve':
+        updateAlarm(data.data.id, { status: 'resolved', ...data.data })
+        break
+      case 'batch_ack':
+        if (data.data?.alarm_ids) {
+          for (const id of data.data.alarm_ids) {
+            updateAlarm(id, { status: 'acknowledged' })
+          }
+        }
+        break
+      case 'escalate':
+        updateAlarm(data.data.id, {
+          alarm_level: data.data.alarm_level,
+          escalated_from: data.data.previous_level
+        })
+        break
+    }
+  }
+
   return {
     activeAlarms,
     alarmCount,
     soundEnabled,
+    loading,
+    fetchActiveAlarms,
     addAlarm,
     removeAlarm,
     updateAlarm,
-    toggleSound
+    toggleSound,
+    handleWsMessage
   }
 })
