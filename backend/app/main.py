@@ -27,6 +27,7 @@ from .engines.escalation_engine import check_escalations
 from .engines.diagnosis_engine import diagnosis_engine
 from .services.pue_calculator import write_pue_history
 from .services.energy_aggregator import aggregate_hourly, aggregate_daily, aggregate_monthly
+from .services.load_shift.shift_constraint_service import ShiftConstraintService
 from .middleware.request_logging import RequestLoggingMiddleware
 from .middleware.metrics_middleware import MetricsMiddleware
 from .middleware.metrics import metrics_collector
@@ -155,6 +156,11 @@ async def init_default_data():
             await session.commit()
             print("初始化角色权限配置")
 
+        # 初始化负荷转移默认约束（算力中心特殊约束）
+        stats = await ShiftConstraintService.ensure_default_constraints(session)
+        if stats["created"] > 0:
+            print(f"初始化负荷转移默认约束: 新增 {stats['created']} 条")
+
 
 async def init_default_configs():
     """初始化默认系统配置"""
@@ -209,12 +215,53 @@ async def init_default_configs():
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """应用生命周期管理"""
+    """应用生命周期管理 - Story 28.2: 分层启动"""
     # 启动时初始化数据库
     await init_db()
-    await init_default_data()
-    await init_default_configs()
-    await demo_startup()
+
+    # === Story 28.2: 分层启动 ===
+    seed_success = False
+
+    # 1. Seed 阶段
+    if settings.seed_enabled:
+        logger.info("=== Seed 阶段：执行最小化种子 ===")
+        try:
+            from app.seeds.minimal_seed import run_minimal_seed
+            await run_minimal_seed()
+            logger.info("✓ 最小化种子执行成功")
+            seed_success = True
+        except Exception as e:
+            logger.error(f"✗ 最小化种子执行失败: {e}")
+            seed_success = False
+    else:
+        # 如果未启用 seed，执行旧的默认数据初始化（向后兼容）
+        await init_default_data()
+        await init_default_configs()
+
+    # 2. Demo 阶段
+    if settings.demo_enabled:
+        if not settings.seed_enabled or seed_success:
+            logger.info("=== Demo 阶段：加载 Demo 数据 ===")
+            try:
+                await demo_startup()
+                logger.info("✓ Demo 数据加载成功")
+            except Exception as e:
+                logger.error(f"✗ Demo 数据加载失败: {e}")
+        else:
+            logger.warning("⚠️  Seed 阶段失败，跳过 Demo 阶段")
+
+    # 3. Simulation 阶段
+    if settings.simulation_enabled:
+        logger.info("=== Simulation 阶段：启动数据模拟器 ===")
+        try:
+            # 模拟器启动逻辑在 demo_startup() 中处理
+            if not settings.demo_enabled:
+                # 如果 demo 未启用，单独启动模拟器
+                from app.demo.lifecycle import start_simulator
+                await start_simulator()
+            logger.info("✓ 数据模拟器启动成功")
+        except Exception as e:
+            logger.error(f"✗ 数据模拟器启动失败: {e}")
 
     # 连接 Redis 缓存
     if settings.redis_enabled:
@@ -406,7 +453,8 @@ async def lifespan(app: FastAPI):
     yield
 
     # 关闭演示模块
-    await demo_shutdown()
+    if settings.demo_enabled or settings.simulation_enabled:
+        await demo_shutdown()
     refresh_task.cancel()
     comm_monitor_task.cancel()
     escalation_task.cancel()

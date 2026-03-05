@@ -429,6 +429,7 @@ class ElectricityPricing(Base):
     effective_date = Column(Date, nullable=False, comment="生效日期")
     expire_date = Column(Date, comment="失效日期")
     is_enabled = Column(Boolean, default=True, comment="是否启用")
+    data_source = Column(String(50), comment="数据来源: seed/demo/real")
     created_at = Column(DateTime, default=datetime.now, comment="创建时间")
     updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now, comment="更新时间")
 

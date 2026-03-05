@@ -46,10 +46,26 @@ class Settings(BaseSettings):
     collect_interval: int = 10  # 秒
     data_retention_days: int = 30
 
-    # 模拟模式配置
-    simulation_enabled: bool = False  # 是否启用模拟数据
-    demo_enabled: bool = False  # 演示模式开关（替代 simulation_enabled，过渡期两者等价）
-    simulation_interval: int = 5  # 模拟数据生成间隔(秒)
+    # === 数据初始化配置（Story 28.2）===
+    seed_enabled: bool = Field(default=False, env="SEED_ENABLED", description="启用最小化种子")
+    demo_enabled: bool = Field(default=False, env="DEMO_ENABLED", description="启用 Demo 数据")
+    simulation_enabled: bool = Field(default=False, env="SIMULATION_ENABLED", description="启用数据模拟器")
+
+    # === Seed 配置（Story 28.2）===
+    default_site_name: str = Field(default="默认站点", env="DEFAULT_SITE_NAME")
+    default_floor_count: int = Field(default=1, ge=1, le=50, env="DEFAULT_FLOOR_COUNT")
+    default_room_count: int = Field(default=1, ge=1, le=100, env="DEFAULT_ROOM_COUNT")
+    default_admin_password: str = Field(default="admin123", env="DEFAULT_ADMIN_PASSWORD")
+
+    # === 电价配置（五级制，Story 28.2）===
+    default_sharp_peak_price: float = Field(default=1.5, env="DEFAULT_SHARP_PEAK_PRICE")
+    default_peak_price: float = Field(default=1.2, env="DEFAULT_PEAK_PRICE")
+    default_flat_price: float = Field(default=0.8, env="DEFAULT_FLAT_PRICE")
+    default_valley_price: float = Field(default=0.4, env="DEFAULT_VALLEY_PRICE")
+    default_deep_valley_price: float = Field(default=0.2, env="DEFAULT_DEEP_VALLEY_PRICE")
+
+    # 模拟模式配置（已废弃，保留向后兼容）
+    simulation_interval: int = 60  # 模拟数据生成间隔(秒)
 
     # 授权配置
     license_key: str = "DEMO-0000-0000-0000"

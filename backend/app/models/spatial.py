@@ -34,6 +34,7 @@ class Site(Base):
     network_config = Column(JSON, comment="网络配置(VPN/专线信息)")
     status = Column(String(20), default="active", comment="状态: active/inactive/maintenance")
     description = Column(Text, comment="描述")
+    data_source = Column(String(50), comment="数据来源: seed/demo/real")
     created_at = Column(DateTime, default=datetime.now, comment="创建时间")
     updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now, comment="更新时间")
 
@@ -52,6 +53,7 @@ class Floor(Base):
     floor_name = Column(String(100), nullable=False, comment="楼层名称")
     site_id = Column(Integer, ForeignKey("sites.id"), nullable=False, comment="所属站点ID")
     sort_order = Column(Integer, default=0, comment="排序")
+    data_source = Column(String(50), comment="数据来源: seed/demo/real")
     created_at = Column(DateTime, default=datetime.now, comment="创建时间")
     updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now, comment="更新时间")
 
@@ -74,6 +76,7 @@ class Room(Base):
     grid_rows = Column(Integer, default=20, comment="网格行数")
     area_sqm = Column(Float, comment="面积(平方米)")
     description = Column(Text, comment="描述")
+    data_source = Column(String(50), comment="数据来源: seed/demo/real")
     created_at = Column(DateTime, default=datetime.now, comment="创建时间")
     updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now, comment="更新时间")
 

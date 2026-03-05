@@ -2,6 +2,7 @@
 数据模型
 """
 
+from .enums import DataSourceType, PricingPeriodType
 from .user import User, RolePermission, UserLoginHistory, UserSession, UserSite, PasswordHistory
 from .device import Device
 from .point import Point, PointRealtime, PointGroup, PointGroupMember
@@ -17,6 +18,7 @@ from .energy import (
     EnergyMonthly,
     ElectricityPricing,
     PricingConfig,
+    PricingScheme,
     EnergySuggestion,
     PUEHistory,
     EnergyOpportunity,
@@ -109,6 +111,9 @@ from .load_shift import (
 )
 
 __all__ = [
+    # 枚举
+    "DataSourceType",
+    "PricingPeriodType",
     # 用户
     "User",
     "RolePermission",
@@ -154,6 +159,7 @@ __all__ = [
     "EnergyMonthly",
     "ElectricityPricing",
     "PricingConfig",
+    "PricingScheme",
     "EnergySuggestion",
     "PUEHistory",
     # 节能中心
