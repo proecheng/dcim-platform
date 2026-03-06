@@ -264,7 +264,7 @@ development_status:
   # ============================================================
 
   # Epic 24: 智能诊断核心引擎 (Phase 2a 月7-8)
-  epic-24: in-progress
+  epic-24: done
   24-1-l1-rule-engine: done
   24-2-diagnosis-scheduler-and-concurrency-control: done
   24-3-fault-tree-data-model-and-crud: done
@@ -272,7 +272,7 @@ development_status:
   24-5-l2-fault-tree-inference-engine: done
   24-6-diagnosis-result-storage-and-graded-push: done
   24-7-circuit-breaker-degradation-mechanism: done
-  24-8-diagnosis-result-annotation-and-rbac: backlog
+  24-8-diagnosis-result-annotation-and-rbac: done
   epic-24-retrospective: optional
 
   # Epic 25: 智能诊断专业扩展 (Phase 2b 月9-10)

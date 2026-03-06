@@ -168,3 +168,79 @@ export function manualDiagnose(alarmId: number): Promise<{ message: string; alar
 export function getDiagnosisCategories(): Promise<DiagnosisCategory[]> {
   return request.get('/v1/diagnosis/categories')
 }
+
+// ==================== 标注管理 (Story 24.8) ====================
+
+/** 诊断标注 */
+export interface DiagnosisAnnotation {
+  id: number
+  session_id: number
+  annotator_id: number | null
+  annotation: 'accurate' | 'inaccurate' | 'unknown'
+  actual_root_cause: string | null
+  notes: string | null
+  annotated_at: string
+  created_at: string
+  updated_at: string
+}
+
+/** 创建标注参数 */
+export interface DiagnosisAnnotationCreate {
+  session_id: number
+  annotation: 'accurate' | 'inaccurate' | 'unknown'
+  actual_root_cause?: string
+  notes?: string
+}
+
+/** 标注统计 */
+export interface DiagnosisAnnotationStats {
+  total_annotations: number
+  accurate_count: number
+  inaccurate_count: number
+  unknown_count: number
+  accurate_rate: number
+  user_stats: Array<{
+    user_id: number
+    username: string
+    annotation_count: number
+  }>
+  top_annotators: Array<{
+    user_id: number
+    username: string
+    annotation_count: number
+  }>
+}
+
+/**
+ * 创建诊断标注
+ */
+export function createDiagnosisAnnotation(data: DiagnosisAnnotationCreate): Promise<DiagnosisAnnotation> {
+  return request.post('/v1/diagnosis/annotations', data)
+}
+
+/**
+ * 获取标注列表
+ */
+export function getDiagnosisAnnotations(params?: PageParams & {
+  session_id?: number
+  annotator_id?: number
+  annotation?: string
+}): Promise<PageResponse<DiagnosisAnnotation>> {
+  return request.get('/v1/diagnosis/annotations', { params })
+}
+
+/**
+ * 删除标注
+ */
+export function deleteDiagnosisAnnotation(id: number): Promise<{ message: string }> {
+  return request.delete(`/v1/diagnosis/annotations/${id}`)
+}
+
+/**
+ * 获取标注统计
+ */
+export function getDiagnosisAnnotationStats(topN?: number): Promise<DiagnosisAnnotationStats> {
+  return request.get('/v1/diagnosis/annotations/stats', {
+    params: { top_n: topN || 10 }
+  })
+}

@@ -16,7 +16,7 @@ from app.models.fault_tree import (
 )
 from app.services.diagnosis.hmac_manager import HMACManager
 from app.services.diagnosis.dag_validator import DAGValidator
-from app.core.redis_client import get_redis
+from app.core.redis_lock import get_redis_client
 
 logger = logging.getLogger(__name__)
 
@@ -172,7 +172,7 @@ class VersionManager:
 
         # 发布版本切换事件（失败不影响激活）
         try:
-            redis = await get_redis()
+            redis = await get_redis_client()
             await redis.publish("diagnosis:tree_version_change", json.dumps({
                 "tree_id": version.tree_id,
                 "version_id": version.id,

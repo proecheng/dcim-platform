@@ -9,13 +9,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
 from app.core.database import async_session
-from app.core.redis_client import get_redis
+from app.core.redis_lock import get_redis_client
 from app.services.diagnosis.priority_queue import CancellablePriorityQueue, PriorityTask
 from app.services.diagnosis.l1_engine import L1RuleEngine
 from app.services.diagnosis.result_store import DiagnosisResultStore
 from app.services.diagnosis.push_service import DiagnosisPushService
 from app.services.diagnosis.circuit_breaker import CircuitBreaker
 from app.services.diagnosis.fallback_store import DiagnosisFallbackStore
+from app.services.diagnosis.annotation_anomaly import AnnotationAnomalyDetector
 from app.models.diagnosis import DiagnosisResult
 from app.models.device import Device
 
@@ -54,6 +55,7 @@ class DiagnosisScheduler:
         self._workers: list[asyncio.Task] = []
         self._subscriber_task: Optional[asyncio.Task] = None
         self._recovery_task: Optional[asyncio.Task] = None
+        self._anomaly_detection_task: Optional[asyncio.Task] = None
 
         # 熔断器 (Story 24.7)
         self.circuit_breaker = CircuitBreaker(
@@ -85,7 +87,7 @@ class DiagnosisScheduler:
             self._subscriber_task = None
 
         self.running = True
-        self.redis = await get_redis()
+        self.redis = await get_redis_client()
 
         # 加载 L1 规则引擎
         try:
@@ -105,6 +107,9 @@ class DiagnosisScheduler:
 
         # 启动 Redis 降级恢复定时任务 (Story 24.7)
         self._recovery_task = asyncio.create_task(self._recovery_loop())
+
+        # 启动标注偏差检测定时任务 (Story 24.8)
+        self._anomaly_detection_task = asyncio.create_task(self._anomaly_detection_loop())
 
         logger.info("DiagnosisScheduler started")
 
@@ -143,6 +148,15 @@ class DiagnosisScheduler:
             except asyncio.CancelledError:
                 pass
             self._recovery_task = None
+
+        # 取消偏差检测任务
+        if self._anomaly_detection_task:
+            self._anomaly_detection_task.cancel()
+            try:
+                await self._anomaly_detection_task
+            except asyncio.CancelledError:
+                pass
+            self._anomaly_detection_task = None
 
         # 取消所有 worker
         for worker in self._workers:
@@ -493,6 +507,76 @@ class DiagnosisScheduler:
             )
         except Exception as e:
             logger.error(f"Failed to broadcast breaker state change: {e}")
+
+    async def _anomaly_detection_loop(self):
+        """定时检测标注偏差 (Story 24.8)"""
+        # 启动后等待 10 分钟再开始检测（避免启动时数据不足）
+        await asyncio.sleep(600)
+
+        while self.running:
+            try:
+                # 使用 Redis 分布式锁确保只有一个实例执行
+                lock_key = "diagnosis:annotation_anomaly_detection:lock"
+                lock_value = str(uuid.uuid4())
+                lock_ttl = 300  # 5 分钟锁超时
+
+                # 尝试获取锁
+                acquired = await self.redis.set(lock_key, lock_value, nx=True, ex=lock_ttl)
+
+                if acquired:
+                    try:
+                        async with async_session() as db_session:
+                            anomalies = await AnnotationAnomalyDetector.detect_anomalies(db_session)
+
+                            if anomalies:
+                                logger.warning(f"Detected {len(anomalies)} annotation anomalies")
+
+                                # 推送 WebSocket 告警给管理员
+                                try:
+                                    from app.services.websocket import ws_manager
+                                    await ws_manager.broadcast_diagnosis(
+                                        msg_type="annotation_anomaly_alert",
+                                        data={
+                                            "anomalies": anomalies,
+                                            "detected_at": datetime.now().isoformat(),
+                                        },
+                                        target_roles=["admin"],
+                                    )
+                                except Exception as ws_err:
+                                    logger.error(f"Failed to broadcast anomaly alert: {ws_err}")
+
+                                # 写入系统内通知表（持久化）
+                                try:
+                                    from app.models.notification import SystemNotification
+                                    notification = SystemNotification(
+                                        title="标注偏差告警",
+                                        content=f"检测到 {len(anomalies)} 个用户标注率异常",
+                                        notification_type="annotation_anomaly",
+                                        target_role="admin",
+                                        data={"anomalies": anomalies},
+                                    )
+                                    db_session.add(notification)
+                                    await db_session.commit()
+                                except Exception as notif_err:
+                                    logger.error(f"Failed to save anomaly notification: {notif_err}")
+                    finally:
+                        # 释放锁
+                        script = """
+                        if redis.call("get", KEYS[1]) == ARGV[1] then
+                            return redis.call("del", KEYS[1])
+                        else
+                            return 0
+                        end
+                        """
+                        await self.redis.eval(script, 1, lock_key, lock_value)
+                else:
+                    logger.debug("Anomaly detection lock already held by another instance")
+
+            except Exception as e:
+                logger.error(f"Anomaly detection loop error: {e}", exc_info=True)
+
+            # 每小时检测一次
+            await asyncio.sleep(3600)
 
 
 # 全局调度器实例

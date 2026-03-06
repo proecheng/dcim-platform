@@ -157,3 +157,53 @@ class DiagnosisCategoryItem(BaseModel):
     code: str
     name: str
     count: int = 0
+
+
+# ==================== Annotation Schemas ====================
+
+
+class DiagnosisAnnotationCreate(BaseModel):
+    """创建诊断标注"""
+
+    session_id: int = Field(..., description="诊断会话ID")
+    annotation: str = Field(..., description="标注结果: accurate/inaccurate/unknown")
+    actual_root_cause: Optional[str] = Field(None, max_length=1000, description="实际根因(标注为inaccurate时必填)")
+    notes: Optional[str] = Field(None, max_length=2000, description="备注")
+
+
+class DiagnosisAnnotationResponse(BaseModel):
+    """诊断标注响应"""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    session_id: int
+    annotator_id: Optional[int] = None
+    annotation: str
+    actual_root_cause: Optional[str] = None
+    notes: Optional[str] = None
+    annotated_at: datetime
+    created_at: datetime
+    updated_at: datetime
+
+
+class DiagnosisAnnotationListQuery(BaseModel):
+    """诊断标注列表查询参数"""
+
+    page: int = Field(default=1, ge=1, description="页码")
+    page_size: int = Field(default=20, ge=1, le=100, description="每页数量")
+    session_id: Optional[int] = Field(default=None, description="会话ID")
+    annotator_id: Optional[int] = Field(default=None, description="标注者ID")
+    annotation: Optional[str] = Field(default=None, description="标注结果")
+
+
+class DiagnosisAnnotationStatsResponse(BaseModel):
+    """诊断标注统计响应"""
+
+    total_annotations: int = Field(..., description="总标注数")
+    accurate_count: int = Field(..., description="准确标注数")
+    inaccurate_count: int = Field(..., description="不准确标注数")
+    unknown_count: int = Field(..., description="未知标注数")
+    accurate_rate: float = Field(..., description="准确率")
+    user_stats: List[dict] = Field(..., description="用户标注统计")
+    top_annotators: List[dict] = Field(..., description="Top标注者")

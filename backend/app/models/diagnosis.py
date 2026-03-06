@@ -98,3 +98,19 @@ class DiagnosisAuditLog(Base):
     inference_time_ms = Column(Integer, default=0, comment="推理耗时(毫秒)")
     fault_tree_version = Column(String(50), nullable=True, comment="故障树版本号")
     created_at = Column(DateTime, default=datetime.now, comment="创建时间")
+
+
+class DiagnosisAnnotation(Base):
+    """诊断结果标注表 - Story 24.8"""
+
+    __tablename__ = "diagnosis_annotations"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    session_id = Column(Integer, ForeignKey("diagnosis_sessions.id", ondelete="CASCADE"), nullable=False, index=True, comment="诊断会话ID")
+    annotator_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True, comment="标注者ID")
+    annotation = Column(String(20), nullable=False, comment="标注结果: accurate/inaccurate/unknown")
+    actual_root_cause = Column(Text, nullable=True, comment="实际根因(标注为inaccurate时必填)")
+    notes = Column(Text, nullable=True, comment="备注")
+    annotated_at = Column(DateTime, nullable=False, default=datetime.now, comment="标注时间")
+    created_at = Column(DateTime, default=datetime.now, comment="创建时间")
+    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now, comment="更新时间")

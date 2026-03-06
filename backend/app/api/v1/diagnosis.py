@@ -23,6 +23,10 @@ from ...schemas.diagnosis import (
     DiagnosisCategoryItem,
     DiagnosisSessionResponse,
     DiagnosisAuditLogResponse,
+    DiagnosisAnnotationCreate,
+    DiagnosisAnnotationResponse,
+    DiagnosisAnnotationListQuery,
+    DiagnosisAnnotationStatsResponse,
 )
 from ...engines.diagnosis_engine import diagnosis_engine
 
@@ -449,3 +453,88 @@ async def manual_diagnose(
     if payload is None:
         raise HTTPException(status_code=404, detail="告警不存在")
     return {"message": "诊断已触发", "alarm_id": alarm_id}
+
+
+# ==================== 标注管理 (Story 24.8) ====================
+
+
+@router.post("/annotations", response_model=DiagnosisAnnotationResponse)
+async def create_annotation(
+    data: DiagnosisAnnotationCreate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_operator),
+):
+    """创建诊断标注（operator+）"""
+    from ...services.diagnosis.annotation_service import DiagnosisAnnotationService
+
+    try:
+        annotation = await DiagnosisAnnotationService.create_annotation(
+            db=db,
+            data=data,
+            annotator_id=current_user.id,
+        )
+        return annotation
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.get("/annotations", response_model=dict)
+async def list_annotations(
+    query: DiagnosisAnnotationListQuery = Depends(),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_operator),
+):
+    """获取标注列表（operator 只能查看自己的，admin 可查看所有）"""
+    from ...services.diagnosis.annotation_service import DiagnosisAnnotationService
+
+    try:
+        annotations, total = await DiagnosisAnnotationService.get_annotations(
+            db=db,
+            query=query,
+            user_id=current_user.id,
+            user_role=current_user.role,
+        )
+        return {
+            "items": annotations,
+            "total": total,
+            "page": query.page,
+            "page_size": query.page_size,
+        }
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e))
+
+
+@router.delete("/annotations/{annotation_id}", response_model=dict)
+async def delete_annotation(
+    annotation_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_operator),
+):
+    """删除标注（operator 只能删除自己的，admin 可删除任何）"""
+    from ...services.diagnosis.annotation_service import DiagnosisAnnotationService
+
+    try:
+        await DiagnosisAnnotationService.delete_annotation(
+            db=db,
+            annotation_id=annotation_id,
+            user_id=current_user.id,
+            user_role=current_user.role,
+        )
+        return {"message": "标注已删除"}
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except PermissionError as e:
+        raise HTTPException(status_code=403, detail=str(e))
+
+
+@router.get("/annotations/stats", response_model=DiagnosisAnnotationStatsResponse)
+async def get_annotation_stats(
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_admin),
+    top_n: int = Query(10, ge=1, le=50, description="Top N 标注者数量"),
+):
+    """获取标注统计（仅 admin）"""
+    from ...services.diagnosis.annotation_service import DiagnosisAnnotationService
+
+    stats = await DiagnosisAnnotationService.get_annotation_stats(db=db, top_n=top_n)
+    return stats

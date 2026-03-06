@@ -1,0 +1,436 @@
+"""
+Story 24.8: 诊断结果标注与RBAC 集成测试
+"""
+
+import pytest
+from httpx import AsyncClient
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.models.diagnosis import DiagnosisSession, DiagnosisAnnotation
+from app.models.user import User
+
+
+@pytest.mark.asyncio
+async def test_create_annotation_success(
+    client: AsyncClient,
+    db_session: AsyncSession,
+    operator_token: str,
+):
+    """测试创建标注 - 成功"""
+    # 创建测试会话
+    session = DiagnosisSession(
+        device_id=1,
+        engine_level="L1",
+        status="success",
+        push_status="skipped",
+        start_time="2026-03-06 10:00:00",
+    )
+    db_session.add(session)
+    await db_session.commit()
+    await db_session.refresh(session)
+
+    # 创建标注
+    response = await client.post(
+        "/api/v1/diagnosis/annotations",
+        json={
+            "session_id": session.id,
+            "annotation": "accurate",
+            "notes": "测试标注",
+        },
+        headers={"Authorization": f"Bearer {operator_token}"},
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["session_id"] == session.id
+    assert data["annotation"] == "accurate"
+    assert data["notes"] == "测试标注"
+
+
+@pytest.mark.asyncio
+async def test_create_annotation_inaccurate_without_root_cause(
+    client: AsyncClient,
+    db_session: AsyncSession,
+    operator_token: str,
+):
+    """测试创建标注 - 标注为inaccurate但未提供actual_root_cause"""
+    # 创建测试会话
+    session = DiagnosisSession(
+        device_id=1,
+        engine_level="L1",
+        status="success",
+        push_status="skipped",
+        start_time="2026-03-06 10:00:00",
+    )
+    db_session.add(session)
+    await db_session.commit()
+    await db_session.refresh(session)
+
+    # 创建标注（缺少 actual_root_cause）
+    response = await client.post(
+        "/api/v1/diagnosis/annotations",
+        json={
+            "session_id": session.id,
+            "annotation": "inaccurate",
+        },
+        headers={"Authorization": f"Bearer {operator_token}"},
+    )
+
+    assert response.status_code == 400
+    assert "actual_root_cause is required" in response.json()["detail"]
+
+
+@pytest.mark.asyncio
+async def test_create_annotation_inaccurate_with_root_cause(
+    client: AsyncClient,
+    db_session: AsyncSession,
+    operator_token: str,
+):
+    """测试创建标注 - 标注为inaccurate且提供actual_root_cause"""
+    # 创建测试会话
+    session = DiagnosisSession(
+        device_id=1,
+        engine_level="L1",
+        status="success",
+        push_status="skipped",
+        start_time="2026-03-06 10:00:00",
+    )
+    db_session.add(session)
+    await db_session.commit()
+    await db_session.refresh(session)
+
+    # 创建标注
+    response = await client.post(
+        "/api/v1/diagnosis/annotations",
+        json={
+            "session_id": session.id,
+            "annotation": "inaccurate",
+            "actual_root_cause": "实际是电源故障",
+        },
+        headers={"Authorization": f"Bearer {operator_token}"},
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["annotation"] == "inaccurate"
+    assert data["actual_root_cause"] == "实际是电源故障"
+
+
+@pytest.mark.asyncio
+async def test_create_annotation_session_not_found(
+    client: AsyncClient,
+    operator_token: str,
+):
+    """测试创建标注 - 会话不存在"""
+    response = await client.post(
+        "/api/v1/diagnosis/annotations",
+        json={
+            "session_id": 99999,
+            "annotation": "accurate",
+        },
+        headers={"Authorization": f"Bearer {operator_token}"},
+    )
+
+    assert response.status_code == 400
+    assert "not found" in response.json()["detail"]
+
+
+@pytest.mark.asyncio
+async def test_get_annotations_operator_only_own(
+    client: AsyncClient,
+    db_session: AsyncSession,
+    operator_token: str,
+    operator_user: User,
+):
+    """测试获取标注列表 - operator只能查看自己的"""
+    # 创建测试会话
+    session = DiagnosisSession(
+        device_id=1,
+        engine_level="L1",
+        status="success",
+        push_status="skipped",
+        start_time="2026-03-06 10:00:00",
+    )
+    db_session.add(session)
+    await db_session.commit()
+    await db_session.refresh(session)
+
+    # 创建标注（当前用户）
+    annotation1 = DiagnosisAnnotation(
+        session_id=session.id,
+        annotator_id=operator_user.id,
+        annotation="accurate",
+        annotated_at="2026-03-06 10:00:00",
+    )
+    db_session.add(annotation1)
+
+    # 创建标注（其他用户）
+    annotation2 = DiagnosisAnnotation(
+        session_id=session.id,
+        annotator_id=999,  # 其他用户
+        annotation="inaccurate",
+        actual_root_cause="测试",
+        annotated_at="2026-03-06 10:01:00",
+    )
+    db_session.add(annotation2)
+    await db_session.commit()
+
+    # 查询标注列表
+    response = await client.get(
+        "/api/v1/diagnosis/annotations",
+        headers={"Authorization": f"Bearer {operator_token}"},
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    # operator 只能看到自己的标注
+    assert data["total"] == 1
+    assert data["items"][0]["annotator_id"] == operator_user.id
+
+
+@pytest.mark.asyncio
+async def test_get_annotations_operator_query_other_user_forbidden(
+    client: AsyncClient,
+    db_session: AsyncSession,
+    operator_token: str,
+):
+    """测试获取标注列表 - operator查询其他用户ID返回403"""
+    response = await client.get(
+        "/api/v1/diagnosis/annotations?annotator_id=999",
+        headers={"Authorization": f"Bearer {operator_token}"},
+    )
+
+    assert response.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_get_annotations_admin_can_view_all(
+    client: AsyncClient,
+    db_session: AsyncSession,
+    admin_token: str,
+):
+    """测试获取标注列表 - admin可以查看所有"""
+    # 创建测试会话
+    session = DiagnosisSession(
+        device_id=1,
+        engine_level="L1",
+        status="success",
+        push_status="skipped",
+        start_time="2026-03-06 10:00:00",
+    )
+    db_session.add(session)
+    await db_session.commit()
+    await db_session.refresh(session)
+
+    # 创建多个用户的标注
+    annotation1 = DiagnosisAnnotation(
+        session_id=session.id,
+        annotator_id=1,
+        annotation="accurate",
+        annotated_at="2026-03-06 10:00:00",
+    )
+    annotation2 = DiagnosisAnnotation(
+        session_id=session.id,
+        annotator_id=2,
+        annotation="inaccurate",
+        actual_root_cause="测试",
+        annotated_at="2026-03-06 10:01:00",
+    )
+    db_session.add_all([annotation1, annotation2])
+    await db_session.commit()
+
+    # 查询标注列表
+    response = await client.get(
+        "/api/v1/diagnosis/annotations",
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    # admin 可以看到所有标注
+    assert data["total"] == 2
+
+
+@pytest.mark.asyncio
+async def test_delete_annotation_operator_own(
+    client: AsyncClient,
+    db_session: AsyncSession,
+    operator_token: str,
+    operator_user: User,
+):
+    """测试删除标注 - operator删除自己的"""
+    # 创建测试会话
+    session = DiagnosisSession(
+        device_id=1,
+        engine_level="L1",
+        status="success",
+        push_status="skipped",
+        start_time="2026-03-06 10:00:00",
+    )
+    db_session.add(session)
+    await db_session.commit()
+    await db_session.refresh(session)
+
+    # 创建标注
+    annotation = DiagnosisAnnotation(
+        session_id=session.id,
+        annotator_id=operator_user.id,
+        annotation="accurate",
+        annotated_at="2026-03-06 10:00:00",
+    )
+    db_session.add(annotation)
+    await db_session.commit()
+    await db_session.refresh(annotation)
+
+    # 删除标注
+    response = await client.delete(
+        f"/api/v1/diagnosis/annotations/{annotation.id}",
+        headers={"Authorization": f"Bearer {operator_token}"},
+    )
+
+    assert response.status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_delete_annotation_operator_other_forbidden(
+    client: AsyncClient,
+    db_session: AsyncSession,
+    operator_token: str,
+):
+    """测试删除标注 - operator删除其他用户的返回403"""
+    # 创建测试会话
+    session = DiagnosisSession(
+        device_id=1,
+        engine_level="L1",
+        status="success",
+        push_status="skipped",
+        start_time="2026-03-06 10:00:00",
+    )
+    db_session.add(session)
+    await db_session.commit()
+    await db_session.refresh(session)
+
+    # 创建标注（其他用户）
+    annotation = DiagnosisAnnotation(
+        session_id=session.id,
+        annotator_id=999,
+        annotation="accurate",
+        annotated_at="2026-03-06 10:00:00",
+    )
+    db_session.add(annotation)
+    await db_session.commit()
+    await db_session.refresh(annotation)
+
+    # 删除标注
+    response = await client.delete(
+        f"/api/v1/diagnosis/annotations/{annotation.id}",
+        headers={"Authorization": f"Bearer {operator_token}"},
+    )
+
+    assert response.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_delete_annotation_admin_can_delete_any(
+    client: AsyncClient,
+    db_session: AsyncSession,
+    admin_token: str,
+):
+    """测试删除标注 - admin可以删除任何用户的"""
+    # 创建测试会话
+    session = DiagnosisSession(
+        device_id=1,
+        engine_level="L1",
+        status="success",
+        push_status="skipped",
+        start_time="2026-03-06 10:00:00",
+    )
+    db_session.add(session)
+    await db_session.commit()
+    await db_session.refresh(session)
+
+    # 创建标注（其他用户）
+    annotation = DiagnosisAnnotation(
+        session_id=session.id,
+        annotator_id=999,
+        annotation="accurate",
+        annotated_at="2026-03-06 10:00:00",
+    )
+    db_session.add(annotation)
+    await db_session.commit()
+    await db_session.refresh(annotation)
+
+    # 删除标注
+    response = await client.delete(
+        f"/api/v1/diagnosis/annotations/{annotation.id}",
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+
+    assert response.status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_get_annotation_stats(
+    client: AsyncClient,
+    db_session: AsyncSession,
+    admin_token: str,
+):
+    """测试获取标注统计"""
+    # 创建测试会话
+    session = DiagnosisSession(
+        device_id=1,
+        engine_level="L1",
+        status="success",
+        push_status="skipped",
+        start_time="2026-03-06 10:00:00",
+    )
+    db_session.add(session)
+    await db_session.commit()
+    await db_session.refresh(session)
+
+    # 创建多个标注
+    annotations = [
+        DiagnosisAnnotation(
+            session_id=session.id,
+            annotator_id=1,
+            annotation="accurate",
+            annotated_at="2026-03-06 10:00:00",
+        ),
+        DiagnosisAnnotation(
+            session_id=session.id,
+            annotator_id=1,
+            annotation="accurate",
+            annotated_at="2026-03-06 10:01:00",
+        ),
+        DiagnosisAnnotation(
+            session_id=session.id,
+            annotator_id=2,
+            annotation="inaccurate",
+            actual_root_cause="测试",
+            annotated_at="2026-03-06 10:02:00",
+        ),
+        DiagnosisAnnotation(
+            session_id=session.id,
+            annotator_id=2,
+            annotation="unknown",
+            annotated_at="2026-03-06 10:03:00",
+        ),
+    ]
+    db_session.add_all(annotations)
+    await db_session.commit()
+
+    # 获取统计
+    response = await client.get(
+        "/api/v1/diagnosis/annotations/stats",
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["total_annotations"] == 4
+    assert data["accurate_count"] == 2
+    assert data["inaccurate_count"] == 1
+    assert data["unknown_count"] == 1
+    assert data["accurate_rate"] == 50.0
+    assert len(data["user_stats"]) == 2
+    assert len(data["top_annotators"]) <= 10
