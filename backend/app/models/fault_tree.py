@@ -100,6 +100,7 @@ class FaultTreeVersion(Base):
 
     __table_args__ = (
         CheckConstraint("status IN ('draft', 'reviewed', 'active', 'archived')", name="check_status"),
+        CheckConstraint("version_number > 0", name="check_version_number_positive"),
     )
 
     tree = relationship("FaultTree", back_populates="versions")

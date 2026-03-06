@@ -36,9 +36,10 @@ So that 故障树变更有迹可循，配置不会被未授权篡改。
 
 - **Given** 管理员需要将版本从 draft 改为 reviewed
 - **When** 调用审批 API
-- **Then** 系统验证审批者与创建者不同（`reviewed_by != created_by`）
+- **Then** 系统验证版本当前状态为 draft（如果不是 draft，返回 400 错误："只有 draft 状态的版本可以审批"）
+- **And** 系统验证审批者与创建者不同（`reviewed_by != created_by`）
 - **And** 验证通过后将状态改为 reviewed，记录 reviewed_by 和 reviewed_at
-- **And** 验证失败时返回 403 错误："不能审批自己创建的版本"
+- **And** 验证失败时返回 400 错误："不能审批自己创建的版本"
 
 ### 3. 版本激活与 HMAC 签名
 
@@ -46,14 +47,14 @@ So that 故障树变更有迹可循，配置不会被未授权篡改。
 - **When** 调用激活 API
 - **Then** 系统执行以下步骤：
   1. 从环境变量读取 `FAULT_TREE_HMAC_KEY`（必需，最短 32 字节）
-  2. 验证快照中的故障树结构是否为有效的 DAG（调用 DAGValidator）
-  3. 如果版本已有签名（重新激活场景），验证签名（使用当前密钥或 `FAULT_TREE_HMAC_KEY_PREVIOUS`，支持密钥轮换）
-  4. 使用 HMAC-SHA-256 对 snapshot 生成新签名：`hmac.new(key, snapshot.encode(), hashlib.sha256).hexdigest()`
-  5. 使用数据库锁（SELECT FOR UPDATE）获取同一 tree_id 的所有 active 版本，防止并发激活
+  2. 验证快照完整性：检查 snapshot 包含 tree、nodes、edges、device_mappings 四个必需字段
+  3. 验证快照中的故障树结构是否为有效的 DAG（调用 DAGValidator）
+  4. 使用 HMAC-SHA-256 对 snapshot 生成新签名：`hmac.new(key, snapshot.encode(), hashlib.sha256).hexdigest()`（注意：重新激活时直接生成新签名覆盖旧签名，不验证旧签名）
+  5. 使用数据库锁（SELECT FOR UPDATE）锁定同一 tree_id 的所有版本记录（不限状态），防止并发激活
   6. 在单个事务中：将其他 active 版本改为 archived，将当前版本状态改为 active，更新 hmac_signature 和 activated_at
-  7. 通过 Redis Pub/Sub 发布 `diagnosis:tree_version_change` 事件
+  7. 提交事务后，通过 Redis Pub/Sub 发布 `diagnosis:tree_version_change` 事件（如果 Redis 不可用，记录错误日志但不回滚事务，由运维人员手动触发诊断引擎重载）
+- **And** 快照完整性验证失败时拒绝激活，返回具体错误信息
 - **And** DAG 验证失败时拒绝激活，返回具体错误信息
-- **And** 签名验证失败时拒绝激活，记录安全告警日志
 - **And** 诊断引擎订阅版本切换事件，热加载新版本故障树到内存
 - **And** 并发激活时，后提交的请求会因为数据库锁而等待，确保只有一个版本最终为 active
 
@@ -72,8 +73,8 @@ So that 故障树变更有迹可循，配置不会被未授权篡改。
 - **Given** 管理员需要回滚到上一个版本
 - **When** 调用回滚 API
 - **Then** 系统找到同一 tree_id 的最近一个 archived 版本
-- **And** 验证该版本的签名（如果签名验证失败，拒绝回滚并返回错误："版本签名验证失败，可能使用了已删除的旧密钥，请联系管理员"）
-- **And** 签名验证通过后，重新激活该版本（执行 DAG 验证、状态切换、生成新签名）
+- **And** 检查回滚频率限制：如果 5 分钟内已回滚 3 次，拒绝回滚并返回 429 错误："回滚过于频繁，请稍后再试"
+- **And** 直接调用 activate_version 激活该版本（不修改版本状态，由 activate_version 内部处理）
 - **And** 如果没有可回滚的版本，返回 404 错误："没有可回滚的版本"
 
 ### 6. 版本列表查询
@@ -102,7 +103,7 @@ So that 故障树变更有迹可循，配置不会被未授权篡改。
 CREATE TABLE fault_tree_versions (
     id SERIAL PRIMARY KEY,
     tree_id INTEGER NOT NULL REFERENCES fault_trees(id) ON DELETE CASCADE,
-    version_number INTEGER NOT NULL,
+    version_number INTEGER NOT NULL CHECK (version_number > 0),
     status VARCHAR(20) NOT NULL DEFAULT 'draft' CHECK (status IN ('draft', 'reviewed', 'active', 'archived')),
     snapshot TEXT NOT NULL,  -- JSON 快照
     hmac_signature VARCHAR(64),  -- HMAC-SHA-256 签名（64 字符十六进制）

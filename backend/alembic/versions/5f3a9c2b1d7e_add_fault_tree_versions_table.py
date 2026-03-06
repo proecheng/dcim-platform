@@ -31,6 +31,7 @@ def upgrade() -> None:
         sa.Column('reviewed_at', sa.TIMESTAMP(), nullable=True),
         sa.Column('activated_at', sa.TIMESTAMP(), nullable=True),
         sa.CheckConstraint("status IN ('draft', 'reviewed', 'active', 'archived')", name='check_status'),
+        sa.CheckConstraint('version_number > 0', name='check_version_number_positive'),
         sa.ForeignKeyConstraint(['created_by'], ['users.id'], ),
         sa.ForeignKeyConstraint(['reviewed_by'], ['users.id'], ),
         sa.ForeignKeyConstraint(['tree_id'], ['fault_trees.id'], ondelete='CASCADE'),

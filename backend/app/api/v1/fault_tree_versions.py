@@ -55,8 +55,7 @@ async def review_version(
     - **返回**: 审批后的版本信息
     - **错误**:
         - 404 - 版本不存在
-        - 400 - 版本状态不是 draft
-        - 403 - 不能审批自己创建的版本
+        - 400 - 版本状态不是 draft / 不能审批自己创建的版本
     """
     version = await db.get(FaultTreeVersion, version_id)
     if not version or version.tree_id != tree_id:
@@ -65,13 +64,13 @@ async def review_version(
     if version.status != "draft":
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Only draft versions can be reviewed, current status: {version.status}"
+            detail=f"只有 draft 状态的版本可以审批，当前状态: {version.status}"
         )
 
     # 验证审批者与创建者不同
     if version.created_by == current_user.id:
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
+            status_code=status.HTTP_400_BAD_REQUEST,
             detail="不能审批自己创建的版本"
         )
 
@@ -124,17 +123,21 @@ async def rollback_version(
     - **返回**: 回滚后激活的版本信息
     - **错误**:
         - 404 - 没有可回滚的版本
-        - 400 - 签名验证失败 / DAG 验证失败
+        - 429 - 回滚过于频繁
+        - 400 - DAG 验证失败 / 快照完整性验证失败
     """
     try:
         version = await VersionManager.rollback_version(db, tree_id)
         return version
     except ValueError as e:
         logger.error(f"Failed to rollback tree {tree_id}: {e}")
-        if "没有可回滚的版本" in str(e):
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        error_msg = str(e)
+        if "没有可回滚的版本" in error_msg:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=error_msg)
+        elif "回滚过于频繁" in error_msg:
+            raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail=error_msg)
         else:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=error_msg)
 
 
 @router.get("/", response_model=List[FaultTreeVersionListResponse])
