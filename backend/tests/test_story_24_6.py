@@ -259,7 +259,7 @@ async def test_session_audit_log_requires_admin(client, async_db, viewer_user, a
 
 @pytest.mark.anyio
 async def test_save_complete_rollback_on_error():
-    """模拟数据库写入失败，验证全部回滚"""
+    """模拟数据库写入失败，验证回滚并降级到 Redis (Story 24.7 改动)"""
     from app.services.diagnosis.result_store import DiagnosisResultStore
 
     mock_session = AsyncMock()
@@ -272,15 +272,20 @@ async def test_save_complete_rollback_on_error():
     mock_ctx.__aenter__ = AsyncMock(return_value=mock_session)
     mock_ctx.__aexit__ = AsyncMock(return_value=False)
 
+    # DB 失败后会尝试 Redis fallback；Redis 也失败时才 raise
+    mock_redis = AsyncMock()
+    mock_redis.set = AsyncMock(side_effect=Exception("Redis also down"))
+
     with patch("app.services.diagnosis.result_store.async_session", return_value=mock_ctx):
-        with pytest.raises(Exception, match="DB write failed"):
-            await DiagnosisResultStore.save_complete(
-                engine_level="L1",
-                start_time=datetime.now(),
-                input_data={},
-                output_data={},
-            )
-        mock_session.rollback.assert_called_once()
+        with patch("app.services.diagnosis.fallback_store.get_redis_client", return_value=mock_redis):
+            with pytest.raises(Exception, match="DB write failed"):
+                await DiagnosisResultStore.save_complete(
+                    engine_level="L1",
+                    start_time=datetime.now(),
+                    input_data={},
+                    output_data={},
+                )
+            mock_session.rollback.assert_called_once()
 
 
 # ==================== 7.7 审计日志脱敏测试 ====================

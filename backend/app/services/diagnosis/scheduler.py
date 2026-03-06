@@ -14,6 +14,8 @@ from app.services.diagnosis.priority_queue import CancellablePriorityQueue, Prio
 from app.services.diagnosis.l1_engine import L1RuleEngine
 from app.services.diagnosis.result_store import DiagnosisResultStore
 from app.services.diagnosis.push_service import DiagnosisPushService
+from app.services.diagnosis.circuit_breaker import CircuitBreaker
+from app.services.diagnosis.fallback_store import DiagnosisFallbackStore
 from app.models.diagnosis import DiagnosisResult
 from app.models.device import Device
 
@@ -51,6 +53,12 @@ class DiagnosisScheduler:
         self.running = False
         self._workers: list[asyncio.Task] = []
         self._subscriber_task: Optional[asyncio.Task] = None
+        self._recovery_task: Optional[asyncio.Task] = None
+
+        # 熔断器 (Story 24.7)
+        self.circuit_breaker = CircuitBreaker(
+            on_state_change=self._on_breaker_state_change,
+        )
 
 
     async def start(self):
@@ -95,6 +103,9 @@ class DiagnosisScheduler:
         # 启动 Redis 订阅（显式存储）
         self._subscriber_task = asyncio.create_task(self._subscribe_alarms())
 
+        # 启动 Redis 降级恢复定时任务 (Story 24.7)
+        self._recovery_task = asyncio.create_task(self._recovery_loop())
+
         logger.info("DiagnosisScheduler started")
 
     async def stop(self):
@@ -123,6 +134,15 @@ class DiagnosisScheduler:
         qsize = await self.queue.qsize()
         if qsize > 0:
             logger.warning(f"Queue not empty after 30s, {qsize} tasks will be lost")
+
+        # 取消恢复任务
+        if self._recovery_task:
+            self._recovery_task.cancel()
+            try:
+                await self._recovery_task
+            except asyncio.CancelledError:
+                pass
+            self._recovery_task = None
 
         # 取消所有 worker
         for worker in self._workers:
@@ -232,6 +252,7 @@ class DiagnosisScheduler:
     async def _execute_inference(self, task: PriorityTask):
         """
         执行推理任务（使用 DiagnosisResultStore + DiagnosisPushService）
+        含熔断检查 (Story 24.7)
         """
         task_data = task.data
 
@@ -253,6 +274,14 @@ class DiagnosisScheduler:
             logger.error(f"Invalid alarm_data type: {type(alarm_data)}")
             return
 
+        # 熔断检查 (Story 24.7)
+        allowed, degraded = await self.circuit_breaker.allow_request(inference_level)
+        original_level = inference_level
+
+        if degraded and inference_level in ("L2", "L3"):
+            inference_level = "L1"
+            logger.warning(f"Circuit breaker degraded: alarm {alarm_id} {original_level}->L1")
+
         start_time = datetime.utcnow()
 
         try:
@@ -271,6 +300,10 @@ class DiagnosisScheduler:
             else:
                 result = {"matched": False, "reason": f"Unknown level {inference_level}"}
 
+            # 记录成功（仅对原始级别 L2/L3 且未降级计数）
+            if original_level in ("L2", "L3") and not degraded:
+                await self.circuit_breaker.record_success()
+
             # 计算推理时间
             end_time = datetime.utcnow()
             inference_time_ms = int((end_time - start_time).total_seconds() * 1000)
@@ -278,17 +311,18 @@ class DiagnosisScheduler:
             # 使用 DiagnosisResultStore 保存结果
             confidence = result.get("confidence")
             if isinstance(confidence, (int, float)):
-                # 如果引擎返回整数百分比，转为 0.0-1.0
                 if confidence > 1.0:
                     confidence = confidence / 100.0
             else:
                 confidence = None
 
+            status = "degraded" if degraded else "success"
+
             session_id, result_id = await DiagnosisResultStore.save_complete(
                 trigger_alarm_id=alarm_id,
                 device_id=device_id,
                 engine_level=inference_level,
-                status="success",
+                status=status,
                 max_confidence=confidence,
                 start_time=start_time,
                 end_time=end_time,
@@ -308,6 +342,10 @@ class DiagnosisScheduler:
                 output_data=result,
             )
 
+            # fallback 模式跳过推送 (session_id=0 表示已降级写入 Redis)
+            if session_id == 0:
+                return
+
             # 分级推送
             if confidence is not None:
                 push_status = await DiagnosisPushService.push_diagnosis_result(
@@ -321,10 +359,9 @@ class DiagnosisScheduler:
                 )
                 await DiagnosisResultStore.update_push_status(session_id, push_status)
 
-            # 自动升级逻辑
-            if not result.get("matched") and task_data.get("alarm_level") in ["critical", "major"]:
+            # 自动升级逻辑（降级时不升级）
+            if not degraded and not result.get("matched") and task_data.get("alarm_level") in ["critical", "major"]:
                 if inference_level == "L1":
-                    # 检查是否已有 L2 诊断结果，避免重复诊断
                     async with async_session() as db_session:
                         existing_l2 = await db_session.execute(
                             select(DiagnosisResult).where(
@@ -342,6 +379,9 @@ class DiagnosisScheduler:
 
         except asyncio.TimeoutError:
             logger.error(f"Inference timeout for alarm {alarm_id} (level={inference_level})")
+            # 记录超时（仅对原始级别 L2/L3 且未降级计数）
+            if original_level in ("L2", "L3") and not degraded:
+                await self.circuit_breaker.record_timeout()
             end_time = datetime.utcnow()
             timeout_ms = INFERENCE_TIMEOUT.get(inference_level, 2) * 1000
             try:
@@ -365,6 +405,9 @@ class DiagnosisScheduler:
 
         except Exception as e:
             logger.error(f"Inference error for alarm {alarm_id}: {e}", exc_info=True)
+            # 记录失败（仅对原始级别 L2/L3 且未降级计数）
+            if original_level in ("L2", "L3") and not degraded:
+                await self.circuit_breaker.record_failure()
             end_time = datetime.utcnow()
             try:
                 await DiagnosisResultStore.save_complete(
@@ -425,6 +468,32 @@ class DiagnosisScheduler:
             raise RuntimeError("Queue full, cannot trigger diagnosis")
 
         return {"status": "queued", "device_id": device_id, "level": level}
+
+    async def _recovery_loop(self):
+        """定时恢复 Redis 中的 pending 诊断结果 (Story 24.7)"""
+        # 启动后立即尝试一次恢复（处理重启前遗留数据）
+        await asyncio.sleep(5)  # 等待 Redis 连接就绪
+        while self.running:
+            try:
+                recovered = await DiagnosisFallbackStore.recover_pending()
+                if recovered > 0:
+                    logger.info(f"Recovered {recovered} pending diagnosis results from Redis")
+            except Exception as e:
+                logger.warning(f"Recovery loop error: {e}")
+            await asyncio.sleep(60)
+
+    async def _on_breaker_state_change(self, data: dict):
+        """熔断器状态变更回调 -- 推送 WebSocket 告警 (Story 24.7)"""
+        try:
+            from app.services.websocket import ws_manager
+            await ws_manager.broadcast_diagnosis(
+                msg_type="system_diagnosis_breaker",
+                data=data,
+                target_roles=["admin"],
+            )
+        except Exception as e:
+            logger.error(f"Failed to broadcast breaker state change: {e}")
+
 
 # 全局调度器实例
 _scheduler: Optional[DiagnosisScheduler] = None

@@ -271,7 +271,7 @@ development_status:
   24-4-fault-tree-version-management-and-hmac: done
   24-5-l2-fault-tree-inference-engine: done
   24-6-diagnosis-result-storage-and-graded-push: done
-  24-7-circuit-breaker-degradation-mechanism: backlog
+  24-7-circuit-breaker-degradation-mechanism: done
   24-8-diagnosis-result-annotation-and-rbac: backlog
   epic-24-retrospective: optional
 

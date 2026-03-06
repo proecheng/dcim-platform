@@ -231,6 +231,29 @@ async def toggle_rule(
 # ==================== 诊断结果 ====================
 
 
+# ==================== 健康检查 (Story 24.7) ====================
+
+
+@router.get("/health")
+async def diagnosis_health(_: User = Depends(require_viewer)):
+    """诊断引擎健康检查（熔断器状态）"""
+    try:
+        from ...services.diagnosis.scheduler import get_scheduler
+        scheduler = await get_scheduler()
+        breaker = scheduler.circuit_breaker
+        return {
+            "state": breaker.state.value,
+            "error_rate": round(breaker.error_rate, 4),
+            "last_trip_time": breaker.last_trip_time_iso,
+            "consecutive_failures": breaker.consecutive_failures,
+            "total_requests_in_window": breaker.total_in_window,
+            "failed_requests_in_window": breaker.failed_in_window,
+            "degraded_since": breaker.degraded_since_iso,
+        }
+    except Exception:
+        return {"state": "UNKNOWN", "error_rate": 0, "message": "Scheduler not running"}
+
+
 # ==================== 诊断会话 (Story 24.6) ====================
 
 

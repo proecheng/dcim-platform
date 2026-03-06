@@ -138,7 +138,44 @@ class DiagnosisResultStore:
             except Exception as e:
                 await session.rollback()
                 logger.error("诊断结果保存失败: %s", e)
-                raise
+                # DB 故障降级写入 Redis (Story 24.7)
+                try:
+                    from app.services.diagnosis.fallback_store import DiagnosisFallbackStore
+                    await DiagnosisFallbackStore.save_to_redis({
+                        "trigger_alarm_id": trigger_alarm_id,
+                        "device_id": device_id,
+                        "engine_level": engine_level,
+                        "status": status,
+                        "max_confidence": max_confidence,
+                        "start_time": start_time.isoformat() if start_time else None,
+                        "end_time": end_time.isoformat() if end_time else None,
+                        "inference_time_ms": inference_time_ms,
+                        "alarm_id": alarm_id,
+                        "alarm_no": alarm_no,
+                        "rule_id": rule_id,
+                        "rule_code": rule_code,
+                        "device_type": device_type,
+                        "zone": zone,
+                        "causes": causes,
+                        "diagnosis_level": diagnosis_level,
+                        "matched": matched,
+                        "conclusion": conclusion,
+                        "confidence": confidence,
+                        "suggested_actions": suggested_actions,
+                        "evidence": evidence,
+                        "root_cause": root_cause,
+                        "reasoning_path": reasoning_path,
+                        "fault_tree_version": fault_tree_version,
+                        "error_message": error_message,
+                        "input_data": input_data,
+                        "output_data": output_data,
+                        "push_status": push_status,
+                    })
+                    logger.warning("诊断结果已降级写入 Redis: alarm_id=%s", trigger_alarm_id)
+                    return (0, 0)  # 占位 ID，不 raise，避免 scheduler 重复保存
+                except Exception as redis_err:
+                    logger.critical("Redis 降级写入也失败: %s (原始DB错误: %s)", redis_err, e)
+                    raise e  # 抛出原始 DB 异常，而非 Redis 异常
 
     @staticmethod
     async def update_push_status(session_id: int, push_status: str) -> None:
