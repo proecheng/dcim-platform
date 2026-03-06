@@ -386,7 +386,7 @@ class FaultTreeInferenceEngine:
                     value = history[0].value
 
                 threshold = node_data.get("threshold")
-                status = "abnormal" if threshold and value > threshold else "normal"
+                status = "abnormal" if threshold is not None and value > threshold else "normal"
 
                 evidence[node_id] = EvidenceItem(
                     point_id=point_id,
