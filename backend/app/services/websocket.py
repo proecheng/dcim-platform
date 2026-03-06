@@ -143,6 +143,15 @@ class ConnectionManager:
         message = {"type": "linkage", "data": linkage_data}
         await self.broadcast(message, "linkage")
 
+    async def broadcast_diagnosis(self, msg_type: str, data: dict, target_roles: list = None):
+        """广播诊断结果 - Story 24.6，接口风格与 broadcast_alarm() 一致"""
+        message = {
+            "type": msg_type,  # "diagnosis_alert" 或 "diagnosis_suggestion"
+            "target_roles": target_roles or ["operator", "admin"],
+            "data": data,
+        }
+        await self.broadcast(message, "alarms")
+
 
 # 全局连接管理器
 ws_manager = ConnectionManager()

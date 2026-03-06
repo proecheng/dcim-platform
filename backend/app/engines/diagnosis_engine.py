@@ -16,6 +16,8 @@ from ..core.database import async_session
 from ..models.alarm import Alarm
 from ..models.diagnosis import DiagnosisRule, DiagnosisResult
 from ..services.websocket import ws_manager
+from ..services.diagnosis.result_store import DiagnosisResultStore
+from ..services.diagnosis.push_service import DiagnosisPushService
 from .event_bus import Event
 
 logger = logging.getLogger(__name__)
@@ -196,9 +198,26 @@ class DiagnosisEngine:
 
         elapsed_ms = int((time.monotonic() - start_ms) * 1000)
 
-        # 写入数据库
-        async with async_session() as session:
-            result_obj = DiagnosisResult(
+        # 最高置信度（引擎返回整数 0-100，转为 0.0-1.0）
+        top = all_causes[0] if all_causes else {}
+        top_confidence_int = top.get("confidence", 0)
+        top_confidence = top_confidence_int / 100.0 if top_confidence_int > 1 else float(top_confidence_int)
+        # start_time 根据 elapsed_ms 反推，end_time 取当前时间
+        end_dt = datetime.now()
+        from datetime import timedelta
+        start_dt = end_dt - timedelta(milliseconds=elapsed_ms)
+
+        # 使用 DiagnosisResultStore 统一存储
+        try:
+            session_id, result_id = await DiagnosisResultStore.save_complete(
+                trigger_alarm_id=alarm_id,
+                device_id=payload.get("device_id"),
+                engine_level="L1",
+                status="success",
+                max_confidence=top_confidence,
+                start_time=start_dt,
+                end_time=end_dt,
+                inference_time_ms=elapsed_ms,
                 alarm_id=alarm_id,
                 alarm_no=payload.get("alarm_no", ""),
                 rule_id=matched_rule_id,
@@ -206,26 +225,31 @@ class DiagnosisEngine:
                 device_type=device_type,
                 zone=payload.get("zone", ""),
                 causes=all_causes,
-                diagnosis_time_ms=elapsed_ms,
+                diagnosis_level="L1",
+                matched=True,
+                conclusion=top.get("cause", ""),
+                confidence=top_confidence,
+                suggested_actions=top.get("suggested_actions"),
+                root_cause=top.get("cause", ""),
+                input_data=payload,
+                output_data={"causes": all_causes, "elapsed_ms": elapsed_ms},
             )
-            session.add(result_obj)
-            await session.commit()
 
-        # WebSocket 推送
-        try:
-            top = all_causes[0] if all_causes else {}
-            await ws_manager.broadcast_alarm(
-                {
-                    "action": "diagnosis_completed",
-                    "alarm_id": alarm_id,
-                    "alarm_no": payload.get("alarm_no", ""),
-                    "causes_count": len(all_causes),
-                    "top_cause": top.get("cause", ""),
-                    "top_confidence": top.get("confidence", 0),
-                }
+            # 分级推送
+            push_status = await DiagnosisPushService.push_diagnosis_result(
+                session_id=session_id,
+                device_id=payload.get("device_id"),
+                device_type=device_type,
+                engine_level="L1",
+                confidence=top_confidence,
+                conclusion=top.get("cause", ""),
+                root_cause=top.get("cause", ""),
+                suggested_actions=top.get("suggested_actions"),
             )
+            await DiagnosisResultStore.update_push_status(session_id, push_status)
+
         except Exception as e:
-            logger.warning("诊断结果 WebSocket 推送失败: %s", e)
+            logger.error("诊断结果存储/推送失败: %s", e, exc_info=True)
 
     async def _calculate_confidence(self, cause_data: dict, alarm_level: str, payload: dict) -> int:
         """计算置信度"""

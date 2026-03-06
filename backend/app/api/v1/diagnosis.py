@@ -1,6 +1,7 @@
 """
 智能诊断 API
 Story 9-3: 智能故障诊断
+Story 24.6: 诊断会话、审计日志、历史查询
 """
 
 import logging
@@ -13,13 +14,15 @@ from sqlalchemy import select, func
 
 from ..deps import get_db, require_admin, require_operator, require_viewer
 from ...models.user import User
-from ...models.diagnosis import DiagnosisRule, DiagnosisResult
+from ...models.diagnosis import DiagnosisRule, DiagnosisResult, DiagnosisSession, DiagnosisAuditLog
 from ...schemas.diagnosis import (
     DiagnosisRuleCreate,
     DiagnosisRuleUpdate,
     DiagnosisRuleResponse,
     DiagnosisResultResponse,
     DiagnosisCategoryItem,
+    DiagnosisSessionResponse,
+    DiagnosisAuditLogResponse,
 )
 from ...engines.diagnosis_engine import diagnosis_engine
 
@@ -228,6 +231,110 @@ async def toggle_rule(
 # ==================== 诊断结果 ====================
 
 
+# ==================== 诊断会话 (Story 24.6) ====================
+
+
+@router.get("/sessions", response_model=dict)
+async def list_sessions(
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_viewer),
+    device_id: Optional[int] = Query(None, description="设备ID"),
+    engine_level: Optional[str] = Query(None, description="推理级别: L1/L2/L3"),
+    min_confidence: Optional[float] = Query(None, ge=0.0, le=1.0, description="最低置信度"),
+    start_date: Optional[str] = Query(None, description="开始时间 ISO格式"),
+    end_date: Optional[str] = Query(None, description="结束时间 ISO格式"),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+):
+    """诊断会话列表（分页查询）"""
+    query = select(DiagnosisSession)
+    if device_id is not None:
+        query = query.where(DiagnosisSession.device_id == device_id)
+    if engine_level is not None:
+        query = query.where(DiagnosisSession.engine_level == engine_level)
+    if min_confidence is not None:
+        query = query.where(DiagnosisSession.max_confidence >= min_confidence)
+    if start_date is not None:
+        try:
+            sd = datetime.fromisoformat(start_date)
+            query = query.where(DiagnosisSession.created_at >= sd)
+        except ValueError:
+            pass
+    if end_date is not None:
+        try:
+            ed = datetime.fromisoformat(end_date)
+            query = query.where(DiagnosisSession.created_at <= ed)
+        except ValueError:
+            pass
+    query = query.order_by(DiagnosisSession.created_at.desc())
+
+    count_query = select(func.count()).select_from(query.subquery())
+    total = (await db.execute(count_query)).scalar() or 0
+
+    query = query.offset((page - 1) * page_size).limit(page_size)
+    result = await db.execute(query)
+    sessions = result.scalars().all()
+
+    return {
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+        "items": [DiagnosisSessionResponse.model_validate(s) for s in sessions],
+    }
+
+
+@router.get("/sessions/{session_id}", response_model=DiagnosisSessionResponse)
+async def get_session_detail(
+    session_id: int,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_viewer),
+):
+    """诊断会话详情（含关联的诊断结果）"""
+    result = await db.execute(
+        select(DiagnosisSession).where(DiagnosisSession.id == session_id)
+    )
+    session_obj = result.scalar_one_or_none()
+    if session_obj is None:
+        raise HTTPException(status_code=404, detail="诊断会话不存在")
+
+    # 查询关联的诊断结果
+    result_query = await db.execute(
+        select(DiagnosisResult).where(DiagnosisResult.session_id == session_id)
+    )
+    diagnosis_result = result_query.scalar_one_or_none()
+
+    response = DiagnosisSessionResponse.model_validate(session_obj)
+    if diagnosis_result is not None:
+        response.result = DiagnosisResultResponse.model_validate(diagnosis_result)
+    return response
+
+
+@router.get("/sessions/{session_id}/audit-log", response_model=list)
+async def get_session_audit_log(
+    session_id: int,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_admin),
+):
+    """诊断会话审计日志（需 admin 角色）"""
+    # 验证会话存在
+    session_result = await db.execute(
+        select(DiagnosisSession).where(DiagnosisSession.id == session_id)
+    )
+    if session_result.scalar_one_or_none() is None:
+        raise HTTPException(status_code=404, detail="诊断会话不存在")
+
+    result = await db.execute(
+        select(DiagnosisAuditLog)
+        .where(DiagnosisAuditLog.session_id == session_id)
+        .order_by(DiagnosisAuditLog.created_at.desc())
+    )
+    logs = result.scalars().all()
+    return [DiagnosisAuditLogResponse.model_validate(log) for log in logs]
+
+
+# ==================== 诊断结果 ====================
+
+
 @router.get("/results/by-alarm/{alarm_id}", response_model=list)
 async def get_results_by_alarm(
     alarm_id: int,
@@ -248,6 +355,8 @@ async def list_results(
     _: User = Depends(require_viewer),
     device_type: Optional[str] = Query(None),
     zone: Optional[str] = Query(None),
+    session_id: Optional[int] = Query(None, description="诊断会话ID"),
+    min_confidence: Optional[float] = Query(None, ge=0.0, le=1.0, description="最低置信度"),
     start_time: Optional[str] = Query(None, description="开始时间 ISO格式"),
     end_time: Optional[str] = Query(None, description="结束时间 ISO格式"),
     page: int = Query(1, ge=1),
@@ -259,6 +368,10 @@ async def list_results(
         query = query.where(DiagnosisResult.device_type == device_type)
     if zone is not None:
         query = query.where(DiagnosisResult.zone == zone)
+    if session_id is not None:
+        query = query.where(DiagnosisResult.session_id == session_id)
+    if min_confidence is not None:
+        query = query.where(DiagnosisResult.confidence >= min_confidence)
     if start_time is not None:
         try:
             st = datetime.fromisoformat(start_time)

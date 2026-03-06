@@ -12,6 +12,8 @@ from app.core.database import async_session
 from app.core.redis_client import get_redis
 from app.services.diagnosis.priority_queue import CancellablePriorityQueue, PriorityTask
 from app.services.diagnosis.l1_engine import L1RuleEngine
+from app.services.diagnosis.result_store import DiagnosisResultStore
+from app.services.diagnosis.push_service import DiagnosisPushService
 from app.models.diagnosis import DiagnosisResult
 from app.models.device import Device
 
@@ -229,7 +231,7 @@ class DiagnosisScheduler:
 
     async def _execute_inference(self, task: PriorityTask):
         """
-        执行推理任务
+        执行推理任务（使用 DiagnosisResultStore + DiagnosisPushService）
         """
         task_data = task.data
 
@@ -244,9 +246,6 @@ class DiagnosisScheduler:
         alarm_data = task_data.get("alarm_data")
 
         # 验证必需字段
-        if device_id is None:
-            logger.error(f"Missing device_id in task_data: {task_data}")
-            return
         if not inference_level:
             logger.error(f"Missing inference_level in task_data: {task_data}")
             return
@@ -273,24 +272,67 @@ class DiagnosisScheduler:
                 result = {"matched": False, "reason": f"Unknown level {inference_level}"}
 
             # 计算推理时间
-            inference_time_ms = int((datetime.utcnow() - start_time).total_seconds() * 1000)
+            end_time = datetime.utcnow()
+            inference_time_ms = int((end_time - start_time).total_seconds() * 1000)
 
-            # 保存结果
-            await self._save_result(alarm_id, device_id, inference_level, result, inference_time_ms)
+            # 使用 DiagnosisResultStore 保存结果
+            confidence = result.get("confidence")
+            if isinstance(confidence, (int, float)):
+                # 如果引擎返回整数百分比，转为 0.0-1.0
+                if confidence > 1.0:
+                    confidence = confidence / 100.0
+            else:
+                confidence = None
+
+            session_id, result_id = await DiagnosisResultStore.save_complete(
+                trigger_alarm_id=alarm_id,
+                device_id=device_id,
+                engine_level=inference_level,
+                status="success",
+                max_confidence=confidence,
+                start_time=start_time,
+                end_time=end_time,
+                inference_time_ms=inference_time_ms,
+                alarm_id=alarm_id,
+                diagnosis_level=inference_level,
+                matched=result.get("matched", False),
+                conclusion=result.get("conclusion"),
+                confidence=confidence,
+                suggested_actions=result.get("suggested_actions"),
+                evidence=result.get("evidence"),
+                root_cause=result.get("root_cause"),
+                reasoning_path=result.get("reasoning_path"),
+                fault_tree_version=result.get("fault_tree_version"),
+                error_message=result.get("error"),
+                input_data=alarm_data,
+                output_data=result,
+            )
+
+            # 分级推送
+            if confidence is not None:
+                push_status = await DiagnosisPushService.push_diagnosis_result(
+                    session_id=session_id,
+                    device_id=device_id,
+                    engine_level=inference_level,
+                    confidence=confidence,
+                    conclusion=result.get("conclusion"),
+                    root_cause=result.get("root_cause"),
+                    suggested_actions=result.get("suggested_actions"),
+                )
+                await DiagnosisResultStore.update_push_status(session_id, push_status)
 
             # 自动升级逻辑
-            if not result.get("matched") and task_data["alarm_level"] in ["critical", "major"]:
+            if not result.get("matched") and task_data.get("alarm_level") in ["critical", "major"]:
                 if inference_level == "L1":
                     # 检查是否已有 L2 诊断结果，避免重复诊断
-                    async with async_session() as session:
-                        existing_l2 = await session.execute(
+                    async with async_session() as db_session:
+                        existing_l2 = await db_session.execute(
                             select(DiagnosisResult).where(
                                 DiagnosisResult.alarm_id == alarm_id,
                                 DiagnosisResult.diagnosis_level == "L2"
                             )
                         )
                         if existing_l2.scalar_one_or_none() is None:
-                            # L1 未匹配且无 L2 结果，升级到 L2
                             logger.info(f"Alarm {alarm_id} L1 no match, upgrading to L2")
                             task_data["inference_level"] = "L2"
                             priority = ALARM_LEVEL_PRIORITY.get(task_data["alarm_level"], 1)
@@ -300,56 +342,49 @@ class DiagnosisScheduler:
 
         except asyncio.TimeoutError:
             logger.error(f"Inference timeout for alarm {alarm_id} (level={inference_level})")
-            # TODO: 触发熔断计数器（Story 24.7）
-            await self._save_result(
-                alarm_id, device_id, inference_level,
-                {"matched": False, "error": "Timeout"},
-                INFERENCE_TIMEOUT.get(inference_level, 2) * 1000
-            )
+            end_time = datetime.utcnow()
+            timeout_ms = INFERENCE_TIMEOUT.get(inference_level, 2) * 1000
+            try:
+                await DiagnosisResultStore.save_complete(
+                    trigger_alarm_id=alarm_id,
+                    device_id=device_id,
+                    engine_level=inference_level,
+                    status="timeout",
+                    start_time=start_time,
+                    end_time=end_time,
+                    inference_time_ms=timeout_ms,
+                    alarm_id=alarm_id,
+                    diagnosis_level=inference_level,
+                    matched=False,
+                    error_message="Timeout",
+                    input_data=alarm_data,
+                    output_data={"matched": False, "error": "Timeout"},
+                )
+            except Exception as save_err:
+                logger.error(f"Failed to save timeout result: {save_err}")
+
         except Exception as e:
             logger.error(f"Inference error for alarm {alarm_id}: {e}", exc_info=True)
-            await self._save_result(
-                alarm_id, device_id, inference_level,
-                {"matched": False, "error": str(e)},
-                0
-            )
-
-
-    async def _save_result(
-        self,
-        alarm_id: int,
-        device_id: int,
-        diagnosis_level: str,
-        result: dict,
-        inference_time_ms: int
-    ):
-        """
-        保存诊断结果到数据库
-        """
-        async with async_session() as session:
+            end_time = datetime.utcnow()
             try:
-                diagnosis_result = DiagnosisResult(
-                    alarm_id=alarm_id,
+                await DiagnosisResultStore.save_complete(
+                    trigger_alarm_id=alarm_id,
                     device_id=device_id,
-                    diagnosis_level=diagnosis_level,
-                    matched=result.get("matched", False),
-                    conclusion=result.get("conclusion"),
-                    confidence=result.get("confidence"),
-                    suggested_actions=result.get("suggested_actions"),
-                    evidence=result.get("evidence"),
-                    inference_time_ms=inference_time_ms,
-                    error_message=result.get("error")
+                    engine_level=inference_level,
+                    status="error",
+                    start_time=start_time,
+                    end_time=end_time,
+                    inference_time_ms=0,
+                    alarm_id=alarm_id,
+                    diagnosis_level=inference_level,
+                    matched=False,
+                    error_message=str(e),
+                    input_data=alarm_data,
+                    output_data={"matched": False, "error": str(e)},
                 )
-                session.add(diagnosis_result)
-                await session.commit()
+            except Exception as save_err:
+                logger.error(f"Failed to save error result: {save_err}")
 
-                logger.info(f"Saved diagnosis result for alarm {alarm_id}")
-            except Exception as e:
-                await session.rollback()
-                logger.error(f"Failed to save diagnosis result for alarm {alarm_id}: {e}", exc_info=True)
-                raise
-
-            # TODO: WebSocket 推送结果（需 operator+ 角色）
 
     async def trigger_manual(
         self,

@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 from typing import Optional, List
 from app.core.database import get_db
-from app.core.security import require_role, get_current_user
+from app.api.deps import require_role, get_current_user
 from app.services.diagnosis.version_manager import VersionManager
 from app.models.fault_tree import FaultTreeVersion
 from app.schemas.fault_tree_version import (
