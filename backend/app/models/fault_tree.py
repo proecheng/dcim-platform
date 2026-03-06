@@ -22,6 +22,7 @@ class FaultTree(Base):
     nodes = relationship("FaultTreeNode", back_populates="tree", cascade="all, delete-orphan")
     edges = relationship("FaultTreeEdge", back_populates="tree", cascade="all, delete-orphan")
     device_mappings = relationship("FaultTreeDeviceMapping", back_populates="tree", cascade="all, delete-orphan")
+    versions = relationship("FaultTreeVersion", back_populates="tree", cascade="all, delete-orphan")
 
 
 class FaultTreeNode(Base):
@@ -79,3 +80,26 @@ class FaultTreeDeviceMapping(Base):
     created_at = Column(TIMESTAMP, nullable=False, server_default=func.now())
 
     tree = relationship("FaultTree", back_populates="device_mappings")
+
+
+class FaultTreeVersion(Base):
+    """故障树版本"""
+    __tablename__ = "fault_tree_versions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    tree_id = Column(Integer, ForeignKey("fault_trees.id", ondelete="CASCADE"), nullable=False, index=True)
+    version_number = Column(Integer, nullable=False)
+    status = Column(String(20), nullable=False, default="draft", index=True)
+    snapshot = Column(Text, nullable=False)
+    hmac_signature = Column(String(64))
+    created_by = Column(Integer, ForeignKey("users.id"), nullable=False)
+    created_at = Column(TIMESTAMP, nullable=False, server_default=func.now())
+    reviewed_by = Column(Integer, ForeignKey("users.id"))
+    reviewed_at = Column(TIMESTAMP)
+    activated_at = Column(TIMESTAMP)
+
+    __table_args__ = (
+        CheckConstraint("status IN ('draft', 'reviewed', 'active', 'archived')", name="check_status"),
+    )
+
+    tree = relationship("FaultTree", back_populates="versions")

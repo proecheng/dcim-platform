@@ -4,8 +4,9 @@
 
 import secrets
 from pydantic_settings import BaseSettings
-from pydantic import Field
+from pydantic import Field, field_validator
 from functools import lru_cache
+from typing import Optional
 
 
 def generate_secret_key() -> str:
@@ -91,6 +92,28 @@ class Settings(BaseSettings):
         default=0.7,
         description="默认电价（元/kWh），用于填补缺失时段"
     )
+
+    # 故障树 HMAC 密钥（Story 24.4）
+    fault_tree_hmac_key: str = Field(
+        default="",
+        env="FAULT_TREE_HMAC_KEY",
+        description="故障树 HMAC 签名密钥（至少 32 字符）"
+    )
+    fault_tree_hmac_key_previous: Optional[str] = Field(
+        default=None,
+        env="FAULT_TREE_HMAC_KEY_PREVIOUS",
+        description="故障树 HMAC 旧密钥（密钥轮换时使用）"
+    )
+
+    @field_validator("fault_tree_hmac_key")
+    @classmethod
+    def validate_hmac_key(cls, v):
+        """验证 HMAC 密钥长度"""
+        if not v:
+            raise ValueError("FAULT_TREE_HMAC_KEY is required")
+        if len(v) < 32:
+            raise ValueError("FAULT_TREE_HMAC_KEY must be at least 32 characters")
+        return v
 
     class Config:
         env_file = ".env"

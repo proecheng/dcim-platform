@@ -268,7 +268,7 @@ development_status:
   24-1-l1-rule-engine: done
   24-2-diagnosis-scheduler-and-concurrency-control: done
   24-3-fault-tree-data-model-and-crud: done
-  24-4-fault-tree-version-management-and-hmac: backlog
+  24-4-fault-tree-version-management-and-hmac: done
   24-5-l2-fault-tree-inference-engine: backlog
   24-6-diagnosis-result-storage-and-graded-push: backlog
   24-7-circuit-breaker-degradation-mechanism: backlog

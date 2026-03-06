@@ -52,6 +52,7 @@ from .drift import router as drift_router
 from .video import router as video_router
 from .ota import router as ota_router
 from .shift import router as shift_router
+from .fault_tree_versions import router as fault_tree_versions_router
 
 # 深度学习节能优化模块 (需要安装 torch)
 try:
@@ -111,6 +112,7 @@ api_router.include_router(drift_router, prefix="/drift", tags=["漂移检测"])
 api_router.include_router(video_router, prefix="/video", tags=["视频监控"])
 api_router.include_router(ota_router, prefix="/ota", tags=["OTA升级"])
 api_router.include_router(shift_router, prefix="/energy/shift", tags=["负荷转移"])
+api_router.include_router(fault_tree_versions_router, tags=["故障树版本管理"])
 
 # 深度学习节能优化API
 if _ml_available:
