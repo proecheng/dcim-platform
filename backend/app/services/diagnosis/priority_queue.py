@@ -22,6 +22,7 @@ class CancellablePriorityQueue:
         self._maxsize = maxsize
         self._event = asyncio.Event()
         self._lock = asyncio.Lock()
+        self._cancelled_count = 0  # 跟踪已取消任务数量
 
     async def put(self, priority: int, task_id: str, data: Any) -> bool:
         """
@@ -31,20 +32,32 @@ class CancellablePriorityQueue:
         - 新任务优先级 < 队列最低优先级：取消队列中最低优先级任务，插入新任务
         """
         async with self._lock:
-            # 移除已取消的任务
-            self._queue = [t for t in self._queue if not t._cancelled]
-            heapq.heapify(self._queue)
+            # 只在已取消任务过多时才清理（避免每次都重建）
+            if self._cancelled_count > self._maxsize:
+                self._compact()
 
-            if len(self._queue) >= self._maxsize:
+            active_size = len(self._queue) - self._cancelled_count
+
+            if active_size >= self._maxsize:
                 # 队列已满，检查是否需要替换
-                # 此时 self._queue 中都是未取消的任务
-                lowest_priority_task = max(self._queue, key=lambda t: t.priority)
-                if priority >= lowest_priority_task.priority:
+                # 找到未取消的最低优先级任务
+                lowest_priority_task = None
+                lowest_priority = -1
+                for task in self._queue:
+                    if not task._cancelled and task.priority > lowest_priority:
+                        lowest_priority = task.priority
+                        lowest_priority_task = task
+
+                if lowest_priority_task is None:
+                    # 所有任务都已取消，清理后重试
+                    self._compact()
+                elif priority >= lowest_priority:
                     # 新任务优先级更低，丢弃
                     return False
                 else:
                     # 取消最低优先级任务
                     lowest_priority_task._cancelled = True
+                    self._cancelled_count += 1
 
             # 插入新任务
             task = PriorityTask(priority=priority, task_id=task_id, data=data)
@@ -61,11 +74,16 @@ class CancellablePriorityQueue:
                 # 移除已取消的任务
                 while self._queue and self._queue[0]._cancelled:
                     heapq.heappop(self._queue)
+                    self._cancelled_count -= 1
 
                 if self._queue:
                     task = heapq.heappop(self._queue)
                     if not task._cancelled:
                         return task
+                    else:
+                        # 已取消，继续循环
+                        self._cancelled_count -= 1
+                        continue
                 else:
                     self._event.clear()
 
@@ -80,11 +98,22 @@ class CancellablePriorityQueue:
             for task in self._queue:
                 if task.task_id == task_id and not task._cancelled:
                     task._cancelled = True
+                    self._cancelled_count += 1
                     return True
             return False
 
-    def qsize(self) -> int:
+    async def qsize(self) -> int:
         """
         返回队列大小（不包括已取消的任务）
+        注意：此方法现在是异步的，需要加锁保护
         """
-        return sum(1 for t in self._queue if not t._cancelled)
+        async with self._lock:
+            return len(self._queue) - self._cancelled_count
+
+    def _compact(self):
+        """
+        清理已取消的任务（内部方法，调用者需持有锁）
+        """
+        self._queue = [t for t in self._queue if not t._cancelled]
+        heapq.heapify(self._queue)
+        self._cancelled_count = 0

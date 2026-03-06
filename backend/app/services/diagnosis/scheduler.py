@@ -48,6 +48,7 @@ class DiagnosisScheduler:
         self.redis: Optional[Redis] = None
         self.running = False
         self._workers: list[asyncio.Task] = []
+        self._subscriber_task: Optional[asyncio.Task] = None
 
 
     async def start(self):
@@ -57,6 +58,21 @@ class DiagnosisScheduler:
         if self.running:
             logger.warning("Scheduler already running")
             return
+
+        # 清理旧状态（防止重启时状态不一致）
+        if self._workers:
+            logger.warning("Cleaning up old workers from previous failed start")
+            for worker in self._workers:
+                worker.cancel()
+            await asyncio.gather(*self._workers, return_exceptions=True)
+            self._workers.clear()
+        if self._subscriber_task:
+            self._subscriber_task.cancel()
+            try:
+                await self._subscriber_task
+            except asyncio.CancelledError:
+                pass
+            self._subscriber_task = None
 
         self.running = True
         self.redis = await get_redis()
@@ -74,9 +90,8 @@ class DiagnosisScheduler:
             worker = asyncio.create_task(self._worker(f"worker-{i}"))
             self._workers.append(worker)
 
-        # 启动 Redis 订阅
-        subscriber = asyncio.create_task(self._subscribe_alarms())
-        self._workers.append(subscriber)
+        # 启动 Redis 订阅（显式存储）
+        self._subscriber_task = asyncio.create_task(self._subscribe_alarms())
 
         logger.info("DiagnosisScheduler started")
 
@@ -88,29 +103,31 @@ class DiagnosisScheduler:
         self.running = False
 
         # 先取消订阅协程，停止接收新告警
-        if self._workers:
-            subscriber = self._workers[-1]  # 最后一个是订阅协程
-            subscriber.cancel()
+        if self._subscriber_task:
+            self._subscriber_task.cancel()
             try:
-                await subscriber
+                await self._subscriber_task
             except asyncio.CancelledError:
                 pass
 
         # 等待队列清空（最多等待 30 秒）
         logger.info("Waiting for queue to drain...")
         for _ in range(30):
-            if self.queue.qsize() == 0:
+            qsize = await self.queue.qsize()
+            if qsize == 0:
                 break
             await asyncio.sleep(1)
 
-        if self.queue.qsize() > 0:
-            logger.warning(f"Queue not empty after 30s, {self.queue.qsize()} tasks will be lost")
+        qsize = await self.queue.qsize()
+        if qsize > 0:
+            logger.warning(f"Queue not empty after 30s, {qsize} tasks will be lost")
 
         # 取消所有 worker
-        for worker in self._workers[:-1]:  # 排除已取消的订阅协程
+        for worker in self._workers:
             worker.cancel()
         await asyncio.gather(*self._workers, return_exceptions=True)
         self._workers.clear()
+        self._subscriber_task = None
         logger.info("DiagnosisScheduler stopped")
 
 
@@ -215,10 +232,27 @@ class DiagnosisScheduler:
         执行推理任务
         """
         task_data = task.data
-        alarm_id = task_data["alarm_id"]
-        device_id = task_data["device_id"]
-        inference_level = task_data["inference_level"]
-        alarm_data = task_data["alarm_data"]
+
+        # 验证 task_data 格式
+        if not isinstance(task_data, dict):
+            logger.error(f"Invalid task_data type: {type(task_data)}")
+            return
+
+        alarm_id = task_data.get("alarm_id")
+        device_id = task_data.get("device_id")
+        inference_level = task_data.get("inference_level")
+        alarm_data = task_data.get("alarm_data")
+
+        # 验证必需字段
+        if device_id is None:
+            logger.error(f"Missing device_id in task_data: {task_data}")
+            return
+        if not inference_level:
+            logger.error(f"Missing inference_level in task_data: {task_data}")
+            return
+        if not isinstance(alarm_data, dict):
+            logger.error(f"Invalid alarm_data type: {type(alarm_data)}")
+            return
 
         start_time = datetime.utcnow()
 
@@ -293,22 +327,27 @@ class DiagnosisScheduler:
         保存诊断结果到数据库
         """
         async with async_session() as session:
-            diagnosis_result = DiagnosisResult(
-                alarm_id=alarm_id,
-                device_id=device_id,
-                diagnosis_level=diagnosis_level,
-                matched=result.get("matched", False),
-                conclusion=result.get("conclusion"),
-                confidence=result.get("confidence"),
-                suggested_actions=result.get("suggested_actions"),
-                evidence=result.get("evidence"),
-                inference_time_ms=inference_time_ms,
-                error_message=result.get("error")
-            )
-            session.add(diagnosis_result)
-            await session.commit()
+            try:
+                diagnosis_result = DiagnosisResult(
+                    alarm_id=alarm_id,
+                    device_id=device_id,
+                    diagnosis_level=diagnosis_level,
+                    matched=result.get("matched", False),
+                    conclusion=result.get("conclusion"),
+                    confidence=result.get("confidence"),
+                    suggested_actions=result.get("suggested_actions"),
+                    evidence=result.get("evidence"),
+                    inference_time_ms=inference_time_ms,
+                    error_message=result.get("error")
+                )
+                session.add(diagnosis_result)
+                await session.commit()
 
-            logger.info(f"Saved diagnosis result for alarm {alarm_id}")
+                logger.info(f"Saved diagnosis result for alarm {alarm_id}")
+            except Exception as e:
+                await session.rollback()
+                logger.error(f"Failed to save diagnosis result for alarm {alarm_id}: {e}", exc_info=True)
+                raise
 
             # TODO: WebSocket 推送结果（需 operator+ 角色）
 
@@ -354,13 +393,15 @@ class DiagnosisScheduler:
 
 # 全局调度器实例
 _scheduler: Optional[DiagnosisScheduler] = None
+_scheduler_lock = asyncio.Lock()
 
 async def get_scheduler() -> DiagnosisScheduler:
     """
-    获取全局调度器实例
+    获取全局调度器实例（线程安全）
     """
     global _scheduler
-    if _scheduler is None:
-        _scheduler = DiagnosisScheduler()
-    return _scheduler
+    async with _scheduler_lock:
+        if _scheduler is None:
+            _scheduler = DiagnosisScheduler()
+        return _scheduler
 
