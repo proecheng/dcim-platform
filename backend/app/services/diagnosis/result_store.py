@@ -5,6 +5,7 @@
 
 import json
 import logging
+import re
 from datetime import datetime
 from typing import Optional
 
@@ -19,8 +20,15 @@ logger = logging.getLogger(__name__)
 class DiagnosisResultStore:
     """诊断结果存储 - 无状态工具类"""
 
-    # 需要脱敏的敏感字段名
+    # 需要脱敏的敏感字段名（使用更精确的模式）
     SENSITIVE_KEYS = {"password", "token", "secret", "api_key", "authorization"}
+    # 敏感字段后缀模式（避免误匹配 primary_key, keyboard 等）
+    SENSITIVE_SUFFIXES = {"_password", "_token", "_secret", "_key", "_api_key"}
+    # 字符串值中的敏感模式
+    SENSITIVE_VALUE_PATTERN = re.compile(
+        r'(password|token|key|secret|authorization)\s*[:=]\s*\S+(\s+\S+)?|bearer\s+\S+',
+        re.IGNORECASE
+    )
     # 审计数据最大大小 64KB
     MAX_AUDIT_SIZE = 64 * 1024
 
@@ -107,6 +115,23 @@ class DiagnosisResultStore:
                 session.add(db_result)
                 await session.flush()
 
+                # 数据一致性检查（AC2 第二轮审查问题 1）
+                if device_id is not None and db_session.device_id is not None:
+                    if device_id != db_session.device_id:
+                        logger.error(
+                            "数据一致性错误: result.device_id=%s != session.device_id=%s",
+                            device_id, db_session.device_id
+                        )
+                        raise ValueError(
+                            f"device_id 不一致: result={device_id}, session={db_session.device_id}"
+                        )
+
+                if inference_time_ms != db_session.inference_time_ms:
+                    logger.warning(
+                        "inference_time_ms 不一致: result=%d, session=%d (可能是计算误差)",
+                        inference_time_ms, db_session.inference_time_ms
+                    )
+
                 # 3. 创建审计日志（脱敏处理）
                 sanitized_input = DiagnosisResultStore._sanitize_audit_data(
                     input_data or {}
@@ -141,14 +166,16 @@ class DiagnosisResultStore:
                 # DB 故障降级写入 Redis (Story 24.7)
                 try:
                     from app.services.diagnosis.fallback_store import DiagnosisFallbackStore
-                    await DiagnosisFallbackStore.save_to_redis({
+
+                    # 构建降级数据（保持 datetime 对象，由 save_to_redis 自动转换）
+                    fallback_data = {
                         "trigger_alarm_id": trigger_alarm_id,
                         "device_id": device_id,
                         "engine_level": engine_level,
                         "status": status,
                         "max_confidence": max_confidence,
-                        "start_time": start_time.isoformat() if start_time else None,
-                        "end_time": end_time.isoformat() if end_time else None,
+                        "start_time": start_time,  # datetime 对象
+                        "end_time": end_time,      # datetime 对象
                         "inference_time_ms": inference_time_ms,
                         "alarm_id": alarm_id,
                         "alarm_no": alarm_no,
@@ -170,12 +197,26 @@ class DiagnosisResultStore:
                         "input_data": input_data,
                         "output_data": output_data,
                         "push_status": push_status,
-                    })
+                    }
+
+                    # 记录降级原因
+                    fallback_reason = f"{type(e).__name__}: {str(e)}"
+
+                    await DiagnosisFallbackStore.save_to_redis(fallback_data, reason=fallback_reason)
                     logger.warning("诊断结果已降级写入 Redis: alarm_id=%s", trigger_alarm_id)
-                    return (0, 0)  # 占位 ID，不 raise，避免 scheduler 重复保存
+                    return (None, None)  # 修正：返回 (None, None) 表示降级保存成功
+
                 except Exception as redis_err:
                     logger.critical("Redis 降级写入也失败: %s (原始DB错误: %s)", redis_err, e)
-                    raise e  # 抛出原始 DB 异常，而非 Redis 异常
+                    # Redis 也失败，尝试写入本地文件
+                    try:
+                        await DiagnosisFallbackStore._save_to_local_file(
+                            fallback_data, "redis_unavailable"
+                        )
+                        return (None, None)  # 仍返回 (None, None)，表示已降级处理
+                    except Exception as file_err:
+                        logger.critical("本地文件降级也失败: %s", file_err)
+                        raise e  # 抛出原始 DB 异常
 
     @staticmethod
     async def update_push_status(session_id: int, push_status: str) -> None:
@@ -211,15 +252,26 @@ class DiagnosisResultStore:
 
         sanitized = {}
         for key, value in data.items():
-            # 检查是否为敏感字段
-            if key.lower() in DiagnosisResultStore.SENSITIVE_KEYS:
+            # 检查是否为敏感字段（AC2 第二轮审查问题 2）
+            key_lower = key.lower()
+            is_sensitive = (
+                key_lower in DiagnosisResultStore.SENSITIVE_KEYS or
+                any(key_lower.endswith(suffix) for suffix in DiagnosisResultStore.SENSITIVE_SUFFIXES)
+            )
+
+            if is_sensitive:
                 sanitized[key] = "***REDACTED***"
+            elif isinstance(value, str):
+                # 检查字符串值中的敏感模式（AC2 第二轮审查问题 3）
+                sanitized[key] = DiagnosisResultStore._sanitize_string_value(value)
             elif isinstance(value, dict):
                 sanitized[key] = DiagnosisResultStore._sanitize_audit_data(value)
             elif isinstance(value, list):
                 sanitized[key] = [
                     DiagnosisResultStore._sanitize_audit_data(item)
                     if isinstance(item, dict)
+                    else DiagnosisResultStore._sanitize_string_value(item)
+                    if isinstance(item, str)
                     else item
                     for item in value
                 ]
@@ -230,6 +282,27 @@ class DiagnosisResultStore:
         return DiagnosisResultStore._truncate_to_size(
             sanitized, DiagnosisResultStore.MAX_AUDIT_SIZE
         )
+
+    @staticmethod
+    def _sanitize_string_value(value: str) -> str:
+        """
+        检查并脱敏字符串值中的敏感模式
+
+        例如: "Authorization: Bearer abc123" -> "Authorization: ***REDACTED***"
+              "password=secret123" -> "password=***REDACTED***"
+        """
+        def replace_sensitive(match):
+            full = match.group(0)
+            # Bearer 模式
+            if full.lower().startswith("bearer"):
+                return "Bearer ***REDACTED***"
+            # 其他 key=value / key: value 模式
+            group1 = match.group(1)
+            if group1:
+                return f"{group1}=***REDACTED***"
+            return "***REDACTED***"
+
+        return DiagnosisResultStore.SENSITIVE_VALUE_PATTERN.sub(replace_sensitive, value)
 
     @staticmethod
     def _truncate_to_size(data: dict, max_size: int) -> dict:

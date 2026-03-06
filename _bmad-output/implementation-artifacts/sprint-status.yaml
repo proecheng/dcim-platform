@@ -273,7 +273,7 @@ development_status:
   24-6-diagnosis-result-storage-and-graded-push: done
   24-7-circuit-breaker-degradation-mechanism: done
   24-8-diagnosis-result-annotation-and-rbac: done
-  epic-24-retrospective: optional
+  epic-24-retrospective: done
 
   # Epic 25: 智能诊断专业扩展 (Phase 2b 月9-10)
   epic-25: backlog
@@ -315,7 +315,7 @@ development_status:
   27-4-alarm-sound-toggle-unification: done
   27-5-websocket-single-connection-manager: done
   27-5-websocket-single-connection-manager: done
-  27-6-site-filter-propagation: backlog
+  27-6-site-filter-propagation: done
   epic-27-retrospective: optional
 
   # Epic 28: Demo 系统解耦与数据隔离 (MVP 月1-3)

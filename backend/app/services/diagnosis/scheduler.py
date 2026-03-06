@@ -56,6 +56,7 @@ class DiagnosisScheduler:
         self._subscriber_task: Optional[asyncio.Task] = None
         self._recovery_task: Optional[asyncio.Task] = None
         self._anomaly_detection_task: Optional[asyncio.Task] = None
+        self._push_retry_task: Optional[asyncio.Task] = None  # Story 24.6 推送重试任务
 
         # 熔断器 (Story 24.7)
         self.circuit_breaker = CircuitBreaker(
@@ -111,6 +112,9 @@ class DiagnosisScheduler:
         # 启动标注偏差检测定时任务 (Story 24.8)
         self._anomaly_detection_task = asyncio.create_task(self._anomaly_detection_loop())
 
+        # 启动推送重试定时任务 (Story 24.6)
+        self._push_retry_task = asyncio.create_task(self._push_retry_loop())
+
         logger.info("DiagnosisScheduler started")
 
     async def stop(self):
@@ -157,6 +161,15 @@ class DiagnosisScheduler:
             except asyncio.CancelledError:
                 pass
             self._anomaly_detection_task = None
+
+        # 取消推送重试任务
+        if self._push_retry_task:
+            self._push_retry_task.cancel()
+            try:
+                await self._push_retry_task
+            except asyncio.CancelledError:
+                pass
+            self._push_retry_task = None
 
         # 取消所有 worker
         for worker in self._workers:
@@ -356,8 +369,8 @@ class DiagnosisScheduler:
                 output_data=result,
             )
 
-            # fallback 模式跳过推送 (session_id=0 表示已降级写入 Redis)
-            if session_id == 0:
+            # fallback 模式跳过推送 (session_id=None 表示已降级写入 Redis)
+            if session_id is None:
                 return
 
             # 分级推送
@@ -577,6 +590,28 @@ class DiagnosisScheduler:
 
             # 每小时检测一次
             await asyncio.sleep(3600)
+
+    async def _push_retry_loop(self):
+        """
+        推送重试定时任务（Story 24.6）
+        每 60 秒处理一次重试队列
+        """
+        # 启动延迟 10 秒，避免与其他任务冲突
+        await asyncio.sleep(10)
+
+        while self.running:
+            try:
+                result = await DiagnosisPushService.process_retry_queue()
+                if result["success"] + result["failed"] + result["expired"] > 0:
+                    logger.info(
+                        "推送重试队列处理完成: success=%d, failed=%d, expired=%d",
+                        result["success"], result["failed"], result["expired"]
+                    )
+            except Exception as e:
+                logger.error(f"Push retry loop error: {e}", exc_info=True)
+
+            # 每 60 秒处理一次
+            await asyncio.sleep(60)
 
 
 # 全局调度器实例

@@ -13,6 +13,8 @@ import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
 # Mock redis_client 模块 (scheduler 依赖它,但测试环境不需要)
+sys.modules.setdefault('redis', MagicMock())
+sys.modules.setdefault('redis.asyncio', MagicMock())
 if "app.core.redis_client" not in sys.modules:
     _mock_redis = types.ModuleType("app.core.redis_client")
     _mock_redis.get_redis = MagicMock()
@@ -368,7 +370,7 @@ class TestFaultTreeInferenceEngine:
         context = await engine.diagnose_l2(device_id=1, device_type="UPS")
 
         assert context is not None
-        assert "没有可用的故障树" in context.errors
+        assert "没有适用的故障树" in context.errors
         assert context.fault_tree_id == 0
 
     @pytest.mark.asyncio

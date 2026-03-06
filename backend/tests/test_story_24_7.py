@@ -6,6 +6,11 @@ import pytest
 import json
 from datetime import datetime
 from unittest.mock import patch, AsyncMock, MagicMock
+import sys
+
+# Mock redis module before any imports
+sys.modules['redis'] = MagicMock()
+sys.modules['redis.asyncio'] = MagicMock()
 
 from tests.conftest import auth_headers
 
@@ -41,7 +46,7 @@ async def test_breaker_trip_on_error_rate():
 
     breaker = CircuitBreaker(
         error_threshold=0.10,
-        min_requests=5,
+        window_size=5,  # 修正：使用 window_size 替代 min_requests
         consecutive_failures_threshold=100,  # 禁用连续失败触发
     )
 
@@ -61,15 +66,15 @@ async def test_breaker_trip_on_error_rate():
 
 @pytest.mark.anyio
 async def test_breaker_low_traffic_mode():
-    """<5 次请求时连续 3 次失败触发"""
+    """连续 3 次失败触发熔断（快速熔断）"""
     from app.services.diagnosis.circuit_breaker import CircuitBreaker, BreakerState
 
     breaker = CircuitBreaker(
-        min_requests=5,
+        window_size=10,  # 修正：使用 window_size
         consecutive_failures_threshold=3,
     )
 
-    # 只有 3 次请求（< min_requests），但全部失败
+    # 连续 3 次失败触发快速熔断
     await breaker.record_failure()
     await breaker.record_failure()
     assert breaker.state == BreakerState.CLOSED
@@ -214,12 +219,15 @@ async def test_health_api(client, admin_user):
 @pytest.mark.anyio
 async def test_fallback_save_to_redis():
     """模拟 DB 不可用，验证写入 Redis"""
-    from app.services.diagnosis.fallback_store import DiagnosisFallbackStore
-
     mock_client = AsyncMock()
     mock_client.set = AsyncMock()
 
-    with patch("app.services.diagnosis.fallback_store.get_redis_client", return_value=mock_client):
+    async def mock_get_redis_client():
+        return mock_client
+
+    with patch("app.services.diagnosis.fallback_store.get_redis_client", new=mock_get_redis_client):
+        from app.services.diagnosis.fallback_store import DiagnosisFallbackStore
+
         key = await DiagnosisFallbackStore.save_to_redis({
             "engine_level": "L1",
             "start_time": datetime.now().isoformat(),
@@ -239,10 +247,9 @@ async def test_fallback_save_to_redis():
 @pytest.mark.anyio
 async def test_recover_pending():
     """验证 Redis 中的 pending 数据成功恢复到 DB"""
-    from app.services.diagnosis.fallback_store import DiagnosisFallbackStore
-
     now = datetime.now()
     test_data = {
+        "_version": "1.0",  # 添加版本号
         "engine_level": "L1",
         "start_time": now.isoformat(),
         "end_time": now.isoformat(),
@@ -258,15 +265,24 @@ async def test_recover_pending():
     mock_client.scan_iter = mock_scan_iter
     mock_client.get = AsyncMock(return_value=json.dumps(test_data))
     mock_client.delete = AsyncMock()
+    mock_client.set = AsyncMock(return_value=True)  # 添加分布式锁 mock
 
-    with patch("app.services.diagnosis.fallback_store.get_redis_client", return_value=mock_client):
+    async def mock_get_redis_client():
+        return mock_client
+
+    with patch("app.services.diagnosis.fallback_store.get_redis_client", new=mock_get_redis_client):
+        from app.services.diagnosis.fallback_store import DiagnosisFallbackStore
+
         with patch("app.services.diagnosis.result_store.DiagnosisResultStore.save_complete", new_callable=AsyncMock) as mock_save:
             mock_save.return_value = (1, 1)
-            recovered = await DiagnosisFallbackStore.recover_pending()
+            result = await DiagnosisFallbackStore.recover_pending()
 
-            assert recovered == 1
+            # 修正：返回值现在是 dict
+            assert result["success"] == 1
+            assert result["failed"] == 0
+            assert result["skipped"] == 0
             mock_save.assert_called_once()
-            mock_client.delete.assert_called_once_with("diagnosis:pending:test-uuid")
+            mock_client.delete.assert_called()  # 会被调用两次：删除数据 key 和释放锁
 
             # 验证 datetime 字段被还原
             call_kwargs = mock_save.call_args[1]
@@ -333,8 +349,6 @@ async def test_l1_bypasses_breaker():
 @pytest.mark.anyio
 async def test_datetime_round_trip():
     """Redis fallback 的 datetime 字段 round-trip 正确性"""
-    from app.services.diagnosis.fallback_store import DiagnosisFallbackStore
-
     original_time = datetime(2026, 3, 6, 12, 30, 45)
     test_data = {
         "engine_level": "L1",
@@ -446,7 +460,7 @@ async def test_breaker_stays_closed_below_threshold():
 
     breaker = CircuitBreaker(
         error_threshold=0.10,
-        min_requests=5,
+        window_size=10,  # 修正：使用 window_size
         consecutive_failures_threshold=100,  # 禁用连续失败触发
     )
 
@@ -486,24 +500,27 @@ async def test_breaker_reset():
 
 @pytest.mark.anyio
 async def test_result_store_fallback_to_redis():
-    """save_complete DB 失败时降级到 Redis，返回 (0, 0)"""
-    from app.services.diagnosis.result_store import DiagnosisResultStore
-
-    mock_session = AsyncMock()
-    mock_session.add = MagicMock()
-    mock_session.flush = AsyncMock(side_effect=Exception("DB connection refused"))
-    mock_session.rollback = AsyncMock()
-    mock_session.commit = AsyncMock()
-
-    mock_ctx = AsyncMock()
-    mock_ctx.__aenter__ = AsyncMock(return_value=mock_session)
-    mock_ctx.__aexit__ = AsyncMock(return_value=False)
-
+    """save_complete DB 失败时降级到 Redis，返回 (None, None)"""
     mock_redis_client = AsyncMock()
     mock_redis_client.set = AsyncMock()
 
-    with patch("app.services.diagnosis.result_store.async_session", return_value=mock_ctx):
-        with patch("app.services.diagnosis.fallback_store.get_redis_client", return_value=mock_redis_client):
+    async def mock_get_redis_client():
+        return mock_redis_client
+
+    with patch("app.services.diagnosis.fallback_store.get_redis_client", new=mock_get_redis_client):
+        from app.services.diagnosis.result_store import DiagnosisResultStore
+
+        mock_session = AsyncMock()
+        mock_session.add = MagicMock()
+        mock_session.flush = AsyncMock(side_effect=Exception("DB connection refused"))
+        mock_session.rollback = AsyncMock()
+        mock_session.commit = AsyncMock()
+
+        mock_ctx = AsyncMock()
+        mock_ctx.__aenter__ = AsyncMock(return_value=mock_session)
+        mock_ctx.__aexit__ = AsyncMock(return_value=False)
+
+        with patch("app.services.diagnosis.result_store.async_session", return_value=mock_ctx):
             session_id, result_id = await DiagnosisResultStore.save_complete(
                 engine_level="L1",
                 start_time=datetime.now(),
@@ -511,8 +528,8 @@ async def test_result_store_fallback_to_redis():
                 output_data={},
             )
 
-            assert session_id == 0
-            assert result_id == 0
+            assert session_id is None  # 修正：降级保存返回 (None, None)
+            assert result_id is None  # 修正：降级保存返回 (None, None)
             mock_session.rollback.assert_called_once()
             mock_redis_client.set.assert_called_once()
 

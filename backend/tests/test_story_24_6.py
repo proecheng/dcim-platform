@@ -3,8 +3,14 @@ Story 24.6 诊断结果存储与分级推送 — 单元测试与集成测试
 """
 
 import pytest
-from datetime import datetime
+import json
+from datetime import datetime, timedelta
 from unittest.mock import patch, AsyncMock, MagicMock
+import sys
+
+# Mock redis module before any imports
+sys.modules.setdefault('redis', MagicMock())
+sys.modules.setdefault('redis.asyncio', MagicMock())
 
 from tests.conftest import auth_headers
 
@@ -259,7 +265,7 @@ async def test_session_audit_log_requires_admin(client, async_db, viewer_user, a
 
 @pytest.mark.anyio
 async def test_save_complete_rollback_on_error():
-    """模拟数据库写入失败，验证回滚并降级到 Redis (Story 24.7 改动)"""
+    """模拟数据库写入失败，验证回滚并三级降级：DB → Redis → 本地文件 → raise"""
     from app.services.diagnosis.result_store import DiagnosisResultStore
 
     mock_session = AsyncMock()
@@ -272,20 +278,26 @@ async def test_save_complete_rollback_on_error():
     mock_ctx.__aenter__ = AsyncMock(return_value=mock_session)
     mock_ctx.__aexit__ = AsyncMock(return_value=False)
 
-    # DB 失败后会尝试 Redis fallback；Redis 也失败时才 raise
+    # DB 失败后尝试 Redis fallback，Redis 也失败
     mock_redis = AsyncMock()
     mock_redis.set = AsyncMock(side_effect=Exception("Redis also down"))
 
+    async def mock_get_redis():
+        return mock_redis
+
     with patch("app.services.diagnosis.result_store.async_session", return_value=mock_ctx):
-        with patch("app.services.diagnosis.fallback_store.get_redis_client", return_value=mock_redis):
-            with pytest.raises(Exception, match="DB write failed"):
-                await DiagnosisResultStore.save_complete(
-                    engine_level="L1",
-                    start_time=datetime.now(),
-                    input_data={},
-                    output_data={},
-                )
-            mock_session.rollback.assert_called_once()
+        with patch("app.services.diagnosis.fallback_store.get_redis_client", new=mock_get_redis):
+            # Redis 也失败后尝试本地文件，本地文件也失败时才 raise
+            with patch("app.services.diagnosis.fallback_store.DiagnosisFallbackStore._save_to_local_file",
+                        new_callable=AsyncMock, side_effect=Exception("File also down")):
+                with pytest.raises(Exception, match="DB write failed"):
+                    await DiagnosisResultStore.save_complete(
+                        engine_level="L1",
+                        start_time=datetime.now(),
+                        input_data={},
+                        output_data={},
+                    )
+                mock_session.rollback.assert_called_once()
 
 
 # ==================== 7.7 审计日志脱敏测试 ====================
@@ -440,3 +452,178 @@ async def test_websocket_message_format():
     assert msg["target_roles"] == ["operator", "admin"]
     assert msg["data"]["session_id"] == 1
     assert msg["data"]["confidence"] == 92
+
+
+# ==================== 8.1 审计脱敏 - 敏感后缀字段测试（第二轮审查问题 2） ====================
+
+
+def test_sanitize_sensitive_suffix_fields():
+    """验证敏感后缀字段被脱敏，而 primary_key/keyboard 等不被脱敏"""
+    from app.services.diagnosis.result_store import DiagnosisResultStore
+
+    data = {
+        "user_password": "secret123",
+        "auth_token": "jwt_xxx",
+        "database_key": "xyz789",
+        "api_secret": "hidden",
+        "primary_key": 123,        # 不应被脱敏（不以 _key 结尾，完整匹配 primary_key）
+        "keyboard": "qwerty",      # 不应被脱敏
+        "monkey": "banana",        # 不应被脱敏
+    }
+
+    sanitized = DiagnosisResultStore._sanitize_audit_data(data)
+
+    assert sanitized["user_password"] == "***REDACTED***"
+    assert sanitized["auth_token"] == "***REDACTED***"
+    assert sanitized["database_key"] == "***REDACTED***"
+    assert sanitized["api_secret"] == "***REDACTED***"
+    assert sanitized["keyboard"] == "qwerty"
+    assert sanitized["monkey"] == "banana"
+
+
+# ==================== 8.2 字符串值敏感模式脱敏测试（第二轮审查问题 3） ====================
+
+
+def test_sanitize_string_value_patterns():
+    """验证字符串值中的敏感模式被脱敏"""
+    from app.services.diagnosis.result_store import DiagnosisResultStore
+
+    data = {
+        "log_message": "User login with password=secret123",
+        "config": "Authorization: Bearer xyz789",
+        "normal_text": "This is a normal message",
+        "token_in_value": "token:abc456 was used",
+    }
+
+    sanitized = DiagnosisResultStore._sanitize_audit_data(data)
+
+    assert "secret123" not in sanitized["log_message"]
+    assert "***REDACTED***" in sanitized["log_message"]
+    assert "xyz789" not in sanitized["config"]
+    assert sanitized["normal_text"] == "This is a normal message"
+    assert "abc456" not in sanitized["token_in_value"]
+
+
+# ==================== 8.3 推送重试队列测试（第二轮审查问题 5） ====================
+
+
+@pytest.mark.anyio
+async def test_push_retry_enqueue_on_failure():
+    """推送失败时写入重试队列"""
+    from app.services.diagnosis.push_service import DiagnosisPushService
+
+    mock_redis_client = AsyncMock()
+    mock_redis_client.rpush = AsyncMock()
+
+    async def mock_get_redis():
+        return mock_redis_client
+
+    mock_ws = AsyncMock()
+    mock_ws.broadcast_diagnosis = AsyncMock(side_effect=Exception("WebSocket error"))
+
+    with patch("app.services.diagnosis.push_service.get_redis_client", new=mock_get_redis):
+        with patch("app.services.diagnosis.push_service.ws_manager", mock_ws):
+            status = await DiagnosisPushService.push_diagnosis_result(
+                session_id=1,
+                device_id=100,
+                device_type="server",
+                engine_level="L1",
+                confidence=0.85,
+                conclusion="测试结论",
+                root_cause="测试根因",
+                suggested_actions=["action1"],
+            )
+
+            assert status == "failed"
+            mock_redis_client.rpush.assert_called_once()
+            call_args = mock_redis_client.rpush.call_args
+            assert call_args[0][0] == "diagnosis:push_retry_queue"
+            retry_data = json.loads(call_args[0][1])
+            assert retry_data["session_id"] == 1
+            assert retry_data["retry_count"] == 0
+            assert "created_at" in retry_data
+
+
+@pytest.mark.anyio
+async def test_push_retry_process_success():
+    """重试队列成功处理"""
+    from app.services.diagnosis.push_service import DiagnosisPushService
+
+    now = datetime.now()
+    retry_data = json.dumps({
+        "session_id": 1,
+        "device_id": 100,
+        "device_type": "server",
+        "engine_level": "L1",
+        "confidence": 0.85,
+        "conclusion": "测试",
+        "retry_count": 0,
+        "created_at": now.isoformat(),
+    })
+
+    mock_redis = AsyncMock()
+    mock_redis.lpop = AsyncMock(side_effect=[retry_data, None])
+    mock_redis.rpush = AsyncMock()
+
+    async def mock_get_redis():
+        return mock_redis
+
+    with patch("app.services.diagnosis.push_service.get_redis_client", new=mock_get_redis):
+        with patch.object(DiagnosisPushService, "push_diagnosis_result", new_callable=AsyncMock) as mock_push:
+            mock_push.return_value = "pushed"
+            result = await DiagnosisPushService.process_retry_queue()
+
+            assert result["success"] == 1
+            assert result["failed"] == 0
+            assert result["expired"] == 0
+
+
+@pytest.mark.anyio
+async def test_push_retry_expired_skipped():
+    """过期数据被跳过"""
+    from app.services.diagnosis.push_service import DiagnosisPushService
+
+    old_time = datetime.now() - timedelta(hours=25)
+    retry_data = json.dumps({
+        "session_id": 1,
+        "confidence": 0.85,
+        "engine_level": "L1",
+        "retry_count": 0,
+        "created_at": old_time.isoformat(),
+    })
+
+    mock_redis = AsyncMock()
+    mock_redis.lpop = AsyncMock(side_effect=[retry_data, None])
+
+    async def mock_get_redis():
+        return mock_redis
+
+    with patch("app.services.diagnosis.push_service.get_redis_client", new=mock_get_redis):
+        result = await DiagnosisPushService.process_retry_queue()
+        assert result["expired"] == 1
+        assert result["success"] == 0
+
+
+@pytest.mark.anyio
+async def test_push_retry_max_count_exceeded():
+    """超过最大重试次数的数据被丢弃"""
+    from app.services.diagnosis.push_service import DiagnosisPushService
+
+    retry_data = json.dumps({
+        "session_id": 1,
+        "confidence": 0.85,
+        "engine_level": "L1",
+        "retry_count": 3,  # 已达上限
+        "created_at": datetime.now().isoformat(),
+    })
+
+    mock_redis = AsyncMock()
+    mock_redis.lpop = AsyncMock(side_effect=[retry_data, None])
+
+    async def mock_get_redis():
+        return mock_redis
+
+    with patch("app.services.diagnosis.push_service.get_redis_client", new=mock_get_redis):
+        result = await DiagnosisPushService.process_retry_queue()
+        assert result["failed"] == 1
+        assert result["success"] == 0

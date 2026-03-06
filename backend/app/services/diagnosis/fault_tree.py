@@ -60,7 +60,7 @@ class DiagnosisContext:
     evidence: Dict[int, EvidenceItem]  # node_id → EvidenceItem
 
     # L3 引擎复用数据
-    graph: Optional[object] = None  # nx.DiGraph 引用
+    graph: Optional["nx.DiGraph"] = None  # 修正：使用正确类型标注
     node_probabilities: Dict[int, float] = field(default_factory=dict)
     leaf_probabilities: Dict[int, float] = field(default_factory=dict)
 
@@ -86,6 +86,7 @@ class FaultTreeCache:
         self._cache: Dict[int, nx.DiGraph] = {}
         self._ref_count: Dict[int, int] = {}
         self._last_access: Dict[int, float] = {}
+        self._pending_delete: set = set()  # 待删除标记（第二轮审查问题 14）
         self._lock = asyncio.Lock()
         self.max_size = max_size
         self.ttl_seconds = ttl_seconds
@@ -93,7 +94,7 @@ class FaultTreeCache:
     async def get(self, tree_id: int) -> Optional[nx.DiGraph]:
         """获取缓存的故障树 (返回深拷贝, 保证并发安全)"""
         async with self._lock:
-            if tree_id in self._cache:
+            if tree_id in self._cache and tree_id not in self._pending_delete:
                 self._ref_count[tree_id] += 1
                 self._last_access[tree_id] = time.time()
                 logger.debug(f"故障树 {tree_id} 缓存命中, 引用计数: {self._ref_count[tree_id]}")
@@ -112,11 +113,44 @@ class FaultTreeCache:
             logger.debug(f"故障树 {tree_id} 已缓存, 当前缓存大小: {len(self._cache)}")
 
     async def release(self, tree_id: int) -> None:
-        """释放故障树引用"""
+        """释放故障树引用
+
+        如果 ref_count 降为 0 且标记为 pending_delete，自动删除
+        """
         async with self._lock:
             if tree_id in self._ref_count:
                 self._ref_count[tree_id] -= 1
                 logger.debug(f"故障树 {tree_id} 引用释放, 剩余引用: {self._ref_count[tree_id]}")
+
+                # pending_delete 且引用计数归零，自动删除（第二轮审查问题 14）
+                if self._ref_count[tree_id] <= 0 and tree_id in self._pending_delete:
+                    self._pending_delete.discard(tree_id)
+                    if tree_id in self._cache:
+                        del self._cache[tree_id]
+                    if tree_id in self._ref_count:
+                        del self._ref_count[tree_id]
+                    if tree_id in self._last_access:
+                        del self._last_access[tree_id]
+                    logger.info(f"故障树 {tree_id} 已从缓存中删除 (pending_delete 释放)")
+
+    async def invalidate(self, tree_id: int) -> None:
+        """使指定故障树缓存失效（用于版本变更）
+
+        如果 ref_count > 0，标记为 pending_delete
+        如果 ref_count == 0，立即删除
+        """
+        async with self._lock:
+            if tree_id not in self._cache:
+                return
+
+            if self._ref_count.get(tree_id, 0) > 0:
+                self._pending_delete.add(tree_id)
+                logger.info(f"故障树 {tree_id} 标记为 pending_delete (引用计数: {self._ref_count[tree_id]})")
+            else:
+                del self._cache[tree_id]
+                self._ref_count.pop(tree_id, None)
+                self._last_access.pop(tree_id, None)
+                logger.info(f"故障树 {tree_id} 已从缓存中立即删除 (invalidate)")
 
     async def _evict_lru(self) -> None:
         """清理最久未使用的缓存条目"""
@@ -177,6 +211,9 @@ def or_gate(child_probs: List[float]) -> float:
     if not child_probs:
         return 0.0
 
+    # Clamp 子节点概率到 [0, 1]（第二轮审查要求）
+    child_probs = [max(0.0, min(1.0, p)) for p in child_probs]
+
     product = 1.0
     for p in child_probs:
         product *= (1.0 - p)
@@ -188,6 +225,9 @@ def and_gate(child_probs: List[float]) -> float:
     """AND 门概率计算: P = ∏ P(child_i)"""
     if not child_probs:
         return 0.0
+
+    # Clamp 子节点概率到 [0, 1]（第二轮审查要求）
+    child_probs = [max(0.0, min(1.0, p)) for p in child_probs]
 
     product = 1.0
     for p in child_probs:
@@ -208,9 +248,9 @@ async def validate_fault_tree(graph: nx.DiGraph) -> List[str]:
     """
     warnings = []
 
+    # 检查是否为 DAG（不立即返回，继续收集其他警告 - 第二轮审查问题 9）
     if not nx.is_directed_acyclic_graph(graph):
         warnings.append("故障树包含环路,不是有效的 DAG")
-        return warnings
 
     # 根节点: 出度为 0 的节点 (child→parent 边方向下, 根节点没有出边)
     root_nodes = [node for node in graph.nodes() if graph.out_degree(node) == 0]
@@ -256,7 +296,7 @@ class FaultTreeInferenceEngine:
         1. device_type + alarm_type 精确匹配
         2. device_type 匹配 (alarm_type 为 NULL)
         3. 通用映射 (device_type = 'generic')
-        4. 回退: 任意 active 状态的故障树
+        4. 未找到时返回 None（不回退到任意故障树，避免误匹配）
         """
         # 1. 精确匹配 device_type + alarm_type
         if alarm_type:
@@ -312,18 +352,8 @@ class FaultTreeInferenceEngine:
             logger.info(f"使用通用映射故障树: {mapping.tree_id}")
             return mapping.tree_id
 
-        # 4. 回退: 任意 active 状态的故障树
-        result = await self.session.execute(
-            select(FaultTree)
-            .where(FaultTree.status == "active")
-            .order_by(FaultTree.updated_at.desc())
-        )
-        tree = result.scalars().first()
-        if tree:
-            logger.info(f"使用回退故障树: {tree.id}")
-            return tree.id
-
-        logger.warning(f"没有可用的故障树: device_type={device_type}, alarm_type={alarm_type}")
+        # 未找到故障树，返回 None（第二轮审查问题 15：不回退到任意故障树）
+        logger.warning(f"没有适用的故障树: device_type={device_type}, alarm_type={alarm_type}")
         return None
 
     async def load_fault_tree_to_networkx(self, tree_id: int) -> nx.DiGraph:
@@ -433,20 +463,30 @@ class FaultTreeInferenceEngine:
                     )
                     return
 
-                # 聚合策略: AVG (温度), MAX (电压), ANY (开关)
-                point_name = node_data.get("name", "")
+                # 聚合策略：基于 point_type 字段（第二轮审查问题 5）
+                point_type = node_data.get("config", {}).get("point_type")
                 valid_values = [h.value for h in history if h.value is not None]
 
                 if not valid_values:
-                    # 所有记录的 value 都是 None
                     value = 0.0
-                elif "温度" in point_name or "temp" in point_name.lower():
+                elif point_type == "temperature" or point_type == "gauge":
+                    # AVG（平均值）
                     value = sum(valid_values) / len(valid_values)
-                elif "电压" in point_name or "voltage" in point_name.lower():
+                elif point_type == "voltage":
+                    # MAX（最大值）
                     value = max(valid_values)
-                elif "开关" in point_name or "switch" in point_name.lower():
+                elif point_type == "switch":
+                    # ANY（任意一次 > 0.5 则为 1.0）
                     value = 1.0 if any(v > 0.5 for v in valid_values) else 0.0
+                elif point_type == "counter":
+                    # DIFF（时间窗口内最后一个值减第一个值，即累计增量）
+                    if len(valid_values) >= 2:
+                        # history 按 recorded_at DESC 排序，所以 [0] 是最新的，[-1] 是最早的
+                        value = valid_values[0] - valid_values[-1]
+                    else:
+                        value = valid_values[0]
                 else:
+                    # 其他或 point_type 为 NULL：LAST（取最新值）
                     value = valid_values[0]
 
                 threshold = node_data.get("threshold")
@@ -492,36 +532,26 @@ class FaultTreeInferenceEngine:
     def compute_leaf_probability(self, node_data: dict, evidence: EvidenceItem) -> float:
         """计算叶节点概率
 
-        公式: P = prior + (1.0 - prior) × sigmoid(k × (value - threshold))
-        - prior: 节点先验概率
-        - k: sigmoid 斜率参数 (默认 2.0)
-        - value: 点位实际值
-        - threshold: 阈值
+        异常情况: P = prior + (1.0 - prior) × sigmoid(k × (value - threshold))
+        正常情况: P = prior × sigmoid(k × (threshold - value))
         """
         prior = node_data.get("prior_probability", 0.5)
         k = node_data.get("sigmoid_k", DEFAULT_SIGMOID_K)
 
+        # 前置条件检查（第二轮审查要求）
+        if evidence.value is None or evidence.threshold is None:
+            return prior
+
         if evidence.status == "abnormal":
-            if (
-                evidence.value is not None
-                and evidence.threshold is not None
-            ):
-                deviation = evidence.value - evidence.threshold
-                sigmoid_value = sigmoid_stable(k * deviation)
-                return prior + (1.0 - prior) * sigmoid_value
-            else:
-                return prior  # 缺少 value/threshold 时回退到先验概率
+            deviation = evidence.value - evidence.threshold
+            sigmoid_value = sigmoid_stable(k * deviation)
+            return prior + (1.0 - prior) * sigmoid_value
 
         elif evidence.status == "normal":
-            if (
-                evidence.value is not None
-                and evidence.threshold is not None
-            ):
-                deviation = evidence.value - evidence.threshold
-                sigmoid_value = sigmoid_stable(k * deviation)
-                return prior + (1.0 - prior) * sigmoid_value
-            else:
-                return prior  # 正常状态返回先验概率
+            # 正常情况使用不同公式（第二轮审查问题 6）
+            deviation = evidence.threshold - evidence.value
+            sigmoid_value = sigmoid_stable(k * deviation)
+            return prior * sigmoid_value
 
         else:  # timeout, error — 不确定性, 使用先验概率
             return prior
@@ -597,14 +627,26 @@ class FaultTreeInferenceEngine:
             gate_type = graph.nodes[current_node].get("gate_type")
 
             if gate_type == "AND":
-                # AND 门: 选偏离先验最大的子节点
-                best_child = max(
-                    child_nodes,
-                    key=lambda n: abs(
-                        graph.nodes[n]["probability"]
-                        - graph.nodes[n].get("prior_probability", 0.5)
-                    ),
-                )
+                # AND 门：优先正向偏离策略（第二轮审查问题 1）
+                # 1. 优先选择概率高于先验的子节点
+                positive_deviations = [
+                    n for n in child_nodes
+                    if graph.nodes[n]["probability"] > graph.nodes[n].get("prior_probability", 0.5)
+                ]
+                if positive_deviations:
+                    # 2. 多个正向偏离，选偏离最大的
+                    best_child = max(
+                        positive_deviations,
+                        key=lambda n: (
+                            graph.nodes[n]["probability"]
+                            - graph.nodes[n].get("prior_probability", 0.5)
+                        ),
+                    )
+                else:
+                    # 3. 所有子节点都低于或等于先验，选概率最高的
+                    best_child = max(
+                        child_nodes, key=lambda n: graph.nodes[n]["probability"]
+                    )
             else:
                 # OR 门 / 默认: 选概率最大的子节点
                 best_child = max(
@@ -645,7 +687,7 @@ class FaultTreeInferenceEngine:
             # 1. 选择故障树
             tree_id = await self.select_fault_tree(device_type, alarm_type)
             if tree_id is None:
-                context.errors.append("没有可用的故障树")
+                context.errors.append("没有适用的故障树")
                 return context
 
             context.fault_tree_id = tree_id
@@ -703,10 +745,27 @@ class FaultTreeInferenceEngine:
             # 保存图引用供 L3 引擎使用
             context.graph = graph
 
-        except Exception as e:
-            logger.error(f"L2 推理失败: {e}", exc_info=True)
-            context.errors.append(f"推理异常: {str(e)}")
+        except asyncio.TimeoutError:
+            # 超时异常（第二轮审查问题 2、7）
+            logger.error(f"L2 推理超时: 设备 {device_id}")
+            context.errors.append("推理超时，已终止")
             context.degraded = True
+
+        except nx.NetworkXError as e:
+            # NetworkX 图结构异常（第二轮审查问题 7）
+            logger.error(f"L2 推理图结构异常: {e}")
+            context.errors.append(f"图结构异常: {str(e)}")
+
+        except Exception as e:
+            # 未知异常：记录 ERROR 级别日志，重新抛出（第二轮审查问题 7）
+            from sqlalchemy.exc import DatabaseError, OperationalError
+            if isinstance(e, (DatabaseError, OperationalError)):
+                logger.error(f"L2 推理数据库错误: {e}")
+                context.errors.append(f"数据库错误: {str(e)}")
+                context.degraded = True
+            else:
+                logger.error(f"L2 推理未知异常: {e}", exc_info=True)
+                raise
 
         finally:
             context.inference_time_ms = (time.time() - start_time) * 1000
