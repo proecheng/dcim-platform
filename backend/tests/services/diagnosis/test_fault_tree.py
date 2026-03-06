@@ -19,6 +19,7 @@ if "app.core.redis_client" not in sys.modules:
     sys.modules["app.core.redis_client"] = _mock_redis
 
 from app.services.diagnosis.fault_tree import (
+    DEFAULT_SIGMOID_K,
     DiagnosisContext,
     EvidenceItem,
     FaultTreeCache,
@@ -34,29 +35,31 @@ class TestSigmoidStable:
     """测试数值稳定的 sigmoid 函数"""
 
     def test_zero_input(self):
-        """测试零输入"""
         result = sigmoid_stable(0.0)
         assert abs(result - 0.5) < 1e-6
 
     def test_positive_input(self):
-        """测试正数输入"""
         result = sigmoid_stable(10.0)
         assert result > 0.99
 
     def test_negative_input(self):
-        """测试负数输入"""
         result = sigmoid_stable(-10.0)
         assert result < 0.01
 
     def test_large_positive(self):
-        """测试大正数不会溢出"""
+        """大正数不会溢出"""
         result = sigmoid_stable(100.0)
         assert 0.0 <= result <= 1.0
 
     def test_large_negative(self):
-        """测试大负数不会溢出"""
+        """大负数不会溢出"""
         result = sigmoid_stable(-100.0)
         assert 0.0 <= result <= 1.0
+
+    def test_symmetry(self):
+        """sigmoid(x) + sigmoid(-x) = 1"""
+        for x in [0.5, 1.0, 5.0, 20.0]:
+            assert abs(sigmoid_stable(x) + sigmoid_stable(-x) - 1.0) < 1e-10
 
 
 class TestGateFunctions:
@@ -69,9 +72,14 @@ class TestGateFunctions:
         assert or_gate([0.5]) == 0.5
 
     def test_or_gate_multiple(self):
-        # P = 1 - (1-0.3) * (1-0.4) = 1 - 0.42 = 0.58
         result = or_gate([0.3, 0.4])
         assert abs(result - 0.58) < 1e-6
+
+    def test_or_gate_all_zero(self):
+        assert or_gate([0.0, 0.0, 0.0]) == 0.0
+
+    def test_or_gate_one_certain(self):
+        assert or_gate([1.0, 0.0]) == 1.0
 
     def test_and_gate_empty(self):
         assert and_gate([]) == 0.0
@@ -80,9 +88,11 @@ class TestGateFunctions:
         assert and_gate([0.5]) == 0.5
 
     def test_and_gate_multiple(self):
-        # P = 0.3 * 0.4 = 0.12
         result = and_gate([0.3, 0.4])
         assert abs(result - 0.12) < 1e-6
+
+    def test_and_gate_one_zero(self):
+        assert and_gate([0.5, 0.0]) == 0.0
 
 
 class TestValidateFaultTree:
@@ -90,10 +100,9 @@ class TestValidateFaultTree:
 
     @pytest.mark.asyncio
     async def test_valid_tree(self):
-        """测试有效的故障树"""
         graph = nx.DiGraph()
-        graph.add_node(1, gate_type="LEAF")
-        graph.add_node(2, gate_type="LEAF")
+        graph.add_node(1, gate_type="LEAF", evidence_point_id=10)
+        graph.add_node(2, gate_type="LEAF", evidence_point_id=20)
         graph.add_node(3, gate_type="OR")
         graph.add_edge(1, 3)
         graph.add_edge(2, 3)
@@ -103,7 +112,6 @@ class TestValidateFaultTree:
 
     @pytest.mark.asyncio
     async def test_cyclic_tree(self):
-        """测试包含环路的故障树"""
         graph = nx.DiGraph()
         graph.add_node(1, gate_type="OR")
         graph.add_node(2, gate_type="OR")
@@ -115,12 +123,32 @@ class TestValidateFaultTree:
 
     @pytest.mark.asyncio
     async def test_invalid_gate_type(self):
-        """测试无效的门类型"""
         graph = nx.DiGraph()
         graph.add_node(1, gate_type="INVALID")
 
         warnings = await validate_fault_tree(graph)
         assert any("gate_type 无效" in w for w in warnings)
+
+    @pytest.mark.asyncio
+    async def test_isolated_node(self):
+        """测试孤立节点检测"""
+        graph = nx.DiGraph()
+        graph.add_node(1, gate_type="LEAF", evidence_point_id=10)
+        graph.add_node(2, gate_type="LEAF")  # 孤立节点
+
+        warnings = await validate_fault_tree(graph)
+        assert any("孤立节点" in w for w in warnings)
+
+    @pytest.mark.asyncio
+    async def test_leaf_without_evidence(self):
+        """测试叶节点缺少证据点位"""
+        graph = nx.DiGraph()
+        graph.add_node(1, gate_type="LEAF", evidence_point_id=None)
+        graph.add_node(2, gate_type="OR")
+        graph.add_edge(1, 2)
+
+        warnings = await validate_fault_tree(graph)
+        assert any("没有关联证据点位" in w for w in warnings)
 
 
 class TestFaultTreeCache:
@@ -133,15 +161,18 @@ class TestFaultTreeCache:
         assert result is None
 
     @pytest.mark.asyncio
-    async def test_cache_hit(self):
+    async def test_cache_hit_returns_deep_copy(self):
+        """缓存命中返回深拷贝, 修改不影响原图"""
         cache = FaultTreeCache(max_size=10)
         graph = nx.DiGraph()
-        graph.add_node(1)
+        graph.add_node(1, probability=0.0)
 
         await cache.put(1, graph)
-        result = await cache.get(1)
-        assert result is not None
-        assert 1 in result.nodes()
+        copy1 = await cache.get(1)
+        copy1.nodes[1]["probability"] = 0.99  # 修改拷贝
+
+        copy2 = await cache.get(1)
+        assert copy2.nodes[1]["probability"] == 0.0  # 原图未被影响
 
     @pytest.mark.asyncio
     async def test_reference_counting(self):
@@ -161,10 +192,10 @@ class TestFaultTreeCache:
         g1, g2, g3 = nx.DiGraph(), nx.DiGraph(), nx.DiGraph()
 
         await cache.put(1, g1)
-        await cache.release(1)  # ref_count = 0
+        await cache.release(1)
 
         await cache.put(2, g2)
-        await cache.release(2)  # ref_count = 0
+        await cache.release(2)
 
         await cache.put(3, g3)
         assert len(cache._cache) == 2
@@ -180,108 +211,152 @@ class TestFaultTreeInferenceEngine:
     @pytest.fixture
     def engine(self, mock_session):
         eng = FaultTreeInferenceEngine(mock_session)
-        # 使用独立缓存避免测试之间互相影响
         eng.cache = FaultTreeCache(max_size=10)
         return eng
 
-    def test_compute_leaf_probability_abnormal(self, engine):
-        """测试异常状态的叶节点概率计算"""
+    def test_compute_leaf_probability_abnormal_with_prior(self, engine):
+        """测试异常状态: P = prior + (1 - prior) * sigmoid(k * deviation)"""
+        node_data = {"prior_probability": 0.1, "sigmoid_k": 2.0}
         evidence = EvidenceItem(
-            point_id=1,
-            value=110.0,
-            threshold=100.0,
-            status="abnormal",
+            point_id=1, value=55.0, threshold=50.0, status="abnormal"
         )
-        prob = engine.compute_leaf_probability(evidence)
-        assert prob > 0.5
 
-    def test_compute_leaf_probability_normal(self, engine):
-        """测试正常状态的叶节点概率计算"""
+        prob = engine.compute_leaf_probability(node_data, evidence)
+        # deviation = 55 - 50 = 5, sigmoid(2*5) ≈ 0.9999
+        # P = 0.1 + 0.9 * 0.9999 ≈ 0.99+
+        assert prob > 0.9
+
+    def test_compute_leaf_probability_normal_below_threshold(self, engine):
+        """测试正常状态: 值低于阈值, sigmoid 给出较低概率"""
+        node_data = {"prior_probability": 0.1, "sigmoid_k": 2.0}
         evidence = EvidenceItem(
-            point_id=1,
-            value=90.0,
-            threshold=100.0,
-            status="normal",
+            point_id=1, value=45.0, threshold=50.0, status="normal"
         )
-        prob = engine.compute_leaf_probability(evidence)
-        assert prob == 0.01
 
-    def test_compute_leaf_probability_timeout(self, engine):
-        """测试超时状态的叶节点概率计算"""
+        prob = engine.compute_leaf_probability(node_data, evidence)
+        # deviation = 45 - 50 = -5, sigmoid(2*-5) ≈ 0.0001
+        # P = 0.1 + 0.9 * 0.0001 ≈ 0.1
+        assert prob < 0.2
+
+    def test_compute_leaf_probability_timeout_uses_prior(self, engine):
+        """测试超时状态: 使用先验概率"""
+        node_data = {"prior_probability": 0.3, "sigmoid_k": 2.0}
         evidence = EvidenceItem(point_id=1, status="timeout")
-        prob = engine.compute_leaf_probability(evidence)
-        assert prob == 0.5
 
-    def test_compute_leaf_probability_zero_threshold(self, engine):
-        """测试阈值为 0 时不会除零"""
+        prob = engine.compute_leaf_probability(node_data, evidence)
+        assert prob == 0.3
+
+    def test_compute_leaf_probability_at_threshold(self, engine):
+        """测试值等于阈值: P = prior + (1-prior) * 0.5"""
+        node_data = {"prior_probability": 0.1, "sigmoid_k": 2.0}
         evidence = EvidenceItem(
-            point_id=1,
-            value=10.0,
-            threshold=0.0,
-            status="abnormal",
+            point_id=1, value=50.0, threshold=50.0, status="abnormal"
         )
-        prob = engine.compute_leaf_probability(evidence)
-        assert prob == 0.5  # 降级为不确定性
+
+        prob = engine.compute_leaf_probability(node_data, evidence)
+        expected = 0.1 + 0.9 * 0.5  # = 0.55
+        assert abs(prob - expected) < 1e-6
+
+    def test_compute_leaf_probability_default_k(self, engine):
+        """测试默认 sigmoid_k = 2.0"""
+        node_data = {"prior_probability": 0.2}  # 不指定 sigmoid_k
+        evidence = EvidenceItem(
+            point_id=1, value=55.0, threshold=50.0, status="abnormal"
+        )
+
+        prob = engine.compute_leaf_probability(node_data, evidence)
+        assert prob > 0.5
 
     @pytest.mark.asyncio
     async def test_propagate_probabilities_or_gate(self, engine):
         """测试 OR 门概率传播"""
         graph = nx.DiGraph()
-        graph.add_node(1, gate_type="LEAF", probability=0.0, prior_probability=0.5)
-        graph.add_node(2, gate_type="LEAF", probability=0.0, prior_probability=0.5)
+        graph.add_node(1, gate_type="LEAF", probability=0.0, prior_probability=0.1, sigmoid_k=2.0)
+        graph.add_node(2, gate_type="LEAF", probability=0.0, prior_probability=0.1, sigmoid_k=2.0)
         graph.add_node(3, gate_type="OR", probability=0.0)
         graph.add_edge(1, 3)
         graph.add_edge(2, 3)
 
         evidence = {
-            1: EvidenceItem(point_id=1, value=110.0, threshold=100.0, status="abnormal"),
-            2: EvidenceItem(point_id=2, value=90.0, threshold=100.0, status="normal"),
+            1: EvidenceItem(point_id=1, value=55.0, threshold=50.0, status="abnormal"),
+            2: EvidenceItem(point_id=2, value=45.0, threshold=50.0, status="normal"),
         }
 
-        await engine.propagate_probabilities(graph, evidence)
+        node_probs = await engine.propagate_probabilities(graph, evidence)
 
-        assert graph.nodes[1]["probability"] > 0.5
-        assert graph.nodes[2]["probability"] == 0.01
-
-        p1 = graph.nodes[1]["probability"]
-        p2 = graph.nodes[2]["probability"]
+        p1 = node_probs[1]
+        p2 = node_probs[2]
         expected = 1.0 - (1.0 - p1) * (1.0 - p2)
-        assert abs(graph.nodes[3]["probability"] - expected) < 1e-6
+        assert abs(node_probs[3] - expected) < 1e-6
 
     @pytest.mark.asyncio
     async def test_propagate_probabilities_and_gate(self, engine):
         """测试 AND 门概率传播"""
         graph = nx.DiGraph()
-        graph.add_node(1, gate_type="LEAF", probability=0.0, prior_probability=0.5)
-        graph.add_node(2, gate_type="LEAF", probability=0.0, prior_probability=0.5)
+        graph.add_node(1, gate_type="LEAF", probability=0.0, prior_probability=0.1, sigmoid_k=2.0)
+        graph.add_node(2, gate_type="LEAF", probability=0.0, prior_probability=0.1, sigmoid_k=2.0)
         graph.add_node(3, gate_type="AND", probability=0.0)
         graph.add_edge(1, 3)
         graph.add_edge(2, 3)
 
         evidence = {
-            1: EvidenceItem(point_id=1, value=110.0, threshold=100.0, status="abnormal"),
-            2: EvidenceItem(point_id=2, value=90.0, threshold=100.0, status="normal"),
+            1: EvidenceItem(point_id=1, value=55.0, threshold=50.0, status="abnormal"),
+            2: EvidenceItem(point_id=2, value=45.0, threshold=50.0, status="normal"),
         }
 
-        await engine.propagate_probabilities(graph, evidence)
+        node_probs = await engine.propagate_probabilities(graph, evidence)
 
-        p1 = graph.nodes[1]["probability"]
-        p2 = graph.nodes[2]["probability"]
+        p1 = node_probs[1]
+        p2 = node_probs[2]
         expected = p1 * p2
-        assert abs(graph.nodes[3]["probability"] - expected) < 1e-6
+        assert abs(node_probs[3] - expected) < 1e-6
 
     @pytest.mark.asyncio
-    async def test_extract_root_cause_path(self, engine):
-        """测试根因路径提取"""
+    async def test_propagate_returns_all_probs(self, engine):
+        """测试 propagate 返回完整概率字典"""
         graph = nx.DiGraph()
-        graph.add_node(1, gate_type="LEAF", probability=0.8)
-        graph.add_node(2, gate_type="LEAF", probability=0.2)
+        graph.add_node(1, gate_type="LEAF", probability=0.0, prior_probability=0.5, sigmoid_k=2.0)
+        graph.add_node(2, gate_type="OR", probability=0.0)
+        graph.add_edge(1, 2)
+
+        evidence = {
+            1: EvidenceItem(point_id=1, value=55.0, threshold=50.0, status="abnormal"),
+        }
+
+        node_probs = await engine.propagate_probabilities(graph, evidence)
+
+        assert 1 in node_probs
+        assert 2 in node_probs
+        assert len(node_probs) == 2
+
+    @pytest.mark.asyncio
+    async def test_extract_root_cause_path_or_gate(self, engine):
+        """OR 门: 选概率最大的子节点"""
+        graph = nx.DiGraph()
+        graph.add_node(1, gate_type="LEAF", probability=0.8, prior_probability=0.1)
+        graph.add_node(2, gate_type="LEAF", probability=0.2, prior_probability=0.1)
         graph.add_node(3, gate_type="OR", probability=0.84)
         graph.add_edge(1, 3)
         graph.add_edge(2, 3)
 
         path = await engine.extract_root_cause_path(graph, root_node_id=3)
         assert path == [3, 1]
+
+    @pytest.mark.asyncio
+    async def test_extract_root_cause_path_and_gate(self, engine):
+        """AND 门: 选偏离先验最大的子节点"""
+        graph = nx.DiGraph()
+        # 节点 1: prob=0.8, prior=0.1, 偏离=0.7
+        # 节点 2: prob=0.9, prior=0.8, 偏离=0.1
+        # AND 门应选偏离最大的节点 1
+        graph.add_node(1, gate_type="LEAF", probability=0.8, prior_probability=0.1)
+        graph.add_node(2, gate_type="LEAF", probability=0.9, prior_probability=0.8)
+        graph.add_node(3, gate_type="AND", probability=0.72)
+        graph.add_edge(1, 3)
+        graph.add_edge(2, 3)
+
+        path = await engine.extract_root_cause_path(graph, root_node_id=3)
+        assert path == [3, 1]  # 偏离先验最大的是节点 1
 
     @pytest.mark.asyncio
     async def test_diagnose_l2_no_fault_tree(self, engine, mock_session):
@@ -297,21 +372,53 @@ class TestFaultTreeInferenceEngine:
         assert context.fault_tree_id == 0
 
     @pytest.mark.asyncio
+    async def test_diagnose_l2_has_alarm_type(self, engine, mock_session):
+        """测试 DiagnosisContext 包含 alarm_type"""
+        mock_result = MagicMock()
+        mock_result.scalars.return_value.first.return_value = None
+        mock_session.execute.return_value = mock_result
+
+        context = await engine.diagnose_l2(
+            device_id=1, device_type="UPS", alarm_type="over_temperature"
+        )
+        assert context.alarm_type == "over_temperature"
+
+    @pytest.mark.asyncio
     async def test_propagate_with_missing_evidence(self, engine):
         """测试缺少证据的叶节点使用先验概率"""
         graph = nx.DiGraph()
-        graph.add_node(1, gate_type="LEAF", probability=0.0, prior_probability=0.3)
-        graph.add_node(2, gate_type="LEAF", probability=0.0, prior_probability=0.5)
+        graph.add_node(1, gate_type="LEAF", probability=0.0, prior_probability=0.3, sigmoid_k=2.0)
+        graph.add_node(2, gate_type="LEAF", probability=0.0, prior_probability=0.5, sigmoid_k=2.0)
         graph.add_node(3, gate_type="OR", probability=0.0)
         graph.add_edge(1, 3)
         graph.add_edge(2, 3)
 
-        # 只给节点 1 证据,节点 2 缺少证据
         evidence = {
-            1: EvidenceItem(point_id=1, value=110.0, threshold=100.0, status="abnormal"),
+            1: EvidenceItem(point_id=1, value=55.0, threshold=50.0, status="abnormal"),
         }
 
-        await engine.propagate_probabilities(graph, evidence)
+        node_probs = await engine.propagate_probabilities(graph, evidence)
+        assert node_probs[2] == 0.5  # 使用先验概率
 
-        # 节点 2 应使用先验概率 0.5
-        assert graph.nodes[2]["probability"] == 0.5
+    @pytest.mark.asyncio
+    async def test_deep_tree_10_layers(self, engine):
+        """测试 10 层深度故障树"""
+        graph = nx.DiGraph()
+        # 构建一条直线: leaf → n2 → n3 → ... → root (10层)
+        for i in range(1, 11):
+            if i == 1:
+                graph.add_node(i, gate_type="LEAF", probability=0.0, prior_probability=0.5, sigmoid_k=2.0)
+            else:
+                graph.add_node(i, gate_type="OR", probability=0.0)
+            if i > 1:
+                graph.add_edge(i - 1, i)
+
+        evidence = {
+            1: EvidenceItem(point_id=1, value=55.0, threshold=50.0, status="abnormal"),
+        }
+
+        node_probs = await engine.propagate_probabilities(graph, evidence)
+        # 每层 OR 门只有一个子节点, 概率应不变
+        root_prob = node_probs[10]
+        leaf_prob = node_probs[1]
+        assert abs(root_prob - leaf_prob) < 1e-6
