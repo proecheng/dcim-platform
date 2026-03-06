@@ -264,15 +264,15 @@ development_status:
   # ============================================================
 
   # Epic 24: 智能诊断核心引擎 (Phase 2a 月7-8)
-  epic-24: backlog
-  24-1-fault-tree-model-management: backlog
-  24-2-l1-rule-engine-threshold-diagnosis: backlog
-  24-3-l2-fault-tree-forward-inference: backlog
-  24-4-l3-bayesian-reverse-inference: backlog
-  24-5-alarm-diagnosis-integration: backlog
-  24-6-diagnosis-result-storage-and-query: backlog
-  24-7-diagnosis-frontend-result-display: backlog
-  24-8-diagnosis-rbac-and-audit: backlog
+  epic-24: in-progress
+  24-1-l1-rule-engine: ready-for-dev
+  24-2-diagnosis-scheduler-and-concurrency-control: backlog
+  24-3-fault-tree-data-model-and-crud: backlog
+  24-4-fault-tree-version-management-and-hmac: backlog
+  24-5-l2-fault-tree-inference-engine: backlog
+  24-6-diagnosis-result-storage-and-graded-push: backlog
+  24-7-circuit-breaker-degradation-mechanism: backlog
+  24-8-diagnosis-result-annotation-and-rbac: backlog
   epic-24-retrospective: optional
 
   # Epic 25: 智能诊断专业扩展 (Phase 2b 月9-10)
