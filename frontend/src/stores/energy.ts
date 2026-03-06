@@ -17,6 +17,7 @@ import type {
   EnergySuggestion,
   DistributionDiagram
 } from '@/api/modules/energy'
+import { siteEvents } from '@/utils/siteEvents'
 
 export const useEnergyStore = defineStore('energy', () => {
   // 实时电力数据
@@ -45,6 +46,9 @@ export const useEnergyStore = defineStore('energy', () => {
 
   // 加载状态（防重入）
   const loading = ref(false)
+
+  // Story 27.6: 版本号模式防竞态
+  let reloadVersion = 0
 
   // 计算属性
   const powerDataList = computed(() => Array.from(realtimePowerData.value.values()))
@@ -163,9 +167,9 @@ export const useEnergyStore = defineStore('energy', () => {
     lastUpdateTime.value = null
   }
 
-  // 重新加载数据（带防重入锁，返回 false 表示被跳过）
+  // 重新加载数据（版本号模式防竞态）
   async function reload(): Promise<boolean> {
-    if (loading.value) return false
+    const version = ++reloadVersion
     loading.value = true
     try {
       const [powerRes, summaryRes, pueRes] = await Promise.allSettled([
@@ -173,6 +177,8 @@ export const useEnergyStore = defineStore('energy', () => {
         getPowerSummary(),
         getCurrentPUE(),
       ])
+      // 版本号检查：如果有更新的请求已发出，丢弃本次结果
+      if (version !== reloadVersion) return false
       let anySuccess = false
       if (powerRes.status === 'fulfilled') {
         const res = powerRes.value as any
@@ -202,9 +208,17 @@ export const useEnergyStore = defineStore('energy', () => {
     } catch {
       return true
     } finally {
-      loading.value = false
+      if (version === reloadVersion) {
+        loading.value = false
+      }
     }
   }
+
+  // Story 27.6: 站点切换时重新加载能源数据
+  function handleSiteChange() {
+    reload()
+  }
+  siteEvents.on(handleSiteChange)
 
   return {
     // 状态

@@ -15,6 +15,23 @@ const instance = axios.create({
   timeout: 10000
 })
 
+// 不需要站点过滤的 API 路径（Story 27.6）
+export const SITE_FILTER_EXCLUDED_PATHS = [
+  '/v1/auth/',           // 认证
+  '/v1/spatial/sites',   // 站点管理本身不过滤
+  '/v1/system/',         // 系统配置
+  '/v1/users/',          // 用户管理
+  '/v1/demo/',           // Demo 系统
+  '/v1/configs/',        // 全局配置
+  '/v1/logs/',           // 系统日志
+]
+
+export function shouldInjectSiteId(url: string): boolean {
+  return !SITE_FILTER_EXCLUDED_PATHS.some(
+    path => url === path || url.startsWith(path.endsWith('/') ? path : path + '/')
+  )
+}
+
 // 请求拦截器
 instance.interceptors.request.use(
   (config) => {
@@ -22,6 +39,25 @@ instance.interceptors.request.use(
     if (token) {
       config.headers.Authorization = `Bearer ${token}`
     }
+
+    // site_id 自动注入（Story 27.6）
+    // 直接读 localStorage 而非 useSiteStore()，避免 Pinia 生命周期问题
+    // switchSite(null) 使用 removeItem，所以 null 表示"全部站点"
+    const siteIdStr = localStorage.getItem('current_site_id')
+    if (siteIdStr != null) {
+      const siteId = Number(siteIdStr)
+      if (!isNaN(siteId) && siteId > 0) {
+        const url = config.url || ''
+        if (shouldInjectSiteId(url)) {
+          if (!config.params) config.params = {}
+          // 手动指定优先，不覆盖
+          if (config.params.site_id === undefined) {
+            config.params.site_id = siteId
+          }
+        }
+      }
+    }
+
     return config
   },
   (error) => {

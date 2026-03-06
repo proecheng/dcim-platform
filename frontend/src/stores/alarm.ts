@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { getActiveAlarms } from '@/api/modules/alarm'
+import { siteEvents } from '@/utils/siteEvents'
 
 export interface Alarm {
   id: number
@@ -38,17 +39,33 @@ export const useAlarmStore = defineStore('alarm', () => {
   })
   const loading = ref(false)
 
+  // Story 27.6: 版本号模式防竞态（替代 AbortController，因 API 函数不接受 signal）
+  let fetchVersion = 0
+
   async function fetchActiveAlarms() {
-    if (loading.value) return
+    const version = ++fetchVersion
     loading.value = true
     try {
       const alarms = await getActiveAlarms()
+      // 版本号检查：如果有更新的请求已发出，丢弃本次结果
+      if (version !== fetchVersion) return
       activeAlarms.value = alarms as unknown as Alarm[]
       updateCount()
+    } catch (e) {
+      if (version !== fetchVersion) return
+      console.error('获取活跃告警失败:', e)
     } finally {
-      loading.value = false
+      if (version === fetchVersion) {
+        loading.value = false
+      }
     }
   }
+
+  // Story 27.6: 站点切换时重新加载告警数据
+  function handleSiteChange() {
+    fetchActiveAlarms()
+  }
+  siteEvents.on(handleSiteChange)
 
   function addAlarm(alarm: Alarm) {
     // 去重：相同 id 不重复添加

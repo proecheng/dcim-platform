@@ -7,6 +7,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { getAllRealtimeData, getRealtimeSummary, type RealtimeData, type RealtimeSummary } from '@/api/modules/realtime'
+import { siteEvents } from '@/utils/siteEvents'
 
 export type { RealtimeData, RealtimeSummary }
 
@@ -26,6 +27,9 @@ export const useRealtimeStore = defineStore('realtime', () => {
   // 加载状态（防重入）
   const loading = ref(false)
 
+  // Story 27.6: 版本号模式防竞态
+  let fetchVersion = 0
+
   // 计算属性
   const realtimeData = computed(() => Array.from(dataMap.value.values()))
   const totalPoints = computed(() => dataMap.value.size)
@@ -42,12 +46,13 @@ export const useRealtimeStore = defineStore('realtime', () => {
     offline: summary.value?.offline_points ?? offlineCount.value,
   }))
 
-  // 从 API 加载全量实时数据（带防重入锁，返回 false 表示被跳过）
+  // 从 API 加载全量实时数据（版本号模式防竞态）
   async function fetchAllData(pointIds?: number[]): Promise<boolean> {
-    if (loading.value) return false
+    const version = ++fetchVersion
     loading.value = true
     try {
       const data = await getAllRealtimeData(pointIds ? { point_ids: pointIds } : undefined)
+      if (version !== fetchVersion) return false
       // API 成功后才替换数据，避免 API 失败时清空导致页面空白
       const newMap = new Map<number, RealtimeData>()
       data.forEach(d => newMap.set(d.point_id, d))
@@ -57,7 +62,9 @@ export const useRealtimeStore = defineStore('realtime', () => {
     } catch {
       return false
     } finally {
-      loading.value = false
+      if (version === fetchVersion) {
+        loading.value = false
+      }
     }
   }
 
@@ -130,6 +137,12 @@ export const useRealtimeStore = defineStore('realtime', () => {
     summary.value = null
     lastUpdateTime.value = null
   }
+
+  // Story 27.6: 站点切换时重新加载实时数据
+  function handleSiteChange() {
+    reload()
+  }
+  siteEvents.on(handleSiteChange)
 
   return {
     dataMap,
