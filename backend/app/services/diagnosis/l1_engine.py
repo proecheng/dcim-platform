@@ -336,10 +336,13 @@ class L1RuleEngine:
         Returns:
             是否为过流告警
         """
-        # 检查告警类型或点位类型是否与电流相关
-        alarm_type = alarm_event.get("alarm_type", "").lower()
-        point_type = alarm_event.get("point_type", "").lower()
+        # 必须是阈值类型告警
+        alarm_type = alarm_event.get("alarm_type", "")
+        if alarm_type != "threshold":
+            return False
 
+        # 检查点位类型是否与电流相关
+        point_type = alarm_event.get("point_type", "").lower()
         overcurrent_keywords = ["current", "overcurrent", "过流", "电流", "过载", "overload"]
 
-        return any(keyword in alarm_type or keyword in point_type for keyword in overcurrent_keywords)
+        return any(keyword in point_type for keyword in overcurrent_keywords)

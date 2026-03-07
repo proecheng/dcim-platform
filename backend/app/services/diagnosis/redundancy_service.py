@@ -124,7 +124,7 @@ async def check_redundancy_backup(device_id: int, session: AsyncSession) -> Redu
             has_backup = backup_count >= 1
         elif device.redundancy_type == '2N':
             # 2N: 至少与当前设备数量相等的备用设备可用
-            # 计算同组/同回路设备总数
+            # 计算同组/同回路设备总数（包括自身）
             total_query = select(PowerDevice).where(
                 PowerDevice.device_type == device.device_type,
                 PowerDevice.is_enabled == True
@@ -142,8 +142,9 @@ async def check_redundancy_backup(device_id: int, session: AsyncSession) -> Redu
             total_devices = len(result.scalars().all())
 
             # 至少一半设备正常（向上取整）
+            # backup_count 已排除自身，所以需要 +1 才是实际可用设备数
             import math
-            required_backup = math.ceil(total_devices / 2)
+            required_backup = math.ceil(total_devices / 2) - 1  # -1 因为 backup_count 不包括自身
             has_backup = backup_count >= required_backup
 
         status = RedundancyStatus(

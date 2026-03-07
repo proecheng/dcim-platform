@@ -18,6 +18,9 @@ from app.models.energy import PowerDevice
 
 logger = logging.getLogger(__name__)
 
+# 断路器动作时间阈值倍数
+BREAKER_FAILURE_THRESHOLD_MULTIPLIER = 2.0
+
 # Prometheus 监控指标（条件注册，避免重复）
 try:
     diagnosis_breaker_check_duration_seconds = Histogram(
@@ -200,7 +203,7 @@ async def check_breaker_action(alarm: Alarm, session: AsyncSession) -> BreakerAc
                 expected_time_range=(min_time, max_time),
                 actual_time=actual_time
             )
-        elif actual_time > max_time and actual_time <= max_time * 2:
+        elif actual_time > max_time and actual_time <= max_time * BREAKER_FAILURE_THRESHOLD_MULTIPLIER:
             # 动作时间 > max_time 且 < max_time × 2 → "动作过慢，断路器老化"
             action_type = "动作过慢，断路器老化"
             diagnosis_breaker_action_total.labels(action_type=action_type).inc()

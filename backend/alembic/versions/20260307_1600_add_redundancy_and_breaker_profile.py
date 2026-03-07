@@ -79,13 +79,32 @@ def downgrade() -> None:
     """
     删除 breaker_profiles 表，删除 power_devices 的冗余配置字段
     """
+    # 检查表是否存在（幂等性）
+    conn = op.get_bind()
+    inspector = sa.inspect(conn)
+    existing_tables = inspector.get_table_names()
+
     # 删除 breaker_profiles 表
-    op.drop_index('idx_breaker_profiles_device_id', table_name='breaker_profiles')
-    op.drop_table('breaker_profiles')
+    if 'breaker_profiles' in existing_tables:
+        op.drop_index('idx_breaker_profiles_device_id', table_name='breaker_profiles', if_exists=True)
+        op.drop_table('breaker_profiles')
+        print("[OK] breaker_profiles 表已删除")
+    else:
+        print("[SKIP] breaker_profiles 表不存在，跳过删除")
 
     # 删除 power_devices 的冗余配置字段
-    op.drop_column('power_devices', 'redundancy_group_id')
-    op.drop_column('power_devices', 'redundancy_type')
+    if 'power_devices' in existing_tables:
+        columns = [col['name'] for col in inspector.get_columns('power_devices')]
+        if 'redundancy_group_id' in columns:
+            op.drop_column('power_devices', 'redundancy_group_id')
+            print("[OK] power_devices.redundancy_group_id 字段已删除")
+        else:
+            print("[SKIP] power_devices.redundancy_group_id 字段不存在")
 
-    print("[OK] breaker_profiles 表已删除")
-    print("[OK] power_devices 表的冗余配置字段已删除")
+        if 'redundancy_type' in columns:
+            op.drop_column('power_devices', 'redundancy_type')
+            print("[OK] power_devices.redundancy_type 字段已删除")
+        else:
+            print("[SKIP] power_devices.redundancy_type 字段不存在")
+    else:
+        print("[SKIP] power_devices 表不存在，跳过字段删除")
