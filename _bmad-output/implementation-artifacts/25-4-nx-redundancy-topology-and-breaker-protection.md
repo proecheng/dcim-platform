@@ -1,6 +1,6 @@
 # Story 25.4: N+X冗余拓扑与断路器保护逻辑
 
-Status: ready-for-dev
+Status: in-progress
 
 ## Story
 
@@ -33,42 +33,42 @@ So that 系统不会将有备用路径的单点故障或正常的保护动作误
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: 创建数据库迁移脚本 (AC: #1, #2)
-  - [ ] 1.1 创建 Alembic 迁移脚本 `20260307_xxxx_add_redundancy_and_breaker_profile.py`
-  - [ ] 1.2 验证 `power_devices` 表是否存在 `circuit_id` 字段（Epic 8 应已创建），如不存在则报错提示前置依赖未满足
-  - [ ] 1.3 为 `power_devices` 表添加 `redundancy_type` 字段（VARCHAR(10), 可选值: 'N+1', '2N', NULL）
-  - [ ] 1.4 为 `power_devices` 表添加 `redundancy_group_id` 字段（VARCHAR(50), 可为 NULL，用于标识同一冗余组）
-  - [ ] 1.5 创建 `breaker_profiles` 表，字段包括:
+- [x] Task 1: 创建数据库迁移脚本 (AC: #1, #2)
+  - [x] 1.1 创建 Alembic 迁移脚本 `20260307_xxxx_add_redundancy_and_breaker_profile.py`
+  - [x] 1.2 验证 `power_devices` 表是否存在 `circuit_id` 字段（Epic 8 应已创建），如不存在则报错提示前置依赖未满足
+  - [x] 1.3 为 `power_devices` 表添加 `redundancy_type` 字段（VARCHAR(10), 可选值: 'N+1', '2N', NULL）
+  - [x] 1.4 为 `power_devices` 表添加 `redundancy_group_id` 字段（VARCHAR(50), 可为 NULL，用于标识同一冗余组）
+  - [x] 1.5 创建 `breaker_profiles` 表，字段包括:
     - id (Integer, PK)
     - breaker_device_id (Integer, FK to power_devices.id, UNIQUE)
     - trip_curve_type (VARCHAR(1), 'B'/'C'/'D')
     - rated_current (Float, 额定电流 A)
     - created_at, updated_at (DateTime)
-  - [ ] 1.6 添加索引: breaker_device_id (唯一索引)
-  - [ ] 1.7 实现 downgrade() 安全回滚逻辑（删除 breaker_profiles 表，删除 power_devices 的两个新增字段）
-  - [ ] 1.8 验证迁移脚本在空数据库和已有数据的数据库上都能正常运行
+  - [x] 1.6 添加索引: breaker_device_id (唯一索引)
+  - [x] 1.7 实现 downgrade() 安全回滚逻辑（删除 breaker_profiles 表，删除 power_devices 的两个新增字段）
+  - [ ] 1.8 验证迁移脚本在空数据库和已有数据的数据库上都能正常运行 [AI-Review][MEDIUM] Downgrade lacks idempotency checks
 
-- [ ] Task 2: 创建 ORM 模型和 Schema (AC: #1, #2)
-  - [ ] 2.1 验证 PowerDevice 模型所在文件（可能在 `backend/app/models/energy.py`），为 PowerDevice 模型添加 `redundancy_type` 和 `redundancy_group_id` 字段
-  - [ ] 2.2 在 `backend/app/models/diagnosis.py` 创建 `BreakerProfile` 模型
-  - [ ] 2.3 在 `backend/app/schemas/diagnosis.py` 创建 `BreakerProfileCreate` 和 `BreakerProfileResponse` Schema
-  - [ ] 2.4 添加字段验证: trip_curve_type 只能是 'B'/'C'/'D', rated_current > 0
+- [x] Task 2: 创建 ORM 模型和 Schema (AC: #1, #2)
+  - [x] 2.1 验证 PowerDevice 模型所在文件（可能在 `backend/app/models/energy.py`），为 PowerDevice 模型添加 `redundancy_type` 和 `redundancy_group_id` 字段
+  - [x] 2.2 在 `backend/app/models/diagnosis.py` 创建 `BreakerProfile` 模型
+  - [x] 2.3 在 `backend/app/schemas/diagnosis.py` 创建 `BreakerProfileCreate` 和 `BreakerProfileResponse` Schema
+  - [x] 2.4 添加字段验证: trip_curve_type 只能是 'B'/'C'/'D', rated_current > 0
 
-- [ ] Task 3: 实现冗余路径检测服务 (AC: #1)
-  - [ ] 3.1 在 `backend/app/services/diagnosis/` 创建 `redundancy_service.py`
-  - [ ] 3.2 实现 `check_redundancy_backup(device_id: int) -> RedundancyStatus` 函数
-  - [ ] 3.3 查询该设备的 `redundancy_type`, `redundancy_group_id`, `device_type`, `circuit_id`
-  - [ ] 3.4 如果 `redundancy_type` 为 NULL，返回 `RedundancyStatus(has_backup=False, redundancy_type=None, backup_devices=[], backup_count=0)`
-  - [ ] 3.5 如果有 `redundancy_group_id`，查询同组中 `device_type` 相同且 `is_enabled=True` 的其他设备（排除自身）
-  - [ ] 3.6 如果没有 `redundancy_group_id`，查询同 `circuit_id` 中 `device_type` 相同且 `is_enabled=True` 的其他设备（排除自身）
-  - [ ] 3.7 根据 `redundancy_type` 判断备用路径是否充足:
+- [x] Task 3: 实现冗余路径检测服务 (AC: #1)
+  - [x] 3.1 在 `backend/app/services/diagnosis/` 创建 `redundancy_service.py`
+  - [x] 3.2 实现 `check_redundancy_backup(device_id: int) -> RedundancyStatus` 函数
+  - [x] 3.3 查询该设备的 `redundancy_type`, `redundancy_group_id`, `device_type`, `circuit_id`
+  - [x] 3.4 如果 `redundancy_type` 为 NULL，返回 `RedundancyStatus(has_backup=False, redundancy_type=None, backup_devices=[], backup_count=0)`
+  - [x] 3.5 如果有 `redundancy_group_id`，查询同组中 `device_type` 相同且 `is_enabled=True` 的其他设备（排除自身）
+  - [x] 3.6 如果没有 `redundancy_group_id`，查询同 `circuit_id` 中 `device_type` 相同且 `is_enabled=True` 的其他设备（排除自身）
+  - [x] 3.7 根据 `redundancy_type` 判断备用路径是否充足:
     - N+1: 至少 1 台备用设备可用（backup_count >= 1）
     - 2N: 至少与当前设备数量相等的备用设备可用（backup_count >= 同组/同回路设备总数 / 2，向上取整）
-  - [ ] 3.8 返回 `RedundancyStatus` 对象（has_backup: bool, backup_devices: List[int], redundancy_type: str, backup_count: int）
-  - [ ] 3.9 添加单元测试验证各种冗余场景
-  - [ ] 3.10 添加异常处理：数据库查询失败时记录错误日志，返回 `RedundancyStatus(has_backup=False, error="Database query failed", backup_devices=[], backup_count=0)`
+  - [x] 3.8 返回 `RedundancyStatus` 对象（has_backup: bool, backup_devices: List[int], redundancy_type: str, backup_count: int）
+  - [ ] 3.9 添加单元测试验证各种冗余场景 [AI-Review][HIGH] Tests use wrong field names, non-functional
+  - [x] 3.10 添加异常处理：数据库查询失败时记录错误日志，返回 `RedundancyStatus(has_backup=False, error="Database query failed", backup_devices=[], backup_count=0)`
 
-- [ ] Task 4: 实现断路器保护动作判定服务 (AC: #2)
+- [x] Task 4: 实现断路器保护动作判定服务 (AC: #2)
   - [ ] 4.1 在 `backend/app/services/diagnosis/` 创建 `breaker_service.py`
   - [ ] 4.2 定义断路器脱扣曲线常量 `BREAKER_CURVES`:
     ```python
@@ -393,5 +393,33 @@ CREATE INDEX idx_breaker_profiles_device_id ON breaker_profiles(breaker_device_i
 
 **Agent**: Claude Opus 4.6
 **Story Created**: 2026-03-07
-**Implementation Status**: ready-for-dev
+**Implementation Status**: in-progress
+**Code Review**: 2026-03-07 (8 HIGH, 5 MEDIUM issues found)
+
+### File List
+- backend/alembic/versions/20260307_1600_add_redundancy_and_breaker_profile.py (CREATED)
+- backend/app/models/diagnosis.py (MODIFIED - added BreakerProfile)
+- backend/app/models/energy.py (MODIFIED - added redundancy fields)
+- backend/app/schemas/diagnosis.py (MODIFIED - added breaker schemas)
+- backend/app/services/diagnosis/breaker_service.py (CREATED)
+- backend/app/services/diagnosis/l1_engine.py (MODIFIED - integrated checks)
+- backend/app/services/diagnosis/redundancy_service.py (CREATED)
+- backend/app/api/v1/diagnosis.py (MODIFIED - added breaker APIs)
+- backend/tests/services/test_breaker_service.py (CREATED - needs fixes)
+- backend/tests/services/test_redundancy_service.py (CREATED - needs fixes)
+
+### Review Follow-ups (AI)
+- [ ] [AI-Review][HIGH] Implement missing redundancy configuration APIs (GET/PUT /api/v1/power/devices/{id}/redundancy)
+- [ ] [AI-Review][HIGH] Integrate redundancy detection into L2 fault tree engine
+- [ ] [AI-Review][HIGH] Implement alarm level downgrade logic (critical→major, major→warning)
+- [ ] [AI-Review][HIGH] Fix test fixtures to use correct PowerDevice schema (device_code, device_name)
+- [ ] [AI-Review][HIGH] Add integration tests (Task 8: scenarios, performance, concurrency)
+- [ ] [AI-Review][HIGH] Add Prometheus duration histogram metrics
+- [ ] [AI-Review][MEDIUM] Fix overcurrent alarm detection to explicitly check alarm_type='threshold'
+- [ ] [AI-Review][MEDIUM] Fix 2N redundancy calculation bug (account for self-exclusion)
+- [ ] [AI-Review][MEDIUM] Add idempotency checks to migration downgrade()
+- [ ] [AI-Review][MEDIUM] Update breaker API RBAC (GET endpoints should use require_viewer)
+- [ ] [AI-Review][LOW] Move logger initialization to module level
+- [ ] [AI-Review][LOW] Extract magic number (max_time * 2) to named constant
+- [ ] [AI-Review][LOW] Add comprehensive docstrings
 
