@@ -32,7 +32,7 @@ class EnvironmentContextService:
     # 缓存
     _cache: Dict[str, Any] = {}
     _cache_lock = asyncio.Lock()
-    _cache_ttl = 300  # 缓存有效期 5 分钟
+    _cache_ttl = 60  # 缓存有效期 60 秒（符合 Task 3.3 要求）
 
     @classmethod
     async def get_context(cls) -> Dict[str, Any]:

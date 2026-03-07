@@ -74,11 +74,16 @@ class Lexer:
         return string
 
     def read_identifier(self) -> str:
-        """读取标识符"""
+        """读取标识符（限制为字母、数字、下划线）"""
         identifier = ""
         while self.current_char is not None and (self.current_char.isalnum() or self.current_char == '_'):
             identifier += self.current_char
             self.advance()
+
+        # 安全检查: 变量名只能包含字母、数字、下划线
+        if not identifier or not all(c.isalnum() or c == '_' for c in identifier):
+            raise ValueError(f"Invalid identifier: {identifier}")
+
         return identifier
 
     def get_next_token(self) -> Token:
@@ -259,6 +264,10 @@ def parse_and_evaluate(condition: str, context: Dict[str, Any]) -> bool:
         True
     """
     try:
+        # 安全检查: 限制表达式长度 < 200 字符
+        if len(condition) >= 200:
+            return False
+
         lexer = Lexer(condition)
         parser = Parser(lexer)
         ast = parser.parse()

@@ -1,6 +1,6 @@
 # Story 25.6: 动态告警阈值
 
-Status: ready-for-dev
+Status: in-progress
 
 ## Story
 
@@ -24,13 +24,13 @@ So that 夏季高温高负载时不会产生大量虚假告警。
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: 创建动态阈值规则配置 (AC: #1)
-  - [ ] 1.1 在 `system_configs` 表中创建配置记录:
+- [x] Task 1: 创建动态阈值规则配置 (AC: #1)
+  - [x] 1.1 在 `system_configs` 表中创建配置记录:
     - config_group: "alarm"
     - config_key: "dynamic_threshold_rules"
     - config_value: JSON 数组，每条规则包含 condition, adjustment, description
     - value_type: "json"
-  - [ ] 1.2 创建默认规则示例:
+  - [x] 1.2 创建默认规则示例:
     ```json
     [
       {
@@ -53,22 +53,22 @@ So that 夏季高温高负载时不会产生大量虚假告警。
       }
     ]
     ```
-  - [ ] 1.3 创建安全边界配置:
+  - [x] 1.3 创建安全边界配置:
     - config_key: "dynamic_threshold_safety_boundary_percent"
     - config_value: "20"
     - description: "动态阈值调整的安全边界百分比"
-  - [ ] 1.4 创建特性开关配置:
+  - [x] 1.4 创建特性开关配置:
     - config_key: "DYNAMIC_THRESHOLDS_ENABLED"
     - config_value: "false"
     - description: "动态阈值特性开关（默认关闭）"
-  - [ ] 1.5 创建适用点位类型配置:
+  - [x] 1.5 创建适用点位类型配置:
     - config_key: "dynamic_threshold_applicable_point_types"
     - config_value: '["temperature", "humidity"]'
     - value_type: "json"
     - description: "动态阈值适用的点位类型列表"
-  - [ ] 1.6 在 system_configs 表中增加 version 字段（如果不存在）:
+  - [x] 1.6 在 system_configs 表中增加 version 字段（如果不存在）:
     - 使用 Alembic 迁移脚本添加 version INTEGER DEFAULT 1
-  - [ ] 1.7 创建 config_history 表记录配置修改历史:
+  - [x] 1.7 创建 config_history 表记录配置修改历史:
     ```sql
     CREATE TABLE config_history (
       id SERIAL PRIMARY KEY,
@@ -81,24 +81,24 @@ So that 夏季高温高负载时不会产生大量虚假告警。
     );
     ```
 
-- [ ] Task 2: 实现简单条件表达式解析器 (AC: #1)
-  - [ ] 2.1 在 `backend/app/services/` 创建 `condition_parser.py`
-  - [ ] 2.2 实现 `parse_condition(condition: str, context: dict) -> bool` 函数:
+- [x] Task 2: 实现简单条件表达式解析器 (AC: #1)
+  - [x] 2.1 在 `backend/app/services/` 创建 `condition_parser.py`
+  - [x] 2.2 实现 `parse_condition(condition: str, context: dict) -> bool` 函数:
     - 支持比较运算符: >, <, ==, !=, >=, <=
     - 支持逻辑运算符: AND, OR（不支持 NOT，保持简单）
     - 支持括号分组: 例如 "(outdoor_temp > 35 OR season == 'summer') AND it_load_percent > 80"
     - 支持变量替换: 从 context 字典中获取变量值
     - 支持字符串比较（用单引号包裹）
     - 示例: "outdoor_temp >= 35 AND it_load_percent > 80"
-  - [ ] 2.3 实现安全检查:
+  - [x] 2.3 实现安全检查:
     - 禁止使用 eval()，使用手写解析器
     - 限制表达式长度 < 200 字符
     - 限制变量名只能包含字母、数字、下划线
     - 限制运算符白名单: >, <, ==, !=, >=, <=, AND, OR, (, )
-  - [ ] 2.4 添加异常处理:
+  - [x] 2.4 添加异常处理:
     - 解析失败时返回 False 并记录警告日志
     - 变量不存在时返回 False 并记录警告日志
-  - [ ] 2.5 添加单元测试:
+  - [x] 2.5 添加单元测试:
     - 测试基本比较: "outdoor_temp > 35"
     - 测试逻辑运算: "outdoor_temp > 35 AND it_load_percent > 80"
     - 测试字符串比较: "season == 'winter'"
@@ -282,6 +282,55 @@ So that 夏季高温高负载时不会产生大量虚假告警。
     - 记录降级次数（异常导致的降级）
     - 记录性能耗时（P50/P95/P99）
   - [ ] 8.11 验证向后兼容性: Epic 5 告警引擎现有测试全部通过
+
+### Review Follow-ups (AI Code Review 2026-03-07)
+
+- [ ] [AI-Review][HIGH] Task 3 实现不符合需求: 环境上下文服务应从 Redis 读取数据而非数据库 [environment_context_service.py:90-110]
+  - 当前实现: 从 point_history 表查询点位历史数据
+  - 需求: 从 Redis 读取 key "outdoor_temp", "it_load_percent"
+  - 需要重构 _get_latest_point_value() 方法改为 Redis 查询
+  - 添加数据时效性检查（10分钟）
+  - 添加降级逻辑（Redis 不可用时使用默认值）
+
+- [ ] [AI-Review][HIGH] Task 3 IT负载计算缺失: 需要实现 _calculate_it_load_percent() 函数 [environment_context_service.py]
+  - 从 point_realtime 表查询所有 point_type='AI' 且 unit='kW' 的启用点位实时值
+  - 从 devices 表查询所有 device_type='rack' 的启用设备额定功率
+  - 计算: sum(实时功率) / sum(额定功率) × 100%
+  - 结果写入 Redis key "it_load_percent"，TTL 60 秒
+
+- [ ] [AI-Review][HIGH] Task 4 监控指标记录缺失: 需要实现 Task 4.4 监控指标 [dynamic_threshold_service.py]
+  - 记录调整次数: 按 point_id, rule_id 统计
+  - 记录调整幅度: 记录 adjustment 值到时序数据库
+  - 记录规则匹配率: 每条规则的匹配次数
+  - 记录降级次数: 异常类型和次数
+  - 记录性能耗时: 上下文查询、规则评估、总耗时
+  - 使用 Redis 或 TimescaleDB 存储指标数据
+
+- [ ] [AI-Review][HIGH] Task 4 点位类型检查不完整: 需要检查 point.unit 字段判断类型 [dynamic_threshold_service.py:_get_applicable_point_types]
+  - 查询 point 表获取 point.unit 字段
+  - 判断逻辑: unit 包含 "℃" 或 "°C" → temperature, unit 包含 "%RH" 或 "%" → humidity
+  - 如果点位类型不在 applicable_point_types 中，直接返回静态阈值
+
+- [ ] [AI-Review][HIGH] Task 5 告警引擎集成缺失: 需要在 alarm_engine.py 中集成动态阈值 [backend/app/engines/alarm_engine.py]
+  - 在 _check_threshold() 方法中调用 DynamicThresholdService.adjust_threshold()
+  - 使用调整后的阈值进行越限判断
+  - 记录调整信息到告警 additional_info
+  - 确保向后兼容性（特性开关关闭时行为不变）
+
+- [ ] [AI-Review][HIGH] Task 6 管理 API 缺失: 需要创建动态阈值规则管理端点 [backend/app/api/v1/config.py]
+  - GET /api/v1/config/dynamic-threshold-rules - 查询规则
+  - PUT /api/v1/config/dynamic-threshold-rules - 更新规则（含乐观锁）
+  - GET /api/v1/config/dynamic-threshold-status - 查询特性状态
+  - POST /api/v1/config/dynamic-threshold-toggle - 切换特性开关
+  - POST /api/v1/config/dynamic-threshold-rules/test - 测试规则
+  - GET /api/v1/config/dynamic-threshold-rules/history - 查询历史
+  - POST /api/v1/config/dynamic-threshold-rules/rollback - 回滚版本
+  - 添加 RBAC 权限控制和输入验证
+
+- [ ] [AI-Review][MEDIUM] 环境上下文数据源配置化: 硬编码的点位名称应改为配置 [environment_context_service.py:23-26]
+  - 当前: DATA_SOURCE_MAPPING 硬编码中文点位名称
+  - 改进: 从 system_configs 读取点位名称映射配置
+  - 或者: 改为从 Redis 读取数据（符合 Task 3.2 需求）
 
 ## Dev Notes
 
@@ -821,9 +870,43 @@ Claude Opus 4.6
 
 ### Implementation Status
 
-ready-for-dev
+in-progress
 
 ### File List
 
-待实施后更新。
+**数据库迁移**:
+- `backend/alembic/versions/8574ebeb7faa_story_25_6_add_dynamic_threshold_config.py` - 创建 version 字段和 config_history 表，插入默认配置
+
+**服务层**:
+- `backend/app/services/diagnosis/condition_parser.py` - 条件表达式解析器（支持 >, <, ==, !=, >=, <=, AND, OR, 括号）
+- `backend/app/services/diagnosis/environment_context_service.py` - 环境上下文服务（室外温度、IT负载、季节）
+- `backend/app/services/diagnosis/dynamic_threshold_service.py` - 动态阈值调整服务（规则评估、安全边界）
+
+**单元测试**:
+- `backend/tests/services/test_condition_parser.py` - 条件解析器测试（19个测试用例）
+- `backend/tests/services/test_dynamic_threshold_service.py` - 动态阈值服务测试（部分实现）
+
+**配置**:
+- `_bmad-output/implementation-artifacts/sprint-status.yaml` - 更新 Story 25.6 状态为 in-progress
+
+### Change Log
+
+**2026-03-07 - 初始实现（部分完成）**:
+- ✅ Task 1: 数据库迁移和配置初始化
+- ✅ Task 2: 条件表达式解析器
+- ⚠️ Task 3: 环境上下文服务（实现方式与需求不符，需重构）
+- ⚠️ Task 4: 动态阈值服务（缺少监控指标和点位类型检查）
+- ❌ Task 5: 告警引擎集成（未实现）
+- ❌ Task 6: 管理 API（未实现）
+- ⚠️ Task 7: 单元测试（部分完成）
+- ❌ Task 8: 集成测试（未实现）
+
+**2026-03-07 - 代码审查修复**:
+- 修复表达式长度验证（< 200 字符）
+- 修复变量名验证（仅允许字母、数字、下划线）
+- 修复环境上下文缓存 TTL（300s → 60s）
+- 添加表达式长度和变量名测试用例
+- 更新 Story 状态为 in-progress
+- 标记已完成的 Task 1 和 Task 2
+- 添加代码审查发现的待办事项
 

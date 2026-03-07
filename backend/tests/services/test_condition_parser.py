@@ -121,3 +121,15 @@ class TestConditionParser:
         assert parse_and_evaluate("temp > 35.5", {"temp": 36.0}) is True
         assert parse_and_evaluate("temp >= 35.5", {"temp": 35.5}) is True
         assert parse_and_evaluate("load < 80.5", {"load": 80.0}) is True
+
+    def test_expression_length_limit(self):
+        """测试表达式长度限制（< 200 字符）"""
+        # 生成超过 200 字符的表达式
+        long_expr = "a > 1" + " AND b > 2" * 30  # 超过 200 字符
+        assert parse_and_evaluate(long_expr, {"a": 2, "b": 3}) is False
+
+    def test_valid_variable_names(self):
+        """测试有效的变量名（字母、数字、下划线）"""
+        assert parse_and_evaluate("var_1 > 5", {"var_1": 6}) is True
+        assert parse_and_evaluate("temp2 == 10", {"temp2": 10}) is True
+        assert parse_and_evaluate("_private > 0", {"_private": 1}) is True
