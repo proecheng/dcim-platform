@@ -759,16 +759,28 @@ class FaultTreeInferenceEngine:
 
                 if redundancy_status.has_backup:
                     # 有活跃备用路径，降低故障影响等级
+                    # 建议的等级降级映射（记录到 warnings，不修改告警表）
+                    # critical → major, major → warning, warning/info 不降级
+                    suggested_downgrade = {
+                        "critical": "major",
+                        "major": "warning",
+                        "warning": "warning",
+                        "info": "info"
+                    }
+
                     # 记录到 context 的 warnings 中
                     context.warnings.append(
                         f"已有备用路径自动切换（冗余类型: {redundancy_status.redundancy_type}，"
                         f"备用设备: {redundancy_status.backup_devices}）"
                     )
+
                     # 降低根节点概率（模拟故障等级降低）
                     # 原概率 * 0.7（降低 30%）
+                    original_prob = context.root_node_probability
                     context.root_node_probability *= 0.7
+
                     logger.info(
-                        f"设备 {device_id} 有冗余备用路径，故障概率降低至 {context.root_node_probability:.3f}"
+                        f"设备 {device_id} 有冗余备用路径，故障概率从 {original_prob:.3f} 降低至 {context.root_node_probability:.3f}"
                     )
 
             # 保存图引用供 L3 引擎使用
