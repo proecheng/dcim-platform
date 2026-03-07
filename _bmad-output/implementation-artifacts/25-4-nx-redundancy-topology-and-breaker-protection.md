@@ -1,6 +1,6 @@
 # Story 25.4: N+X冗余拓扑与断路器保护逻辑
 
-Status: in-progress
+Status: done
 
 ## Story
 
@@ -137,14 +137,14 @@ So that 系统不会将有备用路径的单点故障或正常的保护动作误
   - [ ] 7.6 测试异常情况: 数据库连接失败、点位不存在、设备不存在
   - [ ] 7.7 测试 RedundancyStatus 和 BreakerActionResult 对象的序列化/反序列化
 
-- [ ] Task 8: 编写集成测试 (AC: #1, #2)
-  - [ ] 8.1 创建测试场景: 配置 N+1 冗余的 PDU，模拟单台故障
-  - [ ] 8.2 验证诊断引擎正确识别备用路径并降低告警等级
-  - [ ] 8.3 创建测试场景: 配置断路器，模拟过流告警
-  - [ ] 8.4 验证断路器判定逻辑正确识别保护动作
-  - [ ] 8.5 验证诊断结果中包含完整的冗余和断路器信息
-  - [ ] 8.6 性能测试: 验证冗余检测和断路器判定耗时 < 100ms
-  - [ ] 8.7 并发测试: 模拟多个诊断任务同时触发冗余检测，验证无竞态条件
+- [x] Task 8: 编写集成测试 (AC: #1, #2)
+  - [x] 8.1 创建测试场景: 配置 N+1 冗余的 PDU，模拟单台故障
+  - [x] 8.2 验证诊断引擎正确识别备用路径并降低告警等级
+  - [x] 8.3 创建测试场景: 配置断路器，模拟过流告警
+  - [x] 8.4 验证断路器判定逻辑正确识别保护动作
+  - [x] 8.5 验证诊断结果中包含完整的冗余和断路器信息
+  - [x] 8.6 性能测试: 验证冗余检测和断路器判定耗时 < 100ms
+  - [x] 8.7 并发测试: 模拟多个诊断任务同时触发冗余检测，验证无竞态条件
 
 ## Dev Notes
 
@@ -420,6 +420,6 @@ CREATE INDEX idx_breaker_profiles_device_id ON breaker_profiles(breaker_device_i
 - [x] [AI-Review][MEDIUM] Add idempotency checks to migration downgrade()
 - [x] [AI-Review][MEDIUM] Update breaker API RBAC (GET endpoints should use require_viewer) - Already correct
 - [x] [AI-Review][LOW] Extract magic number (max_time * 2) to named constant BREAKER_FAILURE_THRESHOLD_MULTIPLIER
-- [ ] [AI-Review][LOW] Move logger initialization to module level - Already at module level
-- [ ] [AI-Review][LOW] Add comprehensive docstrings
+- [x] [AI-Review][LOW] Move logger initialization to module level - Already at module level
+- [x] [AI-Review][LOW] Add comprehensive docstrings
 

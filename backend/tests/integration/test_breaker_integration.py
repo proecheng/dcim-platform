@@ -4,6 +4,7 @@
 """
 import pytest
 import time
+import asyncio
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 from datetime import datetime, timedelta
@@ -329,3 +330,137 @@ async def test_breaker_api_integration(client: AsyncClient, async_db: AsyncSessi
     result = await check_breaker_action(alarm, async_db)
     assert result.action_type == "保护正常动作"
     assert result.overload_ratio == pytest.approx(3.0, rel=0.01)
+
+
+@pytest.mark.asyncio
+async def test_breaker_check_performance(async_db: AsyncSession):
+    """
+    测试场景: 验证断路器判定性能 < 100ms (Task 8.6)
+    """
+    # 创建测试点位
+    point = Point(
+        point_code="POINT-BREAKER-PERF",
+        point_name="Breaker Performance Test Point",
+        point_type="AI_CURRENT",
+        unit="A"
+    )
+    async_db.add(point)
+    await async_db.commit()
+    await async_db.refresh(point)
+
+    # 创建配电设备
+    device = PowerDevice(
+        device_code="BREAKER-PERF",
+        device_name="Performance Test Breaker",
+        device_type="BREAKER",
+        is_enabled=True,
+        current_point_id=point.id
+    )
+    async_db.add(device)
+    await async_db.commit()
+    await async_db.refresh(device)
+
+    # 创建断路器配置
+    breaker_profile = BreakerProfile(
+        breaker_device_id=device.id,
+        trip_curve_type="C",
+        rated_current=63.0
+    )
+    async_db.add(breaker_profile)
+    await async_db.commit()
+
+    # 创建过流告警
+    alarm_time = datetime.now() - timedelta(seconds=8)
+    alarm = Alarm(
+        alarm_no=f"ALM-BREAKER-{int(time.time() * 1000)}",
+        point_id=point.id,
+        alarm_type="threshold",
+        alarm_level="critical",
+        alarm_message="过流告警",
+        trigger_value=315.0,
+        created_at=alarm_time
+    )
+    async_db.add(alarm)
+    await async_db.commit()
+    await async_db.refresh(alarm)
+
+    # 测试单次检测性能
+    start_time = time.time()
+    result = await check_breaker_action(alarm, async_db)
+    duration = time.time() - start_time
+
+    assert result.action_type == "保护正常动作"
+    assert duration < 0.1, f"断路器判定耗时 {duration:.3f}s 超过 100ms 阈值"
+
+
+@pytest.mark.asyncio
+async def test_breaker_check_concurrency(async_db: AsyncSession):
+    """
+    测试场景: 验证并发断路器判定无竞态条件 (Task 8.7)
+    """
+    # 创建测试点位和设备
+    devices = []
+    alarms = []
+    for i in range(5):
+        point = Point(
+            point_code=f"POINT-BREAKER-CONC-{i:03d}",
+            point_name=f"Concurrency Test Point {i}",
+            point_type="AI_CURRENT",
+            unit="A"
+        )
+        async_db.add(point)
+        await async_db.commit()
+        await async_db.refresh(point)
+
+        device = PowerDevice(
+            device_code=f"BREAKER-CONC-{i:03d}",
+            device_name=f"Concurrency Test Breaker {i}",
+            device_type="BREAKER",
+            is_enabled=True,
+            current_point_id=point.id
+        )
+        async_db.add(device)
+        await async_db.commit()
+        await async_db.refresh(device)
+        devices.append(device)
+
+        # 创建断路器配置
+        breaker_profile = BreakerProfile(
+            breaker_device_id=device.id,
+            trip_curve_type="C",
+            rated_current=63.0
+        )
+        async_db.add(breaker_profile)
+        await async_db.commit()
+
+        # 创建过流告警
+        alarm_time = datetime.now() - timedelta(seconds=8)
+        alarm = Alarm(
+            alarm_no=f"ALM-BREAKER-CONC-{i:03d}-{int(time.time() * 1000)}",
+            point_id=point.id,
+            alarm_type="threshold",
+            alarm_level="critical",
+            alarm_message="过流告警",
+            trigger_value=315.0,
+            created_at=alarm_time
+        )
+        async_db.add(alarm)
+        await async_db.commit()
+        await async_db.refresh(alarm)
+        alarms.append(alarm)
+
+    # 并发执行多个断路器判定
+    tasks = [
+        check_breaker_action(alarm, async_db)
+        for alarm in alarms
+        for _ in range(3)  # 每个告警检测 3 次
+    ]
+
+    results = await asyncio.gather(*tasks)
+
+    # 验证所有结果一致且正确
+    assert len(results) == 15  # 5 alarms × 3 checks
+    for result in results:
+        assert result.action_type == "保护正常动作"
+        assert result.confidence == 0.95
+        assert result.overload_ratio == pytest.approx(5.0, rel=0.01)

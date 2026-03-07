@@ -4,6 +4,7 @@
 """
 import pytest
 import time
+import asyncio
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -242,3 +243,73 @@ async def test_redundancy_api_integration(client: AsyncClient, async_db: AsyncSe
     redundancy_status = await check_redundancy_backup(device.id, async_db)
     assert redundancy_status.has_backup is True
     assert redundancy_status.redundancy_type == "N+1"
+
+
+@pytest.mark.asyncio
+async def test_redundancy_check_performance(async_db: AsyncSession):
+    """
+    测试场景: 验证冗余检测性能 < 100ms (Task 8.6)
+    """
+    # 创建测试设备
+    devices = []
+    for i in range(10):
+        device = PowerDevice(
+            device_code=f"PDU-PERF-{i:03d}",
+            device_name=f"Performance Test PDU {i}",
+            device_type="PDU",
+            is_enabled=True,
+            redundancy_type="N+1",
+            redundancy_group_id="PERF-TEST-GROUP"
+        )
+        devices.append(device)
+        async_db.add(device)
+    await async_db.commit()
+    for device in devices:
+        await async_db.refresh(device)
+
+    # 测试单次检测性能
+    start_time = time.time()
+    result = await check_redundancy_backup(devices[0].id, async_db)
+    duration = time.time() - start_time
+
+    assert result.has_backup is True
+    assert duration < 0.1, f"冗余检测耗时 {duration:.3f}s 超过 100ms 阈值"
+
+
+@pytest.mark.asyncio
+async def test_redundancy_check_concurrency(async_db: AsyncSession):
+    """
+    测试场景: 验证并发冗余检测无竞态条件 (Task 8.7)
+    """
+    # 创建测试设备
+    devices = []
+    for i in range(5):
+        device = PowerDevice(
+            device_code=f"PDU-CONC-{i:03d}",
+            device_name=f"Concurrency Test PDU {i}",
+            device_type="PDU",
+            is_enabled=True,
+            redundancy_type="N+1",
+            redundancy_group_id="CONC-TEST-GROUP"
+        )
+        devices.append(device)
+        async_db.add(device)
+    await async_db.commit()
+    for device in devices:
+        await async_db.refresh(device)
+
+    # 并发执行多个冗余检测
+    tasks = [
+        check_redundancy_backup(device.id, async_db)
+        for device in devices
+        for _ in range(3)  # 每个设备检测 3 次
+    ]
+
+    results = await asyncio.gather(*tasks)
+
+    # 验证所有结果一致且正确
+    assert len(results) == 15  # 5 devices × 3 checks
+    for result in results:
+        assert result.has_backup is True
+        assert result.redundancy_type == "N+1"
+        assert result.backup_count >= 1  # 至少有 1 个备用设备
