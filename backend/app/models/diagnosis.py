@@ -2,10 +2,11 @@
 诊断规则模型
 Story 9-3: 智能故障诊断
 Story 24.6: 诊断会话、审计日志、结果扩展
+Story 25.3: UPS电池SOH预测
 """
 
 from datetime import datetime
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, Text, Float, ForeignKey, JSON
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, Text, Float, ForeignKey, JSON, Index
 
 from ..core.database import Base
 
@@ -112,5 +113,38 @@ class DiagnosisAnnotation(Base):
     actual_root_cause = Column(Text, nullable=True, comment="实际根因(标注为inaccurate时必填)")
     notes = Column(Text, nullable=True, comment="备注")
     annotated_at = Column(DateTime, nullable=False, default=datetime.now, comment="标注时间")
+    created_at = Column(DateTime, default=datetime.now, comment="创建时间")
+    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now, comment="更新时间")
+
+
+class BatterySOHRecord(Base):
+    """UPS电池SOH记录表 - Story 25.3"""
+
+    __tablename__ = "battery_soh_records"
+    __table_args__ = (
+        Index("idx_battery_soh_device_id", "device_id"),
+        Index("idx_battery_soh_calculated_at", "calculated_at"),
+        Index("idx_battery_soh_device_time", "device_id", "calculated_at"),
+    )
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    device_id = Column(Integer, ForeignKey("devices.id", ondelete="CASCADE"), nullable=False, comment="设备ID")
+    soh_percent = Column(Float, nullable=False, comment="SOH百分比 [0-100]")
+    resistance_mohm = Column(Float, nullable=True, comment="当前内阻(毫欧)")
+    cycle_count = Column(Integer, nullable=True, comment="充放电循环次数")
+    weights_version = Column(String(50), nullable=True, comment="权重配置版本")
+    calculated_at = Column(DateTime, nullable=False, comment="计算时间(UTC)")
+
+
+class SOHPointUnavailableTracking(Base):
+    """SOH点位不可用追踪表 - Story 25.3"""
+
+    __tablename__ = "soh_point_unavailable_tracking"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    device_id = Column(Integer, ForeignKey("devices.id", ondelete="CASCADE"), nullable=False, unique=True, comment="设备ID")
+    consecutive_days = Column(Integer, nullable=False, default=0, comment="连续不可用天数")
+    last_unavailable_date = Column(DateTime, nullable=False, comment="最后一次不可用日期")
+    alarm_triggered = Column(Boolean, nullable=False, default=False, comment="是否已触发告警")
     created_at = Column(DateTime, default=datetime.now, comment="创建时间")
     updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now, comment="更新时间")

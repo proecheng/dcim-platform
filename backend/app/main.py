@@ -4,7 +4,7 @@ V2.0 架构重构版
 """
 
 import asyncio
-from datetime import datetime
+from datetime import datetime, timedelta
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Query
 from fastapi.middleware.cors import CORSMiddleware
@@ -444,6 +444,36 @@ async def lifespan(app: FastAPI):
 
     effect_tracking_task = asyncio.create_task(_effect_tracking_loop())
 
+    # 启动 UPS 电池 SOH 计算定时任务（每日凌晨 3:00）- Story 25.3
+    async def _battery_soh_calculation_loop():
+        """UPS 电池 SOH 计算定时任务 - 每日凌晨 3:00"""
+        from datetime import time as dt_time
+        await asyncio.sleep(60)  # 启动后延迟1分钟
+        while True:
+            try:
+                now = datetime.now()
+                # 计算距离下一个凌晨 3:00 的秒数
+                target_time = now.replace(hour=3, minute=0, second=0, microsecond=0)
+                if now >= target_time:
+                    # 如果已经过了今天的 3:00，则计算明天的 3:00
+                    target_time = target_time + timedelta(days=1)
+
+                wait_seconds = (target_time - now).total_seconds()
+                logger.info(f"UPS 电池 SOH 计算任务将在 {wait_seconds/3600:.1f} 小时后执行（{target_time}）")
+
+                await asyncio.sleep(wait_seconds)
+
+                # 执行 SOH 计算
+                from app.services.diagnosis.battery_soh_service import run_daily_soh_calculation
+                await run_daily_soh_calculation()
+
+            except Exception as e:
+                logger.error(f"UPS 电池 SOH 计算任务失败: {e}")
+                # 失败后等待 1 小时再重试
+                await asyncio.sleep(3600)
+
+    soh_calculation_task = asyncio.create_task(_battery_soh_calculation_loop())
+
     print(f"{'=' * 50}")
     print(f"{settings.app_name} v{settings.app_version} 启动成功")
     print(f"{'=' * 50}")
@@ -455,6 +485,7 @@ async def lifespan(app: FastAPI):
     print("能耗聚合任务已启动，每30分钟检查一次")
     print("节能机会自动检测已启动，每小时检查一次")
     print("效果追踪任务已启动，每6小时检查一次")
+    print("UPS 电池 SOH 计算任务已启动，每日凌晨 3:00 执行")
 
     # 启动 WebSocket 心跳检测
     ws_manager.start_heartbeat()
@@ -481,6 +512,7 @@ async def lifespan(app: FastAPI):
     energy_agg_task.cancel()
     detection_task.cancel()
     effect_tracking_task.cancel()
+    soh_calculation_task.cancel()
     ws_manager.stop_heartbeat()
     # 关闭 Redis 连接
     await redis_service.close()

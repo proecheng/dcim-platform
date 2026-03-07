@@ -279,7 +279,7 @@ development_status:
   epic-25: in-progress
   25-1-power-topology-cascade-analysis: done
   25-2-electrical-parameter-node-integration: done
-  25-3-ups-battery-soh-prediction: backlog
+  25-3-ups-battery-soh-prediction: done
   25-4-nx-redundancy-topology-and-breaker-protection: backlog
   25-5-sensor-metadata-and-accuracy-weighting: backlog
   25-6-dynamic-alarm-thresholds: backlog

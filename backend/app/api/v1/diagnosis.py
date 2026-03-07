@@ -27,6 +27,7 @@ from ...schemas.diagnosis import (
     DiagnosisAnnotationResponse,
     DiagnosisAnnotationListQuery,
     DiagnosisAnnotationStatsResponse,
+    SOHWeightsConfig,
 )
 from ...engines.diagnosis_engine import diagnosis_engine
 
@@ -538,3 +539,150 @@ async def get_annotation_stats(
 
     stats = await DiagnosisAnnotationService.get_annotation_stats(db=db, top_n=top_n)
     return stats
+
+
+# ==================== Battery SOH Endpoints (Story 25.3) ====================
+
+
+@router.get("/battery-soh/{device_id}", response_model=dict)
+async def get_device_soh_history(
+    device_id: int,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_viewer),
+    limit: int = Query(30, ge=1, le=100, description="返回记录数量"),
+):
+    """查询设备 SOH 历史记录（分页）"""
+    from sqlalchemy import select, desc
+    from ...models.diagnosis import BatterySOHRecord
+    from ...schemas.diagnosis import BatterySOHRecordResponse
+
+    result = await db.execute(
+        select(BatterySOHRecord)
+        .where(BatterySOHRecord.device_id == device_id)
+        .order_by(desc(BatterySOHRecord.calculated_at))
+        .limit(limit)
+    )
+    records = result.scalars().all()
+
+    return {
+        "device_id": device_id,
+        "total": len(records),
+        "records": [BatterySOHRecordResponse.model_validate(r) for r in records],
+    }
+
+
+@router.get("/battery-soh/latest", response_model=dict)
+async def get_all_latest_soh(
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_viewer),
+):
+    """查询所有 UPS 设备最新 SOH（使用窗口函数优化）"""
+    from sqlalchemy import text
+
+    # 使用窗口函数获取每台设备最新的 SOH 记录
+    query = text("""
+        WITH ranked_soh AS (
+            SELECT
+                device_id,
+                soh_percent,
+                resistance_mohm,
+                cycle_count,
+                weights_version,
+                calculated_at,
+                ROW_NUMBER() OVER (PARTITION BY device_id ORDER BY calculated_at DESC) AS rn
+            FROM battery_soh_records
+        )
+        SELECT
+            device_id,
+            soh_percent,
+            resistance_mohm,
+            cycle_count,
+            weights_version,
+            calculated_at
+        FROM ranked_soh
+        WHERE rn = 1
+        ORDER BY device_id
+    """)
+
+    result = await db.execute(query)
+    rows = result.fetchall()
+
+    records = [
+        {
+            "device_id": row[0],
+            "soh_percent": row[1],
+            "resistance_mohm": row[2],
+            "cycle_count": row[3],
+            "weights_version": row[4],
+            "calculated_at": row[5],
+        }
+        for row in rows
+    ]
+
+    return {"total": len(records), "records": records}
+
+
+@router.post("/battery-soh/calculate/{device_id}", response_model=dict)
+async def trigger_soh_calculation(
+    device_id: int,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_operator),
+):
+    """手动触发 SOH 计算（operator/admin）"""
+    from ...services.diagnosis.battery_soh_service import calculate_soh
+
+    soh = await calculate_soh(device_id)
+
+    if soh is None:
+        raise HTTPException(
+            status_code=400,
+            detail=f"设备 {device_id} SOH 计算失败，请检查设备配置和点位数据",
+        )
+
+    return {"device_id": device_id, "soh_percent": soh, "message": "SOH 计算完成"}
+
+
+@router.get("/config/soh-weights", response_model=SOHWeightsConfig)
+async def get_soh_weights_config(
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_viewer),
+):
+    """获取 SOH 权重配置"""
+    from ...services.diagnosis.battery_soh_service import get_soh_weights
+
+    weights = await get_soh_weights()
+    return SOHWeightsConfig(**weights)
+
+
+@router.put("/config/soh-weights", response_model=dict)
+async def update_soh_weights_config(
+    config: SOHWeightsConfig,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_admin),
+):
+    """更新 SOH 权重配置（仅 admin）"""
+    from sqlalchemy import select, update
+    from ...models.config import SystemConfig
+    import json
+
+    # 查询现有配置
+    result = await db.execute(
+        select(SystemConfig)
+        .where(SystemConfig.config_group == "diagnosis")
+        .where(SystemConfig.config_key == "soh_weights")
+    )
+    existing_config = result.scalar_one_or_none()
+
+    if not existing_config:
+        raise HTTPException(status_code=404, detail="SOH 权重配置不存在")
+
+    # 更新配置
+    new_value = config.model_dump()
+    await db.execute(
+        update(SystemConfig)
+        .where(SystemConfig.id == existing_config.id)
+        .values(config_value=json.dumps(new_value))
+    )
+    await db.commit()
+
+    return {"message": "SOH 权重配置已更新", "config": new_value}

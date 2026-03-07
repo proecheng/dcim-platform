@@ -2,12 +2,13 @@
 诊断 Schema
 Story 9-3: 智能故障诊断
 Story 24.6: 诊断会话、审计日志、结果扩展
+Story 25.3: UPS电池SOH预测
 """
 
 from datetime import datetime
 from typing import Optional, List, Any
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 # ==================== Cause Item ====================
@@ -207,3 +208,41 @@ class DiagnosisAnnotationStatsResponse(BaseModel):
     accurate_rate: float = Field(..., description="准确率")
     user_stats: List[dict] = Field(..., description="用户标注统计")
     top_annotators: List[dict] = Field(..., description="Top标注者")
+
+
+# ==================== Battery SOH Schemas ====================
+
+
+class BatterySOHRecordCreate(BaseModel):
+    """创建电池SOH记录"""
+
+    device_id: int
+    soh_percent: float = Field(ge=0, le=100, description="SOH百分比 [0-100]")
+    resistance_mohm: Optional[float] = Field(default=None, gt=0, description="当前内阻(毫欧)")
+    cycle_count: Optional[int] = Field(default=None, ge=0, description="充放电循环次数")
+    weights_version: Optional[str] = None
+
+
+class BatterySOHRecordResponse(BatterySOHRecordCreate):
+    """电池SOH记录响应"""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    calculated_at: datetime
+
+
+class SOHWeightsConfig(BaseModel):
+    """SOH权重配置"""
+
+    w_r: float = Field(ge=0, le=1, description="内阻权重")
+    w_c: float = Field(ge=0, le=1, description="循环次数权重")
+    version: str = Field(default="v1.0", description="配置版本")
+
+    @model_validator(mode='after')
+    def validate_weights_sum(self):
+        """验证权重之和约为 1.0（允许 ±0.1 误差）"""
+        total = self.w_r + self.w_c
+        if not (0.9 <= total <= 1.1):
+            raise ValueError(f"权重之和应约为 1.0，当前为 {total:.2f}")
+        return self
