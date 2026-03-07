@@ -294,3 +294,34 @@ class BreakerProfileResponse(BaseModel):
     rated_current: float
     created_at: datetime
     updated_at: datetime
+
+
+# ==================== Redundancy Config Schemas - Story 25.4 ====================
+
+
+class RedundancyConfigUpdate(BaseModel):
+    """更新冗余配置"""
+
+    redundancy_type: Optional[str] = Field(None, description="冗余类型: N+1/2N/NULL")
+    redundancy_group_id: Optional[str] = Field(None, max_length=50, description="冗余组标识")
+
+    @field_validator('redundancy_type')
+    @classmethod
+    def validate_redundancy_type(cls, v: Optional[str]) -> Optional[str]:
+        """验证冗余类型"""
+        if v is not None and v not in ('N+1', '2N'):
+            raise ValueError("冗余类型必须是 'N+1' 或 '2N'")
+        return v
+
+
+class RedundancyConfigResponse(BaseModel):
+    """冗余配置响应"""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    device_id: int
+    device_code: str
+    device_name: str
+    device_type: str
+    redundancy_type: Optional[str] = None
+    redundancy_group_id: Optional[str] = None

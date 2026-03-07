@@ -13,6 +13,7 @@ from ...models.user import User
 from ...models.device import Device
 from ...models.point import Point, PointRealtime
 from ...models.power import UPSDevice, BatteryGroup
+from ...models.energy import PowerDevice
 from ...schemas.power import (
     UPSDeviceCreate,
     UPSDeviceUpdate,
@@ -24,6 +25,10 @@ from ...schemas.power import (
 )
 from ...schemas.device import DeviceInfo
 from ...schemas.common import PageResponse
+from ...schemas.diagnosis import (
+    RedundancyConfigUpdate,
+    RedundancyConfigResponse
+)
 
 router = APIRouter()
 
