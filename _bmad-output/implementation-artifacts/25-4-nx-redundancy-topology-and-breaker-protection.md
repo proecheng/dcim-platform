@@ -409,7 +409,7 @@ CREATE INDEX idx_breaker_profiles_device_id ON breaker_profiles(breaker_device_i
 - backend/tests/services/test_redundancy_service.py (CREATED - needs fixes)
 
 ### Review Follow-ups (AI)
-- [ ] [AI-Review][HIGH] Implement missing redundancy configuration APIs (GET/PUT /api/v1/power/devices/{id}/redundancy)
+- [x] [AI-Review][HIGH] Implement missing redundancy configuration APIs (GET/PUT /api/v1/power/devices/{id}/redundancy)
 - [ ] [AI-Review][HIGH] Integrate redundancy detection into L2 fault tree engine
 - [ ] [AI-Review][HIGH] Implement alarm level downgrade logic (critical→major, major→warning)
 - [x] [AI-Review][HIGH] Fix test fixtures to use correct PowerDevice schema (device_code, device_name)

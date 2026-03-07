@@ -742,6 +742,35 @@ class FaultTreeInferenceEngine:
             context.root_cause_path = await self.extract_root_cause_path(graph, root_node_id)
             context.path_extraction_time_ms = (time.time() - path_start) * 1000
 
+            # 6. 冗余检测 (Story 25.4)
+            # 如果故障涉及配电设备，检查是否有活跃的冗余备用路径
+            from app.services.diagnosis.redundancy_service import check_redundancy_backup
+            from app.models.energy import PowerDevice
+
+            # 查询设备是否为配电设备
+            result = await self.session.execute(
+                select(PowerDevice).where(PowerDevice.id == device_id)
+            )
+            power_device = result.scalar_one_or_none()
+
+            if power_device:
+                # 检查冗余备用路径
+                redundancy_status = await check_redundancy_backup(device_id, self.session)
+
+                if redundancy_status.has_backup:
+                    # 有活跃备用路径，降低故障影响等级
+                    # 记录到 context 的 warnings 中
+                    context.warnings.append(
+                        f"已有备用路径自动切换（冗余类型: {redundancy_status.redundancy_type}，"
+                        f"备用设备: {redundancy_status.backup_devices}）"
+                    )
+                    # 降低根节点概率（模拟故障等级降低）
+                    # 原概率 * 0.7（降低 30%）
+                    context.root_node_probability *= 0.7
+                    logger.info(
+                        f"设备 {device_id} 有冗余备用路径，故障概率降低至 {context.root_node_probability:.3f}"
+                    )
+
             # 保存图引用供 L3 引擎使用
             context.graph = graph
 
