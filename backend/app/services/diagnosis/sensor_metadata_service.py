@@ -76,7 +76,14 @@ class SensorMetadataCache:
             """监听器循环"""
             try:
                 import redis.asyncio as redis
-                redis_client = redis.Redis(host='localhost', port=6379, decode_responses=True)
+                from app.core.config import get_settings
+                settings = get_settings()
+
+                redis_client = redis.Redis(
+                    host=settings.redis_host,
+                    port=settings.redis_port,
+                    decode_responses=True
+                )
                 pubsub = redis_client.pubsub()
                 await pubsub.subscribe('sensor:metadata_update')
 
@@ -159,6 +166,32 @@ def get_sensor_weight(point_id: int) -> float:
             return base_weight * 0.6
 
     return base_weight
+
+
+def apply_evidence_weight(prior: float, observed: float, weight: float) -> float:
+    """
+    使用收缩公式调整证据概率
+
+    Args:
+        prior: 先验概率
+        observed: 观测概率（原始证据概率）
+        weight: 传感器权重 (0-1)
+
+    Returns:
+        调整后的概率
+
+    公式: P_adj = prior + (observed - prior) × weight
+
+    解释:
+    - weight=1.0: P_adj = observed（完全信任观测值）
+    - weight=0.0: P_adj = prior（完全不信任观测值，回归先验）
+    - weight=0.5: P_adj = (prior + observed) / 2（折中）
+
+    避免系统性压低: 权重影响的是观测值向先验的回归程度，
+    而不是直接乘以观测值，因此不会系统性压低所有概率。
+    """
+    adjusted = prior + (observed - prior) * weight
+    return max(0.0, min(1.0, adjusted))  # 确保在 [0, 1] 范围内
 
 
 async def check_calibration_status(point_id: int, session: AsyncSession) -> Dict:

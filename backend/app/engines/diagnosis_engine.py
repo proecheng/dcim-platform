@@ -278,15 +278,16 @@ class DiagnosisEngine:
         # 如果告警关联点位，应用传感器权重调整置信度
         point_id = payload.get("point_id")
         if point_id:
-            from ..services.diagnosis.sensor_metadata_service import get_sensor_weight
-            sensor_weight = get_sensor_weight(point_id)
-            # 权重调整公式: adjusted_confidence = base + (100 - base) × (weight - 0.85) / 0.15
-            # 当 weight = 1.0 时，置信度向 100 调整
-            # 当 weight = 0.85 时，置信度不变
-            # 当 weight < 0.85 时，置信度向下调整
-            if sensor_weight != 0.85:
-                adjustment = (100 - base) * (sensor_weight - 0.85) / 0.15
-                base = base + adjustment
+            try:
+                from ..services.diagnosis.sensor_metadata_service import get_sensor_weight, apply_evidence_weight
+                sensor_weight = get_sensor_weight(point_id)
+                # 使用收缩公式调整置信度
+                # 将置信度视为观测概率，50 作为先验
+                prior = 50.0
+                base = apply_evidence_weight(prior, float(base), sensor_weight / 1.0) if sensor_weight != 0.85 else base
+            except Exception as e:
+                logger.warning(f"传感器权重调整失败，使用默认权重: {e}")
+                # 降级策略：使用默认权重，不影响诊断流程
 
         return min(int(base), 100)
 

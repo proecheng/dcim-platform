@@ -19,6 +19,7 @@ from app.schemas.diagnosis import (
     SensorMetadataCreate,
     SensorMetadataUpdate,
     SensorMetadataResponse,
+    SensorMetadataListResponse,
     CalibrationStatusResponse
 )
 from app.services.diagnosis.sensor_metadata_service import (
@@ -65,12 +66,12 @@ async def create_sensor_metadata(
     return metadata
 
 
-@router.get("/", response_model=List[SensorMetadataResponse])
+@router.get("/", response_model=SensorMetadataListResponse)
 async def list_sensor_metadata(
     point_id: Optional[int] = Query(None, description="点位ID过滤"),
     accuracy_class: Optional[float] = Query(None, description="精度等级过滤"),
-    skip: int = Query(0, ge=0),
-    limit: int = Query(100, ge=1, le=500),
+    page: int = Query(1, ge=1, description="页码"),
+    page_size: int = Query(20, ge=1, le=100, description="每页数量"),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
@@ -79,6 +80,7 @@ async def list_sensor_metadata(
 
     权限: 所有登录用户
     """
+    # 构建查询
     query = select(SensorMetadata)
 
     if point_id is not None:
@@ -86,11 +88,29 @@ async def list_sensor_metadata(
     if accuracy_class is not None:
         query = query.where(SensorMetadata.accuracy_class == accuracy_class)
 
-    query = query.offset(skip).limit(limit)
+    # 获取总数
+    from sqlalchemy import func
+    count_query = select(func.count()).select_from(SensorMetadata)
+    if point_id is not None:
+        count_query = count_query.where(SensorMetadata.point_id == point_id)
+    if accuracy_class is not None:
+        count_query = count_query.where(SensorMetadata.accuracy_class == accuracy_class)
+
+    total_result = await db.execute(count_query)
+    total = total_result.scalar()
+
+    # 分页查询
+    skip = (page - 1) * page_size
+    query = query.offset(skip).limit(page_size)
     result = await db.execute(query)
     metadata_list = result.scalars().all()
 
-    return metadata_list
+    return {
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+        "items": metadata_list
+    }
 
 
 @router.get("/{metadata_id}", response_model=SensorMetadataResponse)
@@ -223,7 +243,14 @@ async def _publish_metadata_update(point_id: int):
     """发布传感器元数据更新通知到 Redis"""
     try:
         import redis.asyncio as redis
-        redis_client = redis.Redis(host='localhost', port=6379, decode_responses=True)
+        from app.core.config import get_settings
+        settings = get_settings()
+
+        redis_client = redis.Redis(
+            host=settings.redis_host,
+            port=settings.redis_port,
+            decode_responses=True
+        )
         payload = json.dumps({"point_id": point_id})
         await redis_client.publish('sensor:metadata_update', payload)
         await redis_client.close()

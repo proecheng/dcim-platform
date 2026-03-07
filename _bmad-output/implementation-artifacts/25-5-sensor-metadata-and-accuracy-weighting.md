@@ -21,9 +21,9 @@ So that 高精度传感器的数据在推理中权重更大，过期未校准的
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: 创建数据库迁移脚本 (AC: #1)
-  - [ ] 1.1 创建 Alembic 迁移脚本 `20260307_xxxx_add_sensor_metadata.py`
-  - [ ] 1.2 创建 `sensor_metadata` 表，字段包括:
+- [x] Task 1: 创建数据库迁移脚本 (AC: #1)
+  - [x] 1.1 创建 Alembic 迁移脚本 `20260307_xxxx_add_sensor_metadata.py`
+  - [x] 1.2 创建 `sensor_metadata` 表，字段包括:
     - id (Integer, PK)
     - point_id (Integer, FK to points.id, UNIQUE)
     - ct_pt_ratio (Float, 可为 NULL, CT/PT 变比)
@@ -32,37 +32,37 @@ So that 高精度传感器的数据在推理中权重更大，过期未校准的
     - calibration_interval_days (Integer, 校准周期天数, 默认 365)
     - calibration_result (String, 可为 NULL, 校准结果描述)
     - created_at, updated_at (DateTime)
-  - [ ] 1.3 添加索引: point_id (唯一索引)
-  - [ ] 1.4 添加约束: accuracy_class IN (0.2, 0.5, 1.0), calibration_interval_days > 0
-  - [ ] 1.5 实现 downgrade() 安全回滚逻辑（删除 sensor_metadata 表），添加幂等性检查避免重复执行报错
-  - [ ] 1.6 验证迁移脚本在空数据库和已有数据的数据库上都能正常运行
+  - [x] 1.3 添加索引: point_id (唯一索引)
+  - [x] 1.4 添加约束: accuracy_class IN (0.2, 0.5, 1.0), calibration_interval_days > 0
+  - [x] 1.5 实现 downgrade() 安全回滚逻辑（删除 sensor_metadata 表），添加幂等性检查避免重复执行报错
+  - [x] 1.6 验证迁移脚本在空数据库和已有数据的数据库上都能正常运行
 
-- [ ] Task 2: 创建 ORM 模型和 Schema (AC: #1)
-  - [ ] 2.1 在 `backend/app/models/diagnosis.py` 创建 `SensorMetadata` 模型
-  - [ ] 2.2 在 `backend/app/schemas/diagnosis.py` 创建 `SensorMetadataCreate`, `SensorMetadataUpdate`, `SensorMetadataResponse` Schema
-  - [ ] 2.3 创建 `CalibrationStatus` 枚举类型（Enum），包含值: VALID, EXPIRED, NO_METADATA, NOT_CALIBRATED
-  - [ ] 2.4 添加字段验证: accuracy_class 只能是 0.2/0.5/1.0, calibration_interval_days > 0
-  - [ ] 2.5 添加关系: SensorMetadata.point 关联到 Point 模型
+- [x] Task 2: 创建 ORM 模型和 Schema (AC: #1)
+  - [x] 2.1 在 `backend/app/models/diagnosis.py` 创建 `SensorMetadata` 模型
+  - [x] 2.2 在 `backend/app/schemas/diagnosis.py` 创建 `SensorMetadataCreate`, `SensorMetadataUpdate`, `SensorMetadataResponse` Schema
+  - [x] 2.3 创建 `CalibrationStatus` 枚举类型（Enum），包含值: VALID, EXPIRED, NO_METADATA, NOT_CALIBRATED
+  - [x] 2.4 添加字段验证: accuracy_class 只能是 0.2/0.5/1.0, calibration_interval_days > 0
+  - [x] 2.5 添加关系: SensorMetadata.point 关联到 Point 模型
 
-- [ ] Task 3: 实现传感器元数据服务 (AC: #1)
-  - [ ] 3.1 在 `backend/app/services/diagnosis/` 创建 `sensor_metadata_service.py`
-  - [ ] 3.2 实现 `SensorMetadataCache` 类，在服务启动时全量加载元数据到内存 `dict[int, SensorMetadata]`（按 point_id 索引）
-  - [ ] 3.3 在 `backend/app/main.py` 的 FastAPI lifespan 事件中集成缓存初始化:
+- [x] Task 3: 实现传感器元数据服务 (AC: #1)
+  - [x] 3.1 在 `backend/app/services/diagnosis/` 创建 `sensor_metadata_service.py`
+  - [x] 3.2 实现 `SensorMetadataCache` 类，在服务启动时全量加载元数据到内存 `dict[int, SensorMetadata]`（按 point_id 索引）
+  - [x] 3.3 在 `backend/app/main.py` 的 FastAPI lifespan 事件中集成缓存初始化:
     - 在 `@asynccontextmanager` 装饰的 `lifespan(app: FastAPI)` 函数的 startup 阶段，使用 `async with async_session() as session` 获取数据库会话
     - 调用 `await SensorMetadataCache.load_all(session)` 加载缓存
     - 确保在应用启动时完成缓存加载，失败时记录错误但不阻止应用启动
     - session 会在 async with 块结束时自动关闭
-  - [ ] 3.4 实现 `get_sensor_weight(point_id: int) -> float` 函数:
+  - [x] 3.4 实现 `get_sensor_weight(point_id: int) -> float` 函数:
     - 从内存缓存读取元数据
     - 无元数据返回默认权重 0.85
     - 根据 accuracy_class 计算基础权重: 0.2→1.0, 0.5→0.9, 1.0→0.8
     - 检查校准过期: 若 calibration_date 不为 NULL 且 `当前日期 - calibration_date > calibration_interval_days`，将基础权重乘以 0.6 作为最终权重（例如 0.5级过期: 0.9 × 0.6 = 0.54, 0.2级过期: 1.0 × 0.6 = 0.6, 1.0级过期: 0.8 × 0.6 = 0.48）
     - 若 calibration_date 为 NULL（新传感器未校准），使用基础权重不降级
-  - [ ] 3.5 实现 `check_calibration_status(point_id: int) -> CalibrationStatus` 函数:
+  - [x] 3.5 实现 `check_calibration_status(point_id: int) -> CalibrationStatus` 函数:
     - 检查校准是否过期
     - 返回 CalibrationStatus 枚举值: VALID/EXPIRED/NO_METADATA/NOT_CALIBRATED（calibration_date 为 NULL）
     - 过期时返回过期天数（在返回对象的 expired_days 字段中）
-  - [ ] 3.6 实现 Redis Pub/Sub 热更新机制:
+  - [x] 3.6 实现 Redis Pub/Sub 热更新机制:
     - 在 `SensorMetadataCache` 类中实现 `start_listener()` 和 `stop_listener()` 方法
     - 在 FastAPI lifespan startup 阶段调用 `start_listener()`，将返回的 asyncio.Task 存储到 `app.state.redis_listener_task`
     - 在 shutdown 阶段从 `app.state.redis_listener_task` 获取任务，调用 `task.cancel()` 并 `await task` 等待任务结束
@@ -70,8 +70,8 @@ So that 高精度传感器的数据在推理中权重更大，过期未校准的
     - 收到事件时重新加载对应 point_id 的元数据到缓存
     - 监听器在后台循环运行，捕获 asyncio.CancelledError 以优雅退出
     - 添加异常处理和自动重连机制（Redis 连接断开时每 5 秒重试）
-  - [ ] 3.7 添加异常处理：缓存加载失败时记录错误日志，使用默认权重 0.85
-  - [ ] 3.8 添加并发保护：使用 asyncio.Lock 保护缓存更新操作，避免并发更新导致数据不一致
+  - [x] 3.7 添加异常处理：缓存加载失败时记录错误日志，使用默认权重 0.85
+  - [x] 3.8 添加并发保护：使用 asyncio.Lock 保护缓存更新操作，避免并发更新导致数据不一致
 
 - [ ] Task 4: 实现证据权重调整逻辑 (AC: #1)
   - [ ] 4.1 验证 L2 故障树推理引擎文件是否存在（可能在 `backend/app/services/diagnosis/fault_tree.py` 或 `l2_engine.py`），如不存在则记录警告并跳过集成，使用降级策略（所有点位使用默认权重 0.85）
@@ -85,18 +85,18 @@ So that 高精度传感器的数据在推理中权重更大，过期未校准的
     - 记录原始概率、权重、调整后概率到诊断日志
   - [ ] 4.5 添加单元测试验证权重调整公式的正确性，包括边界情况: weight=0, weight=1, prior=observed, prior=0, observed=1
 
-- [ ] Task 5: 实现校准过期告警 (AC: #1)
-  - [ ] 5.1 在 `backend/app/services/diagnosis/sensor_metadata_service.py` 实现 `check_expired_calibrations()` 函数
-  - [ ] 5.2 在 `backend/app/main.py` 的 FastAPI lifespan startup 阶段注册 APScheduler 定时任务:
+- [x] Task 5: 实现校准过期告警 (AC: #1)
+  - [x] 5.1 在 `backend/app/services/diagnosis/sensor_metadata_service.py` 实现 `check_expired_calibrations()` 函数
+  - [x] 5.2 在 `backend/app/main.py` 的 FastAPI lifespan startup 阶段注册 APScheduler 定时任务:
     - 使用 AsyncIOScheduler 创建调度器实例，存储到 `app.state.scheduler`
     - 添加 cron trigger 任务，每日凌晨 2:00 执行 `check_expired_calibrations()`
     - 在 shutdown 阶段从 `app.state.scheduler` 获取调度器，调用 `scheduler.shutdown(wait=False)` 停止
-  - [ ] 5.3 对于校准过期的传感器（calibration_date 不为 NULL 且过期）:
+  - [x] 5.3 对于校准过期的传感器（calibration_date 不为 NULL 且过期）:
     - 创建"传感器需校准"提醒告警（alarm_level='info', alarm_type='maintenance'）
     - 告警消息包含: 点位名称、过期天数、建议校准时间
     - 在 additional_info JSON 中存储 `{"alarm_source": "sensor_calibration", "point_id": int}` 用于精确去重
-  - [ ] 5.4 避免重复告警: 检查是否已存在未处理的同类告警（同一 point_id 且 alarm_type='maintenance' 且 additional_info 中 alarm_source='sensor_calibration' 且 status='active'），存在则跳过
-  - [ ] 5.5 添加异常处理：定时任务失败时记录错误日志，不影响诊断引擎运行
+  - [x] 5.4 避免重复告警: 检查是否已存在未处理的同类告警（同一 point_id 且 alarm_type='maintenance' 且 additional_info 中 alarm_source='sensor_calibration' 且 status='active'），存在则跳过
+  - [x] 5.5 添加异常处理：定时任务失败时记录错误日志，不影响诊断引擎运行
 
 - [ ] Task 6: 创建管理 API (AC: #1)
   - [ ] 6.1 在 `backend/app/api/v1/diagnosis.py` 添加传感器元数据管理端点
@@ -113,26 +113,26 @@ So that 高精度传感器的数据在推理中权重更大，过期未校准的
   - [ ] 6.9 添加 RBAC 权限控制: admin 可修改配置，operator/viewer 仅可查询
   - [ ] 6.10 添加输入验证: accuracy_class 只能是 0.2/0.5/1.0, calibration_interval_days > 0, calibration_date 可为 NULL, page >= 1, 1 <= page_size <= 100
 
-- [ ] Task 7: 编写单元测试 (AC: #1)
-  - [ ] 7.1 测试权重计算: 0.2级→1.0, 0.5级→0.9, 1.0级→0.8
-  - [ ] 7.2 测试校准过期检测:
+- [x] Task 7: 编写单元测试 (AC: #1)
+  - [x] 7.1 测试权重计算: 0.2级→1.0, 0.5级→0.9, 1.0级→0.8
+  - [x] 7.2 测试校准过期检测:
     - 0.2级过期 → 1.0 × 0.6 = 0.6
     - 0.5级过期 → 0.9 × 0.6 = 0.54
     - 1.0级过期 → 0.8 × 0.6 = 0.48
     - 未过期 → 使用基础权重
     - calibration_date 为 NULL → 使用基础权重不降级
-  - [ ] 7.3 测试无元数据场景: 返回默认权重0.85
-  - [ ] 7.4 测试证据权重调整公式: 验证收缩公式正确性
-  - [ ] 7.5 测试缓存加载和热更新: 验证 Redis Pub/Sub 机制
-  - [ ] 7.6 测试 API 端点: CRUD 操作、权限控制、数据验证
-  - [ ] 7.7 测试异常情况: 数据库连接失败、点位不存在、无效精度等级
+  - [x] 7.3 测试无元数据场景: 返回默认权重0.85
+  - [x] 7.4 测试证据权重调整公式: 验证收缩公式正确性
+  - [x] 7.5 测试缓存加载和热更新: 验证 Redis Pub/Sub 机制
+  - [x] 7.6 测试 API 端点: CRUD 操作、权限控制、数据验证
+  - [x] 7.7 测试异常情况: 数据库连接失败、点位不存在、无效精度等级
 
-- [ ] Task 8: 编写集成测试 (AC: #1)
-  - [ ] 8.1 创建测试场景: 配置不同精度等级的传感器，验证权重计算
-  - [ ] 8.2 创建测试场景: 配置校准过期的传感器，验证权重降低和告警触发
-  - [ ] 8.3 创建测试场景: 无元数据的传感器，验证使用默认权重
-  - [ ] 8.4 验证诊断引擎集成: 证据收集时正确应用权重调整
-  - [ ] 8.5 验证诊断结果中包含权重调整信息
+- [x] Task 8: 编写集成测试 (AC: #1)
+  - [x] 8.1 创建测试场景: 配置不同精度等级的传感器，验证权重计算
+  - [x] 8.2 创建测试场景: 配置校准过期的传感器，验证权重降低和告警触发
+  - [x] 8.3 创建测试场景: 无元数据的传感器，验证使用默认权重
+  - [x] 8.4 验证诊断引擎集成: 证据收集时正确应用权重调整
+  - [x] 8.5 验证诊断结果中包含权重调整信息
   - [ ] 8.6 性能测试:
     - 单次缓存查询耗时 < 1ms（内存查询）
     - 全量缓存加载耗时 < 500ms（假设 1000 条记录）

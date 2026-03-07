@@ -493,34 +493,65 @@ async def lifespan(app: FastAPI):
     soh_calculation_task = asyncio.create_task(_battery_soh_calculation_loop())
 
     # 启动传感器校准过期检查定时任务（每日凌晨 2:00）- Story 25.5
-    async def _calibration_check_loop():
-        """传感器校准过期检查定时任务 - 每日凌晨 2:00"""
-        await asyncio.sleep(60)  # 启动后延迟1分钟
-        while True:
+    # 使用 APScheduler AsyncIOScheduler
+    try:
+        from apscheduler.schedulers.asyncio import AsyncIOScheduler
+        from app.services.diagnosis.sensor_metadata_service import check_expired_calibrations
+
+        scheduler = AsyncIOScheduler()
+
+        async def _run_calibration_check():
+            """执行校准过期检查"""
             try:
-                now = datetime.now()
-                # 计算距离下一个凌晨 2:00 的秒数
-                target_time = now.replace(hour=2, minute=0, second=0, microsecond=0)
-                if now >= target_time:
-                    # 如果已经过了今天的 2:00，则计算明天的 2:00
-                    target_time = target_time + timedelta(days=1)
-
-                wait_seconds = (target_time - now).total_seconds()
-                logger.info(f"传感器校准过期检查任务将在 {wait_seconds/3600:.1f} 小时后执行（{target_time}）")
-
-                await asyncio.sleep(wait_seconds)
-
-                # 执行校准过期检查
-                from app.services.diagnosis.sensor_metadata_service import check_expired_calibrations
                 async with async_session() as session:
                     await check_expired_calibrations(session)
-
             except Exception as e:
                 logger.error(f"传感器校准过期检查任务失败: {e}")
-                # 失败后等待 1 小时再重试
-                await asyncio.sleep(3600)
 
-    calibration_check_task = asyncio.create_task(_calibration_check_loop())
+        scheduler.add_job(
+            _run_calibration_check,
+            'cron',
+            hour=2,
+            minute=0,
+            id='calibration_check',
+            name='传感器校准过期检查'
+        )
+        scheduler.start()
+        logger.info("✓ 传感器校准过期检查定时任务已启动（每日凌晨 2:00）")
+    except ImportError:
+        logger.warning("⚠️  APScheduler 未安装，使用降级方案（asyncio.create_task）")
+        async def _calibration_check_loop():
+            """传感器校准过期检查定时任务 - 每日凌晨 2:00"""
+            await asyncio.sleep(60)  # 启动后延迟1分钟
+            while True:
+                try:
+                    now = datetime.now()
+                    # 计算距离下一个凌晨 2:00 的秒数
+                    target_time = now.replace(hour=2, minute=0, second=0, microsecond=0)
+                    if now >= target_time:
+                        # 如果已经过了今天的 2:00，则计算明天的 2:00
+                        target_time = target_time + timedelta(days=1)
+
+                    wait_seconds = (target_time - now).total_seconds()
+                    logger.info(f"传感器校准过期检查任务将在 {wait_seconds/3600:.1f} 小时后执行（{target_time}）")
+
+                    await asyncio.sleep(wait_seconds)
+
+                    # 执行校准过期检查
+                    from app.services.diagnosis.sensor_metadata_service import check_expired_calibrations
+                    async with async_session() as session:
+                        await check_expired_calibrations(session)
+
+                except Exception as e:
+                    logger.error(f"传感器校准过期检查任务失败: {e}")
+                    # 失败后等待 1 小时再重试
+                    await asyncio.sleep(3600)
+
+        calibration_check_task = asyncio.create_task(_calibration_check_loop())
+        scheduler = None
+    except Exception as e:
+        logger.error(f"✗ 传感器校准过期检查定时任务启动失败: {e}")
+        scheduler = None
 
     print(f"{'=' * 50}")
     print(f"{settings.app_name} v{settings.app_version} 启动成功")
@@ -571,7 +602,14 @@ async def lifespan(app: FastAPI):
     detection_task.cancel()
     effect_tracking_task.cancel()
     soh_calculation_task.cancel()
-    calibration_check_task.cancel()
+
+    # 停止校准检查定时任务
+    if scheduler:
+        scheduler.shutdown(wait=False)
+        logger.info("✓ 传感器校准过期检查定时任务已停止")
+    else:
+        calibration_check_task.cancel()
+
     ws_manager.stop_heartbeat()
     # 关闭 Redis 连接
     await redis_service.close()

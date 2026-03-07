@@ -116,7 +116,7 @@ api_router.include_router(video_router, prefix="/video", tags=["视频监控"])
 api_router.include_router(ota_router, prefix="/ota", tags=["OTA升级"])
 api_router.include_router(shift_router, prefix="/energy/shift", tags=["负荷转移"])
 api_router.include_router(fault_tree_versions_router, tags=["故障树版本管理"])
-api_router.include_router(sensor_metadata_router, prefix="/sensor-metadata", tags=["传感器元数据"])
+api_router.include_router(sensor_metadata_router, prefix="/diagnosis/sensor-metadata", tags=["传感器元数据"])
 
 # 深度学习节能优化API
 if _ml_available:

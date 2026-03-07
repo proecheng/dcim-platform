@@ -392,3 +392,12 @@ class CalibrationStatusResponse(BaseModel):
     expired_days: Optional[int] = Field(None, description="过期天数（仅当status=expired时）")
     calibration_date: Optional[date] = None
     next_calibration_date: Optional[date] = None
+
+
+class SensorMetadataListResponse(BaseModel):
+    """传感器元数据列表响应（分页）"""
+
+    total: int = Field(..., description="总记录数")
+    page: int = Field(..., description="当前页码")
+    page_size: int = Field(..., description="每页数量")
+    items: List[SensorMetadataResponse] = Field(..., description="元数据列表")

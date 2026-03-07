@@ -18,7 +18,7 @@ class TestSensorMetadataAPI:
         """测试创建传感器元数据"""
         # 先创建一个点位（假设点位 ID 1001 存在）
         response = await client.post(
-            "/api/v1/sensor-metadata/",
+            "/api/v1/diagnosis/sensor-metadata/",
             json={
                 "point_id": 1001,
                 "ct_pt_ratio": 100.0,
@@ -50,7 +50,7 @@ class TestSensorMetadataAPI:
 
         # 尝试创建重复点位
         response = await client.post(
-            "/api/v1/sensor-metadata/",
+            "/api/v1/diagnosis/sensor-metadata/",
             json={
                 "point_id": 1002,
                 "accuracy_class": 0.2,
@@ -81,13 +81,15 @@ class TestSensorMetadataAPI:
 
         # 查询所有
         response = await client.get(
-            "/api/v1/sensor-metadata/",
+            "/api/v1/diagnosis/sensor-metadata/",
             headers={"Authorization": f"Bearer {admin_token}"}
         )
 
         assert response.status_code == 200
         data = response.json()
-        assert len(data) >= 2
+        assert "total" in data
+        assert "items" in data
+        assert len(data["items"]) >= 2
 
     @pytest.mark.asyncio
     async def test_list_sensor_metadata_with_filters(self, client: AsyncClient, admin_token: str, async_db):
@@ -103,13 +105,14 @@ class TestSensorMetadataAPI:
 
         # 按精度等级过滤
         response = await client.get(
-            "/api/v1/sensor-metadata/?accuracy_class=0.2",
+            "/api/v1/diagnosis/sensor-metadata/?accuracy_class=0.2",
             headers={"Authorization": f"Bearer {admin_token}"}
         )
 
         assert response.status_code == 200
         data = response.json()
-        assert all(item["accuracy_class"] == 0.2 for item in data)
+        assert "items" in data
+        assert all(item["accuracy_class"] == 0.2 for item in data["items"])
 
     @pytest.mark.asyncio
     async def test_get_sensor_metadata(self, client: AsyncClient, admin_token: str, async_db):
@@ -126,7 +129,7 @@ class TestSensorMetadataAPI:
 
         # 获取详情
         response = await client.get(
-            f"/api/v1/sensor-metadata/{metadata.id}",
+            f"/api/v1/diagnosis/sensor-metadata/{metadata.id}",
             headers={"Authorization": f"Bearer {admin_token}"}
         )
 
@@ -139,7 +142,7 @@ class TestSensorMetadataAPI:
     async def test_get_nonexistent_metadata(self, client: AsyncClient, admin_token: str):
         """测试获取不存在的元数据"""
         response = await client.get(
-            "/api/v1/sensor-metadata/99999",
+            "/api/v1/diagnosis/sensor-metadata/99999",
             headers={"Authorization": f"Bearer {admin_token}"}
         )
 
@@ -160,7 +163,7 @@ class TestSensorMetadataAPI:
 
         # 更新元数据
         response = await client.put(
-            f"/api/v1/sensor-metadata/{metadata.id}",
+            f"/api/v1/diagnosis/sensor-metadata/{metadata.id}",
             json={
                 "accuracy_class": 0.2,
                 "calibration_result": "重新校准合格"
@@ -188,7 +191,7 @@ class TestSensorMetadataAPI:
 
         # 删除元数据
         response = await client.delete(
-            f"/api/v1/sensor-metadata/{metadata.id}",
+            f"/api/v1/diagnosis/sensor-metadata/{metadata.id}",
             headers={"Authorization": f"Bearer {admin_token}"}
         )
 
@@ -196,7 +199,7 @@ class TestSensorMetadataAPI:
 
         # 验证已删除
         response = await client.get(
-            f"/api/v1/sensor-metadata/{metadata.id}",
+            f"/api/v1/diagnosis/sensor-metadata/{metadata.id}",
             headers={"Authorization": f"Bearer {admin_token}"}
         )
         assert response.status_code == 404
@@ -217,7 +220,7 @@ class TestSensorMetadataAPI:
 
         # 获取校准状态
         response = await client.get(
-            "/api/v1/sensor-metadata/calibration-status/1009",
+            "/api/v1/diagnosis/sensor-metadata/calibration-status/1009",
             headers={"Authorization": f"Bearer {admin_token}"}
         )
 
@@ -243,7 +246,7 @@ class TestSensorMetadataAPI:
 
         # 获取校准状态
         response = await client.get(
-            "/api/v1/sensor-metadata/calibration-status/1010",
+            "/api/v1/diagnosis/sensor-metadata/calibration-status/1010",
             headers={"Authorization": f"Bearer {admin_token}"}
         )
 
@@ -257,7 +260,7 @@ class TestSensorMetadataAPI:
     async def test_get_calibration_status_no_metadata(self, client: AsyncClient, admin_token: str):
         """测试获取校准状态 - 无元数据"""
         response = await client.get(
-            "/api/v1/sensor-metadata/calibration-status/99999",
+            "/api/v1/diagnosis/sensor-metadata/calibration-status/99999",
             headers={"Authorization": f"Bearer {admin_token}"}
         )
 
@@ -270,7 +273,7 @@ class TestSensorMetadataAPI:
     async def test_trigger_expired_calibrations_check(self, client: AsyncClient, admin_token: str):
         """测试手动触发校准过期检查"""
         response = await client.post(
-            "/api/v1/sensor-metadata/check-expired-calibrations",
+            "/api/v1/diagnosis/sensor-metadata/check-expired-calibrations",
             headers={"Authorization": f"Bearer {admin_token}"}
         )
 
@@ -281,7 +284,7 @@ class TestSensorMetadataAPI:
     async def test_permission_operator_can_create(self, client: AsyncClient, operator_token: str):
         """测试 operator 权限可以创建元数据"""
         response = await client.post(
-            "/api/v1/sensor-metadata/",
+            "/api/v1/diagnosis/sensor-metadata/",
             json={
                 "point_id": 2001,
                 "accuracy_class": 0.5,
@@ -296,7 +299,7 @@ class TestSensorMetadataAPI:
     async def test_permission_viewer_cannot_create(self, client: AsyncClient, viewer_token: str):
         """测试 viewer 权限不能创建元数据"""
         response = await client.post(
-            "/api/v1/sensor-metadata/",
+            "/api/v1/diagnosis/sensor-metadata/",
             json={
                 "point_id": 2002,
                 "accuracy_class": 0.5,
@@ -311,7 +314,7 @@ class TestSensorMetadataAPI:
     async def test_permission_viewer_can_read(self, client: AsyncClient, viewer_token: str):
         """测试 viewer 权限可以查询元数据"""
         response = await client.get(
-            "/api/v1/sensor-metadata/",
+            "/api/v1/diagnosis/sensor-metadata/",
             headers={"Authorization": f"Bearer {viewer_token}"}
         )
 
