@@ -9,7 +9,7 @@ from app.models.energy import PowerDevice
 
 
 @pytest.mark.asyncio
-async def test_check_redundancy_backup_n_plus_1_with_backup(db_session: AsyncSession):
+async def test_check_redundancy_backup_n_plus_1_with_backup(async_db: AsyncSession):
     """测试 N+1 冗余，有备用设备"""
     # 创建冗余组设备
     device1 = PowerDevice(
@@ -28,13 +28,13 @@ async def test_check_redundancy_backup_n_plus_1_with_backup(db_session: AsyncSes
         redundancy_group_id="group-a",
         is_enabled=True
     )
-    db_session.add_all([device1, device2])
-    await db_session.commit()
-    await db_session.refresh(device1)
-    await db_session.refresh(device2)
+    async_db.add_all([device1, device2])
+    await async_db.commit()
+    await async_db.refresh(device1)
+    await async_db.refresh(device2)
 
     # 检查 device1 的冗余状态
-    result = await check_redundancy_backup(device1.id, db_session)
+    result = await check_redundancy_backup(device1.id, async_db)
 
     assert result.has_backup is True
     assert result.redundancy_type == "N+1"
@@ -43,7 +43,7 @@ async def test_check_redundancy_backup_n_plus_1_with_backup(db_session: AsyncSes
 
 
 @pytest.mark.asyncio
-async def test_check_redundancy_backup_no_redundancy_type(db_session: AsyncSession):
+async def test_check_redundancy_backup_no_redundancy_type(async_db: AsyncSession):
     """测试无冗余配置"""
     device = PowerDevice(
         device_code="PDU-003",
@@ -52,20 +52,20 @@ async def test_check_redundancy_backup_no_redundancy_type(db_session: AsyncSessi
         redundancy_type=None,
         is_enabled=True
     )
-    db_session.add(device)
-    await db_session.commit()
-    await db_session.refresh(device)
+    async_db.add(device)
+    await async_db.commit()
+    await async_db.refresh(device)
 
-    result = await check_redundancy_backup(device.id, db_session)
+    result = await check_redundancy_backup(device.id, async_db)
 
     assert result.has_backup is False
     assert result.redundancy_type is None
 
 
 @pytest.mark.asyncio
-async def test_check_redundancy_backup_device_not_found(db_session: AsyncSession):
+async def test_check_redundancy_backup_device_not_found(async_db: AsyncSession):
     """测试设备不存在"""
-    result = await check_redundancy_backup(99999, db_session)
+    result = await check_redundancy_backup(99999, async_db)
 
     assert result.has_backup is False
     assert result.error is not None
