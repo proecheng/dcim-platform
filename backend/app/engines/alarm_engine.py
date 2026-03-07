@@ -43,6 +43,12 @@ class EvaluateResult:
     alarm_level: str
     alarm_message: str
     is_communication_suspect: bool = False  # 疑似通信异常标记
+    threshold_metadata: dict = None  # 动态阈值元数据（Story 25.6）
+
+    def __post_init__(self):
+        """初始化后处理"""
+        if self.threshold_metadata is None:
+            self.threshold_metadata = {}
 
 
 class AlarmEngine:
@@ -194,7 +200,8 @@ class AlarmEngine:
             if self._check_storm(storm_key):
                 continue
 
-            triggered = self._check_threshold(point_id, value, tc, now)
+            # 使用动态阈值检测
+            triggered, threshold_metadata = self._check_threshold_with_dynamic(point_id, value, tc, now)
             if triggered:
                 results.append(
                     EvaluateResult(
@@ -203,6 +210,7 @@ class AlarmEngine:
                         threshold_value=tc.threshold_value,
                         alarm_level=tc.alarm_level,
                         alarm_message=tc.alarm_message or f"点位 {point_id} {tc.threshold_type} 告警",
+                        threshold_metadata=threshold_metadata,  # 添加动态阈值元数据
                     )
                 )
                 # 更新风暴防护时间戳
@@ -275,6 +283,88 @@ class AlarmEngine:
                 self._delay_first_exceed.pop(key, None)
                 return True
         return True
+
+    def _check_threshold_with_dynamic(
+        self, point_id: int, value: float, tc: ThresholdCache, now: float
+    ) -> tuple[bool, dict]:
+        """
+        检测单条阈值是否越限（含动态阈值调整）
+
+        Returns:
+            tuple[bool, dict]: (是否触发, 动态阈值元数据)
+        """
+        key = (point_id, tc.id)
+
+        # ===== 动态阈值调整 =====
+        threshold_value = tc.threshold_value
+        threshold_metadata = {}
+
+        try:
+            from ..services.diagnosis.dynamic_threshold_service import DynamicThresholdService
+            import asyncio
+
+            # 异步调用动态阈值服务
+            adjusted_threshold, metadata = asyncio.run(
+                DynamicThresholdService.calculate_dynamic_threshold(
+                    point_id, tc.threshold_value, tc.threshold_type
+                )
+            )
+            threshold_value = adjusted_threshold
+            threshold_metadata = metadata
+        except Exception as e:
+            logger.warning(f"动态阈值调整失败: {e}，使用静态阈值")
+        # ===== 动态阈值调整结束 =====
+
+        exceeded = False
+
+        # 1. 判断是否越限（使用调整后的阈值）
+        if tc.threshold_type in ("high_high", "high"):
+            exceeded = value > threshold_value
+        elif tc.threshold_type in ("low", "low_low"):
+            exceeded = value < threshold_value
+        elif tc.threshold_type == "equal":
+            exceeded = abs(value - threshold_value) < 0.001
+        elif tc.threshold_type == "change":
+            prev = self._prev_values.get(point_id)
+            if prev is not None:
+                exceeded = abs(value - prev) > threshold_value
+        else:
+            return False, threshold_metadata
+
+        # 2. 死区逻辑（使用调整后的阈值）
+        if tc.dead_band > 0:
+            was_triggered = self._dead_band_triggered.get(key, False)
+            if was_triggered:
+                if tc.threshold_type in ("high_high", "high"):
+                    recovered = value < (threshold_value - tc.dead_band)
+                elif tc.threshold_type in ("low", "low_low"):
+                    recovered = value > (threshold_value + tc.dead_band)
+                else:
+                    recovered = not exceeded
+                if recovered:
+                    self._dead_band_triggered[key] = False
+                return False, threshold_metadata  # 已触发状态下不重复触发
+            elif exceeded:
+                self._dead_band_triggered[key] = True
+            else:
+                return False, threshold_metadata
+
+        if not exceeded:
+            self._delay_first_exceed.pop(key, None)
+            return False, threshold_metadata
+
+        # 3. 延迟触发逻辑
+        if tc.delay_seconds > 0:
+            first_time = self._delay_first_exceed.get(key)
+            if first_time is None:
+                self._delay_first_exceed[key] = now
+                return False, threshold_metadata
+            elif (now - first_time) < tc.delay_seconds:
+                return False, threshold_metadata
+            else:
+                self._delay_first_exceed.pop(key, None)
+                return True, threshold_metadata
+        return True, threshold_metadata
 
     def _check_storm(self, key: Tuple[int, int]) -> bool:
         """告警风暴防护：同一点位+阈值 60 秒内不重复产生告警"""

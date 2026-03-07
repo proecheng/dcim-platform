@@ -8,12 +8,15 @@ Story 25.6: 动态告警阈值
 import asyncio
 import json
 import logging
-from typing import Dict, Any, Optional, List
+import time
+from typing import Dict, Any, Optional, List, Tuple
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import async_session
+from app.core.redis import redis_service
 from app.models.config import SystemConfig
+from app.models.point import Point
 from app.services.diagnosis.condition_parser import parse_and_evaluate
 from app.services.diagnosis.environment_context_service import EnvironmentContextService
 
@@ -60,84 +63,240 @@ class DynamicThresholdService:
     async def calculate_dynamic_threshold(
         cls,
         point_id: int,
-        point_type: str,
         static_threshold: float,
         threshold_direction: str
-    ) -> Dict[str, Any]:
+    ) -> Tuple[float, Dict[str, Any]]:
         """
         计算动态阈值
 
         Args:
             point_id: 点位 ID
-            point_type: 点位类型 (temperature/humidity/...)
             static_threshold: 静态阈值
-            threshold_direction: 阈值方向 (high/low)
+            threshold_direction: 阈值方向 (high/low/high_high/low_low)
 
         Returns:
-            Dict[str, Any]: 包含:
-                - dynamic_threshold: 动态阈值
+            Tuple[float, Dict[str, Any]]: (调整后的阈值, 元数据)
+                元数据包含:
+                - original_threshold: 原始静态阈值
                 - adjustment: 调整值
-                - applied_rules: 应用的规则列表
+                - adjusted_threshold: 最终阈值
+                - matched_rules: 匹配的规则列表
+                - context: 环境上下文
+                - rule_version: 规则配置版本号
                 - is_enabled: 是否启用动态阈值
         """
-        # 检查特性开关
-        is_enabled = await cls._is_feature_enabled()
-        if not is_enabled:
-            return {
-                "dynamic_threshold": static_threshold,
-                "adjustment": 0.0,
-                "applied_rules": [],
-                "is_enabled": False
-            }
+        start_time = time.time()
 
-        # 检查点位类型是否适用
-        applicable_types = await cls._get_applicable_point_types()
-        if point_type not in applicable_types:
-            return {
-                "dynamic_threshold": static_threshold,
-                "adjustment": 0.0,
-                "applied_rules": [],
+        try:
+            # 检查特性开关
+            is_enabled = await cls._is_feature_enabled()
+            if not is_enabled:
+                return static_threshold, {"is_enabled": False}
+
+            # 检查点位类型是否适用
+            point_type = await cls._get_point_type(point_id)
+            applicable_types = await cls._get_applicable_point_types()
+
+            if not point_type or point_type not in applicable_types:
+                await cls._record_metrics("skipped", point_id, 0.0, time.time() - start_time)
+                return static_threshold, {
+                    "is_enabled": True,
+                    "skipped": True,
+                    "reason": f"Point type '{point_type}' not applicable"
+                }
+
+            # 获取环境上下文
+            context_start = time.time()
+            context = await EnvironmentContextService.get_context()
+            context_time = time.time() - context_start
+
+            # 加载规则
+            rules = await cls._load_rules()
+            rule_version = cls._cache_version
+
+            # 评估规则并计算调整值
+            eval_start = time.time()
+            matched_rules = []
+            total_adjustment = 0.0
+
+            for rule in rules:
+                if rule.evaluate(context):
+                    adjustment = rule.get_adjustment_value()
+                    total_adjustment += adjustment
+                    matched_rules.append({
+                        "condition": rule.condition,
+                        "adjustment": adjustment,
+                        "description": rule.description,
+                        "priority": rule.priority
+                    })
+                    # 记录规则匹配
+                    await cls._record_rule_match(rule.condition, rule.priority)
+
+            eval_time = time.time() - eval_start
+
+            # 应用安全边界
+            safety_boundary = await cls._get_safety_boundary_percent()
+            max_adjustment = abs(static_threshold * safety_boundary / 100.0)
+            total_adjustment = max(-max_adjustment, min(max_adjustment, total_adjustment))
+
+            # 计算动态阈值（根据方向）
+            if threshold_direction in ("high", "high_high"):
+                adjusted_threshold = static_threshold + total_adjustment
+            else:  # low, low_low
+                adjusted_threshold = static_threshold - total_adjustment
+
+            # 记录监控指标
+            total_time = time.time() - start_time
+            await cls._record_metrics(
+                "adjusted",
+                point_id,
+                total_adjustment,
+                total_time,
+                context_time=context_time,
+                eval_time=eval_time,
+                matched_count=len(matched_rules)
+            )
+
+            # 构建元数据
+            metadata = {
+                "original_threshold": static_threshold,
+                "adjustment": total_adjustment,
+                "adjusted_threshold": adjusted_threshold,
+                "matched_rules": matched_rules,
+                "context": context,
+                "rule_version": rule_version,
                 "is_enabled": True
             }
 
-        # 获取环境上下文
-        context = await EnvironmentContextService.get_context()
+            return adjusted_threshold, metadata
 
-        # 加载规则
-        rules = await cls._load_rules()
+        except Exception as e:
+            logger.error(f"动态阈值调整失败: {e}，降级到静态阈值")
+            await cls._record_metrics("degraded", point_id, 0.0, time.time() - start_time, error=str(e))
+            return static_threshold, {"is_enabled": True, "degraded": True, "error": str(e)}
 
-        # 评估规则并计算调整值
-        applied_rules = []
-        total_adjustment = 0.0
+    @classmethod
+    async def _get_point_type(cls, point_id: int) -> Optional[str]:
+        """
+        获取点位类型（根据 unit 字段判断）
 
-        for rule in rules:
-            if rule.evaluate(context):
-                adjustment = rule.get_adjustment_value()
-                total_adjustment += adjustment
-                applied_rules.append({
-                    "condition": rule.condition,
-                    "adjustment": adjustment,
-                    "description": rule.description,
-                    "priority": rule.priority
-                })
+        Args:
+            point_id: 点位 ID
 
-        # 应用安全边界
-        safety_boundary = await cls._get_safety_boundary_percent()
-        max_adjustment = abs(static_threshold * safety_boundary / 100.0)
-        total_adjustment = max(-max_adjustment, min(max_adjustment, total_adjustment))
+        Returns:
+            Optional[str]: 点位类型 (temperature/humidity/...)，无法判断返回 None
+        """
+        try:
+            async with async_session() as session:
+                result = await session.execute(
+                    select(Point.unit).where(Point.id == point_id)
+                )
+                unit = result.scalar_one_or_none()
 
-        # 计算动态阈值（根据方向）
-        if threshold_direction == "high":
-            dynamic_threshold = static_threshold + total_adjustment
-        else:  # low
-            dynamic_threshold = static_threshold - total_adjustment
+                if not unit:
+                    return None
 
-        return {
-            "dynamic_threshold": dynamic_threshold,
-            "adjustment": total_adjustment,
-            "applied_rules": applied_rules,
-            "is_enabled": True
-        }
+                # 根据单位判断类型
+                unit_lower = unit.lower()
+                if "℃" in unit or "°c" in unit_lower or "celsius" in unit_lower:
+                    return "temperature"
+                elif "%rh" in unit_lower or ("%" in unit and "rh" in unit_lower):
+                    return "humidity"
+                else:
+                    return None
+
+        except Exception as e:
+            logger.error(f"查询点位 {point_id} 类型失败: {e}")
+            return None
+
+    @classmethod
+    async def _record_metrics(
+        cls,
+        status: str,
+        point_id: int,
+        adjustment: float,
+        total_time: float,
+        context_time: float = 0.0,
+        eval_time: float = 0.0,
+        matched_count: int = 0,
+        error: Optional[str] = None
+    ):
+        """
+        记录监控指标到 Redis
+
+        Args:
+            status: 状态 (adjusted/skipped/degraded)
+            point_id: 点位 ID
+            adjustment: 调整值
+            total_time: 总耗时（秒）
+            context_time: 上下文查询耗时（秒）
+            eval_time: 规则评估耗时（秒）
+            matched_count: 匹配的规则数量
+            error: 错误信息（降级时）
+        """
+        try:
+            timestamp = int(time.time())
+
+            # 记录调整次数（按点位统计）
+            await redis_service.set(
+                f"dynamic_threshold:count:{point_id}:{status}",
+                str(timestamp),
+                ttl=86400  # 24小时
+            )
+
+            # 记录调整幅度（用于 P50/P95/P99 分析）
+            if status == "adjusted":
+                await redis_service.set(
+                    f"dynamic_threshold:adjustment:{point_id}:{timestamp}",
+                    str(adjustment),
+                    ttl=3600  # 1小时
+                )
+
+            # 记录性能耗时
+            perf_data = {
+                "total_time": total_time,
+                "context_time": context_time,
+                "eval_time": eval_time,
+                "matched_count": matched_count
+            }
+            await redis_service.set_json(
+                f"dynamic_threshold:perf:{timestamp}",
+                perf_data,
+                ttl=3600
+            )
+
+            # 记录降级次数
+            if status == "degraded" and error:
+                await redis_service.set(
+                    f"dynamic_threshold:degraded:{timestamp}",
+                    error,
+                    ttl=86400
+                )
+
+        except Exception as e:
+            logger.warning(f"记录监控指标失败: {e}")
+
+    @classmethod
+    async def _record_rule_match(cls, condition: str, priority: int):
+        """
+        记录规则匹配次数
+
+        Args:
+            condition: 规则条件
+            priority: 规则优先级
+        """
+        try:
+            # 使用条件的哈希值作为 key（避免特殊字符）
+            rule_hash = str(hash(condition))
+            key = f"dynamic_threshold:rule_match:{rule_hash}"
+
+            # 递增匹配计数
+            if redis_service.is_available:
+                await redis_service._pool.incr(key)
+                await redis_service._pool.expire(key, 86400)  # 24小时
+
+        except Exception as e:
+            logger.warning(f"记录规则匹配失败: {e}")
 
     @classmethod
     async def _is_feature_enabled(cls) -> bool:
