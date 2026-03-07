@@ -252,7 +252,11 @@ class DiagnosisEngine:
             logger.error("诊断结果存储/推送失败: %s", e, exc_info=True)
 
     async def _calculate_confidence(self, cause_data: dict, alarm_level: str, payload: dict) -> int:
-        """计算置信度"""
+        """
+        计算置信度
+
+        Story 25.5: 集成传感器精度权重调整
+        """
         base = cause_data.get("base_confidence", 50)
 
         # alarm_level 加成
@@ -270,7 +274,21 @@ class DiagnosisEngine:
             )
             base += boost
 
-        return min(base, 100)
+        # Story 25.5: 传感器精度权重调整
+        # 如果告警关联点位，应用传感器权重调整置信度
+        point_id = payload.get("point_id")
+        if point_id:
+            from ..services.diagnosis.sensor_metadata_service import get_sensor_weight
+            sensor_weight = get_sensor_weight(point_id)
+            # 权重调整公式: adjusted_confidence = base + (100 - base) × (weight - 0.85) / 0.15
+            # 当 weight = 1.0 时，置信度向 100 调整
+            # 当 weight = 0.85 时，置信度不变
+            # 当 weight < 0.85 时，置信度向下调整
+            if sensor_weight != 0.85:
+                adjustment = (100 - base) * (sensor_weight - 0.85) / 0.15
+                base = base + adjustment
+
+        return min(int(base), 100)
 
     async def _check_history(
         self,

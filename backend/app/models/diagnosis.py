@@ -3,12 +3,22 @@
 Story 9-3: 智能故障诊断
 Story 24.6: 诊断会话、审计日志、结果扩展
 Story 25.3: UPS电池SOH预测
+Story 25.5: 传感器元数据与精度加权
 """
 
-from datetime import datetime
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, Text, Float, ForeignKey, JSON, Index
+from datetime import datetime, date
+from enum import Enum
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, Text, Float, ForeignKey, JSON, Index, Date
 
 from ..core.database import Base
+
+
+class CalibrationStatus(str, Enum):
+    """校准状态枚举"""
+    VALID = "valid"
+    EXPIRED = "expired"
+    NO_METADATA = "no_metadata"
+    NOT_CALIBRATED = "not_calibrated"
 
 
 class DiagnosisRule(Base):
@@ -159,5 +169,21 @@ class BreakerProfile(Base):
     breaker_device_id = Column(Integer, ForeignKey("power_devices.id", ondelete="CASCADE"), nullable=False, unique=True, comment="断路器设备ID")
     trip_curve_type = Column(String(1), nullable=False, comment="脱扣曲线类型: B/C/D")
     rated_current = Column(Float, nullable=False, comment="额定电流 A")
+    created_at = Column(DateTime, default=datetime.now, comment="创建时间")
+    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now, comment="更新时间")
+
+
+class SensorMetadata(Base):
+    """传感器元数据表 - Story 25.5"""
+
+    __tablename__ = "sensor_metadata"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    point_id = Column(Integer, ForeignKey("points.id", ondelete="CASCADE"), nullable=False, unique=True, index=True, comment="点位ID")
+    ct_pt_ratio = Column(Float, nullable=True, comment="CT/PT变比")
+    accuracy_class = Column(Float, nullable=False, comment="精度等级: 0.2/0.5/1.0")
+    calibration_date = Column(Date, nullable=True, comment="校准日期")
+    calibration_interval_days = Column(Integer, nullable=False, default=365, comment="校准周期天数")
+    calibration_result = Column(String(500), nullable=True, comment="校准结果描述")
     created_at = Column(DateTime, default=datetime.now, comment="创建时间")
     updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now, comment="更新时间")

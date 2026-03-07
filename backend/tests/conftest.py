@@ -169,6 +169,27 @@ async def viewer_user(async_db):
     return await _create_user_with_token(async_db, "test_viewer", "viewer", "测试只读用户", "viewer@test.local")
 
 
+@pytest.fixture(scope="function")
+async def admin_token(admin_user):
+    """返回管理员 token"""
+    _, token = admin_user
+    return token
+
+
+@pytest.fixture(scope="function")
+async def operator_token(operator_user):
+    """返回操作员 token"""
+    _, token = operator_user
+    return token
+
+
+@pytest.fixture(scope="function")
+async def viewer_token(viewer_user):
+    """返回只读用户 token"""
+    _, token = viewer_user
+    return token
+
+
 def auth_headers(token: str) -> dict:
     """生成认证请求头"""
     return {"Authorization": f"Bearer {token}"}

@@ -270,6 +270,15 @@ async def lifespan(app: FastAPI):
     # 加载告警引擎阈值缓存
     await alarm_engine.load_thresholds()
 
+    # 加载传感器元数据缓存（Story 25.5）
+    try:
+        from app.services.diagnosis.sensor_metadata_service import SensorMetadataCache
+        async with async_session() as session:
+            await SensorMetadataCache.load_all(session)
+        logger.info("✓ 传感器元数据缓存加载成功")
+    except Exception as e:
+        logger.error(f"✗ 传感器元数据缓存加载失败: {e}")
+
     # 同步消防策略 YAML 到数据库（Story 9-2） — 仅演示模式
     from .demo.config import is_demo_enabled
 
@@ -317,6 +326,15 @@ async def lifespan(app: FastAPI):
     # 启动拓扑变更监听器（Story 25.1）
     from app.services.diagnosis.device_sync_service import start_device_sync_listener, stop_device_sync_listener
     listener_task = asyncio.create_task(start_device_sync_listener())
+
+    # 启动传感器元数据 Redis 监听器（Story 25.5）
+    try:
+        from app.services.diagnosis.sensor_metadata_service import SensorMetadataCache
+        redis_listener_task = await SensorMetadataCache.start_listener()
+        logger.info("✓ 传感器元数据 Redis 监听器启动成功")
+    except Exception as e:
+        logger.error(f"✗ 传感器元数据 Redis 监听器启动失败: {e}")
+        redis_listener_task = None
 
     # 启动告警引擎定时刷新（每 30 秒检查阈值版本）
     async def _alarm_engine_refresh_loop():
@@ -474,6 +492,36 @@ async def lifespan(app: FastAPI):
 
     soh_calculation_task = asyncio.create_task(_battery_soh_calculation_loop())
 
+    # 启动传感器校准过期检查定时任务（每日凌晨 2:00）- Story 25.5
+    async def _calibration_check_loop():
+        """传感器校准过期检查定时任务 - 每日凌晨 2:00"""
+        await asyncio.sleep(60)  # 启动后延迟1分钟
+        while True:
+            try:
+                now = datetime.now()
+                # 计算距离下一个凌晨 2:00 的秒数
+                target_time = now.replace(hour=2, minute=0, second=0, microsecond=0)
+                if now >= target_time:
+                    # 如果已经过了今天的 2:00，则计算明天的 2:00
+                    target_time = target_time + timedelta(days=1)
+
+                wait_seconds = (target_time - now).total_seconds()
+                logger.info(f"传感器校准过期检查任务将在 {wait_seconds/3600:.1f} 小时后执行（{target_time}）")
+
+                await asyncio.sleep(wait_seconds)
+
+                # 执行校准过期检查
+                from app.services.diagnosis.sensor_metadata_service import check_expired_calibrations
+                async with async_session() as session:
+                    await check_expired_calibrations(session)
+
+            except Exception as e:
+                logger.error(f"传感器校准过期检查任务失败: {e}")
+                # 失败后等待 1 小时再重试
+                await asyncio.sleep(3600)
+
+    calibration_check_task = asyncio.create_task(_calibration_check_loop())
+
     print(f"{'=' * 50}")
     print(f"{settings.app_name} v{settings.app_version} 启动成功")
     print(f"{'=' * 50}")
@@ -486,6 +534,7 @@ async def lifespan(app: FastAPI):
     print("节能机会自动检测已启动，每小时检查一次")
     print("效果追踪任务已启动，每6小时检查一次")
     print("UPS 电池 SOH 计算任务已启动，每日凌晨 3:00 执行")
+    print("传感器校准过期检查任务已启动，每日凌晨 2:00 执行")
 
     # 启动 WebSocket 心跳检测
     ws_manager.start_heartbeat()
@@ -502,6 +551,15 @@ async def lifespan(app: FastAPI):
     except asyncio.TimeoutError:
         logger.warning("拓扑监听器停止超时")
 
+    # 停止传感器元数据 Redis 监听器（Story 25.5）
+    if redis_listener_task:
+        try:
+            from app.services.diagnosis.sensor_metadata_service import SensorMetadataCache
+            await SensorMetadataCache.stop_listener()
+            logger.info("✓ 传感器元数据 Redis 监听器已停止")
+        except Exception as e:
+            logger.error(f"✗ 传感器元数据 Redis 监听器停止失败: {e}")
+
     # 关闭演示模块
     if settings.demo_enabled or settings.simulation_enabled:
         await demo_shutdown()
@@ -513,6 +571,7 @@ async def lifespan(app: FastAPI):
     detection_task.cancel()
     effect_tracking_task.cancel()
     soh_calculation_task.cancel()
+    calibration_check_task.cancel()
     ws_manager.stop_heartbeat()
     # 关闭 Redis 连接
     await redis_service.close()

@@ -4,9 +4,10 @@ Story 9-3: 智能故障诊断
 Story 24.6: 诊断会话、审计日志、结果扩展
 Story 25.3: UPS电池SOH预测
 Story 25.4: N+X冗余拓扑与断路器保护逻辑
+Story 25.5: 传感器元数据与精度加权
 """
 
-from datetime import datetime
+from datetime import datetime, date
 from typing import Optional, List, Any
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator, field_validator
@@ -325,3 +326,69 @@ class RedundancyConfigResponse(BaseModel):
     device_type: str
     redundancy_type: Optional[str] = None
     redundancy_group_id: Optional[str] = None
+
+
+# ==================== Sensor Metadata Schemas - Story 25.5 ====================
+
+
+class SensorMetadataCreate(BaseModel):
+    """创建传感器元数据"""
+
+    point_id: int = Field(..., description="点位ID")
+    ct_pt_ratio: Optional[float] = Field(None, description="CT/PT变比")
+    accuracy_class: float = Field(..., description="精度等级: 0.2/0.5/1.0")
+    calibration_date: Optional[date] = Field(None, description="校准日期")
+    calibration_interval_days: int = Field(365, gt=0, description="校准周期天数")
+    calibration_result: Optional[str] = Field(None, max_length=500, description="校准结果描述")
+
+    @field_validator('accuracy_class')
+    @classmethod
+    def validate_accuracy_class(cls, v: float) -> float:
+        """验证精度等级"""
+        if v not in (0.2, 0.5, 1.0):
+            raise ValueError("精度等级必须是 0.2, 0.5 或 1.0")
+        return v
+
+
+class SensorMetadataUpdate(BaseModel):
+    """更新传感器元数据"""
+
+    ct_pt_ratio: Optional[float] = Field(None, description="CT/PT变比")
+    accuracy_class: Optional[float] = Field(None, description="精度等级: 0.2/0.5/1.0")
+    calibration_date: Optional[date] = Field(None, description="校准日期")
+    calibration_interval_days: Optional[int] = Field(None, gt=0, description="校准周期天数")
+    calibration_result: Optional[str] = Field(None, max_length=500, description="校准结果描述")
+
+    @field_validator('accuracy_class')
+    @classmethod
+    def validate_accuracy_class(cls, v: Optional[float]) -> Optional[float]:
+        """验证精度等级"""
+        if v is not None and v not in (0.2, 0.5, 1.0):
+            raise ValueError("精度等级必须是 0.2, 0.5 或 1.0")
+        return v
+
+
+class SensorMetadataResponse(BaseModel):
+    """传感器元数据响应"""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    point_id: int
+    ct_pt_ratio: Optional[float] = None
+    accuracy_class: float
+    calibration_date: Optional[date] = None
+    calibration_interval_days: int
+    calibration_result: Optional[str] = None
+    created_at: datetime
+    updated_at: datetime
+
+
+class CalibrationStatusResponse(BaseModel):
+    """校准状态响应"""
+
+    point_id: int
+    status: str = Field(..., description="校准状态: valid/expired/no_metadata/not_calibrated")
+    expired_days: Optional[int] = Field(None, description="过期天数（仅当status=expired时）")
+    calibration_date: Optional[date] = None
+    next_calibration_date: Optional[date] = None
