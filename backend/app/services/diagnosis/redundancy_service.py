@@ -174,11 +174,3 @@ async def check_redundancy_backup(device_id: int, session: AsyncSession) -> Redu
         # 记录耗时
         duration = time.time() - start_time
         diagnosis_redundancy_check_duration_seconds.observe(duration)
-        logger.error(f"冗余检测失败 device_id={device_id}: {str(e)}")
-
-        return RedundancyStatus(
-            has_backup=False,
-            error=f"Database query failed: {str(e)}",
-            backup_devices=[],
-            backup_count=0
-        )
