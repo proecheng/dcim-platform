@@ -74,16 +74,16 @@ So that 高精度传感器的数据在推理中权重更大，过期未校准的
   - [x] 3.8 添加并发保护：使用 asyncio.Lock 保护缓存更新操作，避免并发更新导致数据不一致
 
 - [ ] Task 4: 实现证据权重调整逻辑 (AC: #1)
-  - [ ] 4.1 验证 L2 故障树推理引擎文件是否存在（可能在 `backend/app/services/diagnosis/fault_tree.py` 或 `l2_engine.py`），如不存在则记录警告并跳过集成，使用降级策略（所有点位使用默认权重 0.85）
-  - [ ] 4.2 在 L2 引擎证据收集阶段集成权重调整（如果引擎存在）
-  - [ ] 4.3 实现 `apply_evidence_weight(prior: float, observed: float, weight: float) -> float` 函数:
+  - [x] 4.1 验证 L2 故障树推理引擎文件是否存在（可能在 `backend/app/services/diagnosis/fault_tree.py` 或 `l2_engine.py`），如不存在则记录警告并跳过集成，使用降级策略（所有点位使用默认权重 0.85）
+  - [x] 4.2 在 L2 引擎证据收集阶段集成权重调整（如果引擎存在）
+  - [x] 4.3 实现 `apply_evidence_weight(prior: float, observed: float, weight: float) -> float` 函数:
     - 使用收缩公式: `P_adj = prior + (observed - prior) × weight`
     - 确保结果在 [0, 1] 范围内
-  - [ ] 4.4 在收集叶节点证据时:
+  - [x] 4.4 在收集叶节点证据时:
     - 调用 `get_sensor_weight(point_id)` 获取权重
     - 调用 `apply_evidence_weight(prior, observed, weight)` 调整概率
     - 记录原始概率、权重、调整后概率到诊断日志
-  - [ ] 4.5 添加单元测试验证权重调整公式的正确性，包括边界情况: weight=0, weight=1, prior=observed, prior=0, observed=1
+  - [x] 4.5 添加单元测试验证权重调整公式的正确性，包括边界情况: weight=0, weight=1, prior=observed, prior=0, observed=1
 
 - [x] Task 5: 实现校准过期告警 (AC: #1)
   - [x] 5.1 在 `backend/app/services/diagnosis/sensor_metadata_service.py` 实现 `check_expired_calibrations()` 函数
@@ -98,20 +98,20 @@ So that 高精度传感器的数据在推理中权重更大，过期未校准的
   - [x] 5.4 避免重复告警: 检查是否已存在未处理的同类告警（同一 point_id 且 alarm_type='maintenance' 且 additional_info 中 alarm_source='sensor_calibration' 且 status='active'），存在则跳过
   - [x] 5.5 添加异常处理：定时任务失败时记录错误日志，不影响诊断引擎运行
 
-- [ ] Task 6: 创建管理 API (AC: #1)
-  - [ ] 6.1 在 `backend/app/api/v1/diagnosis.py` 添加传感器元数据管理端点
-  - [ ] 6.2 创建 `GET /api/v1/diagnosis/sensor-metadata` 查询所有传感器元数据:
+- [x] Task 6: 创建管理 API (AC: #1)
+  - [x] 6.1 在 `backend/app/api/v1/diagnosis.py` 添加传感器元数据管理端点
+  - [x] 6.2 创建 `GET /api/v1/diagnosis/sensor-metadata` 查询所有传感器元数据:
     - 支持分页参数: page (默认1), page_size (默认20, 最大100)
     - 返回格式: {total: int, page: int, page_size: int, items: List[SensorMetadataResponse]}
     - 使用 SQLAlchemy 的 limit/offset 实现分页
-  - [ ] 6.3 创建 `GET /api/v1/diagnosis/sensor-metadata/{point_id}` 查询单个传感器元数据
-  - [ ] 6.4 创建 `POST /api/v1/diagnosis/sensor-metadata` 创建传感器元数据
-  - [ ] 6.5 创建 `PUT /api/v1/diagnosis/sensor-metadata/{point_id}` 更新传感器元数据
-  - [ ] 6.6 创建 `DELETE /api/v1/diagnosis/sensor-metadata/{point_id}` 删除传感器元数据
-  - [ ] 6.7 创建 `GET /api/v1/diagnosis/sensor-metadata/{point_id}/calibration-status` 查询校准状态
-  - [ ] 6.8 创建/更新/删除操作后发布 Redis `sensor:metadata_update` 事件，payload 格式为 JSON 字符串 `json.dumps({"point_id": int})`，触发缓存更新
-  - [ ] 6.9 添加 RBAC 权限控制: admin 可修改配置，operator/viewer 仅可查询
-  - [ ] 6.10 添加输入验证: accuracy_class 只能是 0.2/0.5/1.0, calibration_interval_days > 0, calibration_date 可为 NULL, page >= 1, 1 <= page_size <= 100
+  - [x] 6.3 创建 `GET /api/v1/diagnosis/sensor-metadata/{point_id}` 查询单个传感器元数据
+  - [x] 6.4 创建 `POST /api/v1/diagnosis/sensor-metadata` 创建传感器元数据
+  - [x] 6.5 创建 `PUT /api/v1/diagnosis/sensor-metadata/{point_id}` 更新传感器元数据
+  - [x] 6.6 创建 `DELETE /api/v1/diagnosis/sensor-metadata/{point_id}` 删除传感器元数据
+  - [x] 6.7 创建 `GET /api/v1/diagnosis/sensor-metadata/{point_id}/calibration-status` 查询校准状态
+  - [x] 6.8 创建/更新/删除操作后发布 Redis `sensor:metadata_update` 事件，payload 格式为 JSON 字符串 `json.dumps({"point_id": int})`，触发缓存更新
+  - [x] 6.9 添加 RBAC 权限控制: admin 可修改配置，operator/viewer 仅可查询
+  - [x] 6.10 添加输入验证: accuracy_class 只能是 0.2/0.5/1.0, calibration_interval_days > 0, calibration_date 可为 NULL, page >= 1, 1 <= page_size <= 100
 
 - [x] Task 7: 编写单元测试 (AC: #1)
   - [x] 7.1 测试权重计算: 0.2级→1.0, 0.5级→0.9, 1.0级→0.8
@@ -133,11 +133,11 @@ So that 高精度传感器的数据在推理中权重更大，过期未校准的
   - [x] 8.3 创建测试场景: 无元数据的传感器，验证使用默认权重
   - [x] 8.4 验证诊断引擎集成: 证据收集时正确应用权重调整
   - [x] 8.5 验证诊断结果中包含权重调整信息
-  - [ ] 8.6 性能测试:
+  - [x] 8.6 性能测试:
     - 单次缓存查询耗时 < 1ms（内存查询）
     - 全量缓存加载耗时 < 500ms（假设 1000 条记录）
     - 分别测试这两个场景，不混淆
-  - [ ] 8.7 并发测试: 模拟多个诊断任务同时查询元数据，验证无竞态条件
+  - [x] 8.7 并发测试: 模拟多个诊断任务同时查询元数据，验证无竞态条件
 
 ## Dev Notes
 
