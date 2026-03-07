@@ -415,11 +415,11 @@ CREATE INDEX idx_breaker_profiles_device_id ON breaker_profiles(breaker_device_i
 - [x] [AI-Review][HIGH] Fix test fixtures to use correct PowerDevice schema (device_code, device_name)
 - [x] [AI-Review][HIGH] Add Prometheus duration histogram metrics
 - [x] [AI-Review][HIGH] Add integration tests (Task 8: scenarios, performance, concurrency)
-- [ ] [AI-Review][MEDIUM] Fix overcurrent alarm detection to explicitly check alarm_type='threshold'
-- [ ] [AI-Review][MEDIUM] Fix 2N redundancy calculation bug (account for self-exclusion)
-- [ ] [AI-Review][MEDIUM] Add idempotency checks to migration downgrade()
-- [ ] [AI-Review][MEDIUM] Update breaker API RBAC (GET endpoints should use require_viewer)
-- [ ] [AI-Review][LOW] Move logger initialization to module level
-- [ ] [AI-Review][LOW] Extract magic number (max_time * 2) to named constant
+- [x] [AI-Review][MEDIUM] Fix overcurrent alarm detection to explicitly check alarm_type='threshold'
+- [x] [AI-Review][MEDIUM] Fix 2N redundancy calculation bug (account for self-exclusion)
+- [x] [AI-Review][MEDIUM] Add idempotency checks to migration downgrade()
+- [x] [AI-Review][MEDIUM] Update breaker API RBAC (GET endpoints should use require_viewer) - Already correct
+- [x] [AI-Review][LOW] Extract magic number (max_time * 2) to named constant BREAKER_FAILURE_THRESHOLD_MULTIPLIER
+- [ ] [AI-Review][LOW] Move logger initialization to module level - Already at module level
 - [ ] [AI-Review][LOW] Add comprehensive docstrings
 
