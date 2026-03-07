@@ -148,3 +148,16 @@ class SOHPointUnavailableTracking(Base):
     alarm_triggered = Column(Boolean, nullable=False, default=False, comment="是否已触发告警")
     created_at = Column(DateTime, default=datetime.now, comment="创建时间")
     updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now, comment="更新时间")
+
+
+class BreakerProfile(Base):
+    """断路器配置表 - Story 25.4"""
+
+    __tablename__ = "breaker_profiles"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    breaker_device_id = Column(Integer, ForeignKey("power_devices.id", ondelete="CASCADE"), nullable=False, unique=True, comment="断路器设备ID")
+    trip_curve_type = Column(String(1), nullable=False, comment="脱扣曲线类型: B/C/D")
+    rated_current = Column(Float, nullable=False, comment="额定电流 A")
+    created_at = Column(DateTime, default=datetime.now, comment="创建时间")
+    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now, comment="更新时间")

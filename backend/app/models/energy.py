@@ -324,6 +324,10 @@ class PowerDevice(Base):
     circuit_id = Column(Integer, ForeignKey("distribution_circuits.id"), comment="所属回路ID")
     circuit_no = Column(String(20), comment="回路编号")
 
+    # ==================== Story 25.4: 冗余配置 ====================
+    redundancy_type = Column(String(10), nullable=True, comment="冗余类型: N+1/2N/NULL")
+    redundancy_group_id = Column(String(50), nullable=True, comment="冗余组标识")
+
     # ==================== 新增: 点位关联 ====================
     # 关联动环监控设备(用于获取实时数据)
     monitor_device_id = Column(Integer, ForeignKey("devices.id"), comment="关联动环设备ID")

@@ -3,12 +3,13 @@
 Story 9-3: 智能故障诊断
 Story 24.6: 诊断会话、审计日志、结果扩展
 Story 25.3: UPS电池SOH预测
+Story 25.4: N+X冗余拓扑与断路器保护逻辑
 """
 
 from datetime import datetime
 from typing import Optional, List, Any
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, model_validator, field_validator
 
 
 # ==================== Cause Item ====================
@@ -246,3 +247,50 @@ class SOHWeightsConfig(BaseModel):
         if not (0.9 <= total <= 1.1):
             raise ValueError(f"权重之和应约为 1.0，当前为 {total:.2f}")
         return self
+
+
+# ==================== Breaker Profile Schemas - Story 25.4 ====================
+
+
+class BreakerProfileCreate(BaseModel):
+    """创建断路器配置"""
+
+    breaker_device_id: int = Field(..., description="断路器设备ID")
+    trip_curve_type: str = Field(..., description="脱扣曲线类型: B/C/D")
+    rated_current: float = Field(..., gt=0, description="额定电流 A")
+
+    @field_validator('trip_curve_type')
+    @classmethod
+    def validate_trip_curve_type(cls, v: str) -> str:
+        """验证脱扣曲线类型"""
+        if v not in ('B', 'C', 'D'):
+            raise ValueError("脱扣曲线类型必须是 'B', 'C', 或 'D'")
+        return v
+
+
+class BreakerProfileUpdate(BaseModel):
+    """更新断路器配置"""
+
+    trip_curve_type: Optional[str] = Field(None, description="脱扣曲线类型: B/C/D")
+    rated_current: Optional[float] = Field(None, gt=0, description="额定电流 A")
+
+    @field_validator('trip_curve_type')
+    @classmethod
+    def validate_trip_curve_type(cls, v: Optional[str]) -> Optional[str]:
+        """验证脱扣曲线类型"""
+        if v is not None and v not in ('B', 'C', 'D'):
+            raise ValueError("脱扣曲线类型必须是 'B', 'C', 或 'D'")
+        return v
+
+
+class BreakerProfileResponse(BaseModel):
+    """断路器配置响应"""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    breaker_device_id: int
+    trip_curve_type: str
+    rated_current: float
+    created_at: datetime
+    updated_at: datetime

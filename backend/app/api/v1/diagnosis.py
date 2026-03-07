@@ -14,7 +14,7 @@ from sqlalchemy import select, func
 
 from ..deps import get_db, require_admin, require_operator, require_viewer
 from ...models.user import User
-from ...models.diagnosis import DiagnosisRule, DiagnosisResult, DiagnosisSession, DiagnosisAuditLog
+from ...models.diagnosis import DiagnosisRule, DiagnosisResult, DiagnosisSession, DiagnosisAuditLog, BreakerProfile
 from ...schemas.diagnosis import (
     DiagnosisRuleCreate,
     DiagnosisRuleUpdate,
@@ -28,6 +28,9 @@ from ...schemas.diagnosis import (
     DiagnosisAnnotationListQuery,
     DiagnosisAnnotationStatsResponse,
     SOHWeightsConfig,
+    BreakerProfileCreate,
+    BreakerProfileUpdate,
+    BreakerProfileResponse,
 )
 from ...engines.diagnosis_engine import diagnosis_engine
 
@@ -686,3 +689,129 @@ async def update_soh_weights_config(
     await db.commit()
 
     return {"message": "SOH 权重配置已更新", "config": new_value}
+
+
+# ==================== 断路器配置管理 - Story 25.4 ====================
+
+
+@router.post("/breaker-profiles", response_model=dict, status_code=201)
+async def create_breaker_profile(
+    profile: BreakerProfileCreate,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_admin),
+):
+    """创建断路器配置"""
+    from ...models.diagnosis import BreakerProfile
+    from ...models.energy import PowerDevice
+
+    # 验证设备存在
+    device = await db.get(PowerDevice, profile.breaker_device_id)
+    if not device:
+        raise HTTPException(status_code=404, detail=f"设备 {profile.breaker_device_id} 不存在")
+
+    # 检查是否已存在配置
+    result = await db.execute(
+        select(BreakerProfile).where(BreakerProfile.breaker_device_id == profile.breaker_device_id)
+    )
+    existing = result.scalar_one_or_none()
+    if existing:
+        raise HTTPException(status_code=400, detail=f"设备 {profile.breaker_device_id} 已存在断路器配置")
+
+    # 创建配置
+    new_profile = BreakerProfile(
+        breaker_device_id=profile.breaker_device_id,
+        trip_curve_type=profile.trip_curve_type,
+        rated_current=profile.rated_current,
+    )
+    db.add(new_profile)
+    await db.commit()
+    await db.refresh(new_profile)
+
+    return {"message": "断路器配置创建成功", "id": new_profile.id}
+
+
+@router.get("/breaker-profiles", response_model=dict)
+async def list_breaker_profiles(
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_viewer),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+):
+    """断路器配置列表"""
+    # 查询总数
+    count_result = await db.execute(select(func.count(BreakerProfile.id)))
+    total = count_result.scalar()
+
+    # 分页查询
+    result = await db.execute(
+        select(BreakerProfile)
+        .offset((page - 1) * page_size)
+        .limit(page_size)
+    )
+    profiles = result.scalars().all()
+
+    return {
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+        "items": [BreakerProfileResponse.model_validate(p) for p in profiles],
+    }
+
+
+@router.get("/breaker-profiles/{profile_id}", response_model=BreakerProfileResponse)
+async def get_breaker_profile(
+    profile_id: int,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_viewer),
+):
+    """获取断路器配置详情"""
+    profile = await db.get(BreakerProfile, profile_id)
+    if not profile:
+        raise HTTPException(status_code=404, detail="断路器配置不存在")
+
+    return BreakerProfileResponse.model_validate(profile)
+
+
+@router.put("/breaker-profiles/{profile_id}", response_model=dict)
+async def update_breaker_profile(
+    profile_id: int,
+    profile_update: BreakerProfileUpdate,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_admin),
+):
+    """更新断路器配置"""
+    from ...models.diagnosis import BreakerProfile
+
+    profile = await db.get(BreakerProfile, profile_id)
+    if not profile:
+        raise HTTPException(status_code=404, detail="断路器配置不存在")
+
+    # 更新字段
+    update_data = profile_update.model_dump(exclude_unset=True)
+    for field, value in update_data.items():
+        setattr(profile, field, value)
+
+    await db.commit()
+    await db.refresh(profile)
+
+    return {"message": "断路器配置更新成功"}
+
+
+@router.delete("/breaker-profiles/{profile_id}", response_model=dict)
+async def delete_breaker_profile(
+    profile_id: int,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_admin),
+):
+    """删除断路器配置"""
+    from ...models.diagnosis import BreakerProfile
+
+    profile = await db.get(BreakerProfile, profile_id)
+    if not profile:
+        raise HTTPException(status_code=404, detail="断路器配置不存在")
+
+    await db.delete(profile)
+    await db.commit()
+
+    return {"message": "断路器配置删除成功"}
+
