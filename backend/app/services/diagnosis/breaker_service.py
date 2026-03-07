@@ -3,15 +3,39 @@
 Story 25.4: N+X冗余拓扑与断路器保护逻辑
 """
 
+import time
+import logging
 from typing import Tuple, Optional
 from datetime import datetime
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from prometheus_client import Counter, Histogram, REGISTRY
 
 from app.models.alarm import Alarm
 from app.models.diagnosis import BreakerProfile
 from app.models.energy import PowerDevice
+
+logger = logging.getLogger(__name__)
+
+# Prometheus 监控指标（条件注册，避免重复）
+try:
+    diagnosis_breaker_check_duration_seconds = Histogram(
+        'diagnosis_breaker_check_duration_seconds',
+        'Duration of breaker action check operations in seconds',
+        buckets=[0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0]
+    )
+except ValueError:
+    diagnosis_breaker_check_duration_seconds = REGISTRY._names_to_collectors['diagnosis_breaker_check_duration_seconds']
+
+try:
+    diagnosis_breaker_action_total = Counter(
+        'diagnosis_breaker_action_total',
+        'Total number of breaker action checks',
+        ['action_type']
+    )
+except ValueError:
+    diagnosis_breaker_action_total = REGISTRY._names_to_collectors['diagnosis_breaker_action_total']
 
 
 # 断路器脱扣曲线常量
@@ -84,6 +108,9 @@ async def check_breaker_action(alarm: Alarm, session: AsyncSession) -> BreakerAc
     Returns:
         BreakerActionResult: 断路器动作判定结果
     """
+    start_time = time.time()
+    action_type = "error"
+
     try:
         # 从告警对象获取 point_id，查询点位关联的 power_device_id
         # 通过 power_devices.current_point_id 反向查询
@@ -93,14 +120,17 @@ async def check_breaker_action(alarm: Alarm, session: AsyncSession) -> BreakerAc
         power_device = result.scalar_one_or_none()
 
         if not power_device:
-            return BreakerActionResult(
-                action_type="no_breaker_config",
+            action_type = "no_breaker_config"
+            result = BreakerActionResult(
+                action_type=action_type,
                 confidence=0.0,
                 explanation="点位未关联到配电设备",
                 overload_ratio=0.0,
                 expected_time_range=(0, 0),
                 actual_time=0.0
             )
+            diagnosis_breaker_action_total.labels(action_type=action_type).inc()
+            return result
 
         # 从 breaker_profiles 表查询断路器特性
         result = await session.execute(
@@ -109,20 +139,25 @@ async def check_breaker_action(alarm: Alarm, session: AsyncSession) -> BreakerAc
         breaker_profile = result.scalar_one_or_none()
 
         if not breaker_profile:
-            return BreakerActionResult(
-                action_type="no_breaker_config",
+            action_type = "no_breaker_config"
+            result = BreakerActionResult(
+                action_type=action_type,
                 confidence=0.0,
                 explanation="设备未配置断路器特性",
                 overload_ratio=0.0,
                 expected_time_range=(0, 0),
                 actual_time=0.0
             )
+            diagnosis_breaker_action_total.labels(action_type=action_type).inc()
+            return result
 
         # 从告警的 trigger_value 获取实际电流
         actual_current = alarm.trigger_value
         if not actual_current or actual_current <= 0:
+            action_type = "error"
+            diagnosis_breaker_action_total.labels(action_type=action_type).inc()
             return BreakerActionResult(
-                action_type="error",
+                action_type=action_type,
                 confidence=0.0,
                 explanation="告警触发值无效",
                 overload_ratio=0.0,
@@ -143,8 +178,10 @@ async def check_breaker_action(alarm: Alarm, session: AsyncSession) -> BreakerAc
         # 判定动作是否正常
         if min_time <= actual_time <= max_time:
             # 动作时间在预期范围内 → "保护正常动作"
+            action_type = "保护正常动作"
+            diagnosis_breaker_action_total.labels(action_type=action_type).inc()
             return BreakerActionResult(
-                action_type="保护正常动作",
+                action_type=action_type,
                 confidence=0.95,
                 explanation=f"断路器在预期时间范围内动作（{min_time:.2f}s - {max_time:.2f}s），实际动作时间 {actual_time:.2f}s",
                 overload_ratio=overload_ratio,
@@ -153,8 +190,10 @@ async def check_breaker_action(alarm: Alarm, session: AsyncSession) -> BreakerAc
             )
         elif actual_time < min_time:
             # 动作时间 < min_time → "动作过快，可能误动作"
+            action_type = "动作过快，可能误动作"
+            diagnosis_breaker_action_total.labels(action_type=action_type).inc()
             return BreakerActionResult(
-                action_type="动作过快，可能误动作",
+                action_type=action_type,
                 confidence=0.7,
                 explanation=f"断路器动作过快（预期 ≥{min_time:.2f}s，实际 {actual_time:.2f}s），可能存在误动作",
                 overload_ratio=overload_ratio,
@@ -163,8 +202,10 @@ async def check_breaker_action(alarm: Alarm, session: AsyncSession) -> BreakerAc
             )
         elif actual_time > max_time and actual_time <= max_time * 2:
             # 动作时间 > max_time 且 < max_time × 2 → "动作过慢，断路器老化"
+            action_type = "动作过慢，断路器老化"
+            diagnosis_breaker_action_total.labels(action_type=action_type).inc()
             return BreakerActionResult(
-                action_type="动作过慢，断路器老化",
+                action_type=action_type,
                 confidence=0.8,
                 explanation=f"断路器动作过慢（预期 ≤{max_time:.2f}s，实际 {actual_time:.2f}s），可能存在老化",
                 overload_ratio=overload_ratio,
@@ -173,8 +214,10 @@ async def check_breaker_action(alarm: Alarm, session: AsyncSession) -> BreakerAc
             )
         else:
             # 动作时间 > max_time × 2 → "断路器故障，未动作"
+            action_type = "断路器故障，未动作"
+            diagnosis_breaker_action_total.labels(action_type=action_type).inc()
             return BreakerActionResult(
-                action_type="断路器故障，未动作",
+                action_type=action_type,
                 confidence=0.9,
                 explanation=f"断路器未在预期时间内动作（预期 ≤{max_time:.2f}s，实际 {actual_time:.2f}s），可能存在故障",
                 overload_ratio=overload_ratio,
@@ -184,12 +227,12 @@ async def check_breaker_action(alarm: Alarm, session: AsyncSession) -> BreakerAc
 
     except Exception as e:
         # 数据库查询失败或计算异常时记录错误日志
-        import logging
-        logger = logging.getLogger(__name__)
+        action_type = "error"
         logger.error(f"断路器判定失败 alarm_id={alarm.id}: {str(e)}")
+        diagnosis_breaker_action_total.labels(action_type=action_type).inc()
 
         return BreakerActionResult(
-            action_type="error",
+            action_type=action_type,
             confidence=0.0,
             explanation="断路器判定过程发生错误",
             overload_ratio=0.0,
@@ -197,3 +240,8 @@ async def check_breaker_action(alarm: Alarm, session: AsyncSession) -> BreakerAc
             actual_time=0.0,
             error=str(e)
         )
+
+    finally:
+        # 记录耗时
+        duration = time.time() - start_time
+        diagnosis_breaker_check_duration_seconds.observe(duration)

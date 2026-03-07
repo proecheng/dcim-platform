@@ -3,12 +3,36 @@
 Story 25.4: N+X冗余拓扑与断路器保护逻辑
 """
 
+import time
+import logging
 from typing import List, Optional
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from prometheus_client import Counter, Histogram, REGISTRY
 
 from app.models.energy import PowerDevice
+
+logger = logging.getLogger(__name__)
+
+# Prometheus 监控指标（条件注册，避免重复）
+try:
+    diagnosis_redundancy_check_duration_seconds = Histogram(
+        'diagnosis_redundancy_check_duration_seconds',
+        'Duration of redundancy check operations in seconds',
+        buckets=[0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0]
+    )
+except ValueError:
+    diagnosis_redundancy_check_duration_seconds = REGISTRY._names_to_collectors['diagnosis_redundancy_check_duration_seconds']
+
+try:
+    diagnosis_redundancy_check_total = Counter(
+        'diagnosis_redundancy_check_total',
+        'Total number of redundancy checks',
+        ['has_backup']
+    )
+except ValueError:
+    diagnosis_redundancy_check_total = REGISTRY._names_to_collectors['diagnosis_redundancy_check_total']
 
 
 class RedundancyStatus(BaseModel):
@@ -31,6 +55,8 @@ async def check_redundancy_backup(device_id: int, session: AsyncSession) -> Redu
     Returns:
         RedundancyStatus: 冗余状态对象
     """
+    start_time = time.time()
+
     try:
         # 查询该设备的冗余配置
         result = await session.execute(
@@ -39,21 +65,25 @@ async def check_redundancy_backup(device_id: int, session: AsyncSession) -> Redu
         device = result.scalar_one_or_none()
 
         if not device:
-            return RedundancyStatus(
+            status = RedundancyStatus(
                 has_backup=False,
                 error=f"Device {device_id} not found",
                 backup_devices=[],
                 backup_count=0
             )
+            diagnosis_redundancy_check_total.labels(has_backup='false').inc()
+            return status
 
         # 如果没有配置冗余类型，返回无冗余
         if not device.redundancy_type:
-            return RedundancyStatus(
+            status = RedundancyStatus(
                 has_backup=False,
                 redundancy_type=None,
                 backup_devices=[],
                 backup_count=0
             )
+            diagnosis_redundancy_check_total.labels(has_backup='false').inc()
+            return status
 
         # 查询备用设备
         backup_query = select(PowerDevice).where(
@@ -116,17 +146,34 @@ async def check_redundancy_backup(device_id: int, session: AsyncSession) -> Redu
             required_backup = math.ceil(total_devices / 2)
             has_backup = backup_count >= required_backup
 
-        return RedundancyStatus(
+        status = RedundancyStatus(
             has_backup=has_backup,
             redundancy_type=device.redundancy_type,
             backup_devices=backup_device_ids,
             backup_count=backup_count
         )
 
+        # 记录监控指标
+        diagnosis_redundancy_check_total.labels(has_backup=str(has_backup).lower()).inc()
+
+        return status
+
     except Exception as e:
         # 数据库查询失败时记录错误日志，返回默认值
-        import logging
-        logger = logging.getLogger(__name__)
+        logger.error(f"Redundancy check failed for device {device_id}: {e}")
+        status = RedundancyStatus(
+            has_backup=False,
+            error=f"Database query failed: {str(e)}",
+            backup_devices=[],
+            backup_count=0
+        )
+        diagnosis_redundancy_check_total.labels(has_backup='false').inc()
+        return status
+
+    finally:
+        # 记录耗时
+        duration = time.time() - start_time
+        diagnosis_redundancy_check_duration_seconds.observe(duration)
         logger.error(f"冗余检测失败 device_id={device_id}: {str(e)}")
 
         return RedundancyStatus(
