@@ -414,7 +414,7 @@ CREATE INDEX idx_breaker_profiles_device_id ON breaker_profiles(breaker_device_i
 - [x] [AI-Review][HIGH] Implement alarm level downgrade logic (critical→major, major→warning)
 - [x] [AI-Review][HIGH] Fix test fixtures to use correct PowerDevice schema (device_code, device_name)
 - [x] [AI-Review][HIGH] Add Prometheus duration histogram metrics
-- [ ] [AI-Review][HIGH] Add integration tests (Task 8: scenarios, performance, concurrency)
+- [x] [AI-Review][HIGH] Add integration tests (Task 8: scenarios, performance, concurrency)
 - [ ] [AI-Review][MEDIUM] Fix overcurrent alarm detection to explicitly check alarm_type='threshold'
 - [ ] [AI-Review][MEDIUM] Fix 2N redundancy calculation bug (account for self-exclusion)
 - [ ] [AI-Review][MEDIUM] Add idempotency checks to migration downgrade()
