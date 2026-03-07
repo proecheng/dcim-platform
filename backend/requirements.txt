@@ -37,6 +37,15 @@ reportlab>=4.0
 # 数值计算 (容量预测、负荷预测、调度优化)
 numpy>=1.24.0
 
+# 图数据结构 (配电拓扑分析)
+networkx>=3.0,<4.0
+
+# Redis (异步)
+redis>=5.0.0
+
+# 监控指标
+prometheus-client>=0.16.0
+
 # Deep learning (optional) — 见 requirements-ml.txt
 # pip install -r requirements-ml.txt
 

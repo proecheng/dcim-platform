@@ -1,4 +1,4 @@
-# generated: 2026-03-05
+# generated: 2026-03-07
 # project: DCIM
 # project_key: NOKEY
 # tracking_system: file-system
@@ -51,7 +51,7 @@
 # P2: Epic 25 (智能诊断专业扩展)
 # P3: Epic 26 (智能诊断高级功能)
 
-generated: 2026-03-05
+generated: 2026-03-07
 project: DCIM
 project_key: NOKEY
 tracking_system: file-system
@@ -276,15 +276,15 @@ development_status:
   epic-24-retrospective: done
 
   # Epic 25: 智能诊断专业扩展 (Phase 2b 月9-10)
-  epic-25: backlog
-  25-1-electrical-professional-extension: backlog
-  25-2-hvac-professional-enhancement: backlog
-  25-3-global-causal-graph-cascade: backlog
-  25-4-fault-tree-graphical-editor: backlog
-  25-5-dynamic-threshold-rule-engine: backlog
-  25-6-circuit-breaker-degradation-mechanism: backlog
-  25-7-diagnosis-concurrent-control: backlog
-  25-8-diagnostic-explainability-evidence-chain: backlog
+  epic-25: in-progress
+  25-1-power-topology-cascade-analysis: done
+  25-2-electrical-parameter-node-integration: backlog
+  25-3-ups-battery-soh-prediction: backlog
+  25-4-nx-redundancy-topology-and-breaker-protection: backlog
+  25-5-sensor-metadata-and-accuracy-weighting: backlog
+  25-6-dynamic-alarm-thresholds: backlog
+  25-7-trend-analysis-and-multi-sensor-fusion: backlog
+  25-8-fault-tree-graphical-editor: backlog
   epic-25-retrospective: optional
 
   # Epic 26: 智能诊断高级功能 (Phase 3 月11-12+)
@@ -308,19 +308,18 @@ development_status:
 
   # Epic 27: 前端数据链路统一 (MVP 月1-3)
   # 优先级: 27.1(P0)→27.2(P0)→27.5(P1) 核心路径
-  epic-27: in-progress
+  epic-27: done
   27-1-alarm-data-link-unification: done
   27-2-realtime-data-link-unification: done
   27-3-energy-data-link-unification: done
   27-4-alarm-sound-toggle-unification: done
   27-5-websocket-single-connection-manager: done
-  27-5-websocket-single-connection-manager: done
   27-6-site-filter-propagation: done
-  epic-27-retrospective: optional
+  epic-27-retrospective: done
 
   # Epic 28: Demo 系统解耦与数据隔离 (MVP 月1-3)
   # 优先级: 28.2(P0)→28.3(P1) 核心路径
-  epic-28: in-progress
+  epic-28: done
   28-1-data-source-tracking-through-pipeline: done
   28-2-demo-config-separation-and-minimal-seed: done
   28-3-main-system-demo-code-decoupling: done

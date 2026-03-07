@@ -701,3 +701,83 @@ async def sync_topology_devices(db: AsyncSession = Depends(get_db)):
     except Exception as e:
         await db.rollback()
         raise HTTPException(status_code=500, detail=f"同步失败: {str(e)}")
+
+
+# ==================== 配电拓扑级联分析 (Story 25.1) ====================
+
+
+from pydantic import BaseModel
+from typing import List, Dict, Any
+
+
+class AffectedDevice(BaseModel):
+    """受影响设备"""
+    node_id: str
+    type: str
+    name: str
+    status: Dict[str, Any]
+
+
+class CascadeAnalysisResponse(BaseModel):
+    """级联分析响应"""
+    fault_node: str
+    affected_count: int
+    affected_devices: List[AffectedDevice]
+    error: str | None = None
+
+
+class UpstreamDevice(BaseModel):
+    """上游设备"""
+    node_id: str
+    type: str
+    name: str
+    status: Dict[str, Any]
+
+
+class UpstreamAnalysisResponse(BaseModel):
+    """溯源分析响应"""
+    device_id: int
+    power_path: List[UpstreamDevice]
+    error: str | None = None
+
+
+@router.get("/cascade/{node_id}", response_model=CascadeAnalysisResponse, summary="向下级联分析")
+async def get_cascade_analysis(node_id: str):
+    """
+    向下级联分析：列出受影响的下游设备
+
+    Args:
+        node_id: 故障节点 ID（格式: T-{id}, P-{id}, C-{id}, D-{id}）
+
+    Returns:
+        级联分析结果，包含受影响设备列表
+    """
+    from app.services.diagnosis.power_topology_service import analyze_downstream_impact
+
+    result = await analyze_downstream_impact(node_id)
+
+    if "error" in result:
+        raise HTTPException(status_code=404, detail=result["error"])
+
+    return result
+
+
+@router.get("/upstream/{device_id}", response_model=UpstreamAnalysisResponse, summary="向上溯源分析")
+async def get_upstream_analysis(device_id: int):
+    """
+    向上溯源：列出供电链路上的所有上游设备
+
+    Args:
+        device_id: PowerDevice 的数据库 ID
+
+    Returns:
+        溯源分析结果，包含供电链路设备列表
+    """
+    from app.services.diagnosis.power_topology_service import analyze_upstream_path
+
+    result = await analyze_upstream_path(device_id)
+
+    if "error" in result:
+        raise HTTPException(status_code=404, detail=result["error"])
+
+    return result

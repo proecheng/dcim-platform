@@ -306,6 +306,18 @@ async def lifespan(app: FastAPI):
     await diagnosis_engine.load_rules()
     await event_bus.subscribe("linkage", diagnosis_engine.on_alarm_event)
 
+    # 初始化配电拓扑图（Story 25.1）
+    try:
+        from app.services.diagnosis.power_topology_service import initialize_power_topology_graph
+        await initialize_power_topology_graph()
+        logger.info("✓ 配电拓扑图初始化成功")
+    except Exception as e:
+        logger.error(f"✗ 配电拓扑图初始化失败: {e}")
+
+    # 启动拓扑变更监听器（Story 25.1）
+    from app.services.diagnosis.device_sync_service import start_device_sync_listener, stop_device_sync_listener
+    listener_task = asyncio.create_task(start_device_sync_listener())
+
     # 启动告警引擎定时刷新（每 30 秒检查阈值版本）
     async def _alarm_engine_refresh_loop():
         while True:
@@ -451,6 +463,13 @@ async def lifespan(app: FastAPI):
     print("API文档: http://localhost:8000/docs")
 
     yield
+
+    # 停止拓扑变更监听器（Story 25.1）
+    await stop_device_sync_listener()
+    try:
+        await asyncio.wait_for(listener_task, timeout=5.0)
+    except asyncio.TimeoutError:
+        logger.warning("拓扑监听器停止超时")
 
     # 关闭演示模块
     if settings.demo_enabled or settings.simulation_enabled:
