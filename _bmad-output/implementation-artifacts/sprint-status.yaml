@@ -278,7 +278,7 @@ development_status:
   # Epic 25: 智能诊断专业扩展 (Phase 2b 月9-10)
   epic-25: in-progress
   25-1-power-topology-cascade-analysis: done
-  25-2-electrical-parameter-node-integration: backlog
+  25-2-electrical-parameter-node-integration: done
   25-3-ups-battery-soh-prediction: backlog
   25-4-nx-redundancy-topology-and-breaker-protection: backlog
   25-5-sensor-metadata-and-accuracy-weighting: backlog

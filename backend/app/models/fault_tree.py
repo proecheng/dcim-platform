@@ -38,6 +38,12 @@ class FaultTreeNode(Base):
     prior_probability = Column(Float, nullable=False, default=0.5, server_default="0.5")
     evidence_point_id = Column(Integer, ForeignKey("points.id", ondelete="RESTRICT"))
     config = Column(Text)  # SQLite 兼容：使用 Text 存储 JSON
+
+    # Story 25.2: 电气参数阈值配置
+    threshold_type = Column(String(10), nullable=True)  # 'ABOVE' or 'BELOW'
+    threshold_value = Column(Float, nullable=True)
+    sigmoid_k = Column(Float, nullable=True, default=2.0)
+
     created_at = Column(TIMESTAMP, nullable=False, server_default=func.now())
 
     __table_args__ = (
