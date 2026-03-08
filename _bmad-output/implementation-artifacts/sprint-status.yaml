@@ -282,7 +282,7 @@ development_status:
   25-3-ups-battery-soh-prediction: done
   25-4-nx-redundancy-topology-and-breaker-protection: done
   25-5-sensor-metadata-and-accuracy-weighting: done
-  25-6-dynamic-alarm-thresholds: review
+  25-6-dynamic-alarm-thresholds: done
   25-7-trend-analysis-and-multi-sensor-fusion: backlog
   25-8-fault-tree-graphical-editor: backlog
   epic-25-retrospective: optional
