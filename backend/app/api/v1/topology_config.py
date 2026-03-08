@@ -2,6 +2,8 @@
 配电与制冷拓扑配置 API
 """
 
+import json
+import logging
 from typing import Optional, List
 from datetime import datetime
 
@@ -54,6 +56,7 @@ from ...schemas.topology_config import (
 )
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 # ==================== 三相接线映射 ====================
@@ -235,6 +238,9 @@ async def create_power_phase_mapping(
         raise HTTPException(status_code=409, detail="该机柜的此馈电类型已存在映射")
     await db.refresh(mapping)
 
+    # 发布 Redis 更新通知
+    await _publish_topology_update("create", mapping.id, "power_phase")
+
     return PowerPhaseMappingResponse(
         id=mapping.id,
         cabinet_id=mapping.cabinet_id,
@@ -280,6 +286,9 @@ async def update_power_phase_mapping(
         raise HTTPException(status_code=409, detail="该机柜的此馈电类型已存在映射")
     await db.refresh(mapping)
 
+    # 发布 Redis 更新通知
+    await _publish_topology_update("update", mapping.id, "power_phase")
+
     # 丰富响应
     dev_result = await db.execute(select(Device).where(Device.id == mapping.pdu_device_id))
     dev = dev_result.scalar_one_or_none()
@@ -314,6 +323,10 @@ async def delete_power_phase_mapping(
         raise HTTPException(status_code=404, detail="映射不存在")
     await db.delete(mapping)
     await db.commit()
+
+    # 发布 Redis 更新通知
+    await _publish_topology_update("delete", mapping_id, "power_phase")
+
     return {"detail": "删除成功"}
 
 
@@ -439,6 +452,9 @@ async def create_cooling_zone(
             db.add(CoolingZoneUnit(zone_id=zone.id, cooling_unit_id=unit_id))
     await db.commit()
 
+    # 发布 Redis 更新通知
+    await _publish_topology_update("create", zone.id, "cooling_zone")
+
     return await _build_zone_response(db, zone)
 
 
@@ -476,6 +492,10 @@ async def update_cooling_zone(
 
     await db.commit()
     await db.refresh(zone)
+
+    # 发布 Redis 更新通知
+    await _publish_topology_update("update", zone.id, "cooling_zone")
+
     return await _build_zone_response(db, zone)
 
 
@@ -495,6 +515,10 @@ async def delete_cooling_zone(
     await db.execute(delete(CoolingZoneUnit).where(CoolingZoneUnit.zone_id == zone_id))
     await db.delete(zone)
     await db.commit()
+
+    # 发布 Redis 更新通知
+    await _publish_topology_update("delete", zone_id, "cooling_zone")
+
     return {"detail": "删除成功"}
 
 
@@ -1158,3 +1182,40 @@ async def fault_impact_analysis(
         suggestions=suggestions,
         analysis_time=datetime.now().isoformat(),
     )
+
+
+# ==================== Redis 事件发布辅助函数 ====================
+
+
+async def _publish_topology_update(event_type: str, entity_id: int, entity_type: str):
+    """
+    发布拓扑配置更新通知到 Redis
+
+    Args:
+        event_type: 事件类型 (create/update/delete)
+        entity_id: 实体 ID
+        entity_type: 实体类型 (power_phase/cooling_zone)
+    """
+    try:
+        import redis.asyncio as redis
+        from app.core.config import get_settings
+        settings = get_settings()
+
+        redis_client = redis.Redis(
+            host=settings.redis_host,
+            port=settings.redis_port,
+            decode_responses=True
+        )
+        payload = json.dumps({
+            "event_type": event_type,
+            "entity_id": entity_id,
+            "entity_type": entity_type,
+            "timestamp": datetime.now().isoformat()
+        })
+        await redis_client.publish('topology:config_update', payload)
+        await redis_client.close()
+        logger.debug(f"发布拓扑更新通知: {event_type} {entity_type} {entity_id}")
+    except ImportError:
+        logger.warning("Redis 不可用，跳过拓扑更新通知")
+    except Exception as e:
+        logger.error(f"发布拓扑更新通知失败: {e}")

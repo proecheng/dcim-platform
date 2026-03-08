@@ -235,6 +235,46 @@ class DiagnosisEngine:
                 output_data={"causes": all_causes, "elapsed_ms": elapsed_ms},
             )
 
+            # Story 25.1: 级联分析 - 分析受影响的下游设备
+            cascade_impact = None
+            if device_type in ["transformer", "panel", "circuit", "device"]:
+                try:
+                    from ..services.diagnosis.power_topology_service import analyze_downstream_impact
+                    device_id = payload.get("device_id")
+                    if device_id:
+                        # 构建节点 ID
+                        node_prefix = {
+                            "transformer": "T",
+                            "panel": "P",
+                            "circuit": "C",
+                            "device": "D"
+                        }.get(device_type, "D")
+                        fault_node_id = f"{node_prefix}-{device_id}"
+
+                        # 执行级联分析
+                        cascade_impact = await analyze_downstream_impact(fault_node_id)
+
+                        # 将级联分析结果添加到输出数据
+                        if cascade_impact and "error" not in cascade_impact:
+                            output_data = {"causes": all_causes, "elapsed_ms": elapsed_ms, "cascade_impact": cascade_impact}
+                            # 更新诊断结果的输出数据
+                            async with async_session() as db:
+                                from ..models.diagnosis import DiagnosisResult
+                                result = await db.execute(
+                                    select(DiagnosisResult).where(DiagnosisResult.id == result_id)
+                                )
+                                diagnosis_result = result.scalar_one_or_none()
+                                if diagnosis_result:
+                                    diagnosis_result.output_data = output_data
+                                    await db.commit()
+
+                            logger.info(f"级联分析完成: 故障节点 {fault_node_id}, 受影响设备 {len(cascade_impact.get('affected_devices', []))} 个")
+
+                except ImportError:
+                    logger.debug("级联分析服务不可用，跳过级联分析")
+                except Exception as e:
+                    logger.warning(f"级联分析失败: {e}")
+
             # 分级推送
             push_status = await DiagnosisPushService.push_diagnosis_result(
                 session_id=session_id,
