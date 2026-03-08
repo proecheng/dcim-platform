@@ -292,7 +292,7 @@ development_status:
   26-1-counterfactual-analysis: done
   26-2-misdiagnosis-feedback-report: done
   26-3-closed-loop-learning-probability-tuning: in-progress  # blocked: 依赖 Story 24.4 未完成
-  26-4-time-window-adaptive: in-progress
+  26-4-time-window-adaptive: done
   26-5-ab-testing-and-gradual-rollout: backlog
   26-6-fault-tree-version-management: backlog
   26-7-disaster-recovery-drill: backlog
