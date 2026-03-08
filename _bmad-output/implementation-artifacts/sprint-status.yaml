@@ -289,7 +289,7 @@ development_status:
 
   # Epic 26: 智能诊断高级功能 (Phase 3 月11-12+)
   epic-26: in-progress
-  26-1-counterfactual-analysis: in-progress
+  26-1-counterfactual-analysis: done
   26-2-misdiagnosis-feedback-report: backlog
   26-3-closed-loop-learning-probability-tuning: backlog
   26-4-performance-monitoring-dashboard: backlog
