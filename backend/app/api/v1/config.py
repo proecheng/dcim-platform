@@ -819,3 +819,171 @@ async def rollback_dynamic_threshold_rules(
         logger.error(f"回滚规则失败: {e}")
         raise HTTPException(status_code=500, detail=f"回滚失败: {str(e)}")
 
+
+@router.get("/dynamic-threshold-metrics", summary="查询动态阈值监控指标")
+async def get_dynamic_threshold_metrics(
+    point_id: Optional[int] = Query(None, description="点位 ID（可选，不传则返回全局统计）"),
+    time_range: int = Query(3600, description="时间范围（秒），默认 1 小时"),
+    _: User = Depends(require_admin),
+):
+    """
+    查询动态阈值监控指标
+
+    Returns:
+        - adjustment_count: 调整次数统计 (adjusted/skipped/degraded)
+        - adjustment_distribution: 调整幅度分布 (P50/P95/P99)
+        - rule_match_stats: 规则匹配统计 (top 10 规则)
+        - performance_stats: 性能统计 (平均耗时)
+        - degradation_count: 降级次数
+    """
+    try:
+        from ...core.redis import redis_service
+        import time
+
+        now = int(time.time())
+        start_time = now - time_range
+
+        # 1. 调整次数统计
+        adjustment_count = {"adjusted": 0, "skipped": 0, "degraded": 0}
+
+        # 扫描 Redis keys
+        if point_id:
+            # 单点位统计
+            for status in ["adjusted", "skipped", "degraded"]:
+                pattern = f"dynamic_threshold:count:{point_id}:{status}"
+                keys = []
+                if redis_service.is_available:
+                    cursor = 0
+                    while True:
+                        cursor, batch = await redis_service._pool.scan(cursor, match=pattern, count=100)
+                        keys.extend(batch)
+                        if cursor == 0:
+                            break
+                adjustment_count[status] = len(keys)
+        else:
+            # 全局统计
+            for status in ["adjusted", "skipped", "degraded"]:
+                pattern = f"dynamic_threshold:count:*:{status}"
+                keys = []
+                if redis_service.is_available:
+                    cursor = 0
+                    while True:
+                        cursor, batch = await redis_service._pool.scan(cursor, match=pattern, count=100)
+                        keys.extend(batch)
+                        if cursor == 0:
+                            break
+                adjustment_count[status] = len(keys)
+
+        # 2. 调整幅度分布（仅 adjusted 状态）
+        adjustment_values = []
+        if redis_service.is_available:
+            pattern = f"dynamic_threshold:adjustment:{point_id or '*'}:*"
+            cursor = 0
+            while True:
+                cursor, keys = await redis_service._pool.scan(cursor, match=pattern, count=100)
+                for key in keys:
+                    # 检查时间戳是否在范围内
+                    timestamp = int(key.decode().split(":")[-1])
+                    if timestamp >= start_time:
+                        value_str = await redis_service.get(key.decode())
+                        if value_str:
+                            try:
+                                adjustment_values.append(float(value_str))
+                            except ValueError:
+                                pass
+                if cursor == 0:
+                    break
+
+        # 计算分位数
+        adjustment_distribution = {}
+        if adjustment_values:
+            adjustment_values.sort()
+            n = len(adjustment_values)
+            adjustment_distribution = {
+                "p50": adjustment_values[int(n * 0.5)],
+                "p95": adjustment_values[int(n * 0.95)],
+                "p99": adjustment_values[int(n * 0.99)],
+                "count": n,
+            }
+
+        # 3. 规则匹配统计（Top 10）
+        rule_match_stats = []
+        if redis_service.is_available:
+            pattern = "dynamic_threshold:rule_match:*"
+            cursor = 0
+            rule_counts = {}
+            while True:
+                cursor, keys = await redis_service._pool.scan(cursor, match=pattern, count=100)
+                for key in keys:
+                    count = await redis_service._pool.get(key)
+                    if count:
+                        rule_hash = key.decode().split(":")[-1]
+                        rule_counts[rule_hash] = int(count)
+                if cursor == 0:
+                    break
+
+            # 排序并取 Top 10
+            sorted_rules = sorted(rule_counts.items(), key=lambda x: x[1], reverse=True)[:10]
+            rule_match_stats = [{"rule_hash": rule, "match_count": count} for rule, count in sorted_rules]
+
+        # 4. 性能统计
+        perf_data_list = []
+        if redis_service.is_available:
+            pattern = "dynamic_threshold:perf:*"
+            cursor = 0
+            while True:
+                cursor, keys = await redis_service._pool.scan(cursor, match=pattern, count=100)
+                for key in keys:
+                    # 检查时间戳是否在范围内
+                    timestamp = int(key.decode().split(":")[-1])
+                    if timestamp >= start_time:
+                        perf_json = await redis_service.get_json(key.decode())
+                        if perf_json:
+                            perf_data_list.append(perf_json)
+                if cursor == 0:
+                    break
+
+        performance_stats = {}
+        if perf_data_list:
+            avg_total_time = sum(p["total_time"] for p in perf_data_list) / len(perf_data_list)
+            avg_context_time = sum(p["context_time"] for p in perf_data_list) / len(perf_data_list)
+            avg_eval_time = sum(p["eval_time"] for p in perf_data_list) / len(perf_data_list)
+            avg_matched_count = sum(p["matched_count"] for p in perf_data_list) / len(perf_data_list)
+
+            performance_stats = {
+                "avg_total_time_ms": round(avg_total_time * 1000, 2),
+                "avg_context_time_ms": round(avg_context_time * 1000, 2),
+                "avg_eval_time_ms": round(avg_eval_time * 1000, 2),
+                "avg_matched_count": round(avg_matched_count, 2),
+                "sample_count": len(perf_data_list),
+            }
+
+        # 5. 降级次数
+        degradation_count = 0
+        if redis_service.is_available:
+            pattern = "dynamic_threshold:degraded:*"
+            cursor = 0
+            while True:
+                cursor, keys = await redis_service._pool.scan(cursor, match=pattern, count=100)
+                for key in keys:
+                    # 检查时间戳是否在范围内
+                    timestamp = int(key.decode().split(":")[-1])
+                    if timestamp >= start_time:
+                        degradation_count += 1
+                if cursor == 0:
+                    break
+
+        return {
+            "time_range_seconds": time_range,
+            "point_id": point_id,
+            "adjustment_count": adjustment_count,
+            "adjustment_distribution": adjustment_distribution,
+            "rule_match_stats": rule_match_stats,
+            "performance_stats": performance_stats,
+            "degradation_count": degradation_count,
+        }
+
+    except Exception as e:
+        logger.error(f"查询监控指标失败: {e}")
+        raise HTTPException(status_code=500, detail=f"查询失败: {str(e)}")
+

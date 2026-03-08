@@ -301,13 +301,10 @@ class AlarmEngine:
 
         try:
             from ..services.diagnosis.dynamic_threshold_service import DynamicThresholdService
-            import asyncio
 
-            # 异步调用动态阈值服务
-            adjusted_threshold, metadata = asyncio.run(
-                DynamicThresholdService.calculate_dynamic_threshold(
-                    point_id, tc.threshold_value, tc.threshold_type
-                )
+            # 使用同步版本（避免 asyncio.run() 性能问题）
+            adjusted_threshold, metadata = DynamicThresholdService.calculate_dynamic_threshold_sync(
+                point_id, tc.threshold_value, tc.threshold_type
             )
             threshold_value = adjusted_threshold
             threshold_metadata = metadata

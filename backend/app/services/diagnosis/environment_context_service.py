@@ -8,6 +8,7 @@ Story 25.6: 动态告警阈值
 
 import asyncio
 import logging
+import os
 import time
 from datetime import datetime
 from typing import Dict, Any, Optional
@@ -28,10 +29,10 @@ class EnvironmentContextService:
     # 缓存
     _cache: Dict[str, Any] = {}
     _cache_lock = asyncio.Lock()
-    _cache_ttl = 60  # 缓存有效期 60 秒（符合 Task 3.3 要求）
+    _cache_ttl = int(os.getenv("ENVIRONMENT_CONTEXT_CACHE_TTL", "60"))  # 缓存有效期（秒），可通过环境变量配置
 
     # 数据时效性阈值（秒）
-    _data_freshness_threshold = 600  # 10 分钟（符合 Task 3.2 要求）
+    _data_freshness_threshold = int(os.getenv("ENVIRONMENT_DATA_FRESHNESS_THRESHOLD", "600"))  # 10 分钟，可配置
 
     @classmethod
     async def get_context(cls) -> Dict[str, Any]:
@@ -133,30 +134,41 @@ class EnvironmentContextService:
 
             # 缓存未命中，重新计算
             async with async_session() as session:
-                # 1. 查询所有功率点位的实时值（AI 类型，单位 kW）
+                # 1. 查询所有功率点位的实时值（AI 类型，单位 kW，且点位名称包含 rack 或 cabinet）
                 power_points_query = select(Point.id, Point.point_name).where(
                     and_(
                         Point.point_type == "AI",
                         Point.unit.like("%kW%"),
-                        Point.enabled == True
+                        Point.enabled == True,
+                        # 过滤：仅包含机柜相关的功率点位
+                        (Point.point_name.like("%rack%") | Point.point_name.like("%cabinet%") | Point.point_name.like("%机柜%"))
                     )
                 )
                 power_points_result = await session.execute(power_points_query)
                 power_points = power_points_result.all()
 
                 if not power_points:
-                    logger.warning("未找到功率点位（point_type=AI, unit=kW），无法计算 IT 负载")
+                    logger.warning("未找到机柜功率点位（point_type=AI, unit=kW, name contains rack/cabinet），无法计算 IT 负载")
                     return None
+
+                logger.debug(f"找到 {len(power_points)} 个机柜功率点位")
 
                 # 2. 从 Redis 读取实时功率值并求和
                 total_power = 0.0
+                valid_count = 0
                 for point_id, point_name in power_points:
                     value_str = await redis_service.get(f"point:realtime:{point_id}")
                     if value_str:
                         try:
-                            total_power += float(value_str)
+                            power_value = float(value_str)
+                            total_power += power_value
+                            valid_count += 1
                         except (ValueError, TypeError):
                             logger.warning(f"点位 {point_name} 实时值格式错误: {value_str}")
+
+                if valid_count == 0:
+                    logger.warning("所有功率点位实时值无效，无法计算 IT 负载")
+                    return None
 
                 # 3. 查询所有机柜的额定功率
                 racks_query = select(Device.rated_power).where(
@@ -186,7 +198,8 @@ class EnvironmentContextService:
                 await redis_service.set("it_load_percent", str(it_load_percent), ttl=60)
 
                 logger.debug(
-                    f"IT 负载计算完成: {total_power:.2f}kW / {total_rated_power:.2f}kW = {it_load_percent:.2f}%"
+                    f"IT 负载计算完成: {total_power:.2f}kW / {total_rated_power:.2f}kW = {it_load_percent:.2f}% "
+                    f"(有效点位: {valid_count}/{len(power_points)})"
                 )
 
                 return it_load_percent

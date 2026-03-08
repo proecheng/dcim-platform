@@ -2,6 +2,7 @@
 Pytest 配置和 fixtures
 """
 
+import os
 import pytest
 import uuid
 from datetime import datetime, timedelta, timezone
@@ -12,12 +13,21 @@ from sqlalchemy.pool import StaticPool
 from httpx import AsyncClient, ASGITransport
 from jose import jwt as jose_jwt
 
+# 加载 .env 文件（测试环境）
+from dotenv import load_dotenv
+load_dotenv()
+
+# 设置测试环境默认值（如果 .env 未提供）
+if not os.getenv("FAULT_TREE_HMAC_KEY"):
+    os.environ["FAULT_TREE_HMAC_KEY"] = "test-hmac-key-at-least-32-chars-long-for-testing-only"
+
 from app.core.database import Base, get_db
 from app.core.security import get_password_hash
 from app.core.config import get_settings
 
 # 确保所有模型在 create_all 之前被导入
 import app.models  # noqa: F401
+
 
 
 # ==================== 同步 fixtures (旧测试文件依赖，迁移后移除) ====================

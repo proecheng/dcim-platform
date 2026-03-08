@@ -6,9 +6,12 @@ Story 25.6: 动态告警阈值
 支持括号分组
 """
 
+import logging
 import re
 from typing import Any, Dict
 from enum import Enum
+
+logger = logging.getLogger(__name__)
 
 
 class TokenType(Enum):
@@ -266,6 +269,7 @@ def parse_and_evaluate(condition: str, context: Dict[str, Any]) -> bool:
     try:
         # 安全检查: 限制表达式长度 < 200 字符
         if len(condition) >= 200:
+            logger.warning(f"条件表达式过长 ({len(condition)} 字符): {condition[:50]}...")
             return False
 
         lexer = Lexer(condition)
@@ -273,5 +277,6 @@ def parse_and_evaluate(condition: str, context: Dict[str, Any]) -> bool:
         ast = parser.parse()
         evaluator = ConditionEvaluator(context)
         return evaluator.evaluate(ast)
-    except Exception:
+    except Exception as e:
+        logger.warning(f"条件表达式解析失败: {condition} - {e}")
         return False

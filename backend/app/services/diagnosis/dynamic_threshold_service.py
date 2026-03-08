@@ -22,6 +22,10 @@ from app.services.diagnosis.environment_context_service import EnvironmentContex
 
 logger = logging.getLogger(__name__)
 
+# 全局事件循环（用于同步调用）
+_event_loop: Optional[asyncio.AbstractEventLoop] = None
+_loop_lock = asyncio.Lock()
+
 
 class DynamicThresholdRule:
     """动态阈值规则"""
@@ -58,6 +62,49 @@ class DynamicThresholdService:
     _config_cache: Dict[str, Any] = {}
     _cache_lock = asyncio.Lock()
     _cache_version: Optional[int] = None
+
+    @classmethod
+    def calculate_dynamic_threshold_sync(
+        cls,
+        point_id: int,
+        static_threshold: float,
+        threshold_direction: str
+    ) -> Tuple[float, Dict[str, Any]]:
+        """
+        计算动态阈值（同步版本，用于告警引擎）
+
+        Args:
+            point_id: 点位 ID
+            static_threshold: 静态阈值
+            threshold_direction: 阈值方向 (high/low/high_high/low_low)
+
+        Returns:
+            Tuple[float, Dict[str, Any]]: (调整后的阈值, 元数据)
+        """
+        try:
+            # 尝试获取或创建事件循环
+            try:
+                loop = asyncio.get_running_loop()
+            except RuntimeError:
+                # 没有运行中的事件循环，创建新的
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                result = loop.run_until_complete(
+                    cls.calculate_dynamic_threshold(point_id, static_threshold, threshold_direction)
+                )
+                loop.close()
+                return result
+            else:
+                # 已有运行中的事件循环，使用 run_coroutine_threadsafe
+                import concurrent.futures
+                future = asyncio.run_coroutine_threadsafe(
+                    cls.calculate_dynamic_threshold(point_id, static_threshold, threshold_direction),
+                    loop
+                )
+                return future.result(timeout=5.0)  # 5秒超时
+        except Exception as e:
+            logger.error(f"同步调用动态阈值失败: {e}")
+            return static_threshold, {"is_enabled": False, "error": str(e)}
 
     @classmethod
     async def calculate_dynamic_threshold(
