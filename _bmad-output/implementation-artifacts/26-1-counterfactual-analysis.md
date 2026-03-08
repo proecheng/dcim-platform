@@ -777,6 +777,110 @@ def remove_evidence(input_data: dict, evidence_id: str) -> dict:
 
 ---
 
+## Dev Agent Record
+
+### Tasks/Subtasks
+
+#### Task 1: 数据库迁移
+- [x] 创建 `counterfactual_analyses` 表
+- [x] 添加 UNIQUE 约束和索引
+- [x] 添加软删除字段和版本字段
+- [x] 创建回滚脚本
+
+#### Task 2: 后端服务实现
+- [x] 实现 `CounterfactualService` 核心逻辑
+- [x] 实现证据权重计算（指数衰减）
+- [x] 实现证据依赖级联删除
+- [x] 实现置信度模拟
+- [ ] 实现 Redis 分布式锁（Lua 脚本）
+- [ ] 实现缓存失效逻辑
+- [ ] 实现真实 L2 推理调用
+
+#### Task 3: 后端 API 实现
+- [x] 实现 POST `/diagnosis/counterfactual/{session_id}` 触发分析
+- [x] 实现 GET `/diagnosis/counterfactual/{session_id}` 查询结果
+- [x] 实现 GET `/diagnosis/counterfactual` 列表查询
+- [x] 实现 DELETE `/diagnosis/counterfactual/{session_id}` 软删除
+- [ ] 添加权限控制装饰器
+- [ ] 实现 SSE 进度推送端点
+- [x] 添加 Prometheus 监控指标
+
+#### Task 4: 后端测试
+- [x] 单元测试：证据权重计算（4个测试）
+- [x] 单元测试：证据级联删除（3个测试）
+- [x] 单元测试：置信度模拟（3个测试）
+- [x] 单元测试：主流程测试（3个测试）
+- [ ] 集成测试：完整流程测试
+- [ ] 集成测试：3个证据场景
+- [ ] 集成测试：1个证据场景
+- [ ] 边界测试：无证据场景
+- [ ] 边界测试：证据权重相同
+- [ ] 边界测试：证据数量 > 10
+- [ ] 并发测试：同 session_id 并发请求
+
+#### Task 5: 前端组件实现
+- [ ] 创建反事实解释展示组件
+- [ ] 实现 loading 状态
+- [ ] 实现 SSE 进度接收
+- [ ] 实现错误处理
+- [ ] 添加可访问性 i18n
+- [ ] 添加未知证据类型 fallback
+
+#### Task 6: 前端集成
+- [ ] 集成到诊断详情页
+- [ ] 实现 SSE 连接管理
+- [ ] 添加折叠/展开交互
+
+#### Task 7: 端到端测试
+- [ ] 验证完整流程
+- [ ] 缓存失效测试
+- [ ] 并发测试
+- [ ] 版本变更测试
+
+#### Task 8: 文档更新
+- [ ] API 文档更新
+- [ ] 用户手册更新
+- [ ] Prometheus 指标文档
+- [ ] i18n 翻译文件
+
+### File List
+
+**后端文件**:
+- `backend/alembic/versions/20260308_1600_create_counterfactual_analyses.py` - 数据库迁移脚本
+- `backend/alembic/versions/c7ffe6454eb5_merge_heads.py` - 合并迁移头
+- `backend/app/models/diagnosis.py` - 添加 CounterfactualAnalysis 模型
+- `backend/app/schemas/diagnosis.py` - 添加反事实分析 Schema
+- `backend/app/services/diagnosis/counterfactual_service.py` - 核心服务实现
+- `backend/app/api/v1/diagnosis.py` - API 端点实现
+- `backend/app/main.py` - APScheduler 任务配置
+- `tests/services/diagnosis/test_counterfactual_service.py` - 单元测试
+
+**前端文件**:
+- （待实现）
+
+### Change Log
+
+**2026-03-08 16:30** - 初始实现
+- 创建数据库表和模型
+- 实现核心服务逻辑（证据权重计算、级联删除、置信度模拟）
+- 实现 4 个 API 端点
+- 添加 APScheduler 自动分析任务
+- 添加 13 个单元测试（全部通过）
+- 添加 Prometheus 监控指标
+
+**待完成**:
+- Redis 分布式锁实现
+- 缓存失效逻辑
+- 真实 L2 推理调用
+- 权限控制
+- SSE 进度推送
+- 前端组件实现
+- 集成测试和边界测试
+- 文档更新
+
+---
+
 **Story 创建日期**: 2026-03-08
 **Story 创建者**: Bob (Scrum Master)
-**Story 状态**: ready-for-dev
+**Story 状态**: in-progress
+**最后更新**: 2026-03-08 (代码审查后)

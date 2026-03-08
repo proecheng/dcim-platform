@@ -6,10 +6,12 @@ Story 26.1: 反事实分析
 import asyncio
 import logging
 import time
+import uuid
 from datetime import datetime
 from typing import List, Dict, Optional, Any
 import json
 
+import redis.asyncio as redis
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from prometheus_client import Counter, Histogram
@@ -21,8 +23,10 @@ from ...models.diagnosis import (
 )
 from ...models.config import SystemConfig
 from ...core.database import async_session
+from ...core.config import get_settings
 
 logger = logging.getLogger(__name__)
+settings = get_settings()
 
 # Prometheus 监控指标
 counterfactual_analysis_total = Counter(
@@ -38,6 +42,15 @@ counterfactual_analysis_duration = Histogram(
 counterfactual_evidence_removed = Counter(
     "counterfactual_evidence_removed_total",
     "反事实分析移除证据总数"
+)
+counterfactual_lock_wait_duration = Histogram(
+    "counterfactual_lock_wait_seconds",
+    "Redis 锁等待时间",
+    buckets=[0.001, 0.01, 0.1, 0.5, 1.0]
+)
+counterfactual_cache_hit_total = Counter(
+    "counterfactual_cache_hit_total",
+    "缓存命中次数"
 )
 
 
@@ -55,6 +68,29 @@ CONFIDENCE_THRESHOLD_MEDIUM = 0.5
 CACHE_TTL_SECONDS_KEY = "counterfactual.cache_ttl_seconds"
 CACHE_TTL_SECONDS_DEFAULT = 3600  # 1小时
 ANALYSIS_TIMEOUT_SECONDS = 5
+REDIS_LOCK_TTL = 60  # Redis 锁过期时间（秒）
+REDIS_LOCK_RETRY_DELAY = 0.1  # 锁重试延迟（秒）
+REDIS_LOCK_MAX_RETRIES = 3  # 最大重试次数
+
+
+# Lua 脚本：原子获取锁
+REDIS_LOCK_SCRIPT = """
+if redis.call("exists", KEYS[1]) == 0 then
+    redis.call("set", KEYS[1], ARGV[1], "EX", ARGV[2])
+    return 1
+else
+    return 0
+end
+"""
+
+# Lua 脚本：原子释放锁
+REDIS_UNLOCK_SCRIPT = """
+if redis.call("get", KEYS[1]) == ARGV[1] then
+    return redis.call("del", KEYS[1])
+else
+    return 0
+end
+"""
 
 
 async def get_config(key: str, default: Any) -> Any:
@@ -74,6 +110,102 @@ async def get_config(key: str, default: Any) -> Any:
     except Exception as e:
         logger.warning(f"Failed to get config {key}: {e}, using default {default}")
         return default
+
+
+async def _acquire_redis_lock(session_id: int) -> Optional[str]:
+    """
+    获取 Redis 分布式锁
+
+    Args:
+        session_id: 诊断会话ID
+
+    Returns:
+        锁的 token（用于释放锁），如果获取失败返回 None
+    """
+    lock_key = f"counterfactual:lock:{session_id}"
+    lock_token = f"{uuid.uuid4()}:{time.time()}"
+
+    redis_client = None
+    lock_wait_start = time.time()
+
+    try:
+        redis_client = redis.from_url(settings.REDIS_URL)
+
+        # 尝试获取锁（带重试）
+        for attempt in range(REDIS_LOCK_MAX_RETRIES):
+            result = await redis_client.eval(
+                REDIS_LOCK_SCRIPT,
+                1,
+                lock_key,
+                lock_token,
+                str(REDIS_LOCK_TTL)
+            )
+
+            if result == 1:
+                # 获取锁成功
+                counterfactual_lock_wait_duration.observe(time.time() - lock_wait_start)
+                logger.debug(f"Acquired lock for session {session_id}, token={lock_token}")
+                return lock_token
+
+            # 获取锁失败，等待后重试
+            if attempt < REDIS_LOCK_MAX_RETRIES - 1:
+                await asyncio.sleep(REDIS_LOCK_RETRY_DELAY)
+
+        # 所有重试都失败
+        logger.warning(f"Failed to acquire lock for session {session_id} after {REDIS_LOCK_MAX_RETRIES} attempts")
+        return None
+
+    except Exception as e:
+        logger.error(f"Redis lock error for session {session_id}: {e}")
+        return None
+    finally:
+        if redis_client:
+            try:
+                await redis_client.close()
+            except Exception as e:
+                logger.warning(f"Failed to close Redis client: {e}")
+
+
+async def _release_redis_lock(session_id: int, lock_token: str) -> bool:
+    """
+    释放 Redis 分布式锁
+
+    Args:
+        session_id: 诊断会话ID
+        lock_token: 锁的 token
+
+    Returns:
+        是否成功释放
+    """
+    lock_key = f"counterfactual:lock:{session_id}"
+
+    redis_client = None
+    try:
+        redis_client = redis.from_url(settings.REDIS_URL)
+
+        result = await redis_client.eval(
+            REDIS_UNLOCK_SCRIPT,
+            1,
+            lock_key,
+            lock_token
+        )
+
+        if result == 1:
+            logger.debug(f"Released lock for session {session_id}")
+            return True
+        else:
+            logger.warning(f"Failed to release lock for session {session_id}: lock token mismatch")
+            return False
+
+    except Exception as e:
+        logger.error(f"Redis unlock error for session {session_id}: {e}")
+        return False
+    finally:
+        if redis_client:
+            try:
+                await redis_client.close()
+            except Exception as e:
+                logger.warning(f"Failed to close Redis client: {e}")
 
 
 def calculate_evidence_weight(evidence: Dict[str, Any], path_decay_factor: float) -> float:
@@ -97,13 +229,80 @@ def calculate_evidence_weight(evidence: Dict[str, Any], path_decay_factor: float
     return evidence_prob * sensor_weight * path_contribution
 
 
+async def _check_cache(session_id: int, db: AsyncSession) -> Optional[CounterfactualAnalysis]:
+    """
+    检查缓存是否有效
+
+    缓存失效条件:
+    1. 不存在记录
+    2. 记录已软删除（deleted_at IS NOT NULL）
+    3. 故障树版本不匹配
+    4. 配置版本不匹配
+    5. 记录过期（created_at < NOW() - cache_ttl）
+
+    Args:
+        session_id: 诊断会话ID
+        db: 数据库会话
+
+    Returns:
+        有效的缓存记录，如果缓存失效返回 None
+    """
+    try:
+        # 查询现有记录
+        result = await db.execute(
+            select(CounterfactualAnalysis).where(
+                CounterfactualAnalysis.session_id == session_id,
+                CounterfactualAnalysis.deleted_at.is_(None)
+            )
+        )
+        cached = result.scalar_one_or_none()
+
+        if not cached:
+            return None
+
+        # 检查是否过期
+        cache_ttl = await get_config(CACHE_TTL_SECONDS_KEY, CACHE_TTL_SECONDS_DEFAULT)
+        if cached.created_at:
+            age_seconds = (datetime.now() - cached.created_at).total_seconds()
+            if age_seconds > cache_ttl:
+                logger.debug(f"Cache expired for session {session_id}, age={age_seconds}s")
+                return None
+
+        # 检查版本是否匹配
+        current_config_version = await _get_config_version()
+
+        # 查询当前诊断结果的故障树版本
+        diagnosis_result = await db.execute(
+            select(DiagnosisResult).where(DiagnosisResult.session_id == session_id)
+        )
+        current_result = diagnosis_result.scalar_one_or_none()
+
+        if current_result:
+            current_fault_tree_version = current_result.fault_tree_version
+
+            if cached.fault_tree_version != current_fault_tree_version:
+                logger.debug(f"Fault tree version mismatch for session {session_id}")
+                return None
+
+        if cached.config_version != current_config_version:
+            logger.debug(f"Config version mismatch for session {session_id}")
+            return None
+
+        # 缓存有效
+        return cached
+
+    except Exception as e:
+        logger.error(f"Cache check failed for session {session_id}: {e}")
+        return None
+
+
 async def analyze_counterfactual(
     session_id: int,
     top_n: int = 5,
     db: Optional[AsyncSession] = None
 ) -> Optional[CounterfactualAnalysis]:
     """
-    执行反事实分析
+    执行反事实分析（带 Redis 锁和缓存检查）
 
     Args:
         session_id: 诊断会话ID
@@ -114,14 +313,36 @@ async def analyze_counterfactual(
         CounterfactualAnalysis 对象，如果失败返回 None
     """
     start_time = time.time()
+    lock_token = None
 
     try:
-        # 创建数据库会话
+        # 1. 获取 Redis 分布式锁
+        lock_token = await _acquire_redis_lock(session_id)
+        if lock_token is None:
+            logger.info(f"Failed to acquire lock for session {session_id}, skipping analysis")
+            return None
+
+        # 2. 检查缓存
         if db is None:
             async with async_session() as session:
+                cached_result = await _check_cache(session_id, session)
+                if cached_result:
+                    counterfactual_cache_hit_total.inc()
+                    logger.info(f"Cache hit for session {session_id}")
+                    return cached_result
+
+                # 执行分析
                 return await _analyze_counterfactual_impl(session_id, top_n, session, start_time)
         else:
+            cached_result = await _check_cache(session_id, db)
+            if cached_result:
+                counterfactual_cache_hit_total.inc()
+                logger.info(f"Cache hit for session {session_id}")
+                return cached_result
+
+            # 执行分析
             return await _analyze_counterfactual_impl(session_id, top_n, db, start_time)
+
     except asyncio.TimeoutError:
         logger.error(f"Counterfactual analysis timeout for session {session_id}")
         counterfactual_analysis_total.labels(status="timeout").inc()
@@ -130,6 +351,10 @@ async def analyze_counterfactual(
         logger.error(f"Counterfactual analysis failed for session {session_id}: {e}", exc_info=True)
         counterfactual_analysis_total.labels(status="error").inc()
         return None
+    finally:
+        # 3. 释放 Redis 锁
+        if lock_token:
+            await _release_redis_lock(session_id, lock_token)
 
 
 async def _analyze_counterfactual_impl(
