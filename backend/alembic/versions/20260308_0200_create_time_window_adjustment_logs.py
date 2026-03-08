@@ -1,7 +1,7 @@
 """Create time_window_adjustment_logs and audit_logs tables
 
 Revision ID: 20260308_0200
-Revises: 20260308_1000
+Revises: 77468b53feb1
 Create Date: 2026-03-08 02:00:00.000000
 
 Story 26.4: 时间窗口自适应
@@ -72,22 +72,34 @@ def upgrade() -> None:
     op.create_index('idx_adjustment_logs_approved_by', 'time_window_adjustment_logs', ['approved_by'])
 
     # 创建触发器（自动更新 updated_at 和 version）
-    # SQLite 触发器语法
+    # SQLite 触发器语法 - 使用 BEFORE UPDATE 避免递归
     op.execute("""
         CREATE TRIGGER IF NOT EXISTS trigger_update_adjustment_logs_updated_at
-        AFTER UPDATE ON time_window_adjustment_logs
+        BEFORE UPDATE ON time_window_adjustment_logs
         FOR EACH ROW
         BEGIN
-            UPDATE time_window_adjustment_logs
-            SET updated_at = CURRENT_TIMESTAMP,
-                version = OLD.version + 1
-            WHERE id = NEW.id;
+            SELECT CASE
+                WHEN NEW.updated_at = OLD.updated_at THEN
+                    RAISE(IGNORE)
+            END;
+        END;
+    """)
+
+    op.execute("""
+        CREATE TRIGGER IF NOT EXISTS trigger_set_adjustment_logs_metadata
+        BEFORE UPDATE ON time_window_adjustment_logs
+        FOR EACH ROW
+        WHEN NEW.updated_at = OLD.updated_at
+        BEGIN
+            SELECT NEW.updated_at = CURRENT_TIMESTAMP,
+                   NEW.version = OLD.version + 1;
         END;
     """)
 
 
 def downgrade() -> None:
     # 删除触发器
+    op.execute("DROP TRIGGER IF EXISTS trigger_set_adjustment_logs_metadata")
     op.execute("DROP TRIGGER IF EXISTS trigger_update_adjustment_logs_updated_at")
 
     # 删除索引

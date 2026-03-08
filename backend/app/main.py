@@ -732,6 +732,7 @@ async def lifespan(app: FastAPI):
             minute=0,
             coalesce=True,
             max_instances=1,
+            misfire_grace_time=300,
             id='time_window_tuning',
             name='时间窗口调参分析任务'
         )

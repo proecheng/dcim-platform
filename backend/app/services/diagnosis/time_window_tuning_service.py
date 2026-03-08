@@ -69,6 +69,14 @@ class TimeWindowTuningService:
             )
             device_types = [row[0] for row in result.fetchall()]
 
+            if not device_types:
+                logger.info(f"未找到有准确诊断的设备类型（过滤条件: {device_type_filter or '无'}），分析结束")
+                return {
+                    "analyzed_device_types": 0,
+                    "total_adjustments": 0,
+                    "pending_approvals": 0
+                }
+
             logger.info(f"找到 {len(device_types)} 个设备类型需要分析")
 
             for device_type in device_types:
@@ -139,18 +147,30 @@ class TimeWindowTuningService:
             logger.error(f"计算分位数失败: {e}")
             return None
 
-        # 计算建议时间窗口: P90 × 1.2，转换为分钟，向上取整
+        # 计算建议时间窗口: P90 × 1.2，转换为分钟，四舍五入
         proposed_window_seconds = p90_duration_seconds * 1.2
-        proposed_window_minutes = max(1, round(proposed_window_seconds / 60))
+        proposed_window_minutes = round(proposed_window_seconds / 60)
+
+        # 如果计算结果 < 1 分钟，强制设为 1 分钟
+        if proposed_window_minutes < 1:
+            logger.info(f"设备类型 {device_type} 计算的时间窗口 < 1 分钟（P90={p90_duration_seconds:.1f}秒 × 1.2 = {proposed_window_seconds:.1f}秒），设为最小值 1 分钟")
+            proposed_window_minutes = 1
 
         # 限制范围 [1, 120]
-        proposed_window_minutes = max(1, min(120, proposed_window_minutes))
+        if proposed_window_minutes > 120:
+            logger.info(f"设备类型 {device_type} 计算的时间窗口 > 120 分钟，截断到最大值 120 分钟")
+            proposed_window_minutes = 120
 
         # 计算调整百分比
         if current_window_minutes == 0:
             adjustment_percent = 0.0
+            logger.error(f"设备类型 {device_type} 当前时间窗口为 0，配置错误")
         else:
             adjustment_percent = ((proposed_window_minutes - current_window_minutes) / current_window_minutes) * 100
+
+        # 如果调整百分比 > 500%，记录警告（可能数据异常）
+        if abs(adjustment_percent) > 500:
+            logger.warning(f"设备类型 {device_type} 调整百分比过大（{adjustment_percent:.1f}%），可能数据异常")
 
         # 如果调整幅度 < 10%，不生成调参建议
         if abs(adjustment_percent) < 10:
@@ -212,13 +232,72 @@ class TimeWindowTuningService:
         Args:
             result: 调参分析结果
         """
-        # 注意：这里需要实现邮件和 WebSocket 通知
-        # 邮件主题: "智能诊断系统 - 时间窗口调参审批通知"
-        # 邮件正文: 包含待审批调参数量、设备类型、调整建议
-        # WebSocket 消息: { "type": "time_window_tuning_approval", "pending_count": 5 }
-        # 通知对象: 所有 role='admin' 的用户
-
         logger.info(f"通知管理员审批: {result['pending_approvals']} 条待审批调参建议")
 
-        # 临时实现：仅记录日志
-        pass
+        # 查询所有管理员用户
+        from app.models.user import User
+
+        async with async_session() as session:
+            admin_result = await session.execute(
+                select(User).where(User.role == 'admin', User.is_active == True)
+            )
+            admins = admin_result.scalars().all()
+
+            if not admins:
+                logger.warning("未找到活跃的管理员用户，跳过通知")
+                return
+
+            # 发送邮件通知
+            try:
+                from app.services.email_service import email_service
+
+                if email_service.is_available:
+                    for admin in admins:
+                        if admin.email:
+                            try:
+                                subject = "智能诊断系统 - 时间窗口调参审批通知"
+                                body = f"""
+                                <h2>时间窗口调参审批通知</h2>
+                                <p>您好，{admin.real_name or admin.username}：</p>
+                                <p>系统已完成时间窗口调参分析，有 <strong>{result['pending_approvals']}</strong> 条调参建议待您审批。</p>
+                                <p>请登录系统查看详情并进行审批。</p>
+                                <p>分析结果：</p>
+                                <ul>
+                                    <li>分析的设备类型数量: {result['analyzed_device_types']}</li>
+                                    <li>生成的调参建议总数: {result['total_adjustments']}</li>
+                                    <li>待审批的调参建议数量: {result['pending_approvals']}</li>
+                                </ul>
+                                <p>此邮件由系统自动发送，请勿回复。</p>
+                                """
+                                await email_service.send_html_email(
+                                    to_email=admin.email,
+                                    subject=subject,
+                                    html_content=body
+                                )
+                                logger.info(f"已发送邮件通知给管理员: {admin.username} ({admin.email})")
+                            except Exception as e:
+                                logger.error(f"发送邮件给 {admin.username} 失败: {e}", exc_info=True)
+                else:
+                    logger.info("邮件服务未配置，跳过邮件通知")
+            except ImportError:
+                logger.warning("邮件服务模块未安装，跳过邮件通知")
+
+            # 发送 WebSocket 通知
+            try:
+                from app.services.websocket import ws_manager
+
+                message = {
+                    "type": "time_window_tuning_approval",
+                    "pending_count": result['pending_approvals'],
+                    "analyzed_device_types": result['analyzed_device_types'],
+                    "total_adjustments": result['total_adjustments']
+                }
+
+                for admin in admins:
+                    try:
+                        await ws_manager.send_to_user(admin.username, message)
+                        logger.info(f"已发送 WebSocket 通知给管理员: {admin.username}")
+                    except Exception as e:
+                        logger.error(f"发送 WebSocket 通知给 {admin.username} 失败: {e}", exc_info=True)
+            except Exception as e:
+                logger.error(f"WebSocket 通知失败: {e}", exc_info=True)

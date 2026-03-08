@@ -1703,29 +1703,28 @@ async def approve_time_window_adjustment(
         if config:
             # 更新现有配置
             time_windows = json.loads(config.config_value) if isinstance(config.config_value, str) else config.config_value
-            time_windows[adjustment.device_type] = adjustment.proposed_window_minutes
+            time_windows[locked_adjustment.device_type] = locked_adjustment.proposed_window_minutes
             config.config_value = json.dumps(time_windows)
         else:
             # 创建新配置
             config = SystemConfig(
                 config_key='diagnosis_time_windows',
-                config_value=json.dumps({adjustment.device_type: adjustment.proposed_window_minutes}),
+                config_value=json.dumps({locked_adjustment.device_type: locked_adjustment.proposed_window_minutes}),
                 description='诊断时间窗口配置（分钟）'
             )
             db.add(config)
 
-        await db.commit()
-
-        # 记录审计日志
+        # 记录审计日志（在同一事务中）
         from ...models.diagnosis import AuditLog
         audit_log = AuditLog(
             user_id=current_user.id,
             action='approve_time_window_adjustment',
             resource_type='time_window_adjustment',
             resource_id=adjustment_id,
-            details=f"审批时间窗口调参: {adjustment.device_type}, {adjustment.current_window_minutes} -> {adjustment.proposed_window_minutes} 分钟"
+            details=f"审批时间窗口调参: {locked_adjustment.device_type}, {locked_adjustment.current_window_minutes} -> {locked_adjustment.proposed_window_minutes} 分钟"
         )
         db.add(audit_log)
+
         await db.commit()
 
         logger.info(f"时间窗口调参已审批: {adjustment_id}, 用户: {current_user.username}")
@@ -1733,8 +1732,8 @@ async def approve_time_window_adjustment(
         return {
             "message": "调参已审批，配置已更新",
             "adjustment_id": adjustment_id,
-            "device_type": adjustment.device_type,
-            "new_window_minutes": adjustment.proposed_window_minutes
+            "device_type": locked_adjustment.device_type,
+            "new_window_minutes": locked_adjustment.proposed_window_minutes
         }
 
     except HTTPException:
