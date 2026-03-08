@@ -284,7 +284,7 @@ development_status:
   25-5-sensor-metadata-and-accuracy-weighting: done
   25-6-dynamic-alarm-thresholds: done
   25-7-trend-analysis-and-multi-sensor-fusion: done
-  25-8-fault-tree-graphical-editor: review
+  25-8-fault-tree-graphical-editor: done
   epic-25-retrospective: optional
 
   # Epic 26: 智能诊断高级功能 (Phase 3 月11-12+)

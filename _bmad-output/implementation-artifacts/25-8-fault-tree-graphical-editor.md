@@ -1,6 +1,6 @@
 # Story 25.8: 故障树图形化编辑器
 
-Status: review
+Status: done
 
 ## Story
 
@@ -1050,3 +1050,34 @@ Claude Opus 4.6 (claude-opus-4-6)
 
 **Frontend - 依赖**
 - frontend/package.json (modified - added vis-network, vis-data, nanoid, lodash-es, @types/lodash-es)
+
+### Code Review Fixes (2026-03-08)
+
+**修复的问题 (16 个):**
+
+1. **[HIGH]** 修复临时 ID 映射逻辑 - 边的 from/to 使用节点索引而非 0
+2. **[HIGH]** 修复版本冲突检测 - 保存前检查而非保存后比较
+3. **[HIGH]** 添加 DAG 校验自动触发 - 编辑操作后防抖校验
+4. **[HIGH]** 修复根节点删除逻辑 - 允许删除唯一节点
+5. **[HIGH]** 实现键盘快捷键 - Ctrl+Z/Ctrl+Shift+Z/Delete 带焦点检查
+6. **[HIGH]** 未保存更改提示已实现 - beforeunload + 路由守卫
+7. **[HIGH]** 点位选择器已实现 - el-select remote 模式
+8. **[HIGH]** 添加临时 ID 映射单元测试 - 7 个测试用例全部通过
+9. **[MEDIUM]** 实现防抖逻辑 - 300ms 防抖校验和历史记录
+10. **[MEDIUM]** 修复 Canvas 降级方案 - 使用 nodes.get() 获取数组
+11. **[MEDIUM]** 添加节点 fixed 属性 - 保存位置后固定节点
+12. **[MEDIUM]** 添加大型故障树加载进度提示 - >100 节点显示提示
+13. **[LOW]** 添加 VisNode.fixed 类型定义
+14. **[LOW]** 改进错误消息 - 包含节点名称
+
+**测试结果:**
+- 所有 composable 测试通过 (204 个测试)
+- 新增 useFaultTreeEditor 测试 (7 个测试)
+- DAG 校验测试通过 (10 个测试)
+- 历史管理测试通过 (10 个测试)
+
+**修改的文件:**
+- frontend/src/composables/useFaultTreeEditor.ts (修复临时 ID 映射、版本冲突、防抖、加载进度)
+- frontend/src/components/diagnosis/FaultTreeCanvas.vue (添加键盘快捷键、修复降级方案)
+- frontend/src/types/fault-tree.ts (添加 fixed 属性)
+- frontend/src/composables/__tests__/useFaultTreeEditor.spec.ts (新增测试文件)
