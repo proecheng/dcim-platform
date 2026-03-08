@@ -968,6 +968,15 @@ Claude Opus 4.6 (claude-opus-4-6)
   - 确认定时任务配置正确（coalesce=True, max_instances=1, misfire_grace_time=300）
   - 确认所有核心功能已实现并通过测试
   - 新增设备类型转义测试用例（test_device_type_name_escaping）
+- 2026-03-09 01:00: 完成后续优化（列表自动刷新 + WebSocket 通知）
+  - 前端：实现 WebSocket 监听时间窗口调参更新通知
+  - 前端：实现 30 秒定时轮询作为 WebSocket 降级方案
+  - 前端：WebSocket 连接失败时自动切换到轮询模式
+  - 前端：组件卸载时清理 WebSocket 连接和定时器
+  - 后端：审批/拒绝操作后发送 WebSocket 通知给所有管理员
+  - 后端：通知消息包含调参记录 ID、设备类型、状态、操作人
+  - 优化：静默刷新列表（轮询时不显示 loading）
+  - 优化：收到通知时显示提示消息
 
 ### Implementation Notes
 
@@ -988,9 +997,14 @@ Claude Opus 4.6 (claude-opus-4-6)
 - Task 2: 后端服务 ✓
 - Task 3: 后端 API ✓
 - Task 4: 定时任务 ✓
-- Task 5: 后端测试 ✓（部分测试需要调整）
-- Task 6: 前端页面 ✓
+- Task 5: 后端测试 ✓（包含设备类型转义测试）
+- Task 6: 前端页面 ✓（包含 WebSocket 自动刷新和定时轮询）
 - Task 7: 文档更新 ✓
+
+**后续优化（已完成）**:
+- ✓ 前端列表自动刷新（WebSocket + 30秒轮询降级）
+- ✓ 后端审批/拒绝操作 WebSocket 通知
+- ✓ 审计日志表结构注释说明
 
 **待解决问题**:
 1. 需要确认 diagnosis_results 表是否有 alarm_id 字段（如果字段名不同需要调整 SQL）

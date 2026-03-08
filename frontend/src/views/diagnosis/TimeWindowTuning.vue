@@ -170,10 +170,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, onUnmounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Refresh } from '@element-plus/icons-vue'
 import api from '@/api'
+import { useUserStore } from '@/stores/user'
 
 interface TimeWindowAdjustment {
   id: number
@@ -199,6 +200,12 @@ const detailVisible = ref(false)
 const approveVisible = ref(false)
 const rejectVisible = ref(false)
 const currentRow = ref<TimeWindowAdjustment | null>(null)
+
+// WebSocket 和轮询相关
+const userStore = useUserStore()
+let wsConnection: WebSocket | null = null
+let pollingTimer: number | null = null
+const POLLING_INTERVAL = 30000 // 30 秒轮询一次
 
 const queryForm = reactive({
   device_type: '',
@@ -375,8 +382,99 @@ const getStatusText = (status: string) => {
   return map[status] || status
 }
 
+// 初始化 WebSocket 连接
+const initWebSocket = () => {
+  try {
+    const token = userStore.token
+    if (!token) {
+      console.warn('未登录，跳过 WebSocket 连接')
+      return
+    }
+
+    const wsUrl = import.meta.env.VITE_WS_URL || 'ws://localhost:8080/ws'
+    const url = `${wsUrl}/system?token=${token}`
+
+    wsConnection = new WebSocket(url)
+
+    wsConnection.onopen = () => {
+      console.log('WebSocket 连接成功（时间窗口调参）')
+    }
+
+    wsConnection.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data)
+
+        // 监听时间窗口调参相关消息
+        if (data.type === 'time_window_tuning_approval' ||
+            data.type === 'time_window_adjustment_updated') {
+          console.log('收到时间窗口调参更新通知，刷新列表')
+          ElMessage.info('有新的调参建议或状态更新')
+          fetchAdjustments()
+        }
+      } catch (error) {
+        console.error('解析 WebSocket 消息失败:', error)
+      }
+    }
+
+    wsConnection.onerror = (error) => {
+      console.error('WebSocket 连接错误:', error)
+    }
+
+    wsConnection.onclose = () => {
+      console.log('WebSocket 连接关闭')
+      // 连接关闭后，启动轮询作为降级方案
+      startPolling()
+    }
+  } catch (error) {
+    console.error('初始化 WebSocket 失败:', error)
+    // WebSocket 失败，启动轮询
+    startPolling()
+  }
+}
+
+// 启动定时轮询（降级方案）
+const startPolling = () => {
+  if (pollingTimer) return // 避免重复启动
+
+  console.log('启动定时轮询（每 30 秒）')
+  pollingTimer = window.setInterval(() => {
+    // 静默刷新，不显示 loading
+    const originalLoading = loading.value
+    loading.value = false
+    fetchAdjustments().finally(() => {
+      loading.value = originalLoading
+    })
+  }, POLLING_INTERVAL)
+}
+
+// 停止定时轮询
+const stopPolling = () => {
+  if (pollingTimer) {
+    clearInterval(pollingTimer)
+    pollingTimer = null
+    console.log('停止定时轮询')
+  }
+}
+
+// 关闭 WebSocket 连接
+const closeWebSocket = () => {
+  if (wsConnection) {
+    wsConnection.close()
+    wsConnection = null
+  }
+}
+
 onMounted(() => {
   fetchAdjustments()
+
+  // 尝试建立 WebSocket 连接
+  initWebSocket()
+})
+
+onUnmounted(() => {
+  // 清理资源
+  closeWebSocket()
+  stopPolling()
 })
 </script>
 

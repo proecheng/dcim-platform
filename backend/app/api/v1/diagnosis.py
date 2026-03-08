@@ -1729,6 +1729,22 @@ async def approve_time_window_adjustment(
 
         logger.info(f"时间窗口调参已审批: {adjustment_id}, 用户: {current_user.username}")
 
+        # 发送 WebSocket 通知给所有管理员
+        try:
+            from ...services.websocket import ws_manager
+            await ws_manager.broadcast_to_role(
+                'admin',
+                {
+                    'type': 'time_window_adjustment_updated',
+                    'adjustment_id': adjustment_id,
+                    'device_type': locked_adjustment.device_type,
+                    'status': 'approved',
+                    'approved_by': current_user.username
+                }
+            )
+        except Exception as ws_error:
+            logger.error(f"发送 WebSocket 通知失败: {ws_error}", exc_info=True)
+
         return {
             "message": "调参已审批，配置已更新",
             "adjustment_id": adjustment_id,
@@ -1780,6 +1796,22 @@ async def reject_time_window_adjustment(
     await db.commit()
 
     logger.info(f"时间窗口调参记录 {adjustment_id} 已拒绝，用户: {current_user.username}")
+
+    # 发送 WebSocket 通知给所有管理员
+    try:
+        from ...services.websocket import ws_manager
+        await ws_manager.broadcast_to_role(
+            'admin',
+            {
+                'type': 'time_window_adjustment_updated',
+                'adjustment_id': adjustment_id,
+                'device_type': adjustment.device_type,
+                'status': 'rejected',
+                'rejected_by': current_user.username
+            }
+        )
+    except Exception as ws_error:
+        logger.error(f"发送 WebSocket 通知失败: {ws_error}", exc_info=True)
 
     return {
         "message": "调参已拒绝",
