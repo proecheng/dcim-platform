@@ -900,9 +900,16 @@ def remove_evidence(input_data: dict, evidence_id: str) -> dict:
 - 集成测试和边界测试
 - 文档更新
 
+**2026-03-08 20:00** - 代码审查修复
+- 修复权限控制：将 diagnosis:view_advanced 从 ["admin", "operator"] 改为 ["admin"]
+- 删除 API 端点死代码（diagnosis.py:1119-1122）
+- 更新 Redis 客户端方法：close() → aclose()
+- 修复边界测试 fixture：db → async_db
+- 添加 Redis 可用性检查和跳过标记（集成测试、并发测试）
+
 ---
 
 **Story 创建日期**: 2026-03-08
 **Story 创建者**: Bob (Scrum Master)
-**Story 状态**: in-progress
-**最后更新**: 2026-03-08 (代码审查后)
+**Story 状态**: done
+**最后更新**: 2026-03-08 (代码审查修复后)

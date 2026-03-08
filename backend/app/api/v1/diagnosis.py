@@ -1101,7 +1101,7 @@ async def get_counterfactual_progress(
 
     返回反事实分析的实时进度
 
-    权限要求: diagnosis:view_advanced (admin, operator)
+    权限要求: diagnosis:view_advanced (admin)
     """
     from fastapi.responses import StreamingResponse
     from ...services.diagnosis.counterfactual_service import stream_counterfactual_progress
@@ -1115,11 +1115,6 @@ async def get_counterfactual_progress(
             "X-Accel-Buffering": "no",  # 禁用 Nginx 缓冲
         }
     )
-
-    if not analysis:
-        raise HTTPException(status_code=404, detail="反事实分析不存在")
-
-    return CounterfactualAnalysisResponse.model_validate(analysis)
 
 
 @router.get("/counterfactual", response_model=CounterfactualAnalysisListResponse)

@@ -123,7 +123,8 @@ def require_permission(permission: str):
         # 定义权限映射表
         permission_map = {
             # 诊断高级功能权限（反事实分析、闭环学习等）
-            "diagnosis:view_advanced": ["admin", "operator"],
+            # Story 26.1 要求: 普通运维（operator）无权访问反事实分析
+            "diagnosis:view_advanced": ["admin"],
             "diagnosis:manage_annotations": ["admin", "operator"],
             "diagnosis:manage_fault_trees": ["admin"],
             # 其他模块权限可以在此扩展

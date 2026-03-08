@@ -14,8 +14,10 @@ from app.models.diagnosis import (
     CounterfactualAnalysis,
 )
 from app.services.diagnosis.counterfactual_service import analyze_counterfactual
+from tests.conftest import redis_required
 
 
+@redis_required
 @pytest.mark.asyncio
 async def test_counterfactual_analysis_workflow_3_evidences(
     client: AsyncClient,

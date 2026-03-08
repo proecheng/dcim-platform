@@ -17,6 +17,29 @@ from jose import jwt as jose_jwt
 from dotenv import load_dotenv
 load_dotenv()
 
+# 检查 Redis 是否可用
+def check_redis_available():
+    """检查 Redis 服务是否可用"""
+    try:
+        import redis.asyncio as redis
+        import asyncio
+
+        async def _check():
+            try:
+                client = redis.from_url("redis://localhost:6379", decode_responses=True)
+                await client.ping()
+                await client.aclose()
+                return True
+            except Exception:
+                return False
+
+        return asyncio.run(_check())
+    except Exception:
+        return False
+
+redis_available = check_redis_available()
+redis_required = pytest.mark.skipif(not redis_available, reason="Redis not available")
+
 # 设置测试环境默认值（如果 .env 未提供）
 if not os.getenv("FAULT_TREE_HMAC_KEY"):
     os.environ["FAULT_TREE_HMAC_KEY"] = "test-hmac-key-at-least-32-chars-long-for-testing-only"

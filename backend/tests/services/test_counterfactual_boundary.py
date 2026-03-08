@@ -4,6 +4,7 @@ Story 26.1: 反事实分析
 """
 
 import pytest
+from datetime import datetime
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.diagnosis import DiagnosisSession, DiagnosisResult
@@ -14,7 +15,7 @@ from app.services.diagnosis.counterfactual_service import (
 
 
 @pytest.mark.asyncio
-async def test_counterfactual_no_evidence(db: AsyncSession):
+async def test_counterfactual_no_evidence(async_db: AsyncSession):
     """
     边界测试: 无证据场景
 
@@ -23,16 +24,19 @@ async def test_counterfactual_no_evidence(db: AsyncSession):
     2. 分析返回 None（跳过分析）
     """
     # 1. 创建诊断会话
+    now = datetime.now()
     session = DiagnosisSession(
         trigger_alarm_id=3001,
         device_id=301,
         engine_level="L1",
         status="success",
         max_confidence=0.5,
+        start_time=now,
+        end_time=now,
     )
-    db.add(session)
-    await db.commit()
-    await db.refresh(session)
+    async_db.add(session)
+    await async_db.commit()
+    await async_db.refresh(session)
 
     # 2. 创建诊断结果（无证据）
     result = DiagnosisResult(
@@ -47,17 +51,17 @@ async def test_counterfactual_no_evidence(db: AsyncSession):
         reasoning_path=[],
         fault_tree_version="v1.0.0",
     )
-    db.add(result)
-    await db.commit()
+    async_db.add(result)
+    await async_db.commit()
 
     # 3. 执行反事实分析（应该跳过）
-    analysis = await analyze_counterfactual(session.id, top_n=3, db=db)
+    analysis = await analyze_counterfactual(session.id, top_n=3, db=async_db)
 
     assert analysis is None  # 无证据时应该返回 None
 
 
 @pytest.mark.asyncio
-async def test_counterfactual_low_confidence(db: AsyncSession):
+async def test_counterfactual_low_confidence(async_db: AsyncSession):
     """
     边界测试: 低置信度场景
 
@@ -66,16 +70,19 @@ async def test_counterfactual_low_confidence(db: AsyncSession):
     2. 分析返回 None（跳过分析）
     """
     # 1. 创建诊断会话
+    now = datetime.now()
     session = DiagnosisSession(
         trigger_alarm_id=3002,
         device_id=302,
         engine_level="L1",
         status="success",
         max_confidence=0.25,
+        start_time=now,
+        end_time=now,
     )
-    db.add(session)
-    await db.commit()
-    await db.refresh(session)
+    async_db.add(session)
+    await async_db.commit()
+    await async_db.refresh(session)
 
     # 2. 创建诊断结果（低置信度）
     result = DiagnosisResult(
@@ -98,17 +105,17 @@ async def test_counterfactual_low_confidence(db: AsyncSession):
         reasoning_path=[{"node_id": 601, "description": "弱证据", "dependencies": []}],
         fault_tree_version="v1.0.0",
     )
-    db.add(result)
-    await db.commit()
+    async_db.add(result)
+    await async_db.commit()
 
     # 3. 执行反事实分析（应该跳过）
-    analysis = await analyze_counterfactual(session.id, top_n=3, db=db)
+    analysis = await analyze_counterfactual(session.id, top_n=3, db=async_db)
 
     assert analysis is None  # 低置信度时应该返回 None
 
 
 @pytest.mark.asyncio
-async def test_counterfactual_equal_weights(db: AsyncSession):
+async def test_counterfactual_equal_weights(async_db: AsyncSession):
     """
     边界测试: 证据权重相等场景
 
@@ -118,16 +125,19 @@ async def test_counterfactual_equal_weights(db: AsyncSession):
     3. 返回结果按原始顺序
     """
     # 1. 创建诊断会话
+    now = datetime.now()
     session = DiagnosisSession(
         trigger_alarm_id=3003,
         device_id=303,
         engine_level="L2",
         status="success",
         max_confidence=0.7,
+        start_time=now,
+        end_time=now,
     )
-    db.add(session)
-    await db.commit()
-    await db.refresh(session)
+    async_db.add(session)
+    await async_db.commit()
+    await async_db.refresh(session)
 
     # 2. 创建诊断结果（所有证据权重相等）
     result = DiagnosisResult(
@@ -168,11 +178,11 @@ async def test_counterfactual_equal_weights(db: AsyncSession):
         ],
         fault_tree_version="v1.0.0",
     )
-    db.add(result)
-    await db.commit()
+    async_db.add(result)
+    await async_db.commit()
 
     # 3. 执行反事实分析
-    analysis = await analyze_counterfactual(session.id, top_n=3, db=db)
+    analysis = await analyze_counterfactual(session.id, top_n=3, db=async_db)
 
     assert analysis is not None
     assert len(analysis.top_evidences) == 3
@@ -186,7 +196,7 @@ async def test_counterfactual_equal_weights(db: AsyncSession):
 
 
 @pytest.mark.asyncio
-async def test_counterfactual_more_than_10_evidences(db: AsyncSession):
+async def test_counterfactual_more_than_10_evidences(async_db: AsyncSession):
     """
     边界测试: 超过10个证据场景
 
@@ -196,16 +206,19 @@ async def test_counterfactual_more_than_10_evidences(db: AsyncSession):
     3. 返回结果数量 = 5
     """
     # 1. 创建诊断会话
+    now = datetime.now()
     session = DiagnosisSession(
         trigger_alarm_id=3004,
         device_id=304,
         engine_level="L2",
         status="success",
         max_confidence=0.9,
+        start_time=now,
+        end_time=now,
     )
-    db.add(session)
-    await db.commit()
-    await db.refresh(session)
+    async_db.add(session)
+    await async_db.commit()
+    await async_db.refresh(session)
 
     # 2. 创建诊断结果（15个证据）
     evidences = []
@@ -236,8 +249,8 @@ async def test_counterfactual_more_than_10_evidences(db: AsyncSession):
         reasoning_path=reasoning_path,
         fault_tree_version="v1.0.0",
     )
-    db.add(result)
-    await db.commit()
+    async_db.add(result)
+    await async_db.commit()
 
     # 3. 执行反事实分析（top_n=5）
     analysis = await analyze_counterfactual(session.id, top_n=5, db=db)
@@ -252,7 +265,7 @@ async def test_counterfactual_more_than_10_evidences(db: AsyncSession):
 
 
 @pytest.mark.asyncio
-async def test_counterfactual_session_not_found(db: AsyncSession):
+async def test_counterfactual_session_not_found(async_db: AsyncSession):
     """
     边界测试: 诊断会话不存在
 
@@ -267,7 +280,7 @@ async def test_counterfactual_session_not_found(db: AsyncSession):
 
 
 @pytest.mark.asyncio
-async def test_counterfactual_result_not_found(db: AsyncSession):
+async def test_counterfactual_result_not_found(async_db: AsyncSession):
     """
     边界测试: 诊断结果不存在
 
@@ -276,19 +289,22 @@ async def test_counterfactual_result_not_found(db: AsyncSession):
     2. 分析返回 None
     """
     # 1. 创建诊断会话（但不创建诊断结果）
+    now = datetime.now()
     session = DiagnosisSession(
         trigger_alarm_id=3005,
         device_id=305,
         engine_level="L1",
         status="pending",
         max_confidence=0.0,
+        start_time=now,
+        end_time=now,
     )
-    db.add(session)
-    await db.commit()
-    await db.refresh(session)
+    async_db.add(session)
+    await async_db.commit()
+    await async_db.refresh(session)
 
     # 2. 执行反事实分析（没有诊断结果）
-    analysis = await analyze_counterfactual(session.id, top_n=3, db=db)
+    analysis = await analyze_counterfactual(session.id, top_n=3, db=async_db)
 
     assert analysis is None
 
@@ -339,7 +355,7 @@ def test_calculate_evidence_weight_boundary():
 
 
 @pytest.mark.asyncio
-async def test_counterfactual_cache_invalidation_version_mismatch(db: AsyncSession):
+async def test_counterfactual_cache_invalidation_version_mismatch(async_db: AsyncSession):
     """
     边界测试: 缓存失效 - 版本不匹配
 
@@ -349,16 +365,19 @@ async def test_counterfactual_cache_invalidation_version_mismatch(db: AsyncSessi
     3. 第二次分析重新计算（缓存失效）
     """
     # 1. 创建诊断会话和结果
+    now = datetime.now()
     session = DiagnosisSession(
         trigger_alarm_id=3006,
         device_id=306,
         engine_level="L2",
         status="success",
         max_confidence=0.8,
+        start_time=now,
+        end_time=now,
     )
-    db.add(session)
-    await db.commit()
-    await db.refresh(session)
+    async_db.add(session)
+    await async_db.commit()
+    await async_db.refresh(session)
 
     result = DiagnosisResult(
         session_id=session.id,
@@ -380,8 +399,8 @@ async def test_counterfactual_cache_invalidation_version_mismatch(db: AsyncSessi
         reasoning_path=[{"node_id": 901, "description": "电压异常", "dependencies": []}],
         fault_tree_version="v1.0.0",
     )
-    db.add(result)
-    await db.commit()
+    async_db.add(result)
+    await async_db.commit()
 
     # 2. 第一次分析（创建缓存）
     analysis1 = await analyze_counterfactual(session.id, top_n=3, db=db)
@@ -400,7 +419,7 @@ async def test_counterfactual_cache_invalidation_version_mismatch(db: AsyncSessi
 
 
 @pytest.mark.asyncio
-async def test_counterfactual_timeout_handling(db: AsyncSession):
+async def test_counterfactual_timeout_handling(async_db: AsyncSession):
     """
     边界测试: 超时处理
 
@@ -413,16 +432,19 @@ async def test_counterfactual_timeout_handling(db: AsyncSession):
     # 这里只验证正常情况下不会超时
 
     # 1. 创建诊断会话和结果
+    now = datetime.now()
     session = DiagnosisSession(
         trigger_alarm_id=3007,
         device_id=307,
         engine_level="L2",
         status="success",
         max_confidence=0.75,
+        start_time=now,
+        end_time=now,
     )
-    db.add(session)
-    await db.commit()
-    await db.refresh(session)
+    async_db.add(session)
+    await async_db.commit()
+    await async_db.refresh(session)
 
     result = DiagnosisResult(
         session_id=session.id,
@@ -444,11 +466,11 @@ async def test_counterfactual_timeout_handling(db: AsyncSession):
         reasoning_path=[{"node_id": 1001, "description": "温度异常", "dependencies": []}],
         fault_tree_version="v1.0.0",
     )
-    db.add(result)
-    await db.commit()
+    async_db.add(result)
+    await async_db.commit()
 
     # 2. 执行反事实分析（正常情况下应该在5秒内完成）
-    analysis = await analyze_counterfactual(session.id, top_n=3, db=db)
+    analysis = await analyze_counterfactual(session.id, top_n=3, db=async_db)
 
     assert analysis is not None
     assert analysis.analysis_time_ms < 5000  # 应该在5秒内完成

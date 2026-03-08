@@ -10,8 +10,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.diagnosis import DiagnosisSession, DiagnosisResult
 from app.services.diagnosis.counterfactual_service import analyze_counterfactual
+from tests.conftest import redis_required
 
 
+@redis_required
 @pytest.mark.asyncio
 async def test_concurrent_same_session_redis_lock(async_db: AsyncSession):
     """
@@ -110,6 +112,7 @@ async def test_concurrent_same_session_redis_lock(async_db: AsyncSession):
     assert count == 1, f"应该只有一条分析记录，实际有 {count} 条"
 
 
+@redis_required
 @pytest.mark.asyncio
 async def test_concurrent_different_sessions(async_db: AsyncSession):
     """
@@ -192,6 +195,7 @@ async def test_concurrent_different_sessions(async_db: AsyncSession):
         assert analysis is not None, f"Session {session.id} 应该有分析记录"
 
 
+@redis_required
 @pytest.mark.asyncio
 async def test_concurrent_cache_hit(async_db: AsyncSession):
     """
@@ -263,6 +267,7 @@ async def test_concurrent_cache_hit(async_db: AsyncSession):
         assert analysis.id == first_analysis_id, "所有请求应该返回相同的缓存记录"
 
 
+@redis_required
 @pytest.mark.asyncio
 async def test_concurrent_lock_timeout(async_db: AsyncSession):
     """

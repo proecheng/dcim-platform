@@ -161,7 +161,7 @@ async def _acquire_redis_lock(session_id: int) -> Optional[str]:
     finally:
         if redis_client:
             try:
-                await redis_client.close()
+                await redis_client.aclose()
             except Exception as e:
                 logger.warning(f"Failed to close Redis client: {e}")
 
@@ -203,7 +203,7 @@ async def _release_redis_lock(session_id: int, lock_token: str) -> bool:
     finally:
         if redis_client:
             try:
-                await redis_client.close()
+                await redis_client.aclose()
             except Exception as e:
                 logger.warning(f"Failed to close Redis client: {e}")
 
