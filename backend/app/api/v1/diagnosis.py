@@ -31,6 +31,13 @@ from ...schemas.diagnosis import (
     BreakerProfileCreate,
     BreakerProfileUpdate,
     BreakerProfileResponse,
+    TrendWarningListResponse,
+    TrendWarningResponse,
+    TrendWarningAcknowledge,
+    SensorFusionRecordListResponse,
+    SensorFusionRecordResponse,
+    TrendConfigUpdate,
+    TrendConfigResponse,
 )
 from ...engines.diagnosis_engine import diagnosis_engine
 
@@ -814,4 +821,210 @@ async def delete_breaker_profile(
     await db.commit()
 
     return {"message": "断路器配置删除成功"}
+
+
+# ==================== Story 25.7: 趋势分析与多传感器融合 API ====================
+
+
+@router.get("/trend-warnings", response_model=TrendWarningListResponse)
+async def get_trend_warnings(
+    page: int = Query(1, ge=1, description="页码"),
+    page_size: int = Query(20, ge=1, le=100, description="每页数量"),
+    point_id: Optional[int] = Query(None, description="点位ID过滤"),
+    start_time: Optional[datetime] = Query(None, description="开始时间"),
+    end_time: Optional[datetime] = Query(None, description="结束时间"),
+    acknowledged: Optional[bool] = Query(None, description="是否已确认"),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_viewer),
+):
+    """查询趋势预警列表（分页）"""
+    from ...models.diagnosis import TrendWarning
+    from ...schemas.diagnosis import TrendWarningListResponse, TrendWarningResponse
+
+    # 构建查询
+    query = select(TrendWarning)
+
+    # 应用过滤条件
+    if point_id:
+        query = query.where(TrendWarning.point_id == point_id)
+    if start_time:
+        query = query.where(TrendWarning.detected_at >= start_time)
+    if end_time:
+        query = query.where(TrendWarning.detected_at <= end_time)
+    if acknowledged is not None:
+        query = query.where(TrendWarning.acknowledged == acknowledged)
+
+    # 计算总数
+    count_query = select(func.count()).select_from(query.subquery())
+    total_result = await db.execute(count_query)
+    total = total_result.scalar()
+
+    # 分页查询
+    query = query.order_by(TrendWarning.detected_at.desc())
+    query = query.offset((page - 1) * page_size).limit(page_size)
+
+    result = await db.execute(query)
+    warnings = result.scalars().all()
+
+    return TrendWarningListResponse(
+        total=total,
+        page=page,
+        page_size=page_size,
+        items=[TrendWarningResponse.model_validate(w) for w in warnings]
+    )
+
+
+@router.post("/trend-warnings/{warning_id}/acknowledge", response_model=dict)
+async def acknowledge_trend_warning(
+    warning_id: int,
+    request: TrendWarningAcknowledge,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_operator),
+):
+    """确认趋势预警"""
+    from ...models.diagnosis import TrendWarning
+    from ...schemas.diagnosis import TrendWarningAcknowledge
+
+    warning = await db.get(TrendWarning, warning_id)
+    if not warning:
+        raise HTTPException(status_code=404, detail="趋势预警不存在")
+
+    if warning.acknowledged:
+        raise HTTPException(status_code=400, detail="趋势预警已确认")
+
+    warning.acknowledged = True
+    warning.acknowledged_by = request.acknowledged_by
+    warning.acknowledged_at = datetime.now()
+
+    await db.commit()
+
+    return {"message": "趋势预警确认成功", "warning_id": warning_id}
+
+
+@router.get("/sensor-fusion", response_model=SensorFusionRecordListResponse)
+async def get_sensor_fusion_records(
+    page: int = Query(1, ge=1, description="页码"),
+    page_size: int = Query(20, ge=1, le=100, description="每页数量"),
+    zone_id: Optional[int] = Query(None, description="区域ID过滤"),
+    start_time: Optional[datetime] = Query(None, description="开始时间"),
+    end_time: Optional[datetime] = Query(None, description="结束时间"),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_viewer),
+):
+    """查询多传感器融合记录列表（分页）"""
+    from ...models.diagnosis import SensorFusionRecord
+    from ...schemas.diagnosis import SensorFusionRecordListResponse, SensorFusionRecordResponse
+
+    # 构建查询
+    query = select(SensorFusionRecord)
+
+    # 应用过滤条件
+    if zone_id:
+        query = query.where(SensorFusionRecord.zone_id == zone_id)
+    if start_time:
+        query = query.where(SensorFusionRecord.created_at >= start_time)
+    if end_time:
+        query = query.where(SensorFusionRecord.created_at <= end_time)
+
+    # 计算总数
+    count_query = select(func.count()).select_from(query.subquery())
+    total_result = await db.execute(count_query)
+    total = total_result.scalar()
+
+    # 分页查询
+    query = query.order_by(SensorFusionRecord.created_at.desc())
+    query = query.offset((page - 1) * page_size).limit(page_size)
+
+    result = await db.execute(query)
+    records = result.scalars().all()
+
+    return SensorFusionRecordListResponse(
+        total=total,
+        page=page,
+        page_size=page_size,
+        items=[SensorFusionRecordResponse.model_validate(r) for r in records]
+    )
+
+
+@router.get("/trend-config", response_model=TrendConfigResponse)
+async def get_trend_config(
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_viewer),
+):
+    """获取趋势阈值配置"""
+    from ...models import SystemConfig
+    from ...schemas.diagnosis import TrendConfigResponse
+
+    # 查询配置
+    result = await db.execute(
+        select(SystemConfig).where(
+            SystemConfig.config_group == "diagnosis",
+            SystemConfig.config_key.in_([
+                "trend_threshold_temperature",
+                "trend_threshold_humidity",
+                "airflow_variance_threshold",
+                "trend_analysis_enabled",
+                "sensor_fusion_enabled"
+            ])
+        )
+    )
+    configs = {c.config_key: c.config_value for c in result.scalars().all()}
+
+    return TrendConfigResponse(
+        trend_threshold_temperature=float(configs.get("trend_threshold_temperature", "0.5")),
+        trend_threshold_humidity=float(configs.get("trend_threshold_humidity", "3.0")),
+        airflow_variance_threshold=float(configs.get("airflow_variance_threshold", "5.0")),
+        trend_analysis_enabled=configs.get("trend_analysis_enabled", "true").lower() == "true",
+        sensor_fusion_enabled=configs.get("sensor_fusion_enabled", "true").lower() == "true"
+    )
+
+
+@router.put("/trend-config", response_model=dict)
+async def update_trend_config(
+    request: TrendConfigUpdate,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_admin),
+):
+    """更新趋势阈值配置"""
+    from ...models import SystemConfig
+    from ...schemas.diagnosis import TrendConfigUpdate
+
+    # 更新配置
+    updates = {}
+    if request.trend_threshold_temperature is not None:
+        updates["trend_threshold_temperature"] = str(request.trend_threshold_temperature)
+    if request.trend_threshold_humidity is not None:
+        updates["trend_threshold_humidity"] = str(request.trend_threshold_humidity)
+    if request.airflow_variance_threshold is not None:
+        updates["airflow_variance_threshold"] = str(request.airflow_variance_threshold)
+    if request.trend_analysis_enabled is not None:
+        updates["trend_analysis_enabled"] = "true" if request.trend_analysis_enabled else "false"
+    if request.sensor_fusion_enabled is not None:
+        updates["sensor_fusion_enabled"] = "true" if request.sensor_fusion_enabled else "false"
+
+    for key, value in updates.items():
+        result = await db.execute(
+            select(SystemConfig).where(
+                SystemConfig.config_group == "diagnosis",
+                SystemConfig.config_key == key
+            )
+        )
+        config = result.scalar_one_or_none()
+
+        if config:
+            config.config_value = value
+        else:
+            # 如果配置不存在，创建新配置
+            config = SystemConfig(
+                config_group="diagnosis",
+                config_key=key,
+                config_value=value,
+                value_type="number" if key.endswith("threshold") else "boolean",
+                description=f"趋势分析配置: {key}"
+            )
+            db.add(config)
+
+    await db.commit()
+
+    return {"message": "趋势阈值配置更新成功", "updated_keys": list(updates.keys())}
 

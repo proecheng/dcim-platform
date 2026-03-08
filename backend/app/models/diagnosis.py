@@ -4,6 +4,7 @@ Story 9-3: 智能故障诊断
 Story 24.6: 诊断会话、审计日志、结果扩展
 Story 25.3: UPS电池SOH预测
 Story 25.5: 传感器元数据与精度加权
+Story 25.7: 趋势分析与多传感器融合
 """
 
 from datetime import datetime, date
@@ -187,3 +188,45 @@ class SensorMetadata(Base):
     calibration_result = Column(String(500), nullable=True, comment="校准结果描述")
     created_at = Column(DateTime, default=datetime.now, comment="创建时间")
     updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now, comment="更新时间")
+
+
+class TrendWarning(Base):
+    """趋势预警记录表 - Story 25.7"""
+
+    __tablename__ = "trend_warnings"
+    __table_args__ = (
+        Index("idx_trend_warnings_point_time", "point_id", "detected_at"),
+        Index("idx_trend_warnings_ack", "acknowledged", "detected_at"),
+    )
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    point_id = Column(Integer, ForeignKey("points.id", ondelete="CASCADE"), nullable=False, comment="点位ID")
+    trend_type = Column(String(20), nullable=False, comment="趋势类型: 上升/下降")
+    start_value = Column(Float, nullable=False, comment="起始值")
+    end_value = Column(Float, nullable=False, comment="结束值")
+    total_change = Column(Float, nullable=False, comment="总变化量")
+    message = Column(Text, nullable=False, comment="预警消息")
+    level = Column(String(20), nullable=False, default="info", comment="预警级别")
+    detected_at = Column(DateTime, nullable=False, default=datetime.now, comment="检测时间")
+    acknowledged = Column(Boolean, nullable=False, default=False, comment="是否已确认")
+    acknowledged_by = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, comment="确认人ID")
+    acknowledged_at = Column(DateTime, nullable=True, comment="确认时间")
+
+
+class SensorFusionRecord(Base):
+    """多传感器融合记录表 - Story 25.7"""
+
+    __tablename__ = "sensor_fusion_records"
+    __table_args__ = (
+        Index("idx_sensor_fusion_zone_time", "zone_id", "created_at"),
+    )
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    zone_id = Column(Integer, ForeignKey("zones.id", ondelete="CASCADE"), nullable=False, comment="区域ID")
+    sensor_count = Column(Integer, nullable=False, comment="传感器数量")
+    std_dev = Column(Float, nullable=True, comment="标准差")
+    evidence_type = Column(String(50), nullable=False, comment="证据类型")
+    is_evidence = Column(Boolean, nullable=False, default=False, comment="是否作为证据")
+    probability = Column(Float, nullable=True, comment="概率")
+    message = Column(Text, nullable=True, comment="融合结果消息")
+    created_at = Column(DateTime, nullable=False, default=datetime.now, comment="创建时间")

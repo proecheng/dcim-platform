@@ -527,14 +527,118 @@ class FaultTreeInferenceEngine:
             logger.warning("证据收集总超时 (3秒)")
 
         logger.info(f"收集了 {len(evidence)} 个叶节点证据")
+
+        # Story 25.7: 集成多传感器融合和趋势预警
+        try:
+            await self._integrate_sensor_fusion_and_trends(graph, evidence)
+        except Exception as e:
+            logger.error(f"多传感器融合和趋势预警集成失败: {e}", exc_info=True)
+
         return evidence
+
+    async def _integrate_sensor_fusion_and_trends(
+        self,
+        graph: nx.DiGraph,
+        evidence: Dict[int, EvidenceItem]
+    ) -> None:
+        """集成多传感器融合和趋势预警到证据收集 - Story 25.7"""
+        try:
+            from app.services.diagnosis.sensor_fusion_service import get_sensor_fusion_service
+            from app.services.diagnosis.trend_analysis_service import get_trend_analysis_service
+
+            # 1. 多传感器融合（需要 zone_id）
+            # 从图中提取 zone_id（如果有）
+            zone_id = None
+            for node_id in graph.nodes():
+                node_data = graph.nodes[node_id]
+                if node_data.get("zone_id"):
+                    zone_id = node_data["zone_id"]
+                    break
+
+            if zone_id:
+                fusion_service = get_sensor_fusion_service(self.session)
+
+                # 温度标准差证据
+                temp_fusion = await fusion_service.calculate_temperature_variance(zone_id)
+                # 保存融合记录到数据库
+                await fusion_service.save_fusion_record(temp_fusion)
+
+                if temp_fusion.is_evidence:
+                    # 查找对应的故障树节点（如"气流不均匀"节点）
+                    for node_id in graph.nodes():
+                        node_data = graph.nodes[node_id]
+                        if node_data.get("evidence_type") == "airflow_uneven":
+                            # 添加融合证据
+                            evidence[node_id] = EvidenceItem(
+                                point_id=None,
+                                point_name=node_data.get("name", "气流不均匀"),
+                                value=temp_fusion.std_dev,
+                                threshold=None,
+                                timestamp=datetime.now(),
+                                status="abnormal"
+                            )
+                            # 直接设置节点概率
+                            graph.nodes[node_id]["fusion_probability"] = temp_fusion.probability
+                            logger.info(f"添加气流不均匀证据: 概率 {temp_fusion.probability}")
+                            break
+
+                # 压差传感器证据
+                pressure_fusion = await fusion_service.check_differential_pressure(zone_id)
+                if pressure_fusion:
+                    # 保存融合记录到数据库
+                    await fusion_service.save_fusion_record(pressure_fusion)
+
+                    if pressure_fusion.is_evidence:
+                        for node_id in graph.nodes():
+                            node_data = graph.nodes[node_id]
+                            if node_data.get("evidence_type") == "air_supply_abnormal":
+                                evidence[node_id] = EvidenceItem(
+                                    point_id=None,
+                                    point_name=node_data.get("name", "送风系统异常"),
+                                    value=None,
+                                    threshold=None,
+                                    timestamp=datetime.now(),
+                                    status="abnormal"
+                                )
+                                graph.nodes[node_id]["fusion_probability"] = pressure_fusion.probability
+                                logger.info(f"添加送风系统异常证据: 概率 {pressure_fusion.probability}")
+                                break
+
+            # 2. 趋势预警证据
+            trend_service = get_trend_analysis_service(self.session)
+            recent_warnings = await trend_service.get_recent_warnings(zone_id=zone_id, hours=24)
+
+            if recent_warnings:
+                # 趋势预警作为补充证据，提升相关节点概率
+                for warning in recent_warnings:
+                    for node_id in graph.nodes():
+                        node_data = graph.nodes[node_id]
+                        if node_data.get("evidence_point_id") == warning.point_id:
+                            # 如果节点已有证据，提升其概率权重
+                            if node_id in evidence:
+                                # 标记有趋势预警
+                                graph.nodes[node_id]["has_trend_warning"] = True
+                                graph.nodes[node_id]["trend_change"] = warning.total_change
+                                logger.info(f"节点 {node_id} 有趋势预警，变化量: {warning.total_change}")
+                            break
+
+        except ImportError as e:
+            logger.warning(f"多传感器融合或趋势分析服务未安装: {e}")
+        except Exception as e:
+            logger.error(f"集成多传感器融合和趋势预警失败: {e}", exc_info=True)
 
     def compute_leaf_probability(self, node_data: dict, evidence: EvidenceItem) -> float:
         """计算叶节点概率
 
         异常情况: P = prior + (1.0 - prior) × sigmoid(k × (value - threshold))
         正常情况: P = prior × sigmoid(k × (threshold - value))
+
+        Story 25.7: 支持融合证据和趋势预警
         """
+        # Story 25.7: 如果有融合概率，直接使用
+        if "fusion_probability" in node_data:
+            return node_data["fusion_probability"]
+
         prior = node_data.get("prior_probability", 0.5)
         k = node_data.get("sigmoid_k", DEFAULT_SIGMOID_K)
 
@@ -545,7 +649,17 @@ class FaultTreeInferenceEngine:
         if evidence.status == "abnormal":
             deviation = evidence.value - evidence.threshold
             sigmoid_value = sigmoid_stable(k * deviation)
-            return prior + (1.0 - prior) * sigmoid_value
+            prob = prior + (1.0 - prior) * sigmoid_value
+
+            # Story 25.7: 如果有趋势预警，根据变化量动态调整权重
+            if node_data.get("has_trend_warning"):
+                trend_change = node_data.get("trend_change", 0)
+                # 变化量越大，权重越高，范围 0.05-0.15
+                weight_boost = min(0.05 + abs(trend_change) * 0.02, 0.15)
+                prob = min(prob + weight_boost, 0.95)  # 不超过 0.95
+                logger.debug(f"节点有趋势预警，概率提升 {weight_boost:.3f} → {prob:.3f}")
+
+            return prob
 
         elif evidence.status == "normal":
             # 正常情况使用不同公式（第二轮审查问题 6）

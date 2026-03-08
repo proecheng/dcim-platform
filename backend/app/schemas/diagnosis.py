@@ -5,6 +5,7 @@ Story 24.6: 诊断会话、审计日志、结果扩展
 Story 25.3: UPS电池SOH预测
 Story 25.4: N+X冗余拓扑与断路器保护逻辑
 Story 25.5: 传感器元数据与精度加权
+Story 25.7: 趋势分析与多传感器融合
 """
 
 from datetime import datetime, date
@@ -401,3 +402,91 @@ class SensorMetadataListResponse(BaseModel):
     page: int = Field(..., description="当前页码")
     page_size: int = Field(..., description="每页数量")
     items: List[SensorMetadataResponse] = Field(..., description="元数据列表")
+
+
+# ==================== Trend Warning Schemas - Story 25.7 ====================
+
+
+class TrendWarningResponse(BaseModel):
+    """趋势预警响应"""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    point_id: int
+    trend_type: str = Field(..., description="趋势类型: 上升/下降")
+    start_value: float = Field(..., description="起始值")
+    end_value: float = Field(..., description="结束值")
+    total_change: float = Field(..., description="总变化量")
+    message: str = Field(..., description="预警消息")
+    level: str = Field(..., description="预警级别")
+    detected_at: datetime = Field(..., description="检测时间")
+    acknowledged: bool = Field(..., description="是否已确认")
+    acknowledged_by: Optional[int] = Field(None, description="确认人ID")
+    acknowledged_at: Optional[datetime] = Field(None, description="确认时间")
+
+
+class TrendWarningListResponse(BaseModel):
+    """趋势预警列表响应（分页）"""
+
+    total: int = Field(..., description="总记录数")
+    page: int = Field(..., description="当前页码")
+    page_size: int = Field(..., description="每页数量")
+    items: List[TrendWarningResponse] = Field(..., description="预警列表")
+
+
+class TrendWarningAcknowledge(BaseModel):
+    """确认趋势预警请求"""
+
+    acknowledged_by: int = Field(..., description="确认人ID")
+
+
+# ==================== Sensor Fusion Schemas - Story 25.7 ====================
+
+
+class SensorFusionRecordResponse(BaseModel):
+    """多传感器融合记录响应"""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    zone_id: int
+    sensor_count: int = Field(..., description="传感器数量")
+    std_dev: Optional[float] = Field(None, description="标准差")
+    evidence_type: str = Field(..., description="证据类型")
+    is_evidence: bool = Field(..., description="是否作为证据")
+    probability: Optional[float] = Field(None, description="概率")
+    message: Optional[str] = Field(None, description="融合结果消息")
+    created_at: datetime = Field(..., description="创建时间")
+
+
+class SensorFusionRecordListResponse(BaseModel):
+    """多传感器融合记录列表响应（分页）"""
+
+    total: int = Field(..., description="总记录数")
+    page: int = Field(..., description="当前页码")
+    page_size: int = Field(..., description="每页数量")
+    items: List[SensorFusionRecordResponse] = Field(..., description="融合记录列表")
+
+
+# ==================== Trend Config Schemas - Story 25.7 ====================
+
+
+class TrendConfigUpdate(BaseModel):
+    """更新趋势阈值配置请求"""
+
+    trend_threshold_temperature: Optional[float] = Field(None, description="温度趋势预警阈值（℃）", ge=0.1, le=10.0)
+    trend_threshold_humidity: Optional[float] = Field(None, description="湿度趋势预警阈值（%RH）", ge=0.5, le=20.0)
+    airflow_variance_threshold: Optional[float] = Field(None, description="气流不均匀标准差阈值（℃）", ge=1.0, le=20.0)
+    trend_analysis_enabled: Optional[bool] = Field(None, description="趋势分析特性开关")
+    sensor_fusion_enabled: Optional[bool] = Field(None, description="多传感器融合特性开关")
+
+
+class TrendConfigResponse(BaseModel):
+    """趋势阈值配置响应"""
+
+    trend_threshold_temperature: float = Field(..., description="温度趋势预警阈值（℃）")
+    trend_threshold_humidity: float = Field(..., description="湿度趋势预警阈值（%RH）")
+    airflow_variance_threshold: float = Field(..., description="气流不均匀标准差阈值（℃）")
+    trend_analysis_enabled: bool = Field(..., description="趋势分析特性开关")
+    sensor_fusion_enabled: bool = Field(..., description="多传感器融合特性开关")

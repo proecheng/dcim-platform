@@ -516,8 +516,51 @@ async def lifespan(app: FastAPI):
             id='calibration_check',
             name='传感器校准过期检查'
         )
+
+        # 启动趋势分析定时任务（每小时执行）- Story 25.7
+        async def _run_trend_analysis():
+            """执行趋势分析任务"""
+            try:
+                logger.info("开始执行趋势分析任务")
+                async with async_session() as session:
+                    from app.services.diagnosis.trend_analysis_service import get_trend_analysis_service
+                    from app.models.point import Point
+                    from app.models.diagnosis import TrendWarning
+
+                    # 查询所有启用的温湿度点位
+                    result = await session.execute(
+                        select(Point).where(
+                            Point.enabled == True,
+                            (Point.unit.like('%℃%')) | (Point.unit.like('%°C%')) | (Point.unit.like('%RH%'))
+                        )
+                    )
+                    points = result.scalars().all()
+
+                    trend_service = get_trend_analysis_service(session)
+                    warnings = []
+                    for point in points:
+                        warning = await trend_service.analyze_point_trend(point.id)
+                        if warning:
+                            warnings.append(warning)
+                            # 保存趋势预警到数据库
+                            session.add(warning)
+
+                    await session.commit()
+                    logger.info(f"趋势分析任务完成，生成 {len(warnings)} 条预警")
+            except Exception as e:
+                logger.error(f"趋势分析任务执行失败: {e}", exc_info=True)
+
+        scheduler.add_job(
+            _run_trend_analysis,
+            'cron',
+            minute=0,  # 每小时整点执行
+            id='trend_analysis',
+            name='趋势分析任务'
+        )
+
         scheduler.start()
         logger.info("✓ 传感器校准过期检查定时任务已启动（每日凌晨 2:00）")
+        logger.info("✓ 趋势分析定时任务已启动（每小时整点执行）")
     except ImportError:
         logger.warning("⚠️  APScheduler 未安装，使用降级方案（asyncio.create_task）")
         async def _calibration_check_loop():
@@ -566,6 +609,7 @@ async def lifespan(app: FastAPI):
     print("效果追踪任务已启动，每6小时检查一次")
     print("UPS 电池 SOH 计算任务已启动，每日凌晨 3:00 执行")
     print("传感器校准过期检查任务已启动，每日凌晨 2:00 执行")
+    print("趋势分析任务已启动，每小时整点执行")
 
     # 启动 WebSocket 心跳检测
     ws_manager.start_heartbeat()
