@@ -219,6 +219,18 @@ async def lifespan(app: FastAPI):
     # 启动时初始化数据库
     await init_db()
 
+    # 初始化邮件服务（Story 26.2）
+    if settings.smtp_enabled:
+        from app.services.email_service import email_service
+        email_service.configure(
+            smtp_host=settings.smtp_host,
+            smtp_port=settings.smtp_port,
+            smtp_user=settings.smtp_user,
+            smtp_password=settings.smtp_password,
+            from_email=settings.smtp_from_email,
+        )
+        logger.info("✓ 邮件服务已配置")
+
     # === Story 28.2: 分层启动 ===
     seed_success = False
 
@@ -608,10 +620,128 @@ async def lifespan(app: FastAPI):
             name='反事实分析任务'
         )
 
+        # 启动误诊报告月度定时任务（每月1日凌晨 0:00）- Story 26.2
+        async def _run_misdiagnosis_report():
+            """执行误诊报告生成任务"""
+            try:
+                from app.services.diagnosis.misdiagnosis_report_service import MisdiagnosisReportService
+                from app.services.email_service import email_service
+                from datetime import datetime
+                from jinja2 import Template
+                import os
+
+                # 生成上月报告
+                last_month = datetime.now().replace(day=1) - timedelta(days=1)
+                period = last_month.strftime("%Y-%m")
+
+                logger.info(f"开始生成误诊分析报告: period={period}")
+                async with async_session() as session:
+                    report = await MisdiagnosisReportService.generate_monthly_report(period, session)
+                    if report:
+                        logger.info(f"误诊分析报告生成成功: report_id={report.id}")
+
+                        # 发送邮件通知管理员
+                        if email_service.is_available:
+                            # 查询管理员邮箱
+                            admin_result = await session.execute(
+                                select(User).where(
+                                    User.role == "admin",
+                                    User.is_active == True,
+                                    User.email.isnot(None)
+                                )
+                            )
+                            admins = admin_result.scalars().all()
+                            admin_emails = [admin.email for admin in admins if admin.email]
+
+                            if admin_emails:
+                                # 加载邮件模板
+                                template_path = os.path.join(
+                                    os.path.dirname(__file__),
+                                    "templates/emails/misdiagnosis_report.html"
+                                )
+                                with open(template_path, "r", encoding="utf-8") as f:
+                                    template_content = f.read()
+
+                                template = Template(template_content)
+                                summary = report.summary or {}
+                                top_node = ""
+                                if summary.get("top_misdiagnosed_nodes"):
+                                    top_node = summary["top_misdiagnosed_nodes"][0].get("node_id", "")
+
+                                html_content = template.render(
+                                    period=period,
+                                    total_diagnoses=summary.get("total_diagnoses", 0),
+                                    accuracy_rate=summary.get("accuracy_rate"),
+                                    false_positive_count=summary.get("false_positive_count", 0),
+                                    false_negative_count=summary.get("false_negative_count", 0),
+                                    top_misdiagnosed_node=top_node,
+                                    report_url=f"http://localhost:3000/diagnosis/reports/misdiagnosis?period={period}"
+                                )
+
+                                success = await email_service.send_html_email(
+                                    to_emails=admin_emails,
+                                    subject=f"[DCIM] 误诊分析报告 - {period}",
+                                    html_content=html_content
+                                )
+                                if success:
+                                    logger.info(f"误诊报告邮件发送成功: to={admin_emails}")
+                                else:
+                                    logger.warning("误诊报告邮件发送失败")
+                            else:
+                                logger.warning("未找到管理员邮箱，跳过邮件发送")
+                        else:
+                            logger.info("邮件服务未配置，跳过邮件发送")
+                    else:
+                        logger.warning(f"误诊分析报告生成失败或数据不足: period={period}")
+            except Exception as e:
+                logger.error(f"误诊报告生成任务执行失败: {e}", exc_info=True)
+
+        scheduler.add_job(
+            _run_misdiagnosis_report,
+            'cron',
+            day=1,
+            hour=0,
+            minute=0,
+            id='misdiagnosis_report',
+            name='误诊分析报告生成任务'
+        )
+
+        # Story 26.4: 时间窗口自适应调参任务（每月1日凌晨3:00）
+        async def _run_time_window_tuning():
+            """时间窗口调参分析任务"""
+            try:
+                from app.services.diagnosis.time_window_tuning_service import TimeWindowTuningService
+                tuning_service = TimeWindowTuningService()
+                result = await tuning_service.analyze_all_device_types()
+                logger.info(f"时间窗口调参分析完成: {result}")
+
+                # 如果有待审批的调参建议，发送通知
+                if result['pending_approvals'] > 0:
+                    try:
+                        await tuning_service.notify_admins(result)
+                    except Exception as notify_error:
+                        logger.error(f"通知管理员失败: {notify_error}", exc_info=True)
+            except Exception as e:
+                logger.error(f"时间窗口调参分析任务执行失败: {e}", exc_info=True)
+
+        scheduler.add_job(
+            _run_time_window_tuning,
+            'cron',
+            day=1,
+            hour=3,
+            minute=0,
+            coalesce=True,
+            max_instances=1,
+            id='time_window_tuning',
+            name='时间窗口调参分析任务'
+        )
+
         scheduler.start()
         logger.info("✓ 传感器校准过期检查定时任务已启动（每日凌晨 2:00）")
         logger.info("✓ 趋势分析定时任务已启动（每小时整点执行）")
         logger.info("✓ 反事实分析定时任务已启动（每小时30分执行）")
+        logger.info("✓ 误诊分析报告生成任务已启动（每月1日凌晨 0:00）")
+        logger.info("✓ 时间窗口调参分析任务已启动（每月1日凌晨 3:00）")
     except ImportError:
         logger.warning("⚠️  APScheduler 未安装，使用降级方案（asyncio.create_task）")
         async def _calibration_check_loop():

@@ -250,6 +250,7 @@ const routes: RouteRecordRaw[] = [
             children: [
               { path: 'results', name: 'DiagnosisResults', component: () => import('@/views/diagnosis/results.vue'), meta: { title: '诊断结果', icon: 'DataAnalysis' } },
               { path: 'rules', name: 'DiagnosisRules', component: () => import('@/views/diagnosis/rules.vue'), meta: { title: '诊断规则', icon: 'SetUp' } },
+              { path: 'reports', name: 'DiagnosisReports', component: () => import('@/views/diagnosis/Reports.vue'), meta: { title: '误诊报告', icon: 'Document' } },
               { path: 'fault-trees/:id/editor', name: 'FaultTreeEditor', component: () => import('@/views/diagnosis/FaultTreeEditor.vue'), meta: { title: '故障树编辑器', icon: 'Edit', hidden: true } }
             ]
           },

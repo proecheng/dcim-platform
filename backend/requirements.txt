@@ -27,12 +27,15 @@ websockets==12.0
 python-dotenv==1.0.0
 apscheduler==3.10.4
 scipy>=1.11.0  # 用于多设备协同优化算法
+jinja2>=3.1.0  # 邮件模板渲染
 
 # Data export
 openpyxl==3.1.2
 
 # PDF 报表生成
 reportlab>=4.0
+weasyprint>=60.0  # Markdown 转 PDF（误诊报告导出）
+markdown>=3.5  # Markdown 解析
 
 # 数值计算 (容量预测、负荷预测、调度优化)
 numpy>=1.24.0

@@ -117,6 +117,47 @@ class RedisService:
         except Exception as e:
             logger.warning("Redis SADD 失败 key=%s: %s", key, e)
 
+    def set_with_expiry(self, key: str, value: str, ttl: int) -> bool:
+        """同步方式设置值+TTL（用于分布式锁），返回是否成功"""
+        if not self.is_available:
+            return False
+        try:
+            import redis
+            # 从配置获取 Redis URL
+            from app.core.config import get_settings
+            settings = get_settings()
+
+            # 使用同步 Redis 客户端进行 SET NX EX 操作
+            sync_client = redis.from_url(
+                settings.REDIS_URL,
+                decode_responses=True,
+            )
+            result = sync_client.set(key, value, nx=True, ex=ttl)
+            sync_client.close()
+            return bool(result)
+        except Exception as e:
+            logger.warning("Redis SET NX 失败 key=%s: %s", key, e)
+            return False
+
+    def delete(self, key: str) -> None:
+        """同步方式删除 key（用于释放分布式锁）"""
+        if not self.is_available:
+            return
+        try:
+            import redis
+            # 从配置获取 Redis URL
+            from app.core.config import get_settings
+            settings = get_settings()
+
+            sync_client = redis.from_url(
+                settings.REDIS_URL,
+                decode_responses=True,
+            )
+            sync_client.delete(key)
+            sync_client.close()
+        except Exception as e:
+            logger.warning("Redis DELETE 失败 key=%s: %s", key, e)
+
 
 # 全局单例
 redis_service = RedisService()

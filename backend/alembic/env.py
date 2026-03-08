@@ -39,6 +39,7 @@ if config.config_file_name is not None:
 # for 'autogenerate' support
 # Import all models to register them with the Base metadata
 from app.core.database import Base
+from app.models import *  # noqa: F401, F403 - 导入所有模型以注册到 Base.metadata
 
 # Import energy models directly that are not in __init__
 

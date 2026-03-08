@@ -256,3 +256,130 @@ class CounterfactualAnalysis(Base):
     deleted_at = Column(DateTime, nullable=True, comment="软删除时间")
     created_at = Column(DateTime, nullable=False, default=datetime.now, comment="创建时间")
     updated_at = Column(DateTime, nullable=False, default=datetime.now, onupdate=datetime.now, comment="更新时间")
+
+
+class SystemReport(Base):
+    """系统报告表 - Story 26.2"""
+
+    __tablename__ = "system_reports"
+    __table_args__ = (
+        Index("idx_system_reports_type_period", "report_type", "report_period"),
+        Index("idx_system_reports_generated", "generated_at"),
+        Index("idx_system_reports_deleted", "deleted_at"),
+    )
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    report_type = Column(String(50), nullable=False, comment="报告类型")
+    report_period = Column(String(20), nullable=False, comment="报告周期 YYYY-MM")
+    report_version = Column(String(20), nullable=True, default="v1.0", comment="报告模板版本")
+    content = Column(Text, nullable=False, comment="Markdown 格式报告内容")
+    summary = Column(JSON, nullable=True, comment="报告摘要（关键指标）")
+    generated_at = Column(DateTime, nullable=True, default=datetime.now, comment="生成时间")
+    generated_by = Column(String(100), nullable=True, comment="生成者")
+    deleted_at = Column(DateTime, nullable=True, comment="软删除时间戳")
+    updated_at = Column(DateTime, nullable=True, default=datetime.now, onupdate=datetime.now, comment="更新时间")
+
+
+class DiagnosisImprovementRule(Base):
+    """诊断改进建议规则表 - Story 26.2"""
+
+    __tablename__ = "diagnosis_improvement_rules"
+    __table_args__ = (
+        Index("idx_improvement_rules_type_node", "rule_type", "node_id"),
+        Index("idx_improvement_rules_type_fault", "rule_type", "fault_type"),
+        Index("idx_improvement_rules_active", "is_active"),
+    )
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    rule_type = Column(String(20), nullable=False, comment="规则类型: false_positive 或 false_negative")
+    node_id = Column(String(100), nullable=True, comment="故障树节点ID（误报规则）")
+    fault_type = Column(String(100), nullable=True, comment="故障类型（漏报规则）")
+    suggestion_template = Column(Text, nullable=False, comment="建议模板（支持变量替换）")
+    priority = Column(Integer, nullable=True, default=0, comment="优先级（数字越大优先级越高）")
+    is_active = Column(Boolean, nullable=True, default=True, comment="是否启用")
+    created_at = Column(DateTime, nullable=True, default=datetime.now, comment="创建时间")
+    updated_at = Column(DateTime, nullable=True, default=datetime.now, onupdate=datetime.now, comment="更新时间")
+
+
+class ProbabilityAdjustmentLog(Base):
+    """概率调参记录表 - Story 26.3"""
+
+    __tablename__ = "probability_adjustment_logs"
+    __table_args__ = (
+        Index("idx_adjustment_logs_tree", "tree_id"),
+        Index("idx_adjustment_logs_node", "node_id"),
+        Index("idx_adjustment_logs_status", "status"),
+        Index("idx_adjustment_logs_created", "created_at"),
+        Index("idx_adjustment_logs_approved_by", "approved_by"),
+    )
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    tree_id = Column(Integer, ForeignKey("fault_trees.id", ondelete="CASCADE"), nullable=False, comment="故障树ID")
+    node_id = Column(Integer, ForeignKey("fault_tree_nodes.id", ondelete="CASCADE"), nullable=False, comment="节点ID")
+    node_name = Column(String(200), nullable=False, comment="节点名称")
+    node_type = Column(String(20), nullable=False, comment="节点类型: root/intermediate/leaf")
+    current_probability = Column(Float, nullable=False, comment="当前先验概率")
+    proposed_probability = Column(Float, nullable=False, comment="建议先验概率")
+    adjustment_percent = Column(Float, nullable=False, comment="调整百分比")
+    sample_count = Column(Integer, nullable=False, comment="样本数")
+    accurate_count = Column(Integer, nullable=False, comment="准确标注次数")
+    inaccurate_count = Column(Integer, nullable=False, comment="不准确标注次数")
+    accuracy_rate = Column(Float, nullable=False, comment="准确率")
+    status = Column(String(20), nullable=False, default="pending", comment="状态: pending/approved/rejected")
+    reason = Column(Text, nullable=True, comment="审批理由或拒绝原因")
+    approved_by = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, comment="审批人ID")
+    approved_at = Column(DateTime, nullable=True, comment="审批时间")
+    version = Column(Integer, nullable=False, default=1, comment="乐观锁版本号")
+    created_at = Column(DateTime, nullable=False, default=datetime.now, comment="创建时间")
+    updated_at = Column(DateTime, nullable=False, default=datetime.now, onupdate=datetime.now, comment="更新时间")
+
+
+class AuditLog(Base):
+    """通用审计日志表 - Story 26.4"""
+
+    __tablename__ = "audit_logs"
+    __table_args__ = (
+        Index("idx_audit_logs_user_id", "user_id"),
+        Index("idx_audit_logs_action", "action"),
+        Index("idx_audit_logs_resource", "resource_type", "resource_id"),
+        Index("idx_audit_logs_created_at", "created_at"),
+    )
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, comment="用户ID")
+    action = Column(String(100), nullable=False, comment="操作类型")
+    resource_type = Column(String(50), nullable=False, comment="资源类型")
+    resource_id = Column(Integer, nullable=True, comment="资源ID")
+    details = Column(Text, nullable=True, comment="操作详情")
+    ip_address = Column(String(50), nullable=True, comment="IP地址")
+    user_agent = Column(String(500), nullable=True, comment="User Agent")
+    created_at = Column(DateTime, nullable=False, default=datetime.now, comment="创建时间")
+
+
+class TimeWindowAdjustmentLog(Base):
+    """时间窗口调参记录表 - Story 26.4"""
+
+    __tablename__ = "time_window_adjustment_logs"
+    __table_args__ = (
+        Index("idx_adjustment_logs_device_type", "device_type"),
+        Index("idx_adjustment_logs_status", "status"),
+        Index("idx_adjustment_logs_created", "created_at"),
+        Index("idx_adjustment_logs_approved_by", "approved_by"),
+    )
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    device_type = Column(String(100), nullable=False, comment="设备类型")
+    current_window_minutes = Column(Integer, nullable=False, comment="当前时间窗口(分钟)")
+    proposed_window_minutes = Column(Integer, nullable=False, comment="建议时间窗口(分钟)")
+    adjustment_percent = Column(Float, nullable=False, comment="调整百分比")
+    sample_count = Column(Integer, nullable=False, comment="样本数")
+    p50_duration_seconds = Column(Float, nullable=False, comment="P50持续时长(秒)")
+    p90_duration_seconds = Column(Float, nullable=False, comment="P90持续时长(秒)")
+    status = Column(String(20), nullable=False, default="pending", comment="状态: pending/approved/rejected")
+    reason = Column(Text, nullable=True, comment="审批理由或拒绝原因")
+    approved_by = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, comment="审批人ID")
+    approved_at = Column(DateTime, nullable=True, comment="审批时间")
+    version = Column(Integer, nullable=False, default=1, comment="乐观锁版本号")
+    created_at = Column(DateTime, nullable=False, default=datetime.now, comment="创建时间")
+    updated_at = Column(DateTime, nullable=False, default=datetime.now, onupdate=datetime.now, comment="更新时间")
+

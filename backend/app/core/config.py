@@ -118,6 +118,14 @@ class Settings(BaseSettings):
             raise ValueError("FAULT_TREE_HMAC_KEY must be at least 32 characters")
         return v
 
+    # 邮件服务配置（Story 26.2）
+    smtp_enabled: bool = Field(default=False, env="SMTP_ENABLED", description="启用邮件服务")
+    smtp_host: str = Field(default="", env="SMTP_HOST", description="SMTP 服务器地址")
+    smtp_port: int = Field(default=587, env="SMTP_PORT", description="SMTP 端口")
+    smtp_user: str = Field(default="", env="SMTP_USER", description="SMTP 用户名")
+    smtp_password: str = Field(default="", env="SMTP_PASSWORD", description="SMTP 密码")
+    smtp_from_email: str = Field(default="", env="SMTP_FROM_EMAIL", description="发件人邮箱")
+
     class Config:
         env_file = ".env"
         case_sensitive = False

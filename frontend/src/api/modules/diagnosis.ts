@@ -293,3 +293,67 @@ export function getCounterfactualAnalysisList(params?: PageParams & {
 }): Promise<PageResponse<CounterfactualAnalysis>> {
   return request.get('/v1/diagnosis/counterfactual', { params })
 }
+
+// ==================== 误诊反馈报告 (Story 26.2) ====================
+
+/** 系统报告 */
+export interface SystemReport {
+  id: number
+  report_type: string
+  report_period: string
+  report_version: string
+  content: string
+  summary: Record<string, unknown> | null
+  generated_at: string
+  generated_by: string | null
+  deleted_at: string | null
+  updated_at: string
+}
+
+/** 报告摘要 */
+export interface ReportSummary {
+  total_sessions: number
+  annotated_count: number
+  annotation_coverage: number
+  false_positive_count: number
+  false_negative_count: number
+  accuracy_rate: number | null
+}
+
+/**
+ * 获取误诊报告列表
+ */
+export function getMisdiagnosisReports(params?: PageParams & {
+  start_period?: string
+  end_period?: string
+}): Promise<PageResponse<SystemReport>> {
+  return request.get('/v1/diagnosis/reports/misdiagnosis', { params })
+}
+
+/**
+ * 获取误诊报告详情
+ */
+export function getMisdiagnosisReport(reportId: number): Promise<SystemReport> {
+  return request.get(`/v1/diagnosis/reports/misdiagnosis/${reportId}`)
+}
+
+/**
+ * 手动生成误诊报告
+ */
+export function generateMisdiagnosisReport(period: string): Promise<{
+  report_id: number
+  message: string
+}> {
+  return request.post('/v1/diagnosis/reports/misdiagnosis/generate', null, {
+    params: { period }
+  })
+}
+
+/**
+ * 导出误诊报告为 PDF
+ */
+export function exportMisdiagnosisReport(reportId: number): Promise<Blob> {
+  return request.get(`/v1/diagnosis/reports/misdiagnosis/${reportId}/export`, {
+    responseType: 'blob'
+  })
+}

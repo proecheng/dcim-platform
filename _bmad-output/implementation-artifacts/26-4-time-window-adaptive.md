@@ -543,10 +543,10 @@ async def monthly_time_window_tuning():
 ## 3. 实现任务
 
 ### Task 1: 数据库迁移
-- [ ] 检查 system_configs 表是否已存在（查询 information_schema.tables）
-  - 如果不存在，在迁移脚本中创建（包含 PostgreSQL 和 SQLite 兼容版本）
-- [ ] 检查 audit_logs 表是否已存在
-  - 如果不存在，在迁移脚本中创建
+- [x] 检查 system_configs 表是否已存在（查询 information_schema.tables）
+  - system_configs 表已存在
+- [x] 检查 audit_logs 表是否已存在
+  - audit_logs 表不存在，已在迁移脚本中创建
 - [ ] 创建 `time_window_adjustment_logs` 表（包含 version 字段用于乐观锁）
 - [ ] 添加索引和触发器（自动更新 updated_at 和 version）
 - [ ] 创建回滚脚本（`alembic downgrade -1`）
