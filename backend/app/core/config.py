@@ -31,6 +31,9 @@ class Settings(BaseSettings):
     # PostgreSQL:  postgresql+asyncpg://user:pass@localhost:5432/dcim
     database_url: str = "sqlite+aiosqlite:///./dcim.db"
 
+    # Redis 配置 (Story 26.1: 反事实分析分布式锁)
+    REDIS_URL: str = "redis://localhost:6379/0"
+
     # TimescaleDB（仅 PostgreSQL 生效）
     timescaledb_enabled: bool = False
 

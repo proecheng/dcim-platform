@@ -244,3 +244,52 @@ export function getDiagnosisAnnotationStats(topN?: number): Promise<DiagnosisAnn
     params: { top_n: topN || 10 }
   })
 }
+
+// ==================== 反事实分析 (Story 26.1) ====================
+
+/** 反事实场景 */
+export interface CounterfactualScenario {
+  removed_evidence_id: number
+  new_root_cause: string | null
+  new_confidence: number
+  confidence_change: number
+  conclusion_changed: boolean
+}
+
+/** 反事实分析结果 */
+export interface CounterfactualAnalysis {
+  id: number
+  session_id: number
+  original_root_cause: string | null
+  original_confidence: number
+  top_evidences: Array<{
+    node_id: number
+    evidence_type: string
+    probability: number
+    sensor_weight: number
+    path_length: number
+  }>
+  analysis_results: CounterfactualScenario[]
+  analysis_time_ms: number
+  fault_tree_version: string | null
+  config_version: string
+  created_at: string
+}
+
+/**
+ * 获取反事实分析结果
+ */
+export function getCounterfactualAnalysis(sessionId: number): Promise<CounterfactualAnalysis> {
+  return request.get(`/v1/diagnosis/counterfactual/${sessionId}`)
+}
+
+/**
+ * 获取反事实分析列表
+ */
+export function getCounterfactualAnalysisList(params?: PageParams & {
+  min_confidence?: number
+  start_date?: string
+  end_date?: string
+}): Promise<PageResponse<CounterfactualAnalysis>> {
+  return request.get('/v1/diagnosis/counterfactual', { params })
+}
