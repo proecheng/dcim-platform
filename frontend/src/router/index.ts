@@ -249,7 +249,8 @@ const routes: RouteRecordRaw[] = [
             meta: { title: '智能诊断', icon: 'FirstAidKit' },
             children: [
               { path: 'results', name: 'DiagnosisResults', component: () => import('@/views/diagnosis/results.vue'), meta: { title: '诊断结果', icon: 'DataAnalysis' } },
-              { path: 'rules', name: 'DiagnosisRules', component: () => import('@/views/diagnosis/rules.vue'), meta: { title: '诊断规则', icon: 'SetUp' } }
+              { path: 'rules', name: 'DiagnosisRules', component: () => import('@/views/diagnosis/rules.vue'), meta: { title: '诊断规则', icon: 'SetUp' } },
+              { path: 'fault-trees/:id/editor', name: 'FaultTreeEditor', component: () => import('@/views/diagnosis/FaultTreeEditor.vue'), meta: { title: '故障树编辑器', icon: 'Edit', hidden: true } }
             ]
           },
           { path: 'drift', name: 'StrategyDrift', redirect: '/collection/drift' }
