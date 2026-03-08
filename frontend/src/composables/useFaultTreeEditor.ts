@@ -7,6 +7,7 @@ import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { DataSet, Network } from 'vis-network/standalone'
 import type { Data, Options, Node, Edge } from 'vis-network'
 import { nanoid } from 'nanoid'
+import { debounce } from 'lodash-es'
 import { ElMessage } from 'element-plus'
 import { getFaultTree, createFaultTreeVersion } from '@/api/modules/fault-tree'
 import type {
@@ -45,12 +46,29 @@ export function useFaultTreeEditor(treeId: number) {
   // 状态
   const loading = ref(false)
   const hasUnsavedChanges = ref(false)
+  const canSave = ref(true)
 
   // DAG 校验
   const { validateDAG, highlightErrors, clearHighlights } = useDAGValidation(nodes, edges)
 
   // 历史管理
   const { push: pushHistory, undo, redo, canUndo, canRedo, clear: clearHistory } = useHistoryManager(nodes, edges)
+
+  // 防抖的校验和历史记录函数
+  const debouncedValidate = debounce(() => {
+    const validationResult = validateDAG()
+    if (!validationResult.valid) {
+      highlightErrors(validationResult.errors)
+      canSave.value = false
+    } else {
+      clearHighlights()
+      canSave.value = true
+    }
+  }, 300)
+
+  const debouncedPushHistory = debounce(() => {
+    pushHistory()
+  }, 300)
 
   // 计算属性
   const nodeCount = computed(() => nodes.value.length)
@@ -69,6 +87,11 @@ export function useFaultTreeEditor(treeId: number) {
       const response = await getFaultTree(treeId)
       faultTree.value = response.data
       loadedUpdatedAt.value = response.data.updated_at
+
+      // 如果节点数 > 100，显示详细进度
+      if (response.data.nodes.length > 100) {
+        ElMessage.info(`正在加载 ${response.data.nodes.length} 个节点...`)
+      }
 
       // 转换数据格式
       const visNodes = toVisNodes(response.data.nodes)
@@ -114,7 +137,10 @@ export function useFaultTreeEditor(treeId: number) {
         nodeType: node.node_type,
         description: node.description,
         x: node.position_x,
-        y: node.position_y
+        y: node.position_y,
+        // 如果有保存的位置，固定节点防止自动布局移动
+        fixed: node.position_x !== null && node.position_x !== undefined &&
+               node.position_y !== null && node.position_y !== undefined
       }
 
       // 设置颜色和形状
@@ -180,11 +206,41 @@ export function useFaultTreeEditor(treeId: number) {
   /**
    * 将 vis-network 格式转换为后端边格式
    */
-  function fromVisEdges(visEdges: VisEdge[]): SaveFaultTreePayload['edges'] {
+  function fromVisEdges(visEdges: VisEdge[], visNodes: VisNode[]): SaveFaultTreePayload['edges'] {
+    // 创建临时 ID 到数组索引的映射
+    const tempIdToIndex = new Map<string, number>()
+    visNodes.forEach((node, index) => {
+      if (typeof node.id === 'string' && node.id.startsWith('temp_')) {
+        tempIdToIndex.set(node.id, index)
+      }
+    })
+
     return visEdges.map(edge => {
       const backendEdge: SaveFaultTreePayload['edges'][0] = {
-        from_node_id: typeof edge.from === 'number' ? edge.from : 0, // 临时 ID 会在保存后映射
-        to_node_id: typeof edge.to === 'number' ? edge.to : 0
+        from_node_id: 0,
+        to_node_id: 0
+      }
+
+      // 处理 from_node_id
+      if (typeof edge.from === 'number') {
+        backendEdge.from_node_id = edge.from
+      } else if (typeof edge.from === 'string' && edge.from.startsWith('temp_')) {
+        // 临时 ID，使用数组索引
+        const index = tempIdToIndex.get(edge.from)
+        if (index !== undefined) {
+          backendEdge.from_node_id = index
+        }
+      }
+
+      // 处理 to_node_id
+      if (typeof edge.to === 'number') {
+        backendEdge.to_node_id = edge.to
+      } else if (typeof edge.to === 'string' && edge.to.startsWith('temp_')) {
+        // 临时 ID，使用数组索引
+        const index = tempIdToIndex.get(edge.to)
+        if (index !== undefined) {
+          backendEdge.to_node_id = index
+        }
       }
 
       if (typeof edge.id === 'number') {
@@ -243,7 +299,8 @@ export function useFaultTreeEditor(treeId: number) {
 
     nodes.value.add(newNode)
     hasUnsavedChanges.value = true
-    pushHistory()
+    debouncedValidate()
+    debouncedPushHistory()
   }
 
   /**
@@ -252,7 +309,8 @@ export function useFaultTreeEditor(treeId: number) {
   function updateNode(updatedNode: VisNode) {
     nodes.value.update(updatedNode)
     hasUnsavedChanges.value = true
-    pushHistory()
+    debouncedValidate()
+    debouncedPushHistory()
   }
 
   /**
@@ -262,7 +320,17 @@ export function useFaultTreeEditor(treeId: number) {
     // 检查是否为根节点
     const node = nodes.value.get(nodeId)
     if (node && node.nodeType === 'root') {
-      ElMessage.warning('根节点不能删除，请先删除其他节点')
+      // 如果只有根节点一个节点，允许删除
+      const allNodes = nodes.value.get()
+      if (allNodes.length === 1) {
+        nodes.value.remove(nodeId)
+        hasUnsavedChanges.value = true
+        pushHistory()
+        return
+      }
+
+      // 如果还有其他节点，不允许删除根节点
+      ElMessage.warning(`根节点"${node.label}"不能删除，请先删除其他节点`)
       return
     }
 
@@ -274,7 +342,8 @@ export function useFaultTreeEditor(treeId: number) {
     edges.value.remove(relatedEdges.map(e => e.id))
 
     hasUnsavedChanges.value = true
-    pushHistory()
+    debouncedValidate()
+    debouncedPushHistory()
   }
 
   /**
@@ -297,7 +366,8 @@ export function useFaultTreeEditor(treeId: number) {
 
     edges.value.add(newEdge)
     hasUnsavedChanges.value = true
-    pushHistory()
+    debouncedValidate()
+    debouncedPushHistory()
   }
 
   /**
@@ -306,7 +376,8 @@ export function useFaultTreeEditor(treeId: number) {
   function deleteEdge(edgeId: number | string) {
     edges.value.remove(edgeId)
     hasUnsavedChanges.value = true
-    pushHistory()
+    debouncedValidate()
+    debouncedPushHistory()
   }
 
   /**
@@ -324,28 +395,32 @@ export function useFaultTreeEditor(treeId: number) {
     clearHighlights()
 
     // 准备保存数据
+    const visNodes = nodes.value.get()
     const payload: SaveFaultTreePayload = {
       name: faultTree.value!.name,
       description: faultTree.value!.description,
-      nodes: fromVisNodes(nodes.value.get()),
-      edges: fromVisEdges(edges.value.get())
+      nodes: fromVisNodes(visNodes),
+      edges: fromVisEdges(edges.value.get(), visNodes)
     }
 
     try {
-      const response = await createFaultTreeVersion(treeId, payload)
-
-      // 检查版本冲突
-      if (response.data.updated_at !== loadedUpdatedAt.value) {
+      // 先检查版本冲突（保存前）
+      const currentTreeResponse = await getFaultTree(treeId)
+      if (currentTreeResponse.data.updated_at !== loadedUpdatedAt.value) {
+        ElMessage.error('故障树已被其他用户修改，请刷新页面后重试')
         throw new Error('VERSION_CONFLICT')
       }
 
-      // 更新 loadedUpdatedAt
+      const response = await createFaultTreeVersion(treeId, payload)
+
+      // 更新 loadedUpdatedAt 为新版本的时间戳
       loadedUpdatedAt.value = response.data.updated_at
 
       // 映射临时 ID 到真实 ID
       await mapTempIdsToRealIds(response.data)
 
       hasUnsavedChanges.value = false
+      ElMessage.success('保存成功')
     } catch (error: any) {
       if (error.message === 'VERSION_CONFLICT') {
         throw error
@@ -463,6 +538,7 @@ export function useFaultTreeEditor(treeId: number) {
     // 状态
     loading,
     hasUnsavedChanges,
+    canSave,
     nodeCount,
     isLargeTree,
     canUndo,

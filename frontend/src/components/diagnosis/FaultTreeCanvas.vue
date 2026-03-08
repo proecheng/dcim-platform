@@ -13,7 +13,7 @@
         :closable="false"
       />
 
-      <el-table :data="nodes" border style="margin-top: 20px">
+      <el-table :data="nodes.get()" border style="margin-top: 20px">
         <el-table-column prop="label" label="节点名称" />
         <el-table-column prop="nodeType" label="节点类型" />
         <el-table-column prop="gateType" label="门类型" />
@@ -71,6 +71,7 @@ const emit = defineEmits<{
 const canvasContainer = ref<HTMLElement | null>(null)
 const networkContainer = ref<HTMLElement | null>(null)
 const canvasSupported = ref(true)
+const selectedNodes = ref<(number | string)[]>([])
 
 const {
   loading,
@@ -79,6 +80,7 @@ const {
   isLargeTree,
   canUndo,
   canRedo,
+  canSave,
   initialize,
   addNode,
   updateNode,
@@ -93,22 +95,108 @@ const {
   network
 } = useFaultTreeEditor(props.treeId)
 
-// 防抖的校验函数
-const debouncedValidate = debounce(() => {
-  // 校验逻辑在 useFaultTreeEditor 中处理
-  // 这里只是触发校验
-  emit('validation-change', true) // 简化处理，实际应该从 useDAGValidation 获取结果
-}, 300)
-
-// 防抖的历史记录函数
-const debouncedPushHistory = debounce(() => {
-  // 历史记录在 useFaultTreeEditor 中处理
-}, 300)
-
 // 监听未保存更改
-watch(hasUnsavedChanges, (changed) => {
-  emit('unsaved-change', changed)
+watch(hasUnsavedChanges, (value) => {
+  emit('unsaved-change', value)
 })
+
+// 监听校验状态
+watch(canSave, (value) => {
+  emit('validation-change', value)
+})
+
+// 键盘快捷键处理
+function handleKeyDown(event: KeyboardEvent) {
+  // 检查焦点元素，如果在输入框中则不触发画布快捷键
+  const activeElement = document.activeElement
+  if (activeElement && (
+    activeElement.tagName === 'INPUT' ||
+    activeElement.tagName === 'TEXTAREA' ||
+    activeElement.getAttribute('contenteditable') === 'true'
+  )) {
+    return  // 焦点在输入框，不处理画布快捷键
+  }
+
+  // Ctrl+Z: 撤销
+  if (event.ctrlKey && event.key === 'z' && !event.shiftKey) {
+    event.preventDefault()
+    event.stopPropagation()
+    handleUndo()
+    return
+  }
+
+  // Ctrl+Shift+Z 或 Ctrl+Y: 重做
+  if ((event.ctrlKey && event.shiftKey && event.key === 'Z') ||
+      (event.ctrlKey && event.key === 'y')) {
+    event.preventDefault()
+    event.stopPropagation()
+    handleRedo()
+    return
+  }
+
+  // Delete: 删除选中节点/边
+  if (event.key === 'Delete' && selectedNodes.value.length > 0) {
+    event.preventDefault()
+    event.stopPropagation()
+    handleDelete()
+    return
+  }
+}
+
+// 删除选中节点
+function handleDelete() {
+  if (!network.value) return
+
+  const selection = network.value.getSelection()
+
+  if (selection.nodes.length > 0) {
+    selection.nodes.forEach(nodeId => {
+      deleteNode(nodeId)
+    })
+  }
+
+  if (selection.edges.length > 0) {
+    selection.edges.forEach(edgeId => {
+      edges.value.remove(edgeId)
+    })
+  }
+}
+
+// 绑定网络事件
+function bindNetworkEvents() {
+  if (!network.value) return
+
+  // 监听节点选择
+  network.value.on('select', (params) => {
+    selectedNodes.value = params.nodes
+  })
+
+  // 监听双击节点
+  network.value.on('doubleClick', (params) => {
+    if (params.nodes.length > 0) {
+      const nodeId = params.nodes[0]
+      const node = nodes.value.get(nodeId)
+      if (node) {
+        emit('node-double-click', node)
+      }
+    }
+  })
+}
+
+// 撤销
+function handleUndo() {
+  undo()
+}
+
+// 重做
+function handleRedo() {
+  redo()
+}
+
+// 适应视图
+function handleFitView() {
+  fitView()
+}
 
 // 初始化
 onMounted(async () => {
@@ -127,98 +215,18 @@ onMounted(async () => {
 
   if (networkContainer.value) {
     await initialize(networkContainer.value)
-    bindKeyboardShortcuts()
     bindNetworkEvents()
   }
+
+  // 绑定键盘快捷键
+  window.addEventListener('keydown', handleKeyDown)
 })
 
 // 销毁
 onBeforeUnmount(() => {
-  unbindKeyboardShortcuts()
+  window.removeEventListener('keydown', handleKeyDown)
   destroy()
 })
-
-// 绑定键盘快捷键
-function bindKeyboardShortcuts() {
-  window.addEventListener('keydown', handleKeyDown)
-}
-
-// 解绑键盘快捷键
-function unbindKeyboardShortcuts() {
-  window.removeEventListener('keydown', handleKeyDown)
-}
-
-// 键盘事件处理
-function handleKeyDown(event: KeyboardEvent) {
-  // 检查焦点元素，如果在输入框中则不触发画布快捷键
-  const activeElement = document.activeElement
-  if (activeElement && (
-    activeElement.tagName === 'INPUT' ||
-    activeElement.tagName === 'TEXTAREA' ||
-    activeElement.getAttribute('contenteditable') === 'true'
-  )) {
-    return  // 焦点在输入框，不处理画布快捷键
-  }
-
-  if (event.ctrlKey && event.key === 'z' && !event.shiftKey) {
-    event.preventDefault()
-    event.stopPropagation()
-    handleUndo()
-    return
-  }
-
-  if (event.ctrlKey && event.shiftKey && event.key === 'Z') {
-    event.preventDefault()
-    event.stopPropagation()
-    handleRedo()
-    return
-  }
-
-  if (event.key === 'Delete') {
-    event.preventDefault()
-    event.stopPropagation()
-    handleDelete()
-    return
-  }
-}
-
-// 绑定 vis-network 事件
-function bindNetworkEvents() {
-  if (!network.value) return
-
-  // 双击节点
-  network.value.on('doubleClick', (params) => {
-    if (params.nodes.length > 0) {
-      const nodeId = params.nodes[0]
-      const node = nodes.value.get(nodeId)
-      if (node) {
-        emit('node-double-click', node)
-      }
-    }
-  })
-
-  // 节点/边变化时触发校验和历史记录
-  network.value.on('afterDrawing', () => {
-    debouncedValidate()
-    debouncedPushHistory()
-  })
-}
-
-// 撤销
-function handleUndo() {
-  undo()
-}
-
-// 重做
-function handleRedo() {
-  redo()
-}
-
-// 删除选中的节点或边
-function handleDelete() {
-  if (!network.value) return
-
-  const selection = network.value.getSelection()
 
   if (selection.nodes.length > 0) {
     selection.nodes.forEach(nodeId => {

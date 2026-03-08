@@ -69,6 +69,7 @@ export interface VisNode {
   font?: { color: string }
   x?: number
   y?: number
+  fixed?: boolean | { x: boolean; y: boolean } // 节点是否固定位置
   // 自定义数据
   nodeType: NodeType
   gateType?: GateType
