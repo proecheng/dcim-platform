@@ -276,7 +276,7 @@ development_status:
   epic-24-retrospective: done
 
   # Epic 25: 智能诊断专业扩展 (Phase 2b 月9-10)
-  epic-25: in-progress
+  epic-25: done
   25-1-power-topology-cascade-analysis: done
   25-2-electrical-parameter-node-integration: done
   25-3-ups-battery-soh-prediction: done
@@ -285,10 +285,10 @@ development_status:
   25-6-dynamic-alarm-thresholds: done
   25-7-trend-analysis-and-multi-sensor-fusion: done
   25-8-fault-tree-graphical-editor: done
-  epic-25-retrospective: optional
+  epic-25-retrospective: done
 
   # Epic 26: 智能诊断高级功能 (Phase 3 月11-12+)
-  epic-26: backlog
+  epic-26: in-progress
   26-1-counterfactual-analysis: backlog
   26-2-misdiagnosis-feedback-report: backlog
   26-3-closed-loop-learning-probability-tuning: backlog

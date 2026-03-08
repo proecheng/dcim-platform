@@ -490,3 +490,54 @@ class TrendConfigResponse(BaseModel):
     airflow_variance_threshold: float = Field(..., description="气流不均匀标准差阈值（℃）")
     trend_analysis_enabled: bool = Field(..., description="趋势分析特性开关")
     sensor_fusion_enabled: bool = Field(..., description="多传感器融合特性开关")
+
+
+# ==================== Counterfactual Analysis Schemas - Story 26.1 ====================
+
+
+class EvidenceItem(BaseModel):
+    """证据条目"""
+
+    node_id: int = Field(..., description="节点ID")
+    evidence_type: str = Field(..., description="证据类型")
+    probability: float = Field(..., description="证据概率", ge=0.0, le=1.0)
+    sensor_weight: float = Field(1.0, description="传感器权重", ge=0.0, le=1.0)
+    path_length: int = Field(1, description="路径长度", ge=1)
+
+
+class CounterfactualScenario(BaseModel):
+    """反事实场景"""
+
+    removed_evidence_id: int = Field(..., description="移除的证据节点ID")
+    new_root_cause: Optional[str] = Field(None, description="新根因")
+    new_confidence: float = Field(..., description="新置信度", ge=0.0, le=1.0)
+    confidence_change: float = Field(..., description="置信度变化量")
+    conclusion_changed: bool = Field(..., description="结论是否改变")
+
+
+class CounterfactualAnalysisResponse(BaseModel):
+    """反事实分析响应"""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    session_id: int
+    original_root_cause: Optional[str] = None
+    original_confidence: Optional[float] = None
+    top_evidences: List[EvidenceItem]
+    analysis_results: List[CounterfactualScenario]
+    analysis_time_ms: int
+    fault_tree_version: Optional[str] = None
+    config_version: Optional[str] = None
+    deleted_at: Optional[datetime] = None
+    created_at: datetime
+    updated_at: datetime
+
+
+class CounterfactualAnalysisListResponse(BaseModel):
+    """反事实分析列表响应（分页）"""
+
+    total: int = Field(..., description="总记录数")
+    page: int = Field(..., description="当前页码")
+    page_size: int = Field(..., description="每页数量")
+    items: List[CounterfactualAnalysisResponse] = Field(..., description="分析列表")

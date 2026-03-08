@@ -38,6 +38,8 @@ from ...schemas.diagnosis import (
     SensorFusionRecordResponse,
     TrendConfigUpdate,
     TrendConfigResponse,
+    CounterfactualAnalysisResponse,
+    CounterfactualAnalysisListResponse,
 )
 from ...engines.diagnosis_engine import diagnosis_engine
 
@@ -1027,4 +1029,129 @@ async def update_trend_config(
     await db.commit()
 
     return {"message": "趋势阈值配置更新成功", "updated_keys": list(updates.keys())}
+
+
+# ==================== Counterfactual Analysis Endpoints - Story 26.1 ====================
+
+
+@router.post("/counterfactual/{session_id}", response_model=dict)
+async def trigger_counterfactual_analysis(
+    session_id: int,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_operator),
+    top_n: int = Query(5, ge=1, le=10, description="分析Top N证据"),
+):
+    """手动触发反事实分析（operator/admin）"""
+    from ...services.diagnosis.counterfactual_service import analyze_counterfactual
+
+    # 检查会话是否存在
+    from ...models.diagnosis import DiagnosisSession
+    session_result = await db.execute(
+        select(DiagnosisSession).where(DiagnosisSession.id == session_id)
+    )
+    if not session_result.scalar_one_or_none():
+        raise HTTPException(status_code=404, detail="诊断会话不存在")
+
+    # 触发分析
+    analysis = await analyze_counterfactual(session_id, top_n, db)
+
+    if not analysis:
+        raise HTTPException(
+            status_code=400,
+            detail=f"会话 {session_id} 反事实分析失败，请检查会话状态和证据数据"
+        )
+
+    return {
+        "message": "反事实分析完成",
+        "session_id": session_id,
+        "analysis_id": analysis.id,
+        "analysis_time_ms": analysis.analysis_time_ms
+    }
+
+
+@router.get("/counterfactual/{session_id}", response_model=CounterfactualAnalysisResponse)
+async def get_counterfactual_analysis(
+    session_id: int,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_viewer),
+):
+    """获取反事实分析结果"""
+    from ...services.diagnosis.counterfactual_service import get_counterfactual_analysis as get_analysis
+    from ...models.diagnosis import CounterfactualAnalysis
+
+    analysis = await get_analysis(session_id, db)
+
+    if not analysis:
+        raise HTTPException(status_code=404, detail="反事实分析不存在")
+
+    return CounterfactualAnalysisResponse.model_validate(analysis)
+
+
+@router.get("/counterfactual", response_model=CounterfactualAnalysisListResponse)
+async def list_counterfactual_analyses(
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_viewer),
+    min_confidence: Optional[float] = Query(None, ge=0.0, le=1.0, description="最低原始置信度"),
+    start_date: Optional[str] = Query(None, description="开始时间 ISO格式"),
+    end_date: Optional[str] = Query(None, description="结束时间 ISO格式"),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+):
+    """反事实分析列表（分页查询）"""
+    from ...models.diagnosis import CounterfactualAnalysis
+
+    query = select(CounterfactualAnalysis).where(CounterfactualAnalysis.deleted_at.is_(None))
+
+    if min_confidence is not None:
+        query = query.where(CounterfactualAnalysis.original_confidence >= min_confidence)
+    if start_date is not None:
+        try:
+            sd = datetime.fromisoformat(start_date)
+            query = query.where(CounterfactualAnalysis.created_at >= sd)
+        except ValueError:
+            pass
+    if end_date is not None:
+        try:
+            ed = datetime.fromisoformat(end_date)
+            query = query.where(CounterfactualAnalysis.created_at <= ed)
+        except ValueError:
+            pass
+
+    query = query.order_by(CounterfactualAnalysis.created_at.desc())
+
+    count_query = select(func.count()).select_from(query.subquery())
+    total = (await db.execute(count_query)).scalar() or 0
+
+    query = query.offset((page - 1) * page_size).limit(page_size)
+    result = await db.execute(query)
+    analyses = result.scalars().all()
+
+    return CounterfactualAnalysisListResponse(
+        total=total,
+        page=page,
+        page_size=page_size,
+        items=[CounterfactualAnalysisResponse.model_validate(a) for a in analyses]
+    )
+
+
+@router.delete("/counterfactual/{session_id}", response_model=dict)
+async def delete_counterfactual_analysis(
+    session_id: int,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_admin),
+):
+    """软删除反事实分析（仅 admin）"""
+    from ...services.diagnosis.counterfactual_service import get_counterfactual_analysis as get_analysis
+
+    analysis = await get_analysis(session_id, db)
+
+    if not analysis:
+        raise HTTPException(status_code=404, detail="反事实分析不存在")
+
+    # 软删除
+    analysis.deleted_at = datetime.now()
+    await db.commit()
+
+    return {"message": "反事实分析已删除", "session_id": session_id}
+
 

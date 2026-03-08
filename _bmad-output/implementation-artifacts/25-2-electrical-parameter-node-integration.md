@@ -1,6 +1,6 @@
 # Story 25.2: 电气参数节点集成
 
-Status: ready-for-dev
+Status: done
 
 ## Story
 

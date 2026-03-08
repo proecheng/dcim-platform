@@ -222,7 +222,7 @@ class SensorFusionRecord(Base):
     )
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    zone_id = Column(Integer, ForeignKey("zones.id", ondelete="CASCADE"), nullable=False, comment="区域ID")
+    zone_id = Column(Integer, ForeignKey("cooling_zones.id", ondelete="CASCADE"), nullable=False, comment="区域ID")
     sensor_count = Column(Integer, nullable=False, comment="传感器数量")
     std_dev = Column(Float, nullable=True, comment="标准差")
     evidence_type = Column(String(50), nullable=False, comment="证据类型")
@@ -230,3 +230,29 @@ class SensorFusionRecord(Base):
     probability = Column(Float, nullable=True, comment="概率")
     message = Column(Text, nullable=True, comment="融合结果消息")
     created_at = Column(DateTime, nullable=False, default=datetime.now, comment="创建时间")
+
+
+class CounterfactualAnalysis(Base):
+    """反事实分析表 - Story 26.1"""
+
+    __tablename__ = "counterfactual_analyses"
+    __table_args__ = (
+        Index("idx_counterfactual_session", "session_id"),
+        Index("idx_counterfactual_created", "created_at"),
+        Index("idx_counterfactual_confidence", "original_confidence"),
+        Index("idx_counterfactual_time", "analysis_time_ms"),
+        Index("idx_counterfactual_deleted", "deleted_at"),
+    )
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    session_id = Column(Integer, ForeignKey("diagnosis_sessions.id", ondelete="CASCADE"), nullable=False, unique=True, comment="诊断会话ID")
+    original_root_cause = Column(String(500), nullable=True, comment="原始根因")
+    original_confidence = Column(Float, nullable=True, comment="原始置信度")
+    top_evidences = Column(JSON, nullable=False, comment="Top证据列表")
+    analysis_results = Column(JSON, nullable=False, comment="分析结果")
+    analysis_time_ms = Column(Integer, nullable=False, default=0, comment="分析耗时(毫秒)")
+    fault_tree_version = Column(String(50), nullable=True, comment="故障树版本号")
+    config_version = Column(String(50), nullable=True, comment="配置版本号")
+    deleted_at = Column(DateTime, nullable=True, comment="软删除时间")
+    created_at = Column(DateTime, nullable=False, default=datetime.now, comment="创建时间")
+    updated_at = Column(DateTime, nullable=False, default=datetime.now, onupdate=datetime.now, comment="更新时间")

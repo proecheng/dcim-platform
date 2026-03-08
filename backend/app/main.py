@@ -558,9 +558,60 @@ async def lifespan(app: FastAPI):
             name='趋势分析任务'
         )
 
+        # 启动反事实分析定时任务（每小时执行）- Story 26.1
+        async def _run_counterfactual_analysis():
+            """执行反事实分析任务"""
+            try:
+                from app.services.diagnosis.counterfactual_service import analyze_counterfactual
+                from app.models.diagnosis import DiagnosisSession
+
+                async with async_session() as session:
+                    # 查询最近1小时内的高置信度诊断会话
+                    one_hour_ago = datetime.now() - timedelta(hours=1)
+                    result = await session.execute(
+                        select(DiagnosisSession).where(
+                            DiagnosisSession.created_at >= one_hour_ago,
+                            DiagnosisSession.max_confidence >= 0.7,
+                            DiagnosisSession.status == "success"
+                        )
+                    )
+                    sessions = result.scalars().all()
+
+                    # 为每个会话执行反事实分析
+                    analyzed_count = 0
+                    for sess in sessions:
+                        # 检查是否已存在分析结果
+                        from app.models.diagnosis import CounterfactualAnalysis
+                        existing = await session.execute(
+                            select(CounterfactualAnalysis).where(
+                                CounterfactualAnalysis.session_id == sess.id,
+                                CounterfactualAnalysis.deleted_at.is_(None)
+                            )
+                        )
+                        if existing.scalar_one_or_none():
+                            continue  # 已存在，跳过
+
+                        # 执行分析
+                        analysis = await analyze_counterfactual(sess.id, top_n=5, db=session)
+                        if analysis:
+                            analyzed_count += 1
+
+                    logger.info(f"反事实分析任务完成，分析 {analyzed_count}/{len(sessions)} 个会话")
+            except Exception as e:
+                logger.error(f"反事实分析任务执行失败: {e}", exc_info=True)
+
+        scheduler.add_job(
+            _run_counterfactual_analysis,
+            'cron',
+            minute=30,  # 每小时30分执行
+            id='counterfactual_analysis',
+            name='反事实分析任务'
+        )
+
         scheduler.start()
         logger.info("✓ 传感器校准过期检查定时任务已启动（每日凌晨 2:00）")
         logger.info("✓ 趋势分析定时任务已启动（每小时整点执行）")
+        logger.info("✓ 反事实分析定时任务已启动（每小时30分执行）")
     except ImportError:
         logger.warning("⚠️  APScheduler 未安装，使用降级方案（asyncio.create_task）")
         async def _calibration_check_loop():
