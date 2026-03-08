@@ -22,6 +22,10 @@ depends_on: Union[str, Sequence[str], None] = None
 def upgrade() -> None:
     # 创建 audit_logs 表（通用审计日志表）
     # 注意：使用 IF NOT EXISTS 避免重复创建
+    # 注意：此表结构为简化版本，与设计文档 (Story 26.4 line 215-229) 不完全一致
+    # 实际字段: user_id, action, resource_type, resource_id, details, ip_address, user_agent
+    # 设计字段: operation_user_id, operation_type, old_value, new_value, description
+    # 简化原因: 减少字段冗余，details 字段可包含 old_value/new_value 的 JSON 格式数据
     op.execute("""
         CREATE TABLE IF NOT EXISTS audit_logs (
             id INTEGER PRIMARY KEY AUTOINCREMENT,

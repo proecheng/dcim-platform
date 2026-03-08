@@ -463,3 +463,50 @@ async def test_notify_admins(db_session, setup_test_data):
         # 验证 WebSocket 发送被调用
         assert mock_ws.send_to_user.called
 
+
+@pytest.mark.asyncio
+async def test_device_type_name_escaping(db_session, setup_test_data, create_diagnosis_data):
+    """测试设备类型名称转义（包含特殊字符）"""
+    import json
+
+    # 创建包含特殊字符的设备类型
+    special_device_type = 'UPS"测试\'设备'
+
+    # 创建诊断数据
+    durations = [300] * 30  # 30 个样本，P90 = 300 秒
+    await create_diagnosis_data(special_device_type, 30, durations)
+
+    # 创建配置（使用 json.dumps 自动转义）
+    config_value = {
+        "default": 5,
+        special_device_type: 5
+    }
+    config = SystemConfig(
+        config_key="diagnosis_time_windows",
+        config_value=json.dumps(config_value),
+        description="测试配置"
+    )
+    db_session.add(config)
+    await db_session.commit()
+
+    # 执行分析
+    service = TimeWindowTuningService()
+    result = await service.analyze_all_device_types(device_type_filter=special_device_type)
+
+    # 验证：能够正确处理特殊字符的设备类型
+    assert result["analyzed_device_types"] == 1
+
+    # 验证：生成的调整记录包含正确的设备类型名称
+    adjustment = await db_session.execute(
+        select(TimeWindowAdjustmentLog).where(TimeWindowAdjustmentLog.device_type == special_device_type)
+    )
+    adjustment = adjustment.scalar_one()
+    assert adjustment.device_type == special_device_type
+
+    # 验证：配置更新后能正确读取（json.dumps/json.loads 自动处理转义）
+    updated_config = await db_session.execute(
+        select(SystemConfig).where(SystemConfig.config_key == "diagnosis_time_windows")
+    )
+    updated_config = updated_config.scalar_one()
+    parsed_config = json.loads(updated_config.config_value)
+    assert special_device_type in parsed_config
