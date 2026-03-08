@@ -682,6 +682,85 @@ kill -9 <PID>
 | 查询响应 | < 100ms | < 50ms |
 | 内存占用 | 500 MB | 1 GB |
 
+## 定时任务配置
+
+系统使用 APScheduler 管理定时任务，包括数据模拟、时间窗口调参分析等。
+
+### 时间窗口调参定时任务
+
+**任务说明**: 每天凌晨 2:00 自动分析各设备类型的告警持续时长，生成时间窗口调整建议。
+
+**配置位置**: `backend/app/scheduler/jobs.py`
+
+**默认配置**:
+```python
+# 每天凌晨 2:00 执行
+scheduler.add_job(
+    time_window_tuning_job,
+    trigger='cron',
+    hour=2,
+    minute=0,
+    id='time_window_tuning',
+    replace_existing=True,
+    misfire_grace_time=300  # 5分钟容错时间
+)
+```
+
+**修改执行时间**:
+
+编辑 `backend/app/scheduler/jobs.py`，修改 `hour` 和 `minute` 参数：
+
+```python
+# 示例：改为每天凌晨 3:30 执行
+scheduler.add_job(
+    time_window_tuning_job,
+    trigger='cron',
+    hour=3,
+    minute=30,
+    id='time_window_tuning',
+    replace_existing=True,
+    misfire_grace_time=300
+)
+```
+
+**禁用定时任务**:
+
+在 `backend/app/scheduler/jobs.py` 中注释掉相关代码：
+
+```python
+# scheduler.add_job(
+#     time_window_tuning_job,
+#     trigger='cron',
+#     hour=2,
+#     minute=0,
+#     id='time_window_tuning',
+#     replace_existing=True,
+#     misfire_grace_time=300
+# )
+```
+
+**手动触发**:
+
+管理员可以在前端页面手动触发分析：
+1. 登录系统（管理员账号）
+2. 进入"策略域 > 智能诊断 > 时间窗口调参"页面
+3. 点击"触发分析"按钮
+
+**日志查看**:
+
+定时任务执行日志位于 `backend/logs/app.log`：
+
+```bash
+# 查看最近的调参任务日志
+tail -f backend/logs/app.log | grep "time_window_tuning"
+```
+
+**注意事项**:
+- 定时任务需要至少 30 条准确诊断样本才会生成调整建议
+- 调整建议需要管理员审批后才会生效
+- 系统会通过邮件和 WebSocket 通知管理员审批
+- 建议在业务低峰期（凌晨）执行，避免影响系统性能
+
 ## 技术支持
 
 如遇到部署问题，请参考:

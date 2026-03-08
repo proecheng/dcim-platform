@@ -249,6 +249,10 @@ username=admin&password=admin123
 | PUT | /diagnosis/rules/{id} | 更新诊断规则 |
 | DELETE | /diagnosis/rules/{id} | 删除诊断规则 |
 | GET | /diagnosis/results | 诊断结果列表 |
+| GET | /diagnosis/time-window-tuning/adjustments | 时间窗口调参记录列表 |
+| POST | /diagnosis/time-window-tuning/analyze | 触发时间窗口调参分析 |
+| POST | /diagnosis/time-window-tuning/adjustments/{id}/approve | 审批时间窗口调整 |
+| POST | /diagnosis/time-window-tuning/adjustments/{id}/reject | 拒绝时间窗口调整 |
 
 ## 控制命令 (/api/v1/command)
 
