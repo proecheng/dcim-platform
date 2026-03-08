@@ -361,10 +361,10 @@ class TimeWindowAdjustmentLog(Base):
 
     __tablename__ = "time_window_adjustment_logs"
     __table_args__ = (
-        Index("idx_adjustment_logs_device_type", "device_type"),
-        Index("idx_adjustment_logs_status", "status"),
-        Index("idx_adjustment_logs_created", "created_at"),
-        Index("idx_adjustment_logs_approved_by", "approved_by"),
+        Index("idx_time_window_adjustment_logs_device_type", "device_type"),
+        Index("idx_time_window_adjustment_logs_status", "status"),
+        Index("idx_time_window_adjustment_logs_created", "created_at"),
+        Index("idx_time_window_adjustment_logs_approved_by", "approved_by"),
     )
 
     id = Column(Integer, primary_key=True, autoincrement=True)
