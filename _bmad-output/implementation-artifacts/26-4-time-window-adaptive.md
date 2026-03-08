@@ -600,20 +600,20 @@ async def monthly_time_window_tuning():
 - [x] 边界测试：建议值与当前值相同的场景（不生成记录）
 
 ### Task 6: 前端页面
-- [ ] 创建时间窗口管理页面（`frontend/src/views/diagnosis/TimeWindowTuning.vue`）
-  - 如果 ProbabilityTuning.vue 不存在，参考 Reports.vue 或其他诊断页面的布局模式
-  - 路由路径: `/diagnosis/time-window-tuning`
+- [x] 创建时间窗口管理页面（`frontend/src/views/diagnosis/TimeWindowTuning.vue`）
+  - 参考 Reports.vue 的布局模式
+  - 路由路径: `/strategy/diagnosis/time-window-tuning`
   - 权限要求: admin only（在路由 meta 中配置 `requiresRole: ['admin']`）
-- [ ] 实现调整记录列表展示
+- [x] 实现调整记录列表展示
   - 表格列: 设备类型、当前窗口、建议窗口、调整百分比、样本数、P50、P90、状态、创建时间
   - 筛选条件: 设备类型、状态（pending/approved/rejected）
-- [ ] 实现调整详情查看（对比调整前后窗口、统计数据）
+- [x] 实现调整详情查看（对比调整前后窗口、统计数据）
   - 使用 el-dialog 弹窗展示详情
-- [ ] 实现审批/拒绝操作
+- [x] 实现审批/拒绝操作
   - 审批按钮: 二次确认对话框（el-message-box.confirm）
   - 拒绝按钮: 输入拒绝理由（el-message-box.prompt）
-- [ ] 实现手动触发分析按钮
-- [ ] 添加路由配置到 `frontend/src/router/index.ts`
+- [x] 实现手动触发分析按钮
+- [x] 添加路由配置到 `frontend/src/router/index.ts`
   - 添加菜单项到侧边栏（在"智能诊断"分组下）
 - [ ] 实现列表自动刷新（可选，使用 WebSocket 或定时轮询）
   - 当收到 WebSocket 消息时自动刷新列表
@@ -948,6 +948,16 @@ Claude Opus 4.6 (claude-opus-4-6)
   - 修复 TimeWindowAdjustmentLog 模型索引名称冲突
   - 测试覆盖：时间窗口计算、P50/P90 统计、边界测试、并发审批、通知功能
   - 待修复：部分测试因数据模型字段不匹配需要调整
+- 2026-03-08 23:30: 完成前端页面（Task 6 完成）
+  - 创建 TimeWindowTuning.vue 组件
+  - 实现调参记录列表展示（设备类型、当前/建议窗口、调整幅度、P50/P90、状态）
+  - 实现查询筛选（设备类型、状态）
+  - 实现详情对话框（完整调参信息）
+  - 实现审批/拒绝对话框（带理由输入）
+  - 实现触发分析按钮（手动触发调参分析）
+  - 添加 API 方法到 diagnosis.ts（getTimeWindowAdjustments、triggerTimeWindowAnalysis、approveTimeWindowAdjustment、rejectTimeWindowAdjustment）
+  - 添加路由配置（/strategy/diagnosis/time-window-tuning，菜单项：时间窗口调参）
+  - 待实现：列表自动刷新（WebSocket 或定时轮询）
 
 ### Implementation Notes
 
