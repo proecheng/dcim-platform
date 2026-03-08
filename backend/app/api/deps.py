@@ -104,6 +104,49 @@ require_operator = require_role(["admin", "operator"])
 require_viewer = require_role(["admin", "operator", "viewer"])
 
 
+def require_permission(permission: str):
+    """
+    细粒度权限检查装饰器
+
+    Args:
+        permission: 权限标识，格式: "module:action"
+                   例如: "diagnosis:view_advanced"
+
+    Returns:
+        权限检查函数
+    """
+    async def permission_checker(current_user: User = Depends(get_current_user)) -> User:
+        # Admin 拥有所有权限
+        if current_user.role == "admin":
+            return current_user
+
+        # 定义权限映射表
+        permission_map = {
+            # 诊断高级功能权限（反事实分析、闭环学习等）
+            "diagnosis:view_advanced": ["admin", "operator"],
+            "diagnosis:manage_annotations": ["admin", "operator"],
+            "diagnosis:manage_fault_trees": ["admin"],
+            # 其他模块权限可以在此扩展
+        }
+
+        allowed_roles = permission_map.get(permission, [])
+        if current_user.role not in allowed_roles:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"权限不足: 需要 {permission} 权限"
+            )
+
+        return current_user
+
+    return permission_checker
+
+
+# 预定义常用权限检查器
+require_diagnosis_advanced = require_permission("diagnosis:view_advanced")
+require_diagnosis_annotations = require_permission("diagnosis:manage_annotations")
+require_diagnosis_fault_trees = require_permission("diagnosis:manage_fault_trees")
+
+
 async def get_user_site_ids(
     current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)
 ) -> Optional[list[int]]:

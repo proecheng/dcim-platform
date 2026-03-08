@@ -12,7 +12,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 
-from ..deps import get_db, require_admin, require_operator, require_viewer
+from ..deps import get_db, require_admin, require_operator, require_viewer, require_diagnosis_advanced
 from ...models.user import User
 from ...models.diagnosis import DiagnosisRule, DiagnosisResult, DiagnosisSession, DiagnosisAuditLog, BreakerProfile
 from ...schemas.diagnosis import (
@@ -1073,13 +1073,48 @@ async def trigger_counterfactual_analysis(
 async def get_counterfactual_analysis(
     session_id: int,
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_viewer),
+    _: User = Depends(require_diagnosis_advanced),
 ):
-    """获取反事实分析结果"""
+    """
+    获取反事实分析结果
+
+    权限要求: diagnosis:view_advanced (admin, operator)
+    """
     from ...services.diagnosis.counterfactual_service import get_counterfactual_analysis as get_analysis
     from ...models.diagnosis import CounterfactualAnalysis
 
     analysis = await get_analysis(session_id, db)
+
+    if not analysis:
+        raise HTTPException(status_code=404, detail="反事实分析不存在")
+
+    return CounterfactualAnalysisResponse.model_validate(analysis)
+
+
+@router.get("/counterfactual/{session_id}/progress")
+async def get_counterfactual_progress(
+    session_id: int,
+    _: User = Depends(require_diagnosis_advanced),
+):
+    """
+    SSE 进度推送端点
+
+    返回反事实分析的实时进度
+
+    权限要求: diagnosis:view_advanced (admin, operator)
+    """
+    from fastapi.responses import StreamingResponse
+    from ...services.diagnosis.counterfactual_service import stream_counterfactual_progress
+
+    return StreamingResponse(
+        stream_counterfactual_progress(session_id),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",  # 禁用 Nginx 缓冲
+        }
+    )
 
     if not analysis:
         raise HTTPException(status_code=404, detail="反事实分析不存在")

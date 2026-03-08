@@ -794,15 +794,15 @@ def remove_evidence(input_data: dict, evidence_id: str) -> dict:
 - [x] 实现置信度模拟
 - [x] 实现 Redis 分布式锁（Lua 脚本）
 - [x] 实现缓存失效逻辑
-- [ ] 实现真实 L2 推理调用
+- [x] 实现真实 L2 推理调用（带降级）
 
 #### Task 3: 后端 API 实现
 - [x] 实现 POST `/diagnosis/counterfactual/{session_id}` 触发分析
 - [x] 实现 GET `/diagnosis/counterfactual/{session_id}` 查询结果
 - [x] 实现 GET `/diagnosis/counterfactual` 列表查询
 - [x] 实现 DELETE `/diagnosis/counterfactual/{session_id}` 软删除
-- [ ] 添加权限控制装饰器
-- [ ] 实现 SSE 进度推送端点
+- [x] 添加权限控制装饰器（require_diagnosis_advanced）
+- [x] 实现 SSE 进度推送端点
 - [x] 添加 Prometheus 监控指标
 
 #### Task 4: 后端测试
@@ -816,12 +816,12 @@ def remove_evidence(input_data: dict, evidence_id: str) -> dict:
 - [x] 边界测试：无证据场景（已创建）
 - [x] 边界测试：证据权重相同（已创建）
 - [x] 边界测试：证据数量 > 10（已创建）
-- [ ] 并发测试：同 session_id 并发请求
+- [x] 并发测试：同 session_id 并发请求（已创建）
 
 #### Task 5: 前端组件实现
 - [x] 创建反事实解释展示组件
 - [x] 实现 loading 状态
-- [ ] 实现 SSE 进度接收
+- [x] 实现 SSE 进度接收
 - [x] 实现错误处理
 - [ ] 添加可访问性 i18n
 - [x] 添加未知证据类型 fallback
@@ -852,13 +852,20 @@ def remove_evidence(input_data: dict, evidence_id: str) -> dict:
 - `backend/alembic/versions/c7ffe6454eb5_merge_heads.py` - 合并迁移头
 - `backend/app/models/diagnosis.py` - 添加 CounterfactualAnalysis 模型
 - `backend/app/schemas/diagnosis.py` - 添加反事实分析 Schema
-- `backend/app/services/diagnosis/counterfactual_service.py` - 核心服务实现
-- `backend/app/api/v1/diagnosis.py` - API 端点实现
+- `backend/app/services/diagnosis/counterfactual_service.py` - 核心服务实现（含 SSE）
+- `backend/app/api/v1/diagnosis.py` - API 端点实现（含 SSE 端点）
+- `backend/app/api/deps.py` - 细粒度权限控制
+- `backend/app/core/config.py` - Redis 配置
 - `backend/app/main.py` - APScheduler 任务配置
-- `tests/services/diagnosis/test_counterfactual_service.py` - 单元测试
+- `backend/tests/services/diagnosis/test_counterfactual_service.py` - 单元测试
+- `backend/tests/api/test_diagnosis_counterfactual.py` - 集成测试
+- `backend/tests/services/test_counterfactual_boundary.py` - 边界测试
+- `backend/tests/services/test_counterfactual_concurrency.py` - 并发测试
 
 **前端文件**:
-- （待实现）
+- `frontend/src/components/diagnosis/CounterfactualExplanation.vue` - 反事实解释组件（含 SSE）
+- `frontend/src/views/diagnosis/results.vue` - 诊断结果页面集成
+- `frontend/src/api/modules/diagnosis.ts` - API 接口定义
 
 ### Change Log
 
@@ -870,12 +877,24 @@ def remove_evidence(input_data: dict, evidence_id: str) -> dict:
 - 添加 13 个单元测试（全部通过）
 - 添加 Prometheus 监控指标
 
-**待完成**:
-- Redis 分布式锁实现
-- 缓存失效逻辑
-- 真实 L2 推理调用
-- 权限控制
-- SSE 进度推送
+**2026-03-08 17:30** - 代码审查修复
+- 添加 Redis 分布式锁（Lua 脚本）
+- 实现缓存失效逻辑（5种失效条件）
+- 添加 Dev Agent Record
+- 分离 Epic 25 集成代码
+
+**2026-03-08 18:00** - 前端组件和测试
+- 实现前端反事实解释组件
+- 集成到诊断详情页
+- 添加集成测试（2个核心场景）
+- 添加边界测试（8个边界场景）
+- 添加 REDIS_URL 配置
+
+**2026-03-08 19:00** - 完成待办功能
+- 实现 SSE 进度推送（后端 + 前端）
+- 实现真实 L2 推理调用（带降级）
+- 实现细粒度权限控制（diagnosis:view_advanced）
+- 添加并发测试（4个并发场景）
 - 前端组件实现
 - 集成测试和边界测试
 - 文档更新

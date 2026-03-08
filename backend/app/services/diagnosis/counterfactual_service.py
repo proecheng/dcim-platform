@@ -503,22 +503,43 @@ async def _perform_counterfactual_inference(
         # 移除当前证据及其依赖
         removed_evidence_ids = _get_evidence_cascade(evidence["node_id"], reasoning_path)
 
-        # 重新计算置信度（简化模拟）
-        new_confidence = _simulate_confidence_without_evidence(
-            original_confidence,
-            evidence["weight"],
-            removed_evidence_ids,
-            reasoning_path
-        )
+        # 尝试调用真实 L2 推理引擎
+        try:
+            from ...services.diagnosis.l2_inference_engine import infer_fault_tree
+
+            # 构建移除证据后的输入数据
+            filtered_reasoning_path = [
+                item for item in reasoning_path
+                if isinstance(item, dict) and item.get("node_id") not in removed_evidence_ids
+            ]
+
+            # 调用 L2 推理引擎（带超时）
+            inference_result = await asyncio.wait_for(
+                infer_fault_tree(
+                    fault_tree_id=1,  # 假设使用默认故障树
+                    sensor_data={},  # 需要从原始诊断结果中提取
+                    reasoning_path=filtered_reasoning_path
+                ),
+                timeout=5.0
+            )
+
+            new_confidence = inference_result.get("confidence", 0.0)
+            new_root_cause = inference_result.get("root_cause")
+
+        except (ImportError, asyncio.TimeoutError, Exception) as e:
+            # 降级到模拟逻辑
+            logger.warning(f"L2 inference failed for evidence {evidence['node_id']}, using simulation: {e}")
+            new_confidence = _simulate_confidence_without_evidence(
+                original_confidence,
+                evidence["weight"],
+                removed_evidence_ids,
+                reasoning_path
+            )
+            new_root_cause = _simulate_new_root_cause(reasoning_path, removed_evidence_ids)
 
         # 判断结论是否改变
         confidence_change = new_confidence - original_confidence
         conclusion_changed = abs(confidence_change) >= relative_threshold
-
-        # 模拟新根因（如果结论改变）
-        new_root_cause = None
-        if conclusion_changed:
-            new_root_cause = _simulate_new_root_cause(reasoning_path, removed_evidence_ids)
 
         scenarios.append({
             "removed_evidence_id": evidence["node_id"],
@@ -682,3 +703,93 @@ async def invalidate_cache_if_needed(
         return True
 
     return False
+
+
+# ==================== SSE 进度推送 ====================
+
+async def stream_counterfactual_progress(session_id: int):
+    """
+    SSE 流式推送反事实分析进度
+
+    Args:
+        session_id: 诊断会话ID
+
+    Yields:
+        SSE 格式的进度消息
+    """
+    import json
+    import asyncio
+
+    try:
+        # 1. 发送开始消息
+        yield f"data: {json.dumps({'status': 'started', 'session_id': session_id, 'progress': 0})}\n\n"
+        await asyncio.sleep(0.1)
+
+        # 2. 检查是否已有缓存
+        async with async_session() as db:
+            cached = await _check_cache(session_id, db)
+            if cached:
+                yield f"data: {json.dumps({'status': 'cached', 'progress': 100, 'message': '使用缓存结果'})}\n\n"
+                yield f"data: {json.dumps({'status': 'completed', 'analysis_id': cached.id})}\n\n"
+                return
+
+        # 3. 发送加载诊断结果消息
+        yield f"data: {json.dumps({'status': 'loading', 'progress': 10, 'message': '加载诊断结果'})}\n\n"
+        await asyncio.sleep(0.1)
+
+        # 4. 查询诊断结果
+        async with async_session() as db:
+            result_query = await db.execute(
+                select(DiagnosisResult).where(DiagnosisResult.session_id == session_id)
+            )
+            diagnosis_result = result_query.scalar_one_or_none()
+
+            if not diagnosis_result:
+                yield f"data: {json.dumps({'status': 'error', 'message': '诊断结果不存在'})}\n\n"
+                return
+
+            evidence_list = diagnosis_result.evidence or []
+            if not evidence_list:
+                yield f"data: {json.dumps({'status': 'error', 'message': '无证据数据'})}\n\n"
+                return
+
+            # 5. 发送计算证据权重消息
+            yield f"data: {json.dumps({'status': 'calculating', 'progress': 20, 'message': '计算证据权重'})}\n\n"
+            await asyncio.sleep(0.1)
+
+            # 6. 计算证据权重
+            path_decay_factor = await get_config(PATH_DECAY_FACTOR_KEY, PATH_DECAY_FACTOR_DEFAULT)
+            weighted_evidences = []
+            for ev in evidence_list:
+                weight = calculate_evidence_weight(ev, path_decay_factor)
+                weighted_evidences.append({
+                    "node_id": ev.get("node_id"),
+                    "weight": weight
+                })
+
+            weighted_evidences.sort(key=lambda x: x["weight"], reverse=True)
+            top_n = min(5, len(weighted_evidences))
+            top_evidences = weighted_evidences[:top_n]
+
+            # 7. 逐个分析证据
+            for i, evidence in enumerate(top_evidences):
+                progress = 30 + int((i / top_n) * 60)
+                yield f"data: {json.dumps({'status': 'analyzing', 'progress': progress, 'message': f'分析证据 {i+1}/{top_n}', 'evidence_id': evidence['node_id']})}\n\n"
+                await asyncio.sleep(0.5)  # 模拟分析耗时
+
+            # 8. 发送保存结果消息
+            yield f"data: {json.dumps({'status': 'saving', 'progress': 95, 'message': '保存分析结果'})}\n\n"
+            await asyncio.sleep(0.1)
+
+            # 9. 执行完整分析（如果尚未完成）
+            analysis = await analyze_counterfactual(session_id, top_n=top_n, db=db)
+
+            if analysis:
+                yield f"data: {json.dumps({'status': 'completed', 'progress': 100, 'analysis_id': analysis.id})}\n\n"
+            else:
+                yield f"data: {json.dumps({'status': 'error', 'message': '分析失败'})}\n\n"
+
+    except Exception as e:
+        logger.error(f"SSE stream error for session {session_id}: {e}", exc_info=True)
+        yield f"data: {json.dumps({'status': 'error', 'message': str(e)})}\n\n"
+

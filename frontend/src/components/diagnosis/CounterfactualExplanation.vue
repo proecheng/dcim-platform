@@ -3,19 +3,28 @@
  * 反事实解释组件
  * Story 26.1: 反事实分析
  */
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { getCounterfactualAnalysis, type CounterfactualAnalysis } from '@/api/modules/diagnosis'
 import { ElMessage } from 'element-plus'
 
 interface Props {
   sessionId: number
+  enableSSE?: boolean  // 是否启用 SSE 进度推送
 }
 
-const props = defineProps<Props>()
+const props = withDefaults(defineProps<Props>(), {
+  enableSSE: false
+})
 
 const loading = ref(false)
 const analysis = ref<CounterfactualAnalysis | null>(null)
 const error = ref<string | null>(null)
+
+// SSE 进度状态
+const sseProgress = ref(0)
+const sseMessage = ref('')
+const sseStatus = ref<'idle' | 'connecting' | 'analyzing' | 'completed' | 'error'>('idle')
+let eventSource: EventSource | null = null
 
 // 证据类型映射
 const evidenceTypeMap: Record<string, string> = {
@@ -57,6 +66,8 @@ async function loadAnalysis() {
   } catch (e: any) {
     if (e.response?.status === 404) {
       error.value = '反事实分析不存在，可能尚未生成'
+    } else if (e.response?.status === 403) {
+      error.value = '权限不足，需要高级诊断权限'
     } else {
       error.value = e.message || '加载失败'
       ElMessage.error('加载反事实分析失败')
@@ -66,8 +77,60 @@ async function loadAnalysis() {
   }
 }
 
+// SSE 进度推送
+function connectSSE() {
+  if (!props.enableSSE) return
+
+  sseStatus.value = 'connecting'
+  const token = localStorage.getItem('token')
+  const url = `/api/v1/diagnosis/counterfactual/${props.sessionId}/progress?token=${token}`
+
+  eventSource = new EventSource(url)
+
+  eventSource.onmessage = (event) => {
+    try {
+      const data = JSON.parse(event.data)
+
+      sseStatus.value = data.status
+      sseProgress.value = data.progress || 0
+      sseMessage.value = data.message || ''
+
+      if (data.status === 'completed') {
+        // 分析完成，加载结果
+        loadAnalysis()
+        closeSSE()
+      } else if (data.status === 'error') {
+        error.value = data.message || '分析失败'
+        closeSSE()
+      }
+    } catch (e) {
+      console.error('SSE 消息解析失败:', e)
+    }
+  }
+
+  eventSource.onerror = () => {
+    ElMessage.error('SSE 连接失败')
+    closeSSE()
+  }
+}
+
+function closeSSE() {
+  if (eventSource) {
+    eventSource.close()
+    eventSource = null
+  }
+}
+
 onMounted(() => {
-  loadAnalysis()
+  if (props.enableSSE) {
+    connectSSE()
+  } else {
+    loadAnalysis()
+  }
+})
+
+onUnmounted(() => {
+  closeSSE()
 })
 </script>
 
@@ -83,8 +146,12 @@ onMounted(() => {
     </template>
 
     <!-- 加载状态 -->
-    <div v-if="loading" class="loading-container">
-      <el-skeleton :rows="5" animated />
+    <div v-if="loading || sseStatus === 'analyzing'" class="loading-container">
+      <el-skeleton v-if="!enableSSE" :rows="5" animated />
+      <div v-else class="sse-progress">
+        <el-progress :percentage="sseProgress" :status="sseStatus === 'error' ? 'exception' : undefined" />
+        <p class="progress-message">{{ sseMessage }}</p>
+      </div>
     </div>
 
     <!-- 错误状态 -->
@@ -254,5 +321,16 @@ onMounted(() => {
   padding: 12px;
   background-color: #f5f7fa;
   border-radius: 4px;
+}
+
+.sse-progress {
+  padding: 24px;
+  text-align: center;
+}
+
+.progress-message {
+  margin-top: 12px;
+  color: #606266;
+  font-size: 14px;
 }
 </style>
