@@ -357,3 +357,80 @@ export function exportMisdiagnosisReport(reportId: number): Promise<Blob> {
     responseType: 'blob'
   })
 }
+
+// ==================== 时间窗口调参 API ====================
+
+/** 时间窗口调整记录 */
+export interface TimeWindowAdjustment {
+  id: number
+  device_type: string
+  current_window_minutes: number
+  proposed_window_minutes: number
+  adjustment_percent: number
+  sample_count: number
+  p50_duration_seconds: number
+  p90_duration_seconds: number
+  status: string
+  reason?: string
+  approved_by?: number
+  approved_at?: string
+  created_at: string
+  updated_at: string
+}
+
+/** 时间窗口调整查询参数 */
+export interface TimeWindowAdjustmentQuery extends PageParams {
+  device_type?: string
+  status?: string
+}
+
+/** 审批/拒绝参数 */
+export interface TimeWindowApprovalRequest {
+  reason?: string
+}
+
+/**
+ * 获取时间窗口调整记录列表
+ */
+export function getTimeWindowAdjustments(
+  params: TimeWindowAdjustmentQuery
+): Promise<PageResponse<TimeWindowAdjustment>> {
+  return request.get('/v1/diagnosis/time-window-tuning/adjustments', { params })
+}
+
+/**
+ * 触发时间窗口调参分析
+ */
+export function triggerTimeWindowAnalysis(): Promise<{
+  analyzed_device_types: number
+  total_adjustments: number
+  pending_approvals: number
+}> {
+  return request.post('/v1/diagnosis/time-window-tuning/analyze')
+}
+
+/**
+ * 审批时间窗口调整
+ */
+export function approveTimeWindowAdjustment(
+  adjustmentId: number,
+  data: TimeWindowApprovalRequest
+): Promise<{
+  message: string
+  device_type: string
+  new_window_minutes: number
+}> {
+  return request.post(`/v1/diagnosis/time-window-tuning/adjustments/${adjustmentId}/approve`, data)
+}
+
+/**
+ * 拒绝时间窗口调整
+ */
+export function rejectTimeWindowAdjustment(
+  adjustmentId: number,
+  data: TimeWindowApprovalRequest
+): Promise<{
+  message: string
+}> {
+  return request.post(`/v1/diagnosis/time-window-tuning/adjustments/${adjustmentId}/reject`, data)
+}
