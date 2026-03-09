@@ -124,14 +124,19 @@ class Settings(BaseSettings):
     smtp_port: int = Field(default=587, env="SMTP_PORT", description="SMTP 端口")
     smtp_user: str = Field(default="", env="SMTP_USER", description="SMTP 用户名")
     smtp_password: str = Field(default="", env="SMTP_PASSWORD", description="SMTP 密码")
-    smtp_from_email: str = Field(default="", env="SMTP_FROM_EMAIL", description="发件人邮箱")
+    smtp_from_email: str = Field(default="", description="发件人邮箱")
 
     # 报告文件存储目录（Story 26.6）
-    report_dir: str = Field(default="reports/", env="REPORT_DIR", description="报告文件存储目录")
+    report_dir: str = Field(default="reports/", description="报告文件存储目录")
 
     class Config:
         env_file = ".env"
         case_sensitive = False
+        # Pydantic v2: 环境变量前缀映射
+        env_prefix = ""
+        fields = {
+            'report_dir': {'env': 'REPORT_DIR'}
+        }
 
 
 @lru_cache()

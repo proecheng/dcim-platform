@@ -5,7 +5,7 @@
 **Story Key**: 26-6-misdiagnosis-analysis-report
 **优先级**: P3 (愿景阶段)
 **估算**: 3 天
-**状态**: backlog
+**状态**: in-progress
 **创建日期**: 2026-03-09
 
 ---
@@ -855,9 +855,42 @@ Claude Opus 4.6 (claude-opus-4-6)
 
 ### Completion Notes List
 
-待实施
+**实施完成 (2026-03-09)**:
+- ✅ 服务层实现 (MisdiagnosisReportServiceV2)
+- ✅ API 端点实现 (4个端点，全部 admin-only)
+- ✅ Pydantic Schema 定义
+- ✅ APScheduler 定时任务（每月1日凌晨2:00 UTC，含重试机制）
+- ✅ 审计日志记录
+- ✅ WebSocket 通知集成
+- ✅ 配置项添加 (report_dir)
+- ✅ 路由注册
+- ✅ 单元测试框架（部分实现）
+- ✅ API 测试框架（部分实现）
+
+**待完善**:
+- ⚠️ 测试覆盖率未达 80%（仅实现基础测试框架）
+- ⚠️ 邮件通知未实现（可选功能）
+- ⚠️ 数据库索引优化未实施
+- ⚠️ 集成测试未实现
+
+**已修复问题**:
+- 🐛 修复 probability_tuning_service.py 导入错误（AsyncSession 未导入）
+- 🐛 修复 misdiagnosis_report_service.py 重复 return 语句
+- 🐛 修复 Pydantic v2 配置警告
 
 ### File List
 
-待实施后更新
+**新增文件**:
+- `backend/app/api/v1/misdiagnosis_reports.py` - API 端点（183 行）
+- `backend/app/schemas/misdiagnosis_report.py` - Pydantic Schema（109 行）
+- `backend/tests/services/diagnosis/test_misdiagnosis_report_service.py` - 单元测试（部分）
+- `backend/tests/api/test_misdiagnosis_reports.py` - API 测试（部分）
+
+**修改文件**:
+- `backend/app/services/diagnosis/misdiagnosis_report_service.py` - 添加 MisdiagnosisReportServiceV2 类（603 行新增）
+- `backend/app/services/diagnosis/scheduler.py` - 添加月度定时任务（116 行新增，含重试机制）
+- `backend/app/core/config.py` - 添加 report_dir 配置（3 行新增）
+- `backend/app/api/v1/__init__.py` - 注册路由（2 行新增）
+- `backend/app/services/diagnosis/probability_tuning_service.py` - 修复导入错误（1 行）
+- `_bmad-output/implementation-artifacts/sprint-status.yaml` - 更新状态为 in-progress
 

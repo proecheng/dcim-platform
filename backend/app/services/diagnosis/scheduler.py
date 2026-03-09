@@ -722,7 +722,7 @@ class DiagnosisScheduler:
     async def _misdiagnosis_report_loop(self):
         """
         月度误判分析报告定时任务（Story 26.6）
-        每月1日凌晨 2:00 UTC 执行一次
+        每月1日凌晨 2:00 UTC 执行一次，失败后每小时重试，最多3次
         """
         from app.services.diagnosis.misdiagnosis_report_service import MisdiagnosisReportServiceV2
         from datetime import timezone
@@ -731,12 +731,26 @@ class DiagnosisScheduler:
         # 启动延迟 60 秒，避免与其他任务冲突
         await asyncio.sleep(60)
 
+        retry_count = 0
+        max_retries = 3
+        last_attempt_month = None
+
         while self.running:
             try:
                 now = datetime.now(timezone.utc)
 
-                # 检查是否是每月1日凌晨 2:00-2:05 UTC
-                if now.day == 1 and now.hour == 2 and now.minute < 5:
+                # 检查是否是每月1日凌晨 2:00-2:05 UTC 或重试时间
+                is_scheduled_time = now.day == 1 and now.hour == 2 and now.minute < 5
+                is_retry_time = retry_count > 0 and retry_count <= max_retries
+
+                if is_scheduled_time or is_retry_time:
+                    # 检查是否是新的月份（避免同一个月重复执行）
+                    current_month_key = f"{now.year}-{now.month}"
+                    if is_scheduled_time and last_attempt_month == current_month_key:
+                        # 同一个月已经尝试过，跳过
+                        await asyncio.sleep(300)
+                        continue
+
                     # 使用 Redis 分布式锁确保只有一个实例执行
                     lock_key = "diagnosis:misdiagnosis_report:lock"
                     lock_value = str(uuid.uuid4())
@@ -747,7 +761,7 @@ class DiagnosisScheduler:
 
                     if acquired:
                         try:
-                            logger.info("开始生成月度误判分析报告...")
+                            logger.info(f"开始生成月度误判分析报告... (尝试 {retry_count + 1}/{max_retries + 1})")
 
                             # 计算上个月的时间范围
                             if now.month == 1:
@@ -763,6 +777,17 @@ class DiagnosisScheduler:
                             # 上个月最后一天
                             last_day = calendar.monthrange(prev_year, prev_month)[1]
                             end_date = datetime(prev_year, prev_month, last_day, 23, 59, 59, tzinfo=timezone.utc)
+
+                            # 检查报告状态（如果已完成，跳过重试）
+                            async with async_session() as check_session:
+                                check_service = MisdiagnosisReportServiceV2(check_session)
+                                existing = await check_service._check_existing_report(start_date, end_date)
+                                if existing and existing.status == "completed":
+                                    logger.info(f"报告已完成，跳过重试: report_id={existing.id}")
+                                    retry_count = 0
+                                    last_attempt_month = current_month_key
+                                    await asyncio.sleep(300)
+                                    continue
 
                             # 生成报告
                             async with async_session() as db_session:
@@ -794,11 +819,42 @@ class DiagnosisScheduler:
                             except Exception as ws_err:
                                 logger.error(f"Failed to broadcast report notification: {ws_err}")
 
+                            # 成功后重置重试计数
+                            retry_count = 0
+                            last_attempt_month = current_month_key
+
                         except ValueError as ve:
                             # 报告已存在，跳过
                             logger.info(f"月度误判分析报告已存在: {ve}")
+                            retry_count = 0
+                            last_attempt_month = current_month_key
                         except Exception as e:
-                            logger.error(f"月度误判分析报告生成失败: {e}", exc_info=True)
+                            logger.error(f"月度误判分析报告生成失败 (尝试 {retry_count + 1}/{max_retries + 1}): {e}", exc_info=True)
+
+                            # 增加重试计数
+                            retry_count += 1
+                            last_attempt_month = current_month_key
+
+                            # 如果达到最大重试次数，发送最终失败通知
+                            if retry_count > max_retries:
+                                logger.error(f"月度误判分析报告生成失败，已达最大重试次数 ({max_retries})")
+                                try:
+                                    from app.services.websocket import ws_manager
+                                    await ws_manager.broadcast_diagnosis(
+                                        msg_type="misdiagnosis_report_failed",
+                                        data={
+                                            "error": str(e),
+                                            "retry_count": retry_count - 1,
+                                            "start_date": start_date.isoformat(),
+                                            "end_date": end_date.isoformat(),
+                                        },
+                                        target_roles=["admin"],
+                                    )
+                                except Exception as ws_err:
+                                    logger.error(f"Failed to broadcast failure notification: {ws_err}")
+
+                                # 重置重试计数，等待下个月
+                                retry_count = 0
                         finally:
                             # 释放锁
                             script = """
@@ -812,8 +868,11 @@ class DiagnosisScheduler:
                     else:
                         logger.debug("月度误判分析报告锁已被其他实例持有")
 
-                    # 执行后等待 5 分钟，避免重复执行
-                    await asyncio.sleep(300)
+                    # 执行后等待时间：成功或达到最大重试后等5分钟，否则等1小时重试
+                    if retry_count == 0 or retry_count > max_retries:
+                        await asyncio.sleep(300)
+                    else:
+                        await asyncio.sleep(3600)  # 1小时后重试
                 else:
                     # 每 5 分钟检查一次时间
                     await asyncio.sleep(300)

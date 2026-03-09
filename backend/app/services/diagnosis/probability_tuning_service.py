@@ -8,6 +8,7 @@ from datetime import datetime
 from typing import Optional
 from sqlalchemy import select, and_, func, desc
 from sqlalchemy.orm import selectinload
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import async_session
 from app.models.diagnosis import ProbabilityAdjustmentLog, DiagnosisResult, DiagnosisAnnotation

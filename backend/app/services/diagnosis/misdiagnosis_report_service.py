@@ -22,6 +22,7 @@ from app.models.diagnosis import (
 from app.models.report import ReportRecord
 from app.models.alarm import Alarm
 from app.models.operation import WorkOrder
+from app.models.operation_log import OperationLog
 from app.core.redis import redis_service
 from app.core.config import get_settings
 
@@ -722,6 +723,27 @@ class MisdiagnosisReportServiceV2:
             report.file_size = file_size
             report.report_data = json.dumps(report_data, ensure_ascii=False)
             report.status = "completed"
+
+            # 11. 记录审计日志 (Story 26.6 Task 5)
+            audit_log = OperationLog(
+                user_id=generated_by,
+                operation_type="generate_misdiagnosis_report",
+                resource_type="misdiagnosis_report",
+                resource_id=report_id,
+                operation_content=json.dumps({
+                    "report_name": report_name,
+                    "start_date": start_date.isoformat(),
+                    "end_date": end_date.isoformat(),
+                    "total_diagnosis_count": summary["total_diagnosis_count"],
+                    "annotation_coverage_rate": summary["annotation_coverage_rate"],
+                    "false_positive_rate": false_positive_stats["false_positive_rate"],
+                    "false_negative_rate": false_negative_stats["false_negative_rate"],
+                    "generated_by": "scheduled_task" if generated_by is None else "manual",
+                }, ensure_ascii=False),
+                ip_address="127.0.0.1",  # 定时任务本地执行
+            )
+            self.db.add(audit_log)
+
             await self.db.commit()
 
             logger.info(f"报告生成成功: {report_name}, report_id={report_id}")
@@ -1202,6 +1224,3 @@ class MisdiagnosisReportServiceV2:
         file_size = os.path.getsize(file_path)
 
         return file_path, file_size
-
-
-        return content
