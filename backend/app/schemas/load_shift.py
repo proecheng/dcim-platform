@@ -5,7 +5,7 @@ Load Shift Schemas - Pydantic models for load shifting API
 
 from enum import Enum
 from typing import Optional, List, Dict, Any
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, ConfigDict
 from datetime import datetime, date, time
 
 
@@ -139,8 +139,7 @@ class ShiftPlanResponse(ShiftPlanBase):
     executed_at: Optional[datetime] = None
     completed_at: Optional[datetime] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class ShiftPlanDetail(ShiftPlanResponse):
@@ -187,8 +186,7 @@ class ShiftExecutionResponse(ShiftExecutionBase):
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class ShiftExecutionDetail(ShiftExecutionResponse):
@@ -224,8 +222,7 @@ class ShiftOpportunityResponse(ShiftOpportunityBase):
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class ShiftOpportunityDetail(ShiftOpportunityResponse):
@@ -276,11 +273,7 @@ class ShiftConstraintResponse(ShiftConstraintBase):
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        from_attributes = True
-
-
-# ========== Analysis Schemas ==========
+    model_config = ConfigDict(from_attributes=True)
 
 class FeasibilityAnalysisRequest(BaseModel):
     """Feasibility analysis request - 可行性分析请求"""

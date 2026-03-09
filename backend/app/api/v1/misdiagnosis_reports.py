@@ -11,7 +11,7 @@ from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.core.security import require_role
+from app.api.deps import require_role
 from app.models.report import ReportRecord
 from app.schemas.misdiagnosis_report import (
     MisdiagnosisReportGenerateRequest,
@@ -26,8 +26,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/diagnosis/misdiagnosis-reports", tags=["misdiagnosis-reports"])
 
 
-@router.get("", response_model=MisdiagnosisReportListResponse)
-@require_role("admin")
+@router.get("", response_model=MisdiagnosisReportListResponse, dependencies=[Depends(require_role(["admin"]))])
 async def list_misdiagnosis_reports(
     page: int = Query(1, ge=1, description="页码"),
     page_size: int = Query(20, ge=1, le=100, description="每页数量"),
@@ -72,7 +71,7 @@ async def list_misdiagnosis_reports(
     result = await db.execute(query)
     reports = result.scalars().all()
 
-    items = [MisdiagnosisReportListItem.from_orm(report) for report in reports]
+    items = [MisdiagnosisReportListItem.model_validate(report) for report in reports]
 
     return MisdiagnosisReportListResponse(
         total=total,
@@ -82,8 +81,7 @@ async def list_misdiagnosis_reports(
     )
 
 
-@router.get("/{report_id}", response_model=MisdiagnosisReportDetailResponse)
-@require_role("admin")
+@router.get("/{report_id}", response_model=MisdiagnosisReportDetailResponse, dependencies=[Depends(require_role(["admin"]))])
 async def get_misdiagnosis_report(
     report_id: int,
     db: AsyncSession = Depends(get_db),
@@ -103,11 +101,10 @@ async def get_misdiagnosis_report(
     if not report:
         raise HTTPException(status_code=404, detail="报告不存在")
 
-    return MisdiagnosisReportDetailResponse.from_orm(report)
+    return MisdiagnosisReportDetailResponse.model_validate(report)
 
 
-@router.get("/{report_id}/download")
-@require_role("admin")
+@router.get("/{report_id}/download", dependencies=[Depends(require_role(["admin"]))])
 async def download_misdiagnosis_report(
     report_id: int,
     db: AsyncSession = Depends(get_db),
@@ -144,12 +141,11 @@ async def download_misdiagnosis_report(
     )
 
 
-@router.post("/generate")
-@require_role("admin")
+@router.post("/generate", dependencies=[Depends(require_role(["admin"]))])
 async def generate_misdiagnosis_report(
     request: MisdiagnosisReportGenerateRequest,
     db: AsyncSession = Depends(get_db),
-    current_user_id: int = Depends(require_role("admin")),
+    current_user = Depends(require_role(["admin"])),
 ):
     """
     手动触发报告生成（仅用于测试）
@@ -167,7 +163,7 @@ async def generate_misdiagnosis_report(
         report_id = await service.generate_monthly_report_v2(
             start_date=start_datetime,
             end_date=end_datetime,
-            generated_by=current_user_id,
+            generated_by=current_user.id,
         )
 
         return {

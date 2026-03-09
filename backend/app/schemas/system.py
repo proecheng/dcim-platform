@@ -4,7 +4,7 @@
 
 from datetime import datetime, date
 from typing import Optional
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 
 class ControlCommandCreate(BaseModel):
@@ -22,8 +22,7 @@ class ControlCommandResponse(BaseModel):
     created_at: datetime
     executed_at: Optional[datetime] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class LicenseResponse(BaseModel):
@@ -34,8 +33,7 @@ class LicenseResponse(BaseModel):
     expire_date: Optional[date] = None
     is_active: bool
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class LicenseActivate(BaseModel):
@@ -63,5 +61,4 @@ class OperationLogResponse(BaseModel):
     ip_address: Optional[str] = None
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)

@@ -1,7 +1,7 @@
 """
 故障树版本 Schema - Story 24.4
 """
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 from typing import Optional
 from datetime import datetime
 
@@ -25,8 +25,7 @@ class FaultTreeVersionResponse(BaseModel):
     reviewed_at: Optional[datetime] = None
     activated_at: Optional[datetime] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class FaultTreeVersionListResponse(BaseModel):
@@ -40,5 +39,4 @@ class FaultTreeVersionListResponse(BaseModel):
     reviewed_at: Optional[datetime] = None
     activated_at: Optional[datetime] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)

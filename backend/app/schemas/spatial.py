@@ -3,7 +3,7 @@
 """
 
 from typing import Optional, List
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 from datetime import datetime
 
 
@@ -54,8 +54,7 @@ class SiteResponse(BaseModel):
     created_at: datetime = Field(..., description="创建时间")
     updated_at: datetime = Field(..., description="更新时间")
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class SiteSummaryItem(BaseModel):
@@ -112,11 +111,7 @@ class FloorResponse(BaseModel):
     created_at: datetime = Field(..., description="创建时间")
     updated_at: datetime = Field(..., description="更新时间")
 
-    class Config:
-        from_attributes = True
-
-
-# ==================== Room Schemas ====================
+    model_config = ConfigDict(from_attributes=True)
 
 
 class RoomCreate(BaseModel):
@@ -157,11 +152,7 @@ class RoomResponse(BaseModel):
     created_at: datetime = Field(..., description="创建时间")
     updated_at: datetime = Field(..., description="更新时间")
 
-    class Config:
-        from_attributes = True
-
-
-# ==================== Row Schemas ====================
+    model_config = ConfigDict(from_attributes=True)
 
 
 class RowCreate(BaseModel):
@@ -196,11 +187,7 @@ class RowResponse(BaseModel):
     created_at: datetime = Field(..., description="创建时间")
     updated_at: datetime = Field(..., description="更新时间")
 
-    class Config:
-        from_attributes = True
-
-
-# ==================== LayoutTemplate Schemas ====================
+    model_config = ConfigDict(from_attributes=True)
 
 
 class LayoutTemplateResponse(BaseModel):
@@ -213,11 +200,7 @@ class LayoutTemplateResponse(BaseModel):
     template_data: Optional[str] = Field(None, description="JSON格式模板数据")
     created_at: datetime = Field(..., description="创建时间")
 
-    class Config:
-        from_attributes = True
-
-
-# ==================== Cabinet Position ====================
+    model_config = ConfigDict(from_attributes=True)
 
 
 class CabinetPositionUpdate(BaseModel):
@@ -242,8 +225,7 @@ class TreeCabinetItem(BaseModel):
     grid_x: Optional[int] = None
     grid_y: Optional[int] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class TreeRowItem(BaseModel):
@@ -255,8 +237,7 @@ class TreeRowItem(BaseModel):
     aisle_type: str = "none"
     cabinets: List[TreeCabinetItem] = []
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class TreeRoomItem(BaseModel):
@@ -269,8 +250,7 @@ class TreeRoomItem(BaseModel):
     grid_rows: int = 20
     rows: List[TreeRowItem] = []
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class TreeFloorItem(BaseModel):
@@ -282,8 +262,7 @@ class TreeFloorItem(BaseModel):
     sort_order: int = 0
     rooms: List[TreeRoomItem] = []
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class SpatialTreeResponse(BaseModel):
@@ -294,11 +273,7 @@ class SpatialTreeResponse(BaseModel):
     site_name: str
     floors: List[TreeFloorItem] = []
 
-    class Config:
-        from_attributes = True
-
-
-# ==================== Import/Export ====================
+    model_config = ConfigDict(from_attributes=True)
 
 
 class ImportResultResponse(BaseModel):

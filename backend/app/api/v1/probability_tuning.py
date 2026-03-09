@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 from typing import Optional, List
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 from datetime import datetime
 
 from app.core.database import get_db
@@ -14,7 +14,7 @@ from app.models.diagnosis import ProbabilityAdjustmentLog
 from app.models.fault_tree import FaultTree
 from app.services.diagnosis.probability_tuning_service import ProbabilityTuningService
 from app.services.diagnosis.version_manager import VersionManager
-from app.services.websocket_manager import ws_manager
+from app.services.websocket import ws_manager
 import logging
 
 logger = logging.getLogger(__name__)
@@ -46,8 +46,7 @@ class ProbabilityAdjustmentResponse(BaseModel):
     approved_at: Optional[datetime] = None
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class ProbabilityAdjustmentListResponse(BaseModel):

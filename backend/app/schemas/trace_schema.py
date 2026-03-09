@@ -3,7 +3,7 @@
 实现专利 S1/S3 - 数据追溯链展示和用户交互
 """
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 from typing import Optional, List, Dict, Any
 from datetime import datetime
 from decimal import Decimal
@@ -61,8 +61,7 @@ class TraceRecordResponse(BaseModel):
     # 时间戳
     calculated_at: Optional[datetime] = Field(None, description="计算时间")
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class TraceNodeResponse(BaseModel):
@@ -83,11 +82,7 @@ class TraceNodeResponse(BaseModel):
     # 子节点
     children: List["TraceNodeResponse"] = Field(default_factory=list, description="子节点列表")
 
-    class Config:
-        from_attributes = True
-
-
-# 解决循环引用
+    model_config = ConfigDict(from_attributes=True)
 TraceNodeResponse.model_rebuild()
 
 
@@ -174,11 +169,7 @@ class MeasureDetailResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        from_attributes = True
-
-
-# ========== 措施状态更新模型 ==========
+    model_config = ConfigDict(from_attributes=True)
 
 
 class MeasureStatusUpdate(BaseModel):

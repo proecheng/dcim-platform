@@ -5,7 +5,7 @@ Story 26.4: 时间窗口自适应
 
 from datetime import datetime
 from typing import Optional
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 
 
 class TimeWindowAdjustmentBase(BaseModel):
@@ -38,8 +38,7 @@ class TimeWindowAdjustmentResponse(TimeWindowAdjustmentBase):
     created_at: datetime = Field(..., description="创建时间")
     updated_at: datetime = Field(..., description="更新时间")
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class TimeWindowAdjustmentListResponse(BaseModel):

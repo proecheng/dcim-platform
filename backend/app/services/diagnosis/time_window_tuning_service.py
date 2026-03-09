@@ -47,21 +47,20 @@ class TimeWindowTuningService:
 
         async with async_session() as session:
             # 查询所有有准确诊断的设备类型
-            # 注意：这里假设 diagnosis_results 表有 device_type 字段
-            # 实际实现时需要通过 JOIN alarms 表获取 device_type
+            # 通过 diagnosis_results.device_type 获取，JOIN annotations 通过 session_id
             query = """
-                SELECT DISTINCT d.device_type
-                FROM devices d
-                INNER JOIN alarms a ON a.device_id = d.id
-                INNER JOIN diagnosis_results dr ON dr.alarm_id = a.id
-                INNER JOIN diagnosis_annotations da ON da.result_id = dr.id
+                SELECT DISTINCT dr.device_type
+                FROM diagnosis_results dr
+                INNER JOIN diagnosis_annotations da ON da.session_id = dr.session_id
+                INNER JOIN alarms a ON dr.alarm_id = a.id
                 WHERE da.annotation = 'accurate'
-                  AND a.recovered_at IS NOT NULL
-                  AND a.recovered_at > a.created_at
+                  AND a.resolved_at IS NOT NULL
+                  AND a.duration_seconds > 0
+                  AND dr.device_type IS NOT NULL
             """
 
             if device_type_filter:
-                query += f" AND d.device_type = :device_type"
+                query += " AND dr.device_type = :device_type"
 
             result = await session.execute(
                 text(query),
@@ -113,20 +112,17 @@ class TimeWindowTuningService:
         current_window_minutes = await self._get_current_window_minutes(session, device_type)
 
         # 查询该设备类型的告警持续时长统计
-        # 使用 SQL percentile_cont 函数计算 P50 和 P90
-        # 注意：SQLite 不支持 percentile_cont，需要使用 Python 计算
+        # 使用 alarms.duration_seconds 字段（已计算），通过 Python 计算 P50/P90
         query = """
             SELECT
-                (CAST(strftime('%s', a.recovered_at) AS INTEGER) - CAST(strftime('%s', a.created_at) AS INTEGER)) AS duration_seconds
-            FROM alarms a
-            INNER JOIN devices d ON a.device_id = d.id
-            INNER JOIN diagnosis_results dr ON dr.alarm_id = a.id
-            INNER JOIN diagnosis_annotations da ON da.result_id = dr.id
-            WHERE d.device_type = :device_type
+                a.duration_seconds AS duration_seconds
+            FROM diagnosis_results dr
+            INNER JOIN diagnosis_annotations da ON da.session_id = dr.session_id
+            INNER JOIN alarms a ON dr.alarm_id = a.id
+            WHERE dr.device_type = :device_type
               AND da.annotation = 'accurate'
-              AND a.recovered_at IS NOT NULL
-              AND a.recovered_at > a.created_at
-              AND (CAST(strftime('%s', a.recovered_at) AS INTEGER) - CAST(strftime('%s', a.created_at) AS INTEGER)) > 0
+              AND a.resolved_at IS NOT NULL
+              AND a.duration_seconds > 0
         """
 
         result = await session.execute(text(query), {"device_type": device_type})

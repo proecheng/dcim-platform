@@ -5,7 +5,7 @@
 
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 
@@ -93,8 +93,7 @@ class DispatchableDeviceResponse(DispatchableDeviceBase):
     meter_point_id: Optional[int] = None
     power_device_id: Optional[int] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class StorageConfigBase(BaseModel):
@@ -141,8 +140,7 @@ class StorageConfigResponse(StorageConfigBase):
     id: int
     meter_point_id: Optional[int] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class PVConfigBase(BaseModel):
@@ -179,8 +177,7 @@ class PVConfigResponse(PVConfigBase):
     id: int
     meter_point_id: Optional[int] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # ==================== 可调度设备 API ====================

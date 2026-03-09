@@ -3,7 +3,7 @@
 """
 
 from typing import Optional, List
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, model_validator, ConfigDict
 
 
 # ==================== PowerPhaseMapping Schemas ====================
@@ -44,11 +44,7 @@ class PowerPhaseMappingResponse(BaseModel):
     cabinet_code: Optional[str] = None
     cabinet_name: Optional[str] = None
 
-    class Config:
-        from_attributes = True
-
-
-# ==================== CoolingZone Schemas ====================
+    model_config = ConfigDict(from_attributes=True)
 
 
 class CoolingZoneCreate(BaseModel):
@@ -102,11 +98,7 @@ class CoolingZoneResponse(BaseModel):
     cabinets: List[CoolingZoneCabinetItem] = Field(default_factory=list)
     cooling_units: List[CoolingZoneUnitItem] = Field(default_factory=list)
 
-    class Config:
-        from_attributes = True
-
-
-# ==================== PhaseBalance Schemas ====================
+    model_config = ConfigDict(from_attributes=True)
 
 
 class PhaseBalanceResponse(BaseModel):

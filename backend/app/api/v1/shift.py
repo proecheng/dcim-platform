@@ -748,7 +748,7 @@ async def get_shift_report(
 @router.post("/reports/export", response_model=Dict[str, Any])
 async def export_shift_report(
     report_data: Dict[str, Any],
-    format: str = Query(..., regex="^(excel|pdf)$"),
+    format: str = Query(..., pattern="^(excel|pdf)$"),
     current_user: User = Depends(get_current_user)
 ):
     """

@@ -22,7 +22,7 @@ from app.models.diagnosis import (
 from app.models.report import ReportRecord
 from app.models.alarm import Alarm
 from app.models.operation import WorkOrder
-from app.models.operation_log import OperationLog
+from app.models.log import OperationLog
 from app.core.redis import redis_service
 from app.core.config import get_settings
 
@@ -727,11 +727,12 @@ class MisdiagnosisReportServiceV2:
             # 11. 记录审计日志 (Story 26.6 Task 5)
             audit_log = OperationLog(
                 user_id=generated_by,
-                operation_type="generate_misdiagnosis_report",
-                resource_type="misdiagnosis_report",
-                resource_id=report_id,
-                operation_content=json.dumps({
-                    "report_name": report_name,
+                module="report",
+                action="create",
+                target_type="misdiagnosis_report",
+                target_id=report_id,
+                target_name=report_name,
+                new_value=json.dumps({
                     "start_date": start_date.isoformat(),
                     "end_date": end_date.isoformat(),
                     "total_diagnosis_count": summary["total_diagnosis_count"],
@@ -740,7 +741,7 @@ class MisdiagnosisReportServiceV2:
                     "false_negative_rate": false_negative_stats["false_negative_rate"],
                     "generated_by": "scheduled_task" if generated_by is None else "manual",
                 }, ensure_ascii=False),
-                ip_address="127.0.0.1",  # 定时任务本地执行
+                ip_address="127.0.0.1",
             )
             self.db.add(audit_log)
 
@@ -795,7 +796,7 @@ class MisdiagnosisReportServiceV2:
                     COUNT(da.id) AS annotated_count,
                     CAST(COUNT(da.id) AS REAL) / NULLIF(COUNT(*), 0) AS annotation_coverage_rate
                 FROM diagnosis_results dr
-                LEFT JOIN diagnosis_annotations da ON dr.id = da.diagnosis_result_id
+                LEFT JOIN diagnosis_annotations da ON dr.session_id = da.session_id
                 WHERE dr.created_at BETWEEN :start_date AND :end_date
             """)
         else:  # postgresql
@@ -805,7 +806,7 @@ class MisdiagnosisReportServiceV2:
                     COUNT(da.id) AS annotated_count,
                     CAST(COUNT(da.id) AS FLOAT) / NULLIF(COUNT(*), 0) AS annotation_coverage_rate
                 FROM diagnosis_results dr
-                LEFT JOIN diagnosis_annotations da ON dr.id = da.diagnosis_result_id
+                LEFT JOIN diagnosis_annotations da ON dr.session_id = da.session_id
                 WHERE dr.created_at BETWEEN :start_date AND :end_date
             """)
 
@@ -828,7 +829,7 @@ class MisdiagnosisReportServiceV2:
                     SUM(CASE WHEN dr.root_cause IS NOT NULL AND da.is_accurate = 0 THEN 1 ELSE 0 END) AS false_positive_count,
                     SUM(CASE WHEN dr.root_cause IS NOT NULL THEN 1 ELSE 0 END) AS total_positive_count
                 FROM diagnosis_results dr
-                JOIN diagnosis_annotations da ON dr.id = da.diagnosis_result_id
+                JOIN diagnosis_annotations da ON dr.session_id = da.session_id
                 WHERE dr.created_at BETWEEN :start_date AND :end_date
             """)
         else:  # postgresql
@@ -837,7 +838,7 @@ class MisdiagnosisReportServiceV2:
                     COUNT(*) FILTER (WHERE dr.root_cause IS NOT NULL AND da.is_accurate = false) AS false_positive_count,
                     COUNT(*) FILTER (WHERE dr.root_cause IS NOT NULL) AS total_positive_count
                 FROM diagnosis_results dr
-                JOIN diagnosis_annotations da ON dr.id = da.diagnosis_result_id
+                JOIN diagnosis_annotations da ON dr.session_id = da.session_id
                 WHERE dr.created_at BETWEEN :start_date AND :end_date
             """)
 
@@ -925,7 +926,7 @@ class MisdiagnosisReportServiceV2:
                         COUNT(*) AS total_count,
                         CAST(SUM(CASE WHEN da.is_accurate = 0 THEN 1 ELSE 0 END) AS REAL) / COUNT(*) AS misdiagnosis_rate
                     FROM diagnosis_results dr
-                    JOIN diagnosis_annotations da ON dr.id = da.diagnosis_result_id
+                    JOIN diagnosis_annotations da ON dr.session_id = da.session_id
                     LEFT JOIN fault_tree_nodes ftn ON dr.root_cause = ftn.node_id
                     WHERE dr.created_at BETWEEN :start_date AND :end_date
                       AND dr.root_cause IS NOT NULL
@@ -944,7 +945,7 @@ class MisdiagnosisReportServiceV2:
                         COUNT(*) AS total_count,
                         CAST(COUNT(*) FILTER (WHERE da.is_accurate = false) AS FLOAT) / COUNT(*) AS misdiagnosis_rate
                     FROM diagnosis_results dr
-                    JOIN diagnosis_annotations da ON dr.id = da.diagnosis_result_id
+                    JOIN diagnosis_annotations da ON dr.session_id = da.session_id
                     LEFT JOIN fault_tree_nodes ftn ON dr.root_cause = ftn.node_id
                     WHERE dr.created_at BETWEEN :start_date AND :end_date
                       AND dr.root_cause IS NOT NULL
@@ -965,7 +966,7 @@ class MisdiagnosisReportServiceV2:
                         COUNT(*) AS total_count,
                         CAST(SUM(CASE WHEN da.is_accurate = 0 THEN 1 ELSE 0 END) AS REAL) / COUNT(*) AS misdiagnosis_rate
                     FROM diagnosis_results dr
-                    JOIN diagnosis_annotations da ON dr.id = da.diagnosis_result_id
+                    JOIN diagnosis_annotations da ON dr.session_id = da.session_id
                     WHERE dr.created_at BETWEEN :start_date AND :end_date
                       AND dr.root_cause IS NOT NULL
                     GROUP BY dr.root_cause
@@ -983,7 +984,7 @@ class MisdiagnosisReportServiceV2:
                         COUNT(*) AS total_count,
                         CAST(COUNT(*) FILTER (WHERE da.is_accurate = false) AS FLOAT) / COUNT(*) AS misdiagnosis_rate
                     FROM diagnosis_results dr
-                    JOIN diagnosis_annotations da ON dr.id = da.diagnosis_result_id
+                    JOIN diagnosis_annotations da ON dr.session_id = da.session_id
                     WHERE dr.created_at BETWEEN :start_date AND :end_date
                       AND dr.root_cause IS NOT NULL
                     GROUP BY dr.root_cause
@@ -1018,7 +1019,7 @@ class MisdiagnosisReportServiceV2:
                     SUM(CASE WHEN da.is_accurate = 0 THEN 1 ELSE 0 END) AS misdiagnosis_count,
                     CAST(SUM(CASE WHEN da.is_accurate = 0 THEN 1 ELSE 0 END) AS REAL) / COUNT(*) AS misdiagnosis_rate
                 FROM diagnosis_results dr
-                JOIN diagnosis_annotations da ON dr.id = da.diagnosis_result_id
+                JOIN diagnosis_annotations da ON dr.session_id = da.session_id
                 WHERE dr.created_at BETWEEN :start_date AND :end_date
                 GROUP BY dr.device_type
                 HAVING COUNT(*) > 0
@@ -1032,7 +1033,7 @@ class MisdiagnosisReportServiceV2:
                     COUNT(*) FILTER (WHERE da.is_accurate = false) AS misdiagnosis_count,
                     CAST(COUNT(*) FILTER (WHERE da.is_accurate = false) AS FLOAT) / COUNT(*) AS misdiagnosis_rate
                 FROM diagnosis_results dr
-                JOIN diagnosis_annotations da ON dr.id = da.diagnosis_result_id
+                JOIN diagnosis_annotations da ON dr.session_id = da.session_id
                 WHERE dr.created_at BETWEEN :start_date AND :end_date
                 GROUP BY dr.device_type
                 HAVING COUNT(*) > 0

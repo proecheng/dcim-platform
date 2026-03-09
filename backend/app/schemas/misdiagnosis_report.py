@@ -4,7 +4,7 @@ Pydantic Schema for Misdiagnosis Report - Story 26.6
 
 from datetime import datetime, date
 from typing import Optional, List
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator, ConfigDict
 
 
 class MisdiagnosisReportGenerateRequest(BaseModel):
@@ -12,10 +12,11 @@ class MisdiagnosisReportGenerateRequest(BaseModel):
     start_date: date = Field(..., description="统计开始日期")
     end_date: date = Field(..., description="统计结束日期")
 
-    @validator("end_date")
-    def validate_date_range(cls, v, values):
-        if "start_date" in values:
-            start_date = values["start_date"]
+    @field_validator("end_date")
+    @classmethod
+    def validate_date_range(cls, v, info):
+        if "start_date" in info.data:
+            start_date = info.data["start_date"]
             if v <= start_date:
                 raise ValueError("end_date 必须晚于 start_date")
             # 检查时间范围不超过31天
@@ -82,8 +83,7 @@ class MisdiagnosisReportDetailResponse(BaseModel):
     generated_by: Optional[int]
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class MisdiagnosisReportListItem(BaseModel):
@@ -97,8 +97,7 @@ class MisdiagnosisReportListItem(BaseModel):
     file_size: Optional[int]
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class MisdiagnosisReportListResponse(BaseModel):

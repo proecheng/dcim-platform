@@ -5,7 +5,7 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 from ..deps import get_db, get_current_user
 from ...models import FloorMap
@@ -40,8 +40,7 @@ class FloorMapResponse(BaseModel):
     thumbnail: Optional[str] = None
     is_default: bool
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 @router.get("/floors", response_model=ResponseModel[FloorListResponse], summary="获取楼层列表")

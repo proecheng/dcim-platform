@@ -2,7 +2,7 @@
 节能方案相关的 Pydantic 模型
 """
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 from typing import Optional, List, Dict, Any
 from datetime import datetime
 from decimal import Decimal
@@ -29,8 +29,7 @@ class MeasureResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        from_attributes = True  # Pydantic v2
+    model_config = ConfigDict(from_attributes=True)
 
 
 # ========== 方案相关模型 ==========
@@ -52,8 +51,7 @@ class ProposalResponse(BaseModel):
     updated_at: datetime
     measures: List[MeasureResponse] = Field(default_factory=list, description="措施列表")
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class ProposalCreate(BaseModel):
@@ -84,8 +82,7 @@ class ExecutionLogResponse(BaseModel):
     result: Optional[str]
     result_message: Optional[str]
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class MeasureMonitoringResponse(BaseModel):
@@ -100,8 +97,7 @@ class MeasureMonitoringResponse(BaseModel):
     success_count: int = Field(0, description="成功次数")
     latest_execution: Optional[ExecutionLogResponse] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class ProposalMonitoringResponse(BaseModel):
@@ -242,6 +238,8 @@ class RLTrainingResponse(BaseModel):
 class RLModelInfoResponse(BaseModel):
     """RL 模型信息响应"""
 
+    model_config = ConfigDict(protected_namespaces=())
+
     model_name: str = Field("adaptive_optimizer", description="模型名称")
     is_trained: bool = Field(False, description="是否已训练")
     is_available: bool = Field(False, description="模型是否可用")
@@ -271,8 +269,7 @@ class RLOptimizationHistoryItem(BaseModel):
     achievement_rate: Optional[float]
     adjustments: Optional[Dict[str, Any]]
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class RLOptimizationHistoryResponse(BaseModel):

@@ -350,7 +350,7 @@ class ProbabilityTuningService:
         from app.core.database import async_session
         from app.models.user import User
         from app.services.email_service import email_service
-        from app.services.websocket_manager import ws_manager
+        from app.services.websocket import ws_manager
 
         logger.info(f"通知管理员审批: {result['pending_approvals']} 条待审批调参建议")
 

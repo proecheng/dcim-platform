@@ -3,7 +3,7 @@
 """
 
 from typing import Optional, List, Dict
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 from datetime import datetime, date
 
 from app.models.asset import AssetStatus, AssetType
@@ -62,11 +62,7 @@ class CabinetResponse(CabinetBase):
     created_at: datetime = Field(..., description="创建时间")
     updated_at: datetime = Field(..., description="更新时间")
 
-    class Config:
-        from_attributes = True
-
-
-# ==================== 资产 Schemas ====================
+    model_config = ConfigDict(from_attributes=True)
 
 
 class AssetBase(BaseModel):
@@ -146,11 +142,7 @@ class AssetResponse(AssetBase):
     created_at: datetime = Field(..., description="创建时间")
     updated_at: datetime = Field(..., description="更新时间")
 
-    class Config:
-        from_attributes = True
-
-
-# ==================== 资产生命周期 Schemas ====================
+    model_config = ConfigDict(from_attributes=True)
 
 
 class LifecycleCreate(BaseModel):
@@ -178,11 +170,7 @@ class LifecycleResponse(BaseModel):
     remark: Optional[str] = Field(None, description="备注")
     created_at: datetime = Field(..., description="创建时间")
 
-    class Config:
-        from_attributes = True
-
-
-# ==================== 维护记录 Schemas ====================
+    model_config = ConfigDict(from_attributes=True)
 
 
 class MaintenanceCreate(BaseModel):
@@ -214,11 +202,7 @@ class MaintenanceResponse(BaseModel):
     result: Optional[str] = Field(None, description="维护结果")
     created_at: datetime = Field(..., description="创建时间")
 
-    class Config:
-        from_attributes = True
-
-
-# ==================== 资产盘点 Schemas ====================
+    model_config = ConfigDict(from_attributes=True)
 
 
 class InventoryCreate(BaseModel):
@@ -251,8 +235,7 @@ class InventoryItemResponse(BaseModel):
     check_time: Optional[datetime] = Field(None, description="盘点时间")
     remark: Optional[str] = Field(None, description="备注")
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class InventoryResponse(BaseModel):
@@ -272,11 +255,7 @@ class InventoryResponse(BaseModel):
     completed_at: Optional[datetime] = Field(None, description="完成时间")
     items: List[InventoryItemResponse] = Field(default_factory=list, description="盘点明细")
 
-    class Config:
-        from_attributes = True
-
-
-# ==================== 资产统计 Schemas ====================
+    model_config = ConfigDict(from_attributes=True)
 
 
 class AssetStatistics(BaseModel):

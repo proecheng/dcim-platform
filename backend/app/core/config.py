@@ -3,7 +3,7 @@
 """
 
 import secrets
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import Field, field_validator
 from functools import lru_cache
 from typing import Optional
@@ -51,22 +51,22 @@ class Settings(BaseSettings):
     data_retention_days: int = 30
 
     # === 数据初始化配置（Story 28.2）===
-    seed_enabled: bool = Field(default=False, env="SEED_ENABLED", description="启用最小化种子")
-    demo_enabled: bool = Field(default=False, env="DEMO_ENABLED", description="启用 Demo 数据")
-    simulation_enabled: bool = Field(default=False, env="SIMULATION_ENABLED", description="启用数据模拟器")
+    seed_enabled: bool = Field(default=False, description="启用最小化种子")
+    demo_enabled: bool = Field(default=False, description="启用 Demo 数据")
+    simulation_enabled: bool = Field(default=False, description="启用数据模拟器")
 
     # === Seed 配置（Story 28.2）===
-    default_site_name: str = Field(default="默认站点", env="DEFAULT_SITE_NAME")
-    default_floor_count: int = Field(default=1, ge=1, le=50, env="DEFAULT_FLOOR_COUNT")
-    default_room_count: int = Field(default=1, ge=1, le=100, env="DEFAULT_ROOM_COUNT")
-    default_admin_password: str = Field(default="admin123", env="DEFAULT_ADMIN_PASSWORD")
+    default_site_name: str = Field(default="默认站点")
+    default_floor_count: int = Field(default=1, ge=1, le=50)
+    default_room_count: int = Field(default=1, ge=1, le=100)
+    default_admin_password: str = Field(default="admin123")
 
     # === 电价配置（五级制，Story 28.2）===
-    default_sharp_peak_price: float = Field(default=1.5, env="DEFAULT_SHARP_PEAK_PRICE")
-    default_peak_price: float = Field(default=1.2, env="DEFAULT_PEAK_PRICE")
-    default_flat_price: float = Field(default=0.8, env="DEFAULT_FLAT_PRICE")
-    default_valley_price: float = Field(default=0.4, env="DEFAULT_VALLEY_PRICE")
-    default_deep_valley_price: float = Field(default=0.2, env="DEFAULT_DEEP_VALLEY_PRICE")
+    default_sharp_peak_price: float = Field(default=1.5)
+    default_peak_price: float = Field(default=1.2)
+    default_flat_price: float = Field(default=0.8)
+    default_valley_price: float = Field(default=0.4)
+    default_deep_valley_price: float = Field(default=0.2)
 
     # 模拟模式配置（已废弃，保留向后兼容）
     simulation_interval: int = 60  # 模拟数据生成间隔(秒)
@@ -99,12 +99,10 @@ class Settings(BaseSettings):
     # 故障树 HMAC 密钥（Story 24.4）
     fault_tree_hmac_key: str = Field(
         default="",
-        env="FAULT_TREE_HMAC_KEY",
         description="故障树 HMAC 签名密钥（至少 32 字符）"
     )
     fault_tree_hmac_key_previous: Optional[str] = Field(
         default=None,
-        env="FAULT_TREE_HMAC_KEY_PREVIOUS",
         description="故障树 HMAC 旧密钥（密钥轮换时使用）"
     )
 
@@ -119,24 +117,21 @@ class Settings(BaseSettings):
         return v
 
     # 邮件服务配置（Story 26.2）
-    smtp_enabled: bool = Field(default=False, env="SMTP_ENABLED", description="启用邮件服务")
-    smtp_host: str = Field(default="", env="SMTP_HOST", description="SMTP 服务器地址")
-    smtp_port: int = Field(default=587, env="SMTP_PORT", description="SMTP 端口")
-    smtp_user: str = Field(default="", env="SMTP_USER", description="SMTP 用户名")
-    smtp_password: str = Field(default="", env="SMTP_PASSWORD", description="SMTP 密码")
+    smtp_enabled: bool = Field(default=False, description="启用邮件服务")
+    smtp_host: str = Field(default="", description="SMTP 服务器地址")
+    smtp_port: int = Field(default=587, description="SMTP 端口")
+    smtp_user: str = Field(default="", description="SMTP 用户名")
+    smtp_password: str = Field(default="", description="SMTP 密码")
     smtp_from_email: str = Field(default="", description="发件人邮箱")
 
     # 报告文件存储目录（Story 26.6）
     report_dir: str = Field(default="reports/", description="报告文件存储目录")
 
-    class Config:
-        env_file = ".env"
-        case_sensitive = False
-        # Pydantic v2: 环境变量前缀映射
-        env_prefix = ""
-        fields = {
-            'report_dir': {'env': 'REPORT_DIR'}
-        }
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        case_sensitive=False,
+        env_prefix="",
+    )
 
 
 @lru_cache()

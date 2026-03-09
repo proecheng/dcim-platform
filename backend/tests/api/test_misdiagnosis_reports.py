@@ -12,16 +12,6 @@ from app.models.report import ReportRecord
 from app.models.user import User
 
 
-@pytest.fixture
-async def admin_token(async_client: AsyncClient):
-    """获取管理员 token"""
-    response = await async_client.post(
-        "/api/v1/auth/login",
-        data={"username": "admin", "password": "admin123"}
-    )
-    assert response.status_code == 200
-    return response.json()["access_token"]
-
 
 @pytest.fixture
 async def sample_report(async_db: AsyncSession):
@@ -47,9 +37,9 @@ class TestListMisdiagnosisReports:
     """测试查询历史报告列表"""
 
     @pytest.mark.asyncio
-    async def test_list_reports_success(self, async_client: AsyncClient, admin_token: str, sample_report):
+    async def test_list_reports_success(self, client: AsyncClient, admin_token: str, sample_report):
         """测试成功查询报告列表"""
-        response = await async_client.get(
+        response = await client.get(
             "/api/v1/diagnosis/misdiagnosis-reports",
             headers={"Authorization": f"Bearer {admin_token}"}
         )
@@ -61,9 +51,9 @@ class TestListMisdiagnosisReports:
         assert len(data["items"]) > 0
 
     @pytest.mark.asyncio
-    async def test_list_reports_with_pagination(self, async_client: AsyncClient, admin_token: str, sample_report):
+    async def test_list_reports_with_pagination(self, client: AsyncClient, admin_token: str, sample_report):
         """测试分页查询"""
-        response = await async_client.get(
+        response = await client.get(
             "/api/v1/diagnosis/misdiagnosis-reports?page=1&page_size=10",
             headers={"Authorization": f"Bearer {admin_token}"}
         )
@@ -74,9 +64,9 @@ class TestListMisdiagnosisReports:
         assert data["page_size"] == 10
 
     @pytest.mark.asyncio
-    async def test_list_reports_unauthorized(self, async_client: AsyncClient):
+    async def test_list_reports_unauthorized(self, client: AsyncClient):
         """测试未授权访问"""
-        response = await async_client.get("/api/v1/diagnosis/misdiagnosis-reports")
+        response = await client.get("/api/v1/diagnosis/misdiagnosis-reports")
 
         assert response.status_code == 401
 
@@ -85,9 +75,9 @@ class TestGetMisdiagnosisReport:
     """测试查询单个报告详情"""
 
     @pytest.mark.asyncio
-    async def test_get_report_success(self, async_client: AsyncClient, admin_token: str, sample_report):
+    async def test_get_report_success(self, client: AsyncClient, admin_token: str, sample_report):
         """测试成功查询报告详情"""
-        response = await async_client.get(
+        response = await client.get(
             f"/api/v1/diagnosis/misdiagnosis-reports/{sample_report.id}",
             headers={"Authorization": f"Bearer {admin_token}"}
         )
@@ -99,9 +89,9 @@ class TestGetMisdiagnosisReport:
         assert "report_data" in data
 
     @pytest.mark.asyncio
-    async def test_get_report_not_found(self, async_client: AsyncClient, admin_token: str):
+    async def test_get_report_not_found(self, client: AsyncClient, admin_token: str):
         """测试报告不存在"""
-        response = await async_client.get(
+        response = await client.get(
             "/api/v1/diagnosis/misdiagnosis-reports/99999",
             headers={"Authorization": f"Bearer {admin_token}"}
         )
@@ -113,9 +103,9 @@ class TestGenerateMisdiagnosisReport:
     """测试手动触发报告生成"""
 
     @pytest.mark.asyncio
-    async def test_generate_report_success(self, async_client: AsyncClient, admin_token: str, async_db: AsyncSession):
+    async def test_generate_report_success(self, client: AsyncClient, admin_token: str, async_db: AsyncSession):
         """测试成功生成报告"""
-        response = await async_client.post(
+        response = await client.post(
             "/api/v1/diagnosis/misdiagnosis-reports/generate",
             headers={"Authorization": f"Bearer {admin_token}"},
             json={
@@ -128,9 +118,9 @@ class TestGenerateMisdiagnosisReport:
         assert response.status_code in [202, 409]
 
     @pytest.mark.asyncio
-    async def test_generate_report_invalid_date_range(self, async_client: AsyncClient, admin_token: str):
+    async def test_generate_report_invalid_date_range(self, client: AsyncClient, admin_token: str):
         """测试无效的日期范围"""
-        response = await async_client.post(
+        response = await client.post(
             "/api/v1/diagnosis/misdiagnosis-reports/generate",
             headers={"Authorization": f"Bearer {admin_token}"},
             json={

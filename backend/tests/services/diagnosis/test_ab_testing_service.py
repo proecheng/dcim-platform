@@ -3,13 +3,57 @@ A/B 测试服务单元测试 - Story 26.5
 """
 import pytest
 from datetime import datetime, timedelta
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
+from sqlalchemy import delete
 
+from app.core.database import Base
 from app.services.diagnosis.ab_testing_service import ABTestingService
 from app.models.ab_test_config import ABTestConfig, ABTestDeviceAssignment
 from app.models.fault_tree import FaultTree, FaultTreeVersion
 from app.models.diagnosis import DiagnosisResult, DiagnosisAnnotation
 
+
+# ============================================================
+# 异步 Fixtures（自建内存数据库，不依赖 conftest 的同步 session）
+# ============================================================
+
+@pytest.fixture(scope="module")
+def anyio_backend():
+    return "asyncio"
+
+
+@pytest.fixture(scope="module")
+async def ab_engine():
+    eng = create_async_engine("sqlite+aiosqlite:///:memory:")
+    async with eng.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+    yield eng
+    await eng.dispose()
+
+
+@pytest.fixture(scope="module")
+def ab_session_factory(ab_engine):
+    return async_sessionmaker(ab_engine, class_=AsyncSession, expire_on_commit=False)
+
+
+@pytest.fixture
+async def db_session(ab_session_factory):
+    """每个测试函数独立的异步数据库会话"""
+    async with ab_session_factory() as session:
+        # 清理测试数据
+        await session.execute(delete(ABTestDeviceAssignment))
+        await session.execute(delete(ABTestConfig))
+        await session.execute(delete(DiagnosisAnnotation))
+        await session.execute(delete(DiagnosisResult))
+        await session.execute(delete(FaultTreeVersion))
+        await session.execute(delete(FaultTree))
+        await session.commit()
+        yield session
+
+
+# ============================================================
+# 测试用例
+# ============================================================
 
 @pytest.mark.asyncio
 async def test_create_ab_test(db_session: AsyncSession):
@@ -296,32 +340,42 @@ async def test_chi_square_test(db_session: AsyncSession):
     """测试卡方检验"""
     service = ABTestingService(db_session)
 
+    # 检查 scipy 是否可用
+    try:
+        from scipy.stats import chi2_contingency
+        scipy_available = True
+    except ImportError:
+        scipy_available = False
+
     # 测试样本量不足
     version_a_stats = {
-        "accurate_count": 5,
-        "inaccurate_count": 0,
+        "accuracy_rate": 1.0,
         "diagnosis_count": 5,
     }
     version_b_stats = {
-        "accurate_count": 3,
-        "inaccurate_count": 0,
+        "accuracy_rate": 1.0,
         "diagnosis_count": 3,
     }
     result = service._perform_chi_square_test(version_a_stats, version_b_stats)
-    assert result["method"] == "insufficient_sample"
+    if scipy_available:
+        assert result["method"] == "insufficient_sample"
+    else:
+        assert result["method"] == "unavailable"
     assert result["is_significant"] is False
 
-    # 测试显著差异
+    # 测试显著差异（仅在 scipy 可用时验证）
     version_a_stats = {
-        "accurate_count": 85,
-        "inaccurate_count": 15,
+        "accuracy_rate": 0.85,
         "diagnosis_count": 100,
     }
     version_b_stats = {
-        "accurate_count": 70,
-        "inaccurate_count": 30,
+        "accuracy_rate": 0.70,
         "diagnosis_count": 100,
     }
     result = service._perform_chi_square_test(version_a_stats, version_b_stats)
-    assert result["method"] in ["chi_square", "fisher_exact"]
-    assert result["p_value"] is not None
+    if scipy_available:
+        assert result["method"] in ["chi_square", "fisher_exact"]
+        assert result["p_value"] is not None
+    else:
+        assert result["method"] == "unavailable"
+        assert result["is_significant"] is False

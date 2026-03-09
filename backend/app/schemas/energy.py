@@ -4,7 +4,7 @@
 
 from enum import Enum
 from typing import Optional, List, Dict, Any
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, ConfigDict
 from datetime import datetime, date
 
 
@@ -81,8 +81,7 @@ class PowerDeviceResponse(PowerDeviceBase):
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class PowerDeviceTree(PowerDeviceResponse):
@@ -161,8 +160,7 @@ class PUEHistoryItem(BaseModel):
     total_power: float
     it_power: float
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class PUETrend(BaseModel):
@@ -192,8 +190,7 @@ class EnergyHourlyData(BaseModel):
     avg_current: Optional[float]
     avg_power_factor: Optional[float]
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class EnergyDailyData(BaseModel):
@@ -212,8 +209,7 @@ class EnergyDailyData(BaseModel):
     energy_cost: float
     pue: Optional[float]
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class EnergyMonthlyData(BaseModel):
@@ -236,8 +232,7 @@ class EnergyMonthlyData(BaseModel):
     valley_cost: float
     avg_pue: Optional[float]
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class EnergyStatQuery(BaseModel):
@@ -341,11 +336,7 @@ class ElectricityPricingResponse(ElectricityPricingBase):
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        from_attributes = True
-
-
-# ========== 电价全局配置 ==========
+    model_config = ConfigDict(from_attributes=True)
 
 
 class PowerFactorRule(BaseModel):
@@ -425,11 +416,7 @@ class PricingConfigResponse(PricingConfigBase):
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        from_attributes = True
-
-
-# ========== 节能建议 ==========
+    model_config = ConfigDict(from_attributes=True)
 
 
 class EnergySuggestionBase(BaseModel):
@@ -465,8 +452,7 @@ class EnergySuggestionResponse(EnergySuggestionBase):
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class AcceptSuggestion(BaseModel):
@@ -539,8 +525,7 @@ class MeterPointDemandInfo(BaseModel):
     demand_type: Optional[str] = None
     demand_period: Optional[int] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class TransformerWithMeterPointsResponse(BaseModel):
@@ -557,11 +542,7 @@ class TransformerWithMeterPointsResponse(BaseModel):
     meter_point_count: int = 0  # 计量点数量
     configured_count: int = 0  # 已配置需量的计量点数量
 
-    class Config:
-        from_attributes = True
-
-
-# ========== 变压器 ==========
+    model_config = ConfigDict(from_attributes=True)
 
 
 class TransformerBase(BaseModel):
@@ -615,11 +596,7 @@ class TransformerResponse(TransformerBase):
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        from_attributes = True
-
-
-# ========== 计量点 ==========
+    model_config = ConfigDict(from_attributes=True)
 
 
 class MeterPointBase(BaseModel):
@@ -672,8 +649,7 @@ class MeterPointResponse(MeterPointBase):
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class MeterPointDetail(MeterPointResponse):
@@ -730,11 +706,7 @@ class DistributionPanelResponse(DistributionPanelBase):
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        from_attributes = True
-
-
-# ========== 配电回路 ==========
+    model_config = ConfigDict(from_attributes=True)
 
 
 class DistributionCircuitBase(BaseModel):
@@ -778,11 +750,7 @@ class DistributionCircuitResponse(DistributionCircuitBase):
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        from_attributes = True
-
-
-# ========== 功率曲线 ==========
+    model_config = ConfigDict(from_attributes=True)
 
 
 class PowerCurvePoint(BaseModel):
@@ -1218,8 +1186,7 @@ class LoadRegulationConfigResponse(LoadRegulationConfigBase):
     device_type: Optional[str] = None
     rated_power: Optional[float] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class RegulationSimulateRequest(BaseModel):
@@ -1272,8 +1239,7 @@ class RegulationHistoryResponse(BaseModel):
     executed_at: Optional[datetime]
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class RegulationRecommendation(BaseModel):
@@ -1412,8 +1378,7 @@ class EnhancedSuggestionResponse(BaseModel):
     status: str
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class SuggestionAnalyzeRequest(BaseModel):
@@ -1531,8 +1496,7 @@ class OpportunityMeasureResponse(OpportunityMeasureBase):
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class EnergyOpportunityBase(BaseModel):
@@ -1577,8 +1541,7 @@ class EnergyOpportunityResponse(EnergyOpportunityBase):
     updated_at: datetime
     measures: List[OpportunityMeasureResponse] = []
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class ExecutionTaskBase(BaseModel):
@@ -1623,8 +1586,7 @@ class ExecutionTaskResponse(ExecutionTaskBase):
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class ExecutionResultBase(BaseModel):
@@ -1658,8 +1620,7 @@ class ExecutionResultResponse(ExecutionResultBase):
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class ExecutionPlanBase(BaseModel):
@@ -1691,11 +1652,7 @@ class ExecutionPlanResponse(ExecutionPlanBase):
     tasks: List[ExecutionTaskResponse] = []
     results: List[ExecutionResultResponse] = []
 
-    class Config:
-        from_attributes = True
-
-
-# ========== 仪表盘数据模型 ==========
+    model_config = ConfigDict(from_attributes=True)
 
 
 class OpportunitySummary(BaseModel):
@@ -2092,8 +2049,7 @@ class DevicePointConfigResponse(BaseModel):
     current_value: Optional[float] = None
     last_update_time: Optional[datetime] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class TopologyNodeResponse(BaseModel):
@@ -2112,11 +2068,7 @@ class TopologyNodeResponse(BaseModel):
     attributes: Dict = Field(default_factory=dict, description="节点特定属性")
     points: List[DevicePointConfigResponse] = Field(default_factory=list, description="关联测点")
 
-    class Config:
-        from_attributes = True
-
-
-# ========== 电费单 OCR 识别 ==========
+    model_config = ConfigDict(from_attributes=True)
 
 
 class OcrBillItemSchema(BaseModel):
@@ -2180,8 +2132,7 @@ class PricingSchemeResponse(PricingSchemeBase):
     created_at: datetime
     updated_at: datetime
     
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class SchemeValidationResult(BaseModel):
@@ -2203,5 +2154,4 @@ class PricingSchemeAuditLogResponse(BaseModel):
     changes: Optional[dict]
     timestamp: datetime
     
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)

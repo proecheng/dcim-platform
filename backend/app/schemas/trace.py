@@ -5,7 +5,7 @@
 
 from datetime import datetime
 from typing import Optional, List, Dict, Any
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 
 
 # ==================== 数据源映射 Schema ====================
@@ -58,11 +58,7 @@ class DataSourceMappingResponse(DataSourceMappingBase):
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        from_attributes = True
-
-
-# ==================== 追溯记录 Schema ====================
+    model_config = ConfigDict(from_attributes=True)
 
 
 class TraceSourceInfo(BaseModel):
@@ -102,8 +98,7 @@ class TraceRecordResponse(TraceRecordBase):
     calculated_at: Optional[datetime] = None
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class TraceTreeNode(BaseModel):
@@ -233,11 +228,7 @@ class TemplateParameterResponse(TemplateParameterBase):
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        from_attributes = True
-
-
-# ==================== 通用响应 Schema ====================
+    model_config = ConfigDict(from_attributes=True)
 
 
 class TraceListResponse(BaseModel):

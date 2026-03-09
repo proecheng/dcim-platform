@@ -3,7 +3,7 @@
 """
 
 from typing import Optional, List, Dict
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 from datetime import datetime
 
 from app.models.capacity import CapacityType, CapacityStatus
@@ -57,11 +57,7 @@ class SpaceCapacityResponse(SpaceCapacityBase):
     created_at: datetime = Field(..., description="创建时间")
     updated_at: datetime = Field(..., description="更新时间")
 
-    class Config:
-        from_attributes = True
-
-
-# ==================== 电力容量 Schemas ====================
+    model_config = ConfigDict(from_attributes=True)
 
 
 class PowerCapacityBase(BaseModel):
@@ -111,11 +107,7 @@ class PowerCapacityResponse(PowerCapacityBase):
     created_at: datetime = Field(..., description="创建时间")
     updated_at: datetime = Field(..., description="更新时间")
 
-    class Config:
-        from_attributes = True
-
-
-# ==================== 制冷容量 Schemas ====================
+    model_config = ConfigDict(from_attributes=True)
 
 
 class CoolingCapacityBase(BaseModel):
@@ -163,11 +155,7 @@ class CoolingCapacityResponse(CoolingCapacityBase):
     created_at: datetime = Field(..., description="创建时间")
     updated_at: datetime = Field(..., description="更新时间")
 
-    class Config:
-        from_attributes = True
-
-
-# ==================== 承重容量 Schemas ====================
+    model_config = ConfigDict(from_attributes=True)
 
 
 class WeightCapacityBase(BaseModel):
@@ -209,11 +197,7 @@ class WeightCapacityResponse(WeightCapacityBase):
     created_at: datetime = Field(..., description="创建时间")
     updated_at: datetime = Field(..., description="更新时间")
 
-    class Config:
-        from_attributes = True
-
-
-# ==================== 容量规划 Schemas ====================
+    model_config = ConfigDict(from_attributes=True)
 
 
 class CapacityPlanBase(BaseModel):
@@ -245,11 +229,7 @@ class CapacityPlanResponse(CapacityPlanBase):
     created_at: datetime = Field(..., description="创建时间")
     updated_at: datetime = Field(..., description="更新时间")
 
-    class Config:
-        from_attributes = True
-
-
-# ==================== 容量统计 Schemas ====================
+    model_config = ConfigDict(from_attributes=True)
 
 
 class CapacityStatistics(BaseModel):

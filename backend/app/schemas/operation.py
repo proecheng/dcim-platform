@@ -3,7 +3,7 @@
 """
 
 from typing import Optional
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 from datetime import datetime
 
 from app.models.operation import WorkOrderStatus, WorkOrderType, WorkOrderPriority, InspectionStatus, ApprovalStatus
@@ -71,11 +71,7 @@ class WorkOrderResponse(WorkOrderBase):
     solution: Optional[str] = Field(None, description="解决方案")
     root_cause: Optional[str] = Field(None, description="根本原因")
 
-    class Config:
-        from_attributes = True
-
-
-# ==================== 工单日志 Schemas ====================
+    model_config = ConfigDict(from_attributes=True)
 
 
 class WorkOrderLogResponse(BaseModel):
@@ -88,11 +84,7 @@ class WorkOrderLogResponse(BaseModel):
     operator: Optional[str] = Field(None, description="操作人")
     created_at: datetime = Field(..., description="创建时间")
 
-    class Config:
-        from_attributes = True
-
-
-# ==================== 巡检计划 Schemas ====================
+    model_config = ConfigDict(from_attributes=True)
 
 
 class InspectionPlanBase(BaseModel):
@@ -132,11 +124,7 @@ class InspectionPlanResponse(InspectionPlanBase):
     created_at: datetime = Field(..., description="创建时间")
     updated_at: datetime = Field(..., description="更新时间")
 
-    class Config:
-        from_attributes = True
-
-
-# ==================== 巡检任务 Schemas ====================
+    model_config = ConfigDict(from_attributes=True)
 
 
 class InspectionTaskBase(BaseModel):
@@ -177,11 +165,7 @@ class InspectionTaskResponse(InspectionTaskBase):
     remarks: Optional[str] = Field(None, description="备注")
     created_at: datetime = Field(..., description="创建时间")
 
-    class Config:
-        from_attributes = True
-
-
-# ==================== 知识库 Schemas ====================
+    model_config = ConfigDict(from_attributes=True)
 
 
 class KnowledgeBaseSchema(BaseModel):
@@ -220,11 +204,7 @@ class KnowledgeResponse(KnowledgeBaseSchema):
     created_at: datetime = Field(..., description="创建时间")
     updated_at: datetime = Field(..., description="更新时间")
 
-    class Config:
-        from_attributes = True
-
-
-# ==================== 运维统计 Schemas ====================
+    model_config = ConfigDict(from_attributes=True)
 
 
 class OperationStatistics(BaseModel):
@@ -278,8 +258,7 @@ class AlarmWorkOrderRuleResponse(AlarmWorkOrderRuleBase):
     created_at: datetime = Field(..., description="创建时间")
     updated_at: datetime = Field(..., description="更新时间")
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class AlarmCheckRequest(BaseModel):
@@ -315,8 +294,7 @@ class WorkOrderApprovalResponse(BaseModel):
     created_at: datetime = Field(..., description="创建时间")
     resolved_at: Optional[datetime] = Field(None, description="审批完成时间")
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class ApproveRequest(BaseModel):

@@ -11,7 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.diagnosis import TrendWarning
 from app.models.point import Point
-from app.core.redis_client import get_redis_client
+from app.core.redis_lock import get_redis_client
 
 logger = logging.getLogger(__name__)
 

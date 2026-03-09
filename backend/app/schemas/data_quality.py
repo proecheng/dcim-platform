@@ -1,6 +1,6 @@
 """数据质量相关 Schema"""
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from typing import List, Optional
 from datetime import datetime
 
@@ -15,8 +15,7 @@ class DataQualityPointInfo(BaseModel):
     status: Optional[str] = None
     updated_at: Optional[datetime] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class DataQualityStatus(BaseModel):
