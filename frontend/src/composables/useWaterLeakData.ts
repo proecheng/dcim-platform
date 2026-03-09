@@ -37,12 +37,8 @@ export function useWaterLeakData() {
 
   // ── 区域分组 ──
   const zoneGroups = computed<WaterLeakZoneGroup[]>(() => {
-    const map = new Map<string, RealtimeData[]>()
-    wlSensors.value.forEach(d => {
-      const area = d.area_code || '未分区'
-      if (!map.has(area)) map.set(area, [])
-      map.get(area)!.push(d)
-    })
+    // Story 27.8 AC3: 使用 Store 的统一分组方法
+    const map = realtimeStore.groupByArea('WATER')
 
     return Array.from(map.entries()).map(([areaCode, sensors]) => {
       const normalCount = sensors.filter(s => s.status === 'normal').length

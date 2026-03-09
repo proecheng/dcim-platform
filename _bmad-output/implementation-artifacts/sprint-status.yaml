@@ -308,7 +308,7 @@ development_status:
 
   # Epic 27: 前端数据链路统一 (MVP 月1-3)
   # 优先级: 27.1(P0)→27.2(P0)→27.5(P1) 核心路径
-  # 注意: 2026-03-10 对抗性审查发现实施不完整，新增 27.7 修复 P0 问题
+  # 注意: 2026-03-10 对抗性审查发现实施不完整，新增 27.7 修复 P0 问题，27.8-27.10 修复 P1 问题
   epic-27: in-progress
   27-1-alarm-data-link-unification: done
   27-2-realtime-data-link-unification: done
@@ -316,7 +316,10 @@ development_status:
   27-4-alarm-sound-toggle-unification: done
   27-5-websocket-single-connection-manager: done
   27-6-site-filter-propagation: done
-  27-7-data-link-p0-fixes: ready-for-dev  # 修复温度页面告警、Dashboard能源数据、BigscreenStore派生问题
+  27-7-data-link-p0-fixes: done  # 修复温度页面告警、Dashboard能源数据、BigscreenStore派生问题、proxy端口配置
+  27-8-environment-grouping: done  # 环境监控分组逻辑统一到RealtimeStore，经过两轮对抗性审查和代码审查
+  27-9-dashboard-simplify: ready-for-dev  # Dashboard refreshData 简化
+  27-10-bigscreen-performance: ready-for-dev  # BigscreenStore activeAlarms 性能优化
   epic-27-retrospective: done
 
   # Epic 28: Demo 系统解耦与数据隔离 (MVP 月1-3)

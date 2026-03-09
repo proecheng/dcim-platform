@@ -47,12 +47,8 @@ export function useSmokeInfraredData() {
 
   // ── 区域分组 ──
   const zoneGroups = computed<SmokeIRZoneGroup[]>(() => {
-    const map = new Map<string, RealtimeData[]>()
-    siSensors.value.forEach(d => {
-      const area = d.area_code || '未分区'
-      if (!map.has(area)) map.set(area, [])
-      map.get(area)!.push(d)
-    })
+    // Story 27.8 AC4: 使用 Store 的统一分组方法（支持多个设备类型）
+    const map = realtimeStore.groupByArea(['SMOKE', 'IR'])
 
     return Array.from(map.entries()).map(([areaCode, sensors]) => {
       const smokeSensorsInZone = sensors.filter(s => s.device_type === 'SMOKE')

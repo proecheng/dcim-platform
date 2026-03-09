@@ -126,6 +126,40 @@ export const useRealtimeStore = defineStore('realtime', () => {
     return realtimeData.value.filter(d => d.area_code === areaCode)
   }
 
+  // Story 27.8 AC1: 按区域分组数据（支持设备类型过滤）
+  /**
+   * 按区域分组实时数据
+   * @param deviceType 可选的设备类型过滤，支持单个类型或数组
+   * @returns 按区域分组的数据 Map，键为 area_code，值为该区域的数据数组
+   * @example
+   * // 单个类型
+   * const thMap = store.groupByArea('TH')
+   * // 多个类型
+   * const siMap = store.groupByArea(['SMOKE', 'IR'])
+   * // 所有类型
+   * const allMap = store.groupByArea()
+   */
+  function groupByArea(deviceType?: string | string[]): Map<string, RealtimeData[]> {
+    const map = new Map<string, RealtimeData[]>()
+
+    // 过滤设备类型
+    let filtered = realtimeData.value
+    if (deviceType) {
+      const types = Array.isArray(deviceType) ? deviceType : [deviceType]
+      filtered = filtered.filter(d => types.includes(d.device_type))
+    }
+
+    // 按 area_code 分组
+    for (const data of filtered) {
+      const area = data.area_code || '未分区'
+      if (!map.has(area)) {
+        map.set(area, [])
+      }
+      map.get(area)!.push(data)
+    }
+    return map
+  }
+
   // 设置 WebSocket 连接状态
   function setWsConnected(connected: boolean) {
     wsConnected.value = connected
@@ -167,6 +201,7 @@ export const useRealtimeStore = defineStore('realtime', () => {
     getPointData,
     getDataByType,
     getDataByArea,
+    groupByArea,
     setWsConnected,
     clearData,
   }

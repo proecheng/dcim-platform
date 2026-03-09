@@ -36,26 +36,30 @@ So that 不同页面使用相同的分组算法，避免重复代码和潜在的
 ### AC1: RealtimeStore 添加通用分组方法
 
 - Given RealtimeStore 已加载实时数据
-- When 调用 `groupByArea(deviceType?: string)` 方法
+- When 调用 `groupByArea(deviceType?: string | string[])` 方法
 - Then 返回按区域分组的数据 `Map<string, RealtimeData[]>`
-- And 如果指定 deviceType，只返回该类型的数据
-- And 分组逻辑统一：按 `point_code` 的前缀提取区域（如 `A1_TH_001` → `A1`）
+- And 如果指定 deviceType（字符串或数组），只返回该类型的数据
+- And 分组逻辑统一：按 `area_code` 字段分组，未分区的归为 `'Unknown'`
 
 **实现位置:** `frontend/src/stores/realtime.ts`
 
 **新增方法:**
 ```typescript
 // 在 RealtimeStore 的 getters 中添加
-groupByArea(): (deviceType?: string) => Map<string, RealtimeData[]> {
-  return (deviceType?: string) => {
+groupByArea(): (deviceType?: string | string[]) => Map<string, RealtimeData[]> {
+  return (deviceType?: string | string[]) => {
     const map = new Map<string, RealtimeData[]>()
-    const filtered = deviceType
-      ? Array.from(this.dataMap.values()).filter(d => d.device_type === deviceType)
-      : Array.from(this.dataMap.values())
 
+    // 过滤设备类型
+    let filtered = Array.from(this.dataMap.values())
+    if (deviceType) {
+      const types = Array.isArray(deviceType) ? deviceType : [deviceType]
+      filtered = filtered.filter(d => types.includes(d.device_type))
+    }
+
+    // 按 area_code 分组
     for (const data of filtered) {
-      // 提取区域：A1_TH_001 → A1
-      const area = data.point_code.split('_')[0] || 'Unknown'
+      const area = data.area_code || '未分区'
       if (!map.has(area)) {
         map.set(area, [])
       }
@@ -69,68 +73,130 @@ groupByArea(): (deviceType?: string) => Map<string, RealtimeData[]> {
 ### AC2: useTemperatureData 使用 Store 分组方法
 
 - Given useTemperatureData composable 初始化
-- When 调用 `groupedData` computed
-- Then 从 `realtimeStore.groupByArea('TH')` 获取分组数据
+- When 调用 `zoneGroups` computed
+- Then 从 `realtimeStore.groupByArea('TH')` 获取基础分组数据
+- And 基于分组结果计算统计信息（avgTemp、minTemp、maxTemp、alarmCount 等）
+- And 返回类型 `ZoneGroup[]` 保持不变
 - And 移除本地的 `new Map<string, RealtimeData[]>()` 创建逻辑
 
 **修改文件:** `frontend/src/composables/useTemperatureData.ts`
 
-**修改前（约 line 76）:**
+**修改前（约 line 76-81）:**
 ```typescript
 const map = new Map<string, RealtimeData[]>()
-for (const data of thData) {
-  const area = data.point_code.split('_')[0] || 'Unknown'
-  if (!map.has(area)) {
-    map.set(area, [])
-  }
-  map.get(area)!.push(data)
-}
+thSensors.value.forEach(d => {
+  const area = d.area_code || '未分区'
+  if (!map.has(area)) map.set(area, [])
+  map.get(area)!.push(d)
+})
 ```
 
 **修改后:**
 ```typescript
+// 使用 Store 的统一分组方法
 const map = realtimeStore.groupByArea('TH')
 ```
+
+**重要说明:**
+- `groupByArea` 只负责基础分组，返回 `Map<string, RealtimeData[]>`
+- composable 保留现有的统计计算逻辑（lines 83-106）
+- 返回类型 `ZoneGroup[]` 保持不变，不影响页面使用
 
 ### AC3: useWaterLeakData 使用 Store 分组方法
 
 - Given useWaterLeakData composable 初始化
-- When 调用 `groupedData` computed
-- Then 从 `realtimeStore.groupByArea('WL')` 获取分组数据
+- When 调用 `zoneGroups` computed
+- Then 从 `realtimeStore.groupByArea('WATER')` 获取基础分组数据
+- And 基于分组结果计算统计信息（normalCount、alarmCount、offlineCount 等）
+- And 返回类型 `WaterLeakZoneGroup[]` 保持不变
 - And 移除本地的分组逻辑
 
 **修改文件:** `frontend/src/composables/useWaterLeakData.ts`
 
+**修改前（约 line 40-45）:**
+```typescript
+const map = new Map<string, RealtimeData[]>()
+wlSensors.value.forEach(d => {
+  const area = d.area_code || '未分区'
+  if (!map.has(area)) map.set(area, [])
+  map.get(area)!.push(d)
+})
+```
+
+**修改后:**
+```typescript
+// 使用 Store 的统一分组方法（注意：设备类型是 'WATER' 而非 'WL'）
+const map = realtimeStore.groupByArea('WATER')
+```
+
 ### AC4: useSmokeInfraredData 使用 Store 分组方法
 
 - Given useSmokeInfraredData composable 初始化
-- When 调用 `groupedData` computed
-- Then 从 `realtimeStore.groupByArea()` 获取所有数据的分组
-- And 在 composable 中过滤 `device_type === 'SM' || device_type === 'IR'`
+- When 调用 `zoneGroups` computed
+- Then 从 `realtimeStore.groupByArea(['SMOKE', 'IR'])` 获取基础分组数据（支持多个设备类型）
+- And 基于分组结果计算统计信息（smokeCount、irCount、alarmCount 等）
+- And 返回类型 `SmokeIRZoneGroup[]` 保持不变
 - And 移除本地的分组逻辑
 
 **修改文件:** `frontend/src/composables/useSmokeInfraredData.ts`
 
+**修改前（约 line 50-55）:**
+```typescript
+const map = new Map<string, RealtimeData[]>()
+siSensors.value.forEach(d => {
+  const area = d.area_code || '未分区'
+  if (!map.has(area)) map.set(area, [])
+  map.get(area)!.push(d)
+})
+```
+
+**修改后:**
+```typescript
+// 使用 Store 的统一分组方法（支持多个设备类型）
+const map = realtimeStore.groupByArea(['SMOKE', 'IR'])
+```
+
 ## Technical Implementation
+
+### 关键设计决策
+
+**分组逻辑统一，统计逻辑保留:**
+- `groupByArea` 只负责基础分组，返回 `Map<string, RealtimeData[]>`
+- composables 保留现有的统计计算逻辑（avgTemp、alarmCount、hasDrift 等）
+- composables 的返回类型（ZoneGroup、WaterLeakZoneGroup、SmokeIRZoneGroup）保持不变
+- 这样既统一了分组逻辑，又不破坏现有 API
+
+**设备类型参数支持:**
+- 支持单个类型：`groupByArea('TH')`
+- 支持多个类型：`groupByArea(['SMOKE', 'IR'])`
+- 支持所有类型：`groupByArea()` 或 `groupByArea(undefined)`
+
+**分组字段:**
+- 使用 `area_code` 字段（数据库字段）
+- 未分区的数据归为 `'Unknown'`
+- 不使用 `point_code.split('_')[0]` 解析（避免假设命名规则）
 
 ### 修改清单
 
 1. **frontend/src/stores/realtime.ts**
    - 在 `getters` 中添加 `groupByArea` 方法
-   - 支持可选的 `deviceType` 参数过滤
+   - 支持 `string | string[]` 类型参数
+   - 按 `area_code` 分组
 
 2. **frontend/src/composables/useTemperatureData.ts**
-   - 修改 `groupedData` computed，调用 `realtimeStore.groupByArea('TH')`
-   - 移除本地 Map 创建逻辑
+   - 修改 `zoneGroups` computed（line 75-107）
+   - 将 line 76-81 的分组逻辑替换为 `realtimeStore.groupByArea('TH')`
+   - 保留 line 83-106 的统计计算逻辑
 
 3. **frontend/src/composables/useWaterLeakData.ts**
-   - 修改 `groupedData` computed，调用 `realtimeStore.groupByArea('WL')`
-   - 移除本地 Map 创建逻辑
+   - 修改 `zoneGroups` computed（line 39-65）
+   - 将 line 40-45 的分组逻辑替换为 `realtimeStore.groupByArea('WATER')`
+   - 保留 line 47-64 的统计计算逻辑
 
 4. **frontend/src/composables/useSmokeInfraredData.ts**
-   - 修改 `groupedData` computed，调用 `realtimeStore.groupByArea()`
-   - 在 composable 中过滤烟感和红外类型
-   - 移除本地 Map 创建逻辑
+   - 修改 `zoneGroups` computed（line 49-81）
+   - 将 line 50-55 的分组逻辑替换为 `realtimeStore.groupByArea(['SMOKE', 'IR'])`
+   - 保留 line 57-80 的统计计算逻辑
 
 ### 测试验证
 
@@ -152,6 +218,17 @@ const map = realtimeStore.groupByArea('TH')
 4. **验证数据一致性:**
    - 在不同环境监控页面之间切换
    - 验证相同区域的数据在不同页面显示一致
+
+5. **验证分组逻辑统一:**
+   - 在浏览器控制台执行：
+     ```javascript
+     const store = useRealtimeStore()
+     const map = store.groupByArea('TH')
+     console.log('分组结果:', Array.from(map.keys()))
+     ```
+   - 验证分组键是 `area_code` 的值
+   - 验证未分区的数据归为 '未分区'
+   - 验证多设备类型分组：`store.groupByArea(['SMOKE', 'IR'])`
 
 ## Definition of Done
 

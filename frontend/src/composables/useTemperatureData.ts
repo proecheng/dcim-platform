@@ -73,12 +73,8 @@ export function useTemperatureData() {
 
   // ── 区域分组 ──
   const zoneGroups = computed<ZoneGroup[]>(() => {
-    const map = new Map<string, RealtimeData[]>()
-    thSensors.value.forEach(d => {
-      const area = d.area_code || '未分区'
-      if (!map.has(area)) map.set(area, [])
-      map.get(area)!.push(d)
-    })
+    // Story 27.8 AC2: 使用 Store 的统一分组方法
+    const map = realtimeStore.groupByArea('TH')
 
     return Array.from(map.entries()).map(([areaCode, sensors]) => {
       const temps = sensors.filter(s => s.unit === '°C' || s.unit === '℃')
