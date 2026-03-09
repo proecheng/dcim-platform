@@ -23,6 +23,7 @@ class FaultTree(Base):
     edges = relationship("FaultTreeEdge", back_populates="tree", cascade="all, delete-orphan")
     device_mappings = relationship("FaultTreeDeviceMapping", back_populates="tree", cascade="all, delete-orphan")
     versions = relationship("FaultTreeVersion", back_populates="tree", cascade="all, delete-orphan")
+    ab_tests = relationship("ABTestConfig", back_populates="fault_tree")
 
 
 class FaultTreeNode(Base):

@@ -77,6 +77,7 @@ class DiagnosisResult(Base):
     root_cause = Column(String(500), nullable=True, comment="根因描述")
     reasoning_path = Column(JSON, nullable=True, comment="推理路径")
     fault_tree_version = Column(String(50), nullable=True, comment="故障树版本号")
+    fault_tree_version_id = Column(Integer, ForeignKey("fault_tree_versions.id"), nullable=True, index=True, comment="故障树版本ID")
 
 
 class DiagnosisSession(Base):

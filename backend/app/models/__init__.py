@@ -96,6 +96,7 @@ from .spatial import Site, Floor, Room, Row, LayoutTemplate
 from .topology_config import PowerPhaseMapping, CoolingZone, CoolingZoneCabinet, CoolingZoneUnit, CabinetTemperatureSensor, CabinetITLoad
 from .linkage import LinkagePolicy, LinkageAction, LinkageExecution, LinkageLog, LinkageRecovery, LinkageRecoveryLog
 from .diagnosis import DiagnosisRule, DiagnosisResult, DiagnosisSession, DiagnosisAuditLog, DiagnosisAnnotation, BatterySOHRecord, SOHPointUnavailableTracking, SystemReport, DiagnosisImprovementRule, ProbabilityAdjustmentLog, AuditLog, TimeWindowAdjustmentLog
+from .ab_test_config import ABTestConfig, ABTestDeviceAssignment, ABTestArchive
 from .command import CommandApproval, CommandAuditLog
 from .drift import DriftDetectionResult
 from .video import NVR, Camera, CameraPreset, VideoEvent
@@ -278,6 +279,10 @@ __all__ = [
     "ProbabilityAdjustmentLog",
     "AuditLog",
     "TimeWindowAdjustmentLog",
+    # A/B 测试
+    "ABTestConfig",
+    "ABTestDeviceAssignment",
+    "ABTestArchive",
     # 控制命令分级确认
     "CommandApproval",
     "CommandAuditLog",
