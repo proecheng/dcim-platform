@@ -58,6 +58,7 @@ from .sensor_metadata import router as sensor_metadata_router
 from .probability_tuning import router as probability_tuning_router
 from .ab_testing import router as ab_testing_router
 from .misdiagnosis_reports import router as misdiagnosis_reports_router
+from .chaos_drill import router as chaos_drill_router
 
 # 深度学习节能优化模块 (需要安装 torch)
 try:
@@ -121,8 +122,9 @@ api_router.include_router(shift_router, prefix="/energy/shift", tags=["负荷转
 api_router.include_router(fault_tree_versions_router, tags=["故障树版本管理"])
 api_router.include_router(sensor_metadata_router, prefix="/diagnosis/sensor-metadata", tags=["传感器元数据"])
 api_router.include_router(probability_tuning_router, tags=["概率调参"])
-api_router.include_router(ab_testing_router, prefix="/api/v1", tags=["A/B Testing"])
+api_router.include_router(ab_testing_router, tags=["A/B Testing"])
 api_router.include_router(misdiagnosis_reports_router, tags=["误判分析报告"])
+api_router.include_router(chaos_drill_router, tags=["灾难恢复演练"])
 
 # 深度学习节能优化API
 if _ml_available:

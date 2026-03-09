@@ -225,6 +225,15 @@ class CircuitBreaker:
             except Exception:
                 pass  # 回调失败不应影响熔断器，回调内部自行记录日志
 
+    async def force_open(self):
+        """演练专用：安全地强制熔断器为 OPEN 状态"""
+        self._ensure_lock()
+        async with self._lock:
+            now = self._time_func()
+            self._last_trip_time = now
+            self._degraded_since = now
+            await self._set_state(BreakerState.OPEN, reason="chaos_drill")
+
     def reset(self):
         """重置为 CLOSED（调度器重启时使用）"""
         self._state = BreakerState.CLOSED

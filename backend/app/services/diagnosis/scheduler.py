@@ -266,6 +266,15 @@ class DiagnosisScheduler:
         else:
             inference_level = "L1"  # 次要/提示 → L1
 
+        # 演练模式保护：真实告警强制 L1 (Story 26.7)
+        try:
+            from app.services.diagnosis.chaos_drill_service import ChaosDrillService
+            if ChaosDrillService.is_drill_active:
+                inference_level = "L1"
+                logger.info(f"演练模式: 告警 {alarm_id} 强制降级为 L1")
+        except ImportError:
+            pass
+
         task_data = {
             "alarm_id": alarm_id,
             "device_id": device_id,
