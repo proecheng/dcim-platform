@@ -60,6 +60,7 @@ class DiagnosisResultStore:
         root_cause: Optional[str] = None,
         reasoning_path: Optional[list] = None,
         fault_tree_version: Optional[str] = None,
+        fault_tree_version_id: Optional[int] = None,  # Story 26.5: A/B 测试版本ID
         error_message: Optional[str] = None,
         # audit 字段
         input_data: Optional[dict] = None,
@@ -111,6 +112,7 @@ class DiagnosisResultStore:
                     root_cause=root_cause,
                     reasoning_path=reasoning_path,
                     fault_tree_version=fault_tree_version,
+                    fault_tree_version_id=fault_tree_version_id,  # Story 26.5
                 )
                 session.add(db_result)
                 await session.flush()

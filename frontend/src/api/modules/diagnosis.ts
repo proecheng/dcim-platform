@@ -434,3 +434,27 @@ export function rejectTimeWindowAdjustment(
 }> {
   return request.post(`/v1/diagnosis/time-window-tuning/adjustments/${adjustmentId}/reject`, data)
 }
+
+// ==================== 故障树管理 ====================
+
+/** 故障树 */
+export interface FaultTree {
+  id: number
+  name: string
+  description?: string
+  device_type?: string
+  created_at: string
+  updated_at: string
+}
+
+/**
+ * 获取故障树列表
+ */
+export function getFaultTrees(params?: {
+  device_type?: string
+  skip?: number
+  limit?: number
+}): Promise<FaultTree[]> {
+  return request.get('/v1/diagnosis/fault-trees', { params })
+}
+

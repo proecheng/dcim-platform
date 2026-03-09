@@ -1,6 +1,7 @@
 """
 A/B 测试 API 路由 - Story 26.5
 """
+import json
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List
@@ -8,6 +9,7 @@ from typing import List
 from app.core.database import get_db
 from app.core.security import get_current_user, require_role
 from app.models.user import User
+from app.models.log import OperationLog
 from app.schemas.ab_testing import (
     ABTestCreateRequest,
     ABTestUpdateRequest,
@@ -20,6 +22,27 @@ from app.models.ab_test_config import ABTestConfig
 from sqlalchemy import select
 
 router = APIRouter(prefix="/diagnosis/ab-tests", tags=["A/B Testing"])
+
+
+async def _log_operation(
+    db: AsyncSession,
+    user: User,
+    action: str,
+    target_id: int = None,
+    details: dict = None,
+):
+    """记录 A/B 测试操作审计日志"""
+    log = OperationLog(
+        user_id=user.id,
+        username=user.username,
+        module="ab_testing",
+        action=action,
+        target_type="ab_test_config",
+        target_id=target_id,
+        new_value=json.dumps(details, ensure_ascii=False) if details else None,
+    )
+    db.add(log)
+    await db.commit()
 
 
 @router.post("", response_model=ABTestResponse, status_code=status.HTTP_201_CREATED)
@@ -42,6 +65,23 @@ async def create_ab_test(
             min_sample_size=request.min_sample_size,
             created_by=current_user.id,
         )
+
+        # 记录审计日志
+        await _log_operation(
+            db,
+            current_user,
+            "create_ab_test",
+            ab_test.id,
+            {
+                "name": request.name,
+                "fault_tree_id": request.fault_tree_id,
+                "version_a_id": request.version_a_id,
+                "version_b_id": request.version_b_id,
+                "strategy": request.strategy,
+                "strategy_params": request.strategy_params.model_dump(),
+            },
+        )
+
         return ABTestResponse.model_validate(ab_test)
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
@@ -99,11 +139,30 @@ async def update_ab_test(
     """更新 A/B 测试配置（扩大灰度）"""
     service = ABTestingService(db)
     try:
+        # 获取旧配置
+        stmt = select(ABTestConfig).where(ABTestConfig.id == ab_test_id)
+        result = await db.execute(stmt)
+        old_config = result.scalar_one_or_none()
+        old_strategy_params = old_config.strategy_params if old_config else None
+
         ab_test = await service.update_ab_test(
             ab_test_id=ab_test_id,
             strategy_params=request.strategy_params.model_dump(),
             version=request.version,
         )
+
+        # 记录审计日志
+        await _log_operation(
+            db,
+            current_user,
+            "update_ab_test",
+            ab_test_id,
+            {
+                "old_strategy_params": old_strategy_params,
+                "new_strategy_params": request.strategy_params.model_dump(),
+            },
+        )
+
         return ABTestResponse.model_validate(ab_test)
     except ValueError as e:
         if "版本冲突" in str(e):
@@ -121,12 +180,30 @@ async def complete_ab_test(
     """完成 A/B 测试（全量切换或回滚）"""
     service = ABTestingService(db)
     try:
+        # 获取效果报告用于审计日志
+        report = await service.get_ab_test_report(ab_test_id)
+
         result = await service.complete_ab_test(
             ab_test_id=ab_test_id,
             action=request.action,
             version=request.version,
             archived_by=current_user.id,
         )
+
+        # 记录审计日志
+        await _log_operation(
+            db,
+            current_user,
+            "complete_ab_test",
+            ab_test_id,
+            {
+                "decision": request.action,
+                "version_a_stats": report["version_a"],
+                "version_b_stats": report["version_b"],
+                "statistical_test_result": report["statistical_test"],
+            },
+        )
+
         return result
     except ValueError as e:
         if "版本冲突" in str(e):
@@ -151,5 +228,15 @@ async def delete_ab_test(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"只能删除 paused 状态的 A/B 测试（当前状态: {ab_test.status}）"
         )
+
+    # 记录审计日志
+    await _log_operation(
+        db,
+        current_user,
+        "delete_ab_test",
+        ab_test_id,
+        {"reason": "手动删除"},
+    )
+
     await db.delete(ab_test)
     await db.commit()

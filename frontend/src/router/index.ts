@@ -252,6 +252,7 @@ const routes: RouteRecordRaw[] = [
               { path: 'rules', name: 'DiagnosisRules', component: () => import('@/views/diagnosis/rules.vue'), meta: { title: '诊断规则', icon: 'SetUp' } },
               { path: 'reports', name: 'DiagnosisReports', component: () => import('@/views/diagnosis/Reports.vue'), meta: { title: '误诊报告', icon: 'Document' } },
               { path: 'time-window-tuning', name: 'TimeWindowTuning', component: () => import('@/views/diagnosis/TimeWindowTuning.vue'), meta: { title: '时间窗口调参', icon: 'Timer' } },
+              { path: 'probability-tuning', name: 'ProbabilityTuning', component: () => import('@/views/diagnosis/ProbabilityTuning.vue'), meta: { title: '概率调参', icon: 'TrendCharts' } },
               { path: 'fault-trees/:id/editor', name: 'FaultTreeEditor', component: () => import('@/views/diagnosis/FaultTreeEditor.vue'), meta: { title: '故障树编辑器', icon: 'Edit', hidden: true } }
             ]
           },

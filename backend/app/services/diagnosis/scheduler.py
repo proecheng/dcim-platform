@@ -17,6 +17,7 @@ from app.services.diagnosis.push_service import DiagnosisPushService
 from app.services.diagnosis.circuit_breaker import CircuitBreaker
 from app.services.diagnosis.fallback_store import DiagnosisFallbackStore
 from app.services.diagnosis.annotation_anomaly import AnnotationAnomalyDetector
+from app.services.diagnosis.ab_testing_service import ABTestingService
 from app.models.diagnosis import DiagnosisResult
 from app.models.device import Device
 
@@ -57,6 +58,7 @@ class DiagnosisScheduler:
         self._recovery_task: Optional[asyncio.Task] = None
         self._anomaly_detection_task: Optional[asyncio.Task] = None
         self._push_retry_task: Optional[asyncio.Task] = None  # Story 24.6 推送重试任务
+        self._probability_tuning_task: Optional[asyncio.Task] = None  # Story 26.3 概率调参任务
 
         # 熔断器 (Story 24.7)
         self.circuit_breaker = CircuitBreaker(
@@ -115,6 +117,9 @@ class DiagnosisScheduler:
         # 启动推送重试定时任务 (Story 24.6)
         self._push_retry_task = asyncio.create_task(self._push_retry_loop())
 
+        # 启动概率调参定时任务 (Story 26.3)
+        self._probability_tuning_task = asyncio.create_task(self._probability_tuning_loop())
+
         logger.info("DiagnosisScheduler started")
 
     async def stop(self):
@@ -170,6 +175,15 @@ class DiagnosisScheduler:
             except asyncio.CancelledError:
                 pass
             self._push_retry_task = None
+
+        # 取消概率调参任务
+        if self._probability_tuning_task:
+            self._probability_tuning_task.cancel()
+            try:
+                await self._probability_tuning_task
+            except asyncio.CancelledError:
+                pass
+            self._probability_tuning_task = None
 
         # 取消所有 worker
         for worker in self._workers:
@@ -309,6 +323,12 @@ class DiagnosisScheduler:
             inference_level = "L1"
             logger.warning(f"Circuit breaker degraded: alarm {alarm_id} {original_level}->L1")
 
+        # A/B 测试版本选择 (Story 26.5)
+        fault_tree_version_id = None
+        if inference_level == "L2":
+            # L2 推理需要选择故障树版本
+            fault_tree_version_id = await self._select_fault_tree_version(device_id, alarm_data)
+
         start_time = datetime.utcnow()
 
         try:
@@ -364,6 +384,7 @@ class DiagnosisScheduler:
                 root_cause=result.get("root_cause"),
                 reasoning_path=result.get("reasoning_path"),
                 fault_tree_version=result.get("fault_tree_version"),
+                fault_tree_version_id=fault_tree_version_id,  # Story 26.5: 记录使用的故障树版本ID
                 error_message=result.get("error"),
                 input_data=alarm_data,
                 output_data=result,
@@ -612,6 +633,121 @@ class DiagnosisScheduler:
 
             # 每 60 秒处理一次
             await asyncio.sleep(60)
+
+    async def _probability_tuning_loop(self):
+        """
+        概率调参定时任务（Story 26.3）
+        每周日凌晨 2:00 执行一次
+        """
+        from app.services.diagnosis.probability_tuning_service import ProbabilityTuningService
+        import calendar
+
+        # 启动延迟 30 秒，避免与其他任务冲突
+        await asyncio.sleep(30)
+
+        while self.running:
+            try:
+                now = datetime.now()
+
+                # 检查是否是周日凌晨 2:00-2:05
+                if now.weekday() == 6 and now.hour == 2 and now.minute < 5:
+                    # 使用 Redis 分布式锁确保只有一个实例执行
+                    lock_key = "diagnosis:probability_tuning:lock"
+                    lock_value = str(uuid.uuid4())
+                    lock_ttl = 3600  # 1 小时锁超时
+
+                    # 尝试获取锁
+                    acquired = await self.redis.set(lock_key, lock_value, nx=True, ex=lock_ttl)
+
+                    if acquired:
+                        try:
+                            logger.info("开始执行概率调参分析...")
+                            service = ProbabilityTuningService()
+                            result = await service.analyze_all_trees()
+
+                            logger.info(
+                                f"概率调参分析完成: analyzed_trees={result['analyzed_trees']}, "
+                                f"analyzed_nodes={result['analyzed_nodes']}, "
+                                f"total_adjustments={result['total_adjustments']}, "
+                                f"pending_approvals={result['pending_approvals']}"
+                            )
+
+                            # 如果有待审批的调参建议，通知管理员
+                            if result['pending_approvals'] > 0:
+                                await service.notify_admins(result)
+
+                        except Exception as e:
+                            logger.error(f"概率调参分析失败: {e}", exc_info=True)
+                        finally:
+                            # 释放锁
+                            script = """
+                            if redis.call("get", KEYS[1]) == ARGV[1] then
+                                return redis.call("del", KEYS[1])
+                            else
+                                return 0
+                            end
+                            """
+                            await self.redis.eval(script, 1, lock_key, lock_value)
+                    else:
+                        logger.debug("概率调参锁已被其他实例持有")
+
+                    # 执行后等待 5 分钟，避免重复执行
+                    await asyncio.sleep(300)
+                else:
+                    # 每 5 分钟检查一次时间
+                    await asyncio.sleep(300)
+
+            except Exception as e:
+                logger.error(f"概率调参定时任务错误: {e}", exc_info=True)
+                await asyncio.sleep(300)
+
+    async def _select_fault_tree_version(self, device_id: int, alarm_data: dict) -> Optional[int]:
+        """
+        选择故障树版本（Story 26.5 A/B 测试集成）
+
+        Args:
+            device_id: 设备ID
+            alarm_data: 告警数据（包含设备类型、站点等信息）
+
+        Returns:
+            故障树版本ID，如果选择失败则返回 None（使用 active 版本降级）
+        """
+        try:
+            # 获取设备信息
+            async with async_session() as db_session:
+                device_stmt = select(Device).where(Device.id == device_id)
+                device_result = await db_session.execute(device_stmt)
+                device = device_result.scalar_one_or_none()
+
+                if not device:
+                    logger.warning(f"Device {device_id} not found, using active version")
+                    return None
+
+                # 获取故障树ID（假设从告警数据或设备类型推断）
+                # TODO: 实际实现需要根据设备类型和告警类型查询对应的故障树ID
+                # 这里简化处理，假设有一个默认故障树ID
+                fault_tree_id = 1  # 简化实现
+
+                # 调用 A/B 测试服务选择版本
+                ab_testing_service = ABTestingService(db_session, self.redis)
+                version_id = await ab_testing_service.select_version(
+                    fault_tree_id=fault_tree_id,
+                    device_id=str(device_id),
+                    device_type=device.device_type,
+                    site_id=device.site_id,
+                )
+
+                logger.debug(f"Selected fault tree version {version_id} for device {device_id}")
+                return version_id
+
+        except Exception as e:
+            # 异常降级：使用 active 版本
+            logger.error(
+                f"Failed to select fault tree version for device {device_id}: {e}, "
+                f"falling back to active version",
+                exc_info=True
+            )
+            return None
 
 
 # 全局调度器实例

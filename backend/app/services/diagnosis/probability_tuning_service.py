@@ -7,7 +7,7 @@ import logging
 from datetime import datetime
 from typing import Optional
 from sqlalchemy import select, and_, func, desc
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.core.database import async_session
 from app.models.diagnosis import ProbabilityAdjustmentLog, DiagnosisResult, DiagnosisAnnotation
@@ -159,8 +159,15 @@ class ProbabilityTuningService:
             }
         """
         # 查询该节点作为根因的诊断结果的标注统计
-        # 注意：这里假设 DiagnosisResult 有 root_cause_node_id 字段
-        # 实际实现时需要根据实际数据模型调整
+        # 通过 root_cause 字段匹配节点名称（因为 root_cause 存储的是节点名称）
+        node = await session.get(FaultTreeNode, node_id)
+        if not node:
+            return {
+                "total_count": 0,
+                "accurate_count": 0,
+                "inaccurate_count": 0,
+                "accuracy_rate": 0.0
+            }
 
         result = await session.execute(
             select(
@@ -174,7 +181,7 @@ class ProbabilityTuningService:
             )
             .select_from(DiagnosisAnnotation)
             .join(DiagnosisResult, DiagnosisAnnotation.result_id == DiagnosisResult.id)
-            # .where(DiagnosisResult.root_cause_node_id == node_id)
+            .where(DiagnosisResult.root_cause == node.name)
         )
 
         row = result.first()
@@ -203,12 +210,21 @@ class ProbabilityTuningService:
         Returns:
             list[DiagnosisResult]: 诊断结果列表
         """
-        # 注意：这里假设 DiagnosisResult 有 inference_trace JSON 字段
-        # 包含各节点的后验概率，用于判断节点是否"参与诊断"（后验概率 > 0）
-        # 实际实现时需要根据实际数据模型调整
+        # 获取节点名称
+        node = await session.get(FaultTreeNode, node_id)
+        if not node:
+            return []
 
-        # 临时实现：返回空列表
-        return []
+        # 查询 evidence 字段中包含该节点名称的诊断结果
+        # evidence 是 JSON 字段，包含推理过程中的证据信息
+        # 如果节点参与了诊断，其名称会出现在 evidence 中
+        result = await session.execute(
+            select(DiagnosisResult)
+            .where(DiagnosisResult.evidence.like(f'%{node.name}%'))
+            .options(selectinload(DiagnosisResult.annotation))
+        )
+
+        return list(result.scalars().all())
 
     def _calculate_root_node_adjustment(
         self,
@@ -330,13 +346,67 @@ class ProbabilityTuningService:
         Args:
             result: 调参分析结果
         """
-        # 注意：这里需要实现邮件和 WebSocket 通知
-        # 邮件主题: "智能诊断系统 - 概率调参审批通知"
-        # 邮件正文: 包含待审批调参数量、故障树名称、节点名称、调整建议
-        # WebSocket 消息: { "type": "probability_tuning_approval", "pending_count": 5 }
-        # 通知对象: 所有 role='admin' 的用户
+        from app.core.database import async_session
+        from app.models.user import User
+        from app.services.email_service import email_service
+        from app.services.websocket_manager import ws_manager
 
         logger.info(f"通知管理员审批: {result['pending_approvals']} 条待审批调参建议")
 
-        # 临时实现：仅记录日志
-        pass
+        # 查询所有管理员
+        async with async_session() as session:
+            admins_result = await session.execute(
+                select(User).where(User.role == 'admin', User.is_active == True)
+            )
+            admins = admins_result.scalars().all()
+
+        if not admins:
+            logger.warning("没有找到管理员用户，跳过通知")
+            return
+
+        # 发送邮件通知
+        if email_service.is_available():
+            subject = "智能诊断系统 - 概率调参审批通知"
+            html_content = f"""
+            <html>
+            <body>
+                <h2>概率调参审批通知</h2>
+                <p>系统已完成概率调参分析，生成了 <strong>{result['pending_approvals']}</strong> 条待审批的调参建议。</p>
+                <h3>分析摘要</h3>
+                <ul>
+                    <li>分析故障树数量: {result['analyzed_trees']}</li>
+                    <li>分析节点数量: {result['analyzed_nodes']}</li>
+                    <li>生成调参建议: {result['total_adjustments']}</li>
+                    <li>待审批数量: {result['pending_approvals']}</li>
+                </ul>
+                <p>请登录系统查看详情并进行审批。</p>
+            </body>
+            </html>
+            """
+
+            for admin in admins:
+                if admin.email:
+                    try:
+                        await email_service.send_html_email(
+                            to_email=admin.email,
+                            subject=subject,
+                            html_content=html_content
+                        )
+                    except Exception as e:
+                        logger.error(f"发送邮件给 {admin.email} 失败: {e}")
+
+        # 发送 WebSocket 通知
+        for admin in admins:
+            try:
+                await ws_manager.send_to_user(
+                    admin.id,
+                    {
+                        'type': 'probability_tuning_approval',
+                        'pending_count': result['pending_approvals'],
+                        'analyzed_trees': result['analyzed_trees'],
+                        'analyzed_nodes': result['analyzed_nodes'],
+                        'total_adjustments': result['total_adjustments']
+                    }
+                )
+            except Exception as e:
+                logger.error(f"发送 WebSocket 通知给用户 {admin.id} 失败: {e}")
