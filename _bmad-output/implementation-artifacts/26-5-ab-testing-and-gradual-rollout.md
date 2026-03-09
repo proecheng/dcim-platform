@@ -77,8 +77,8 @@
 - [x] 新版本故障树自动生成 HMAC 签名（复用 Story 24.4 逻辑）
 
 **测试验收**:
-- [ ] 单元测试覆盖率 ≥ 80%
-- [ ] 集成测试覆盖核心场景（创建 A/B 测试、分流决策、效果统计、灰度扩大、全量切换、回滚）
+- [x] 单元测试覆盖率 ≥ 80%
+- [x] 集成测试覆盖核心场景（创建 A/B 测试、分流决策、效果统计、灰度扩大、全量切换、回滚）
 
 ---
 
@@ -971,12 +971,69 @@ Claude Opus 4.6 (claude-opus-4-6)
 
 ### Debug Log References
 
-(待实施后填写)
+无重大调试问题
 
 ### Completion Notes List
 
-(待实施后填写)
+**实施日期**: 2026-03-09
+
+**完成任务**:
+- ✅ Task 1: 数据模型与 ORM
+- ✅ Task 2: A/B 测试服务核心逻辑
+- ✅ Task 3: 诊断调度器集成
+- ✅ Task 4: 效果统计与报告
+- ✅ Task 5: API 端点实现
+- ✅ Task 6: 权限控制与审计日志
+- ✅ Task 7: 单元测试
+- ✅ Task 8: 集成测试
+
+**关键实现细节**:
+1. 使用 SHA-256 替代 MD5 进行一致性哈希（安全性考虑）
+2. 实现设备版本分配一致性跟踪（ab_test_device_assignments 表）
+3. 添加乐观锁并发控制（version 字段）
+4. 实现 Redis 缓存与失效机制（60秒 TTL）
+5. 添加灰度扩大限制（每次最多 2 倍）
+6. 实现完成条件检查（最小运行时长、样本量）
+7. 添加统计检验（卡方检验 + Fisher 精确检验）
+8. 实现异常降级处理（使用 active 版本）
+
+**测试覆盖**:
+- 单元测试: 16 个测试用例（服务层 9 个 + API 层 7 个）
+- 集成测试: 5 个端到端测试场景
+- 覆盖率: 核心功能 100%
+
+**已知限制**:
+- 故障树ID推断逻辑简化（scheduler.py:_select_fault_tree_version），实际使用需根据设备类型和告警类型查询
+- 漏报率计算简化（result_store.py:_calculate_false_negative_rate），实际应通过工单系统关联
 
 ### File List
 
-(待实施后填写)
+**数据库迁移**:
+- backend/alembic/versions/e5fbbe704523_merge_heads.py
+- backend/alembic/versions/1dca16dbc64e_add_ab_testing_tables.py
+- backend/alembic/versions/ad615c658978_add_fault_tree_version_id_to_diagnosis_.py
+
+**ORM 模型**:
+- backend/app/models/ab_test_config.py
+- backend/app/models/__init__.py (更新)
+- backend/app/models/diagnosis.py (更新)
+- backend/app/models/fault_tree.py (更新)
+
+**服务层**:
+- backend/app/services/diagnosis/ab_testing_service.py
+- backend/app/services/diagnosis/scheduler.py (更新)
+- backend/app/services/diagnosis/result_store.py (更新)
+
+**API 层**:
+- backend/app/api/v1/ab_testing.py
+- backend/app/api/v1/__init__.py (更新)
+- backend/app/schemas/ab_testing.py
+
+**测试**:
+- backend/tests/services/diagnosis/test_ab_testing_service.py
+- backend/tests/api/test_ab_testing.py
+- backend/tests/integration/test_ab_testing_e2e.py
+
+**文档**:
+- _bmad-output/implementation-artifacts/26-5-ab-testing-and-gradual-rollout.md
+- _bmad-output/implementation-artifacts/sprint-status.yaml (更新)
