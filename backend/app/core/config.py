@@ -79,6 +79,23 @@ class Settings(BaseSettings):
     redis_enabled: bool = True
     redis_url: str = "redis://localhost:6379/0"
 
+    @property
+    def redis_host(self) -> str:
+        """从 redis_url 解析主机"""
+        # redis://localhost:6379/0 -> localhost
+        url = self.redis_url.replace("redis://", "")
+        return url.split(":")[0]
+
+    @property
+    def redis_port(self) -> int:
+        """从 redis_url 解析端口"""
+        # redis://localhost:6379/0 -> 6379
+        url = self.redis_url.replace("redis://", "")
+        if ":" in url:
+            port_part = url.split(":")[1].split("/")[0]
+            return int(port_part)
+        return 6379
+
     # MQTT 配置
     mqtt_enabled: bool = True
     mqtt_host: str = "localhost"

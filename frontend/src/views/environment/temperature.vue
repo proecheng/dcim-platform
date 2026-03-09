@@ -223,10 +223,11 @@
 import * as echarts from 'echarts'
 import { Sunny, Search, WarnTriangleFilled, Odometer, Monitor, CircleCheck, WarningFilled, TrendCharts } from '@element-plus/icons-vue'
 import { getPointTrend, type TrendData } from '@/api/modules/history'
-import { getActiveAlarms, type AlarmInfo } from '@/api/modules/alarm'
+import { type AlarmInfo } from '@/api/modules/alarm'
 import { useTemperatureData, type ZoneGroup } from '@/composables/useTemperatureData'
 import DataQualityTag from '@/components/common/DataQualityTag.vue'
 import type { RealtimeData } from '@/api/modules/realtime'
+import { useAlarmStore } from '@/stores/alarm'
 
 const {
   thSensors,
@@ -305,13 +306,9 @@ function handleZoneClick(zone: ZoneGroup) {
 
 async function handleSensorClick(sensor: RealtimeData) {
   selectedSensor.value = sensor
-  // 加载关联告警
-  try {
-    const alarms = await getActiveAlarms({ point_id: sensor.point_id })
-    sensorAlarms.value = Array.isArray(alarms) ? alarms : []
-  } catch {
-    sensorAlarms.value = []
-  }
+  // 从 AlarmStore 加载关联告警（Story 27.7 AC1）
+  const alarmStore = useAlarmStore()
+  sensorAlarms.value = alarmStore.activeAlarms.filter(a => a.point_id === sensor.point_id)
   // 加载趋势图
   await nextTick()
   loadTrendChart(sensor.point_id, sensor.point_name, sensor.unit)

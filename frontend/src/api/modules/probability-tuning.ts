@@ -1,7 +1,7 @@
 /**
  * 概率调参 API - Story 26.3
  */
-import request from '../request'
+import request from '@/utils/request'
 
 export interface ProbabilityAdjustment {
   id: number

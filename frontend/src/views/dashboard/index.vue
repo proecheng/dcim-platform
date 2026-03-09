@@ -88,20 +88,20 @@
       </el-col>
     </el-row>
 
-    <!-- 能源统计卡片 (V2.3 Enhanced) -->
-    <el-row :gutter="20" class="energy-cards" v-if="energyData">
+    <!-- 能源统计卡片 (V2.3 Enhanced) - Story 27.7 AC2: 从 EnergyStore 读取 -->
+    <el-row :gutter="20" class="energy-cards">
       <el-col :span="5">
         <InteractivePowerCard
           title="实时功率"
-          :value="energyData.realtime?.total_power || 0"
+          :value="energyStore.totalPower"
           unit="kW"
           :icon="Lightning"
           icon-color="#409EFF"
-          :trend-data="energyData.trends?.power_1h || []"
+          :trend-data="[]"
           sparkline-color="#409EFF"
           :details="[
-            { label: 'IT', value: `${energyData.realtime?.it_power?.toFixed(1) || 0} kW` },
-            { label: '制冷', value: `${energyData.realtime?.cooling_power?.toFixed(1) || 0} kW` }
+            { label: 'IT', value: `${energyStore.itPower.toFixed(1)} kW` },
+            { label: '制冷', value: `${energyStore.coolingPower.toFixed(1)} kW` }
           ]"
           navigate-to="/power/monitor"
           tooltip="数据中心总功率消耗，包括IT设备和基础设施"
@@ -110,39 +110,39 @@
 
       <el-col :span="5">
         <PUEIndicatorCard
-          :pue="energyData.efficiency?.pue"
-          :target="energyData.efficiency?.pue_target"
-          :trend="energyData.efficiency?.pue_trend"
-          :trend-data="energyData.trends?.pue_24h || []"
-          :compare-yesterday="(energyData.efficiency?.pue || 1.5) - 1.5"
+          :pue="energyStore.currentPUE"
+          :target="1.5"
+          trend="stable"
+          :trend-data="[]"
+          :compare-yesterday="0"
         />
       </el-col>
 
       <el-col :span="5">
         <DemandStatusCard
-          :current-demand="energyData.demand?.current_demand"
-          :declared-demand="energyData.demand?.declared_demand"
-          :trend-data="energyData.trends?.demand_24h || []"
-          :over-declared-risk="energyData.demand?.over_declared_risk"
+          :current-demand="0"
+          :declared-demand="0"
+          :trend-data="[]"
+          :over-declared-risk="false"
         />
       </el-col>
 
       <el-col :span="5">
         <CostCard
-          :today-cost="energyData.cost?.today_cost"
-          :month-cost="energyData.cost?.month_cost"
-          :avg-price="energyData.cost?.avg_price"
-          :peak-ratio="energyData.cost?.peak_ratio"
-          :valley-ratio="energyData.cost?.valley_ratio"
-          :flat-ratio="100 - (energyData.cost?.peak_ratio || 0) - (energyData.cost?.valley_ratio || 0)"
+          :today-cost="energyStore.todayCost"
+          :month-cost="energyStore.monthCost"
+          :avg-price="0"
+          :peak-ratio="0"
+          :valley-ratio="0"
+          :flat-ratio="100"
         />
       </el-col>
 
       <el-col :span="4">
         <SuggestionsCard
-          :pending-count="energyData.suggestions?.pending_count"
-          :high-priority-count="energyData.suggestions?.high_priority_count"
-          :potential-saving="energyData.suggestions?.potential_saving_cost"
+          :pending-count="energyStore.pendingCount"
+          :high-priority-count="energyStore.highPrioritySuggestions.length"
+          :potential-saving="0"
         />
       </el-col>
     </el-row>
@@ -223,7 +223,6 @@ import { Monitor, CircleCheck, Warning, Remove } from '@element-plus/icons-vue'
 import { Lightning, FullScreen, Refresh, Coin } from '@element-plus/icons-vue'
 import { IceCream, Sunny, Lock, OfficeBuilding, Opportunity } from '@element-plus/icons-vue'
 import { getDashboardData, type RealtimeData } from '@/api/modules/realtime'
-import { getEnergyDashboard, type EnergyDashboardData } from '@/api/modules/energy'
 import { useAlarmStore } from '@/stores/alarm'
 import { useRealtimeStore } from '@/stores/realtime'
 import { useEnergyStore } from '@/stores/energy'
@@ -238,27 +237,17 @@ import DemoDataLoader from '@/components/DemoDataLoader.vue'
 
 const alarmStore = useAlarmStore()
 const realtimeStore = useRealtimeStore()
+const energyStore = useEnergyStore()
 
 const summary = computed(() => realtimeStore.simpleSummary)
 const realtimeData = computed(() => realtimeStore.realtimeData.slice(0, MAX_REALTIME_ROWS))
-const energyData = ref<EnergyDashboardData | null>(null)
 const showDemoLoader = ref(false)
 const isRefreshing = ref(false)
 let timer: number | null = null
 let isPageVisible = true
 
 const DASHBOARD_REFRESH_INTERVAL_MS = 15000
-const DASHBOARD_CACHE_TTL_MS = 20000
 const MAX_REALTIME_ROWS = 200
-const DASHBOARD_CACHE_KEY = 'dcim:dashboard:cache:v2'
-
-interface DashboardCachePayload {
-  savedAt: number
-  summary: { total: number; normal: number; alarm: number; offline: number }
-  realtimeData: RealtimeData[]
-  energyData: EnergyDashboardData | null
-  domainStats: string[]
-}
 
 type DashboardRaw = Awaited<ReturnType<typeof getDashboardData>>
 
@@ -281,7 +270,6 @@ const domainOverview = ref([
 ])
 
 onMounted(() => {
-  applyCachedDashboardData()
   refreshData({ force: true })
   startAutoRefresh()
   document.addEventListener('visibilitychange', handleVisibilityChange)
@@ -341,65 +329,13 @@ function applyDashboardOverviewStat(dashRes: DashboardRaw) {
   const ds = dashRes.device_status || {}
   const totalDevices = Object.values(ds).reduce((sum: number, value) => sum + Number(value || 0), 0)
   domainOverview.value[4].stat = totalDevices > 0 ? `${totalDevices}台设备` : '运行中'
+
+  // 从 EnergyStore 读取 PUE（Story 27.7 AC2）
+  const pue = energyStore.currentPUE
+  domainOverview.value[5].stat = pue > 0 ? `PUE ${pue.toFixed(2)}` : '运行中'
 }
 
-
-function loadDashboardCache(): DashboardCachePayload | null {
-  try {
-    const cacheRaw = sessionStorage.getItem(DASHBOARD_CACHE_KEY)
-    if (!cacheRaw) return null
-    const cache = JSON.parse(cacheRaw) as DashboardCachePayload
-    if (!cache?.savedAt) return null
-    if (Date.now() - cache.savedAt > DASHBOARD_CACHE_TTL_MS) return null
-    return cache
-  } catch {
-    return null
-  }
-}
-
-function saveDashboardCache() {
-  try {
-    const payload: DashboardCachePayload = {
-      savedAt: Date.now(),
-      summary: { ...realtimeStore.simpleSummary },
-      realtimeData: realtimeStore.realtimeData.slice(0, MAX_REALTIME_ROWS),
-      energyData: energyData.value,
-      domainStats: domainOverview.value.map(item => item.stat)
-    }
-    sessionStorage.setItem(DASHBOARD_CACHE_KEY, JSON.stringify(payload))
-  } catch {
-    // 忽略缓存写入失败，避免影响主流程
-  }
-}
-
-function applyCachedDashboardData() {
-  const cache = loadDashboardCache()
-  if (!cache) return
-
-  // 仅在 store 为空时恢复缓存，避免覆盖 MainLayout useRealtime() 已加载的新鲜数据
-  if (realtimeStore.totalPoints === 0) {
-    if (cache.summary) {
-      realtimeStore.setSummary({
-        total_points: cache.summary.total,
-        online_points: cache.summary.normal,
-        alarm_points: cache.summary.alarm,
-        offline_points: cache.summary.offline,
-        by_type: {},
-        by_area: {},
-      })
-    }
-    if (cache.realtimeData?.length) {
-      realtimeStore.setAllData(cache.realtimeData.slice(0, MAX_REALTIME_ROWS))
-    }
-  }
-  energyData.value = cache.energyData
-  cache.domainStats.forEach((stat, index) => {
-    if (domainOverview.value[index]) {
-      domainOverview.value[index].stat = stat
-    }
-  })
-}
-
+// Story 27.7 AC2 & AC5: 简化 refreshData，移除 energyData ref 和 sessionStorage 缓存
 async function refreshData(options: { force?: boolean } = {}) {
   const forceRefresh = options.force === true
   if (isRefreshing.value) return
@@ -409,14 +345,14 @@ async function refreshData(options: { force?: boolean } = {}) {
   try {
     // 非 force 模式下跳过 realtimeStore.reload()，因为 MainLayout 的全局轮询已持续更新 store
     const realtimeReload = forceRefresh ? realtimeStore.reload() : Promise.resolve()
-    const [_realtimeRes, _alarmsRes, dashboardRes, energyRes] = await Promise.allSettled([
+    const [_realtimeRes, _alarmsRes, dashboardRes] = await Promise.allSettled([
       realtimeReload,
       alarmStore.fetchActiveAlarms(),
-      getDashboardData(),
-      getEnergyDashboard()
+      getDashboardData()
     ])
 
-    useEnergyStore().reload()
+    // 始终调用 energyStore.reload() 确保能源数据最新
+    await energyStore.reload()
 
     if (dashboardRes.status === 'fulfilled') {
       const dashData = unwrapApiData<DashboardRaw>(dashboardRes.value)
@@ -439,45 +375,6 @@ async function refreshData(options: { force?: boolean } = {}) {
         })
       }
     }
-
-    if (energyRes.status === 'fulfilled') {
-      const energyPayload = unwrapApiData<EnergyDashboardData>(energyRes.value)
-      if (energyPayload) {
-        energyData.value = energyPayload
-        // 回退：仅在 reload() 尚未写入时，用 dashboard 聚合数据填充 EnergyStore
-        const eStore = useEnergyStore()
-        if (!eStore.powerSummary && energyPayload.realtime) {
-          eStore.setPowerSummary({
-            total_power: energyPayload.realtime.total_power || 0,
-            it_power: energyPayload.realtime.it_power || 0,
-            cooling_power: energyPayload.realtime.cooling_power || 0,
-            ups_power: 0,
-            other_power: energyPayload.realtime.other_power || 0,
-            current_pue: energyPayload.efficiency?.pue ?? null,
-            today_energy: energyPayload.realtime.today_energy || 0,
-            today_cost: energyPayload.cost?.today_cost || 0,
-            month_energy: energyPayload.realtime.month_energy || 0,
-            month_cost: energyPayload.cost?.month_cost || 0,
-          })
-        }
-        if (!eStore.pueData && energyPayload.efficiency?.pue != null) {
-          eStore.setPUEData({
-            current_pue: energyPayload.efficiency.pue,
-            total_power: energyPayload.realtime?.total_power || 0,
-            it_power: energyPayload.realtime?.it_power || 0,
-            cooling_power: energyPayload.realtime?.cooling_power || 0,
-            ups_loss: 0,
-            lighting_power: 0,
-            other_power: energyPayload.realtime?.other_power || 0,
-            update_time: new Date().toISOString(),
-          })
-        }
-      }
-      const pue = energyData.value?.efficiency?.pue
-      domainOverview.value[5].stat = pue != null ? `PUE ${pue.toFixed(2)}` : '运行中'
-    }
-
-    saveDashboardCache()
   } catch (e) {
     console.error('刷新数据失败', e)
   } finally {

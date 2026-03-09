@@ -91,7 +91,15 @@ instance.interceptors.response.use(
         if (currentRoute.meta?.requiresAuth !== false) {
           localStorage.removeItem('token')
           router.push('/login')
-          ElMessage.error('登录已过期，请重新登录')
+          // 防止多个 401 同时弹出多个提示，使用全局标记
+          if (!(window as any).__authExpiredShown) {
+            ;(window as any).__authExpiredShown = true
+            ElMessage.error('登录已过期，请重新登录')
+            // 3 秒后重置标记，允许下次再显示
+            setTimeout(() => {
+              ;(window as any).__authExpiredShown = false
+            }, 3000)
+          }
         }
       } else if (status === 403) {
         ElMessage.error('没有权限执行此操作')

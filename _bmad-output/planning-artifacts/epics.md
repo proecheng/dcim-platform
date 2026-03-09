@@ -3383,6 +3383,41 @@ So that 不会看到其他站点的混合数据。
 **依赖:** Story 27.5（WebSocket 管理器）
 **阶段约束:** 本 Story 依赖 Epic 22（站点管理前端，Phase 2 补充）提供站点切换 UI。MVP 阶段可先实现 API 拦截器和 Store reload 机制，站点切换 UI 集成延迟到 Epic 22 完成后。
 
+### Story 27.7: 数据链路 P0 问题修复
+
+As a 用户,
+I want 所有页面的数据完全来自统一的 Store,
+So that 不同页面显示的数据始终保持一致，不会出现数据不同步的问题。
+
+**Context:**
+
+对抗性审查（2026-03-10）发现 Epic 27 实施不完整，存在 3 个 P0 级别的严重问题：
+
+1. **P0-1**: 温度监控页面仍直接调用 `getActiveAlarms` API，绕过 AlarmStore
+2. **P0-2**: Dashboard 仍维护独立的 `energyData` ref，与 EnergyStore 状态脱节
+3. **P0-3**: BigscreenStore 的 `energy` 和 `environment` 仍是独立状态，未改为从对应 Store 派生的 getter
+
+**Acceptance Criteria:**
+
+- Given 温度监控页面点击传感器
+- When 加载传感器关联告警
+- Then 从 `alarmStore.activeAlarms` 中过滤 `point_id` 匹配的告警，移除直接 API 调用
+- And Dashboard 页面完全从 `useEnergyStore()` 读取能源数据，移除局部 `energyData` ref
+- And BigscreenStore 的 `energy` 和 `environment` 改为 getter，从 EnergyStore 和 RealtimeStore 派生
+- And 移除 Dashboard 的 sessionStorage 缓存机制（`dcim_dashboard_cache`）
+- And 所有页面的数据完全同步，无数据割裂问题
+
+**涉及文件:**
+- `frontend/src/views/environment/temperature.vue:310`
+- `frontend/src/views/dashboard/index.vue`
+- `frontend/src/stores/bigscreen.ts`
+
+**优先级:** P0（紧急修复）
+
+**估算工作量:** 8h
+
+**依赖:** Story 27.1, 27.2, 27.3（修复基于已完成的 Store 架构）
+
 ---
 
 ## Epic 28: Demo 系统解耦与数据隔离

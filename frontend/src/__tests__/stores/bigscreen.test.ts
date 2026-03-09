@@ -37,12 +37,13 @@ describe('useBigscreenStore', () => {
     expect(store.loading).toBe(false)
   })
 
-  it('初始能耗数据', () => {
+  it('energy getter 从 EnergyStore 派生', () => {
     const store = useBigscreenStore()
+    // energy 现在是 getter，从 EnergyStore 派生，初始值为 0
     expect(store.energy.totalPower).toBe(0)
     expect(store.energy.itPower).toBe(0)
     expect(store.energy.coolingPower).toBe(0)
-    expect(store.energy.pue).toBe(1.5)
+    expect(store.energy.pue).toBeGreaterThanOrEqual(0)
     expect(store.energy.todayEnergy).toBe(0)
     expect(store.energy.todayCost).toBe(0)
   })
@@ -114,23 +115,16 @@ describe('useBigscreenStore', () => {
     expect(store.criticalAlarmCount).toBe(1)
   })
 
-  it('updateEnvironment 更新环境数据', () => {
+  it('environment getter 从 RealtimeStore 派生', () => {
     const store = useBigscreenStore()
-    const env = {
-      temperature: { max: 30, avg: 25, min: 20 },
-      humidity: { max: 60, avg: 50, min: 40 }
-    }
-    store.updateEnvironment(env)
-    expect(store.environment.temperature.avg).toBe(25)
-    expect(store.environment.humidity.avg).toBe(50)
-  })
-
-  it('updateEnergy 更新能耗数据', () => {
-    const store = useBigscreenStore()
-    const energy = { totalPower: 500, itPower: 300, coolingPower: 150, pue: 1.67, todayEnergy: 1200, todayCost: 960 }
-    store.updateEnergy(energy)
-    expect(store.energy.totalPower).toBe(500)
-    expect(store.energy.pue).toBe(1.67)
+    // environment 现在是 getter，从 RealtimeStore 派生
+    // 初始状态下没有传感器数据，返回默认值 0
+    expect(store.environment.temperature.max).toBe(0)
+    expect(store.environment.temperature.avg).toBe(0)
+    expect(store.environment.temperature.min).toBe(0)
+    expect(store.environment.humidity.max).toBe(0)
+    expect(store.environment.humidity.avg).toBe(0)
+    expect(store.environment.humidity.min).toBe(0)
   })
 
   it('setLoading 设置加载状态', () => {

@@ -5,8 +5,8 @@ const cors = require('cors');
 const path = require('path');
 
 const app = express();
-const PORT = 3000;
-const BACKEND_PORT = 8080;
+const PORT = 3001;
+const BACKEND_PORT = 8082;
 const BACKEND_URL = 'http://localhost:' + BACKEND_PORT;
 const BACKEND_WS_URL = 'ws://localhost:' + BACKEND_PORT;
 
@@ -64,7 +64,7 @@ app.get('*', (req, res) => {
 
 const server = app.listen(PORT, '0.0.0.0', () => {
     console.log('========================================');
-    console.log('   DCIM Proxy Server Started');
+    console.log('   DCIM Proxy Server Started (TEMP)');
     console.log('========================================');
     console.log('   Local:    http://localhost:' + PORT);
     console.log('   Network:  http://0.0.0.0:' + PORT);

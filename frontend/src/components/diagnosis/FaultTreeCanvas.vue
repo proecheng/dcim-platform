@@ -228,24 +228,6 @@ onBeforeUnmount(() => {
   destroy()
 })
 
-  if (selection.nodes.length > 0) {
-    selection.nodes.forEach(nodeId => {
-      deleteNode(nodeId)
-    })
-  }
-
-  if (selection.edges.length > 0) {
-    selection.edges.forEach(edgeId => {
-      edges.value.remove(edgeId)
-    })
-  }
-}
-
-// 适应视图
-function handleFitView() {
-  fitView()
-}
-
 // 暴露方法给父组件
 defineExpose({
   addNode,

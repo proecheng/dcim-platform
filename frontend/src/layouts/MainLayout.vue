@@ -258,7 +258,7 @@ import {
   RefreshRight, FirstAidKit, User, MapLocation, Box, Files
 } from '@element-plus/icons-vue'
 import { storeToRefs } from 'pinia'
-import { useUserStore, useAlarmStore } from '@/stores'
+import { useUserStore, useAlarmStore, useAppStore } from '@/stores'
 import DegradationBanner from '@/components/common/DegradationBanner.vue'
 import AlarmSoundToggle from '@/components/common/AlarmSoundToggle.vue'
 import VideoPopup from '@/components/video/VideoPopup.vue'
@@ -274,6 +274,7 @@ const route = useRoute()
 const userStore = useUserStore()
 const { isAdmin, isOperator } = storeToRefs(userStore)
 const alarmStore = useAlarmStore()
+const appStore = useAppStore()
 const isCollapse = ref(false)
 const videoPopupRef = ref<InstanceType<typeof VideoPopup>>()
 

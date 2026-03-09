@@ -1,0 +1,23 @@
+{
+  "console_messages": [
+    {
+      "type": "warning",
+      "text": "WebSocket channel \"realtime\" not connected. Call connect() first.",
+      "location": {
+        "url": "http://localhost:3000/assets/useWebSocketManager-DwUOAFm_.js",
+        "lineNumber": 0,
+        "columnNumber": 2580
+      }
+    },
+    {
+      "type": "warning",
+      "text": "WebSocket channel \"realtime\" not connected. Call connect() first.",
+      "location": {
+        "url": "http://localhost:3000/assets/useWebSocketManager-DwUOAFm_.js",
+        "lineNumber": 0,
+        "columnNumber": 2580
+      }
+    }
+  ],
+  "failed_requests": []
+}

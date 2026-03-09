@@ -1,6 +1,8 @@
 // frontend/src/stores/bigscreen.ts
 import { defineStore } from 'pinia'
 import { useAlarmStore } from '@/stores/alarm'
+import { useEnergyStore } from '@/stores/energy'
+import { useRealtimeStore } from '@/stores/realtime'
 import type {
   SceneMode,
   DataCenterLayout,
@@ -34,21 +36,7 @@ interface BigscreenState {
   // 选中的设备
   selectedDeviceId: string | null
 
-  // 环境数据
-  environment: {
-    temperature: { max: number; avg: number; min: number }
-    humidity: { max: number; avg: number; min: number }
-  }
-
-  // 能耗数据
-  energy: {
-    totalPower: number
-    itPower: number
-    coolingPower: number
-    pue: number
-    todayEnergy: number
-    todayCost: number
-  }
+  // Story 27.7 AC3 & AC4: environment 和 energy 移到 getters，不再是 state
 
   // 相机预设
   cameraPresets: Record<string, CameraPreset>
@@ -72,18 +60,6 @@ export const useBigscreenStore = defineStore('bigscreen', {
       airflow: false
     },
     selectedDeviceId: null,
-    environment: {
-      temperature: { max: 0, avg: 0, min: 0 },
-      humidity: { max: 0, avg: 0, min: 0 }
-    },
-    energy: {
-      totalPower: 0,
-      itPower: 0,
-      coolingPower: 0,
-      pue: 1.5,
-      todayEnergy: 0,
-      todayCost: 0
-    },
     cameraPresets: {
       overview: { position: [0, 50, 50], target: [0, 0, 0] },
       topDown: { position: [0, 80, 0], target: [0, 0, 0] },
@@ -158,6 +134,55 @@ export const useBigscreenStore = defineStore('bigscreen', {
     // 最近告警列表（从 activeAlarms getter 派生）
     recentAlarms(): BigscreenAlarm[] {
       return this.activeAlarms.slice(0, 10)
+    },
+
+    // Story 27.7 AC3: energy 从 EnergyStore 派生
+    energy(): {
+      totalPower: number
+      itPower: number
+      coolingPower: number
+      pue: number
+      todayEnergy: number
+      todayCost: number
+    } {
+      const energyStore = useEnergyStore()
+      return {
+        totalPower: energyStore.totalPower,
+        itPower: energyStore.itPower,
+        coolingPower: energyStore.coolingPower,
+        pue: energyStore.currentPUE,
+        todayEnergy: energyStore.todayEnergy,
+        todayCost: energyStore.todayCost
+      }
+    },
+
+    // Story 27.7 AC4: environment 从 RealtimeStore 派生
+    environment(): {
+      temperature: { max: number; avg: number; min: number }
+      humidity: { max: number; avg: number; min: number }
+    } {
+      const realtimeStore = useRealtimeStore()
+      const thSensors = Array.from(realtimeStore.dataMap.values())
+        .filter(d => d.device_type === 'TH' && d.status !== 'offline')
+
+      const tempSensors = thSensors.filter(d => d.unit === '°C' || d.unit === '℃')
+      const humiditySensors = thSensors.filter(d => d.unit === '%' || d.unit === '%RH')
+
+      const tempValues = tempSensors.map(s => s.value ?? 0).filter(v => v > 0)
+      const humidityValues = humiditySensors.map(s => s.value ?? 0).filter(v => v > 0)
+
+      return {
+        temperature: {
+          max: tempValues.length ? Math.max(...tempValues) : 0,
+          avg: tempValues.length ? tempValues.reduce((a, b) => a + b, 0) / tempValues.length : 0,
+          min: tempValues.length ? Math.min(...tempValues) : 0
+        },
+        humidity: {
+          max: humidityValues.length ? Math.max(...humidityValues) : 0,
+          avg: humidityValues.length ? humidityValues.reduce((a, b) => a + b, 0) / humidityValues.length : 0,
+          min: humidityValues.length ? Math.min(...humidityValues) : 0
+        }
+      }
     }
   },
 
@@ -198,15 +223,8 @@ export const useBigscreenStore = defineStore('bigscreen', {
       this.selectedDeviceId = deviceId
     },
 
-    // 更新环境数据
-    updateEnvironment(env: BigscreenState['environment']) {
-      this.environment = env
-    },
-
-    // 更新能耗数据
-    updateEnergy(energy: BigscreenState['energy']) {
-      this.energy = energy
-    },
+    // Story 27.7 AC3 & AC4: 移除 updateEnvironment 和 updateEnergy actions
+    // environment 和 energy 现在是 getters，从对应 Store 派生
 
     // 设置加载状态
     setLoading(loading: boolean) {

@@ -1,7 +1,8 @@
 <template>
   <div class="node-properties-panel">
     <el-drawer
-      v-model="visible"
+      :model-value="visible"
+      @update:model-value="(val: boolean) => emit('update:visible', val)"
       title="节点属性"
       direction="rtl"
       size="400px"

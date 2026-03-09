@@ -173,7 +173,7 @@
 import { ref, reactive, onMounted, onUnmounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Refresh } from '@element-plus/icons-vue'
-import api from '@/api'
+import { getTimeWindowAdjustments, triggerTimeWindowAnalysis, approveTimeWindowAdjustment, rejectTimeWindowAdjustment } from '@/api/modules/diagnosis'
 import { useUserStore } from '@/stores/user'
 
 interface TimeWindowAdjustment {
@@ -236,7 +236,7 @@ const fetchAdjustments = async () => {
       device_type: queryForm.device_type || undefined,
       status: queryForm.status || undefined
     }
-    const response = await api.diagnosis.getTimeWindowAdjustments(params)
+    const response = await getTimeWindowAdjustments(params)
     tableData.value = response.items
     pagination.total = response.total
   } catch (error) {
@@ -261,7 +261,7 @@ const handleTriggerAnalysis = async () => {
     )
 
     analyzing.value = true
-    const response = await api.diagnosis.triggerTimeWindowAnalysis()
+    const response = await triggerTimeWindowAnalysis()
     ElMessage.success(
       `分析完成：分析了 ${response.analyzed_device_types} 个设备类型，生成 ${response.total_adjustments} 条调参建议`
     )
@@ -308,7 +308,7 @@ const confirmApprove = async () => {
 
   submitting.value = true
   try {
-    await api.diagnosis.approveTimeWindowAdjustment(currentRow.value.id, {
+    await approveTimeWindowAdjustment(currentRow.value.id, {
       reason: approveForm.reason || undefined
     })
     ElMessage.success('审批成功')
@@ -339,7 +339,7 @@ const confirmReject = async () => {
 
   submitting.value = true
   try {
-    await api.diagnosis.rejectTimeWindowAdjustment(currentRow.value.id, {
+    await rejectTimeWindowAdjustment(currentRow.value.id, {
       reason: rejectForm.reason
     })
     ElMessage.success('已拒绝')

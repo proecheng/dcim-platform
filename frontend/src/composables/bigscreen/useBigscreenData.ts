@@ -4,8 +4,7 @@ import { useBigscreenStore } from '@/stores/bigscreen'
 import { useAlarmStore } from '@/stores/alarm'
 import { useRealtimeStore } from '@/stores/realtime'
 import { useEnergyStore } from '@/stores/energy'
-import type { DeviceRealtimeData, BigscreenAlarm } from '@/types/bigscreen'
-import { getEnergyDashboard } from '@/api/modules/energy'
+import type { DeviceRealtimeData } from '@/types/bigscreen'
 
 export interface DataFetchOptions {
   refreshInterval?: number
@@ -24,87 +23,15 @@ export function useBigscreenData(options: DataFetchOptions = {}) {
   let refreshTimer: number | null = null
   let currentInterval = refreshInterval
 
-  // 获取环境数据（从 RealtimeStore 读取）
-  async function fetchEnvironmentData() {
-    try {
-      // 确保 store 有数据
-      if (realtimeStore.totalPoints === 0) {
-        await realtimeStore.reload()
-      }
+  // Story 27.7 AC4: 移除 fetchEnvironmentData，environment 现在是 BigscreenStore 的 getter
+  // 从 RealtimeStore 自动派生，无需手动更新
 
-      // 从 store 中提取温湿度
-      const allData = realtimeStore.realtimeData
-      const tempPoints = allData.filter(p => p.point_code.includes('_TH_') && p.point_code.includes('_001'))
-      const humidPoints = allData.filter(p => p.point_code.includes('_TH_') && p.point_code.includes('_002'))
-
-      const temps = tempPoints.map(p => p.value).filter(v => v > 0)
-      const humids = humidPoints.map(p => p.value).filter(v => v > 0)
-
-      const data = {
-        temperature: {
-          max: temps.length > 0 ? Math.max(...temps) : 30,
-          avg: temps.length > 0 ? temps.reduce((a, b) => a + b, 0) / temps.length : 24,
-          min: temps.length > 0 ? Math.min(...temps) : 20
-        },
-        humidity: {
-          max: humids.length > 0 ? Math.max(...humids) : 60,
-          avg: humids.length > 0 ? humids.reduce((a, b) => a + b, 0) / humids.length : 50,
-          min: humids.length > 0 ? Math.min(...humids) : 40
-        }
-      }
-
-      store.updateEnvironment(data)
-    } catch (e) {
-      console.error('Failed to fetch environment data:', e)
-    }
-  }
-
-  // 获取能耗数据
+  // Story 27.7 AC3: 简化 fetchEnergyData，只确保 EnergyStore 有数据
   async function fetchEnergyData() {
     try {
-      const response = await getEnergyDashboard()
-      // 处理可能的 ResponseModel 包装
-      const dashboard = (response as any)?.data || response
-
-      const data = {
-        totalPower: dashboard.realtime?.total_power || 0,
-        itPower: dashboard.realtime?.it_power || 0,
-        coolingPower: dashboard.realtime?.cooling_power || 0,
-        pue: dashboard.efficiency?.pue || 1.5,
-        todayEnergy: dashboard.cost?.today_energy || dashboard.realtime?.today_energy || 0,
-        todayCost: dashboard.cost?.today_cost || 0
-      }
-
-      store.updateEnergy(data)
-
-      // 回退写入 EnergyStore（仅在 Store 为空时），确保能源数据 SSOT 统一
+      // 确保 EnergyStore 有最新数据，BigscreenStore.energy getter 会自动派生
       const energyStore = useEnergyStore()
-      if (!energyStore.powerSummary && dashboard.realtime) {
-        energyStore.setPowerSummary({
-          total_power: dashboard.realtime.total_power || 0,
-          it_power: dashboard.realtime.it_power || 0,
-          cooling_power: dashboard.realtime.cooling_power || 0,
-          ups_power: 0,
-          other_power: dashboard.realtime.other_power || 0,
-          current_pue: dashboard.efficiency?.pue ?? null,
-          today_energy: dashboard.realtime.today_energy || 0,
-          today_cost: dashboard.cost?.today_cost || 0,
-          month_energy: dashboard.realtime.month_energy || 0,
-          month_cost: dashboard.cost?.month_cost || 0,
-        })
-      }
-      if (!energyStore.pueData && dashboard.efficiency?.pue != null) {
-        energyStore.setPUEData({
-          current_pue: dashboard.efficiency.pue,
-          total_power: dashboard.realtime?.total_power || 0,
-          it_power: dashboard.realtime?.it_power || 0,
-          cooling_power: dashboard.realtime?.cooling_power || 0,
-          ups_loss: 0,
-          lighting_power: 0,
-          other_power: dashboard.realtime?.other_power || 0,
-          update_time: new Date().toISOString(),
-        })
-      }
+      await energyStore.reload()
     } catch (e) {
       console.error('Failed to fetch energy data:', e)
     }
@@ -168,7 +95,7 @@ export function useBigscreenData(options: DataFetchOptions = {}) {
 
     try {
       await Promise.all([
-        fetchEnvironmentData(),
+        realtimeStore.reload(), // 确保 RealtimeStore 有最新数据（environment 会自动派生）
         fetchEnergyData(),
         fetchAlarmData(),
         fetchDeviceData()
@@ -229,7 +156,6 @@ export function useBigscreenData(options: DataFetchOptions = {}) {
     startRefresh,
     stopRefresh,
     setRefreshInterval,
-    fetchEnvironmentData,
     fetchEnergyData,
     fetchAlarmData,
     fetchDeviceData
