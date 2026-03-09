@@ -299,7 +299,7 @@ development_status:
   26-8-edge-inference-reservation-and-sbom: backlog
   26-9-training-data-anomaly-detection: backlog
   26-10-hmac-key-management: backlog
-  epic-26-retrospective: optional
+  epic-26-retrospective: done  # 部分回顾(7/10 Story完成)，2026-03-09
 
   # ============================================================
   # 数据链路整改 (Epic 27-28)
