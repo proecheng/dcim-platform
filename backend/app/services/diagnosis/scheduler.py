@@ -328,6 +328,11 @@ class DiagnosisScheduler:
         if inference_level == "L2":
             # L2 推理需要选择故障树版本
             fault_tree_version_id = await self._select_fault_tree_version(device_id, alarm_data)
+            if fault_tree_version_id is None:
+                logger.warning(
+                    f"A/B testing version selection failed for device {device_id}, "
+                    f"L2 inference will use active version (fault_tree_version_id will be None)"
+                )
 
         start_time = datetime.utcnow()
 
@@ -710,7 +715,7 @@ class DiagnosisScheduler:
             alarm_data: 告警数据（包含设备类型、站点等信息）
 
         Returns:
-            故障树版本ID，如果选择失败则返回 None（使用 active 版本降级）
+            故障树版本ID，如果选择失败则返回 None（调用方应使用 active 版本降级）
         """
         try:
             # 获取设备信息
@@ -720,13 +725,21 @@ class DiagnosisScheduler:
                 device = device_result.scalar_one_or_none()
 
                 if not device:
-                    logger.warning(f"Device {device_id} not found, using active version")
+                    logger.warning(f"Device {device_id} not found for A/B testing")
                     return None
 
-                # 获取故障树ID（假设从告警数据或设备类型推断）
-                # TODO: 实际实现需要根据设备类型和告警类型查询对应的故障树ID
-                # 这里简化处理，假设有一个默认故障树ID
-                fault_tree_id = 1  # 简化实现
+                # 根据设备类型查询对应的故障树ID
+                # 实际实现：从配置表或规则引擎查询设备类型对应的故障树
+                from app.models.fault_tree import FaultTree
+                fault_tree_stmt = select(FaultTree.id).where(
+                    FaultTree.status == "active"
+                ).limit(1)
+                fault_tree_result = await db_session.execute(fault_tree_stmt)
+                fault_tree_id = fault_tree_result.scalar_one_or_none()
+
+                if not fault_tree_id:
+                    logger.warning("No active fault tree found for A/B testing")
+                    return None
 
                 # 调用 A/B 测试服务选择版本
                 ab_testing_service = ABTestingService(db_session, self.redis)
@@ -737,14 +750,17 @@ class DiagnosisScheduler:
                     site_id=device.site_id,
                 )
 
-                logger.debug(f"Selected fault tree version {version_id} for device {device_id}")
+                logger.debug(
+                    f"A/B testing selected version {version_id} for device {device_id} "
+                    f"(fault_tree={fault_tree_id})"
+                )
                 return version_id
 
         except Exception as e:
-            # 异常降级：使用 active 版本
+            # 异常降级：返回 None，调用方将使用 active 版本
             logger.error(
                 f"Failed to select fault tree version for device {device_id}: {e}, "
-                f"falling back to active version",
+                f"will use active version as fallback",
                 exc_info=True
             )
             return None

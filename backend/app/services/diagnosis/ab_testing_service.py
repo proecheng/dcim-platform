@@ -89,8 +89,8 @@ class ABTestingService:
         if ab_test.version != version:
             raise ValueError(f"版本冲突：当前版本为 {ab_test.version}，请求版本为 {version}")
 
-        # 验证灰度扩大不超过 2 倍
-        if ab_test.strategy == "percentage" or ab_test.strategy == "hash":
+        # 验证灰度扩大不超过 2 倍（适用于 percentage 和 hash 策略）
+        if ab_test.strategy in ("percentage", "hash"):
             old_percentage = ab_test.strategy_params.get("percentage", 0)
             new_percentage = strategy_params.get("percentage", 0)
             if new_percentage > old_percentage * 2:
@@ -138,8 +138,18 @@ class ABTestingService:
                 cached = await self.redis.get(cache_key)
                 if cached:
                     data = json.loads(cached)
-                    # 重建 ABTestConfig 对象
-                    ab_test = ABTestConfig(**data)
+                    # 重建 ABTestConfig 对象（包含所有必需字段）
+                    ab_test = ABTestConfig(
+                        id=data["id"],
+                        fault_tree_id=data["fault_tree_id"],
+                        version_a_id=data["version_a_id"],
+                        version_b_id=data["version_b_id"],
+                        strategy=data["strategy"],
+                        strategy_params=data["strategy_params"],
+                        status=data.get("status", "active"),
+                        min_duration_hours=data.get("min_duration_hours", 168),
+                        min_sample_size=data.get("min_sample_size", 100),
+                    )
                     return ab_test
             except Exception:
                 pass  # 缓存失败，从数据库读取
@@ -154,7 +164,7 @@ class ABTestingService:
         result = await self.db.execute(stmt)
         ab_test = result.scalar_one_or_none()
 
-        # 写入缓存
+        # 写入缓存（包含所有必需字段）
         if ab_test and self.redis:
             try:
                 data = {
@@ -164,6 +174,9 @@ class ABTestingService:
                     "version_b_id": ab_test.version_b_id,
                     "strategy": ab_test.strategy,
                     "strategy_params": ab_test.strategy_params,
+                    "status": ab_test.status,
+                    "min_duration_hours": ab_test.min_duration_hours,
+                    "min_sample_size": ab_test.min_sample_size,
                 }
                 await self.redis.setex(cache_key, self.cache_ttl, json.dumps(data))
             except Exception:
@@ -228,7 +241,8 @@ class ABTestingService:
         self, device_id: str, percentage: int, version_a_id: int, version_b_id: int
     ) -> int:
         """使用一致性哈希确保同一设备始终使用同一版本"""
-        hash_value = int(hashlib.sha256(device_id.encode()).hexdigest(), 16)
+        # 使用 MD5 足够满足分流需求，性能优于 SHA-256
+        hash_value = int(hashlib.md5(device_id.encode()).hexdigest(), 16)
         bucket = hash_value % 100
         return version_a_id if bucket < percentage else version_b_id
 
@@ -246,17 +260,37 @@ class ABTestingService:
 
     async def _get_active_version_id(self, fault_tree_id: int) -> int:
         """获取故障树的 active 版本ID"""
-        stmt = select(FaultTreeVersion.id).where(
+        # 查询故障树是否存在
+        stmt_tree = select(FaultTree.id).where(FaultTree.id == fault_tree_id)
+        result_tree = await self.db.execute(stmt_tree)
+        tree_exists = result_tree.scalar_one_or_none()
+
+        if not tree_exists:
+            raise ValueError(f"故障树 {fault_tree_id} 不存在")
+
+        # 查询 active 版本
+        stmt = select(FaultTreeVersion.id, FaultTreeVersion.version_number).where(
             and_(
                 FaultTreeVersion.tree_id == fault_tree_id,
                 FaultTreeVersion.status == "active"
             )
         )
         result = await self.db.execute(stmt)
-        version_id = result.scalar_one_or_none()
-        if not version_id:
-            raise ValueError(f"故障树 {fault_tree_id} 没有 active 版本")
-        return version_id
+        row = result.first()
+
+        if not row:
+            # 查询该故障树的所有版本状态
+            stmt_all = select(FaultTreeVersion.status, func.count()).where(
+                FaultTreeVersion.tree_id == fault_tree_id
+            ).group_by(FaultTreeVersion.status)
+            result_all = await self.db.execute(stmt_all)
+            status_counts = {status: count for status, count in result_all.all()}
+            raise ValueError(
+                f"故障树 {fault_tree_id} 没有 active 版本。"
+                f"现有版本状态: {status_counts or '无版本'}"
+            )
+
+        return row[0]
 
     async def _invalidate_cache(self, fault_tree_id: int):
         """删除 Redis 缓存"""
@@ -422,10 +456,13 @@ class ABTestingService:
     async def _calculate_false_negative_rate(
         self, version_id: int, start_date: datetime, end_date: datetime
     ) -> float:
-        """计算漏报率"""
-        # 简化实现：漏报率 = 1 - 准确率（实际应通过工单系统关联）
-        accuracy_rate = await self._calculate_accuracy_rate(version_id, start_date, end_date)
-        return max(0.0, 1.0 - accuracy_rate) if accuracy_rate > 0 else 0.0
+        """
+        计算漏报率
+        注意：当前简化实现返回 0.0，实际应通过工单系统关联真实故障数据计算
+        漏报率 = 未被诊断出的真实故障数 / 真实故障总数
+        """
+        # TODO: 实际实现需要关联工单系统，统计未被诊断出的真实故障
+        return 0.0
 
     def _perform_chi_square_test(
         self, version_a_stats: Dict[str, Any], version_b_stats: Dict[str, Any]
@@ -433,12 +470,14 @@ class ABTestingService:
         """执行卡方检验"""
         try:
             from scipy.stats import chi2_contingency, fisher_exact
-        except ImportError:
+            import numpy as np
+        except ImportError as e:
+            missing_lib = "scipy" if "scipy" in str(e) else "numpy"
             return {
                 "method": "unavailable",
                 "p_value": None,
                 "is_significant": False,
-                "warning": "scipy 未安装，无法执行统计检验"
+                "warning": f"{missing_lib} 未安装，无法执行统计检验"
             }
 
         # 计算准确和不准确的次数
@@ -465,7 +504,6 @@ class ABTestingService:
         chi2, p_value, dof, expected = chi2_contingency(observed)
 
         # 检查期望频数是否 ≥ 5
-        import numpy as np
         if (np.array(expected) < 5).any():
             # 使用 Fisher 精确检验
             oddsratio, p_value_fisher = fisher_exact(observed)
@@ -602,21 +640,27 @@ class ABTestingService:
         }
 
     async def _promote_version(self, new_active_id: int, old_active_id: int):
-        """将新版本设为 active，旧版本归档"""
-        # 将旧版本设为 archived
-        stmt = select(FaultTreeVersion).where(FaultTreeVersion.id == old_active_id)
+        """将新版本设为 active，旧版本归档（事务保护）"""
+        # 查询两个版本（在同一事务中）
+        stmt = select(FaultTreeVersion).where(
+            FaultTreeVersion.id.in_([old_active_id, new_active_id])
+        )
         result = await self.db.execute(stmt)
-        old_version = result.scalar_one_or_none()
+        versions = {v.id: v for v in result.scalars().all()}
+
+        old_version = versions.get(old_active_id)
+        new_version = versions.get(new_active_id)
+
+        if not new_version:
+            raise ValueError(f"新版本 {new_active_id} 不存在")
+
+        # 更新版本状态
         if old_version:
             old_version.status = "archived"
 
-        # 将新版本设为 active
-        stmt = select(FaultTreeVersion).where(FaultTreeVersion.id == new_active_id)
-        result = await self.db.execute(stmt)
-        new_version = result.scalar_one_or_none()
-        if new_version:
-            new_version.status = "active"
-            new_version.activated_at = datetime.utcnow()
+        new_version.status = "active"
+        new_version.activated_at = datetime.utcnow()
 
+        # 单次提交，确保原子性
         await self.db.commit()
 

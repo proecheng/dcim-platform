@@ -1,5 +1,4 @@
-from sqlalchemy import Column, Integer, String, ForeignKey, TIMESTAMP, CheckConstraint
-from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy import Column, Integer, String, ForeignKey, TIMESTAMP, CheckConstraint, JSON
 from sqlalchemy.orm import relationship
 from app.core.database import Base
 from datetime import datetime
@@ -15,7 +14,7 @@ class ABTestConfig(Base):
     version_a_id = Column(Integer, ForeignKey("fault_tree_versions.id"), nullable=False)
     version_b_id = Column(Integer, ForeignKey("fault_tree_versions.id"), nullable=False)
     strategy = Column(String(50), nullable=False)  # hash/device_type/site/percentage
-    strategy_params = Column(JSONB)
+    strategy_params = Column(JSON)  # 使用 JSON 类型兼容 SQLite 和 PostgreSQL
     status = Column(String(20), nullable=False, default="active")  # active/paused/completed
     version = Column(Integer, nullable=False, default=1)  # 乐观锁版本号
     min_duration_hours = Column(Integer, nullable=False, default=168)  # 最小运行时长（小时）
@@ -58,9 +57,9 @@ class ABTestArchive(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     ab_test_id = Column(Integer, ForeignKey("ab_test_configs.id"), nullable=False)
-    version_a_stats = Column(JSONB, nullable=False)
-    version_b_stats = Column(JSONB, nullable=False)
-    statistical_test_result = Column(JSONB, nullable=False)
+    version_a_stats = Column(JSON, nullable=False)  # 使用 JSON 类型兼容 SQLite 和 PostgreSQL
+    version_b_stats = Column(JSON, nullable=False)
+    statistical_test_result = Column(JSON, nullable=False)
     decision = Column(String(50), nullable=False)
     archived_at = Column(TIMESTAMP, nullable=False, default=datetime.utcnow)
     archived_by = Column(Integer, ForeignKey("users.id"))
