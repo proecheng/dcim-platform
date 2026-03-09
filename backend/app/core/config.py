@@ -126,6 +126,9 @@ class Settings(BaseSettings):
     smtp_password: str = Field(default="", env="SMTP_PASSWORD", description="SMTP 密码")
     smtp_from_email: str = Field(default="", env="SMTP_FROM_EMAIL", description="发件人邮箱")
 
+    # 报告文件存储目录（Story 26.6）
+    report_dir: str = Field(default="reports/", env="REPORT_DIR", description="报告文件存储目录")
+
     class Config:
         env_file = ".env"
         case_sensitive = False

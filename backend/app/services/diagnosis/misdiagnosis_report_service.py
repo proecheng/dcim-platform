@@ -1,12 +1,15 @@
 """
 误诊反馈报告服务
 Story 26.2: 误诊反馈报告
+Story 26.6: 月度误判分析报告（使用 ReportRecord 模型）
 """
 
 import logging
-from datetime import datetime, timedelta
-from typing import Optional
-from sqlalchemy import select, func, and_, or_
+import json
+import os
+from datetime import datetime, timedelta, timezone
+from typing import Optional, Dict, List, Any
+from sqlalchemy import select, func, and_, or_, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.diagnosis import (
@@ -16,11 +19,14 @@ from app.models.diagnosis import (
     SystemReport,
     DiagnosisImprovementRule,
 )
+from app.models.report import ReportRecord
 from app.models.alarm import Alarm
 from app.models.operation import WorkOrder
 from app.core.redis import redis_service
+from app.core.config import get_settings
 
 logger = logging.getLogger(__name__)
+settings = get_settings()
 
 
 class MisdiagnosisReportService:
@@ -606,5 +612,596 @@ class MisdiagnosisReportService:
 *报告生成时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}*
 *数据来源: diagnosis_results, diagnosis_annotations, alarms, work_orders*
 """
+        return content
+
+
+# ============================================================
+# Story 26.6: 月度误判分析报告（使用 ReportRecord 模型）
+# ============================================================
+
+
+class MisdiagnosisReportServiceV2:
+    """
+    误判分析报告服务 V2 - Story 26.6
+    使用棕地 ReportRecord 模型，支持 PostgreSQL 和 SQLite
+    """
+
+    def __init__(self, db: AsyncSession):
+        self.db = db
+        self.db_type = db.bind.dialect.name  # postgresql or sqlite
+
+    async def generate_monthly_report_v2(
+        self,
+        start_date: datetime,
+        end_date: datetime,
+        generated_by: Optional[int] = None
+    ) -> int:
+        """
+        生成月度误判分析报告（Story 26.6）
+
+        Args:
+            start_date: 统计开始时间（UTC）
+            end_date: 统计结束时间（UTC）
+            generated_by: 生成人ID（定时任务为 None）
+
+        Returns:
+            report_id: 报告ID
+
+        Raises:
+            ValueError: 如果相同周期的报告已存在
+        """
+        # 1. 检查重复
+        existing = await self._check_existing_report(start_date, end_date)
+        if existing:
+            raise ValueError(f"该时间段的报告已存在，report_id: {existing.id}")
+
+        # 2. 生成报告名称
+        report_name = f"{start_date.year}年{start_date.month}月误判分析报告"
+
+        # 3. 检查依赖表是否存在
+        work_orders_exists = await self._check_table_exists("work_orders")
+        fault_tree_nodes_exists = await self._check_table_exists("fault_tree_nodes")
+
+        # 4. 创建报告记录（状态: generating）
+        report = ReportRecord(
+            report_name=report_name,
+            report_type="diagnosis_monthly",
+            start_time=start_date,
+            end_time=end_date,
+            status="generating",
+            generated_by=generated_by,
+        )
+        self.db.add(report)
+        await self.db.flush()
+        report_id = report.id
+
+        try:
+            # 5. 执行统计查询
+            summary = await self._query_diagnosis_summary(start_date, end_date)
+            false_positive_stats = await self._query_false_positive_stats(start_date, end_date)
+            false_negative_stats = await self._query_false_negative_stats(
+                start_date, end_date, work_orders_exists
+            )
+            top_nodes = await self._query_top_misdiagnosed_nodes(
+                start_date, end_date, fault_tree_nodes_exists
+            )
+            device_type_dist = await self._query_device_type_distribution(start_date, end_date)
+
+            # 6. 生成改进建议
+            recommendations = self._generate_recommendations(top_nodes)
+
+            # 7. 构建 report_data JSON
+            report_data = {
+                "period": {
+                    "start_date": start_date.isoformat(),
+                    "end_date": end_date.isoformat(),
+                },
+                "summary": summary,
+                "misdiagnosis_distribution": {
+                    **false_positive_stats,
+                    **false_negative_stats,
+                    "false_negative_available": work_orders_exists,
+                },
+                "top_misdiagnosed_nodes": top_nodes,
+                "device_type_distribution": device_type_dist,
+                "recommendations": recommendations,
+            }
+
+            # 8. 渲染 Markdown 报告
+            markdown_content = self._render_markdown_report(
+                start_date, end_date, report_data
+            )
+
+            # 9. 保存 Markdown 文件
+            file_path, file_size = await self._save_markdown_file(
+                start_date, markdown_content
+            )
+
+            # 10. 更新报告记录
+            report.file_path = file_path
+            report.file_size = file_size
+            report.report_data = json.dumps(report_data, ensure_ascii=False)
+            report.status = "completed"
+            await self.db.commit()
+
+            logger.info(f"报告生成成功: {report_name}, report_id={report_id}")
+            return report_id
+
+        except Exception as e:
+            # 失败处理
+            report.status = "failed"
+            report.error_message = str(e)
+            await self.db.commit()
+            logger.error(f"报告生成失败: {report_name}, error={e}")
+            raise
+
+    async def _check_existing_report(
+        self, start_date: datetime, end_date: datetime
+    ) -> Optional[ReportRecord]:
+        """检查相同周期的报告是否已存在"""
+        stmt = select(ReportRecord).where(
+            ReportRecord.report_type == "diagnosis_monthly",
+            ReportRecord.start_time == start_date,
+            ReportRecord.end_time == end_date,
+            ReportRecord.status.in_(["completed", "generating"])
+        )
+        result = await self.db.execute(stmt)
+        return result.scalar_one_or_none()
+
+    async def _check_table_exists(self, table_name: str) -> bool:
+        """检查表是否存在"""
+        if self.db_type == "sqlite":
+            query = text(
+                "SELECT name FROM sqlite_master WHERE type='table' AND name=:table_name"
+            )
+        else:  # postgresql
+            query = text(
+                "SELECT tablename FROM pg_tables WHERE tablename=:table_name"
+            )
+
+        result = await self.db.execute(query, {"table_name": table_name})
+        return result.scalar_one_or_none() is not None
+
+    async def _query_diagnosis_summary(
+        self, start_date: datetime, end_date: datetime
+    ) -> Dict[str, Any]:
+        """查询诊断概览统计"""
+        if self.db_type == "sqlite":
+            query = text("""
+                SELECT
+                    COUNT(*) AS total_diagnosis_count,
+                    COUNT(da.id) AS annotated_count,
+                    CAST(COUNT(da.id) AS REAL) / NULLIF(COUNT(*), 0) AS annotation_coverage_rate
+                FROM diagnosis_results dr
+                LEFT JOIN diagnosis_annotations da ON dr.id = da.diagnosis_result_id
+                WHERE dr.created_at BETWEEN :start_date AND :end_date
+            """)
+        else:  # postgresql
+            query = text("""
+                SELECT
+                    COUNT(*) AS total_diagnosis_count,
+                    COUNT(da.id) AS annotated_count,
+                    CAST(COUNT(da.id) AS FLOAT) / NULLIF(COUNT(*), 0) AS annotation_coverage_rate
+                FROM diagnosis_results dr
+                LEFT JOIN diagnosis_annotations da ON dr.id = da.diagnosis_result_id
+                WHERE dr.created_at BETWEEN :start_date AND :end_date
+            """)
+
+        result = await self.db.execute(query, {"start_date": start_date, "end_date": end_date})
+        row = result.fetchone()
+
+        return {
+            "total_diagnosis_count": row.total_diagnosis_count,
+            "annotated_count": row.annotated_count,
+            "annotation_coverage_rate": row.annotation_coverage_rate or 0.0,
+        }
+
+    async def _query_false_positive_stats(
+        self, start_date: datetime, end_date: datetime
+    ) -> Dict[str, Any]:
+        """查询误报统计"""
+        if self.db_type == "sqlite":
+            query = text("""
+                SELECT
+                    SUM(CASE WHEN dr.root_cause IS NOT NULL AND da.is_accurate = 0 THEN 1 ELSE 0 END) AS false_positive_count,
+                    SUM(CASE WHEN dr.root_cause IS NOT NULL THEN 1 ELSE 0 END) AS total_positive_count
+                FROM diagnosis_results dr
+                JOIN diagnosis_annotations da ON dr.id = da.diagnosis_result_id
+                WHERE dr.created_at BETWEEN :start_date AND :end_date
+            """)
+        else:  # postgresql
+            query = text("""
+                SELECT
+                    COUNT(*) FILTER (WHERE dr.root_cause IS NOT NULL AND da.is_accurate = false) AS false_positive_count,
+                    COUNT(*) FILTER (WHERE dr.root_cause IS NOT NULL) AS total_positive_count
+                FROM diagnosis_results dr
+                JOIN diagnosis_annotations da ON dr.id = da.diagnosis_result_id
+                WHERE dr.created_at BETWEEN :start_date AND :end_date
+            """)
+
+        result = await self.db.execute(query, {"start_date": start_date, "end_date": end_date})
+        row = result.fetchone()
+
+        total_positive = row.total_positive_count or 0
+        false_positive = row.false_positive_count or 0
+
+        return {
+            "false_positive_count": false_positive,
+            "false_positive_rate": false_positive / total_positive if total_positive > 0 else 0.0,
+        }
+
+    async def _query_false_negative_stats(
+        self, start_date: datetime, end_date: datetime, work_orders_exists: bool
+    ) -> Dict[str, Any]:
+        """查询漏报统计"""
+        if not work_orders_exists:
+            return {
+                "false_negative_count": 0,
+                "false_negative_rate": 0.0,
+            }
+
+        if self.db_type == "sqlite":
+            query = text("""
+                SELECT
+                    SUM(CASE
+                        WHEN dr.root_cause IS NULL
+                        AND dr.alarm_id IS NOT NULL
+                        AND EXISTS (
+                            SELECT 1 FROM work_orders wo
+                            WHERE wo.alarm_id = dr.alarm_id
+                            AND wo.work_order_type = 'fault_repair'
+                            AND datetime(wo.created_at) <= datetime(dr.created_at, '+30 minutes')
+                        )
+                        THEN 1 ELSE 0 END
+                    ) AS false_negative_count,
+                    COUNT(*) AS total_count
+                FROM diagnosis_results dr
+                WHERE dr.created_at BETWEEN :start_date AND :end_date
+            """)
+        else:  # postgresql
+            query = text("""
+                SELECT
+                    COUNT(*) FILTER (
+                        WHERE dr.root_cause IS NULL
+                        AND dr.alarm_id IS NOT NULL
+                        AND EXISTS (
+                            SELECT 1 FROM work_orders wo
+                            WHERE wo.alarm_id = dr.alarm_id
+                            AND wo.work_order_type = 'fault_repair'
+                            AND wo.created_at <= dr.created_at + INTERVAL '30 minutes'
+                        )
+                    ) AS false_negative_count,
+                    COUNT(*) AS total_count
+                FROM diagnosis_results dr
+                WHERE dr.created_at BETWEEN :start_date AND :end_date
+            """)
+
+        result = await self.db.execute(query, {"start_date": start_date, "end_date": end_date})
+        row = result.fetchone()
+
+        total_count = row.total_count or 0
+        false_negative = row.false_negative_count or 0
+
+        return {
+            "false_negative_count": false_negative,
+            "false_negative_rate": false_negative / total_count if total_count > 0 else 0.0,
+        }
+
+    async def _query_top_misdiagnosed_nodes(
+        self, start_date: datetime, end_date: datetime, fault_tree_nodes_exists: bool
+    ) -> List[Dict[str, Any]]:
+        """查询高频误判根因节点"""
+        if fault_tree_nodes_exists:
+            # JOIN 节点表获取节点名称
+            if self.db_type == "sqlite":
+                query = text("""
+                    SELECT
+                        dr.root_cause AS node_id,
+                        COALESCE(ftn.node_name, dr.root_cause) AS node_name,
+                        SUM(CASE WHEN da.is_accurate = 0 THEN 1 ELSE 0 END) AS misdiagnosis_count,
+                        SUM(CASE WHEN da.is_accurate = 1 THEN 1 ELSE 0 END) AS accurate_count,
+                        COUNT(*) AS total_count,
+                        CAST(SUM(CASE WHEN da.is_accurate = 0 THEN 1 ELSE 0 END) AS REAL) / COUNT(*) AS misdiagnosis_rate
+                    FROM diagnosis_results dr
+                    JOIN diagnosis_annotations da ON dr.id = da.diagnosis_result_id
+                    LEFT JOIN fault_tree_nodes ftn ON dr.root_cause = ftn.node_id
+                    WHERE dr.created_at BETWEEN :start_date AND :end_date
+                      AND dr.root_cause IS NOT NULL
+                    GROUP BY dr.root_cause, ftn.node_name
+                    HAVING SUM(CASE WHEN da.is_accurate = 0 THEN 1 ELSE 0 END) > 0
+                    ORDER BY misdiagnosis_count DESC
+                    LIMIT 5
+                """)
+            else:  # postgresql
+                query = text("""
+                    SELECT
+                        dr.root_cause AS node_id,
+                        COALESCE(ftn.node_name, dr.root_cause) AS node_name,
+                        COUNT(*) FILTER (WHERE da.is_accurate = false) AS misdiagnosis_count,
+                        COUNT(*) FILTER (WHERE da.is_accurate = true) AS accurate_count,
+                        COUNT(*) AS total_count,
+                        CAST(COUNT(*) FILTER (WHERE da.is_accurate = false) AS FLOAT) / COUNT(*) AS misdiagnosis_rate
+                    FROM diagnosis_results dr
+                    JOIN diagnosis_annotations da ON dr.id = da.diagnosis_result_id
+                    LEFT JOIN fault_tree_nodes ftn ON dr.root_cause = ftn.node_id
+                    WHERE dr.created_at BETWEEN :start_date AND :end_date
+                      AND dr.root_cause IS NOT NULL
+                    GROUP BY dr.root_cause, ftn.node_name
+                    HAVING COUNT(*) FILTER (WHERE da.is_accurate = false) > 0
+                    ORDER BY misdiagnosis_count DESC
+                    LIMIT 5
+                """)
+        else:
+            # 不 JOIN 节点表，使用 root_cause 作为 node_name
+            if self.db_type == "sqlite":
+                query = text("""
+                    SELECT
+                        dr.root_cause AS node_id,
+                        dr.root_cause AS node_name,
+                        SUM(CASE WHEN da.is_accurate = 0 THEN 1 ELSE 0 END) AS misdiagnosis_count,
+                        SUM(CASE WHEN da.is_accurate = 1 THEN 1 ELSE 0 END) AS accurate_count,
+                        COUNT(*) AS total_count,
+                        CAST(SUM(CASE WHEN da.is_accurate = 0 THEN 1 ELSE 0 END) AS REAL) / COUNT(*) AS misdiagnosis_rate
+                    FROM diagnosis_results dr
+                    JOIN diagnosis_annotations da ON dr.id = da.diagnosis_result_id
+                    WHERE dr.created_at BETWEEN :start_date AND :end_date
+                      AND dr.root_cause IS NOT NULL
+                    GROUP BY dr.root_cause
+                    HAVING SUM(CASE WHEN da.is_accurate = 0 THEN 1 ELSE 0 END) > 0
+                    ORDER BY misdiagnosis_count DESC
+                    LIMIT 5
+                """)
+            else:  # postgresql
+                query = text("""
+                    SELECT
+                        dr.root_cause AS node_id,
+                        dr.root_cause AS node_name,
+                        COUNT(*) FILTER (WHERE da.is_accurate = false) AS misdiagnosis_count,
+                        COUNT(*) FILTER (WHERE da.is_accurate = true) AS accurate_count,
+                        COUNT(*) AS total_count,
+                        CAST(COUNT(*) FILTER (WHERE da.is_accurate = false) AS FLOAT) / COUNT(*) AS misdiagnosis_rate
+                    FROM diagnosis_results dr
+                    JOIN diagnosis_annotations da ON dr.id = da.diagnosis_result_id
+                    WHERE dr.created_at BETWEEN :start_date AND :end_date
+                      AND dr.root_cause IS NOT NULL
+                    GROUP BY dr.root_cause
+                    HAVING COUNT(*) FILTER (WHERE da.is_accurate = false) > 0
+                    ORDER BY misdiagnosis_count DESC
+                    LIMIT 5
+                """)
+
+        result = await self.db.execute(query, {"start_date": start_date, "end_date": end_date})
+        rows = result.fetchall()
+
+        return [
+            {
+                "node_id": row.node_id,
+                "node_name": row.node_name,
+                "misdiagnosis_count": row.misdiagnosis_count,
+                "total_count": row.total_count,
+                "misdiagnosis_rate": row.misdiagnosis_rate,
+            }
+            for row in rows
+        ]
+
+    async def _query_device_type_distribution(
+        self, start_date: datetime, end_date: datetime
+    ) -> List[Dict[str, Any]]:
+        """查询设备类型误判分布"""
+        if self.db_type == "sqlite":
+            query = text("""
+                SELECT
+                    dr.device_type,
+                    COUNT(*) AS total_count,
+                    SUM(CASE WHEN da.is_accurate = 0 THEN 1 ELSE 0 END) AS misdiagnosis_count,
+                    CAST(SUM(CASE WHEN da.is_accurate = 0 THEN 1 ELSE 0 END) AS REAL) / COUNT(*) AS misdiagnosis_rate
+                FROM diagnosis_results dr
+                JOIN diagnosis_annotations da ON dr.id = da.diagnosis_result_id
+                WHERE dr.created_at BETWEEN :start_date AND :end_date
+                GROUP BY dr.device_type
+                HAVING COUNT(*) > 0
+                ORDER BY misdiagnosis_rate DESC
+            """)
+        else:  # postgresql
+            query = text("""
+                SELECT
+                    dr.device_type,
+                    COUNT(*) AS total_count,
+                    COUNT(*) FILTER (WHERE da.is_accurate = false) AS misdiagnosis_count,
+                    CAST(COUNT(*) FILTER (WHERE da.is_accurate = false) AS FLOAT) / COUNT(*) AS misdiagnosis_rate
+                FROM diagnosis_results dr
+                JOIN diagnosis_annotations da ON dr.id = da.diagnosis_result_id
+                WHERE dr.created_at BETWEEN :start_date AND :end_date
+                GROUP BY dr.device_type
+                HAVING COUNT(*) > 0
+                ORDER BY misdiagnosis_rate DESC
+            """)
+
+        result = await self.db.execute(query, {"start_date": start_date, "end_date": end_date})
+        rows = result.fetchall()
+
+        return [
+            {
+                "device_type": row.device_type,
+                "total_count": row.total_count,
+                "misdiagnosis_count": row.misdiagnosis_count,
+                "misdiagnosis_rate": row.misdiagnosis_rate,
+            }
+            for row in rows
+        ]
+
+    def _generate_recommendations(self, top_nodes: List[Dict[str, Any]]) -> List[str]:
+        """生成改进建议"""
+        recommendations = []
+
+        for node in top_nodes:
+            node_name = node["node_name"]
+            misdiagnosis_rate = node["misdiagnosis_rate"]
+            total_count = node["total_count"]
+
+            if total_count < 10:
+                recommendations.append(
+                    f"节点 {node_name} 样本量不足（{total_count}），建议继续收集标注数据"
+                )
+            elif misdiagnosis_rate > 0.3:
+                recommendations.append(
+                    f"节点 {node_name} 误判率 {misdiagnosis_rate:.1%}（样本量 {total_count}），建议检查先验概率或增加证据维度"
+                )
+            elif misdiagnosis_rate >= 0.2:
+                recommendations.append(
+                    f"节点 {node_name} 误判率 {misdiagnosis_rate:.1%}（样本量 {total_count}），建议审查诊断逻辑"
+                )
+            elif misdiagnosis_rate >= 0.1:
+                recommendations.append(
+                    f"节点 {node_name} 误判率 {misdiagnosis_rate:.1%}（样本量 {total_count}），建议增加标注样本"
+                )
+            else:
+                recommendations.append(
+                    f"节点 {node_name} 误判率 {misdiagnosis_rate:.1%}（样本量 {total_count}），诊断效果良好，继续观察"
+                )
+
+        return recommendations
+
+    def _render_markdown_report(
+        self, start_date: datetime, end_date: datetime, report_data: Dict[str, Any]
+    ) -> str:
+        """渲染 Markdown 报告"""
+        summary = report_data["summary"]
+        misdiagnosis_dist = report_data["misdiagnosis_distribution"]
+        top_nodes = report_data["top_misdiagnosed_nodes"]
+        device_type_dist = report_data["device_type_distribution"]
+        recommendations = report_data["recommendations"]
+
+        # 渲染漏报统计部分
+        if misdiagnosis_dist["false_negative_available"]:
+            false_negative_section = f"""
+| 指标 | 数值 |
+|------|------|
+| 漏报次数 | {misdiagnosis_dist['false_negative_count']} |
+| 漏报率 | {misdiagnosis_dist['false_negative_rate']:.1%} |
+"""
+        else:
+            false_negative_section = "\n⚠️ 工单系统未配置，漏报统计不可用\n"
+
+        # 渲染高频误判节点部分
+        if top_nodes:
+            top_nodes_section = """
+| 排名 | 节点ID | 节点名称 | 误判次数 | 总诊断次数 | 误判率 |
+|------|--------|---------|---------|-----------|--------|
+"""
+            for i, node in enumerate(top_nodes, 1):
+                top_nodes_section += f"| {i} | {node['node_id']} | {node['node_name']} | {node['misdiagnosis_count']} | {node['total_count']} | {node['misdiagnosis_rate']:.1%} |\n"
+        else:
+            top_nodes_section = "\n暂无误判节点数据\n"
+
+        # 渲染设备类型分布部分
+        if device_type_dist:
+            device_type_section = """
+| 设备类型 | 总诊断次数 | 误判次数 | 误判率 |
+|---------|-----------|---------|--------|
+"""
+            for device in device_type_dist:
+                device_type_section += f"| {device['device_type']} | {device['total_count']} | {device['misdiagnosis_count']} | {device['misdiagnosis_rate']:.1%} |\n"
+        else:
+            device_type_section = "\n暂无设备类型误判数据\n"
+
+        # 渲染改进建议
+        recommendations_text = "\n".join([f"{i}. {rec}" for i, rec in enumerate(recommendations, 1)])
+        if not recommendations_text:
+            recommendations_text = "暂无改进建议"
+
+        # 生成完整报告
+        content = f"""# {start_date.year}年{start_date.month}月误判分析报告
+
+**生成时间**: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')}
+**统计周期**: {start_date.strftime('%Y-%m-%d')} 至 {end_date.strftime('%Y-%m-%d')}
+
+---
+
+## 1. 诊断概览
+
+| 指标 | 数值 |
+|------|------|
+| 总诊断次数 | {summary['total_diagnosis_count']} |
+| 已标注次数 | {summary['annotated_count']} |
+| 标注覆盖率 | {summary['annotation_coverage_rate']:.1%} |
+
+---
+
+## 2. 误判类型分布
+
+### 2.1 误报统计
+
+**误报定义**: 诊断给出了根因，但标注为不准确。
+
+| 指标 | 数值 |
+|------|------|
+| 误报次数 | {misdiagnosis_dist['false_positive_count']} |
+| 误报率 | {misdiagnosis_dist['false_positive_rate']:.1%} |
+
+### 2.2 漏报统计
+
+**漏报定义**: 告警产生后30分钟内诊断引擎无任何结论，但告警最终被人工确认为真实故障（通过工单系统关联告警且工单类型=故障修复来识别）。
+
+{false_negative_section}
+
+---
+
+## 3. 高频误判故障树节点
+
+**Top 5 被标注为"不准确"最多的根因节点**:
+
+{top_nodes_section}
+
+---
+
+## 4. 设备类型误判分布
+
+**按设备类型统计误判率**:
+
+{device_type_section}
+
+---
+
+## 5. 改进建议
+
+{recommendations_text}
+
+---
+
+**报告生成**: 智能诊断系统自动生成
+**数据来源**: diagnosis_results + diagnosis_annotations
+"""
+        return content
+
+    async def _save_markdown_file(
+        self, start_date: datetime, markdown_content: str
+    ) -> tuple[str, int]:
+        """保存 Markdown 文件到磁盘"""
+        # 获取报告目录
+        report_dir = getattr(settings, "REPORT_DIR", "reports")
+        if not os.path.isabs(report_dir):
+            # 相对路径，转换为绝对路径
+            report_dir = os.path.abspath(report_dir)
+
+        diagnosis_dir = os.path.join(report_dir, "diagnosis")
+        os.makedirs(diagnosis_dir, exist_ok=True)
+
+        # 生成文件名
+        filename = f"{start_date.year}-{start_date.month:02d}-misdiagnosis.md"
+        file_path = os.path.join(diagnosis_dir, filename)
+
+        # 写入文件
+        with open(file_path, "w", encoding="utf-8") as f:
+            f.write(markdown_content)
+
+        # 设置文件权限 644
+        os.chmod(file_path, 0o644)
+
+        # 获取文件大小
+        file_size = os.path.getsize(file_path)
+
+        return file_path, file_size
+
 
         return content

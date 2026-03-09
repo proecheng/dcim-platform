@@ -59,6 +59,7 @@ class DiagnosisScheduler:
         self._anomaly_detection_task: Optional[asyncio.Task] = None
         self._push_retry_task: Optional[asyncio.Task] = None  # Story 24.6 推送重试任务
         self._probability_tuning_task: Optional[asyncio.Task] = None  # Story 26.3 概率调参任务
+        self._misdiagnosis_report_task: Optional[asyncio.Task] = None  # Story 26.6 月度误判分析报告任务
 
         # 熔断器 (Story 24.7)
         self.circuit_breaker = CircuitBreaker(
@@ -119,6 +120,9 @@ class DiagnosisScheduler:
 
         # 启动概率调参定时任务 (Story 26.3)
         self._probability_tuning_task = asyncio.create_task(self._probability_tuning_loop())
+
+        # 启动月度误判分析报告定时任务 (Story 26.6)
+        self._misdiagnosis_report_task = asyncio.create_task(self._misdiagnosis_report_loop())
 
         logger.info("DiagnosisScheduler started")
 
@@ -184,6 +188,15 @@ class DiagnosisScheduler:
             except asyncio.CancelledError:
                 pass
             self._probability_tuning_task = None
+
+        # 取消月度误判分析报告任务
+        if self._misdiagnosis_report_task:
+            self._misdiagnosis_report_task.cancel()
+            try:
+                await self._misdiagnosis_report_task
+            except asyncio.CancelledError:
+                pass
+            self._misdiagnosis_report_task = None
 
         # 取消所有 worker
         for worker in self._workers:
@@ -704,6 +717,109 @@ class DiagnosisScheduler:
 
             except Exception as e:
                 logger.error(f"概率调参定时任务错误: {e}", exc_info=True)
+                await asyncio.sleep(300)
+
+    async def _misdiagnosis_report_loop(self):
+        """
+        月度误判分析报告定时任务（Story 26.6）
+        每月1日凌晨 2:00 UTC 执行一次
+        """
+        from app.services.diagnosis.misdiagnosis_report_service import MisdiagnosisReportServiceV2
+        from datetime import timezone
+        import calendar
+
+        # 启动延迟 60 秒，避免与其他任务冲突
+        await asyncio.sleep(60)
+
+        while self.running:
+            try:
+                now = datetime.now(timezone.utc)
+
+                # 检查是否是每月1日凌晨 2:00-2:05 UTC
+                if now.day == 1 and now.hour == 2 and now.minute < 5:
+                    # 使用 Redis 分布式锁确保只有一个实例执行
+                    lock_key = "diagnosis:misdiagnosis_report:lock"
+                    lock_value = str(uuid.uuid4())
+                    lock_ttl = 7200  # 2 小时锁超时
+
+                    # 尝试获取锁
+                    acquired = await self.redis.set(lock_key, lock_value, nx=True, ex=lock_ttl)
+
+                    if acquired:
+                        try:
+                            logger.info("开始生成月度误判分析报告...")
+
+                            # 计算上个月的时间范围
+                            if now.month == 1:
+                                prev_year = now.year - 1
+                                prev_month = 12
+                            else:
+                                prev_year = now.year
+                                prev_month = now.month - 1
+
+                            # 上个月第一天
+                            start_date = datetime(prev_year, prev_month, 1, 0, 0, 0, tzinfo=timezone.utc)
+
+                            # 上个月最后一天
+                            last_day = calendar.monthrange(prev_year, prev_month)[1]
+                            end_date = datetime(prev_year, prev_month, last_day, 23, 59, 59, tzinfo=timezone.utc)
+
+                            # 生成报告
+                            async with async_session() as db_session:
+                                service = MisdiagnosisReportServiceV2(db_session)
+                                report_id = await service.generate_monthly_report_v2(
+                                    start_date=start_date,
+                                    end_date=end_date,
+                                    generated_by=None,  # 自动任务
+                                )
+
+                            logger.info(
+                                f"月度误判分析报告生成完成: report_id={report_id}, "
+                                f"period={start_date.date()} to {end_date.date()}"
+                            )
+
+                            # 通知管理员
+                            try:
+                                from app.services.websocket import ws_manager
+                                await ws_manager.broadcast_diagnosis(
+                                    msg_type="misdiagnosis_report_generated",
+                                    data={
+                                        "report_id": report_id,
+                                        "start_date": start_date.isoformat(),
+                                        "end_date": end_date.isoformat(),
+                                        "generated_at": now.isoformat(),
+                                    },
+                                    target_roles=["admin"],
+                                )
+                            except Exception as ws_err:
+                                logger.error(f"Failed to broadcast report notification: {ws_err}")
+
+                        except ValueError as ve:
+                            # 报告已存在，跳过
+                            logger.info(f"月度误判分析报告已存在: {ve}")
+                        except Exception as e:
+                            logger.error(f"月度误判分析报告生成失败: {e}", exc_info=True)
+                        finally:
+                            # 释放锁
+                            script = """
+                            if redis.call("get", KEYS[1]) == ARGV[1] then
+                                return redis.call("del", KEYS[1])
+                            else
+                                return 0
+                            end
+                            """
+                            await self.redis.eval(script, 1, lock_key, lock_value)
+                    else:
+                        logger.debug("月度误判分析报告锁已被其他实例持有")
+
+                    # 执行后等待 5 分钟，避免重复执行
+                    await asyncio.sleep(300)
+                else:
+                    # 每 5 分钟检查一次时间
+                    await asyncio.sleep(300)
+
+            except Exception as e:
+                logger.error(f"月度误判分析报告定时任务错误: {e}", exc_info=True)
                 await asyncio.sleep(300)
 
     async def _select_fault_tree_version(self, device_id: int, alarm_data: dict) -> Optional[int]:

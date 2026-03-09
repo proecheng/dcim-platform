@@ -294,7 +294,7 @@ development_status:
   26-3-closed-loop-learning-probability-tuning: done  # 完成: 概率调参服务、API、前端页面、定时任务
   26-4-time-window-adaptive: done
   26-5-ab-testing-and-gradual-rollout: done  # 完成: 数据模型、服务、API、诊断调度器集成、审计日志
-  26-6-misdiagnosis-analysis-report: ready-for-dev  # Story 创建完成，已通过两轮对抗性审查
+  26-6-misdiagnosis-analysis-report: in-progress  # 服务层、API、Schema、定时任务已完成，待测试
   26-7-disaster-recovery-drill: backlog
   26-8-edge-inference-reservation-and-sbom: backlog
   26-9-training-data-anomaly-detection: backlog
