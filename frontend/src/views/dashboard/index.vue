@@ -335,7 +335,7 @@ function applyDashboardOverviewStat(dashRes: DashboardRaw) {
   domainOverview.value[5].stat = pue > 0 ? `PUE ${pue.toFixed(2)}` : '运行中'
 }
 
-// Story 27.7 AC2 & AC5: 简化 refreshData，移除 energyData ref 和 sessionStorage 缓存
+// Story 27.9: 简化 refreshData，并行调用所有数据源
 async function refreshData(options: { force?: boolean } = {}) {
   const forceRefresh = options.force === true
   if (isRefreshing.value) return
@@ -343,27 +343,23 @@ async function refreshData(options: { force?: boolean } = {}) {
 
   isRefreshing.value = true
   try {
-    // 非 force 模式下跳过 realtimeStore.reload()，因为 MainLayout 的全局轮询已持续更新 store
-    const realtimeReload = forceRefresh ? realtimeStore.reload() : Promise.resolve()
-    const [_realtimeRes, _alarmsRes, dashboardRes] = await Promise.allSettled([
-      realtimeReload,
+    // 并行调用所有数据源
+    const [dashboardRes] = await Promise.allSettled([
+      getDashboardData(),
+      forceRefresh ? realtimeStore.reload() : Promise.resolve(),
       alarmStore.fetchActiveAlarms(),
-      getDashboardData()
+      energyStore.reload()
     ])
 
-    // 始终调用 energyStore.reload() 确保能源数据最新
-    await energyStore.reload()
-
+    // 应用 dashboard 数据
     if (dashboardRes.status === 'fulfilled') {
       const dashData = unwrapApiData<DashboardRaw>(dashboardRes.value)
       applyDashboardOverviewStat(dashData)
 
-      // 如果 store 还没有数据，用 dashboard 返回的 realtime 数据填充
+      // 回退逻辑：如果 store 为空，用 dashboard 数据填充
       if (realtimeStore.totalPoints === 0 && Array.isArray(dashData?.realtime)) {
         realtimeStore.setAllData(dashData.realtime)
       }
-
-      // 如果 store 汇总还没加载，用 dashboard overview 填充
       if (!realtimeStore.summary && dashData?.overview?.total_points) {
         realtimeStore.setSummary({
           total_points: dashData.overview.total_points || 0,
