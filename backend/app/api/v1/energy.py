@@ -2355,6 +2355,36 @@ async def delete_distribution_circuit(
 # ==================== 配电系统拓扑 ====================
 
 
+def _validate_topology_integrity(transformers, meters, panels, circuits, devices):
+    """验证拓扑数据完整性，检测循环依赖和孤立节点（P0-2 修复）"""
+    import logging
+    logger = logging.getLogger(__name__)
+
+    # 检查计量点是否引用不存在的变压器
+    transformer_ids = {t.id for t in transformers}
+    for meter in meters:
+        if meter.transformer_id and meter.transformer_id not in transformer_ids:
+            logger.warning("计量点 %s 引用不存在的变压器 %d", meter.meter_code, meter.transformer_id)
+
+    # 检查配电柜是否引用不存在的计量点
+    meter_ids = {m.id for m in meters}
+    for panel in panels:
+        if panel.meter_point_id and panel.meter_point_id not in meter_ids:
+            logger.warning("配电柜 %s 引用不存在的计量点 %d", panel.panel_code, panel.meter_point_id)
+
+    # 检查回路是否引用不存在的配电柜
+    panel_ids = {p.id for p in panels}
+    for circuit in circuits:
+        if circuit.panel_id not in panel_ids:
+            logger.warning("回路 %s 引用不存在的配电柜 %d", circuit.circuit_code, circuit.panel_id)
+
+    # 检查设备是否引用不存在的回路
+    circuit_ids = {c.id for c in circuits}
+    for device in devices:
+        if device.circuit_id and device.circuit_id not in circuit_ids:
+            logger.warning("设备 %s 引用不存在的回路 %d", device.device_code, device.circuit_id)
+
+
 @router.get("/topology", response_model=ResponseModel[DistributionTopologyResponse], summary="获取配电系统拓扑")
 async def get_distribution_topology(db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
     """
@@ -2382,6 +2412,9 @@ async def get_distribution_topology(db: AsyncSession = Depends(get_db), current_
     # 获取所有设备
     devices_result = await db.execute(select(PowerDevice).where(PowerDevice.is_enabled == True))
     devices = devices_result.scalars().all()
+
+    # 验证拓扑数据完整性（P0-2 修复）
+    _validate_topology_integrity(transformers, meters, panels, circuits, devices)
 
     # 构建拓扑结构
     # 设备按回路分组

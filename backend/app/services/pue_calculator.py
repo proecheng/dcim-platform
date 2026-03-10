@@ -23,6 +23,9 @@ COOLING_DEVICE_TYPES = {"AC", "CHILLER", "CT", "PUMP"}
 # 数据过期阈值（秒）
 DATA_EXPIRY_SECONDS = 300
 
+# IT 负载最小阈值（kW）— 低于此值不计算 PUE
+IT_POWER_THRESHOLD = 1.0
+
 
 @dataclass
 class PUEResult:
@@ -96,13 +99,14 @@ async def calculate_realtime_pue(db: AsyncSession) -> PUEResult:
     # UPS 损耗 = UPS 总功率 - IT 功率（负值归零）
     ups_loss = max(0, ups_total - it_power)
 
-    if it_power <= 0:
+    # IT 负载过低时不计算 PUE（避免除零或异常大的 PUE 值）
+    if it_power < IT_POWER_THRESHOLD:
         return PUEResult(
             current_pue=None,
             total_power=round(total_power, 2),
-            it_power=0,
+            it_power=round(it_power, 2),
             cooling_power=round(cooling_power, 2),
-            ups_loss=0,
+            ups_loss=round(ups_loss, 2),
             data_source="realtime",
             unreliable_count=unreliable_count,
         )
