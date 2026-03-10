@@ -174,9 +174,9 @@ simulation_enabled: bool = Field(default=False, description="启用数据模拟�
 
 | 问题编号 | 问题描述 | 优先级 | 状态 | 影响范围 |
 |---------|---------|--------|------|---------|
-| P0-1 | service_new.py 缺少 _clear_demo_data_safe 实现 | P0 | 未修复 | 卸载功能 |
-| P2-1 | service_new.py 与 service.py 重复 | P2 | 未修复 | 代码维护 |
-| P2-2 | device_sync.py 回路推断规则仍有硬编码 | P2 | 部分修复 | 系统通用性 |
+| P0-1 | service_new.py 缺少 _clear_demo_data_safe 实现 | P0 | ✅ 已修复 | 卸载功能 |
+| P2-1 | service_new.py 与 service.py 重复 | P2 | ✅ 已修复 | 代码维护 |
+| P2-2 | device_sync.py 回路推断规则仍有硬编码 | P2 | ⚠️ 接受现状 | 系统通用性 |
 
 ---
 
@@ -192,18 +192,20 @@ simulation_enabled: bool = Field(default=False, description="启用数据模拟�
 
 ### 缺点
 
-1. **P0 问题** - service_new.py 缺少关键方法实现
-2. **代码重复** - service.py 和 service_new.py 同时存在
-3. **部分硬编码** - device_sync.py 回路推断规则仍有硬编码
+1. **P2-2 问题** - device_sync.py 回路推断规则仍有硬编码（可接受现状，作为后续优化）
 
 ### 总体评价
 
-Epic 28 的核心目标（数据源追踪、配置分离、is_demo 标记、安全卸载）已基本实现，但存在 1 个 P0 问题和 2 个 P2 问题。
+Epic 28 的核心目标（数据源追踪、配置分离、is_demo 标记、安全卸载）已完全实现，所有问题已修复或评估为可接受现状。
+
+**修复记录:**
+1. **P0-1 已修复** - 将 _clear_demo_data_safe 方法添加到 service_new.py（2026-03-10）
+2. **P2-1 已修复** - 删除未使用的 service_new.py 文件（2026-03-10）
+3. **P2-2 接受现状** - 硬编码回路规则不影响当前功能，可作为后续优化任务
 
 **建议:**
-1. **立即修复 P0-1** - 将 _clear_demo_data_safe 方法复制到 service_new.py
-2. **清理代码** - 删除未使用的 service_new.py 或 service.py
-3. **参数化回路规则** - 将 device_sync.py 的硬编码规则改为配置驱动
+- Epic 28 可以标记为完成 (done)
+- P2-2 问题可以创建后续优化任务（Epic 29 或 Story 28.5）
 
 ---
 
@@ -237,4 +239,5 @@ Epic 28 的核心目标（数据源追踪、配置分离、is_demo 标记、安�
 ---
 
 **审查完成时间:** 2026-03-10
-**下一步:** 修复 P0-1 问题，清理代码重复
+**修复完成时间:** 2026-03-10
+**下一步:** Epic 28 可以标记为完成 (done)
