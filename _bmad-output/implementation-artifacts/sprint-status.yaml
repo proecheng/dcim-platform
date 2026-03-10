@@ -319,7 +319,7 @@ development_status:
   27-7-data-link-p0-fixes: done  # 修复温度页面告警、Dashboard能源数据、BigscreenStore派生问题、proxy端口配置
   27-8-environment-grouping: done  # 环境监控分组逻辑统一到RealtimeStore，经过两轮对抗性审查和代码审查
   27-9-dashboard-simplify: done  # Dashboard refreshData 简化，经过两轮对抗性审查和实施后代码审查
-  27-10-bigscreen-performance: ready-for-dev  # BigscreenStore activeAlarms 性能优化
+  27-10-bigscreen-performance: done  # BigscreenStore 改为 setup API，computed 缓存优化，经过两轮对抗性审查和实施后代码审查
   epic-27-retrospective: done
 
   # Epic 28: Demo 系统解耦与数据隔离 (MVP 月1-3)

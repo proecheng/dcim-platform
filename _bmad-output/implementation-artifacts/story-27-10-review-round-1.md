@@ -1,92 +1,168 @@
----
-epic: 27
-story_id: 27.10
-title: 数据链路 P1 问题修复 - BigscreenStore activeAlarms 性能优化
-status: ready-for-dev
-priority: P1
-created: 2026-03-10
-assigned_to: dev
-estimated_effort: 2h
-sprint: next
+# Story 27.10 第一轮对抗性审查报告
+
+**审查日期:** 2026-03-10
+**审查人:** Claude (Adversarial Review Round 1)
+**审查方法:** 对比 Story 假设与实际代码实现
+
 ---
 
-# Story 27.10: BigscreenStore activeAlarms Getter 性能优化
+## 审查结论
 
-## User Story
+⚠️ **Story 存在 2 个问题，需要修改**
 
-As a 大屏用户,
-I want activeAlarms getter 使用缓存避免重复计算,
-So that 在告警数量多时大屏页面不会出现卡顿。
+---
 
-## Context
+## 发现的问题
 
-对抗性审查发现 P1-7 问题：BigscreenStore 的 `activeAlarms` getter 每次访问都会执行 `map()` 转换，将 AlarmStore 的告警数据转换为 BigscreenAlarm 类型。
+### P1-1: Story 假设的实现方案不适用于 Options API
 
-**当前问题：**
-- BigscreenStore 使用 Pinia options API，getters 每次访问都重新执行函数体
-- `activeAlarms` getter 每次访问都重新执行 `map()` 转换
-- `environment` getter 也有复杂计算（多次 filter、map、reduce）
-- 如果告警数量多（如 100+ 条）且访问频繁，会影响性能
-- 大屏页面可能出现卡顿
+**问题描述:**
+- Story AC1 的修改后代码假设可以在 options API 中使用 `computed`
+- 实际代码使用 Pinia options API（`defineStore('bigscreen', { state, getters, actions })`）
+- Options API 的 getters 本身就是 computed 属性，但每次访问都会执行函数体
 
-**解决方案：**
-- 将 BigscreenStore 从 options API 改为 setup API
-- 使用 Vue 的 `computed` 缓存所有 getters
-- 只有当依赖的 Store 数据变化时才重新计算
-
-## Acceptance Criteria
-
-### AC1: 将 BigscreenStore 改为 setup API
-
-- Given BigscreenStore 使用 options API
-- When 改为 setup API
-- Then 所有 state 改为 `ref`
-- And 所有 getters 改为 `computed`
-- And 所有 actions 改为普通函数
-- And `getDeviceData` 从 getter 改为函数（因为它接受参数）
-- And 所有 computed 自动缓存，只在依赖变化时重新计算
-
-**修改文件:** `frontend/src/stores/bigscreen.ts`
-
-**修改前（约 line 51-297）:**
+**证据:**
 ```typescript
+// 当前代码 (lines 51-76)
 export const useBigscreenStore = defineStore('bigscreen', {
-  state: (): BigscreenState => ({
-    mode: 'command',
-    layout: null,
-    deviceData: {},
-    // ... 其他 state
-  }),
-
+  state: (): BigscreenState => ({ ... }),
   getters: {
-    getDeviceData: (state) => (deviceId: string) => {
-      return state.deviceData[deviceId] || null
-    },
-
     activeAlarms(): BigscreenAlarm[] {
       const alarmStore = useAlarmStore()
-      return alarmStore.activeAlarms.map(alarm => ({
-        id: alarm.id,
-        deviceId: alarm.point_code || String(alarm.point_id || ''),
-        deviceName: alarm.point_name || '',
-        level: alarm.alarm_level as BigscreenAlarm['level'],
-        message: alarm.alarm_message || '',
-        value: alarm.trigger_value,
-        threshold: alarm.threshold_value,
-        createdAt: alarm.created_at,
-      }))
-    },
-
-    // ... 其他 getters
+      return alarmStore.activeAlarms.map(alarm => ({ ... }))
+    }
   },
+  actions: { ... }
+})
+```
 
-  actions: {
-    setMode(mode: SceneMode) {
-      this.mode = mode
-    },
+**影响:**
+- Story 提供的修改后代码无法直接应用
+- 需要将 store 从 options API 改为 setup API，或者使用其他方案
 
+**修复方案:**
+
+**方案 A: 改为 setup API（推荐）**
+```typescript
+export const useBigscreenStore = defineStore('bigscreen', () => {
+  // state
+  const mode = ref<SceneMode>('command')
+  const layout = ref<DataCenterLayout | null>(null)
+  // ... 其他 state
+
+  // computed
+  const alarmStore = useAlarmStore()
+  const activeAlarms = computed(() => {
+    return alarmStore.activeAlarms.map(alarm => ({
+      id: alarm.id,
+      deviceId: alarm.point_code || String(alarm.point_id || ''),
+      deviceName: alarm.point_name || '',
+      level: alarm.alarm_level as BigscreenAlarm['level'],
+      message: alarm.alarm_message || '',
+      value: alarm.trigger_value,
+      threshold: alarm.threshold_value,
+      createdAt: alarm.created_at,
+    }))
+  })
+
+  // actions
+  function setMode(newMode: SceneMode) {
+    mode.value = newMode
+  }
+  // ... 其他 actions
+
+  return {
+    mode,
+    layout,
+    // ... 其他 state
+    activeAlarms,
+    // ... 其他 getters
+    setMode,
     // ... 其他 actions
   }
+})
+```
+
+**方案 B: 在 options API 中使用缓存变量（不推荐）**
+- 在 state 中添加 `_cachedActiveAlarms` 和 `_lastAlarmVersion`
+- 在 getter 中检查版本号，如果未变化则返回缓存
+- 这种方案复杂且容易出错
+
+**推荐:** 方案 A（改为 setup API）
+
+---
+
+### P2-2: Story 没有说明如何处理其他 getters
+
+**问题描述:**
+- BigscreenStore 有多个 getters：
+  - `activeAlarms` (line 85) - 需要优化
+  - `alarmCount` (line 100) - 已经很简单
+  - `criticalAlarmCount` (line 105) - 已经很简单
+  - `recentAlarms` (line 135) - 依赖 `activeAlarms`
+  - `energy` (line 140) - 已经很简单
+  - `environment` (line 160) - 可能也需要优化（复杂计算）
+- Story 只提到优化 `activeAlarms`，但没有说明其他 getters 如何处理
+
+**证据:**
+```typescript
+// lines 160-186
+environment(): {
+  temperature: { max: number; avg: number; min: number }
+  humidity: { max: number; avg: number; min: number }
+} {
+  const realtimeStore = useRealtimeStore()
+  const thSensors = Array.from(realtimeStore.dataMap.values())
+    .filter(d => d.device_type === 'TH' && d.status !== 'offline')
+
+  const tempSensors = thSensors.filter(d => d.unit === '°C' || d.unit === '℃')
+  const humiditySensors = thSensors.filter(d => d.unit === '%' || d.unit === '%RH')
+
+  const tempValues = tempSensors.map(s => s.value ?? 0).filter(v => v > 0)
+  const humidityValues = humiditySensors.map(s => s.value ?? 0).filter(v => v > 0)
+
+  return {
+    temperature: {
+      max: tempValues.length ? Math.max(...tempValues) : 0,
+      avg: tempValues.length ? tempValues.reduce((a, b) => a + b, 0) / tempValues.length : 0,
+      min: tempValues.length ? Math.min(...tempValues) : 0
+    },
+    humidity: {
+      max: humidityValues.length ? Math.max(...humidityValues) : 0,
+      avg: humidityValues.length ? humidityValues.reduce((a, b) => a + b, 0) / humidityValues.length : 0,
+      min: humidityValues.length ? Math.min(...humidityValues) : 0
+    }
+  }
+}
+```
+
+**影响:**
+- `environment` getter 也有复杂计算（多次 filter、map、reduce）
+- 如果改为 setup API，需要明确说明如何处理所有 getters
+
+**修复方案:**
+- 在 Story 中添加说明：改为 setup API 后，所有 getters 都会自动变成 computed 属性
+- 或者明确说明只优化 `activeAlarms`，其他 getters 保持不变
+
+---
+
+## 修改建议
+
+### 方案 A: 改为 setup API（推荐）
+
+**修改 Story AC1:**
+
+**修改前（约 line 51-76）:**
+```typescript
+export const useBigscreenStore = defineStore('bigscreen', {
+  state: (): BigscreenState => ({ ... }),
+  getters: {
+    activeAlarms(): BigscreenAlarm[] {
+      const alarmStore = useAlarmStore()
+      return alarmStore.activeAlarms.map(alarm => ({ ... }))
+    }
+  },
+  actions: { ... }
 })
 ```
 
@@ -287,7 +363,7 @@ export const useBigscreenStore = defineStore('bigscreen', () => {
     savePanelStates()
   }
 
-  // getDeviceData 改为函数（原来是 getter）
+  // 添加 getDeviceData 函数（原来是 getter）
   function getDeviceData(deviceId: string) {
     return deviceData.value[deviceId] || null
   }
@@ -332,132 +408,23 @@ export const useBigscreenStore = defineStore('bigscreen', () => {
 
 **关键改进:**
 1. 所有 state 改为 `ref`
-2. 所有 getters 改为 `computed`（自动缓存）
+2. 所有 getters 改为 `computed`
 3. 所有 actions 改为普通函数
 4. `getDeviceData` 从 getter 改为函数（因为它接受参数）
-5. 所有 computed 只在依赖变化时重新计算
+5. 所有 computed 自动缓存，只在依赖变化时重新计算
 
-### AC2: 验证性能改进
+---
 
-- Given 大屏页面加载，系统有 50+ 条告警
-- When 页面渲染和更新
-- Then activeAlarms 和 environment 转换只在依赖数据变化时执行
-- And 多次访问 computed 属性不会重复执行计算
-- And 大屏页面无明显卡顿
+## 审查总结
 
-**验证方法:**
-- 在 `activeAlarms` 和 `environment` computed 中添加 `console.log`
-- 观察控制台输出次数
-- 修改前：每次访问都输出
-- 修改后：只在依赖数据变化时输出
+Story 27.10 的目标是正确的（优化 activeAlarms 性能），但实施方案需要调整：
 
-### AC3: 保持 API 兼容性
+1. **P1-1:** 需要将 store 从 options API 改为 setup API
+2. **P2-2:** 需要说明如何处理其他 getters
 
-- Given 大屏页面和其他使用 BigscreenStore 的组件
-- When 访问 `bigscreenStore.activeAlarms`
-- Then 返回的数据结构和类型与修改前完全一致
-- And 不影响现有功能
+**建议:** 修改 Story 采用方案 A（改为 setup API），这样所有 getters 都会自动获得 computed 缓存。
 
-## Technical Implementation
+---
 
-### 实现方案
-
-**将 BigscreenStore 从 options API 改为 setup API:**
-
-在 Pinia store 中，options API 的 getters 虽然是 computed 属性，但每次访问都会执行函数体。改为 setup API 后，可以使用 Vue 的 `computed` 显式缓存结果。
-
-**优点:**
-1. 所有 computed 自动缓存，只在依赖变化时重新计算
-2. 代码更简洁，更接近 Vue 3 Composition API 风格
-3. 性能更好，避免重复计算
-
-**注意事项:**
-1. `getDeviceData` 原来是接受参数的 getter，改为普通函数
-2. 所有 state 需要用 `ref` 包装
-3. 所有 actions 改为普通函数，访问 state 需要 `.value`
-
-### 修改清单
-
-1. **frontend/src/stores/bigscreen.ts**
-   - 将 store 定义从 options API 改为 setup API
-   - 所有 state 改为 `ref`
-   - 所有 getters 改为 `computed`
-   - 所有 actions 改为普通函数
-   - `getDeviceData` 改为函数
-
-### 测试验证
-
-**性能测试步骤:**
-
-1. **添加性能日志:**
-   ```typescript
-   const activeAlarms = computed(() => {
-     console.log('[Performance] activeAlarms computed')
-     return alarmStore.activeAlarms.map(...)
-   })
-
-   const environment = computed(() => {
-     console.log('[Performance] environment computed')
-     const thSensors = Array.from(realtimeStore.dataMap.values())...
-   })
-   ```
-
-2. **测试修改前:**
-   - 打开大屏页面
-   - 观察控制台输出次数
-   - 预期：多次输出（每次访问都计算）
-
-3. **测试修改后:**
-   - 打开大屏页面
-   - 观察控制台输出次数
-   - 预期：只输出 1-2 次（初始化和依赖变化时）
-
-4. **测试告警更新:**
-   - 触发新告警（或通过 WebSocket 推送）
-   - 验证 activeAlarms 自动更新
-   - 验证只在告警变化时重新计算
-
-5. **测试实时数据更新:**
-   - 等待实时数据更新（WebSocket 推送）
-   - 验证 environment 自动更新
-   - 验证只在实时数据变化时重新计算
-
-## Definition of Done
-
-- [ ] AC1-AC3 全部通过验证
-- [ ] 性能测试通过
-- [ ] 代码审查通过
-- [ ] 无 TypeScript 类型错误
-- [ ] 无控制台错误或警告
-- [ ] 提交代码并创建 commit
-
-## Notes
-
-- 本 Story 是性能优化，不改变功能行为
-- 将整个 BigscreenStore 从 options API 改为 setup API
-- 所有 getters 都会获得 computed 缓存，不仅是 activeAlarms
-- `getDeviceData` 从 getter 改为函数（因为它接受参数）
-
-## Related Issues
-
-- Epic 27: 前端数据链路统一
-- Story 27.7: 数据链路 P0 问题修复
-- 对抗性审查报告: P1-7
-
-## Performance Impact
-
-**预期性能改进:**
-- 告警数量 50 条时：减少 ~50 次 map 操作/秒（activeAlarms）
-- 告警数量 100 条时：减少 ~100 次 map 操作/秒（activeAlarms）
-- 实时数据 200+ 点位时：减少 ~10 次复杂计算/秒（environment）
-- 大屏页面帧率提升：预计从 55fps 提升到 60fps（在告警多时）
-
-**优化的 computed 属性:**
-- `activeAlarms` - map 转换（告警多时影响大）
-- `environment` - 多次 filter、map、reduce（实时数据多时影响大）
-- `energy` - 简单对象转换（影响小）
-- `alarmCount` - 简单属性访问（影响小）
-- `criticalAlarmCount` - 简单属性访问（影响小）
-- `recentAlarms` - slice 操作（影响小）
-- `modeConfig` - 对象查找（影响小）
-- `hasSelectedDevice` - 简单比较（影响小）
+**审查完成时间:** 2026-03-10
+**下一步:** 修改 Story 后进行第二轮审查
