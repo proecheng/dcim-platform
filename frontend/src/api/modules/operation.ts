@@ -7,13 +7,13 @@ import type { ResponseModel, PageParams } from './types'
 // ==================== 类型定义 ====================
 
 /** 工单状态 */
-export type WorkOrderStatus = 'pending' | 'assigned' | 'accepted' | 'processing' | 'completed' | 'closed' | 'cancelled'
+export type WorkOrderStatus = '待处理' | '已派单' | '已接单' | '处理中' | '已完成' | '已关闭' | '已取消'
 
 /** 工单类型 */
-export type WorkOrderType = 'fault' | 'maintenance' | 'inspection' | 'change' | 'other'
+export type WorkOrderType = '故障报修' | '日常维护' | '巡检任务' | '变更请求' | '其他'
 
 /** 工单优先级 */
-export type WorkOrderPriority = 'critical' | 'high' | 'medium' | 'low'
+export type WorkOrderPriority = '紧急' | '高' | '中' | '低'
 
 /** 巡检状态 */
 export type InspectionStatus = 'pending' | 'in_progress' | 'completed' | 'overdue'
@@ -408,7 +408,7 @@ export function checkAlarmCreateWorkOrder(data: { alarm_id: number; alarm_level:
 // ==================== 工单审批 ====================
 
 /** 审批状态 */
-export type ApprovalStatus = 'pending' | 'approved' | 'rejected' | 'timeout' | 'escalated'
+export type ApprovalStatus = '待审批' | '已批准' | '已驳回' | '已超时' | '已升级'
 
 /** 工单审批 */
 export interface WorkOrderApproval {

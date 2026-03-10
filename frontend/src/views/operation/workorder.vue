@@ -63,18 +63,19 @@
       <div class="toolbar">
         <div class="toolbar-left">
           <el-select v-model="filterStatus" placeholder="工单状态" clearable style="width: 140px;">
-            <el-option label="待处理" value="pending" />
-            <el-option label="已分配" value="assigned" />
-            <el-option label="处理中" value="processing" />
-            <el-option label="已完成" value="completed" />
-            <el-option label="已关闭" value="closed" />
-            <el-option label="已取消" value="cancelled" />
+            <el-option label="待处理" value="待处理" />
+            <el-option label="已派单" value="已派单" />
+            <el-option label="已接单" value="已接单" />
+            <el-option label="处理中" value="处理中" />
+            <el-option label="已完成" value="已完成" />
+            <el-option label="已关闭" value="已关闭" />
+            <el-option label="已取消" value="已取消" />
           </el-select>
           <el-select v-model="filterPriority" placeholder="优先级" clearable style="width: 120px;">
-            <el-option label="紧急" value="critical" />
-            <el-option label="高" value="high" />
-            <el-option label="中" value="medium" />
-            <el-option label="低" value="low" />
+            <el-option label="紧急" value="紧急" />
+            <el-option label="高" value="高" />
+            <el-option label="中" value="中" />
+            <el-option label="低" value="低" />
           </el-select>
           <el-input
             v-model="filterKeyword"
@@ -131,7 +132,7 @@
           <template #default="{ row }">
             <el-button type="primary" link @click="showDetailDialog(row)">详情</el-button>
             <el-button
-              v-if="row.status === 'pending' || row.status === 'assigned'"
+              v-if="row.status === '待处理' || row.status === '已派单'"
               type="success"
               link
               @click="handleProcess(row)"
@@ -139,7 +140,7 @@
               处理
             </el-button>
             <el-button
-              v-if="row.status === 'processing'"
+              v-if="row.status === '处理中'"
               type="warning"
               link
               @click="showCompleteDialog(row)"
@@ -192,11 +193,11 @@
           <el-col :span="12">
             <el-form-item label="工单类型" prop="order_type">
               <el-select v-model="createForm.order_type" placeholder="请选择类型" style="width: 100%;">
-                <el-option label="故障" value="fault" />
-                <el-option label="维护" value="maintenance" />
-                <el-option label="巡检" value="inspection" />
-                <el-option label="变更" value="change" />
-                <el-option label="其他" value="other" />
+                <el-option label="故障报修" value="故障报修" />
+                <el-option label="日常维护" value="日常维护" />
+                <el-option label="巡检任务" value="巡检任务" />
+                <el-option label="变更请求" value="变更请求" />
+                <el-option label="其他" value="其他" />
               </el-select>
             </el-form-item>
           </el-col>
@@ -323,7 +324,7 @@
       <template #footer>
         <el-button @click="detailDialogVisible = false">关闭</el-button>
         <el-button
-          v-if="currentOrder && (currentOrder.status === 'pending' || currentOrder.status === 'assigned')"
+          v-if="currentOrder && (currentOrder.status === '待处理' || currentOrder.status === '已派单')"
           type="warning"
           @click="showSubmitApprovalDialog(currentOrder)"
         >提交审批</el-button>
@@ -424,11 +425,11 @@
         <div class="toolbar">
           <div class="toolbar-left">
             <el-select v-model="approvalFilterStatus" placeholder="审批状态" clearable style="width: 140px;" @change="loadApprovals">
-              <el-option label="待审批" value="pending" />
-              <el-option label="已批准" value="approved" />
-              <el-option label="已驳回" value="rejected" />
-              <el-option label="已超时" value="timeout" />
-              <el-option label="已升级" value="escalated" />
+              <el-option label="待审批" value="待审批" />
+              <el-option label="已批准" value="已批准" />
+              <el-option label="已驳回" value="已驳回" />
+              <el-option label="已超时" value="已超时" />
+              <el-option label="已升级" value="已升级" />
             </el-select>
           </div>
         </div>
@@ -453,7 +454,7 @@
           </el-table-column>
           <el-table-column label="操作" width="180" fixed="right">
             <template #default="{ row }">
-              <template v-if="row.status === 'pending'">
+              <template v-if="row.status === '待审批'">
                 <el-button type="success" link @click="handleApprove(row)">批准</el-button>
                 <el-button type="danger" link @click="handleReject(row)">驳回</el-button>
               </template>
@@ -497,11 +498,11 @@
           <el-col :span="12">
             <el-form-item label="工单类型" prop="order_type">
               <el-select v-model="ruleForm.order_type" placeholder="请选择" style="width: 100%;">
-                <el-option label="故障" value="fault" />
-                <el-option label="维护" value="maintenance" />
-                <el-option label="巡检" value="inspection" />
-                <el-option label="变更" value="change" />
-                <el-option label="其他" value="other" />
+                <el-option label="故障报修" value="故障报修" />
+                <el-option label="日常维护" value="日常维护" />
+                <el-option label="巡检任务" value="巡检任务" />
+                <el-option label="变更请求" value="变更请求" />
+                <el-option label="其他" value="其他" />
               </el-select>
             </el-form-item>
           </el-col>
@@ -654,8 +655,8 @@ const createFormRef = ref<FormInstance>()
 const createForm = reactive({
   title: '',
   description: '',
-  order_type: 'fault' as WorkOrderType,
-  priority: 'medium' as WorkOrderPriority,
+  order_type: '故障报修' as WorkOrderType,
+  priority: '中' as WorkOrderPriority,
   device_name: '',
   location: '',
   reporter: '',
@@ -712,8 +713,8 @@ const ruleForm = reactive({
   name: '',
   alarm_level: 'critical',
   alarm_type: '',
-  order_type: 'fault' as WorkOrderType,
-  priority: 'high' as WorkOrderPriority,
+  order_type: '故障报修' as WorkOrderType,
+  priority: '高' as WorkOrderPriority,
   assignee: '',
   is_enabled: true
 })
@@ -799,8 +800,8 @@ function showCreateDialog() {
   Object.assign(createForm, {
     title: '',
     description: '',
-    order_type: 'fault',
-    priority: 'medium',
+    order_type: '故障报修',
+    priority: '中',
     device_name: '',
     location: '',
     reporter: '',
@@ -976,10 +977,9 @@ function confirmDelete(row: WorkOrder) {
 async function loadAlarmRules() {
   ruleLoading.value = true
   try {
-    const res = await getAlarmWorkOrderRules(ruleFilterEnabled.value ? { is_enabled: true } : undefined)
-    if (res.data) {
-      alarmRuleList.value = Array.isArray(res.data) ? res.data : (res.data as any).items || []
-    }
+    const res = await getAlarmWorkOrderRules(ruleFilterEnabled.value ? { is_enabled: true } : undefined) as any
+    const data = Array.isArray(res) ? res : (res.data ? (Array.isArray(res.data) ? res.data : res.data.items || []) : [])
+    alarmRuleList.value = data
   } catch (e) {
     console.error('加载告警工单规则失败', e)
     alarmRuleList.value = []
@@ -991,7 +991,7 @@ async function loadAlarmRules() {
 function showCreateRuleDialog() {
   isEditRule.value = false
   editRuleId.value = null
-  Object.assign(ruleForm, { name: '', alarm_level: 'critical', alarm_type: '', order_type: 'fault', priority: 'high', assignee: '', is_enabled: true })
+  Object.assign(ruleForm, { name: '', alarm_level: 'critical', alarm_type: '', order_type: '故障报修', priority: '高', assignee: '', is_enabled: true })
   ruleDialogVisible.value = true
 }
 
@@ -1053,10 +1053,9 @@ function confirmDeleteRule(row: AlarmWorkOrderRule) {
 async function loadApprovals() {
   approvalLoading.value = true
   try {
-    const res = await getWorkOrderApprovals({ status: approvalFilterStatus.value || undefined })
-    if (res.data) {
-      approvalList.value = Array.isArray(res.data) ? res.data : (res.data as any).items || []
-    }
+    const res = await getWorkOrderApprovals({ status: approvalFilterStatus.value || undefined }) as any
+    const data = Array.isArray(res) ? res : (res.data ? (Array.isArray(res.data) ? res.data : res.data.items || []) : [])
+    approvalList.value = data
   } catch (e) {
     console.error('加载审批列表失败', e)
     approvalList.value = []
@@ -1118,60 +1117,38 @@ async function handleReject(row: WorkOrderApproval) {
 
 // 辅助函数
 function getStatusType(status?: WorkOrderStatus): TagType {
-  const map: Record<WorkOrderStatus, TagType> = {
-    pending: 'warning',
-    assigned: 'info',
-    accepted: 'primary',
-    processing: 'primary',
-    completed: 'success',
-    closed: 'info',
-    cancelled: 'danger'
+  const map: Record<string, TagType> = {
+    '待处理': 'warning',
+    '已派单': 'info',
+    '已接单': 'primary',
+    '处理中': 'primary',
+    '已完成': 'success',
+    '已关闭': 'info',
+    '已取消': 'danger'
   }
   return status ? map[status] || 'info' : 'info'
 }
 
 function getStatusLabel(status?: WorkOrderStatus): string {
-  const map: Record<WorkOrderStatus, string> = {
-    pending: '待处理',
-    assigned: '已分配',
-    accepted: '已接受',
-    processing: '处理中',
-    completed: '已完成',
-    closed: '已关闭',
-    cancelled: '已取消'
-  }
-  return status ? map[status] || status : '--'
+  return status || '--'
 }
 
 function getPriorityType(priority?: WorkOrderPriority): TagType {
-  const map: Record<WorkOrderPriority, TagType> = {
-    critical: 'danger',
-    high: 'warning',
-    medium: 'primary',
-    low: 'info'
+  const map: Record<string, TagType> = {
+    '紧急': 'danger',
+    '高': 'warning',
+    '中': 'primary',
+    '低': 'info'
   }
   return priority ? map[priority] || 'info' : 'info'
 }
 
 function getPriorityLabel(priority?: WorkOrderPriority): string {
-  const map: Record<WorkOrderPriority, string> = {
-    critical: '紧急',
-    high: '高',
-    medium: '中',
-    low: '低'
-  }
-  return priority ? map[priority] || priority : '--'
+  return priority || '--'
 }
 
 function getOrderTypeLabel(type?: WorkOrderType): string {
-  const map: Record<WorkOrderType, string> = {
-    fault: '故障',
-    maintenance: '维护',
-    inspection: '巡检',
-    change: '变更',
-    other: '其他'
-  }
-  return type ? map[type] || type : '--'
+  return type || '--'
 }
 
 function getAlarmLevelType(level?: string): TagType {
@@ -1185,13 +1162,12 @@ function getAlarmLevelLabel(level?: string): string {
 }
 
 function getApprovalStatusType(status?: ApprovalStatus): TagType {
-  const map: Record<ApprovalStatus, TagType> = { pending: 'warning', approved: 'success', rejected: 'danger', timeout: 'info', escalated: 'primary' }
+  const map: Record<string, TagType> = { '待审批': 'warning', '已批准': 'success', '已驳回': 'danger', '已超时': 'info', '已升级': 'primary' }
   return status ? map[status] || 'info' : 'info'
 }
 
 function getApprovalStatusLabel(status?: ApprovalStatus): string {
-  const map: Record<ApprovalStatus, string> = { pending: '待审批', approved: '已批准', rejected: '已驳回', timeout: '已超时', escalated: '已升级' }
-  return status ? map[status] || status : '--'
+  return status || '--'
 }
 
 function formatDateTime(dateStr?: string): string {
