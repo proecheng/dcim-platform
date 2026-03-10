@@ -129,12 +129,19 @@ async def aggregate_hourly(db: AsyncSession, target_time: Optional[datetime] = N
 async def aggregate_daily(db: AsyncSession, target_date: Optional[date] = None):
     """
     日聚合：从 EnergyHourly + ElectricityPricing 聚合到 EnergyDaily
+
+    P1-3 修复: 使用 UTC 时区确保跨时区一致性
     """
     if target_date is None:
-        target_date = date.today() - timedelta(days=1)
+        # P1-3 修复: 使用 UTC 时区而不是本地时区
+        from datetime import timezone
+        utc_now = datetime.now(timezone.utc)
+        target_date = (utc_now - timedelta(days=1)).date()
 
     # 获取电价配置（用于五时段分类：尖峰/高峰/平段/低谷/深谷）
-    today = date.today()
+    # P1-3 修复: 使用 UTC 日期
+    from datetime import timezone
+    today = datetime.now(timezone.utc).date()
     pricing_result = await db.execute(
         select(ElectricityPricing)
         .where(ElectricityPricing.is_enabled == True, ElectricityPricing.effective_date <= today)
@@ -247,9 +254,14 @@ async def aggregate_daily(db: AsyncSession, target_date: Optional[date] = None):
 async def aggregate_monthly(db: AsyncSession, target_year: Optional[int] = None, target_month: Optional[int] = None):
     """
     月聚合：从 EnergyDaily 聚合到 EnergyMonthly
+
+    P1-3 修复: 使用 UTC 时区确保跨时区一致性
     """
     if target_year is None or target_month is None:
-        last_month = date.today().replace(day=1) - timedelta(days=1)
+        # P1-3 修复: 使用 UTC 时区而不是本地时区
+        from datetime import timezone
+        utc_now = datetime.now(timezone.utc)
+        last_month = utc_now.replace(day=1) - timedelta(days=1)
         target_year = last_month.year
         target_month = last_month.month
 

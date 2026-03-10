@@ -738,12 +738,18 @@ async def get_pue_trend(
 async def get_daily_statistics(
     device_id: Optional[int] = Query(None, description="设备ID"),
     device_type: Optional[str] = Query(None, description="设备类型"),
-    start_date: date = Query(..., description="开始日期"),
-    end_date: date = Query(..., description="结束日期"),
+    start_date: date = Query(..., description="开始日期（UTC 时区）"),
+    end_date: date = Query(..., description="结束日期（UTC 时区）"),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """获取日能耗统计数据"""
+    """
+    获取日能耗统计数据
+
+    P1-3 修复: 明确说明日期基于 UTC 时区
+    - 数据聚合使用 UTC 时区
+    - 查询时请使用 UTC 日期
+    """
     query = select(EnergyDaily).where(EnergyDaily.stat_date >= start_date, EnergyDaily.stat_date <= end_date)
 
     if device_id:
