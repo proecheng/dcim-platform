@@ -252,13 +252,20 @@ async function openDetail(row: OutdoorUnit) {
   detailParams.value = []
   try {
     const res = await getCoolingUnitDetail(row.id)
-    const data = res?.data ?? res
-    detail.value = data as OutdoorDetailData
-    if (detail.value?.points && detail.value.points.length > 0) {
-      detailParams.value = detail.value.points.map((p, i) => ({
+    const data = (res as any)?.data ?? res
+    // API返回 {unit: {...}, device: {...}, points: [...]}
+    const unitData = data?.unit ?? data
+    detail.value = {
+      device_code: unitData?.device_code ?? row.device_code,
+      device_name: unitData?.device_name ?? row.device_name,
+      cooling_capacity_kw: unitData?.cooling_capacity_kw ?? row.cooling_capacity_kw,
+      points: data?.points ?? unitData?.points ?? []
+    }
+    if (detail.value.points && detail.value.points.length > 0) {
+      detailParams.value = detail.value.points.map((p: any, i: number) => ({
         key: String(i),
         label: p.point_name,
-        value: p.value !== null ? String(p.value) : '-',
+        value: p.value !== null && p.value !== undefined ? String(p.value) : '-',
         unit: p.unit || '',
         status: p.status || 'normal'
       }))
@@ -267,7 +274,7 @@ async function openDetail(row: OutdoorUnit) {
     }
   } catch {
     console.warn('室外机详情API未就绪，使用模拟数据')
-    detail.value = { device_code: row.device_code, device_name: row.device_name, cooling_capacity_kw: 0 }
+    detail.value = { device_code: row.device_code, device_name: row.device_name, cooling_capacity_kw: row.cooling_capacity_kw }
     detailParams.value = mockOutdoorDetailParams
   } finally {
     detailLoading.value = false

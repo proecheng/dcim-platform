@@ -191,9 +191,33 @@ async function openDetail(row: AisleItem) {
   skylightList.value = []
   try {
     const res = await getColdAisleDetail(row.id)
-    const data = res?.data ?? res
-    currentAisle.value = data as AisleItem
-    skylightList.value = data?.skylights ?? []
+    const data = (res as any)?.data ?? res
+    // API返回 {aisle: {...}, device: {...}, points: [...]}
+    const aisleData = data?.aisle ?? data
+    currentAisle.value = {
+      id: aisleData?.id ?? row.id,
+      aisle_code: aisleData?.aisle_code ?? aisleData?.device_code ?? row.aisle_code,
+      aisle_name: aisleData?.aisle_name ?? aisleData?.device_name ?? row.aisle_name,
+      skylight_count: aisleData?.skylight_count ?? row.skylight_count,
+      location: aisleData?.location ?? row.location,
+      skylight_open: aisleData?.skylight_open ?? row.skylight_open
+    }
+    // 点位数据来自 points 字段，转换为天窗状态展示
+    const points = data?.points ?? aisleData?.points ?? []
+    if (points.length > 0) {
+      skylightList.value = points.map((p: any, i: number) => ({
+        index: i + 1,
+        status: p.value !== null && p.value !== undefined && Number(p.value) > 0 ? 'open' : 'closed'
+      }))
+    } else {
+      // 如果没有点位数据，根据 skylight_count 和 skylight_open 模拟
+      const count = currentAisle.value.skylight_count || 0
+      const openCount = currentAisle.value.skylight_open || 0
+      skylightList.value = Array.from({ length: count }, (_, i) => ({
+        index: i + 1,
+        status: i < (count - openCount) ? 'closed' : 'open'
+      }))
+    }
   } catch {
     console.warn('冷通道详情API未就绪，使用模拟数据')
     currentAisle.value = row
