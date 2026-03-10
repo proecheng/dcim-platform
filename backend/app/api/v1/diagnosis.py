@@ -15,6 +15,7 @@ from sqlalchemy import select, func, and_
 from ..deps import get_db, require_admin, require_operator, require_viewer, require_diagnosis_advanced
 from ...models.user import User
 from ...models.diagnosis import DiagnosisRule, DiagnosisResult, DiagnosisSession, DiagnosisAuditLog, BreakerProfile
+from ...models.fault_tree import FaultTree
 from ...schemas.diagnosis import (
     DiagnosisRuleCreate,
     DiagnosisRuleUpdate,
@@ -79,6 +80,27 @@ async def get_categories(
             name=CATEGORY_MAP.get(row[0], row[0]),
             count=row[1],
         )
+        for row in rows
+    ]
+
+
+@router.get("/fault-trees", response_model=list)
+async def get_fault_trees(
+    device_type: Optional[str] = Query(None, description="设备类型筛选"),
+    skip: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=500),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_viewer),
+):
+    """获取故障树列表（供概率调参页面筛选用）"""
+    query = select(FaultTree.id, FaultTree.name, FaultTree.description, FaultTree.status)
+    if device_type:
+        query = query.where(FaultTree.name.ilike(f"%{device_type}%"))
+    query = query.order_by(FaultTree.id).offset(skip).limit(limit)
+    result = await db.execute(query)
+    rows = result.all()
+    return [
+        {"id": row.id, "name": row.name, "description": row.description, "status": row.status}
         for row in rows
     ]
 

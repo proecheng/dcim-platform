@@ -13,10 +13,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update
 from jose import jwt
 
-from ..deps import get_db, get_current_user
+from ..deps import get_db, get_current_user, oauth2_scheme
 from ...core.config import get_settings
 from ...core.security import verify_password, get_password_hash
-from ...models.user import User, UserLoginHistory, PasswordHistory
+from ...models.user import User, UserLoginHistory, UserSession, PasswordHistory
 from ...models.config import SystemConfig
 from ...schemas.user import Token, UserInfo, PasswordChange, PasswordPolicyConfig
 

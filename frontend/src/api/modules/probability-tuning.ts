@@ -40,11 +40,11 @@ export interface TriggerAnalysisResponse {
  * 触发概率调参分析
  */
 export function triggerProbabilityAnalysis(treeId?: number) {
-  return request<TriggerAnalysisResponse>({
-    url: '/diagnosis/probability-tuning/trigger',
-    method: 'post',
-    params: treeId ? { tree_id: treeId } : undefined
-  })
+  return request.post<TriggerAnalysisResponse>(
+    '/v1/diagnosis/probability-tuning/analyze',
+    undefined,
+    { params: treeId ? { tree_id: treeId } : undefined }
+  )
 }
 
 /**
@@ -56,41 +56,35 @@ export function getProbabilityAdjustments(params: {
   skip?: number
   limit?: number
 }) {
-  return request<ProbabilityAdjustmentListResponse>({
-    url: '/diagnosis/probability-tuning/adjustments',
-    method: 'get',
-    params
-  })
+  return request.get<ProbabilityAdjustmentListResponse>(
+    '/v1/diagnosis/probability-tuning/adjustments',
+    { params }
+  )
 }
 
 /**
  * 审批调参建议
  */
 export function approveProbabilityAdjustment(adjustmentId: number, reason?: string) {
-  return request({
-    url: `/diagnosis/probability-tuning/adjustments/${adjustmentId}/approve`,
-    method: 'post',
-    data: { reason }
-  })
+  return request.post(
+    `/v1/diagnosis/probability-tuning/adjustments/${adjustmentId}/approve`,
+    { reason }
+  )
 }
 
 /**
  * 拒绝调参建议
  */
 export function rejectProbabilityAdjustment(adjustmentId: number, reason: string) {
-  return request({
-    url: `/diagnosis/probability-tuning/adjustments/${adjustmentId}/reject`,
-    method: 'post',
-    data: { reason }
-  })
+  return request.post(
+    `/v1/diagnosis/probability-tuning/adjustments/${adjustmentId}/reject`,
+    { reason }
+  )
 }
 
 /**
  * 回滚故障树到上一个版本
  */
 export function rollbackFaultTree(treeId: number) {
-  return request({
-    url: `/diagnosis/probability-tuning/rollback/${treeId}`,
-    method: 'post'
-  })
+  return request.post(`/v1/diagnosis/probability-tuning/rollback/${treeId}`)
 }

@@ -130,4 +130,50 @@ api_router.include_router(chaos_drill_router, tags=["灾难恢复演练"])
 if _ml_available:
     api_router.include_router(ml_router, prefix="/ml", tags=["深度学习节能优化"])
 
+# === 故障树详情路由（供编辑器使用） ===
+from fastapi import Depends, HTTPException
+from sqlalchemy.ext.asyncio import AsyncSession as _AsyncSession
+from sqlalchemy import select as _select
+from app.core.database import get_db as _get_db
+from app.api.deps import require_role as _require_role
+from app.models.fault_tree import FaultTree as _FaultTree, FaultTreeNode as _FaultTreeNode, FaultTreeEdge as _FaultTreeEdge
+
+
+@api_router.get("/fault-trees/{tree_id}", tags=["故障树"])
+async def get_fault_tree_detail(tree_id: int, db: _AsyncSession = Depends(_get_db), _=Depends(_require_role(["admin", "operator", "viewer"]))):
+    """获取故障树详情（含节点和边）"""
+    result = await db.execute(_select(_FaultTree).where(_FaultTree.id == tree_id))
+    tree = result.scalar_one_or_none()
+    if not tree:
+        raise HTTPException(status_code=404, detail="故障树不存在")
+
+    nodes_result = await db.execute(_select(_FaultTreeNode).where(_FaultTreeNode.tree_id == tree_id))
+    nodes = nodes_result.scalars().all()
+
+    edges_result = await db.execute(_select(_FaultTreeEdge).where(_FaultTreeEdge.tree_id == tree_id))
+    edges = edges_result.scalars().all()
+
+    return {
+        "id": tree.id,
+        "name": tree.name,
+        "description": tree.description,
+        "status": tree.status,
+        "created_at": str(tree.created_at) if tree.created_at else None,
+        "updated_at": str(tree.updated_at) if tree.updated_at else None,
+        "nodes": [
+            {
+                "id": n.id, "name": n.name, "node_type": n.node_type,
+                "gate_type": n.gate_type, "description": n.description,
+                "prior_probability": n.prior_probability,
+                "evidence_point_id": n.evidence_point_id,
+            }
+            for n in nodes
+        ],
+        "edges": [
+            {"id": e.id, "parent_node_id": e.parent_node_id, "child_node_id": e.child_node_id}
+            for e in edges
+        ],
+    }
+
+
 # reload 1769696750.1147227

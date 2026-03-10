@@ -46,6 +46,7 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
 
 
 # P1-5 修复: 删除重复的 get_current_user，统一使用 api.deps.get_current_user
+
 # 保留 get_current_admin_user 以兼容旧代码
 async def get_current_admin_user(current_user=Depends("api.deps.get_current_user")):
     """获取当前管理员用户（已废弃，请使用 api.deps.require_admin）"""

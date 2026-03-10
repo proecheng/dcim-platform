@@ -87,63 +87,63 @@ class AlarmEngine:
         """从数据库批量加载所有启用的阈值配置到内存"""
         async with self._load_lock:
             async with async_session() as session:
-            result = await session.execute(
-                select(AlarmThreshold).where(AlarmThreshold.is_enabled == True)  # noqa: E712
-            )
-            thresholds = result.scalars().all()
-
-            points_result = await session.execute(
-                select(Point.id, Point.device_type).where(Point.is_enabled == True)  # noqa: E712
-            )
-            points = points_result.all()
-
-            # 重建缓存
-            new_cache: Dict[int, List[ThresholdCache]] = defaultdict(list)
-            for t in thresholds:
-                cache_item = ThresholdCache(
-                    id=t.id,
-                    point_id=t.point_id,
-                    threshold_type=t.threshold_type,
-                    threshold_value=t.threshold_value or 0,
-                    alarm_level=t.alarm_level or "minor",
-                    alarm_message=t.alarm_message or "",
-                    delay_seconds=t.delay_seconds or 0,
-                    dead_band=t.dead_band or 0,
-                    priority=t.priority or 0,
+                result = await session.execute(
+                    select(AlarmThreshold).where(AlarmThreshold.is_enabled == True)  # noqa: E712
                 )
-                new_cache[t.point_id].append(cache_item)
+                thresholds = result.scalars().all()
 
-            # 按 priority 降序排列
-            for point_id in new_cache:
-                new_cache[point_id].sort(key=lambda x: x.priority, reverse=True)
+                points_result = await session.execute(
+                    select(Point.id, Point.device_type).where(Point.is_enabled == True)  # noqa: E712
+                )
+                points = points_result.all()
 
-            self._thresholds = new_cache
+                # 重建缓存
+                new_cache: Dict[int, List[ThresholdCache]] = defaultdict(list)
+                for t in thresholds:
+                    cache_item = ThresholdCache(
+                        id=t.id,
+                        point_id=t.point_id,
+                        threshold_type=t.threshold_type,
+                        threshold_value=t.threshold_value or 0,
+                        alarm_level=t.alarm_level or "minor",
+                        alarm_message=t.alarm_message or "",
+                        delay_seconds=t.delay_seconds or 0,
+                        dead_band=t.dead_band or 0,
+                        priority=t.priority or 0,
+                    )
+                    new_cache[t.point_id].append(cache_item)
 
-            # 重建点位 -> device_type 映射
-            self._point_device_type.clear()
-            self._device_type_points.clear()
-            for point_id, device_type in points:
-                if device_type:
-                    self._point_device_type[point_id] = device_type
-                    self._device_type_points[device_type].add(point_id)
+                # 按 priority 降序排列
+                for point_id in new_cache:
+                    new_cache[point_id].sort(key=lambda x: x.priority, reverse=True)
 
-            # 加载点位数据质量缓存
-            quality_result = await session.execute(select(PointRealtime.point_id, PointRealtime.quality))
-            self._point_quality = {row[0]: (row[1] or 0) for row in quality_result.all()}
+                self._thresholds = new_cache
 
-            self._loaded = True
+                # 重建点位 -> device_type 映射
+                self._point_device_type.clear()
+                self._device_type_points.clear()
+                for point_id, device_type in points:
+                    if device_type:
+                        self._point_device_type[point_id] = device_type
+                        self._device_type_points[device_type].add(point_id)
 
-            # 清理已失效的状态缓存（防止内存无限增长）
-            valid_keys = set()
-            for pid, tc_list in new_cache.items():
-                for tc in tc_list:
-                    valid_keys.add((pid, tc.id))
-            valid_point_ids = set(new_cache.keys()) | set(self._point_device_type.keys())
+                # 加载点位数据质量缓存
+                quality_result = await session.execute(select(PointRealtime.point_id, PointRealtime.quality))
+                self._point_quality = {row[0]: (row[1] or 0) for row in quality_result.all()}
 
-            self._last_alarm_time = {k: v for k, v in self._last_alarm_time.items() if k in valid_keys}
-            self._delay_first_exceed = {k: v for k, v in self._delay_first_exceed.items() if k in valid_keys}
-            self._dead_band_triggered = {k: v for k, v in self._dead_band_triggered.items() if k in valid_keys}
-            self._prev_values = {k: v for k, v in self._prev_values.items() if k in valid_point_ids}
+                self._loaded = True
+
+                # 清理已失效的状态缓存（防止内存无限增长）
+                valid_keys = set()
+                for pid, tc_list in new_cache.items():
+                    for tc in tc_list:
+                        valid_keys.add((pid, tc.id))
+                valid_point_ids = set(new_cache.keys()) | set(self._point_device_type.keys())
+
+                self._last_alarm_time = {k: v for k, v in self._last_alarm_time.items() if k in valid_keys}
+                self._delay_first_exceed = {k: v for k, v in self._delay_first_exceed.items() if k in valid_keys}
+                self._dead_band_triggered = {k: v for k, v in self._dead_band_triggered.items() if k in valid_keys}
+                self._prev_values = {k: v for k, v in self._prev_values.items() if k in valid_point_ids}
 
                 count = sum(len(v) for v in new_cache.values())
                 logger.info("告警引擎: 已加载 %d 条阈值配置（覆盖 %d 个点位）", count, len(new_cache))
