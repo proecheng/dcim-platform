@@ -194,11 +194,12 @@ const loadImpactAnalysis = async () => {
   
   try {
     // 强制传force=false来获取影响分析
-    const res = await props.deleteApi(props.deviceId, false)
-    if (res.code === 200 && res.data) {
-      impactData.value = res.data
+    const res = await props.deleteApi(props.deviceId, false) as any
+    const data = res?.data ?? res
+    if (data && (res.code === 200 || res.code === 0 || data.impact_summary)) {
+      impactData.value = data
     } else {
-      error.value = res.message || '获取分析失败'
+      error.value = res?.message || '获取分析失败'
     }
   } catch (err: any) {
     error.value = err?.response?.data?.detail || err.message || '请求失败，请检查网络或权限'

@@ -757,11 +757,12 @@ const handleCreateShiftOpportunity = async (data: {
 
     console.log('[analysis.vue] Creating opportunity with data:', opportunityData)
 
-    const res = await createOpportunity(opportunityData)
+    const res = await createOpportunity(opportunityData) as any
 
     console.log('[analysis.vue] createOpportunity API response:', res)
 
-    if (res.code === 0) {
+    const resData = res?.data ?? res
+    if (res.code === 0 || resData?.id) {
       console.log('[analysis.vue] ✅ Opportunity created successfully!')
       ElMessage.success({
         message: '节能机会已创建成功！正在跳转到节能中心...',
@@ -885,11 +886,12 @@ const goToVPPAnalysis = () => {
 // 恢复执行计划配置
 async function restorePlanConfig(planId: number) {
   try {
-    const res = await getExecutionPlanDetail(planId)
-    if (res.code === 0 && res.data) {
-      const plan = res.data.plan
+    const res = await getExecutionPlanDetail(planId) as any
+    const planDetail = res?.data ?? res
+    if (planDetail) {
+      const plan = planDetail.plan
       // Backend returns full opportunity with analysis_data
-      const opportunity = res.data.opportunity
+      const opportunity = planDetail.opportunity
       const analysisData = opportunity?.analysis_data
 
       if (analysisData && analysisData.device_rules) {

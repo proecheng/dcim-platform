@@ -405,8 +405,9 @@ export function useFaultTreeEditor(treeId: number) {
 
     try {
       // 先检查版本冲突（保存前）
-      const currentTreeResponse = await getFaultTree(treeId)
-      if (currentTreeResponse.data.updated_at !== loadedUpdatedAt.value) {
+      const currentTreeRes = await getFaultTree(treeId) as any
+      const currentTreeData = currentTreeRes?.data ?? currentTreeRes
+      if (currentTreeData.updated_at !== loadedUpdatedAt.value) {
         ElMessage.error('故障树已被其他用户修改，请刷新页面后重试')
         throw new Error('VERSION_CONFLICT')
       }

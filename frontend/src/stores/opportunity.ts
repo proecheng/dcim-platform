@@ -120,9 +120,10 @@ export const useOpportunityStore = defineStore('opportunity', () => {
   async function loadDashboard() {
     dashboardLoading.value = true
     try {
-      const res = await getOpportunityDashboard()
-      if (res.code === 0 && res.data) {
-        dashboard.value = res.data
+      const res = await getOpportunityDashboard() as any
+      const data = res?.data ?? res
+      if (data) {
+        dashboard.value = data
         lastUpdateTime.value = new Date()
       }
     } catch (e) {
@@ -142,10 +143,11 @@ export const useOpportunityStore = defineStore('opportunity', () => {
   }) {
     opportunitiesLoading.value = true
     try {
-      const res = await getOpportunities(params as any)
-      if (res.code === 0 && res.data) {
-        opportunities.value = res.data.items
-        opportunitiesTotal.value = res.data.total
+      const res = await getOpportunities(params as any) as any
+      const data = res?.data ?? res
+      if (data) {
+        opportunities.value = data.items || data
+        opportunitiesTotal.value = data.total || 0
       }
     } catch (e) {
       console.error('加载机会列表失败', e)
@@ -158,9 +160,10 @@ export const useOpportunityStore = defineStore('opportunity', () => {
   async function loadOpportunityDetail(opportunityId: number) {
     currentOpportunityLoading.value = true
     try {
-      const res = await getOpportunityDetail(opportunityId)
-      if (res.code === 0 && res.data) {
-        currentOpportunity.value = res.data
+      const res = await getOpportunityDetail(opportunityId) as any
+      const data = res?.data ?? res
+      if (data) {
+        currentOpportunity.value = data
       }
     } catch (e) {
       console.error('加载机会详情失败', e)
@@ -176,9 +179,10 @@ export const useOpportunityStore = defineStore('opportunity', () => {
   }) {
     devicesLoading.value = true
     try {
-      const res = await getAvailableDevices(opportunityId, params)
-      if (res.code === 0 && res.data) {
-        availableDevices.value = res.data.available_devices
+      const res = await getAvailableDevices(opportunityId, params) as any
+      const data = res?.data ?? res
+      if (data) {
+        availableDevices.value = data.available_devices || data
       }
     } catch (e) {
       console.error('加载可选设备失败', e)
@@ -219,10 +223,11 @@ export const useOpportunityStore = defineStore('opportunity', () => {
   }) {
     plansLoading.value = true
     try {
-      const res = await getExecutionPlans(params)
-      if (res.code === 0 && res.data) {
-        executionPlans.value = res.data.items
-        plansTotal.value = res.data.total
+      const res = await getExecutionPlans(params) as any
+      const data = res?.data ?? res
+      if (data) {
+        executionPlans.value = data.items || data
+        plansTotal.value = data.total || 0
       }
     } catch (e) {
       console.error('加载执行计划失败', e)
@@ -235,9 +240,10 @@ export const useOpportunityStore = defineStore('opportunity', () => {
   async function loadPlanDetail(planId: number) {
     currentPlanLoading.value = true
     try {
-      const res = await getExecutionPlanDetail(planId)
-      if (res.code === 0 && res.data) {
-        currentPlan.value = res.data
+      const res = await getExecutionPlanDetail(planId) as any
+      const data = res?.data ?? res
+      if (data) {
+        currentPlan.value = data
       }
     } catch (e) {
       console.error('加载计划详情失败', e)
@@ -249,9 +255,10 @@ export const useOpportunityStore = defineStore('opportunity', () => {
   // 加载执行统计
   async function loadExecutionStats() {
     try {
-      const res = await getExecutionStats()
-      if (res.code === 0 && res.data) {
-        executionStats.value = res.data
+      const res = await getExecutionStats() as any
+      const data = res?.data ?? res
+      if (data) {
+        executionStats.value = data
       }
     } catch (e) {
       console.error('加载执行统计失败', e)

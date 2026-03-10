@@ -935,10 +935,11 @@ onMounted(() => {
 // 加载统计数据
 async function loadStatistics() {
   try {
-    const res = await getCapacityStatistics()
-    if (res.data) {
-      statistics.value = res.data
-      originalStatistics.value = { ...res.data }
+    const res = await getCapacityStatistics() as any
+    const data = res?.data ?? res
+    if (data && typeof data === 'object') {
+      statistics.value = data
+      originalStatistics.value = { ...data }
     }
   } catch (e) {
     console.error('加载统计数据失败', e)
@@ -979,10 +980,9 @@ function handleTabChange(tab: string) {
 async function loadSpaceList() {
   loading.value = true
   try {
-    const res = await getSpaceCapacities()
-    if (res.data) {
-      spaceList.value = Array.isArray(res.data) ? res.data : (res.data as any).items || []
-    }
+    const res = await getSpaceCapacities() as any
+    const data = res?.data ?? res
+    spaceList.value = Array.isArray(data) ? data : data?.items || []
   } catch (e) {
     console.error('加载空间容量列表失败', e)
     ElMessage.error('加载空间容量列表失败')
@@ -1070,10 +1070,9 @@ function confirmDeleteSpace(row: SpaceCapacity) {
 async function loadPowerList() {
   loading.value = true
   try {
-    const res = await getPowerCapacities()
-    if (res.data) {
-      powerList.value = Array.isArray(res.data) ? res.data : (res.data as any).items || []
-    }
+    const res = await getPowerCapacities() as any
+    const data = res?.data ?? res
+    powerList.value = Array.isArray(data) ? data : data?.items || []
   } catch (e) {
     console.error('加载电力容量列表失败', e)
     ElMessage.error('加载电力容量列表失败')
@@ -1159,10 +1158,9 @@ function confirmDeletePower(row: PowerCapacity) {
 async function loadCoolingList() {
   loading.value = true
   try {
-    const res = await getCoolingCapacities()
-    if (res.data) {
-      coolingList.value = Array.isArray(res.data) ? res.data : (res.data as any).items || []
-    }
+    const res = await getCoolingCapacities() as any
+    const data = res?.data ?? res
+    coolingList.value = Array.isArray(data) ? data : data?.items || []
   } catch (e) {
     console.error('加载制冷容量列表失败', e)
     ElMessage.error('加载制冷容量列表失败')
@@ -1248,10 +1246,9 @@ function confirmDeleteCooling(row: CoolingCapacity) {
 async function loadPlanList() {
   loading.value = true
   try {
-    const res = await getCapacityPlans()
-    if (res.data) {
-      planList.value = Array.isArray(res.data) ? res.data : (res.data as any).items || []
-    }
+    const res = await getCapacityPlans() as any
+    const data = res?.data ?? res
+    planList.value = Array.isArray(data) ? data : data?.items || []
   } catch (e) {
     console.error('加载上架评估列表失败', e)
     ElMessage.error('加载上架评估列表失败')
@@ -1260,13 +1257,12 @@ async function loadPlanList() {
   }
   // 加载机柜名称映射
   try {
-    const cabRes = await getCabinets()
-    if (cabRes.data) {
-      const cabs = Array.isArray(cabRes.data) ? cabRes.data : []
-      const map: Record<number, string> = {}
-      cabs.forEach((c: any) => { map[c.id] = c.cabinet_name })
-      cabinetMap.value = map
-    }
+    const cabRes = await getCabinets() as any
+    const cabData = cabRes?.data ?? cabRes
+    const cabs = Array.isArray(cabData) ? cabData : []
+    const map: Record<number, string> = {}
+    cabs.forEach((c: any) => { map[c.id] = c.cabinet_name })
+    cabinetMap.value = map
   } catch (e) {
     // 忽略，不影响主功能
   }
@@ -1369,12 +1365,11 @@ async function handleGetRecommendation() {
       required_weight_kg: planForm.required_weight_kg || undefined,
       limit: 5
     })
-    if (res.data) {
-      recommendResult.value = res.data.candidates || []
-      showRecommendResult.value = true
-      if (recommendResult.value.length === 0) {
-        ElMessage.info('没有找到满足条件的候选机柜')
-      }
+    const recData = (res as any)?.data ?? res
+    recommendResult.value = recData?.candidates || []
+    showRecommendResult.value = true
+    if (recommendResult.value.length === 0) {
+      ElMessage.info('没有找到满足条件的候选机柜')
     }
   } catch (e) {
     console.error('获取推荐失败', e)
@@ -1394,10 +1389,9 @@ async function showOverrideDialog(row: CapacityPlan) {
   cabinetLoading.value = true
   overrideDialogVisible.value = true
   try {
-    const res = await getCabinets()
-    if (res.data) {
-      cabinetList.value = Array.isArray(res.data) ? res.data : []
-    }
+    const res = await getCabinets() as any
+    const cabListData = res?.data ?? res
+    cabinetList.value = Array.isArray(cabListData) ? cabListData : []
   } catch (e) {
     console.error('加载机柜列表失败', e)
     ElMessage.error('加载机柜列表失败')
@@ -1423,10 +1417,9 @@ async function handleOverrideCabinet(cabinetId: number) {
 async function loadWeightList() {
   loading.value = true
   try {
-    const res = await getWeightCapacities()
-    if (res.data) {
-      weightList.value = Array.isArray(res.data) ? res.data : (res.data as any).items || []
-    }
+    const res = await getWeightCapacities() as any
+    const data = res?.data ?? res
+    weightList.value = Array.isArray(data) ? data : data?.items || []
   } catch (e) {
     console.error('加载承重容量列表失败', e)
     ElMessage.error('加载承重容量列表失败')
@@ -1520,10 +1513,11 @@ async function handleDimensionChange(val: string) {
   }
 
   try {
-    const res = await getCapacityByLocation({ dimension: val as 'area' | 'floor' | 'room' })
-    if (res.data?.items) {
-      locationData.value = res.data.items
-      locationOptions.value = res.data.items.map((item: any) => item.location)
+    const res = await getCapacityByLocation({ dimension: val as 'area' | 'floor' | 'room' }) as any
+    const locData = res?.data ?? res
+    if (locData?.items) {
+      locationData.value = locData.items
+      locationOptions.value = locData.items.map((item: any) => item.location)
     }
   } catch (e) {
     console.error('加载区域数据失败', e)
@@ -1558,10 +1552,9 @@ async function loadAlertList() {
     const params: any = {}
     if (alertTypeFilter.value) params.type = alertTypeFilter.value
     if (alertStatusFilter.value) params.status = alertStatusFilter.value
-    const res = await getCapacityAlerts(params)
-    if (res.data) {
-      alertList.value = Array.isArray(res.data) ? res.data : (res.data as any).items || []
-    }
+    const res = await getCapacityAlerts(params) as any
+    const alertData = res?.data ?? res
+    alertList.value = Array.isArray(alertData) ? alertData : alertData?.items || []
   } catch (e) {
     console.error('加载容量预警列表失败', e)
     ElMessage.error('加载容量预警列表失败')
@@ -1622,8 +1615,9 @@ async function loadTrendData() {
       interval: trendInterval.value as 'hour' | 'day' | 'week' | 'month'
     })
 
-    if (res.data) {
-      renderTrendChart(res.data)
+    const trendData = (res as any)?.data ?? res
+    if (trendData) {
+      renderTrendChart(trendData)
     }
   } catch (e) {
     console.error('加载趋势数据失败', e)
@@ -1678,9 +1672,10 @@ async function loadForecastData() {
       days: forecastDays.value
     })
 
-    if (res.data) {
-      forecastData.value = res.data
-      renderForecastChart(res.data)
+    const fcData = (res as any)?.data ?? res
+    if (fcData) {
+      forecastData.value = fcData
+      renderForecastChart(fcData)
     }
   } catch (e) {
     console.error('加载预测数据失败', e)
