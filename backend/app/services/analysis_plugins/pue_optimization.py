@@ -80,7 +80,13 @@ class PUEOptimizationPlugin(AnalysisPlugin):
         avg_cooling_power = statistics.mean(cooling_powers) if cooling_powers else 0
         avg_total_power = statistics.mean(total_powers) if total_powers else 0
 
-        cooling_ratio = avg_cooling_power / avg_total_power if avg_total_power > 0 else 0.3
+        # 使用更严格的阈值检查，避免除零或异常大值（P1-1 修复）
+        MIN_POWER_THRESHOLD = 1.0  # 最小功率阈值（kW）
+        cooling_ratio = (
+            avg_cooling_power / avg_total_power
+            if avg_total_power > MIN_POWER_THRESHOLD
+            else 0.3  # 默认值
+        )
 
         thresholds = self._config.thresholds
         target_pue = thresholds.get("target_pue", 1.4)

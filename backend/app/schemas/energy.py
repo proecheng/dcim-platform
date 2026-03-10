@@ -895,6 +895,7 @@ class TopologyCircuitNode(BaseModel):
     load_type: Optional[str]
     is_shiftable: bool
     devices: List[PowerDeviceResponse] = []
+    total_load: float = Field(0, description="回路总负载 kW（设备额定功率之和）")
 
 
 class TopologyPanelNode(BaseModel):
@@ -905,6 +906,7 @@ class TopologyPanelNode(BaseModel):
     panel_name: str
     panel_type: str
     circuits: List[TopologyCircuitNode] = []
+    total_load: float = Field(0, description="配电柜总负载 kW（回路负载之和）")
 
 
 class TopologyMeterNode(BaseModel):
@@ -916,6 +918,7 @@ class TopologyMeterNode(BaseModel):
     declared_demand: Optional[float]
     demand_type: str
     panels: List[TopologyPanelNode] = []
+    total_load: float = Field(0, description="计量点总负载 kW（配电柜负载之和）")
 
 
 class TopologyTransformerNode(BaseModel):
@@ -926,6 +929,8 @@ class TopologyTransformerNode(BaseModel):
     transformer_name: str
     rated_capacity: float
     meter_points: List[TopologyMeterNode] = []
+    total_load: float = Field(0, description="变压器总负载 kW（计量点负载之和）")
+    load_rate: float = Field(0, description="变压器负载率 %")
 
 
 class DistributionTopologyResponse(BaseModel):

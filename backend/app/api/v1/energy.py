@@ -2422,7 +2422,7 @@ async def get_distribution_topology(db: AsyncSession = Depends(get_db), current_
     # 验证拓扑数据完整性（P0-2 修复）
     _validate_topology_integrity(transformers, meters, panels, circuits, devices)
 
-    # 构建拓扑结构
+    # 构建拓扑结构（P1-4 修复：计算各级负载汇总）
     # 设备按回路分组
     circuit_devices = {}
     for device in devices:
@@ -2431,9 +2431,11 @@ async def get_distribution_topology(db: AsyncSession = Depends(get_db), current_
                 circuit_devices[device.circuit_id] = []
             circuit_devices[device.circuit_id].append(PowerDeviceResponse.model_validate(device))
 
-    # 回路按配电柜分组
+    # 回路按配电柜分组，计算回路负载（设备额定功率之和）
     panel_circuits = {}
     for circuit in circuits:
+        devs = circuit_devices.get(circuit.id, [])
+        circuit_load = sum(d.rated_power or 0 for d in devs)
         if circuit.panel_id not in panel_circuits:
             panel_circuits[circuit.panel_id] = []
         panel_circuits[circuit.panel_id].append(
@@ -2443,14 +2445,17 @@ async def get_distribution_topology(db: AsyncSession = Depends(get_db), current_
                 circuit_name=circuit.circuit_name,
                 load_type=circuit.load_type,
                 is_shiftable=circuit.is_shiftable,
-                devices=circuit_devices.get(circuit.id, []),
+                devices=devs,
+                total_load=round(circuit_load, 2),
             )
         )
 
-    # 配电柜按计量点分组
+    # 配电柜按计量点分组，计算配电柜负载（回路负载之和）
     meter_panels = {}
     for panel in panels:
         if panel.meter_point_id:
+            circs = panel_circuits.get(panel.id, [])
+            panel_load = sum(c.total_load for c in circs)
             if panel.meter_point_id not in meter_panels:
                 meter_panels[panel.meter_point_id] = []
             meter_panels[panel.meter_point_id].append(
@@ -2459,14 +2464,17 @@ async def get_distribution_topology(db: AsyncSession = Depends(get_db), current_
                     panel_code=panel.panel_code,
                     panel_name=panel.panel_name,
                     panel_type=panel.panel_type,
-                    circuits=panel_circuits.get(panel.id, []),
+                    circuits=circs,
+                    total_load=round(panel_load, 2),
                 )
             )
 
-    # 计量点按变压器分组
+    # 计量点按变压器分组，计算计量点负载（配电柜负载之和）
     transformer_meters = {}
     for meter in meters:
         if meter.transformer_id:
+            pnls = meter_panels.get(meter.id, [])
+            meter_load = sum(p.total_load for p in pnls)
             if meter.transformer_id not in transformer_meters:
                 transformer_meters[meter.transformer_id] = []
             transformer_meters[meter.transformer_id].append(
@@ -2476,22 +2484,28 @@ async def get_distribution_topology(db: AsyncSession = Depends(get_db), current_
                     meter_name=meter.meter_name,
                     declared_demand=meter.declared_demand,
                     demand_type=meter.demand_type,
-                    panels=meter_panels.get(meter.id, []),
+                    panels=pnls,
+                    total_load=round(meter_load, 2),
                 )
             )
 
-    # 构建变压器节点
+    # 构建变压器节点，计算变压器负载（计量点负载之和）和负载率
     transformer_nodes = []
     total_capacity = 0
     for transformer in transformers:
         total_capacity += transformer.rated_capacity
+        mtrs = transformer_meters.get(transformer.id, [])
+        transformer_load = sum(m.total_load for m in mtrs)
+        load_rate = (transformer_load / transformer.rated_capacity * 100) if transformer.rated_capacity > 0 else 0
         transformer_nodes.append(
             TopologyTransformerNode(
                 transformer_id=transformer.id,
                 transformer_code=transformer.transformer_code,
                 transformer_name=transformer.transformer_name,
                 rated_capacity=transformer.rated_capacity,
-                meter_points=transformer_meters.get(transformer.id, []),
+                meter_points=mtrs,
+                total_load=round(transformer_load, 2),
+                load_rate=round(load_rate, 1),
             )
         )
 
@@ -2508,18 +2522,22 @@ async def get_distribution_topology(db: AsyncSession = Depends(get_db), current_
 # ==================== 功率曲线 ====================
 
 
+MAX_CURVE_POINTS = 1000  # 功率曲线最多返回 1000 个数据点（P1-5 修复）
+
+
 @router.get("/power-curve", response_model=ResponseModel[PowerCurveResponse], summary="获取功率曲线")
 async def get_power_curve(
     start_time: datetime = Query(..., description="开始时间"),
     end_time: datetime = Query(..., description="结束时间"),
     meter_point_id: Optional[int] = Query(None, description="计量点ID"),
     device_id: Optional[int] = Query(None, description="设备ID"),
+    max_points: int = Query(MAX_CURVE_POINTS, ge=10, le=5000, description="最大返回数据点数"),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     """
     获取功率曲线数据
-    支持按计量点或设备查询
+    支持按计量点或设备查询，自动降采样以限制返回数据量
     """
     query = select(PowerCurveData).where(PowerCurveData.timestamp >= start_time, PowerCurveData.timestamp <= end_time)
 
@@ -2544,7 +2562,19 @@ async def get_power_curve(
             )
         )
 
-    # 有真实数据时
+    # 降采样：如果数据点超过 max_points，按等间隔采样
+    if len(curve_data) > max_points:
+        step = len(curve_data) / max_points
+        sampled_data = []
+        for i in range(max_points):
+            idx = int(i * step)
+            sampled_data.append(curve_data[idx])
+        # 确保最后一个点被包含
+        if sampled_data[-1] != curve_data[-1]:
+            sampled_data[-1] = curve_data[-1]
+        curve_data = sampled_data
+
+    # 构建响应数据
     data_list = []
     max_power = 0.0
     total_power = 0.0
