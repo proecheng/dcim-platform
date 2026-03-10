@@ -231,8 +231,8 @@ async function loadPlanList() {
     const params: Record<string, any> = {}
     if (planSearch.value) params.name = planSearch.value
     if (planActiveFilter.value !== '') params.is_active = planActiveFilter.value
-    const res = await getInspectionPlans(params)
-    planList.value = Array.isArray(res.data) ? res.data : []
+    const res = await getInspectionPlans(params) as any
+    planList.value = Array.isArray(res) ? res : (res.data ? (Array.isArray(res.data) ? res.data : []) : [])
   } catch { ElMessage.error('加载巡检计划失败') }
   finally { planLoading.value = false }
 }
@@ -312,8 +312,8 @@ async function loadTaskList() {
     const params: Record<string, any> = {}
     if (taskStatusFilter.value) params.status = taskStatusFilter.value
     if (taskPlanFilter.value) params.plan_id = taskPlanFilter.value
-    const res = await getInspectionTasks(params)
-    taskList.value = Array.isArray(res.data) ? res.data : []
+    const res = await getInspectionTasks(params) as any
+    taskList.value = Array.isArray(res) ? res : (res.data ? (Array.isArray(res.data) ? res.data : []) : [])
   } catch { ElMessage.error('加载巡检任务失败') }
   finally { taskLoading.value = false }
 }
