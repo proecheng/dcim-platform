@@ -16,7 +16,7 @@ export type WorkOrderType = '故障报修' | '日常维护' | '巡检任务' | '
 export type WorkOrderPriority = '紧急' | '高' | '中' | '低'
 
 /** 巡检状态 */
-export type InspectionStatus = 'pending' | 'in_progress' | 'completed' | 'overdue'
+export type InspectionStatus = '待巡检' | '巡检中' | '已完成' | '已逾期'
 
 /** 工单信息 */
 export interface WorkOrder {
