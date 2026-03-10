@@ -179,9 +179,9 @@ class ModbusTcpAdapter(BaseProtocolAdapter):
         """断开连接"""
         if self._client is not None:
             try:
-                self._client.close()
-            except Exception:
-                pass
+                await self._client.close()
+            except Exception as e:
+                logger.warning("Modbus TCP 断开连接时出错: %s", e)
             self._client = None
         self._state = AdapterState.DISCONNECTED
         self._connected_since = None

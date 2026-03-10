@@ -275,7 +275,13 @@ class SnmpAdapter(BaseProtocolAdapter):
         return UsmUserData(username, **kwargs)
 
     async def disconnect(self) -> None:
-        """断开连接 — SnmpEngine 无显式 close，设为 None"""
+        """断开连接 — 释放 SnmpEngine 资源"""
+        if self._engine is not None:
+            try:
+                # pysnmp 7.x 需要显式关闭 dispatcher
+                self._engine.close_dispatcher()
+            except Exception as e:
+                logger.warning("SNMP 引擎关闭时出错: %s", e)
         self._engine = None
         self._auth_data = None
         self._transport = None
