@@ -35,6 +35,9 @@ logger = logging.getLogger(__name__)
 # Sigmoid 默认斜率参数
 DEFAULT_SIGMOID_K = 2.0
 
+# L2 推理总超时（秒）— P0-2 修复
+L2_INFERENCE_TIMEOUT = 10.0
+
 
 @dataclass
 class EvidenceItem:
@@ -780,10 +783,37 @@ class FaultTreeInferenceEngine:
         alarm_type: Optional[str] = None,
         time_window_minutes: int = 5,
     ) -> DiagnosisContext:
-        """L2 故障树推理主流程
+        """L2 故障树推理主流程（带超时保护）— P0-2 修复"""
+        try:
+            # 整个推理流程设置 10 秒超时
+            return await asyncio.wait_for(
+                self._diagnose_l2_impl(device_id, device_type, alarm_type, time_window_minutes),
+                timeout=L2_INFERENCE_TIMEOUT
+            )
+        except asyncio.TimeoutError:
+            logger.error(f"L2 推理超时 ({L2_INFERENCE_TIMEOUT}s): 设备 {device_id}")
+            context = DiagnosisContext(
+                device_id=device_id,
+                device_type=device_type,
+                alarm_type=alarm_type or "",
+                fault_tree_id=0,
+                fault_tree_name="",
+                root_node_probability=0.0,
+                root_cause_path=[],
+                evidence={},
+            )
+            context.errors.append(f"推理超时 ({L2_INFERENCE_TIMEOUT}s)")
+            context.degraded = True
+            return context
 
-        返回 DiagnosisContext 供 L3 引擎使用
-        """
+    async def _diagnose_l2_impl(
+        self,
+        device_id: int,
+        device_type: str,
+        alarm_type: Optional[str],
+        time_window_minutes: int,
+    ) -> DiagnosisContext:
+        """L2 故障树推理实现（原 diagnose_l2 逻辑）"""
         start_time = time.time()
         context = DiagnosisContext(
             device_id=device_id,

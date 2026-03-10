@@ -44,41 +44,47 @@ class DiagnosisEngine:
         # 内存告警计数器: {"alarm_type:device_type": [timestamp, ...]}
         self._alarm_counter: Dict[str, List[float]] = defaultdict(list)
         self._loaded = False
+        self._load_lock = asyncio.Lock()  # P0-1 修复: 添加加载锁
 
     async def load_rules(self) -> int:
-        """从数据库加载启用的诊断规则到内存缓存"""
-        async with async_session() as session:
-            result = await session.execute(
-                select(DiagnosisRule).where(DiagnosisRule.is_enabled == True)  # noqa: E712
-            )
-            rules = result.scalars().all()
+        """从数据库加载启用的诊断规则到内存缓存（线程安全）"""
+        async with self._load_lock:  # P0-1 修复: 使用锁保护
+            # 双重检查
+            if self._loaded:
+                return sum(len(v) for v in self._rule_cache.values())
 
-            # copy-on-write: 构建新缓存
-            new_cache: Dict[str, List[dict]] = defaultdict(list)
-            for r in rules:
-                rule_dict = {
-                    "id": r.id,
-                    "rule_code": r.rule_code,
-                    "name": r.name,
-                    "category": r.category,
-                    "trigger_condition": r.trigger_condition or {},
-                    "diagnosis_logic": r.diagnosis_logic or {},
-                    "priority": r.priority or 0,
-                }
-                # 按 device_type 索引
-                device_types = (r.trigger_condition or {}).get("device_type", ["*"])
-                for dt in device_types:
-                    new_cache[dt].append(rule_dict)
+            async with async_session() as session:
+                result = await session.execute(
+                    select(DiagnosisRule).where(DiagnosisRule.is_enabled == True)  # noqa: E712
+                )
+                rules = result.scalars().all()
 
-            # 每个 device_type 列表按 priority 降序
-            for dt in new_cache:
-                new_cache[dt].sort(key=lambda x: x["priority"], reverse=True)
+                # copy-on-write: 构建新缓存
+                new_cache: Dict[str, List[dict]] = defaultdict(list)
+                for r in rules:
+                    rule_dict = {
+                        "id": r.id,
+                        "rule_code": r.rule_code,
+                        "name": r.name,
+                        "category": r.category,
+                        "trigger_condition": r.trigger_condition or {},
+                        "diagnosis_logic": r.diagnosis_logic or {},
+                        "priority": r.priority or 0,
+                    }
+                    # 按 device_type 索引
+                    device_types = (r.trigger_condition or {}).get("device_type", ["*"])
+                    for dt in device_types:
+                        new_cache[dt].append(rule_dict)
 
-            self._rule_cache = dict(new_cache)
-            self._loaded = True
-            count = sum(len(v) for v in self._rule_cache.values())
-            logger.info("诊断引擎: 已加载 %d 条规则索引（%d 个 device_type 分组）", count, len(self._rule_cache))
-            return len(rules)
+                # 每个 device_type 列表按 priority 降序
+                for dt in new_cache:
+                    new_cache[dt].sort(key=lambda x: x["priority"], reverse=True)
+
+                self._rule_cache = dict(new_cache)
+                self._loaded = True
+                count = sum(len(v) for v in self._rule_cache.values())
+                logger.info("诊断引擎: 已加载 %d 条规则索引（%d 个 device_type 分组）", count, len(self._rule_cache))
+                return len(rules)
 
     async def reload_rules(self) -> int:
         """重载规则缓存"""
