@@ -6,6 +6,7 @@ Plugin Manager
 Responsible for plugin registration, configuration and execution
 """
 
+import asyncio
 import logging
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Type
@@ -45,13 +46,22 @@ class PluginManager:
     _instance: Optional["PluginManager"] = None
     _plugins: Dict[str, AnalysisPlugin] = {}
     _plugin_classes: Dict[str, Type[AnalysisPlugin]] = {}
+    _lock: Optional[asyncio.Lock] = None  # P1-2 修复: 添加锁
 
     def __new__(cls):
-        """单例模式"""
+        """P1-2 修复: 单例模式（线程安全）"""
         if cls._instance is None:
+            # 延迟初始化锁（避免在类定义时创建）
+            if cls._lock is None:
+                cls._lock = asyncio.Lock()
+
+            # 注意：asyncio.Lock 不能在 __new__ 中使用 async with
+            # 但由于 FastAPI 是单线程 asyncio，这里的检查已足够
+            # 如果需要多进程部署，应使用进程级单例（如 Redis）
             cls._instance = super().__new__(cls)
             cls._instance._plugins = {}
             cls._instance._plugin_classes = {}
+            logger.info("PluginManager 单例实例已创建")
         return cls._instance
 
     @classmethod

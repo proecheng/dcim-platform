@@ -170,6 +170,14 @@ class VersionManager:
         await session.commit()
         await session.refresh(version)
 
+        # P1-5 修复: 使故障树缓存失效
+        try:
+            from app.services.diagnosis.fault_tree import _fault_tree_cache
+            await _fault_tree_cache.invalidate(version.tree_id)
+            logger.info(f"故障树 {version.tree_id} 缓存已失效（版本 {version.version_number} 激活）")
+        except Exception as e:
+            logger.error(f"故障树缓存失效失败: {e}")
+
         # 发布版本切换事件（失败不影响激活）
         try:
             redis = await get_redis_client()
