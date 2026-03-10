@@ -170,7 +170,7 @@ async def get_fault_tree_detail(tree_id: int, db: _AsyncSession = Depends(_get_d
             for n in nodes
         ],
         "edges": [
-            {"id": e.id, "parent_node_id": e.parent_node_id, "child_node_id": e.child_node_id}
+            {"id": e.id, "from_node_id": e.parent_node_id, "to_node_id": e.child_node_id, "parent_node_id": e.parent_node_id, "child_node_id": e.child_node_id}
             for e in edges
         ],
     }

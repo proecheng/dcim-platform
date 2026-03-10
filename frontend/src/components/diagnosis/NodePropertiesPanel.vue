@@ -165,8 +165,8 @@ async function loadPointInfo(pointId: number) {
   try {
     pointsLoading.value = true
     const response = await searchPoints(String(pointId), 1)
-    if (response.data.items.length > 0) {
-      pointOptions.value = response.data.items
+    if (response.items.length > 0) {
+      pointOptions.value = response.items
     }
   } catch (error) {
     console.error('加载点位信息失败', error)
@@ -185,7 +185,7 @@ async function handleSearchPoints(query: string) {
   try {
     pointsLoading.value = true
     const response = await searchPoints(query, 50)
-    pointOptions.value = response.data.items
+    pointOptions.value = response.items
   } catch (error) {
     console.error('搜索点位失败', error)
     pointOptions.value = []

@@ -85,17 +85,17 @@ export function useFaultTreeEditor(treeId: number) {
 
       // 加载故障树数据
       const response = await getFaultTree(treeId)
-      faultTree.value = response.data
-      loadedUpdatedAt.value = response.data.updated_at
+      faultTree.value = response
+      loadedUpdatedAt.value = response.updated_at
 
       // 如果节点数 > 100，显示详细进度
-      if (response.data.nodes.length > 100) {
-        ElMessage.info(`正在加载 ${response.data.nodes.length} 个节点...`)
+      if (response.nodes.length > 100) {
+        ElMessage.info(`正在加载 ${response.nodes.length} 个节点...`)
       }
 
       // 转换数据格式
-      const visNodes = toVisNodes(response.data.nodes)
-      const visEdges = toVisEdges(response.data.edges)
+      const visNodes = toVisNodes(response.nodes)
+      const visEdges = toVisEdges(response.edges)
 
       nodes.value.clear()
       edges.value.clear()
@@ -151,7 +151,7 @@ export function useFaultTreeEditor(treeId: number) {
         visNode.gateType = node.gate_type
         visNode.color = node.gate_type === 'AND' ? nodeColors.andGate : nodeColors.orGate
         visNode.shape = nodeShapes.gate
-      } else if (node.node_type === 'leaf') {
+      } else if (node.node_type === 'leaf' || node.node_type === 'basic') {
         visNode.priorProbability = node.prior_probability
         visNode.evidencePointId = node.evidence_point_id
         visNode.color = nodeColors.leaf
@@ -166,10 +166,10 @@ export function useFaultTreeEditor(treeId: number) {
    * 将后端边格式转换为 vis-network 格式
    */
   function toVisEdges(backendEdges: FaultTreeEdge[]): VisEdge[] {
-    return backendEdges.map(edge => ({
+    return backendEdges.map((edge: any) => ({
       id: edge.id,
-      from: edge.from_node_id,
-      to: edge.to_node_id,
+      from: edge.from_node_id ?? edge.parent_node_id,
+      to: edge.to_node_id ?? edge.child_node_id,
       arrows: 'to'
     }))
   }
@@ -414,10 +414,10 @@ export function useFaultTreeEditor(treeId: number) {
       const response = await createFaultTreeVersion(treeId, payload)
 
       // 更新 loadedUpdatedAt 为新版本的时间戳
-      loadedUpdatedAt.value = response.data.updated_at
+      loadedUpdatedAt.value = response.updated_at
 
       // 映射临时 ID 到真实 ID
-      await mapTempIdsToRealIds(response.data)
+      await mapTempIdsToRealIds(response)
 
       hasUnsavedChanges.value = false
       ElMessage.success('保存成功')

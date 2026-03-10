@@ -64,7 +64,7 @@ const hasUnsavedChanges = ref(false)
 onMounted(async () => {
   try {
     const response = await getFaultTree(treeId.value)
-    faultTree.value = response.data
+    faultTree.value = response
   } catch (error) {
     ElMessage.error('加载故障树失败')
     console.error(error)

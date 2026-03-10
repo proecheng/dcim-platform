@@ -1,10 +1,10 @@
 <template>
   <div class="fault-tree-canvas" ref="canvasContainer">
-    <div v-if="loading" class="canvas-loading">
+    <div v-show="loading" class="canvas-loading">
       <el-skeleton :rows="5" animated />
     </div>
 
-    <div v-else-if="!canvasSupported" class="canvas-fallback">
+    <div v-if="!canvasSupported" class="canvas-fallback">
       <el-alert
         title="浏览器不支持 Canvas"
         type="warning"
@@ -21,7 +21,7 @@
       </el-table>
     </div>
 
-    <div v-else ref="networkContainer" class="network-container"></div>
+    <div v-show="!loading && canvasSupported" ref="networkContainer" class="network-container"></div>
 
     <!-- 工具栏 -->
     <div v-if="!loading && canvasSupported" class="canvas-toolbar">
