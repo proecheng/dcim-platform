@@ -78,7 +78,7 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
     jti = uuid.uuid4().hex
     expire = datetime.utcnow() + (expires_delta or timedelta(minutes=settings.access_token_expire_minutes))
     to_encode.update({"exp": expire, "jti": jti})
-    token = jwt.encode(to_encode, settings.secret_key, algorithm="HS256")
+    token = jwt.encode(to_encode, settings.secret_key, algorithm=settings.algorithm)
     return token, jti
 
 
@@ -146,13 +146,7 @@ async def login(request: Request, form_data: OAuth2PasswordRequestForm = Depends
     # 创建令牌（含 jti）
     access_token, jti = create_access_token(data={"sub": user.username})
 
-    # 创建会话记录
-    from ...models.user import UserSession
-
-    session_record = UserSession(user_id=user.id, token_jti=jti)
-    db.add(session_record)
-
-    # 并发会话限制：最多3个活跃会话，超限踢出最早的
+    # P0-3 修复: 先查询现有活跃会话，再创建新会话
     MAX_SESSIONS = 3
     active_sessions_result = await db.execute(
         select(UserSession)
@@ -160,11 +154,16 @@ async def login(request: Request, form_data: OAuth2PasswordRequestForm = Depends
         .order_by(UserSession.created_at.asc())
     )
     active_sessions = active_sessions_result.scalars().all()
-    # 加上刚创建的，如果超过限制则踢出最早的
-    if len(active_sessions) > MAX_SESSIONS:
-        sessions_to_kick = active_sessions[: len(active_sessions) - MAX_SESSIONS]
+
+    # 如果已达到限制，踢出最早的会话
+    if len(active_sessions) >= MAX_SESSIONS:
+        sessions_to_kick = active_sessions[: len(active_sessions) - MAX_SESSIONS + 1]
         for s in sessions_to_kick:
             s.is_active = False
+
+    # 创建新会话记录
+    session_record = UserSession(user_id=user.id, token_jti=jti)
+    db.add(session_record)
 
     await db.commit()
 
@@ -188,19 +187,41 @@ async def login(request: Request, form_data: OAuth2PasswordRequestForm = Depends
 
 
 @router.post("/logout", summary="用户登出")
-async def logout(current_user: User = Depends(get_current_user)):
+async def logout(token: str = Depends(oauth2_scheme), current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     """
-    用户登出（客户端删除token即可）
+    用户登出（失效当前会话）
     """
+    # P0-2 修复: 解析 token 获取 jti 并失效会话
+    try:
+        payload = jwt.decode(token, settings.secret_key, algorithms=[settings.algorithm])
+        jti = payload.get("jti")
+
+        if jti:
+            # 失效当前会话
+            await db.execute(
+                update(UserSession)
+                .where(UserSession.token_jti == jti)
+                .values(is_active=False)
+            )
+            await db.commit()
+    except Exception:
+        pass  # 即使失败也返回成功，避免泄露信息
+
     return {"message": "登出成功"}
 
 
 @router.post("/refresh", response_model=Token, summary="刷新令牌")
-async def refresh_token(current_user: User = Depends(get_current_user)):
+async def refresh_token(current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     """
     刷新访问令牌
     """
-    access_token, _jti = create_access_token(data={"sub": current_user.username})
+    access_token, jti = create_access_token(data={"sub": current_user.username})
+
+    # P0-1 修复: 创建新会话记录
+    session_record = UserSession(user_id=current_user.id, token_jti=jti)
+    db.add(session_record)
+    await db.commit()
+
     return Token(access_token=access_token, token_type="bearer", expires_in=settings.access_token_expire_minutes * 60)
 
 
