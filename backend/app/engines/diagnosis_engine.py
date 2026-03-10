@@ -30,11 +30,20 @@ _LEVEL_BOOST = {
     "info": 0,
 }
 
+# P1-6 修复: 根据告警级别动态调整去重窗口
+DEDUP_WINDOW_BY_LEVEL = {
+    "critical": 300,  # 5 分钟
+    "major": 180,     # 3 分钟
+    "warning": 120,   # 2 分钟
+    "info": 60,       # 1 分钟
+}
+
 
 class DiagnosisEngine:
     """诊断引擎 — 核心类"""
 
-    DEDUP_WINDOW = 60  # 去重窗口（秒）
+    # 默认去重窗口（秒）— 已被 DEDUP_WINDOW_BY_LEVEL 替代
+    DEDUP_WINDOW = 60
 
     def __init__(self) -> None:
         # 规则缓存: {device_type: [rule_dict, ...]}，"*" 为通配
@@ -117,15 +126,20 @@ class DiagnosisEngine:
         if alarm_id is None:
             return
 
+        # P1-6 修复: 根据告警级别动态调整去重窗口
+        alarm_level = payload.get("alarm_level", "info")
+        dedup_window = DEDUP_WINDOW_BY_LEVEL.get(alarm_level, self.DEDUP_WINDOW)
+
         # 去重检查
         now = time.time()
         last_time = self._recent.get(alarm_id)
-        if last_time is not None and (now - last_time) < self.DEDUP_WINDOW:
+        if last_time is not None and (now - last_time) < dedup_window:
             return
         self._recent[alarm_id] = now
 
-        # 清理过期去重缓存
-        expired = [k for k, v in self._recent.items() if (now - v) > self.DEDUP_WINDOW * 2]
+        # 清理过期去重缓存（使用最长窗口的 2 倍）
+        max_window = max(DEDUP_WINDOW_BY_LEVEL.values())
+        expired = [k for k, v in self._recent.items() if (now - v) > max_window * 2]
         for k in expired:
             del self._recent[k]
 

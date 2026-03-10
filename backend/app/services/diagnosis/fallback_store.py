@@ -59,29 +59,47 @@ class DiagnosisFallbackStore:
         """
         将诊断结果序列化写入 Redis
 
+        P1-4 修复: 如果 Redis 不可用，降级到本地文件
         自动检测并转换 datetime 字段为 ISO 字符串（递归处理嵌套字典）。
         添加数据版本号 _version: "1.0"。
         添加降级原因 _fallback_reason。
-        Returns: pending_key
+        Returns: pending_key 或 "local_file"
         """
-        client = await get_redis_client()
-        pending_id = str(uuid.uuid4())
-        key = f"{DiagnosisFallbackStore.PENDING_KEY_PREFIX}{pending_id}"
+        import asyncio  # P1-4 修复
 
-        # 添加元数据
-        data_with_meta = {
-            "_version": "1.0",
-            "_fallback_reason": reason,
-            **data
-        }
+        try:
+            client = await get_redis_client()
+            pending_id = str(uuid.uuid4())
+            key = f"{DiagnosisFallbackStore.PENDING_KEY_PREFIX}{pending_id}"
 
-        # 自动转换 datetime 字段
-        converted_data = _convert_datetime_to_iso(data_with_meta)
+            # 添加元数据
+            data_with_meta = {
+                "_version": "1.0",
+                "_fallback_reason": reason,
+                **data
+            }
 
-        serialized = json.dumps(converted_data, ensure_ascii=False)
-        await client.set(key, serialized, ex=DiagnosisFallbackStore.PENDING_TTL)
-        logger.info("诊断结果已写入 Redis 降级存储: %s (reason: %s)", key, reason)
-        return key
+            # 自动转换 datetime 字段
+            converted_data = _convert_datetime_to_iso(data_with_meta)
+
+            serialized = json.dumps(converted_data, ensure_ascii=False)
+
+            # P1-4 修复: 设置 1 秒超时
+            await asyncio.wait_for(
+                client.set(key, serialized, ex=DiagnosisFallbackStore.PENDING_TTL),
+                timeout=1.0
+            )
+
+            logger.info("诊断结果已写入 Redis 降级存储: %s (reason: %s)", key, reason)
+            return key
+
+        except (asyncio.TimeoutError, ConnectionError, Exception) as e:
+            # P1-4 修复: Redis 写入失败，降级到本地文件
+            logger.warning(f"Redis 写入失败，降级到本地文件: {e}")
+            await DiagnosisFallbackStore._save_to_local_file(
+                data, "redis_unavailable", ""
+            )
+            return "local_file"
 
     @staticmethod
     async def recover_pending() -> Dict[str, int]:

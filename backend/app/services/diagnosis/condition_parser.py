@@ -135,9 +135,17 @@ class Lexer:
 
 class Parser:
     """语法分析器"""
+    MAX_RECURSION_DEPTH = 20  # P1-1 修复: 最大递归深度
+
     def __init__(self, lexer: Lexer):
         self.lexer = lexer
         self.current_token = self.lexer.get_next_token()
+        self._recursion_depth = 0  # P1-1 修复: 递归深度计数器
+
+    def _check_recursion_depth(self):
+        """P1-1 修复: 检查递归深度"""
+        if self._recursion_depth >= self.MAX_RECURSION_DEPTH:
+            raise ValueError(f"表达式嵌套过深 (最大 {self.MAX_RECURSION_DEPTH} 层)")
 
     def eat(self, token_type: TokenType):
         """消费当前 token"""
@@ -152,51 +160,66 @@ class Parser:
 
     def or_expr(self):
         """OR 表达式"""
-        node = self.and_expr()
+        self._recursion_depth += 1  # P1-1 修复
+        self._check_recursion_depth()  # P1-1 修复
+        try:
+            node = self.and_expr()
 
-        while self.current_token.type == TokenType.OR:
-            self.eat(TokenType.OR)
-            node = ('OR', node, self.and_expr())
+            while self.current_token.type == TokenType.OR:
+                self.eat(TokenType.OR)
+                node = ('OR', node, self.and_expr())
 
-        return node
+            return node
+        finally:
+            self._recursion_depth -= 1  # P1-1 修复
 
     def and_expr(self):
         """AND 表达式"""
-        node = self.comparison()
+        self._recursion_depth += 1  # P1-1 修复
+        self._check_recursion_depth()  # P1-1 修复
+        try:
+            node = self.comparison()
 
-        while self.current_token.type == TokenType.AND:
-            self.eat(TokenType.AND)
-            node = ('AND', node, self.comparison())
+            while self.current_token.type == TokenType.AND:
+                self.eat(TokenType.AND)
+                node = ('AND', node, self.comparison())
 
-        return node
+            return node
+        finally:
+            self._recursion_depth -= 1  # P1-1 修复
 
     def comparison(self):
         """比较表达式"""
-        if self.current_token.type == TokenType.LPAREN:
-            self.eat(TokenType.LPAREN)
-            node = self.or_expr()
-            self.eat(TokenType.RPAREN)
-            return node
+        self._recursion_depth += 1  # P1-1 修复
+        self._check_recursion_depth()  # P1-1 修复
+        try:
+            if self.current_token.type == TokenType.LPAREN:
+                self.eat(TokenType.LPAREN)
+                node = self.or_expr()
+                self.eat(TokenType.RPAREN)
+                return node
 
-        left = self.current_token
-        if left.type == TokenType.IDENTIFIER:
-            self.eat(TokenType.IDENTIFIER)
-        else:
-            raise ValueError(f"Expected IDENTIFIER, got {left.type}")
+            left = self.current_token
+            if left.type == TokenType.IDENTIFIER:
+                self.eat(TokenType.IDENTIFIER)
+            else:
+                raise ValueError(f"Expected IDENTIFIER, got {left.type}")
 
-        op = self.current_token
-        if op.type == TokenType.OPERATOR:
-            self.eat(TokenType.OPERATOR)
-        else:
-            raise ValueError(f"Expected OPERATOR, got {op.type}")
+            op = self.current_token
+            if op.type == TokenType.OPERATOR:
+                self.eat(TokenType.OPERATOR)
+            else:
+                raise ValueError(f"Expected OPERATOR, got {op.type}")
 
-        right = self.current_token
-        if right.type in (TokenType.NUMBER, TokenType.STRING, TokenType.IDENTIFIER):
-            self.eat(right.type)
-        else:
-            raise ValueError(f"Expected NUMBER/STRING/IDENTIFIER, got {right.type}")
+            right = self.current_token
+            if right.type in (TokenType.NUMBER, TokenType.STRING, TokenType.IDENTIFIER):
+                self.eat(right.type)
+            else:
+                raise ValueError(f"Expected NUMBER/STRING/IDENTIFIER, got {right.type}")
 
-        return ('CMP', left.value, op.value, right.value)
+            return ('CMP', left.value, op.value, right.value)
+        finally:
+            self._recursion_depth -= 1  # P1-1 修复
 
 
 class ConditionEvaluator:
