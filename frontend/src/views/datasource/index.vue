@@ -20,6 +20,10 @@
             <el-option label="Modbus RTU" value="modbus_rtu" />
             <el-option label="SNMP v2c" value="snmp_v2c" />
             <el-option label="SNMP v3" value="snmp_v3" />
+            <el-option label="MQTT" value="mqtt" />
+            <el-option label="HTTP REST" value="http_rest" />
+            <el-option label="BACnet/IP" value="bacnet_ip" />
+            <el-option label="OPC-UA" value="opc_ua" />
           </el-select>
         </el-form-item>
         <el-form-item label="状态">
@@ -217,8 +221,8 @@
           </el-form-item>
         </template>
 
-        <!-- SNMP -->
-        <template v-if="form.protocol_type === 'snmp_v2c' || form.protocol_type === 'snmp_v3'">
+        <!-- SNMP v2c -->
+        <template v-if="form.protocol_type === 'snmp_v2c'">
           <el-form-item label="目标地址">
             <el-input v-model="form.connection_config.host" placeholder="192.168.1.100" />
           </el-form-item>
@@ -227,6 +231,132 @@
           </el-form-item>
           <el-form-item label="团体名">
             <el-input v-model="form.connection_config.community" placeholder="public" />
+          </el-form-item>
+        </template>
+
+        <!-- SNMP v3 -->
+        <template v-if="form.protocol_type === 'snmp_v3'">
+          <el-form-item label="目标地址">
+            <el-input v-model="form.connection_config.host" placeholder="192.168.1.100" />
+          </el-form-item>
+          <el-form-item label="端口">
+            <el-input-number v-model="form.connection_config.port" :min="1" :max="65535" />
+          </el-form-item>
+          <el-form-item label="用户名">
+            <el-input v-model="form.connection_config.username" placeholder="请输入SNMPv3用户名" />
+          </el-form-item>
+          <el-form-item label="认证协议">
+            <el-select v-model="form.connection_config.auth_protocol" placeholder="请选择" style="width: 100%;">
+              <el-option label="无" value="none" />
+              <el-option label="MD5" value="MD5" />
+              <el-option label="SHA" value="SHA" />
+            </el-select>
+          </el-form-item>
+          <el-form-item label="认证密码" v-if="form.connection_config.auth_protocol && form.connection_config.auth_protocol !== 'none'">
+            <el-input v-model="form.connection_config.auth_password" type="password" show-password placeholder="请输入认证密码" />
+          </el-form-item>
+          <el-form-item label="加密协议">
+            <el-select v-model="form.connection_config.priv_protocol" placeholder="请选择" style="width: 100%;">
+              <el-option label="无" value="none" />
+              <el-option label="DES" value="DES" />
+              <el-option label="AES" value="AES" />
+            </el-select>
+          </el-form-item>
+          <el-form-item label="加密密码" v-if="form.connection_config.priv_protocol && form.connection_config.priv_protocol !== 'none'">
+            <el-input v-model="form.connection_config.priv_password" type="password" show-password placeholder="请输入加密密码" />
+          </el-form-item>
+        </template>
+
+        <!-- MQTT -->
+        <template v-if="form.protocol_type === 'mqtt'">
+          <el-form-item label="Broker地址">
+            <el-input v-model="form.connection_config.broker" placeholder="broker.example.com" />
+          </el-form-item>
+          <el-form-item label="端口">
+            <el-input-number v-model="form.connection_config.port" :min="1" :max="65535" />
+          </el-form-item>
+          <el-form-item label="Topic">
+            <el-input v-model="form.connection_config.topic" placeholder="sensors/+/data" />
+          </el-form-item>
+          <el-form-item label="Client ID">
+            <el-input v-model="form.connection_config.client_id" placeholder="可选，留空自动生成" />
+          </el-form-item>
+          <el-form-item label="用户名">
+            <el-input v-model="form.connection_config.username" placeholder="MQTT 用户名（可选）" />
+          </el-form-item>
+          <el-form-item label="密码">
+            <el-input v-model="form.connection_config.password" type="password" show-password placeholder="MQTT 密码（可选）" />
+          </el-form-item>
+          <el-form-item label="消息格式">
+            <el-select v-model="form.connection_config.message_format" style="width: 100%;">
+              <el-option label="JSON" value="json" />
+              <el-option label="自定义" value="custom" />
+            </el-select>
+          </el-form-item>
+        </template>
+
+        <!-- HTTP REST -->
+        <template v-if="form.protocol_type === 'http_rest'">
+          <el-form-item label="请求URL">
+            <el-input v-model="form.connection_config.url" placeholder="https://api.example.com/data" />
+          </el-form-item>
+          <el-form-item label="请求方式">
+            <el-select v-model="form.connection_config.method" style="width: 100%;">
+              <el-option label="GET" value="GET" />
+              <el-option label="POST" value="POST" />
+            </el-select>
+          </el-form-item>
+          <el-form-item label="认证方式">
+            <el-select v-model="form.connection_config.auth_type" style="width: 100%;">
+              <el-option label="无" value="none" />
+              <el-option label="Basic Auth" value="basic" />
+              <el-option label="Bearer Token" value="bearer" />
+            </el-select>
+          </el-form-item>
+          <el-form-item label="用户名" v-if="form.connection_config.auth_type === 'basic'">
+            <el-input v-model="form.connection_config.username" placeholder="Basic Auth 用户名" />
+          </el-form-item>
+          <el-form-item label="密码" v-if="form.connection_config.auth_type === 'basic'">
+            <el-input v-model="form.connection_config.password" type="password" show-password placeholder="Basic Auth 密码" />
+          </el-form-item>
+          <el-form-item label="Token" v-if="form.connection_config.auth_type === 'bearer'">
+            <el-input v-model="form.connection_config.auth_token" placeholder="Bearer Token" />
+          </el-form-item>
+          <el-form-item label="数据路径">
+            <el-input v-model="form.connection_config.data_path" placeholder="JSON 数据路径，如 data.sensors" />
+          </el-form-item>
+        </template>
+
+        <!-- BACnet/IP -->
+        <template v-if="form.protocol_type === 'bacnet_ip'">
+          <el-form-item label="设备地址">
+            <el-input v-model="form.connection_config.host" placeholder="192.168.1.100" />
+          </el-form-item>
+          <el-form-item label="端口">
+            <el-input-number v-model="form.connection_config.port" :min="1" :max="65535" />
+          </el-form-item>
+          <el-form-item label="设备实例">
+            <el-input-number v-model="form.connection_config.device_instance" :min="0" :max="4194302" />
+          </el-form-item>
+        </template>
+
+        <!-- OPC-UA -->
+        <template v-if="form.protocol_type === 'opc_ua'">
+          <el-form-item label="端点URL">
+            <el-input v-model="form.connection_config.endpoint_url" placeholder="opc.tcp://192.168.1.100:4840" />
+          </el-form-item>
+          <el-form-item label="安全模式">
+            <el-select v-model="form.connection_config.security_mode" style="width: 100%;">
+              <el-option label="无" value="None" />
+              <el-option label="签名" value="Sign" />
+              <el-option label="签名并加密" value="SignAndEncrypt" />
+            </el-select>
+          </el-form-item>
+          <el-form-item label="用户名" v-if="form.connection_config.security_mode !== 'None'">
+            <el-input v-model="form.connection_config.username" placeholder="OPC-UA 用户名" />
+          </el-form-item>
+          <el-form-item label="密码" v-if="form.connection_config.security_mode !== 'None'">
+            <el-input v-model="form.connection_config.password" type="password" show-password placeholder="OPC-UA 密码" />
           </el-form-item>
         </template>
       </el-form>
@@ -351,6 +481,10 @@ const protocolOptions = [
   { label: 'Modbus RTU', value: 'modbus_rtu' },
   { label: 'SNMP v2c', value: 'snmp_v2c' },
   { label: 'SNMP v3', value: 'snmp_v3' },
+  { label: 'MQTT', value: 'mqtt' },
+  { label: 'HTTP REST', value: 'http_rest' },
+  { label: 'BACnet/IP', value: 'bacnet_ip' },
+  { label: 'OPC-UA', value: 'opc_ua' },
 ]
 
 function getDefaultConfig(protocolType: string): Record<string, any> {
@@ -360,8 +494,17 @@ function getDefaultConfig(protocolType: string): Record<string, any> {
     case 'modbus_rtu':
       return { serial_port: '', baudrate: 9600, data_bits: 8, parity: 'N', stop_bits: 1 }
     case 'snmp_v2c':
-    case 'snmp_v3':
       return { host: '', port: 161, community: 'public' }
+    case 'snmp_v3':
+      return { host: '', port: 161, username: '', auth_protocol: 'none', auth_password: '', priv_protocol: 'none', priv_password: '' }
+    case 'mqtt':
+      return { broker: '', port: 1883, topic: '', client_id: '', username: '', password: '', message_format: 'json' }
+    case 'http_rest':
+      return { url: '', method: 'GET', auth_type: 'none', auth_token: '', username: '', password: '', data_path: '' }
+    case 'bacnet_ip':
+      return { host: '', port: 47808, device_instance: 0 }
+    case 'opc_ua':
+      return { endpoint_url: '', security_mode: 'None', username: '', password: '' }
     default:
       return {}
   }
@@ -389,7 +532,11 @@ function getProtocolTagType(type: string): TagType {
     modbus_tcp: 'primary',
     modbus_rtu: 'warning',
     snmp_v2c: 'success',
-    snmp_v3: 'danger'
+    snmp_v3: 'danger',
+    mqtt: 'info',
+    http_rest: 'primary',
+    bacnet_ip: 'warning',
+    opc_ua: 'success'
   }
   return map[type] || 'info'
 }
@@ -399,7 +546,11 @@ function getProtocolLabel(type: string): string {
     modbus_tcp: 'Modbus TCP',
     modbus_rtu: 'Modbus RTU',
     snmp_v2c: 'SNMP v2c',
-    snmp_v3: 'SNMP v3'
+    snmp_v3: 'SNMP v3',
+    mqtt: 'MQTT',
+    http_rest: 'HTTP REST',
+    bacnet_ip: 'BACnet/IP',
+    opc_ua: 'OPC-UA'
   }
   return map[type] || type
 }

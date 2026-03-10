@@ -1,5 +1,13 @@
 <template>
   <div class="gateway-monitor">
+    <!-- 页面级选项卡 -->
+    <el-tabs v-model="activeTab" class="page-tabs">
+      <el-tab-pane label="网关监控" name="monitor" />
+      <el-tab-pane label="OTA 升级" name="ota" />
+    </el-tabs>
+
+    <!-- ==================== 网关监控 Tab ==================== -->
+    <template v-if="activeTab === 'monitor'">
     <!-- 顶部统计卡片 -->
     <el-row :gutter="16" class="stat-row">
       <el-col :span="5" v-for="card in statCards" :key="card.label">
@@ -253,12 +261,265 @@
       :gateway-name="configGatewayName"
       @pushed="handleRefresh"
     />
+    </template>
+
+    <!-- ==================== OTA 升级 Tab ==================== -->
+    <template v-if="activeTab === 'ota'">
+      <el-row :gutter="16" style="margin-bottom: 16px;">
+        <!-- 固件包管理 -->
+        <el-col :span="24">
+          <el-card shadow="hover">
+            <template #header>
+              <div class="card-header">
+                <div class="header-left">
+                  <el-icon :size="18"><Upload /></el-icon>
+                  <span>固件包管理</span>
+                </div>
+                <el-button type="primary" size="default" @click="openFirmwareDialog">
+                  <el-icon><Plus /></el-icon>
+                  注册固件包
+                </el-button>
+              </div>
+            </template>
+            <el-table :data="firmwareList" stripe v-loading="firmwareLoading">
+              <el-table-column prop="version" label="版本号" width="120" />
+              <el-table-column prop="filename" label="文件名" min-width="180" show-overflow-tooltip />
+              <el-table-column label="文件大小" width="100">
+                <template #default="{ row }">
+                  {{ formatFileSize(row.file_size) }}
+                </template>
+              </el-table-column>
+              <el-table-column prop="download_url" label="下载地址" min-width="200" show-overflow-tooltip />
+              <el-table-column label="状态" width="80">
+                <template #default="{ row }">
+                  <el-tag :type="row.is_active ? 'success' : 'info'" size="small">
+                    {{ row.is_active ? '可用' : '停用' }}
+                  </el-tag>
+                </template>
+              </el-table-column>
+              <el-table-column label="更新说明" min-width="150" show-overflow-tooltip>
+                <template #default="{ row }">
+                  {{ row.release_notes || '--' }}
+                </template>
+              </el-table-column>
+              <el-table-column label="注册时间" width="170">
+                <template #default="{ row }">
+                  {{ formatTime(row.created_at) }}
+                </template>
+              </el-table-column>
+              <el-table-column label="操作" width="80" fixed="right">
+                <template #default="{ row }">
+                  <el-popconfirm title="确定删除此固件包？" @confirm="handleDeleteFirmware(row.id)">
+                    <template #reference>
+                      <el-button type="danger" link size="small">删除</el-button>
+                    </template>
+                  </el-popconfirm>
+                </template>
+              </el-table-column>
+            </el-table>
+          </el-card>
+        </el-col>
+      </el-row>
+
+      <!-- OTA 任务管理 -->
+      <el-card shadow="hover">
+        <template #header>
+          <div class="card-header">
+            <div class="header-left">
+              <el-icon :size="18"><DataLine /></el-icon>
+              <span>升级任务</span>
+            </div>
+            <div class="header-filters">
+              <el-select v-model="otaFilterStatus" placeholder="全部状态" clearable size="default" style="width: 130px;" @change="loadOtaTasks">
+                <el-option label="待执行" value="pending" />
+                <el-option label="运行中" value="running" />
+                <el-option label="已暂停" value="paused" />
+                <el-option label="已完成" value="completed" />
+                <el-option label="已取消" value="cancelled" />
+                <el-option label="失败" value="failed" />
+              </el-select>
+              <el-button type="primary" size="default" @click="openTaskDialog">
+                <el-icon><Plus /></el-icon>
+                创建升级任务
+              </el-button>
+            </div>
+          </div>
+        </template>
+        <el-table :data="otaTaskList" stripe v-loading="otaTaskLoading">
+          <el-table-column prop="task_id" label="任务ID" width="200" show-overflow-tooltip />
+          <el-table-column prop="target_version" label="目标版本" width="120" />
+          <el-table-column label="策略" width="100">
+            <template #default="{ row }">
+              <el-tag :type="getStrategyTagType(row.strategy)" size="small">
+                {{ getStrategyLabel(row.strategy) }}
+              </el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column label="状态" width="100">
+            <template #default="{ row }">
+              <el-tag :type="getOtaStatusType(row.status)" size="small">
+                {{ getOtaStatusLabel(row.status) }}
+              </el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column label="进度" width="160">
+            <template #default="{ row }">
+              <span>{{ row.success_count }}/{{ row.total_gateways }} 成功</span>
+              <span v-if="row.fail_count > 0" style="color: #f56c6c; margin-left: 8px;">{{ row.fail_count }} 失败</span>
+            </template>
+          </el-table-column>
+          <el-table-column prop="created_by" label="创建者" width="100" />
+          <el-table-column label="创建时间" width="170">
+            <template #default="{ row }">
+              {{ formatTime(row.created_at) }}
+            </template>
+          </el-table-column>
+          <el-table-column label="操作" width="200" fixed="right">
+            <template #default="{ row }">
+              <el-button v-if="row.status === 'pending'" type="success" link size="small" @click="handleStartTask(row.task_id)">启动</el-button>
+              <el-button v-if="row.status === 'running'" type="warning" link size="small" @click="handlePauseTask(row.task_id)">暂停</el-button>
+              <el-button v-if="row.status === 'paused'" type="primary" link size="small" @click="handleResumeTask(row.task_id)">恢复</el-button>
+              <el-button v-if="['pending', 'running', 'paused'].includes(row.status)" type="danger" link size="small" @click="handleCancelTask(row.task_id)">取消</el-button>
+              <el-button type="info" link size="small" @click="openTaskDetail(row.task_id)">详情</el-button>
+            </template>
+          </el-table-column>
+        </el-table>
+        <el-pagination
+          v-model:current-page="otaPagination.page"
+          v-model:page-size="otaPagination.pageSize"
+          :total="otaPagination.total"
+          :page-sizes="[10, 20, 50]"
+          layout="total, sizes, prev, pager, next"
+          style="margin-top: 16px; justify-content: flex-end;"
+          @size-change="loadOtaTasks"
+          @current-change="loadOtaTasks"
+        />
+      </el-card>
+
+      <!-- 注册固件包对话框 -->
+      <el-dialog v-model="firmwareDialogVisible" title="注册固件包" width="550px" destroy-on-close>
+        <el-form :model="firmwareForm" label-width="100px" :rules="firmwareRules" ref="firmwareFormRef">
+          <el-form-item label="版本号" prop="version">
+            <el-input v-model="firmwareForm.version" placeholder="如 1.2.0" />
+          </el-form-item>
+          <el-form-item label="文件名" prop="filename">
+            <el-input v-model="firmwareForm.filename" placeholder="如 gateway-fw-1.2.0.bin" />
+          </el-form-item>
+          <el-form-item label="文件大小" prop="file_size">
+            <el-input-number v-model="firmwareForm.file_size" :min="1" style="width: 100%;" />
+            <span style="color: var(--text-secondary); font-size: 12px;">字节</span>
+          </el-form-item>
+          <el-form-item label="SHA-256" prop="checksum_sha256">
+            <el-input v-model="firmwareForm.checksum_sha256" placeholder="64位SHA-256校验和" />
+          </el-form-item>
+          <el-form-item label="下载地址" prop="download_url">
+            <el-input v-model="firmwareForm.download_url" placeholder="固件包下载URL" />
+          </el-form-item>
+          <el-form-item label="更新说明">
+            <el-input v-model="firmwareForm.release_notes" type="textarea" :rows="3" placeholder="可选" />
+          </el-form-item>
+          <el-form-item label="最低版本">
+            <el-input v-model="firmwareForm.min_version" placeholder="最低兼容版本（可选）" />
+          </el-form-item>
+        </el-form>
+        <template #footer>
+          <el-button @click="firmwareDialogVisible = false">取消</el-button>
+          <el-button type="primary" :loading="firmwareSubmitting" @click="handleCreateFirmware">确定</el-button>
+        </template>
+      </el-dialog>
+
+      <!-- 创建升级任务对话框 -->
+      <el-dialog v-model="taskDialogVisible" title="创建升级任务" width="600px" destroy-on-close>
+        <el-form :model="taskForm" label-width="100px" :rules="taskRules" ref="taskFormRef">
+          <el-form-item label="目标固件" prop="firmware_id">
+            <el-select v-model="taskForm.firmware_id" placeholder="选择固件版本" style="width: 100%;">
+              <el-option
+                v-for="fw in activeFirmwareList"
+                :key="fw.id"
+                :label="`${fw.version} - ${fw.filename}`"
+                :value="fw.id"
+              />
+            </el-select>
+          </el-form-item>
+          <el-form-item label="目标网关" prop="gateway_ids">
+            <el-select v-model="taskForm.gateway_ids" multiple placeholder="选择目标网关" style="width: 100%;" filterable>
+              <el-option
+                v-for="gw in allGateways"
+                :key="gw.id"
+                :label="`${gw.name} (${gw.gateway_id})`"
+                :value="gw.id"
+              />
+            </el-select>
+          </el-form-item>
+          <el-form-item label="升级策略" prop="strategy">
+            <el-radio-group v-model="taskForm.strategy">
+              <el-radio value="immediate">立即升级</el-radio>
+              <el-radio value="batch">分批升级</el-radio>
+              <el-radio value="canary">灰度升级</el-radio>
+            </el-radio-group>
+          </el-form-item>
+          <el-form-item v-if="taskForm.strategy === 'batch'" label="批次大小">
+            <el-input-number v-model="taskForm.batch_size" :min="1" :max="100" />
+          </el-form-item>
+          <el-form-item v-if="taskForm.strategy !== 'immediate'" label="批次间隔">
+            <el-input-number v-model="taskForm.batch_interval" :min="0" :max="3600" />
+            <span style="color: var(--text-secondary); font-size: 12px; margin-left: 8px;">秒</span>
+          </el-form-item>
+          <el-form-item v-if="taskForm.strategy === 'canary'" label="灰度比例">
+            <el-input-number v-model="taskForm.canary_percent" :min="1" :max="50" />
+            <span style="color: var(--text-secondary); font-size: 12px; margin-left: 8px;">%</span>
+          </el-form-item>
+        </el-form>
+        <template #footer>
+          <el-button @click="taskDialogVisible = false">取消</el-button>
+          <el-button type="primary" :loading="taskSubmitting" @click="handleCreateTask">确定</el-button>
+        </template>
+      </el-dialog>
+
+      <!-- 任务详情对话框 -->
+      <el-dialog v-model="taskDetailVisible" title="升级任务详情" width="750px" destroy-on-close>
+        <template v-if="taskDetail">
+          <el-descriptions :column="2" border size="small" style="margin-bottom: 16px;">
+            <el-descriptions-item label="任务ID">{{ taskDetail.task_id }}</el-descriptions-item>
+            <el-descriptions-item label="目标版本">{{ taskDetail.target_version }}</el-descriptions-item>
+            <el-descriptions-item label="策略">{{ getStrategyLabel(taskDetail.strategy) }}</el-descriptions-item>
+            <el-descriptions-item label="状态">
+              <el-tag :type="getOtaStatusType(taskDetail.status)" size="small">{{ getOtaStatusLabel(taskDetail.status) }}</el-tag>
+            </el-descriptions-item>
+            <el-descriptions-item label="总数">{{ taskDetail.total_gateways }}</el-descriptions-item>
+            <el-descriptions-item label="成功/失败">
+              <span style="color: #67c23a;">{{ taskDetail.success_count }}</span> / <span style="color: #f56c6c;">{{ taskDetail.fail_count }}</span>
+            </el-descriptions-item>
+            <el-descriptions-item label="创建者">{{ taskDetail.created_by || '--' }}</el-descriptions-item>
+            <el-descriptions-item label="创建时间">{{ formatTime(taskDetail.created_at) }}</el-descriptions-item>
+          </el-descriptions>
+
+          <div style="font-weight: 600; margin-bottom: 8px;">各网关升级状态</div>
+          <el-table :data="taskDetail.gateways" stripe size="small" max-height="300">
+            <el-table-column prop="gateway_id" label="网关ID" width="150" show-overflow-tooltip />
+            <el-table-column prop="batch_index" label="批次" width="60" />
+            <el-table-column label="状态" width="100">
+              <template #default="{ row }">
+                <el-tag :type="getGwOtaStatusType(row.status)" size="small">{{ getGwOtaStatusLabel(row.status) }}</el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column label="进度" width="100">
+              <template #default="{ row }">
+                <el-progress :percentage="row.progress" :stroke-width="10" :status="row.status === 'success' ? 'success' : row.status === 'failed' ? 'exception' : undefined" />
+              </template>
+            </el-table-column>
+            <el-table-column prop="old_version" label="原版本" width="100" />
+            <el-table-column prop="error_message" label="错误信息" min-width="150" show-overflow-tooltip />
+          </el-table>
+        </template>
+      </el-dialog>
+    </template>
   </div>
 </template>
 
 <script setup lang="ts">
 import * as echarts from 'echarts'
-import { Search, Monitor, Refresh, WarningFilled, CircleCheck, CircleClose, DataLine, Setting } from '@element-plus/icons-vue'
+import { Search, Monitor, Refresh, WarningFilled, CircleCheck, CircleClose, DataLine, Setting, Upload, Plus } from '@element-plus/icons-vue'
 import {
   getGatewayList,
   getGatewaySummary,
@@ -270,6 +531,21 @@ import {
   type GatewayDetail,
   type GatewayEvent,
 } from '@/api/modules/gateway'
+import {
+  getFirmwareList,
+  createFirmware,
+  deleteFirmware,
+  getOtaTasks,
+  getOtaTaskDetail,
+  createOtaTask,
+  startOtaTask,
+  cancelOtaTask,
+  pauseOtaTask,
+  resumeOtaTask,
+  type Firmware,
+  type OtaTask,
+  type OtaTaskDetail,
+} from '@/api/modules/ota'
 import { useWebSocket } from '@/composables/useWebSocket'
 import GatewayConfigDialog from './GatewayConfigDialog.vue'
 import { useDebounceFn } from '@vueuse/core'
@@ -672,6 +948,266 @@ async function handleBatchPush() {
   }
 }
 
+// ── 页面选项卡 ──
+const activeTab = ref('monitor')
+
+// ── OTA 升级 ──
+const firmwareList = ref<Firmware[]>([])
+const firmwareLoading = ref(false)
+const firmwareDialogVisible = ref(false)
+const firmwareSubmitting = ref(false)
+const firmwareFormRef = ref()
+const firmwareForm = reactive({
+  version: '',
+  filename: '',
+  file_size: 1,
+  checksum_sha256: '',
+  download_url: '',
+  release_notes: '',
+  min_version: '',
+})
+const firmwareRules = {
+  version: [{ required: true, message: '请输入版本号', trigger: 'blur' }],
+  filename: [{ required: true, message: '请输入文件名', trigger: 'blur' }],
+  file_size: [{ required: true, message: '请输入文件大小', trigger: 'blur' }],
+  checksum_sha256: [{ required: true, message: '请输入SHA-256', trigger: 'blur' }],
+  download_url: [{ required: true, message: '请输入下载地址', trigger: 'blur' }],
+}
+
+const otaTaskList = ref<OtaTask[]>([])
+const otaTaskLoading = ref(false)
+const otaFilterStatus = ref('')
+const otaPagination = reactive({ page: 1, pageSize: 20, total: 0 })
+
+const taskDialogVisible = ref(false)
+const taskSubmitting = ref(false)
+const taskFormRef = ref()
+const taskForm = reactive({
+  firmware_id: null as number | null,
+  gateway_ids: [] as number[],
+  strategy: 'immediate' as 'immediate' | 'batch' | 'canary',
+  batch_size: 5,
+  batch_interval: 300,
+  canary_percent: 10,
+})
+const taskRules = {
+  firmware_id: [{ required: true, message: '请选择固件版本', trigger: 'change' }],
+  gateway_ids: [{ required: true, message: '请选择目标网关', trigger: 'change' }],
+  strategy: [{ required: true, message: '请选择策略', trigger: 'change' }],
+}
+
+const taskDetailVisible = ref(false)
+const taskDetail = ref<OtaTaskDetail | null>(null)
+
+// 可用固件（用于创建任务选择）
+const activeFirmwareList = computed(() => firmwareList.value.filter(f => f.is_active))
+
+// 所有网关（用于创建任务选择）
+const allGateways = ref<GatewayInfo[]>([])
+
+async function loadAllGateways() {
+  try {
+    const res = await getGatewayList({ page: 1, page_size: 100 })
+    allGateways.value = res.items
+  } catch (e) {
+    console.error('加载网关列表失败', e)
+  }
+}
+
+async function loadFirmwareList() {
+  firmwareLoading.value = true
+  try {
+    const res = await getFirmwareList()
+    firmwareList.value = Array.isArray(res) ? res : (res as any)?.data ?? []
+  } catch (e) {
+    console.error('加载固件列表失败', e)
+  } finally {
+    firmwareLoading.value = false
+  }
+}
+
+async function loadOtaTasks() {
+  otaTaskLoading.value = true
+  try {
+    const params: Record<string, any> = { page: otaPagination.page, page_size: otaPagination.pageSize }
+    if (otaFilterStatus.value) params.status = otaFilterStatus.value
+    const res = await getOtaTasks(params)
+    const data = (res as any)?.data ?? res
+    otaTaskList.value = data.items || []
+    otaPagination.total = data.total || 0
+  } catch (e) {
+    console.error('加载OTA任务失败', e)
+  } finally {
+    otaTaskLoading.value = false
+  }
+}
+
+function openFirmwareDialog() {
+  Object.assign(firmwareForm, { version: '', filename: '', file_size: 1, checksum_sha256: '', download_url: '', release_notes: '', min_version: '' })
+  firmwareDialogVisible.value = true
+}
+
+async function handleCreateFirmware() {
+  try {
+    await firmwareFormRef.value?.validate()
+  } catch { return }
+  firmwareSubmitting.value = true
+  try {
+    await createFirmware({
+      version: firmwareForm.version,
+      filename: firmwareForm.filename,
+      file_size: firmwareForm.file_size,
+      checksum_sha256: firmwareForm.checksum_sha256,
+      download_url: firmwareForm.download_url,
+      release_notes: firmwareForm.release_notes || undefined,
+      min_version: firmwareForm.min_version || undefined,
+    })
+    ElMessage.success('固件包注册成功')
+    firmwareDialogVisible.value = false
+    loadFirmwareList()
+  } catch (e: any) {
+    ElMessage.error(e?.response?.data?.detail || '注册失败')
+  } finally {
+    firmwareSubmitting.value = false
+  }
+}
+
+async function handleDeleteFirmware(id: number) {
+  try {
+    await deleteFirmware(id)
+    ElMessage.success('已删除')
+    loadFirmwareList()
+  } catch (e: any) {
+    ElMessage.error(e?.response?.data?.detail || '删除失败')
+  }
+}
+
+function openTaskDialog() {
+  Object.assign(taskForm, { firmware_id: null, gateway_ids: [], strategy: 'immediate', batch_size: 5, batch_interval: 300, canary_percent: 10 })
+  taskDialogVisible.value = true
+  loadAllGateways()
+}
+
+async function handleCreateTask() {
+  try {
+    await taskFormRef.value?.validate()
+  } catch { return }
+  taskSubmitting.value = true
+  try {
+    await createOtaTask({
+      firmware_id: taskForm.firmware_id!,
+      gateway_ids: taskForm.gateway_ids,
+      strategy: taskForm.strategy,
+      batch_size: taskForm.strategy === 'batch' ? taskForm.batch_size : undefined,
+      batch_interval: taskForm.strategy !== 'immediate' ? taskForm.batch_interval : undefined,
+      canary_percent: taskForm.strategy === 'canary' ? taskForm.canary_percent : undefined,
+    })
+    ElMessage.success('升级任务创建成功')
+    taskDialogVisible.value = false
+    loadOtaTasks()
+  } catch (e: any) {
+    ElMessage.error(e?.response?.data?.detail || '创建失败')
+  } finally {
+    taskSubmitting.value = false
+  }
+}
+
+async function handleStartTask(taskId: string) {
+  try {
+    await startOtaTask(taskId)
+    ElMessage.success('任务已启动')
+    loadOtaTasks()
+  } catch (e: any) {
+    ElMessage.error(e?.response?.data?.detail || '启动失败')
+  }
+}
+
+async function handlePauseTask(taskId: string) {
+  try {
+    await pauseOtaTask(taskId)
+    ElMessage.success('任务已暂停')
+    loadOtaTasks()
+  } catch (e: any) {
+    ElMessage.error(e?.response?.data?.detail || '暂停失败')
+  }
+}
+
+async function handleResumeTask(taskId: string) {
+  try {
+    await resumeOtaTask(taskId)
+    ElMessage.success('任务已恢复')
+    loadOtaTasks()
+  } catch (e: any) {
+    ElMessage.error(e?.response?.data?.detail || '恢复失败')
+  }
+}
+
+async function handleCancelTask(taskId: string) {
+  try {
+    await ElMessageBox.confirm('确定取消此升级任务？', '取消任务', { type: 'warning' })
+    await cancelOtaTask(taskId)
+    ElMessage.success('任务已取消')
+    loadOtaTasks()
+  } catch (e: any) {
+    if (e !== 'cancel') ElMessage.error(e?.response?.data?.detail || '取消失败')
+  }
+}
+
+async function openTaskDetail(taskId: string) {
+  taskDetailVisible.value = true
+  taskDetail.value = null
+  try {
+    const res = await getOtaTaskDetail(taskId)
+    taskDetail.value = (res as any)?.data ?? res
+  } catch (e) {
+    ElMessage.error('获取任务详情失败')
+  }
+}
+
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return bytes + ' B'
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB'
+  return (bytes / 1024 / 1024).toFixed(1) + ' MB'
+}
+
+function getStrategyTagType(s: string): TagType {
+  const map: Record<string, TagType> = { immediate: 'danger', batch: 'warning', canary: 'primary' }
+  return map[s] || 'info'
+}
+
+function getStrategyLabel(s: string): string {
+  const map: Record<string, string> = { immediate: '立即升级', batch: '分批升级', canary: '灰度升级' }
+  return map[s] || s
+}
+
+function getOtaStatusType(s: string): TagType {
+  const map: Record<string, TagType> = { pending: 'info', running: 'primary', paused: 'warning', completed: 'success', cancelled: 'info', failed: 'danger' }
+  return map[s] || 'info'
+}
+
+function getOtaStatusLabel(s: string): string {
+  const map: Record<string, string> = { pending: '待执行', running: '运行中', paused: '已暂停', completed: '已完成', cancelled: '已取消', failed: '失败' }
+  return map[s] || s
+}
+
+function getGwOtaStatusType(s: string): TagType {
+  const map: Record<string, TagType> = { pending: 'info', downloading: 'primary', installing: 'warning', success: 'success', failed: 'danger', skipped: 'info' }
+  return map[s] || 'info'
+}
+
+function getGwOtaStatusLabel(s: string): string {
+  const map: Record<string, string> = { pending: '待升级', downloading: '下载中', installing: '安装中', success: '成功', failed: '失败', skipped: '跳过' }
+  return map[s] || s
+}
+
+// OTA tab 激活时加载数据
+watch(activeTab, (val) => {
+  if (val === 'ota') {
+    loadFirmwareList()
+    loadOtaTasks()
+  }
+})
+
 // ── 生命周期 ──
 onMounted(() => {
   loadData()
@@ -690,6 +1226,13 @@ onUnmounted(() => {
 
 <style scoped lang="scss">
 @use '@/styles/mixins-25d' as *;
+
+.page-tabs {
+  margin-bottom: 16px;
+  :deep(.el-tabs__header) {
+    margin-bottom: 0;
+  }
+}
 
 .gateway-monitor {
   @include page-dashboard(5);

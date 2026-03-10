@@ -1,5 +1,14 @@
 <template>
   <div class="workorder-page">
+    <!-- 页面Tab切换 -->
+    <el-tabs v-model="activeTab" class="page-tabs" @tab-change="handleTabChange">
+      <el-tab-pane label="工单列表" name="workorders" />
+      <el-tab-pane label="告警工单规则" name="alarm-rules" />
+      <el-tab-pane label="审批管理" name="approvals" />
+    </el-tabs>
+
+    <!-- ==================== 工单列表 Tab ==================== -->
+    <template v-if="activeTab === 'workorders'">
     <!-- 统计卡片 -->
     <el-row :gutter="20" class="stat-cards">
       <el-col :span="6">
@@ -290,8 +299,34 @@
         <el-empty v-else description="暂无日志" :image-size="60" />
       </div>
 
+      <!-- 审批信息 -->
+      <div class="approval-section" v-if="currentOrderApprovals.length > 0">
+        <div class="log-header">
+          <span class="log-title">审批记录</span>
+        </div>
+        <el-table :data="currentOrderApprovals" stripe border size="small">
+          <el-table-column prop="approver" label="审批人" width="120" />
+          <el-table-column prop="status" label="状态" width="100">
+            <template #default="{ row }">
+              <el-tag :type="getApprovalStatusType(row.status)" size="small">{{ getApprovalStatusLabel(row.status) }}</el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column prop="reason" label="审批意见" min-width="150">
+            <template #default="{ row }">{{ row.reason || '--' }}</template>
+          </el-table-column>
+          <el-table-column prop="created_at" label="提交时间" width="160">
+            <template #default="{ row }">{{ formatDateTime(row.created_at) }}</template>
+          </el-table-column>
+        </el-table>
+      </div>
+
       <template #footer>
         <el-button @click="detailDialogVisible = false">关闭</el-button>
+        <el-button
+          v-if="currentOrder && (currentOrder.status === 'pending' || currentOrder.status === 'assigned')"
+          type="warning"
+          @click="showSubmitApprovalDialog(currentOrder)"
+        >提交审批</el-button>
       </template>
     </el-dialog>
 
@@ -331,6 +366,190 @@
       <template #footer>
         <el-button @click="addLogDialogVisible = false">取消</el-button>
         <el-button type="primary" @click="submitAddLog" :loading="submitting">确定</el-button>
+      </template>
+    </el-dialog>
+
+    </template>
+
+    <!-- ==================== 告警工单规则 Tab ==================== -->
+    <template v-if="activeTab === 'alarm-rules'">
+      <el-card shadow="hover" class="main-card">
+        <div class="toolbar">
+          <div class="toolbar-left">
+            <el-switch v-model="ruleFilterEnabled" active-text="仅启用" inactive-text="全部" @change="loadAlarmRules" />
+          </div>
+          <div class="toolbar-right">
+            <el-button type="primary" :icon="Plus" @click="showCreateRuleDialog">新建规则</el-button>
+          </div>
+        </div>
+        <el-table :data="alarmRuleList" stripe border v-loading="ruleLoading" empty-text="暂无告警工单规则">
+          <el-table-column prop="name" label="规则名称" min-width="150" show-overflow-tooltip />
+          <el-table-column prop="alarm_level" label="告警级别" width="120">
+            <template #default="{ row }">
+              <el-tag :type="getAlarmLevelType(row.alarm_level)" size="small">{{ getAlarmLevelLabel(row.alarm_level) }}</el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column prop="alarm_type" label="告警类型" width="120">
+            <template #default="{ row }">{{ row.alarm_type || '全部' }}</template>
+          </el-table-column>
+          <el-table-column prop="order_type" label="工单类型" width="100">
+            <template #default="{ row }">{{ getOrderTypeLabel(row.order_type) }}</template>
+          </el-table-column>
+          <el-table-column prop="priority" label="优先级" width="100">
+            <template #default="{ row }">
+              <el-tag :type="getPriorityType(row.priority)" size="small">{{ getPriorityLabel(row.priority) }}</el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column prop="assignee" label="指派人" width="120">
+            <template #default="{ row }">{{ row.assignee || '未指定' }}</template>
+          </el-table-column>
+          <el-table-column prop="is_enabled" label="状态" width="100">
+            <template #default="{ row }">
+              <el-switch v-model="row.is_enabled" @change="toggleRuleEnabled(row)" />
+            </template>
+          </el-table-column>
+          <el-table-column label="操作" width="150" fixed="right">
+            <template #default="{ row }">
+              <el-button type="primary" link @click="showEditRuleDialog(row)">编辑</el-button>
+              <el-button type="danger" link @click="confirmDeleteRule(row)">删除</el-button>
+            </template>
+          </el-table-column>
+        </el-table>
+      </el-card>
+    </template>
+
+    <!-- ==================== 审批管理 Tab ==================== -->
+    <template v-if="activeTab === 'approvals'">
+      <el-card shadow="hover" class="main-card">
+        <div class="toolbar">
+          <div class="toolbar-left">
+            <el-select v-model="approvalFilterStatus" placeholder="审批状态" clearable style="width: 140px;" @change="loadApprovals">
+              <el-option label="待审批" value="pending" />
+              <el-option label="已批准" value="approved" />
+              <el-option label="已驳回" value="rejected" />
+              <el-option label="已超时" value="timeout" />
+              <el-option label="已升级" value="escalated" />
+            </el-select>
+          </div>
+        </div>
+        <el-table :data="approvalList" stripe border v-loading="approvalLoading" empty-text="暂无审批记录">
+          <el-table-column prop="id" label="审批编号" width="100" />
+          <el-table-column prop="order_id" label="工单ID" width="100" />
+          <el-table-column prop="approver" label="审批人" width="120" />
+          <el-table-column prop="status" label="状态" width="120">
+            <template #default="{ row }">
+              <el-tag :type="getApprovalStatusType(row.status)" size="small">{{ getApprovalStatusLabel(row.status) }}</el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column prop="timeout_hours" label="超时(小时)" width="110" />
+          <el-table-column prop="escalate_to" label="升级审批人" width="120">
+            <template #default="{ row }">{{ row.escalate_to || '--' }}</template>
+          </el-table-column>
+          <el-table-column prop="reason" label="审批意见" min-width="150" show-overflow-tooltip>
+            <template #default="{ row }">{{ row.reason || '--' }}</template>
+          </el-table-column>
+          <el-table-column prop="created_at" label="提交时间" width="170">
+            <template #default="{ row }">{{ formatDateTime(row.created_at) }}</template>
+          </el-table-column>
+          <el-table-column label="操作" width="180" fixed="right">
+            <template #default="{ row }">
+              <template v-if="row.status === 'pending'">
+                <el-button type="success" link @click="handleApprove(row)">批准</el-button>
+                <el-button type="danger" link @click="handleReject(row)">驳回</el-button>
+              </template>
+              <span v-else class="text-muted">{{ formatDateTime(row.resolved_at) }}</span>
+            </template>
+          </el-table-column>
+        </el-table>
+      </el-card>
+    </template>
+
+    <!-- ==================== 对话框区域 ==================== -->
+
+    <!-- 新建/编辑告警工单规则对话框 -->
+    <el-dialog append-to-body
+      v-model="ruleDialogVisible"
+      :title="isEditRule ? '编辑告警工单规则' : '新建告警工单规则'"
+      width="550px"
+    >
+      <el-form ref="ruleFormRef" :model="ruleForm" :rules="ruleFormRules" label-width="100px">
+        <el-form-item label="规则名称" prop="name">
+          <el-input v-model="ruleForm.name" placeholder="请输入规则名称" />
+        </el-form-item>
+        <el-row :gutter="20">
+          <el-col :span="12">
+            <el-form-item label="告警级别" prop="alarm_level">
+              <el-select v-model="ruleForm.alarm_level" placeholder="请选择" style="width: 100%;">
+                <el-option label="紧急" value="critical" />
+                <el-option label="重要" value="major" />
+                <el-option label="一般" value="minor" />
+                <el-option label="提示" value="info" />
+              </el-select>
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="告警类型" prop="alarm_type">
+              <el-input v-model="ruleForm.alarm_type" placeholder="留空表示全部类型" />
+            </el-form-item>
+          </el-col>
+        </el-row>
+        <el-row :gutter="20">
+          <el-col :span="12">
+            <el-form-item label="工单类型" prop="order_type">
+              <el-select v-model="ruleForm.order_type" placeholder="请选择" style="width: 100%;">
+                <el-option label="故障" value="fault" />
+                <el-option label="维护" value="maintenance" />
+                <el-option label="巡检" value="inspection" />
+                <el-option label="变更" value="change" />
+                <el-option label="其他" value="other" />
+              </el-select>
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="优先级" prop="priority">
+              <el-select v-model="ruleForm.priority" placeholder="请选择" style="width: 100%;">
+                <el-option label="紧急" value="critical" />
+                <el-option label="高" value="high" />
+                <el-option label="中" value="medium" />
+                <el-option label="低" value="low" />
+              </el-select>
+            </el-form-item>
+          </el-col>
+        </el-row>
+        <el-form-item label="指派人" prop="assignee">
+          <el-input v-model="ruleForm.assignee" placeholder="自动指派的处理人（可选）" />
+        </el-form-item>
+        <el-form-item label="启用" prop="is_enabled">
+          <el-switch v-model="ruleForm.is_enabled" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="ruleDialogVisible = false">取消</el-button>
+        <el-button type="primary" @click="submitRuleForm" :loading="submitting">确定</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 提交审批对话框 -->
+    <el-dialog append-to-body
+      v-model="submitApprovalDialogVisible"
+      title="提交审批"
+      width="500px"
+    >
+      <el-form ref="approvalFormRef" :model="approvalForm" :rules="approvalFormRules" label-width="100px">
+        <el-form-item label="审批人" prop="approver">
+          <el-input v-model="approvalForm.approver" placeholder="请输入审批人" />
+        </el-form-item>
+        <el-form-item label="超时时间" prop="timeout_hours">
+          <el-input-number v-model="approvalForm.timeout_hours" :min="1" :max="168" />
+          <span style="margin-left: 8px; color: var(--text-secondary);">小时</span>
+        </el-form-item>
+        <el-form-item label="升级审批人" prop="escalate_to">
+          <el-input v-model="approvalForm.escalate_to" placeholder="超时后自动升级的审批人（可选）" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="submitApprovalDialogVisible = false">取消</el-button>
+        <el-button type="primary" @click="submitApprovalForm" :loading="submitting">提交</el-button>
       </template>
     </el-dialog>
 
@@ -385,12 +604,23 @@ import {
   getWorkOrderLogs,
   addWorkOrderLog,
   getOperationStatistics,
+  getAlarmWorkOrderRules,
+  createAlarmWorkOrderRule,
+  updateAlarmWorkOrderRule,
+  deleteAlarmWorkOrderRule,
+  getWorkOrderApprovals,
+  submitWorkOrderApproval,
+  approveWorkOrderApproval,
+  rejectWorkOrderApproval,
   type WorkOrder,
   type WorkOrderStatus,
   type WorkOrderPriority,
   type WorkOrderType,
   type WorkOrderLog,
-  type OperationStatistics
+  type OperationStatistics,
+  type AlarmWorkOrderRule,
+  type WorkOrderApproval,
+  type ApprovalStatus
 } from '@/api/modules/operation'
 
 // 类型定义
@@ -465,6 +695,53 @@ const completeForm = reactive({
 
 const completeRules = {
   solution: [{ required: true, message: '请输入解决方案', trigger: 'blur' }]
+}
+
+// 页面Tab
+const activeTab = ref('workorders')
+
+// ==================== 告警工单规则 ====================
+const ruleLoading = ref(false)
+const alarmRuleList = ref<AlarmWorkOrderRule[]>([])
+const ruleFilterEnabled = ref(false)
+const ruleDialogVisible = ref(false)
+const isEditRule = ref(false)
+const editRuleId = ref<number | null>(null)
+const ruleFormRef = ref<FormInstance>()
+const ruleForm = reactive({
+  name: '',
+  alarm_level: 'critical',
+  alarm_type: '',
+  order_type: 'fault' as WorkOrderType,
+  priority: 'high' as WorkOrderPriority,
+  assignee: '',
+  is_enabled: true
+})
+const ruleFormRules = {
+  name: [{ required: true, message: '请输入规则名称', trigger: 'blur' }],
+  alarm_level: [{ required: true, message: '请选择告警级别', trigger: 'change' }]
+}
+
+// ==================== 审批管理 ====================
+const approvalLoading = ref(false)
+const approvalList = ref<WorkOrderApproval[]>([])
+const approvalFilterStatus = ref<ApprovalStatus | ''>('')
+const submitApprovalDialogVisible = ref(false)
+const submitApprovalOrderId = ref<number | null>(null)
+const approvalFormRef = ref<FormInstance>()
+const approvalForm = reactive({
+  approver: '',
+  timeout_hours: 24,
+  escalate_to: ''
+})
+const approvalFormRules = {
+  approver: [{ required: true, message: '请输入审批人', trigger: 'blur' }]
+}
+const currentOrderApprovals = ref<WorkOrderApproval[]>([])
+
+function handleTabChange(tab: string) {
+  if (tab === 'alarm-rules') loadAlarmRules()
+  else if (tab === 'approvals') loadApprovals()
 }
 
 // 初始化加载
@@ -582,6 +859,16 @@ async function showDetailDialog(row: WorkOrder) {
     console.error('加载工单日志失败', e)
     orderLogs.value = []
   }
+
+  // 加载工单审批记录
+  try {
+    const res = await getWorkOrderApprovals({ order_id: row.id })
+    if (res.data) {
+      currentOrderApprovals.value = Array.isArray(res.data) ? res.data : (res.data as any).items || []
+    }
+  } catch (e) {
+    currentOrderApprovals.value = []
+  }
 }
 
 // 显示添加日志对话框
@@ -684,6 +971,151 @@ function confirmDelete(row: WorkOrder) {
   }).catch(() => {})
 }
 
+// ==================== 告警工单规则方法 ====================
+
+async function loadAlarmRules() {
+  ruleLoading.value = true
+  try {
+    const res = await getAlarmWorkOrderRules(ruleFilterEnabled.value ? { is_enabled: true } : undefined)
+    if (res.data) {
+      alarmRuleList.value = Array.isArray(res.data) ? res.data : (res.data as any).items || []
+    }
+  } catch (e) {
+    console.error('加载告警工单规则失败', e)
+    alarmRuleList.value = []
+  } finally {
+    ruleLoading.value = false
+  }
+}
+
+function showCreateRuleDialog() {
+  isEditRule.value = false
+  editRuleId.value = null
+  Object.assign(ruleForm, { name: '', alarm_level: 'critical', alarm_type: '', order_type: 'fault', priority: 'high', assignee: '', is_enabled: true })
+  ruleDialogVisible.value = true
+}
+
+function showEditRuleDialog(row: AlarmWorkOrderRule) {
+  isEditRule.value = true
+  editRuleId.value = row.id
+  Object.assign(ruleForm, { name: row.name, alarm_level: row.alarm_level, alarm_type: row.alarm_type || '', order_type: row.order_type, priority: row.priority, assignee: row.assignee || '', is_enabled: row.is_enabled })
+  ruleDialogVisible.value = true
+}
+
+async function submitRuleForm() {
+  const valid = await ruleFormRef.value?.validate()
+  if (!valid) return
+  submitting.value = true
+  try {
+    const data = { ...ruleForm, alarm_type: ruleForm.alarm_type || undefined, assignee: ruleForm.assignee || undefined }
+    if (isEditRule.value && editRuleId.value) {
+      await updateAlarmWorkOrderRule(editRuleId.value, data)
+      ElMessage.success('更新成功')
+    } else {
+      await createAlarmWorkOrderRule(data)
+      ElMessage.success('创建成功')
+    }
+    ruleDialogVisible.value = false
+    loadAlarmRules()
+  } catch (e) {
+    console.error('操作失败', e)
+    ElMessage.error('操作失败')
+  } finally {
+    submitting.value = false
+  }
+}
+
+async function toggleRuleEnabled(row: AlarmWorkOrderRule) {
+  try {
+    await updateAlarmWorkOrderRule(row.id, { is_enabled: row.is_enabled })
+    ElMessage.success(row.is_enabled ? '已启用' : '已禁用')
+  } catch (e) {
+    row.is_enabled = !row.is_enabled
+    ElMessage.error('操作失败')
+  }
+}
+
+function confirmDeleteRule(row: AlarmWorkOrderRule) {
+  ElMessageBox.confirm(`确定要删除规则 "${row.name}" 吗？`, '删除确认', { confirmButtonText: '确定', cancelButtonText: '取消', type: 'warning' })
+    .then(async () => {
+      try {
+        await deleteAlarmWorkOrderRule(row.id)
+        ElMessage.success('删除成功')
+        loadAlarmRules()
+      } catch (e) {
+        ElMessage.error('删除失败')
+      }
+    }).catch(() => {})
+}
+
+// ==================== 审批管理方法 ====================
+
+async function loadApprovals() {
+  approvalLoading.value = true
+  try {
+    const res = await getWorkOrderApprovals({ status: approvalFilterStatus.value || undefined })
+    if (res.data) {
+      approvalList.value = Array.isArray(res.data) ? res.data : (res.data as any).items || []
+    }
+  } catch (e) {
+    console.error('加载审批列表失败', e)
+    approvalList.value = []
+  } finally {
+    approvalLoading.value = false
+  }
+}
+
+function showSubmitApprovalDialog(order: WorkOrder) {
+  submitApprovalOrderId.value = order.id
+  Object.assign(approvalForm, { approver: '', timeout_hours: 24, escalate_to: '' })
+  submitApprovalDialogVisible.value = true
+}
+
+async function submitApprovalForm() {
+  const valid = await approvalFormRef.value?.validate()
+  if (!valid) return
+  if (!submitApprovalOrderId.value) return
+  submitting.value = true
+  try {
+    await submitWorkOrderApproval(submitApprovalOrderId.value, {
+      approver: approvalForm.approver,
+      timeout_hours: approvalForm.timeout_hours,
+      escalate_to: approvalForm.escalate_to || undefined
+    })
+    ElMessage.success('审批已提交')
+    submitApprovalDialogVisible.value = false
+    detailDialogVisible.value = false
+    loadWorkOrders()
+  } catch (e) {
+    console.error('提交审批失败', e)
+    ElMessage.error('提交审批失败')
+  } finally {
+    submitting.value = false
+  }
+}
+
+async function handleApprove(row: WorkOrderApproval) {
+  try {
+    await ElMessageBox.prompt('请输入批准意见（可选）', '批准审批', { confirmButtonText: '批准', cancelButtonText: '取消', inputPlaceholder: '审批意见' })
+      .then(async ({ value }) => {
+        await approveWorkOrderApproval(row.id, value || undefined)
+        ElMessage.success('已批准')
+        loadApprovals()
+      })
+  } catch { /* cancelled */ }
+}
+
+async function handleReject(row: WorkOrderApproval) {
+  try {
+    await ElMessageBox.prompt('请输入驳回原因', '驳回审批', { confirmButtonText: '驳回', cancelButtonText: '取消', inputPlaceholder: '驳回原因', inputValidator: (v: string) => !!v || '请输入驳回原因' })
+      .then(async ({ value }) => {
+        await rejectWorkOrderApproval(row.id, value)
+        ElMessage.success('已驳回')
+        loadApprovals()
+      })
+  } catch { /* cancelled */ }
+}
+
 // 辅助函数
 function getStatusType(status?: WorkOrderStatus): TagType {
   const map: Record<WorkOrderStatus, TagType> = {
@@ -740,6 +1172,26 @@ function getOrderTypeLabel(type?: WorkOrderType): string {
     other: '其他'
   }
   return type ? map[type] || type : '--'
+}
+
+function getAlarmLevelType(level?: string): TagType {
+  const map: Record<string, TagType> = { critical: 'danger', major: 'warning', minor: 'primary', info: 'info' }
+  return level ? map[level] || 'info' : 'info'
+}
+
+function getAlarmLevelLabel(level?: string): string {
+  const map: Record<string, string> = { critical: '紧急', major: '重要', minor: '一般', info: '提示' }
+  return level ? map[level] || level : '--'
+}
+
+function getApprovalStatusType(status?: ApprovalStatus): TagType {
+  const map: Record<ApprovalStatus, TagType> = { pending: 'warning', approved: 'success', rejected: 'danger', timeout: 'info', escalated: 'primary' }
+  return status ? map[status] || 'info' : 'info'
+}
+
+function getApprovalStatusLabel(status?: ApprovalStatus): string {
+  const map: Record<ApprovalStatus, string> = { pending: '待审批', approved: '已批准', rejected: '已驳回', timeout: '已超时', escalated: '已升级' }
+  return status ? map[status] || status : '--'
 }
 
 function formatDateTime(dateStr?: string): string {
@@ -968,6 +1420,35 @@ function formatDateTime(dateStr?: string): string {
 
   :deep(.el-timeline-item__timestamp) {
     color: var(--text-secondary);
+  }
+
+  .page-tabs {
+    margin-bottom: 16px;
+
+    :deep(.el-tabs__item) {
+      color: var(--text-secondary);
+
+      &.is-active {
+        color: var(--accent-color);
+      }
+    }
+
+    :deep(.el-tabs__active-bar) {
+      background-color: var(--accent-color);
+    }
+
+    :deep(.el-tabs__nav-wrap::after) {
+      background-color: var(--border-color);
+    }
+  }
+
+  .approval-section {
+    margin-top: 24px;
+  }
+
+  .text-muted {
+    color: var(--text-secondary);
+    font-size: 12px;
   }
 
   :deep(.el-form-item__label) {
