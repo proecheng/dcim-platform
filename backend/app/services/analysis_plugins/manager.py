@@ -32,6 +32,12 @@ logger = logging.getLogger(__name__)
 PLUGIN_TIMEOUT = 30
 
 
+# P1-3 修复: 定义数据加载错误异常
+class DataLoadError(Exception):
+    """数据加载错误（用于区分无数据和数据库连接失败）"""
+    pass
+
+
 class PluginManager:
     """
     插件管理器
@@ -217,7 +223,11 @@ class PluginManager:
         return context
 
     async def _load_energy_data(self, db: AsyncSession, start_date: datetime, end_date: datetime) -> List[EnergyData]:
-        """加载能耗数据"""
+        """
+        加载能耗数据
+
+        P1-3 修复: 区分无数据和数据库连接失败
+        """
         energy_data = []
 
         try:
@@ -244,12 +254,16 @@ class PluginManager:
                 )
         except Exception as e:
             logger.error(f"加载能耗数据失败: {e}")
-            # 无数据时返回空列表，不生成模拟数据
-            energy_data = []
+            # P1-3 修复: 抛出异常而不是返回空列表
+            raise DataLoadError(f"数据库查询失败: {e}") from e
         return energy_data
 
     async def _load_power_data(self, db: AsyncSession) -> List[PowerData]:
-        """加载功率数据"""
+        """
+        加载功率数据
+
+        P1-3 修复: 区分无数据和数据库连接失败
+        """
         power_data = []
 
         try:
@@ -276,12 +290,16 @@ class PluginManager:
                 )
         except Exception as e:
             logger.error(f"加载功率数据失败: {e}")
-            # 无数据时返回空列表，不生成模拟数据
-            power_data = []
+            # P1-3 修复: 抛出异常而不是返回空列表
+            raise DataLoadError(f"数据库查询失败: {e}") from e
         return power_data
 
     async def _load_bill_data(self, db: AsyncSession, days: int = 365) -> List[BillData]:
-        """加载账单数据"""
+        """
+        加载账单数据
+
+        P1-3 修复: 区分无数据和数据库连接失败
+        """
         bill_data = []
 
         try:
@@ -312,12 +330,16 @@ class PluginManager:
                     )
         except Exception as e:
             logger.error(f"加载账单数据失败: {e}")
-            # 无数据时返回空列表，不生成模拟数据
-            bill_data = []
+            # P1-3 修复: 抛出异常而不是返回空列表
+            raise DataLoadError(f"数据库查询失败: {e}") from e
         return bill_data
 
     async def _load_device_data(self, db: AsyncSession) -> List[DeviceData]:
-        """加载设备数据"""
+        """
+        加载设备数据
+
+        P1-3 修复: 区分无数据和数据库连接失败
+        """
         device_data = []
 
         try:
@@ -337,9 +359,10 @@ class PluginManager:
                         location=device.location or "",
                     )
                 )
-        except Exception:
-            # 无数据时返回空列表，不生成模拟数据
-            device_data = []
+        except Exception as e:
+            logger.error(f"加载设备数据失败: {e}")
+            # P1-3 修复: 抛出异常而不是返回空列表
+            raise DataLoadError(f"数据库查询失败: {e}") from e
         return device_data
 
     async def _load_environment_data(self, db: AsyncSession, days: int = 7) -> List[EnvironmentData]:
@@ -365,9 +388,10 @@ class PluginManager:
                         total_power=record.total_power or 75,
                     )
                 )
-        except Exception:
-            # 无数据时返回空列表，不生成模拟数据
-            environment_data = []
+        except Exception as e:
+            logger.error(f"加载环境数据失败: {e}")
+            # P1-3 修复: 抛出异常而不是返回空列表
+            raise DataLoadError(f"数据库查询失败: {e}") from e
         return environment_data
 
     async def _load_pricing_config(self, db: AsyncSession) -> Dict[str, float]:
@@ -404,9 +428,15 @@ class PluginManager:
 
         Returns:
             所有建议结果
+
+        P1-3 修复: 捕获 DataLoadError，避免基于空数据生成错误建议
         """
-        # 构建分析上下文
-        context = await self.build_context(db, days)
+        # P1-3 修复: 构建分析上下文，捕获数据加载错误
+        try:
+            context = await self.build_context(db, days)
+        except DataLoadError as e:
+            logger.error(f"构建分析上下文失败: {e}")
+            return []  # 返回空结果而不是继续执行
 
         # 确定要执行的插件
         if plugin_ids:
@@ -467,9 +497,32 @@ class PluginManager:
         return await self.run_analysis(db, [plugin_id], days, save_results)
 
     async def _save_suggestions(self, db: AsyncSession, results: List[SuggestionResult]) -> None:
-        """保存建议到数据库"""
+        """
+        保存建议到数据库
+
+        P1-4 修复: 去重，避免重复建议
+        """
+        saved_count = 0
+        skipped_count = 0
+
         for result in results:
             try:
+                # P1-4 修复: 检查是否已存在相同建议（24小时内）
+                existing = await db.execute(
+                    select(EnergySuggestion).where(
+                        and_(
+                            EnergySuggestion.suggestion_type == result.suggestion_type.value,
+                            EnergySuggestion.title == result.title,
+                            EnergySuggestion.status == "pending",
+                            EnergySuggestion.created_at >= datetime.now() - timedelta(hours=24)
+                        )
+                    )
+                )
+                if existing.scalar_one_or_none():
+                    logger.info(f"建议已存在，跳过: {result.title}")
+                    skipped_count += 1
+                    continue
+
                 suggestion = EnergySuggestion(
                     suggestion_type=result.suggestion_type.value,
                     priority=result.priority.value,
@@ -484,12 +537,13 @@ class PluginManager:
                     created_at=result.created_at,
                 )
                 db.add(suggestion)
+                saved_count += 1
             except Exception as e:
                 logger.error(f"保存建议失败: {e}")
 
         try:
             await db.commit()
-            logger.info(f"保存 {len(results)} 条建议到数据库")
+            logger.info(f"保存建议完成: 新增 {saved_count} 条, 跳过重复 {skipped_count} 条")
         except Exception as e:
             await db.rollback()
             logger.error(f"提交建议失败: {e}")
