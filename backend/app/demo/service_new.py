@@ -1469,6 +1469,150 @@ class DemoDataService:
 
             invalidate_point_cache()
 
+    async def _clear_demo_data_safe(self):
+        """安全清理演示数据 - 仅删除 is_demo=True 的记录"""
+        async with async_session() as session:
+            deleted_counts = {}
+
+            async def _execute_delete_where_demo(model, label: str):
+                """删除指定模型中 is_demo=True 的记录"""
+                try:
+                    result = await session.execute(
+                        delete(model).where(model.is_demo == True)
+                    )
+                    deleted_counts[label] = result.rowcount
+                    logger.info(f"删除 {label}: {result.rowcount} 条记录")
+                except Exception as e:
+                    logger.error("清理 %s 失败: %s", label, e, exc_info=True)
+                    raise Exception(f"清理 {label} 失败: {str(e)}") from e
+
+            async def _execute_delete_by_fk(model, label: str, fk_column, parent_model, parent_filter):
+                """通过外键关联删除记录"""
+                try:
+                    result = await session.execute(
+                        delete(model).where(
+                            fk_column.in_(
+                                select(parent_model.id).where(parent_filter)
+                            )
+                        )
+                    )
+                    deleted_counts[label] = result.rowcount
+                    logger.info(f"删除 {label}: {result.rowcount} 条记录")
+                except Exception as e:
+                    logger.error("清理 %s 失败: %s", label, e, exc_info=True)
+                    raise Exception(f"清理 {label} 失败: {str(e)}") from e
+
+            async def _execute_delete_all(model, label: str):
+                """删除表中所有记录（用于运行时数据表）"""
+                try:
+                    result = await session.execute(delete(model))
+                    deleted_counts[label] = result.rowcount
+                    logger.info(f"删除 {label}: {result.rowcount} 条记录")
+                except Exception as e:
+                    logger.error("清理 %s 失败: %s", label, e, exc_info=True)
+                    raise Exception(f"清理 {label} 失败: {str(e)}") from e
+
+            try:
+                # 按照外键依赖顺序删除（子表→父表）
+
+                # 1. 删除 demo Point 关联的数据（通过外键）
+                await _execute_delete_by_fk(
+                    PointHistory, "PointHistory",
+                    PointHistory.point_id, Point, Point.is_demo == True
+                )
+                await _execute_delete_by_fk(
+                    PointRealtime, "PointRealtime",
+                    PointRealtime.point_id, Point, Point.is_demo == True
+                )
+                await _execute_delete_by_fk(
+                    Alarm, "Alarm",
+                    Alarm.point_id, Point, Point.is_demo == True
+                )
+
+                # 2. 删除告警阈值和点位
+                await _execute_delete_where_demo(AlarmThreshold, "AlarmThreshold")
+                await _execute_delete_where_demo(Point, "Point")
+
+                # 3. 能源相关运行时数据表（全部删除，因为是运行时生成的）
+                await _execute_delete_all(ExecutionResult, "ExecutionResult")
+                await _execute_delete_all(ExecutionTask, "ExecutionTask")
+                await _execute_delete_all(ExecutionPlan, "ExecutionPlan")
+                await _execute_delete_all(MeasureExecutionLog, "MeasureExecutionLog")
+                await _execute_delete_all(OpportunityMeasure, "OpportunityMeasure")
+                await _execute_delete_all(ProposalMeasure, "ProposalMeasure")
+                await _execute_delete_all(EnergyOpportunity, "EnergyOpportunity")
+                await _execute_delete_all(EnergySavingProposal, "EnergySavingProposal")
+                await _execute_delete_all(EnergySuggestion, "EnergySuggestion")
+                await _execute_delete_all(RegulationHistory, "RegulationHistory")
+                await _execute_delete_all(LoadRegulationConfig, "LoadRegulationConfig")
+                await _execute_delete_all(DispatchSchedule, "DispatchSchedule")
+                await _execute_delete_all(DispatchableDevice, "DispatchableDevice")
+                await _execute_delete_all(DemandAnalysisRecord, "DemandAnalysisRecord")
+                await _execute_delete_all(Demand15MinData, "Demand15MinData")
+                await _execute_delete_all(OverDemandEvent, "OverDemandEvent")
+                await _execute_delete_all(DemandHistory, "DemandHistory")
+                await _execute_delete_all(DeviceShiftConfig, "DeviceShiftConfig")
+                await _execute_delete_all(DeviceLoadProfile, "DeviceLoadProfile")
+                await _execute_delete_all(PowerCurveData, "PowerCurveData")
+                await _execute_delete_all(OptimizationResult, "OptimizationResult")
+                await _execute_delete_all(MonthlyStatistics, "MonthlyStatistics")
+                await _execute_delete_all(RealtimeMonitoring, "RealtimeMonitoring")
+                await _execute_delete_all(EnergyMonthly, "EnergyMonthly")
+                await _execute_delete_all(EnergyDaily, "EnergyDaily")
+                await _execute_delete_all(EnergyHourly, "EnergyHourly")
+                await _execute_delete_all(PUEHistory, "PUEHistory")
+                await _execute_delete_all(PricingConfig, "PricingConfig")
+                await _execute_delete_all(StorageSystemConfig, "StorageSystemConfig")
+                await _execute_delete_all(PVSystemConfig, "PVSystemConfig")
+
+                # 4. 配电设备（有 is_demo 字段）
+                await _execute_delete_where_demo(PowerDevice, "PowerDevice")
+
+                # 5. 配电回路
+                await _execute_delete_where_demo(DistributionCircuit, "DistributionCircuit")
+
+                # 6. 配电柜
+                await _execute_delete_where_demo(DistributionPanel, "DistributionPanel")
+
+                # 7. 计量点和变压器
+                await _execute_delete_where_demo(MeterPoint, "MeterPoint")
+                await _execute_delete_where_demo(Transformer, "Transformer")
+
+                # 8. 电价配置
+                await _execute_delete_where_demo(ElectricityPricing, "ElectricityPricing")
+
+                # 9. 制冷设备
+                await _execute_delete_where_demo(ColdAisle, "ColdAisle")
+                await _execute_delete_where_demo(CoolingUnit, "CoolingUnit")
+                await _execute_delete_where_demo(CoolingGroup, "CoolingGroup")
+
+                # 10. 设备
+                await _execute_delete_where_demo(Device, "Device")
+
+                # 11. 空间结构
+                await _execute_delete_where_demo(Row, "Row")
+                await _execute_delete_where_demo(Room, "Room")
+                await _execute_delete_where_demo(Floor, "Floor")
+                await _execute_delete_where_demo(Site, "Site")
+
+                # 12. 其他
+                await _execute_delete_where_demo(FloorMap, "FloorMap")
+
+                # 提交事务
+                await session.commit()
+
+                logger.info(f"Demo 数据清理完成，共删除 {sum(deleted_counts.values())} 条记录")
+                return deleted_counts
+
+            except Exception as e:
+                logger.error("Demo 数据清理失败，事务已回滚: %s", e, exc_info=True)
+                raise
+
+            # 失效入库管道缓存
+            from ..services.ingest_pipeline import invalidate_point_cache
+
+            invalidate_point_cache()
+
     async def _create_points(self, progress_callback) -> int:
         """创建点位"""
         async with async_session() as session:
