@@ -38,11 +38,14 @@ async def list_gateways(
     user_site_ids: Optional[list[int]] = Depends(get_user_site_ids),
 ):
     query = select(Gateway)
+    # P1-6 修复: 验证 site_id 参数是否在用户权限范围内
+    if site_id is not None:
+        if user_site_ids is not None and site_id not in user_site_ids:
+            raise HTTPException(status_code=403, detail="无权访问该站点")
+        query = query.where(Gateway.site_id == site_id)
     # 站点权限过滤
     if user_site_ids is not None:
         query = query.where(Gateway.site_id.in_(user_site_ids))
-    if site_id is not None:
-        query = query.where(Gateway.site_id == site_id)
     if status:
         query = query.where(Gateway.status == status)
     if is_enabled is not None:

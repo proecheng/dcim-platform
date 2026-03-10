@@ -1,5 +1,7 @@
 """网关自动注册服务 — Story 2.1 + Story 16.3 多站点网关接入"""
 
+import hmac
+import hashlib
 import logging
 from datetime import datetime, timedelta
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -9,10 +11,53 @@ from ..models.gateway import Gateway
 from ..models.spatial import Site
 from .gateway_monitor import record_status_change, check_resource_warnings
 from .cache_service import cache_gateway_status
+from ..core.config import get_settings
 
 logger = logging.getLogger(__name__)
+settings = get_settings()
 
 HEARTBEAT_TIMEOUT_SECONDS = 90
+
+
+def verify_gateway_signature(payload: dict, signature: str) -> bool:
+    """验证网关消息签名 — P0-2 修复
+
+    使用 HMAC-SHA256 验证消息完整性，防止消息伪造。
+    """
+    if not signature:
+        logger.warning("消息缺少签名")
+        return False
+
+    # 从配置读取共享密钥（生产环境应使用环境变量）
+    secret_key = getattr(settings, 'gateway_secret_key', 'default-secret-key-change-in-production')
+
+    # 计算消息签名（排除 signature 字段）
+    message_data = {k: v for k, v in payload.items() if k != 'signature'}
+    import json
+    message = json.dumps(message_data, sort_keys=True)
+    expected = hmac.new(secret_key.encode(), message.encode(), hashlib.sha256).hexdigest()
+
+    # 使用 compare_digest 防止时序攻击
+    return hmac.compare_digest(expected, signature)
+
+
+def is_gateway_authorized(gw_id: str) -> bool:
+    """验证网关是否在白名单中 — P0-1 修复
+
+    生产环境应从数据库或配置文件读取白名单。
+    开发环境可以设置 GATEWAY_AUTO_REGISTER=true 跳过验证。
+    """
+    # 开发模式：允许自动注册
+    if getattr(settings, 'gateway_auto_register', False):
+        return True
+
+    # 生产模式：检查白名单（这里简化为检查 gw_id 格式）
+    # TODO: 从数据库 gateway_whitelist 表读取白名单
+    if not gw_id or len(gw_id) < 3:
+        return False
+
+    # 临时实现：允许以 gw- 开头的网关 ID
+    return gw_id.startswith('gw-')
 
 
 async def _resolve_site_id(site_id_str: str | None, db: AsyncSession) -> int | None:
@@ -32,14 +77,30 @@ async def _resolve_site_id(site_id_str: str | None, db: AsyncSession) -> int | N
 
 
 async def handle_gateway_status(payload: dict, db: AsyncSession, *, site_id: str | None = None) -> None:
-    """处理网关心跳消息 — 自动注册或更新，支持 site_id 绑定"""
+    """处理网关心跳消息 — 自动注册或更新，支持 site_id 绑定
+
+    P0-1 修复: 添加网关认证机制
+    P0-2 修复: 添加消息签名验证
+    """
     gw_id = payload.get("gw_id")
     if not gw_id:
         logger.warning("心跳消息缺少 gw_id: %s", payload)
         return
 
+    # P0-2 修复: 验证消息签名
+    signature = payload.get("signature")
+    if not verify_gateway_signature(payload, signature):
+        logger.error("网关 %s 消息签名验证失败，拒绝处理", gw_id)
+        return
+
     result = await db.execute(select(Gateway).where(Gateway.gateway_id == gw_id))
     existing = result.scalar_one_or_none()
+
+    # P0-1 修复: 新网关注册前验证授权
+    if existing is None:
+        if not is_gateway_authorized(gw_id):
+            logger.error("网关 %s 未授权，拒绝注册", gw_id)
+            return
 
     now = datetime.now()
     resolved_site_id = await _resolve_site_id(site_id, db)
@@ -86,17 +147,18 @@ async def handle_gateway_status(payload: dict, db: AsyncSession, *, site_id: str
             last_heartbeat=now,
             updated_at=now,
         )
-        # 如果网关无 site_id 且 topic 有，则补充设置
+        # P1-2 修复: 禁止覆盖已有 site_id
         if resolved_site_id is not None and existing.site_id is None:
             update_values["site_id"] = resolved_site_id
             logger.info("网关 %s 补充绑定站点: site_id=%s", gw_id, resolved_site_id)
         elif resolved_site_id is not None and existing.site_id != resolved_site_id:
-            logger.warning(
-                "网关 %s site_id 不一致: DB=%s, topic=%s（不覆盖）",
+            logger.error(
+                "网关 %s site_id 冲突: DB=%s, topic=%s（拒绝覆盖）",
                 gw_id,
                 existing.site_id,
                 resolved_site_id,
             )
+            # 不更新 site_id，继续处理其他字段
 
         await db.execute(update(Gateway).where(Gateway.gateway_id == gw_id).values(**update_values))
         # 状态变更记录
