@@ -27,6 +27,9 @@ from app.models.energy import PowerDevice, EnergyDaily, EnergyMonthly, Electrici
 
 logger = logging.getLogger(__name__)
 
+# 插件执行超时（秒）
+PLUGIN_TIMEOUT = 30
+
 
 class PluginManager:
     """
@@ -416,11 +419,16 @@ class PluginManager:
                     logger.warning(f"插件 {plugin.plugin_id} 上下文验证失败，跳过")
                     continue
 
-                # 执行分析
-                results = await plugin.analyze(context)
-                all_results.extend(results)
-
-                logger.info(f"插件 {plugin.plugin_id} 生成 {len(results)} 条建议")
+                # 执行分析（带超时控制，P0-1 修复）
+                try:
+                    results = await asyncio.wait_for(
+                        plugin.analyze(context),
+                        timeout=PLUGIN_TIMEOUT
+                    )
+                    all_results.extend(results)
+                    logger.info(f"插件 {plugin.plugin_id} 生成 {len(results)} 条建议")
+                except asyncio.TimeoutError:
+                    logger.error(f"插件 {plugin.plugin_id} 执行超时（{PLUGIN_TIMEOUT}秒）")
 
             except Exception as e:
                 logger.error(f"插件 {plugin.plugin_id} 执行失败: {e}", exc_info=True)
