@@ -26,6 +26,9 @@ DATA_EXPIRY_SECONDS = 300
 # IT 负载最小阈值（kW）— 低于此值不计算 PUE
 IT_POWER_THRESHOLD = 1.0
 
+# P1-2 修复: UPS 效率模型（用于降级估算）
+UPS_EFFICIENCY = 0.95  # 默认 UPS 效率 95%
+
 
 @dataclass
 class PUEResult:
@@ -96,8 +99,22 @@ async def calculate_realtime_pue(db: AsyncSession) -> PUEResult:
         elif device.device_type == "UPS":
             ups_total += power
 
-    # UPS 损耗 = UPS 总功率 - IT 功率（负值归零）
-    ups_loss = max(0, ups_total - it_power)
+    # P1-2 修复: UPS 损耗计算 - 使用效率模型作为降级策略
+    # 1. 如果有 UPS 总功率数据且合理（> IT 功率），使用实际值
+    # 2. 否则使用效率模型估算（IT 功率 * (1/效率 - 1)）
+    if ups_total > it_power:
+        # 实际测量值合理，使用实际值
+        ups_loss = ups_total - it_power
+    else:
+        # 降级到效率模型估算
+        # 例如：IT 100kW，效率 95%，则 UPS 输入 = 100/0.95 = 105.26kW，损耗 = 5.26kW
+        ups_loss = it_power * (1 / UPS_EFFICIENCY - 1) if it_power > 0 else 0
+        if ups_total > 0:
+            # 如果有 UPS 数据但不合理，记录警告
+            logger.warning(
+                "UPS 功率数据异常 (ups_total=%.2f < it_power=%.2f)，使用效率模型估算 ups_loss=%.2f",
+                ups_total, it_power, ups_loss
+            )
 
     # IT 负载过低时不计算 PUE（避免除零或异常大的 PUE 值）
     if it_power < IT_POWER_THRESHOLD:
