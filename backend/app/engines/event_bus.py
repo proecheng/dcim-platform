@@ -71,7 +71,11 @@ class InMemoryEventBus(EventBus):
             event.event_type,
             event.priority.value,
         )
-        await asyncio.gather(*[h(event) for h in handlers], return_exceptions=True)
+        results = await asyncio.gather(*[h(event) for h in handlers], return_exceptions=True)
+        # 记录异常
+        for idx, result in enumerate(results):
+            if isinstance(result, Exception):
+                logger.error("事件总线: 订阅者 %d 处理事件失败: %s", idx, result)
 
     async def subscribe(self, channel: str, handler: Callable) -> None:
         """订阅通道"""

@@ -79,10 +79,14 @@ class AlarmEngine:
         # 点位数据质量缓存: {point_id: quality}  0=好 1=不确定 2=坏
         self._point_quality: Dict[int, int] = {}
         self._loaded = False
+        # 加载锁（P0-2 修复）
+        import asyncio
+        self._load_lock = asyncio.Lock()
 
     async def load_thresholds(self) -> int:
         """从数据库批量加载所有启用的阈值配置到内存"""
-        async with async_session() as session:
+        async with self._load_lock:
+            async with async_session() as session:
             result = await session.execute(
                 select(AlarmThreshold).where(AlarmThreshold.is_enabled == True)  # noqa: E712
             )
@@ -141,9 +145,9 @@ class AlarmEngine:
             self._dead_band_triggered = {k: v for k, v in self._dead_band_triggered.items() if k in valid_keys}
             self._prev_values = {k: v for k, v in self._prev_values.items() if k in valid_point_ids}
 
-            count = sum(len(v) for v in new_cache.values())
-            logger.info("告警引擎: 已加载 %d 条阈值配置（覆盖 %d 个点位）", count, len(new_cache))
-            return count
+                count = sum(len(v) for v in new_cache.values())
+                logger.info("告警引擎: 已加载 %d 条阈值配置（覆盖 %d 个点位）", count, len(new_cache))
+                return count
 
     async def check_version(self) -> bool:
         """检查阈值版本号，版本变化时重新加载"""
