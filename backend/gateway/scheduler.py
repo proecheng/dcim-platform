@@ -55,9 +55,12 @@ class CollectionScheduler:
             task.cancel()
             logger.info("取消采集任务: %s", ds_id)
 
-        # 等待所有任务完成取消
+        # 等待所有任务完成取消，记录异常但不抛出
         if self._tasks:
-            await asyncio.gather(*self._tasks.values(), return_exceptions=True)
+            results = await asyncio.gather(*self._tasks.values(), return_exceptions=True)
+            for ds_id, result in zip(self._tasks.keys(), results):
+                if isinstance(result, Exception) and not isinstance(result, asyncio.CancelledError):
+                    logger.error("任务 %s 停止时异常: %s", ds_id, result)
 
         self._tasks.clear()
         self._adapters.clear()
