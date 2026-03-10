@@ -191,7 +191,8 @@ class MisdiagnosisReportService:
                 "top_missed_fault_types": top_missed_fault_types,
             }
 
-            # 16. 创建报告记录
+            # 16. P1-2 修复: 使用 UPSERT 逻辑避免并发冲突
+            # 先尝试插入，如果冲突则查询返回现有记录
             report = SystemReport(
                 report_type="misdiagnosis_monthly",
                 report_period=period,
@@ -201,11 +202,34 @@ class MisdiagnosisReportService:
                 generated_by="system",
             )
             db.add(report)
-            await db.commit()
-            await db.refresh(report)
 
-            logger.info("误诊分析报告生成完成: period=%s, report_id=%s", period, report.id)
-            return report
+            try:
+                await db.commit()
+                await db.refresh(report)
+                logger.info("误诊分析报告生成完成: period=%s, report_id=%s", period, report.id)
+                return report
+            except Exception as e:
+                # P1-2 修复: 如果插入冲突（并发场景），回滚并查询现有记录
+                await db.rollback()
+                logger.warning("报告插入冲突，查询现有记录: period=%s, error=%s", period, e)
+
+                existing_report = await db.execute(
+                    select(SystemReport).where(
+                        and_(
+                            SystemReport.report_type == "misdiagnosis_monthly",
+                            SystemReport.report_period == period,
+                            SystemReport.deleted_at.is_(None),
+                        )
+                    )
+                )
+                existing = existing_report.scalar_one_or_none()
+                if existing:
+                    logger.info("返回现有报告: period=%s, report_id=%s", period, existing.id)
+                    return existing
+                else:
+                    # 如果仍然找不到，说明是其他错误，重新抛出
+                    logger.error("报告插入失败且未找到现有记录: period=%s", period)
+                    raise
 
         finally:
             # 释放分布式锁

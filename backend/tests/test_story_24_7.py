@@ -488,8 +488,8 @@ async def test_breaker_reset():
     await breaker.record_failure()
     assert breaker.state == BreakerState.OPEN
 
-    # 重置
-    breaker.reset()
+    # P1-3 修复: 重置（异步调用）
+    await breaker.reset()
     assert breaker.state == BreakerState.CLOSED
     assert breaker.consecutive_failures == 0
     assert breaker.total_in_window == 0

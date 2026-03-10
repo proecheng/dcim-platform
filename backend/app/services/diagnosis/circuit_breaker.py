@@ -234,11 +234,14 @@ class CircuitBreaker:
             self._degraded_since = now
             await self._set_state(BreakerState.OPEN, reason="chaos_drill")
 
-    def reset(self):
-        """重置为 CLOSED（调度器重启时使用）"""
-        self._state = BreakerState.CLOSED
-        self._window.clear()
-        self._consecutive_failures = 0
-        self._last_trip_time = None
-        self._half_open_in_flight = False
-        self._degraded_since = None
+    async def reset(self):
+        """P1-3 修复: 重置为 CLOSED（调度器重启时使用）- 异步 + 锁保护"""
+        self._ensure_lock()
+        async with self._lock:
+            self._state = BreakerState.CLOSED
+            self._window.clear()
+            self._consecutive_failures = 0
+            self._last_trip_time = None
+            self._half_open_in_flight = False
+            self._degraded_since = None
+            logger.info("CircuitBreaker 已重置为 CLOSED 状态")

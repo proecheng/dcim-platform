@@ -224,9 +224,9 @@ class ChaosDrillService:
                 logger.error(f"演练 {drill_id} 执行异常: {e}")
 
             finally:
-                # 确保恢复
+                # P1-3 修复: 确保恢复（异步调用）
                 if breaker and breaker.state != BreakerState.CLOSED:
-                    breaker.reset()
+                    await breaker.reset()
 
                 self.__class__.is_drill_active = False
                 self.__class__._current_drill_id = None
@@ -290,8 +290,8 @@ class ChaosDrillService:
             l1_allowed, l1_degraded = await breaker.allow_request("L1")
             result["details"]["l1_fallback_working"] = l1_allowed and not l1_degraded
 
-            # 4. 恢复
-            breaker.reset()
+            # 4. P1-3 修复: 恢复（异步调用）
+            await breaker.reset()
             result["details"]["breaker_restored_to"] = breaker.state.value
 
             # 5. 验证恢复
@@ -308,9 +308,9 @@ class ChaosDrillService:
         except Exception as e:
             result["status"] = "failed"
             result["details"]["error"] = str(e)
-            # 确保恢复
+            # P1-3 修复: 确保恢复（异步调用）
             try:
-                breaker.reset()
+                await breaker.reset()
             except Exception:
                 pass
 
@@ -389,9 +389,9 @@ class ChaosDrillService:
         drill_id = self.__class__._current_drill_id
         self.__class__._stop_requested = True
 
-        # 立即恢复熔断器
+        # P1-3 修复: 立即恢复熔断器（异步调用）
         if breaker and breaker.state != BreakerState.CLOSED:
-            breaker.reset()
+            await breaker.reset()
 
         return drill_id or "unknown"
 
