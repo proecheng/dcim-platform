@@ -127,6 +127,7 @@ async def calculate_realtime_pue(db: AsyncSession) -> PUEResult:
 async def write_pue_history(db: AsyncSession) -> None:
     """
     将当前 PUE 写入 PUEHistory 表
+    P1-1 修复: 使用 UPSERT 逻辑避免并发重复
     仅在 PUE 有效时（非 None）写入
     """
     pue_result = await calculate_realtime_pue(db)
@@ -135,16 +136,35 @@ async def write_pue_history(db: AsyncSession) -> None:
         logger.info("PUE 无效（IT 负载为 0），跳过历史写入")
         return
 
-    record = PUEHistory(
-        record_time=datetime.now(),
-        pue=pue_result.current_pue,
-        total_power=pue_result.total_power,
-        it_power=pue_result.it_power,
-        cooling_power=pue_result.cooling_power,
-        ups_loss=pue_result.ups_loss,
+    # P1-1 修复: 按分钟粒度去重（同一分钟只保留最新记录）
+    record_time = datetime.now().replace(second=0, microsecond=0)
+
+    # P1-1 修复: 检查是否已存在
+    existing = await db.execute(
+        select(PUEHistory).where(PUEHistory.recorded_at == record_time)
     )
-    try:
+    existing_record = existing.scalar_one_or_none()
+
+    if existing_record:
+        # P1-1 修复: 更新现有记录
+        existing_record.pue = pue_result.current_pue
+        existing_record.total_power = pue_result.total_power
+        existing_record.it_power = pue_result.it_power
+        existing_record.cooling_power = pue_result.cooling_power
+        existing_record.ups_loss = pue_result.ups_loss
+    else:
+        # P1-1 修复: 插入新记录
+        record = PUEHistory(
+            recorded_at=record_time,
+            pue=pue_result.current_pue,
+            total_power=pue_result.total_power,
+            it_power=pue_result.it_power,
+            cooling_power=pue_result.cooling_power,
+            ups_loss=pue_result.ups_loss,
+        )
         db.add(record)
+
+    try:
         await db.commit()
         logger.info("PUE 历史记录已写入: PUE=%.3f", pue_result.current_pue)
     except Exception:
