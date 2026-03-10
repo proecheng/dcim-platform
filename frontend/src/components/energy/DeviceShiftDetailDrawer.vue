@@ -512,15 +512,26 @@ function buildTrendChart() {
 }
 
 
+// 规范化趋势数据：后端返回 daily_data/query_days，前端期望 trend_data/days
+function normalizeTrendData(raw: any): PowerTrendResponse | null {
+  if (!raw) return null
+  return {
+    ...raw,
+    trend_data: raw.trend_data ?? raw.daily_data ?? [],
+    days: raw.days ?? raw.query_days ?? 30,
+  }
+}
+
 // 重新加载功率数据（切换天数时）
 async function reloadProfile() {
   if (!props.device) return
   loading.value = true
   try {
     // 调用新的趋势 API
-    const res = await getDevicePowerTrend(props.device.device_id, profileDays.value)
-    if (res.code === 0 && res.data) {
-      trendData.value = res.data
+    const res = await getDevicePowerTrend(props.device.device_id, profileDays.value) as any
+    const data = res?.data ?? res
+    if (data) {
+      trendData.value = normalizeTrendData(data)
       await nextTick()
       buildTrendChart()
     }
@@ -540,11 +551,23 @@ watch(() => props.device, async (newDevice) => {
 
   loading.value = true
   try {
-    const res = await getDevicePowerTrend(newDevice.device_id, profileDays.value)
-    if (res.code === 0 && res.data) {
-      trendData.value = res.data
+    const res = await getDevicePowerTrend(newDevice.device_id, profileDays.value) as any
+    const data = res?.data ?? res
+    if (data) {
+      trendData.value = normalizeTrendData(data)
       await nextTick()
       buildTrendChart()
+    }
+
+    // 加载典型日功率分析（负载率、峰时用电占比）
+    try {
+      const profileRes = await getDeviceTypicalDayProfile(newDevice.device_id, profileDays.value) as any
+      const profileData = profileRes?.data ?? profileRes
+      if (profileData) {
+        profile.value = profileData
+      }
+    } catch (profileErr) {
+      console.warn('加载典型日功率分析失败:', profileErr)
     }
   } catch (e) {
     console.error('加载设备功率趋势失败:', e)

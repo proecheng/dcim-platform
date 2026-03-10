@@ -780,12 +780,29 @@ class DeviceRegulationService:
                 "peak_ratio": round(peak_ratio, 3),
                 "flexibility_factor": flexibility,
                 "type_max_ratio": type_max,
-                "constraints": [
-                    round(constraint_1, 3),
-                    round(constraint_2, 3),
-                    round(constraint_3, 3),
-                    round(constraint_4, 3),
-                ],
+                "constraints": {
+                    "temperature": {
+                        "max_ratio": round(constraint_1, 3),
+                        "reason": "最低功率约束 - 设备必须保持的最低运行功率不可转移",
+                    },
+                    "redundancy": {
+                        "max_ratio": round(constraint_2, 3),
+                        "reason": "负荷波动空间 - 历史最大与平均功率之差代表可削减空间",
+                    },
+                    "pue": {
+                        "max_ratio": round(constraint_3, 3),
+                        "reason": "峰时用电可转移 - 峰时占比越高，可转移潜力越大",
+                    },
+                    "device": {
+                        "max_ratio": round(constraint_4, 3),
+                        "reason": "设备类型上限 - 该类型设备的最大可调节比例",
+                    },
+                },
+                "limiting_factor": min(
+                    [("temperature", constraint_1), ("redundancy", constraint_2),
+                     ("pue", constraint_3), ("device", constraint_4)],
+                    key=lambda x: x[1],
+                )[0],
                 "raw_ratio": round(raw_ratio, 3),
             },
         }
@@ -914,17 +931,19 @@ class DeviceRegulationService:
         if not device:
             return None
         
-        # 查询设备的功率点位
-        # 查询设备的功率点位（可能有多个，取第一个）
-        power_point_query = select(Point.id).where(
-            and_(
-                Point.device_id == device.monitor_device_id,
-                Point.point_name.like("%功率%"),
-                Point.point_type == "AI"
-            )
-        ).limit(1)
-        power_point_result = await self.db.execute(power_point_query)
-        power_point_id = power_point_result.scalar_one_or_none()
+        # 优先使用 power_point_id（直接关联），否则通过名称模糊匹配
+        power_point_id = device.power_point_id if hasattr(device, 'power_point_id') and device.power_point_id else None
+
+        if not power_point_id and device.monitor_device_id:
+            power_point_query = select(Point.id).where(
+                and_(
+                    Point.device_id == device.monitor_device_id,
+                    Point.point_name.like("%功率%"),
+                    Point.point_type == "AI"
+                )
+            ).limit(1)
+            power_point_result = await self.db.execute(power_point_query)
+            power_point_id = power_point_result.scalar_one_or_none()
         
         if not power_point_id:
             # 没有功率点位，返回空数据
@@ -935,7 +954,7 @@ class DeviceRegulationService:
                 "rated_power": device.rated_power,
                 "daily_data": []
             }
-        
+
         # 计算查询起始日期
         cutoff_date = datetime.now() - timedelta(days=days)
         
@@ -960,7 +979,7 @@ class DeviceRegulationService:
         )
         
         rows = result.all()
-        
+
         # 处理结果
         daily_data = []
         for row in rows:

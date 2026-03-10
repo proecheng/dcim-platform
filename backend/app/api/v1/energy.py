@@ -4114,7 +4114,7 @@ async def get_device_power_trend(
     
     service = DeviceRegulationService(db)
     trend_data = await service.get_device_power_trend(device_id, days)
-    
+
     # 修复：即使没有历史数据，也返回空结果而不是404错误
     if trend_data is None:
         # 返回空数据结构，前端可以正常显示抽屉框
