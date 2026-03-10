@@ -309,7 +309,7 @@ development_status:
   # Epic 27: 前端数据链路统一 (MVP 月1-3)
   # 优先级: 27.1(P0)→27.2(P0)→27.5(P1) 核心路径
   # 注意: 2026-03-10 对抗性审查发现实施不完整，新增 27.7 修复 P0 问题，27.8-27.10 修复 P1 问题
-  epic-27: in-progress
+  epic-27: done
   27-1-alarm-data-link-unification: done
   27-2-realtime-data-link-unification: done
   27-3-energy-data-link-unification: done
