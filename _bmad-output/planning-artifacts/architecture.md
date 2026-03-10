@@ -1,5 +1,5 @@
 ---
-stepsCompleted: [tech-stack, architecture-pattern, data-architecture, api-design, deployment, protocol-adapters, linkage-engine, video-integration, physical-topology, nfr-support, demo-module, ingest-pipeline, architecture-update, device-binding, intelligent-diagnosis]
+stepsCompleted: [tech-stack, architecture-pattern, data-architecture, api-design, deployment, protocol-adapters, linkage-engine, video-integration, physical-topology, nfr-support, demo-module, ingest-pipeline, architecture-update, device-binding, intelligent-diagnosis, tcl-precool-model]
 inputDocuments: [_bmad-output/planning-artifacts/prd.md, _bmad-output/planning-artifacts/product-brief.md, docs/project-knowledge/project-context.md, docs/project-knowledge/backend-architecture.md, docs/project-knowledge/frontend-architecture.md, docs/project-knowledge/integration-architecture.md]
 workflowType: 'architecture'
 project_name: 'DCIM'
@@ -11,7 +11,7 @@ date: '2026-03-01'
 
 **Author:** proecheng
 **Date:** 2026-02-15
-**Status:** 完整版（V4.0.0 更新，新增智能诊断系统架构 2026-03-05；V3.2.0 演示系统模块化、统一数据管线、设备双向绑定 2026-03-01）
+**Status:** 完整版（V4.2.0 更新，新增预冷 TCL 模型架构 2026-03-10；V4.0.0 智能诊断系统架构 2026-03-05；V3.2.0 演示系统模块化、统一数据管线、设备双向绑定 2026-03-01）
 
 ---
 
@@ -265,6 +265,7 @@ gateway/
 | **诊断引擎** | DiagnosisSession, DiagnosisEvidence, DiagnosisResult, DiagnosisAuditLog | 推理会话、证据收集、根因结果（含置信度、推理路径）、审计日志 |
 | **闭环学习** | DiagnosisAnnotation, ProbabilityAdjustmentLog | 运维标注（准确/不准确/未知）、概率自动调参记录 |
 | **电气扩展** | SensorMetadata, BreakerProfile, BatterySOHRecord | 传感器元数据（CT/PT变比、精度、校准）、断路器特性库、电池健康度记录 |
+| **预冷 TCL** | ThermalParameter, TemperaturePredictionLog, PrecoolSchedule | RC 热模型参数标定、温度预测偏差记录、预冷调度计划与执行 |
 
 ### 3.2 现有模型扩展字段
 
@@ -276,6 +277,8 @@ gateway/
 | PointHistory | 迁移到 TimescaleDB hypertable | `time` 列分区，启用压缩 |
 | Alarm | `linkage_policy_id` | 告警触发联动策略关联 |
 | Cabinet | `row_number`, `column_number`, `aisle_type`, `cooling_zone_id` | 物理拓扑空间位置 |
+| CoolingZone | `area_m2`, `height_m`, `thermal_R`, `thermal_C`, `bypass_beta` | TCL 模型所需物理参数 |
+| CoolingLinkageConfig | `precool_target_temp`, `precool_enabled` | 预冷调度参数 |
 
 ### 3.3 空间拓扑层级
 
@@ -375,6 +378,7 @@ Site (站点)
 | | load_shifting | `/api/v1/load-shifting` | 负荷转移 |
 | | vpp | `/api/v1/vpp` | 虚拟电厂 |
 | | schedule | `/api/v1/schedule` | 调度计划 |
+| | precool | `/api/v1/precool` | 预冷 TCL 调度、温度预测、VPP 可调容量 |
 | 资产与容量 | assets | `/api/v1/assets` | 资产台账、生命周期 |
 | | capacity | `/api/v1/capacity` | 四维容量监控 |
 | 拓扑与空间 | topology | `/api/v1/topology` | 物理拓扑配置 |
@@ -889,6 +893,10 @@ Cabinet 是三个拓扑的交汇点。
 | 推理调度 | 进程内异步（asyncio） | 2人团队无需维护独立消息队列，APScheduler管理定时任务 |
 | 诊断降级 | 熔断器模式 | 响应>10s或错误率>10%自动回退L1规则引擎 |
 | 配置签名 | HMAC-SHA-256 | 轻量级完整性校验，密钥环境变量注入 |
+| TCL 热模型 | 一阶 RC 集总参数 | 复杂度低、可在线标定、5分钟步长满足精度需求 |
+| TCL 安全兜底 | 温度裕度法（THM） | R/C 未标定前用 THM 兜底，零依赖、实时计算 |
+| 预冷调度优化 | 贪心策略（非线性规划） | 2人团队无需维护 scipy/cvxpy，贪心解接近最优 |
+| VPP 容量上报 | 5 分钟周期 | 平衡实时性与计算开销，温度变化速率 ≤5°C/h |
 
 ---
 
@@ -2410,7 +2418,401 @@ Backend (REST + WS) → API Module (无状态) → Pinia Store (唯一状态) �
 
 ---
 
+## 21. 预冷 TCL 模型架构（V4.2.0 新增）
+
+> 基于 `docs/空调可转移功率算法调研与改进方案.md`（V4.0，三轮对抗性审查），替代现有固定比例 0.4 的制冷可转移功率算法。
+
+### 21.1 架构总览
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                     预冷 TCL 模型服务层                               │
+│                                                                     │
+│  ┌──────────────────┐  ┌──────────────────┐  ┌──────────────────┐   │
+│  │ ThermalModel     │  │ PrecoolScheduler │  │ VPPCapacity      │   │
+│  │ Service          │  │                  │  │ Reporter         │   │
+│  │                  │  │ 谷时预冷          │  │                  │   │
+│  │ RC方程温度预测   │  │ 峰时削减          │  │ 5min 可调容量    │   │
+│  │ R/C 在线标定     │  │ 贪心优化求解      │  │ 上报 VPP 调度    │   │
+│  └────────┬─────────┘  └────────┬─────────┘  └────────┬─────────┘   │
+│           │                     │                     │             │
+│  ┌────────▼─────────────────────▼─────────────────────▼──────────┐  │
+│  │              ConstraintChecker（增强）                          │  │
+│  │  温度裕度法(THM)兜底 | ASHRAE 18-27°C | 速率≤5°C/h | 7项自动回退│  │
+│  └───────────────────────────────────────────────────────────────┘  │
+└──────────┬──────────────┬──────────────────┬────────────────────────┘
+           │              │                  │
+    ┌──────▼──────┐ ┌─────▼──────┐ ┌────────▼─────────┐
+    │ Redis       │ │ TimescaleDB│ │ PostgreSQL       │
+    │ 最新点位值  │ │ 温度历史   │ │ CoolingZone      │
+    │ 温度预测缓存│ │ 预测偏差   │ │ ThermalParameter │
+    └─────────────┘ └────────────┘ └──────────────────┘
+```
+
+**与现有模块的关系**:
+
+| 现有模块 | 集成方式 | 说明 |
+|---------|---------|------|
+| `constraint_checker.py` | **替换**固定 0.4 比例 | 用 `calculate_max_reduction()` 动态计算可转移功率 |
+| `cooling_linkage_service.py` | **增加**预冷调度能力 | 谷时自动触发预冷，峰时触发削减 |
+| `datacenter_shift_strategy.py` | **复用**温度约束 | 复用 ASHRAE 常量和温度约束 |
+| `CoolingZone` 拓扑 | **扩展**物理参数 | 新增面积、层高、R/C/β 参数 |
+| `ShiftPlan` | **增强**温度轨迹 | 创建计划时预测全时段温度曲线 |
+| `ingest_pipeline.py` | **复用**数据管线 | 温度点位数据通过统一管线入库 |
+
+### 21.2 核心算法架构
+
+#### 21.2.1 一阶 RC 热动力学模型
+
+**微分方程**:
+
+```
+C × dT_room/dt = Q_IT(t) - Q_cool(t) + (T_ambient(t) - T_room(t)) / R
+```
+
+**离散化（Euler 显式）**:
+
+```
+T_room(k+1) = T_room(k) + (Δt/C) × [Q_IT(k) - Q_cool(k) + (T_amb(k) - T_room(k)) / R]
+```
+
+**变量说明**:
+
+| 符号 | 含义 | 单位 | 数据来源 |
+|------|------|------|---------|
+| T_room(t) | 冷通道温度（进风温度代表） | °C | 机柜进风温度传感器（已有） |
+| T_ambient(t) | 等效环境温度 | °C | 热通道/回风温度（已有） |
+| Q_IT(t) | IT 设备热负荷 | kW | PDU 功率点位（已有） |
+| Q_cool(t) | 制冷输出功率 | kW | 空调制冷量 = 电功率 × COP |
+| C | 冷通道热容量 | kWh/°C | 自动标定（约 0.04 kWh/°C/m²） |
+| R | 冷通道与外部热阻 | °C/kW | 自动标定 |
+| Δt | 时间步长 | h | 5 分钟 = 1/12 h |
+
+**数值稳定性**: Euler 显式要求 Δt < 2RC，5 分钟步长满足典型数据中心参数。
+
+**COP 季节性修正**:
+
+| 季节 | 室外温度 | COP 值 |
+|------|---------|--------|
+| 夏季 | > 30°C | 2.8 |
+| 过渡季 | 15-30°C | 3.5 |
+| 冬季 | < 15°C | 4.0 |
+
+#### 21.2.2 气流短路修正
+
+冷通道密封不良时，热空气旁路短路修正:
+
+```
+T_inlet_actual = T_inlet_model × (1-β) + T_outlet × β    (典型 β = 0.05~0.15)
+```
+
+当冷通道压差 ΔP < 5Pa 时，自动提高安全裕度从 2°C 到 4°C。
+
+#### 21.2.3 温度裕度法（THM）安全兜底
+
+R/C 参数未标定前（冷启动前 2 周），用温度裕度法替代 TCL 模型:
+
+```python
+headroom = T_max - T_current_max          # 温度裕度
+ratio = (headroom / (T_max - T_supply)) × safety_factor   # 0.7-0.9
+ratio = min(ratio, 0.6)                   # 绝对上限 60%
+if headroom < 2.0: ratio = 0.0            # 裕度 < 2°C 禁止转移
+```
+
+同时校验热缓冲时间 ≥ 制冷滞后时间 × 1.5（约 30 分钟）。
+
+#### 21.2.4 约束条件体系
+
+```
+(1) 温度动力学约束: RC 方程
+(2) 温度上下限: 18°C ≤ T(k) ≤ 27°C,  ∀k  (ASHRAE TC9.9 Class A1)
+(3) 冷通道级约束: T_inlet_i(k) ≤ T_max - 2°C,  ∀i, ∀k
+(4) 制冷功率上下限: Q_cool_min ≤ Q_cool(k) ≤ Q_cool_max
+(5) 功率调整速率约束: |P_cool(k+1) - P_cool(k)| ≤ ΔP_max
+(5.1) 温度变化速率约束: |T(k+1) - T(k)| / Δt ≤ 5 °C/h  (ASHRAE 设备保护)
+(6) 日总冷量守恒: Σ Q_cool(k)×Δt ≈ Σ Q_IT(k)×Δt + Q_envelope_loss
+```
+
+**7 项自动回退保护**:
+
+| 触发条件 | 动作 | 响应时间 |
+|---------|------|---------|
+| 任一机柜 T_inlet > 26°C | 恢复正常制冷 | ≤ 30s |
+| 温升速率超预测 150% | 恢复正常制冷 | ≤ 30s |
+| 温度变化超 5°C/h | 限制功率调整速度 | 即时 |
+| 空调故障告警 | 停止功率转移 | 即时 |
+| 温度传感器离线 | 切回固定比例 0.2 | 即时 |
+| 市电中断切 UPS | T_max 收紧到 25°C | 即时 |
+| 预冷时湿度接近露点 | 停止降温防结露 | 即时 |
+
+### 21.3 数据模型扩展
+
+#### CoolingZone 新增字段
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `area_m2` | Float | 冷通道面积（m²），用于计算热容 C |
+| `height_m` | Float | 冷通道层高（m），默认 3.0 |
+| `thermal_R` | Float | 热阻标定值（°C/kW），NULL 表示未标定 |
+| `thermal_C` | Float | 热容标定值（kWh/°C），NULL 表示未标定 |
+| `bypass_beta` | Float | 气流短路系数（0~0.3），默认 0.1 |
+| `r_calibrated_at` | DateTime | R/C 最近标定时间 |
+
+#### ThermalParameter 表（新增）
+
+记录 R/C 参数标定历史:
+
+```
+thermal_parameters 表:
+  id                     → 主键
+  cooling_zone_id        → 关联 CoolingZone
+  thermal_R              → 标定热阻值 (°C/kW)
+  thermal_C              → 标定热容值 (kWh/°C)
+  fitting_r_squared      → 拟合 R² 值（质量指标）
+  fitting_method         → 标定方法 (auto_fit/manual)
+  sample_count           → 使用的数据样本数
+  calibrated_at          → 标定时间
+  is_active              → 是否为当前生效参数
+```
+
+#### TemperaturePredictionLog 表（新增）
+
+记录温度预测偏差，用于模型验证:
+
+```
+temperature_prediction_logs 表:
+  id                     → 主键
+  cooling_zone_id        → 关联 CoolingZone
+  predicted_temp         → 预测温度 (°C)
+  actual_temp            → 实际温度 (°C)
+  prediction_horizon_min → 预测时长 (分钟)
+  deviation              → 偏差 = actual - predicted
+  model_version          → 模型参数版本
+  created_at             → 记录时间
+```
+
+#### PrecoolSchedule 表（新增）
+
+预冷调度计划与执行记录:
+
+```
+precool_schedules 表:
+  id                     → 主键
+  cooling_zone_id        → 关联 CoolingZone
+  schedule_date          → 调度日期
+  precool_start_time     → 预冷开始时间（谷时）
+  precool_end_time       → 预冷结束时间
+  target_temp            → 预冷目标温度 (°C)
+  peak_start_time        → 峰时削减开始
+  peak_end_time          → 峰时削减结束
+  planned_savings_kwh    → 计划节省电量 (kWh)
+  actual_savings_kwh     → 实际节省电量 (kWh)
+  status                 → pending/executing/completed/aborted
+  abort_reason           → 中止原因（如有）
+  temperature_trajectory → JSON: 预测与实际温度轨迹
+  created_at             → 创建时间
+```
+
+### 21.4 服务层设计
+
+#### 21.4.1 ThermalModelService
+
+```python
+class ThermalModelService:
+    """RC 热动力学模型服务"""
+
+    async def predict_temperature(
+        self, zone_id: int, hours: float, q_cool_schedule: list[float]
+    ) -> list[float]:
+        """预测未来 N 小时温度轨迹"""
+
+    async def calibrate_rc_parameters(self, zone_id: int) -> ThermalParameter:
+        """自动标定 R/C 参数（利用自然功率变化事件）"""
+
+    async def calculate_max_reduction(
+        self, zone_id: int, duration_hours: float
+    ) -> dict:
+        """计算峰时最大可削减制冷功率（替代固定 0.4）"""
+
+    async def calculate_thm_ratio(
+        self, zone_id: int, rack_temps: list[float]
+    ) -> float:
+        """温度裕度法兜底计算（R/C 未标定时使用）"""
+
+    async def validate_model(self, zone_id: int) -> dict:
+        """模型验证: MAE ≤ 1°C/1h, 最大偏差 ≤ 3°C"""
+```
+
+#### 21.4.2 PrecoolScheduler
+
+```python
+class PrecoolScheduler:
+    """预冷调度器"""
+
+    async def generate_schedule(
+        self, zone_id: int, target_date: date
+    ) -> PrecoolSchedule:
+        """生成日前预冷调度计划（贪心优化）"""
+
+    async def execute_schedule(self, schedule_id: int):
+        """执行预冷调度（由 APScheduler 定时触发）"""
+
+    async def monitor_and_rollback(self, schedule_id: int):
+        """实时监控 + 7 项自动回退"""
+```
+
+#### 21.4.3 VPPCapacityReporter
+
+```python
+class VPPCapacityReporter:
+    """虚拟电厂可调容量上报"""
+
+    async def calculate_adjustable_capacity(
+        self, zone_id: int
+    ) -> dict:
+        """计算实时可调容量（向上/向下）"""
+        # 向下可调（削峰）: 减少制冷，温度不超 T_max
+        # 向上可调（填谷）: 增加制冷，温度不低于 T_min
+        # 返回: down_adjustable_kw, up_adjustable_kw (电功率)
+
+    async def report_to_vpp(self):
+        """每 5 分钟上报可调容量到 VPP 调度平台"""
+
+    async def handle_vpp_dispatch(self, command: dict):
+        """处理 VPP 实时调度指令（优先级高于日前优化）"""
+```
+
+#### 21.4.4 ConstraintChecker 增强
+
+在现有 `constraint_checker.py` 中替换固定比例逻辑:
+
+```python
+# 原代码 (constraint_checker.py 第 489-494 行):
+#   max_transferable = total_power * (cooling_ratio * 0.4 + other_ratio * 0.6)
+#
+# 替换为:
+async def calculate_cooling_transferable(self, zone_id: int) -> float:
+    thermal_svc = ThermalModelService()
+    if await thermal_svc.is_calibrated(zone_id):
+        return await thermal_svc.calculate_max_reduction(zone_id, duration_hours=1)
+    else:
+        rack_temps = await self._get_rack_temperatures(zone_id)
+        return await thermal_svc.calculate_thm_ratio(zone_id, rack_temps)
+```
+
+### 21.5 API 设计
+
+| 端点 | 方法 | 说明 | 角色 |
+|------|------|------|------|
+| `/api/v1/precool/zones/{id}/predict` | POST | 温度轨迹预测（指定制冷功率计划） | operator+ |
+| `/api/v1/precool/zones/{id}/schedule` | POST | 生成预冷调度计划 | operator+ |
+| `/api/v1/precool/zones/{id}/schedule` | GET | 查询调度计划列表 | operator+ |
+| `/api/v1/precool/schedules/{id}` | GET | 调度详情（含温度轨迹） | operator+ |
+| `/api/v1/precool/schedules/{id}/abort` | POST | 中止执行中的调度 | operator+ |
+| `/api/v1/precool/zones/{id}/calibrate` | POST | 手动触发 R/C 参数标定 | admin |
+| `/api/v1/precool/zones/{id}/parameters` | GET | 查询 R/C 标定参数历史 | operator+ |
+| `/api/v1/precool/zones/{id}/validation` | GET | 模型验证报告（MAE/最大偏差） | operator+ |
+| `/api/v1/precool/vpp/capacity` | GET | 实时可调容量查询 | operator+ |
+| `/api/v1/precool/vpp/dispatch` | POST | 接收 VPP 调度指令 | system |
+| `/api/v1/precool/dashboard` | GET | 预冷仪表盘聚合数据 | operator+ |
+
+### 21.6 VPP 对外接口
+
+| 接口 | 说明 |
+|------|------|
+| **可调容量上报** | 每 5 分钟上报向上/向下可调量（电功率 kW） |
+| **基线功率定义** | 近 10 个同类型工作日平均制冷功率 |
+| **调度信号接收** | 实时功率调整指令（优先级高于日前优化） |
+| **响应确认与计量** | 15 分钟内响应到位，实际响应量 = 基线 - 实际 |
+
+### 21.7 分阶段实施路径
+
+| 阶段 | 时间 | 内容 | 安全策略 |
+|------|------|------|---------|
+| Phase 1 | 0-2 周 | 收集温度/功率数据，部署 THM | 温度裕度法兜底，替代固定 0.4 |
+| Phase 2 | 2-4 周 | R/C 自动标定，1 个低密度冷通道试运行 TCL | TCL 与 THM 并行，TCL 偏差 > 3°C 自动切回 THM |
+| Phase 3 | 4 周+ | 正式启用 TCL，在线参数修正，推广全部冷通道 | 7 项自动回退保护 |
+| Phase 4 | 8 周+ | VPP 可调容量上报，预冷调度优化 | 累积运行数据后开放 VPP 接口 |
+
+**模型验收标准**:
+
+| 验证指标 | 标准 | 验证方法 |
+|---------|------|---------|
+| 温度预测 MAE | ≤ 1.0°C（1h），≤ 2.0°C（3h） | 历史数据回测 |
+| 温度预测最大偏差 | ≤ 3.0°C | 回测中单点偏差不超标 |
+| 预冷目标达成率 | T_precool ± 1°C 内 ≥ 90% | 统计 10 次以上预冷 |
+| 节省预测准确度 | 预测与实际偏差 ≤ 20% | 日前预测 vs 事后结算 |
+| 回退误触发率 | ≤ 5% | 统计回退事件 |
+
+**灰度发布**: 选择 1 个低密度冷通道试点 2 周 → 对比温度波动和电费 → 通过后推广。
+
+### 21.8 前端展示设计
+
+**预冷调度预览界面**:
+
+1. **温度曲线图**: Y 轴 18-27°C（标注 T_precool, T_normal, T_max），X 轴 00:00-24:00（标注谷/平/峰/尖峰），显示预冷下降→升温释放全过程
+2. **制冷功率曲线图**: 各时段制冷功率变化，标注预冷段与削减段
+3. **关键指标面板**: 预计节省金额、温度范围与安全状态、最热机柜温度与裕度
+
+**转移仪表盘三项监控**:
+
+| 看什么 | 在哪看 | 正常范围 |
+|-------|-------|---------|
+| 最热机柜进风温度 | 转移仪表盘 | ≤ 25°C 绿灯 |
+| 温度预测曲线 | 预冷调度预览 | 曲线在 18-27°C 之间 |
+| 今日节省金额 | 转移仪表盘 | 正数即可 |
+
+### 21.9 NFR 架构支撑（TCL 相关）
+
+| NFR 指标 | 架构支撑 |
+|---------|---------|
+| 温度预测 < 1s | 内存中 RC 方程逐步迭代，无外部依赖 |
+| 调度生成 < 5s | 贪心策略 O(N) 遍历时段，N ≤ 288（5min 步长） |
+| 回退响应 ≤ 30s | Redis 实时温度 → 内存比对阈值 → MQTT 控制命令 |
+| VPP 上报 5min | APScheduler 定时任务，批量计算所有冷通道 |
+| R/C 标定 < 30s | 最小二乘拟合，利用自然功率变化事件数据 |
+| 数据安全 | 温度预测结果写入 TemperaturePredictionLog，可审计 |
+
+---
+
 ## 附录: 架构变更日志
+
+### V4.2.0 (2026-03-10)
+
+**重大变更**:
+
+1. **预冷 TCL 模型架构（Section 21）**
+   - 新增一阶 RC 热动力学模型，替代固定比例 0.4 的制冷可转移功率算法
+   - 温度裕度法（THM）安全兜底：R/C 未标定前零依赖实时计算
+   - 气流短路修正：旁路系数 β 修正进风温度预测
+   - 7 项自动回退保护（温度/速率/故障/传感器/UPS/湿度）
+   - VPP 可调容量接口：5 分钟周期上报向上/向下可调量
+   - 分阶段实施路径：THM 兜底(0-2wk) → R/C 标定(2-4wk) → TCL 正式(4wk+) → VPP(8wk+)
+
+2. **数据模型扩展**
+   - CoolingZone 新增 6 个字段（area_m2, height_m, thermal_R, thermal_C, bypass_beta, r_calibrated_at）
+   - CoolingLinkageConfig 新增 precool_target_temp, precool_enabled
+   - 3 个新表：ThermalParameter（R/C 标定历史）、TemperaturePredictionLog（预测偏差）、PrecoolSchedule（调度计划）
+
+3. **服务层新增**
+   - ThermalModelService: RC 方程温度预测、R/C 在线标定、THM 兜底
+   - PrecoolScheduler: 日前调度生成、执行监控、自动回退
+   - VPPCapacityReporter: 可调容量计算与上报、VPP 调度指令处理
+   - ConstraintChecker 增强：动态替代固定 0.4 比例
+
+4. **API 新增**
+   - 11 个新 REST 端点（/api/v1/precool/*）
+   - 温度预测、调度管理、R/C 标定、模型验证、VPP 容量
+
+5. **关键架构决策**
+   - TCL 热模型选用一阶 RC 集总参数（复杂度低、可在线标定）
+   - 预冷优化选用贪心策略（2 人团队无需 scipy/cvxpy）
+   - COP 季节性修正（夏 2.8 / 过渡 3.5 / 冬 4.0）
+   - 数值稳定性保障（Δt < 2RC，5 分钟步长）
+
+**输入文档**: `docs/空调可转移功率算法调研与改进方案.md` V4.0（三轮对抗性审查）
+
+---
 
 ### V4.0.0 (2026-03-05)
 
@@ -2724,10 +3126,10 @@ TODO [生产集成计划]:
 
 ---
 
-**文档版本**: V4.0.0
-**最后更新**: 2026-03-05
+**文档版本**: V4.2.0
+**最后更新**: 2026-03-10
 **更新人**: proecheng
-**变更类型**: 架构重大变更 - 新增智能诊断系统架构（FR34-1~42）
+**变更类型**: 架构重大变更 - 新增预冷 TCL 模型架构（替代固定 0.4 制冷可转移比例）
 
 ---
 

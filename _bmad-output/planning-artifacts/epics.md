@@ -1,6 +1,8 @@
 ---
-stepsCompleted: [requirements-inventory, epic-design, story-creation, coverage-map, phase2-supplement]
-inputDocuments: [_bmad-output/planning-artifacts/prd.md, _bmad-output/planning-artifacts/architecture.md]
+stepsCompleted: [requirements-inventory, epic-design, story-creation, coverage-map, phase2-supplement, tcl-precool-supplement]
+inputDocuments: [_bmad-output/planning-artifacts/prd.md, _bmad-output/planning-artifacts/architecture.md, docs/空调可转移功率算法调研与改进方案.md]
+tcl_supplement_date: 2026-03-10
+tcl_supplement_epics: [29, 30, 31, 32, 33]
 workflowType: epics-and-stories
 project_name: DCIM
 user_name: proecheng
@@ -19,7 +21,7 @@ phase2_supplement_epics: [18, 19, 20, 21, 22, 23]
 
 ## 概述
 
-本文档将 PRD 中功能需求 FR1-FR99 和非功能需求按业务域组织为 28 个 Epic，每个 Epic 包含 1-10 个用户故事。所有故事按 PRD 分阶段计划标注阶段归属。Epic 24-26 为智能诊断系统（FR34-1~FR34-42），基于架构文档 V4.0.0 Section 18 设计。Epic 27 为前端数据链路统一，基于 `docs/data-flow-audit.md` 审查结果和架构文档 V4.0.0 Section 19 规范。Epic 28 为 Demo 系统解耦与数据隔离，基于 `docs/demo-system-audit.md` 审查结果和架构文档 V4.0.0 Section 20 规范。
+本文档将 PRD 中功能需求 FR1-FR99 和非功能需求按业务域组织为 33 个 Epic，每个 Epic 包含 1-10 个用户故事。所有故事按 PRD 分阶段计划标注阶段归属。Epic 24-26 为智能诊断系统（FR34-1~FR34-42），基于架构文档 V4.0.0 Section 18 设计。Epic 27 为前端数据链路统一，基于 `docs/data-flow-audit.md` 审查结果和架构文档 V4.0.0 Section 19 规范。Epic 28 为 Demo 系统解耦与数据隔离，基于 `docs/demo-system-audit.md` 审查结果和架构文档 V4.0.0 Section 20 规范。Epic 29-33 为预冷 TCL 模型（FR-TCL-1~23），基于架构文档 V4.2.0 Section 21 和 `docs/空调可转移功率算法调研与改进方案.md` 设计。
 
 ### Epic 总览
 
@@ -53,6 +55,11 @@ phase2_supplement_epics: [18, 19, 20, 21, 22, 23]
 | **26** | **智能诊断高级功能** | **Phase 3 (月11-12+)** | **FR34-3, 20~21, 27~28, 33~42** | **10** |
 | **27** | **前端数据链路统一** | **MVP (月1-3)** | **NFR-P1, NFR-M1** | **6** |
 | **28** | **Demo 系统解耦与数据隔离** | **MVP (月1-3)** | **NFR-M1, NFR-M3** | **4** |
+| **29** | **热模型与温度预测** | **Phase 2a (月7-8)** | **FR-TCL-1~3, 9, 14, 15, 17, 20~22** | **7** |
+| **30** | **安全约束与自动回退** | **Phase 2a (月7-8)** | **FR-TCL-4~7** | **4** |
+| **31** | **预冷计划优化** | **Phase 2b (月9-10)** | **FR-TCL-10, 16, 18, 23** | **5** |
+| **32** | **热参数自动校准与分阶段部署** | **Phase 2b (月9-10)** | **FR-TCL-8, 13, 19** | **4** |
+| **33** | **VPP 虚拟电厂集成** | **Phase 3 (月11-12+)** | **FR-TCL-11, 12** | **3** |
 
 ### Epic 依赖关系
 
@@ -73,6 +80,9 @@ Epic 8 --> Epic 25 (配电拓扑级联依赖物理拓扑)
 Epic 14 --> Epic 24 (诊断引擎需 PostgreSQL)
 Epic 27 独立并行（棕地前端重构，无外部依赖，但应在 Epic 4/5/6 实施前或同步完成）
 Epic 28 独立并行（demo 解耦，应在真实网关接入前完成，即 Epic 1/2 之前或同步）
+Epic 6 --> Epic 29 --> Epic 30 --> Epic 31 --> Epic 33
+Epic 29 --> Epic 32 (校准依赖热模型)
+Epic 32 与 Epic 31 可并行
 ```
 
 ### 阶段规划
@@ -81,9 +91,9 @@ Epic 28 独立并行（demo 解耦，应在真实网关接入前完成，即 Epi
 |------|------|------|
 | MVP 月1-3 | 120人天 | 1, 2, 3, 4, 5, 6基础, 13, 14, **27**, **28** |
 | Phase 1.5 月4-6 | 试点+补全 | 7基础, 15-MQTT/HTTP |
-| Phase 2a 月7-8 | 核心推理 | 6完整, 7完整, 8, 9, 10, 11, 12, 15-BACnet/OPC-UA, **24** |
-| Phase 2b 月9-10 | 专业扩展 | **25**, 16 |
-| Phase 3 月11-12+ | 高级+灰度 | **26** |
+| Phase 2a 月7-8 | 核心推理 | 6完整, 7完整, 8, 9, 10, 11, 12, 15-BACnet/OPC-UA, **24**, **29**, **30** |
+| Phase 2b 月9-10 | 专业扩展 | **25**, 16, **31**, **32** |
+| Phase 3 月11-12+ | 高级+灰度 | **26**, **33** |
 
 ---
 
@@ -3555,4 +3565,784 @@ So that 从 demo 模式过渡到生产模式时不会丢失自定义的告警规
 
 ---
 
-*文档更新 - 共 28 个 Epic, 138+ 个 Stories, 覆盖 FR1-FR99 全部功能需求 + FR34-1~42 智能诊断子需求（含 FR34-8 图形化编辑器、FR34-35 对抗样本检测）+ 关键 NFR + Phase 2 补充页面 + 前端数据链路统一 + Demo 系统解耦与数据隔离*
+---
+
+## Epic 29: 热模型与温度预测
+
+**阶段:** Phase 2a (月7-8)
+**FR 覆盖:** FR-TCL-1, FR-TCL-2, FR-TCL-3, FR-TCL-9, FR-TCL-14, FR-TCL-15, FR-TCL-17, FR-TCL-20, FR-TCL-21, FR-TCL-22
+**依赖:** Epic 6（能源管理，制冷设备数据基础）
+**用户价值:** 运维人员可以查看每个制冷区域的实时温度预测曲线，了解未来温度走势，为预冷决策提供数据支撑。
+
+### Story 29.1: 热动力学数据模型与数据库迁移
+
+As a 系统管理员,
+I want 系统建立制冷区域热参数和温度预测的数据存储基础,
+So that 后续的热模型计算和预测记录有持久化支撑。
+
+**Acceptance Criteria:**
+
+- Given 架构文档 Section 21 定义的数据模型扩展
+- When 执行数据库迁移
+- Then `thermal_parameters` 表创建成功，包含 cooling_zone_id(FK), thermal_R(°C/kW), thermal_C(kWh/°C), fitting_r_squared(拟合 R² 值), fitting_method(auto_fit|manual), sample_count(样本数), calibrated_at, is_active(boolean) 字段
+- And `temperature_prediction_logs` 表创建成功，包含 cooling_zone_id(FK), predicted_temp(°C), actual_temp(°C), prediction_horizon_min(分钟), deviation(actual-predicted), model_version(str), created_at 字段（单条记录模式，非 JSON 批量）
+- And **`cooling_zones` 表处理**（位于 `models/topology_config.py`）：
+  - 如果表不存在，创建 `cooling_zones` 表（id, name, description, site_id, created_at 等基础字段）
+  - 添加/扩展字段：area_m2(冷通道面积), height_m(层高,默认3.0), thermal_R(°C/kW,NULL=未标定), thermal_C(kWh/°C,NULL=未标定), bypass_beta(气流短路系数,默认0.1,范围0~0.3), r_calibrated_at(DateTime)
+- And **`cooling_linkage_configs` 表处理**（位于 `models/load_shift.py`）：
+  - 如果表不存在，创建 `cooling_linkage_configs` 表（id, cooling_zone_id, enabled, created_at 等基础字段）
+  - 添加/扩展字段：precool_target_temp(°C), precool_enabled(boolean)
+- And **Alembic 迁移脚本要求**（P1-20 修复）：
+  - 所有迁移必须实现完整的 `downgrade()` 回滚逻辑
+  - 回滚脚本必须通过测试：`alembic upgrade head && alembic downgrade -1 && alembic upgrade head`
+  - 迁移脚本必须包含数据迁移逻辑（如果涉及现有数据）
+  - 回滚时需正确处理外键约束和索引
+  - 迁移脚本需检查表是否存在，避免重复创建错误
+- And demo 种子数据为现有制冷区域生成默认热参数（R=0.03°C/kW, C=0.04kWh/°C/m², β=0.1，参照架构典型值范围 R=0.01-0.05），标记 is_demo=True
+
+**涉及文件:**
+- 新建 `backend/app/models/thermal.py` — ThermalParameter, TemperaturePredictionLog 模型
+- `backend/app/models/topology_config.py` — CoolingZone 扩展字段（注意：CoolingZone 在此文件，非 cooling.py）
+- `backend/app/models/load_shift.py` — CoolingLinkageConfig 扩展字段（注意：CoolingLinkageConfig 在此文件，非 cooling.py）
+- `backend/app/demo/seeds/cooling_seed.py` — 热参数种子数据（遵循 is_demo=True 模式）
+- Alembic 迁移脚本
+
+**NFR 追溯:** NFR-TCL-7
+
+**注意:** PrecoolSchedule 表在 Story 31.1 中创建（属于 Epic 31 职责范围）
+
+### Story 29.2: RC 热动力学模型核心算法
+
+As a 系统运维人员,
+I want 系统使用一阶 RC 热动力学模型预测制冷区域温度变化,
+So that 我能准确了解区域未来温度走势。
+
+**依赖 Story:** Story 29.1（数据模型，temperature_prediction_logs 表）
+
+**Acceptance Criteria:**
+
+- Given RC 模型方程 `C × dT/dt = Q_IT - Q_cool + (T_ambient - T)/R`
+- When 调用温度预测服务（传入 zone_id, hours, q_cool_schedule）
+- Then 系统使用离散 Euler 法（Δt=5min=1/12h，与架构一致）计算温度轨迹
+- And 预测时长由调用方指定（默认 1 小时，支持最长 24 小时）
+- And 数值稳定性约束 Δt < 2RC 自动校验，不满足时自动缩小步长
+- And bypass 系数 β 校正进风温度：T_inlet_actual = T_inlet_model × (1-β) + T_outlet × β
+- And COP 季节修正因子自动应用（夏季 T_outdoor>30°C: COP=2.8、过渡季 15-30°C: COP=3.5、冬季 <15°C: COP=4.0）
+- And **数据源映射**: Q_IT（IT热负荷）通过 CabinetITLoad.power_point_id → PointHistory 获取; T_ambient（等效环境温度）通过精密空调回风温度点位（`{device_code}_return_temp`）获取; T_current 通过 CabinetTemperatureSensor(sensor_location='inlet') → PointHistory 获取——复用 datacenter_shift_strategy.py 现有温度查询链路
+- And **数据质量保障**（P1-16 修复）：
+  - 当 Q_IT 点位数据缺失时，使用机柜额定功率 × 0.7 作为估算值
+  - 当 Q_IT 数据超过 24 小时未更新时，触发告警并禁用该区域预冷
+  - 当 T_ambient 或 T_current 数据缺失时，拒绝预测并返回错误 `{error: "insufficient_data", missing_fields: [...]}`
+  - 数据质量检查逻辑在 `thermal_model.py` 中实现
+- And 预测完成后写入 temperature_prediction_logs 一条摘要记录（predicted_temp=最终预测值, prediction_horizon_min=预测时长），非逐步写入（避免写入量爆炸：5min×24h=288条/次）
+- And 单区预测计算耗时 < 1s（架构标准），典型场景 < 200ms
+
+**涉及文件:**
+- 新建 `backend/app/services/precool/thermal_model.py` — RC 模型核心算法（含数据质量检查）
+- 新建 `backend/app/services/precool/__init__.py`
+
+**NFR 追溯:** NFR-TCL-1, NFR-TCL-6
+
+### Story 29.3: 温度裕度法 (THM) 安全兜底
+
+As a 系统运维人员,
+I want 在 RC 模型未校准时系统自动使用 THM 方法估算可转移功率,
+So that 系统上线初期也能安全地参与负荷转移。
+
+**依赖 Story:** Story 29.1（数据模型，thermal_parameters 表）
+
+**Acceptance Criteria:**
+
+- Given 制冷区域 RC 参数未校准（is_calibrated=False 或 thermal_R/thermal_C 为 NULL）
+- When 请求可转移功率估算
+- Then 系统自动使用 THM 公式：ratio = (T_max - T_current_max) / (T_max - T_supply) × safety_factor
+- And T_max=27°C（ASHRAE 上限），T_supply=12°C（空调送风温度），safety_factor=0.8（范围 0.7~0.9 可配置）
+- And ratio 绝对上限 0.6（absolute_max_ratio），即最多转移 60% 制冷功率
+- And 当温度裕度 headroom = T_max - T_current_max < 2.0°C 时 ratio=0（禁止转移）
+- And 同时校验热缓冲时间 ≥ 制冷滞后时间 × 1.5（约 30 分钟）
+- And T_current_max（最热机柜进风温度）通过复用 datacenter_shift_strategy.py 现有链路获取：CoolingZone → CoolingZoneUnit → CoolingZoneCabinet → CabinetTemperatureSensor(inlet) → PointHistory
+- And 日志记录当前使用 THM 模式、裕度值、计算结果
+- And RC 模型校准完成（is_calibrated=True 且 fitting_r_squared ≥ 0.85）后自动切换到 TCL 模式
+
+**涉及文件:**
+- `backend/app/services/precool/thermal_model.py` — THM 兜底逻辑
+- `backend/app/services/datacenter_shift_strategy.py` — 复用温度查询链路和 ASHRAE 常量
+
+**NFR 追溯:** NFR-TCL-3
+
+### Story 29.4: 温度预测 API 端点
+
+As a 前端开发人员,
+I want 后端提供温度预测和热参数查询的 REST API,
+So that 前端可以展示温度预测数据。
+
+**依赖 Story:** Story 29.1（数据模型）, Story 29.2（RC 模型）, Story 29.3（THM 模式）
+
+**Acceptance Criteria:**
+
+- Given 温度预测服务已实现
+- When 前端调用 API
+- Then `POST /api/v1/precool/zones/{zone_id}/predict` 接收 q_cool_schedule(制冷功率计划) 和 hours 参数，返回温度序列 list[float]（与架构一致，POST 因需传入调度参数）
+- And `GET /api/v1/precool/zones/{zone_id}/parameters` 返回 R/C 标定参数历史 list[ThermalParameter]
+- And `GET /api/v1/precool/zones/{zone_id}/validation` 返回模型验证报告（mae_1h, mae_3h, max_deviation）
+- And `GET /api/v1/precool/dashboard` 返回预冷仪表盘聚合数据（zones 列表、today_savings、status_summary）
+- And 所有端点遵循 JWT 认证、RBAC 权限控制（operator+ 角色）
+- And **速率限制**（P2-9 修复）：
+  - `POST /zones/{id}/predict`: 每用户 10 次/分钟（计算密集）
+  - `GET /zones/{id}/parameters`: 每用户 30 次/分钟
+  - `GET /zones/{id}/validation`: 每用户 30 次/分钟
+  - `GET /dashboard`: 每用户 20 次/分钟
+  - 超限返回 429 Too Many Requests，响应头包含 `Retry-After` 秒数
+- And 响应格式符合现有 API 规范（code/message/data 结构）
+
+**涉及文件:**
+- 新建 `backend/app/api/v1/precool.py` — API 路由
+- 新建 `backend/app/schemas/precool.py` — Pydantic schemas
+- `backend/app/api/v1/__init__.py` — 注册路由
+
+**NFR 追溯:** NFR-TCL-5
+
+### Story 29.5: 模型精度验证与记录
+
+As a 系统运维人员,
+I want 系统自动对比预测温度与实际温度并记录精度指标,
+So that 我能评估模型可靠性并在精度退化时收到预警。
+
+**依赖 Story:** Story 29.2（RC 模型）, Story 29.4（预测 API）
+
+**Acceptance Criteria:**
+
+- Given 温度预测摘要已记录到 prediction_logs
+- When 预测时间窗口到期后实际温度数据可用（通过 APScheduler 定时任务每 5 分钟检查一次）
+- Then 系统自动回填 actual_temp 字段并计算 deviation = actual - predicted
+- And 验证标准（与架构一致）：MAE ≤ 1.0°C(1h 内), MAE ≤ 2.0°C(3h 内), 最大偏差 ≤ 3.0°C
+- And 连续 3 次预测误差 > 2°C 时自动回退到 THM 模式
+- And **持续监控**（P2-10 修复）：
+  - 每日凌晨自动计算过去 24 小时的预测 MAE（mae_1h, mae_3h）
+  - MAE 超过阈值时触发告警并建议重新校准：mae_1h > 1.5°C 或 mae_3h > 3.0°C
+  - 精度指标记录到 `temperature_prediction_logs` 表的 mae_1h/mae_3h 字段（需在 Story 29.1 中追加这两个字段）
+  - 精度趋势可通过 validation API 查询（返回最近 7 天的 MAE 趋势）
+- And 精度退化事件记录到系统日志并触发告警
+- And 通过 `GET /api/v1/precool/zones/{zone_id}/validation` 端点可查询验证报告
+
+**涉及文件:**
+- `backend/app/services/precool/thermal_model.py` — 精度验证逻辑
+- 新建 `backend/app/services/precool/accuracy_monitor.py` — 精度监控
+
+**NFR 追溯:** NFR-TCL-3, NFR-TCL-6
+
+### Story 29.6: 前端温度预测曲线展示
+
+As a 运维人员,
+I want 在制冷管理页面查看每个区域的实时温度预测曲线,
+So that 我能直观了解温度趋势并做出决策。
+
+**依赖 Story:** Story 29.4（预测 API）, Story 29.5（精度验证）
+
+**Acceptance Criteria:**
+
+- Given 后端温度预测 API 已就绪
+- When 进入制冷管理详情页
+- Then 显示 ECharts 双轴图表：实际温度（实线）+ 预测温度（虚线）
+- And **预测误差带展示**（P2-16 修复）：
+  - 预测曲线显示 ±误差带（半透明阴影区域）
+  - 误差带基于历史 MAE 计算：`error_band = max(mae_1h, 1.0)`（最小 1°C）
+  - 校准后的模型误差带更窄（典型 ±1°C），未校准的更宽（典型 ±2°C）
+  - 误差带颜色：绿色（MAE < 1°C）、黄色（1-2°C）、红色（> 2°C）
+  - Tooltip 显示预测值 ± 误差带范围（如"23.5°C ± 1.2°C"）
+- And 预测区间用浅色填充表示置信范围
+- And 图表标注 ASHRAE 上下限（18°C/27°C）水平参考线
+- And 支持 30 分钟 / 1 小时 / 2 小时预测范围切换
+- And 显示当前模型模式标签（THM / TCL）
+- And 图表每 60 秒自动刷新
+
+**涉及文件:**
+- 新建 `frontend/src/components/energy/TemperaturePredictionChart.vue`
+- 新建 `frontend/src/api/modules/precool.ts` — 预冷模块 API 封装（供所有前端 Story 共用）
+- 修改制冷管理详情页集成新组件
+
+**NFR 追溯:** NFR-TCL-1
+
+### Story 29.7: 替换 constraint_checker.py 固定 0.4 制冷比例
+
+As a 系统运维人员,
+I want 系统使用 TCL/THM 动态计算替代固定 0.4 制冷可转移比例,
+So that 负荷转移功率评估更准确、更安全。
+
+**依赖 Story:** Story 29.2（RC 模型）, Story 29.3（THM 兜底）, Story 29.4（ThermalModelService API）, Story 30.1（约束检查引擎）
+
+**Acceptance Criteria:**
+
+- Given `services/load_shift/algorithms/constraint_checker.py` 第 487-494 行现有代码：`cooling_transferable_ratio = float(cfg.get("cooling_transferable_ratio", 0.40))`，然后 `max_transfer_power = total_power * (cooling_ratio * cooling_transferable_ratio + other_ratio * other_transferable_ratio)`
+- When 计算制冷可转移功率
+- Then 替换 `cooling_transferable_ratio` 的获取逻辑为动态计算：
+  - 如果 RC 参数已标定（is_calibrated=True）：调用 ThermalModelService.calculate_max_reduction(zone_id, duration_hours=1)，返回值转换为比例
+  - 如果 RC 参数未标定：调用 ThermalModelService.calculate_thm_ratio(zone_id, rack_temps)
+- And `other_transferable_ratio` 部分保持不变（默认 0.60）
+- And 替换逻辑通过特性开关 precool_enabled 控制，关闭时回退到原有配置默认值 0.40
+- And 单元测试覆盖：THM 路径、TCL 路径、特性开关关闭回退路径
+
+**涉及文件:**
+- `backend/app/services/load_shift/algorithms/constraint_checker.py` — 替换第 487-494 行（注意实际路径含 load_shift/algorithms/ 子目录）
+- `backend/app/services/precool/thermal_model.py` — 被调用方
+
+**NFR 追溯:** NFR-TCL-3, NFR-TCL-8
+
+**注意:** 这是 TCL 模型的核心集成点，直接替代原有固定比例算法，是本次架构升级的关键价值交付。
+
+---
+
+## Epic 30: 安全约束与自动回退
+
+**阶段:** Phase 2a (月7-8)
+**FR 覆盖:** FR-TCL-4, FR-TCL-5, FR-TCL-6, FR-TCL-7
+**依赖:** Epic 29（热模型基础）
+**用户价值:** 系统自动执行安全约束和回退保护，确保制冷操作始终在安全范围内，运维人员可以查看约束触发记录。
+
+### Story 30.1: ASHRAE 温度硬约束与功率限制
+
+As a 系统管理员,
+I want 系统在所有制冷操作中强制执行 ASHRAE 温度限制和功率上限,
+So that 设备始终在安全范围内运行。
+
+**Acceptance Criteria:**
+
+- Given 制冷调度或预冷操作正在执行
+- When 温度或功率达到约束边界
+- Then ASHRAE TC9.9 Class A1 硬约束 18°C ≤ T ≤ 27°C 始终生效
+- And 制冷功率上限约束 Q_cool ≤ 1.5 × Q_rated 强制执行
+- And 温变速率约束 |dT/dt| ≤ 5°C/hour 自动检测
+- And 约束违反时立即中止当前操作并记录日志
+- And 约束参数可通过系统配置表修改（预留可配置性）
+- And 复用 `datacenter_shift_strategy.py` 已定义的 ASHRAE 常量（TEMP_RECOMMENDED_MIN/MAX=18/27, TEMP_SAFETY_MARGIN=2.0, SAFETY_FACTOR=0.9），避免重复定义
+
+**涉及文件:**
+- 新建 `backend/app/services/precool/constraints.py` — 约束检查引擎
+- `backend/app/services/datacenter_shift_strategy.py` — 复用 ASHRAE 常量定义
+
+**NFR 追溯:** NFR-TCL-4
+
+### Story 30.2: 7 项自动回退保护机制
+
+As a 系统运维人员,
+I want 系统在检测到异常条件时自动回退制冷操作,
+So that 数据中心设备安全不受威胁。
+
+**依赖 Story:** Story 30.1（约束检查引擎）
+
+**Acceptance Criteria:**
+
+- Given 预冷或负荷转移操作正在进行
+- When 检测到以下任一条件
+- Then 触发自动回退（与架构 7 项保护一致）：
+  1. 任一机柜 T_inlet > 26°C — 恢复正常制冷，≤ 30s
+  2. 温升速率超预测 150% — 恢复正常制冷，≤ 30s
+  3. 温度变化超 5°C/h — 限制功率调整速度，即时生效
+  4. 空调故障告警 — 停止功率转移，即时生效
+  5. 温度传感器离线 — 切回固定保守比例 0.2，即时生效
+  6. 市电中断切 UPS — T_max 收紧到 25°C（留应急余量），即时生效
+  7. 预冷时湿度接近露点 — 停止降温防结露（送风温度 ≥ 露点 + 3°C），即时生效
+- And 补充保护：冷通道压差 ΔP < 5Pa 时（密封不良），自动将安全裕度从 2°C 提高到 4°C
+- And 回退动作在检测到条件后 ≤ 30 秒内触发（与架构一致，非 10 秒）
+- And 回退操作恢复到上一安全状态（非预冷模式）
+- And **自动恢复条件**（P1-17 修复）：
+  - 温度回退（条件1/2）：当温度裕度恢复到 > 4°C 且持续 15 分钟后，自动恢复预冷
+  - 传感器回退（条件5）：当传感器恢复正常且数据稳定 10 分钟后，自动恢复动态模式
+  - UPS 回退（条件6）：当 UPS 负载率降至 < 75% 且持续 5 分钟后，自动放宽 T_max 到 27°C
+  - 空调故障回退（条件4）：故障告警清除且空调运行稳定 10 分钟后，自动恢复
+  - 湿度回退（条件7）：送风温度与露点温差 > 5°C 且持续 10 分钟后，自动恢复
+  - 所有恢复动作需记录到 rollback_history 并推送告警通知
+- And 每次回退事件记录完整上下文（触发条件、当前温度、操作内容、恢复动作、自动恢复条件）
+- And 回退事件推送到告警 WebSocket 通道
+
+- And 监控机制：通过 asyncio 后台任务持续轮询温度/传感器/UPS 状态点位（复用现有 WebSocket 实时数据通道接收推送），检测周期 ≤ 10 秒
+
+**涉及文件:**
+- 新建 `backend/app/services/precool/rollback_manager.py` — 回退保护管理器（asyncio 后台任务）
+- `backend/app/services/precool/constraints.py` — 约束触发集成
+
+**NFR 追溯:** NFR-TCL-4, NFR-TCL-6
+
+### Story 30.3: 回退保护 API 与状态查询
+
+As a 运维人员,
+I want 查询当前回退保护状态和历史触发记录,
+So that 我能了解系统安全防护的运行情况。
+
+**依赖 Story:** Story 30.2（回退保护机制）
+
+**Acceptance Criteria:**
+
+- Given 回退保护机制已运行
+- When 调用查询 API
+- Then `GET /api/v1/precool/zones/{zone_id}/rollback-status` 返回当前保护状态（正常/回退中）
+- And `GET /api/v1/precool/zones/{zone_id}/rollback-history` 返回历史回退事件列表（分页）
+- And 响应包含触发条件、触发时间、恢复时间、持续时长
+
+**涉及文件:**
+- `backend/app/api/v1/precool.py` — 追加回退相关端点
+- `backend/app/schemas/precool.py` — 追加回退相关 schema
+
+**NFR 追溯:** NFR-TCL-6
+
+### Story 30.4: 前端约束状态与回退记录展示
+
+As a 运维人员,
+I want 在前端查看约束状态指示器和回退事件时间线,
+So that 我能直观了解安全保护的运行情况。
+
+**依赖 Story:** Story 30.3（回退 API）
+
+**Acceptance Criteria:**
+
+- Given 回退保护 API 已就绪
+- When 进入制冷管理详情页
+- Then 显示约束状态指示灯（绿/黄/红：正常/接近约束/回退中）
+- And 显示回退事件时间线（最近 24 小时）
+- And 点击事件可展开详情（触发条件、温度快照、恢复过程）
+- And **实时推送**（P2-11 修复）：
+  - 复用现有 `/ws/alarms` WebSocket 通道推送回退事件
+  - 前端接收到推送后立即更新时间线和状态指示器（无需轮询）
+  - 推送消息格式：`{type: 'precool_rollback', zone_id, trigger, timestamp, status: 'triggered'|'recovered'}`
+  - 连接断开时自动重连并拉取最新状态
+
+**涉及文件:**
+- 新建 `frontend/src/components/energy/RollbackTimeline.vue`
+- `frontend/src/api/modules/precool.ts` — 追加回退相关 API 调用
+- 修改制冷管理详情页集成新组件
+- `backend/app/services/precool/rollback_manager.py` — 推送回退事件到 WebSocket
+
+**NFR 追溯:** NFR-TCL-6
+
+---
+
+## Epic 31: 预冷计划优化
+
+**阶段:** Phase 2b (月9-10)
+**FR 覆盖:** FR-TCL-10, FR-TCL-16, FR-TCL-18, FR-TCL-23
+**依赖:** Epic 29（热模型）+ Epic 30（安全约束）
+**用户价值:** 运维人员可以基于电价信号生成优化的预冷计划，查看时间线，跟踪执行状态。
+
+### Story 31.1: 贪心优化预冷调度算法
+
+As a 运维人员,
+I want 系统根据电价信号自动生成最优预冷计划,
+So that 在保证温度安全的前提下最大化电费节省。
+
+**依赖 Story:** Story 29.1（数据模型，precool_schedules 表）, Story 29.2（RC 模型）, Story 29.3（THM 模式，未校准区域）, Story 30.1（约束检查）
+
+**Acceptance Criteria:**
+
+- Given 电价信号（峰/谷/平/尖峰时段）和制冷区域热参数
+- When 触发预冷计划生成
+- Then 首先创建 `precool_schedules` 表（如不存在），包含 cooling_zone_id(FK), schedule_date, precool_start_time(谷时), precool_end_time, target_temp(°C), peak_start_time, peak_end_time, planned_savings_kwh, actual_savings_kwh, status(pending|executing|completed|aborted), abort_reason(nullable), temperature_trajectory(JSON: 预测与实际温度轨迹), created_at（与架构表结构一致）
+- And 系统使用贪心优化算法 O(N)（N≤288，5min 步长）：谷时加大制冷预冷、峰时削减制冷释放温度缓冲、平时维持正常
+- And 预冷目标温度不低于 ASHRAE 下限 18°C
+- And 算法遵循所有约束：温度动力学、温度上下限、冷通道级约束（T_inlet ≤ T_max-2°C）、功率上下限、功率调整速率、温变速率 ≤ 5°C/h、日总冷量守恒（软约束）
+- And **可行性验证**（P1-18 修复）：
+  - 算法生成计划后，必须通过 `constraints.py` 全约束验证（温度、功率、速率、ASHRAE 限制）
+  - 验证失败时，算法自动放宽目标并重试：第1次减少预冷深度 1°C，第2次缩短峰时削减时长 30min，第3次同时放宽两者
+  - 3 次重试仍失败时，返回错误 `{error: "no_feasible_plan", reason: "...", suggestions: ["调整热参数", "缩短电价时段"]}`
+  - 验证通过的计划标记 `is_validated=True` 并记录验证时间戳
+- And 生成的计划包含 precool 时段、peak 削减时段、目标温度、预期节省 kWh/金额
+- And 计划存入 precool_schedules 表
+- And 支持手动调整生成的计划
+- And 计划生成耗时 < 5s（架构标准）
+
+**涉及文件:**
+- 新建 `backend/app/services/precool/scheduler.py` — 贪心调度算法
+- 新建 `backend/app/models/thermal.py` 追加 PrecoolSchedule 模型（或在 Story 29.1 迁移中预创建）
+- `backend/app/services/precool/constraints.py` — 约束集成
+- Alembic 迁移脚本（precool_schedules 表）
+
+**NFR 追溯:** NFR-TCL-1
+
+### Story 31.2: 预冷计划执行引擎
+
+As a 运维人员,
+I want 系统按计划自动执行预冷操作并跟踪执行状态,
+So that 预冷计划能可靠地自动运行。
+
+**依赖 Story:** Story 29.2（RC 模型）, Story 30.2（回退保护）, Story 31.1（调度算法）
+
+**Acceptance Criteria:**
+
+- Given 已批准的预冷计划
+- When 到达计划时间段（通过 APScheduler 定时触发）
+- Then 系统通过 `cooling_linkage_service.py` 下发制冷设定温度调整指令，遵守联动服务的 power_adjust_step(20kW) 和 max_adjust_ratio(0.25) 约束
+- And 实时监控温度变化是否符合预期（复用 rollback_manager 监控通道）
+- And 温度偏差超过阈值时触发告警
+- And 安全约束触发时自动中止预冷并回退（委托 rollback_manager）
+- And 执行状态实时更新（pending → executing → completed / aborted）
+- And 执行结果更新 precool_schedules.actual_savings_kwh 和 temperature_trajectory
+
+**涉及文件:**
+- 新建 `backend/app/services/precool/executor.py` — 执行引擎（APScheduler 定时触发）
+- `backend/app/services/load_shift/cooling_linkage_service.py` — 通过联动服务下发制冷调整指令
+
+**NFR 追溯:** NFR-TCL-4
+
+### Story 31.3: 预冷计划 API 端点
+
+As a 前端开发人员,
+I want 后端提供预冷计划管理的 REST API,
+So that 前端可以展示和管理预冷计划。
+
+**依赖 Story:** Story 31.1（调度算法）, Story 31.2（执行引擎）
+
+**Acceptance Criteria:**
+
+- Given 预冷调度和执行服务已实现
+- When 前端调用 API（与架构 11 端点对齐）
+- Then `POST /api/v1/precool/zones/{zone_id}/schedule` 生成日前预冷计划（operator+）
+- And `GET /api/v1/precool/zones/{zone_id}/schedule` 返回计划列表（operator+）
+- And `GET /api/v1/precool/schedules/{schedule_id}` 返回计划详情含温度轨迹（operator+）
+- And `POST /api/v1/precool/schedules/{schedule_id}/abort` 中止执行中的计划，返回 {status, abort_reason}（operator+）
+
+**涉及文件:**
+- `backend/app/api/v1/precool.py` — 追加计划相关端点
+- `backend/app/schemas/precool.py` — 追加计划相关 schema
+
+**NFR 追溯:** NFR-TCL-5
+
+### Story 31.4: CoolingLinkageConfig 预冷扩展
+
+As a 系统管理员,
+I want 在制冷联动配置中启用/禁用预冷功能并设置目标温度,
+So that 我能按区域灵活控制预冷策略。
+
+**依赖 Story:** Story 29.1（数据模型扩展）
+
+**Acceptance Criteria:**
+
+- Given CoolingLinkageConfig（位于 `models/load_shift.py`）已扩展 precool_target_temp 和 precool_enabled 字段
+- When 配置制冷联动
+- Then precool_enabled 默认为 False，手动开启后该区域参与预冷调度
+- And precool_target_temp 设置预冷目标温度（默认 18°C=ASHRAE 下限，范围 18-25°C，与调研文档一致）
+- And 配置变更记录审计日志
+
+**涉及文件:**
+- `backend/app/models/load_shift.py` — CoolingLinkageConfig 扩展（注意：非 cooling.py）
+- `backend/app/api/v1/precool.py` — 配置管理端点
+
+**NFR 追溯:** NFR-TCL-8
+
+### Story 31.5: 前端预冷计划时间线展示
+
+As a 运维人员,
+I want 在前端查看预冷计划的时间线和执行状态,
+So that 我能直观管理预冷操作。
+
+**依赖 Story:** Story 31.3（计划 API）
+
+**Acceptance Criteria:**
+
+- Given 预冷计划 API 已就绪
+- When 进入预冷管理页面
+- Then 显示今日/明日预冷计划甘特图时间线
+- And 时间线标注峰/谷/平电价时段底色
+- And 计划状态用颜色区分（蓝=待执行, 绿=执行中, 灰=已完成, 红=已中止）
+- And 显示预期/实际节省电费对比
+- And 支持拖拽调整计划时间段（仅 pending 状态）
+- And **约束可视化详情**（P2-12 修复）：
+  - 约束违反指示器在计划条上高亮显示（红色虚线边框）
+  - 鼠标悬停计划条时，显示该时段的约束状态 tooltip
+  - Tooltip 内容：温度裕度（°C）、功率余量（kW）、温变速率（°C/h）、是否满足约束（✓/✗）
+  - 不满足约束的具体原因（如"温度裕度不足 < 2°C"、"功率调整速率超限"）
+  - 约束状态实时更新（通过 WebSocket 或轮询）
+
+**涉及文件:**
+- 新建 `frontend/src/views/energy/PrecoolScheduleView.vue` — 预冷计划页面
+- 新建 `frontend/src/components/energy/PrecoolTimeline.vue` — 时间线组件
+- `frontend/src/api/modules/precool.ts` — API 封装
+- `frontend/src/router/` — 路由注册
+
+**NFR 追溯:** NFR-TCL-1
+
+---
+
+## Epic 32: 热参数自动校准与分阶段部署
+
+**阶段:** Phase 2b (月9-10)
+**FR 覆盖:** FR-TCL-8, FR-TCL-13, FR-TCL-19
+**依赖:** Epic 29（热模型基础）
+**用户价值:** 系统自动校准热模型参数，支持分阶段上线（THM→校准→TCL→VPP），运维人员可通过 API 管理全部热参数和部署阶段。
+
+### Story 32.1: R/C 参数最小二乘自动校准
+
+As a 系统运维人员,
+I want 系统自动基于历史温度数据校准 R 和 C 参数,
+So that 热模型预测越来越精准。
+
+**依赖 Story:** Story 29.1（数据模型）, Story 29.2（RC 模型）
+
+**Acceptance Criteria:**
+
+- Given 制冷区域已积累 ≥ 48 小时温度历史数据
+- When 触发自动校准（每月定时 + 手动触发）
+- Then 系统利用自然发生的功率变化事件（群控切换、故障恢复、定时启停）数据进行拟合，**禁止在生产环境主动制造功率扰动**
+- And 事件检测逻辑：监控 CoolingLinkageRecord(event_type='adjust'|'recovery') 记录中功率变化 > 10% 的事件作为校准数据点
+- And **异常值过滤**（P2-13 修复）：
+  - 校准前使用 3σ 原则过滤温度异常值（偏离均值 > 3 倍标准差）
+  - 过滤功率变化 > 50% 的极端事件（可能是故障而非正常调整）
+  - 过滤环境温度 < 10°C 或 > 35°C 的数据（极端天气）
+  - 过滤后数据点 < 20 个时，拒绝校准并返回错误 `{error: "insufficient_data", valid_samples: N}`
+- And 系统使用最小二乘法拟合 R 和 C 参数（温度响应模型：T(t) = T_steady + (T0 - T_steady) × e^(-t/τ)，τ=RC）
+- And 校准数据窗口为最近 7 天（可配置）
+- And 校准结果通过物理合理性检查：R > 0, C > 0, 时间常数 RC 在 0.5-8 小时范围
+- And 校准通过后更新 thermal_parameters 表，标记 is_calibrated=True
+- And 校准失败时保留旧参数，记录失败原因
+- And 校准历史可追溯（保留最近 10 次校准记录）
+
+**涉及文件:**
+- 新建 `backend/app/services/precool/calibrator.py` — 自动校准服务
+
+**NFR 追溯:** NFR-TCL-6, NFR-TCL-7
+
+### Story 32.2: 分阶段部署控制
+
+As a 系统管理员,
+I want 通过特性开关控制预冷功能的分阶段上线,
+So that 我能安全地逐步推进功能部署。
+
+**依赖 Story:** Story 29.2（热模型服务，包含 THM/TCL 切换）, Story 32.1（校准服务）
+
+**Acceptance Criteria:**
+
+- Given 系统配置表 system_configs 已有特性开关机制
+- When 配置预冷部署阶段
+- Then 支持 4 个阶段切换：
+  1. THM 模式（0-2 周）：仅使用 THM 估算，不执行预冷
+  2. 校准模式（2-4 周）：运行 RC 校准，对比 THM 与 TCL 结果
+  3. TCL 上线（4 周+）：使用校准后的 TCL 模型执行预冷
+  4. VPP 接入（8 周+）：开放 VPP 接口
+- And **阶段切换前置检查**（P2-14 修复）：
+  - 切换到阶段 3（TCL 上线）时，检查所有区域是否已完成校准（`is_calibrated=True` 且 `fitting_r_squared ≥ 0.85`）
+  - 切换到阶段 4（VPP 接入）时，检查是否已有 ≥ 7 天的预冷执行历史（`precool_schedules` 表中 status='completed' 的记录）
+  - 前置条件不满足时，阻止切换并返回详细原因：`{error: "precondition_failed", details: ["区域A未校准", "区域B R²=0.72<0.85"]}`
+  - 前置检查可通过 `force=true` 参数跳过（仅 admin 角色，记录审计日志）
+- And 每个阶段可独立开启/关闭
+- And 阶段切换记录审计日志
+- And 前端显示当前部署阶段状态
+
+**涉及文件:**
+- `backend/app/services/precool/thermal_model.py` — 阶段控制逻辑
+- `backend/app/api/v1/precool.py` — 部署阶段管理端点
+
+**NFR 追溯:** NFR-TCL-8
+
+### Story 32.3: 热参数管理 API 完整实现
+
+As a 系统管理员,
+I want 通过 API 管理所有热参数和校准任务,
+So that 我能灵活控制热模型的运行。
+
+**依赖 Story:** Story 32.1（校准服务）, Story 32.2（分阶段部署）
+
+**Acceptance Criteria:**
+
+- Given 校准服务和分阶段部署已实现
+- When 调用热参数管理 API
+- Then `POST /api/v1/precool/zones/{zone_id}/calibrate` 触发手动校准
+- And `GET /api/v1/precool/zones/{zone_id}/calibration-history` 返回校准历史
+- And `GET /api/v1/precool/deployment-phase` 返回当前部署阶段
+- And `PUT /api/v1/precool/deployment-phase` 切换部署阶段
+- And 所有端点遵循 JWT + RBAC（仅 admin 可切换部署阶段）
+
+**涉及文件:**
+- `backend/app/api/v1/precool.py` — 追加校准和部署端点
+- `backend/app/schemas/precool.py` — 追加相关 schema
+
+**NFR 追溯:** NFR-TCL-5
+
+### Story 32.4: 前端部署阶段与校准状态展示
+
+As a 系统管理员,
+I want 在前端查看当前部署阶段和各区域校准状态,
+So that 我能监控预冷功能的上线进度。
+
+**依赖 Story:** Story 32.3（热参数管理 API）
+
+**Acceptance Criteria:**
+
+- Given 部署阶段和校准 API 已就绪
+- When 进入预冷管理设置页面
+- Then 显示 4 阶段部署进度条（当前阶段高亮）
+- And 显示各区域校准状态表格（未校准/校准中/已校准/校准失败）
+- And 支持一键触发单区域校准
+- And 显示 THM vs TCL 模式对比（校准模式下）
+
+**涉及文件:**
+- 新建 `frontend/src/components/energy/DeploymentPhasePanel.vue`
+- `frontend/src/api/modules/precool.ts` — 追加部署阶段和校准 API 调用
+- 修改预冷管理页面集成新组件
+
+**NFR 追溯:** NFR-TCL-8
+
+---
+
+## Epic 33: VPP 虚拟电厂集成
+
+**阶段:** Phase 3 (月11-12+)
+**FR 覆盖:** FR-TCL-11, FR-TCL-12
+**依赖:** Epic 29 + Epic 30 + Epic 31（完整预冷功能链路）
+**用户价值:** 外部虚拟电厂平台可以查询数据中心可调容量，下发调控指令，系统自动响应并反馈执行结果。
+
+### Story 33.1: VPP 可调容量上报接口
+
+As a VPP 平台运营人员,
+I want 数据中心每 5 分钟上报可调容量,
+So that 我能将数据中心纳入虚拟电厂调度资源池。
+
+**依赖 Story:** Story 29.2（热模型服务，包含 THM/TCL）, Story 32.2（部署阶段控制，VPP 在阶段 4）
+
+**Acceptance Criteria:**
+
+- Given 预冷功能已上线（部署阶段 4: VPP 接入）
+- When VPP 平台查询可调容量
+- Then `GET /api/v1/precool/vpp/capacity` 返回分向可调容量（与架构一致），同时返回热功率和电功率：
+  - down_adjustable_kw: 向下可调电功率（kW_e = kW_th / COP，削峰，减少制冷）
+  - up_adjustable_kw: 向上可调电功率（kW_e = kW_th / COP，填谷，增加制冷）
+  - down_adjustable_thermal_kw: 向下可调制冷量（kW_th）
+  - up_adjustable_thermal_kw: 向上可调制冷量（kW_th）
+  - T_current, headroom_up, headroom_down, response_window_hours
+- And 向下可调计算：温度裕度 ≤ 1°C 时返回 0；否则 min(当前制冷-最低制冷, C×(裕度-1°C)/响应窗口)
+- And 向上可调计算：温度裕度 ≤ 0.5°C 时返回 0；否则 min(最大制冷-当前制冷, C×(裕度-0.5°C)/响应窗口)
+- And **基线功率计算细节**（P2-15 修复）：
+  - 基线功率 = 近 10 个同类型工作日平均制冷功率
+  - 同类型工作日定义：周一~周五，排除法定节假日
+  - 排除环境温度偏离月均值 > 5°C 的日期（极端天气）
+  - 排除 IT 负载偏离月均值 > 20% 的日期（异常负载）
+  - 基线每周一凌晨自动更新（通过 APScheduler 定时任务）
+  - 基线计算结果缓存到 Redis，TTL=7天
+- And 系统每 5 分钟通过 APScheduler 定时任务主动上报（格式：资源 ID + up_kw + down_kw + max_duration）
+
+**涉及文件:**
+- 新建 `backend/app/services/precool/vpp_interface.py` — VPP 接口服务
+- `backend/app/api/v1/precool.py` — VPP 相关端点
+
+**NFR 追溯:** NFR-TCL-2, NFR-TCL-5
+
+### Story 33.2: VPP 调控指令接收与执行
+
+As a VPP 平台运营人员,
+I want 向数据中心下发负荷调控指令并获取执行反馈,
+So that 我能通过虚拟电厂协调数据中心参与电网需求响应。
+
+**依赖 Story:** Story 31.1（调度算法）, Story 31.2（执行引擎）, Story 33.1（容量上报）
+
+**Acceptance Criteria:**
+
+- Given VPP 平台已认证并获得调控权限
+- When 下发调控指令
+- Then `POST /api/v1/precool/vpp/dispatch` 接收调度指令（目标功率、持续时间、优先级，与架构端点一致）
+- And **冲突检测**（P1-19 修复）：
+  - VPP 指令到达时，检查是否与当前执行中的 `precool_schedules` 冲突
+  - 冲突判定：VPP 要求削减制冷（down_adjust）&& 当前处于预冷时段（precool_start_time ≤ now < precool_end_time）→ 冲突
+  - 冲突处理：优先级 VPP > 预冷计划，中止预冷计划并标记 `abort_reason='vpp_override'`，记录冲突事件到审计日志
+  - 冲突事件推送告警通知：`{type: 'precool_aborted', reason: 'vpp_override', schedule_id, vpp_dispatch_id}`
+- And 系统自动校验指令是否满足安全约束
+- And 约束通过：接受指令，生成临时预冷计划并执行
+- And 约束不通过：拒绝指令，返回拒绝原因和当前最大可调容量
+- And 指令执行过程实时推送状态更新
+- And 指令完成后返回执行报告（实际调控量、持续时间、温度变化）
+- And VPP 接口需独立认证（API Key + IP 白名单），与系统内部 JWT 认证分离
+- And 速率限制：每小时最多 12 条指令
+
+**涉及文件:**
+- `backend/app/services/precool/vpp_interface.py` — 指令处理逻辑
+- `backend/app/api/v1/precool.py` — 指令接收端点
+- `backend/app/schemas/precool.py` — VPP 相关 schema
+
+**NFR 追溯:** NFR-TCL-2, NFR-TCL-4, NFR-TCL-5
+
+### Story 33.3: 前端 VPP 集成状态监控
+
+As a 系统管理员,
+I want 在前端查看 VPP 集成状态和指令执行历史,
+So that 我能监控数据中心参与虚拟电厂的运行情况。
+
+**依赖 Story:** Story 33.1（容量上报）, Story 33.2（指令接收）
+
+**Acceptance Criteria:**
+
+- Given VPP 接口已上线
+- When 进入 VPP 监控页面
+- Then 显示 VPP 连接状态（在线/离线/异常）
+- And 显示当前可调容量仪表盘
+- And 显示最近指令执行列表（时间、类型、状态、实际调控量）
+- And 显示日/月累计参与需求响应统计（次数、总调控量、总节省电费）
+
+**涉及文件:**
+- 新建 `frontend/src/views/energy/VppMonitorView.vue` — VPP 监控页面
+- 新建 `frontend/src/components/energy/VppCapacityGauge.vue` — 容量仪表组件
+- `frontend/src/api/modules/precool.ts` — 追加 VPP 相关 API 调用
+- `frontend/src/router/` — 路由注册
+
+**NFR 追溯:** NFR-TCL-2
+
+---
+
+## FR-TCL 覆盖映射
+
+| FR | Epic | Story | 描述 |
+|---|---|---|---|
+| FR-TCL-1 | 29 | 29.2 | RC 热动力学模型（Δt=5min） |
+| FR-TCL-2 | 29 | 29.3 | THM 安全兜底（ratio=(T_max-T_current)/(T_max-T_supply)×sf） |
+| FR-TCL-3 | 29 | 29.2 | bypass β 校正（T_inlet = T_model×(1-β) + T_outlet×β） |
+| FR-TCL-4 | 30 | 30.1 | ASHRAE 温度硬约束 |
+| FR-TCL-5 | 30 | 30.1 | 制冷功率上限 |
+| FR-TCL-6 | 30 | 30.1 | 温变速率限制 |
+| FR-TCL-7 | 30 | 30.2 | 7 项自动回退保护（≤30s 响应） |
+| FR-TCL-8 | 32 | 32.1 | R/C 自动校准 |
+| FR-TCL-9 | 29 | 29.2 | COP 季节修正（2.8/3.5/4.0） |
+| FR-TCL-10 | 31 | 31.1 | 贪心优化调度（O(288)） |
+| FR-TCL-11 | 33 | 33.1 | VPP 容量上报（down/up 分向） |
+| FR-TCL-12 | 33 | 33.2 | VPP 指令接收（POST /vpp/dispatch） |
+| FR-TCL-13 | 32 | 32.2 | 分阶段部署（4 阶段 12 周） |
+| FR-TCL-14 | 29 | 29.1 | ThermalParameter 表（含 fitting_r_squared） |
+| FR-TCL-15 | 29 | 29.1 | TemperaturePredictionLog 表（单条记录模式） |
+| FR-TCL-16 | 31 | 31.1 | PrecoolSchedule 表（含 precool/peak 时段） |
+| FR-TCL-17 | 29 | 29.1 | CoolingZone 扩展字段（β默认0.1） |
+| FR-TCL-18 | 31 | 31.4 | CoolingLinkageConfig 扩展 |
+| FR-TCL-19 | 32 | 32.3 | 11 个 API 端点（含 dashboard/validation） |
+| FR-TCL-20 | 29 | 29.2 | 数值稳定性（Δt < 2RC） |
+| FR-TCL-21 | 29 | 29.5 | 模型精度验证（MAE≤1°C/1h, ≤2°C/3h） |
+| FR-TCL-22 | 29 | 29.6 | 前端预测曲线 |
+| FR-TCL-23 | 31 | 31.5 | 前端预冷时间线 |
+| — | 29 | 29.7 | **关键集成**: 替换 constraint_checker.py 固定 0.4 比例 |
+
+### API 端点对照（架构 11 个 + 扩展 6 个）
+
+**架构定义的 11 个核心端点:**
+1. `POST /zones/{id}/predict` — Story 29.4
+2. `POST /zones/{id}/schedule` — Story 31.3
+3. `GET /zones/{id}/schedule` — Story 31.3
+4. `GET /schedules/{id}` — Story 31.3
+5. `POST /schedules/{id}/abort` — Story 31.3
+6. `POST /zones/{id}/calibrate` — Story 32.3
+7. `GET /zones/{id}/parameters` — Story 29.4
+8. `GET /zones/{id}/validation` — Story 29.4
+9. `GET /vpp/capacity` — Story 33.1
+10. `POST /vpp/dispatch` — Story 33.2
+11. `GET /dashboard` — Story 29.4
+
+**扩展端点（不在架构 11 个之列，按需实现）:**
+- `GET /zones/{id}/rollback-status` — Story 30.3
+- `GET /zones/{id}/rollback-history` — Story 30.3
+- `GET /zones/{id}/calibration-history` — Story 32.3
+- `GET /deployment-phase` — Story 32.3
+- `PUT /deployment-phase` — Story 32.3
+- 联动配置管理 — Story 31.4
+
+### 后续迭代 Backlog（调研文档审查建议）
+
+以下风险点在调研文档对抗性审查中被识别，当前 Epic 未覆盖，记录为后续迭代 backlog：
+- **IT 负载波动适配**: GPU 集群 idle 50W → full 350W/GPU，需接入算力调度系统获取 24h 负载预测
+- **高密区差异化策略**: 20kW/柜 GPU 区 vs 3kW/柜 存储区热特性不同，高密区应自动使用更保守参数
+- **季节性预冷策略**: 冬季室外 <15°C 时自然冷却充足，预冷价值下降，应自动禁用
+- **多负荷转移协调**: TCL 预冷与储能充电、照明等共享变压器容量，需 ShiftPlan 层面总功率约束
+
+---
+
+*文档更新 - 共 33 个 Epic, 161+ 个 Stories, 覆盖 FR1-FR99 全部功能需求 + FR34-1~42 智能诊断子需求 + FR-TCL-1~23 预冷 TCL 模型（含 constraint_checker 集成）+ 关键 NFR + Phase 2 补充页面 + 前端数据链路统一 + Demo 系统解耦与数据隔离。Epic 29-33 经三轮对抗性审查修订+依赖关系审查修复+无依赖Story审查。第一轮(10P1+6P2)：Δt步长、THM公式、安全裕度、数据表字段、API端点、回退响应时间、热参数默认值、VPP分向容量、新增Story 29.7。第二轮(5P1+8P2)：文件路径校正(constraint_checker→load_shift/algorithms/、CoolingZone→topology_config.py、CoolingLinkageConfig→load_shift.py)、Q_IT/T_ambient数据源映射、prediction_logs写入量优化、复用现有ASHRAE常量和温度查询链路、联动服务交互、校准事件检测、周期任务机制、API端点对照表、后续迭代backlog。第三轮(5P1+8P2+依赖追加)：数据质量保障(Q_IT缺失降级)、回退自动恢复条件、贪心算法可行性验证、VPP指令冲突检测、迁移回滚脚本要求、API速率限制、模型精度持续监控、WebSocket实时推送、约束可视化详情、校准异常值过滤、阶段切换前置检查、VPP基线功率计算细节、预测误差带展示、Story级别依赖关系明确(15个关键Story)。依赖关系审查：修复8处缺失/冗余依赖(29.2→29.1、29.3→29.1、29.4→29.1/29.2/29.3、29.7→29.4/30.1、30.2→30.1、31.1→29.1/29.3、32.2→29.2、33.1→29.2)，确保执行顺序正确。无依赖Story审查：确认Story 29.1和30.1无依赖正确，修复29.1表创建/扩展措辞(cooling_zones/cooling_linkage_configs表处理逻辑明确化，迁移脚本增加表存在性检查)。*
