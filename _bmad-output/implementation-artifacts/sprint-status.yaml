@@ -354,11 +354,11 @@ development_status:
   epic-29-retrospective: done
 
   # Epic 30: 安全约束与自动回退 (Phase 2a 月7-8)
-  epic-30: in-progress
+  epic-30: done
   30-1-ashrae-temperature-hard-constraint-and-power-limit: done
   30-2-seven-auto-rollback-protection-mechanisms: done
   30-3-rollback-protection-api-and-status-query: done
-  30-4-frontend-constraint-status-and-rollback-log: backlog
+  30-4-frontend-constraint-status-and-rollback-log: done
   epic-30-retrospective: optional
 
   # Epic 31: 预冷计划优化 (Phase 2b 月9-10)

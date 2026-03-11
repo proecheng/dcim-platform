@@ -78,3 +78,67 @@ export function getDashboard() {
     '/v1/precool/dashboard'
   )
 }
+
+// ========== 回退保护类型 ==========
+
+export interface RollbackTriggerInfo {
+  trigger_type: string
+  since: string | null
+  event_id: number | null
+  recovering: boolean
+}
+
+export interface RollbackStatusResponse {
+  zone_id: number
+  has_active_rollback: boolean
+  active_triggers: RollbackTriggerInfo[]
+}
+
+export interface RollbackEventItem {
+  id: number
+  zone_id: number
+  trigger_type: string
+  trigger_value: number | null
+  threshold: number | null
+  action: string
+  status: string
+  context_json: string | null
+  created_at: string | null
+  resolved_at: string | null
+}
+
+export interface RollbackOverviewResponse {
+  total_zones: number
+  zones_with_active_rollback: number
+  total_active_triggers: number
+  trigger_type_counts: Record<string, number>
+  recent_events_24h: number
+  zone_statuses: RollbackStatusResponse[]
+}
+
+// ========== 回退保护 API ==========
+
+/** 查询 zone 回退状态 */
+export function getRollbackStatus(zoneId: number) {
+  return request.get<{ code: number; message: string; data: RollbackStatusResponse }>(
+    `/v1/precool/zones/${zoneId}/rollback-status`
+  )
+}
+
+/** 查询回退历史事件 */
+export function getRollbackHistory(
+  zoneId: number,
+  params?: { skip?: number; limit?: number; status?: 'active' | 'resolved' }
+) {
+  return request.get<{ code: number; message: string; data: { items: RollbackEventItem[]; total: number } }>(
+    `/v1/precool/zones/${zoneId}/rollback-history`,
+    { params }
+  )
+}
+
+/** 全局回退概览 */
+export function getRollbackOverview() {
+  return request.get<{ code: number; message: string; data: RollbackOverviewResponse }>(
+    '/v1/precool/rollback-overview'
+  )
+}

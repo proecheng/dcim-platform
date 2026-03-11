@@ -41,6 +41,16 @@
       </el-col>
     </el-row>
 
+    <!-- 回退保护状态与事件记录 -->
+    <el-row :gutter="20" style="margin-top: 20px" v-if="selectedZoneId">
+      <el-col :span="8">
+        <RollbackStatusCard :zone-id="selectedZoneId" :headroom="currentZoneHeadroom" />
+      </el-col>
+      <el-col :span="16">
+        <RollbackTimeline :zone-id="selectedZoneId" />
+      </el-col>
+    </el-row>
+
     <el-row :gutter="20" style="margin-top: 20px">
       <el-col :span="12">
         <el-card shadow="hover">
@@ -168,12 +178,14 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { getCoolingConfig, getCoolingStatus, getCoolingHistory } from '@/api/modules/shift'
 import { getDashboard } from '@/api/modules/precool'
 import type { DashboardZone } from '@/api/modules/precool'
 import TemperaturePredictionChart from '@/components/energy/TemperaturePredictionChart.vue'
+import RollbackStatusCard from '@/components/energy/RollbackStatusCard.vue'
+import RollbackTimeline from '@/components/energy/RollbackTimeline.vue'
 import * as echarts from 'echarts'
 
 const loading = ref(false)
@@ -193,6 +205,11 @@ const selectedZoneId = ref<number>(0)
 const selectedZoneName = computed(() => {
   const zone = zoneList.value.find(z => z.zone_id === selectedZoneId.value)
   return zone?.zone_name || ''
+})
+
+const currentZoneHeadroom = computed(() => {
+  const zone = zoneList.value.find(z => z.zone_id === selectedZoneId.value)
+  return zone?.headroom ?? null
 })
 
 const onZoneChange = (val: number) => {

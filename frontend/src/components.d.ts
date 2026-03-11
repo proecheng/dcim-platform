@@ -141,6 +141,8 @@ declare module 'vue' {
     PueTrend: typeof import('./components/bigscreen/charts/PueTrend.vue')['default']
     RealtimeChart: typeof import('./components/charts/RealtimeChart.vue')['default']
     RightPanel: typeof import('./components/bigscreen/panels/RightPanel.vue')['default']
+    RollbackStatusCard: typeof import('./components/energy/RollbackStatusCard.vue')['default']
+    RollbackTimeline: typeof import('./components/energy/RollbackTimeline.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
     ScheduleDashboard: typeof import('./components/energy/ScheduleDashboard.vue')['default']
