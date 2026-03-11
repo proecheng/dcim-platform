@@ -219,6 +219,32 @@ async def lifespan(app: FastAPI):
     # 启动时初始化数据库
     await init_db()
 
+    # Story 29.3: 初始化 THM 配置项
+    try:
+        from app.models.system_config import SystemConfig
+        from app.core.database import async_session
+
+        async with async_session() as session:
+            thm_configs = {
+                "thm_safety_factor": "0.8",
+                "thm_absolute_max_ratio": "0.6",
+                "thm_min_headroom_celsius": "2.0"
+            }
+
+            for key, value in thm_configs.items():
+                existing = (await session.execute(
+                    select(SystemConfig).where(SystemConfig.key == key)
+                )).scalar_one_or_none()
+
+                if existing is None:
+                    new_config = SystemConfig(key=key, value=value)
+                    session.add(new_config)
+                    logger.info(f"✓ 初始化 THM 配置项: {key}={value}")
+
+            await session.commit()
+    except Exception as e:
+        logger.warning(f"⚠️  THM 配置项初始化失败: {e}")
+
     # 初始化邮件服务（Story 26.2）
     if settings.smtp_enabled:
         from app.services.email_service import email_service

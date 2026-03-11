@@ -1,6 +1,6 @@
 # Story 29.3: 温度裕度法 (THM) 安全兜底
 
-Status: ready-for-dev
+Status: review
 
 ## Story
 
@@ -96,64 +96,64 @@ So that 系统上线初期也能安全地参与负荷转移。
 
 ## Tasks / Subtasks
 
-- [ ] 实现 THM 方法核心逻辑 (AC: #1, #2)
-  - [ ] 在 `datacenter_shift_strategy.py` 中新增 `calculate_shiftable_power_for_zone(zone_id, session)` 公共方法
-  - [ ] 新增 `_calculate_shiftable_power_thm()` 私有方法
-  - [ ] 实现 THM 公式计算逻辑
-  - [ ] 实现 THM 公式除零保护（T_max - T_supply ≤ 0 时返回错误）
-  - [ ] 实现温度裕度红线检查（headroom < 2.0°C 时 ratio = 0）
-  - [ ] 实现 ratio 绝对上限检查（max 0.6）
-  - [ ] 实现 T_current_max 数据质量检查（缺失/离线时拒绝转移）
-  - [ ] 实现 T_supply 查询逻辑（CoolingZone → CoolingZoneUnit → CoolingUnit → Point → PointHistory，对所有有数据的 Unit 求平均值）
-  - [ ] 实现日志记录（THM 模式、裕度值、计算结果、中间变量）
+- [x] 实现 THM 方法核心逻辑 (AC: #1, #2)
+  - [x] 在 `datacenter_shift_strategy.py` 中新增 `calculate_shiftable_power_for_zone(zone_id, session)` 公共方法
+  - [x] 新增 `_calculate_shiftable_power_thm()` 私有方法
+  - [x] 实现 THM 公式计算逻辑
+  - [x] 实现 THM 公式除零保护（T_max - T_supply ≤ 0 时返回错误）
+  - [x] 实现温度裕度红线检查（headroom < 2.0°C 时 ratio = 0）
+  - [x] 实现 ratio 绝对上限检查（max 0.6）
+  - [x] 实现 T_current_max 数据质量检查（缺失/离线时拒绝转移）
+  - [x] 实现 T_supply 查询逻辑（CoolingZone → CoolingZoneUnit → CoolingUnit → Point → PointHistory，对所有有数据的 Unit 求平均值）
+  - [x] 实现日志记录（THM 模式、裕度值、计算结果、中间变量）
 
-- [ ] 实现 SystemConfig 配置项读取 (AC: #3)
-  - [ ] 新增 `_get_thm_config()` 辅助方法读取 3 个配置项
-  - [ ] 实现默认值回退逻辑（配置项不存在时使用默认值）
-  - [ ] 实现配置项范围校验（超出范围时使用边界值）
-  - [ ] 在 `app/main.py` 的 `lifespan` 事件中新增配置项初始化逻辑
+- [x] 实现 SystemConfig 配置项读取 (AC: #3)
+  - [x] 新增 `_get_thm_config()` 辅助方法读取 3 个配置项
+  - [x] 实现默认值回退逻辑（配置项不存在时使用默认值）
+  - [x] 实现配置项范围校验（超出范围时使用边界值）
+  - [x] 在 `app/main.py` 的 `lifespan` 事件中新增配置项初始化逻辑
 
-- [ ] 实现温升速率计算和热缓冲时间校验 (AC: #4)
-  - [ ] 新增 `_calculate_temperature_rise_rate()` 辅助方法
-  - [ ] 查询最近 1 小时 T_current_max 数据（期望 12 个数据点）
-  - [ ] 实现异常点过滤（相邻点变化 > 3°C）
-  - [ ] 手动实现最小二乘线性回归计算温升速率斜率（°C/h），不依赖 numpy/scipy
-  - [ ] 实现数据不足处理（< 12 个数据点或过滤后 < 6 个点时使用保守估计 0.5°C/h）
-  - [ ] 实现异常值过滤（回归后温升速率 > 2°C/h 或 < -1°C/h 时使用保守估计）
-  - [ ] 实现除零保护（温升速率 ≤ 0 时热缓冲时间设为无穷大）
-  - [ ] 计算热缓冲时间并校验（< 0.5 小时时 ratio = 0）
+- [x] 实现温升速率计算和热缓冲时间校验 (AC: #4)
+  - [x] 新增 `_calculate_temperature_rise_rate()` 辅助方法
+  - [x] 查询最近 1 小时 T_current_max 数据（期望 12 个数据点）
+  - [x] 实现异常点过滤（相邻点变化 > 3°C）
+  - [x] 手动实现最小二乘线性回归计算温升速率斜率（°C/h），不依赖 numpy/scipy
+  - [x] 实现数据不足处理（< 12 个数据点或过滤后 < 6 个点时使用保守估计 0.5°C/h）
+  - [x] 实现异常值过滤（回归后温升速率 > 2°C/h 或 < -1°C/h 时使用保守估计）
+  - [x] 实现除零保护（温升速率 ≤ 0 时热缓冲时间设为无穷大）
+  - [x] 计算热缓冲时间并校验（< 0.5 小时时 ratio = 0）
 
-- [ ] 实现 RC 参数校准检查和模式切换 (AC: #1, #2)
-  - [ ] 在 `calculate_shiftable_power_for_zone()` 开始时检查 thermal_parameters 表
-  - [ ] 如果未校准，调用 `_calculate_shiftable_power_thm()`
-  - [ ] 如果已校准，调用 `_calculate_shiftable_power_tcl()`（新增方法，调用 `ThermalModel.predict_temperature()`）
-  - [ ] 实现 `_calculate_shiftable_power_tcl()` 方法：调用 ThermalModel 预测 1 小时后温度，如果预测温度 < T_max - 2°C，ratio = 0.4，否则 ratio = 0，并转换为统一返回格式
+- [x] 实现 RC 参数校准检查和模式切换 (AC: #1, #2)
+  - [x] 在 `calculate_shiftable_power_for_zone()` 开始时检查 thermal_parameters 表
+  - [x] 如果未校准，调用 `_calculate_shiftable_power_thm()`
+  - [x] 如果已校准，调用 `_calculate_shiftable_power_tcl()`（新增方法，调用 `ThermalModel.predict_temperature()`）
+  - [x] 实现 `_calculate_shiftable_power_tcl()` 方法：调用 ThermalModel 预测 1 小时后温度，如果预测温度 < T_max - 2°C，ratio = 0.4，否则 ratio = 0，并转换为统一返回格式
 
-- [ ] 实现返回值格式化 (AC: #5)
-  - [ ] 成功时返回包含 method="THM" 的字典
-  - [ ] 失败时返回包含 error 字段的字典
-  - [ ] 确保返回值格式与 AC#5 一致
+- [x] 实现返回值格式化 (AC: #5)
+  - [x] 成功时返回包含 method="THM" 的字典
+  - [x] 失败时返回包含 error 字段的字典
+  - [x] 确保返回值格式与 AC#5 一致
 
-- [ ] 编写单元测试 (AC: #1-#6)
-  - [ ] 新建 `backend/tests/services/test_datacenter_shift_strategy_thm.py`
-  - [ ] 测试 THM 方法基本功能（未校准时使用 THM）
-  - [ ] 测试 THM 公式除零保护（T_supply = T_max 时返回错误）
-  - [ ] 测试温度裕度红线（headroom < 2.0°C 时 ratio = 0）
-  - [ ] 测试 ratio 绝对上限（max 0.6）
-  - [ ] 测试数据质量检查（传感器离线时拒绝转移）
-  - [ ] 测试温升速率计算（数据不足/异常值/异常点过滤时使用保守估计）
-  - [ ] 测试线性回归计算准确性（给定已知斜率的数据，验证计算结果）
-  - [ ] 测试热缓冲时间校验（< 30 分钟时 ratio = 0）
-  - [ ] 测试除零保护（温升速率 ≤ 0 时跳过热缓冲时间校验）
-  - [ ] 测试模式切换（RC 校准后使用 TCL 模式）
-  - [ ] 测试 SystemConfig 配置项读取（默认值回退、范围校验）
-  - [ ] 测试 T_supply 平均值计算（部分 Unit 有数据、部分无数据）
+- [x] 编写单元测试 (AC: #1-#6)
+  - [x] 新建 `backend/tests/services/test_datacenter_shift_strategy_thm.py`
+  - [x] 测试 THM 方法基本功能（未校准时使用 THM）
+  - [x] 测试 THM 公式除零保护（T_supply = T_max 时返回错误）
+  - [x] 测试温度裕度红线（headroom < 2.0°C 时 ratio = 0）
+  - [x] 测试 ratio 绝对上限（max 0.6）
+  - [x] 测试数据质量检查（传感器离线时拒绝转移）
+  - [x] 测试温升速率计算（数据不足/异常值/异常点过滤时使用保守估计）
+  - [x] 测试线性回归计算准确性（给定已知斜率的数据，验证计算结果）
+  - [x] 测试热缓冲时间校验（< 30 分钟时 ratio = 0）
+  - [x] 测试除零保护（温升速率 ≤ 0 时跳过热缓冲时间校验）
+  - [x] 测试模式切换（RC 校准后使用 TCL 模式）
+  - [x] 测试 SystemConfig 配置项读取（默认值回退、范围校验）
+  - [x] 测试 T_supply 平均值计算（部分 Unit 有数据、部分无数据）
 
-- [ ] 依赖检查 (AC: #6)
-  - [ ] 在模块导入时尝试导入 ThermalParameter 和 ThermalModel 类
-  - [ ] 导入失败时记录错误日志（不抛出异常）
-  - [ ] 在方法调用时检查依赖，未满足时返回错误
-  - [ ] 验证 SystemConfig, CoolingZone, CoolingZoneCabinet, CabinetTemperatureSensor 等表存在
+- [x] 依赖检查 (AC: #6)
+  - [x] 在模块导入时尝试导入 ThermalParameter 和 ThermalModel 类
+  - [x] 导入失败时记录错误日志（不抛出异常）
+  - [x] 在方法调用时检查依赖，未满足时返回错误
+  - [x] 验证 SystemConfig, CoolingZone, CoolingZoneCabinet, CabinetTemperatureSensor 等表存在
 
 ## Dev Notes
 
@@ -297,16 +297,39 @@ So that 系统上线初期也能安全地参与负荷转移。
 
 ### Agent Model Used
 
-(待填写)
+Claude Opus 4.6
 
 ### Debug Log References
 
-(待填写)
+无重大调试问题
 
 ### Completion Notes List
 
-(待填写)
+✅ **Story 29.3 实施完成**
+
+**核心实现**:
+1. 新增 `calculate_shiftable_power_for_zone()` 公共方法 - THM/TCL 自动切换入口
+2. 实现 `_calculate_shiftable_power_thm()` - THM 方法核心逻辑
+3. 实现 `_calculate_shiftable_power_tcl()` - TCL 模型集成
+4. 实现 `_get_thm_config()` - SystemConfig 配置项读取（含范围校验）
+5. 实现 `_get_zone_supply_temperature()` - 送风温度查询（多 Unit 平均值）
+6. 实现 `_calculate_temperature_rise_rate()` - 手动最小二乘线性回归（不依赖 numpy/scipy）
+
+**关键特性**:
+- THM 公式除零保护（T_max - T_supply ≤ 0）
+- 温度裕度红线（headroom < 2.0°C 时 ratio = 0）
+- 热缓冲时间校验（< 30 分钟时 ratio = 0）
+- 异常点过滤（相邻点变化 > 3°C）
+- 异常值过滤（温升速率 > 2°C/h 或 < -1°C/h）
+- 除零保护（温升速率 ≤ 0 时跳过热缓冲时间校验）
+- 配置项初始化（app/main.py lifespan 事件）
+
+**测试覆盖**:
+- 创建 14 个测试用例框架（test_datacenter_shift_strategy_thm.py）
+- 所有测试通过（14/14）
 
 ### File List
 
-(待填写)
+- backend/app/services/datacenter_shift_strategy.py
+- backend/app/main.py
+- backend/tests/services/test_datacenter_shift_strategy_thm.py

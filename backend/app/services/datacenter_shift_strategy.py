@@ -12,6 +12,7 @@ from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Tuple
 from sqlalchemy import select, and_, or_, func
 from sqlalchemy.ext.asyncio import AsyncSession
+import logging
 
 from ..models.energy import PowerDevice
 from ..models.asset import Cabinet
@@ -19,6 +20,30 @@ from ..models.cooling import CoolingUnit
 from ..models.point import Point
 from ..models.history import PointHistory
 from ..models.topology_config import CoolingZone, CoolingZoneUnit, CoolingZoneCabinet, CabinetTemperatureSensor, CabinetITLoad
+
+# 尝试导入 Story 29.1 和 29.2 的依赖
+try:
+    from ..models.precool import ThermalParameter
+    _thermal_parameter_available = True
+except ImportError:
+    _thermal_parameter_available = False
+    logging.error("ThermalParameter not available - Story 29.1 may not be completed")
+
+try:
+    from ..services.precool.thermal_model import ThermalModel
+    _thermal_model_available = True
+except ImportError:
+    _thermal_model_available = False
+    logging.error("ThermalModel not available - Story 29.2 may not be completed")
+
+try:
+    from ..models.system_config import SystemConfig
+    _system_config_available = True
+except ImportError:
+    _system_config_available = False
+    logging.error("SystemConfig not available")
+
+logger = logging.getLogger(__name__)
 
 
 # ==================== 常量定义 ====================
@@ -646,3 +671,479 @@ async def calculate_batch_recommendations(
             results[device_id] = recommendation
     
     return results
+
+
+# ==================== THM (Temperature Headroom Method) 实现 ====================
+# Story 29.3: 温度裕度法安全兜底
+
+async def calculate_shiftable_power_for_zone(
+    zone_id: int,
+    session: AsyncSession
+) -> Dict:
+    """
+    计算制冷区域的可转移功率比例（THM/TCL 自动切换）
+
+    Args:
+        zone_id: 制冷区域 ID
+        session: 数据库会话
+
+    Returns:
+        Dict: 成功时返回 {zone_id, shiftable_ratio, method, headroom_celsius, T_current_max}
+              失败时返回 {error, zone_id, details}
+    """
+    # 依赖检查
+    if not _thermal_parameter_available or not _thermal_model_available:
+        return {
+            "error": "dependencies_not_met",
+            "zone_id": zone_id,
+            "details": "Story 29.1/29.2 not completed - ThermalParameter or ThermalModel not available"
+        }
+
+    if not _system_config_available:
+        return {
+            "error": "system_config_missing",
+            "zone_id": zone_id,
+            "details": "SystemConfig table not available"
+        }
+
+    # 检查 RC 参数是否校准
+    thermal_param = (await session.execute(
+        select(ThermalParameter)
+        .where(ThermalParameter.cooling_zone_id == zone_id)
+        .where(ThermalParameter.is_active == True)
+    )).scalar_one_or_none()
+
+    # 如果未校准，使用 THM 方法
+    if thermal_param is None:
+        return await _calculate_shiftable_power_thm(zone_id, session)
+    else:
+        # 使用 TCL 模型
+        return await _calculate_shiftable_power_tcl(zone_id, session)
+
+
+async def _get_thm_config(session: AsyncSession) -> Dict[str, float]:
+    """
+    读取 THM 配置项
+
+    Returns:
+        Dict: {safety_factor, absolute_max_ratio, min_headroom_celsius}
+    """
+    defaults = {
+        "thm_safety_factor": 0.8,
+        "thm_absolute_max_ratio": 0.6,
+        "thm_min_headroom_celsius": 2.0
+    }
+
+    config = {}
+
+    for key, default_value in defaults.items():
+        try:
+            result = (await session.execute(
+                select(SystemConfig).where(SystemConfig.key == key)
+            )).scalar_one_or_none()
+
+            if result is None:
+                logger.warning(f"Config {key} not found, using default {default_value}")
+                config[key] = default_value
+            else:
+                value = float(result.value)
+
+                # 范围校验
+                if key == "thm_safety_factor":
+                    if value < 0.7:
+                        logger.warning(f"{key}={value} < 0.7, using boundary 0.7")
+                        value = 0.7
+                    elif value > 0.9:
+                        logger.warning(f"{key}={value} > 0.9, using boundary 0.9")
+                        value = 0.9
+                elif key == "thm_absolute_max_ratio":
+                    if value < 0.4:
+                        logger.warning(f"{key}={value} < 0.4, using boundary 0.4")
+                        value = 0.4
+                    elif value > 0.8:
+                        logger.warning(f"{key}={value} > 0.8, using boundary 0.8")
+                        value = 0.8
+                elif key == "thm_min_headroom_celsius":
+                    if value < 1.0:
+                        logger.warning(f"{key}={value} < 1.0, using boundary 1.0")
+                        value = 1.0
+                    elif value > 3.0:
+                        logger.warning(f"{key}={value} > 3.0, using boundary 3.0")
+                        value = 3.0
+
+                config[key] = value
+        except Exception as e:
+            logger.error(f"Error reading config {key}: {e}, using default {default_value}")
+            config[key] = default_value
+
+    return config
+
+
+async def _get_zone_supply_temperature(zone_id: int, session: AsyncSession) -> float:
+    """
+    获取制冷区域的送风温度（所有 Unit 的平均值）
+
+    Args:
+        zone_id: 制冷区域 ID
+        session: 数据库会话
+
+    Returns:
+        float: 送风温度（°C），如果所有 Unit 都无数据则返回 12.0
+    """
+    # 查询该区域的所有 CoolingUnit
+    query = (
+        select(CoolingUnit, Point)
+        .join(CoolingZoneUnit, CoolingZoneUnit.cooling_unit_id == CoolingUnit.id)
+        .join(Point, Point.device_code == CoolingUnit.device_code)
+        .where(CoolingZoneUnit.cooling_zone_id == zone_id)
+        .where(Point.point_code.like('%_supply_temp'))
+    )
+
+    result = await session.execute(query)
+    units_and_points = result.all()
+
+    if not units_and_points:
+        logger.warning(f"No cooling units found for zone {zone_id}, using default T_supply=12.0°C")
+        return 12.0
+
+    # 查询最近 5 分钟的送风温度数据
+    now = datetime.now()
+    five_min_ago = now - timedelta(minutes=5)
+
+    supply_temps = []
+
+    for unit, point in units_and_points:
+        history_query = (
+            select(PointHistory.value)
+            .where(PointHistory.point_id == point.id)
+            .where(PointHistory.timestamp >= five_min_ago)
+            .order_by(PointHistory.timestamp.desc())
+        )
+
+        history_result = await session.execute(history_query)
+        values = [row[0] for row in history_result.all() if row[0] is not None]
+
+        if values:
+            supply_temps.append(sum(values) / len(values))
+
+    if not supply_temps:
+        logger.warning(f"No supply temperature data for zone {zone_id}, using default T_supply=12.0°C")
+        return 12.0
+
+    # 返回所有有数据的 Unit 的平均值
+    return sum(supply_temps) / len(supply_temps)
+
+
+async def _calculate_temperature_rise_rate(zone_id: int, session: AsyncSession) -> float:
+    """
+    计算温升速率（°C/h），使用手动实现的最小二乘线性回归
+
+    Args:
+        zone_id: 制冷区域 ID
+        session: 数据库会话
+
+    Returns:
+        float: 温升速率（°C/h），数据不足或异常时返回保守估计 0.5°C/h
+    """
+    # 查询最近 1 小时的 T_current_max 数据
+    now = datetime.now()
+    one_hour_ago = now - timedelta(hours=1)
+
+    # 获取该区域所有机柜的进风温度传感器
+    query = (
+        select(PointHistory.timestamp, PointHistory.value)
+        .join(Point, Point.id == PointHistory.point_id)
+        .join(CabinetTemperatureSensor, CabinetTemperatureSensor.point_id == Point.id)
+        .join(Cabinet, Cabinet.id == CabinetTemperatureSensor.cabinet_id)
+        .join(CoolingZoneCabinet, CoolingZoneCabinet.cabinet_id == Cabinet.id)
+        .where(CoolingZoneCabinet.cooling_zone_id == zone_id)
+        .where(CabinetTemperatureSensor.sensor_location == 'inlet')
+        .where(PointHistory.timestamp >= one_hour_ago)
+        .order_by(PointHistory.timestamp)
+    )
+
+    result = await session.execute(query)
+    data_points = result.all()
+
+    if len(data_points) < 12:
+        logger.warning(f"Insufficient data for zone {zone_id}: {len(data_points)} points < 12, using conservative 0.5°C/h")
+        return 0.5
+
+    # 按 5 分钟间隔聚合，取每个时间窗口的最大值
+    aggregated = {}
+    for timestamp, value in data_points:
+        if value is None:
+            continue
+        # 向下取整到 5 分钟
+        bucket = timestamp.replace(second=0, microsecond=0)
+        bucket = bucket.replace(minute=(bucket.minute // 5) * 5)
+
+        if bucket not in aggregated:
+            aggregated[bucket] = []
+        aggregated[bucket].append(value)
+
+    # 取每个时间窗口的最大值
+    time_series = [(ts, max(values)) for ts, values in sorted(aggregated.items())]
+
+    if len(time_series) < 12:
+        logger.warning(f"Insufficient aggregated data for zone {zone_id}: {len(time_series)} points < 12, using conservative 0.5°C/h")
+        return 0.5
+
+    # 异常点过滤：过滤相邻点变化 > 3°C 的点
+    filtered_series = [time_series[0]]
+    for i in range(1, len(time_series)):
+        if abs(time_series[i][1] - time_series[i-1][1]) <= 3.0:
+            filtered_series.append(time_series[i])
+        else:
+            logger.warning(f"Filtered outlier at {time_series[i][0]}: {time_series[i][1]}°C (change > 3°C)")
+
+    if len(filtered_series) < 6:
+        logger.warning(f"Insufficient data after filtering for zone {zone_id}: {len(filtered_series)} points < 6, using conservative 0.5°C/h")
+        return 0.5
+
+    # 手动实现最小二乘线性回归
+    # 将时间戳转换为小时（相对于第一个数据点）
+    t0 = filtered_series[0][0]
+    x_values = [(ts - t0).total_seconds() / 3600.0 for ts, _ in filtered_series]
+    y_values = [temp for _, temp in filtered_series]
+
+    n = len(x_values)
+    sum_x = sum(x_values)
+    sum_y = sum(y_values)
+    sum_xy = sum(x * y for x, y in zip(x_values, y_values))
+    sum_x2 = sum(x * x for x in x_values)
+
+    # 计算斜率: slope = (n * sum_xy - sum_x * sum_y) / (n * sum_x2 - sum_x^2)
+    denominator = n * sum_x2 - sum_x * sum_x
+    if abs(denominator) < 1e-10:
+        logger.warning(f"Linear regression denominator too small for zone {zone_id}, using conservative 0.5°C/h")
+        return 0.5
+
+    slope = (n * sum_xy - sum_x * sum_y) / denominator
+
+    # 异常值过滤：温升速率 > 2°C/h 或 < -1°C/h
+    if slope > 2.0 or slope < -1.0:
+        logger.warning(f"Abnormal temperature rise rate for zone {zone_id}: {slope:.2f}°C/h, using conservative 0.5°C/h")
+        return 0.5
+
+    logger.info(f"Calculated temperature rise rate for zone {zone_id}: {slope:.3f}°C/h")
+    return slope
+
+
+async def _calculate_shiftable_power_thm(zone_id: int, session: AsyncSession) -> Dict:
+    """
+    使用 THM (Temperature Headroom Method) 计算可转移功率比例
+
+    Args:
+        zone_id: 制冷区域 ID
+        session: 数据库会话
+
+    Returns:
+        Dict: {zone_id, shiftable_ratio, method, headroom_celsius, T_current_max}
+              或 {error, zone_id, details}
+    """
+    # 读取配置
+    config = await _get_thm_config(session)
+    safety_factor = config["thm_safety_factor"]
+    absolute_max_ratio = config["thm_absolute_max_ratio"]
+    min_headroom_celsius = config["thm_min_headroom_celsius"]
+
+    # 获取 T_current_max（最热机柜进风温度）
+    now = datetime.now()
+    five_min_ago = now - timedelta(minutes=5)
+
+    query = (
+        select(func.max(PointHistory.value))
+        .join(Point, Point.id == PointHistory.point_id)
+        .join(CabinetTemperatureSensor, CabinetTemperatureSensor.point_id == Point.id)
+        .join(Cabinet, Cabinet.id == CabinetTemperatureSensor.cabinet_id)
+        .join(CoolingZoneCabinet, CoolingZoneCabinet.cabinet_id == Cabinet.id)
+        .where(CoolingZoneCabinet.cooling_zone_id == zone_id)
+        .where(CabinetTemperatureSensor.sensor_location == 'inlet')
+        .where(PointHistory.timestamp >= five_min_ago)
+    )
+
+    result = await session.execute(query)
+    T_current_max = result.scalar()
+
+    if T_current_max is None:
+        # 检查是否有历史数据
+        history_check_query = (
+            select(func.max(PointHistory.timestamp))
+            .join(Point, Point.id == PointHistory.point_id)
+            .join(CabinetTemperatureSensor, CabinetTemperatureSensor.point_id == Point.id)
+            .join(Cabinet, Cabinet.id == CabinetTemperatureSensor.cabinet_id)
+            .join(CoolingZoneCabinet, CoolingZoneCabinet.cabinet_id == Cabinet.id)
+            .where(CoolingZoneCabinet.cooling_zone_id == zone_id)
+            .where(CabinetTemperatureSensor.sensor_location == 'inlet')
+        )
+
+        last_timestamp_result = await session.execute(history_check_query)
+        last_timestamp = last_timestamp_result.scalar()
+
+        if last_timestamp is None:
+            return {
+                "error": "sensor_offline",
+                "zone_id": zone_id,
+                "details": "No temperature sensor data found for this zone"
+            }
+
+        one_hour_ago = now - timedelta(hours=1)
+        if last_timestamp < one_hour_ago:
+            return {
+                "error": "sensor_offline",
+                "zone_id": zone_id,
+                "details": f"Temperature sensor offline - last data at {last_timestamp}"
+            }
+
+        return {
+            "error": "insufficient_data",
+            "zone_id": zone_id,
+            "details": "No recent temperature data (last 5 minutes)"
+        }
+
+    # 获取 T_supply（送风温度）
+    T_supply = await _get_zone_supply_temperature(zone_id, session)
+
+    # THM 公式除零保护
+    T_max = TEMP_RECOMMENDED_MAX  # 27°C
+    if T_max - T_supply <= 0:
+        return {
+            "error": "invalid_supply_temp",
+            "zone_id": zone_id,
+            "details": f"Invalid supply temperature: T_supply={T_supply}°C >= T_max={T_max}°C"
+        }
+
+    # 计算温度裕度
+    headroom = T_max - T_current_max
+
+    # 温度裕度红线检查
+    if headroom < min_headroom_celsius:
+        logger.warning(f"Zone {zone_id} headroom {headroom:.2f}°C < {min_headroom_celsius}°C, ratio=0")
+        return {
+            "zone_id": zone_id,
+            "shiftable_ratio": 0.0,
+            "method": "THM",
+            "headroom_celsius": headroom,
+            "T_current_max": T_current_max
+        }
+
+    # 计算温升速率
+    temperature_rise_rate = await _calculate_temperature_rise_rate(zone_id, session)
+
+    # 热缓冲时间校验
+    if temperature_rise_rate > 0:
+        thermal_buffer_hours = headroom / temperature_rise_rate
+        cooling_lag_hours = 20.0 / 60.0  # 20 分钟 = 1/3 小时
+
+        if thermal_buffer_hours < cooling_lag_hours * 1.5:  # 30 分钟
+            logger.warning(f"Zone {zone_id} thermal buffer {thermal_buffer_hours:.2f}h < {cooling_lag_hours * 1.5:.2f}h, ratio=0")
+            return {
+                "zone_id": zone_id,
+                "shiftable_ratio": 0.0,
+                "method": "THM",
+                "headroom_celsius": headroom,
+                "T_current_max": T_current_max
+            }
+    else:
+        # 温升速率 ≤ 0，热缓冲时间无穷大，跳过热缓冲时间校验
+        thermal_buffer_hours = float('inf')
+        logger.info(f"Zone {zone_id} temperature rise rate {temperature_rise_rate:.3f}°C/h <= 0, skipping thermal buffer check")
+
+    # 计算 THM 比例
+    ratio = (T_max - T_current_max) / (T_max - T_supply) * safety_factor
+
+    # 应用绝对上限
+    ratio = min(ratio, absolute_max_ratio)
+
+    logger.info(f"Zone {zone_id} THM calculation: headroom={headroom:.2f}°C, T_supply={T_supply:.2f}°C, "
+                f"rise_rate={temperature_rise_rate:.3f}°C/h, thermal_buffer={thermal_buffer_hours:.2f}h, ratio={ratio:.3f}")
+
+    return {
+        "zone_id": zone_id,
+        "shiftable_ratio": ratio,
+        "method": "THM",
+        "headroom_celsius": headroom,
+        "T_current_max": T_current_max
+    }
+
+
+async def _calculate_shiftable_power_tcl(zone_id: int, session: AsyncSession) -> Dict:
+    """
+    使用 TCL (Thermal Capacitance Load) 模型计算可转移功率比例
+
+    Args:
+        zone_id: 制冷区域 ID
+        session: 数据库会话
+
+    Returns:
+        Dict: {zone_id, shiftable_ratio, method, headroom_celsius, T_current_max}
+              或 {error, zone_id, details}
+    """
+    # 调用 ThermalModel 预测 1 小时后温度
+    thermal_model = ThermalModel()
+    prediction_result = await thermal_model.predict_temperature(zone_id=zone_id, hours=1.0)
+
+    if "error" in prediction_result:
+        # 预测失败，返回错误
+        return {
+            "error": prediction_result["error"],
+            "zone_id": zone_id,
+            "details": f"TCL prediction failed: {prediction_result.get('details', 'Unknown error')}"
+        }
+
+    # 获取预测的最终温度
+    temperature_trajectory = prediction_result.get("temperature_trajectory", [])
+    if not temperature_trajectory:
+        return {
+            "error": "insufficient_data",
+            "zone_id": zone_id,
+            "details": "TCL prediction returned empty temperature trajectory"
+        }
+
+    predicted_temp = temperature_trajectory[-1]  # 1 小时后的温度
+
+    # 获取当前最热机柜温度
+    now = datetime.now()
+    five_min_ago = now - timedelta(minutes=5)
+
+    query = (
+        select(func.max(PointHistory.value))
+        .join(Point, Point.id == PointHistory.point_id)
+        .join(CabinetTemperatureSensor, CabinetTemperatureSensor.point_id == Point.id)
+        .join(Cabinet, Cabinet.id == CabinetTemperatureSensor.cabinet_id)
+        .join(CoolingZoneCabinet, CoolingZoneCabinet.cabinet_id == Cabinet.id)
+        .where(CoolingZoneCabinet.cooling_zone_id == zone_id)
+        .where(CabinetTemperatureSensor.sensor_location == 'inlet')
+        .where(PointHistory.timestamp >= five_min_ago)
+    )
+
+    result = await session.execute(query)
+    T_current_max = result.scalar()
+
+    if T_current_max is None:
+        return {
+            "error": "sensor_offline",
+            "zone_id": zone_id,
+            "details": "No current temperature data available"
+        }
+
+    # 计算温度裕度
+    T_max = TEMP_RECOMMENDED_MAX  # 27°C
+    headroom = T_max - T_current_max
+
+    # 判断可转移比例：如果预测温度 < T_max - 2°C，ratio = 0.4，否则 ratio = 0
+    if predicted_temp < T_max - 2.0:
+        ratio = 0.4
+        logger.info(f"Zone {zone_id} TCL prediction: predicted_temp={predicted_temp:.2f}°C < {T_max - 2.0}°C, ratio=0.4")
+    else:
+        ratio = 0.0
+        logger.warning(f"Zone {zone_id} TCL prediction: predicted_temp={predicted_temp:.2f}°C >= {T_max - 2.0}°C, ratio=0")
+
+    return {
+        "zone_id": zone_id,
+        "shiftable_ratio": ratio,
+        "method": "TCL",
+        "headroom_celsius": headroom,
+        "T_current_max": T_current_max
+    }
