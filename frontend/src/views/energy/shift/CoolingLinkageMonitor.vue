@@ -105,6 +105,23 @@
       </el-col>
     </el-row>
 
+    <el-row :gutter="20" style="margin-top: 20px">
+      <el-col :span="24">
+        <el-card shadow="hover">
+          <template #header>
+            <div class="card-header">
+              <span>温度预测</span>
+              <el-select v-if="zoneList.length > 1" v-model="selectedZoneId" size="small" style="width: 200px" @change="onZoneChange">
+                <el-option v-for="zone in zoneList" :key="zone.zone_id" :label="zone.zone_name" :value="zone.zone_id" />
+              </el-select>
+            </div>
+          </template>
+          <TemperaturePredictionChart v-if="selectedZoneId" :zone-id="selectedZoneId" :zone-name="selectedZoneName" />
+          <el-empty v-else description="暂无制冷区域数据" />
+        </el-card>
+      </el-col>
+    </el-row>
+
     <el-card shadow="hover" style="margin-top: 20px">
       <template #header>
         <span>联动历史记录</span>
@@ -154,6 +171,9 @@
 import { ref, onMounted, onUnmounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { getCoolingConfig, getCoolingStatus, getCoolingHistory } from '@/api/modules/shift'
+import { getDashboard } from '@/api/modules/precool'
+import type { DashboardZone } from '@/api/modules/precool'
+import TemperaturePredictionChart from '@/components/energy/TemperaturePredictionChart.vue'
 import * as echarts from 'echarts'
 
 const loading = ref(false)
@@ -168,6 +188,29 @@ const copChartInstance = ref<echarts.ECharts>()
 const tempChartInstance = ref<echarts.ECharts>()
 const autoRefresh = ref(true)
 const refreshTimer = ref<number>()
+const zoneList = ref<DashboardZone[]>([])
+const selectedZoneId = ref<number>(0)
+const selectedZoneName = computed(() => {
+  const zone = zoneList.value.find(z => z.zone_id === selectedZoneId.value)
+  return zone?.zone_name || ''
+})
+
+const onZoneChange = (val: number) => {
+  selectedZoneId.value = val
+}
+
+const fetchZones = async () => {
+  try {
+    const res = await getDashboard()
+    const data = res.data as any
+    zoneList.value = data?.zones || []
+    if (zoneList.value.length > 0 && !selectedZoneId.value) {
+      selectedZoneId.value = zoneList.value[0].zone_id
+    }
+  } catch {
+    // 静默处理，不影响主页面
+  }
+}
 
 const fetchConfig = async () => {
   try {
@@ -351,6 +394,7 @@ onMounted(async () => {
   await fetchConfig()
   await fetchStatus()
   await fetchHistory()
+  await fetchZones()
   initCharts()
   if (autoRefresh.value) {
     startAutoRefresh()

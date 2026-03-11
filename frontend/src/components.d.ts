@@ -153,6 +153,7 @@ declare module 'vue' {
     SuggestionDetailDrawer: typeof import('./components/energy/SuggestionDetailDrawer.vue')['default']
     SuggestionOverview: typeof import('./components/energy/SuggestionOverview.vue')['default']
     SuggestionsCard: typeof import('./components/energy/SuggestionsCard.vue')['default']
+    TemperaturePredictionChart: typeof import('./components/energy/TemperaturePredictionChart.vue')['default']
     TemperatureTrend: typeof import('./components/bigscreen/charts/TemperatureTrend.vue')['default']
     ThemeSelector: typeof import('./components/bigscreen/ui/ThemeSelector.vue')['default']
     ThreeScene: typeof import('./components/bigscreen/ThreeScene.vue')['default']
