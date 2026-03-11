@@ -2,14 +2,16 @@
 预冷系统 API 路由
 
 Story 29.4: 温度预测 API 端点
-提供温度预测、热参数查询、模型验证报告、预冷仪表盘等 4 个端点
+Story 30.3: 回退保护 API
+Story 31.3: 预冷计划 API 端点
 """
 
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, date, timedelta
 
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy import select, func, and_
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Literal, Optional
 
@@ -25,6 +27,11 @@ from ...schemas.precool import (
     RollbackStatusResponse,
     RollbackEventOut,
     RollbackOverviewResponse,
+    ScheduleCreateRequest,
+    ScheduleListItem,
+    ScheduleDetailOut,
+    ScheduleAbortRequest,
+    ScheduleAbortResponse,
 )
 from ...services.precool.rollback_manager import rollback_manager
 from ...models.rollback import RollbackEvent
@@ -532,4 +539,255 @@ async def get_rollback_overview(
 
     except Exception as e:
         logger.error(f"查询回退概览异常: {e}")
+        return {"code": 500, "message": "内部错误", "data": None}
+
+
+# ==================== Story 31.3: 预冷计划 API ====================
+
+
+def _schedule_to_list_item(plan) -> dict:
+    """将 PrecoolSchedule ORM 转为 ScheduleListItem dict"""
+    return ScheduleListItem(
+        id=plan.id,
+        cooling_zone_id=plan.cooling_zone_id,
+        schedule_date=str(plan.schedule_date),
+        precool_start_time=str(plan.precool_start_time),
+        precool_end_time=str(plan.precool_end_time),
+        target_temp=plan.target_temp,
+        peak_start_time=str(plan.peak_start_time),
+        peak_end_time=str(plan.peak_end_time),
+        planned_savings_kwh=plan.planned_savings_kwh,
+        actual_savings_kwh=plan.actual_savings_kwh,
+        status=plan.status,
+        abort_reason=plan.abort_reason,
+        is_validated=plan.is_validated or False,
+        created_at=plan.created_at,
+        updated_at=plan.updated_at,
+    ).model_dump()
+
+
+def _schedule_to_detail(plan) -> dict:
+    """将 PrecoolSchedule ORM 转为 ScheduleDetailOut dict"""
+    return ScheduleDetailOut(
+        id=plan.id,
+        cooling_zone_id=plan.cooling_zone_id,
+        schedule_date=str(plan.schedule_date),
+        precool_start_time=str(plan.precool_start_time),
+        precool_end_time=str(plan.precool_end_time),
+        target_temp=plan.target_temp,
+        peak_start_time=str(plan.peak_start_time),
+        peak_end_time=str(plan.peak_end_time),
+        planned_savings_kwh=plan.planned_savings_kwh,
+        actual_savings_kwh=plan.actual_savings_kwh,
+        status=plan.status,
+        abort_reason=plan.abort_reason,
+        temperature_trajectory=plan.temperature_trajectory,
+        is_validated=plan.is_validated or False,
+        validated_at=plan.validated_at,
+        created_at=plan.created_at,
+        updated_at=plan.updated_at,
+    ).model_dump()
+
+
+@router.post("/zones/{zone_id}/schedule", summary="生成预冷计划")
+async def create_schedule(
+    zone_id: int,
+    request: ScheduleCreateRequest,
+    db: AsyncSession = Depends(get_db),
+    _=Depends(require_role(["admin", "operator"])),
+):
+    """生成日前预冷计划（调用贪心优化算法）"""
+    try:
+        from ...models.topology_config import CoolingZone
+        from ...services.precool.scheduler import (
+            PrecoolScheduler,
+            PrecoolPlanError,
+            load_time_slots_from_db,
+        )
+
+        # 校验 zone 存在
+        zone = (await db.execute(
+            select(CoolingZone).where(CoolingZone.id == zone_id)
+        )).scalar_one_or_none()
+        if zone is None:
+            return {"code": 404, "message": f"制冷区域 {zone_id} 不存在", "data": None}
+
+        # 解析日期
+        if request.schedule_date:
+            try:
+                schedule_date = date.fromisoformat(request.schedule_date)
+            except ValueError:
+                return {"code": 422, "message": "日期格式错误，需 YYYY-MM-DD", "data": None}
+        else:
+            schedule_date = date.today() + timedelta(days=1)
+
+        # 加载电价时段
+        time_slots = await load_time_slots_from_db(db)
+
+        # 生成计划
+        try:
+            scheduler = PrecoolScheduler()
+            result = await scheduler.generate_precool_plan(
+                zone_id=zone_id,
+                schedule_date=schedule_date,
+                session=db,
+                time_slots=time_slots,
+            )
+        except PrecoolPlanError as e:
+            return {
+                "code": 422,
+                "message": e.reason,
+                "data": {
+                    "error": e.error,
+                    "reason": e.reason,
+                    "suggestions": e.suggestions,
+                },
+            }
+
+        if result.schedule is None:
+            return {"code": 422, "message": "计划生成失败", "data": None}
+
+        # 保存到数据库（API 层控制事务）
+        plan = result.schedule
+        db.add(plan)
+        try:
+            await db.commit()
+            await db.refresh(plan)
+        except IntegrityError:
+            await db.rollback()
+            return {
+                "code": 409,
+                "message": f"zone {zone_id} 日期 {schedule_date} 已有预冷计划",
+                "data": None,
+            }
+
+        logger.info(
+            "预冷计划已创建: zone=%d, date=%s, saving=%.2f kWh",
+            zone_id, schedule_date, plan.planned_savings_kwh or 0,
+        )
+
+        return {"code": 200, "message": "success", "data": _schedule_to_detail(plan)}
+
+    except Exception as e:
+        logger.error(f"创建预冷计划异常: zone_id={zone_id}, error={e}")
+        return {"code": 500, "message": "内部错误", "data": None}
+
+
+@router.get("/zones/{zone_id}/schedule", summary="查询预冷计划列表")
+async def list_schedules(
+    zone_id: int,
+    skip: int = Query(default=0, ge=0),
+    limit: int = Query(default=20, ge=1, le=100),
+    status: Optional[Literal["pending", "executing", "completed", "aborted"]] = Query(
+        default=None, description="状态筛选"
+    ),
+    db: AsyncSession = Depends(get_db),
+    _=Depends(require_role(["admin", "operator"])),
+):
+    """查询指定 zone 的预冷计划列表（不含 trajectory）"""
+    try:
+        from ...models.topology_config import CoolingZone
+        from ...models.thermal import PrecoolSchedule
+
+        # 校验 zone 存在
+        zone = (await db.execute(
+            select(CoolingZone).where(CoolingZone.id == zone_id)
+        )).scalar_one_or_none()
+        if zone is None:
+            return {"code": 404, "message": f"制冷区域 {zone_id} 不存在", "data": None}
+
+        # 构建查询
+        query = select(PrecoolSchedule).where(
+            PrecoolSchedule.cooling_zone_id == zone_id
+        )
+        if status is not None:
+            query = query.where(PrecoolSchedule.status == status)
+
+        # 总数
+        count_query = select(func.count()).select_from(query.subquery())
+        total = (await db.execute(count_query)).scalar() or 0
+
+        # 分页
+        query = query.order_by(PrecoolSchedule.schedule_date.desc()).offset(skip).limit(limit)
+        result = await db.execute(query)
+        items = result.scalars().all()
+
+        items_out = [_schedule_to_list_item(item) for item in items]
+
+        return {
+            "code": 200,
+            "message": "success",
+            "data": {"items": items_out, "total": total},
+        }
+
+    except Exception as e:
+        logger.error(f"查询预冷计划列表异常: zone_id={zone_id}, error={e}")
+        return {"code": 500, "message": "内部错误", "data": None}
+
+
+@router.get("/schedules/{schedule_id}", summary="查询预冷计划详情")
+async def get_schedule(
+    schedule_id: int,
+    db: AsyncSession = Depends(get_db),
+    _=Depends(require_role(["admin", "operator"])),
+):
+    """查询单个预冷计划详情（含完整 trajectory）"""
+    try:
+        from ...models.thermal import PrecoolSchedule
+
+        plan = (await db.execute(
+            select(PrecoolSchedule).where(PrecoolSchedule.id == schedule_id)
+        )).scalar_one_or_none()
+
+        if plan is None:
+            return {"code": 404, "message": f"预冷计划 {schedule_id} 不存在", "data": None}
+
+        return {"code": 200, "message": "success", "data": _schedule_to_detail(plan)}
+
+    except Exception as e:
+        logger.error(f"查询预冷计划详情异常: schedule_id={schedule_id}, error={e}")
+        return {"code": 500, "message": "内部错误", "data": None}
+
+
+@router.post("/schedules/{schedule_id}/abort", summary="中止预冷计划")
+async def abort_schedule(
+    schedule_id: int,
+    request: ScheduleAbortRequest,
+    db: AsyncSession = Depends(get_db),
+    _=Depends(require_role(["admin", "operator"])),
+):
+    """中止执行中的预冷计划"""
+    try:
+        from ...models.thermal import PrecoolSchedule
+        from ...services.precool.executor import precool_executor
+
+        plan = (await db.execute(
+            select(PrecoolSchedule).where(PrecoolSchedule.id == schedule_id)
+        )).scalar_one_or_none()
+
+        if plan is None:
+            return {"code": 404, "message": f"预冷计划 {schedule_id} 不存在", "data": None}
+
+        if plan.status != "executing":
+            return {
+                "code": 400,
+                "message": f"计划状态为 {plan.status}，只能中止 executing 状态的计划",
+                "data": None,
+            }
+
+        reason = request.reason or "manual_abort"
+        await precool_executor.abort_plan_by_api(plan, reason, db)
+        await db.commit()
+
+        return {
+            "code": 200,
+            "message": "success",
+            "data": ScheduleAbortResponse(
+                status=plan.status,
+                abort_reason=plan.abort_reason,
+            ).model_dump(),
+        }
+
+    except Exception as e:
+        logger.error(f"中止预冷计划异常: schedule_id={schedule_id}, error={e}")
         return {"code": 500, "message": "内部错误", "data": None}

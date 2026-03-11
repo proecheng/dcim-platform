@@ -126,3 +126,73 @@ class RollbackOverviewResponse(BaseModel):
     trigger_type_counts: Dict[str, int]
     recent_events_24h: int
     zone_statuses: List[RollbackStatusResponse]
+
+
+# ==================== Story 31.3: 预冷计划 API Schema ====================
+
+
+class ScheduleCreateRequest(BaseModel):
+    """预冷计划生成请求"""
+    schedule_date: Optional[str] = Field(
+        default=None,
+        description="计划日期 YYYY-MM-DD，默认明天",
+    )
+
+
+class ScheduleListItem(BaseModel):
+    """预冷计划列表项（不含 trajectory，减少传输量）"""
+    model_config = {"from_attributes": True}
+
+    id: int
+    cooling_zone_id: int
+    schedule_date: str
+    precool_start_time: str
+    precool_end_time: str
+    target_temp: float
+    peak_start_time: str
+    peak_end_time: str
+    planned_savings_kwh: Optional[float] = None
+    actual_savings_kwh: Optional[float] = None
+    status: str
+    abort_reason: Optional[str] = None
+    is_validated: bool = False
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+
+class ScheduleDetailOut(BaseModel):
+    """预冷计划详情（含完整 trajectory）"""
+    model_config = {"from_attributes": True}
+
+    id: int
+    cooling_zone_id: int
+    schedule_date: str
+    precool_start_time: str
+    precool_end_time: str
+    target_temp: float
+    peak_start_time: str
+    peak_end_time: str
+    planned_savings_kwh: Optional[float] = None
+    actual_savings_kwh: Optional[float] = None
+    status: str
+    abort_reason: Optional[str] = None
+    temperature_trajectory: Optional[dict] = None
+    is_validated: bool = False
+    validated_at: Optional[datetime] = None
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+
+class ScheduleAbortRequest(BaseModel):
+    """中止计划请求"""
+    reason: Optional[str] = Field(
+        default="manual_abort",
+        max_length=500,
+        description="中止原因",
+    )
+
+
+class ScheduleAbortResponse(BaseModel):
+    """中止计划响应"""
+    status: str
+    abort_reason: Optional[str] = None

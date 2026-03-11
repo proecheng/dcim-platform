@@ -168,5 +168,4 @@ class PrecoolSchedule(Base):
             "schedule_date",
             name="uq_zone_schedule_date"
         ),
-        Index("ix_precool_schedules_status", "status"),
     )

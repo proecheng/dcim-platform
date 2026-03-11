@@ -365,7 +365,7 @@ development_status:
   epic-31: in-progress
   31-1-greedy-optimization-precooling-scheduler: done
   31-2-precooling-plan-execution-engine: done
-  31-3-precooling-plan-api-endpoint: backlog
+  31-3-precooling-plan-api-endpoint: done
   31-4-cooling-linkage-config-precooling-extension: backlog
   31-5-frontend-precooling-plan-timeline: backlog
   epic-31-retrospective: optional

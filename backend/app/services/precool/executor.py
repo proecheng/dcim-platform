@@ -342,6 +342,19 @@ class PrecoolExecutor:
 
     # ==================== 中止和完成 ====================
 
+    async def abort_plan_by_api(
+        self,
+        plan: PrecoolSchedule,
+        reason: str,
+        session: AsyncSession,
+    ):
+        """API 层调用的公共中止方法（封装内部状态获取）"""
+        step_index = self._get_current_step_index()
+        actual_temp = await self._get_actual_temperature(
+            plan.cooling_zone_id, session
+        )
+        await self._abort_plan(plan, reason, step_index, actual_temp, session)
+
     async def _abort_plan(
         self,
         plan: PrecoolSchedule,
