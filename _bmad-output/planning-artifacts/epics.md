@@ -40,7 +40,7 @@ phase2_supplement_epics: [18, 19, 20, 21, 22, 23]
 | 11 | 运维管理 | Phase 2 | FR67-FR71 | 5 |
 | 12 | 报表与决策支持 | Phase 2 | FR72-FR75,FR85 | 4 |
 | 13 | 用户与系统管理 | MVP | FR76-FR82,FR84 | 6 |
-| 14 | 棕地改进 - 代码质量与测试 | MVP | FR83,FR86,FR88,NFR-E5,NFR-M3 | 6 |
+| 14 | 棕地改进 - 代码质量与测试 | MVP | FR83,FR86,FR88,NFR-E5,NFR-M3,Arch16 | 7 |
 | 15 | 协议扩展 | Ph1.5+Ph2 | FR3-FR6,FR20 | 5 |
 | 16 | 多站点集中管理 | 推广阶段 | FR82补充 | 3 |
 | 17 | 2.5D 视觉增强 | 全阶段 | FR89-FR92 | 4 |
@@ -1373,7 +1373,7 @@ So that 用户账号安全性满足等保二级要求。
 
 **阶段:** MVP (月1-3，与其他 Epic 并行)
 **目标:** 提升现有代码质量，补全自动化测试，完善缺失的前端页面。
-**FR 覆盖:** FR83, FR86, FR88, NFR-E5, NFR-M3（6 个 Story）
+**FR 覆盖:** FR83, FR86, FR88, NFR-E5, NFR-M3, Architecture Section 16（7 个 Story）
 
 ### Story 14.1: 后端自动化测试套件
 
@@ -1476,6 +1476,40 @@ So that 部署过程标准化且可重复。
 - And 支持 docker-compose down 完整停止所有服务
 
 **FR 追溯:** NFR-M3, Architecture 5.5
+
+### Story 14.7: 修复已知技术债务
+
+As a 开发者,
+I want 修复 Architecture Section 16 列出的已知技术债务,
+So that 代码质量和可维护性得到提升。
+
+**Acceptance Criteria:**
+
+- Given Architecture Section 16 列出的技术债务清单
+- When 执行修复计划
+- Then 修复 device_sync.py 重复代码块 (问题 1)
+  - 合并 _infer_circuit_id() 方法中的两个重复 HVAC 处理块 (692-780 行)
+  - 提取 _infer_hvac_circuit() 独立方法
+  - 代码重复率从 11% 降至 <5%
+- And 修复回路绑定优先级问题 (问题 2)
+  - 按优先级从高到低排列规则: 精确匹配 → 模糊匹配 → 通用回路
+  - 添加单元测试覆盖所有边界情况 (CA-F2-01, AC-OUT-01 等)
+  - 验证配电拓扑页显示准确性
+- And 修复 bcrypt 版本兼容性问题 (CLAUDE.md 常见问题 1)
+  - 确保 bcrypt 版本 == 4.0.1 (与 passlib 1.7.4 兼容)
+  - 验证登录功能正常 (admin/admin123)
+- And 所有修复通过回归测试
+
+**技术债务清单 (Architecture Section 16):**
+1. device_sync.py 重复代码 (中优先级, 2-3 小时)
+2. 回路绑定优先级问题 (高优先级, 4-6 小时)
+3. 拓扑同步通信 (低优先级, 2 小时) - 可选
+4. 容量预测优化 (中优先级, 4 小时) - 可选
+5. OCR 生产集成 (低优先级, 8 小时) - Phase 2
+
+**预计工作量:** 6-9 小时 (必修项 1+2+bcrypt)
+
+**FR 追溯:** Architecture Section 16, CLAUDE.md 常见问题
 
 ---
 

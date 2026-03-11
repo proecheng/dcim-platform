@@ -1,6 +1,6 @@
 # Story 29.1: 热动力学数据模型与数据库迁移
 
-Status: ready-for-dev
+Status: done
 
 ## Story
 
