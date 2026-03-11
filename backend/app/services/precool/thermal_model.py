@@ -77,7 +77,17 @@ class ThermalModel:
                 return dep_check
             self._dependencies_checked = True
 
-        # 2. 加载 RC 参数
+        # 2. 验证 q_cool_schedule（参数检查优先）
+        steps = int(hours * 12)  # 5 分钟一步
+        if q_cool_schedule is not None:
+            if len(q_cool_schedule) != steps:
+                return {
+                    "error": "invalid_q_cool_schedule",
+                    "zone_id": zone_id,
+                    "details": f"Expected length {steps}, got {len(q_cool_schedule)}"
+                }
+
+        # 3. 加载 RC 参数
         async with async_session() as session:
             zone_result = await self._get_zone(session, zone_id)
             if zone_result.get("error"):
@@ -96,7 +106,7 @@ class ThermalModel:
             C = zone.thermal_C  # kWh/°C
             beta = zone.bypass_beta if zone.bypass_beta is not None else 0.1  # 气流短路系数
 
-            # 3. 数值稳定性检查
+            # 4. 数值稳定性检查
             dt = 5 / 60  # 5 分钟 = 1/12 小时
             if dt >= 2 * R * C:
                 max_hours = max(0.5, 2 * R * C * 12)  # 最大安全预测时长，最小 0.5 小时
@@ -106,16 +116,6 @@ class ThermalModel:
                     "details": f"Requested {hours}h exceeds stability limit",
                     "suggested_max_hours": round(max_hours, 2)
                 }
-
-            # 4. 验证 q_cool_schedule
-            steps = int(hours * 12)  # 5 分钟一步
-            if q_cool_schedule is not None:
-                if len(q_cool_schedule) != steps:
-                    return {
-                        "error": "invalid_q_cool_schedule",
-                        "zone_id": zone_id,
-                        "details": f"Expected length {steps}, got {len(q_cool_schedule)}"
-                    }
 
             # 5. 加载历史数据
             try:
@@ -218,10 +218,10 @@ class ThermalModel:
                 await session.execute(select(TemperaturePredictionLog).limit(1))
 
                 # 检查 CoolingZone 表字段
-                zone = await session.execute(select(CoolingZone).limit(1))
-                if zone.scalar_one_or_none():
-                    z = zone.scalar_one()
-                    if not hasattr(z, 'thermal_R') or not hasattr(z, 'thermal_C') or not hasattr(z, 'bypass_beta'):
+                zone_result = await session.execute(select(CoolingZone).limit(1))
+                zone = zone_result.scalar_one_or_none()
+                if zone:
+                    if not hasattr(zone, 'thermal_R') or not hasattr(zone, 'thermal_C') or not hasattr(zone, 'bypass_beta'):
                         raise RuntimeError("CoolingZone table missing required fields")
 
                 return {"success": True}
@@ -263,11 +263,246 @@ class ThermalModel:
                 "t_outdoor": Optional[float]  # 室外温度（°C）
             }
         """
-        # 实现数据加载逻辑（下一步实现）
+        from sqlalchemy import func, and_
+
+        now = datetime.now()
+        lookback_hours = max(24, hours)  # 至少查询 24 小时历史数据
+        start_time = now - timedelta(hours=lookback_hours)
+
+        # 1. 获取 IT 热负荷 Q_IT
+        # 路径：CoolingZone → CoolingZoneCabinet → CabinetITLoad → Point → PointHistory
+        q_it_query = (
+            select(PointHistory.timestamp, PointHistory.value)
+            .join(Point, PointHistory.point_id == Point.id)
+            .join(CabinetITLoad, Point.id == CabinetITLoad.power_point_id)
+            .join(CoolingZoneCabinet, CabinetITLoad.cabinet_id == CoolingZoneCabinet.cabinet_id)
+            .where(
+                and_(
+                    CoolingZoneCabinet.cooling_zone_id == zone_id,
+                    PointHistory.timestamp >= start_time
+                )
+            )
+            .order_by(PointHistory.timestamp.desc())
+        )
+
+        q_it_result = await session.execute(q_it_query)
+        q_it_rows = q_it_result.fetchall()
+
+        if len(q_it_rows) < 6:  # 最小 30 分钟数据（6 条，5分钟间隔）
+            return {
+                "error": "insufficient_history",
+                "field": "Q_IT",
+                "available_minutes": len(q_it_rows) * 5,
+                "zone_id": zone_id
+            }
+
+        # 聚合到 5 分钟间隔（平均值）
+        q_it_data = self._aggregate_timeseries(q_it_rows, interval_minutes=5, agg_func="mean")
+
+        # 2. 获取等效环境温度 T_ambient（精密空调回风温度）
+        # 路径：CoolingZone → CoolingZoneUnit → CoolingUnit → Device → Point → PointHistory
+        t_ambient_query = (
+            select(PointHistory.timestamp, PointHistory.value)
+            .join(Point, PointHistory.point_id == Point.id)
+            .join(Device, Point.device_id == Device.id)
+            .join(CoolingUnit, Device.id == CoolingUnit.device_id)
+            .join(CoolingZoneUnit, CoolingUnit.id == CoolingZoneUnit.cooling_unit_id)
+            .where(
+                and_(
+                    CoolingZoneUnit.cooling_zone_id == zone_id,
+                    Point.point_code.like('%_return_temp'),
+                    PointHistory.timestamp >= start_time
+                )
+            )
+            .order_by(PointHistory.timestamp.desc())
+        )
+
+        t_ambient_result = await session.execute(t_ambient_query)
+        t_ambient_rows = t_ambient_result.fetchall()
+
+        if not t_ambient_rows:
+            return {
+                "error": "insufficient_data",
+                "missing_fields": ["T_ambient"],
+                "zone_id": zone_id
+            }
+
+        # 聚合到 5 分钟间隔（平均值）
+        t_ambient_data = self._aggregate_timeseries(t_ambient_rows, interval_minutes=5, agg_func="mean")
+
+        # 3. 获取当前温度 T_current（进风温度传感器）
+        # 路径：CoolingZone → CoolingZoneCabinet → CabinetTemperatureSensor(inlet) → Point → PointHistory
+        t_current_query = (
+            select(PointHistory.value)
+            .join(Point, PointHistory.point_id == Point.id)
+            .join(CabinetTemperatureSensor, Point.id == CabinetTemperatureSensor.point_id)
+            .join(CoolingZoneCabinet, CabinetTemperatureSensor.cabinet_id == CoolingZoneCabinet.cabinet_id)
+            .where(
+                and_(
+                    CoolingZoneCabinet.cooling_zone_id == zone_id,
+                    CabinetTemperatureSensor.sensor_location == 'inlet',
+                    PointHistory.timestamp >= now - timedelta(minutes=5)
+                )
+            )
+            .order_by(PointHistory.timestamp.desc())
+            .limit(10)
+        )
+
+        t_current_result = await session.execute(t_current_query)
+        t_current_rows = t_current_result.fetchall()
+
+        if not t_current_rows:
+            return {
+                "error": "insufficient_data",
+                "missing_fields": ["T_current"],
+                "zone_id": zone_id
+            }
+
+        # 取最大值（保守估计）
+        t_current = max(row[0] for row in t_current_rows)
+
+        # 4. 获取出风温度 T_outlet（可选）
+        t_outlet_query = (
+            select(PointHistory.value)
+            .join(Point, PointHistory.point_id == Point.id)
+            .join(CabinetTemperatureSensor, Point.id == CabinetTemperatureSensor.point_id)
+            .join(CoolingZoneCabinet, CabinetTemperatureSensor.cabinet_id == CoolingZoneCabinet.cabinet_id)
+            .where(
+                and_(
+                    CoolingZoneCabinet.cooling_zone_id == zone_id,
+                    CabinetTemperatureSensor.sensor_location == 'outlet',
+                    PointHistory.timestamp >= now - timedelta(minutes=5)
+                )
+            )
+            .order_by(PointHistory.timestamp.desc())
+            .limit(10)
+        )
+
+        t_outlet_result = await session.execute(t_outlet_query)
+        t_outlet_rows = t_outlet_result.fetchall()
+
+        t_outlet = None
+        if t_outlet_rows:
+            t_outlet = sum(row[0] for row in t_outlet_rows) / len(t_outlet_rows)
+        else:
+            logger.warning(f"Zone {zone_id}: outlet temperature sensor not found, will use T_ambient as fallback")
+
+        # 5. 获取室外温度 T_outdoor（可选，用于 COP 季节修正）
+        t_outdoor_query = (
+            select(PointHistory.value)
+            .join(Point, PointHistory.point_id == Point.id)
+            .join(Device, Point.device_id == Device.id)
+            .join(CoolingUnit, Device.id == CoolingUnit.device_id)
+            .join(CoolingZoneUnit, CoolingUnit.id == CoolingZoneUnit.cooling_unit_id)
+            .where(
+                and_(
+                    CoolingZoneUnit.cooling_zone_id == zone_id,
+                    Point.point_code.like('%_ambient_temp'),
+                    Device.device_type == 'PRECISION_AC_OUTDOOR',
+                    PointHistory.timestamp >= now - timedelta(minutes=5)
+                )
+            )
+            .order_by(PointHistory.timestamp.desc())
+            .limit(10)
+        )
+
+        t_outdoor_result = await session.execute(t_outdoor_query)
+        t_outdoor_rows = t_outdoor_result.fetchall()
+
+        t_outdoor = None
+        if t_outdoor_rows:
+            t_outdoor = sum(row[0] for row in t_outdoor_rows) / len(t_outdoor_rows)
+        else:
+            logger.warning(f"Zone {zone_id}: outdoor temperature not found, will use default COP=3.5")
+
+        # 6. 数据插值和 forward fill
+        steps = int(hours * 12)
+        q_it_filled = self._fill_timeseries(q_it_data, steps)
+        t_ambient_filled = self._fill_timeseries(t_ambient_data, steps)
+
         return {
-            "error": "not_implemented",
-            "details": "Data loading not yet implemented"
+            "q_it": q_it_filled,
+            "t_ambient": t_ambient_filled,
+            "t_current": t_current,
+            "t_outlet": t_outlet,
+            "t_outdoor": t_outdoor
         }
+
+
+    def _aggregate_timeseries(self, rows: list, interval_minutes: int, agg_func: str) -> List[float]:
+        """
+        将时间序列数据聚合到指定间隔
+
+        Args:
+            rows: [(timestamp, value), ...]
+            interval_minutes: 聚合间隔（分钟）
+            agg_func: 聚合函数 "mean" | "max" | "min"
+
+        Returns:
+            聚合后的值列表（从最新到最旧）
+        """
+        if not rows:
+            return []
+
+        from collections import defaultdict
+
+        # 按时间间隔分组
+        buckets = defaultdict(list)
+        for timestamp, value in rows:
+            # 计算时间桶（向下取整到 interval_minutes）
+            bucket_time = timestamp.replace(second=0, microsecond=0)
+            bucket_minutes = (bucket_time.minute // interval_minutes) * interval_minutes
+            bucket_time = bucket_time.replace(minute=bucket_minutes)
+            buckets[bucket_time].append(value)
+
+        # 聚合每个桶
+        aggregated = []
+        for bucket_time in sorted(buckets.keys(), reverse=True):
+            values = buckets[bucket_time]
+            if agg_func == "mean":
+                agg_value = sum(values) / len(values)
+            elif agg_func == "max":
+                agg_value = max(values)
+            elif agg_func == "min":
+                agg_value = min(values)
+            else:
+                agg_value = sum(values) / len(values)
+
+            aggregated.append(agg_value)
+
+        return aggregated
+
+
+    def _fill_timeseries(self, data: List[float], target_length: int) -> List[float]:
+        """
+        填充时间序列数据到目标长度
+
+        使用策略：
+        1. 如果数据足够，截取到目标长度
+        2. 如果数据不足，使用 forward fill（最后一个有效值）
+
+        Args:
+            data: 原始数据（从最新到最旧）
+            target_length: 目标长度
+
+        Returns:
+            填充后的数据
+        """
+        if not data:
+            return []
+
+        if len(data) >= target_length:
+            return data[:target_length]
+
+        # Forward fill
+        filled = data.copy()
+        last_value = data[-1]
+        while len(filled) < target_length:
+            filled.append(last_value)
+
+        logger.warning(f"Data insufficient: {len(data)} points, filled to {target_length} using forward fill")
+
+        return filled
 
 
     async def _check_data_quality(
@@ -299,23 +534,199 @@ class ThermalModel:
                 "details": "..."
             }
         """
-        # 实现数据质量检查逻辑（下一步实现）
+        missing_fields = []
+
+        # 1. 检查温度数据（必需）
+        if not t_ambient or len(t_ambient) == 0:
+            missing_fields.append("T_ambient")
+        if t_current is None:
+            missing_fields.append("T_current")
+
+        if missing_fields:
+            return {
+                "error": "insufficient_data",
+                "missing_fields": missing_fields,
+                "zone_id": zone_id
+            }
+
+        # 2. 温度异常检查
+        if t_current < 0 or t_current > 50:
+            return {
+                "error": "invalid_temperature",
+                "field": "T_current",
+                "value": t_current,
+                "zone_id": zone_id
+            }
+
+        for i, t in enumerate(t_ambient):
+            if t < 0 or t > 50:
+                return {
+                    "error": "invalid_temperature",
+                    "field": "T_ambient",
+                    "index": i,
+                    "value": t,
+                    "zone_id": zone_id
+                }
+
+        # 3. 温度突变检查（警告）
+        t_ambient_quality = "good"
+        for i in range(1, len(t_ambient)):
+            if abs(t_ambient[i] - t_ambient[i-1]) > 3.0:
+                logger.warning(f"Zone {zone_id}: Temperature spike detected: {t_ambient[i-1]} -> {t_ambient[i]}")
+                t_ambient_quality = "warning"
+
+        # 4. 传感器离线检查
+        latest_temp_time = await self._get_latest_temp_timestamp(session, zone_id)
+        if latest_temp_time and (datetime.now() - latest_temp_time).total_seconds() > 3600:
+            return {
+                "error": "sensor_offline",
+                "sensor": "inlet",
+                "last_update": latest_temp_time.isoformat(),
+                "zone_id": zone_id
+            }
+
+        # 5. 检查 Q_IT 数据（可估算）
+        q_it_quality = "good"
+        if not q_it or len(q_it) < 6:  # < 30 分钟
+            # 使用估算值
+            rated_power = await self._get_rated_power(session, zone_id)
+            if rated_power:
+                q_it_estimated = [rated_power * 0.7] * max(6, len(q_it) if q_it else 0)
+                q_it.clear()
+                q_it.extend(q_it_estimated)
+                q_it_quality = "estimated"
+                logger.warning(f"Zone {zone_id}: Q_IT data insufficient, using estimated value {rated_power * 0.7} kW")
+            else:
+                return {
+                    "error": "insufficient_history",
+                    "field": "Q_IT",
+                    "available_minutes": len(q_it) * 5 if q_it else 0,
+                    "zone_id": zone_id
+                }
+        else:
+            # 检查 Q_IT 过期
+            latest_q_it_time = await self._get_latest_q_it_timestamp(session, zone_id)
+            if latest_q_it_time and (datetime.now() - latest_q_it_time).total_seconds() > 86400:
+                # 触发告警
+                logger.error(f"Zone {zone_id}: Q_IT data stale (last update: {latest_q_it_time})")
+                return {
+                    "error": "q_it_data_stale",
+                    "last_update": latest_q_it_time.isoformat(),
+                    "zone_id": zone_id
+                }
+
+            # 检查 Q_IT 异常
+            rated_power = await self._get_rated_power(session, zone_id)
+            if rated_power:
+                for i, q in enumerate(q_it):
+                    if q < 0 or q > rated_power * 1.5:
+                        logger.warning(f"Zone {zone_id}: Q_IT anomaly detected at index {i}: {q} kW (rated: {rated_power} kW)")
+                        q_it[i] = rated_power * 0.7  # 使用估算值
+                        q_it_quality = "estimated"
+
         return {
             "error": None,
             "missing_fields": [],
-            "q_it_quality": "good",
-            "t_ambient_quality": "good",
+            "q_it_quality": q_it_quality,
+            "t_ambient_quality": t_ambient_quality,
             "t_current_quality": "good"
         }
 
 
+    async def _get_latest_temp_timestamp(self, session: AsyncSession, zone_id: int) -> Optional[datetime]:
+        """获取最新温度数据时间戳"""
+        from sqlalchemy import func
+
+        query = (
+            select(func.max(PointHistory.timestamp))
+            .join(Point, PointHistory.point_id == Point.id)
+            .join(CabinetTemperatureSensor, Point.id == CabinetTemperatureSensor.point_id)
+            .join(CoolingZoneCabinet, CabinetTemperatureSensor.cabinet_id == CoolingZoneCabinet.cabinet_id)
+            .where(
+                CoolingZoneCabinet.cooling_zone_id == zone_id,
+                CabinetTemperatureSensor.sensor_location == 'inlet'
+            )
+        )
+
+        result = await session.execute(query)
+        return result.scalar_one_or_none()
+
+
+    async def _get_latest_q_it_timestamp(self, session: AsyncSession, zone_id: int) -> Optional[datetime]:
+        """获取最新 Q_IT 数据时间戳"""
+        from sqlalchemy import func
+
+        query = (
+            select(func.max(PointHistory.timestamp))
+            .join(Point, PointHistory.point_id == Point.id)
+            .join(CabinetITLoad, Point.id == CabinetITLoad.power_point_id)
+            .join(CoolingZoneCabinet, CabinetITLoad.cabinet_id == CoolingZoneCabinet.cabinet_id)
+            .where(CoolingZoneCabinet.cooling_zone_id == zone_id)
+        )
+
+        result = await session.execute(query)
+        return result.scalar_one_or_none()
+
+
+    async def _get_rated_power(self, session: AsyncSession, zone_id: int) -> Optional[float]:
+        """获取机柜额定功率总和"""
+        from sqlalchemy import func
+
+        query = (
+            select(func.sum(CabinetITLoad.rated_power_kw))
+            .join(CoolingZoneCabinet, CabinetITLoad.cabinet_id == CoolingZoneCabinet.cabinet_id)
+            .where(CoolingZoneCabinet.cooling_zone_id == zone_id)
+        )
+
+        result = await session.execute(query)
+        return result.scalar_one_or_none()
+
+
     async def _get_current_cooling(self, session: AsyncSession, zone_id: int) -> Dict:
-        """获取当前制冷功率"""
-        # 实现当前制冷功率获取逻辑（下一步实现）
-        return {
-            "error": "not_implemented",
-            "details": "Current cooling power retrieval not yet implemented"
-        }
+        """
+        获取当前制冷功率
+
+        路径：CoolingZone → CoolingZoneUnit → CoolingUnit → Device → Point → PointHistory
+
+        Returns:
+            成功时: {"value": float}
+            失败时: {"error": str, "details": str}
+        """
+        from sqlalchemy import and_
+
+        now = datetime.now()
+
+        query = (
+            select(PointHistory.value)
+            .join(Point, PointHistory.point_id == Point.id)
+            .join(Device, Point.device_id == Device.id)
+            .join(CoolingUnit, Device.id == CoolingUnit.device_id)
+            .join(CoolingZoneUnit, CoolingUnit.id == CoolingZoneUnit.cooling_unit_id)
+            .where(
+                and_(
+                    CoolingZoneUnit.cooling_zone_id == zone_id,
+                    Point.point_code.like('%_power'),
+                    PointHistory.timestamp >= now - timedelta(minutes=5)
+                )
+            )
+            .order_by(PointHistory.timestamp.desc())
+            .limit(10)
+        )
+
+        result = await session.execute(query)
+        rows = result.fetchall()
+
+        if not rows:
+            logger.warning(f"Zone {zone_id}: current cooling power not found")
+            return {
+                "error": "current_cooling_not_found",
+                "details": "No recent cooling power data available"
+            }
+
+        # 取平均值
+        avg_power = sum(row[0] for row in rows) / len(rows)
+
+        return {"value": avg_power}
 
 
     def _get_seasonal_cop(self, t_outdoor: Optional[float]) -> float:

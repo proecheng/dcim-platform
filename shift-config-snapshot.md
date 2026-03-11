@@ -1,0 +1,3943 @@
+- generic [ref=e3]:
+  - complementary [ref=e4]:
+    - generic [ref=e5]:
+      - img [ref=e7]
+      - generic [ref=e9]: 算力监控
+    - menubar [ref=e10]:
+      - listitem [ref=e11]: 监控域
+      - menuitem "综合概览" [ref=e12] [cursor=pointer]:
+        - img [ref=e14]
+        - text: 综合概览
+      - menuitem "供配电监控" [ref=e16]:
+        - generic [ref=e17] [cursor=pointer]:
+          - img [ref=e19]
+          - generic [ref=e22]: 供配电监控
+          - img [ref=e24]
+      - menuitem "制冷监控" [ref=e26]:
+        - generic [ref=e27] [cursor=pointer]:
+          - img [ref=e29]
+          - generic [ref=e31]: 制冷监控
+          - img [ref=e33]
+      - menuitem "环境监控" [ref=e35]:
+        - generic [ref=e36] [cursor=pointer]:
+          - img [ref=e38]
+          - generic [ref=e40]: 环境监控
+          - img [ref=e42]
+      - menuitem "安防消防" [ref=e44]:
+        - generic [ref=e45] [cursor=pointer]:
+          - img [ref=e47]
+          - generic [ref=e50]: 安防消防
+          - img [ref=e52]
+      - menuitem "告警中心" [ref=e54] [cursor=pointer]:
+        - img [ref=e56]
+        - text: 告警中心
+      - listitem [ref=e60]: 管理域
+      - menuitem "能效管理" [ref=e61]:
+        - generic [ref=e62] [cursor=pointer]:
+          - img [ref=e64]
+          - generic [ref=e66]: 能效管理
+          - img [ref=e68]
+      - menuitem "资产与容量" [ref=e70]:
+        - generic [ref=e71] [cursor=pointer]:
+          - img [ref=e73]
+          - generic [ref=e77]: 资产与容量
+          - img [ref=e79]
+      - menuitem "运维管理" [ref=e81]:
+        - generic [ref=e82] [cursor=pointer]:
+          - img [ref=e84]
+          - generic [ref=e86]: 运维管理
+          - img [ref=e88]
+      - menuitem "虚拟电厂" [ref=e90]:
+        - generic [ref=e91] [cursor=pointer]:
+          - img [ref=e93]
+          - generic [ref=e96]: 虚拟电厂
+          - img [ref=e98]
+      - listitem [ref=e206]: 配置域
+      - menuitem "采集配置" [expanded] [ref=e207]:
+        - generic [ref=e208] [cursor=pointer]:
+          - img [ref=e210]
+          - generic [ref=e213]: 采集配置
+          - img [ref=e215]
+        - menu [ref=e217]:
+          - menuitem "设备管理" [ref=e218] [cursor=pointer]
+          - menuitem "设备状态看板" [ref=e219] [cursor=pointer]
+          - menuitem "点位管理" [ref=e220] [cursor=pointer]
+          - menuitem "数据源管理" [ref=e221] [cursor=pointer]
+          - menuitem "设备模板" [ref=e222] [cursor=pointer]
+          - menuitem "配电配置" [ref=e223] [cursor=pointer]
+          - menuitem "网关管理" [ref=e224] [cursor=pointer]
+          - menuitem "漂移检测" [ref=e225] [cursor=pointer]
+      - menuitem "策略引擎" [ref=e226]:
+        - generic [ref=e227] [cursor=pointer]:
+          - img [ref=e229]
+          - generic [ref=e234]: 策略引擎
+          - img [ref=e236]
+      - menuitem "系统管理" [ref=e238]:
+        - generic [ref=e239] [cursor=pointer]:
+          - img [ref=e241]
+          - generic [ref=e243]: 系统管理
+          - img [ref=e245]
+  - generic [ref=e100]:
+    - generic [ref=e101]:
+      - generic [ref=e102]:
+        - img [ref=e104] [cursor=pointer]
+        - navigation "面包屑" [ref=e106]:
+          - generic [ref=e107]:
+            - link "首页" [ref=e108]
+            - text: /
+          - link "配电配置" [ref=e110]
+      - generic [ref=e111]:
+        - generic [ref=e113] [cursor=pointer]:
+          - generic:
+            - combobox [ref=e115]
+            - generic [ref=e116]: 选择站点
+          - img [ref=e119]
+        - button [ref=e121] [cursor=pointer]:
+          - img [ref=e123]
+        - generic [ref=e126]:
+          - button [ref=e127] [cursor=pointer]:
+            - img [ref=e129]
+          - superscript [ref=e133]: "0"
+        - button "admin" [ref=e247] [cursor=pointer]:
+          - img [ref=e138]
+          - generic [ref=e248]: admin
+          - img [ref=e141]
+    - main [ref=e143]:
+      - generic [ref=e145]:
+        - tablist [ref=e149]:
+          - tab "变压器" [ref=e150]
+          - tab "计量点" [ref=e151]
+          - tab "配电柜" [ref=e152]
+          - tab "配电回路" [ref=e153]
+          - tab "电价配置" [ref=e154]
+          - tab "需量配置" [ref=e155]
+          - tab "转移配置" [active] [selected] [ref=e156] [cursor=pointer]
+        - tabpanel "转移配置" [ref=e249]:
+          - generic [ref=e250]:
+            - button "全部接受推荐值" [ref=e251] [cursor=pointer]:
+              - generic [ref=e252]:
+                - img [ref=e254]
+                - text: 全部接受推荐值
+            - button "刷新推荐" [ref=e256] [cursor=pointer]:
+              - generic [ref=e257]:
+                - img [ref=e259]
+                - text: 刷新推荐
+            - generic [ref=e261]: 基于过去30天历史数据智能分析
+          - alert [ref=e262]:
+            - generic [ref=e263]:
+              - generic [ref=e264]: 转移配置说明
+              - paragraph [ref=e265]:
+                - paragraph [ref=e266]: 可调节容量比例(shiftable_power_ratio)决定设备在负荷转移时可调节的功率占比。
+                - paragraph [ref=e267]: 推荐值基于设备历史运行数据(负荷波动、峰谷用电分布)智能计算，置信度反映数据充足程度。
+          - generic [ref=e269]:
+            - table [ref=e271]:
+              - rowgroup [ref=e282]:
+                - row "设备编码 设备名称 类型 额定功率 当前比例 推荐比例 可调节容量 置信度 操作" [ref=e283]:
+                  - columnheader "设备编码" [ref=e284]:
+                    - generic [ref=e285]: 设备编码
+                  - columnheader "设备名称" [ref=e286]:
+                    - generic [ref=e287]: 设备名称
+                  - columnheader "类型" [ref=e288]:
+                    - generic [ref=e289]: 类型
+                  - columnheader "额定功率" [ref=e290]:
+                    - generic [ref=e291]: 额定功率
+                  - columnheader "当前比例" [ref=e292]:
+                    - generic [ref=e293]: 当前比例
+                  - columnheader "推荐比例" [ref=e294]:
+                    - generic [ref=e295]: 推荐比例
+                  - columnheader "可调节容量" [ref=e296]:
+                    - generic [ref=e297]: 可调节容量
+                  - columnheader "置信度" [ref=e298]:
+                    - generic [ref=e299]: 置信度
+                  - columnheader "操作" [ref=e300]:
+                    - generic [ref=e301]: 操作
+            - table [ref=e306]:
+              - rowgroup [ref=e317]:
+                - row "AC-A01 精密空调1 空调 50 kW 0% 17% 变更 0.0 kW → 8.5 低 调整 接受" [ref=e318]:
+                  - cell "AC-A01" [ref=e319]:
+                    - generic [ref=e320]: AC-A01
+                  - cell "精密空调1" [ref=e321]:
+                    - generic [ref=e324] [cursor=pointer]: 精密空调1
+                  - cell "空调" [ref=e325]:
+                    - generic [ref=e326]: 空调
+                  - cell "50 kW" [ref=e327]:
+                    - generic [ref=e328]: 50 kW
+                  - cell "0%" [ref=e329]:
+                    - generic [ref=e330]: 0%
+                  - cell "17% 变更" [ref=e331]:
+                    - generic [ref=e332]:
+                      - text: 17%
+                      - generic [ref=e334]: 变更
+                  - cell "0.0 kW → 8.5" [ref=e335]:
+                    - generic [ref=e336]: 0.0 kW → 8.5
+                  - cell "低" [ref=e337]:
+                    - generic [ref=e340]: 低
+                  - cell "调整 接受" [ref=e341]:
+                    - generic [ref=e342]:
+                      - button "调整" [ref=e343] [cursor=pointer]:
+                        - generic [ref=e344]: 调整
+                      - button "接受" [ref=e345] [cursor=pointer]:
+                        - generic [ref=e346]: 接受
+                - row "AC-A02 精密空调2 空调 50 kW 0% 17% 变更 0.0 kW → 8.5 低 调整 接受" [ref=e347]:
+                  - cell "AC-A02" [ref=e348]:
+                    - generic [ref=e349]: AC-A02
+                  - cell "精密空调2" [ref=e350]:
+                    - generic [ref=e353] [cursor=pointer]: 精密空调2
+                  - cell "空调" [ref=e354]:
+                    - generic [ref=e355]: 空调
+                  - cell "50 kW" [ref=e356]:
+                    - generic [ref=e357]: 50 kW
+                  - cell "0%" [ref=e358]:
+                    - generic [ref=e359]: 0%
+                  - cell "17% 变更" [ref=e360]:
+                    - generic [ref=e361]:
+                      - text: 17%
+                      - generic [ref=e363]: 变更
+                  - cell "0.0 kW → 8.5" [ref=e364]:
+                    - generic [ref=e365]: 0.0 kW → 8.5
+                  - cell "低" [ref=e366]:
+                    - generic [ref=e369]: 低
+                  - cell "调整 接受" [ref=e370]:
+                    - generic [ref=e371]:
+                      - button "调整" [ref=e372] [cursor=pointer]:
+                        - generic [ref=e373]: 调整
+                      - button "接受" [ref=e374] [cursor=pointer]:
+                        - generic [ref=e375]: 接受
+                - row "AC-B01 精密空调3 空调 45 kW 0% 17% 变更 0.0 kW → 7.7 低 调整 接受" [ref=e376]:
+                  - cell "AC-B01" [ref=e377]:
+                    - generic [ref=e378]: AC-B01
+                  - cell "精密空调3" [ref=e379]:
+                    - generic [ref=e382] [cursor=pointer]: 精密空调3
+                  - cell "空调" [ref=e383]:
+                    - generic [ref=e384]: 空调
+                  - cell "45 kW" [ref=e385]:
+                    - generic [ref=e386]: 45 kW
+                  - cell "0%" [ref=e387]:
+                    - generic [ref=e388]: 0%
+                  - cell "17% 变更" [ref=e389]:
+                    - generic [ref=e390]:
+                      - text: 17%
+                      - generic [ref=e392]: 变更
+                  - cell "0.0 kW → 7.7" [ref=e393]:
+                    - generic [ref=e394]: 0.0 kW → 7.7
+                  - cell "低" [ref=e395]:
+                    - generic [ref=e398]: 低
+                  - cell "调整 接受" [ref=e399]:
+                    - generic [ref=e400]:
+                      - button "调整" [ref=e401] [cursor=pointer]:
+                        - generic [ref=e402]: 调整
+                      - button "接受" [ref=e403] [cursor=pointer]:
+                        - generic [ref=e404]: 接受
+                - row "F1-AC-001 F1 精密空调-1 空调 30 kW 0% 0% 0.0 kW 低 调整" [ref=e405]:
+                  - cell "F1-AC-001" [ref=e406]:
+                    - generic [ref=e407]: F1-AC-001
+                  - cell "F1 精密空调-1" [ref=e408]:
+                    - generic [ref=e411] [cursor=pointer]: F1 精密空调-1
+                  - cell "空调" [ref=e412]:
+                    - generic [ref=e413]: 空调
+                  - cell "30 kW" [ref=e414]:
+                    - generic [ref=e415]: 30 kW
+                  - cell "0%" [ref=e416]:
+                    - generic [ref=e417]: 0%
+                  - cell "0%" [ref=e418]:
+                    - generic [ref=e419]: 0%
+                  - cell "0.0 kW" [ref=e420]:
+                    - generic [ref=e421]: 0.0 kW
+                  - cell "低" [ref=e422]:
+                    - generic [ref=e425]: 低
+                  - cell "调整" [ref=e426]:
+                    - button "调整" [ref=e428] [cursor=pointer]:
+                      - generic [ref=e429]: 调整
+                - row "F1-AC-002 F1 精密空调-2 空调 30 kW 0% 0% 0.0 kW 低 调整" [ref=e430]:
+                  - cell "F1-AC-002" [ref=e431]:
+                    - generic [ref=e432]: F1-AC-002
+                  - cell "F1 精密空调-2" [ref=e433]:
+                    - generic [ref=e436] [cursor=pointer]: F1 精密空调-2
+                  - cell "空调" [ref=e437]:
+                    - generic [ref=e438]: 空调
+                  - cell "30 kW" [ref=e439]:
+                    - generic [ref=e440]: 30 kW
+                  - cell "0%" [ref=e441]:
+                    - generic [ref=e442]: 0%
+                  - cell "0%" [ref=e443]:
+                    - generic [ref=e444]: 0%
+                  - cell "0.0 kW" [ref=e445]:
+                    - generic [ref=e446]: 0.0 kW
+                  - cell "低" [ref=e447]:
+                    - generic [ref=e450]: 低
+                  - cell "调整" [ref=e451]:
+                    - button "调整" [ref=e453] [cursor=pointer]:
+                      - generic [ref=e454]: 调整
+                - row "F1-AC-003 F1 精密空调-3 空调 30 kW 0% 0% 0.0 kW 低 调整" [ref=e455]:
+                  - cell "F1-AC-003" [ref=e456]:
+                    - generic [ref=e457]: F1-AC-003
+                  - cell "F1 精密空调-3" [ref=e458]:
+                    - generic [ref=e461] [cursor=pointer]: F1 精密空调-3
+                  - cell "空调" [ref=e462]:
+                    - generic [ref=e463]: 空调
+                  - cell "30 kW" [ref=e464]:
+                    - generic [ref=e465]: 30 kW
+                  - cell "0%" [ref=e466]:
+                    - generic [ref=e467]: 0%
+                  - cell "0%" [ref=e468]:
+                    - generic [ref=e469]: 0%
+                  - cell "0.0 kW" [ref=e470]:
+                    - generic [ref=e471]: 0.0 kW
+                  - cell "低" [ref=e472]:
+                    - generic [ref=e475]: 低
+                  - cell "调整" [ref=e476]:
+                    - button "调整" [ref=e478] [cursor=pointer]:
+                      - generic [ref=e479]: 调整
+                - row "F1-AC-004 F1 精密空调-4 空调 30 kW 0% 0% 0.0 kW 低 调整" [ref=e480]:
+                  - cell "F1-AC-004" [ref=e481]:
+                    - generic [ref=e482]: F1-AC-004
+                  - cell "F1 精密空调-4" [ref=e483]:
+                    - generic [ref=e486] [cursor=pointer]: F1 精密空调-4
+                  - cell "空调" [ref=e487]:
+                    - generic [ref=e488]: 空调
+                  - cell "30 kW" [ref=e489]:
+                    - generic [ref=e490]: 30 kW
+                  - cell "0%" [ref=e491]:
+                    - generic [ref=e492]: 0%
+                  - cell "0%" [ref=e493]:
+                    - generic [ref=e494]: 0%
+                  - cell "0.0 kW" [ref=e495]:
+                    - generic [ref=e496]: 0.0 kW
+                  - cell "低" [ref=e497]:
+                    - generic [ref=e500]: 低
+                  - cell "调整" [ref=e501]:
+                    - button "调整" [ref=e503] [cursor=pointer]:
+                      - generic [ref=e504]: 调整
+                - row "F2-AC-001 F2 精密空调-1 空调 30 kW 0% 0% 0.0 kW 低 调整" [ref=e505]:
+                  - cell "F2-AC-001" [ref=e506]:
+                    - generic [ref=e507]: F2-AC-001
+                  - cell "F2 精密空调-1" [ref=e508]:
+                    - generic [ref=e511] [cursor=pointer]: F2 精密空调-1
+                  - cell "空调" [ref=e512]:
+                    - generic [ref=e513]: 空调
+                  - cell "30 kW" [ref=e514]:
+                    - generic [ref=e515]: 30 kW
+                  - cell "0%" [ref=e516]:
+                    - generic [ref=e517]: 0%
+                  - cell "0%" [ref=e518]:
+                    - generic [ref=e519]: 0%
+                  - cell "0.0 kW" [ref=e520]:
+                    - generic [ref=e521]: 0.0 kW
+                  - cell "低" [ref=e522]:
+                    - generic [ref=e525]: 低
+                  - cell "调整" [ref=e526]:
+                    - button "调整" [ref=e528] [cursor=pointer]:
+                      - generic [ref=e529]: 调整
+                - row "F2-AC-002 F2 精密空调-2 空调 30 kW 0% 0% 0.0 kW 低 调整" [ref=e530]:
+                  - cell "F2-AC-002" [ref=e531]:
+                    - generic [ref=e532]: F2-AC-002
+                  - cell "F2 精密空调-2" [ref=e533]:
+                    - generic [ref=e536] [cursor=pointer]: F2 精密空调-2
+                  - cell "空调" [ref=e537]:
+                    - generic [ref=e538]: 空调
+                  - cell "30 kW" [ref=e539]:
+                    - generic [ref=e540]: 30 kW
+                  - cell "0%" [ref=e541]:
+                    - generic [ref=e542]: 0%
+                  - cell "0%" [ref=e543]:
+                    - generic [ref=e544]: 0%
+                  - cell "0.0 kW" [ref=e545]:
+                    - generic [ref=e546]: 0.0 kW
+                  - cell "低" [ref=e547]:
+                    - generic [ref=e550]: 低
+                  - cell "调整" [ref=e551]:
+                    - button "调整" [ref=e553] [cursor=pointer]:
+                      - generic [ref=e554]: 调整
+                - row "F2-AC-003 F2 精密空调-3 空调 30 kW 0% 0% 0.0 kW 低 调整" [ref=e555]:
+                  - cell "F2-AC-003" [ref=e556]:
+                    - generic [ref=e557]: F2-AC-003
+                  - cell "F2 精密空调-3" [ref=e558]:
+                    - generic [ref=e561] [cursor=pointer]: F2 精密空调-3
+                  - cell "空调" [ref=e562]:
+                    - generic [ref=e563]: 空调
+                  - cell "30 kW" [ref=e564]:
+                    - generic [ref=e565]: 30 kW
+                  - cell "0%" [ref=e566]:
+                    - generic [ref=e567]: 0%
+                  - cell "0%" [ref=e568]:
+                    - generic [ref=e569]: 0%
+                  - cell "0.0 kW" [ref=e570]:
+                    - generic [ref=e571]: 0.0 kW
+                  - cell "低" [ref=e572]:
+                    - generic [ref=e575]: 低
+                  - cell "调整" [ref=e576]:
+                    - button "调整" [ref=e578] [cursor=pointer]:
+                      - generic [ref=e579]: 调整
+                - row "F2-AC-004 F2 精密空调-4 空调 30 kW 0% 0% 0.0 kW 低 调整" [ref=e580]:
+                  - cell "F2-AC-004" [ref=e581]:
+                    - generic [ref=e582]: F2-AC-004
+                  - cell "F2 精密空调-4" [ref=e583]:
+                    - generic [ref=e586] [cursor=pointer]: F2 精密空调-4
+                  - cell "空调" [ref=e587]:
+                    - generic [ref=e588]: 空调
+                  - cell "30 kW" [ref=e589]:
+                    - generic [ref=e590]: 30 kW
+                  - cell "0%" [ref=e591]:
+                    - generic [ref=e592]: 0%
+                  - cell "0%" [ref=e593]:
+                    - generic [ref=e594]: 0%
+                  - cell "0.0 kW" [ref=e595]:
+                    - generic [ref=e596]: 0.0 kW
+                  - cell "低" [ref=e597]:
+                    - generic [ref=e600]: 低
+                  - cell "调整" [ref=e601]:
+                    - button "调整" [ref=e603] [cursor=pointer]:
+                      - generic [ref=e604]: 调整
+                - row "F3-AC-001 F3 精密空调-1 空调 20 kW 0% 0% 0.0 kW 低 调整" [ref=e605]:
+                  - cell "F3-AC-001" [ref=e606]:
+                    - generic [ref=e607]: F3-AC-001
+                  - cell "F3 精密空调-1" [ref=e608]:
+                    - generic [ref=e611] [cursor=pointer]: F3 精密空调-1
+                  - cell "空调" [ref=e612]:
+                    - generic [ref=e613]: 空调
+                  - cell "20 kW" [ref=e614]:
+                    - generic [ref=e615]: 20 kW
+                  - cell "0%" [ref=e616]:
+                    - generic [ref=e617]: 0%
+                  - cell "0%" [ref=e618]:
+                    - generic [ref=e619]: 0%
+                  - cell "0.0 kW" [ref=e620]:
+                    - generic [ref=e621]: 0.0 kW
+                  - cell "低" [ref=e622]:
+                    - generic [ref=e625]: 低
+                  - cell "调整" [ref=e626]:
+                    - button "调整" [ref=e628] [cursor=pointer]:
+                      - generic [ref=e629]: 调整
+                - row "F3-AC-002 F3 精密空调-2 空调 20 kW 0% 0% 0.0 kW 低 调整" [ref=e630]:
+                  - cell "F3-AC-002" [ref=e631]:
+                    - generic [ref=e632]: F3-AC-002
+                  - cell "F3 精密空调-2" [ref=e633]:
+                    - generic [ref=e636] [cursor=pointer]: F3 精密空调-2
+                  - cell "空调" [ref=e637]:
+                    - generic [ref=e638]: 空调
+                  - cell "20 kW" [ref=e639]:
+                    - generic [ref=e640]: 20 kW
+                  - cell "0%" [ref=e641]:
+                    - generic [ref=e642]: 0%
+                  - cell "0%" [ref=e643]:
+                    - generic [ref=e644]: 0%
+                  - cell "0.0 kW" [ref=e645]:
+                    - generic [ref=e646]: 0.0 kW
+                  - cell "低" [ref=e647]:
+                    - generic [ref=e650]: 低
+                  - cell "调整" [ref=e651]:
+                    - button "调整" [ref=e653] [cursor=pointer]:
+                      - generic [ref=e654]: 调整
+                - row "CH-F1-01 1#冷水机组 冷水机 350 kW 0% 0% 0.0 kW 低 调整" [ref=e655]:
+                  - cell "CH-F1-01" [ref=e656]:
+                    - generic [ref=e657]: CH-F1-01
+                  - cell "1#冷水机组" [ref=e658]:
+                    - generic [ref=e661] [cursor=pointer]: 1#冷水机组
+                  - cell "冷水机" [ref=e662]:
+                    - generic [ref=e663]: 冷水机
+                  - cell "350 kW" [ref=e664]:
+                    - generic [ref=e665]: 350 kW
+                  - cell "0%" [ref=e666]:
+                    - generic [ref=e667]: 0%
+                  - cell "0%" [ref=e668]:
+                    - generic [ref=e669]: 0%
+                  - cell "0.0 kW" [ref=e670]:
+                    - generic [ref=e671]: 0.0 kW
+                  - cell "低" [ref=e672]:
+                    - generic [ref=e675]: 低
+                  - cell "调整" [ref=e676]:
+                    - button "调整" [ref=e678] [cursor=pointer]:
+                      - generic [ref=e679]: 调整
+                - row "CH-F1-02 2#冷水机组 冷水机 350 kW 0% 0% 0.0 kW 低 调整" [ref=e680]:
+                  - cell "CH-F1-02" [ref=e681]:
+                    - generic [ref=e682]: CH-F1-02
+                  - cell "2#冷水机组" [ref=e683]:
+                    - generic [ref=e686] [cursor=pointer]: 2#冷水机组
+                  - cell "冷水机" [ref=e687]:
+                    - generic [ref=e688]: 冷水机
+                  - cell "350 kW" [ref=e689]:
+                    - generic [ref=e690]: 350 kW
+                  - cell "0%" [ref=e691]:
+                    - generic [ref=e692]: 0%
+                  - cell "0%" [ref=e693]:
+                    - generic [ref=e694]: 0%
+                  - cell "0.0 kW" [ref=e695]:
+                    - generic [ref=e696]: 0.0 kW
+                  - cell "低" [ref=e697]:
+                    - generic [ref=e700]: 低
+                  - cell "调整" [ref=e701]:
+                    - button "调整" [ref=e703] [cursor=pointer]:
+                      - generic [ref=e704]: 调整
+                - row "CT-F1-01 1#冷却塔 CT 30 kW 0% 0% 0.0 kW 低 调整" [ref=e705]:
+                  - cell "CT-F1-01" [ref=e706]:
+                    - generic [ref=e707]: CT-F1-01
+                  - cell "1#冷却塔" [ref=e708]:
+                    - generic [ref=e711] [cursor=pointer]: 1#冷却塔
+                  - cell "CT" [ref=e712]:
+                    - generic [ref=e713]: CT
+                  - cell "30 kW" [ref=e714]:
+                    - generic [ref=e715]: 30 kW
+                  - cell "0%" [ref=e716]:
+                    - generic [ref=e717]: 0%
+                  - cell "0%" [ref=e718]:
+                    - generic [ref=e719]: 0%
+                  - cell "0.0 kW" [ref=e720]:
+                    - generic [ref=e721]: 0.0 kW
+                  - cell "低" [ref=e722]:
+                    - generic [ref=e725]: 低
+                  - cell "调整" [ref=e726]:
+                    - button "调整" [ref=e728] [cursor=pointer]:
+                      - generic [ref=e729]: 调整
+                - row "CT-F1-02 2#冷却塔 CT 30 kW 0% 0% 0.0 kW 低 调整" [ref=e730]:
+                  - cell "CT-F1-02" [ref=e731]:
+                    - generic [ref=e732]: CT-F1-02
+                  - cell "2#冷却塔" [ref=e733]:
+                    - generic [ref=e736] [cursor=pointer]: 2#冷却塔
+                  - cell "CT" [ref=e737]:
+                    - generic [ref=e738]: CT
+                  - cell "30 kW" [ref=e739]:
+                    - generic [ref=e740]: 30 kW
+                  - cell "0%" [ref=e741]:
+                    - generic [ref=e742]: 0%
+                  - cell "0%" [ref=e743]:
+                    - generic [ref=e744]: 0%
+                  - cell "0.0 kW" [ref=e745]:
+                    - generic [ref=e746]: 0.0 kW
+                  - cell "低" [ref=e747]:
+                    - generic [ref=e750]: 低
+                  - cell "调整" [ref=e751]:
+                    - button "调整" [ref=e753] [cursor=pointer]:
+                      - generic [ref=e754]: 调整
+                - row "AC-OUT-A01 A区1号室外机 暖通 50 kW 0% 17% 变更 0.0 kW → 8.5 低 调整 接受" [ref=e755]:
+                  - cell "AC-OUT-A01" [ref=e756]:
+                    - generic [ref=e757]: AC-OUT-A01
+                  - cell "A区1号室外机" [ref=e758]:
+                    - generic [ref=e761] [cursor=pointer]: A区1号室外机
+                  - cell "暖通" [ref=e762]:
+                    - generic [ref=e763]: 暖通
+                  - cell "50 kW" [ref=e764]:
+                    - generic [ref=e765]: 50 kW
+                  - cell "0%" [ref=e766]:
+                    - generic [ref=e767]: 0%
+                  - cell "17% 变更" [ref=e768]:
+                    - generic [ref=e769]:
+                      - text: 17%
+                      - generic [ref=e771]: 变更
+                  - cell "0.0 kW → 8.5" [ref=e772]:
+                    - generic [ref=e773]: 0.0 kW → 8.5
+                  - cell "低" [ref=e774]:
+                    - generic [ref=e777]: 低
+                  - cell "调整 接受" [ref=e778]:
+                    - generic [ref=e779]:
+                      - button "调整" [ref=e780] [cursor=pointer]:
+                        - generic [ref=e781]: 调整
+                      - button "接受" [ref=e782] [cursor=pointer]:
+                        - generic [ref=e783]: 接受
+                - row "AC-OUT-A02 A区2号室外机 暖通 50 kW 0% 17% 变更 0.0 kW → 8.5 低 调整 接受" [ref=e784]:
+                  - cell "AC-OUT-A02" [ref=e785]:
+                    - generic [ref=e786]: AC-OUT-A02
+                  - cell "A区2号室外机" [ref=e787]:
+                    - generic [ref=e790] [cursor=pointer]: A区2号室外机
+                  - cell "暖通" [ref=e791]:
+                    - generic [ref=e792]: 暖通
+                  - cell "50 kW" [ref=e793]:
+                    - generic [ref=e794]: 50 kW
+                  - cell "0%" [ref=e795]:
+                    - generic [ref=e796]: 0%
+                  - cell "17% 变更" [ref=e797]:
+                    - generic [ref=e798]:
+                      - text: 17%
+                      - generic [ref=e800]: 变更
+                  - cell "0.0 kW → 8.5" [ref=e801]:
+                    - generic [ref=e802]: 0.0 kW → 8.5
+                  - cell "低" [ref=e803]:
+                    - generic [ref=e806]: 低
+                  - cell "调整 接受" [ref=e807]:
+                    - generic [ref=e808]:
+                      - button "调整" [ref=e809] [cursor=pointer]:
+                        - generic [ref=e810]: 调整
+                      - button "接受" [ref=e811] [cursor=pointer]:
+                        - generic [ref=e812]: 接受
+                - row "CA-A01 A区1号冷通道 暖通 50 kW 0% 17% 变更 0.0 kW → 8.5 低 调整 接受" [ref=e813]:
+                  - cell "CA-A01" [ref=e814]:
+                    - generic [ref=e815]: CA-A01
+                  - cell "A区1号冷通道" [ref=e816]:
+                    - generic [ref=e819] [cursor=pointer]: A区1号冷通道
+                  - cell "暖通" [ref=e820]:
+                    - generic [ref=e821]: 暖通
+                  - cell "50 kW" [ref=e822]:
+                    - generic [ref=e823]: 50 kW
+                  - cell "0%" [ref=e824]:
+                    - generic [ref=e825]: 0%
+                  - cell "17% 变更" [ref=e826]:
+                    - generic [ref=e827]:
+                      - text: 17%
+                      - generic [ref=e829]: 变更
+                  - cell "0.0 kW → 8.5" [ref=e830]:
+                    - generic [ref=e831]: 0.0 kW → 8.5
+                  - cell "低" [ref=e832]:
+                    - generic [ref=e835]: 低
+                  - cell "调整 接受" [ref=e836]:
+                    - generic [ref=e837]:
+                      - button "调整" [ref=e838] [cursor=pointer]:
+                        - generic [ref=e839]: 调整
+                      - button "接受" [ref=e840] [cursor=pointer]:
+                        - generic [ref=e841]: 接受
+                - row "CA-A02 A区2号冷通道 暖通 50 kW 0% 17% 变更 0.0 kW → 8.5 低 调整 接受" [ref=e842]:
+                  - cell "CA-A02" [ref=e843]:
+                    - generic [ref=e844]: CA-A02
+                  - cell "A区2号冷通道" [ref=e845]:
+                    - generic [ref=e848] [cursor=pointer]: A区2号冷通道
+                  - cell "暖通" [ref=e849]:
+                    - generic [ref=e850]: 暖通
+                  - cell "50 kW" [ref=e851]:
+                    - generic [ref=e852]: 50 kW
+                  - cell "0%" [ref=e853]:
+                    - generic [ref=e854]: 0%
+                  - cell "17% 变更" [ref=e855]:
+                    - generic [ref=e856]:
+                      - text: 17%
+                      - generic [ref=e858]: 变更
+                  - cell "0.0 kW → 8.5" [ref=e859]:
+                    - generic [ref=e860]: 0.0 kW → 8.5
+                  - cell "低" [ref=e861]:
+                    - generic [ref=e864]: 低
+                  - cell "调整 接受" [ref=e865]:
+                    - generic [ref=e866]:
+                      - button "调整" [ref=e867] [cursor=pointer]:
+                        - generic [ref=e868]: 调整
+                      - button "接受" [ref=e869] [cursor=pointer]:
+                        - generic [ref=e870]: 接受
+                - row "CA-F2-01 F2冷通道1号 暖通 50 kW 0% 17% 变更 0.0 kW → 8.5 低 调整 接受" [ref=e871]:
+                  - cell "CA-F2-01" [ref=e872]:
+                    - generic [ref=e873]: CA-F2-01
+                  - cell "F2冷通道1号" [ref=e874]:
+                    - generic [ref=e877] [cursor=pointer]: F2冷通道1号
+                  - cell "暖通" [ref=e878]:
+                    - generic [ref=e879]: 暖通
+                  - cell "50 kW" [ref=e880]:
+                    - generic [ref=e881]: 50 kW
+                  - cell "0%" [ref=e882]:
+                    - generic [ref=e883]: 0%
+                  - cell "17% 变更" [ref=e884]:
+                    - generic [ref=e885]:
+                      - text: 17%
+                      - generic [ref=e887]: 变更
+                  - cell "0.0 kW → 8.5" [ref=e888]:
+                    - generic [ref=e889]: 0.0 kW → 8.5
+                  - cell "低" [ref=e890]:
+                    - generic [ref=e893]: 低
+                  - cell "调整 接受" [ref=e894]:
+                    - generic [ref=e895]:
+                      - button "调整" [ref=e896] [cursor=pointer]:
+                        - generic [ref=e897]: 调整
+                      - button "接受" [ref=e898] [cursor=pointer]:
+                        - generic [ref=e899]: 接受
+                - row "CA-F2-02 F2冷通道2号 暖通 50 kW 0% 17% 变更 0.0 kW → 8.5 低 调整 接受" [ref=e900]:
+                  - cell "CA-F2-02" [ref=e901]:
+                    - generic [ref=e902]: CA-F2-02
+                  - cell "F2冷通道2号" [ref=e903]:
+                    - generic [ref=e906] [cursor=pointer]: F2冷通道2号
+                  - cell "暖通" [ref=e907]:
+                    - generic [ref=e908]: 暖通
+                  - cell "50 kW" [ref=e909]:
+                    - generic [ref=e910]: 50 kW
+                  - cell "0%" [ref=e911]:
+                    - generic [ref=e912]: 0%
+                  - cell "17% 变更" [ref=e913]:
+                    - generic [ref=e914]:
+                      - text: 17%
+                      - generic [ref=e916]: 变更
+                  - cell "0.0 kW → 8.5" [ref=e917]:
+                    - generic [ref=e918]: 0.0 kW → 8.5
+                  - cell "低" [ref=e919]:
+                    - generic [ref=e922]: 低
+                  - cell "调整 接受" [ref=e923]:
+                    - generic [ref=e924]:
+                      - button "调整" [ref=e925] [cursor=pointer]:
+                        - generic [ref=e926]: 调整
+                      - button "接受" [ref=e927] [cursor=pointer]:
+                        - generic [ref=e928]: 接受
+                - row "CA-F2-03 F2冷通道3号 暖通 50 kW 0% 17% 变更 0.0 kW → 8.5 低 调整 接受" [ref=e929]:
+                  - cell "CA-F2-03" [ref=e930]:
+                    - generic [ref=e931]: CA-F2-03
+                  - cell "F2冷通道3号" [ref=e932]:
+                    - generic [ref=e935] [cursor=pointer]: F2冷通道3号
+                  - cell "暖通" [ref=e936]:
+                    - generic [ref=e937]: 暖通
+                  - cell "50 kW" [ref=e938]:
+                    - generic [ref=e939]: 50 kW
+                  - cell "0%" [ref=e940]:
+                    - generic [ref=e941]: 0%
+                  - cell "17% 变更" [ref=e942]:
+                    - generic [ref=e943]:
+                      - text: 17%
+                      - generic [ref=e945]: 变更
+                  - cell "0.0 kW → 8.5" [ref=e946]:
+                    - generic [ref=e947]: 0.0 kW → 8.5
+                  - cell "低" [ref=e948]:
+                    - generic [ref=e951]: 低
+                  - cell "调整 接受" [ref=e952]:
+                    - generic [ref=e953]:
+                      - button "调整" [ref=e954] [cursor=pointer]:
+                        - generic [ref=e955]: 调整
+                      - button "接受" [ref=e956] [cursor=pointer]:
+                        - generic [ref=e957]: 接受
+                - row "CA-F2-04 F2冷通道4号 暖通 50 kW 0% 17% 变更 0.0 kW → 8.5 低 调整 接受" [ref=e958]:
+                  - cell "CA-F2-04" [ref=e959]:
+                    - generic [ref=e960]: CA-F2-04
+                  - cell "F2冷通道4号" [ref=e961]:
+                    - generic [ref=e964] [cursor=pointer]: F2冷通道4号
+                  - cell "暖通" [ref=e965]:
+                    - generic [ref=e966]: 暖通
+                  - cell "50 kW" [ref=e967]:
+                    - generic [ref=e968]: 50 kW
+                  - cell "0%" [ref=e969]:
+                    - generic [ref=e970]: 0%
+                  - cell "17% 变更" [ref=e971]:
+                    - generic [ref=e972]:
+                      - text: 17%
+                      - generic [ref=e974]: 变更
+                  - cell "0.0 kW → 8.5" [ref=e975]:
+                    - generic [ref=e976]: 0.0 kW → 8.5
+                  - cell "低" [ref=e977]:
+                    - generic [ref=e980]: 低
+                  - cell "调整 接受" [ref=e981]:
+                    - generic [ref=e982]:
+                      - button "调整" [ref=e983] [cursor=pointer]:
+                        - generic [ref=e984]: 调整
+                      - button "接受" [ref=e985] [cursor=pointer]:
+                        - generic [ref=e986]: 接受
+                - row "CA-F2-05 F2冷通道5号 暖通 50 kW 0% 17% 变更 0.0 kW → 8.5 低 调整 接受" [ref=e987]:
+                  - cell "CA-F2-05" [ref=e988]:
+                    - generic [ref=e989]: CA-F2-05
+                  - cell "F2冷通道5号" [ref=e990]:
+                    - generic [ref=e993] [cursor=pointer]: F2冷通道5号
+                  - cell "暖通" [ref=e994]:
+                    - generic [ref=e995]: 暖通
+                  - cell "50 kW" [ref=e996]:
+                    - generic [ref=e997]: 50 kW
+                  - cell "0%" [ref=e998]:
+                    - generic [ref=e999]: 0%
+                  - cell "17% 变更" [ref=e1000]:
+                    - generic [ref=e1001]:
+                      - text: 17%
+                      - generic [ref=e1003]: 变更
+                  - cell "0.0 kW → 8.5" [ref=e1004]:
+                    - generic [ref=e1005]: 0.0 kW → 8.5
+                  - cell "低" [ref=e1006]:
+                    - generic [ref=e1009]: 低
+                  - cell "调整 接受" [ref=e1010]:
+                    - generic [ref=e1011]:
+                      - button "调整" [ref=e1012] [cursor=pointer]:
+                        - generic [ref=e1013]: 调整
+                      - button "接受" [ref=e1014] [cursor=pointer]:
+                        - generic [ref=e1015]: 接受
+                - row "CA-F2-06 F2冷通道6号 暖通 50 kW 0% 17% 变更 0.0 kW → 8.5 低 调整 接受" [ref=e1016]:
+                  - cell "CA-F2-06" [ref=e1017]:
+                    - generic [ref=e1018]: CA-F2-06
+                  - cell "F2冷通道6号" [ref=e1019]:
+                    - generic [ref=e1022] [cursor=pointer]: F2冷通道6号
+                  - cell "暖通" [ref=e1023]:
+                    - generic [ref=e1024]: 暖通
+                  - cell "50 kW" [ref=e1025]:
+                    - generic [ref=e1026]: 50 kW
+                  - cell "0%" [ref=e1027]:
+                    - generic [ref=e1028]: 0%
+                  - cell "17% 变更" [ref=e1029]:
+                    - generic [ref=e1030]:
+                      - text: 17%
+                      - generic [ref=e1032]: 变更
+                  - cell "0.0 kW → 8.5" [ref=e1033]:
+                    - generic [ref=e1034]: 0.0 kW → 8.5
+                  - cell "低" [ref=e1035]:
+                    - generic [ref=e1038]: 低
+                  - cell "调整 接受" [ref=e1039]:
+                    - generic [ref=e1040]:
+                      - button "调整" [ref=e1041] [cursor=pointer]:
+                        - generic [ref=e1042]: 调整
+                      - button "接受" [ref=e1043] [cursor=pointer]:
+                        - generic [ref=e1044]: 接受
+                - row "CA-F2-07 F2冷通道7号 暖通 50 kW 0% 17% 变更 0.0 kW → 8.5 低 调整 接受" [ref=e1045]:
+                  - cell "CA-F2-07" [ref=e1046]:
+                    - generic [ref=e1047]: CA-F2-07
+                  - cell "F2冷通道7号" [ref=e1048]:
+                    - generic [ref=e1051] [cursor=pointer]: F2冷通道7号
+                  - cell "暖通" [ref=e1052]:
+                    - generic [ref=e1053]: 暖通
+                  - cell "50 kW" [ref=e1054]:
+                    - generic [ref=e1055]: 50 kW
+                  - cell "0%" [ref=e1056]:
+                    - generic [ref=e1057]: 0%
+                  - cell "17% 变更" [ref=e1058]:
+                    - generic [ref=e1059]:
+                      - text: 17%
+                      - generic [ref=e1061]: 变更
+                  - cell "0.0 kW → 8.5" [ref=e1062]:
+                    - generic [ref=e1063]: 0.0 kW → 8.5
+                  - cell "低" [ref=e1064]:
+                    - generic [ref=e1067]: 低
+                  - cell "调整 接受" [ref=e1068]:
+                    - generic [ref=e1069]:
+                      - button "调整" [ref=e1070] [cursor=pointer]:
+                        - generic [ref=e1071]: 调整
+                      - button "接受" [ref=e1072] [cursor=pointer]:
+                        - generic [ref=e1073]: 接受
+                - row "CA-F2-08 F2冷通道8号 暖通 50 kW 0% 17% 变更 0.0 kW → 8.5 低 调整 接受" [ref=e1074]:
+                  - cell "CA-F2-08" [ref=e1075]:
+                    - generic [ref=e1076]: CA-F2-08
+                  - cell "F2冷通道8号" [ref=e1077]:
+                    - generic [ref=e1080] [cursor=pointer]: F2冷通道8号
+                  - cell "暖通" [ref=e1081]:
+                    - generic [ref=e1082]: 暖通
+                  - cell "50 kW" [ref=e1083]:
+                    - generic [ref=e1084]: 50 kW
+                  - cell "0%" [ref=e1085]:
+                    - generic [ref=e1086]: 0%
+                  - cell "17% 变更" [ref=e1087]:
+                    - generic [ref=e1088]:
+                      - text: 17%
+                      - generic [ref=e1090]: 变更
+                  - cell "0.0 kW → 8.5" [ref=e1091]:
+                    - generic [ref=e1092]: 0.0 kW → 8.5
+                  - cell "低" [ref=e1093]:
+                    - generic [ref=e1096]: 低
+                  - cell "调整 接受" [ref=e1097]:
+                    - generic [ref=e1098]:
+                      - button "调整" [ref=e1099] [cursor=pointer]:
+                        - generic [ref=e1100]: 调整
+                      - button "接受" [ref=e1101] [cursor=pointer]:
+                        - generic [ref=e1102]: 接受
+                - row "CA-F2-09 F2冷通道9号 暖通 50 kW 0% 17% 变更 0.0 kW → 8.5 低 调整 接受" [ref=e1103]:
+                  - cell "CA-F2-09" [ref=e1104]:
+                    - generic [ref=e1105]: CA-F2-09
+                  - cell "F2冷通道9号" [ref=e1106]:
+                    - generic [ref=e1109] [cursor=pointer]: F2冷通道9号
+                  - cell "暖通" [ref=e1110]:
+                    - generic [ref=e1111]: 暖通
+                  - cell "50 kW" [ref=e1112]:
+                    - generic [ref=e1113]: 50 kW
+                  - cell "0%" [ref=e1114]:
+                    - generic [ref=e1115]: 0%
+                  - cell "17% 变更" [ref=e1116]:
+                    - generic [ref=e1117]:
+                      - text: 17%
+                      - generic [ref=e1119]: 变更
+                  - cell "0.0 kW → 8.5" [ref=e1120]:
+                    - generic [ref=e1121]: 0.0 kW → 8.5
+                  - cell "低" [ref=e1122]:
+                    - generic [ref=e1125]: 低
+                  - cell "调整 接受" [ref=e1126]:
+                    - generic [ref=e1127]:
+                      - button "调整" [ref=e1128] [cursor=pointer]:
+                        - generic [ref=e1129]: 调整
+                      - button "接受" [ref=e1130] [cursor=pointer]:
+                        - generic [ref=e1131]: 接受
+                - row "CA-F2-10 F2冷通道10号 暖通 50 kW 0% 17% 变更 0.0 kW → 8.5 低 调整 接受" [ref=e1132]:
+                  - cell "CA-F2-10" [ref=e1133]:
+                    - generic [ref=e1134]: CA-F2-10
+                  - cell "F2冷通道10号" [ref=e1135]:
+                    - generic [ref=e1138] [cursor=pointer]: F2冷通道10号
+                  - cell "暖通" [ref=e1139]:
+                    - generic [ref=e1140]: 暖通
+                  - cell "50 kW" [ref=e1141]:
+                    - generic [ref=e1142]: 50 kW
+                  - cell "0%" [ref=e1143]:
+                    - generic [ref=e1144]: 0%
+                  - cell "17% 变更" [ref=e1145]:
+                    - generic [ref=e1146]:
+                      - text: 17%
+                      - generic [ref=e1148]: 变更
+                  - cell "0.0 kW → 8.5" [ref=e1149]:
+                    - generic [ref=e1150]: 0.0 kW → 8.5
+                  - cell "低" [ref=e1151]:
+                    - generic [ref=e1154]: 低
+                  - cell "调整 接受" [ref=e1155]:
+                    - generic [ref=e1156]:
+                      - button "调整" [ref=e1157] [cursor=pointer]:
+                        - generic [ref=e1158]: 调整
+                      - button "接受" [ref=e1159] [cursor=pointer]:
+                        - generic [ref=e1160]: 接受
+                - row "CA-F2-11 F2冷通道11号 暖通 50 kW 0% 17% 变更 0.0 kW → 8.5 低 调整 接受" [ref=e1161]:
+                  - cell "CA-F2-11" [ref=e1162]:
+                    - generic [ref=e1163]: CA-F2-11
+                  - cell "F2冷通道11号" [ref=e1164]:
+                    - generic [ref=e1167] [cursor=pointer]: F2冷通道11号
+                  - cell "暖通" [ref=e1168]:
+                    - generic [ref=e1169]: 暖通
+                  - cell "50 kW" [ref=e1170]:
+                    - generic [ref=e1171]: 50 kW
+                  - cell "0%" [ref=e1172]:
+                    - generic [ref=e1173]: 0%
+                  - cell "17% 变更" [ref=e1174]:
+                    - generic [ref=e1175]:
+                      - text: 17%
+                      - generic [ref=e1177]: 变更
+                  - cell "0.0 kW → 8.5" [ref=e1178]:
+                    - generic [ref=e1179]: 0.0 kW → 8.5
+                  - cell "低" [ref=e1180]:
+                    - generic [ref=e1183]: 低
+                  - cell "调整 接受" [ref=e1184]:
+                    - generic [ref=e1185]:
+                      - button "调整" [ref=e1186] [cursor=pointer]:
+                        - generic [ref=e1187]: 调整
+                      - button "接受" [ref=e1188] [cursor=pointer]:
+                        - generic [ref=e1189]: 接受
+                - row "CA-F2-12 F2冷通道12号 暖通 50 kW 0% 17% 变更 0.0 kW → 8.5 低 调整 接受" [ref=e1190]:
+                  - cell "CA-F2-12" [ref=e1191]:
+                    - generic [ref=e1192]: CA-F2-12
+                  - cell "F2冷通道12号" [ref=e1193]:
+                    - generic [ref=e1196] [cursor=pointer]: F2冷通道12号
+                  - cell "暖通" [ref=e1197]:
+                    - generic [ref=e1198]: 暖通
+                  - cell "50 kW" [ref=e1199]:
+                    - generic [ref=e1200]: 50 kW
+                  - cell "0%" [ref=e1201]:
+                    - generic [ref=e1202]: 0%
+                  - cell "17% 变更" [ref=e1203]:
+                    - generic [ref=e1204]:
+                      - text: 17%
+                      - generic [ref=e1206]: 变更
+                  - cell "0.0 kW → 8.5" [ref=e1207]:
+                    - generic [ref=e1208]: 0.0 kW → 8.5
+                  - cell "低" [ref=e1209]:
+                    - generic [ref=e1212]: 低
+                  - cell "调整 接受" [ref=e1213]:
+                    - generic [ref=e1214]:
+                      - button "调整" [ref=e1215] [cursor=pointer]:
+                        - generic [ref=e1216]: 调整
+                      - button "接受" [ref=e1217] [cursor=pointer]:
+                        - generic [ref=e1218]: 接受
+                - row "CA-F2-13 F2冷通道13号 暖通 50 kW 0% 17% 变更 0.0 kW → 8.5 低 调整 接受" [ref=e1219]:
+                  - cell "CA-F2-13" [ref=e1220]:
+                    - generic [ref=e1221]: CA-F2-13
+                  - cell "F2冷通道13号" [ref=e1222]:
+                    - generic [ref=e1225] [cursor=pointer]: F2冷通道13号
+                  - cell "暖通" [ref=e1226]:
+                    - generic [ref=e1227]: 暖通
+                  - cell "50 kW" [ref=e1228]:
+                    - generic [ref=e1229]: 50 kW
+                  - cell "0%" [ref=e1230]:
+                    - generic [ref=e1231]: 0%
+                  - cell "17% 变更" [ref=e1232]:
+                    - generic [ref=e1233]:
+                      - text: 17%
+                      - generic [ref=e1235]: 变更
+                  - cell "0.0 kW → 8.5" [ref=e1236]:
+                    - generic [ref=e1237]: 0.0 kW → 8.5
+                  - cell "低" [ref=e1238]:
+                    - generic [ref=e1241]: 低
+                  - cell "调整 接受" [ref=e1242]:
+                    - generic [ref=e1243]:
+                      - button "调整" [ref=e1244] [cursor=pointer]:
+                        - generic [ref=e1245]: 调整
+                      - button "接受" [ref=e1246] [cursor=pointer]:
+                        - generic [ref=e1247]: 接受
+                - row "CA-F2-14 F2冷通道14号 暖通 50 kW 0% 17% 变更 0.0 kW → 8.5 低 调整 接受" [ref=e1248]:
+                  - cell "CA-F2-14" [ref=e1249]:
+                    - generic [ref=e1250]: CA-F2-14
+                  - cell "F2冷通道14号" [ref=e1251]:
+                    - generic [ref=e1254] [cursor=pointer]: F2冷通道14号
+                  - cell "暖通" [ref=e1255]:
+                    - generic [ref=e1256]: 暖通
+                  - cell "50 kW" [ref=e1257]:
+                    - generic [ref=e1258]: 50 kW
+                  - cell "0%" [ref=e1259]:
+                    - generic [ref=e1260]: 0%
+                  - cell "17% 变更" [ref=e1261]:
+                    - generic [ref=e1262]:
+                      - text: 17%
+                      - generic [ref=e1264]: 变更
+                  - cell "0.0 kW → 8.5" [ref=e1265]:
+                    - generic [ref=e1266]: 0.0 kW → 8.5
+                  - cell "低" [ref=e1267]:
+                    - generic [ref=e1270]: 低
+                  - cell "调整 接受" [ref=e1271]:
+                    - generic [ref=e1272]:
+                      - button "调整" [ref=e1273] [cursor=pointer]:
+                        - generic [ref=e1274]: 调整
+                      - button "接受" [ref=e1275] [cursor=pointer]:
+                        - generic [ref=e1276]: 接受
+                - row "CA-F2-15 F2冷通道15号 暖通 50 kW 0% 17% 变更 0.0 kW → 8.5 低 调整 接受" [ref=e1277]:
+                  - cell "CA-F2-15" [ref=e1278]:
+                    - generic [ref=e1279]: CA-F2-15
+                  - cell "F2冷通道15号" [ref=e1280]:
+                    - generic [ref=e1283] [cursor=pointer]: F2冷通道15号
+                  - cell "暖通" [ref=e1284]:
+                    - generic [ref=e1285]: 暖通
+                  - cell "50 kW" [ref=e1286]:
+                    - generic [ref=e1287]: 50 kW
+                  - cell "0%" [ref=e1288]:
+                    - generic [ref=e1289]: 0%
+                  - cell "17% 变更" [ref=e1290]:
+                    - generic [ref=e1291]:
+                      - text: 17%
+                      - generic [ref=e1293]: 变更
+                  - cell "0.0 kW → 8.5" [ref=e1294]:
+                    - generic [ref=e1295]: 0.0 kW → 8.5
+                  - cell "低" [ref=e1296]:
+                    - generic [ref=e1299]: 低
+                  - cell "调整 接受" [ref=e1300]:
+                    - generic [ref=e1301]:
+                      - button "调整" [ref=e1302] [cursor=pointer]:
+                        - generic [ref=e1303]: 调整
+                      - button "接受" [ref=e1304] [cursor=pointer]:
+                        - generic [ref=e1305]: 接受
+                - row "CA-F2-16 F2冷通道16号 暖通 50 kW 0% 17% 变更 0.0 kW → 8.5 低 调整 接受" [ref=e1306]:
+                  - cell "CA-F2-16" [ref=e1307]:
+                    - generic [ref=e1308]: CA-F2-16
+                  - cell "F2冷通道16号" [ref=e1309]:
+                    - generic [ref=e1312] [cursor=pointer]: F2冷通道16号
+                  - cell "暖通" [ref=e1313]:
+                    - generic [ref=e1314]: 暖通
+                  - cell "50 kW" [ref=e1315]:
+                    - generic [ref=e1316]: 50 kW
+                  - cell "0%" [ref=e1317]:
+                    - generic [ref=e1318]: 0%
+                  - cell "17% 变更" [ref=e1319]:
+                    - generic [ref=e1320]:
+                      - text: 17%
+                      - generic [ref=e1322]: 变更
+                  - cell "0.0 kW → 8.5" [ref=e1323]:
+                    - generic [ref=e1324]: 0.0 kW → 8.5
+                  - cell "低" [ref=e1325]:
+                    - generic [ref=e1328]: 低
+                  - cell "调整 接受" [ref=e1329]:
+                    - generic [ref=e1330]:
+                      - button "调整" [ref=e1331] [cursor=pointer]:
+                        - generic [ref=e1332]: 调整
+                      - button "接受" [ref=e1333] [cursor=pointer]:
+                        - generic [ref=e1334]: 接受
+                - row "CA-F2-17 F2冷通道17号 暖通 50 kW 0% 17% 变更 0.0 kW → 8.5 低 调整 接受" [ref=e1335]:
+                  - cell "CA-F2-17" [ref=e1336]:
+                    - generic [ref=e1337]: CA-F2-17
+                  - cell "F2冷通道17号" [ref=e1338]:
+                    - generic [ref=e1341] [cursor=pointer]: F2冷通道17号
+                  - cell "暖通" [ref=e1342]:
+                    - generic [ref=e1343]: 暖通
+                  - cell "50 kW" [ref=e1344]:
+                    - generic [ref=e1345]: 50 kW
+                  - cell "0%" [ref=e1346]:
+                    - generic [ref=e1347]: 0%
+                  - cell "17% 变更" [ref=e1348]:
+                    - generic [ref=e1349]:
+                      - text: 17%
+                      - generic [ref=e1351]: 变更
+                  - cell "0.0 kW → 8.5" [ref=e1352]:
+                    - generic [ref=e1353]: 0.0 kW → 8.5
+                  - cell "低" [ref=e1354]:
+                    - generic [ref=e1357]: 低
+                  - cell "调整 接受" [ref=e1358]:
+                    - generic [ref=e1359]:
+                      - button "调整" [ref=e1360] [cursor=pointer]:
+                        - generic [ref=e1361]: 调整
+                      - button "接受" [ref=e1362] [cursor=pointer]:
+                        - generic [ref=e1363]: 接受
+                - row "CA-F2-18 F2冷通道18号 暖通 50 kW 0% 17% 变更 0.0 kW → 8.5 低 调整 接受" [ref=e1364]:
+                  - cell "CA-F2-18" [ref=e1365]:
+                    - generic [ref=e1366]: CA-F2-18
+                  - cell "F2冷通道18号" [ref=e1367]:
+                    - generic [ref=e1370] [cursor=pointer]: F2冷通道18号
+                  - cell "暖通" [ref=e1371]:
+                    - generic [ref=e1372]: 暖通
+                  - cell "50 kW" [ref=e1373]:
+                    - generic [ref=e1374]: 50 kW
+                  - cell "0%" [ref=e1375]:
+                    - generic [ref=e1376]: 0%
+                  - cell "17% 变更" [ref=e1377]:
+                    - generic [ref=e1378]:
+                      - text: 17%
+                      - generic [ref=e1380]: 变更
+                  - cell "0.0 kW → 8.5" [ref=e1381]:
+                    - generic [ref=e1382]: 0.0 kW → 8.5
+                  - cell "低" [ref=e1383]:
+                    - generic [ref=e1386]: 低
+                  - cell "调整 接受" [ref=e1387]:
+                    - generic [ref=e1388]:
+                      - button "调整" [ref=e1389] [cursor=pointer]:
+                        - generic [ref=e1390]: 调整
+                      - button "接受" [ref=e1391] [cursor=pointer]:
+                        - generic [ref=e1392]: 接受
+                - row "CA-F3-19 F3冷通道19号 暖通 50 kW 0% 17% 变更 0.0 kW → 8.5 低 调整 接受" [ref=e1393]:
+                  - cell "CA-F3-19" [ref=e1394]:
+                    - generic [ref=e1395]: CA-F3-19
+                  - cell "F3冷通道19号" [ref=e1396]:
+                    - generic [ref=e1399] [cursor=pointer]: F3冷通道19号
+                  - cell "暖通" [ref=e1400]:
+                    - generic [ref=e1401]: 暖通
+                  - cell "50 kW" [ref=e1402]:
+                    - generic [ref=e1403]: 50 kW
+                  - cell "0%" [ref=e1404]:
+                    - generic [ref=e1405]: 0%
+                  - cell "17% 变更" [ref=e1406]:
+                    - generic [ref=e1407]:
+                      - text: 17%
+                      - generic [ref=e1409]: 变更
+                  - cell "0.0 kW → 8.5" [ref=e1410]:
+                    - generic [ref=e1411]: 0.0 kW → 8.5
+                  - cell "低" [ref=e1412]:
+                    - generic [ref=e1415]: 低
+                  - cell "调整 接受" [ref=e1416]:
+                    - generic [ref=e1417]:
+                      - button "调整" [ref=e1418] [cursor=pointer]:
+                        - generic [ref=e1419]: 调整
+                      - button "接受" [ref=e1420] [cursor=pointer]:
+                        - generic [ref=e1421]: 接受
+                - row "CA-F3-20 F3冷通道20号 暖通 50 kW 0% 17% 变更 0.0 kW → 8.5 低 调整 接受" [ref=e1422]:
+                  - cell "CA-F3-20" [ref=e1423]:
+                    - generic [ref=e1424]: CA-F3-20
+                  - cell "F3冷通道20号" [ref=e1425]:
+                    - generic [ref=e1428] [cursor=pointer]: F3冷通道20号
+                  - cell "暖通" [ref=e1429]:
+                    - generic [ref=e1430]: 暖通
+                  - cell "50 kW" [ref=e1431]:
+                    - generic [ref=e1432]: 50 kW
+                  - cell "0%" [ref=e1433]:
+                    - generic [ref=e1434]: 0%
+                  - cell "17% 变更" [ref=e1435]:
+                    - generic [ref=e1436]:
+                      - text: 17%
+                      - generic [ref=e1438]: 变更
+                  - cell "0.0 kW → 8.5" [ref=e1439]:
+                    - generic [ref=e1440]: 0.0 kW → 8.5
+                  - cell "低" [ref=e1441]:
+                    - generic [ref=e1444]: 低
+                  - cell "调整 接受" [ref=e1445]:
+                    - generic [ref=e1446]:
+                      - button "调整" [ref=e1447] [cursor=pointer]:
+                        - generic [ref=e1448]: 调整
+                      - button "接受" [ref=e1449] [cursor=pointer]:
+                        - generic [ref=e1450]: 接受
+                - row "CA-F3-21 F3冷通道21号 暖通 50 kW 0% 17% 变更 0.0 kW → 8.5 低 调整 接受" [ref=e1451]:
+                  - cell "CA-F3-21" [ref=e1452]:
+                    - generic [ref=e1453]: CA-F3-21
+                  - cell "F3冷通道21号" [ref=e1454]:
+                    - generic [ref=e1457] [cursor=pointer]: F3冷通道21号
+                  - cell "暖通" [ref=e1458]:
+                    - generic [ref=e1459]: 暖通
+                  - cell "50 kW" [ref=e1460]:
+                    - generic [ref=e1461]: 50 kW
+                  - cell "0%" [ref=e1462]:
+                    - generic [ref=e1463]: 0%
+                  - cell "17% 变更" [ref=e1464]:
+                    - generic [ref=e1465]:
+                      - text: 17%
+                      - generic [ref=e1467]: 变更
+                  - cell "0.0 kW → 8.5" [ref=e1468]:
+                    - generic [ref=e1469]: 0.0 kW → 8.5
+                  - cell "低" [ref=e1470]:
+                    - generic [ref=e1473]: 低
+                  - cell "调整 接受" [ref=e1474]:
+                    - generic [ref=e1475]:
+                      - button "调整" [ref=e1476] [cursor=pointer]:
+                        - generic [ref=e1477]: 调整
+                      - button "接受" [ref=e1478] [cursor=pointer]:
+                        - generic [ref=e1479]: 接受
+                - row "CA-F3-22 F3冷通道22号 暖通 50 kW 0% 17% 变更 0.0 kW → 8.5 低 调整 接受" [ref=e1480]:
+                  - cell "CA-F3-22" [ref=e1481]:
+                    - generic [ref=e1482]: CA-F3-22
+                  - cell "F3冷通道22号" [ref=e1483]:
+                    - generic [ref=e1486] [cursor=pointer]: F3冷通道22号
+                  - cell "暖通" [ref=e1487]:
+                    - generic [ref=e1488]: 暖通
+                  - cell "50 kW" [ref=e1489]:
+                    - generic [ref=e1490]: 50 kW
+                  - cell "0%" [ref=e1491]:
+                    - generic [ref=e1492]: 0%
+                  - cell "17% 变更" [ref=e1493]:
+                    - generic [ref=e1494]:
+                      - text: 17%
+                      - generic [ref=e1496]: 变更
+                  - cell "0.0 kW → 8.5" [ref=e1497]:
+                    - generic [ref=e1498]: 0.0 kW → 8.5
+                  - cell "低" [ref=e1499]:
+                    - generic [ref=e1502]: 低
+                  - cell "调整 接受" [ref=e1503]:
+                    - generic [ref=e1504]:
+                      - button "调整" [ref=e1505] [cursor=pointer]:
+                        - generic [ref=e1506]: 调整
+                      - button "接受" [ref=e1507] [cursor=pointer]:
+                        - generic [ref=e1508]: 接受
+                - row "CA-F3-23 F3冷通道23号 暖通 50 kW 0% 17% 变更 0.0 kW → 8.5 低 调整 接受" [ref=e1509]:
+                  - cell "CA-F3-23" [ref=e1510]:
+                    - generic [ref=e1511]: CA-F3-23
+                  - cell "F3冷通道23号" [ref=e1512]:
+                    - generic [ref=e1515] [cursor=pointer]: F3冷通道23号
+                  - cell "暖通" [ref=e1516]:
+                    - generic [ref=e1517]: 暖通
+                  - cell "50 kW" [ref=e1518]:
+                    - generic [ref=e1519]: 50 kW
+                  - cell "0%" [ref=e1520]:
+                    - generic [ref=e1521]: 0%
+                  - cell "17% 变更" [ref=e1522]:
+                    - generic [ref=e1523]:
+                      - text: 17%
+                      - generic [ref=e1525]: 变更
+                  - cell "0.0 kW → 8.5" [ref=e1526]:
+                    - generic [ref=e1527]: 0.0 kW → 8.5
+                  - cell "低" [ref=e1528]:
+                    - generic [ref=e1531]: 低
+                  - cell "调整 接受" [ref=e1532]:
+                    - generic [ref=e1533]:
+                      - button "调整" [ref=e1534] [cursor=pointer]:
+                        - generic [ref=e1535]: 调整
+                      - button "接受" [ref=e1536] [cursor=pointer]:
+                        - generic [ref=e1537]: 接受
+                - row "CA-F3-24 F3冷通道24号 暖通 50 kW 0% 17% 变更 0.0 kW → 8.5 低 调整 接受" [ref=e1538]:
+                  - cell "CA-F3-24" [ref=e1539]:
+                    - generic [ref=e1540]: CA-F3-24
+                  - cell "F3冷通道24号" [ref=e1541]:
+                    - generic [ref=e1544] [cursor=pointer]: F3冷通道24号
+                  - cell "暖通" [ref=e1545]:
+                    - generic [ref=e1546]: 暖通
+                  - cell "50 kW" [ref=e1547]:
+                    - generic [ref=e1548]: 50 kW
+                  - cell "0%" [ref=e1549]:
+                    - generic [ref=e1550]: 0%
+                  - cell "17% 变更" [ref=e1551]:
+                    - generic [ref=e1552]:
+                      - text: 17%
+                      - generic [ref=e1554]: 变更
+                  - cell "0.0 kW → 8.5" [ref=e1555]:
+                    - generic [ref=e1556]: 0.0 kW → 8.5
+                  - cell "低" [ref=e1557]:
+                    - generic [ref=e1560]: 低
+                  - cell "调整 接受" [ref=e1561]:
+                    - generic [ref=e1562]:
+                      - button "调整" [ref=e1563] [cursor=pointer]:
+                        - generic [ref=e1564]: 调整
+                      - button "接受" [ref=e1565] [cursor=pointer]:
+                        - generic [ref=e1566]: 接受
+                - row "CA-F3-25 F3冷通道25号 暖通 50 kW 0% 17% 变更 0.0 kW → 8.5 低 调整 接受" [ref=e1567]:
+                  - cell "CA-F3-25" [ref=e1568]:
+                    - generic [ref=e1569]: CA-F3-25
+                  - cell "F3冷通道25号" [ref=e1570]:
+                    - generic [ref=e1573] [cursor=pointer]: F3冷通道25号
+                  - cell "暖通" [ref=e1574]:
+                    - generic [ref=e1575]: 暖通
+                  - cell "50 kW" [ref=e1576]:
+                    - generic [ref=e1577]: 50 kW
+                  - cell "0%" [ref=e1578]:
+                    - generic [ref=e1579]: 0%
+                  - cell "17% 变更" [ref=e1580]:
+                    - generic [ref=e1581]:
+                      - text: 17%
+                      - generic [ref=e1583]: 变更
+                  - cell "0.0 kW → 8.5" [ref=e1584]:
+                    - generic [ref=e1585]: 0.0 kW → 8.5
+                  - cell "低" [ref=e1586]:
+                    - generic [ref=e1589]: 低
+                  - cell "调整 接受" [ref=e1590]:
+                    - generic [ref=e1591]:
+                      - button "调整" [ref=e1592] [cursor=pointer]:
+                        - generic [ref=e1593]: 调整
+                      - button "接受" [ref=e1594] [cursor=pointer]:
+                        - generic [ref=e1595]: 接受
+                - row "CA-F3-26 F3冷通道26号 暖通 50 kW 0% 17% 变更 0.0 kW → 8.5 低 调整 接受" [ref=e1596]:
+                  - cell "CA-F3-26" [ref=e1597]:
+                    - generic [ref=e1598]: CA-F3-26
+                  - cell "F3冷通道26号" [ref=e1599]:
+                    - generic [ref=e1602] [cursor=pointer]: F3冷通道26号
+                  - cell "暖通" [ref=e1603]:
+                    - generic [ref=e1604]: 暖通
+                  - cell "50 kW" [ref=e1605]:
+                    - generic [ref=e1606]: 50 kW
+                  - cell "0%" [ref=e1607]:
+                    - generic [ref=e1608]: 0%
+                  - cell "17% 变更" [ref=e1609]:
+                    - generic [ref=e1610]:
+                      - text: 17%
+                      - generic [ref=e1612]: 变更
+                  - cell "0.0 kW → 8.5" [ref=e1613]:
+                    - generic [ref=e1614]: 0.0 kW → 8.5
+                  - cell "低" [ref=e1615]:
+                    - generic [ref=e1618]: 低
+                  - cell "调整 接受" [ref=e1619]:
+                    - generic [ref=e1620]:
+                      - button "调整" [ref=e1621] [cursor=pointer]:
+                        - generic [ref=e1622]: 调整
+                      - button "接受" [ref=e1623] [cursor=pointer]:
+                        - generic [ref=e1624]: 接受
+                - row "CA-F3-27 F3冷通道27号 暖通 50 kW 0% 17% 变更 0.0 kW → 8.5 低 调整 接受" [ref=e1625]:
+                  - cell "CA-F3-27" [ref=e1626]:
+                    - generic [ref=e1627]: CA-F3-27
+                  - cell "F3冷通道27号" [ref=e1628]:
+                    - generic [ref=e1631] [cursor=pointer]: F3冷通道27号
+                  - cell "暖通" [ref=e1632]:
+                    - generic [ref=e1633]: 暖通
+                  - cell "50 kW" [ref=e1634]:
+                    - generic [ref=e1635]: 50 kW
+                  - cell "0%" [ref=e1636]:
+                    - generic [ref=e1637]: 0%
+                  - cell "17% 变更" [ref=e1638]:
+                    - generic [ref=e1639]:
+                      - text: 17%
+                      - generic [ref=e1641]: 变更
+                  - cell "0.0 kW → 8.5" [ref=e1642]:
+                    - generic [ref=e1643]: 0.0 kW → 8.5
+                  - cell "低" [ref=e1644]:
+                    - generic [ref=e1647]: 低
+                  - cell "调整 接受" [ref=e1648]:
+                    - generic [ref=e1649]:
+                      - button "调整" [ref=e1650] [cursor=pointer]:
+                        - generic [ref=e1651]: 调整
+                      - button "接受" [ref=e1652] [cursor=pointer]:
+                        - generic [ref=e1653]: 接受
+                - row "CA-F3-28 F3冷通道28号 暖通 50 kW 0% 17% 变更 0.0 kW → 8.5 低 调整 接受" [ref=e1654]:
+                  - cell "CA-F3-28" [ref=e1655]:
+                    - generic [ref=e1656]: CA-F3-28
+                  - cell "F3冷通道28号" [ref=e1657]:
+                    - generic [ref=e1660] [cursor=pointer]: F3冷通道28号
+                  - cell "暖通" [ref=e1661]:
+                    - generic [ref=e1662]: 暖通
+                  - cell "50 kW" [ref=e1663]:
+                    - generic [ref=e1664]: 50 kW
+                  - cell "0%" [ref=e1665]:
+                    - generic [ref=e1666]: 0%
+                  - cell "17% 变更" [ref=e1667]:
+                    - generic [ref=e1668]:
+                      - text: 17%
+                      - generic [ref=e1670]: 变更
+                  - cell "0.0 kW → 8.5" [ref=e1671]:
+                    - generic [ref=e1672]: 0.0 kW → 8.5
+                  - cell "低" [ref=e1673]:
+                    - generic [ref=e1676]: 低
+                  - cell "调整 接受" [ref=e1677]:
+                    - generic [ref=e1678]:
+                      - button "调整" [ref=e1679] [cursor=pointer]:
+                        - generic [ref=e1680]: 调整
+                      - button "接受" [ref=e1681] [cursor=pointer]:
+                        - generic [ref=e1682]: 接受
+                - row "CA-F3-29 F3冷通道29号 暖通 50 kW 0% 17% 变更 0.0 kW → 8.5 低 调整 接受" [ref=e1683]:
+                  - cell "CA-F3-29" [ref=e1684]:
+                    - generic [ref=e1685]: CA-F3-29
+                  - cell "F3冷通道29号" [ref=e1686]:
+                    - generic [ref=e1689] [cursor=pointer]: F3冷通道29号
+                  - cell "暖通" [ref=e1690]:
+                    - generic [ref=e1691]: 暖通
+                  - cell "50 kW" [ref=e1692]:
+                    - generic [ref=e1693]: 50 kW
+                  - cell "0%" [ref=e1694]:
+                    - generic [ref=e1695]: 0%
+                  - cell "17% 变更" [ref=e1696]:
+                    - generic [ref=e1697]:
+                      - text: 17%
+                      - generic [ref=e1699]: 变更
+                  - cell "0.0 kW → 8.5" [ref=e1700]:
+                    - generic [ref=e1701]: 0.0 kW → 8.5
+                  - cell "低" [ref=e1702]:
+                    - generic [ref=e1705]: 低
+                  - cell "调整 接受" [ref=e1706]:
+                    - generic [ref=e1707]:
+                      - button "调整" [ref=e1708] [cursor=pointer]:
+                        - generic [ref=e1709]: 调整
+                      - button "接受" [ref=e1710] [cursor=pointer]:
+                        - generic [ref=e1711]: 接受
+                - row "CA-F3-30 F3冷通道30号 暖通 50 kW 0% 17% 变更 0.0 kW → 8.5 低 调整 接受" [ref=e1712]:
+                  - cell "CA-F3-30" [ref=e1713]:
+                    - generic [ref=e1714]: CA-F3-30
+                  - cell "F3冷通道30号" [ref=e1715]:
+                    - generic [ref=e1718] [cursor=pointer]: F3冷通道30号
+                  - cell "暖通" [ref=e1719]:
+                    - generic [ref=e1720]: 暖通
+                  - cell "50 kW" [ref=e1721]:
+                    - generic [ref=e1722]: 50 kW
+                  - cell "0%" [ref=e1723]:
+                    - generic [ref=e1724]: 0%
+                  - cell "17% 变更" [ref=e1725]:
+                    - generic [ref=e1726]:
+                      - text: 17%
+                      - generic [ref=e1728]: 变更
+                  - cell "0.0 kW → 8.5" [ref=e1729]:
+                    - generic [ref=e1730]: 0.0 kW → 8.5
+                  - cell "低" [ref=e1731]:
+                    - generic [ref=e1734]: 低
+                  - cell "调整 接受" [ref=e1735]:
+                    - generic [ref=e1736]:
+                      - button "调整" [ref=e1737] [cursor=pointer]:
+                        - generic [ref=e1738]: 调整
+                      - button "接受" [ref=e1739] [cursor=pointer]:
+                        - generic [ref=e1740]: 接受
+                - row "CA-F3-31 F3冷通道31号 暖通 50 kW 0% 17% 变更 0.0 kW → 8.5 低 调整 接受" [ref=e1741]:
+                  - cell "CA-F3-31" [ref=e1742]:
+                    - generic [ref=e1743]: CA-F3-31
+                  - cell "F3冷通道31号" [ref=e1744]:
+                    - generic [ref=e1747] [cursor=pointer]: F3冷通道31号
+                  - cell "暖通" [ref=e1748]:
+                    - generic [ref=e1749]: 暖通
+                  - cell "50 kW" [ref=e1750]:
+                    - generic [ref=e1751]: 50 kW
+                  - cell "0%" [ref=e1752]:
+                    - generic [ref=e1753]: 0%
+                  - cell "17% 变更" [ref=e1754]:
+                    - generic [ref=e1755]:
+                      - text: 17%
+                      - generic [ref=e1757]: 变更
+                  - cell "0.0 kW → 8.5" [ref=e1758]:
+                    - generic [ref=e1759]: 0.0 kW → 8.5
+                  - cell "低" [ref=e1760]:
+                    - generic [ref=e1763]: 低
+                  - cell "调整 接受" [ref=e1764]:
+                    - generic [ref=e1765]:
+                      - button "调整" [ref=e1766] [cursor=pointer]:
+                        - generic [ref=e1767]: 调整
+                      - button "接受" [ref=e1768] [cursor=pointer]:
+                        - generic [ref=e1769]: 接受
+                - row "CA-F3-32 F3冷通道32号 暖通 50 kW 0% 17% 变更 0.0 kW → 8.5 低 调整 接受" [ref=e1770]:
+                  - cell "CA-F3-32" [ref=e1771]:
+                    - generic [ref=e1772]: CA-F3-32
+                  - cell "F3冷通道32号" [ref=e1773]:
+                    - generic [ref=e1776] [cursor=pointer]: F3冷通道32号
+                  - cell "暖通" [ref=e1777]:
+                    - generic [ref=e1778]: 暖通
+                  - cell "50 kW" [ref=e1779]:
+                    - generic [ref=e1780]: 50 kW
+                  - cell "0%" [ref=e1781]:
+                    - generic [ref=e1782]: 0%
+                  - cell "17% 变更" [ref=e1783]:
+                    - generic [ref=e1784]:
+                      - text: 17%
+                      - generic [ref=e1786]: 变更
+                  - cell "0.0 kW → 8.5" [ref=e1787]:
+                    - generic [ref=e1788]: 0.0 kW → 8.5
+                  - cell "低" [ref=e1789]:
+                    - generic [ref=e1792]: 低
+                  - cell "调整 接受" [ref=e1793]:
+                    - generic [ref=e1794]:
+                      - button "调整" [ref=e1795] [cursor=pointer]:
+                        - generic [ref=e1796]: 调整
+                      - button "接受" [ref=e1797] [cursor=pointer]:
+                        - generic [ref=e1798]: 接受
+                - row "CA-F3-33 F3冷通道33号 暖通 50 kW 0% 17% 变更 0.0 kW → 8.5 低 调整 接受" [ref=e1799]:
+                  - cell "CA-F3-33" [ref=e1800]:
+                    - generic [ref=e1801]: CA-F3-33
+                  - cell "F3冷通道33号" [ref=e1802]:
+                    - generic [ref=e1805] [cursor=pointer]: F3冷通道33号
+                  - cell "暖通" [ref=e1806]:
+                    - generic [ref=e1807]: 暖通
+                  - cell "50 kW" [ref=e1808]:
+                    - generic [ref=e1809]: 50 kW
+                  - cell "0%" [ref=e1810]:
+                    - generic [ref=e1811]: 0%
+                  - cell "17% 变更" [ref=e1812]:
+                    - generic [ref=e1813]:
+                      - text: 17%
+                      - generic [ref=e1815]: 变更
+                  - cell "0.0 kW → 8.5" [ref=e1816]:
+                    - generic [ref=e1817]: 0.0 kW → 8.5
+                  - cell "低" [ref=e1818]:
+                    - generic [ref=e1821]: 低
+                  - cell "调整 接受" [ref=e1822]:
+                    - generic [ref=e1823]:
+                      - button "调整" [ref=e1824] [cursor=pointer]:
+                        - generic [ref=e1825]: 调整
+                      - button "接受" [ref=e1826] [cursor=pointer]:
+                        - generic [ref=e1827]: 接受
+                - row "CA-F3-34 F3冷通道34号 暖通 50 kW 0% 17% 变更 0.0 kW → 8.5 低 调整 接受" [ref=e1828]:
+                  - cell "CA-F3-34" [ref=e1829]:
+                    - generic [ref=e1830]: CA-F3-34
+                  - cell "F3冷通道34号" [ref=e1831]:
+                    - generic [ref=e1834] [cursor=pointer]: F3冷通道34号
+                  - cell "暖通" [ref=e1835]:
+                    - generic [ref=e1836]: 暖通
+                  - cell "50 kW" [ref=e1837]:
+                    - generic [ref=e1838]: 50 kW
+                  - cell "0%" [ref=e1839]:
+                    - generic [ref=e1840]: 0%
+                  - cell "17% 变更" [ref=e1841]:
+                    - generic [ref=e1842]:
+                      - text: 17%
+                      - generic [ref=e1844]: 变更
+                  - cell "0.0 kW → 8.5" [ref=e1845]:
+                    - generic [ref=e1846]: 0.0 kW → 8.5
+                  - cell "低" [ref=e1847]:
+                    - generic [ref=e1850]: 低
+                  - cell "调整 接受" [ref=e1851]:
+                    - generic [ref=e1852]:
+                      - button "调整" [ref=e1853] [cursor=pointer]:
+                        - generic [ref=e1854]: 调整
+                      - button "接受" [ref=e1855] [cursor=pointer]:
+                        - generic [ref=e1856]: 接受
+                - row "CA-F3-35 F3冷通道35号 暖通 50 kW 0% 17% 变更 0.0 kW → 8.5 低 调整 接受" [ref=e1857]:
+                  - cell "CA-F3-35" [ref=e1858]:
+                    - generic [ref=e1859]: CA-F3-35
+                  - cell "F3冷通道35号" [ref=e1860]:
+                    - generic [ref=e1863] [cursor=pointer]: F3冷通道35号
+                  - cell "暖通" [ref=e1864]:
+                    - generic [ref=e1865]: 暖通
+                  - cell "50 kW" [ref=e1866]:
+                    - generic [ref=e1867]: 50 kW
+                  - cell "0%" [ref=e1868]:
+                    - generic [ref=e1869]: 0%
+                  - cell "17% 变更" [ref=e1870]:
+                    - generic [ref=e1871]:
+                      - text: 17%
+                      - generic [ref=e1873]: 变更
+                  - cell "0.0 kW → 8.5" [ref=e1874]:
+                    - generic [ref=e1875]: 0.0 kW → 8.5
+                  - cell "低" [ref=e1876]:
+                    - generic [ref=e1879]: 低
+                  - cell "调整 接受" [ref=e1880]:
+                    - generic [ref=e1881]:
+                      - button "调整" [ref=e1882] [cursor=pointer]:
+                        - generic [ref=e1883]: 调整
+                      - button "接受" [ref=e1884] [cursor=pointer]:
+                        - generic [ref=e1885]: 接受
+                - row "CA-F3-36 F3冷通道36号 暖通 50 kW 0% 17% 变更 0.0 kW → 8.5 低 调整 接受" [ref=e1886]:
+                  - cell "CA-F3-36" [ref=e1887]:
+                    - generic [ref=e1888]: CA-F3-36
+                  - cell "F3冷通道36号" [ref=e1889]:
+                    - generic [ref=e1892] [cursor=pointer]: F3冷通道36号
+                  - cell "暖通" [ref=e1893]:
+                    - generic [ref=e1894]: 暖通
+                  - cell "50 kW" [ref=e1895]:
+                    - generic [ref=e1896]: 50 kW
+                  - cell "0%" [ref=e1897]:
+                    - generic [ref=e1898]: 0%
+                  - cell "17% 变更" [ref=e1899]:
+                    - generic [ref=e1900]:
+                      - text: 17%
+                      - generic [ref=e1902]: 变更
+                  - cell "0.0 kW → 8.5" [ref=e1903]:
+                    - generic [ref=e1904]: 0.0 kW → 8.5
+                  - cell "低" [ref=e1905]:
+                    - generic [ref=e1908]: 低
+                  - cell "调整 接受" [ref=e1909]:
+                    - generic [ref=e1910]:
+                      - button "调整" [ref=e1911] [cursor=pointer]:
+                        - generic [ref=e1912]: 调整
+                      - button "接受" [ref=e1913] [cursor=pointer]:
+                        - generic [ref=e1914]: 接受
+                - row "CA-F4-37 F4冷通道37号 暖通 50 kW 0% 17% 变更 0.0 kW → 8.5 低 调整 接受" [ref=e1915]:
+                  - cell "CA-F4-37" [ref=e1916]:
+                    - generic [ref=e1917]: CA-F4-37
+                  - cell "F4冷通道37号" [ref=e1918]:
+                    - generic [ref=e1921] [cursor=pointer]: F4冷通道37号
+                  - cell "暖通" [ref=e1922]:
+                    - generic [ref=e1923]: 暖通
+                  - cell "50 kW" [ref=e1924]:
+                    - generic [ref=e1925]: 50 kW
+                  - cell "0%" [ref=e1926]:
+                    - generic [ref=e1927]: 0%
+                  - cell "17% 变更" [ref=e1928]:
+                    - generic [ref=e1929]:
+                      - text: 17%
+                      - generic [ref=e1931]: 变更
+                  - cell "0.0 kW → 8.5" [ref=e1932]:
+                    - generic [ref=e1933]: 0.0 kW → 8.5
+                  - cell "低" [ref=e1934]:
+                    - generic [ref=e1937]: 低
+                  - cell "调整 接受" [ref=e1938]:
+                    - generic [ref=e1939]:
+                      - button "调整" [ref=e1940] [cursor=pointer]:
+                        - generic [ref=e1941]: 调整
+                      - button "接受" [ref=e1942] [cursor=pointer]:
+                        - generic [ref=e1943]: 接受
+                - row "CA-F4-38 F4冷通道38号 暖通 50 kW 0% 17% 变更 0.0 kW → 8.5 低 调整 接受" [ref=e1944]:
+                  - cell "CA-F4-38" [ref=e1945]:
+                    - generic [ref=e1946]: CA-F4-38
+                  - cell "F4冷通道38号" [ref=e1947]:
+                    - generic [ref=e1950] [cursor=pointer]: F4冷通道38号
+                  - cell "暖通" [ref=e1951]:
+                    - generic [ref=e1952]: 暖通
+                  - cell "50 kW" [ref=e1953]:
+                    - generic [ref=e1954]: 50 kW
+                  - cell "0%" [ref=e1955]:
+                    - generic [ref=e1956]: 0%
+                  - cell "17% 变更" [ref=e1957]:
+                    - generic [ref=e1958]:
+                      - text: 17%
+                      - generic [ref=e1960]: 变更
+                  - cell "0.0 kW → 8.5" [ref=e1961]:
+                    - generic [ref=e1962]: 0.0 kW → 8.5
+                  - cell "低" [ref=e1963]:
+                    - generic [ref=e1966]: 低
+                  - cell "调整 接受" [ref=e1967]:
+                    - generic [ref=e1968]:
+                      - button "调整" [ref=e1969] [cursor=pointer]:
+                        - generic [ref=e1970]: 调整
+                      - button "接受" [ref=e1971] [cursor=pointer]:
+                        - generic [ref=e1972]: 接受
+                - row "CA-F4-39 F4冷通道39号 暖通 50 kW 0% 17% 变更 0.0 kW → 8.5 低 调整 接受" [ref=e1973]:
+                  - cell "CA-F4-39" [ref=e1974]:
+                    - generic [ref=e1975]: CA-F4-39
+                  - cell "F4冷通道39号" [ref=e1976]:
+                    - generic [ref=e1979] [cursor=pointer]: F4冷通道39号
+                  - cell "暖通" [ref=e1980]:
+                    - generic [ref=e1981]: 暖通
+                  - cell "50 kW" [ref=e1982]:
+                    - generic [ref=e1983]: 50 kW
+                  - cell "0%" [ref=e1984]:
+                    - generic [ref=e1985]: 0%
+                  - cell "17% 变更" [ref=e1986]:
+                    - generic [ref=e1987]:
+                      - text: 17%
+                      - generic [ref=e1989]: 变更
+                  - cell "0.0 kW → 8.5" [ref=e1990]:
+                    - generic [ref=e1991]: 0.0 kW → 8.5
+                  - cell "低" [ref=e1992]:
+                    - generic [ref=e1995]: 低
+                  - cell "调整 接受" [ref=e1996]:
+                    - generic [ref=e1997]:
+                      - button "调整" [ref=e1998] [cursor=pointer]:
+                        - generic [ref=e1999]: 调整
+                      - button "接受" [ref=e2000] [cursor=pointer]:
+                        - generic [ref=e2001]: 接受
+                - row "CA-F4-40 F4冷通道40号 暖通 50 kW 0% 17% 变更 0.0 kW → 8.5 低 调整 接受" [ref=e2002]:
+                  - cell "CA-F4-40" [ref=e2003]:
+                    - generic [ref=e2004]: CA-F4-40
+                  - cell "F4冷通道40号" [ref=e2005]:
+                    - generic [ref=e2008] [cursor=pointer]: F4冷通道40号
+                  - cell "暖通" [ref=e2009]:
+                    - generic [ref=e2010]: 暖通
+                  - cell "50 kW" [ref=e2011]:
+                    - generic [ref=e2012]: 50 kW
+                  - cell "0%" [ref=e2013]:
+                    - generic [ref=e2014]: 0%
+                  - cell "17% 变更" [ref=e2015]:
+                    - generic [ref=e2016]:
+                      - text: 17%
+                      - generic [ref=e2018]: 变更
+                  - cell "0.0 kW → 8.5" [ref=e2019]:
+                    - generic [ref=e2020]: 0.0 kW → 8.5
+                  - cell "低" [ref=e2021]:
+                    - generic [ref=e2024]: 低
+                  - cell "调整 接受" [ref=e2025]:
+                    - generic [ref=e2026]:
+                      - button "调整" [ref=e2027] [cursor=pointer]:
+                        - generic [ref=e2028]: 调整
+                      - button "接受" [ref=e2029] [cursor=pointer]:
+                        - generic [ref=e2030]: 接受
+                - row "CA-F4-41 F4冷通道41号 暖通 50 kW 0% 17% 变更 0.0 kW → 8.5 低 调整 接受" [ref=e2031]:
+                  - cell "CA-F4-41" [ref=e2032]:
+                    - generic [ref=e2033]: CA-F4-41
+                  - cell "F4冷通道41号" [ref=e2034]:
+                    - generic [ref=e2037] [cursor=pointer]: F4冷通道41号
+                  - cell "暖通" [ref=e2038]:
+                    - generic [ref=e2039]: 暖通
+                  - cell "50 kW" [ref=e2040]:
+                    - generic [ref=e2041]: 50 kW
+                  - cell "0%" [ref=e2042]:
+                    - generic [ref=e2043]: 0%
+                  - cell "17% 变更" [ref=e2044]:
+                    - generic [ref=e2045]:
+                      - text: 17%
+                      - generic [ref=e2047]: 变更
+                  - cell "0.0 kW → 8.5" [ref=e2048]:
+                    - generic [ref=e2049]: 0.0 kW → 8.5
+                  - cell "低" [ref=e2050]:
+                    - generic [ref=e2053]: 低
+                  - cell "调整 接受" [ref=e2054]:
+                    - generic [ref=e2055]:
+                      - button "调整" [ref=e2056] [cursor=pointer]:
+                        - generic [ref=e2057]: 调整
+                      - button "接受" [ref=e2058] [cursor=pointer]:
+                        - generic [ref=e2059]: 接受
+                - row "CA-F4-42 F4冷通道42号 暖通 50 kW 0% 17% 变更 0.0 kW → 8.5 低 调整 接受" [ref=e2060]:
+                  - cell "CA-F4-42" [ref=e2061]:
+                    - generic [ref=e2062]: CA-F4-42
+                  - cell "F4冷通道42号" [ref=e2063]:
+                    - generic [ref=e2066] [cursor=pointer]: F4冷通道42号
+                  - cell "暖通" [ref=e2067]:
+                    - generic [ref=e2068]: 暖通
+                  - cell "50 kW" [ref=e2069]:
+                    - generic [ref=e2070]: 50 kW
+                  - cell "0%" [ref=e2071]:
+                    - generic [ref=e2072]: 0%
+                  - cell "17% 变更" [ref=e2073]:
+                    - generic [ref=e2074]:
+                      - text: 17%
+                      - generic [ref=e2076]: 变更
+                  - cell "0.0 kW → 8.5" [ref=e2077]:
+                    - generic [ref=e2078]: 0.0 kW → 8.5
+                  - cell "低" [ref=e2079]:
+                    - generic [ref=e2082]: 低
+                  - cell "调整 接受" [ref=e2083]:
+                    - generic [ref=e2084]:
+                      - button "调整" [ref=e2085] [cursor=pointer]:
+                        - generic [ref=e2086]: 调整
+                      - button "接受" [ref=e2087] [cursor=pointer]:
+                        - generic [ref=e2088]: 接受
+                - row "CA-F4-43 F4冷通道43号 暖通 50 kW 0% 17% 变更 0.0 kW → 8.5 低 调整 接受" [ref=e2089]:
+                  - cell "CA-F4-43" [ref=e2090]:
+                    - generic [ref=e2091]: CA-F4-43
+                  - cell "F4冷通道43号" [ref=e2092]:
+                    - generic [ref=e2095] [cursor=pointer]: F4冷通道43号
+                  - cell "暖通" [ref=e2096]:
+                    - generic [ref=e2097]: 暖通
+                  - cell "50 kW" [ref=e2098]:
+                    - generic [ref=e2099]: 50 kW
+                  - cell "0%" [ref=e2100]:
+                    - generic [ref=e2101]: 0%
+                  - cell "17% 变更" [ref=e2102]:
+                    - generic [ref=e2103]:
+                      - text: 17%
+                      - generic [ref=e2105]: 变更
+                  - cell "0.0 kW → 8.5" [ref=e2106]:
+                    - generic [ref=e2107]: 0.0 kW → 8.5
+                  - cell "低" [ref=e2108]:
+                    - generic [ref=e2111]: 低
+                  - cell "调整 接受" [ref=e2112]:
+                    - generic [ref=e2113]:
+                      - button "调整" [ref=e2114] [cursor=pointer]:
+                        - generic [ref=e2115]: 调整
+                      - button "接受" [ref=e2116] [cursor=pointer]:
+                        - generic [ref=e2117]: 接受
+                - row "CA-F4-44 F4冷通道44号 暖通 50 kW 0% 17% 变更 0.0 kW → 8.5 低 调整 接受" [ref=e2118]:
+                  - cell "CA-F4-44" [ref=e2119]:
+                    - generic [ref=e2120]: CA-F4-44
+                  - cell "F4冷通道44号" [ref=e2121]:
+                    - generic [ref=e2124] [cursor=pointer]: F4冷通道44号
+                  - cell "暖通" [ref=e2125]:
+                    - generic [ref=e2126]: 暖通
+                  - cell "50 kW" [ref=e2127]:
+                    - generic [ref=e2128]: 50 kW
+                  - cell "0%" [ref=e2129]:
+                    - generic [ref=e2130]: 0%
+                  - cell "17% 变更" [ref=e2131]:
+                    - generic [ref=e2132]:
+                      - text: 17%
+                      - generic [ref=e2134]: 变更
+                  - cell "0.0 kW → 8.5" [ref=e2135]:
+                    - generic [ref=e2136]: 0.0 kW → 8.5
+                  - cell "低" [ref=e2137]:
+                    - generic [ref=e2140]: 低
+                  - cell "调整 接受" [ref=e2141]:
+                    - generic [ref=e2142]:
+                      - button "调整" [ref=e2143] [cursor=pointer]:
+                        - generic [ref=e2144]: 调整
+                      - button "接受" [ref=e2145] [cursor=pointer]:
+                        - generic [ref=e2146]: 接受
+                - row "CA-F4-45 F4冷通道45号 暖通 50 kW 0% 17% 变更 0.0 kW → 8.5 低 调整 接受" [ref=e2147]:
+                  - cell "CA-F4-45" [ref=e2148]:
+                    - generic [ref=e2149]: CA-F4-45
+                  - cell "F4冷通道45号" [ref=e2150]:
+                    - generic [ref=e2153] [cursor=pointer]: F4冷通道45号
+                  - cell "暖通" [ref=e2154]:
+                    - generic [ref=e2155]: 暖通
+                  - cell "50 kW" [ref=e2156]:
+                    - generic [ref=e2157]: 50 kW
+                  - cell "0%" [ref=e2158]:
+                    - generic [ref=e2159]: 0%
+                  - cell "17% 变更" [ref=e2160]:
+                    - generic [ref=e2161]:
+                      - text: 17%
+                      - generic [ref=e2163]: 变更
+                  - cell "0.0 kW → 8.5" [ref=e2164]:
+                    - generic [ref=e2165]: 0.0 kW → 8.5
+                  - cell "低" [ref=e2166]:
+                    - generic [ref=e2169]: 低
+                  - cell "调整 接受" [ref=e2170]:
+                    - generic [ref=e2171]:
+                      - button "调整" [ref=e2172] [cursor=pointer]:
+                        - generic [ref=e2173]: 调整
+                      - button "接受" [ref=e2174] [cursor=pointer]:
+                        - generic [ref=e2175]: 接受
+                - row "CA-F4-46 F4冷通道46号 暖通 50 kW 0% 17% 变更 0.0 kW → 8.5 低 调整 接受" [ref=e2176]:
+                  - cell "CA-F4-46" [ref=e2177]:
+                    - generic [ref=e2178]: CA-F4-46
+                  - cell "F4冷通道46号" [ref=e2179]:
+                    - generic [ref=e2182] [cursor=pointer]: F4冷通道46号
+                  - cell "暖通" [ref=e2183]:
+                    - generic [ref=e2184]: 暖通
+                  - cell "50 kW" [ref=e2185]:
+                    - generic [ref=e2186]: 50 kW
+                  - cell "0%" [ref=e2187]:
+                    - generic [ref=e2188]: 0%
+                  - cell "17% 变更" [ref=e2189]:
+                    - generic [ref=e2190]:
+                      - text: 17%
+                      - generic [ref=e2192]: 变更
+                  - cell "0.0 kW → 8.5" [ref=e2193]:
+                    - generic [ref=e2194]: 0.0 kW → 8.5
+                  - cell "低" [ref=e2195]:
+                    - generic [ref=e2198]: 低
+                  - cell "调整 接受" [ref=e2199]:
+                    - generic [ref=e2200]:
+                      - button "调整" [ref=e2201] [cursor=pointer]:
+                        - generic [ref=e2202]: 调整
+                      - button "接受" [ref=e2203] [cursor=pointer]:
+                        - generic [ref=e2204]: 接受
+                - row "CA-F4-47 F4冷通道47号 暖通 50 kW 0% 17% 变更 0.0 kW → 8.5 低 调整 接受" [ref=e2205]:
+                  - cell "CA-F4-47" [ref=e2206]:
+                    - generic [ref=e2207]: CA-F4-47
+                  - cell "F4冷通道47号" [ref=e2208]:
+                    - generic [ref=e2211] [cursor=pointer]: F4冷通道47号
+                  - cell "暖通" [ref=e2212]:
+                    - generic [ref=e2213]: 暖通
+                  - cell "50 kW" [ref=e2214]:
+                    - generic [ref=e2215]: 50 kW
+                  - cell "0%" [ref=e2216]:
+                    - generic [ref=e2217]: 0%
+                  - cell "17% 变更" [ref=e2218]:
+                    - generic [ref=e2219]:
+                      - text: 17%
+                      - generic [ref=e2221]: 变更
+                  - cell "0.0 kW → 8.5" [ref=e2222]:
+                    - generic [ref=e2223]: 0.0 kW → 8.5
+                  - cell "低" [ref=e2224]:
+                    - generic [ref=e2227]: 低
+                  - cell "调整 接受" [ref=e2228]:
+                    - generic [ref=e2229]:
+                      - button "调整" [ref=e2230] [cursor=pointer]:
+                        - generic [ref=e2231]: 调整
+                      - button "接受" [ref=e2232] [cursor=pointer]:
+                        - generic [ref=e2233]: 接受
+                - row "CA-F4-48 F4冷通道48号 暖通 50 kW 0% 17% 变更 0.0 kW → 8.5 低 调整 接受" [ref=e2234]:
+                  - cell "CA-F4-48" [ref=e2235]:
+                    - generic [ref=e2236]: CA-F4-48
+                  - cell "F4冷通道48号" [ref=e2237]:
+                    - generic [ref=e2240] [cursor=pointer]: F4冷通道48号
+                  - cell "暖通" [ref=e2241]:
+                    - generic [ref=e2242]: 暖通
+                  - cell "50 kW" [ref=e2243]:
+                    - generic [ref=e2244]: 50 kW
+                  - cell "0%" [ref=e2245]:
+                    - generic [ref=e2246]: 0%
+                  - cell "17% 变更" [ref=e2247]:
+                    - generic [ref=e2248]:
+                      - text: 17%
+                      - generic [ref=e2250]: 变更
+                  - cell "0.0 kW → 8.5" [ref=e2251]:
+                    - generic [ref=e2252]: 0.0 kW → 8.5
+                  - cell "低" [ref=e2253]:
+                    - generic [ref=e2256]: 低
+                  - cell "调整 接受" [ref=e2257]:
+                    - generic [ref=e2258]:
+                      - button "调整" [ref=e2259] [cursor=pointer]:
+                        - generic [ref=e2260]: 调整
+                      - button "接受" [ref=e2261] [cursor=pointer]:
+                        - generic [ref=e2262]: 接受
+                - row "CA-F4-49 F4冷通道49号 暖通 50 kW 0% 17% 变更 0.0 kW → 8.5 低 调整 接受" [ref=e2263]:
+                  - cell "CA-F4-49" [ref=e2264]:
+                    - generic [ref=e2265]: CA-F4-49
+                  - cell "F4冷通道49号" [ref=e2266]:
+                    - generic [ref=e2269] [cursor=pointer]: F4冷通道49号
+                  - cell "暖通" [ref=e2270]:
+                    - generic [ref=e2271]: 暖通
+                  - cell "50 kW" [ref=e2272]:
+                    - generic [ref=e2273]: 50 kW
+                  - cell "0%" [ref=e2274]:
+                    - generic [ref=e2275]: 0%
+                  - cell "17% 变更" [ref=e2276]:
+                    - generic [ref=e2277]:
+                      - text: 17%
+                      - generic [ref=e2279]: 变更
+                  - cell "0.0 kW → 8.5" [ref=e2280]:
+                    - generic [ref=e2281]: 0.0 kW → 8.5
+                  - cell "低" [ref=e2282]:
+                    - generic [ref=e2285]: 低
+                  - cell "调整 接受" [ref=e2286]:
+                    - generic [ref=e2287]:
+                      - button "调整" [ref=e2288] [cursor=pointer]:
+                        - generic [ref=e2289]: 调整
+                      - button "接受" [ref=e2290] [cursor=pointer]:
+                        - generic [ref=e2291]: 接受
+                - row "CA-F4-50 F4冷通道50号 暖通 50 kW 0% 17% 变更 0.0 kW → 8.5 低 调整 接受" [ref=e2292]:
+                  - cell "CA-F4-50" [ref=e2293]:
+                    - generic [ref=e2294]: CA-F4-50
+                  - cell "F4冷通道50号" [ref=e2295]:
+                    - generic [ref=e2298] [cursor=pointer]: F4冷通道50号
+                  - cell "暖通" [ref=e2299]:
+                    - generic [ref=e2300]: 暖通
+                  - cell "50 kW" [ref=e2301]:
+                    - generic [ref=e2302]: 50 kW
+                  - cell "0%" [ref=e2303]:
+                    - generic [ref=e2304]: 0%
+                  - cell "17% 变更" [ref=e2305]:
+                    - generic [ref=e2306]:
+                      - text: 17%
+                      - generic [ref=e2308]: 变更
+                  - cell "0.0 kW → 8.5" [ref=e2309]:
+                    - generic [ref=e2310]: 0.0 kW → 8.5
+                  - cell "低" [ref=e2311]:
+                    - generic [ref=e2314]: 低
+                  - cell "调整 接受" [ref=e2315]:
+                    - generic [ref=e2316]:
+                      - button "调整" [ref=e2317] [cursor=pointer]:
+                        - generic [ref=e2318]: 调整
+                      - button "接受" [ref=e2319] [cursor=pointer]:
+                        - generic [ref=e2320]: 接受
+                - row "CA-F4-51 F4冷通道51号 暖通 50 kW 0% 17% 变更 0.0 kW → 8.5 低 调整 接受" [ref=e2321]:
+                  - cell "CA-F4-51" [ref=e2322]:
+                    - generic [ref=e2323]: CA-F4-51
+                  - cell "F4冷通道51号" [ref=e2324]:
+                    - generic [ref=e2327] [cursor=pointer]: F4冷通道51号
+                  - cell "暖通" [ref=e2328]:
+                    - generic [ref=e2329]: 暖通
+                  - cell "50 kW" [ref=e2330]:
+                    - generic [ref=e2331]: 50 kW
+                  - cell "0%" [ref=e2332]:
+                    - generic [ref=e2333]: 0%
+                  - cell "17% 变更" [ref=e2334]:
+                    - generic [ref=e2335]:
+                      - text: 17%
+                      - generic [ref=e2337]: 变更
+                  - cell "0.0 kW → 8.5" [ref=e2338]:
+                    - generic [ref=e2339]: 0.0 kW → 8.5
+                  - cell "低" [ref=e2340]:
+                    - generic [ref=e2343]: 低
+                  - cell "调整 接受" [ref=e2344]:
+                    - generic [ref=e2345]:
+                      - button "调整" [ref=e2346] [cursor=pointer]:
+                        - generic [ref=e2347]: 调整
+                      - button "接受" [ref=e2348] [cursor=pointer]:
+                        - generic [ref=e2349]: 接受
+                - row "CA-F4-52 F4冷通道52号 暖通 50 kW 0% 17% 变更 0.0 kW → 8.5 低 调整 接受" [ref=e2350]:
+                  - cell "CA-F4-52" [ref=e2351]:
+                    - generic [ref=e2352]: CA-F4-52
+                  - cell "F4冷通道52号" [ref=e2353]:
+                    - generic [ref=e2356] [cursor=pointer]: F4冷通道52号
+                  - cell "暖通" [ref=e2357]:
+                    - generic [ref=e2358]: 暖通
+                  - cell "50 kW" [ref=e2359]:
+                    - generic [ref=e2360]: 50 kW
+                  - cell "0%" [ref=e2361]:
+                    - generic [ref=e2362]: 0%
+                  - cell "17% 变更" [ref=e2363]:
+                    - generic [ref=e2364]:
+                      - text: 17%
+                      - generic [ref=e2366]: 变更
+                  - cell "0.0 kW → 8.5" [ref=e2367]:
+                    - generic [ref=e2368]: 0.0 kW → 8.5
+                  - cell "低" [ref=e2369]:
+                    - generic [ref=e2372]: 低
+                  - cell "调整 接受" [ref=e2373]:
+                    - generic [ref=e2374]:
+                      - button "调整" [ref=e2375] [cursor=pointer]:
+                        - generic [ref=e2376]: 调整
+                      - button "接受" [ref=e2377] [cursor=pointer]:
+                        - generic [ref=e2378]: 接受
+                - row "CA-F4-53 F4冷通道53号 暖通 50 kW 0% 17% 变更 0.0 kW → 8.5 低 调整 接受" [ref=e2379]:
+                  - cell "CA-F4-53" [ref=e2380]:
+                    - generic [ref=e2381]: CA-F4-53
+                  - cell "F4冷通道53号" [ref=e2382]:
+                    - generic [ref=e2385] [cursor=pointer]: F4冷通道53号
+                  - cell "暖通" [ref=e2386]:
+                    - generic [ref=e2387]: 暖通
+                  - cell "50 kW" [ref=e2388]:
+                    - generic [ref=e2389]: 50 kW
+                  - cell "0%" [ref=e2390]:
+                    - generic [ref=e2391]: 0%
+                  - cell "17% 变更" [ref=e2392]:
+                    - generic [ref=e2393]:
+                      - text: 17%
+                      - generic [ref=e2395]: 变更
+                  - cell "0.0 kW → 8.5" [ref=e2396]:
+                    - generic [ref=e2397]: 0.0 kW → 8.5
+                  - cell "低" [ref=e2398]:
+                    - generic [ref=e2401]: 低
+                  - cell "调整 接受" [ref=e2402]:
+                    - generic [ref=e2403]:
+                      - button "调整" [ref=e2404] [cursor=pointer]:
+                        - generic [ref=e2405]: 调整
+                      - button "接受" [ref=e2406] [cursor=pointer]:
+                        - generic [ref=e2407]: 接受
+                - row "CA-F4-54 F4冷通道54号 暖通 50 kW 0% 17% 变更 0.0 kW → 8.5 低 调整 接受" [ref=e2408]:
+                  - cell "CA-F4-54" [ref=e2409]:
+                    - generic [ref=e2410]: CA-F4-54
+                  - cell "F4冷通道54号" [ref=e2411]:
+                    - generic [ref=e2414] [cursor=pointer]: F4冷通道54号
+                  - cell "暖通" [ref=e2415]:
+                    - generic [ref=e2416]: 暖通
+                  - cell "50 kW" [ref=e2417]:
+                    - generic [ref=e2418]: 50 kW
+                  - cell "0%" [ref=e2419]:
+                    - generic [ref=e2420]: 0%
+                  - cell "17% 变更" [ref=e2421]:
+                    - generic [ref=e2422]:
+                      - text: 17%
+                      - generic [ref=e2424]: 变更
+                  - cell "0.0 kW → 8.5" [ref=e2425]:
+                    - generic [ref=e2426]: 0.0 kW → 8.5
+                  - cell "低" [ref=e2427]:
+                    - generic [ref=e2430]: 低
+                  - cell "调整 接受" [ref=e2431]:
+                    - generic [ref=e2432]:
+                      - button "调整" [ref=e2433] [cursor=pointer]:
+                        - generic [ref=e2434]: 调整
+                      - button "接受" [ref=e2435] [cursor=pointer]:
+                        - generic [ref=e2436]: 接受
+                - row "CH-F1-03 F1冷机3号 暖通 50 kW 0% 17% 变更 0.0 kW → 8.5 低 调整 接受" [ref=e2437]:
+                  - cell "CH-F1-03" [ref=e2438]:
+                    - generic [ref=e2439]: CH-F1-03
+                  - cell "F1冷机3号" [ref=e2440]:
+                    - generic [ref=e2443] [cursor=pointer]: F1冷机3号
+                  - cell "暖通" [ref=e2444]:
+                    - generic [ref=e2445]: 暖通
+                  - cell "50 kW" [ref=e2446]:
+                    - generic [ref=e2447]: 50 kW
+                  - cell "0%" [ref=e2448]:
+                    - generic [ref=e2449]: 0%
+                  - cell "17% 变更" [ref=e2450]:
+                    - generic [ref=e2451]:
+                      - text: 17%
+                      - generic [ref=e2453]: 变更
+                  - cell "0.0 kW → 8.5" [ref=e2454]:
+                    - generic [ref=e2455]: 0.0 kW → 8.5
+                  - cell "低" [ref=e2456]:
+                    - generic [ref=e2459]: 低
+                  - cell "调整 接受" [ref=e2460]:
+                    - generic [ref=e2461]:
+                      - button "调整" [ref=e2462] [cursor=pointer]:
+                        - generic [ref=e2463]: 调整
+                      - button "接受" [ref=e2464] [cursor=pointer]:
+                        - generic [ref=e2465]: 接受
+                - row "CH-F1-04 F1冷机4号 暖通 50 kW 0% 17% 变更 0.0 kW → 8.5 低 调整 接受" [ref=e2466]:
+                  - cell "CH-F1-04" [ref=e2467]:
+                    - generic [ref=e2468]: CH-F1-04
+                  - cell "F1冷机4号" [ref=e2469]:
+                    - generic [ref=e2472] [cursor=pointer]: F1冷机4号
+                  - cell "暖通" [ref=e2473]:
+                    - generic [ref=e2474]: 暖通
+                  - cell "50 kW" [ref=e2475]:
+                    - generic [ref=e2476]: 50 kW
+                  - cell "0%" [ref=e2477]:
+                    - generic [ref=e2478]: 0%
+                  - cell "17% 变更" [ref=e2479]:
+                    - generic [ref=e2480]:
+                      - text: 17%
+                      - generic [ref=e2482]: 变更
+                  - cell "0.0 kW → 8.5" [ref=e2483]:
+                    - generic [ref=e2484]: 0.0 kW → 8.5
+                  - cell "低" [ref=e2485]:
+                    - generic [ref=e2488]: 低
+                  - cell "调整 接受" [ref=e2489]:
+                    - generic [ref=e2490]:
+                      - button "调整" [ref=e2491] [cursor=pointer]:
+                        - generic [ref=e2492]: 调整
+                      - button "接受" [ref=e2493] [cursor=pointer]:
+                        - generic [ref=e2494]: 接受
+                - row "CH-F1-05 F1冷机5号 暖通 50 kW 0% 17% 变更 0.0 kW → 8.5 低 调整 接受" [ref=e2495]:
+                  - cell "CH-F1-05" [ref=e2496]:
+                    - generic [ref=e2497]: CH-F1-05
+                  - cell "F1冷机5号" [ref=e2498]:
+                    - generic [ref=e2501] [cursor=pointer]: F1冷机5号
+                  - cell "暖通" [ref=e2502]:
+                    - generic [ref=e2503]: 暖通
+                  - cell "50 kW" [ref=e2504]:
+                    - generic [ref=e2505]: 50 kW
+                  - cell "0%" [ref=e2506]:
+                    - generic [ref=e2507]: 0%
+                  - cell "17% 变更" [ref=e2508]:
+                    - generic [ref=e2509]:
+                      - text: 17%
+                      - generic [ref=e2511]: 变更
+                  - cell "0.0 kW → 8.5" [ref=e2512]:
+                    - generic [ref=e2513]: 0.0 kW → 8.5
+                  - cell "低" [ref=e2514]:
+                    - generic [ref=e2517]: 低
+                  - cell "调整 接受" [ref=e2518]:
+                    - generic [ref=e2519]:
+                      - button "调整" [ref=e2520] [cursor=pointer]:
+                        - generic [ref=e2521]: 调整
+                      - button "接受" [ref=e2522] [cursor=pointer]:
+                        - generic [ref=e2523]: 接受
+                - row "CH-F1-06 F1冷机6号 暖通 50 kW 0% 17% 变更 0.0 kW → 8.5 低 调整 接受" [ref=e2524]:
+                  - cell "CH-F1-06" [ref=e2525]:
+                    - generic [ref=e2526]: CH-F1-06
+                  - cell "F1冷机6号" [ref=e2527]:
+                    - generic [ref=e2530] [cursor=pointer]: F1冷机6号
+                  - cell "暖通" [ref=e2531]:
+                    - generic [ref=e2532]: 暖通
+                  - cell "50 kW" [ref=e2533]:
+                    - generic [ref=e2534]: 50 kW
+                  - cell "0%" [ref=e2535]:
+                    - generic [ref=e2536]: 0%
+                  - cell "17% 变更" [ref=e2537]:
+                    - generic [ref=e2538]:
+                      - text: 17%
+                      - generic [ref=e2540]: 变更
+                  - cell "0.0 kW → 8.5" [ref=e2541]:
+                    - generic [ref=e2542]: 0.0 kW → 8.5
+                  - cell "低" [ref=e2543]:
+                    - generic [ref=e2546]: 低
+                  - cell "调整 接受" [ref=e2547]:
+                    - generic [ref=e2548]:
+                      - button "调整" [ref=e2549] [cursor=pointer]:
+                        - generic [ref=e2550]: 调整
+                      - button "接受" [ref=e2551] [cursor=pointer]:
+                        - generic [ref=e2552]: 接受
+                - row "CT-F1-03 F1冷却塔3号 暖通 50 kW 0% 17% 变更 0.0 kW → 8.5 低 调整 接受" [ref=e2553]:
+                  - cell "CT-F1-03" [ref=e2554]:
+                    - generic [ref=e2555]: CT-F1-03
+                  - cell "F1冷却塔3号" [ref=e2556]:
+                    - generic [ref=e2559] [cursor=pointer]: F1冷却塔3号
+                  - cell "暖通" [ref=e2560]:
+                    - generic [ref=e2561]: 暖通
+                  - cell "50 kW" [ref=e2562]:
+                    - generic [ref=e2563]: 50 kW
+                  - cell "0%" [ref=e2564]:
+                    - generic [ref=e2565]: 0%
+                  - cell "17% 变更" [ref=e2566]:
+                    - generic [ref=e2567]:
+                      - text: 17%
+                      - generic [ref=e2569]: 变更
+                  - cell "0.0 kW → 8.5" [ref=e2570]:
+                    - generic [ref=e2571]: 0.0 kW → 8.5
+                  - cell "低" [ref=e2572]:
+                    - generic [ref=e2575]: 低
+                  - cell "调整 接受" [ref=e2576]:
+                    - generic [ref=e2577]:
+                      - button "调整" [ref=e2578] [cursor=pointer]:
+                        - generic [ref=e2579]: 调整
+                      - button "接受" [ref=e2580] [cursor=pointer]:
+                        - generic [ref=e2581]: 接受
+                - row "CT-F1-04 F1冷却塔4号 暖通 50 kW 0% 17% 变更 0.0 kW → 8.5 低 调整 接受" [ref=e2582]:
+                  - cell "CT-F1-04" [ref=e2583]:
+                    - generic [ref=e2584]: CT-F1-04
+                  - cell "F1冷却塔4号" [ref=e2585]:
+                    - generic [ref=e2588] [cursor=pointer]: F1冷却塔4号
+                  - cell "暖通" [ref=e2589]:
+                    - generic [ref=e2590]: 暖通
+                  - cell "50 kW" [ref=e2591]:
+                    - generic [ref=e2592]: 50 kW
+                  - cell "0%" [ref=e2593]:
+                    - generic [ref=e2594]: 0%
+                  - cell "17% 变更" [ref=e2595]:
+                    - generic [ref=e2596]:
+                      - text: 17%
+                      - generic [ref=e2598]: 变更
+                  - cell "0.0 kW → 8.5" [ref=e2599]:
+                    - generic [ref=e2600]: 0.0 kW → 8.5
+                  - cell "低" [ref=e2601]:
+                    - generic [ref=e2604]: 低
+                  - cell "调整 接受" [ref=e2605]:
+                    - generic [ref=e2606]:
+                      - button "调整" [ref=e2607] [cursor=pointer]:
+                        - generic [ref=e2608]: 调整
+                      - button "接受" [ref=e2609] [cursor=pointer]:
+                        - generic [ref=e2610]: 接受
+                - row "PMP-F1-03 F1水泵3号 暖通 50 kW 0% 17% 变更 0.0 kW → 8.5 低 调整 接受" [ref=e2611]:
+                  - cell "PMP-F1-03" [ref=e2612]:
+                    - generic [ref=e2613]: PMP-F1-03
+                  - cell "F1水泵3号" [ref=e2614]:
+                    - generic [ref=e2617] [cursor=pointer]: F1水泵3号
+                  - cell "暖通" [ref=e2618]:
+                    - generic [ref=e2619]: 暖通
+                  - cell "50 kW" [ref=e2620]:
+                    - generic [ref=e2621]: 50 kW
+                  - cell "0%" [ref=e2622]:
+                    - generic [ref=e2623]: 0%
+                  - cell "17% 变更" [ref=e2624]:
+                    - generic [ref=e2625]:
+                      - text: 17%
+                      - generic [ref=e2627]: 变更
+                  - cell "0.0 kW → 8.5" [ref=e2628]:
+                    - generic [ref=e2629]: 0.0 kW → 8.5
+                  - cell "低" [ref=e2630]:
+                    - generic [ref=e2633]: 低
+                  - cell "调整 接受" [ref=e2634]:
+                    - generic [ref=e2635]:
+                      - button "调整" [ref=e2636] [cursor=pointer]:
+                        - generic [ref=e2637]: 调整
+                      - button "接受" [ref=e2638] [cursor=pointer]:
+                        - generic [ref=e2639]: 接受
+                - row "PMP-F1-04 F1水泵4号 暖通 50 kW 0% 17% 变更 0.0 kW → 8.5 低 调整 接受" [ref=e2640]:
+                  - cell "PMP-F1-04" [ref=e2641]:
+                    - generic [ref=e2642]: PMP-F1-04
+                  - cell "F1水泵4号" [ref=e2643]:
+                    - generic [ref=e2646] [cursor=pointer]: F1水泵4号
+                  - cell "暖通" [ref=e2647]:
+                    - generic [ref=e2648]: 暖通
+                  - cell "50 kW" [ref=e2649]:
+                    - generic [ref=e2650]: 50 kW
+                  - cell "0%" [ref=e2651]:
+                    - generic [ref=e2652]: 0%
+                  - cell "17% 变更" [ref=e2653]:
+                    - generic [ref=e2654]:
+                      - text: 17%
+                      - generic [ref=e2656]: 变更
+                  - cell "0.0 kW → 8.5" [ref=e2657]:
+                    - generic [ref=e2658]: 0.0 kW → 8.5
+                  - cell "低" [ref=e2659]:
+                    - generic [ref=e2662]: 低
+                  - cell "调整 接受" [ref=e2663]:
+                    - generic [ref=e2664]:
+                      - button "调整" [ref=e2665] [cursor=pointer]:
+                        - generic [ref=e2666]: 调整
+                      - button "接受" [ref=e2667] [cursor=pointer]:
+                        - generic [ref=e2668]: 接受
+                - row "PMP-F1-05 F1水泵5号 暖通 50 kW 0% 17% 变更 0.0 kW → 8.5 低 调整 接受" [ref=e2669]:
+                  - cell "PMP-F1-05" [ref=e2670]:
+                    - generic [ref=e2671]: PMP-F1-05
+                  - cell "F1水泵5号" [ref=e2672]:
+                    - generic [ref=e2675] [cursor=pointer]: F1水泵5号
+                  - cell "暖通" [ref=e2676]:
+                    - generic [ref=e2677]: 暖通
+                  - cell "50 kW" [ref=e2678]:
+                    - generic [ref=e2679]: 50 kW
+                  - cell "0%" [ref=e2680]:
+                    - generic [ref=e2681]: 0%
+                  - cell "17% 变更" [ref=e2682]:
+                    - generic [ref=e2683]:
+                      - text: 17%
+                      - generic [ref=e2685]: 变更
+                  - cell "0.0 kW → 8.5" [ref=e2686]:
+                    - generic [ref=e2687]: 0.0 kW → 8.5
+                  - cell "低" [ref=e2688]:
+                    - generic [ref=e2691]: 低
+                  - cell "调整 接受" [ref=e2692]:
+                    - generic [ref=e2693]:
+                      - button "调整" [ref=e2694] [cursor=pointer]:
+                        - generic [ref=e2695]: 调整
+                      - button "接受" [ref=e2696] [cursor=pointer]:
+                        - generic [ref=e2697]: 接受
+                - row "PMP-F1-06 F1水泵6号 暖通 50 kW 0% 17% 变更 0.0 kW → 8.5 低 调整 接受" [ref=e2698]:
+                  - cell "PMP-F1-06" [ref=e2699]:
+                    - generic [ref=e2700]: PMP-F1-06
+                  - cell "F1水泵6号" [ref=e2701]:
+                    - generic [ref=e2704] [cursor=pointer]: F1水泵6号
+                  - cell "暖通" [ref=e2705]:
+                    - generic [ref=e2706]: 暖通
+                  - cell "50 kW" [ref=e2707]:
+                    - generic [ref=e2708]: 50 kW
+                  - cell "0%" [ref=e2709]:
+                    - generic [ref=e2710]: 0%
+                  - cell "17% 变更" [ref=e2711]:
+                    - generic [ref=e2712]:
+                      - text: 17%
+                      - generic [ref=e2714]: 变更
+                  - cell "0.0 kW → 8.5" [ref=e2715]:
+                    - generic [ref=e2716]: 0.0 kW → 8.5
+                  - cell "低" [ref=e2717]:
+                    - generic [ref=e2720]: 低
+                  - cell "调整 接受" [ref=e2721]:
+                    - generic [ref=e2722]:
+                      - button "调整" [ref=e2723] [cursor=pointer]:
+                        - generic [ref=e2724]: 调整
+                      - button "接受" [ref=e2725] [cursor=pointer]:
+                        - generic [ref=e2726]: 接受
+                - row "PMP-F1-09 F1水泵9号 暖通 50 kW 0% 17% 变更 0.0 kW → 8.5 低 调整 接受" [ref=e2727]:
+                  - cell "PMP-F1-09" [ref=e2728]:
+                    - generic [ref=e2729]: PMP-F1-09
+                  - cell "F1水泵9号" [ref=e2730]:
+                    - generic [ref=e2733] [cursor=pointer]: F1水泵9号
+                  - cell "暖通" [ref=e2734]:
+                    - generic [ref=e2735]: 暖通
+                  - cell "50 kW" [ref=e2736]:
+                    - generic [ref=e2737]: 50 kW
+                  - cell "0%" [ref=e2738]:
+                    - generic [ref=e2739]: 0%
+                  - cell "17% 变更" [ref=e2740]:
+                    - generic [ref=e2741]:
+                      - text: 17%
+                      - generic [ref=e2743]: 变更
+                  - cell "0.0 kW → 8.5" [ref=e2744]:
+                    - generic [ref=e2745]: 0.0 kW → 8.5
+                  - cell "低" [ref=e2746]:
+                    - generic [ref=e2749]: 低
+                  - cell "调整 接受" [ref=e2750]:
+                    - generic [ref=e2751]:
+                      - button "调整" [ref=e2752] [cursor=pointer]:
+                        - generic [ref=e2753]: 调整
+                      - button "接受" [ref=e2754] [cursor=pointer]:
+                        - generic [ref=e2755]: 接受
+                - row "PMP-F1-10 F1水泵10号 暖通 50 kW 0% 17% 变更 0.0 kW → 8.5 低 调整 接受" [ref=e2756]:
+                  - cell "PMP-F1-10" [ref=e2757]:
+                    - generic [ref=e2758]: PMP-F1-10
+                  - cell "F1水泵10号" [ref=e2759]:
+                    - generic [ref=e2762] [cursor=pointer]: F1水泵10号
+                  - cell "暖通" [ref=e2763]:
+                    - generic [ref=e2764]: 暖通
+                  - cell "50 kW" [ref=e2765]:
+                    - generic [ref=e2766]: 50 kW
+                  - cell "0%" [ref=e2767]:
+                    - generic [ref=e2768]: 0%
+                  - cell "17% 变更" [ref=e2769]:
+                    - generic [ref=e2770]:
+                      - text: 17%
+                      - generic [ref=e2772]: 变更
+                  - cell "0.0 kW → 8.5" [ref=e2773]:
+                    - generic [ref=e2774]: 0.0 kW → 8.5
+                  - cell "低" [ref=e2775]:
+                    - generic [ref=e2778]: 低
+                  - cell "调整 接受" [ref=e2779]:
+                    - generic [ref=e2780]:
+                      - button "调整" [ref=e2781] [cursor=pointer]:
+                        - generic [ref=e2782]: 调整
+                      - button "接受" [ref=e2783] [cursor=pointer]:
+                        - generic [ref=e2784]: 接受
+                - row "PMP-F1-11 F1水泵11号 暖通 50 kW 0% 17% 变更 0.0 kW → 8.5 低 调整 接受" [ref=e2785]:
+                  - cell "PMP-F1-11" [ref=e2786]:
+                    - generic [ref=e2787]: PMP-F1-11
+                  - cell "F1水泵11号" [ref=e2788]:
+                    - generic [ref=e2791] [cursor=pointer]: F1水泵11号
+                  - cell "暖通" [ref=e2792]:
+                    - generic [ref=e2793]: 暖通
+                  - cell "50 kW" [ref=e2794]:
+                    - generic [ref=e2795]: 50 kW
+                  - cell "0%" [ref=e2796]:
+                    - generic [ref=e2797]: 0%
+                  - cell "17% 变更" [ref=e2798]:
+                    - generic [ref=e2799]:
+                      - text: 17%
+                      - generic [ref=e2801]: 变更
+                  - cell "0.0 kW → 8.5" [ref=e2802]:
+                    - generic [ref=e2803]: 0.0 kW → 8.5
+                  - cell "低" [ref=e2804]:
+                    - generic [ref=e2807]: 低
+                  - cell "调整 接受" [ref=e2808]:
+                    - generic [ref=e2809]:
+                      - button "调整" [ref=e2810] [cursor=pointer]:
+                        - generic [ref=e2811]: 调整
+                      - button "接受" [ref=e2812] [cursor=pointer]:
+                        - generic [ref=e2813]: 接受
+                - row "PMP-F1-12 F1水泵12号 暖通 50 kW 0% 17% 变更 0.0 kW → 8.5 低 调整 接受" [ref=e2814]:
+                  - cell "PMP-F1-12" [ref=e2815]:
+                    - generic [ref=e2816]: PMP-F1-12
+                  - cell "F1水泵12号" [ref=e2817]:
+                    - generic [ref=e2820] [cursor=pointer]: F1水泵12号
+                  - cell "暖通" [ref=e2821]:
+                    - generic [ref=e2822]: 暖通
+                  - cell "50 kW" [ref=e2823]:
+                    - generic [ref=e2824]: 50 kW
+                  - cell "0%" [ref=e2825]:
+                    - generic [ref=e2826]: 0%
+                  - cell "17% 变更" [ref=e2827]:
+                    - generic [ref=e2828]:
+                      - text: 17%
+                      - generic [ref=e2830]: 变更
+                  - cell "0.0 kW → 8.5" [ref=e2831]:
+                    - generic [ref=e2832]: 0.0 kW → 8.5
+                  - cell "低" [ref=e2833]:
+                    - generic [ref=e2836]: 低
+                  - cell "调整 接受" [ref=e2837]:
+                    - generic [ref=e2838]:
+                      - button "调整" [ref=e2839] [cursor=pointer]:
+                        - generic [ref=e2840]: 调整
+                      - button "接受" [ref=e2841] [cursor=pointer]:
+                        - generic [ref=e2842]: 接受
+                - row "NET-001 网络机柜1 IT 10 kW 0% 0% 0.0 kW 低 调整" [ref=e2843]:
+                  - cell "NET-001" [ref=e2844]:
+                    - generic [ref=e2845]: NET-001
+                  - cell "网络机柜1" [ref=e2846]:
+                    - generic [ref=e2849] [cursor=pointer]: 网络机柜1
+                  - cell "IT" [ref=e2850]:
+                    - generic [ref=e2851]: IT
+                  - cell "10 kW" [ref=e2852]:
+                    - generic [ref=e2853]: 10 kW
+                  - cell "0%" [ref=e2854]:
+                    - generic [ref=e2855]: 0%
+                  - cell "0%" [ref=e2856]:
+                    - generic [ref=e2857]: 0%
+                  - cell "0.0 kW" [ref=e2858]:
+                    - generic [ref=e2859]: 0.0 kW
+                  - cell "低" [ref=e2860]:
+                    - generic [ref=e2863]: 低
+                  - cell "调整" [ref=e2864]:
+                    - button "调整" [ref=e2866] [cursor=pointer]:
+                      - generic [ref=e2867]: 调整
+                - row "SRV-001 服务器机柜1 IT 20 kW 0% 0% 0.0 kW 低 调整" [ref=e2868]:
+                  - cell "SRV-001" [ref=e2869]:
+                    - generic [ref=e2870]: SRV-001
+                  - cell "服务器机柜1" [ref=e2871]:
+                    - generic [ref=e2874] [cursor=pointer]: 服务器机柜1
+                  - cell "IT" [ref=e2875]:
+                    - generic [ref=e2876]: IT
+                  - cell "20 kW" [ref=e2877]:
+                    - generic [ref=e2878]: 20 kW
+                  - cell "0%" [ref=e2879]:
+                    - generic [ref=e2880]: 0%
+                  - cell "0%" [ref=e2881]:
+                    - generic [ref=e2882]: 0%
+                  - cell "0.0 kW" [ref=e2883]:
+                    - generic [ref=e2884]: 0.0 kW
+                  - cell "低" [ref=e2885]:
+                    - generic [ref=e2888]: 低
+                  - cell "调整" [ref=e2889]:
+                    - button "调整" [ref=e2891] [cursor=pointer]:
+                      - generic [ref=e2892]: 调整
+                - row "SRV-002 服务器机柜2 IT 20 kW 0% 0% 0.0 kW 低 调整" [ref=e2893]:
+                  - cell "SRV-002" [ref=e2894]:
+                    - generic [ref=e2895]: SRV-002
+                  - cell "服务器机柜2" [ref=e2896]:
+                    - generic [ref=e2899] [cursor=pointer]: 服务器机柜2
+                  - cell "IT" [ref=e2900]:
+                    - generic [ref=e2901]: IT
+                  - cell "20 kW" [ref=e2902]:
+                    - generic [ref=e2903]: 20 kW
+                  - cell "0%" [ref=e2904]:
+                    - generic [ref=e2905]: 0%
+                  - cell "0%" [ref=e2906]:
+                    - generic [ref=e2907]: 0%
+                  - cell "0.0 kW" [ref=e2908]:
+                    - generic [ref=e2909]: 0.0 kW
+                  - cell "低" [ref=e2910]:
+                    - generic [ref=e2913]: 低
+                  - cell "调整" [ref=e2914]:
+                    - button "调整" [ref=e2916] [cursor=pointer]:
+                      - generic [ref=e2917]: 调整
+                - row "SRV-003 服务器机柜3 IT 25 kW 0% 0% 0.0 kW 低 调整" [ref=e2918]:
+                  - cell "SRV-003" [ref=e2919]:
+                    - generic [ref=e2920]: SRV-003
+                  - cell "服务器机柜3" [ref=e2921]:
+                    - generic [ref=e2924] [cursor=pointer]: 服务器机柜3
+                  - cell "IT" [ref=e2925]:
+                    - generic [ref=e2926]: IT
+                  - cell "25 kW" [ref=e2927]:
+                    - generic [ref=e2928]: 25 kW
+                  - cell "0%" [ref=e2929]:
+                    - generic [ref=e2930]: 0%
+                  - cell "0%" [ref=e2931]:
+                    - generic [ref=e2932]: 0%
+                  - cell "0.0 kW" [ref=e2933]:
+                    - generic [ref=e2934]: 0.0 kW
+                  - cell "低" [ref=e2935]:
+                    - generic [ref=e2938]: 低
+                  - cell "调整" [ref=e2939]:
+                    - button "调整" [ref=e2941] [cursor=pointer]:
+                      - generic [ref=e2942]: 调整
+                - row "SRV-004 服务器机柜4 IT 25 kW 0% 0% 0.0 kW 低 调整" [ref=e2943]:
+                  - cell "SRV-004" [ref=e2944]:
+                    - generic [ref=e2945]: SRV-004
+                  - cell "服务器机柜4" [ref=e2946]:
+                    - generic [ref=e2949] [cursor=pointer]: 服务器机柜4
+                  - cell "IT" [ref=e2950]:
+                    - generic [ref=e2951]: IT
+                  - cell "25 kW" [ref=e2952]:
+                    - generic [ref=e2953]: 25 kW
+                  - cell "0%" [ref=e2954]:
+                    - generic [ref=e2955]: 0%
+                  - cell "0%" [ref=e2956]:
+                    - generic [ref=e2957]: 0%
+                  - cell "0.0 kW" [ref=e2958]:
+                    - generic [ref=e2959]: 0.0 kW
+                  - cell "低" [ref=e2960]:
+                    - generic [ref=e2963]: 低
+                  - cell "调整" [ref=e2964]:
+                    - button "调整" [ref=e2966] [cursor=pointer]:
+                      - generic [ref=e2967]: 调整
+                - row "STO-001 存储机柜1 IT 30 kW 0% 0% 0.0 kW 低 调整" [ref=e2968]:
+                  - cell "STO-001" [ref=e2969]:
+                    - generic [ref=e2970]: STO-001
+                  - cell "存储机柜1" [ref=e2971]:
+                    - generic [ref=e2974] [cursor=pointer]: 存储机柜1
+                  - cell "IT" [ref=e2975]:
+                    - generic [ref=e2976]: IT
+                  - cell "30 kW" [ref=e2977]:
+                    - generic [ref=e2978]: 30 kW
+                  - cell "0%" [ref=e2979]:
+                    - generic [ref=e2980]: 0%
+                  - cell "0%" [ref=e2981]:
+                    - generic [ref=e2982]: 0%
+                  - cell "0.0 kW" [ref=e2983]:
+                    - generic [ref=e2984]: 0.0 kW
+                  - cell "低" [ref=e2985]:
+                    - generic [ref=e2988]: 低
+                  - cell "调整" [ref=e2989]:
+                    - button "调整" [ref=e2991] [cursor=pointer]:
+                      - generic [ref=e2992]: 调整
+                - row "LIGHT-001 机房照明 LIGHT 5 kW 0% 0% 0.0 kW 低 调整" [ref=e2993]:
+                  - cell "LIGHT-001" [ref=e2994]:
+                    - generic [ref=e2995]: LIGHT-001
+                  - cell "机房照明" [ref=e2996]:
+                    - generic [ref=e2999] [cursor=pointer]: 机房照明
+                  - cell "LIGHT" [ref=e3000]:
+                    - generic [ref=e3001]: LIGHT
+                  - cell "5 kW" [ref=e3002]:
+                    - generic [ref=e3003]: 5 kW
+                  - cell "0%" [ref=e3004]:
+                    - generic [ref=e3005]: 0%
+                  - cell "0%" [ref=e3006]:
+                    - generic [ref=e3007]: 0%
+                  - cell "0.0 kW" [ref=e3008]:
+                    - generic [ref=e3009]: 0.0 kW
+                  - cell "低" [ref=e3010]:
+                    - generic [ref=e3013]: 低
+                  - cell "调整" [ref=e3014]:
+                    - button "调整" [ref=e3016] [cursor=pointer]:
+                      - generic [ref=e3017]: 调整
+                - row "PDU-F2-01 F2列头柜1号 PDU 22 kW 0% 10% 变更 0.0 kW → 2.2 低 调整 接受" [ref=e3018]:
+                  - cell "PDU-F2-01" [ref=e3019]:
+                    - generic [ref=e3020]: PDU-F2-01
+                  - cell "F2列头柜1号" [ref=e3021]:
+                    - generic [ref=e3024] [cursor=pointer]: F2列头柜1号
+                  - cell "PDU" [ref=e3025]:
+                    - generic [ref=e3026]: PDU
+                  - cell "22 kW" [ref=e3027]:
+                    - generic [ref=e3028]: 22 kW
+                  - cell "0%" [ref=e3029]:
+                    - generic [ref=e3030]: 0%
+                  - cell "10% 变更" [ref=e3031]:
+                    - generic [ref=e3032]:
+                      - text: 10%
+                      - generic [ref=e3034]: 变更
+                  - cell "0.0 kW → 2.2" [ref=e3035]:
+                    - generic [ref=e3036]: 0.0 kW → 2.2
+                  - cell "低" [ref=e3037]:
+                    - generic [ref=e3040]: 低
+                  - cell "调整 接受" [ref=e3041]:
+                    - generic [ref=e3042]:
+                      - button "调整" [ref=e3043] [cursor=pointer]:
+                        - generic [ref=e3044]: 调整
+                      - button "接受" [ref=e3045] [cursor=pointer]:
+                        - generic [ref=e3046]: 接受
+                - row "PDU-F2-02 F2列头柜2号 PDU 22 kW 0% 10% 变更 0.0 kW → 2.2 低 调整 接受" [ref=e3047]:
+                  - cell "PDU-F2-02" [ref=e3048]:
+                    - generic [ref=e3049]: PDU-F2-02
+                  - cell "F2列头柜2号" [ref=e3050]:
+                    - generic [ref=e3053] [cursor=pointer]: F2列头柜2号
+                  - cell "PDU" [ref=e3054]:
+                    - generic [ref=e3055]: PDU
+                  - cell "22 kW" [ref=e3056]:
+                    - generic [ref=e3057]: 22 kW
+                  - cell "0%" [ref=e3058]:
+                    - generic [ref=e3059]: 0%
+                  - cell "10% 变更" [ref=e3060]:
+                    - generic [ref=e3061]:
+                      - text: 10%
+                      - generic [ref=e3063]: 变更
+                  - cell "0.0 kW → 2.2" [ref=e3064]:
+                    - generic [ref=e3065]: 0.0 kW → 2.2
+                  - cell "低" [ref=e3066]:
+                    - generic [ref=e3069]: 低
+                  - cell "调整 接受" [ref=e3070]:
+                    - generic [ref=e3071]:
+                      - button "调整" [ref=e3072] [cursor=pointer]:
+                        - generic [ref=e3073]: 调整
+                      - button "接受" [ref=e3074] [cursor=pointer]:
+                        - generic [ref=e3075]: 接受
+                - row "PDU-F2-03 F2列头柜3号 PDU 22 kW 0% 10% 变更 0.0 kW → 2.2 低 调整 接受" [ref=e3076]:
+                  - cell "PDU-F2-03" [ref=e3077]:
+                    - generic [ref=e3078]: PDU-F2-03
+                  - cell "F2列头柜3号" [ref=e3079]:
+                    - generic [ref=e3082] [cursor=pointer]: F2列头柜3号
+                  - cell "PDU" [ref=e3083]:
+                    - generic [ref=e3084]: PDU
+                  - cell "22 kW" [ref=e3085]:
+                    - generic [ref=e3086]: 22 kW
+                  - cell "0%" [ref=e3087]:
+                    - generic [ref=e3088]: 0%
+                  - cell "10% 变更" [ref=e3089]:
+                    - generic [ref=e3090]:
+                      - text: 10%
+                      - generic [ref=e3092]: 变更
+                  - cell "0.0 kW → 2.2" [ref=e3093]:
+                    - generic [ref=e3094]: 0.0 kW → 2.2
+                  - cell "低" [ref=e3095]:
+                    - generic [ref=e3098]: 低
+                  - cell "调整 接受" [ref=e3099]:
+                    - generic [ref=e3100]:
+                      - button "调整" [ref=e3101] [cursor=pointer]:
+                        - generic [ref=e3102]: 调整
+                      - button "接受" [ref=e3103] [cursor=pointer]:
+                        - generic [ref=e3104]: 接受
+                - row "PDU-F2-04 F2列头柜4号 PDU 22 kW 0% 10% 变更 0.0 kW → 2.2 低 调整 接受" [ref=e3105]:
+                  - cell "PDU-F2-04" [ref=e3106]:
+                    - generic [ref=e3107]: PDU-F2-04
+                  - cell "F2列头柜4号" [ref=e3108]:
+                    - generic [ref=e3111] [cursor=pointer]: F2列头柜4号
+                  - cell "PDU" [ref=e3112]:
+                    - generic [ref=e3113]: PDU
+                  - cell "22 kW" [ref=e3114]:
+                    - generic [ref=e3115]: 22 kW
+                  - cell "0%" [ref=e3116]:
+                    - generic [ref=e3117]: 0%
+                  - cell "10% 变更" [ref=e3118]:
+                    - generic [ref=e3119]:
+                      - text: 10%
+                      - generic [ref=e3121]: 变更
+                  - cell "0.0 kW → 2.2" [ref=e3122]:
+                    - generic [ref=e3123]: 0.0 kW → 2.2
+                  - cell "低" [ref=e3124]:
+                    - generic [ref=e3127]: 低
+                  - cell "调整 接受" [ref=e3128]:
+                    - generic [ref=e3129]:
+                      - button "调整" [ref=e3130] [cursor=pointer]:
+                        - generic [ref=e3131]: 调整
+                      - button "接受" [ref=e3132] [cursor=pointer]:
+                        - generic [ref=e3133]: 接受
+                - row "PDU-F2-05 F2列头柜5号 PDU 22 kW 0% 10% 变更 0.0 kW → 2.2 低 调整 接受" [ref=e3134]:
+                  - cell "PDU-F2-05" [ref=e3135]:
+                    - generic [ref=e3136]: PDU-F2-05
+                  - cell "F2列头柜5号" [ref=e3137]:
+                    - generic [ref=e3140] [cursor=pointer]: F2列头柜5号
+                  - cell "PDU" [ref=e3141]:
+                    - generic [ref=e3142]: PDU
+                  - cell "22 kW" [ref=e3143]:
+                    - generic [ref=e3144]: 22 kW
+                  - cell "0%" [ref=e3145]:
+                    - generic [ref=e3146]: 0%
+                  - cell "10% 变更" [ref=e3147]:
+                    - generic [ref=e3148]:
+                      - text: 10%
+                      - generic [ref=e3150]: 变更
+                  - cell "0.0 kW → 2.2" [ref=e3151]:
+                    - generic [ref=e3152]: 0.0 kW → 2.2
+                  - cell "低" [ref=e3153]:
+                    - generic [ref=e3156]: 低
+                  - cell "调整 接受" [ref=e3157]:
+                    - generic [ref=e3158]:
+                      - button "调整" [ref=e3159] [cursor=pointer]:
+                        - generic [ref=e3160]: 调整
+                      - button "接受" [ref=e3161] [cursor=pointer]:
+                        - generic [ref=e3162]: 接受
+                - row "PDU-F2-06 F2列头柜6号 PDU 22 kW 0% 10% 变更 0.0 kW → 2.2 低 调整 接受" [ref=e3163]:
+                  - cell "PDU-F2-06" [ref=e3164]:
+                    - generic [ref=e3165]: PDU-F2-06
+                  - cell "F2列头柜6号" [ref=e3166]:
+                    - generic [ref=e3169] [cursor=pointer]: F2列头柜6号
+                  - cell "PDU" [ref=e3170]:
+                    - generic [ref=e3171]: PDU
+                  - cell "22 kW" [ref=e3172]:
+                    - generic [ref=e3173]: 22 kW
+                  - cell "0%" [ref=e3174]:
+                    - generic [ref=e3175]: 0%
+                  - cell "10% 变更" [ref=e3176]:
+                    - generic [ref=e3177]:
+                      - text: 10%
+                      - generic [ref=e3179]: 变更
+                  - cell "0.0 kW → 2.2" [ref=e3180]:
+                    - generic [ref=e3181]: 0.0 kW → 2.2
+                  - cell "低" [ref=e3182]:
+                    - generic [ref=e3185]: 低
+                  - cell "调整 接受" [ref=e3186]:
+                    - generic [ref=e3187]:
+                      - button "调整" [ref=e3188] [cursor=pointer]:
+                        - generic [ref=e3189]: 调整
+                      - button "接受" [ref=e3190] [cursor=pointer]:
+                        - generic [ref=e3191]: 接受
+                - row "PDU-F2-07 F2列头柜7号 PDU 22 kW 0% 10% 变更 0.0 kW → 2.2 低 调整 接受" [ref=e3192]:
+                  - cell "PDU-F2-07" [ref=e3193]:
+                    - generic [ref=e3194]: PDU-F2-07
+                  - cell "F2列头柜7号" [ref=e3195]:
+                    - generic [ref=e3198] [cursor=pointer]: F2列头柜7号
+                  - cell "PDU" [ref=e3199]:
+                    - generic [ref=e3200]: PDU
+                  - cell "22 kW" [ref=e3201]:
+                    - generic [ref=e3202]: 22 kW
+                  - cell "0%" [ref=e3203]:
+                    - generic [ref=e3204]: 0%
+                  - cell "10% 变更" [ref=e3205]:
+                    - generic [ref=e3206]:
+                      - text: 10%
+                      - generic [ref=e3208]: 变更
+                  - cell "0.0 kW → 2.2" [ref=e3209]:
+                    - generic [ref=e3210]: 0.0 kW → 2.2
+                  - cell "低" [ref=e3211]:
+                    - generic [ref=e3214]: 低
+                  - cell "调整 接受" [ref=e3215]:
+                    - generic [ref=e3216]:
+                      - button "调整" [ref=e3217] [cursor=pointer]:
+                        - generic [ref=e3218]: 调整
+                      - button "接受" [ref=e3219] [cursor=pointer]:
+                        - generic [ref=e3220]: 接受
+                - row "PDU-F2-08 F2列头柜8号 PDU 22 kW 0% 10% 变更 0.0 kW → 2.2 低 调整 接受" [ref=e3221]:
+                  - cell "PDU-F2-08" [ref=e3222]:
+                    - generic [ref=e3223]: PDU-F2-08
+                  - cell "F2列头柜8号" [ref=e3224]:
+                    - generic [ref=e3227] [cursor=pointer]: F2列头柜8号
+                  - cell "PDU" [ref=e3228]:
+                    - generic [ref=e3229]: PDU
+                  - cell "22 kW" [ref=e3230]:
+                    - generic [ref=e3231]: 22 kW
+                  - cell "0%" [ref=e3232]:
+                    - generic [ref=e3233]: 0%
+                  - cell "10% 变更" [ref=e3234]:
+                    - generic [ref=e3235]:
+                      - text: 10%
+                      - generic [ref=e3237]: 变更
+                  - cell "0.0 kW → 2.2" [ref=e3238]:
+                    - generic [ref=e3239]: 0.0 kW → 2.2
+                  - cell "低" [ref=e3240]:
+                    - generic [ref=e3243]: 低
+                  - cell "调整 接受" [ref=e3244]:
+                    - generic [ref=e3245]:
+                      - button "调整" [ref=e3246] [cursor=pointer]:
+                        - generic [ref=e3247]: 调整
+                      - button "接受" [ref=e3248] [cursor=pointer]:
+                        - generic [ref=e3249]: 接受
+                - row "PDU-F2-09 F2列头柜9号 PDU 22 kW 0% 10% 变更 0.0 kW → 2.2 低 调整 接受" [ref=e3250]:
+                  - cell "PDU-F2-09" [ref=e3251]:
+                    - generic [ref=e3252]: PDU-F2-09
+                  - cell "F2列头柜9号" [ref=e3253]:
+                    - generic [ref=e3256] [cursor=pointer]: F2列头柜9号
+                  - cell "PDU" [ref=e3257]:
+                    - generic [ref=e3258]: PDU
+                  - cell "22 kW" [ref=e3259]:
+                    - generic [ref=e3260]: 22 kW
+                  - cell "0%" [ref=e3261]:
+                    - generic [ref=e3262]: 0%
+                  - cell "10% 变更" [ref=e3263]:
+                    - generic [ref=e3264]:
+                      - text: 10%
+                      - generic [ref=e3266]: 变更
+                  - cell "0.0 kW → 2.2" [ref=e3267]:
+                    - generic [ref=e3268]: 0.0 kW → 2.2
+                  - cell "低" [ref=e3269]:
+                    - generic [ref=e3272]: 低
+                  - cell "调整 接受" [ref=e3273]:
+                    - generic [ref=e3274]:
+                      - button "调整" [ref=e3275] [cursor=pointer]:
+                        - generic [ref=e3276]: 调整
+                      - button "接受" [ref=e3277] [cursor=pointer]:
+                        - generic [ref=e3278]: 接受
+                - row "PDU-F2-10 F2列头柜10号 PDU 22 kW 0% 10% 变更 0.0 kW → 2.2 低 调整 接受" [ref=e3279]:
+                  - cell "PDU-F2-10" [ref=e3280]:
+                    - generic [ref=e3281]: PDU-F2-10
+                  - cell "F2列头柜10号" [ref=e3282]:
+                    - generic [ref=e3285] [cursor=pointer]: F2列头柜10号
+                  - cell "PDU" [ref=e3286]:
+                    - generic [ref=e3287]: PDU
+                  - cell "22 kW" [ref=e3288]:
+                    - generic [ref=e3289]: 22 kW
+                  - cell "0%" [ref=e3290]:
+                    - generic [ref=e3291]: 0%
+                  - cell "10% 变更" [ref=e3292]:
+                    - generic [ref=e3293]:
+                      - text: 10%
+                      - generic [ref=e3295]: 变更
+                  - cell "0.0 kW → 2.2" [ref=e3296]:
+                    - generic [ref=e3297]: 0.0 kW → 2.2
+                  - cell "低" [ref=e3298]:
+                    - generic [ref=e3301]: 低
+                  - cell "调整 接受" [ref=e3302]:
+                    - generic [ref=e3303]:
+                      - button "调整" [ref=e3304] [cursor=pointer]:
+                        - generic [ref=e3305]: 调整
+                      - button "接受" [ref=e3306] [cursor=pointer]:
+                        - generic [ref=e3307]: 接受
+                - row "PDU-F2-11 F2列头柜11号 PDU 22 kW 0% 10% 变更 0.0 kW → 2.2 低 调整 接受" [ref=e3308]:
+                  - cell "PDU-F2-11" [ref=e3309]:
+                    - generic [ref=e3310]: PDU-F2-11
+                  - cell "F2列头柜11号" [ref=e3311]:
+                    - generic [ref=e3314] [cursor=pointer]: F2列头柜11号
+                  - cell "PDU" [ref=e3315]:
+                    - generic [ref=e3316]: PDU
+                  - cell "22 kW" [ref=e3317]:
+                    - generic [ref=e3318]: 22 kW
+                  - cell "0%" [ref=e3319]:
+                    - generic [ref=e3320]: 0%
+                  - cell "10% 变更" [ref=e3321]:
+                    - generic [ref=e3322]:
+                      - text: 10%
+                      - generic [ref=e3324]: 变更
+                  - cell "0.0 kW → 2.2" [ref=e3325]:
+                    - generic [ref=e3326]: 0.0 kW → 2.2
+                  - cell "低" [ref=e3327]:
+                    - generic [ref=e3330]: 低
+                  - cell "调整 接受" [ref=e3331]:
+                    - generic [ref=e3332]:
+                      - button "调整" [ref=e3333] [cursor=pointer]:
+                        - generic [ref=e3334]: 调整
+                      - button "接受" [ref=e3335] [cursor=pointer]:
+                        - generic [ref=e3336]: 接受
+                - row "PDU-F2-12 F2列头柜12号 PDU 22 kW 0% 10% 变更 0.0 kW → 2.2 低 调整 接受" [ref=e3337]:
+                  - cell "PDU-F2-12" [ref=e3338]:
+                    - generic [ref=e3339]: PDU-F2-12
+                  - cell "F2列头柜12号" [ref=e3340]:
+                    - generic [ref=e3343] [cursor=pointer]: F2列头柜12号
+                  - cell "PDU" [ref=e3344]:
+                    - generic [ref=e3345]: PDU
+                  - cell "22 kW" [ref=e3346]:
+                    - generic [ref=e3347]: 22 kW
+                  - cell "0%" [ref=e3348]:
+                    - generic [ref=e3349]: 0%
+                  - cell "10% 变更" [ref=e3350]:
+                    - generic [ref=e3351]:
+                      - text: 10%
+                      - generic [ref=e3353]: 变更
+                  - cell "0.0 kW → 2.2" [ref=e3354]:
+                    - generic [ref=e3355]: 0.0 kW → 2.2
+                  - cell "低" [ref=e3356]:
+                    - generic [ref=e3359]: 低
+                  - cell "调整 接受" [ref=e3360]:
+                    - generic [ref=e3361]:
+                      - button "调整" [ref=e3362] [cursor=pointer]:
+                        - generic [ref=e3363]: 调整
+                      - button "接受" [ref=e3364] [cursor=pointer]:
+                        - generic [ref=e3365]: 接受
+                - row "PDU-F2-13 F2列头柜13号 PDU 22 kW 0% 10% 变更 0.0 kW → 2.2 低 调整 接受" [ref=e3366]:
+                  - cell "PDU-F2-13" [ref=e3367]:
+                    - generic [ref=e3368]: PDU-F2-13
+                  - cell "F2列头柜13号" [ref=e3369]:
+                    - generic [ref=e3372] [cursor=pointer]: F2列头柜13号
+                  - cell "PDU" [ref=e3373]:
+                    - generic [ref=e3374]: PDU
+                  - cell "22 kW" [ref=e3375]:
+                    - generic [ref=e3376]: 22 kW
+                  - cell "0%" [ref=e3377]:
+                    - generic [ref=e3378]: 0%
+                  - cell "10% 变更" [ref=e3379]:
+                    - generic [ref=e3380]:
+                      - text: 10%
+                      - generic [ref=e3382]: 变更
+                  - cell "0.0 kW → 2.2" [ref=e3383]:
+                    - generic [ref=e3384]: 0.0 kW → 2.2
+                  - cell "低" [ref=e3385]:
+                    - generic [ref=e3388]: 低
+                  - cell "调整 接受" [ref=e3389]:
+                    - generic [ref=e3390]:
+                      - button "调整" [ref=e3391] [cursor=pointer]:
+                        - generic [ref=e3392]: 调整
+                      - button "接受" [ref=e3393] [cursor=pointer]:
+                        - generic [ref=e3394]: 接受
+                - row "PDU-F2-14 F2列头柜14号 PDU 22 kW 0% 10% 变更 0.0 kW → 2.2 低 调整 接受" [ref=e3395]:
+                  - cell "PDU-F2-14" [ref=e3396]:
+                    - generic [ref=e3397]: PDU-F2-14
+                  - cell "F2列头柜14号" [ref=e3398]:
+                    - generic [ref=e3401] [cursor=pointer]: F2列头柜14号
+                  - cell "PDU" [ref=e3402]:
+                    - generic [ref=e3403]: PDU
+                  - cell "22 kW" [ref=e3404]:
+                    - generic [ref=e3405]: 22 kW
+                  - cell "0%" [ref=e3406]:
+                    - generic [ref=e3407]: 0%
+                  - cell "10% 变更" [ref=e3408]:
+                    - generic [ref=e3409]:
+                      - text: 10%
+                      - generic [ref=e3411]: 变更
+                  - cell "0.0 kW → 2.2" [ref=e3412]:
+                    - generic [ref=e3413]: 0.0 kW → 2.2
+                  - cell "低" [ref=e3414]:
+                    - generic [ref=e3417]: 低
+                  - cell "调整 接受" [ref=e3418]:
+                    - generic [ref=e3419]:
+                      - button "调整" [ref=e3420] [cursor=pointer]:
+                        - generic [ref=e3421]: 调整
+                      - button "接受" [ref=e3422] [cursor=pointer]:
+                        - generic [ref=e3423]: 接受
+                - row "PDU-F2-15 F2列头柜15号 PDU 22 kW 0% 10% 变更 0.0 kW → 2.2 低 调整 接受" [ref=e3424]:
+                  - cell "PDU-F2-15" [ref=e3425]:
+                    - generic [ref=e3426]: PDU-F2-15
+                  - cell "F2列头柜15号" [ref=e3427]:
+                    - generic [ref=e3430] [cursor=pointer]: F2列头柜15号
+                  - cell "PDU" [ref=e3431]:
+                    - generic [ref=e3432]: PDU
+                  - cell "22 kW" [ref=e3433]:
+                    - generic [ref=e3434]: 22 kW
+                  - cell "0%" [ref=e3435]:
+                    - generic [ref=e3436]: 0%
+                  - cell "10% 变更" [ref=e3437]:
+                    - generic [ref=e3438]:
+                      - text: 10%
+                      - generic [ref=e3440]: 变更
+                  - cell "0.0 kW → 2.2" [ref=e3441]:
+                    - generic [ref=e3442]: 0.0 kW → 2.2
+                  - cell "低" [ref=e3443]:
+                    - generic [ref=e3446]: 低
+                  - cell "调整 接受" [ref=e3447]:
+                    - generic [ref=e3448]:
+                      - button "调整" [ref=e3449] [cursor=pointer]:
+                        - generic [ref=e3450]: 调整
+                      - button "接受" [ref=e3451] [cursor=pointer]:
+                        - generic [ref=e3452]: 接受
+                - row "PDU-F2-16 F2列头柜16号 PDU 22 kW 0% 10% 变更 0.0 kW → 2.2 低 调整 接受" [ref=e3453]:
+                  - cell "PDU-F2-16" [ref=e3454]:
+                    - generic [ref=e3455]: PDU-F2-16
+                  - cell "F2列头柜16号" [ref=e3456]:
+                    - generic [ref=e3459] [cursor=pointer]: F2列头柜16号
+                  - cell "PDU" [ref=e3460]:
+                    - generic [ref=e3461]: PDU
+                  - cell "22 kW" [ref=e3462]:
+                    - generic [ref=e3463]: 22 kW
+                  - cell "0%" [ref=e3464]:
+                    - generic [ref=e3465]: 0%
+                  - cell "10% 变更" [ref=e3466]:
+                    - generic [ref=e3467]:
+                      - text: 10%
+                      - generic [ref=e3469]: 变更
+                  - cell "0.0 kW → 2.2" [ref=e3470]:
+                    - generic [ref=e3471]: 0.0 kW → 2.2
+                  - cell "低" [ref=e3472]:
+                    - generic [ref=e3475]: 低
+                  - cell "调整 接受" [ref=e3476]:
+                    - generic [ref=e3477]:
+                      - button "调整" [ref=e3478] [cursor=pointer]:
+                        - generic [ref=e3479]: 调整
+                      - button "接受" [ref=e3480] [cursor=pointer]:
+                        - generic [ref=e3481]: 接受
+                - row "PDU-F2-17 F2列头柜17号 PDU 22 kW 0% 10% 变更 0.0 kW → 2.2 低 调整 接受" [ref=e3482]:
+                  - cell "PDU-F2-17" [ref=e3483]:
+                    - generic [ref=e3484]: PDU-F2-17
+                  - cell "F2列头柜17号" [ref=e3485]:
+                    - generic [ref=e3488] [cursor=pointer]: F2列头柜17号
+                  - cell "PDU" [ref=e3489]:
+                    - generic [ref=e3490]: PDU
+                  - cell "22 kW" [ref=e3491]:
+                    - generic [ref=e3492]: 22 kW
+                  - cell "0%" [ref=e3493]:
+                    - generic [ref=e3494]: 0%
+                  - cell "10% 变更" [ref=e3495]:
+                    - generic [ref=e3496]:
+                      - text: 10%
+                      - generic [ref=e3498]: 变更
+                  - cell "0.0 kW → 2.2" [ref=e3499]:
+                    - generic [ref=e3500]: 0.0 kW → 2.2
+                  - cell "低" [ref=e3501]:
+                    - generic [ref=e3504]: 低
+                  - cell "调整 接受" [ref=e3505]:
+                    - generic [ref=e3506]:
+                      - button "调整" [ref=e3507] [cursor=pointer]:
+                        - generic [ref=e3508]: 调整
+                      - button "接受" [ref=e3509] [cursor=pointer]:
+                        - generic [ref=e3510]: 接受
+                - row "PDU-F2-18 F2列头柜18号 PDU 22 kW 0% 10% 变更 0.0 kW → 2.2 低 调整 接受" [ref=e3511]:
+                  - cell "PDU-F2-18" [ref=e3512]:
+                    - generic [ref=e3513]: PDU-F2-18
+                  - cell "F2列头柜18号" [ref=e3514]:
+                    - generic [ref=e3517] [cursor=pointer]: F2列头柜18号
+                  - cell "PDU" [ref=e3518]:
+                    - generic [ref=e3519]: PDU
+                  - cell "22 kW" [ref=e3520]:
+                    - generic [ref=e3521]: 22 kW
+                  - cell "0%" [ref=e3522]:
+                    - generic [ref=e3523]: 0%
+                  - cell "10% 变更" [ref=e3524]:
+                    - generic [ref=e3525]:
+                      - text: 10%
+                      - generic [ref=e3527]: 变更
+                  - cell "0.0 kW → 2.2" [ref=e3528]:
+                    - generic [ref=e3529]: 0.0 kW → 2.2
+                  - cell "低" [ref=e3530]:
+                    - generic [ref=e3533]: 低
+                  - cell "调整 接受" [ref=e3534]:
+                    - generic [ref=e3535]:
+                      - button "调整" [ref=e3536] [cursor=pointer]:
+                        - generic [ref=e3537]: 调整
+                      - button "接受" [ref=e3538] [cursor=pointer]:
+                        - generic [ref=e3539]: 接受
+                - row "PDU-F3-01 F3 列头柜1 PDU 22 kW 0% 10% 变更 0.0 kW → 2.2 低 调整 接受" [ref=e3540]:
+                  - cell "PDU-F3-01" [ref=e3541]:
+                    - generic [ref=e3542]: PDU-F3-01
+                  - cell "F3 列头柜1" [ref=e3543]:
+                    - generic [ref=e3546] [cursor=pointer]: F3 列头柜1
+                  - cell "PDU" [ref=e3547]:
+                    - generic [ref=e3548]: PDU
+                  - cell "22 kW" [ref=e3549]:
+                    - generic [ref=e3550]: 22 kW
+                  - cell "0%" [ref=e3551]:
+                    - generic [ref=e3552]: 0%
+                  - cell "10% 变更" [ref=e3553]:
+                    - generic [ref=e3554]:
+                      - text: 10%
+                      - generic [ref=e3556]: 变更
+                  - cell "0.0 kW → 2.2" [ref=e3557]:
+                    - generic [ref=e3558]: 0.0 kW → 2.2
+                  - cell "低" [ref=e3559]:
+                    - generic [ref=e3562]: 低
+                  - cell "调整 接受" [ref=e3563]:
+                    - generic [ref=e3564]:
+                      - button "调整" [ref=e3565] [cursor=pointer]:
+                        - generic [ref=e3566]: 调整
+                      - button "接受" [ref=e3567] [cursor=pointer]:
+                        - generic [ref=e3568]: 接受
+                - row "PDU-F3-02 F3 列头柜2 PDU 22 kW 0% 10% 变更 0.0 kW → 2.2 低 调整 接受" [ref=e3569]:
+                  - cell "PDU-F3-02" [ref=e3570]:
+                    - generic [ref=e3571]: PDU-F3-02
+                  - cell "F3 列头柜2" [ref=e3572]:
+                    - generic [ref=e3575] [cursor=pointer]: F3 列头柜2
+                  - cell "PDU" [ref=e3576]:
+                    - generic [ref=e3577]: PDU
+                  - cell "22 kW" [ref=e3578]:
+                    - generic [ref=e3579]: 22 kW
+                  - cell "0%" [ref=e3580]:
+                    - generic [ref=e3581]: 0%
+                  - cell "10% 变更" [ref=e3582]:
+                    - generic [ref=e3583]:
+                      - text: 10%
+                      - generic [ref=e3585]: 变更
+                  - cell "0.0 kW → 2.2" [ref=e3586]:
+                    - generic [ref=e3587]: 0.0 kW → 2.2
+                  - cell "低" [ref=e3588]:
+                    - generic [ref=e3591]: 低
+                  - cell "调整 接受" [ref=e3592]:
+                    - generic [ref=e3593]:
+                      - button "调整" [ref=e3594] [cursor=pointer]:
+                        - generic [ref=e3595]: 调整
+                      - button "接受" [ref=e3596] [cursor=pointer]:
+                        - generic [ref=e3597]: 接受
+                - row "PDU-F3-19 F3列头柜19号 PDU 22 kW 0% 10% 变更 0.0 kW → 2.2 低 调整 接受" [ref=e3598]:
+                  - cell "PDU-F3-19" [ref=e3599]:
+                    - generic [ref=e3600]: PDU-F3-19
+                  - cell "F3列头柜19号" [ref=e3601]:
+                    - generic [ref=e3604] [cursor=pointer]: F3列头柜19号
+                  - cell "PDU" [ref=e3605]:
+                    - generic [ref=e3606]: PDU
+                  - cell "22 kW" [ref=e3607]:
+                    - generic [ref=e3608]: 22 kW
+                  - cell "0%" [ref=e3609]:
+                    - generic [ref=e3610]: 0%
+                  - cell "10% 变更" [ref=e3611]:
+                    - generic [ref=e3612]:
+                      - text: 10%
+                      - generic [ref=e3614]: 变更
+                  - cell "0.0 kW → 2.2" [ref=e3615]:
+                    - generic [ref=e3616]: 0.0 kW → 2.2
+                  - cell "低" [ref=e3617]:
+                    - generic [ref=e3620]: 低
+                  - cell "调整 接受" [ref=e3621]:
+                    - generic [ref=e3622]:
+                      - button "调整" [ref=e3623] [cursor=pointer]:
+                        - generic [ref=e3624]: 调整
+                      - button "接受" [ref=e3625] [cursor=pointer]:
+                        - generic [ref=e3626]: 接受
+                - row "PDU-F3-20 F3列头柜20号 PDU 22 kW 0% 10% 变更 0.0 kW → 2.2 低 调整 接受" [ref=e3627]:
+                  - cell "PDU-F3-20" [ref=e3628]:
+                    - generic [ref=e3629]: PDU-F3-20
+                  - cell "F3列头柜20号" [ref=e3630]:
+                    - generic [ref=e3633] [cursor=pointer]: F3列头柜20号
+                  - cell "PDU" [ref=e3634]:
+                    - generic [ref=e3635]: PDU
+                  - cell "22 kW" [ref=e3636]:
+                    - generic [ref=e3637]: 22 kW
+                  - cell "0%" [ref=e3638]:
+                    - generic [ref=e3639]: 0%
+                  - cell "10% 变更" [ref=e3640]:
+                    - generic [ref=e3641]:
+                      - text: 10%
+                      - generic [ref=e3643]: 变更
+                  - cell "0.0 kW → 2.2" [ref=e3644]:
+                    - generic [ref=e3645]: 0.0 kW → 2.2
+                  - cell "低" [ref=e3646]:
+                    - generic [ref=e3649]: 低
+                  - cell "调整 接受" [ref=e3650]:
+                    - generic [ref=e3651]:
+                      - button "调整" [ref=e3652] [cursor=pointer]:
+                        - generic [ref=e3653]: 调整
+                      - button "接受" [ref=e3654] [cursor=pointer]:
+                        - generic [ref=e3655]: 接受
+                - row "PDU-F3-21 F3列头柜21号 PDU 22 kW 0% 10% 变更 0.0 kW → 2.2 低 调整 接受" [ref=e3656]:
+                  - cell "PDU-F3-21" [ref=e3657]:
+                    - generic [ref=e3658]: PDU-F3-21
+                  - cell "F3列头柜21号" [ref=e3659]:
+                    - generic [ref=e3662] [cursor=pointer]: F3列头柜21号
+                  - cell "PDU" [ref=e3663]:
+                    - generic [ref=e3664]: PDU
+                  - cell "22 kW" [ref=e3665]:
+                    - generic [ref=e3666]: 22 kW
+                  - cell "0%" [ref=e3667]:
+                    - generic [ref=e3668]: 0%
+                  - cell "10% 变更" [ref=e3669]:
+                    - generic [ref=e3670]:
+                      - text: 10%
+                      - generic [ref=e3672]: 变更
+                  - cell "0.0 kW → 2.2" [ref=e3673]:
+                    - generic [ref=e3674]: 0.0 kW → 2.2
+                  - cell "低" [ref=e3675]:
+                    - generic [ref=e3678]: 低
+                  - cell "调整 接受" [ref=e3679]:
+                    - generic [ref=e3680]:
+                      - button "调整" [ref=e3681] [cursor=pointer]:
+                        - generic [ref=e3682]: 调整
+                      - button "接受" [ref=e3683] [cursor=pointer]:
+                        - generic [ref=e3684]: 接受
+                - row "PDU-F3-22 F3列头柜22号 PDU 22 kW 0% 10% 变更 0.0 kW → 2.2 低 调整 接受" [ref=e3685]:
+                  - cell "PDU-F3-22" [ref=e3686]:
+                    - generic [ref=e3687]: PDU-F3-22
+                  - cell "F3列头柜22号" [ref=e3688]:
+                    - generic [ref=e3691] [cursor=pointer]: F3列头柜22号
+                  - cell "PDU" [ref=e3692]:
+                    - generic [ref=e3693]: PDU
+                  - cell "22 kW" [ref=e3694]:
+                    - generic [ref=e3695]: 22 kW
+                  - cell "0%" [ref=e3696]:
+                    - generic [ref=e3697]: 0%
+                  - cell "10% 变更" [ref=e3698]:
+                    - generic [ref=e3699]:
+                      - text: 10%
+                      - generic [ref=e3701]: 变更
+                  - cell "0.0 kW → 2.2" [ref=e3702]:
+                    - generic [ref=e3703]: 0.0 kW → 2.2
+                  - cell "低" [ref=e3704]:
+                    - generic [ref=e3707]: 低
+                  - cell "调整 接受" [ref=e3708]:
+                    - generic [ref=e3709]:
+                      - button "调整" [ref=e3710] [cursor=pointer]:
+                        - generic [ref=e3711]: 调整
+                      - button "接受" [ref=e3712] [cursor=pointer]:
+                        - generic [ref=e3713]: 接受
+                - row "PDU-F3-23 F3列头柜23号 PDU 22 kW 0% 10% 变更 0.0 kW → 2.2 低 调整 接受" [ref=e3714]:
+                  - cell "PDU-F3-23" [ref=e3715]:
+                    - generic [ref=e3716]: PDU-F3-23
+                  - cell "F3列头柜23号" [ref=e3717]:
+                    - generic [ref=e3720] [cursor=pointer]: F3列头柜23号
+                  - cell "PDU" [ref=e3721]:
+                    - generic [ref=e3722]: PDU
+                  - cell "22 kW" [ref=e3723]:
+                    - generic [ref=e3724]: 22 kW
+                  - cell "0%" [ref=e3725]:
+                    - generic [ref=e3726]: 0%
+                  - cell "10% 变更" [ref=e3727]:
+                    - generic [ref=e3728]:
+                      - text: 10%
+                      - generic [ref=e3730]: 变更
+                  - cell "0.0 kW → 2.2" [ref=e3731]:
+                    - generic [ref=e3732]: 0.0 kW → 2.2
+                  - cell "低" [ref=e3733]:
+                    - generic [ref=e3736]: 低
+                  - cell "调整 接受" [ref=e3737]:
+                    - generic [ref=e3738]:
+                      - button "调整" [ref=e3739] [cursor=pointer]:
+                        - generic [ref=e3740]: 调整
+                      - button "接受" [ref=e3741] [cursor=pointer]:
+                        - generic [ref=e3742]: 接受
+                - row "PDU-F3-24 F3列头柜24号 PDU 22 kW 0% 10% 变更 0.0 kW → 2.2 低 调整 接受" [ref=e3743]:
+                  - cell "PDU-F3-24" [ref=e3744]:
+                    - generic [ref=e3745]: PDU-F3-24
+                  - cell "F3列头柜24号" [ref=e3746]:
+                    - generic [ref=e3749] [cursor=pointer]: F3列头柜24号
+                  - cell "PDU" [ref=e3750]:
+                    - generic [ref=e3751]: PDU
+                  - cell "22 kW" [ref=e3752]:
+                    - generic [ref=e3753]: 22 kW
+                  - cell "0%" [ref=e3754]:
+                    - generic [ref=e3755]: 0%
+                  - cell "10% 变更" [ref=e3756]:
+                    - generic [ref=e3757]:
+                      - text: 10%
+                      - generic [ref=e3759]: 变更
+                  - cell "0.0 kW → 2.2" [ref=e3760]:
+                    - generic [ref=e3761]: 0.0 kW → 2.2
+                  - cell "低" [ref=e3762]:
+                    - generic [ref=e3765]: 低
+                  - cell "调整 接受" [ref=e3766]:
+                    - generic [ref=e3767]:
+                      - button "调整" [ref=e3768] [cursor=pointer]:
+                        - generic [ref=e3769]: 调整
+                      - button "接受" [ref=e3770] [cursor=pointer]:
+                        - generic [ref=e3771]: 接受
+                - row "PDU-F3-25 F3列头柜25号 PDU 22 kW 0% 10% 变更 0.0 kW → 2.2 低 调整 接受" [ref=e3772]:
+                  - cell "PDU-F3-25" [ref=e3773]:
+                    - generic [ref=e3774]: PDU-F3-25
+                  - cell "F3列头柜25号" [ref=e3775]:
+                    - generic [ref=e3778] [cursor=pointer]: F3列头柜25号
+                  - cell "PDU" [ref=e3779]:
+                    - generic [ref=e3780]: PDU
+                  - cell "22 kW" [ref=e3781]:
+                    - generic [ref=e3782]: 22 kW
+                  - cell "0%" [ref=e3783]:
+                    - generic [ref=e3784]: 0%
+                  - cell "10% 变更" [ref=e3785]:
+                    - generic [ref=e3786]:
+                      - text: 10%
+                      - generic [ref=e3788]: 变更
+                  - cell "0.0 kW → 2.2" [ref=e3789]:
+                    - generic [ref=e3790]: 0.0 kW → 2.2
+                  - cell "低" [ref=e3791]:
+                    - generic [ref=e3794]: 低
+                  - cell "调整 接受" [ref=e3795]:
+                    - generic [ref=e3796]:
+                      - button "调整" [ref=e3797] [cursor=pointer]:
+                        - generic [ref=e3798]: 调整
+                      - button "接受" [ref=e3799] [cursor=pointer]:
+                        - generic [ref=e3800]: 接受
+                - row "PDU-F3-26 F3列头柜26号 PDU 22 kW 0% 10% 变更 0.0 kW → 2.2 低 调整 接受" [ref=e3801]:
+                  - cell "PDU-F3-26" [ref=e3802]:
+                    - generic [ref=e3803]: PDU-F3-26
+                  - cell "F3列头柜26号" [ref=e3804]:
+                    - generic [ref=e3807] [cursor=pointer]: F3列头柜26号
+                  - cell "PDU" [ref=e3808]:
+                    - generic [ref=e3809]: PDU
+                  - cell "22 kW" [ref=e3810]:
+                    - generic [ref=e3811]: 22 kW
+                  - cell "0%" [ref=e3812]:
+                    - generic [ref=e3813]: 0%
+                  - cell "10% 变更" [ref=e3814]:
+                    - generic [ref=e3815]:
+                      - text: 10%
+                      - generic [ref=e3817]: 变更
+                  - cell "0.0 kW → 2.2" [ref=e3818]:
+                    - generic [ref=e3819]: 0.0 kW → 2.2
+                  - cell "低" [ref=e3820]:
+                    - generic [ref=e3823]: 低
+                  - cell "调整 接受" [ref=e3824]:
+                    - generic [ref=e3825]:
+                      - button "调整" [ref=e3826] [cursor=pointer]:
+                        - generic [ref=e3827]: 调整
+                      - button "接受" [ref=e3828] [cursor=pointer]:
+                        - generic [ref=e3829]: 接受
+                - row "PDU-F3-27 F3列头柜27号 PDU 22 kW 0% 10% 变更 0.0 kW → 2.2 低 调整 接受" [ref=e3830]:
+                  - cell "PDU-F3-27" [ref=e3831]:
+                    - generic [ref=e3832]: PDU-F3-27
+                  - cell "F3列头柜27号" [ref=e3833]:
+                    - generic [ref=e3836] [cursor=pointer]: F3列头柜27号
+                  - cell "PDU" [ref=e3837]:
+                    - generic [ref=e3838]: PDU
+                  - cell "22 kW" [ref=e3839]:
+                    - generic [ref=e3840]: 22 kW
+                  - cell "0%" [ref=e3841]:
+                    - generic [ref=e3842]: 0%
+                  - cell "10% 变更" [ref=e3843]:
+                    - generic [ref=e3844]:
+                      - text: 10%
+                      - generic [ref=e3846]: 变更
+                  - cell "0.0 kW → 2.2" [ref=e3847]:
+                    - generic [ref=e3848]: 0.0 kW → 2.2
+                  - cell "低" [ref=e3849]:
+                    - generic [ref=e3852]: 低
+                  - cell "调整 接受" [ref=e3853]:
+                    - generic [ref=e3854]:
+                      - button "调整" [ref=e3855] [cursor=pointer]:
+                        - generic [ref=e3856]: 调整
+                      - button "接受" [ref=e3857] [cursor=pointer]:
+                        - generic [ref=e3858]: 接受
+                - row "PDU-F3-28 F3列头柜28号 PDU 22 kW 0% 10% 变更 0.0 kW → 2.2 低 调整 接受" [ref=e3859]:
+                  - cell "PDU-F3-28" [ref=e3860]:
+                    - generic [ref=e3861]: PDU-F3-28
+                  - cell "F3列头柜28号" [ref=e3862]:
+                    - generic [ref=e3865] [cursor=pointer]: F3列头柜28号
+                  - cell "PDU" [ref=e3866]:
+                    - generic [ref=e3867]: PDU
+                  - cell "22 kW" [ref=e3868]:
+                    - generic [ref=e3869]: 22 kW
+                  - cell "0%" [ref=e3870]:
+                    - generic [ref=e3871]: 0%
+                  - cell "10% 变更" [ref=e3872]:
+                    - generic [ref=e3873]:
+                      - text: 10%
+                      - generic [ref=e3875]: 变更
+                  - cell "0.0 kW → 2.2" [ref=e3876]:
+                    - generic [ref=e3877]: 0.0 kW → 2.2
+                  - cell "低" [ref=e3878]:
+                    - generic [ref=e3881]: 低
+                  - cell "调整 接受" [ref=e3882]:
+                    - generic [ref=e3883]:
+                      - button "调整" [ref=e3884] [cursor=pointer]:
+                        - generic [ref=e3885]: 调整
+                      - button "接受" [ref=e3886] [cursor=pointer]:
+                        - generic [ref=e3887]: 接受
+                - row "PDU-F3-29 F3列头柜29号 PDU 22 kW 0% 10% 变更 0.0 kW → 2.2 低 调整 接受" [ref=e3888]:
+                  - cell "PDU-F3-29" [ref=e3889]:
+                    - generic [ref=e3890]: PDU-F3-29
+                  - cell "F3列头柜29号" [ref=e3891]:
+                    - generic [ref=e3894] [cursor=pointer]: F3列头柜29号
+                  - cell "PDU" [ref=e3895]:
+                    - generic [ref=e3896]: PDU
+                  - cell "22 kW" [ref=e3897]:
+                    - generic [ref=e3898]: 22 kW
+                  - cell "0%" [ref=e3899]:
+                    - generic [ref=e3900]: 0%
+                  - cell "10% 变更" [ref=e3901]:
+                    - generic [ref=e3902]:
+                      - text: 10%
+                      - generic [ref=e3904]: 变更
+                  - cell "0.0 kW → 2.2" [ref=e3905]:
+                    - generic [ref=e3906]: 0.0 kW → 2.2
+                  - cell "低" [ref=e3907]:
+                    - generic [ref=e3910]: 低
+                  - cell "调整 接受" [ref=e3911]:
+                    - generic [ref=e3912]:
+                      - button "调整" [ref=e3913] [cursor=pointer]:
+                        - generic [ref=e3914]: 调整
+                      - button "接受" [ref=e3915] [cursor=pointer]:
+                        - generic [ref=e3916]: 接受
+                - row "PDU-F3-30 F3列头柜30号 PDU 22 kW 0% 10% 变更 0.0 kW → 2.2 低 调整 接受" [ref=e3917]:
+                  - cell "PDU-F3-30" [ref=e3918]:
+                    - generic [ref=e3919]: PDU-F3-30
+                  - cell "F3列头柜30号" [ref=e3920]:
+                    - generic [ref=e3923] [cursor=pointer]: F3列头柜30号
+                  - cell "PDU" [ref=e3924]:
+                    - generic [ref=e3925]: PDU
+                  - cell "22 kW" [ref=e3926]:
+                    - generic [ref=e3927]: 22 kW
+                  - cell "0%" [ref=e3928]:
+                    - generic [ref=e3929]: 0%
+                  - cell "10% 变更" [ref=e3930]:
+                    - generic [ref=e3931]:
+                      - text: 10%
+                      - generic [ref=e3933]: 变更
+                  - cell "0.0 kW → 2.2" [ref=e3934]:
+                    - generic [ref=e3935]: 0.0 kW → 2.2
+                  - cell "低" [ref=e3936]:
+                    - generic [ref=e3939]: 低
+                  - cell "调整 接受" [ref=e3940]:
+                    - generic [ref=e3941]:
+                      - button "调整" [ref=e3942] [cursor=pointer]:
+                        - generic [ref=e3943]: 调整
+                      - button "接受" [ref=e3944] [cursor=pointer]:
+                        - generic [ref=e3945]: 接受
+                - row "PDU-F3-31 F3列头柜31号 PDU 22 kW 0% 10% 变更 0.0 kW → 2.2 低 调整 接受" [ref=e3946]:
+                  - cell "PDU-F3-31" [ref=e3947]:
+                    - generic [ref=e3948]: PDU-F3-31
+                  - cell "F3列头柜31号" [ref=e3949]:
+                    - generic [ref=e3952] [cursor=pointer]: F3列头柜31号
+                  - cell "PDU" [ref=e3953]:
+                    - generic [ref=e3954]: PDU
+                  - cell "22 kW" [ref=e3955]:
+                    - generic [ref=e3956]: 22 kW
+                  - cell "0%" [ref=e3957]:
+                    - generic [ref=e3958]: 0%
+                  - cell "10% 变更" [ref=e3959]:
+                    - generic [ref=e3960]:
+                      - text: 10%
+                      - generic [ref=e3962]: 变更
+                  - cell "0.0 kW → 2.2" [ref=e3963]:
+                    - generic [ref=e3964]: 0.0 kW → 2.2
+                  - cell "低" [ref=e3965]:
+                    - generic [ref=e3968]: 低
+                  - cell "调整 接受" [ref=e3969]:
+                    - generic [ref=e3970]:
+                      - button "调整" [ref=e3971] [cursor=pointer]:
+                        - generic [ref=e3972]: 调整
+                      - button "接受" [ref=e3973] [cursor=pointer]:
+                        - generic [ref=e3974]: 接受
+                - row "PDU-F3-32 F3列头柜32号 PDU 22 kW 0% 10% 变更 0.0 kW → 2.2 低 调整 接受" [ref=e3975]:
+                  - cell "PDU-F3-32" [ref=e3976]:
+                    - generic [ref=e3977]: PDU-F3-32
+                  - cell "F3列头柜32号" [ref=e3978]:
+                    - generic [ref=e3981] [cursor=pointer]: F3列头柜32号
+                  - cell "PDU" [ref=e3982]:
+                    - generic [ref=e3983]: PDU
+                  - cell "22 kW" [ref=e3984]:
+                    - generic [ref=e3985]: 22 kW
+                  - cell "0%" [ref=e3986]:
+                    - generic [ref=e3987]: 0%
+                  - cell "10% 变更" [ref=e3988]:
+                    - generic [ref=e3989]:
+                      - text: 10%
+                      - generic [ref=e3991]: 变更
+                  - cell "0.0 kW → 2.2" [ref=e3992]:
+                    - generic [ref=e3993]: 0.0 kW → 2.2
+                  - cell "低" [ref=e3994]:
+                    - generic [ref=e3997]: 低
+                  - cell "调整 接受" [ref=e3998]:
+                    - generic [ref=e3999]:
+                      - button "调整" [ref=e4000] [cursor=pointer]:
+                        - generic [ref=e4001]: 调整
+                      - button "接受" [ref=e4002] [cursor=pointer]:
+                        - generic [ref=e4003]: 接受
+                - row "PDU-F3-33 F3列头柜33号 PDU 22 kW 0% 10% 变更 0.0 kW → 2.2 低 调整 接受" [ref=e4004]:
+                  - cell "PDU-F3-33" [ref=e4005]:
+                    - generic [ref=e4006]: PDU-F3-33
+                  - cell "F3列头柜33号" [ref=e4007]:
+                    - generic [ref=e4010] [cursor=pointer]: F3列头柜33号
+                  - cell "PDU" [ref=e4011]:
+                    - generic [ref=e4012]: PDU
+                  - cell "22 kW" [ref=e4013]:
+                    - generic [ref=e4014]: 22 kW
+                  - cell "0%" [ref=e4015]:
+                    - generic [ref=e4016]: 0%
+                  - cell "10% 变更" [ref=e4017]:
+                    - generic [ref=e4018]:
+                      - text: 10%
+                      - generic [ref=e4020]: 变更
+                  - cell "0.0 kW → 2.2" [ref=e4021]:
+                    - generic [ref=e4022]: 0.0 kW → 2.2
+                  - cell "低" [ref=e4023]:
+                    - generic [ref=e4026]: 低
+                  - cell "调整 接受" [ref=e4027]:
+                    - generic [ref=e4028]:
+                      - button "调整" [ref=e4029] [cursor=pointer]:
+                        - generic [ref=e4030]: 调整
+                      - button "接受" [ref=e4031] [cursor=pointer]:
+                        - generic [ref=e4032]: 接受
+                - row "PDU-F3-34 F3列头柜34号 PDU 22 kW 0% 10% 变更 0.0 kW → 2.2 低 调整 接受" [ref=e4033]:
+                  - cell "PDU-F3-34" [ref=e4034]:
+                    - generic [ref=e4035]: PDU-F3-34
+                  - cell "F3列头柜34号" [ref=e4036]:
+                    - generic [ref=e4039] [cursor=pointer]: F3列头柜34号
+                  - cell "PDU" [ref=e4040]:
+                    - generic [ref=e4041]: PDU
+                  - cell "22 kW" [ref=e4042]:
+                    - generic [ref=e4043]: 22 kW
+                  - cell "0%" [ref=e4044]:
+                    - generic [ref=e4045]: 0%
+                  - cell "10% 变更" [ref=e4046]:
+                    - generic [ref=e4047]:
+                      - text: 10%
+                      - generic [ref=e4049]: 变更
+                  - cell "0.0 kW → 2.2" [ref=e4050]:
+                    - generic [ref=e4051]: 0.0 kW → 2.2
+                  - cell "低" [ref=e4052]:
+                    - generic [ref=e4055]: 低
+                  - cell "调整 接受" [ref=e4056]:
+                    - generic [ref=e4057]:
+                      - button "调整" [ref=e4058] [cursor=pointer]:
+                        - generic [ref=e4059]: 调整
+                      - button "接受" [ref=e4060] [cursor=pointer]:
+                        - generic [ref=e4061]: 接受
+                - row "PDU-F3-35 F3列头柜35号 PDU 22 kW 0% 10% 变更 0.0 kW → 2.2 低 调整 接受" [ref=e4062]:
+                  - cell "PDU-F3-35" [ref=e4063]:
+                    - generic [ref=e4064]: PDU-F3-35
+                  - cell "F3列头柜35号" [ref=e4065]:
+                    - generic [ref=e4068] [cursor=pointer]: F3列头柜35号
+                  - cell "PDU" [ref=e4069]:
+                    - generic [ref=e4070]: PDU
+                  - cell "22 kW" [ref=e4071]:
+                    - generic [ref=e4072]: 22 kW
+                  - cell "0%" [ref=e4073]:
+                    - generic [ref=e4074]: 0%
+                  - cell "10% 变更" [ref=e4075]:
+                    - generic [ref=e4076]:
+                      - text: 10%
+                      - generic [ref=e4078]: 变更
+                  - cell "0.0 kW → 2.2" [ref=e4079]:
+                    - generic [ref=e4080]: 0.0 kW → 2.2
+                  - cell "低" [ref=e4081]:
+                    - generic [ref=e4084]: 低
+                  - cell "调整 接受" [ref=e4085]:
+                    - generic [ref=e4086]:
+                      - button "调整" [ref=e4087] [cursor=pointer]:
+                        - generic [ref=e4088]: 调整
+                      - button "接受" [ref=e4089] [cursor=pointer]:
+                        - generic [ref=e4090]: 接受
+                - row "PDU-F3-36 F3列头柜36号 PDU 22 kW 0% 10% 变更 0.0 kW → 2.2 低 调整 接受" [ref=e4091]:
+                  - cell "PDU-F3-36" [ref=e4092]:
+                    - generic [ref=e4093]: PDU-F3-36
+                  - cell "F3列头柜36号" [ref=e4094]:
+                    - generic [ref=e4097] [cursor=pointer]: F3列头柜36号
+                  - cell "PDU" [ref=e4098]:
+                    - generic [ref=e4099]: PDU
+                  - cell "22 kW" [ref=e4100]:
+                    - generic [ref=e4101]: 22 kW
+                  - cell "0%" [ref=e4102]:
+                    - generic [ref=e4103]: 0%
+                  - cell "10% 变更" [ref=e4104]:
+                    - generic [ref=e4105]:
+                      - text: 10%
+                      - generic [ref=e4107]: 变更
+                  - cell "0.0 kW → 2.2" [ref=e4108]:
+                    - generic [ref=e4109]: 0.0 kW → 2.2
+                  - cell "低" [ref=e4110]:
+                    - generic [ref=e4113]: 低
+                  - cell "调整 接受" [ref=e4114]:
+                    - generic [ref=e4115]:
+                      - button "调整" [ref=e4116] [cursor=pointer]:
+                        - generic [ref=e4117]: 调整
+                      - button "接受" [ref=e4118] [cursor=pointer]:
+                        - generic [ref=e4119]: 接受
+                - row "PDU-F4-37 F4列头柜37号 PDU 22 kW 0% 10% 变更 0.0 kW → 2.2 低 调整 接受" [ref=e4120]:
+                  - cell "PDU-F4-37" [ref=e4121]:
+                    - generic [ref=e4122]: PDU-F4-37
+                  - cell "F4列头柜37号" [ref=e4123]:
+                    - generic [ref=e4126] [cursor=pointer]: F4列头柜37号
+                  - cell "PDU" [ref=e4127]:
+                    - generic [ref=e4128]: PDU
+                  - cell "22 kW" [ref=e4129]:
+                    - generic [ref=e4130]: 22 kW
+                  - cell "0%" [ref=e4131]:
+                    - generic [ref=e4132]: 0%
+                  - cell "10% 变更" [ref=e4133]:
+                    - generic [ref=e4134]:
+                      - text: 10%
+                      - generic [ref=e4136]: 变更
+                  - cell "0.0 kW → 2.2" [ref=e4137]:
+                    - generic [ref=e4138]: 0.0 kW → 2.2
+                  - cell "低" [ref=e4139]:
+                    - generic [ref=e4142]: 低
+                  - cell "调整 接受" [ref=e4143]:
+                    - generic [ref=e4144]:
+                      - button "调整" [ref=e4145] [cursor=pointer]:
+                        - generic [ref=e4146]: 调整
+                      - button "接受" [ref=e4147] [cursor=pointer]:
+                        - generic [ref=e4148]: 接受
+                - row "PDU-F4-38 F4列头柜38号 PDU 22 kW 0% 10% 变更 0.0 kW → 2.2 低 调整 接受" [ref=e4149]:
+                  - cell "PDU-F4-38" [ref=e4150]:
+                    - generic [ref=e4151]: PDU-F4-38
+                  - cell "F4列头柜38号" [ref=e4152]:
+                    - generic [ref=e4155] [cursor=pointer]: F4列头柜38号
+                  - cell "PDU" [ref=e4156]:
+                    - generic [ref=e4157]: PDU
+                  - cell "22 kW" [ref=e4158]:
+                    - generic [ref=e4159]: 22 kW
+                  - cell "0%" [ref=e4160]:
+                    - generic [ref=e4161]: 0%
+                  - cell "10% 变更" [ref=e4162]:
+                    - generic [ref=e4163]:
+                      - text: 10%
+                      - generic [ref=e4165]: 变更
+                  - cell "0.0 kW → 2.2" [ref=e4166]:
+                    - generic [ref=e4167]: 0.0 kW → 2.2
+                  - cell "低" [ref=e4168]:
+                    - generic [ref=e4171]: 低
+                  - cell "调整 接受" [ref=e4172]:
+                    - generic [ref=e4173]:
+                      - button "调整" [ref=e4174] [cursor=pointer]:
+                        - generic [ref=e4175]: 调整
+                      - button "接受" [ref=e4176] [cursor=pointer]:
+                        - generic [ref=e4177]: 接受
+                - row "PDU-F4-39 F4列头柜39号 PDU 22 kW 0% 10% 变更 0.0 kW → 2.2 低 调整 接受" [ref=e4178]:
+                  - cell "PDU-F4-39" [ref=e4179]:
+                    - generic [ref=e4180]: PDU-F4-39
+                  - cell "F4列头柜39号" [ref=e4181]:
+                    - generic [ref=e4184] [cursor=pointer]: F4列头柜39号
+                  - cell "PDU" [ref=e4185]:
+                    - generic [ref=e4186]: PDU
+                  - cell "22 kW" [ref=e4187]:
+                    - generic [ref=e4188]: 22 kW
+                  - cell "0%" [ref=e4189]:
+                    - generic [ref=e4190]: 0%
+                  - cell "10% 变更" [ref=e4191]:
+                    - generic [ref=e4192]:
+                      - text: 10%
+                      - generic [ref=e4194]: 变更
+                  - cell "0.0 kW → 2.2" [ref=e4195]:
+                    - generic [ref=e4196]: 0.0 kW → 2.2
+                  - cell "低" [ref=e4197]:
+                    - generic [ref=e4200]: 低
+                  - cell "调整 接受" [ref=e4201]:
+                    - generic [ref=e4202]:
+                      - button "调整" [ref=e4203] [cursor=pointer]:
+                        - generic [ref=e4204]: 调整
+                      - button "接受" [ref=e4205] [cursor=pointer]:
+                        - generic [ref=e4206]: 接受
+                - row "PDU-F4-40 F4列头柜40号 PDU 22 kW 0% 10% 变更 0.0 kW → 2.2 低 调整 接受" [ref=e4207]:
+                  - cell "PDU-F4-40" [ref=e4208]:
+                    - generic [ref=e4209]: PDU-F4-40
+                  - cell "F4列头柜40号" [ref=e4210]:
+                    - generic [ref=e4213] [cursor=pointer]: F4列头柜40号
+                  - cell "PDU" [ref=e4214]:
+                    - generic [ref=e4215]: PDU
+                  - cell "22 kW" [ref=e4216]:
+                    - generic [ref=e4217]: 22 kW
+                  - cell "0%" [ref=e4218]:
+                    - generic [ref=e4219]: 0%
+                  - cell "10% 变更" [ref=e4220]:
+                    - generic [ref=e4221]:
+                      - text: 10%
+                      - generic [ref=e4223]: 变更
+                  - cell "0.0 kW → 2.2" [ref=e4224]:
+                    - generic [ref=e4225]: 0.0 kW → 2.2
+                  - cell "低" [ref=e4226]:
+                    - generic [ref=e4229]: 低
+                  - cell "调整 接受" [ref=e4230]:
+                    - generic [ref=e4231]:
+                      - button "调整" [ref=e4232] [cursor=pointer]:
+                        - generic [ref=e4233]: 调整
+                      - button "接受" [ref=e4234] [cursor=pointer]:
+                        - generic [ref=e4235]: 接受
+                - row "PDU-F4-41 F4列头柜41号 PDU 22 kW 0% 10% 变更 0.0 kW → 2.2 低 调整 接受" [ref=e4236]:
+                  - cell "PDU-F4-41" [ref=e4237]:
+                    - generic [ref=e4238]: PDU-F4-41
+                  - cell "F4列头柜41号" [ref=e4239]:
+                    - generic [ref=e4242] [cursor=pointer]: F4列头柜41号
+                  - cell "PDU" [ref=e4243]:
+                    - generic [ref=e4244]: PDU
+                  - cell "22 kW" [ref=e4245]:
+                    - generic [ref=e4246]: 22 kW
+                  - cell "0%" [ref=e4247]:
+                    - generic [ref=e4248]: 0%
+                  - cell "10% 变更" [ref=e4249]:
+                    - generic [ref=e4250]:
+                      - text: 10%
+                      - generic [ref=e4252]: 变更
+                  - cell "0.0 kW → 2.2" [ref=e4253]:
+                    - generic [ref=e4254]: 0.0 kW → 2.2
+                  - cell "低" [ref=e4255]:
+                    - generic [ref=e4258]: 低
+                  - cell "调整 接受" [ref=e4259]:
+                    - generic [ref=e4260]:
+                      - button "调整" [ref=e4261] [cursor=pointer]:
+                        - generic [ref=e4262]: 调整
+                      - button "接受" [ref=e4263] [cursor=pointer]:
+                        - generic [ref=e4264]: 接受
+                - row "PDU-F4-42 F4列头柜42号 PDU 22 kW 0% 10% 变更 0.0 kW → 2.2 低 调整 接受" [ref=e4265]:
+                  - cell "PDU-F4-42" [ref=e4266]:
+                    - generic [ref=e4267]: PDU-F4-42
+                  - cell "F4列头柜42号" [ref=e4268]:
+                    - generic [ref=e4271] [cursor=pointer]: F4列头柜42号
+                  - cell "PDU" [ref=e4272]:
+                    - generic [ref=e4273]: PDU
+                  - cell "22 kW" [ref=e4274]:
+                    - generic [ref=e4275]: 22 kW
+                  - cell "0%" [ref=e4276]:
+                    - generic [ref=e4277]: 0%
+                  - cell "10% 变更" [ref=e4278]:
+                    - generic [ref=e4279]:
+                      - text: 10%
+                      - generic [ref=e4281]: 变更
+                  - cell "0.0 kW → 2.2" [ref=e4282]:
+                    - generic [ref=e4283]: 0.0 kW → 2.2
+                  - cell "低" [ref=e4284]:
+                    - generic [ref=e4287]: 低
+                  - cell "调整 接受" [ref=e4288]:
+                    - generic [ref=e4289]:
+                      - button "调整" [ref=e4290] [cursor=pointer]:
+                        - generic [ref=e4291]: 调整
+                      - button "接受" [ref=e4292] [cursor=pointer]:
+                        - generic [ref=e4293]: 接受
+                - row "PDU-F4-43 F4列头柜43号 PDU 22 kW 0% 10% 变更 0.0 kW → 2.2 低 调整 接受" [ref=e4294]:
+                  - cell "PDU-F4-43" [ref=e4295]:
+                    - generic [ref=e4296]: PDU-F4-43
+                  - cell "F4列头柜43号" [ref=e4297]:
+                    - generic [ref=e4300] [cursor=pointer]: F4列头柜43号
+                  - cell "PDU" [ref=e4301]:
+                    - generic [ref=e4302]: PDU
+                  - cell "22 kW" [ref=e4303]:
+                    - generic [ref=e4304]: 22 kW
+                  - cell "0%" [ref=e4305]:
+                    - generic [ref=e4306]: 0%
+                  - cell "10% 变更" [ref=e4307]:
+                    - generic [ref=e4308]:
+                      - text: 10%
+                      - generic [ref=e4310]: 变更
+                  - cell "0.0 kW → 2.2" [ref=e4311]:
+                    - generic [ref=e4312]: 0.0 kW → 2.2
+                  - cell "低" [ref=e4313]:
+                    - generic [ref=e4316]: 低
+                  - cell "调整 接受" [ref=e4317]:
+                    - generic [ref=e4318]:
+                      - button "调整" [ref=e4319] [cursor=pointer]:
+                        - generic [ref=e4320]: 调整
+                      - button "接受" [ref=e4321] [cursor=pointer]:
+                        - generic [ref=e4322]: 接受
+                - row "PDU-F4-44 F4列头柜44号 PDU 22 kW 0% 10% 变更 0.0 kW → 2.2 低 调整 接受" [ref=e4323]:
+                  - cell "PDU-F4-44" [ref=e4324]:
+                    - generic [ref=e4325]: PDU-F4-44
+                  - cell "F4列头柜44号" [ref=e4326]:
+                    - generic [ref=e4329] [cursor=pointer]: F4列头柜44号
+                  - cell "PDU" [ref=e4330]:
+                    - generic [ref=e4331]: PDU
+                  - cell "22 kW" [ref=e4332]:
+                    - generic [ref=e4333]: 22 kW
+                  - cell "0%" [ref=e4334]:
+                    - generic [ref=e4335]: 0%
+                  - cell "10% 变更" [ref=e4336]:
+                    - generic [ref=e4337]:
+                      - text: 10%
+                      - generic [ref=e4339]: 变更
+                  - cell "0.0 kW → 2.2" [ref=e4340]:
+                    - generic [ref=e4341]: 0.0 kW → 2.2
+                  - cell "低" [ref=e4342]:
+                    - generic [ref=e4345]: 低
+                  - cell "调整 接受" [ref=e4346]:
+                    - generic [ref=e4347]:
+                      - button "调整" [ref=e4348] [cursor=pointer]:
+                        - generic [ref=e4349]: 调整
+                      - button "接受" [ref=e4350] [cursor=pointer]:
+                        - generic [ref=e4351]: 接受
+                - row "PDU-F4-45 F4列头柜45号 PDU 22 kW 0% 10% 变更 0.0 kW → 2.2 低 调整 接受" [ref=e4352]:
+                  - cell "PDU-F4-45" [ref=e4353]:
+                    - generic [ref=e4354]: PDU-F4-45
+                  - cell "F4列头柜45号" [ref=e4355]:
+                    - generic [ref=e4358] [cursor=pointer]: F4列头柜45号
+                  - cell "PDU" [ref=e4359]:
+                    - generic [ref=e4360]: PDU
+                  - cell "22 kW" [ref=e4361]:
+                    - generic [ref=e4362]: 22 kW
+                  - cell "0%" [ref=e4363]:
+                    - generic [ref=e4364]: 0%
+                  - cell "10% 变更" [ref=e4365]:
+                    - generic [ref=e4366]:
+                      - text: 10%
+                      - generic [ref=e4368]: 变更
+                  - cell "0.0 kW → 2.2" [ref=e4369]:
+                    - generic [ref=e4370]: 0.0 kW → 2.2
+                  - cell "低" [ref=e4371]:
+                    - generic [ref=e4374]: 低
+                  - cell "调整 接受" [ref=e4375]:
+                    - generic [ref=e4376]:
+                      - button "调整" [ref=e4377] [cursor=pointer]:
+                        - generic [ref=e4378]: 调整
+                      - button "接受" [ref=e4379] [cursor=pointer]:
+                        - generic [ref=e4380]: 接受
+                - row "PDU-F4-46 F4列头柜46号 PDU 22 kW 0% 10% 变更 0.0 kW → 2.2 低 调整 接受" [ref=e4381]:
+                  - cell "PDU-F4-46" [ref=e4382]:
+                    - generic [ref=e4383]: PDU-F4-46
+                  - cell "F4列头柜46号" [ref=e4384]:
+                    - generic [ref=e4387] [cursor=pointer]: F4列头柜46号
+                  - cell "PDU" [ref=e4388]:
+                    - generic [ref=e4389]: PDU
+                  - cell "22 kW" [ref=e4390]:
+                    - generic [ref=e4391]: 22 kW
+                  - cell "0%" [ref=e4392]:
+                    - generic [ref=e4393]: 0%
+                  - cell "10% 变更" [ref=e4394]:
+                    - generic [ref=e4395]:
+                      - text: 10%
+                      - generic [ref=e4397]: 变更
+                  - cell "0.0 kW → 2.2" [ref=e4398]:
+                    - generic [ref=e4399]: 0.0 kW → 2.2
+                  - cell "低" [ref=e4400]:
+                    - generic [ref=e4403]: 低
+                  - cell "调整 接受" [ref=e4404]:
+                    - generic [ref=e4405]:
+                      - button "调整" [ref=e4406] [cursor=pointer]:
+                        - generic [ref=e4407]: 调整
+                      - button "接受" [ref=e4408] [cursor=pointer]:
+                        - generic [ref=e4409]: 接受
+                - row "PDU-F4-47 F4列头柜47号 PDU 22 kW 0% 10% 变更 0.0 kW → 2.2 低 调整 接受" [ref=e4410]:
+                  - cell "PDU-F4-47" [ref=e4411]:
+                    - generic [ref=e4412]: PDU-F4-47
+                  - cell "F4列头柜47号" [ref=e4413]:
+                    - generic [ref=e4416] [cursor=pointer]: F4列头柜47号
+                  - cell "PDU" [ref=e4417]:
+                    - generic [ref=e4418]: PDU
+                  - cell "22 kW" [ref=e4419]:
+                    - generic [ref=e4420]: 22 kW
+                  - cell "0%" [ref=e4421]:
+                    - generic [ref=e4422]: 0%
+                  - cell "10% 变更" [ref=e4423]:
+                    - generic [ref=e4424]:
+                      - text: 10%
+                      - generic [ref=e4426]: 变更
+                  - cell "0.0 kW → 2.2" [ref=e4427]:
+                    - generic [ref=e4428]: 0.0 kW → 2.2
+                  - cell "低" [ref=e4429]:
+                    - generic [ref=e4432]: 低
+                  - cell "调整 接受" [ref=e4433]:
+                    - generic [ref=e4434]:
+                      - button "调整" [ref=e4435] [cursor=pointer]:
+                        - generic [ref=e4436]: 调整
+                      - button "接受" [ref=e4437] [cursor=pointer]:
+                        - generic [ref=e4438]: 接受
+                - row "PDU-F4-48 F4列头柜48号 PDU 22 kW 0% 10% 变更 0.0 kW → 2.2 低 调整 接受" [ref=e4439]:
+                  - cell "PDU-F4-48" [ref=e4440]:
+                    - generic [ref=e4441]: PDU-F4-48
+                  - cell "F4列头柜48号" [ref=e4442]:
+                    - generic [ref=e4445] [cursor=pointer]: F4列头柜48号
+                  - cell "PDU" [ref=e4446]:
+                    - generic [ref=e4447]: PDU
+                  - cell "22 kW" [ref=e4448]:
+                    - generic [ref=e4449]: 22 kW
+                  - cell "0%" [ref=e4450]:
+                    - generic [ref=e4451]: 0%
+                  - cell "10% 变更" [ref=e4452]:
+                    - generic [ref=e4453]:
+                      - text: 10%
+                      - generic [ref=e4455]: 变更
+                  - cell "0.0 kW → 2.2" [ref=e4456]:
+                    - generic [ref=e4457]: 0.0 kW → 2.2
+                  - cell "低" [ref=e4458]:
+                    - generic [ref=e4461]: 低
+                  - cell "调整 接受" [ref=e4462]:
+                    - generic [ref=e4463]:
+                      - button "调整" [ref=e4464] [cursor=pointer]:
+                        - generic [ref=e4465]: 调整
+                      - button "接受" [ref=e4466] [cursor=pointer]:
+                        - generic [ref=e4467]: 接受
+                - row "PDU-F4-49 F4列头柜49号 PDU 22 kW 0% 10% 变更 0.0 kW → 2.2 低 调整 接受" [ref=e4468]:
+                  - cell "PDU-F4-49" [ref=e4469]:
+                    - generic [ref=e4470]: PDU-F4-49
+                  - cell "F4列头柜49号" [ref=e4471]:
+                    - generic [ref=e4474] [cursor=pointer]: F4列头柜49号
+                  - cell "PDU" [ref=e4475]:
+                    - generic [ref=e4476]: PDU
+                  - cell "22 kW" [ref=e4477]:
+                    - generic [ref=e4478]: 22 kW
+                  - cell "0%" [ref=e4479]:
+                    - generic [ref=e4480]: 0%
+                  - cell "10% 变更" [ref=e4481]:
+                    - generic [ref=e4482]:
+                      - text: 10%
+                      - generic [ref=e4484]: 变更
+                  - cell "0.0 kW → 2.2" [ref=e4485]:
+                    - generic [ref=e4486]: 0.0 kW → 2.2
+                  - cell "低" [ref=e4487]:
+                    - generic [ref=e4490]: 低
+                  - cell "调整 接受" [ref=e4491]:
+                    - generic [ref=e4492]:
+                      - button "调整" [ref=e4493] [cursor=pointer]:
+                        - generic [ref=e4494]: 调整
+                      - button "接受" [ref=e4495] [cursor=pointer]:
+                        - generic [ref=e4496]: 接受
+                - row "PDU-F4-50 F4列头柜50号 PDU 22 kW 0% 10% 变更 0.0 kW → 2.2 低 调整 接受" [ref=e4497]:
+                  - cell "PDU-F4-50" [ref=e4498]:
+                    - generic [ref=e4499]: PDU-F4-50
+                  - cell "F4列头柜50号" [ref=e4500]:
+                    - generic [ref=e4503] [cursor=pointer]: F4列头柜50号
+                  - cell "PDU" [ref=e4504]:
+                    - generic [ref=e4505]: PDU
+                  - cell "22 kW" [ref=e4506]:
+                    - generic [ref=e4507]: 22 kW
+                  - cell "0%" [ref=e4508]:
+                    - generic [ref=e4509]: 0%
+                  - cell "10% 变更" [ref=e4510]:
+                    - generic [ref=e4511]:
+                      - text: 10%
+                      - generic [ref=e4513]: 变更
+                  - cell "0.0 kW → 2.2" [ref=e4514]:
+                    - generic [ref=e4515]: 0.0 kW → 2.2
+                  - cell "低" [ref=e4516]:
+                    - generic [ref=e4519]: 低
+                  - cell "调整 接受" [ref=e4520]:
+                    - generic [ref=e4521]:
+                      - button "调整" [ref=e4522] [cursor=pointer]:
+                        - generic [ref=e4523]: 调整
+                      - button "接受" [ref=e4524] [cursor=pointer]:
+                        - generic [ref=e4525]: 接受
+                - row "PDU-F4-51 F4列头柜51号 PDU 22 kW 0% 10% 变更 0.0 kW → 2.2 低 调整 接受" [ref=e4526]:
+                  - cell "PDU-F4-51" [ref=e4527]:
+                    - generic [ref=e4528]: PDU-F4-51
+                  - cell "F4列头柜51号" [ref=e4529]:
+                    - generic [ref=e4532] [cursor=pointer]: F4列头柜51号
+                  - cell "PDU" [ref=e4533]:
+                    - generic [ref=e4534]: PDU
+                  - cell "22 kW" [ref=e4535]:
+                    - generic [ref=e4536]: 22 kW
+                  - cell "0%" [ref=e4537]:
+                    - generic [ref=e4538]: 0%
+                  - cell "10% 变更" [ref=e4539]:
+                    - generic [ref=e4540]:
+                      - text: 10%
+                      - generic [ref=e4542]: 变更
+                  - cell "0.0 kW → 2.2" [ref=e4543]:
+                    - generic [ref=e4544]: 0.0 kW → 2.2
+                  - cell "低" [ref=e4545]:
+                    - generic [ref=e4548]: 低
+                  - cell "调整 接受" [ref=e4549]:
+                    - generic [ref=e4550]:
+                      - button "调整" [ref=e4551] [cursor=pointer]:
+                        - generic [ref=e4552]: 调整
+                      - button "接受" [ref=e4553] [cursor=pointer]:
+                        - generic [ref=e4554]: 接受
+                - row "PDU-F4-52 F4列头柜52号 PDU 22 kW 0% 10% 变更 0.0 kW → 2.2 低 调整 接受" [ref=e4555]:
+                  - cell "PDU-F4-52" [ref=e4556]:
+                    - generic [ref=e4557]: PDU-F4-52
+                  - cell "F4列头柜52号" [ref=e4558]:
+                    - generic [ref=e4561] [cursor=pointer]: F4列头柜52号
+                  - cell "PDU" [ref=e4562]:
+                    - generic [ref=e4563]: PDU
+                  - cell "22 kW" [ref=e4564]:
+                    - generic [ref=e4565]: 22 kW
+                  - cell "0%" [ref=e4566]:
+                    - generic [ref=e4567]: 0%
+                  - cell "10% 变更" [ref=e4568]:
+                    - generic [ref=e4569]:
+                      - text: 10%
+                      - generic [ref=e4571]: 变更
+                  - cell "0.0 kW → 2.2" [ref=e4572]:
+                    - generic [ref=e4573]: 0.0 kW → 2.2
+                  - cell "低" [ref=e4574]:
+                    - generic [ref=e4577]: 低
+                  - cell "调整 接受" [ref=e4578]:
+                    - generic [ref=e4579]:
+                      - button "调整" [ref=e4580] [cursor=pointer]:
+                        - generic [ref=e4581]: 调整
+                      - button "接受" [ref=e4582] [cursor=pointer]:
+                        - generic [ref=e4583]: 接受
+                - row "PDU-F4-53 F4列头柜53号 PDU 22 kW 0% 10% 变更 0.0 kW → 2.2 低 调整 接受" [ref=e4584]:
+                  - cell "PDU-F4-53" [ref=e4585]:
+                    - generic [ref=e4586]: PDU-F4-53
+                  - cell "F4列头柜53号" [ref=e4587]:
+                    - generic [ref=e4590] [cursor=pointer]: F4列头柜53号
+                  - cell "PDU" [ref=e4591]:
+                    - generic [ref=e4592]: PDU
+                  - cell "22 kW" [ref=e4593]:
+                    - generic [ref=e4594]: 22 kW
+                  - cell "0%" [ref=e4595]:
+                    - generic [ref=e4596]: 0%
+                  - cell "10% 变更" [ref=e4597]:
+                    - generic [ref=e4598]:
+                      - text: 10%
+                      - generic [ref=e4600]: 变更
+                  - cell "0.0 kW → 2.2" [ref=e4601]:
+                    - generic [ref=e4602]: 0.0 kW → 2.2
+                  - cell "低" [ref=e4603]:
+                    - generic [ref=e4606]: 低
+                  - cell "调整 接受" [ref=e4607]:
+                    - generic [ref=e4608]:
+                      - button "调整" [ref=e4609] [cursor=pointer]:
+                        - generic [ref=e4610]: 调整
+                      - button "接受" [ref=e4611] [cursor=pointer]:
+                        - generic [ref=e4612]: 接受
+                - row "PDU-F4-54 F4列头柜54号 PDU 22 kW 0% 10% 变更 0.0 kW → 2.2 低 调整 接受" [ref=e4613]:
+                  - cell "PDU-F4-54" [ref=e4614]:
+                    - generic [ref=e4615]: PDU-F4-54
+                  - cell "F4列头柜54号" [ref=e4616]:
+                    - generic [ref=e4619] [cursor=pointer]: F4列头柜54号
+                  - cell "PDU" [ref=e4620]:
+                    - generic [ref=e4621]: PDU
+                  - cell "22 kW" [ref=e4622]:
+                    - generic [ref=e4623]: 22 kW
+                  - cell "0%" [ref=e4624]:
+                    - generic [ref=e4625]: 0%
+                  - cell "10% 变更" [ref=e4626]:
+                    - generic [ref=e4627]:
+                      - text: 10%
+                      - generic [ref=e4629]: 变更
+                  - cell "0.0 kW → 2.2" [ref=e4630]:
+                    - generic [ref=e4631]: 0.0 kW → 2.2
+                  - cell "低" [ref=e4632]:
+                    - generic [ref=e4635]: 低
+                  - cell "调整 接受" [ref=e4636]:
+                    - generic [ref=e4637]:
+                      - button "调整" [ref=e4638] [cursor=pointer]:
+                        - generic [ref=e4639]: 调整
+                      - button "接受" [ref=e4640] [cursor=pointer]:
+                        - generic [ref=e4641]: 接受
+                - row "PMP-F1-01 1#冷冻水泵 水泵 45 kW 0% 0% 0.0 kW 低 调整" [ref=e4642]:
+                  - cell "PMP-F1-01" [ref=e4643]:
+                    - generic [ref=e4644]: PMP-F1-01
+                  - cell "1#冷冻水泵" [ref=e4645]:
+                    - generic [ref=e4648] [cursor=pointer]: 1#冷冻水泵
+                  - cell "水泵" [ref=e4649]:
+                    - generic [ref=e4650]: 水泵
+                  - cell "45 kW" [ref=e4651]:
+                    - generic [ref=e4652]: 45 kW
+                  - cell "0%" [ref=e4653]:
+                    - generic [ref=e4654]: 0%
+                  - cell "0%" [ref=e4655]:
+                    - generic [ref=e4656]: 0%
+                  - cell "0.0 kW" [ref=e4657]:
+                    - generic [ref=e4658]: 0.0 kW
+                  - cell "低" [ref=e4659]:
+                    - generic [ref=e4662]: 低
+                  - cell "调整" [ref=e4663]:
+                    - button "调整" [ref=e4665] [cursor=pointer]:
+                      - generic [ref=e4666]: 调整
+                - row "PMP-F1-02 2#冷冻水泵 水泵 45 kW 0% 0% 0.0 kW 低 调整" [ref=e4667]:
+                  - cell "PMP-F1-02" [ref=e4668]:
+                    - generic [ref=e4669]: PMP-F1-02
+                  - cell "2#冷冻水泵" [ref=e4670]:
+                    - generic [ref=e4673] [cursor=pointer]: 2#冷冻水泵
+                  - cell "水泵" [ref=e4674]:
+                    - generic [ref=e4675]: 水泵
+                  - cell "45 kW" [ref=e4676]:
+                    - generic [ref=e4677]: 45 kW
+                  - cell "0%" [ref=e4678]:
+                    - generic [ref=e4679]: 0%
+                  - cell "0%" [ref=e4680]:
+                    - generic [ref=e4681]: 0%
+                  - cell "0.0 kW" [ref=e4682]:
+                    - generic [ref=e4683]: 0.0 kW
+                  - cell "低" [ref=e4684]:
+                    - generic [ref=e4687]: 低
+                  - cell "调整" [ref=e4688]:
+                    - button "调整" [ref=e4690] [cursor=pointer]:
+                      - generic [ref=e4691]: 调整
+                - row "PMP-F1-07 1#冷却水泵 水泵 37 kW 0% 0% 0.0 kW 低 调整" [ref=e4692]:
+                  - cell "PMP-F1-07" [ref=e4693]:
+                    - generic [ref=e4694]: PMP-F1-07
+                  - cell "1#冷却水泵" [ref=e4695]:
+                    - generic [ref=e4698] [cursor=pointer]: 1#冷却水泵
+                  - cell "水泵" [ref=e4699]:
+                    - generic [ref=e4700]: 水泵
+                  - cell "37 kW" [ref=e4701]:
+                    - generic [ref=e4702]: 37 kW
+                  - cell "0%" [ref=e4703]:
+                    - generic [ref=e4704]: 0%
+                  - cell "0%" [ref=e4705]:
+                    - generic [ref=e4706]: 0%
+                  - cell "0.0 kW" [ref=e4707]:
+                    - generic [ref=e4708]: 0.0 kW
+                  - cell "低" [ref=e4709]:
+                    - generic [ref=e4712]: 低
+                  - cell "调整" [ref=e4713]:
+                    - button "调整" [ref=e4715] [cursor=pointer]:
+                      - generic [ref=e4716]: 调整
+                - row "PMP-F1-08 2#冷却水泵 水泵 37 kW 0% 0% 0.0 kW 低 调整" [ref=e4717]:
+                  - cell "PMP-F1-08" [ref=e4718]:
+                    - generic [ref=e4719]: PMP-F1-08
+                  - cell "2#冷却水泵" [ref=e4720]:
+                    - generic [ref=e4723] [cursor=pointer]: 2#冷却水泵
+                  - cell "水泵" [ref=e4724]:
+                    - generic [ref=e4725]: 水泵
+                  - cell "37 kW" [ref=e4726]:
+                    - generic [ref=e4727]: 37 kW
+                  - cell "0%" [ref=e4728]:
+                    - generic [ref=e4729]: 0%
+                  - cell "0%" [ref=e4730]:
+                    - generic [ref=e4731]: 0%
+                  - cell "0.0 kW" [ref=e4732]:
+                    - generic [ref=e4733]: 0.0 kW
+                  - cell "低" [ref=e4734]:
+                    - generic [ref=e4737]: 低
+                  - cell "调整" [ref=e4738]:
+                    - button "调整" [ref=e4740] [cursor=pointer]:
+                      - generic [ref=e4741]: 调整
+          - generic [ref=e4742]:
+            - generic [ref=e4745]:
+              - generic [ref=e4746]: 可转移设备
+              - generic [ref=e4747]: 156 台
+            - generic [ref=e4750]:
+              - generic [ref=e4751]: 有变更建议
+              - generic [ref=e4752]: 131 台
+            - generic [ref=e4755]:
+              - generic [ref=e4756]: 当前可调节容量
+              - generic [ref=e4757]: 0.0 kW
+            - generic [ref=e4760]:
+              - generic [ref=e4761]: 推荐可调节容量
+              - generic [ref=e4762]: 759.9 kW
