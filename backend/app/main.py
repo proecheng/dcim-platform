@@ -763,12 +763,49 @@ async def lifespan(app: FastAPI):
             name='时间窗口调参分析任务'
         )
 
+        # Story 29.5: 精度回填定时任务（每 5 分钟）
+        async def _run_accuracy_backfill():
+            """回填实际温度"""
+            try:
+                from app.services.precool.accuracy_monitor import backfill_actual_temperatures
+                await backfill_actual_temperatures()
+            except Exception as e:
+                logger.error(f"精度回填任务失败: {e}")
+
+        scheduler.add_job(
+            _run_accuracy_backfill,
+            'interval',
+            minutes=5,
+            id='accuracy_backfill',
+            name='精度回填任务'
+        )
+
+        # Story 29.5: 每日精度统计（凌晨 1:00）
+        async def _run_accuracy_daily_report():
+            """每日精度统计"""
+            try:
+                from app.services.precool.accuracy_monitor import run_daily_accuracy_report
+                await run_daily_accuracy_report()
+            except Exception as e:
+                logger.error(f"每日精度统计任务失败: {e}")
+
+        scheduler.add_job(
+            _run_accuracy_daily_report,
+            'cron',
+            hour=1,
+            minute=0,
+            id='accuracy_daily_report',
+            name='每日精度统计任务'
+        )
+
         scheduler.start()
         logger.info("✓ 传感器校准过期检查定时任务已启动（每日凌晨 2:00）")
         logger.info("✓ 趋势分析定时任务已启动（每小时整点执行）")
         logger.info("✓ 反事实分析定时任务已启动（每小时30分执行）")
         logger.info("✓ 误诊分析报告生成任务已启动（每月1日凌晨 0:00）")
         logger.info("✓ 时间窗口调参分析任务已启动（每月1日凌晨 3:00）")
+        logger.info("✓ 精度回填任务已启动（每 5 分钟执行）")
+        logger.info("✓ 每日精度统计任务已启动（每日凌晨 1:00）")
     except ImportError:
         logger.warning("⚠️  APScheduler 未安装，使用降级方案（asyncio.create_task）")
         async def _calibration_check_loop():
@@ -799,6 +836,38 @@ async def lifespan(app: FastAPI):
                     await asyncio.sleep(3600)
 
         calibration_check_task = asyncio.create_task(_calibration_check_loop())
+
+        # Story 29.5: 精度回填降级方案（每 5 分钟）
+        async def _accuracy_backfill_loop():
+            await asyncio.sleep(120)  # 启动后延迟 2 分钟
+            while True:
+                try:
+                    from app.services.precool.accuracy_monitor import backfill_actual_temperatures
+                    await backfill_actual_temperatures()
+                except Exception as e:
+                    logger.error(f"精度回填任务失败: {e}")
+                await asyncio.sleep(300)  # 5 分钟
+
+        asyncio.create_task(_accuracy_backfill_loop())
+
+        # Story 29.5: 每日精度统计降级方案（凌晨 1:00）
+        async def _accuracy_daily_loop():
+            await asyncio.sleep(60)
+            while True:
+                try:
+                    now = datetime.now()
+                    target = now.replace(hour=1, minute=0, second=0, microsecond=0)
+                    if now >= target:
+                        target = target + timedelta(days=1)
+                    await asyncio.sleep((target - now).total_seconds())
+                    from app.services.precool.accuracy_monitor import run_daily_accuracy_report
+                    await run_daily_accuracy_report()
+                except Exception as e:
+                    logger.error(f"每日精度统计任务失败: {e}")
+                    await asyncio.sleep(3600)
+
+        asyncio.create_task(_accuracy_daily_loop())
+
         scheduler = None
     except Exception as e:
         logger.error(f"✗ 传感器校准过期检查定时任务启动失败: {e}")

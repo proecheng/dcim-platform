@@ -188,14 +188,16 @@ async def get_validation_report(
 
         seven_days_ago = datetime.now() - timedelta(days=7)
 
-        # 查询最近 7 天已回填的预测记录
+        # 查询最近 7 天已回填的有效预测记录
+        # 排除哨兵值 -999.0（数据不可用），仅使用 deviation IS NOT NULL 的记录
         query = (
             select(TemperaturePredictionLog)
             .where(
                 and_(
                     TemperaturePredictionLog.cooling_zone_id == zone_id,
                     TemperaturePredictionLog.created_at >= seven_days_ago,
-                    TemperaturePredictionLog.actual_temp.isnot(None),
+                    TemperaturePredictionLog.actual_temp > 0,
+                    TemperaturePredictionLog.deviation.isnot(None),
                 )
             )
         )
@@ -215,13 +217,13 @@ async def get_validation_report(
                 ).model_dump(),
             }
 
-        # 计算 MAE
+        # 计算 MAE（使用存储的 deviation 字段）
         deviations_1h = []
         deviations_3h = []
         all_deviations = []
 
         for log in logs:
-            dev = abs(log.actual_temp - log.predicted_temp)
+            dev = abs(log.deviation)
             all_deviations.append(dev)
 
             if log.prediction_horizon_min <= 60:
