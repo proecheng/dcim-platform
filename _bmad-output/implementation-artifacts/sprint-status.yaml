@@ -367,7 +367,7 @@ development_status:
   31-2-precooling-plan-execution-engine: done
   31-3-precooling-plan-api-endpoint: done
   31-4-cooling-linkage-config-precooling-extension: done
-  31-5-frontend-precooling-plan-timeline: backlog
+  31-5-frontend-precooling-plan-timeline: done
   epic-31-retrospective: optional
 
   # Epic 32: 热参数自动校准与分阶段部署 (Phase 2b 月9-10)

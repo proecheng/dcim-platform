@@ -5,7 +5,7 @@
 import * as echarts from 'echarts/core'
 
 // 图表类型
-import { BarChart, LineChart, PieChart, GaugeChart } from 'echarts/charts'
+import { BarChart, LineChart, PieChart, GaugeChart, CustomChart } from 'echarts/charts'
 
 // 组件
 import {
@@ -15,6 +15,8 @@ import {
   LegendComponent,
   DataZoomComponent,
   MarkLineComponent,
+  MarkAreaComponent,
+  MarkPointComponent,
 } from 'echarts/components'
 
 // 渲染器
@@ -26,12 +28,15 @@ echarts.use([
   LineChart,
   PieChart,
   GaugeChart,
+  CustomChart,
   TitleComponent,
   TooltipComponent,
   GridComponent,
   LegendComponent,
   DataZoomComponent,
   MarkLineComponent,
+  MarkAreaComponent,
+  MarkPointComponent,
   CanvasRenderer,
 ])
 

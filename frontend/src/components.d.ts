@@ -134,6 +134,7 @@ declare module 'vue' {
     PointCard: typeof import('./components/monitor/PointCard.vue')['default']
     PowerCard: typeof import('./components/energy/PowerCard.vue')['default']
     PowerDistribution: typeof import('./components/bigscreen/charts/PowerDistribution.vue')['default']
+    PrecoolTimeline: typeof import('./components/energy/PrecoolTimeline.vue')['default']
     PricingSchemeManager: typeof import('./components/energy/PricingSchemeManager.vue')['default']
     PricingTimeline: typeof import('./components/energy/PricingTimeline.vue')['default']
     PUEGauge: typeof import('./components/energy/PUEGauge.vue')['default']

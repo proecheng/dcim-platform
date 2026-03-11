@@ -142,3 +142,92 @@ export function getRollbackOverview() {
     '/v1/precool/rollback-overview'
   )
 }
+
+// ========== 预冷计划类型 (Story 31.5) ==========
+
+export interface ScheduleListItem {
+  id: number
+  cooling_zone_id: number
+  schedule_date: string
+  precool_start_time: string
+  precool_end_time: string
+  target_temp: number
+  peak_start_time: string
+  peak_end_time: string
+  planned_savings_kwh: number | null
+  actual_savings_kwh: number | null
+  status: 'pending' | 'executing' | 'completed' | 'aborted'
+  abort_reason: string | null
+  is_validated: boolean
+  created_at: string | null
+  updated_at: string | null
+}
+
+export interface ScheduleDetail extends ScheduleListItem {
+  temperature_trajectory: {
+    predicted?: number[]
+    actual?: number[]
+    timestamps?: string[]
+    q_cool?: number[]
+    q_cool_actual?: number[]
+    prices?: number[]
+  } | null
+  validated_at: string | null
+}
+
+export interface PrecoolConfig {
+  zone_id: number
+  precool_enabled: boolean
+  precool_target_temp: number
+}
+
+// ========== 预冷计划 API (Story 31.5) ==========
+
+/** 生成预冷计划 */
+export function createSchedule(zoneId: number, data?: { schedule_date?: string }) {
+  return request.post<{ code: number; message: string; data: ScheduleDetail }>(
+    `/v1/precool/zones/${zoneId}/schedule`,
+    data || {}
+  )
+}
+
+/** 查询预冷计划列表 */
+export function listSchedules(
+  zoneId: number,
+  params?: { schedule_date?: string; status?: string; skip?: number; limit?: number }
+) {
+  return request.get<{ code: number; message: string; data: { items: ScheduleListItem[]; total: number } }>(
+    `/v1/precool/zones/${zoneId}/schedule`,
+    { params }
+  )
+}
+
+/** 查询预冷计划详情 */
+export function getSchedule(scheduleId: number) {
+  return request.get<{ code: number; message: string; data: ScheduleDetail }>(
+    `/v1/precool/schedules/${scheduleId}`
+  )
+}
+
+/** 中止预冷计划 */
+export function abortSchedule(scheduleId: number, data?: { reason?: string }) {
+  return request.post<{ code: number; message: string; data: { status: string; abort_reason: string | null } }>(
+    `/v1/precool/schedules/${scheduleId}/abort`,
+    data || {}
+  )
+}
+
+/** 查询预冷配置 */
+export function getPrecoolConfig(zoneId: number) {
+  return request.get<{ code: number; message: string; data: PrecoolConfig }>(
+    `/v1/precool/zones/${zoneId}/config`
+  )
+}
+
+/** 更新预冷配置 */
+export function updatePrecoolConfig(zoneId: number, data: { precool_enabled?: boolean; precool_target_temp?: number }) {
+  return request.put<{ code: number; message: string; data: PrecoolConfig }>(
+    `/v1/precool/zones/${zoneId}/config`,
+    data
+  )
+}

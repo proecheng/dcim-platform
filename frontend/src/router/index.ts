@@ -144,6 +144,7 @@ const routes: RouteRecordRaw[] = [
               { path: 'cooling-monitor', name: 'CoolingLinkageMonitor', component: () => import('@/views/energy/shift/CoolingLinkageMonitor.vue'), meta: { title: '制冷状态监控', icon: 'Monitor' } },
               { path: 'constraints', name: 'ShiftConstraintConfig', component: () => import('@/views/energy/shift/ShiftConstraintConfig.vue'), meta: { title: '约束管理', icon: 'Lock' } },
               { path: 'reports', name: 'ShiftReports', component: () => import('@/views/energy/shift/ShiftReports.vue'), meta: { title: '收益报表', icon: 'Document' } },
+              { path: 'precool-schedule', name: 'PrecoolSchedule', component: () => import('@/views/energy/shift/PrecoolScheduleView.vue'), meta: { title: '预冷计划', icon: 'Timer' } },
             ]
           },
         ]
