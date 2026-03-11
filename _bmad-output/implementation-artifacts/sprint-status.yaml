@@ -350,7 +350,7 @@ development_status:
   29-4-temperature-prediction-api-endpoint: done
   29-5-model-accuracy-validation-and-logging: done
   29-6-frontend-temperature-prediction-curve: done
-  29-7-replace-constraint-checker-fixed-cooling-ratio: backlog
+  29-7-replace-constraint-checker-fixed-cooling-ratio: done
   epic-29-retrospective: optional
 
   # Epic 30: 安全约束与自动回退 (Phase 2a 月7-8)

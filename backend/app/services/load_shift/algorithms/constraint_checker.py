@@ -5,16 +5,19 @@ Constraint Checker - Validate shift plan constraints
 
 from typing import List, Dict, Any, Optional
 from datetime import datetime, time
+import logging
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.load_shift import ShiftConstraint
+from app.models.load_shift import ShiftConstraint, CoolingLinkageConfig
 from app.models.energy import PowerDevice, DeviceShiftConfig
 from app.schemas.load_shift import (
     ConstraintType,
     ConstraintCheckResult,
     FeasibilityAnalysisRequest
 )
+
+logger = logging.getLogger(__name__)
 
 
 class ConstraintChecker:
@@ -31,6 +34,57 @@ class ConstraintChecker:
             return cfg
         old_cfg = getattr(constraint, "constraint_params", None)
         return old_cfg if isinstance(old_cfg, dict) else {}
+
+    async def _get_dynamic_cooling_ratio(self, zone_id_raw: Any) -> Optional[float]:
+        """
+        获取动态制冷可转移比例（TCL/THM）
+
+        Args:
+            zone_id_raw: 从约束配置中获取的 cooling_zone_id（可能为 None/str/int）
+
+        Returns:
+            float: 动态比例（0~1），或 None（调用方应回退到固定值）
+        """
+        if zone_id_raw is None:
+            return None
+
+        try:
+            zone_id = int(zone_id_raw)
+        except (ValueError, TypeError):
+            return None
+
+        try:
+            # 检查 precool_enabled 特性开关
+            result = await self.db.execute(
+                select(CoolingLinkageConfig)
+                .where(CoolingLinkageConfig.cooling_zone_id == zone_id)
+            )
+            linkage_config = result.scalar_one_or_none()
+
+            if linkage_config is None or not getattr(linkage_config, 'precool_enabled', False):
+                return None
+
+            # 延迟导入避免循环依赖
+            from app.services.datacenter_shift_strategy import calculate_shiftable_power_for_zone
+
+            calc_result = await calculate_shiftable_power_for_zone(zone_id, self.db)
+
+            if "error" in calc_result:
+                logger.warning(
+                    f"Zone {zone_id} 动态制冷比例计算失败: {calc_result.get('error')}, "
+                    f"详情: {calc_result.get('details', '')}, 回退到固定比例"
+                )
+                return None
+
+            ratio = calc_result.get("shiftable_ratio")
+            if ratio is not None:
+                logger.info(f"Zone {zone_id} 使用动态制冷比例: {ratio:.4f} (方法: {calc_result.get('method', 'unknown')})")
+                return float(ratio)
+
+            return None
+        except Exception as e:
+            logger.warning(f"Zone {zone_id_raw} 动态制冷比例查询异常: {e}, 回退到固定比例")
+            return None
 
     @staticmethod
     def _estimate_device_power(device: PowerDevice) -> float:
@@ -487,6 +541,10 @@ class ConstraintChecker:
             cooling_ratio = float(cfg.get("cooling_ratio", current_cooling_ratio))
             other_ratio = float(cfg.get("other_ratio", current_other_ratio))
             cooling_transferable_ratio = float(cfg.get("cooling_transferable_ratio", 0.40))
+            # 动态制冷比例: 如果配置了 cooling_zone_id 且 precool_enabled，使用 TCL/THM 动态计算
+            dynamic_ratio = await self._get_dynamic_cooling_ratio(cfg.get("cooling_zone_id"))
+            if dynamic_ratio is not None:
+                cooling_transferable_ratio = dynamic_ratio
             other_transferable_ratio = float(cfg.get("other_transferable_ratio", 0.60))
 
             max_transfer_power = total_power * (
