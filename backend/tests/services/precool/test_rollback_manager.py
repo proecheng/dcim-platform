@@ -87,7 +87,7 @@ class TestRateOverPredicted:
             "app.services.datacenter_shift_strategy._calculate_temperature_rise_rate",
             new_callable=AsyncMock,
             return_value=1.0,
-        ), patch.object(mgr, "_get_config_value", new_callable=AsyncMock, return_value=DEFAULT_PREDICTED_RATE):
+        ), patch.object(mgr, "_get_predicted_rate_from_schedule", new_callable=AsyncMock, return_value=DEFAULT_PREDICTED_RATE):
             result = await mgr._check_rate_over_predicted(1, session)
             assert result is None
 
@@ -101,7 +101,7 @@ class TestRateOverPredicted:
             "app.services.datacenter_shift_strategy._calculate_temperature_rise_rate",
             new_callable=AsyncMock,
             return_value=4.0,  # > 2.0 * 1.5 = 3.0
-        ), patch.object(mgr, "_get_config_value", new_callable=AsyncMock, return_value=DEFAULT_PREDICTED_RATE):
+        ), patch.object(mgr, "_get_predicted_rate_from_schedule", new_callable=AsyncMock, return_value=DEFAULT_PREDICTED_RATE):
             result = await mgr._check_rate_over_predicted(1, session)
             assert result is not None
             assert result["value"] == 4.0
@@ -116,9 +116,43 @@ class TestRateOverPredicted:
             "app.services.datacenter_shift_strategy._calculate_temperature_rise_rate",
             new_callable=AsyncMock,
             return_value=-3.0,
-        ), patch.object(mgr, "_get_config_value", new_callable=AsyncMock, return_value=DEFAULT_PREDICTED_RATE):
+        ), patch.object(mgr, "_get_predicted_rate_from_schedule", new_callable=AsyncMock, return_value=DEFAULT_PREDICTED_RATE):
             result = await mgr._check_rate_over_predicted(1, session)
             assert result is None
+
+    @pytest.mark.asyncio
+    async def test_dynamic_predicted_rate_from_schedule(self):
+        """从活跃 PrecoolSchedule 获取动态预测速率"""
+        mgr = RollbackManager()
+        session = _mock_session()
+
+        # 模拟 trajectory: 温度从 22.0 → 22.5（每步升 0.5°C/5min = 6°C/h）
+        mock_schedule = MagicMock()
+        mock_schedule.temperature_trajectory = {
+            "predicted": [22.0 + i * 0.5 for i in range(288)],
+            "timestamps": [f"{i*5//60:02d}:{i*5%60:02d}" for i in range(288)],
+        }
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none.return_value = mock_schedule
+        session.execute = AsyncMock(return_value=mock_result)
+
+        predicted_rate = await mgr._get_predicted_rate_from_schedule(1, session)
+        # 0.5°C / 5min × 12 = 6.0°C/h
+        assert predicted_rate == pytest.approx(6.0)
+
+    @pytest.mark.asyncio
+    async def test_dynamic_rate_fallback_no_schedule(self):
+        """无活跃计划时回退到 SystemConfig 默认值"""
+        mgr = RollbackManager()
+        session = _mock_session()
+
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none.return_value = None
+        session.execute = AsyncMock(return_value=mock_result)
+
+        with patch.object(mgr, "_get_config_value", new_callable=AsyncMock, return_value=DEFAULT_PREDICTED_RATE):
+            predicted_rate = await mgr._get_predicted_rate_from_schedule(1, session)
+            assert predicted_rate == DEFAULT_PREDICTED_RATE
 
 
 # ==================== 条件3: 温变速率超限 ====================

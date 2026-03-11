@@ -113,9 +113,7 @@ class RollbackManager:
         if rate <= 0:
             return None  # 降温或无变化不触发
 
-        predicted_rate = await self._get_config_value(
-            session, "rollback_predicted_rate", DEFAULT_PREDICTED_RATE
-        )
+        predicted_rate = await self._get_predicted_rate_from_schedule(zone_id, session)
         threshold = predicted_rate * DEFAULT_RATE_MULTIPLIER
 
         if rate > threshold:
@@ -125,6 +123,55 @@ class RollbackManager:
                 "action": f"恢复正常制冷（温升 {rate:.2f}°C/h > 预测 {predicted_rate:.1f} × {DEFAULT_RATE_MULTIPLIER}）",
             }
         return None
+
+    async def _get_predicted_rate_from_schedule(
+        self, zone_id: int, session: AsyncSession
+    ) -> float:
+        """从活跃 PrecoolSchedule 的 trajectory 动态计算预测温升速率。
+
+        在 trajectory["predicted"] 中找到当前时间对应的步骤索引，
+        用相邻步骤的温度差计算速率（°C/h）。
+        若无活跃计划或数据不足，回退到 SystemConfig / DEFAULT_PREDICTED_RATE。
+        """
+        try:
+            from app.models.thermal import PrecoolSchedule
+
+            result = await session.execute(
+                select(PrecoolSchedule)
+                .where(PrecoolSchedule.cooling_zone_id == zone_id)
+                .where(PrecoolSchedule.status == "executing")
+                .order_by(PrecoolSchedule.schedule_date.desc())
+                .limit(1)
+            )
+            schedule = result.scalar_one_or_none()
+
+            if schedule and schedule.temperature_trajectory:
+                traj = schedule.temperature_trajectory
+                predicted = traj.get("predicted", [])
+                if len(predicted) >= 2:
+                    now = datetime.now()
+                    # 每步 5 分钟，计算当前步骤索引
+                    minutes_since_midnight = now.hour * 60 + now.minute
+                    step_idx = minutes_since_midnight // 5
+                    step_idx = min(step_idx, len(predicted) - 1)
+
+                    # 用当前步与前一步（或后一步）计算温升速率
+                    if step_idx > 0:
+                        dt_celsius = predicted[step_idx] - predicted[step_idx - 1]
+                    else:
+                        dt_celsius = predicted[1] - predicted[0]
+
+                    # 5 分钟 → 每小时：× 12
+                    predicted_rate = dt_celsius * 12.0
+                    if predicted_rate > 0:
+                        return predicted_rate
+        except Exception as e:
+            logger.warning(f"Zone {zone_id} 从 PrecoolSchedule 获取预测速率失败: {e}")
+
+        # 回退: SystemConfig → 硬编码默认值
+        return await self._get_config_value(
+            session, "rollback_predicted_rate", DEFAULT_PREDICTED_RATE
+        )
 
     async def _check_rate_over_limit(
         self, zone_id: int, session: AsyncSession
