@@ -899,6 +899,36 @@ async def lifespan(app: FastAPI):
             name='预冷计划执行推进任务',
         )
 
+        # Story 32.1: 月度 RC 参数自动校准
+        try:
+            from app.services.precool.calibrator import rc_calibrator
+
+            async def _run_monthly_rc_calibration():
+                try:
+                    logger.info("开始月度 RC 参数自动校准...")
+                    results = await rc_calibrator.run_monthly_calibration()
+                    logger.info(
+                        f"月度 RC 校准完成: 成功={len(results.get('success', []))}, "
+                        f"跳过={len(results.get('skipped', []))}, "
+                        f"失败={len(results.get('failed', []))}"
+                    )
+                except Exception as e:
+                    logger.error(f"月度 RC 校准任务异常: {e}", exc_info=True)
+
+            scheduler.add_job(
+                _run_monthly_rc_calibration,
+                'cron',
+                day=1,
+                hour=3,
+                minute=37,
+                id='monthly_rc_calibration',
+                max_instances=1,
+                replace_existing=True,
+                name='月度RC参数自动校准',
+            )
+        except ImportError:
+            logger.warning("⚠️  calibrator 模块不可用（scipy 未安装），跳过月度RC校准任务")
+
         scheduler.start()
         logger.info("✓ 传感器校准过期检查定时任务已启动（每日凌晨 2:00）")
         logger.info("✓ 趋势分析定时任务已启动（每小时整点执行）")
@@ -909,6 +939,7 @@ async def lifespan(app: FastAPI):
         logger.info("✓ 每日精度统计任务已启动（每日凌晨 1:00）")
         logger.info("✓ 预冷计划扫描任务已启动（每分钟执行）")
         logger.info("✓ 预冷计划执行推进任务已启动（每 5 分钟执行）")
+        logger.info("✓ 月度RC参数自动校准任务已注册（每月1日 03:37）")
     except ImportError:
         logger.warning("⚠️  APScheduler 未安装，使用降级方案（asyncio.create_task）")
         async def _calibration_check_loop():

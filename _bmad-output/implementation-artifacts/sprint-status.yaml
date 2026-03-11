@@ -371,8 +371,8 @@ development_status:
   epic-31-retrospective: done  # 2026-03-11
 
   # Epic 32: 热参数自动校准与分阶段部署 (Phase 2b 月9-10)
-  epic-32: backlog
-  32-1-rc-parameter-least-squares-auto-calibration: backlog
+  epic-32: in-progress
+  32-1-rc-parameter-least-squares-auto-calibration: done
   32-2-phased-deployment-control: backlog
   32-3-thermal-parameter-management-api-complete: backlog
   32-4-frontend-deployment-phase-and-calibration-status: backlog
