@@ -357,7 +357,7 @@ development_status:
   epic-30: in-progress
   30-1-ashrae-temperature-hard-constraint-and-power-limit: done
   30-2-seven-auto-rollback-protection-mechanisms: done
-  30-3-rollback-protection-api-and-status-query: backlog
+  30-3-rollback-protection-api-and-status-query: done
   30-4-frontend-constraint-status-and-rollback-log: backlog
   epic-30-retrospective: optional
 

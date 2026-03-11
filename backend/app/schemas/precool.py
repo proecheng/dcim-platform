@@ -82,3 +82,47 @@ class DashboardResponse(BaseModel):
     zones: List[DashboardZone]
     status_summary: Dict[str, int]
     today_savings: float = 0.0
+
+
+# ==================== Story 30.3: 回退保护 API Schema ====================
+
+
+class RollbackTriggerInfo(BaseModel):
+    """回退触发条件信息"""
+    trigger_type: str
+    since: Optional[datetime] = None
+    event_id: Optional[int] = None
+    recovering: bool = False
+
+
+class RollbackStatusResponse(BaseModel):
+    """回退状态响应"""
+    zone_id: int
+    has_active_rollback: bool
+    active_triggers: List[RollbackTriggerInfo]
+
+
+class RollbackEventOut(BaseModel):
+    """回退事件历史输出"""
+    model_config = {"from_attributes": True}
+
+    id: int
+    zone_id: int
+    trigger_type: str
+    trigger_value: Optional[float] = None
+    threshold: Optional[float] = None
+    action: str
+    status: str
+    context_json: Optional[str] = None
+    created_at: Optional[datetime] = None
+    resolved_at: Optional[datetime] = None
+
+
+class RollbackOverviewResponse(BaseModel):
+    """回退全局概览"""
+    total_zones: int
+    zones_with_active_rollback: int
+    total_active_triggers: int
+    trigger_type_counts: Dict[str, int]
+    recent_events_24h: int
+    zone_statuses: List[RollbackStatusResponse]

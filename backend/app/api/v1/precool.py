@@ -11,6 +11,7 @@ from datetime import datetime, timedelta
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy import select, func, and_
 from sqlalchemy.ext.asyncio import AsyncSession
+from typing import Literal, Optional
 
 from ...api.deps import get_db, require_role
 from ...schemas.precool import (
@@ -20,7 +21,13 @@ from ...schemas.precool import (
     ValidationReport,
     DashboardZone,
     DashboardResponse,
+    RollbackTriggerInfo,
+    RollbackStatusResponse,
+    RollbackEventOut,
+    RollbackOverviewResponse,
 )
+from ...services.precool.rollback_manager import rollback_manager
+from ...models.rollback import RollbackEvent
 
 logger = logging.getLogger(__name__)
 
@@ -366,4 +373,163 @@ async def get_dashboard(
 
     except Exception as e:
         logger.error(f"查询仪表盘异常: {e}")
+        return {"code": 500, "message": "内部错误", "data": None}
+
+
+# ==================== Story 30.3: 回退保护 API ====================
+
+
+@router.get("/zones/{zone_id}/rollback-status", summary="查询 zone 回退保护状态")
+async def get_rollback_status(
+    zone_id: int,
+    db: AsyncSession = Depends(get_db),
+    _=Depends(require_role(["admin", "operator", "viewer"])),
+):
+    """返回指定 zone 的实时回退保护状态"""
+    try:
+        from ...models.topology_config import CoolingZone
+
+        # 校验 zone_id 存在
+        zone = (await db.execute(
+            select(CoolingZone).where(CoolingZone.id == zone_id)
+        )).scalar_one_or_none()
+
+        if zone is None:
+            return {"code": 404, "message": f"制冷区域 {zone_id} 不存在", "data": None}
+
+        status = rollback_manager.get_zone_rollback_status(zone_id)
+
+        return {
+            "code": 200,
+            "message": "success",
+            "data": RollbackStatusResponse(
+                zone_id=status["zone_id"],
+                has_active_rollback=status["has_active_rollback"],
+                active_triggers=[
+                    RollbackTriggerInfo(**t) for t in status["active_triggers"]
+                ],
+            ).model_dump(),
+        }
+
+    except Exception as e:
+        logger.error(f"查询回退状态异常: zone_id={zone_id}, error={e}")
+        return {"code": 500, "message": "内部错误", "data": None}
+
+
+@router.get("/zones/{zone_id}/rollback-history", summary="查询回退历史事件")
+async def get_rollback_history(
+    zone_id: int,
+    skip: int = Query(default=0, ge=0),
+    limit: int = Query(default=20, ge=1, le=100),
+    status: Optional[Literal["active", "resolved"]] = Query(
+        default=None, description="筛选: active/resolved，不传返回全部"
+    ),
+    db: AsyncSession = Depends(get_db),
+    _=Depends(require_role(["admin", "operator", "viewer"])),
+):
+    """查询指定 zone 的历史回退事件，支持分页和 status 筛选"""
+    try:
+        from ...models.topology_config import CoolingZone
+
+        # 校验 zone_id 存在
+        zone = (await db.execute(
+            select(CoolingZone).where(CoolingZone.id == zone_id)
+        )).scalar_one_or_none()
+
+        if zone is None:
+            return {"code": 404, "message": f"制冷区域 {zone_id} 不存在", "data": None}
+
+        # 构建查询
+        query = select(RollbackEvent).where(RollbackEvent.zone_id == zone_id)
+
+        if status is not None:
+            query = query.where(RollbackEvent.status == status)
+
+        # 查询总数
+        count_query = select(func.count()).select_from(query.subquery())
+        total = (await db.execute(count_query)).scalar() or 0
+
+        # 分页查询
+        query = query.order_by(RollbackEvent.created_at.desc()).offset(skip).limit(limit)
+        result = await db.execute(query)
+        items = result.scalars().all()
+
+        items_out = [
+            RollbackEventOut.model_validate(item).model_dump()
+            for item in items
+        ]
+
+        return {
+            "code": 200,
+            "message": "success",
+            "data": {"items": items_out, "total": total},
+        }
+
+    except Exception as e:
+        logger.error(f"查询回退历史异常: zone_id={zone_id}, error={e}")
+        return {"code": 500, "message": "内部错误", "data": None}
+
+
+@router.get("/rollback-overview", summary="全局回退状态概览")
+async def get_rollback_overview(
+    db: AsyncSession = Depends(get_db),
+    _=Depends(require_role(["admin", "operator", "viewer"])),
+):
+    """返回所有 zone 的回退状态汇总"""
+    try:
+        from ...models.topology_config import CoolingZone
+
+        # 查询所有 CoolingZone
+        zones_result = await db.execute(select(CoolingZone.id))
+        zone_ids = zones_result.scalars().all()
+        total_zones = len(zone_ids)
+
+        # 逐个查询回退状态（从内存）
+        zone_statuses = []
+        zones_with_active = 0
+        total_triggers = 0
+        trigger_counts: dict = {}
+
+        for zid in zone_ids:
+            status = rollback_manager.get_zone_rollback_status(zid)
+            zone_statuses.append(
+                RollbackStatusResponse(
+                    zone_id=status["zone_id"],
+                    has_active_rollback=status["has_active_rollback"],
+                    active_triggers=[
+                        RollbackTriggerInfo(**t) for t in status["active_triggers"]
+                    ],
+                )
+            )
+
+            if status["has_active_rollback"]:
+                zones_with_active += 1
+                for t in status["active_triggers"]:
+                    total_triggers += 1
+                    tt = t["trigger_type"]
+                    trigger_counts[tt] = trigger_counts.get(tt, 0) + 1
+
+        # 查询最近 24h 事件数
+        now = datetime.now()
+        day_ago = now - timedelta(hours=24)
+        recent_count = (await db.execute(
+            select(func.count(RollbackEvent.id))
+            .where(RollbackEvent.created_at >= day_ago)
+        )).scalar() or 0
+
+        return {
+            "code": 200,
+            "message": "success",
+            "data": RollbackOverviewResponse(
+                total_zones=total_zones,
+                zones_with_active_rollback=zones_with_active,
+                total_active_triggers=total_triggers,
+                trigger_type_counts=trigger_counts,
+                recent_events_24h=recent_count,
+                zone_statuses=[s.model_dump() for s in zone_statuses],
+            ).model_dump(),
+        }
+
+    except Exception as e:
+        logger.error(f"查询回退概览异常: {e}")
         return {"code": 500, "message": "内部错误", "data": None}
