@@ -245,6 +245,39 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning(f"⚠️  THM 配置项初始化失败: {e}")
 
+    # Story 30.1: 初始化约束检查配置项
+    try:
+        from app.models.config import SystemConfig as SysConfig301
+        from app.core.database import async_session as async_session_301
+
+        async with async_session_301() as session:
+            constraint_configs = {
+                "constraint_temp_max": "27.0",
+                "constraint_temp_min": "18.0",
+                "constraint_power_multiplier": "1.5",
+                "constraint_rate_limit": "5.0",
+            }
+
+            for key, value in constraint_configs.items():
+                existing = (await session.execute(
+                    select(SysConfig301).where(SysConfig301.config_key == key)
+                )).scalar_one_or_none()
+
+                if existing is None:
+                    new_config = SysConfig301(
+                        config_group="constraint",
+                        config_key=key,
+                        config_value=value,
+                        value_type="number",
+                        description=f"约束检查参数: {key}",
+                    )
+                    session.add(new_config)
+                    logger.info(f"✓ 初始化约束配置项: {key}={value}")
+
+            await session.commit()
+    except Exception as e:
+        logger.warning(f"⚠️  约束配置项初始化失败: {e}")
+
     # 初始化邮件服务（Story 26.2）
     if settings.smtp_enabled:
         from app.services.email_service import email_service

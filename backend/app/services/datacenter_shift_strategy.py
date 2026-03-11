@@ -706,6 +706,29 @@ async def calculate_shiftable_power_for_zone(
             "details": "SystemConfig table not available"
         }
 
+    # Story 30.1: 前置约束检查（ASHRAE 温度 + 温变速率）
+    try:
+        from app.services.precool.constraints import check_all_constraints
+        violations = await check_all_constraints(zone_id, session)
+        if violations:
+            error_violations = [v for v in violations if v.severity == "error"]
+            if error_violations:
+                return {
+                    "error": "constraint_violated",
+                    "zone_id": zone_id,
+                    "violations": [v.to_dict() for v in error_violations],
+                }
+            # warning 级别仅记录日志，不阻断
+            for w in violations:
+                if w.severity == "warning":
+                    logger.warning(
+                        f"Zone {zone_id} approaching constraint: "
+                        f"{w.constraint_type.value} = {w.current_value} (threshold: {w.threshold})"
+                    )
+    except Exception as e:
+        # 约束检查失败不应阻断功率计算
+        logger.warning(f"Zone {zone_id}: 约束检查异常，跳过: {e}")
+
     # 检查 RC 参数是否校准
     thermal_param = (await session.execute(
         select(ThermalParameter)
