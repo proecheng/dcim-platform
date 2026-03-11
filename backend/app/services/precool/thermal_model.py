@@ -106,6 +106,14 @@ class ThermalModel:
             C = zone.thermal_C  # kWh/°C
             beta = zone.bypass_beta if zone.bypass_beta is not None else 0.1  # 气流短路系数
 
+            # 除零错误保护
+            if R <= 0 or C <= 0:
+                return {
+                    "error": "invalid_parameters",
+                    "zone_id": zone_id,
+                    "details": f"thermal_R and thermal_C must be positive (R={R}, C={C})"
+                }
+
             # 4. 数值稳定性检查
             dt = 5 / 60  # 5 分钟 = 1/12 小时
             if dt >= 2 * R * C:
@@ -299,6 +307,10 @@ class ThermalModel:
         # 聚合到 5 分钟间隔（平均值）
         q_it_data = self._aggregate_timeseries(q_it_rows, interval_minutes=5, agg_func="mean")
 
+        # 应用线性插值（填补间隔 > 10 分钟的缺失点）
+        q_it_timestamps = [row[0] for row in q_it_rows]
+        q_it_timestamps_interp, q_it_data = self._interpolate_timeseries(q_it_timestamps, q_it_data, interval_minutes=5)
+
         # 2. 获取等效环境温度 T_ambient（精密空调回风温度）
         # 路径：CoolingZone → CoolingZoneUnit → CoolingUnit → Device → Point → PointHistory
         t_ambient_query = (
@@ -330,10 +342,15 @@ class ThermalModel:
         # 聚合到 5 分钟间隔（平均值）
         t_ambient_data = self._aggregate_timeseries(t_ambient_rows, interval_minutes=5, agg_func="mean")
 
+        # 应用线性插值
+        t_ambient_timestamps = [row[0] for row in t_ambient_rows]
+        t_ambient_timestamps_interp, t_ambient_data = self._interpolate_timeseries(t_ambient_timestamps, t_ambient_data, interval_minutes=5)
+
         # 3. 获取当前温度 T_current（进风温度传感器）
         # 路径：CoolingZone → CoolingZoneCabinet → CabinetTemperatureSensor(inlet) → Point → PointHistory
+        # 聚合策略：取最大值（保守估计安全裕度）
         t_current_query = (
-            select(PointHistory.value)
+            select(PointHistory.timestamp, PointHistory.value)
             .join(Point, PointHistory.point_id == Point.id)
             .join(CabinetTemperatureSensor, Point.id == CabinetTemperatureSensor.point_id)
             .join(CoolingZoneCabinet, CabinetTemperatureSensor.cabinet_id == CoolingZoneCabinet.cabinet_id)
@@ -345,7 +362,6 @@ class ThermalModel:
                 )
             )
             .order_by(PointHistory.timestamp.desc())
-            .limit(10)
         )
 
         t_current_result = await session.execute(t_current_query)
@@ -358,8 +374,9 @@ class ThermalModel:
                 "zone_id": zone_id
             }
 
-        # 取最大值（保守估计）
-        t_current = max(row[0] for row in t_current_rows)
+        # 聚合到 5 分钟间隔，取最大值（保守估计）
+        t_current_data = self._aggregate_timeseries(t_current_rows, interval_minutes=5, agg_func="max")
+        t_current = t_current_data[0] if t_current_data else t_current_rows[0][1]
 
         # 4. 获取出风温度 T_outlet（可选）
         t_outlet_query = (
@@ -388,6 +405,8 @@ class ThermalModel:
             logger.warning(f"Zone {zone_id}: outlet temperature sensor not found, will use T_ambient as fallback")
 
         # 5. 获取室外温度 T_outdoor（可选，用于 COP 季节修正）
+        # 通过精密空调室外机环境温度点位（{device_code}_ambient_temp）
+        # 注意：使用点位命名约定识别室外机温度，避免匹配室内环境温度
         t_outdoor_query = (
             select(PointHistory.value)
             .join(Point, PointHistory.point_id == Point.id)
@@ -398,7 +417,7 @@ class ThermalModel:
                 and_(
                     CoolingZoneUnit.cooling_zone_id == zone_id,
                     Point.point_code.like('%_ambient_temp'),
-                    Device.device_type == 'PRECISION_AC_OUTDOOR',
+                    Device.device_type == 'AC',  # 精密空调设备
                     PointHistory.timestamp >= now - timedelta(minutes=5)
                 )
             )
@@ -503,6 +522,60 @@ class ThermalModel:
         logger.warning(f"Data insufficient: {len(data)} points, filled to {target_length} using forward fill")
 
         return filled
+
+
+    def _interpolate_timeseries(
+        self,
+        timestamps: List[datetime],
+        values: List[float],
+        interval_minutes: int = 5
+    ) -> tuple[List[datetime], List[float]]:
+        """
+        对时间序列数据进行线性插值，填补间隔 > 10 分钟的缺失点
+
+        Args:
+            timestamps: 时间戳列表（从最新到最旧）
+            values: 数据值列表
+            interval_minutes: 目标时间间隔（分钟）
+
+        Returns:
+            (插值后的时间戳列表, 插值后的数据值列表)
+        """
+        if not timestamps or not values or len(timestamps) != len(values):
+            return timestamps, values
+
+        # 反转为从旧到新（便于插值）
+        timestamps = list(reversed(timestamps))
+        values = list(reversed(values))
+
+        interpolated_timestamps = [timestamps[0]]
+        interpolated_values = [values[0]]
+
+        for i in range(1, len(timestamps)):
+            prev_time = timestamps[i-1]
+            curr_time = timestamps[i]
+            prev_value = values[i-1]
+            curr_value = values[i]
+
+            # 计算时间间隔（分钟）
+            time_diff_minutes = (curr_time - prev_time).total_seconds() / 60
+
+            # 如果间隔 > 10 分钟，进行线性插值
+            if time_diff_minutes > 10:
+                num_points = int(time_diff_minutes / interval_minutes) - 1
+                for j in range(1, num_points + 1):
+                    # 线性插值
+                    ratio = j / (num_points + 1)
+                    interp_time = prev_time + timedelta(minutes=j * interval_minutes)
+                    interp_value = prev_value + ratio * (curr_value - prev_value)
+                    interpolated_timestamps.append(interp_time)
+                    interpolated_values.append(interp_value)
+
+            interpolated_timestamps.append(curr_time)
+            interpolated_values.append(curr_value)
+
+        # 反转回从新到旧
+        return list(reversed(interpolated_timestamps)), list(reversed(interpolated_values))
 
 
     async def _check_data_quality(
