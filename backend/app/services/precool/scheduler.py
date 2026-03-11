@@ -531,10 +531,12 @@ class PrecoolScheduler:
             peak_start = time(int(first_peak.start_hour), int((first_peak.start_hour % 1) * 60))
             peak_end = time(int(last_peak.end_hour) % 24, int((last_peak.end_hour % 1) * 60))
 
-        # 温度轨迹 JSON
+        # 温度轨迹 JSON（含功率和电价，供 executor 执行时使用）
         trajectory = {
             "predicted": [s.T_room for s in steps],
             "timestamps": [f"{int(s.time_minutes // 60):02d}:{int(s.time_minutes % 60):02d}" for s in steps],
+            "q_cool": [s.Q_cool for s in steps],
+            "prices": [s.price for s in steps],
         }
 
         return PrecoolSchedule(

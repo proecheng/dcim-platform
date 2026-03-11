@@ -861,6 +861,44 @@ async def lifespan(app: FastAPI):
             name='每日精度统计任务'
         )
 
+        # Story 31.2: 预冷计划扫描（每分钟）
+        async def _run_precool_scan():
+            """扫描 pending 预冷计划"""
+            try:
+                from app.services.precool.executor import precool_executor
+                await precool_executor.scan_and_execute_plans()
+            except Exception as e:
+                logger.error(f"预冷扫描异常: {e}")
+
+        scheduler.add_job(
+            _run_precool_scan,
+            'interval',
+            minutes=1,
+            max_instances=1,
+            coalesce=True,
+            id='precool_scan',
+            name='预冷计划扫描任务',
+        )
+
+        # Story 31.2: 预冷计划执行推进（每 5 分钟）
+        async def _run_precool_tick():
+            """推进 executing 预冷计划"""
+            try:
+                from app.services.precool.executor import precool_executor
+                await precool_executor.tick_executing_plans()
+            except Exception as e:
+                logger.error(f"预冷推进异常: {e}")
+
+        scheduler.add_job(
+            _run_precool_tick,
+            'interval',
+            minutes=5,
+            max_instances=1,
+            coalesce=True,
+            id='precool_tick',
+            name='预冷计划执行推进任务',
+        )
+
         scheduler.start()
         logger.info("✓ 传感器校准过期检查定时任务已启动（每日凌晨 2:00）")
         logger.info("✓ 趋势分析定时任务已启动（每小时整点执行）")
@@ -869,6 +907,8 @@ async def lifespan(app: FastAPI):
         logger.info("✓ 时间窗口调参分析任务已启动（每月1日凌晨 3:00）")
         logger.info("✓ 精度回填任务已启动（每 5 分钟执行）")
         logger.info("✓ 每日精度统计任务已启动（每日凌晨 1:00）")
+        logger.info("✓ 预冷计划扫描任务已启动（每分钟执行）")
+        logger.info("✓ 预冷计划执行推进任务已启动（每 5 分钟执行）")
     except ImportError:
         logger.warning("⚠️  APScheduler 未安装，使用降级方案（asyncio.create_task）")
         async def _calibration_check_loop():

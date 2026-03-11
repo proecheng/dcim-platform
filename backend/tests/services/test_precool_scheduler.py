@@ -454,6 +454,13 @@ class TestBuildPlan:
         assert plan.planned_savings_kwh == 50.0
         assert "predicted" in plan.temperature_trajectory
         assert len(plan.temperature_trajectory["predicted"]) == 288
+        # Story 31.2 扩展字段
+        assert "q_cool" in plan.temperature_trajectory
+        assert len(plan.temperature_trajectory["q_cool"]) == 288
+        assert plan.temperature_trajectory["q_cool"][0] == 100  # Q_cool from steps
+        assert "prices" in plan.temperature_trajectory
+        assert len(plan.temperature_trajectory["prices"]) == 288
+        assert plan.temperature_trajectory["prices"][0] == 0.5  # price from steps
 
     def test_build_plan_timestamps_format(self, scheduler, default_time_slots):
         steps = [ScheduleStep(i, i * 5, "flat", 0.5, 100, 350, 22.0, 0.1)
