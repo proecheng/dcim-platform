@@ -1,8 +1,8 @@
-# generated: 2026-03-07
-# project: DCIM
+# generated: 2026-03-11
+# project: admin
 # project_key: NOKEY
 # tracking_system: file-system
-# story_location: _bmad-output/implementation-artifacts
+# story_location: D:\mytest1\_bmad-output\implementation-artifacts\stories
 
 # STATUS DEFINITIONS:
 # ==================
@@ -43,19 +43,24 @@
 # P2: Epic 19 (安防消防)
 # P3: Epic 23 (大屏+OCR)
 #
-# PRIORITY (Epic 24-28):
+# PRIORITY (Epic 24-33):
 # ======================
 # P0: Epic 27 (前端数据链路统一) — 27.1→27.2→27.5 核心路径
 # P0: Epic 28 (Demo系统解耦) — 28.2→28.3 核心路径
 # P1: Epic 24 (智能诊断核心引擎)
 # P2: Epic 25 (智能诊断专业扩展)
 # P3: Epic 26 (智能诊断高级功能)
+# P1: Epic 29 (热模型与温度预测) — Phase 2a
+# P1: Epic 30 (安全约束与自动回退) — Phase 2a
+# P2: Epic 31 (预冷计划优化) — Phase 2b
+# P2: Epic 32 (热参数自动校准) — Phase 2b
+# P3: Epic 33 (VPP虚拟电厂集成) — Phase 3
 
-generated: 2026-03-07
-project: DCIM
+generated: 2026-03-11
+project: admin
 project_key: NOKEY
 tracking_system: file-system
-story_location: _bmad-output/implementation-artifacts
+story_location: D:\mytest1\_bmad-output\implementation-artifacts\stories
 
 development_status:
   # Epic 1: 采集网关框架 + Modbus/SNMP 适配器 (MVP)
@@ -330,3 +335,52 @@ development_status:
   28-3-main-system-demo-code-decoupling: done
   28-4-demo-data-safe-unload-and-tagging: done
   epic-28-retrospective: done
+
+  # ============================================================
+  # 预冷 TCL 模型 (Epic 29-33)
+  # 新增于 2026-03-10，基于 docs/空调可转移功率算法调研与改进方案.md V2.0
+  # 架构文档 V4.2.0 Section 21
+  # ============================================================
+
+  # Epic 29: 热模型与温度预测 (Phase 2a 月7-8)
+  epic-29: in-progress
+  29-1-thermodynamic-data-model-and-migration: review
+  29-2-rc-thermodynamic-model-core-algorithm: backlog
+  29-3-temperature-headroom-method-safety-fallback: backlog
+  29-4-temperature-prediction-api-endpoint: backlog
+  29-5-model-accuracy-validation-and-logging: backlog
+  29-6-frontend-temperature-prediction-curve: backlog
+  29-7-replace-constraint-checker-fixed-cooling-ratio: backlog
+  epic-29-retrospective: optional
+
+  # Epic 30: 安全约束与自动回退 (Phase 2a 月7-8)
+  epic-30: backlog
+  30-1-ashrae-temperature-hard-constraint-and-power-limit: backlog
+  30-2-seven-auto-rollback-protection-mechanisms: backlog
+  30-3-rollback-protection-api-and-status-query: backlog
+  30-4-frontend-constraint-status-and-rollback-log: backlog
+  epic-30-retrospective: optional
+
+  # Epic 31: 预冷计划优化 (Phase 2b 月9-10)
+  epic-31: backlog
+  31-1-greedy-optimization-precooling-scheduler: backlog
+  31-2-precooling-plan-execution-engine: backlog
+  31-3-precooling-plan-api-endpoint: backlog
+  31-4-cooling-linkage-config-precooling-extension: backlog
+  31-5-frontend-precooling-plan-timeline: backlog
+  epic-31-retrospective: optional
+
+  # Epic 32: 热参数自动校准与分阶段部署 (Phase 2b 月9-10)
+  epic-32: backlog
+  32-1-rc-parameter-least-squares-auto-calibration: backlog
+  32-2-phased-deployment-control: backlog
+  32-3-thermal-parameter-management-api-complete: backlog
+  32-4-frontend-deployment-phase-and-calibration-status: backlog
+  epic-32-retrospective: optional
+
+  # Epic 33: VPP 虚拟电厂集成 (Phase 3 月11-12+)
+  epic-33: backlog
+  33-1-vpp-adjustable-capacity-reporting-interface: backlog
+  33-2-vpp-control-command-reception-and-execution: backlog
+  33-3-frontend-vpp-integration-status-monitoring: backlog
+  epic-33-retrospective: optional

@@ -9,6 +9,8 @@ from ...core.database import async_session
 from ...models.device import Device
 from ...models.point import Point
 from ...models.cooling import CoolingUnit, CoolingGroup, ColdAisle
+from ...models.topology_config import CoolingZone
+from ...models.thermal import ThermalParameter
 
 import logging
 
@@ -373,144 +375,186 @@ def _create_point(device_id, device_type: str, device_code: str, area_code: str,
 async def seed_cooling_devices():
     """种子数据：创建制冷设备及关联点位"""
     async with async_session() as session:
-        # 检查是否已有AC-A01设备，避免重复创建
+        # 检查是否已有AC-A01设备，避免重复创建设备
         existing = await session.execute(select(Device).where(Device.device_code == "AC-A01"))
-        if existing.scalar_one_or_none():
-            logger.info("制冷种子数据已存在，跳过")
-            return
+        devices_exist = existing.scalar_one_or_none() is not None
 
-        logger.info("开始创建制冷种子数据...")
+        if not devices_exist:
+            logger.info("开始创建制冷种子数据...")
 
-        # ===== 1. 创建群控组 =====
-        group_map = {}
-        for group_data in COOLING_GROUPS:
-            group = CoolingGroup(
-                group_name=group_data["group_name"],
-                group_mode=group_data["group_mode"],
-                description=group_data["description"],
-            )
-            session.add(group)
-            await session.flush()
-            group_map[group_data["group_name"]] = group.id
-            logger.info(f"创建群控组: {group_data['group_name']}")
-
-        # ===== 2. 创建室内精密空调 =====
-        for ac_data in INDOOR_AC_DEVICES:
-            # 创建设备
-            device = Device(
-                device_code=ac_data["device_code"],
-                device_name=ac_data["device_name"],
-                device_type="PRECISION_AC_INDOOR",
-                area_code=ac_data["area_code"],
-                manufacturer=ac_data["manufacturer"],
-                model=ac_data["model"],
-                status="running",
-                install_date=date.today(, is_demo=True),
-            )
-            session.add(device)
-            await session.flush()
-
-            # 创建扩展记录
-            group_id = group_map.get(ac_data.get("group_name"))
-            ac_unit = CoolingUnit(
-                device_id=device.id,
-                unit_type="indoor",
-                cooling_capacity_kw=ac_data["cooling_capacity_kw"],
-                refrigerant_type=ac_data["refrigerant_type"],
-                compressor_count=ac_data["compressor_count"],
-                fan_count=ac_data["fan_count"],
-                group_id=group_id,
-            )
-            session.add(ac_unit)
-
-            # 创建点位
-            for idx, pt in enumerate(_ac_points(ac_data["device_code"])):
-                point = _create_point(
-                    device.id,
-                    "PRECISION_AC_INDOOR",
-                    ac_data["device_code"],
-                    ac_data["area_code"],
-                    pt,
-                    idx,
+            # ===== 1. 创建群控组 =====
+            group_map = {}
+            for group_data in COOLING_GROUPS:
+                group = CoolingGroup(
+                    group_name=group_data["group_name"],
+                    group_mode=group_data["group_mode"],
+                    description=group_data["description"],
                 )
-                session.add(point)
+                session.add(group)
+                await session.flush()
+                group_map[group_data["group_name"]] = group.id
+                logger.info(f"创建群控组: {group_data['group_name']}")
 
-            logger.info(f"创建室内空调: {ac_data['device_code']}")
-
-        # ===== 3. 创建室外机 =====
-        for ac_data in OUTDOOR_AC_DEVICES:
-            device = Device(
-                device_code=ac_data["device_code"],
-                device_name=ac_data["device_name"],
-                device_type="PRECISION_AC_OUTDOOR",
-                area_code=ac_data["area_code"],
-                manufacturer=ac_data["manufacturer"],
-                model=ac_data["model"],
-                status="running",
-                install_date=date.today(, is_demo=True),
-            )
-            session.add(device)
-            await session.flush()
-
-            ac_unit = CoolingUnit(
-                device_id=device.id,
-                unit_type="outdoor",
-                cooling_capacity_kw=ac_data["cooling_capacity_kw"],
-                refrigerant_type=ac_data["refrigerant_type"],
-                compressor_count=ac_data["compressor_count"],
-                fan_count=ac_data["fan_count"],
-            )
-            session.add(ac_unit)
-
-            for idx, pt in enumerate(_outdoor_ac_points(ac_data["device_code"])):
-                point = _create_point(
-                    device.id,
-                    "PRECISION_AC_OUTDOOR",
-                    ac_data["device_code"],
-                    ac_data["area_code"],
-                    pt,
-                    idx,
+            # ===== 2. 创建室内精密空调 =====
+            for ac_data in INDOOR_AC_DEVICES:
+                # 创建设备
+                device = Device(
+                    device_code=ac_data["device_code"],
+                    device_name=ac_data["device_name"],
+                    device_type="PRECISION_AC_INDOOR",
+                    area_code=ac_data["area_code"],
+                    manufacturer=ac_data["manufacturer"],
+                    model=ac_data["model"],
+                    status="running",
+                    install_date=date.today(),
+                    is_demo=True,
                 )
-                session.add(point)
+                session.add(device)
+                await session.flush()
 
-            logger.info(f"创建室外机: {ac_data['device_code']}")
-
-        # ===== 4. 创建冷通道 =====
-        for ca_data in COLD_AISLE_DEVICES:
-            device = Device(
-                device_code=ca_data["device_code"],
-                device_name=ca_data["device_name"],
-                device_type="COLD_AISLE",
-                area_code=ca_data["area_code"],
-                manufacturer=ca_data["manufacturer"],
-                model=ca_data["model"],
-                status="running",
-                install_date=date.today(, is_demo=True),
-            )
-            session.add(device)
-            await session.flush()
-
-            aisle = ColdAisle(
-                device_id=device.id,
-                aisle_code=ca_data["aisle_code"],
-                aisle_name=ca_data["aisle_name"],
-                skylight_count=ca_data["skylight_count"],
-                location=ca_data["location"],
-            )
-            session.add(aisle)
-
-            for idx, pt in enumerate(_cold_aisle_points(ca_data["device_code"])):
-                point = _create_point(
-                    device.id,
-                    "COLD_AISLE",
-                    ca_data["device_code"],
-                    ca_data["area_code"],
-                    pt,
-                    idx,
+                # 创建扩展记录
+                group_id = group_map.get(ac_data.get("group_name"))
+                ac_unit = CoolingUnit(
+                    device_id=device.id,
+                    unit_type="indoor",
+                    cooling_capacity_kw=ac_data["cooling_capacity_kw"],
+                    refrigerant_type=ac_data["refrigerant_type"],
+                    compressor_count=ac_data["compressor_count"],
+                    fan_count=ac_data["fan_count"],
+                    group_id=group_id,
                 )
-                session.add(point)
+                session.add(ac_unit)
 
-            logger.info(f"创建冷通道: {ca_data['device_code']}")
+                # 创建点位
+                for idx, pt in enumerate(_ac_points(ac_data["device_code"])):
+                    point = _create_point(
+                        device.id,
+                        "PRECISION_AC_INDOOR",
+                        ac_data["device_code"],
+                        ac_data["area_code"],
+                        pt,
+                        idx,
+                    )
+                    session.add(point)
+
+                logger.info(f"创建室内空调: {ac_data['device_code']}")
+
+            # ===== 3. 创建室外机 =====
+            for ac_data in OUTDOOR_AC_DEVICES:
+                device = Device(
+                    device_code=ac_data["device_code"],
+                    device_name=ac_data["device_name"],
+                    device_type="PRECISION_AC_OUTDOOR",
+                    area_code=ac_data["area_code"],
+                    manufacturer=ac_data["manufacturer"],
+                    model=ac_data["model"],
+                    status="running",
+                    install_date=date.today(),
+                    is_demo=True,
+                )
+                session.add(device)
+                await session.flush()
+
+                ac_unit = CoolingUnit(
+                    device_id=device.id,
+                    unit_type="outdoor",
+                    cooling_capacity_kw=ac_data["cooling_capacity_kw"],
+                    refrigerant_type=ac_data["refrigerant_type"],
+                    compressor_count=ac_data["compressor_count"],
+                    fan_count=ac_data["fan_count"],
+                )
+                session.add(ac_unit)
+
+                for idx, pt in enumerate(_outdoor_ac_points(ac_data["device_code"])):
+                    point = _create_point(
+                        device.id,
+                        "PRECISION_AC_OUTDOOR",
+                        ac_data["device_code"],
+                        ac_data["area_code"],
+                        pt,
+                        idx,
+                    )
+                    session.add(point)
+
+                logger.info(f"创建室外机: {ac_data['device_code']}")
+
+            # ===== 4. 创建冷通道 =====
+            for ca_data in COLD_AISLE_DEVICES:
+                device = Device(
+                    device_code=ca_data["device_code"],
+                    device_name=ca_data["device_name"],
+                    device_type="COLD_AISLE",
+                    area_code=ca_data["area_code"],
+                    manufacturer=ca_data["manufacturer"],
+                    model=ca_data["model"],
+                    status="running",
+                    install_date=date.today(),
+                    is_demo=True,
+                )
+                session.add(device)
+                await session.flush()
+
+                aisle = ColdAisle(
+                    device_id=device.id,
+                    aisle_code=ca_data["aisle_code"],
+                    aisle_name=ca_data["aisle_name"],
+                    skylight_count=ca_data["skylight_count"],
+                    location=ca_data["location"],
+                )
+                session.add(aisle)
+
+                for idx, pt in enumerate(_cold_aisle_points(ca_data["device_code"])):
+                    point = _create_point(
+                        device.id,
+                        "COLD_AISLE",
+                        ca_data["device_code"],
+                        ca_data["area_code"],
+                        pt,
+                        idx,
+                    )
+                    session.add(point)
+
+                logger.info(f"创建冷通道: {ca_data['device_code']}")
+        else:
+            logger.info("制冷设备种子数据已存在，跳过设备创建")
+
+        # ===== 5. 为现有 CoolingZone 生成默认热参数 =====
+        # 查询所有 CoolingZone
+        zones_result = await session.execute(select(CoolingZone))
+        zones = zones_result.scalars().all()
+
+        for zone in zones:
+            # 检查是否已存在 demo 热参数（去重逻辑）
+            existing_param = await session.execute(
+                select(ThermalParameter).where(
+                    ThermalParameter.cooling_zone_id == zone.id,
+                    ThermalParameter.is_demo == True
+                )
+            )
+            if existing_param.scalar_one_or_none():
+                logger.info(f"CoolingZone {zone.zone_code} 已有 demo 热参数，跳过")
+                continue
+
+            # 计算 thermal_C：基于 area_m2，处理 NULL 和 ≤0 情况
+            if zone.area_m2 and zone.area_m2 > 0:
+                thermal_C = 0.04 * zone.area_m2  # kWh/°C
+            else:
+                thermal_C = 50.0  # 默认值
+
+            # 创建默认热参数
+            thermal_param = ThermalParameter(
+                cooling_zone_id=zone.id,
+                thermal_R=0.5,  # 默认热阻 °C/kW
+                thermal_C=thermal_C,
+                fitting_r_squared=None,
+                fitting_method="default",
+                sample_count=None,
+                calibrated_at=None,
+                is_active=True,
+                is_demo=True,
+            )
+            session.add(thermal_param)
+            logger.info(f"为 CoolingZone {zone.zone_code} 创建默认热参数: R=0.5, C={thermal_C:.2f}")
 
         await session.commit()
         logger.info("制冷种子数据创建完成")

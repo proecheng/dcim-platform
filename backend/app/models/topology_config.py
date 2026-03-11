@@ -40,9 +40,19 @@ class CoolingZone(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     zone_code = Column(String(50), unique=True, nullable=False, comment="区域编码")
     zone_name = Column(String(100), nullable=False, comment="区域名称")
-    room_id = Column(Integer, ForeignKey("rooms.id"), nullable=True, comment="所属房间ID")
+    room_id = Column(Integer, ForeignKey("rooms.id", ondelete="SET NULL"), nullable=True, comment="所属房间ID")
+    site_id = Column(Integer, ForeignKey("sites.id", ondelete="SET NULL"), nullable=True, comment="所属站点")
     design_capacity_kw = Column(Float, nullable=True, comment="设计制冷量(kW)")
     description = Column(Text, nullable=True, comment="描述")
+
+    # 热模型参数（Story 29.1 新增）
+    area_m2 = Column(Float, nullable=True, comment="冷通道面积 m²，用于计算热容")
+    height_m = Column(Float, default=3.0, comment="冷通道层高 m")
+    thermal_R = Column(Float, nullable=True, comment="热阻标定值 °C/kW，NULL=未标定")
+    thermal_C = Column(Float, nullable=True, comment="热容标定值 kWh/°C（总热容），NULL=未标定")
+    bypass_beta = Column(Float, default=0.1, comment="气流短路系数 0~0.3，应用层验证范围")
+    r_calibrated_at = Column(DateTime, nullable=True, comment="R/C 最近标定时间")
+
     created_at = Column(DateTime, default=datetime.now, comment="创建时间")
     updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now, comment="更新时间")
 

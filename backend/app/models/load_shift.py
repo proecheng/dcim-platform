@@ -373,21 +373,27 @@ class ShiftAnalysisRecord(Base):
 
 class CoolingLinkageConfig(Base):
     """制冷联动配置表
-    
+
     配置负荷转移与制冷系统的联动规则
     """
-    
+
     __tablename__ = "cooling_linkage_configs"
-    
+
     id = Column(Integer, primary_key=True, autoincrement=True)
+    cooling_zone_id = Column(
+        Integer,
+        ForeignKey("cooling_zones.id", ondelete="CASCADE"),
+        nullable=False,
+        comment="关联制冷区域"
+    )
     enabled = Column(Boolean, default=True, comment="是否启用制冷联动")
     lag_time_minutes = Column(Integer, default=20, comment="制冷滞后时间 分钟")
-    
+
     # COP 参数
     target_cop = Column(Float, default=3.0, comment="目标 COP")
     cop_lower_threshold = Column(Float, default=2.0, comment="COP 下限阈值")
     cop_upper_threshold = Column(Float, default=4.5, comment="COP 上限阈值")
-    
+
     # 温度参数
     target_supply_temp = Column(Float, default=10.0, comment="供水温度目标值 ℃")
     supply_temp_lower = Column(Float, default=5.0, comment="供水温度下限 ℃")
@@ -395,17 +401,21 @@ class CoolingLinkageConfig(Base):
     target_return_temp = Column(Float, default=15.0, comment="回水温度目标值 ℃")
     return_temp_lower = Column(Float, default=10.0, comment="回水温度下限 ℃")
     return_temp_upper = Column(Float, default=20.0, comment="回水温度上限 ℃")
-    
+
     # 调整策略
     power_adjust_step = Column(Integer, default=20, comment="功率调整步长 kW")
     max_adjust_ratio = Column(Float, default=0.25, comment="最大调整幅度")
     adjust_interval_minutes = Column(Integer, default=10, comment="调整间隔时间 分钟")
-    
+
     # 安全保护
     safety_protection_enabled = Column(Boolean, default=True, comment="启用安全保护")
     min_cooling_power = Column(Float, default=100, comment="最小制冷功率 kW")
     max_cooling_power = Column(Float, default=2000, comment="最大制冷功率 kW")
-    
+
+    # 预冷功能（Story 29.1 新增）
+    precool_target_temp = Column(Float, nullable=True, comment="预冷目标温度 °C")
+    precool_enabled = Column(Boolean, default=False, comment="是否启用预冷功能")
+
     # 时间戳
     created_at = Column(DateTime, default=datetime.now, comment="创建时间")
     updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now, comment="更新时间")
