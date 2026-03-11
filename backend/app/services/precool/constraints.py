@@ -199,7 +199,7 @@ async def _get_max_inlet_temperature(
             .join(CabinetTemperatureSensor, CabinetTemperatureSensor.point_id == Point.id)
             .join(Cabinet, Cabinet.id == CabinetTemperatureSensor.cabinet_id)
             .join(CoolingZoneCabinet, CoolingZoneCabinet.cabinet_id == Cabinet.id)
-            .where(CoolingZoneCabinet.cooling_zone_id == zone_id)
+            .where(CoolingZoneCabinet.zone_id == zone_id)
             .where(CabinetTemperatureSensor.sensor_location == 'inlet')
             .where(PointHistory.timestamp >= five_min_ago)
         )

@@ -278,6 +278,36 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning(f"⚠️  约束配置项初始化失败: {e}")
 
+    # Story 30.2: 初始化回退保护配置项
+    try:
+        from app.models.config import SystemConfig as SysConfig302
+        from app.core.database import async_session as async_session_302
+
+        async with async_session_302() as session:
+            rollback_configs = {
+                "rollback_predicted_rate": "2.0",
+            }
+
+            for key, value in rollback_configs.items():
+                existing = (await session.execute(
+                    select(SysConfig302).where(SysConfig302.config_key == key)
+                )).scalar_one_or_none()
+
+                if existing is None:
+                    new_config = SysConfig302(
+                        config_group="rollback",
+                        config_key=key,
+                        config_value=value,
+                        value_type="number",
+                        description=f"回退保护参数: {key}",
+                    )
+                    session.add(new_config)
+                    logger.info(f"✓ 初始化回退配置项: {key}={value}")
+
+            await session.commit()
+    except Exception as e:
+        logger.warning(f"⚠️  回退配置项初始化失败: {e}")
+
     # 初始化邮件服务（Story 26.2）
     if settings.smtp_enabled:
         from app.services.email_service import email_service
@@ -924,6 +954,38 @@ async def lifespan(app: FastAPI):
     # 启动 WebSocket 心跳检测
     ws_manager.start_heartbeat()
     print("WebSocket 心跳检测已启动，每30秒检查一次")
+
+    # Story 30.2: 回退保护监控
+    async def _rollback_monitor_loop():
+        """回退保护监控循环 — 每 10 秒检查所有 zone"""
+        from app.services.precool.rollback_manager import rollback_manager
+        from app.core.database import async_session as rollback_session
+        from app.models.topology_config import CoolingZone
+
+        await asyncio.sleep(15)
+        logger.info("🛡️ 回退保护监控已启动")
+
+        while True:
+            try:
+                async with rollback_session() as session:
+                    zones = (await session.execute(
+                        select(CoolingZone.id)
+                    )).scalars().all()
+
+                    for zone_id in zones:
+                        try:
+                            await rollback_manager.check_zone(zone_id, session)
+                        except Exception as e:
+                            logger.error(f"Zone {zone_id} 回退检测异常: {e}")
+
+                    await session.commit()
+            except Exception as e:
+                logger.error(f"回退监控循环异常: {e}")
+
+            await asyncio.sleep(10)
+
+    rollback_task = asyncio.create_task(_rollback_monitor_loop())
+    print("回退保护监控已启动，每10秒检查一次")
 
     print("API文档: http://localhost:8000/docs")
 
