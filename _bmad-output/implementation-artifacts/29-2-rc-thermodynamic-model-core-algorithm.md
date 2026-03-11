@@ -1,6 +1,6 @@
 # Story 29.2: RC 热动力学模型核心算法
 
-Status: in-progress
+Status: review
 
 ## Story
 
