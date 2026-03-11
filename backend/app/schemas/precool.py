@@ -196,3 +196,27 @@ class ScheduleAbortResponse(BaseModel):
     """中止计划响应"""
     status: str
     abort_reason: Optional[str] = None
+
+
+# ==================== Story 31.4: 预冷配置 Schema ====================
+
+
+class PrecoolConfigOut(BaseModel):
+    """预冷配置输出"""
+    zone_id: int
+    precool_enabled: bool = False
+    precool_target_temp: float = 18.0
+
+
+class PrecoolConfigUpdate(BaseModel):
+    """预冷配置更新请求"""
+    precool_enabled: Optional[bool] = Field(
+        default=None,
+        description="是否启用预冷功能",
+    )
+    precool_target_temp: Optional[float] = Field(
+        default=None,
+        ge=18.0,
+        le=25.0,
+        description="预冷目标温度 °C（范围 18-25）",
+    )

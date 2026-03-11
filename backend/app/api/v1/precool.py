@@ -4,8 +4,10 @@
 Story 29.4: 温度预测 API 端点
 Story 30.3: 回退保护 API
 Story 31.3: 预冷计划 API 端点
+Story 31.4: 预冷配置管理端点
 """
 
+import json
 import logging
 from datetime import datetime, date, timedelta
 
@@ -15,7 +17,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Literal, Optional
 
-from ...api.deps import get_db, require_role
+from ...api.deps import get_db, get_current_user, require_role
 from ...schemas.precool import (
     PredictRequest,
     PredictResponse,
@@ -32,6 +34,8 @@ from ...schemas.precool import (
     ScheduleDetailOut,
     ScheduleAbortRequest,
     ScheduleAbortResponse,
+    PrecoolConfigOut,
+    PrecoolConfigUpdate,
 )
 from ...services.precool.rollback_manager import rollback_manager
 from ...models.rollback import RollbackEvent
@@ -790,4 +794,147 @@ async def abort_schedule(
 
     except Exception as e:
         logger.error(f"中止预冷计划异常: schedule_id={schedule_id}, error={e}")
+        return {"code": 500, "message": "内部错误", "data": None}
+
+
+# ==================== Story 31.4: 预冷配置管理 API ====================
+
+
+@router.get("/zones/{zone_id}/config", summary="查询预冷配置")
+async def get_precool_config(
+    zone_id: int,
+    db: AsyncSession = Depends(get_db),
+    _=Depends(require_role(["admin", "operator"])),
+):
+    """查询指定 zone 的预冷配置（precool_enabled, precool_target_temp）"""
+    try:
+        from ...models.topology_config import CoolingZone
+        from ...models.load_shift import CoolingLinkageConfig
+
+        # 校验 zone 存在
+        zone = (await db.execute(
+            select(CoolingZone).where(CoolingZone.id == zone_id)
+        )).scalar_one_or_none()
+        if zone is None:
+            return {"code": 404, "message": f"制冷区域 {zone_id} 不存在", "data": None}
+
+        # 查询配置
+        config = (await db.execute(
+            select(CoolingLinkageConfig).where(
+                CoolingLinkageConfig.cooling_zone_id == zone_id
+            )
+        )).scalar_one_or_none()
+
+        if config is None:
+            # 返回默认值
+            return {
+                "code": 200,
+                "message": "success",
+                "data": PrecoolConfigOut(
+                    zone_id=zone_id,
+                    precool_enabled=False,
+                    precool_target_temp=18.0,
+                ).model_dump(),
+            }
+
+        return {
+            "code": 200,
+            "message": "success",
+            "data": PrecoolConfigOut(
+                zone_id=zone_id,
+                precool_enabled=config.precool_enabled or False,
+                precool_target_temp=config.precool_target_temp or 18.0,
+            ).model_dump(),
+        }
+
+    except Exception as e:
+        logger.error(f"查询预冷配置异常: zone_id={zone_id}, error={e}")
+        return {"code": 500, "message": "内部错误", "data": None}
+
+
+@router.put("/zones/{zone_id}/config", summary="更新预冷配置")
+async def update_precool_config(
+    zone_id: int,
+    request: PrecoolConfigUpdate,
+    db: AsyncSession = Depends(get_db),
+    current_user=Depends(require_role(["admin"])),
+):
+    """更新指定 zone 的预冷配置（admin only）"""
+    try:
+        from ...models.topology_config import CoolingZone
+        from ...models.load_shift import CoolingLinkageConfig
+        from ...models.log import OperationLog
+
+        # 校验 zone 存在
+        zone = (await db.execute(
+            select(CoolingZone).where(CoolingZone.id == zone_id)
+        )).scalar_one_or_none()
+        if zone is None:
+            return {"code": 404, "message": f"制冷区域 {zone_id} 不存在", "data": None}
+
+        # 查询或创建配置
+        config = (await db.execute(
+            select(CoolingLinkageConfig).where(
+                CoolingLinkageConfig.cooling_zone_id == zone_id
+            )
+        )).scalar_one_or_none()
+
+        is_new = config is None
+        if is_new:
+            config = CoolingLinkageConfig(cooling_zone_id=zone_id)
+            db.add(config)
+            await db.flush()
+
+        # 记录旧值
+        old_values = {
+            "precool_enabled": config.precool_enabled or False,
+            "precool_target_temp": config.precool_target_temp or 18.0,
+        }
+
+        # 更新字段
+        if request.precool_enabled is not None:
+            config.precool_enabled = request.precool_enabled
+        if request.precool_target_temp is not None:
+            config.precool_target_temp = request.precool_target_temp
+
+        new_values = {
+            "precool_enabled": config.precool_enabled or False,
+            "precool_target_temp": config.precool_target_temp or 18.0,
+        }
+
+        # 审计日志
+        log = OperationLog(
+            user_id=current_user.id,
+            username=current_user.username,
+            module="precool",
+            action="create" if is_new else "update",
+            target_type="cooling_linkage_config",
+            target_id=config.id,
+            target_name=f"zone_{zone_id}_precool_config",
+            old_value=json.dumps(old_values),
+            new_value=json.dumps(new_values),
+        )
+        db.add(log)
+
+        await db.commit()
+
+        logger.info(
+            "预冷配置已更新: zone=%d, enabled=%s, target_temp=%.1f",
+            zone_id,
+            config.precool_enabled,
+            config.precool_target_temp or 18.0,
+        )
+
+        return {
+            "code": 200,
+            "message": "success",
+            "data": PrecoolConfigOut(
+                zone_id=zone_id,
+                precool_enabled=config.precool_enabled or False,
+                precool_target_temp=config.precool_target_temp or 18.0,
+            ).model_dump(),
+        }
+
+    except Exception as e:
+        logger.error(f"更新预冷配置异常: zone_id={zone_id}, error={e}")
         return {"code": 500, "message": "内部错误", "data": None}
