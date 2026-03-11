@@ -359,7 +359,7 @@ development_status:
   30-2-seven-auto-rollback-protection-mechanisms: done
   30-3-rollback-protection-api-and-status-query: done
   30-4-frontend-constraint-status-and-rollback-log: done
-  epic-30-retrospective: optional
+  epic-30-retrospective: done  # 2026-03-11
 
   # Epic 31: 预冷计划优化 (Phase 2b 月9-10)
   epic-31: backlog
