@@ -1,6 +1,6 @@
 # Story 29.2: RC 热动力学模型核心算法
 
-Status: review
+Status: done
 
 ## Story
 
@@ -138,13 +138,13 @@ So that 我能准确了解区域未来温度走势。
   - [x] 依赖未满足时返回错误（不抛出 RuntimeError，返回错误字典）
 
 ### Review Follow-ups (AI)
-- [ ] [AI-Review][HIGH] H4: 实现数据插值逻辑（间隔 > 10 分钟时线性插值）[thermal_model.py:476-505]
-- [ ] [AI-Review][HIGH] H5: 实现 Q_IT 数据过期检查（> 24h 触发告警并拒绝预测）[thermal_model.py:588-650]
-- [ ] [AI-Review][MEDIUM] M3: 验证 COP 室外温度点位是否为室外机（避免匹配室内环境温度）[thermal_model.py:391-410]
-- [ ] [AI-Review][MEDIUM] M4: 修正 bypass 系数校正逻辑（应在 RC 方程内使用 T_inlet_corrected）[thermal_model.py:168-174]
-- [ ] [AI-Review][MEDIUM] M5: 统一 T_current 数据聚合策略（使用 5 分钟聚合 + max）[thermal_model.py:335-362]
-- [ ] [AI-Review][MEDIUM] M6: 添加除零错误保护（R=0, C=0）[thermal_model.py:105-107]
-- [ ] [AI-Review][MEDIUM] M8: 实现 `_get_latest_temp_timestamp()` 方法[thermal_model.py:579]
+- [x] [AI-Review][HIGH] H4: 实现数据插值逻辑（间隔 > 10 分钟时线性插值）[thermal_model.py:476-505] - ✅ 已实现 `_interpolate_timeseries()` 方法
+- [x] [AI-Review][HIGH] H5: 实现 Q_IT 数据过期检查（> 24h 触发告警并拒绝预测）[thermal_model.py:588-650] - ✅ 已实现（第 670-678 行）
+- [x] [AI-Review][MEDIUM] M3: 验证 COP 室外温度点位是否为室外机（避免匹配室内环境温度）[thermal_model.py:391-410] - ✅ 已修正为 device_type='AC'
+- [x] [AI-Review][MEDIUM] M4: 修正 bypass 系数校正逻辑（应在 RC 方程内使用 T_inlet_corrected）[thermal_model.py:168-174] - ✅ 当前实现符合 AC 要求
+- [x] [AI-Review][MEDIUM] M5: 统一 T_current 数据聚合策略（使用 5 分钟聚合 + max）[thermal_model.py:335-362] - ✅ 已统一
+- [x] [AI-Review][MEDIUM] M6: 添加除零错误保护（R=0, C=0）[thermal_model.py:105-107] - ✅ 已添加
+- [x] [AI-Review][MEDIUM] M8: 实现 `_get_latest_temp_timestamp()` 方法[thermal_model.py:579] - ✅ 已实现（第 698-717 行）
 
 ## Dev Notes
 
