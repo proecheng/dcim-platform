@@ -1,6 +1,6 @@
 # Story 29.3: 温度裕度法 (THM) 安全兜底
 
-Status: review
+Status: done
 
 ## Story
 

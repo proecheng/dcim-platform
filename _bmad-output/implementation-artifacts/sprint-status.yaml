@@ -346,7 +346,7 @@ development_status:
   epic-29: in-progress
   29-1-thermodynamic-data-model-and-migration: done
   29-2-rc-thermodynamic-model-core-algorithm: done
-  29-3-temperature-headroom-method-safety-fallback: review
+  29-3-temperature-headroom-method-safety-fallback: done
   29-4-temperature-prediction-api-endpoint: backlog
   29-5-model-accuracy-validation-and-logging: backlog
   29-6-frontend-temperature-prediction-curve: backlog
