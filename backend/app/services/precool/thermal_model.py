@@ -226,8 +226,7 @@ class ThermalModel:
                 await session.execute(select(TemperaturePredictionLog).limit(1))
 
                 # 检查 CoolingZone 表字段
-                zone_result = await session.execute(select(CoolingZone).limit(1))
-                zone = zone_result.scalar_one_or_none()
+                zone = (await session.execute(select(CoolingZone).limit(1))).scalar_one_or_none()
                 if zone:
                     if not hasattr(zone, 'thermal_R') or not hasattr(zone, 'thermal_C') or not hasattr(zone, 'bypass_beta'):
                         raise RuntimeError("CoolingZone table missing required fields")
