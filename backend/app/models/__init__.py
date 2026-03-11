@@ -111,7 +111,7 @@ from .load_shift import (
     CoolingLinkageRecord,
     DeviceLifespanImpact,
 )
-from .thermal import ThermalParameter, TemperaturePredictionLog
+from .thermal import ThermalParameter, TemperaturePredictionLog, PrecoolSchedule
 
 __all__ = [
     # 枚举
@@ -313,4 +313,5 @@ __all__ = [
     # 热动力学模型
     "ThermalParameter",
     "TemperaturePredictionLog",
+    "PrecoolSchedule",
 ]

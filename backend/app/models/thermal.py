@@ -12,10 +12,13 @@ from sqlalchemy import (
     Float,
     Boolean,
     DateTime,
+    Date,
+    Time,
     ForeignKey,
     Index,
     UniqueConstraint,
 )
+from sqlalchemy.types import JSON
 
 from ..core.database import Base
 
@@ -96,4 +99,74 @@ class TemperaturePredictionLog(Base):
     # 复合索引：cooling_zone_id ASC + created_at DESC（时序查询优化）
     __table_args__ = (
         Index("ix_temp_pred_zone_time", "cooling_zone_id", created_at.desc()),
+    )
+
+
+class PrecoolSchedule(Base):
+    """预冷计划表
+
+    存储由贪心优化算法生成的预冷调度计划，
+    包含预冷/峰时时段、温度轨迹、节省电费等信息。
+    """
+
+    __tablename__ = "precool_schedules"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    cooling_zone_id = Column(
+        Integer,
+        ForeignKey("cooling_zones.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+        comment="关联制冷区域ID"
+    )
+    schedule_date = Column(Date, nullable=False, comment="计划日期")
+
+    # 预冷时段
+    precool_start_time = Column(Time, nullable=False, comment="预冷开始时间（谷时）")
+    precool_end_time = Column(Time, nullable=False, comment="预冷结束时间")
+    target_temp = Column(Float, nullable=False, comment="预冷目标温度 °C")
+
+    # 峰时削减时段
+    peak_start_time = Column(Time, nullable=False, comment="峰时削减开始时间")
+    peak_end_time = Column(Time, nullable=False, comment="峰时削减结束时间")
+
+    # 能效指标
+    planned_savings_kwh = Column(Float, default=0.0, comment="计划节省电量 kWh")
+    actual_savings_kwh = Column(Float, nullable=True, comment="实际节省电量 kWh")
+
+    # 执行状态
+    status = Column(
+        String(20),
+        default="pending",
+        index=True,
+        comment="状态: pending/executing/completed/aborted"
+    )
+    abort_reason = Column(String(500), nullable=True, comment="中止原因")
+
+    # 温度轨迹 JSON
+    temperature_trajectory = Column(
+        JSON,
+        nullable=True,
+        comment="预测/实际温度轨迹 JSON: {predicted: [...], timestamps: [...]}"
+    )
+
+    # 验证信息
+    is_validated = Column(Boolean, default=False, comment="是否通过约束验证")
+    validated_at = Column(DateTime, nullable=True, comment="验证时间")
+
+    created_at = Column(DateTime, default=datetime.now, comment="创建时间")
+    updated_at = Column(
+        DateTime,
+        default=datetime.now,
+        onupdate=datetime.now,
+        comment="更新时间"
+    )
+
+    __table_args__ = (
+        UniqueConstraint(
+            "cooling_zone_id",
+            "schedule_date",
+            name="uq_zone_schedule_date"
+        ),
+        Index("ix_precool_schedules_status", "status"),
     )

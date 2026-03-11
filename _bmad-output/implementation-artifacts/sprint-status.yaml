@@ -362,8 +362,8 @@ development_status:
   epic-30-retrospective: done  # 2026-03-11
 
   # Epic 31: 预冷计划优化 (Phase 2b 月9-10)
-  epic-31: backlog
-  31-1-greedy-optimization-precooling-scheduler: backlog
+  epic-31: in-progress
+  31-1-greedy-optimization-precooling-scheduler: done
   31-2-precooling-plan-execution-engine: backlog
   31-3-precooling-plan-api-endpoint: backlog
   31-4-cooling-linkage-config-precooling-extension: backlog
