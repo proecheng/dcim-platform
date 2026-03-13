@@ -16,6 +16,7 @@ from ..core.database import Base
 
 class CalibrationStatus(str, Enum):
     """校准状态枚举"""
+
     VALID = "valid"
     EXPIRED = "expired"
     NO_METADATA = "no_metadata"
@@ -64,7 +65,7 @@ class DiagnosisResult(Base):
     # Story 24.2 迁移已创建的字段（补全模型声明）
     device_id = Column(Integer, nullable=True, index=True, comment="设备ID")
     diagnosis_level = Column(String(10), nullable=True, comment="诊断级别")
-    matched = Column(Boolean, nullable=True, server_default='0', comment="是否匹配规则")
+    matched = Column(Boolean, nullable=True, server_default="0", comment="是否匹配规则")
     conclusion = Column(Text, nullable=True, comment="诊断结论")
     confidence = Column(Float, nullable=True, comment="置信度")
     suggested_actions = Column(JSON, nullable=True, comment="建议操作")
@@ -77,7 +78,9 @@ class DiagnosisResult(Base):
     root_cause = Column(String(500), nullable=True, comment="根因描述")
     reasoning_path = Column(JSON, nullable=True, comment="推理路径")
     fault_tree_version = Column(String(50), nullable=True, comment="故障树版本号")
-    fault_tree_version_id = Column(Integer, ForeignKey("fault_tree_versions.id"), nullable=True, index=True, comment="故障树版本ID")
+    fault_tree_version_id = Column(
+        Integer, ForeignKey("fault_tree_versions.id"), nullable=True, index=True, comment="故障树版本ID"
+    )
 
 
 class DiagnosisSession(Base):
@@ -119,8 +122,16 @@ class DiagnosisAnnotation(Base):
     __tablename__ = "diagnosis_annotations"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    session_id = Column(Integer, ForeignKey("diagnosis_sessions.id", ondelete="CASCADE"), nullable=False, index=True, comment="诊断会话ID")
-    annotator_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True, comment="标注者ID")
+    session_id = Column(
+        Integer,
+        ForeignKey("diagnosis_sessions.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+        comment="诊断会话ID",
+    )
+    annotator_id = Column(
+        Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True, comment="标注者ID"
+    )
     annotation = Column(String(20), nullable=False, comment="标注结果: accurate/inaccurate/unknown")
     actual_root_cause = Column(Text, nullable=True, comment="实际根因(标注为inaccurate时必填)")
     notes = Column(Text, nullable=True, comment="备注")
@@ -154,7 +165,9 @@ class SOHPointUnavailableTracking(Base):
     __tablename__ = "soh_point_unavailable_tracking"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    device_id = Column(Integer, ForeignKey("devices.id", ondelete="CASCADE"), nullable=False, unique=True, comment="设备ID")
+    device_id = Column(
+        Integer, ForeignKey("devices.id", ondelete="CASCADE"), nullable=False, unique=True, comment="设备ID"
+    )
     consecutive_days = Column(Integer, nullable=False, default=0, comment="连续不可用天数")
     last_unavailable_date = Column(DateTime, nullable=False, comment="最后一次不可用日期")
     alarm_triggered = Column(Boolean, nullable=False, default=False, comment="是否已触发告警")
@@ -168,7 +181,9 @@ class BreakerProfile(Base):
     __tablename__ = "breaker_profiles"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    breaker_device_id = Column(Integer, ForeignKey("power_devices.id", ondelete="CASCADE"), nullable=False, unique=True, comment="断路器设备ID")
+    breaker_device_id = Column(
+        Integer, ForeignKey("power_devices.id", ondelete="CASCADE"), nullable=False, unique=True, comment="断路器设备ID"
+    )
     trip_curve_type = Column(String(1), nullable=False, comment="脱扣曲线类型: B/C/D")
     rated_current = Column(Float, nullable=False, comment="额定电流 A")
     created_at = Column(DateTime, default=datetime.now, comment="创建时间")
@@ -181,7 +196,9 @@ class SensorMetadata(Base):
     __tablename__ = "sensor_metadata"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    point_id = Column(Integer, ForeignKey("points.id", ondelete="CASCADE"), nullable=False, unique=True, index=True, comment="点位ID")
+    point_id = Column(
+        Integer, ForeignKey("points.id", ondelete="CASCADE"), nullable=False, unique=True, index=True, comment="点位ID"
+    )
     ct_pt_ratio = Column(Float, nullable=True, comment="CT/PT变比")
     accuracy_class = Column(Float, nullable=False, comment="精度等级: 0.2/0.5/1.0")
     calibration_date = Column(Date, nullable=True, comment="校准日期")
@@ -218,9 +235,7 @@ class SensorFusionRecord(Base):
     """多传感器融合记录表 - Story 25.7"""
 
     __tablename__ = "sensor_fusion_records"
-    __table_args__ = (
-        Index("idx_sensor_fusion_zone_time", "zone_id", "created_at"),
-    )
+    __table_args__ = (Index("idx_sensor_fusion_zone_time", "zone_id", "created_at"),)
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     zone_id = Column(Integer, ForeignKey("cooling_zones.id", ondelete="CASCADE"), nullable=False, comment="区域ID")
@@ -246,7 +261,13 @@ class CounterfactualAnalysis(Base):
     )
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    session_id = Column(Integer, ForeignKey("diagnosis_sessions.id", ondelete="CASCADE"), nullable=False, unique=True, comment="诊断会话ID")
+    session_id = Column(
+        Integer,
+        ForeignKey("diagnosis_sessions.id", ondelete="CASCADE"),
+        nullable=False,
+        unique=True,
+        comment="诊断会话ID",
+    )
     original_root_cause = Column(String(500), nullable=True, comment="原始根因")
     original_confidence = Column(Float, nullable=True, comment="原始置信度")
     top_evidences = Column(JSON, nullable=False, comment="Top证据列表")
@@ -384,3 +405,18 @@ class TimeWindowAdjustmentLog(Base):
     created_at = Column(DateTime, nullable=False, default=datetime.now, comment="创建时间")
     updated_at = Column(DateTime, nullable=False, default=datetime.now, onupdate=datetime.now, comment="更新时间")
 
+
+class TrainingDataAudit(Base):
+    """训练数据异常检测审计表 — Story 26.9"""
+
+    __tablename__ = "training_data_audits"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    run_date = Column(DateTime, nullable=False, default=datetime.now, comment="运行日期")
+    total_samples = Column(Integer, nullable=False, comment="总样本数")
+    anomaly_count = Column(Integer, nullable=False, default=0, comment="异常样本数")
+    anomaly_rate = Column(Float, nullable=False, default=0.0, comment="异常率")
+    contamination = Column(Float, nullable=False, default=0.05, comment="IsolationForest contamination 参数")
+    action_taken = Column(String(50), nullable=False, comment="执行动作: weight_reduced/removed/aborted/skipped")
+    anomaly_sample_ids = Column(JSON, nullable=True, comment="异常样本 annotation ID 列表")
+    created_at = Column(DateTime, default=datetime.now, comment="创建时间")

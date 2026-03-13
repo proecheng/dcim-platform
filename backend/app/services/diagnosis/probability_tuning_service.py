@@ -36,6 +36,25 @@ class ProbabilityTuningService:
         """
         logger.info("开始执行概率调参分析")
 
+        # Story 26.9: 前置训练数据质量检查
+        audit_result = None
+        try:
+            from app.services.diagnosis.training_data_audit_service import training_data_audit_service
+            audit_result = await training_data_audit_service.run_anomaly_detection()
+            if audit_result.get("status") == "aborted":
+                logger.critical("训练数据质量检查未通过，中止概率调参")
+                result = {
+                    "analyzed_trees": 0,
+                    "total_adjustments": 0,
+                    "pending_approvals": 0,
+                }
+                result["audit_result"] = audit_result
+                return result
+        except ImportError:
+            logger.info("training_data_audit_service 不可用，跳过数据质量检查")
+        except Exception as e:
+            logger.error(f"训练数据质量检查失败: {e}", exc_info=True)
+
         analyzed_trees = 0
         total_adjustments = 0
 

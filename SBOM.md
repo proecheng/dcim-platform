@@ -11,7 +11,7 @@
 | numpy | >=1.24.0 | BSD-3-Clause | 已安装 | 贝叶斯矩阵化传播、数值计算 | Epic 24 |
 | scipy | >=1.11.0 | BSD-3-Clause | 已安装 | 最小二乘校准（Epic 32）、多设备优化 | Epic 7, 32 |
 | APScheduler | ==3.10.4 | MIT | 已安装 | 定时诊断/校准/扫描任务调度 | Epic 24 |
-| scikit-learn | — | BSD-3-Clause | 计划引入（Story 26.9） | IsolationForest 异常检测 | — |
+| scikit-learn | >=1.3.0,<2.0 | BSD-3-Clause | 已安装 | IsolationForest 异常检测 | Epic 26 |
 
 ## 依赖关系说明
 
@@ -19,7 +19,7 @@
 - **numpy** 为贝叶斯推理提供矩阵运算，被 scipy 依赖
 - **scipy** 提供 `scipy.optimize.least_squares` 用于 RC 热参数校准
 - **APScheduler** 管理所有异步定时任务（诊断调度、校准、安全扫描等）
-- **scikit-learn** 计划用于 IsolationForest 异常检测，当前未安装，待 Story 26.9 需要时添加到 `requirements.txt`
+- **scikit-learn** 提供 IsolationForest 用于训练数据异常检测（Story 26.9），条件导入（未安装时静默跳过）
 
 ## 安全扫描策略
 

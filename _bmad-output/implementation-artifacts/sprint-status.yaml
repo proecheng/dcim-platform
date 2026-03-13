@@ -302,7 +302,7 @@ development_status:
   26-6-misdiagnosis-analysis-report: done  # 完成: 服务层、API、定时任务、审计日志、34个测试全通过
   26-7-disaster-recovery-drill: done  # 完成: 演练服务、API(6端点)、调度器集成、CircuitBreaker.force_open、22个测试全通过
   26-8-edge-inference-reservation-and-sbom: done
-  26-9-training-data-anomaly-detection: backlog
+  26-9-training-data-anomaly-detection: done
   26-10-hmac-key-management: backlog
   epic-26-retrospective: done  # 部分回顾(7/10 Story完成)，2026-03-09
 

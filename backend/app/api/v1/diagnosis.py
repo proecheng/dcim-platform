@@ -1928,3 +1928,23 @@ async def update_time_window_config(
         "device_type": device_type,
         "time_window_minutes": time_window_minutes
     }
+
+
+# ============================================================
+# 训练数据异常检测 API - Story 26.9
+# ============================================================
+
+@router.get("/training-audit", summary="查询训练数据异常检测历史")
+async def list_training_audits(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    _: User = Depends(require_admin),
+):
+    """查询训练数据异常检测历史报告（仅管理员可访问）"""
+    try:
+        from app.services.diagnosis.training_data_audit_service import training_data_audit_service
+        result = await training_data_audit_service.list_audits(page, page_size)
+        return {"code": 200, "message": "success", "data": result}
+    except Exception as e:
+        logger.error(f"查询训练数据审计历史失败: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"查询失败: {e}")
