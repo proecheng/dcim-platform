@@ -381,6 +381,6 @@ development_status:
   # Epic 33: VPP 虚拟电厂集成 (Phase 3 月11-12+)
   epic-33: in-progress
   33-1-vpp-adjustable-capacity-reporting-interface: done
-  33-2-vpp-control-command-reception-and-execution: backlog
+  33-2-vpp-control-command-reception-and-execution: done
   33-3-frontend-vpp-integration-status-monitoring: backlog
   epic-33-retrospective: optional

@@ -264,6 +264,27 @@ class VppZoneCapacity(BaseModel):
     cop: float
 
 
+class VppDispatchRequest(BaseModel):
+    """VPP 调控指令请求"""
+    command_type: str  # Literal 验证在端点层做
+    target_power_kw: float
+    duration_minutes: int
+    priority: int = 1
+
+
+class VppDispatchResponse(BaseModel):
+    """VPP 调控指令响应"""
+    dispatch_id: str
+    command_type: str
+    target_power_kw: float
+    duration_minutes: int
+    status: str  # accepted / rejected
+    reject_reason: Optional[str] = None
+    max_adjustable_kw: Optional[float] = None
+    accepted_power_kw: Optional[float] = None
+    aborted_schedule_id: Optional[int] = None
+
+
 class VppCapacityResponse(BaseModel):
     """VPP 聚合可调容量响应"""
     down_adjustable_kw: float       # 聚合向下可调电功率

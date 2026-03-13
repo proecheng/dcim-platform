@@ -75,6 +75,9 @@ class Settings(BaseSettings):
     license_key: str = "DEMO-0000-0000-0000"
     max_points: int = 100
 
+    # VPP 对外接口认证 (Story 33.2)
+    VPP_API_KEY: str = "dcim-vpp-default-key-change-me"
+
     # Redis 配置
     redis_enabled: bool = True
     redis_url: str = "redis://localhost:6379/0"

@@ -169,3 +169,37 @@ class PrecoolSchedule(Base):
             name="uq_zone_schedule_date"
         ),
     )
+
+
+class VppDispatch(Base):
+    """VPP 调控指令记录
+
+    记录 VPP 平台下发的负荷调控指令及处理结果。
+    Story 33.2: VPP 调控指令接收与执行
+    """
+    __tablename__ = "vpp_dispatches"
+
+    id = Column(Integer, primary_key=True, index=True)
+    dispatch_id = Column(String(64), unique=True, nullable=False, comment="UUID 外部标识")
+    command_type = Column(String(20), nullable=False, comment="调控方向: down_adjust/up_adjust")
+    target_power_kw = Column(Float, nullable=False, comment="请求调控功率 kW_e")
+    duration_minutes = Column(Integer, nullable=False, comment="持续时间（分钟）")
+    priority = Column(Integer, default=1, comment="优先级 1=普通 2=紧急")
+
+    status = Column(String(20), nullable=False, default="received",
+                    comment="状态: received/accepted/rejected")
+
+    reject_reason = Column(String(500), nullable=True, comment="拒绝原因")
+    max_adjustable_kw = Column(Float, nullable=True, comment="拒绝时返回的最大可调容量")
+    accepted_power_kw = Column(Float, nullable=True, comment="实际接受的调控功率")
+
+    aborted_schedule_id = Column(Integer, nullable=True, comment="被中止的预冷计划 ID")
+
+    created_at = Column(
+        DateTime, default=datetime.now, comment="创建时间"
+    )
+
+    __table_args__ = (
+        Index("ix_vpp_dispatches_status", "status"),
+        Index("ix_vpp_dispatches_created_at", "created_at"),
+    )

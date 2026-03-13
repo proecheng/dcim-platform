@@ -13,7 +13,7 @@ import json
 import logging
 from datetime import datetime, date, timedelta
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Header, Query
 from sqlalchemy import select, func, and_
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -1112,3 +1112,88 @@ async def get_vpp_capacity(
     except Exception as e:
         logger.error(f"VPP 容量查询失败: {e}", exc_info=True)
         return {"code": 500, "message": f"VPP 容量查询失败: {e}", "data": None}
+
+
+# ==================== Story 33.2: VPP 调控指令接收 ====================
+
+
+async def verify_vpp_api_key(x_vpp_api_key: str = Header(None)):
+    """VPP 独立 API Key 认证（与 JWT 分离）"""
+    from ...core.config import get_settings
+    settings = get_settings()
+    if not x_vpp_api_key or x_vpp_api_key != settings.VPP_API_KEY:
+        return None
+    return x_vpp_api_key
+
+
+@router.post("/vpp/dispatch", summary="接收 VPP 调控指令")
+async def receive_vpp_dispatch(
+    request: dict,
+    api_key: str = Depends(verify_vpp_api_key),
+):
+    """
+    接收 VPP 平台下发的负荷调控指令（仅部署阶段 4 可用）
+
+    - command_type: down_adjust（削峰）/ up_adjust（填谷）
+    - target_power_kw: 目标调控功率 (kW_e)
+    - duration_minutes: 持续时间（分钟）
+    - priority: 优先级（1=普通, 2=紧急）
+
+    认证方式: X-VPP-API-Key header（与 JWT 分离）
+    """
+    # 1. API Key 认证
+    if api_key is None:
+        return {"code": 401, "message": "VPP 认证失败", "data": None}
+
+    # 2. 请求格式校验
+    command_type = request.get("command_type")
+    if command_type not in ("down_adjust", "up_adjust"):
+        return {
+            "code": 400,
+            "message": "command_type 必须为 down_adjust 或 up_adjust",
+            "data": None,
+        }
+    for field in ("target_power_kw", "duration_minutes"):
+        if field not in request:
+            return {
+                "code": 400,
+                "message": f"缺少必填字段: {field}",
+                "data": None,
+            }
+
+    # 3. 部署阶段检查
+    try:
+        from ...services.precool.deployment_phase import deployment_phase_service
+        phase_info = await deployment_phase_service.get_current_phase()
+        if phase_info["current_phase"] != 4:
+            return {
+                "code": 403,
+                "message": "VPP 接口仅在部署阶段 4 可用",
+                "data": None,
+            }
+    except Exception as e:
+        logger.error(f"VPP 调控 - 部署阶段检查失败: {e}", exc_info=True)
+        return {"code": 500, "message": f"部署阶段检查失败: {e}", "data": None}
+
+    # 4. 速率限制
+    try:
+        from ...services.precool.vpp_dispatch import vpp_dispatch_service
+        rate_ok = await vpp_dispatch_service.check_rate_limit()
+        if not rate_ok:
+            return {
+                "code": 429,
+                "message": "超出速率限制（每小时最多 12 条）",
+                "data": None,
+            }
+    except Exception as e:
+        logger.error(f"VPP 调控 - 速率限制检查失败: {e}", exc_info=True)
+        # 速率限制失败不阻塞
+
+    # 5. 调用 dispatch 服务
+    try:
+        from ...services.precool.vpp_dispatch import vpp_dispatch_service
+        result = await vpp_dispatch_service.validate_and_execute(request)
+        return {"code": 200, "message": "success", "data": result}
+    except Exception as e:
+        logger.error(f"VPP 调控指令处理失败: {e}", exc_info=True)
+        return {"code": 500, "message": f"VPP 调控指令处理失败: {e}", "data": None}
