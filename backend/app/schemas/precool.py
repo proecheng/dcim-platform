@@ -220,3 +220,26 @@ class PrecoolConfigUpdate(BaseModel):
         le=25.0,
         description="预冷目标温度 °C（范围 18-25）",
     )
+
+
+# ==================== Story 32.2: 部署阶段 Schema ====================
+
+
+class DeploymentPhaseOut(BaseModel):
+    """部署阶段查询响应"""
+    current_phase: int = Field(ge=1, le=4)
+    phase_name: str
+    description: str
+    updated_at: Optional[str] = None
+
+
+class DeploymentPhaseUpdate(BaseModel):
+    """部署阶段切换请求"""
+    phase: int = Field(ge=1, le=4, description="目标阶段: 1=THM, 2=校准, 3=TCL上线, 4=VPP接入")
+    force: bool = Field(default=False, description="强制跳过前置检查（仅 admin）")
+
+
+class PreconditionCheckResult(BaseModel):
+    """前置检查结果"""
+    passed: bool
+    details: List[str] = []
