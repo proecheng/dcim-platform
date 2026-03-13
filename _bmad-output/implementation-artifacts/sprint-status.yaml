@@ -374,7 +374,7 @@ development_status:
   epic-32: in-progress
   32-1-rc-parameter-least-squares-auto-calibration: done
   32-2-phased-deployment-control: done
-  32-3-thermal-parameter-management-api-complete: backlog
+  32-3-thermal-parameter-management-api-complete: done
   32-4-frontend-deployment-phase-and-calibration-status: backlog
   epic-32-retrospective: optional
 

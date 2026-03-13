@@ -5,6 +5,7 @@ Story 29.4: 温度预测 API 端点
 Story 30.3: 回退保护 API
 Story 31.3: 预冷计划 API 端点
 Story 31.4: 预冷配置管理端点
+Story 32.3: 热参数管理 API（手动校准、校准历史、部署阶段）
 """
 
 import json
@@ -36,6 +37,7 @@ from ...schemas.precool import (
     ScheduleAbortResponse,
     PrecoolConfigOut,
     PrecoolConfigUpdate,
+    DeploymentPhaseUpdate,
 )
 from ...services.precool.rollback_manager import rollback_manager
 from ...models.rollback import RollbackEvent
@@ -937,4 +939,135 @@ async def update_precool_config(
 
     except Exception as e:
         logger.error(f"更新预冷配置异常: zone_id={zone_id}, error={e}")
+        return {"code": 500, "message": "内部错误", "data": None}
+
+
+# ==================== Story 32.3: 热参数管理 API ====================
+
+
+@router.post("/zones/{zone_id}/calibrate", summary="触发手动 RC 校准")
+async def trigger_calibration(
+    zone_id: int,
+    db: AsyncSession = Depends(get_db),
+    _=Depends(require_role(["admin", "operator"])),
+):
+    """手动触发指定区域的 RC 参数校准"""
+    try:
+        from ...models.topology_config import CoolingZone
+
+        # 校验 zone 存在
+        zone = (await db.execute(
+            select(CoolingZone).where(CoolingZone.id == zone_id)
+        )).scalar_one_or_none()
+        if zone is None:
+            return {"code": 404, "message": f"制冷区域 {zone_id} 不存在", "data": None}
+
+        # 调用校准服务（self-managing session）
+        from ...services.precool.calibrator import rc_calibrator
+        result = await rc_calibrator.calibrate(zone_id)
+
+        if "error" in result:
+            error = result["error"]
+            if error == "scipy_not_installed":
+                return {"code": 503, "message": "scipy 未安装，校准功能不可用", "data": None}
+            return {"code": 422, "message": f"校准失败: {error}", "data": result}
+
+        return {"code": 200, "message": "success", "data": result}
+
+    except Exception as e:
+        logger.error(f"手动校准异常: zone_id={zone_id}, error={e}")
+        return {"code": 500, "message": "内部错误", "data": None}
+
+
+@router.get("/zones/{zone_id}/calibration-history", summary="查询校准历史")
+async def get_calibration_history(
+    zone_id: int,
+    skip: int = Query(default=0, ge=0),
+    limit: int = Query(default=20, ge=1, le=100),
+    db: AsyncSession = Depends(get_db),
+    _=Depends(require_role(["admin", "operator", "viewer"])),
+):
+    """返回指定区域的校准历史记录（仅非 demo 记录）"""
+    try:
+        from ...models.topology_config import CoolingZone
+        from ...models.thermal import ThermalParameter
+
+        # 校验 zone 存在
+        zone = (await db.execute(
+            select(CoolingZone).where(CoolingZone.id == zone_id)
+        )).scalar_one_or_none()
+        if zone is None:
+            return {"code": 404, "message": f"制冷区域 {zone_id} 不存在", "data": None}
+
+        # 查询总数
+        total_result = await db.execute(
+            select(func.count())
+            .select_from(ThermalParameter)
+            .where(ThermalParameter.cooling_zone_id == zone_id)
+            .where(ThermalParameter.is_demo == False)  # noqa: E712
+        )
+        total = total_result.scalar() or 0
+
+        # 分页查询
+        result = await db.execute(
+            select(ThermalParameter)
+            .where(ThermalParameter.cooling_zone_id == zone_id)
+            .where(ThermalParameter.is_demo == False)  # noqa: E712
+            .order_by(ThermalParameter.created_at.desc())
+            .offset(skip)
+            .limit(limit)
+        )
+        records = result.scalars().all()
+
+        items = [
+            ThermalParameterOut.model_validate(r).model_dump()
+            for r in records
+        ]
+
+        return {
+            "code": 200,
+            "message": "success",
+            "data": {"total": total, "items": items},
+        }
+
+    except Exception as e:
+        logger.error(f"查询校准历史异常: zone_id={zone_id}, error={e}")
+        return {"code": 500, "message": "内部错误", "data": None}
+
+
+@router.get("/deployment-phase", summary="查询当前部署阶段")
+async def get_deployment_phase(
+    _=Depends(require_role(["admin", "operator", "viewer"])),
+):
+    """返回当前预冷功能部署阶段"""
+    try:
+        from ...services.precool.deployment_phase import deployment_phase_service
+        result = await deployment_phase_service.get_current_phase()
+        return {"code": 200, "message": "success", "data": result}
+    except Exception as e:
+        logger.error(f"查询部署阶段异常: {e}")
+        return {"code": 500, "message": "内部错误", "data": None}
+
+
+@router.put("/deployment-phase", summary="切换部署阶段")
+async def update_deployment_phase(
+    request: DeploymentPhaseUpdate,
+    current_user=Depends(require_role(["admin"])),
+):
+    """切换预冷功能部署阶段（仅 admin）"""
+    try:
+        from ...services.precool.deployment_phase import deployment_phase_service
+        result = await deployment_phase_service.update_phase(
+            new_phase=request.phase,
+            force=request.force,
+            user_id=current_user.id,
+            username=current_user.username,
+        )
+        if "error" in result:
+            if result["error"] == "precondition_failed":
+                return {"code": 422, "message": "前置条件不满足", "data": result}
+            return {"code": 400, "message": result.get("details", result["error"]), "data": result}
+        return {"code": 200, "message": "success", "data": result}
+    except Exception as e:
+        logger.error(f"切换部署阶段异常: {e}")
         return {"code": 500, "message": "内部错误", "data": None}
