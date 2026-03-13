@@ -952,7 +952,34 @@ async def lifespan(app: FastAPI):
         except ImportError:
             logger.warning("⚠️  vpp_capacity 模块不可用，跳过 VPP 容量刷新任务")
 
+        # Story 26.8: 依赖安全扫描 — 每周一凌晨 3:30
+        try:
+            from app.services.diagnosis.dependency_audit_service import dependency_audit_service
+
+            async def _run_dependency_audit():
+                try:
+                    result = await dependency_audit_service.run_audit()
+                    vuln_count = result.get("total_vulnerabilities", 0)
+                    logger.info(f"依赖安全扫描完成: 发现 {vuln_count} 个漏洞")
+                except Exception as e:
+                    logger.error(f"依赖安全扫描任务失败: {e}", exc_info=True)
+
+            scheduler.add_job(
+                _run_dependency_audit,
+                'cron',
+                day_of_week='mon',
+                hour=3,
+                minute=30,
+                id='dependency_audit_weekly',
+                max_instances=1,
+                replace_existing=True,
+                name='依赖安全审计',
+            )
+        except ImportError:
+            logger.warning("⚠️  dependency_audit_service 模块不可用，跳过依赖安全扫描任务")
+
         scheduler.start()
+        logger.info("✓ 依赖安全审计任务已启动（每周一凌晨 3:30）")
         logger.info("✓ 传感器校准过期检查定时任务已启动（每日凌晨 2:00）")
         logger.info("✓ 趋势分析定时任务已启动（每小时整点执行）")
         logger.info("✓ 反事实分析定时任务已启动（每小时30分执行）")
