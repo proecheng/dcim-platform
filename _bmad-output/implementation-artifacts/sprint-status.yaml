@@ -375,7 +375,7 @@ development_status:
   32-1-rc-parameter-least-squares-auto-calibration: done
   32-2-phased-deployment-control: done
   32-3-thermal-parameter-management-api-complete: done
-  32-4-frontend-deployment-phase-and-calibration-status: backlog
+  32-4-frontend-deployment-phase-and-calibration-status: done
   epic-32-retrospective: optional
 
   # Epic 33: VPP 虚拟电厂集成 (Phase 3 月11-12+)

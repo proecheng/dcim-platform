@@ -231,3 +231,67 @@ export function updatePrecoolConfig(zoneId: number, data: { precool_enabled?: bo
     data
   )
 }
+
+// ========== 部署阶段与校准 API (Story 32.4) ==========
+
+export interface DeploymentPhaseInfo {
+  current_phase: number
+  phase_name: string
+  description: string
+  updated_at: string | null
+}
+
+export interface CalibrationHistoryItem {
+  id: number
+  cooling_zone_id: number
+  thermal_R: number | null
+  thermal_C: number | null
+  fitting_r_squared: number | null
+  fitting_method: string | null
+  sample_count: number | null
+  calibrated_at: string | null
+  is_active: boolean
+  created_at: string
+}
+
+export interface CalibrationResult {
+  success?: boolean
+  R?: number
+  C?: number
+  r_squared?: number
+  sample_count?: number
+  error?: string
+}
+
+/** 查询当前部署阶段 */
+export function getDeploymentPhase() {
+  return request.get<{ code: number; message: string; data: DeploymentPhaseInfo }>(
+    '/v1/precool/deployment-phase'
+  )
+}
+
+/** 切换部署阶段（仅 admin） */
+export function updateDeploymentPhase(data: { phase: number; force?: boolean }) {
+  return request.put<{ code: number; message: string; data: any }>(
+    '/v1/precool/deployment-phase',
+    data
+  )
+}
+
+/** 触发手动校准 */
+export function triggerCalibration(zoneId: number) {
+  return request.post<{ code: number; message: string; data: CalibrationResult }>(
+    `/v1/precool/zones/${zoneId}/calibrate`
+  )
+}
+
+/** 查询校准历史 */
+export function getCalibrationHistory(
+  zoneId: number,
+  params?: { skip?: number; limit?: number }
+) {
+  return request.get<{ code: number; message: string; data: { items: CalibrationHistoryItem[]; total: number } }>(
+    `/v1/precool/zones/${zoneId}/calibration-history`,
+    { params }
+  )
+}
