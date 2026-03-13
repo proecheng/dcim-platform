@@ -6,6 +6,7 @@ Story 30.3: 回退保护 API
 Story 31.3: 预冷计划 API 端点
 Story 31.4: 预冷配置管理端点
 Story 32.3: 热参数管理 API（手动校准、校准历史、部署阶段）
+Story 33.1: VPP 可调容量查询端点
 """
 
 import json
@@ -1071,3 +1072,43 @@ async def update_deployment_phase(
     except Exception as e:
         logger.error(f"切换部署阶段异常: {e}")
         return {"code": 500, "message": "内部错误", "data": None}
+
+
+# ==================== Story 33.1: VPP 可调容量查询 ====================
+
+
+@router.get("/vpp/capacity", summary="查询 VPP 可调容量")
+async def get_vpp_capacity(
+    _=Depends(require_role(["admin", "operator", "viewer"])),
+):
+    """
+    查询各区域聚合的分向可调容量（仅部署阶段 4 可用）
+
+    - down_adjustable_kw: 向下可调电功率（削峰）
+    - up_adjustable_kw: 向上可调电功率（填谷）
+    """
+    try:
+        # 1. 检查部署阶段
+        from ...services.precool.deployment_phase import deployment_phase_service
+        phase_info = await deployment_phase_service.get_current_phase()
+        if phase_info["current_phase"] != 4:
+            return {"code": 403, "message": "VPP 接口仅在部署阶段 4 可用", "data": None}
+    except Exception as e:
+        logger.error(f"VPP 容量查询 - 部署阶段检查失败: {e}", exc_info=True)
+        return {"code": 500, "message": f"部署阶段检查失败: {e}", "data": None}
+
+    try:
+        from ...services.precool.vpp_capacity import vpp_capacity_service
+
+        # 2. 尝试读取 Redis 缓存
+        cached = await vpp_capacity_service.get_cached_capacity()
+        if cached is not None:
+            return {"code": 200, "message": "success", "data": cached}
+
+        # 3. 缓存未命中，实时计算
+        result = await vpp_capacity_service.calculate_capacity()
+        return {"code": 200, "message": "success", "data": result}
+
+    except Exception as e:
+        logger.error(f"VPP 容量查询失败: {e}", exc_info=True)
+        return {"code": 500, "message": f"VPP 容量查询失败: {e}", "data": None}

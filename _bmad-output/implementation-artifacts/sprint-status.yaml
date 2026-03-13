@@ -371,16 +371,16 @@ development_status:
   epic-31-retrospective: done  # 2026-03-11
 
   # Epic 32: 热参数自动校准与分阶段部署 (Phase 2b 月9-10)
-  epic-32: in-progress
+  epic-32: done
   32-1-rc-parameter-least-squares-auto-calibration: done
   32-2-phased-deployment-control: done
   32-3-thermal-parameter-management-api-complete: done
   32-4-frontend-deployment-phase-and-calibration-status: done
-  epic-32-retrospective: optional
+  epic-32-retrospective: done  # 2026-03-13
 
   # Epic 33: VPP 虚拟电厂集成 (Phase 3 月11-12+)
-  epic-33: backlog
-  33-1-vpp-adjustable-capacity-reporting-interface: backlog
+  epic-33: in-progress
+  33-1-vpp-adjustable-capacity-reporting-interface: done
   33-2-vpp-control-command-reception-and-execution: backlog
   33-3-frontend-vpp-integration-status-monitoring: backlog
   epic-33-retrospective: optional

@@ -243,3 +243,36 @@ class PreconditionCheckResult(BaseModel):
     """前置检查结果"""
     passed: bool
     details: List[str] = []
+
+
+# ==================== Story 33.1: VPP 可调容量 Schema ====================
+
+
+class VppZoneCapacity(BaseModel):
+    """VPP 单区域可调容量"""
+    model_config = {"from_attributes": True}
+
+    zone_id: int
+    zone_name: str
+    T_current: Optional[float] = None
+    headroom_down: float  # TEMP_MAX - T_current（温度上升空间，用于向下可调）
+    headroom_up: float    # T_current - TEMP_MIN（温度下降空间，用于向上可调）
+    down_adjustable_thermal_kw: float
+    up_adjustable_thermal_kw: float
+    down_adjustable_kw: float
+    up_adjustable_kw: float
+    cop: float
+
+
+class VppCapacityResponse(BaseModel):
+    """VPP 聚合可调容量响应"""
+    down_adjustable_kw: float       # 聚合向下可调电功率
+    up_adjustable_kw: float         # 聚合向上可调电功率
+    down_adjustable_thermal_kw: float
+    up_adjustable_thermal_kw: float
+    T_current: Optional[float] = None  # 代表温度（所有区域最高）
+    headroom_down: float            # 各区域最小向下裕度
+    headroom_up: float              # 各区域最小向上裕度
+    response_window_hours: float
+    zones: List[VppZoneCapacity]
+    cached_at: Optional[str] = None

@@ -929,6 +929,29 @@ async def lifespan(app: FastAPI):
         except ImportError:
             logger.warning("⚠️  calibrator 模块不可用（scipy 未安装），跳过月度RC校准任务")
 
+        # Story 33.1: VPP 可调容量定时刷新（每 5 分钟）
+        try:
+            from app.services.precool.vpp_capacity import vpp_capacity_service
+
+            async def _refresh_vpp_capacity():
+                try:
+                    await vpp_capacity_service.refresh_capacity_cache()
+                except Exception as e:
+                    logger.error(f"VPP 容量刷新失败: {e}", exc_info=True)
+
+            scheduler.add_job(
+                _refresh_vpp_capacity,
+                'interval',
+                minutes=5,
+                max_instances=1,
+                coalesce=True,
+                id='vpp_capacity_refresh',
+                replace_existing=True,
+                name='VPP可调容量刷新',
+            )
+        except ImportError:
+            logger.warning("⚠️  vpp_capacity 模块不可用，跳过 VPP 容量刷新任务")
+
         scheduler.start()
         logger.info("✓ 传感器校准过期检查定时任务已启动（每日凌晨 2:00）")
         logger.info("✓ 趋势分析定时任务已启动（每小时整点执行）")
