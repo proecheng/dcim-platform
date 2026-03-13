@@ -295,3 +295,20 @@ export function getCalibrationHistory(
     { params }
   )
 }
+
+// ==================== VPP 监控 (Story 33.3) ====================
+
+/** 查询 VPP 可调容量 */
+export function getVppCapacity() {
+  return request.get<{ code: number; message: string; data: any }>('/v1/precool/vpp/capacity')
+}
+
+/** 查询 VPP 调控指令列表 */
+export function getVppDispatches(params?: { page?: number; page_size?: number; status?: string }) {
+  return request.get<{ code: number; message: string; data: any }>('/v1/precool/vpp/dispatches', { params })
+}
+
+/** 查询 VPP 需求响应统计 */
+export function getVppStatistics() {
+  return request.get<{ code: number; message: string; data: any }>('/v1/precool/vpp/statistics')
+}

@@ -375,3 +375,160 @@ class TestBuildResponse:
         assert result["status"] == "rejected"
         assert result["reject_reason"] == "超过可调容量"
         assert result["max_adjustable_kw"] == 50.0
+
+
+# ==================== 列表查询与统计测试 (Story 33.3) ====================
+
+
+class TestListDispatches:
+    """list_dispatches 测试"""
+
+    @pytest.mark.asyncio
+    async def test_list_empty(self):
+        """无指令时返回空列表"""
+        svc = VppDispatchService()
+        mock_session = AsyncMock()
+
+        # count 查询
+        count_result = MagicMock()
+        count_result.scalar.return_value = 0
+
+        # 列表查询
+        list_result = MagicMock()
+        list_result.scalars.return_value.all.return_value = []
+
+        mock_session.execute = AsyncMock(
+            side_effect=[count_result, list_result]
+        )
+
+        with patch(
+            "app.services.precool.vpp_dispatch.async_session"
+        ) as mock_as:
+            mock_as.return_value.__aenter__ = AsyncMock(
+                return_value=mock_session
+            )
+            mock_as.return_value.__aexit__ = AsyncMock(return_value=False)
+            result = await svc.list_dispatches(1, 20, None)
+
+        assert result["total"] == 0
+        assert result["items"] == []
+        assert result["page"] == 1
+
+    @pytest.mark.asyncio
+    async def test_list_with_data(self):
+        """有指令时返回列表"""
+        svc = VppDispatchService()
+        mock_session = AsyncMock()
+
+        mock_dispatch = MagicMock()
+        mock_dispatch.dispatch_id = "test-uuid"
+        mock_dispatch.command_type = "down_adjust"
+        mock_dispatch.target_power_kw = 30.0
+        mock_dispatch.duration_minutes = 60
+        mock_dispatch.status = "accepted"
+        mock_dispatch.reject_reason = None
+        mock_dispatch.max_adjustable_kw = None
+        mock_dispatch.accepted_power_kw = 30.0
+        mock_dispatch.aborted_schedule_id = None
+        mock_dispatch.created_at = datetime(2026, 3, 14, 10, 0, 0)
+
+        count_result = MagicMock()
+        count_result.scalar.return_value = 1
+
+        list_result = MagicMock()
+        list_result.scalars.return_value.all.return_value = [mock_dispatch]
+
+        mock_session.execute = AsyncMock(
+            side_effect=[count_result, list_result]
+        )
+
+        with patch(
+            "app.services.precool.vpp_dispatch.async_session"
+        ) as mock_as:
+            mock_as.return_value.__aenter__ = AsyncMock(
+                return_value=mock_session
+            )
+            mock_as.return_value.__aexit__ = AsyncMock(return_value=False)
+            result = await svc.list_dispatches(1, 20, None)
+
+        assert result["total"] == 1
+        assert len(result["items"]) == 1
+        assert result["items"][0]["dispatch_id"] == "test-uuid"
+        assert result["items"][0]["created_at"] is not None
+
+
+class TestGetStatistics:
+    """get_statistics 测试"""
+
+    @pytest.mark.asyncio
+    async def test_statistics_empty(self):
+        """无数据时返回零值"""
+        svc = VppDispatchService()
+        mock_session = AsyncMock()
+
+        empty_row = MagicMock()
+        empty_row.count = 0
+        empty_row.total_power = None
+
+        daily_result = MagicMock()
+        daily_result.first.return_value = empty_row
+
+        monthly_result = MagicMock()
+        monthly_result.first.return_value = empty_row
+
+        mock_session.execute = AsyncMock(
+            side_effect=[daily_result, monthly_result]
+        )
+
+        with patch(
+            "app.services.precool.vpp_dispatch.async_session"
+        ) as mock_as:
+            mock_as.return_value.__aenter__ = AsyncMock(
+                return_value=mock_session
+            )
+            mock_as.return_value.__aexit__ = AsyncMock(return_value=False)
+            result = await svc.get_statistics()
+
+        assert result["daily"]["count"] == 0
+        assert result["daily"]["total_power_kw"] == 0
+        assert result["monthly"]["estimated_savings_yuan"] == 0
+
+    @pytest.mark.asyncio
+    async def test_statistics_with_data(self):
+        """有数据时正确计算"""
+        svc = VppDispatchService()
+        mock_session = AsyncMock()
+
+        daily_row = MagicMock()
+        daily_row.count = 3
+        daily_row.total_power = 90.0
+
+        monthly_row = MagicMock()
+        monthly_row.count = 25
+        monthly_row.total_power = 750.0
+
+        daily_result = MagicMock()
+        daily_result.first.return_value = daily_row
+
+        monthly_result = MagicMock()
+        monthly_result.first.return_value = monthly_row
+
+        mock_session.execute = AsyncMock(
+            side_effect=[daily_result, monthly_result]
+        )
+
+        with patch(
+            "app.services.precool.vpp_dispatch.async_session"
+        ) as mock_as:
+            mock_as.return_value.__aenter__ = AsyncMock(
+                return_value=mock_session
+            )
+            mock_as.return_value.__aexit__ = AsyncMock(return_value=False)
+            result = await svc.get_statistics()
+
+        assert result["daily"]["count"] == 3
+        assert result["daily"]["total_power_kw"] == 90.0
+        assert result["daily"]["estimated_savings_yuan"] == 45.0
+        assert result["monthly"]["count"] == 25
+        assert result["monthly"]["total_power_kw"] == 750.0
+        assert result["monthly"]["estimated_savings_yuan"] == 375.0

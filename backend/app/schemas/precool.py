@@ -285,6 +285,26 @@ class VppDispatchResponse(BaseModel):
     aborted_schedule_id: Optional[int] = None
 
 
+class VppDispatchListItem(BaseModel):
+    """VPP 调控指令列表项（Story 33.3）"""
+    dispatch_id: str
+    command_type: str
+    target_power_kw: float
+    duration_minutes: int
+    status: str
+    reject_reason: Optional[str] = None
+    max_adjustable_kw: Optional[float] = None
+    accepted_power_kw: Optional[float] = None
+    aborted_schedule_id: Optional[int] = None
+    created_at: Optional[str] = None
+
+
+class VppStatisticsResponse(BaseModel):
+    """VPP 需求响应统计（Story 33.3）"""
+    daily: dict   # {count, total_power_kw, estimated_savings_yuan}
+    monthly: dict  # {count, total_power_kw, estimated_savings_yuan}
+
+
 class VppCapacityResponse(BaseModel):
     """VPP 聚合可调容量响应"""
     down_adjustable_kw: float       # 聚合向下可调电功率

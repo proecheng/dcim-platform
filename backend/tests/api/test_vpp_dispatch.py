@@ -219,3 +219,104 @@ class TestVppDispatchAPI:
                     )
         body = resp.json()
         assert body["code"] == 500
+
+
+# ==================== VPP 监控查询端点测试 (Story 33.3) ====================
+
+
+@pytest.mark.asyncio
+class TestVppDispatchListAPI:
+    """GET /vpp/dispatches 端点测试"""
+
+    async def test_list_dispatches_success(self, client, admin_token):
+        """管理员可查询指令列表"""
+        with patch(
+            "app.services.precool.vpp_dispatch.vpp_dispatch_service.list_dispatches",
+            new_callable=AsyncMock,
+            return_value={
+                "total": 1,
+                "page": 1,
+                "page_size": 20,
+                "items": [_make_dispatch_result("accepted")],
+            },
+        ):
+            resp = await client.get(
+                "/api/v1/precool/vpp/dispatches",
+                headers={"Authorization": f"Bearer {admin_token}"},
+            )
+        body = resp.json()
+        assert body["code"] == 200
+        assert body["data"]["total"] == 1
+        assert len(body["data"]["items"]) == 1
+
+    async def test_list_dispatches_with_status_filter(self, client, admin_token):
+        """支持按状态过滤"""
+        with patch(
+            "app.services.precool.vpp_dispatch.vpp_dispatch_service.list_dispatches",
+            new_callable=AsyncMock,
+            return_value={"total": 0, "page": 1, "page_size": 20, "items": []},
+        ) as mock_list:
+            resp = await client.get(
+                "/api/v1/precool/vpp/dispatches?status=rejected",
+                headers={"Authorization": f"Bearer {admin_token}"},
+            )
+            mock_list.assert_called_once_with(1, 20, "rejected")
+        body = resp.json()
+        assert body["code"] == 200
+
+    async def test_list_dispatches_no_auth_returns_401(self, client):
+        """未认证返回 401"""
+        resp = await client.get("/api/v1/precool/vpp/dispatches")
+        assert resp.status_code in (401, 403)
+
+
+@pytest.mark.asyncio
+class TestVppStatisticsAPI:
+    """GET /vpp/statistics 端点测试"""
+
+    async def test_statistics_success(self, client, admin_token):
+        """管理员可查询统计数据"""
+        mock_stats = {
+            "daily": {
+                "count": 3,
+                "total_power_kw": 90.0,
+                "estimated_savings_yuan": 45.0,
+            },
+            "monthly": {
+                "count": 25,
+                "total_power_kw": 750.0,
+                "estimated_savings_yuan": 375.0,
+            },
+        }
+        with patch(
+            "app.services.precool.vpp_dispatch.vpp_dispatch_service.get_statistics",
+            new_callable=AsyncMock,
+            return_value=mock_stats,
+        ):
+            resp = await client.get(
+                "/api/v1/precool/vpp/statistics",
+                headers={"Authorization": f"Bearer {admin_token}"},
+            )
+        body = resp.json()
+        assert body["code"] == 200
+        assert body["data"]["daily"]["count"] == 3
+        assert body["data"]["monthly"]["total_power_kw"] == 750.0
+
+    async def test_statistics_no_auth_returns_401(self, client):
+        """未认证返回 401"""
+        resp = await client.get("/api/v1/precool/vpp/statistics")
+        assert resp.status_code in (401, 403)
+
+    async def test_statistics_service_error(self, client, admin_token):
+        """服务异常返回 500"""
+        with patch(
+            "app.services.precool.vpp_dispatch.vpp_dispatch_service.get_statistics",
+            new_callable=AsyncMock,
+            side_effect=Exception("数据库异常"),
+        ):
+            resp = await client.get(
+                "/api/v1/precool/vpp/statistics",
+                headers={"Authorization": f"Bearer {admin_token}"},
+            )
+        body = resp.json()
+        assert body["code"] == 500

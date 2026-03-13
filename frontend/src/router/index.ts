@@ -146,6 +146,7 @@ const routes: RouteRecordRaw[] = [
               { path: 'reports', name: 'ShiftReports', component: () => import('@/views/energy/shift/ShiftReports.vue'), meta: { title: '收益报表', icon: 'Document' } },
               { path: 'precool-schedule', name: 'PrecoolSchedule', component: () => import('@/views/energy/shift/PrecoolScheduleView.vue'), meta: { title: '预冷计划', icon: 'Timer' } },
               { path: 'deployment', name: 'DeploymentPhase', component: () => import('@/views/energy/shift/DeploymentPhaseView.vue'), meta: { title: '部署管理', icon: 'SetUp' } },
+              { path: 'vpp-monitor', name: 'VppMonitor', component: () => import('@/views/energy/shift/VppMonitorView.vue'), meta: { title: 'VPP 集成监控', icon: 'Connection' } },
             ]
           },
         ]

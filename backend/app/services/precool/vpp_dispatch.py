@@ -11,6 +11,7 @@ from datetime import datetime
 from typing import Optional
 
 from sqlalchemy import select
+from sqlalchemy.sql import func
 
 from ...core.database import async_session
 from ...core.redis import redis_service
@@ -167,6 +168,97 @@ class VppDispatchService:
             )
             return None
 
+    async def list_dispatches(
+        self, page: int = 1, page_size: int = 20, status: str = None
+    ) -> dict:
+        """查询 VPP 调控指令列表（分页）"""
+        async with async_session() as session:
+            query = select(VppDispatch).order_by(
+                VppDispatch.created_at.desc()
+            )
+            count_query = select(func.count()).select_from(VppDispatch)
+
+            if status:
+                query = query.where(VppDispatch.status == status)
+                count_query = count_query.where(VppDispatch.status == status)
+
+            total_result = await session.execute(count_query)
+            total = total_result.scalar() or 0
+
+            query = query.offset((page - 1) * page_size).limit(page_size)
+            result = await session.execute(query)
+            dispatches = result.scalars().all()
+
+            return {
+                "total": total,
+                "page": page,
+                "page_size": page_size,
+                "items": [self._build_response(d) for d in dispatches],
+            }
+
+    async def get_statistics(self) -> dict:
+        """查询 VPP 需求响应统计（日/月）"""
+        async with async_session() as session:
+            now = datetime.now()
+            today_start = now.replace(
+                hour=0, minute=0, second=0, microsecond=0
+            )
+            month_start = now.replace(
+                day=1, hour=0, minute=0, second=0, microsecond=0
+            )
+
+            # 日统计
+            daily_result = await session.execute(
+                select(
+                    func.count().label("count"),
+                    func.sum(VppDispatch.accepted_power_kw).label(
+                        "total_power"
+                    ),
+                ).where(
+                    VppDispatch.status == "accepted",
+                    VppDispatch.created_at >= today_start,
+                )
+            )
+            daily = daily_result.first()
+
+            # 月统计
+            monthly_result = await session.execute(
+                select(
+                    func.count().label("count"),
+                    func.sum(VppDispatch.accepted_power_kw).label(
+                        "total_power"
+                    ),
+                ).where(
+                    VppDispatch.status == "accepted",
+                    VppDispatch.created_at >= month_start,
+                )
+            )
+            monthly = monthly_result.first()
+
+            # 峰谷价差估算节省电费（0.5 元/kWh）
+            PRICE_DIFF = 0.5
+            daily_count = daily.count if daily else 0
+            daily_power = float(daily.total_power or 0)
+            monthly_count = monthly.count if monthly else 0
+            monthly_power = float(monthly.total_power or 0)
+
+            return {
+                "daily": {
+                    "count": daily_count,
+                    "total_power_kw": round(daily_power, 1),
+                    "estimated_savings_yuan": round(
+                        daily_power * PRICE_DIFF, 2
+                    ),
+                },
+                "monthly": {
+                    "count": monthly_count,
+                    "total_power_kw": round(monthly_power, 1),
+                    "estimated_savings_yuan": round(
+                        monthly_power * PRICE_DIFF, 2
+                    ),
+                },
+            }
+
     def _build_response(self, dispatch: VppDispatch) -> dict:
         """构建响应字典"""
         return {
@@ -179,6 +271,11 @@ class VppDispatchService:
             "max_adjustable_kw": dispatch.max_adjustable_kw,
             "accepted_power_kw": dispatch.accepted_power_kw,
             "aborted_schedule_id": dispatch.aborted_schedule_id,
+            "created_at": (
+                dispatch.created_at.isoformat()
+                if dispatch.created_at
+                else None
+            ),
         }
 
 

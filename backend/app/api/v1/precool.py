@@ -1197,3 +1197,45 @@ async def receive_vpp_dispatch(
     except Exception as e:
         logger.error(f"VPP 调控指令处理失败: {e}", exc_info=True)
         return {"code": 500, "message": f"VPP 调控指令处理失败: {e}", "data": None}
+
+
+# ==================== VPP 监控查询端点 (Story 33.3) ====================
+
+
+@router.get("/vpp/dispatches", summary="查询 VPP 调控指令列表")
+async def list_vpp_dispatches(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    status: str = Query(None),
+    _=Depends(require_role(["admin", "operator"])),
+):
+    """
+    查询 VPP 调控指令历史（JWT 认证，admin/operator 可访问）
+
+    - **page**: 页码（默认 1）
+    - **page_size**: 每页条数（默认 20，最大 100）
+    - **status**: 可选状态过滤（accepted/rejected/received）
+    """
+    try:
+        from ...services.precool.vpp_dispatch import vpp_dispatch_service
+        result = await vpp_dispatch_service.list_dispatches(
+            page, page_size, status
+        )
+        return {"code": 200, "message": "success", "data": result}
+    except Exception as e:
+        logger.error(f"查询 VPP 调控指令列表失败: {e}", exc_info=True)
+        return {"code": 500, "message": f"查询失败: {e}", "data": None}
+
+
+@router.get("/vpp/statistics", summary="查询 VPP 需求响应统计")
+async def get_vpp_statistics(
+    _=Depends(require_role(["admin", "operator"])),
+):
+    """查询 VPP 需求响应统计（日/月汇总，JWT 认证）"""
+    try:
+        from ...services.precool.vpp_dispatch import vpp_dispatch_service
+        result = await vpp_dispatch_service.get_statistics()
+        return {"code": 200, "message": "success", "data": result}
+    except Exception as e:
+        logger.error(f"查询 VPP 统计失败: {e}", exc_info=True)
+        return {"code": 500, "message": f"查询失败: {e}", "data": None}
