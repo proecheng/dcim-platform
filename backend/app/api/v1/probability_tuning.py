@@ -1,7 +1,7 @@
 """
 概率调参 API - Story 26.3
 """
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Body, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 from typing import Optional, List
@@ -248,16 +248,16 @@ async def approve_adjustment(
     await db.commit()
 
     # 发送 WebSocket 通知
-    await ws_manager.broadcast_to_role(
-        'admin',
-        {
-            'type': 'probability_adjustment_updated',
+    await ws_manager.broadcast_diagnosis(
+        msg_type='probability_adjustment_updated',
+        data={
             'adjustment_id': adjustment_id,
             'tree_id': adjustment.tree_id,
             'node_name': adjustment.node_name,
             'status': 'approved',
             'approved_by': current_user.username
-        }
+        },
+        target_roles=['admin']
     )
 
     return {"message": "审批成功", "version_id": version.id}
@@ -266,7 +266,7 @@ async def approve_adjustment(
 @router.post("/adjustments/{adjustment_id}/reject", dependencies=[Depends(require_role("admin"))])
 async def reject_adjustment(
     adjustment_id: int,
-    request: RejectRequest,
+    request: RejectRequest = Body(...),
     current_user = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
@@ -326,16 +326,16 @@ async def reject_adjustment(
     await db.commit()
 
     # 发送 WebSocket 通知
-    await ws_manager.broadcast_to_role(
-        'admin',
-        {
-            'type': 'probability_adjustment_updated',
+    await ws_manager.broadcast_diagnosis(
+        msg_type='probability_adjustment_updated',
+        data={
             'adjustment_id': adjustment_id,
             'tree_id': adjustment.tree_id,
             'node_name': adjustment.node_name,
             'status': 'rejected',
             'approved_by': current_user.username
-        }
+        },
+        target_roles=['admin']
     )
 
     return {"message": "已拒绝"}

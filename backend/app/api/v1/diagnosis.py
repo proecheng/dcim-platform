@@ -1333,194 +1333,8 @@ async def export_misdiagnosis_report(
 
 # ============================================================
 # 概率调参 API - Story 26.3
+# 注意: 完整实现已迁移至 probability_tuning.py（含乐观锁、版本管理、WebSocket 通知）
 # ============================================================
-
-
-@router.post("/probability-tuning/analyze")
-async def analyze_probability_tuning(
-    tree_id: Optional[int] = None, db: AsyncSession = Depends(get_db), current_user: User = Depends(require_admin)
-):
-    """
-    手动触发调参分析（也可由定时任务自动触发）
-
-    权限: admin
-    """
-    from ...services.diagnosis.probability_tuning_service import ProbabilityTuningService
-
-    tuning_service = ProbabilityTuningService()
-
-    try:
-        if tree_id:
-            # 分析指定故障树
-            # 临时实现：返回模拟数据
-            result = {"analyzed_trees": 1, "total_adjustments": 0, "pending_approvals": 0}
-        else:
-            # 分析所有活跃故障树
-            result = await tuning_service.analyze_all_trees()
-
-        return result
-    except Exception as e:
-        logger.error(f"调参分析失败: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"调参分析失败: {str(e)}")
-
-
-@router.get("/probability-tuning/adjustments")
-async def get_probability_adjustments(
-    tree_id: Optional[int] = Query(None, description="故障树ID"),
-    status: Optional[str] = Query(None, description="状态筛选: pending/approved/rejected"),
-    page: int = Query(1, ge=1, description="页码"),
-    page_size: int = Query(20, ge=1, le=100, description="每页数量"),
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_admin),
-):
-    """
-    查询调参记录列表（通过 JOIN fault_trees 表获取 tree_name）
-
-    权限: admin
-    """
-    from ...models.diagnosis import ProbabilityAdjustmentLog
-    from sqlalchemy import select, and_
-
-    # 构建查询条件
-    conditions = []
-    if tree_id:
-        conditions.append(ProbabilityAdjustmentLog.tree_id == tree_id)
-    if status:
-        conditions.append(ProbabilityAdjustmentLog.status == status)
-
-    # 查询总数
-    count_query = select(func.count(ProbabilityAdjustmentLog.id))
-    if conditions:
-        count_query = count_query.where(and_(*conditions))
-
-    total_result = await db.execute(count_query)
-    total = total_result.scalar() or 0
-
-    # 查询数据
-    query = select(ProbabilityAdjustmentLog)
-    if conditions:
-        query = query.where(and_(*conditions))
-
-    query = query.order_by(ProbabilityAdjustmentLog.created_at.desc())
-    query = query.offset((page - 1) * page_size).limit(page_size)
-
-    result = await db.execute(query)
-    adjustments = result.scalars().all()
-
-    # 转换为响应格式
-    items = []
-    for adj in adjustments:
-        item = {
-            "id": adj.id,
-            "tree_id": adj.tree_id,
-            "tree_name": None,  # TODO: 通过 JOIN 获取
-            "node_id": adj.node_id,
-            "node_name": adj.node_name,
-            "node_type": adj.node_type,
-            "current_probability": adj.current_probability,
-            "proposed_probability": adj.proposed_probability,
-            "adjustment_percent": adj.adjustment_percent,
-            "sample_count": adj.sample_count,
-            "accurate_count": adj.accurate_count,
-            "inaccurate_count": adj.inaccurate_count,
-            "accuracy_rate": adj.accuracy_rate,
-            "status": adj.status,
-            "reason": adj.reason,
-            "approved_by": adj.approved_by,
-            "approved_at": adj.approved_at,
-            "version": adj.version,
-            "created_at": adj.created_at,
-            "updated_at": adj.updated_at,
-        }
-        items.append(item)
-
-    return {"items": items, "total": total, "page": page, "page_size": page_size}
-
-
-@router.post("/probability-tuning/adjustments/{adjustment_id}/approve")
-async def approve_adjustment(
-    adjustment_id: int,
-    reason: Optional[str] = None,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_admin),
-):
-    """
-    审批调参建议
-
-    权限: admin
-    """
-    from ...models.diagnosis import ProbabilityAdjustmentLog
-
-    # 查询调参记录
-    result = await db.execute(select(ProbabilityAdjustmentLog).where(ProbabilityAdjustmentLog.id == adjustment_id))
-    adjustment = result.scalar_one_or_none()
-
-    if not adjustment:
-        raise HTTPException(status_code=404, detail="调参记录不存在")
-
-    if adjustment.status != "pending":
-        raise HTTPException(status_code=400, detail=f"调参记录状态为 {adjustment.status}，无法审批")
-
-    # 使用乐观锁更新状态
-    try:
-        # 开始事务
-        adjustment.status = "approved"
-        adjustment.reason = reason
-        adjustment.approved_by = current_user.id
-        adjustment.approved_at = datetime.now()
-
-        # TODO: 更新节点先验概率
-        # TODO: 调用 FaultTreeVersionService 创建新版本
-        # TODO: 新版本自动生成 HMAC 签名
-        # TODO: 激活新版本
-
-        await db.commit()
-
-        logger.info(f"调参记录 {adjustment_id} 已审批，用户: {current_user.username}")
-
-        return {
-            "message": "调参已审批，新版本故障树已创建",
-            "adjustment_id": adjustment_id,
-            "new_tree_version": "v1.0.0",  # TODO: 返回实际版本号
-        }
-    except Exception as e:
-        await db.rollback()
-        logger.error(f"审批调参失败: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"审批失败: {str(e)}")
-
-
-@router.post("/probability-tuning/adjustments/{adjustment_id}/reject")
-async def reject_adjustment(
-    adjustment_id: int, reason: str, db: AsyncSession = Depends(get_db), current_user: User = Depends(require_admin)
-):
-    """
-    拒绝调参建议
-
-    权限: admin
-    """
-    from ...models.diagnosis import ProbabilityAdjustmentLog
-
-    # 查询调参记录
-    result = await db.execute(select(ProbabilityAdjustmentLog).where(ProbabilityAdjustmentLog.id == adjustment_id))
-    adjustment = result.scalar_one_or_none()
-
-    if not adjustment:
-        raise HTTPException(status_code=404, detail="调参记录不存在")
-
-    if adjustment.status != "pending":
-        raise HTTPException(status_code=400, detail=f"调参记录状态为 {adjustment.status}，无法拒绝")
-
-    # 更新状态
-    adjustment.status = "rejected"
-    adjustment.reason = reason
-    adjustment.approved_by = current_user.id
-    adjustment.approved_at = datetime.now()
-
-    await db.commit()
-
-    logger.info(f"调参记录 {adjustment_id} 已拒绝，用户: {current_user.username}")
-
-    return {"message": "时间窗口调整已拒绝", "adjustment_id": adjustment_id}
 
 
 # ============================================================
@@ -1688,15 +1502,15 @@ async def approve_time_window_adjustment(
         try:
             from ...services.websocket import ws_manager
 
-            await ws_manager.broadcast_to_role(
-                "admin",
-                {
-                    "type": "time_window_adjustment_updated",
+            await ws_manager.broadcast_diagnosis(
+                msg_type="time_window_adjustment_updated",
+                data={
                     "adjustment_id": adjustment_id,
                     "device_type": locked_adjustment.device_type,
                     "status": "approved",
                     "approved_by": current_user.username,
                 },
+                target_roles=["admin"],
             )
         except Exception as ws_error:
             logger.error(f"发送 WebSocket 通知失败: {ws_error}", exc_info=True)
@@ -1754,15 +1568,15 @@ async def reject_time_window_adjustment(
     try:
         from ...services.websocket import ws_manager
 
-        await ws_manager.broadcast_to_role(
-            "admin",
-            {
-                "type": "time_window_adjustment_updated",
+        await ws_manager.broadcast_diagnosis(
+            msg_type="time_window_adjustment_updated",
+            data={
                 "adjustment_id": adjustment_id,
                 "device_type": adjustment.device_type,
                 "status": "rejected",
                 "rejected_by": current_user.username,
             },
+            target_roles=["admin"],
         )
     except Exception as ws_error:
         logger.error(f"发送 WebSocket 通知失败: {ws_error}", exc_info=True)

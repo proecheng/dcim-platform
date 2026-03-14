@@ -173,7 +173,7 @@ async def test_approve_adjustment(client: AsyncClient, admin_token: str, async_d
     mock_version.id = 99
 
     mock_ws = MagicMock()
-    mock_ws.broadcast_to_role = AsyncMock()
+    mock_ws.broadcast_diagnosis = AsyncMock()
 
     with patch(f"{VERSION_MANAGER_PATH}.create_version", new_callable=AsyncMock, return_value=mock_version), \
          patch(WS_MANAGER_PATH, mock_ws):
@@ -225,16 +225,19 @@ async def test_reject_adjustment(client: AsyncClient, admin_token: str, async_db
     tree, node = await _create_tree_with_node(async_db)
     adj = await _create_adjustment(async_db, tree.id, node.id, status="pending")
 
-    resp = await client.post(
-        f"/api/v1/diagnosis/probability-tuning/adjustments/{adj.id}/reject",
-        params={"reason": "test reject"},
-        headers=auth_headers(admin_token),
-    )
+    mock_ws = MagicMock()
+    mock_ws.broadcast_diagnosis = AsyncMock()
 
-    assert resp.status_code in (200, 500)
-    if resp.status_code == 200:
-        data = resp.json()
-        assert "message" in data
+    with patch(WS_MANAGER_PATH, mock_ws):
+        resp = await client.post(
+            f"/api/v1/diagnosis/probability-tuning/adjustments/{adj.id}/reject",
+            json={"reason": "样本量不足，暂不调整"},
+            headers=auth_headers(admin_token),
+        )
+
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["message"] == "已拒绝"
 
 
 @pytest.mark.asyncio
@@ -242,7 +245,7 @@ async def test_reject_nonexistent(client: AsyncClient, admin_token: str, async_d
     """测试拒绝不存在的调参记录返回 404"""
     resp = await client.post(
         "/api/v1/diagnosis/probability-tuning/adjustments/99999/reject",
-        params={"reason": "不存在"},
+        json={"reason": "不存在"},
         headers=auth_headers(admin_token),
     )
     assert resp.status_code == 404
