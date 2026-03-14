@@ -293,7 +293,7 @@ development_status:
   epic-25-retrospective: done
 
   # Epic 26: 智能诊断高级功能 (Phase 3 月11-12+)
-  epic-26: in-progress
+  epic-26: done
   26-1-counterfactual-analysis: done
   26-2-misdiagnosis-feedback-report: done
   26-3-closed-loop-learning-probability-tuning: done  # 完成: 概率调参服务、API、前端页面、定时任务
@@ -303,7 +303,7 @@ development_status:
   26-7-disaster-recovery-drill: done  # 完成: 演练服务、API(6端点)、调度器集成、CircuitBreaker.force_open、22个测试全通过
   26-8-edge-inference-reservation-and-sbom: done
   26-9-training-data-anomaly-detection: done
-  26-10-hmac-key-management: backlog
+  26-10-hmac-key-management: done  # 完成: HMACKeyRotationLog模型、HMACKeyManagementService(状态/轮换/验证/日志)、4个API端点、14个测试全通过
   epic-26-retrospective: done  # 部分回顾(7/10 Story完成)，2026-03-09
 
   # ============================================================

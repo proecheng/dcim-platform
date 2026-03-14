@@ -99,10 +99,7 @@ async def get_fault_trees(
     query = query.order_by(FaultTree.id).offset(skip).limit(limit)
     result = await db.execute(query)
     rows = result.all()
-    return [
-        {"id": row.id, "name": row.name, "description": row.description, "status": row.status}
-        for row in rows
-    ]
+    return [{"id": row.id, "name": row.name, "description": row.description, "status": row.status} for row in rows]
 
 
 # ==================== 规则管理 ====================
@@ -278,6 +275,7 @@ async def diagnosis_health(_: User = Depends(require_viewer)):
     """诊断引擎健康检查（熔断器状态）"""
     try:
         from ...services.diagnosis.scheduler import get_scheduler
+
         scheduler = await get_scheduler()
         breaker = scheduler.circuit_breaker
         return {
@@ -352,17 +350,13 @@ async def get_session_detail(
     _: User = Depends(require_viewer),
 ):
     """诊断会话详情（含关联的诊断结果）"""
-    result = await db.execute(
-        select(DiagnosisSession).where(DiagnosisSession.id == session_id)
-    )
+    result = await db.execute(select(DiagnosisSession).where(DiagnosisSession.id == session_id))
     session_obj = result.scalar_one_or_none()
     if session_obj is None:
         raise HTTPException(status_code=404, detail="诊断会话不存在")
 
     # 查询关联的诊断结果
-    result_query = await db.execute(
-        select(DiagnosisResult).where(DiagnosisResult.session_id == session_id)
-    )
+    result_query = await db.execute(select(DiagnosisResult).where(DiagnosisResult.session_id == session_id))
     diagnosis_result = result_query.scalar_one_or_none()
 
     response = DiagnosisSessionResponse.model_validate(session_obj)
@@ -379,9 +373,7 @@ async def get_session_audit_log(
 ):
     """诊断会话审计日志（需 admin 角色）"""
     # 验证会话存在
-    session_result = await db.execute(
-        select(DiagnosisSession).where(DiagnosisSession.id == session_id)
-    )
+    session_result = await db.execute(select(DiagnosisSession).where(DiagnosisSession.id == session_id))
     if session_result.scalar_one_or_none() is None:
         raise HTTPException(status_code=404, detail="诊断会话不存在")
 
@@ -713,9 +705,7 @@ async def update_soh_weights_config(
     # 更新配置
     new_value = config.model_dump()
     await db.execute(
-        update(SystemConfig)
-        .where(SystemConfig.id == existing_config.id)
-        .values(config_value=json.dumps(new_value))
+        update(SystemConfig).where(SystemConfig.id == existing_config.id).values(config_value=json.dumps(new_value))
     )
     await db.commit()
 
@@ -774,11 +764,7 @@ async def list_breaker_profiles(
     total = count_result.scalar()
 
     # 分页查询
-    result = await db.execute(
-        select(BreakerProfile)
-        .offset((page - 1) * page_size)
-        .limit(page_size)
-    )
+    result = await db.execute(select(BreakerProfile).offset((page - 1) * page_size).limit(page_size))
     profiles = result.scalars().all()
 
     return {
@@ -891,10 +877,7 @@ async def get_trend_warnings(
     warnings = result.scalars().all()
 
     return TrendWarningListResponse(
-        total=total,
-        page=page,
-        page_size=page_size,
-        items=[TrendWarningResponse.model_validate(w) for w in warnings]
+        total=total, page=page, page_size=page_size, items=[TrendWarningResponse.model_validate(w) for w in warnings]
     )
 
 
@@ -966,7 +949,7 @@ async def get_sensor_fusion_records(
         total=total,
         page=page,
         page_size=page_size,
-        items=[SensorFusionRecordResponse.model_validate(r) for r in records]
+        items=[SensorFusionRecordResponse.model_validate(r) for r in records],
     )
 
 
@@ -983,13 +966,15 @@ async def get_trend_config(
     result = await db.execute(
         select(SystemConfig).where(
             SystemConfig.config_group == "diagnosis",
-            SystemConfig.config_key.in_([
-                "trend_threshold_temperature",
-                "trend_threshold_humidity",
-                "airflow_variance_threshold",
-                "trend_analysis_enabled",
-                "sensor_fusion_enabled"
-            ])
+            SystemConfig.config_key.in_(
+                [
+                    "trend_threshold_temperature",
+                    "trend_threshold_humidity",
+                    "airflow_variance_threshold",
+                    "trend_analysis_enabled",
+                    "sensor_fusion_enabled",
+                ]
+            ),
         )
     )
     configs = {c.config_key: c.config_value for c in result.scalars().all()}
@@ -999,7 +984,7 @@ async def get_trend_config(
         trend_threshold_humidity=float(configs.get("trend_threshold_humidity", "3.0")),
         airflow_variance_threshold=float(configs.get("airflow_variance_threshold", "5.0")),
         trend_analysis_enabled=configs.get("trend_analysis_enabled", "true").lower() == "true",
-        sensor_fusion_enabled=configs.get("sensor_fusion_enabled", "true").lower() == "true"
+        sensor_fusion_enabled=configs.get("sensor_fusion_enabled", "true").lower() == "true",
     )
 
 
@@ -1028,10 +1013,7 @@ async def update_trend_config(
 
     for key, value in updates.items():
         result = await db.execute(
-            select(SystemConfig).where(
-                SystemConfig.config_group == "diagnosis",
-                SystemConfig.config_key == key
-            )
+            select(SystemConfig).where(SystemConfig.config_group == "diagnosis", SystemConfig.config_key == key)
         )
         config = result.scalar_one_or_none()
 
@@ -1044,7 +1026,7 @@ async def update_trend_config(
                 config_key=key,
                 config_value=value,
                 value_type="number" if key.endswith("threshold") else "boolean",
-                description=f"趋势分析配置: {key}"
+                description=f"趋势分析配置: {key}",
             )
             db.add(config)
 
@@ -1068,9 +1050,8 @@ async def trigger_counterfactual_analysis(
 
     # 检查会话是否存在
     from ...models.diagnosis import DiagnosisSession
-    session_result = await db.execute(
-        select(DiagnosisSession).where(DiagnosisSession.id == session_id)
-    )
+
+    session_result = await db.execute(select(DiagnosisSession).where(DiagnosisSession.id == session_id))
     if not session_result.scalar_one_or_none():
         raise HTTPException(status_code=404, detail="诊断会话不存在")
 
@@ -1078,16 +1059,13 @@ async def trigger_counterfactual_analysis(
     analysis = await analyze_counterfactual(session_id, top_n, db)
 
     if not analysis:
-        raise HTTPException(
-            status_code=400,
-            detail=f"会话 {session_id} 反事实分析失败，请检查会话状态和证据数据"
-        )
+        raise HTTPException(status_code=400, detail=f"会话 {session_id} 反事实分析失败，请检查会话状态和证据数据")
 
     return {
         "message": "反事实分析完成",
         "session_id": session_id,
         "analysis_id": analysis.id,
-        "analysis_time_ms": analysis.analysis_time_ms
+        "analysis_time_ms": analysis.analysis_time_ms,
     }
 
 
@@ -1135,7 +1113,7 @@ async def get_counterfactual_progress(
             "Cache-Control": "no-cache",
             "Connection": "keep-alive",
             "X-Accel-Buffering": "no",  # 禁用 Nginx 缓冲
-        }
+        },
     )
 
 
@@ -1182,7 +1160,7 @@ async def list_counterfactual_analyses(
         total=total,
         page=page,
         page_size=page_size,
-        items=[CounterfactualAnalysisResponse.model_validate(a) for a in analyses]
+        items=[CounterfactualAnalysisResponse.model_validate(a) for a in analyses],
     )
 
 
@@ -1243,10 +1221,7 @@ async def get_misdiagnosis_report(
     report = result.scalar_one_or_none()
 
     if not report:
-        raise HTTPException(
-            status_code=404,
-            detail=f"报告不存在: period={period}，请先生成报告"
-        )
+        raise HTTPException(status_code=404, detail=f"报告不存在: period={period}，请先生成报告")
 
     return SystemReportInfo.model_validate(report).model_dump()
 
@@ -1268,16 +1243,13 @@ async def generate_misdiagnosis_report(
     report = await MisdiagnosisReportService.generate_monthly_report(period, db)
 
     if not report:
-        raise HTTPException(
-            status_code=400,
-            detail=f"报告生成失败: period={period}，可能是数据不足或获取锁失败"
-        )
+        raise HTTPException(status_code=400, detail=f"报告生成失败: period={period}，可能是数据不足或获取锁失败")
 
     return {
         "status": "success",
         "message": "报告生成任务已完成",
         "report_id": report.id,
-        "note": "如果报告已存在，将返回已存在报告的ID"
+        "note": "如果报告已存在，将返回已存在报告的ID",
     }
 
 
@@ -1307,10 +1279,7 @@ async def export_misdiagnosis_report(
     report = result.scalar_one_or_none()
 
     if not report:
-        raise HTTPException(
-            status_code=404,
-            detail=f"报告不存在: period={period}"
-        )
+        raise HTTPException(status_code=404, detail=f"报告不存在: period={period}")
 
     if format == "pdf":
         try:
@@ -1319,7 +1288,8 @@ async def export_misdiagnosis_report(
 
             # 将 Markdown 转换为 HTML
             import markdown
-            html_content = markdown.markdown(report.content, extensions=['tables'])
+
+            html_content = markdown.markdown(report.content, extensions=["tables"])
 
             # 添加 CSS 样式
             styled_html = f"""
@@ -1350,37 +1320,25 @@ async def export_misdiagnosis_report(
             return Response(
                 content=pdf_buffer.read(),
                 media_type="application/pdf",
-                headers={
-                    "Content-Disposition": f"attachment; filename=误诊分析报告-{period}.pdf"
-                }
+                headers={"Content-Disposition": f"attachment; filename=误诊分析报告-{period}.pdf"},
             )
         except ImportError:
-            raise HTTPException(
-                status_code=500,
-                detail="PDF 导出功能未安装，请安装 weasyprint 和 markdown 库"
-            )
+            raise HTTPException(status_code=500, detail="PDF 导出功能未安装，请安装 weasyprint 和 markdown 库")
         except Exception as e:
             logger.error("PDF 导出失败: %s", e)
-            raise HTTPException(
-                status_code=500,
-                detail=f"PDF 导出失败: {str(e)}"
-            )
+            raise HTTPException(status_code=500, detail=f"PDF 导出失败: {str(e)}")
     else:
-        raise HTTPException(
-            status_code=400,
-            detail=f"不支持的导出格式: {format}"
-        )
+        raise HTTPException(status_code=400, detail=f"不支持的导出格式: {format}")
 
 
 # ============================================================
 # 概率调参 API - Story 26.3
 # ============================================================
 
+
 @router.post("/probability-tuning/analyze")
 async def analyze_probability_tuning(
-    tree_id: Optional[int] = None,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_admin)
+    tree_id: Optional[int] = None, db: AsyncSession = Depends(get_db), current_user: User = Depends(require_admin)
 ):
     """
     手动触发调参分析（也可由定时任务自动触发）
@@ -1395,11 +1353,7 @@ async def analyze_probability_tuning(
         if tree_id:
             # 分析指定故障树
             # 临时实现：返回模拟数据
-            result = {
-                "analyzed_trees": 1,
-                "total_adjustments": 0,
-                "pending_approvals": 0
-            }
+            result = {"analyzed_trees": 1, "total_adjustments": 0, "pending_approvals": 0}
         else:
             # 分析所有活跃故障树
             result = await tuning_service.analyze_all_trees()
@@ -1407,10 +1361,7 @@ async def analyze_probability_tuning(
         return result
     except Exception as e:
         logger.error(f"调参分析失败: {e}", exc_info=True)
-        raise HTTPException(
-            status_code=500,
-            detail=f"调参分析失败: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"调参分析失败: {str(e)}")
 
 
 @router.get("/probability-tuning/adjustments")
@@ -1420,7 +1371,7 @@ async def get_probability_adjustments(
     page: int = Query(1, ge=1, description="页码"),
     page_size: int = Query(20, ge=1, le=100, description="每页数量"),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_admin)
+    current_user: User = Depends(require_admin),
 ):
     """
     查询调参记录列表（通过 JOIN fault_trees 表获取 tree_name）
@@ -1479,16 +1430,11 @@ async def get_probability_adjustments(
             "approved_at": adj.approved_at,
             "version": adj.version,
             "created_at": adj.created_at,
-            "updated_at": adj.updated_at
+            "updated_at": adj.updated_at,
         }
         items.append(item)
 
-    return {
-        "items": items,
-        "total": total,
-        "page": page,
-        "page_size": page_size
-    }
+    return {"items": items, "total": total, "page": page, "page_size": page_size}
 
 
 @router.post("/probability-tuning/adjustments/{adjustment_id}/approve")
@@ -1496,7 +1442,7 @@ async def approve_adjustment(
     adjustment_id: int,
     reason: Optional[str] = None,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_admin)
+    current_user: User = Depends(require_admin),
 ):
     """
     审批调参建议
@@ -1506,21 +1452,19 @@ async def approve_adjustment(
     from ...models.diagnosis import ProbabilityAdjustmentLog
 
     # 查询调参记录
-    result = await db.execute(
-        select(ProbabilityAdjustmentLog).where(ProbabilityAdjustmentLog.id == adjustment_id)
-    )
+    result = await db.execute(select(ProbabilityAdjustmentLog).where(ProbabilityAdjustmentLog.id == adjustment_id))
     adjustment = result.scalar_one_or_none()
 
     if not adjustment:
         raise HTTPException(status_code=404, detail="调参记录不存在")
 
-    if adjustment.status != 'pending':
+    if adjustment.status != "pending":
         raise HTTPException(status_code=400, detail=f"调参记录状态为 {adjustment.status}，无法审批")
 
     # 使用乐观锁更新状态
     try:
         # 开始事务
-        adjustment.status = 'approved'
+        adjustment.status = "approved"
         adjustment.reason = reason
         adjustment.approved_by = current_user.id
         adjustment.approved_at = datetime.now()
@@ -1537,7 +1481,7 @@ async def approve_adjustment(
         return {
             "message": "调参已审批，新版本故障树已创建",
             "adjustment_id": adjustment_id,
-            "new_tree_version": "v1.0.0"  # TODO: 返回实际版本号
+            "new_tree_version": "v1.0.0",  # TODO: 返回实际版本号
         }
     except Exception as e:
         await db.rollback()
@@ -1547,10 +1491,7 @@ async def approve_adjustment(
 
 @router.post("/probability-tuning/adjustments/{adjustment_id}/reject")
 async def reject_adjustment(
-    adjustment_id: int,
-    reason: str,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_admin)
+    adjustment_id: int, reason: str, db: AsyncSession = Depends(get_db), current_user: User = Depends(require_admin)
 ):
     """
     拒绝调参建议
@@ -1560,19 +1501,17 @@ async def reject_adjustment(
     from ...models.diagnosis import ProbabilityAdjustmentLog
 
     # 查询调参记录
-    result = await db.execute(
-        select(ProbabilityAdjustmentLog).where(ProbabilityAdjustmentLog.id == adjustment_id)
-    )
+    result = await db.execute(select(ProbabilityAdjustmentLog).where(ProbabilityAdjustmentLog.id == adjustment_id))
     adjustment = result.scalar_one_or_none()
 
     if not adjustment:
         raise HTTPException(status_code=404, detail="调参记录不存在")
 
-    if adjustment.status != 'pending':
+    if adjustment.status != "pending":
         raise HTTPException(status_code=400, detail=f"调参记录状态为 {adjustment.status}，无法拒绝")
 
     # 更新状态
-    adjustment.status = 'rejected'
+    adjustment.status = "rejected"
     adjustment.reason = reason
     adjustment.approved_by = current_user.id
     adjustment.approved_at = datetime.now()
@@ -1581,21 +1520,17 @@ async def reject_adjustment(
 
     logger.info(f"调参记录 {adjustment_id} 已拒绝，用户: {current_user.username}")
 
-    return {
-        "message": "调参已拒绝",
-        "adjustment_id": adjustment_id
-    }
+    return {"message": "调参已拒绝", "adjustment_id": adjustment_id}
 
 
 # ============================================================
 # 时间窗口调参 API - Story 26.4
 # ============================================================
 
+
 @router.post("/time-window-tuning/analyze", dependencies=[Depends(require_admin)])
 async def analyze_time_window_tuning(
-    device_type: Optional[str] = None,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_admin)
+    device_type: Optional[str] = None, db: AsyncSession = Depends(get_db), current_user: User = Depends(require_admin)
 ):
     """
     手动触发时间窗口调参分析
@@ -1622,7 +1557,7 @@ async def get_time_window_adjustments(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_admin)
+    current_user: User = Depends(require_admin),
 ):
     """
     查询时间窗口调参记录列表
@@ -1655,12 +1590,7 @@ async def get_time_window_adjustments(
     result = await db.execute(query)
     adjustments = result.scalars().all()
 
-    return {
-        "items": adjustments,
-        "total": total,
-        "page": page,
-        "page_size": page_size
-    }
+    return {"items": adjustments, "total": total, "page": page, "page_size": page_size}
 
 
 @router.post("/time-window-tuning/adjustments/{adjustment_id}/approve", dependencies=[Depends(require_admin)])
@@ -1668,7 +1598,7 @@ async def approve_time_window_adjustment(
     adjustment_id: int,
     reason: Optional[str] = None,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_admin)
+    current_user: User = Depends(require_admin),
 ):
     """
     审批时间窗口调参建议
@@ -1680,15 +1610,13 @@ async def approve_time_window_adjustment(
     import json
 
     # 查询调参记录
-    result = await db.execute(
-        select(TimeWindowAdjustmentLog).where(TimeWindowAdjustmentLog.id == adjustment_id)
-    )
+    result = await db.execute(select(TimeWindowAdjustmentLog).where(TimeWindowAdjustmentLog.id == adjustment_id))
     adjustment = result.scalar_one_or_none()
 
     if not adjustment:
         raise HTTPException(status_code=404, detail="调参记录不存在")
 
-    if adjustment.status != 'pending':
+    if adjustment.status != "pending":
         raise HTTPException(status_code=400, detail=f"调参记录状态为 {adjustment.status}，无法审批")
 
     # 使用数据库事务确保原子性
@@ -1700,7 +1628,7 @@ async def approve_time_window_adjustment(
                 and_(
                     TimeWindowAdjustmentLog.id == adjustment_id,
                     TimeWindowAdjustmentLog.version == adjustment.version,
-                    TimeWindowAdjustmentLog.status == 'pending'
+                    TimeWindowAdjustmentLog.status == "pending",
                 )
             )
             .with_for_update()
@@ -1711,39 +1639,42 @@ async def approve_time_window_adjustment(
             raise HTTPException(status_code=409, detail="调参记录已被其他用户修改，请刷新后重试")
 
         # 更新状态
-        locked_adjustment.status = 'approved'
+        locked_adjustment.status = "approved"
         locked_adjustment.reason = reason
         locked_adjustment.approved_by = current_user.id
         locked_adjustment.approved_at = datetime.now()
 
         # 更新 system_configs 表中的时间窗口配置
         config_result = await db.execute(
-            select(SystemConfig).where(SystemConfig.config_key == 'diagnosis_time_windows')
+            select(SystemConfig).where(SystemConfig.config_key == "diagnosis_time_windows")
         )
         config = config_result.scalar_one_or_none()
 
         if config:
             # 更新现有配置
-            time_windows = json.loads(config.config_value) if isinstance(config.config_value, str) else config.config_value
+            time_windows = (
+                json.loads(config.config_value) if isinstance(config.config_value, str) else config.config_value
+            )
             time_windows[locked_adjustment.device_type] = locked_adjustment.proposed_window_minutes
             config.config_value = json.dumps(time_windows)
         else:
             # 创建新配置
             config = SystemConfig(
-                config_key='diagnosis_time_windows',
+                config_key="diagnosis_time_windows",
                 config_value=json.dumps({locked_adjustment.device_type: locked_adjustment.proposed_window_minutes}),
-                description='诊断时间窗口配置（分钟）'
+                description="诊断时间窗口配置（分钟）",
             )
             db.add(config)
 
         # 记录审计日志（在同一事务中）
         from ...models.diagnosis import AuditLog
+
         audit_log = AuditLog(
             user_id=current_user.id,
-            action='approve_time_window_adjustment',
-            resource_type='time_window_adjustment',
+            action="approve_time_window_adjustment",
+            resource_type="time_window_adjustment",
             resource_id=adjustment_id,
-            details=f"审批时间窗口调参: {locked_adjustment.device_type}, {locked_adjustment.current_window_minutes} -> {locked_adjustment.proposed_window_minutes} 分钟"
+            details=f"审批时间窗口调参: {locked_adjustment.device_type}, {locked_adjustment.current_window_minutes} -> {locked_adjustment.proposed_window_minutes} 分钟",
         )
         db.add(audit_log)
 
@@ -1754,15 +1685,16 @@ async def approve_time_window_adjustment(
         # 发送 WebSocket 通知给所有管理员
         try:
             from ...services.websocket import ws_manager
+
             await ws_manager.broadcast_to_role(
-                'admin',
+                "admin",
                 {
-                    'type': 'time_window_adjustment_updated',
-                    'adjustment_id': adjustment_id,
-                    'device_type': locked_adjustment.device_type,
-                    'status': 'approved',
-                    'approved_by': current_user.username
-                }
+                    "type": "time_window_adjustment_updated",
+                    "adjustment_id": adjustment_id,
+                    "device_type": locked_adjustment.device_type,
+                    "status": "approved",
+                    "approved_by": current_user.username,
+                },
             )
         except Exception as ws_error:
             logger.error(f"发送 WebSocket 通知失败: {ws_error}", exc_info=True)
@@ -1771,7 +1703,7 @@ async def approve_time_window_adjustment(
             "message": "调参已审批，配置已更新",
             "adjustment_id": adjustment_id,
             "device_type": locked_adjustment.device_type,
-            "new_window_minutes": locked_adjustment.proposed_window_minutes
+            "new_window_minutes": locked_adjustment.proposed_window_minutes,
         }
 
     except HTTPException:
@@ -1785,10 +1717,7 @@ async def approve_time_window_adjustment(
 
 @router.post("/time-window-tuning/adjustments/{adjustment_id}/reject", dependencies=[Depends(require_admin)])
 async def reject_time_window_adjustment(
-    adjustment_id: int,
-    reason: str,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_admin)
+    adjustment_id: int, reason: str, db: AsyncSession = Depends(get_db), current_user: User = Depends(require_admin)
 ):
     """
     拒绝时间窗口调参建议
@@ -1798,19 +1727,17 @@ async def reject_time_window_adjustment(
     from ...models.diagnosis import TimeWindowAdjustmentLog
 
     # 查询调参记录
-    result = await db.execute(
-        select(TimeWindowAdjustmentLog).where(TimeWindowAdjustmentLog.id == adjustment_id)
-    )
+    result = await db.execute(select(TimeWindowAdjustmentLog).where(TimeWindowAdjustmentLog.id == adjustment_id))
     adjustment = result.scalar_one_or_none()
 
     if not adjustment:
         raise HTTPException(status_code=404, detail="调参记录不存在")
 
-    if adjustment.status != 'pending':
+    if adjustment.status != "pending":
         raise HTTPException(status_code=400, detail=f"调参记录状态为 {adjustment.status}，无法拒绝")
 
     # 更新状态
-    adjustment.status = 'rejected'
+    adjustment.status = "rejected"
     adjustment.reason = reason
     adjustment.approved_by = current_user.id
     adjustment.approved_at = datetime.now()
@@ -1822,30 +1749,25 @@ async def reject_time_window_adjustment(
     # 发送 WebSocket 通知给所有管理员
     try:
         from ...services.websocket import ws_manager
+
         await ws_manager.broadcast_to_role(
-            'admin',
+            "admin",
             {
-                'type': 'time_window_adjustment_updated',
-                'adjustment_id': adjustment_id,
-                'device_type': adjustment.device_type,
-                'status': 'rejected',
-                'rejected_by': current_user.username
-            }
+                "type": "time_window_adjustment_updated",
+                "adjustment_id": adjustment_id,
+                "device_type": adjustment.device_type,
+                "status": "rejected",
+                "rejected_by": current_user.username,
+            },
         )
     except Exception as ws_error:
         logger.error(f"发送 WebSocket 通知失败: {ws_error}", exc_info=True)
 
-    return {
-        "message": "调参已拒绝",
-        "adjustment_id": adjustment_id
-    }
+    return {"message": "调参已拒绝", "adjustment_id": adjustment_id}
 
 
 @router.get("/time-window-tuning/config", dependencies=[Depends(require_admin)])
-async def get_time_window_config(
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_admin)
-):
+async def get_time_window_config(db: AsyncSession = Depends(get_db), current_user: User = Depends(require_admin)):
     """
     查询当前时间窗口配置
 
@@ -1854,14 +1776,14 @@ async def get_time_window_config(
     from ...models.config import SystemConfig
     import json
 
-    result = await db.execute(
-        select(SystemConfig).where(SystemConfig.config_key == 'diagnosis_time_windows')
-    )
+    result = await db.execute(select(SystemConfig).where(SystemConfig.config_key == "diagnosis_time_windows"))
     config = result.scalar_one_or_none()
 
     if config and config.config_value:
         try:
-            time_windows = json.loads(config.config_value) if isinstance(config.config_value, str) else config.config_value
+            time_windows = (
+                json.loads(config.config_value) if isinstance(config.config_value, str) else config.config_value
+            )
             return {"time_windows": time_windows}
         except json.JSONDecodeError:
             return {"time_windows": {}}
@@ -1874,7 +1796,7 @@ async def update_time_window_config(
     device_type: str,
     time_window_minutes: int,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_admin)
+    current_user: User = Depends(require_admin),
 ):
     """
     手动更新时间窗口配置
@@ -1888,9 +1810,7 @@ async def update_time_window_config(
         raise HTTPException(status_code=400, detail="时间窗口必须在 1-120 分钟之间")
 
     # 查询配置
-    result = await db.execute(
-        select(SystemConfig).where(SystemConfig.config_key == 'diagnosis_time_windows')
-    )
+    result = await db.execute(select(SystemConfig).where(SystemConfig.config_key == "diagnosis_time_windows"))
     config = result.scalar_one_or_none()
 
     if config:
@@ -1901,9 +1821,9 @@ async def update_time_window_config(
     else:
         # 创建新配置
         config = SystemConfig(
-            config_key='diagnosis_time_windows',
+            config_key="diagnosis_time_windows",
             config_value=json.dumps({device_type: time_window_minutes}),
-            description='诊断时间窗口配置（分钟）'
+            description="诊断时间窗口配置（分钟）",
         )
         db.add(config)
 
@@ -1911,28 +1831,26 @@ async def update_time_window_config(
 
     # 记录审计日志
     from ...models.diagnosis import AuditLog
+
     audit_log = AuditLog(
         user_id=current_user.id,
-        action='update_time_window_config',
-        resource_type='time_window_config',
+        action="update_time_window_config",
+        resource_type="time_window_config",
         resource_id=None,
-        details=f"手动更新时间窗口配置: {device_type} = {time_window_minutes} 分钟"
+        details=f"手动更新时间窗口配置: {device_type} = {time_window_minutes} 分钟",
     )
     db.add(audit_log)
     await db.commit()
 
     logger.info(f"时间窗口配置已更新: {device_type} = {time_window_minutes} 分钟, 用户: {current_user.username}")
 
-    return {
-        "message": "配置已更新",
-        "device_type": device_type,
-        "time_window_minutes": time_window_minutes
-    }
+    return {"message": "配置已更新", "device_type": device_type, "time_window_minutes": time_window_minutes}
 
 
 # ============================================================
 # 训练数据异常检测 API - Story 26.9
 # ============================================================
+
 
 @router.get("/training-audit", summary="查询训练数据异常检测历史")
 async def list_training_audits(
@@ -1943,8 +1861,85 @@ async def list_training_audits(
     """查询训练数据异常检测历史报告（仅管理员可访问）"""
     try:
         from app.services.diagnosis.training_data_audit_service import training_data_audit_service
+
         result = await training_data_audit_service.list_audits(page, page_size)
         return {"code": 200, "message": "success", "data": result}
     except Exception as e:
         logger.error(f"查询训练数据审计历史失败: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"查询失败: {e}")
+
+
+# ============================================================
+# HMAC 密钥管理 API - Story 26.10
+# ============================================================
+
+
+@router.get("/hmac-key/status", summary="查询 HMAC 密钥状态")
+async def get_hmac_key_status(
+    _: User = Depends(require_admin),
+):
+    """查询当前 HMAC 密钥配置状态和活跃版本统计（仅管理员可访问）"""
+    try:
+        from app.services.diagnosis.hmac_key_service import hmac_key_service
+
+        result = await hmac_key_service.get_key_status()
+        return {"code": 200, "message": "success", "data": result}
+    except Exception as e:
+        logger.error(f"查询 HMAC 密钥状态失败: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"查询失败: {e}")
+
+
+@router.post("/hmac-key/rotate", summary="执行 HMAC 密钥轮换")
+async def rotate_hmac_key(
+    body: dict,
+    current_user: User = Depends(require_admin),
+):
+    """用新密钥对所有活跃/已审核版本重新签名（仅管理员可访问）"""
+    new_key = body.get("new_key")
+    if not new_key or not isinstance(new_key, str):
+        raise HTTPException(status_code=400, detail="请提供 new_key 参数")
+    if len(new_key) < 32:
+        raise HTTPException(status_code=400, detail="新密钥长度必须 >= 32 字符")
+
+    try:
+        from app.services.diagnosis.hmac_key_service import hmac_key_service
+
+        result = await hmac_key_service.rotate_key(new_key, current_user.id)
+        return {"code": 200, "message": "密钥轮换成功", "data": result}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"HMAC 密钥轮换失败: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"轮换失败: {e}")
+
+
+@router.post("/hmac-key/verify-all", summary="批量验证签名完整性")
+async def verify_all_signatures(
+    _: User = Depends(require_admin),
+):
+    """验证所有活跃/已审核故障树版本的 HMAC 签名（仅管理员可访问）"""
+    try:
+        from app.services.diagnosis.hmac_key_service import hmac_key_service
+
+        result = await hmac_key_service.verify_all_signatures()
+        return {"code": 200, "message": "success", "data": result}
+    except Exception as e:
+        logger.error(f"批量验证签名失败: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"验证失败: {e}")
+
+
+@router.get("/hmac-key/rotation-logs", summary="查询密钥轮换历史")
+async def list_rotation_logs(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    _: User = Depends(require_admin),
+):
+    """查询 HMAC 密钥轮换历史记录（仅管理员可访问）"""
+    try:
+        from app.services.diagnosis.hmac_key_service import hmac_key_service
+
+        result = await hmac_key_service.list_rotation_logs(page, page_size)
+        return {"code": 200, "message": "success", "data": result}
+    except Exception as e:
+        logger.error(f"查询密钥轮换历史失败: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"查询失败: {e}")

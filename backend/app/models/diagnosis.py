@@ -420,3 +420,20 @@ class TrainingDataAudit(Base):
     action_taken = Column(String(50), nullable=False, comment="执行动作: weight_reduced/removed/aborted/skipped")
     anomaly_sample_ids = Column(JSON, nullable=True, comment="异常样本 annotation ID 列表")
     created_at = Column(DateTime, default=datetime.now, comment="创建时间")
+
+
+class HMACKeyRotationLog(Base):
+    """HMAC 密钥轮换审计日志 — Story 26.10"""
+
+    __tablename__ = "hmac_key_rotation_logs"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    rotated_at = Column(DateTime, nullable=False, default=datetime.now, comment="轮换时间")
+    rotated_by = Column(Integer, ForeignKey("users.id"), nullable=False, comment="操作者 ID")
+    versions_resigned = Column(Integer, nullable=False, default=0, comment="重签名版本数")
+    resigned_version_ids = Column(JSON, nullable=True, comment="重签名的版本 ID 列表")
+    new_key_prefix = Column(String(4), nullable=False, comment="新密钥前4字符")
+    old_key_prefix = Column(String(4), nullable=True, comment="旧密钥前4字符")
+    status = Column(String(20), nullable=False, comment="操作状态: success/failed")
+    error_detail = Column(Text, nullable=True, comment="错误详情")
+    created_at = Column(DateTime, default=datetime.now, comment="创建时间")

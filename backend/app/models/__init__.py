@@ -95,7 +95,7 @@ from .gateway import Gateway, DataSource, DataSourcePoint, MqttAclRule
 from .spatial import Site, Floor, Room, Row, LayoutTemplate
 from .topology_config import PowerPhaseMapping, CoolingZone, CoolingZoneCabinet, CoolingZoneUnit, CabinetTemperatureSensor, CabinetITLoad
 from .linkage import LinkagePolicy, LinkageAction, LinkageExecution, LinkageLog, LinkageRecovery, LinkageRecoveryLog
-from .diagnosis import DiagnosisRule, DiagnosisResult, DiagnosisSession, DiagnosisAuditLog, DiagnosisAnnotation, BatterySOHRecord, SOHPointUnavailableTracking, SystemReport, DiagnosisImprovementRule, ProbabilityAdjustmentLog, AuditLog, TimeWindowAdjustmentLog, TrainingDataAudit
+from .diagnosis import DiagnosisRule, DiagnosisResult, DiagnosisSession, DiagnosisAuditLog, DiagnosisAnnotation, BatterySOHRecord, SOHPointUnavailableTracking, SystemReport, DiagnosisImprovementRule, ProbabilityAdjustmentLog, AuditLog, TimeWindowAdjustmentLog, TrainingDataAudit, HMACKeyRotationLog
 from .fault_tree import FaultTree, FaultTreeNode, FaultTreeEdge, FaultTreeDeviceMapping, FaultTreeVersion
 from .ab_test_config import ABTestConfig, ABTestDeviceAssignment, ABTestArchive
 from .command import CommandApproval, CommandAuditLog
@@ -282,6 +282,7 @@ __all__ = [
     "AuditLog",
     "TimeWindowAdjustmentLog",
     "TrainingDataAudit",
+    "HMACKeyRotationLog",
     # 故障树
     "FaultTree",
     "FaultTreeNode",

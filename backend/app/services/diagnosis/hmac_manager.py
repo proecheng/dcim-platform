@@ -1,6 +1,7 @@
 """
 HMAC 签名管理器 - Story 24.4
 """
+
 import hmac
 import hashlib
 from typing import Optional
@@ -17,6 +18,11 @@ class HMACManager:
         key = settings.FAULT_TREE_HMAC_KEY.encode()
         signature = hmac.new(key, data.encode(), hashlib.sha256).hexdigest()
         return signature
+
+    @staticmethod
+    def generate_signature_with_key(data: str, key: str) -> str:
+        """使用指定密钥生成 HMAC-SHA-256 签名（用于密钥轮换）"""
+        return hmac.new(key.encode(), data.encode(), hashlib.sha256).hexdigest()
 
     @staticmethod
     def verify_signature(data: str, signature: str) -> bool:
