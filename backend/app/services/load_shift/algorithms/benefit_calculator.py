@@ -117,7 +117,7 @@ class BenefitCalculator:
         """
         result = await self.db.execute(
             select(ElectricityPricing)
-            .where(ElectricityPricing.is_active == True)
+            .where(ElectricityPricing.is_enabled == True)
             .order_by(ElectricityPricing.effective_date.desc())
             .limit(1)
         )

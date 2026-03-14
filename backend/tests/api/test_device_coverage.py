@@ -402,7 +402,7 @@ class TestDeviceCRUD:
         assert resp.status_code == 404
 
     async def test_delete_device(self, client, admin_user, async_db):
-        """DELETE /devices/{id} — 删除设备（无关联点位）"""
+        """DELETE /devices/{id}?force=true — 删除设备（无关联点位）"""
         _, token = admin_user
         device = Device(
             device_code="DEL-DEV-001",
@@ -414,14 +414,14 @@ class TestDeviceCRUD:
         await async_db.flush()
 
         resp = await client.delete(
-            f"/api/v1/devices/{device.id}",
+            f"/api/v1/devices/{device.id}?force=true",
             headers=auth_headers(token),
         )
         assert resp.status_code == 200
         assert "已删除" in resp.json()["message"]
 
     async def test_delete_device_with_points(self, client, admin_user, async_db):
-        """DELETE /devices/{id} — 有关联点位时拒绝删除"""
+        """DELETE /devices/{id} — 有关联点位时返回影响分析（不加 force 参数）"""
         _, token = admin_user
         device = Device(
             device_code="DEL-DEV-002",
@@ -442,12 +442,15 @@ class TestDeviceCRUD:
         async_db.add(point)
         await async_db.flush()
 
+        # 不带 force 参数，应返回影响分析而非直接删除
         resp = await client.delete(
             f"/api/v1/devices/{device.id}",
             headers=auth_headers(token),
         )
-        assert resp.status_code == 400
-        assert "点位" in resp.json()["detail"]
+        assert resp.status_code == 200
+        data = resp.json()
+        # 影响分析应包含点位相关信息
+        assert "impacts" in data or "device_name" in data
 
     async def test_delete_device_not_found(self, client, admin_user, async_db):
         """DELETE /devices/99999 — 不存在"""

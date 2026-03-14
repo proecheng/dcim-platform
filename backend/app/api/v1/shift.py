@@ -181,12 +181,18 @@ async def approve_plan(
     Approve or reject plan
     审批计划（批准/拒绝）
     """
-    plan = await ShiftPlanService.approve_plan(
-        db=db,
-        plan_id=plan_id,
-        approval_data=approval_data,
-        approver_id=current_user.id,
-    )
+    try:
+        plan = await ShiftPlanService.approve_plan(
+            db=db,
+            plan_id=plan_id,
+            approval_data=approval_data,
+            approver_id=current_user.id,
+        )
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e),
+        )
     if not plan:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -205,7 +211,13 @@ async def execute_plan(
     Start plan execution
     开始执行计划
     """
-    plan = await ShiftPlanService.start_execution(db=db, plan_id=plan_id)
+    try:
+        plan = await ShiftPlanService.start_execution(db=db, plan_id=plan_id)
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e),
+        )
     if not plan:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -288,7 +300,7 @@ async def get_opportunities(
     if priority:
         stmt = stmt.where(ShiftOpportunity.priority == priority)
     
-    stmt = stmt.order_by(ShiftOpportunity.analysis_date.desc())
+    stmt = stmt.order_by(ShiftOpportunity.recommended_date.desc())
     stmt = stmt.offset(skip).limit(limit)
     
     result = await db.execute(stmt)
@@ -357,7 +369,7 @@ async def convert_opportunity_to_plan(
         plan_name=f"基于机会 {opportunity.opportunity_code} 的转移计划",
         shift_from_period=opportunity.recommended_shift_from,
         shift_to_period=opportunity.recommended_shift_to,
-        shift_date=opportunity.analysis_date,
+        shift_date=opportunity.recommended_date,
         start_time=time(1, 0),  # Default 01:00
         end_time=time(5, 0),    # Default 05:00
         target_shift_power=opportunity.recommended_shift_power,

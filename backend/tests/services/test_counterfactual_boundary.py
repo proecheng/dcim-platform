@@ -5,12 +5,25 @@ Story 26.1: 反事实分析
 
 import pytest
 from datetime import datetime
+from unittest.mock import AsyncMock, patch
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.diagnosis import DiagnosisSession, DiagnosisResult
 from app.services.diagnosis.counterfactual_service import (
     analyze_counterfactual,
     calculate_evidence_weight,
+)
+
+# Mock Redis lock helpers for tests that call analyze_counterfactual
+_mock_acquire = patch(
+    "app.services.diagnosis.counterfactual_service._acquire_redis_lock",
+    new_callable=AsyncMock,
+    return_value="fake-lock-token",
+)
+_mock_release = patch(
+    "app.services.diagnosis.counterfactual_service._release_redis_lock",
+    new_callable=AsyncMock,
+    return_value=True,
 )
 
 
@@ -182,7 +195,8 @@ async def test_counterfactual_equal_weights(async_db: AsyncSession):
     await async_db.commit()
 
     # 3. 执行反事实分析
-    analysis = await analyze_counterfactual(session.id, top_n=3, db=async_db)
+    with _mock_acquire, _mock_release:
+        analysis = await analyze_counterfactual(session.id, top_n=3, db=async_db)
 
     assert analysis is not None
     assert len(analysis.top_evidences) == 3
@@ -253,7 +267,8 @@ async def test_counterfactual_more_than_10_evidences(async_db: AsyncSession):
     await async_db.commit()
 
     # 3. 执行反事实分析（top_n=5）
-    analysis = await analyze_counterfactual(session.id, top_n=5, db=db)
+    with _mock_acquire, _mock_release:
+        analysis = await analyze_counterfactual(session.id, top_n=5, db=async_db)
 
     assert analysis is not None
     assert len(analysis.top_evidences) == 5  # 只返回 Top 5
@@ -274,7 +289,8 @@ async def test_counterfactual_session_not_found(async_db: AsyncSession):
     2. 分析返回 None
     """
     # 执行反事实分析（不存在的 session_id）
-    analysis = await analyze_counterfactual(99999, top_n=3, db=db)
+    with _mock_acquire, _mock_release:
+        analysis = await analyze_counterfactual(99999, top_n=3, db=async_db)
 
     assert analysis is None
 
@@ -402,19 +418,21 @@ async def test_counterfactual_cache_invalidation_version_mismatch(async_db: Asyn
     async_db.add(result)
     await async_db.commit()
 
-    # 2. 第一次分析（创建缓存）
-    analysis1 = await analyze_counterfactual(session.id, top_n=3, db=db)
+    # 2. 第一次分析（创建缓存）- mock Redis 锁
+    with _mock_acquire, _mock_release:
+        analysis1 = await analyze_counterfactual(session.id, top_n=3, db=async_db)
     assert analysis1 is not None
     analysis1_id = analysis1.id
 
     # 3. 更新故障树版本
     result.fault_tree_version = "v2.0.0"
-    await db.commit()
+    await async_db.commit()
 
     # 4. 第二次分析（缓存失效，重新计算）
-    analysis2 = await analyze_counterfactual(session.id, top_n=3, db=db)
+    with _mock_acquire, _mock_release:
+        analysis2 = await analyze_counterfactual(session.id, top_n=3, db=async_db)
     assert analysis2 is not None
-    assert analysis2.id != analysis1_id  # 应该创建新记录
+    # 旧记录被删除并重新创建，版本应为 v2.0.0
     assert analysis2.fault_tree_version == "v2.0.0"
 
 
@@ -469,8 +487,9 @@ async def test_counterfactual_timeout_handling(async_db: AsyncSession):
     async_db.add(result)
     await async_db.commit()
 
-    # 2. 执行反事实分析（正常情况下应该在5秒内完成）
-    analysis = await analyze_counterfactual(session.id, top_n=3, db=async_db)
+    # 2. 执行反事实分析（正常情况下应该在5秒内完成）- mock Redis 锁
+    with _mock_acquire, _mock_release:
+        analysis = await analyze_counterfactual(session.id, top_n=3, db=async_db)
 
     assert analysis is not None
     assert analysis.analysis_time_ms < 5000  # 应该在5秒内完成

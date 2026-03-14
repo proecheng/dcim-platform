@@ -1,10 +1,13 @@
 ---
 project_name: 'admin'
 user_name: 'proecheng'
-date: '2026-02-21'
-sections_completed: ['technology_stack', 'language_rules', 'framework_rules', 'conventions', 'critical_rules']
-existing_patterns_found: 142
+date: '2026-03-14'
+sections_completed: ['technology_stack', 'language_rules', 'framework_rules', 'conventions', 'critical_rules', 'qa_lessons']
+existing_patterns_found: 160
 status: 'complete'
+rule_count: 160
+optimized_for_llm: true
+last_updated: '2026-03-14'
 ---
 
 # Project Context for AI Agents
@@ -1095,3 +1098,151 @@ This is an intentional design difference, NOT a bug. Unifying would require rewr
 Async driver auto-conversion:
 - `+aiosqlite` → removed (SQLite sync)
 - `+asyncpg` → `+psycopg2` (PostgreSQL sync)
+
+---
+
+## QA Review Lessons (2026-03-14 Update)
+
+### Common Model Field Name Mismatches (CRITICAL)
+
+These are real bugs discovered during QA code review. AI agents MUST verify field names against actual model definitions:
+
+| Model | WRONG field | CORRECT field | Files affected |
+|-------|-------------|---------------|----------------|
+| `ShiftOpportunity` | `analysis_date` | `recommended_date` | shift.py, load_shift schemas |
+| `ElectricityPricing` | `is_active` | `is_enabled` | benefit_calculator.py, manager.py |
+| `EnergyDaily` | `date` | `stat_date` | manager.py |
+| `EnergyDaily` | `flat_energy` | `normal_energy` | manager.py |
+| `PowerDevice` | `name` | `device_name` | manager.py |
+| `PowerDevice` | `status == "online"` | `is_enabled == True` | manager.py |
+| `PUEHistory` | `recorded_at` | `record_time` | manager.py |
+| `PointHistory` | `timestamp` | `recorded_at` | opportunity_finder.py |
+| `Point` | `name` | `point_name` | trend_analysis_service.py |
+| `Point` | `enabled` | `is_enabled` | environment_context_service.py |
+| `Cabinet` | `area_code` | `location` | datacenter_shift_strategy.py |
+| `DiagnosisAnnotation` | `is_accurate` | `annotation` (string: "accurate"/"inaccurate") | misdiagnosis_report_service.py, ab_testing_service.py |
+| `WorkOrder` | `work_order_type` | `order_type` | misdiagnosis_report_service.py |
+| `FaultTreeNode` | `node_name` / `node_id` | `name` / `id` | misdiagnosis_report_service.py |
+
+**Rule**: Before using ANY model field in code, verify it exists in the actual model class definition. Do NOT guess field names.
+
+### MissingGreenlet Prevention (SQLAlchemy Async)
+
+When Pydantic `model_validate(orm_obj)` serializes an ORM object with lazy-loaded relationships, it triggers synchronous attribute access inside an async context, causing `MissingGreenlet` error.
+
+**Fix pattern**:
+```python
+from sqlalchemy.orm import selectinload
+
+# In queries — eagerly load relationships
+query = select(Model).options(selectinload(Model.relationship_field))
+
+# After create/update — refresh specific relationships
+await db.refresh(obj, ["relationship_field"])
+```
+
+**Known relationships requiring selectinload**:
+- `EnergyOpportunity.measures`
+
+### ValueError vs HTTPException in API Endpoints
+
+Service layer methods raise `ValueError` for invalid state transitions. API endpoints MUST catch these:
+
+```python
+# CORRECT
+@router.post("/{id}/approve")
+async def approve(id: int, db: AsyncSession = Depends(get_db)):
+    try:
+        result = await service.approve(db=db, id=id)
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    return result
+
+# WRONG — ValueError becomes 500 Internal Server Error
+@router.post("/{id}/approve")
+async def approve(id: int, db: AsyncSession = Depends(get_db)):
+    result = await service.approve(db=db, id=id)  # ValueError → 500!
+    return result
+```
+
+### SQLAlchemy 2.0 `case()` Usage
+
+```python
+# CORRECT — standalone case()
+from sqlalchemy import case
+stmt = select(case((Model.field == "x", 1), else_=0))
+
+# WRONG — func.case() generates invalid SQL
+from sqlalchemy import func
+stmt = select(func.case((Model.field == "x", 1), else_=0))  # ERROR!
+```
+
+### Raw SQL Column Name Verification
+
+When writing raw SQL queries (via `text()`), verify column names against the actual table schema. Common mistakes:
+- Using Python model attribute names instead of actual DB column names
+- Assuming column names match between related tables
+
+### Testing Patterns (Backend)
+
+#### Async DB Fixture
+```python
+# CORRECT — use async_db from conftest.py
+async def test_something(async_db: AsyncSession):
+    async_db.add(obj)
+    await async_db.commit()
+
+# WRONG — use undefined 'db' variable
+async def test_something(async_db: AsyncSession):
+    await analyze(db=db)  # NameError!
+```
+
+#### Redis Mock Pattern for Services Using Redis Locks
+```python
+from unittest.mock import AsyncMock, patch
+
+_mock_acquire = patch(
+    "app.services.my_service._acquire_redis_lock",
+    new_callable=AsyncMock, return_value="fake-token",
+)
+_mock_release = patch(
+    "app.services.my_service._release_redis_lock",
+    new_callable=AsyncMock, return_value=True,
+)
+
+async def test_with_redis(async_db):
+    with _mock_acquire, _mock_release:
+        result = await my_service_function(db=async_db)
+```
+
+#### Test Isolation Warning
+~107 tests pass individually but fail in full suite (`pytest tests/`). Root cause: shared global state (module-level singletons, SQLAlchemy mapper state). When adding new tests, always verify they pass both individually AND in full suite.
+
+### Project Scale Reference (as of 2026-03-14)
+
+- **33 Epics**, **165 Stories** — all completed
+- **3000+ backend tests**, **100+ frontend test files**
+- **30+ API route modules** in `api/v1/`
+- **10 Pinia stores**, **5 WebSocket channels**
+- **6 analysis plugins**, **4 engine modules**
+
+---
+
+## Usage Guidelines
+
+**For AI Agents:**
+
+- Read this file before implementing any code
+- Follow ALL rules exactly as documented
+- When in doubt, prefer the more restrictive option
+- **Always verify model field names** against actual model class definitions before using them
+- Update this file if new patterns emerge
+
+**For Humans:**
+
+- Keep this file lean and focused on agent needs
+- Update when technology stack changes
+- Review quarterly for outdated rules
+- Remove rules that become obvious over time
+
+Last Updated: 2026-03-14

@@ -252,9 +252,9 @@ async def _calculate_temperature_constraint(
         if not zone_units:
             # 没有配置制冷区域，使用 area_code 作为 fallback
             if device.area_code:
-                # 查找同一区域的机柜
+                # 通过位置信息查找同一区域的机柜（Cabinet 没有 area_code 字段，使用 location 模糊匹配）
                 cabinets_query = select(Cabinet).where(
-                    Cabinet.area_code == device.area_code
+                    Cabinet.location.like(f"%{device.area_code}%")
                 ).limit(50)
                 cabinets_result = await session.execute(cabinets_query)
                 cabinets = cabinets_result.scalars().all()

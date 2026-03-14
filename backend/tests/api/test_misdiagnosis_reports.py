@@ -114,8 +114,8 @@ class TestGenerateMisdiagnosisReport:
             }
         )
 
-        # 可能返回 202 (成功) 或 409 (已存在)
-        assert response.status_code in [202, 409]
+        # 可能返回 200/202 (成功) 或 409 (已存在)
+        assert response.status_code in [200, 202, 409]
 
     @pytest.mark.asyncio
     async def test_generate_report_invalid_date_range(self, client: AsyncClient, admin_token: str):

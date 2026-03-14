@@ -100,7 +100,7 @@ class TrendAnalysisService:
         if total_change > threshold:
             trend_type = "上升" if overall_change > 0 else "下降"
             message = (
-                f"{point_info.name} 连续3天呈{trend_type}趋势"
+                f"{point_info.point_name} 连续3天呈{trend_type}趋势"
                 f"（均值从{values[0]:.1f}→{values[1]:.1f}→{values[2]:.1f}），"
                 f"建议检查空调运行状态"
             )

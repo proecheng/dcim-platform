@@ -101,7 +101,8 @@ class TestOptimize:
     async def test_optimizer_unavailable(self, async_db):
         """优化器不可用时返回错误"""
         svc = AdaptiveOptimizationService(async_db)
-        # _get_optimizer 默认返回 None（因为 ml_models 不可用）
+        # 强制模拟优化器不可用
+        svc._get_optimizer = lambda: None
         result = await svc.optimize(proposal_id=1)
         assert result["success"] is False
         assert "不可用" in result["error"]
@@ -127,6 +128,7 @@ class TestTrainStep:
     async def test_optimizer_unavailable(self, async_db):
         """优化器不可用时返回错误"""
         svc = AdaptiveOptimizationService(async_db)
+        svc._get_optimizer = lambda: None
         result = await svc.train_step(actual_saving=1000, expected_saving=2000)
         assert result["success"] is False
         assert "不可用" in result["error"]
@@ -139,6 +141,7 @@ class TestGetModelInfo:
     async def test_model_info_without_optimizer(self, async_db):
         """无优化器时返回基本信息"""
         svc = AdaptiveOptimizationService(async_db)
+        svc._get_optimizer = lambda: None
         info = await svc.get_model_info()
         assert info["model_name"] == "adaptive_optimizer"
         assert info["is_available"] is False
@@ -177,6 +180,7 @@ class TestUpdateExplorationRate:
     async def test_optimizer_unavailable(self, async_db):
         """优化器不可用时返回错误"""
         svc = AdaptiveOptimizationService(async_db)
+        svc._get_optimizer = lambda: None
         result = await svc.update_exploration_rate(0.1)
         assert result["success"] is False
 
@@ -188,5 +192,6 @@ class TestSaveCheckpoint:
     async def test_optimizer_unavailable(self, async_db):
         """优化器不可用时返回错误"""
         svc = AdaptiveOptimizationService(async_db)
+        svc._get_optimizer = lambda: None
         result = await svc.save_checkpoint()
         assert result["success"] is False

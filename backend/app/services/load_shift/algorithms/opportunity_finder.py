@@ -114,8 +114,8 @@ class OpportunityFinder:
             func.count(PointHistory.id).label("data_count")
         ).where(
             and_(
-                PointHistory.timestamp >= start_date,
-                PointHistory.timestamp < target_date,
+                PointHistory.recorded_at >= start_date,
+                PointHistory.recorded_at < target_date,
                 # 假设点位 ID 1 是总功率
                 PointHistory.point_id == 1
             )

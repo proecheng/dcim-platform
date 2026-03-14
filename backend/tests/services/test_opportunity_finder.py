@@ -89,14 +89,14 @@ async def test_determine_priority(db_session):
 
 
 @pytest.mark.asyncio
-async def test_find_daily_opportunities_no_data(db_session):
+async def test_find_daily_opportunities_no_data(async_db):
     """测试无数据时的机会发现"""
-    finder = OpportunityFinder(db_session)
-    
+    finder = OpportunityFinder(async_db)
+
     # 使用未来日期（无历史数据）
     future_date = date.today() + timedelta(days=365)
     opportunities = await finder.find_daily_opportunities(future_date, lookback_days=7)
-    
+
     assert isinstance(opportunities, list)
     # 无数据时应返回空列表
     assert len(opportunities) == 0

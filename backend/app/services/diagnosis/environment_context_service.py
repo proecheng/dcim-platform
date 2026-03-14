@@ -139,7 +139,7 @@ class EnvironmentContextService:
                     and_(
                         Point.point_type == "AI",
                         Point.unit.like("%kW%"),
-                        Point.enabled == True,
+                        Point.is_enabled == True,
                         # 过滤：仅包含机柜相关的功率点位
                         (Point.point_name.like("%rack%") | Point.point_name.like("%cabinet%") | Point.point_name.like("%机柜%"))
                     )

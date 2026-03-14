@@ -6,7 +6,7 @@ import logging
 from datetime import datetime
 from typing import Optional, List, Tuple
 
-from sqlalchemy import select, func, and_, or_
+from sqlalchemy import select, func, and_, or_, case
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
@@ -197,9 +197,9 @@ class DiagnosisAnnotationService:
         # 总标注数和分类统计
         stats_stmt = select(
             func.count(DiagnosisAnnotation.id).label("total"),
-            func.sum(func.case((DiagnosisAnnotation.annotation == "accurate", 1), else_=0)).label("accurate"),
-            func.sum(func.case((DiagnosisAnnotation.annotation == "inaccurate", 1), else_=0)).label("inaccurate"),
-            func.sum(func.case((DiagnosisAnnotation.annotation == "unknown", 1), else_=0)).label("unknown"),
+            func.sum(case((DiagnosisAnnotation.annotation == "accurate", 1), else_=0)).label("accurate"),
+            func.sum(case((DiagnosisAnnotation.annotation == "inaccurate", 1), else_=0)).label("inaccurate"),
+            func.sum(case((DiagnosisAnnotation.annotation == "unknown", 1), else_=0)).label("unknown"),
         )
 
         stats_result = await db.execute(stats_stmt)

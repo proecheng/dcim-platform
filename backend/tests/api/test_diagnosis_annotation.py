@@ -2,18 +2,19 @@
 Story 24.8: 诊断结果标注与RBAC 集成测试
 """
 
+from datetime import datetime
+
 import pytest
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.diagnosis import DiagnosisSession, DiagnosisAnnotation
-from app.models.user import User
 
 
 @pytest.mark.asyncio
 async def test_create_annotation_success(
     client: AsyncClient,
-    db_session: AsyncSession,
+    async_db: AsyncSession,
     operator_token: str,
 ):
     """测试创建标注 - 成功"""
@@ -23,11 +24,11 @@ async def test_create_annotation_success(
         engine_level="L1",
         status="success",
         push_status="skipped",
-        start_time="2026-03-06 10:00:00",
+        start_time=datetime(2026, 3, 6, 10, 0, 0),
     )
-    db_session.add(session)
-    await db_session.commit()
-    await db_session.refresh(session)
+    async_db.add(session)
+    await async_db.commit()
+    await async_db.refresh(session)
 
     # 创建标注
     response = await client.post(
@@ -50,7 +51,7 @@ async def test_create_annotation_success(
 @pytest.mark.asyncio
 async def test_create_annotation_inaccurate_without_root_cause(
     client: AsyncClient,
-    db_session: AsyncSession,
+    async_db: AsyncSession,
     operator_token: str,
 ):
     """测试创建标注 - 标注为inaccurate但未提供actual_root_cause"""
@@ -60,11 +61,11 @@ async def test_create_annotation_inaccurate_without_root_cause(
         engine_level="L1",
         status="success",
         push_status="skipped",
-        start_time="2026-03-06 10:00:00",
+        start_time=datetime(2026, 3, 6, 10, 0, 0),
     )
-    db_session.add(session)
-    await db_session.commit()
-    await db_session.refresh(session)
+    async_db.add(session)
+    await async_db.commit()
+    await async_db.refresh(session)
 
     # 创建标注（缺少 actual_root_cause）
     response = await client.post(
@@ -83,7 +84,7 @@ async def test_create_annotation_inaccurate_without_root_cause(
 @pytest.mark.asyncio
 async def test_create_annotation_inaccurate_with_root_cause(
     client: AsyncClient,
-    db_session: AsyncSession,
+    async_db: AsyncSession,
     operator_token: str,
 ):
     """测试创建标注 - 标注为inaccurate且提供actual_root_cause"""
@@ -93,11 +94,11 @@ async def test_create_annotation_inaccurate_with_root_cause(
         engine_level="L1",
         status="success",
         push_status="skipped",
-        start_time="2026-03-06 10:00:00",
+        start_time=datetime(2026, 3, 6, 10, 0, 0),
     )
-    db_session.add(session)
-    await db_session.commit()
-    await db_session.refresh(session)
+    async_db.add(session)
+    await async_db.commit()
+    await async_db.refresh(session)
 
     # 创建标注
     response = await client.post(
@@ -138,31 +139,33 @@ async def test_create_annotation_session_not_found(
 @pytest.mark.asyncio
 async def test_get_annotations_operator_only_own(
     client: AsyncClient,
-    db_session: AsyncSession,
+    async_db: AsyncSession,
     operator_token: str,
-    operator_user: User,
+    operator_user,
 ):
     """测试获取标注列表 - operator只能查看自己的"""
+    user, _ = operator_user
+
     # 创建测试会话
     session = DiagnosisSession(
         device_id=1,
         engine_level="L1",
         status="success",
         push_status="skipped",
-        start_time="2026-03-06 10:00:00",
+        start_time=datetime(2026, 3, 6, 10, 0, 0),
     )
-    db_session.add(session)
-    await db_session.commit()
-    await db_session.refresh(session)
+    async_db.add(session)
+    await async_db.commit()
+    await async_db.refresh(session)
 
     # 创建标注（当前用户）
     annotation1 = DiagnosisAnnotation(
         session_id=session.id,
-        annotator_id=operator_user.id,
+        annotator_id=user.id,
         annotation="accurate",
-        annotated_at="2026-03-06 10:00:00",
+        annotated_at=datetime(2026, 3, 6, 10, 0, 0),
     )
-    db_session.add(annotation1)
+    async_db.add(annotation1)
 
     # 创建标注（其他用户）
     annotation2 = DiagnosisAnnotation(
@@ -170,10 +173,10 @@ async def test_get_annotations_operator_only_own(
         annotator_id=999,  # 其他用户
         annotation="inaccurate",
         actual_root_cause="测试",
-        annotated_at="2026-03-06 10:01:00",
+        annotated_at=datetime(2026, 3, 6, 10, 1, 0),
     )
-    db_session.add(annotation2)
-    await db_session.commit()
+    async_db.add(annotation2)
+    await async_db.commit()
 
     # 查询标注列表
     response = await client.get(
@@ -185,13 +188,12 @@ async def test_get_annotations_operator_only_own(
     data = response.json()
     # operator 只能看到自己的标注
     assert data["total"] == 1
-    assert data["items"][0]["annotator_id"] == operator_user.id
+    assert data["items"][0]["annotator_id"] == user.id
 
 
 @pytest.mark.asyncio
 async def test_get_annotations_operator_query_other_user_forbidden(
     client: AsyncClient,
-    db_session: AsyncSession,
     operator_token: str,
 ):
     """测试获取标注列表 - operator查询其他用户ID返回403"""
@@ -206,7 +208,7 @@ async def test_get_annotations_operator_query_other_user_forbidden(
 @pytest.mark.asyncio
 async def test_get_annotations_admin_can_view_all(
     client: AsyncClient,
-    db_session: AsyncSession,
+    async_db: AsyncSession,
     admin_token: str,
 ):
     """测试获取标注列表 - admin可以查看所有"""
@@ -216,28 +218,28 @@ async def test_get_annotations_admin_can_view_all(
         engine_level="L1",
         status="success",
         push_status="skipped",
-        start_time="2026-03-06 10:00:00",
+        start_time=datetime(2026, 3, 6, 10, 0, 0),
     )
-    db_session.add(session)
-    await db_session.commit()
-    await db_session.refresh(session)
+    async_db.add(session)
+    await async_db.commit()
+    await async_db.refresh(session)
 
     # 创建多个用户的标注
     annotation1 = DiagnosisAnnotation(
         session_id=session.id,
         annotator_id=1,
         annotation="accurate",
-        annotated_at="2026-03-06 10:00:00",
+        annotated_at=datetime(2026, 3, 6, 10, 0, 0),
     )
     annotation2 = DiagnosisAnnotation(
         session_id=session.id,
         annotator_id=2,
         annotation="inaccurate",
         actual_root_cause="测试",
-        annotated_at="2026-03-06 10:01:00",
+        annotated_at=datetime(2026, 3, 6, 10, 1, 0),
     )
-    db_session.add_all([annotation1, annotation2])
-    await db_session.commit()
+    async_db.add_all([annotation1, annotation2])
+    await async_db.commit()
 
     # 查询标注列表
     response = await client.get(
@@ -254,33 +256,35 @@ async def test_get_annotations_admin_can_view_all(
 @pytest.mark.asyncio
 async def test_delete_annotation_operator_own(
     client: AsyncClient,
-    db_session: AsyncSession,
+    async_db: AsyncSession,
     operator_token: str,
-    operator_user: User,
+    operator_user,
 ):
     """测试删除标注 - operator删除自己的"""
+    user, _ = operator_user
+
     # 创建测试会话
     session = DiagnosisSession(
         device_id=1,
         engine_level="L1",
         status="success",
         push_status="skipped",
-        start_time="2026-03-06 10:00:00",
+        start_time=datetime(2026, 3, 6, 10, 0, 0),
     )
-    db_session.add(session)
-    await db_session.commit()
-    await db_session.refresh(session)
+    async_db.add(session)
+    await async_db.commit()
+    await async_db.refresh(session)
 
     # 创建标注
     annotation = DiagnosisAnnotation(
         session_id=session.id,
-        annotator_id=operator_user.id,
+        annotator_id=user.id,
         annotation="accurate",
-        annotated_at="2026-03-06 10:00:00",
+        annotated_at=datetime(2026, 3, 6, 10, 0, 0),
     )
-    db_session.add(annotation)
-    await db_session.commit()
-    await db_session.refresh(annotation)
+    async_db.add(annotation)
+    await async_db.commit()
+    await async_db.refresh(annotation)
 
     # 删除标注
     response = await client.delete(
@@ -294,7 +298,7 @@ async def test_delete_annotation_operator_own(
 @pytest.mark.asyncio
 async def test_delete_annotation_operator_other_forbidden(
     client: AsyncClient,
-    db_session: AsyncSession,
+    async_db: AsyncSession,
     operator_token: str,
 ):
     """测试删除标注 - operator删除其他用户的返回403"""
@@ -304,22 +308,22 @@ async def test_delete_annotation_operator_other_forbidden(
         engine_level="L1",
         status="success",
         push_status="skipped",
-        start_time="2026-03-06 10:00:00",
+        start_time=datetime(2026, 3, 6, 10, 0, 0),
     )
-    db_session.add(session)
-    await db_session.commit()
-    await db_session.refresh(session)
+    async_db.add(session)
+    await async_db.commit()
+    await async_db.refresh(session)
 
     # 创建标注（其他用户）
     annotation = DiagnosisAnnotation(
         session_id=session.id,
         annotator_id=999,
         annotation="accurate",
-        annotated_at="2026-03-06 10:00:00",
+        annotated_at=datetime(2026, 3, 6, 10, 0, 0),
     )
-    db_session.add(annotation)
-    await db_session.commit()
-    await db_session.refresh(annotation)
+    async_db.add(annotation)
+    await async_db.commit()
+    await async_db.refresh(annotation)
 
     # 删除标注
     response = await client.delete(
@@ -333,7 +337,7 @@ async def test_delete_annotation_operator_other_forbidden(
 @pytest.mark.asyncio
 async def test_delete_annotation_admin_can_delete_any(
     client: AsyncClient,
-    db_session: AsyncSession,
+    async_db: AsyncSession,
     admin_token: str,
 ):
     """测试删除标注 - admin可以删除任何用户的"""
@@ -343,22 +347,22 @@ async def test_delete_annotation_admin_can_delete_any(
         engine_level="L1",
         status="success",
         push_status="skipped",
-        start_time="2026-03-06 10:00:00",
+        start_time=datetime(2026, 3, 6, 10, 0, 0),
     )
-    db_session.add(session)
-    await db_session.commit()
-    await db_session.refresh(session)
+    async_db.add(session)
+    await async_db.commit()
+    await async_db.refresh(session)
 
     # 创建标注（其他用户）
     annotation = DiagnosisAnnotation(
         session_id=session.id,
         annotator_id=999,
         annotation="accurate",
-        annotated_at="2026-03-06 10:00:00",
+        annotated_at=datetime(2026, 3, 6, 10, 0, 0),
     )
-    db_session.add(annotation)
-    await db_session.commit()
-    await db_session.refresh(annotation)
+    async_db.add(annotation)
+    await async_db.commit()
+    await async_db.refresh(annotation)
 
     # 删除标注
     response = await client.delete(
@@ -372,7 +376,7 @@ async def test_delete_annotation_admin_can_delete_any(
 @pytest.mark.asyncio
 async def test_get_annotation_stats(
     client: AsyncClient,
-    db_session: AsyncSession,
+    async_db: AsyncSession,
     admin_token: str,
 ):
     """测试获取标注统计"""
@@ -382,11 +386,11 @@ async def test_get_annotation_stats(
         engine_level="L1",
         status="success",
         push_status="skipped",
-        start_time="2026-03-06 10:00:00",
+        start_time=datetime(2026, 3, 6, 10, 0, 0),
     )
-    db_session.add(session)
-    await db_session.commit()
-    await db_session.refresh(session)
+    async_db.add(session)
+    await async_db.commit()
+    await async_db.refresh(session)
 
     # 创建多个标注
     annotations = [
@@ -394,30 +398,30 @@ async def test_get_annotation_stats(
             session_id=session.id,
             annotator_id=1,
             annotation="accurate",
-            annotated_at="2026-03-06 10:00:00",
+            annotated_at=datetime(2026, 3, 6, 10, 0, 0),
         ),
         DiagnosisAnnotation(
             session_id=session.id,
             annotator_id=1,
             annotation="accurate",
-            annotated_at="2026-03-06 10:01:00",
+            annotated_at=datetime(2026, 3, 6, 10, 1, 0),
         ),
         DiagnosisAnnotation(
             session_id=session.id,
             annotator_id=2,
             annotation="inaccurate",
             actual_root_cause="测试",
-            annotated_at="2026-03-06 10:02:00",
+            annotated_at=datetime(2026, 3, 6, 10, 2, 0),
         ),
         DiagnosisAnnotation(
             session_id=session.id,
             annotator_id=2,
             annotation="unknown",
-            annotated_at="2026-03-06 10:03:00",
+            annotated_at=datetime(2026, 3, 6, 10, 3, 0),
         ),
     ]
-    db_session.add_all(annotations)
-    await db_session.commit()
+    async_db.add_all(annotations)
+    await async_db.commit()
 
     # 获取统计
     response = await client.get(

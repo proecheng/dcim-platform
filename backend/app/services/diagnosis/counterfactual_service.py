@@ -438,6 +438,17 @@ async def _analyze_counterfactual_impl(
     fault_tree_version = diagnosis_result.fault_tree_version
     config_version = await _get_config_version()
 
+    # 删除旧的分析记录（缓存失效时可能存在旧记录）
+    existing_result = await db.execute(
+        select(CounterfactualAnalysis).where(
+            CounterfactualAnalysis.session_id == session_id
+        )
+    )
+    existing = existing_result.scalar_one_or_none()
+    if existing:
+        await db.delete(existing)
+        await db.flush()
+
     # 创建分析记录
     counterfactual = CounterfactualAnalysis(
         session_id=session_id,

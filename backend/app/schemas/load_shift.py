@@ -200,7 +200,7 @@ class ShiftExecutionDetail(ShiftExecutionResponse):
 
 class ShiftOpportunityBase(BaseModel):
     """Shift opportunity base model - 转移机会基础模型"""
-    analysis_date: date = Field(..., description="分析日期")
+    recommended_date: date = Field(..., description="推荐日期")
     shift_from_period: ShiftPeriodType = Field(..., description="转出时段")
     shift_to_period: ShiftPeriodType = Field(..., description="转入时段")
     recommended_shift_power: float = Field(..., gt=0, description="推荐转移功率 kW")

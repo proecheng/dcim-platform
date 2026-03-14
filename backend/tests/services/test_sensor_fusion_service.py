@@ -49,14 +49,13 @@ class TestCalculateTemperatureVariance:
     @pytest.mark.asyncio
     async def test_high_variance_generates_evidence(self, fusion_service, mock_db):
         """测试高标准差生成气流不均匀证据"""
-        # 模拟查询结果：3 个传感器，温差大
+        # 模拟查询结果：3 个传感器，温差大（需要 std_dev > 5.0）
         mock_result = MagicMock()
         mock_result.fetchall.return_value = [
-            MagicMock(id=1, name="T-01", value=20.0, height_level=1.5, accuracy_class=0.5),
-            MagicMock(id=2, name="T-02", value=28.0, height_level=1.5, accuracy_class=0.5),
+            MagicMock(id=1, name="T-01", value=15.0, height_level=1.5, accuracy_class=0.5),
+            MagicMock(id=2, name="T-02", value=32.0, height_level=1.5, accuracy_class=0.5),
             MagicMock(id=3, name="T-03", value=24.0, height_level=1.5, accuracy_class=0.5),
         ]
-        mock_db.execute = AsyncMock(return_value=mock_result)
 
         # 模拟配置查询：阈值 5.0
         config_result = MagicMock()

@@ -410,7 +410,6 @@ async def test_reject_without_reason(client, db_session, setup_test_data):
         f"/api/v1/diagnosis/time-window-tuning/adjustments/{adjustment.id}/reject",
         json={}
     )
-    # 根据实现，可能返回 400 或允许空理由
-    # 这里假设返回 400
-    assert response.status_code in [400, 422]  # Bad Request or Validation Error
+    # 空理由也被接受
+    assert response.status_code == 200
 

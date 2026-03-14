@@ -8,6 +8,7 @@ from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, and_, case
+from sqlalchemy.orm import selectinload
 
 from ..deps import get_db, require_viewer, require_admin
 from ...models.user import User
@@ -146,24 +147,18 @@ async def get_opportunity_detail(
     opportunity_id: int, db: AsyncSession = Depends(get_db), _: User = Depends(require_viewer)
 ) -> EnergyOpportunityResponse:
     """获取单个节能机会的详细信息，包括措施列表"""
-    result = await db.execute(select(EnergyOpportunity).where(EnergyOpportunity.id == opportunity_id))
+
+    result = await db.execute(
+        select(EnergyOpportunity)
+        .where(EnergyOpportunity.id == opportunity_id)
+        .options(selectinload(EnergyOpportunity.measures))
+    )
     opportunity = result.scalar_one_or_none()
 
     if not opportunity:
         raise HTTPException(status_code=404, detail=f"机会ID {opportunity_id} 不存在")
 
-    # 获取关联的措施
-    measures_result = await db.execute(
-        select(OpportunityMeasure)
-        .where(OpportunityMeasure.opportunity_id == opportunity_id)
-        .order_by(OpportunityMeasure.sort_order)
-    )
-    measures = measures_result.scalars().all()
-
-    response = EnergyOpportunityResponse.model_validate(opportunity)
-    response.measures = [OpportunityMeasureResponse.model_validate(m) for m in measures]
-
-    return response
+    return EnergyOpportunityResponse.model_validate(opportunity)
 
 
 # ========== 模拟 ==========
@@ -493,8 +488,9 @@ async def list_opportunities(
     total_result = await db.execute(count_query)
     total = total_result.scalar() or 0
 
-    # 获取数据
-    query = query.order_by(EnergyOpportunity.discovered_at.desc()).offset(skip).limit(limit)
+    # 获取数据（selectinload 避免 MissingGreenlet）
+
+    query = query.options(selectinload(EnergyOpportunity.measures)).order_by(EnergyOpportunity.discovered_at.desc()).offset(skip).limit(limit)
     result = await db.execute(query)
     items = result.scalars().all()
 
@@ -514,7 +510,7 @@ async def create_opportunity(
     opportunity = EnergyOpportunity(**data.model_dump())
     db.add(opportunity)
     await db.commit()
-    await db.refresh(opportunity)
+    await db.refresh(opportunity, ["measures"])
     return EnergyOpportunityResponse.model_validate(opportunity)
 
 
@@ -536,7 +532,7 @@ async def update_opportunity(
 
     opportunity.updated_at = datetime.now()
     await db.commit()
-    await db.refresh(opportunity)
+    await db.refresh(opportunity, ["measures"])
 
     return EnergyOpportunityResponse.model_validate(opportunity)
 

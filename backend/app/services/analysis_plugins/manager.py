@@ -11,7 +11,7 @@ import logging
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Type
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, and_
+from sqlalchemy import select, and_, or_
 
 from .base import (
     AnalysisPlugin,
@@ -233,23 +233,23 @@ class PluginManager:
         try:
             result = await db.execute(
                 select(EnergyDaily)
-                .where(and_(EnergyDaily.date >= start_date.date(), EnergyDaily.date <= end_date.date()))
-                .order_by(EnergyDaily.date)
+                .where(and_(EnergyDaily.stat_date >= start_date.date(), EnergyDaily.stat_date <= end_date.date()))
+                .order_by(EnergyDaily.stat_date)
             )
             records = result.scalars().all()
 
             for record in records:
                 energy_data.append(
                     EnergyData(
-                        date=datetime.combine(record.date, datetime.min.time()),
+                        date=datetime.combine(record.stat_date, datetime.min.time()),
                         total_energy=record.total_energy or 0,
                         peak_energy=record.peak_energy or 0,
                         valley_energy=record.valley_energy or 0,
-                        flat_energy=record.flat_energy or 0,
-                        peak_cost=record.peak_cost or 0,
-                        valley_cost=record.valley_cost or 0,
-                        flat_cost=record.flat_cost or 0,
-                        total_cost=record.total_cost or 0,
+                        flat_energy=record.normal_energy or 0,
+                        peak_cost=record.energy_cost or 0,
+                        valley_cost=0,
+                        flat_cost=0,
+                        total_cost=record.energy_cost or 0,
                     )
                 )
         except Exception as e:
@@ -267,25 +267,34 @@ class PluginManager:
         power_data = []
 
         try:
-            # 从 PowerDevice 和 PointRealtime 获取实时功率数据
-            result = await db.execute(select(PowerDevice).where(PowerDevice.status == "online"))
+            # 从 PowerDevice 获取设备功率数据
+            result = await db.execute(select(PowerDevice).where(PowerDevice.is_enabled == True))
             devices = result.scalars().all()
 
             for device in devices:
+                rated_power = device.rated_power or 0
+                pf = device.power_factor or 0.95
+                rated_voltage = device.rated_voltage or 380
+                load_rate = device.avg_load_rate or 0
+                active_power = rated_power * (load_rate / 100) if load_rate else rated_power
+                apparent_power = active_power / pf if pf > 0 else active_power
+                reactive_power = (apparent_power ** 2 - active_power ** 2) ** 0.5 if apparent_power > active_power else 0
+                current = (active_power * 1000 / (rated_voltage * 1.732)) if rated_voltage > 0 else 0
+
                 power_data.append(
                     PowerData(
                         timestamp=datetime.now(),
                         device_id=str(device.id),
-                        device_name=device.name,
+                        device_name=device.device_name,
                         device_type=device.device_type,
-                        voltage=device.voltage or 380,
-                        current=device.current or 0,
-                        active_power=device.active_power or 0,
-                        reactive_power=device.reactive_power or 0,
-                        apparent_power=device.apparent_power or 0,
-                        power_factor=device.power_factor or 0.95,
-                        frequency=device.frequency or 50,
-                        load_rate=device.load_rate or 0,
+                        voltage=rated_voltage,
+                        current=round(current, 2),
+                        active_power=round(active_power, 2),
+                        reactive_power=round(reactive_power, 2),
+                        apparent_power=round(apparent_power, 2),
+                        power_factor=pf,
+                        frequency=50,
+                        load_rate=load_rate,
                     )
                 )
         except Exception as e:
@@ -304,25 +313,33 @@ class PluginManager:
 
         try:
             start_date = datetime.now() - timedelta(days=days)
+            start_year = start_date.year
+            start_month = start_date.month
             result = await db.execute(
                 select(EnergyMonthly)
-                .where(EnergyMonthly.month >= start_date.strftime("%Y-%m"))
-                .order_by(EnergyMonthly.month)
+                .where(
+                    or_(
+                        EnergyMonthly.stat_year > start_year,
+                        and_(EnergyMonthly.stat_year == start_year, EnergyMonthly.stat_month >= start_month),
+                    )
+                )
+                .order_by(EnergyMonthly.stat_year, EnergyMonthly.stat_month)
             )
             records = result.scalars().all()
 
             for record in records:
-                total_energy = (record.peak_energy or 0) + (record.valley_energy or 0) + (record.flat_energy or 0)
+                total_energy = (record.peak_energy or 0) + (record.valley_energy or 0) + (record.normal_energy or 0)
                 if total_energy > 0:
+                    month_str = f"{record.stat_year}-{record.stat_month:02d}-01"
                     bill_data.append(
                         BillData(
-                            period_start=datetime.strptime(record.month + "-01", "%Y-%m-%d"),
-                            period_end=datetime.strptime(record.month + "-01", "%Y-%m-%d") + timedelta(days=30),
+                            period_start=datetime.strptime(month_str, "%Y-%m-%d"),
+                            period_end=datetime.strptime(month_str, "%Y-%m-%d") + timedelta(days=30),
                             total_energy=total_energy,
-                            total_cost=record.total_cost or 0,
+                            total_cost=record.energy_cost or 0,
                             peak_ratio=(record.peak_energy or 0) / total_energy,
                             valley_ratio=(record.valley_energy or 0) / total_energy,
-                            flat_ratio=(record.flat_energy or 0) / total_energy,
+                            flat_ratio=(record.normal_energy or 0) / total_energy,
                             demand_cost=0,
                             basic_cost=0,
                             max_demand=record.max_power or 0,
@@ -350,13 +367,13 @@ class PluginManager:
                 device_data.append(
                     DeviceData(
                         device_id=str(device.id),
-                        device_name=device.name,
+                        device_name=device.device_name,
                         device_type=device.device_type,
                         rated_power=device.rated_power or 0,
-                        current_power=device.active_power or 0,
+                        current_power=(device.rated_power or 0) * (device.avg_load_rate or 0) / 100,
                         efficiency=device.efficiency or 95,
                         running_hours=24 * 30,  # 假设持续运行
-                        location=device.location or "",
+                        location=device.area_code or "",
                     )
                 )
         except Exception as e:
@@ -372,14 +389,14 @@ class PluginManager:
         try:
             start_date = datetime.now() - timedelta(days=days)
             result = await db.execute(
-                select(PUEHistory).where(PUEHistory.recorded_at >= start_date).order_by(PUEHistory.recorded_at)
+                select(PUEHistory).where(PUEHistory.record_time >= start_date).order_by(PUEHistory.record_time)
             )
             records = result.scalars().all()
 
             for record in records:
                 environment_data.append(
                     EnvironmentData(
-                        timestamp=record.recorded_at,
+                        timestamp=record.record_time,
                         temperature=25,  # 假设值
                         humidity=50,
                         pue=record.pue or 1.5,
@@ -399,7 +416,7 @@ class PluginManager:
         pricing_config = {"peak_price": 1.2, "valley_price": 0.4, "flat_price": 0.8, "demand_price": 38.0}
 
         try:
-            result = await db.execute(select(ElectricityPricing).where(ElectricityPricing.is_active == True))
+            result = await db.execute(select(ElectricityPricing).where(ElectricityPricing.is_enabled == True))
             records = result.scalars().all()
 
             for record in records:

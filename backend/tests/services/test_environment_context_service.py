@@ -125,8 +125,12 @@ class TestEnvironmentContextService:
 
         assert timestamp1 == timestamp2, "缓存应该生效"
 
-        # 等待缓存过期（61秒）
+        # 模拟缓存过期（设置 timestamp 为 61 秒前）
         EnvironmentContextService._cache["timestamp"] = time.time() - 61
+
+        # 确保重新加载时 time.time() 返回更新的值
+        import asyncio
+        await asyncio.sleep(0.01)
 
         # 第三次调用（缓存已过期）
         context3 = await EnvironmentContextService.get_context()

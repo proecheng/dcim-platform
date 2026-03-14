@@ -3,7 +3,7 @@
 """
 import pytest
 import asyncio
-from unittest.mock import Mock, AsyncMock, patch
+from unittest.mock import Mock, MagicMock, AsyncMock, patch
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.services.datacenter_shift_strategy import (
@@ -23,7 +23,7 @@ class TestTemperatureConstraint:
         """测试：设备没有关联的制冷单元"""
         # Mock session
         session = AsyncMock(spec=AsyncSession)
-        
+
         # Mock device
         device = PowerDevice(
             id=1,
@@ -33,15 +33,15 @@ class TestTemperatureConstraint:
             rated_power=50.0,
             area_code="A1"
         )
-        
-        # Mock query result: no cooling unit
-        mock_result = AsyncMock()
+
+        # Mock query result: no cooling unit (使用 MagicMock 因为 scalar_one_or_none 是同步方法)
+        mock_result = MagicMock()
         mock_result.scalar_one_or_none.return_value = None
         session.execute.return_value = mock_result
-        
+
         # Execute
         constraint = await _calculate_temperature_constraint(session, device, 0.3)
-        
+
         # Assert
         assert constraint.max_reduction_ratio == 0.5  # 保守估计
         assert "未找到制冷单元配置" in constraint.reason
@@ -50,7 +50,7 @@ class TestTemperatureConstraint:
     async def test_no_cooling_zone(self):
         """测试：制冷单元没有配置制冷区域"""
         session = AsyncMock(spec=AsyncSession)
-        
+
         device = PowerDevice(
             id=1,
             device_code="AC-001",
@@ -59,39 +59,29 @@ class TestTemperatureConstraint:
             rated_power=50.0,
             area_code="A1"
         )
-        
+
         # Mock cooling unit exists
         cooling_unit = CoolingUnit(
             id=1,
             device_id=1,
             cooling_capacity_kw=100.0
         )
-        
-        # Mock query results
-        def mock_execute(query):
-            result = AsyncMock()
-            # First call: cooling_unit query
-            if not hasattr(mock_execute, 'call_count'):
-                mock_execute.call_count = 0
-            
-            if mock_execute.call_count == 0:
-                result.scalar_one_or_none.return_value = cooling_unit
-                result.scalars.return_value.all.return_value = []
-            elif mock_execute.call_count == 1:
-                # zone_units query
-                result.scalars.return_value.all.return_value = []
-            elif mock_execute.call_count == 2:
-                # cabinets query (fallback to area_code)
-                result.scalars.return_value.all.return_value = []
-            
-            mock_execute.call_count += 1
-            return result
-        
-        session.execute.side_effect = mock_execute
-        
+
+        # 使用 side_effect 列表：每次 await session.execute() 返回不同的结果
+        result1 = MagicMock()  # cooling_unit query
+        result1.scalar_one_or_none.return_value = cooling_unit
+
+        result2 = MagicMock()  # zone_units query -> empty
+        result2.scalars.return_value.all.return_value = []
+
+        result3 = MagicMock()  # cabinets query (fallback to area_code) -> empty
+        result3.scalars.return_value.all.return_value = []
+
+        session.execute = AsyncMock(side_effect=[result1, result2, result3])
+
         # Execute
         constraint = await _calculate_temperature_constraint(session, device, 0.3)
-        
+
         # Assert
         assert constraint.max_reduction_ratio == 0.5
         assert "未找到关联机柜" in constraint.reason or "未配置制冷区域" in constraint.reason

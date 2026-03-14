@@ -39,7 +39,7 @@ class DeviceLifecycleService:
 
         # 获取该设备下所有点位 ID
         point_ids_result = await self.db.execute(
-            select(Point.id).where(Point.device_id == device_id)  # noqa: F823
+            select(Point.id).where(Point.device_id == device_id)
         )
         point_ids = [row[0] for row in point_ids_result.all()]
 
@@ -259,8 +259,6 @@ class DeviceLifecycleService:
         # 15. 点位能源设备软关联（Point.energy_device_id）
         if point_ids:
             # 查找关联到 PowerDevice 的点位
-            from ..models.point import Point
-
             pd_result = await self.db.execute(select(PowerDevice.id).where(PowerDevice.monitor_device_id == device_id))
             power_device_ids = [row[0] for row in pd_result.all()]
 

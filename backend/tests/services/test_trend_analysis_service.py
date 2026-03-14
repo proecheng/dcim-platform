@@ -37,25 +37,36 @@ def trend_service(mock_db, mock_redis):
     return service
 
 
+def _make_point(id=1, point_name="T-01", unit="℃"):
+    """创建模拟的 Point 对象"""
+    point = MagicMock(spec=Point)
+    point.id = id
+    point.point_name = point_name
+    point.unit = unit
+    point.is_enabled = True
+    return point
+
+
 class TestAnalyzePointTrend:
     """测试 analyze_point_trend 方法"""
 
     @pytest.mark.asyncio
     async def test_insufficient_data_returns_none(self, trend_service, mock_db):
         """测试数据不足时返回 None"""
-        # 模拟点位信息
-        point = Point(id=1, name="T-01", unit="℃", enabled=True)
-        mock_db.execute = AsyncMock()
-        mock_db.execute.return_value.scalar_one_or_none.return_value = point
+        point = _make_point(id=1, point_name="T-01", unit="℃")
 
-        # 模拟查询结果：只有 3 天数据（不足 5 天）
-        mock_result = MagicMock()
-        mock_result.fetchall.return_value = [
+        # 调用顺序：1. _get_point_info -> scalar_one_or_none, 2. 数据查询 -> fetchall
+        point_result = MagicMock()
+        point_result.scalar_one_or_none.return_value = point
+
+        data_result = MagicMock()
+        data_result.fetchall.return_value = [
             MagicMock(avg_value=25.0, sample_count=15),
             MagicMock(avg_value=25.5, sample_count=12),
             MagicMock(avg_value=26.0, sample_count=10),
         ]
-        mock_db.execute.return_value = mock_result
+
+        mock_db.execute = AsyncMock(side_effect=[point_result, data_result])
 
         result = await trend_service.analyze_point_trend(1)
 
@@ -64,12 +75,14 @@ class TestAnalyzePointTrend:
     @pytest.mark.asyncio
     async def test_no_trend_returns_none(self, trend_service, mock_db):
         """测试无明显趋势时返回 None"""
-        # 模拟点位信息
-        point = Point(id=1, name="T-01", unit="℃", enabled=True)
+        point = _make_point(id=1, point_name="T-01", unit="℃")
 
-        # 模拟查询结果：7 天数据，但无明显趋势（波动在容差范围内）
-        mock_result = MagicMock()
-        mock_result.fetchall.return_value = [
+        # 调用顺序：1. point_info, 2. data, 3. threshold
+        point_result = MagicMock()
+        point_result.scalar_one_or_none.return_value = point
+
+        data_result = MagicMock()
+        data_result.fetchall.return_value = [
             MagicMock(avg_value=25.0, sample_count=15),
             MagicMock(avg_value=25.1, sample_count=12),
             MagicMock(avg_value=24.9, sample_count=14),
@@ -79,12 +92,10 @@ class TestAnalyzePointTrend:
             MagicMock(avg_value=25.1, sample_count=10),
         ]
 
-        # 配置 mock_db.execute 返回不同结果
-        execute_results = [mock_result, MagicMock()]
-        execute_results[1].scalar_one_or_none.return_value = point
-        execute_results[1].fetchone.return_value = MagicMock(config_value="0.5")
+        threshold_result = MagicMock()
+        threshold_result.fetchone.return_value = MagicMock(config_value="0.5")
 
-        mock_db.execute = AsyncMock(side_effect=execute_results)
+        mock_db.execute = AsyncMock(side_effect=[point_result, data_result, threshold_result])
 
         result = await trend_service.analyze_point_trend(1)
 
@@ -93,27 +104,27 @@ class TestAnalyzePointTrend:
     @pytest.mark.asyncio
     async def test_increasing_trend_generates_warning(self, trend_service, mock_db):
         """测试上升趋势生成预警"""
-        # 模拟点位信息
-        point = Point(id=1, name="T-01", unit="℃", enabled=True)
+        point = _make_point(id=1, point_name="T-01", unit="℃")
 
-        # 模拟查询结果：7 天数据，明显上升趋势
-        mock_result = MagicMock()
-        mock_result.fetchall.return_value = [
-            MagicMock(avg_value=25.0, sample_count=15),
-            MagicMock(avg_value=25.2, sample_count=12),
-            MagicMock(avg_value=25.4, sample_count=14),
-            MagicMock(avg_value=25.6, sample_count=13),
-            MagicMock(avg_value=25.8, sample_count=11),
-            MagicMock(avg_value=26.0, sample_count=16),
-            MagicMock(avg_value=26.2, sample_count=10),
+        # 调用顺序：1. point_info, 2. data, 3. threshold
+        point_result = MagicMock()
+        point_result.scalar_one_or_none.return_value = point
+
+        data_result = MagicMock()
+        data_result.fetchall.return_value = [
+            MagicMock(avg_value=24.0, sample_count=15),
+            MagicMock(avg_value=24.5, sample_count=12),
+            MagicMock(avg_value=25.0, sample_count=14),
+            MagicMock(avg_value=25.5, sample_count=13),
+            MagicMock(avg_value=26.0, sample_count=11),
+            MagicMock(avg_value=26.5, sample_count=16),
+            MagicMock(avg_value=27.0, sample_count=10),
         ]
 
-        # 配置 mock_db.execute 返回不同结果
-        execute_results = [mock_result, MagicMock(), MagicMock()]
-        execute_results[1].scalar_one_or_none.return_value = point
-        execute_results[2].fetchone.return_value = MagicMock(config_value="0.5")
+        threshold_result = MagicMock()
+        threshold_result.fetchone.return_value = MagicMock(config_value="0.5")
 
-        mock_db.execute = AsyncMock(side_effect=execute_results)
+        mock_db.execute = AsyncMock(side_effect=[point_result, data_result, threshold_result])
 
         result = await trend_service.analyze_point_trend(1)
 
@@ -126,27 +137,27 @@ class TestAnalyzePointTrend:
     @pytest.mark.asyncio
     async def test_decreasing_trend_generates_warning(self, trend_service, mock_db):
         """测试下降趋势生成预警"""
-        # 模拟点位信息
-        point = Point(id=1, name="T-01", unit="℃", enabled=True)
+        point = _make_point(id=1, point_name="T-01", unit="℃")
 
-        # 模拟查询结果：7 天数据，明显下降趋势
-        mock_result = MagicMock()
-        mock_result.fetchall.return_value = [
-            MagicMock(avg_value=26.0, sample_count=15),
-            MagicMock(avg_value=25.8, sample_count=12),
-            MagicMock(avg_value=25.6, sample_count=14),
-            MagicMock(avg_value=25.4, sample_count=13),
-            MagicMock(avg_value=25.2, sample_count=11),
-            MagicMock(avg_value=25.0, sample_count=16),
-            MagicMock(avg_value=24.8, sample_count=10),
+        # 调用顺序：1. point_info, 2. data, 3. threshold
+        point_result = MagicMock()
+        point_result.scalar_one_or_none.return_value = point
+
+        data_result = MagicMock()
+        data_result.fetchall.return_value = [
+            MagicMock(avg_value=27.0, sample_count=15),
+            MagicMock(avg_value=26.5, sample_count=12),
+            MagicMock(avg_value=26.0, sample_count=14),
+            MagicMock(avg_value=25.5, sample_count=13),
+            MagicMock(avg_value=25.0, sample_count=11),
+            MagicMock(avg_value=24.5, sample_count=16),
+            MagicMock(avg_value=24.0, sample_count=10),
         ]
 
-        # 配置 mock_db.execute 返回不同结果
-        execute_results = [mock_result, MagicMock(), MagicMock()]
-        execute_results[1].scalar_one_or_none.return_value = point
-        execute_results[2].fetchone.return_value = MagicMock(config_value="0.5")
+        threshold_result = MagicMock()
+        threshold_result.fetchone.return_value = MagicMock(config_value="0.5")
 
-        mock_db.execute = AsyncMock(side_effect=execute_results)
+        mock_db.execute = AsyncMock(side_effect=[point_result, data_result, threshold_result])
 
         result = await trend_service.analyze_point_trend(1)
 
@@ -158,26 +169,27 @@ class TestAnalyzePointTrend:
     @pytest.mark.asyncio
     async def test_humidity_uses_correct_view(self, trend_service, mock_db):
         """测试湿度点位使用正确的视图"""
-        # 模拟湿度点位
-        point = Point(id=2, name="H-01", unit="%RH", enabled=True)
+        point = _make_point(id=2, point_name="H-01", unit="%RH")
 
-        mock_result = MagicMock()
-        mock_result.fetchall.return_value = [
+        point_result = MagicMock()
+        point_result.scalar_one_or_none.return_value = point
+
+        data_result = MagicMock()
+        data_result.fetchall.return_value = [
             MagicMock(avg_value=50.0, sample_count=15),
             MagicMock(avg_value=51.0, sample_count=12),
             MagicMock(avg_value=52.0, sample_count=14),
         ]
 
-        execute_results = [mock_result, MagicMock()]
-        execute_results[1].scalar_one_or_none.return_value = point
-
-        mock_db.execute = AsyncMock(side_effect=execute_results)
+        mock_db.execute = AsyncMock(side_effect=[point_result, data_result])
 
         await trend_service.analyze_point_trend(2)
 
-        # 验证使用了 humidity_7d_avg 视图
-        call_args = mock_db.execute.call_args_list[0][0][0]
-        assert "humidity_7d_avg" in str(call_args)
+        # 验证使用了 humidity_7d_avg 视图（在第二次 execute 调用中）
+        assert mock_db.execute.call_count >= 2
+        second_call_args = mock_db.execute.call_args_list[1]
+        query_text = str(second_call_args[0][0])
+        assert "humidity_7d_avg" in query_text
 
     @pytest.mark.asyncio
     async def test_point_not_found_returns_none(self, trend_service, mock_db):

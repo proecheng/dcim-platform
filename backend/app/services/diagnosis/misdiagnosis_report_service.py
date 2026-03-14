@@ -850,7 +850,7 @@ class MisdiagnosisReportServiceV2:
         if self.db_type == "sqlite":
             query = text("""
                 SELECT
-                    SUM(CASE WHEN dr.root_cause IS NOT NULL AND da.is_accurate = 0 THEN 1 ELSE 0 END) AS false_positive_count,
+                    SUM(CASE WHEN dr.root_cause IS NOT NULL AND da.annotation = 'inaccurate' THEN 1 ELSE 0 END) AS false_positive_count,
                     SUM(CASE WHEN dr.root_cause IS NOT NULL THEN 1 ELSE 0 END) AS total_positive_count
                 FROM diagnosis_results dr
                 JOIN diagnosis_annotations da ON dr.session_id = da.session_id
@@ -859,7 +859,7 @@ class MisdiagnosisReportServiceV2:
         else:  # postgresql
             query = text("""
                 SELECT
-                    COUNT(*) FILTER (WHERE dr.root_cause IS NOT NULL AND da.is_accurate = false) AS false_positive_count,
+                    COUNT(*) FILTER (WHERE dr.root_cause IS NOT NULL AND da.annotation = 'inaccurate') AS false_positive_count,
                     COUNT(*) FILTER (WHERE dr.root_cause IS NOT NULL) AS total_positive_count
                 FROM diagnosis_results dr
                 JOIN diagnosis_annotations da ON dr.session_id = da.session_id
@@ -896,7 +896,7 @@ class MisdiagnosisReportServiceV2:
                         AND EXISTS (
                             SELECT 1 FROM work_orders wo
                             WHERE wo.alarm_id = dr.alarm_id
-                            AND wo.work_order_type = 'fault_repair'
+                            AND wo.order_type = 'fault_repair'
                             AND datetime(wo.created_at) <= datetime(dr.created_at, '+30 minutes')
                         )
                         THEN 1 ELSE 0 END
@@ -914,7 +914,7 @@ class MisdiagnosisReportServiceV2:
                         AND EXISTS (
                             SELECT 1 FROM work_orders wo
                             WHERE wo.alarm_id = dr.alarm_id
-                            AND wo.work_order_type = 'fault_repair'
+                            AND wo.order_type = 'fault_repair'
                             AND wo.created_at <= dr.created_at + INTERVAL '30 minutes'
                         )
                     ) AS false_negative_count,
@@ -944,18 +944,18 @@ class MisdiagnosisReportServiceV2:
                 query = text("""
                     SELECT
                         dr.root_cause AS node_id,
-                        COALESCE(ftn.node_name, dr.root_cause) AS node_name,
-                        SUM(CASE WHEN da.is_accurate = 0 THEN 1 ELSE 0 END) AS misdiagnosis_count,
-                        SUM(CASE WHEN da.is_accurate = 1 THEN 1 ELSE 0 END) AS accurate_count,
+                        COALESCE(ftn.name, dr.root_cause) AS node_name,
+                        SUM(CASE WHEN da.annotation = 'inaccurate' THEN 1 ELSE 0 END) AS misdiagnosis_count,
+                        SUM(CASE WHEN da.annotation = 'accurate' THEN 1 ELSE 0 END) AS accurate_count,
                         COUNT(*) AS total_count,
-                        CAST(SUM(CASE WHEN da.is_accurate = 0 THEN 1 ELSE 0 END) AS REAL) / COUNT(*) AS misdiagnosis_rate
+                        CAST(SUM(CASE WHEN da.annotation = 'inaccurate' THEN 1 ELSE 0 END) AS REAL) / COUNT(*) AS misdiagnosis_rate
                     FROM diagnosis_results dr
                     JOIN diagnosis_annotations da ON dr.session_id = da.session_id
-                    LEFT JOIN fault_tree_nodes ftn ON dr.root_cause = ftn.node_id
+                    LEFT JOIN fault_tree_nodes ftn ON dr.root_cause = CAST(ftn.id AS TEXT)
                     WHERE dr.created_at BETWEEN :start_date AND :end_date
                       AND dr.root_cause IS NOT NULL
-                    GROUP BY dr.root_cause, ftn.node_name
-                    HAVING SUM(CASE WHEN da.is_accurate = 0 THEN 1 ELSE 0 END) > 0
+                    GROUP BY dr.root_cause, ftn.name
+                    HAVING SUM(CASE WHEN da.annotation = 'inaccurate' THEN 1 ELSE 0 END) > 0
                     ORDER BY misdiagnosis_count DESC
                     LIMIT 5
                 """)
@@ -963,18 +963,18 @@ class MisdiagnosisReportServiceV2:
                 query = text("""
                     SELECT
                         dr.root_cause AS node_id,
-                        COALESCE(ftn.node_name, dr.root_cause) AS node_name,
-                        COUNT(*) FILTER (WHERE da.is_accurate = false) AS misdiagnosis_count,
-                        COUNT(*) FILTER (WHERE da.is_accurate = true) AS accurate_count,
+                        COALESCE(ftn.name, dr.root_cause) AS node_name,
+                        COUNT(*) FILTER (WHERE da.annotation = 'inaccurate') AS misdiagnosis_count,
+                        COUNT(*) FILTER (WHERE da.annotation = 'accurate') AS accurate_count,
                         COUNT(*) AS total_count,
-                        CAST(COUNT(*) FILTER (WHERE da.is_accurate = false) AS FLOAT) / COUNT(*) AS misdiagnosis_rate
+                        CAST(COUNT(*) FILTER (WHERE da.annotation = 'inaccurate') AS FLOAT) / COUNT(*) AS misdiagnosis_rate
                     FROM diagnosis_results dr
                     JOIN diagnosis_annotations da ON dr.session_id = da.session_id
-                    LEFT JOIN fault_tree_nodes ftn ON dr.root_cause = ftn.node_id
+                    LEFT JOIN fault_tree_nodes ftn ON dr.root_cause = CAST(ftn.id AS TEXT)
                     WHERE dr.created_at BETWEEN :start_date AND :end_date
                       AND dr.root_cause IS NOT NULL
-                    GROUP BY dr.root_cause, ftn.node_name
-                    HAVING COUNT(*) FILTER (WHERE da.is_accurate = false) > 0
+                    GROUP BY dr.root_cause, ftn.name
+                    HAVING COUNT(*) FILTER (WHERE da.annotation = 'inaccurate') > 0
                     ORDER BY misdiagnosis_count DESC
                     LIMIT 5
                 """)
@@ -985,16 +985,16 @@ class MisdiagnosisReportServiceV2:
                     SELECT
                         dr.root_cause AS node_id,
                         dr.root_cause AS node_name,
-                        SUM(CASE WHEN da.is_accurate = 0 THEN 1 ELSE 0 END) AS misdiagnosis_count,
-                        SUM(CASE WHEN da.is_accurate = 1 THEN 1 ELSE 0 END) AS accurate_count,
+                        SUM(CASE WHEN da.annotation = 'inaccurate' THEN 1 ELSE 0 END) AS misdiagnosis_count,
+                        SUM(CASE WHEN da.annotation = 'accurate' THEN 1 ELSE 0 END) AS accurate_count,
                         COUNT(*) AS total_count,
-                        CAST(SUM(CASE WHEN da.is_accurate = 0 THEN 1 ELSE 0 END) AS REAL) / COUNT(*) AS misdiagnosis_rate
+                        CAST(SUM(CASE WHEN da.annotation = 'inaccurate' THEN 1 ELSE 0 END) AS REAL) / COUNT(*) AS misdiagnosis_rate
                     FROM diagnosis_results dr
                     JOIN diagnosis_annotations da ON dr.session_id = da.session_id
                     WHERE dr.created_at BETWEEN :start_date AND :end_date
                       AND dr.root_cause IS NOT NULL
                     GROUP BY dr.root_cause
-                    HAVING SUM(CASE WHEN da.is_accurate = 0 THEN 1 ELSE 0 END) > 0
+                    HAVING SUM(CASE WHEN da.annotation = 'inaccurate' THEN 1 ELSE 0 END) > 0
                     ORDER BY misdiagnosis_count DESC
                     LIMIT 5
                 """)
@@ -1003,16 +1003,16 @@ class MisdiagnosisReportServiceV2:
                     SELECT
                         dr.root_cause AS node_id,
                         dr.root_cause AS node_name,
-                        COUNT(*) FILTER (WHERE da.is_accurate = false) AS misdiagnosis_count,
-                        COUNT(*) FILTER (WHERE da.is_accurate = true) AS accurate_count,
+                        COUNT(*) FILTER (WHERE da.annotation = 'inaccurate') AS misdiagnosis_count,
+                        COUNT(*) FILTER (WHERE da.annotation = 'accurate') AS accurate_count,
                         COUNT(*) AS total_count,
-                        CAST(COUNT(*) FILTER (WHERE da.is_accurate = false) AS FLOAT) / COUNT(*) AS misdiagnosis_rate
+                        CAST(COUNT(*) FILTER (WHERE da.annotation = 'inaccurate') AS FLOAT) / COUNT(*) AS misdiagnosis_rate
                     FROM diagnosis_results dr
                     JOIN diagnosis_annotations da ON dr.session_id = da.session_id
                     WHERE dr.created_at BETWEEN :start_date AND :end_date
                       AND dr.root_cause IS NOT NULL
                     GROUP BY dr.root_cause
-                    HAVING COUNT(*) FILTER (WHERE da.is_accurate = false) > 0
+                    HAVING COUNT(*) FILTER (WHERE da.annotation = 'inaccurate') > 0
                     ORDER BY misdiagnosis_count DESC
                     LIMIT 5
                 """)
@@ -1040,8 +1040,8 @@ class MisdiagnosisReportServiceV2:
                 SELECT
                     dr.device_type,
                     COUNT(*) AS total_count,
-                    SUM(CASE WHEN da.is_accurate = 0 THEN 1 ELSE 0 END) AS misdiagnosis_count,
-                    CAST(SUM(CASE WHEN da.is_accurate = 0 THEN 1 ELSE 0 END) AS REAL) / COUNT(*) AS misdiagnosis_rate
+                    SUM(CASE WHEN da.annotation = 'inaccurate' THEN 1 ELSE 0 END) AS misdiagnosis_count,
+                    CAST(SUM(CASE WHEN da.annotation = 'inaccurate' THEN 1 ELSE 0 END) AS REAL) / COUNT(*) AS misdiagnosis_rate
                 FROM diagnosis_results dr
                 JOIN diagnosis_annotations da ON dr.session_id = da.session_id
                 WHERE dr.created_at BETWEEN :start_date AND :end_date
@@ -1054,8 +1054,8 @@ class MisdiagnosisReportServiceV2:
                 SELECT
                     dr.device_type,
                     COUNT(*) AS total_count,
-                    COUNT(*) FILTER (WHERE da.is_accurate = false) AS misdiagnosis_count,
-                    CAST(COUNT(*) FILTER (WHERE da.is_accurate = false) AS FLOAT) / COUNT(*) AS misdiagnosis_rate
+                    COUNT(*) FILTER (WHERE da.annotation = 'inaccurate') AS misdiagnosis_count,
+                    CAST(COUNT(*) FILTER (WHERE da.annotation = 'inaccurate') AS FLOAT) / COUNT(*) AS misdiagnosis_rate
                 FROM diagnosis_results dr
                 JOIN diagnosis_annotations da ON dr.session_id = da.session_id
                 WHERE dr.created_at BETWEEN :start_date AND :end_date

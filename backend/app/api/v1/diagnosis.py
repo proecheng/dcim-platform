@@ -8,7 +8,7 @@ import logging
 from datetime import datetime
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Body, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, and_
 
@@ -1520,7 +1520,7 @@ async def reject_adjustment(
 
     logger.info(f"调参记录 {adjustment_id} 已拒绝，用户: {current_user.username}")
 
-    return {"message": "调参已拒绝", "adjustment_id": adjustment_id}
+    return {"message": "时间窗口调整已拒绝", "adjustment_id": adjustment_id}
 
 
 # ============================================================
@@ -1596,7 +1596,7 @@ async def get_time_window_adjustments(
 @router.post("/time-window-tuning/adjustments/{adjustment_id}/approve", dependencies=[Depends(require_admin)])
 async def approve_time_window_adjustment(
     adjustment_id: int,
-    reason: Optional[str] = None,
+    body: Optional[dict] = Body(None),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_admin),
 ):
@@ -1609,6 +1609,8 @@ async def approve_time_window_adjustment(
     from ...models.config import SystemConfig
     import json
 
+    reason = body.get("reason") if body else None
+
     # 查询调参记录
     result = await db.execute(select(TimeWindowAdjustmentLog).where(TimeWindowAdjustmentLog.id == adjustment_id))
     adjustment = result.scalar_one_or_none()
@@ -1617,7 +1619,7 @@ async def approve_time_window_adjustment(
         raise HTTPException(status_code=404, detail="调参记录不存在")
 
     if adjustment.status != "pending":
-        raise HTTPException(status_code=400, detail=f"调参记录状态为 {adjustment.status}，无法审批")
+        raise HTTPException(status_code=409, detail=f"调参记录已被其他管理员处理，当前状态为 {adjustment.status}")
 
     # 使用数据库事务确保原子性
     try:
@@ -1700,7 +1702,7 @@ async def approve_time_window_adjustment(
             logger.error(f"发送 WebSocket 通知失败: {ws_error}", exc_info=True)
 
         return {
-            "message": "调参已审批，配置已更新",
+            "message": "时间窗口调整已审批，配置已更新",
             "adjustment_id": adjustment_id,
             "device_type": locked_adjustment.device_type,
             "new_window_minutes": locked_adjustment.proposed_window_minutes,
@@ -1717,7 +1719,7 @@ async def approve_time_window_adjustment(
 
 @router.post("/time-window-tuning/adjustments/{adjustment_id}/reject", dependencies=[Depends(require_admin)])
 async def reject_time_window_adjustment(
-    adjustment_id: int, reason: str, db: AsyncSession = Depends(get_db), current_user: User = Depends(require_admin)
+    adjustment_id: int, body: dict = Body(...), db: AsyncSession = Depends(get_db), current_user: User = Depends(require_admin)
 ):
     """
     拒绝时间窗口调参建议
@@ -1725,6 +1727,8 @@ async def reject_time_window_adjustment(
     权限: admin
     """
     from ...models.diagnosis import TimeWindowAdjustmentLog
+
+    reason = body.get("reason") if body else None
 
     # 查询调参记录
     result = await db.execute(select(TimeWindowAdjustmentLog).where(TimeWindowAdjustmentLog.id == adjustment_id))
@@ -1734,7 +1738,7 @@ async def reject_time_window_adjustment(
         raise HTTPException(status_code=404, detail="调参记录不存在")
 
     if adjustment.status != "pending":
-        raise HTTPException(status_code=400, detail=f"调参记录状态为 {adjustment.status}，无法拒绝")
+        raise HTTPException(status_code=409, detail=f"调参记录已被其他管理员处理，当前状态为 {adjustment.status}")
 
     # 更新状态
     adjustment.status = "rejected"
@@ -1763,7 +1767,7 @@ async def reject_time_window_adjustment(
     except Exception as ws_error:
         logger.error(f"发送 WebSocket 通知失败: {ws_error}", exc_info=True)
 
-    return {"message": "调参已拒绝", "adjustment_id": adjustment_id}
+    return {"message": "时间窗口调整已拒绝", "adjustment_id": adjustment_id}
 
 
 @router.get("/time-window-tuning/config", dependencies=[Depends(require_admin)])
