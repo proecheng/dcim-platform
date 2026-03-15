@@ -12,7 +12,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.api.deps import get_current_user
+from app.api.deps import get_current_user, require_admin, require_operator, require_viewer
 from app.models.diagnosis import SensorMetadata
 from app.models.user import User
 from app.schemas.diagnosis import (
@@ -35,15 +35,13 @@ logger = logging.getLogger(__name__)
 async def create_sensor_metadata(
     data: SensorMetadataCreate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(require_operator),
 ):
     """
     创建传感器元数据
 
     权限: admin/operator
     """
-    if current_user.role not in ("admin", "operator"):
-        raise HTTPException(status_code=403, detail="权限不足")
 
     # 检查点位是否已存在元数据
     result = await db.execute(
@@ -140,15 +138,13 @@ async def update_sensor_metadata(
     metadata_id: int,
     data: SensorMetadataUpdate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(require_operator),
 ):
     """
     更新传感器元数据
 
     权限: admin/operator
     """
-    if current_user.role not in ("admin", "operator"):
-        raise HTTPException(status_code=403, detail="权限不足")
 
     result = await db.execute(
         select(SensorMetadata).where(SensorMetadata.id == metadata_id)
@@ -177,15 +173,13 @@ async def update_sensor_metadata(
 async def delete_sensor_metadata(
     metadata_id: int,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(require_admin),
 ):
     """
     删除传感器元数据
 
     权限: admin
     """
-    if current_user.role != "admin":
-        raise HTTPException(status_code=403, detail="权限不足")
 
     result = await db.execute(
         select(SensorMetadata).where(SensorMetadata.id == metadata_id)
@@ -220,23 +214,20 @@ async def get_calibration_status(
     return status
 
 
-@router.post("/check-expired-calibrations", status_code=202)
+@router.post("/check-expired-calibrations", status_code=200)
 async def trigger_expired_calibrations_check(
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(require_operator),
 ):
     """
     手动触发校准过期检查（创建维护告警）
 
     权限: admin/operator
     """
-    if current_user.role not in ("admin", "operator"):
-        raise HTTPException(status_code=403, detail="权限不足")
-
     await check_expired_calibrations(db)
 
     logger.info(f"手动触发校准过期检查: user={current_user.username}")
-    return {"message": "校准过期检查已触发"}
+    return {"message": "校准过期检查已完成"}
 
 
 async def _publish_metadata_update(point_id: int):
@@ -251,9 +242,11 @@ async def _publish_metadata_update(point_id: int):
             port=settings.redis_port,
             decode_responses=True
         )
-        payload = json.dumps({"point_id": point_id})
-        await redis_client.publish('sensor:metadata_update', payload)
-        await redis_client.close()
+        try:
+            payload = json.dumps({"point_id": point_id})
+            await redis_client.publish('sensor:metadata_update', payload)
+        finally:
+            await redis_client.close()
     except ImportError:
         logger.warning("Redis 不可用，跳过元数据更新通知")
     except Exception as e:

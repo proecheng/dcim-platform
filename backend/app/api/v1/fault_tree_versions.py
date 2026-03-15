@@ -1,12 +1,12 @@
 """
 故障树版本管理 API - Story 24.4
 """
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 from typing import Optional, List
 from app.core.database import get_db
-from app.api.deps import require_role, get_current_user
+from app.api.deps import require_role, require_viewer, get_current_user
 from app.services.diagnosis.version_manager import VersionManager
 from app.models.fault_tree import FaultTreeVersion
 from app.schemas.fault_tree_version import (
@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/fault-trees/{tree_id}/versions", tags=["fault-tree-versions"])
 
 
-@router.post("/", response_model=FaultTreeVersionResponse, dependencies=[Depends(require_role("admin"))])
+@router.post("/", response_model=FaultTreeVersionResponse, dependencies=[Depends(require_role(["admin"]))])
 async def create_version(
     tree_id: int,
     current_user = Depends(get_current_user),
@@ -37,10 +37,11 @@ async def create_version(
         version = await VersionManager.create_version(db, tree_id, current_user.id)
         return version
     except ValueError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        logger.warning(f"创建版本失败 tree_id={tree_id}: {e}")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="故障树不存在或无法创建版本")
 
 
-@router.post("/{version_id}/review", response_model=FaultTreeVersionResponse, dependencies=[Depends(require_role("admin"))])
+@router.post("/{version_id}/review", response_model=FaultTreeVersionResponse, dependencies=[Depends(require_role(["admin"]))])
 async def review_version(
     tree_id: int,
     version_id: int,
@@ -82,7 +83,7 @@ async def review_version(
     return version
 
 
-@router.post("/{version_id}/activate", response_model=FaultTreeVersionResponse, dependencies=[Depends(require_role("admin"))])
+@router.post("/{version_id}/activate", response_model=FaultTreeVersionResponse, dependencies=[Depends(require_role(["admin"]))])
 async def activate_version(
     tree_id: int,
     version_id: int,
@@ -108,10 +109,10 @@ async def activate_version(
         return version
     except ValueError as e:
         logger.error(f"Failed to activate version {version_id}: {e}")
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="版本激活失败，请检查版本状态和完整性")
 
 
-@router.post("/rollback", response_model=FaultTreeVersionResponse, dependencies=[Depends(require_role("admin"))])
+@router.post("/rollback", response_model=FaultTreeVersionResponse, dependencies=[Depends(require_role(["admin"]))])
 async def rollback_version(
     tree_id: int,
     db: AsyncSession = Depends(get_db)
@@ -144,7 +145,10 @@ async def rollback_version(
 async def list_versions(
     tree_id: int,
     status: Optional[str] = None,
-    db: AsyncSession = Depends(get_db)
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    db: AsyncSession = Depends(get_db),
+    _=Depends(require_viewer),
 ):
     """
     版本列表
@@ -159,6 +163,7 @@ async def list_versions(
         query = query.where(FaultTreeVersion.status == status)
 
     query = query.order_by(FaultTreeVersion.version_number.desc())
+    query = query.offset((page - 1) * page_size).limit(page_size)
 
     result = await db.execute(query)
     versions = result.scalars().all()

@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field, ConfigDict
 from datetime import datetime
 
 from app.core.database import get_db
-from app.api.deps import require_role, get_current_user
+from app.api.deps import require_role, require_viewer, get_current_user
 from app.models.diagnosis import ProbabilityAdjustmentLog
 from app.models.fault_tree import FaultTree
 from app.services.diagnosis.probability_tuning_service import ProbabilityTuningService
@@ -77,7 +77,7 @@ class TriggerAnalysisResponse(BaseModel):
 # API Endpoints
 # ============================================================
 
-@router.post("/trigger", response_model=TriggerAnalysisResponse, dependencies=[Depends(require_role("admin"))])
+@router.post("/trigger", response_model=TriggerAnalysisResponse, dependencies=[Depends(require_role(["admin"]))])
 async def trigger_analysis(
     tree_id: Optional[int] = None,
     db: AsyncSession = Depends(get_db)
@@ -99,7 +99,8 @@ async def list_adjustments(
     status: Optional[str] = None,
     skip: int = Query(0, ge=0),
     limit: int = Query(20, ge=1, le=100),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    _=Depends(require_viewer),
 ):
     """
     获取调参记录列表
@@ -166,7 +167,7 @@ async def list_adjustments(
     return ProbabilityAdjustmentListResponse(items=items, total=total)
 
 
-@router.post("/adjustments/{adjustment_id}/approve", dependencies=[Depends(require_role("admin"))])
+@router.post("/adjustments/{adjustment_id}/approve", dependencies=[Depends(require_role(["admin"]))])
 async def approve_adjustment(
     adjustment_id: int,
     request: ApproveRequest,
@@ -240,7 +241,7 @@ async def approve_adjustment(
         logger.error(f"创建版本失败: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"创建版本失败: {str(e)}"
+            detail="创建版本失败，请稍后重试"
         )
 
     locked_adjustment.status = 'approved'
@@ -267,7 +268,7 @@ async def approve_adjustment(
     return {"message": "审批成功", "version_id": version.id}
 
 
-@router.post("/adjustments/{adjustment_id}/reject", dependencies=[Depends(require_role("admin"))])
+@router.post("/adjustments/{adjustment_id}/reject", dependencies=[Depends(require_role(["admin"]))])
 async def reject_adjustment(
     adjustment_id: int,
     request: RejectRequest = Body(...),
@@ -345,7 +346,7 @@ async def reject_adjustment(
     return {"message": "已拒绝"}
 
 
-@router.post("/rollback/{tree_id}", dependencies=[Depends(require_role("admin"))])
+@router.post("/rollback/{tree_id}", dependencies=[Depends(require_role(["admin"]))])
 async def rollback_tree(
     tree_id: int,
     db: AsyncSession = Depends(get_db)

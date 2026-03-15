@@ -6,8 +6,8 @@ Story 24.6: 诊断会话、审计日志、历史查询
 
 import html
 import logging
-from datetime import datetime
-from typing import Optional
+from datetime import datetime, timezone
+from typing import Literal, Optional
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -44,10 +44,26 @@ from ...schemas.diagnosis import (
     CounterfactualAnalysisListResponse,
 )
 from ...engines.diagnosis_engine import diagnosis_engine
+from pydantic import BaseModel, Field
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+
+# ==================== 内联 Pydantic 模型 ====================
+
+
+class TimeWindowApproveRequest(BaseModel):
+    reason: Optional[str] = Field(None, description="审批理由（可选）")
+
+
+class TimeWindowRejectRequest(BaseModel):
+    reason: str = Field(..., min_length=1, description="拒绝理由（必填）")
+
+
+class HMACKeyRotateRequest(BaseModel):
+    new_key: str = Field(..., min_length=32, description="新 HMAC 密钥（>=32 字符）")
 
 # 分类映射
 CATEGORY_MAP = {
@@ -106,7 +122,7 @@ async def get_fault_trees(
 # ==================== 规则管理 ====================
 
 
-@router.get("/rules/reload", response_model=dict)
+@router.post("/rules/reload", response_model=dict)
 async def reload_rules_from_yaml(
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_admin),
@@ -573,6 +589,7 @@ async def get_annotation_stats(
 
 @router.get("/battery-soh/latest", response_model=dict)
 async def get_all_latest_soh(
+    limit: int = Query(100, ge=1, le=500, description="最大返回设备数"),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_viewer),
 ):
@@ -602,9 +619,10 @@ async def get_all_latest_soh(
         FROM ranked_soh
         WHERE rn = 1
         ORDER BY device_id
+        LIMIT :limit
     """)
 
-    result = await db.execute(query)
+    result = await db.execute(query, {"limit": limit})
     rows = result.fetchall()
 
     records = [
@@ -856,7 +874,7 @@ async def get_trend_warnings(
     query = select(TrendWarning)
 
     # 应用过滤条件
-    if point_id:
+    if point_id is not None:
         query = query.where(TrendWarning.point_id == point_id)
     if start_time:
         query = query.where(TrendWarning.detected_at >= start_time)
@@ -902,7 +920,7 @@ async def acknowledge_trend_warning(
 
     warning.acknowledged = True
     warning.acknowledged_by = current_user.username
-    warning.acknowledged_at = datetime.now()
+    warning.acknowledged_at = datetime.now(timezone.utc)
 
     await db.commit()
 
@@ -927,7 +945,7 @@ async def get_sensor_fusion_records(
     query = select(SensorFusionRecord)
 
     # 应用过滤条件
-    if zone_id:
+    if zone_id is not None:
         query = query.where(SensorFusionRecord.zone_id == zone_id)
     if start_time:
         query = query.where(SensorFusionRecord.created_at >= start_time)
@@ -1180,7 +1198,7 @@ async def delete_counterfactual_analysis(
         raise HTTPException(status_code=404, detail="反事实分析不存在")
 
     # 软删除
-    analysis.deleted_at = datetime.now()
+    analysis.deleted_at = datetime.now(timezone.utc)
     await db.commit()
 
     return {"message": "反事实分析已删除", "session_id": session_id}
@@ -1205,7 +1223,7 @@ async def get_misdiagnosis_report(
 
     # 如果未指定周期，默认为上月
     if not period:
-        now = datetime.now()
+        now = datetime.now(timezone.utc)
         if now.month == 1:
             period = f"{now.year - 1}-12"
         else:
@@ -1257,7 +1275,7 @@ async def generate_misdiagnosis_report(
 @router.get("/reports/misdiagnosis/export")
 async def export_misdiagnosis_report(
     period: str = Query(..., description="报告周期 YYYY-MM"),
-    format: str = Query("pdf", description="导出格式: pdf"),
+    format: Literal["pdf"] = Query("pdf", description="导出格式: pdf"),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_admin),
 ):
@@ -1328,9 +1346,7 @@ async def export_misdiagnosis_report(
             raise HTTPException(status_code=500, detail="PDF 导出功能未安装，请安装 weasyprint 和 markdown 库")
         except Exception as e:
             logger.error("PDF 导出失败: %s", e)
-            raise HTTPException(status_code=500, detail=f"PDF 导出失败: {str(e)}")
-    else:
-        raise HTTPException(status_code=400, detail=f"不支持的导出格式: {format}")
+            raise HTTPException(status_code=500, detail="PDF 导出失败，请稍后重试")
 
 
 # ============================================================
@@ -1344,7 +1360,7 @@ async def export_misdiagnosis_report(
 # ============================================================
 
 
-@router.post("/time-window-tuning/analyze", dependencies=[Depends(require_admin)])
+@router.post("/time-window-tuning/analyze")
 async def analyze_time_window_tuning(
     device_type: Optional[str] = None, db: AsyncSession = Depends(get_db), current_user: User = Depends(require_admin)
 ):
@@ -1363,10 +1379,10 @@ async def analyze_time_window_tuning(
         return result
     except Exception as e:
         logger.error(f"时间窗口调参分析失败: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"调参分析失败: {str(e)}")
+        raise HTTPException(status_code=500, detail="调参分析失败，请稍后重试")
 
 
-@router.get("/time-window-tuning/adjustments", dependencies=[Depends(require_admin)])
+@router.get("/time-window-tuning/adjustments")
 async def get_time_window_adjustments(
     device_type: Optional[str] = None,
     status: Optional[str] = None,
@@ -1409,10 +1425,10 @@ async def get_time_window_adjustments(
     return {"items": adjustments, "total": total, "page": page, "page_size": page_size}
 
 
-@router.post("/time-window-tuning/adjustments/{adjustment_id}/approve", dependencies=[Depends(require_admin)])
+@router.post("/time-window-tuning/adjustments/{adjustment_id}/approve")
 async def approve_time_window_adjustment(
     adjustment_id: int,
-    body: Optional[dict] = Body(None),
+    body: Optional[TimeWindowApproveRequest] = Body(None),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_admin),
 ):
@@ -1425,7 +1441,7 @@ async def approve_time_window_adjustment(
     from ...models.config import SystemConfig
     import json
 
-    reason = body.get("reason") if body else None
+    reason = body.reason if body else None
 
     # 查询调参记录
     result = await db.execute(select(TimeWindowAdjustmentLog).where(TimeWindowAdjustmentLog.id == adjustment_id))
@@ -1460,7 +1476,7 @@ async def approve_time_window_adjustment(
         locked_adjustment.status = "approved"
         locked_adjustment.reason = reason
         locked_adjustment.approved_by = current_user.id
-        locked_adjustment.approved_at = datetime.now()
+        locked_adjustment.approved_at = datetime.now(timezone.utc)
 
         # 更新 system_configs 表中的时间窗口配置
         config_result = await db.execute(
@@ -1530,12 +1546,15 @@ async def approve_time_window_adjustment(
     except Exception as e:
         await db.rollback()
         logger.error(f"审批时间窗口调参失败: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"审批失败: {str(e)}")
+        raise HTTPException(status_code=500, detail="审批失败，请稍后重试")
 
 
-@router.post("/time-window-tuning/adjustments/{adjustment_id}/reject", dependencies=[Depends(require_admin)])
+@router.post("/time-window-tuning/adjustments/{adjustment_id}/reject")
 async def reject_time_window_adjustment(
-    adjustment_id: int, body: dict = Body(...), db: AsyncSession = Depends(get_db), current_user: User = Depends(require_admin)
+    adjustment_id: int,
+    body: TimeWindowRejectRequest = Body(...),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_admin),
 ):
     """
     拒绝时间窗口调参建议
@@ -1544,10 +1563,7 @@ async def reject_time_window_adjustment(
     """
     from ...models.diagnosis import TimeWindowAdjustmentLog
 
-    reason = body.get("reason") if body else None
-
-    if not reason or not reason.strip():
-        raise HTTPException(status_code=400, detail="拒绝原因不能为空")
+    reason = body.reason
 
     # 查询调参记录
     result = await db.execute(select(TimeWindowAdjustmentLog).where(TimeWindowAdjustmentLog.id == adjustment_id))
@@ -1581,7 +1597,7 @@ async def reject_time_window_adjustment(
         locked_adjustment.status = "rejected"
         locked_adjustment.reason = reason
         locked_adjustment.approved_by = current_user.id
-        locked_adjustment.approved_at = datetime.now()
+        locked_adjustment.approved_at = datetime.now(timezone.utc)
 
         await db.commit()
 
@@ -1591,7 +1607,7 @@ async def reject_time_window_adjustment(
     except Exception as e:
         await db.rollback()
         logger.error(f"拒绝时间窗口调参失败: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"拒绝失败: {str(e)}")
+        raise HTTPException(status_code=500, detail="拒绝失败，请稍后重试")
 
     logger.info(f"时间窗口调参记录 {adjustment_id} 已拒绝，用户: {current_user.username}")
 
@@ -1615,8 +1631,8 @@ async def reject_time_window_adjustment(
     return {"message": "时间窗口调整已拒绝", "adjustment_id": adjustment_id}
 
 
-@router.get("/time-window-tuning/config", dependencies=[Depends(require_admin)])
-async def get_time_window_config(db: AsyncSession = Depends(get_db), current_user: User = Depends(require_admin)):
+@router.get("/time-window-tuning/config")
+async def get_time_window_config(db: AsyncSession = Depends(get_db), _: User = Depends(require_admin)):
     """
     查询当前时间窗口配置
 
@@ -1640,7 +1656,7 @@ async def get_time_window_config(db: AsyncSession = Depends(get_db), current_use
     return {"time_windows": {}}
 
 
-@router.put("/time-window-tuning/config", dependencies=[Depends(require_admin)])
+@router.put("/time-window-tuning/config")
 async def update_time_window_config(
     device_type: str,
     time_window_minutes: int,
@@ -1713,7 +1729,7 @@ async def list_training_audits(
         return {"code": 200, "message": "success", "data": result}
     except Exception as e:
         logger.error(f"查询训练数据审计历史失败: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"查询失败: {e}")
+        raise HTTPException(status_code=500, detail="查询失败，请稍后重试")
 
 
 # ============================================================
@@ -1733,31 +1749,25 @@ async def get_hmac_key_status(
         return {"code": 200, "message": "success", "data": result}
     except Exception as e:
         logger.error(f"查询 HMAC 密钥状态失败: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"查询失败: {e}")
+        raise HTTPException(status_code=500, detail="查询失败，请稍后重试")
 
 
 @router.post("/hmac-key/rotate", summary="执行 HMAC 密钥轮换")
 async def rotate_hmac_key(
-    body: dict,
+    body: HMACKeyRotateRequest,
     current_user: User = Depends(require_admin),
 ):
     """用新密钥对所有活跃/已审核版本重新签名（仅管理员可访问）"""
-    new_key = body.get("new_key")
-    if not new_key or not isinstance(new_key, str):
-        raise HTTPException(status_code=400, detail="请提供 new_key 参数")
-    if len(new_key) < 32:
-        raise HTTPException(status_code=400, detail="新密钥长度必须 >= 32 字符")
-
     try:
         from app.services.diagnosis.hmac_key_service import hmac_key_service
 
-        result = await hmac_key_service.rotate_key(new_key, current_user.id)
+        result = await hmac_key_service.rotate_key(body.new_key, current_user.id)
         return {"code": 200, "message": "密钥轮换成功", "data": result}
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         logger.error(f"HMAC 密钥轮换失败: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"轮换失败: {e}")
+        raise HTTPException(status_code=500, detail="密钥轮换失败，请稍后重试")
 
 
 @router.post("/hmac-key/verify-all", summary="批量验证签名完整性")
@@ -1772,7 +1782,7 @@ async def verify_all_signatures(
         return {"code": 200, "message": "success", "data": result}
     except Exception as e:
         logger.error(f"批量验证签名失败: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"验证失败: {e}")
+        raise HTTPException(status_code=500, detail="验证失败，请稍后重试")
 
 
 @router.get("/hmac-key/rotation-logs", summary="查询密钥轮换历史")
@@ -1789,4 +1799,4 @@ async def list_rotation_logs(
         return {"code": 200, "message": "success", "data": result}
     except Exception as e:
         logger.error(f"查询密钥轮换历史失败: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"查询失败: {e}")
+        raise HTTPException(status_code=500, detail="查询失败，请稍后重试")

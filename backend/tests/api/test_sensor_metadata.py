@@ -277,8 +277,8 @@ class TestSensorMetadataAPI:
             headers={"Authorization": f"Bearer {admin_token}"}
         )
 
-        assert response.status_code == 202
-        assert "已触发" in response.json()["message"]
+        assert response.status_code == 200
+        assert "已完成" in response.json()["message"]
 
     @pytest.mark.asyncio
     async def test_permission_operator_can_create(self, client: AsyncClient, operator_token: str):

@@ -410,6 +410,6 @@ async def test_reject_without_reason(client, db_session, setup_test_data):
         f"/api/v1/diagnosis/time-window-tuning/adjustments/{adjustment.id}/reject",
         json={}
     )
-    # 空理由应被拒绝（V20 边缘修复：拒绝原因不能为空）
-    assert response.status_code == 400
+    # 空理由应被拒绝（Pydantic 验证：reason 为必填字段）
+    assert response.status_code in (400, 422)
 

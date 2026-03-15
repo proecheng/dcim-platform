@@ -3,8 +3,8 @@ Misdiagnosis Report API - Story 26.6
 """
 
 import logging
-from datetime import datetime, timezone
-from typing import Optional
+from datetime import datetime, timedelta, timezone
+from typing import Literal, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import FileResponse
 from sqlalchemy import select, func
@@ -54,7 +54,7 @@ async def list_misdiagnosis_reports(
 
     if end_date:
         try:
-            end_dt = datetime.fromisoformat(end_date)
+            end_dt = datetime.fromisoformat(end_date) + timedelta(days=1)
             query = query.where(ReportRecord.end_time <= end_dt)
         except ValueError:
             raise HTTPException(status_code=400, detail="无效的 end_date 格式")
@@ -147,7 +147,7 @@ async def download_misdiagnosis_report(
     )
 
 
-@router.post("/generate", dependencies=[Depends(require_role(["admin"]))])
+@router.post("/generate")
 async def generate_misdiagnosis_report(
     request: MisdiagnosisReportGenerateRequest,
     db: AsyncSession = Depends(get_db),
@@ -185,4 +185,4 @@ async def generate_misdiagnosis_report(
         raise HTTPException(status_code=409, detail=str(e))
     except Exception as e:
         logger.error(f"报告生成失败: {e}")
-        raise HTTPException(status_code=500, detail=f"报告生成失败: {str(e)}")
+        raise HTTPException(status_code=500, detail="报告生成失败，请稍后重试")

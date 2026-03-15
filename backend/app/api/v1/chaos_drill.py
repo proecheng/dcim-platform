@@ -3,13 +3,16 @@ Chaos Drill API - Story 26.7
 灾难恢复演练管理
 """
 
+import json
 import logging
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.api.deps import require_role
+from app.api.deps import require_role, get_current_user
+from app.models.log import OperationLog
+from app.models.user import User
 from app.schemas.chaos_drill import (
     DrillScheduleResponse,
     DrillScheduleUpdateRequest,
@@ -73,10 +76,11 @@ async def confirm_drill_schedule(
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@router.post("/trigger", response_model=DrillTriggerResponse, status_code=202, dependencies=[Depends(require_role(["admin"]))])
+@router.post("/trigger", response_model=DrillTriggerResponse, status_code=202)
 async def trigger_drill(
     request: DrillTriggerRequest,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_role(["admin"])),
 ):
     """手动触发演练"""
     service = ChaosDrillService(db)
@@ -87,19 +91,47 @@ async def trigger_drill(
             scenarios=request.scenarios,
             breaker=breaker,
         )
+
+        # 审计日志
+        db.add(OperationLog(
+            user_id=current_user.id,
+            username=current_user.username,
+            module="chaos_drill",
+            action="trigger_drill",
+            target_type="drill",
+            target_id=drill_id,
+            new_value=json.dumps({"scenarios": request.scenarios}, ensure_ascii=False),
+        ))
+        await db.commit()
+
         return DrillTriggerResponse(message="演练已启动", drill_id=drill_id)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@router.post("/stop", response_model=DrillStopResponse, dependencies=[Depends(require_role(["admin"]))])
-async def stop_drill(db: AsyncSession = Depends(get_db)):
+@router.post("/stop", response_model=DrillStopResponse)
+async def stop_drill(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_role(["admin"])),
+):
     """终止演练"""
     service = ChaosDrillService(db)
     breaker = _get_breaker()
 
     try:
         drill_id = await service.stop_drill(breaker=breaker)
+
+        # 审计日志
+        db.add(OperationLog(
+            user_id=current_user.id,
+            username=current_user.username,
+            module="chaos_drill",
+            action="stop_drill",
+            target_type="drill",
+            target_id=drill_id,
+        ))
+        await db.commit()
+
         return DrillStopResponse(
             message="演练已终止，所有故障已恢复",
             drill_id=drill_id,

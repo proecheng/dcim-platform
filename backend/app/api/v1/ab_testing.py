@@ -2,7 +2,7 @@
 A/B 测试 API 路由 - Story 26.5
 """
 import json
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List
 
@@ -32,7 +32,7 @@ async def _log_operation(
     target_id: int = None,
     details: dict = None,
 ):
-    """记录 A/B 测试操作审计日志"""
+    """记录 A/B 测试操作审计日志（不独立 commit，由调用方统一提交）"""
     log = OperationLog(
         user_id=user.id,
         username=user.username,
@@ -43,14 +43,13 @@ async def _log_operation(
         new_value=json.dumps(details, ensure_ascii=False) if details else None,
     )
     db.add(log)
-    await db.commit()
 
 
 @router.post("", response_model=ABTestResponse, status_code=status.HTTP_201_CREATED)
 async def create_ab_test(
     request: ABTestCreateRequest,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_role("admin")),
+    current_user: User = Depends(require_role(["admin"])),
 ):
     """创建 A/B 测试配置"""
     service = ABTestingService(db)
@@ -82,6 +81,7 @@ async def create_ab_test(
                 "strategy_params": request.strategy_params.model_dump(),
             },
         )
+        await db.commit()
 
         return ABTestResponse.model_validate(ab_test)
     except ValueError as e:
@@ -90,11 +90,14 @@ async def create_ab_test(
 
 @router.get("", response_model=List[ABTestResponse])
 async def list_ab_tests(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_role("admin")),
+    current_user: User = Depends(require_role(["admin"])),
 ):
     """列出所有 A/B 测试"""
     stmt = select(ABTestConfig).order_by(ABTestConfig.created_at.desc())
+    stmt = stmt.offset((page - 1) * page_size).limit(page_size)
     result = await db.execute(stmt)
     ab_tests = result.scalars().all()
     return [ABTestResponse.model_validate(ab_test) for ab_test in ab_tests]
@@ -104,7 +107,7 @@ async def list_ab_tests(
 async def get_ab_test(
     ab_test_id: int,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_role("admin")),
+    current_user: User = Depends(require_role(["admin"])),
 ):
     """查询单个 A/B 测试"""
     stmt = select(ABTestConfig).where(ABTestConfig.id == ab_test_id)
@@ -119,7 +122,7 @@ async def get_ab_test(
 async def get_ab_test_report(
     ab_test_id: int,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_role("admin")),
+    current_user: User = Depends(require_role(["admin"])),
 ):
     """查询 A/B 测试效果报告"""
     service = ABTestingService(db)
@@ -135,7 +138,7 @@ async def update_ab_test(
     ab_test_id: int,
     request: ABTestUpdateRequest,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_role("admin")),
+    current_user: User = Depends(require_role(["admin"])),
 ):
     """更新 A/B 测试配置（扩大灰度）"""
     service = ABTestingService(db)
@@ -163,6 +166,7 @@ async def update_ab_test(
                 "new_strategy_params": request.strategy_params.model_dump(),
             },
         )
+        await db.commit()
 
         return ABTestResponse.model_validate(ab_test)
     except ValueError as e:
@@ -176,7 +180,7 @@ async def complete_ab_test(
     ab_test_id: int,
     request: ABTestCompleteRequest,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_role("admin")),
+    current_user: User = Depends(require_role(["admin"])),
 ):
     """完成 A/B 测试（全量切换或回滚）"""
     service = ABTestingService(db)
@@ -204,6 +208,7 @@ async def complete_ab_test(
                 "statistical_test_result": report["statistical_test"],
             },
         )
+        await db.commit()
 
         return result
     except ValueError as e:
@@ -216,7 +221,7 @@ async def complete_ab_test(
 async def delete_ab_test(
     ab_test_id: int,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_role("admin")),
+    current_user: User = Depends(require_role(["admin"])),
 ):
     """删除 A/B 测试（仅 paused 状态可删除）"""
     stmt = select(ABTestConfig).where(ABTestConfig.id == ab_test_id)
