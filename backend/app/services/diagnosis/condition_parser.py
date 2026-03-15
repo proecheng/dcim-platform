@@ -217,7 +217,7 @@ class Parser:
             else:
                 raise ValueError(f"Expected NUMBER/STRING/IDENTIFIER, got {right.type}")
 
-            return ('CMP', left.value, op.value, right.value)
+            return ('CMP', left.value, op.value, right.value, right.type)
         finally:
             self._recursion_depth -= 1  # P1-1 修复
 
@@ -235,18 +235,19 @@ class ConditionEvaluator:
             elif node[0] == 'AND':
                 return self.evaluate(node[1]) and self.evaluate(node[2])
             elif node[0] == 'CMP':
-                return self.evaluate_comparison(node[1], node[2], node[3])
+                right_type = node[4] if len(node) > 4 else None
+                return self.evaluate_comparison(node[1], node[2], node[3], right_type)
         return False
 
-    def evaluate_comparison(self, left: str, op: str, right: Any) -> bool:
+    def evaluate_comparison(self, left: str, op: str, right: Any, right_type=None) -> bool:
         """求值比较表达式"""
         # 获取左值
         left_value = self.context.get(left)
         if left_value is None:
             return False
 
-        # 获取右值
-        if isinstance(right, str) and right in self.context:
+        # 获取右值：仅当右操作数为 IDENTIFIER 类型时才从上下文解析变量
+        if right_type == TokenType.IDENTIFIER and isinstance(right, str) and right in self.context:
             right_value = self.context[right]
         else:
             right_value = right

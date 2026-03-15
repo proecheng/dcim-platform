@@ -355,13 +355,13 @@ class ChaosDrillService:
             # 2. 验证 key 存在然后清理（不调用 recover_pending 避免写入 DB）
             from app.core.redis_lock import get_redis_client
 
-            redis = get_redis_client()
-            exists = redis.exists(redis_key) if redis else False
+            redis = await get_redis_client()
+            exists = (await redis.exists(redis_key)) if redis else False
             result["details"]["data_integrity_check"] = bool(exists)
 
             # 3. 清理演练数据
             if redis and exists:
-                redis.delete(redis_key)
+                await redis.delete(redis_key)
                 result["details"]["fault_cleared"] = True
             else:
                 result["details"]["fault_cleared"] = False
@@ -440,19 +440,14 @@ class ChaosDrillService:
             report_data=json.dumps(report_data, ensure_ascii=False),
         )
 
-        # 尝试使用传入的 session，失败则使用独立 session
-        # （后台任务中请求作用域 session 可能已关闭）
+        # 后台任务必须使用独立 session（请求作用域 session 已关闭）
         try:
-            self.db.add(report)
-            await self.db.commit()
-        except Exception:
-            try:
-                from app.core.database import async_session
-                async with async_session() as db:
-                    db.add(report)
-                    await db.commit()
-            except Exception as e:
-                logger.error(f"演练报告保存失败: {e}")
+            from app.core.database import async_session
+            async with async_session() as db:
+                db.add(report)
+                await db.commit()
+        except Exception as e:
+            logger.error(f"演练报告保存失败: {e}")
 
     # ---- 历史查询 ----
 

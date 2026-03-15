@@ -48,6 +48,12 @@ class TrendAnalysisService:
             logger.debug(f"Point {point_id} unit '{point_info.unit}' not supported for trend analysis")
             return None
 
+        # SQL 注入防护：白名单校验视图名
+        ALLOWED_VIEWS = {'temp_7d_avg', 'humidity_7d_avg'}
+        if view_name not in ALLOWED_VIEWS:
+            logger.warning(f"非法视图名: {view_name}")
+            return None
+
         # 1. 查询最近 7 天的日均值
         query = text(f"""
             SELECT day, avg_value, sample_count
@@ -73,7 +79,7 @@ class TrendAnalysisService:
 
         # 3. 检测连续 3 天趋势（允许容差）
         last_3_days = valid_days[-3:]
-        values = [float(row.avg_value) for row in last_3_days]
+        values = [float(row.avg_value) for row in last_3_days if row.avg_value is not None]
 
         # 容差设置
         tolerance = 0.1 if point_info.unit in ['℃', '°C'] else 0.5  # 温度 0.1℃，湿度 0.5%RH
@@ -216,7 +222,7 @@ class TrendAnalysisService:
             TrendWarning.detected_at >= datetime.now() - timedelta(hours=hours)
         )
 
-        if zone_id:
+        if zone_id is not None:
             # 关联 points 表过滤区域
             query = query.join(Point).where(Point.zone_id == zone_id)
 

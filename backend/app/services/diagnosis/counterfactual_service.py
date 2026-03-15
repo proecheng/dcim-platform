@@ -468,7 +468,11 @@ async def _analyze_counterfactual_impl(
     )
 
     db.add(counterfactual)
-    await db.commit()
+    try:
+        await db.commit()
+    except Exception:
+        await db.rollback()
+        raise
     await db.refresh(counterfactual)
 
     # 记录指标

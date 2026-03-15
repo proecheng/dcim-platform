@@ -653,7 +653,11 @@ class MisdiagnosisReportServiceV2:
 
     def __init__(self, db: AsyncSession):
         self.db = db
-        self.db_type = db.bind.dialect.name  # postgresql or sqlite
+        self.db_type = getattr(getattr(self.db, 'bind', None), 'dialect', None)
+        if self.db_type:
+            self.db_type = self.db_type.name
+        else:
+            self.db_type = 'sqlite'
 
     async def generate_monthly_report_v2(
         self,
@@ -836,6 +840,13 @@ class MisdiagnosisReportServiceV2:
 
         result = await self.db.execute(query, {"start_date": start_date, "end_date": end_date})
         row = result.fetchone()
+
+        if row is None:
+            return {
+                "total_diagnosis_count": 0,
+                "annotated_count": 0,
+                "annotation_coverage_rate": 0.0,
+            }
 
         return {
             "total_diagnosis_count": row.total_diagnosis_count,

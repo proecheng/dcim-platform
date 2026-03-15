@@ -84,7 +84,7 @@ async def get_rated_parameters(device_id: int) -> Optional[dict]:
             rated_resistance = params.get("rated_resistance_mohm")
             rated_cycle_count = params.get("rated_cycle_count")
 
-            if not rated_resistance or not rated_cycle_count:
+            if rated_resistance is None or rated_cycle_count is None:
                 logger.warning(
                     f"ups_rated_params 配置不完整: "
                     f"rated_resistance={rated_resistance}, rated_cycle_count={rated_cycle_count}"
@@ -344,7 +344,10 @@ async def calculate_soh(device_id: int) -> Optional[float]:
             latest_soh_record = await get_latest_soh_record(device_id)
             if latest_soh_record and latest_soh_record.cycle_count:
                 prev_cycle_count = latest_soh_record.cycle_count
-                cycle_change_rate = abs(current_cycle_count - prev_cycle_count) / prev_cycle_count
+                if prev_cycle_count and prev_cycle_count > 0:
+                    cycle_change_rate = abs(current_cycle_count - prev_cycle_count) / prev_cycle_count
+                else:
+                    cycle_change_rate = 0.0
                 if cycle_change_rate > 0.1:
                     logger.warning(
                         f"设备 {device_id} 循环次数变化异常: "
@@ -371,6 +374,8 @@ async def calculate_soh(device_id: int) -> Optional[float]:
                 )
 
             # cycle_factor: 循环次数越多，因子越低
+            if rated_cycle_count <= 0:
+                rated_cycle_count = 1
             cycle_factor = clip(
                 1.0 - current_cycle_count / rated_cycle_count,
                 0.0,

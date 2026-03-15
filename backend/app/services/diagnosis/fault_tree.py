@@ -493,7 +493,7 @@ class FaultTreeInferenceEngine:
                     value = valid_values[0]
 
                 threshold = node_data.get("threshold")
-                status = "abnormal" if threshold is not None and value > threshold else "normal"
+                status = "abnormal" if threshold is not None and abs(value) > abs(threshold) else "normal"
 
                 evidence[node_id] = EvidenceItem(
                     point_id=point_id,
@@ -709,7 +709,7 @@ class FaultTreeInferenceEngine:
             gate_type = node_data.get("gate_type")
 
             child_nodes = list(graph.predecessors(node_id))
-            child_probs = [graph.nodes[child]["probability"] for child in child_nodes]
+            child_probs = [graph.nodes[child].get("probability", 0.0) for child in child_nodes]
 
             if gate_type == "OR":
                 prob = or_gate(child_probs)
@@ -734,8 +734,13 @@ class FaultTreeInferenceEngine:
         """
         path = [root_node_id]
         current_node = root_node_id
+        visited = set()
 
         while True:
+            if current_node in visited:
+                logger.warning(f"根因路径检测到环，节点 {current_node}，终止回溯")
+                break
+            visited.add(current_node)
             child_nodes = list(graph.predecessors(current_node))
 
             if not child_nodes:
@@ -880,6 +885,9 @@ class FaultTreeInferenceEngine:
             if not root_nodes:
                 context.errors.append("故障树没有根节点")
                 return context
+
+            if len(root_nodes) > 1:
+                logger.warning(f"故障树存在 {len(root_nodes)} 个根节点，使用第一个: {root_nodes[0]}")
 
             root_node_id = root_nodes[0]
             context.root_node_probability = graph.nodes[root_node_id]["probability"]

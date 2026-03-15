@@ -7,12 +7,11 @@ import asyncio
 import json
 import logging
 from typing import Optional
-import redis.asyncio as redis
 from sqlalchemy import select, desc
 from datetime import datetime, timedelta, timezone
 
-from app.core.config import get_settings
 from app.core.database import async_session
+from app.core.redis import redis_service
 from app.models.fault_tree import FaultTreeNode
 from app.models import Point, PointHistory
 from app.models.alarm import Alarm
@@ -20,7 +19,6 @@ from app.services.diagnosis.evidence_calculator import calc_evidence_probability
 from prometheus_client import Counter, REGISTRY
 
 logger = logging.getLogger(__name__)
-settings = get_settings()
 
 # Prometheus 监控指标（条件注册）
 try:
@@ -51,21 +49,13 @@ async def get_point_latest_value(point_id: int, time_window: int) -> Optional[fl
     Returns:
         点位值（float）或 None（无数据）
     """
-    redis_client = None
     try:
-        # 优先从 Redis 查询
-        redis_client = redis.from_url(settings.REDIS_URL)
-        value_str = await redis_client.get(f"point:value:{point_id}")
+        # 优先从共享 Redis 连接池查询（避免每次调用都创建新连接）
+        value_str = await redis_service.get(f"point:value:{point_id}")
         if value_str:
             return float(value_str)
     except Exception as e:
         logger.warning(f"从 Redis 查询点位值失败: {e}")
-    finally:
-        if redis_client:
-            try:
-                await redis_client.close()
-            except Exception as e:
-                logger.warning(f"关闭 Redis 客户端失败: {e}")
 
     # 降级：从数据库查询
     try:
@@ -145,7 +135,7 @@ async def collect_leaf_evidence(node: FaultTreeNode, time_window: int) -> float:
         # 使用节点配置的阈值，或使用默认值
         threshold = node.threshold_value
         threshold_type = node.threshold_type
-        sigmoid_k = node.sigmoid_k or 2.0
+        sigmoid_k = node.sigmoid_k if node.sigmoid_k and node.sigmoid_k > 0 else 2.0
 
         if threshold is None or threshold_type is None:
             # 使用默认配置

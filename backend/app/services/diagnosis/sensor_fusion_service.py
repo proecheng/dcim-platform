@@ -103,10 +103,15 @@ class SensorFusionService:
             weights = []
             values = []
             for s in layer_sensors:
+                if s.value is None:
+                    continue
                 accuracy = s.accuracy_class or 1.0
                 weight = {0.2: 1.0, 0.5: 0.9, 1.0: 0.8}.get(accuracy, 0.85)
                 weights.append(weight)
                 values.append(s.value)
+
+            if sum(weights) == 0:
+                continue
 
             # 加权标准差计算公式：
             # weighted_std = sqrt(sum(w_i * (x_i - weighted_mean)^2) / sum(w_i))
@@ -191,6 +196,8 @@ class SensorFusionService:
         valid_sensors = []
         for s in sensors:
             # 检查通信状态（5分钟内有更新）
+            if s.updated_at is None:
+                continue
             if (now - s.updated_at).total_seconds() > 300:
                 logger.warning(f"Pressure sensor {s.id} communication timeout")
                 continue

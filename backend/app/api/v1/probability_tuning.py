@@ -1,7 +1,7 @@
 """
 概率调参 API - Story 26.3
 """
-from fastapi import APIRouter, Body, Depends, HTTPException, status
+from fastapi import APIRouter, Body, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 from typing import Optional, List
@@ -97,8 +97,8 @@ async def trigger_analysis(
 async def list_adjustments(
     tree_id: Optional[int] = None,
     status: Optional[str] = None,
-    skip: int = 0,
-    limit: int = 20,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(20, ge=1, le=100),
     db: AsyncSession = Depends(get_db)
 ):
     """
@@ -110,9 +110,12 @@ async def list_adjustments(
     - **limit**: 返回记录数
     - **返回**: 调参记录列表
     """
+    if status and status not in ('pending', 'approved', 'rejected'):
+        raise HTTPException(status_code=400, detail="无效的状态值")
+
     query = select(ProbabilityAdjustmentLog)
 
-    if tree_id:
+    if tree_id is not None:
         query = query.where(ProbabilityAdjustmentLog.tree_id == tree_id)
     if status:
         query = query.where(ProbabilityAdjustmentLog.status == status)
@@ -208,20 +211,7 @@ async def approve_adjustment(
             detail=f"节点 {adjustment.node_id} 不存在"
         )
 
-    node.prior_probability = adjustment.proposed_probability
-
-    # 创建新版本（审批后自动创建版本）
-    try:
-        version = await VersionManager.create_version(db, adjustment.tree_id, current_user.id)
-        logger.info(f"审批调参 {adjustment_id} 后创建版本 {version.id}")
-    except Exception as e:
-        logger.error(f"创建版本失败: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"创建版本失败: {str(e)}"
-        )
-
-    # 更新调参记录状态（使用乐观锁）
+    # 更新调参记录状态（使用乐观锁，必须在修改节点概率之前检查）
     update_result = await db.execute(
         select(ProbabilityAdjustmentLog)
         .where(
@@ -237,6 +227,20 @@ async def approve_adjustment(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="调参记录已被其他用户修改，请刷新后重试"
+        )
+
+    # 乐观锁检查通过后，更新节点概率
+    node.prior_probability = adjustment.proposed_probability
+
+    # 创建新版本（审批后自动创建版本）
+    try:
+        version = await VersionManager.create_version(db, adjustment.tree_id, current_user.id)
+        logger.info(f"审批调参 {adjustment_id} 后创建版本 {version.id}")
+    except Exception as e:
+        logger.error(f"创建版本失败: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"创建版本失败: {str(e)}"
         )
 
     locked_adjustment.status = 'approved'

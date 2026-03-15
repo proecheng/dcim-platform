@@ -97,6 +97,7 @@ class DiagnosisEngine:
 
     async def reload_rules(self) -> int:
         """重载规则缓存"""
+        self._loaded = False
         return await self.load_rules()
 
     async def on_alarm_event(self, event: Event) -> None:
@@ -109,6 +110,15 @@ class DiagnosisEngine:
         payload = event.payload
         counter_key = f"{payload.get('alarm_type', '')}:{payload.get('device_type', '')}"
         self._alarm_counter[counter_key].append(time.time())
+
+        # 防止 _alarm_counter 无限增长：超过 10000 个 key 时清理最旧的一半
+        if len(self._alarm_counter) > 10000:
+            oldest_keys = sorted(
+                self._alarm_counter.keys(),
+                key=lambda k: min(self._alarm_counter[k]) if self._alarm_counter[k] else 0
+            )[:5000]
+            for k in oldest_keys:
+                del self._alarm_counter[k]
 
         # 后台执行诊断，不阻塞联动引擎
         asyncio.create_task(self._safe_diagnose(payload))
@@ -221,7 +231,7 @@ class DiagnosisEngine:
         # 最高置信度（引擎返回整数 0-100，转为 0.0-1.0）
         top = all_causes[0] if all_causes else {}
         top_confidence_int = top.get("confidence", 0)
-        top_confidence = top_confidence_int / 100.0 if top_confidence_int > 1 else float(top_confidence_int)
+        top_confidence = top_confidence_int / 100.0 if top_confidence_int > 1.0 else float(top_confidence_int)
         # start_time 根据 elapsed_ms 反推，end_time 取当前时间
         end_dt = datetime.now()
         from datetime import timedelta
@@ -341,6 +351,8 @@ class DiagnosisEngine:
             try:
                 from ..services.diagnosis.sensor_metadata_service import get_sensor_weight, apply_evidence_weight
                 sensor_weight = get_sensor_weight(point_id)
+                # 防止 sensor_weight=0 导致除零或无效计算
+                sensor_weight = max(sensor_weight, 0.01)
                 # 使用收缩公式调整置信度
                 # 将置信度视为观测概率，50 作为先验
                 prior = 50.0

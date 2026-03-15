@@ -93,8 +93,12 @@ class ABTestingService:
         if ab_test.strategy in ("percentage", "hash"):
             old_percentage = ab_test.strategy_params.get("percentage", 0)
             new_percentage = strategy_params.get("percentage", 0)
-            if new_percentage > old_percentage * 2:
-                raise ValueError(f"灰度扩大不能超过 2 倍（当前 {old_percentage}%，请求 {new_percentage}%）")
+            if old_percentage == 0:
+                max_allowed = 10  # 允许从 0% 初始启动到最多 10%
+            else:
+                max_allowed = old_percentage * 2
+            if new_percentage > max_allowed:
+                raise ValueError(f"灰度扩大不能超过限制（当前 {old_percentage}%，最大允许 {max_allowed}%，请求 {new_percentage}%）")
 
         # 更新配置
         ab_test.strategy_params = strategy_params
@@ -226,7 +230,16 @@ class ABTestingService:
             # 未知策略，使用版本B（对照版本）
             version_id = ab_test.version_b_id
 
-        # 记录设备版本分配
+        # 记录设备版本分配（先检查是否已被并发请求创建）
+        recheck_stmt = select(ABTestDeviceAssignment).where(
+            ABTestDeviceAssignment.ab_test_id == ab_test.id,
+            ABTestDeviceAssignment.device_id == device_id,
+        )
+        recheck_result = await self.db.execute(recheck_stmt)
+        existing_assignment = recheck_result.scalar_one_or_none()
+        if existing_assignment:
+            return existing_assignment.assigned_version_id
+
         assignment = ABTestDeviceAssignment(
             ab_test_id=ab_test.id,
             device_id=device_id,
@@ -661,6 +674,5 @@ class ABTestingService:
         new_version.status = "active"
         new_version.activated_at = datetime.utcnow()
 
-        # 单次提交，确保原子性
-        await self.db.commit()
+        # 不在此处提交，由调用方统一提交确保原子性
 

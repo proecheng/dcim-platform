@@ -327,7 +327,7 @@ async def test_update_ab_test_gradual_expansion_limit(db_session: AsyncSession):
     )
 
     # 尝试扩大到 30%（超过 2 倍，应该失败）
-    with pytest.raises(ValueError, match="灰度扩大不能超过 2 倍"):
+    with pytest.raises(ValueError, match="灰度扩大不能超过限制"):
         await service.update_ab_test(
             ab_test_id=ab_test.id,
             strategy_params={"percentage": 30},

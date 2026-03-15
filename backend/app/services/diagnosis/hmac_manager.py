@@ -15,6 +15,8 @@ class HMACManager:
     def generate_signature(data: str) -> str:
         """生成 HMAC-SHA-256 签名"""
         settings = get_settings()
+        if not settings.FAULT_TREE_HMAC_KEY:
+            raise ValueError("HMAC 密钥未配置或为空，请设置 FAULT_TREE_HMAC_KEY")
         key = settings.FAULT_TREE_HMAC_KEY.encode()
         signature = hmac.new(key, data.encode(), hashlib.sha256).hexdigest()
         return signature

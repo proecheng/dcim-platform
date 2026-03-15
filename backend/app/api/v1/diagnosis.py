@@ -4,6 +4,7 @@ Story 9-3: 智能故障诊断
 Story 24.6: 诊断会话、审计日志、历史查询
 """
 
+import html
 import logging
 from datetime import datetime
 from typing import Optional
@@ -319,13 +320,13 @@ async def list_sessions(
             sd = datetime.fromisoformat(start_date)
             query = query.where(DiagnosisSession.created_at >= sd)
         except ValueError:
-            pass
+            raise HTTPException(status_code=400, detail="无效的日期格式")
     if end_date is not None:
         try:
             ed = datetime.fromisoformat(end_date)
             query = query.where(DiagnosisSession.created_at <= ed)
         except ValueError:
-            pass
+            raise HTTPException(status_code=400, detail="无效的日期格式")
     query = query.order_by(DiagnosisSession.created_at.desc())
 
     count_query = select(func.count()).select_from(query.subquery())
@@ -431,13 +432,13 @@ async def list_results(
             st = datetime.fromisoformat(start_time)
             query = query.where(DiagnosisResult.created_at >= st)
         except ValueError:
-            pass
+            raise HTTPException(status_code=400, detail="无效的日期格式")
     if end_time is not None:
         try:
             et = datetime.fromisoformat(end_time)
             query = query.where(DiagnosisResult.created_at <= et)
         except ValueError:
-            pass
+            raise HTTPException(status_code=400, detail="无效的日期格式")
     query = query.order_by(DiagnosisResult.created_at.desc())
 
     count_query = select(func.count()).select_from(query.subquery())
@@ -570,33 +571,6 @@ async def get_annotation_stats(
 # ==================== Battery SOH Endpoints (Story 25.3) ====================
 
 
-@router.get("/battery-soh/{device_id}", response_model=dict)
-async def get_device_soh_history(
-    device_id: int,
-    db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_viewer),
-    limit: int = Query(30, ge=1, le=100, description="返回记录数量"),
-):
-    """查询设备 SOH 历史记录（分页）"""
-    from sqlalchemy import select, desc
-    from ...models.diagnosis import BatterySOHRecord
-    from ...schemas.diagnosis import BatterySOHRecordResponse
-
-    result = await db.execute(
-        select(BatterySOHRecord)
-        .where(BatterySOHRecord.device_id == device_id)
-        .order_by(desc(BatterySOHRecord.calculated_at))
-        .limit(limit)
-    )
-    records = result.scalars().all()
-
-    return {
-        "device_id": device_id,
-        "total": len(records),
-        "records": [BatterySOHRecordResponse.model_validate(r) for r in records],
-    }
-
-
 @router.get("/battery-soh/latest", response_model=dict)
 async def get_all_latest_soh(
     db: AsyncSession = Depends(get_db),
@@ -646,6 +620,33 @@ async def get_all_latest_soh(
     ]
 
     return {"total": len(records), "records": records}
+
+
+@router.get("/battery-soh/{device_id}", response_model=dict)
+async def get_device_soh_history(
+    device_id: int,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_viewer),
+    limit: int = Query(30, ge=1, le=100, description="返回记录数量"),
+):
+    """查询设备 SOH 历史记录（分页）"""
+    from sqlalchemy import select, desc
+    from ...models.diagnosis import BatterySOHRecord
+    from ...schemas.diagnosis import BatterySOHRecordResponse
+
+    result = await db.execute(
+        select(BatterySOHRecord)
+        .where(BatterySOHRecord.device_id == device_id)
+        .order_by(desc(BatterySOHRecord.calculated_at))
+        .limit(limit)
+    )
+    records = result.scalars().all()
+
+    return {
+        "device_id": device_id,
+        "total": len(records),
+        "records": [BatterySOHRecordResponse.model_validate(r) for r in records],
+    }
 
 
 @router.post("/battery-soh/calculate/{device_id}", response_model=dict)
@@ -886,7 +887,7 @@ async def acknowledge_trend_warning(
     warning_id: int,
     request: TrendWarningAcknowledge,
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_operator),
+    current_user: User = Depends(require_operator),
 ):
     """确认趋势预警"""
     from ...models.diagnosis import TrendWarning
@@ -900,7 +901,7 @@ async def acknowledge_trend_warning(
         raise HTTPException(status_code=400, detail="趋势预警已确认")
 
     warning.acknowledged = True
-    warning.acknowledged_by = request.acknowledged_by
+    warning.acknowledged_by = current_user.username
     warning.acknowledged_at = datetime.now()
 
     await db.commit()
@@ -1139,13 +1140,13 @@ async def list_counterfactual_analyses(
             sd = datetime.fromisoformat(start_date)
             query = query.where(CounterfactualAnalysis.created_at >= sd)
         except ValueError:
-            pass
+            raise HTTPException(status_code=400, detail="无效的日期格式")
     if end_date is not None:
         try:
             ed = datetime.fromisoformat(end_date)
             query = query.where(CounterfactualAnalysis.created_at <= ed)
         except ValueError:
-            pass
+            raise HTTPException(status_code=400, detail="无效的日期格式")
 
     query = query.order_by(CounterfactualAnalysis.created_at.desc())
 
@@ -1289,7 +1290,8 @@ async def export_misdiagnosis_report(
             # 将 Markdown 转换为 HTML
             import markdown
 
-            html_content = markdown.markdown(report.content, extensions=["tables"])
+            sanitized_content = html.escape(report.content)
+            html_content = markdown.markdown(sanitized_content, extensions=["tables"])
 
             # 添加 CSS 样式
             styled_html = f"""
@@ -1544,6 +1546,9 @@ async def reject_time_window_adjustment(
 
     reason = body.get("reason") if body else None
 
+    if not reason or not reason.strip():
+        raise HTTPException(status_code=400, detail="拒绝原因不能为空")
+
     # 查询调参记录
     result = await db.execute(select(TimeWindowAdjustmentLog).where(TimeWindowAdjustmentLog.id == adjustment_id))
     adjustment = result.scalar_one_or_none()
@@ -1554,13 +1559,39 @@ async def reject_time_window_adjustment(
     if adjustment.status != "pending":
         raise HTTPException(status_code=409, detail=f"调参记录已被其他管理员处理，当前状态为 {adjustment.status}")
 
-    # 更新状态
-    adjustment.status = "rejected"
-    adjustment.reason = reason
-    adjustment.approved_by = current_user.id
-    adjustment.approved_at = datetime.now()
+    # 使用乐观锁防止与 approve 并发竞争
+    try:
+        update_result = await db.execute(
+            select(TimeWindowAdjustmentLog)
+            .where(
+                and_(
+                    TimeWindowAdjustmentLog.id == adjustment_id,
+                    TimeWindowAdjustmentLog.version == adjustment.version,
+                    TimeWindowAdjustmentLog.status == "pending",
+                )
+            )
+            .with_for_update()
+        )
+        locked_adjustment = update_result.scalar_one_or_none()
 
-    await db.commit()
+        if not locked_adjustment:
+            raise HTTPException(status_code=409, detail="调参记录已被其他用户修改，请刷新后重试")
+
+        # 更新状态
+        locked_adjustment.status = "rejected"
+        locked_adjustment.reason = reason
+        locked_adjustment.approved_by = current_user.id
+        locked_adjustment.approved_at = datetime.now()
+
+        await db.commit()
+
+    except HTTPException:
+        await db.rollback()
+        raise
+    except Exception as e:
+        await db.rollback()
+        logger.error(f"拒绝时间窗口调参失败: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"拒绝失败: {str(e)}")
 
     logger.info(f"时间窗口调参记录 {adjustment_id} 已拒绝，用户: {current_user.username}")
 
@@ -1572,7 +1603,7 @@ async def reject_time_window_adjustment(
             msg_type="time_window_adjustment_updated",
             data={
                 "adjustment_id": adjustment_id,
-                "device_type": adjustment.device_type,
+                "device_type": locked_adjustment.device_type,
                 "status": "rejected",
                 "rejected_by": current_user.username,
             },
@@ -1645,9 +1676,7 @@ async def update_time_window_config(
         )
         db.add(config)
 
-    await db.commit()
-
-    # 记录审计日志
+    # 记录审计日志（在同一事务中提交，避免崩溃时丢失审计记录）
     from ...models.diagnosis import AuditLog
 
     audit_log = AuditLog(

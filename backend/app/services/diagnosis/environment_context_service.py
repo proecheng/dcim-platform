@@ -91,16 +91,25 @@ class EnvironmentContextService:
 
             # 检查数据时效性（10分钟）
             if outdoor_temp_time:
-                data_age = now - float(outdoor_temp_time)
+                try:
+                    data_age = now - float(outdoor_temp_time)
+                except (ValueError, TypeError):
+                    data_age = cls._data_freshness_threshold + 1  # 视为过期
                 if data_age > cls._data_freshness_threshold:
                     logger.warning(
                         f"室外温度数据过期（{data_age:.0f}秒），使用默认值 {context['outdoor_temp']}℃"
                     )
                 elif outdoor_temp_value:
-                    context["outdoor_temp"] = float(outdoor_temp_value)
+                    try:
+                        context["outdoor_temp"] = float(outdoor_temp_value)
+                    except (ValueError, TypeError):
+                        pass
             elif outdoor_temp_value:
                 # 有值但无时间戳，直接使用
-                context["outdoor_temp"] = float(outdoor_temp_value)
+                try:
+                    context["outdoor_temp"] = float(outdoor_temp_value)
+                except (ValueError, TypeError):
+                    pass
 
             # 计算 IT 负载百分比
             it_load = await cls._calculate_it_load_percent()

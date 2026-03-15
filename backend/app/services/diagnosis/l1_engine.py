@@ -213,16 +213,28 @@ class L1RuleEngine:
                 results.append(False)
                 continue
 
+            is_numeric = True
             try:
                 current_value = float(point_values[point_id])
                 threshold_value = float(threshold)
             except (ValueError, TypeError):
-                # 非数字值，尝试字符串比较
+                is_numeric = False
                 current_value = str(point_values[point_id])
                 threshold_value = str(threshold)
 
             # 执行比较
             try:
+                if not is_numeric and operator in ("<", ">", "<=", ">="):
+                    # 对排序运算符，尝试数值转换以避免字符串比较陷阱（如 '9' > '10'）
+                    try:
+                        current_value = float(point_values[point_id])
+                        threshold_value = float(threshold)
+                    except (ValueError, TypeError):
+                        logger.warning(
+                            f"规则条件使用排序运算符 '{operator}' 但值无法转为数值，"
+                            f"回退字符串比较: '{current_value}' {operator} '{threshold_value}'"
+                        )
+
                 if operator == "<":
                     results.append(current_value < threshold_value)
                 elif operator == ">":

@@ -54,8 +54,8 @@ class HMACKeyManagementService:
 
     async def rotate_key(self, new_key: str, operator_id: int) -> dict:
         """执行密钥轮换：用新密钥对所有 active/reviewed 版本重新签名。"""
-        if len(new_key) < 32:
-            raise ValueError("新密钥长度必须 >= 32 字符")
+        if len(new_key.strip()) < 32:
+            raise ValueError("新密钥长度必须 >= 32 字符（不能为空白字符）")
 
         settings = get_settings()
         old_key = settings.FAULT_TREE_HMAC_KEY
@@ -70,8 +70,9 @@ class HMACKeyManagementService:
 
             if not versions:
                 # 无版本需要重签名，记录日志并返回
+                old_prefix = old_key[:4] if old_key and len(old_key) >= 4 else '(空)'
                 await self._save_rotation_log(
-                    session, operator_id, 0, [], new_key[:4], old_key[:4] if old_key else None, "success"
+                    session, operator_id, 0, [], new_key[:4], old_prefix, "success"
                 )
                 return {
                     "versions_resigned": 0,
@@ -81,6 +82,8 @@ class HMACKeyManagementService:
 
             # 前置验证：检查所有 active 版本的现有签名
             for v in versions:
+                if v.snapshot is None:
+                    continue
                 if v.status == "active" and v.hmac_signature:
                     if not HMACManager.verify_signature(v.snapshot, v.hmac_signature):
                         error_msg = f"版本 {v.id} (tree_id={v.tree_id}) 现有签名验证失败，中止轮换"

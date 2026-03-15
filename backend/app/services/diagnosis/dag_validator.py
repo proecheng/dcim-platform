@@ -33,6 +33,8 @@ class DAGValidator:
         intermediate_nodes = []
 
         for node in nodes:
+            if 'id' not in node:
+                return False, '节点缺少 id 字段'
             node_id = node["id"]
             node_ids.add(node_id)
             G.add_node(node_id, **node)
@@ -53,6 +55,8 @@ class DAGValidator:
 
         # 添加边
         for edge in edges:
+            if 'parent_node_id' not in edge or 'child_node_id' not in edge:
+                return False, '边缺少 parent_node_id 或 child_node_id 字段'
             parent_id = edge["parent_node_id"]
             child_id = edge["child_node_id"]
 

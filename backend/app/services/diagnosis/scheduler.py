@@ -93,6 +93,11 @@ class DiagnosisScheduler:
         self.running = True
         self.redis = await get_redis_client()
 
+        if not self.redis:
+            logger.error("Redis 不可用，诊断调度器无法启动")
+            self.running = False
+            return
+
         # 加载 L1 规则引擎
         try:
             await self.l1_engine.load_rules()
@@ -298,8 +303,11 @@ class DiagnosisScheduler:
 
         try:
             while self.running:
-                # 获取任务
-                task: PriorityTask = await self.queue.get()
+                # 获取任务（带超时，避免关闭时永久阻塞）
+                try:
+                    task: PriorityTask = await asyncio.wait_for(self.queue.get(), timeout=2.0)
+                except asyncio.TimeoutError:
+                    continue
 
                 if task is None:
                     continue

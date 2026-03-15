@@ -128,14 +128,20 @@ async def download_misdiagnosis_report(
         raise HTTPException(status_code=404, detail="报告文件不存在")
 
     import os
-    if not os.path.exists(report.file_path):
+    # 路径遍历防护：确保文件在允许的报告目录内
+    reports_dir = os.path.realpath(os.path.join(os.path.dirname(__file__), "..", "..", "..", "reports"))
+    real_path = os.path.realpath(report.file_path)
+    if not real_path.startswith(reports_dir + os.sep) and real_path != reports_dir:
+        raise HTTPException(status_code=403, detail="非法文件路径")
+
+    if not os.path.exists(real_path):
         raise HTTPException(status_code=404, detail="报告文件已删除")
 
     # 生成文件名
     filename = f"{report.start_time.year}-{report.start_time.month:02d}-misdiagnosis.md"
 
     return FileResponse(
-        path=report.file_path,
+        path=real_path,
         media_type="text/markdown; charset=utf-8",
         filename=filename,
     )
@@ -155,6 +161,9 @@ async def generate_misdiagnosis_report(
     # 转换日期为 datetime（UTC）
     start_datetime = datetime.combine(request.start_date, datetime.min.time()).replace(tzinfo=timezone.utc)
     end_datetime = datetime.combine(request.end_date, datetime.max.time()).replace(tzinfo=timezone.utc)
+
+    if start_datetime > end_datetime:
+        raise HTTPException(status_code=400, detail="开始日期不能晚于结束日期")
 
     # 创建服务实例
     service = MisdiagnosisReportServiceV2(db)

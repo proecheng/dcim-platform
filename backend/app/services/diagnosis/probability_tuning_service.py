@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import async_session
 from app.models.diagnosis import ProbabilityAdjustmentLog, DiagnosisResult, DiagnosisAnnotation
+from app.models.fault_tree import FaultTreeNode
 from app.schemas.probability_tuning import ProbabilityAdjustmentCreate
 
 logger = logging.getLogger(__name__)
@@ -45,6 +46,7 @@ class ProbabilityTuningService:
                 logger.critical("训练数据质量检查未通过，中止概率调参")
                 result = {
                     "analyzed_trees": 0,
+                    "analyzed_nodes": 0,
                     "total_adjustments": 0,
                     "pending_approvals": 0,
                 }
@@ -85,6 +87,7 @@ class ProbabilityTuningService:
 
         return {
             "analyzed_trees": analyzed_trees,
+            "analyzed_nodes": 0,
             "total_adjustments": total_adjustments,
             "pending_approvals": total_adjustments
         }
@@ -276,8 +279,8 @@ class ProbabilityTuningService:
         # 调整方向 = 准确率 - 先验概率
         adjustment = accuracy_rate - current_prior
 
-        # 限制调整幅度：最多 ±10%
-        max_adjustment = current_prior * 0.10
+        # 限制调整幅度：最多 ±10%（至少 0.01，避免零先验永远无法增长）
+        max_adjustment = max(current_prior * 0.10, 0.01)
         if abs(adjustment) > max_adjustment:
             adjustment = max_adjustment if adjustment > 0 else -max_adjustment
 
@@ -337,8 +340,8 @@ class ProbabilityTuningService:
             # 调整方向：向参与准确率靠拢
             adjustment = participation_accuracy - current_prior
 
-            # 限制调整幅度：最多 ±10%
-            max_adjustment = current_prior * 0.10
+            # 限制调整幅度：最多 ±10%（至少 0.01，避免零先验永远无法增长）
+            max_adjustment = max(current_prior * 0.10, 0.01)
             if abs(adjustment) > max_adjustment:
                 adjustment = max_adjustment if adjustment > 0 else -max_adjustment
 

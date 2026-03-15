@@ -144,8 +144,8 @@ async def test_circuit_breaker_scenario(service, breaker):
 async def test_db_timeout_scenario_with_redis(service):
     """DB 超时场景 - Redis 可用时验证完整链路"""
     mock_redis = MagicMock()
-    mock_redis.exists.return_value = True
-    mock_redis.delete.return_value = 1
+    mock_redis.exists = AsyncMock(return_value=True)
+    mock_redis.delete = AsyncMock(return_value=1)
 
     with patch.object(
         DiagnosisFallbackStore, "save_to_redis",
@@ -154,7 +154,7 @@ async def test_db_timeout_scenario_with_redis(service):
     ):
         import app.core.redis_lock as rl
         original_fn = getattr(rl, "get_redis_client", None)
-        rl.get_redis_client = lambda: mock_redis
+        rl.get_redis_client = AsyncMock(return_value=mock_redis)
         try:
             result = await service._run_db_timeout_scenario()
         finally:
@@ -173,7 +173,13 @@ async def test_db_timeout_scenario_with_redis(service):
 @pytest.mark.asyncio
 async def test_execute_drill_all_scenarios(service, breaker, mock_db):
     """执行所有演练场景"""
-    with patch.object(service, "_run_db_timeout_scenario") as mock_db_scenario:
+    # C20 修复: _generate_drill_report 使用独立 async_session
+    mock_session_cm = AsyncMock()
+    mock_session_cm.__aenter__ = AsyncMock(return_value=mock_db)
+    mock_session_cm.__aexit__ = AsyncMock(return_value=False)
+
+    with patch.object(service, "_run_db_timeout_scenario") as mock_db_scenario, \
+         patch("app.core.database.async_session", return_value=mock_session_cm):
         mock_db_scenario.return_value = {
             "name": "db_timeout_fallback",
             "status": "passed",
@@ -230,13 +236,19 @@ async def test_generate_drill_report(service, mock_db):
         {"name": "db_timeout_fallback", "status": "passed"},
     ]
 
-    await service._generate_drill_report(
-        drill_id="drill-test",
-        start_time=now,
-        end_time=now,
-        duration_seconds=5.0,
-        scenario_results=scenarios,
-    )
+    # C20 修复后 _generate_drill_report 使用独立 async_session，需要 patch
+    mock_session_cm = AsyncMock()
+    mock_session_cm.__aenter__ = AsyncMock(return_value=mock_db)
+    mock_session_cm.__aexit__ = AsyncMock(return_value=False)
+
+    with patch("app.core.database.async_session", return_value=mock_session_cm):
+        await service._generate_drill_report(
+            drill_id="drill-test",
+            start_time=now,
+            end_time=now,
+            duration_seconds=5.0,
+            scenario_results=scenarios,
+        )
 
     mock_db.add.assert_called_once()
     report = mock_db.add.call_args[0][0]
@@ -289,13 +301,19 @@ async def test_scenario_timeout(service, mock_db):
         await asyncio.sleep(999)
         return {"name": "test", "status": "passed"}
 
-    with patch.object(service, "_run_scenario", side_effect=slow_scenario):
-        with patch("app.services.diagnosis.chaos_drill_service.SCENARIO_TIMEOUT", 0.1):
-            await service._execute_drill(
-                drill_id="drill-timeout",
-                scenarios=["circuit_breaker_degradation"],
-                breaker=None,
-            )
+    # C20 修复: _generate_drill_report 使用独立 async_session
+    mock_session_cm = AsyncMock()
+    mock_session_cm.__aenter__ = AsyncMock(return_value=mock_db)
+    mock_session_cm.__aexit__ = AsyncMock(return_value=False)
+
+    with patch.object(service, "_run_scenario", side_effect=slow_scenario), \
+         patch("app.services.diagnosis.chaos_drill_service.SCENARIO_TIMEOUT", 0.1), \
+         patch("app.core.database.async_session", return_value=mock_session_cm):
+        await service._execute_drill(
+            drill_id="drill-timeout",
+            scenarios=["circuit_breaker_degradation"],
+            breaker=None,
+        )
 
     # 应生成超时报告
     report = mock_db.add.call_args[0][0]
@@ -317,7 +335,13 @@ async def test_drill_flag_lifecycle(service, breaker, mock_db):
         flag_during_drill = ChaosDrillService.is_drill_active
         return await original_run(b)
 
-    with patch.object(service, "_run_circuit_breaker_scenario", side_effect=capture_flag):
+    # C20 修复: _generate_drill_report 使用独立 async_session
+    mock_session_cm = AsyncMock()
+    mock_session_cm.__aenter__ = AsyncMock(return_value=mock_db)
+    mock_session_cm.__aexit__ = AsyncMock(return_value=False)
+
+    with patch.object(service, "_run_circuit_breaker_scenario", side_effect=capture_flag), \
+         patch("app.core.database.async_session", return_value=mock_session_cm):
         await service._execute_drill(
             drill_id="drill-flag",
             scenarios=["circuit_breaker_degradation"],
@@ -337,7 +361,13 @@ async def test_breaker_recovery_on_error(service, breaker, mock_db):
         await breaker.force_open()
         raise RuntimeError("模拟故障")
 
-    with patch.object(service, "_run_scenario", side_effect=failing_scenario):
+    # C20 修复: _generate_drill_report 使用独立 async_session
+    mock_session_cm = AsyncMock()
+    mock_session_cm.__aenter__ = AsyncMock(return_value=mock_db)
+    mock_session_cm.__aexit__ = AsyncMock(return_value=False)
+
+    with patch.object(service, "_run_scenario", side_effect=failing_scenario), \
+         patch("app.core.database.async_session", return_value=mock_session_cm):
         await service._execute_drill(
             drill_id="drill-error",
             scenarios=["circuit_breaker_degradation"],
@@ -429,16 +459,22 @@ async def test_report_partial_status(service, mock_db):
     """部分场景通过的报告状态"""
     now = datetime.now(timezone.utc)
 
-    await service._generate_drill_report(
-        drill_id="drill-partial",
-        start_time=now,
-        end_time=now,
-        duration_seconds=10.0,
-        scenario_results=[
-            {"name": "s1", "status": "passed"},
-            {"name": "s2", "status": "failed"},
-        ],
-    )
+    # C20 修复: _generate_drill_report 使用独立 async_session
+    mock_session_cm = AsyncMock()
+    mock_session_cm.__aenter__ = AsyncMock(return_value=mock_db)
+    mock_session_cm.__aexit__ = AsyncMock(return_value=False)
+
+    with patch("app.core.database.async_session", return_value=mock_session_cm):
+        await service._generate_drill_report(
+            drill_id="drill-partial",
+            start_time=now,
+            end_time=now,
+            duration_seconds=10.0,
+            scenario_results=[
+                {"name": "s1", "status": "passed"},
+                {"name": "s2", "status": "failed"},
+            ],
+        )
 
     report = mock_db.add.call_args[0][0]
     data = json.loads(report.report_data)
