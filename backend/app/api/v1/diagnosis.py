@@ -59,7 +59,7 @@ class TimeWindowApproveRequest(BaseModel):
 
 
 class TimeWindowRejectRequest(BaseModel):
-    reason: str = Field(..., min_length=1, description="拒绝理由（必填）")
+    reason: str = Field(..., min_length=1, strip_whitespace=True, description="拒绝理由（必填）")
 
 
 class HMACKeyRotateRequest(BaseModel):

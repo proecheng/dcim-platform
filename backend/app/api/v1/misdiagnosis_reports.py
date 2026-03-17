@@ -55,7 +55,7 @@ async def list_misdiagnosis_reports(
     if end_date:
         try:
             end_dt = datetime.fromisoformat(end_date) + timedelta(days=1)
-            query = query.where(ReportRecord.end_time <= end_dt)
+            query = query.where(ReportRecord.end_time < end_dt)
         except ValueError:
             raise HTTPException(status_code=400, detail="无效的 end_date 格式")
 

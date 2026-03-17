@@ -126,7 +126,7 @@ export function toggleDiagnosisRule(id: number): Promise<DiagnosisRule> {
  * 重载 YAML 诊断规则
  */
 export function reloadDiagnosisRules(): Promise<{ message: string; count: number }> {
-  return request.get('/v1/diagnosis/rules/reload')
+  return request.post('/v1/diagnosis/rules/reload')
 }
 
 /**
