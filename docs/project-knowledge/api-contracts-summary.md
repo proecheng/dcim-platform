@@ -1,801 +1,1243 @@
 # 后端 API 接口文档
 
-生成时间: 2026-03-01  
-项目版本: V3.2.1  
-API 版本: v1
-
-## 概述
-
-DCIM 后端提供 48 个 API 模块，涵盖认证、设备管理、实时监控、告警、能源、资产、运维等全栈功能。所有 API 遵循 RESTful 规范，使用 JWT 认证，支持 RBAC 权限控制。
-
-**基础 URL**: `http://localhost:8080/api/v1`  
-**认证方式**: Bearer Token (JWT)  
-**权限级别**: viewer (查看), operator (操作), admin (管理员)
-
-## API 模块总览
-
-| 模块 | 路径前缀 | 端点数 | 说明 |
-|------|---------|-------|------|
-| 认证 | /auth | 8 | 登录/登出/刷新令牌/密码管理 |
-| 用户 | /users | 12 | 用户 CRUD/角色/权限/会话管理 |
-| 设备 | /devices | 15 | 设备 CRUD/树结构/状态/生命周期 |
-| 点位 | /points | 10 | 点位 CRUD/批量导入/模板 |
-| 实时数据 | /realtime | 6 | 实时数据查询/WebSocket 推送 |
-| 告警 | /alarms | 18 | 告警 CRUD/确认/处理/统计/导出 |
-| 阈值 | /thresholds | 8 | 阈值配置/批量设置 |
-| 历史数据 | /history | 8 | 历史数据查询/聚合/导出 |
-| 能源管理 | /energy | 45+ | 用电设备/PUE/能耗统计/节能建议 |
-| 资产管理 | /assets | 20 | 资产台账/机柜/U 位/生命周期 |
-| 容量管理 | /capacity | 15 | 四维容量/趋势预测/智能上架 |
-| 拓扑管理 | /topology | 12 | 配电拓扑/制冷拓扑/故障影响 |
-| 联动引擎 | /linkage | 10 | 联动规则/执行/事件追踪 |
-| 视频监控 | /video | 8 | 摄像头管理/告警联动/PTZ 控制 |
-| 运维管理 | /operation | 25 | 工单/巡检/知识库 |
-| 报表管理 | /reports | 10 | 报表生成/导出/定时任务 |
-| 网关管理 | /gateways | 12 | 网关注册/配置/状态监控 |
-| 数据源管理 | /datasources | 10 | 数据源配置/连接测试 |
-| 设备模板 | /device-templates | 8 | 模板 CRUD/应用 |
-| 制冷系统 | /cooling | 10 | 制冷设备/效率监控 |
-| 供配电系统 | /power | 12 | 配电设备/负载监控 |
-| 监控仪表盘 | /monitoring | 8 | 六大子系统仪表盘数据 |
-| 节能机会 | /opportunities | 8 | 节能机会识别/评估 |
-| 节能优化 | /optimization | 10 | 优化方案/执行追踪 |
-| 电价管理 | /pricing | 8 | 电价配置/时段管理 |
-| 需量管理 | /demand | 10 | 需量监控/优化 |
-| 优化方案 | /proposals | 8 | 方案管理/审批 |
-| 执行追踪 | /execution | 8 | 执行记录/效果评估 |
-| 调节控制 | /regulation | 8 | 设备调节/控制命令 |
-| 智能诊断 | /diagnosis | 10 | 故障诊断/恢复流程 |
-| 事件追踪 | /trace | 8 | 事件时间线/追溯 |
-| 告警升级 | /escalation | 8 | 升级规则/通知 |
-| 数据质量 | /data-quality | 6 | 数据质量标记/检测 |
-| 数据漂移 | /drift | 8 | 传感器漂移检测 |
-| 控制命令 | /commands | 10 | 命令管理/分级确认 |
-| 空间管理 | /spatial | 10 | 楼层/区域/机柜 |
-| 楼层地图 | /floor-maps | 8 | 地图配置/设备定位 |
-| 拓扑配置 | /topology-config | 10 | 拓扑配置/验证 |
-| 系统健康 | /system-health | 8 | 系统状态/健康检查 |
-| 调度优化 | /dispatch | 10 | 负载调度/优化 |
-| 虚拟电厂 | /vpp | 12 | VPP 数据/调度 |
-| OTA 升级 | /ota | 8 | 网关 OTA 升级 |
-| 机器学习 | /ml | 10 | 负载预测/异常检测 (可选) |
-| 系统配置 | /configs | 10 | 系统配置 CRUD |
-| 日志管理 | /logs | 8 | 操作日志/审计 |
-| 统计分析 | /statistics | 12 | 多维度统计分析 |
-
-## 核心 API 模块详解
-
-### 1. 认证模块 (/auth)
-
-#### POST /auth/login
-登录获取访问令牌
-
-**请求体**:
-```json
-{
-  "username": "admin",
-  "password": "admin123"
-}
-```
-
-**响应**:
-```json
-{
-  "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-  "token_type": "bearer",
-  "expires_in": 1440,
-  "user": {
-    "id": 1,
-    "username": "admin",
-    "role": "admin",
-    "permissions": ["read", "write", "admin"]
-  }
-}
-```
-
-**特性**:
-- 速率限制: 每分钟最多 5 次尝试
-- 密码策略验证
-- 登录历史记录
-- 并发会话限制
-
-#### POST /auth/refresh
-刷新访问令牌
-
-**请求头**: `Authorization: Bearer <token>`
-
-**响应**: 新的 access_token
-
-#### POST /auth/logout
-登出（撤销令牌）
-
-**请求头**: `Authorization: Bearer <token>`
-
-#### POST /auth/change-password
-修改密码
-
-**请求体**:
-```json
-{
-  "old_password": "admin123",
-  "new_password": "NewPass123!"
-}
-```
-
-**密码策略**:
-- 最小长度: 8 字符
-- 最少类别: 3 种 (大写/小写/数字/特殊字符)
-- 历史检查: 不能与最近 5 次密码相同
-- 过期时间: 90 天
-
-### 2. 设备管理模块 (/devices)
-
-#### GET /devices
-获取设备列表（分页）
-
-**查询参数**:
-- `page`: 页码 (默认 1)
-- `page_size`: 每页数量 (默认 20, 最大 100)
-- `keyword`: 关键词搜索
-- `device_type`: 设备类型
-- `area_code`: 区域代码
-- `status`: 状态 (online/offline/fault)
-- `site_id`: 站点 ID
-
-**响应**:
-```json
-{
-  "items": [
-    {
-      "id": 1,
-      "device_code": "UPS-01",
-      "device_name": "UPS 1号机",
-      "device_type": "UPS",
-      "area_code": "A",
-      "status": "online",
-      "site_id": 1,
-      "created_at": "2026-01-01T00:00:00",
-      "updated_at": "2026-03-01T10:00:00"
-    }
-  ],
-  "total": 150,
-  "page": 1,
-  "page_size": 20
-}
-```
-
-#### GET /devices/tree
-获取设备树结构（按区域-设备类型-设备）
-
-**响应**:
-```json
-{
-  "A": {
-    "label": "A区",
-    "children": {
-      "UPS": {
-        "label": "UPS",
-        "children": [
-          {"id": 1, "label": "UPS 1号机", "code": "UPS-01", "status": "online"}
-        ]
-      }
-    }
-  }
-}
-```
-
-#### POST /devices
-创建设备
-
-**请求体**:
-```json
-{
-  "device_code": "UPS-02",
-  "device_name": "UPS 2号机",
-  "device_type": "UPS",
-  "area_code": "A",
-  "site_id": 1,
-  "manufacturer": "华为",
-  "model": "UPS5000-A",
-  "rated_power": 100.0,
-  "install_date": "2026-01-01"
-}
-```
-
-#### PUT /devices/{id}
-更新设备
-
-#### DELETE /devices/{id}
-删除设备（检查依赖关系）
-
-**响应**:
-```json
-{
-  "can_delete": false,
-  "reason": "设备有 15 个关联点位，无法删除",
-  "dependencies": {
-    "points": 15,
-    "alarms": 3
-  }
-}
-```
-
-#### GET /devices/{id}/status
-获取设备状态详情
-
-**响应**:
-```json
-{
-  "device_id": 1,
-  "status": "online",
-  "online_points": 12,
-  "offline_points": 3,
-  "active_alarms": 2,
-  "last_update": "2026-03-01T10:30:00"
-}
-```
-
-### 3. 告警管理模块 (/alarms)
-
-#### GET /alarms
-获取告警列表（多条件筛选）
-
-**查询参数**:
-- `page`, `page_size`: 分页
-- `status`: active/acknowledged/resolved
-- `level`: critical/major/minor/info
-- `point_id`: 点位 ID
-- `device_type`: 设备类型
-- `start_time`, `end_time`: 时间范围
-- `keyword`: 关键词
-
-**响应**:
-```json
-{
-  "items": [
-    {
-      "id": 1,
-      "point_id": 10,
-      "point_code": "UPS-01-V",
-      "point_name": "UPS 1号机电压",
-      "alarm_level": "critical",
-      "alarm_message": "电压过低: 210V (阈值: 220V)",
-      "status": "active",
-      "created_at": "2026-03-01T10:00:00",
-      "acknowledged_at": null,
-      "resolved_at": null
-    }
-  ],
-  "total": 50,
-  "page": 1,
-  "page_size": 20
-}
-```
-
-#### GET /alarms/active
-获取所有活动告警
-
-#### GET /alarms/statistics
-获取告警统计
-
-**响应**:
-```json
-{
-  "total": 150,
-  "by_level": {
-    "critical": 5,
-    "major": 15,
-    "minor": 80,
-    "info": 50
-  },
-  "by_status": {
-    "active": 20,
-    "acknowledged": 30,
-    "resolved": 100
-  },
-  "by_device_type": {
-    "UPS": 30,
-    "空调": 50,
-    "温湿度": 70
-  }
-}
-```
-
-#### POST /alarms/{id}/acknowledge
-确认告警
-
-**请求体**:
-```json
-{
-  "note": "已通知运维人员处理"
-}
-```
-
-#### POST /alarms/{id}/resolve
-解除告警
-
-**请求体**:
-```json
-{
-  "resolution": "已更换传感器，问题解决",
-  "root_cause": "传感器老化"
-}
-```
-
-#### POST /alarms/batch-acknowledge
-批量确认告警
-
-**请求体**:
-```json
-{
-  "alarm_ids": [1, 2, 3],
-  "note": "批量确认"
-}
-```
-
-#### GET /alarms/export
-导出告警记录 (CSV)
-
-### 4. 能源管理模块 (/energy)
-
-能源管理是最复杂的模块，包含 45+ 个端点。
-
-#### 用电设备管理
-
-**GET /energy/devices** - 获取用电设备列表  
-**POST /energy/devices** - 创建用电设备  
-**PUT /energy/devices/{id}** - 更新用电设备  
-**DELETE /energy/devices/{id}** - 删除用电设备  
-**GET /energy/devices/tree** - 获取配电层级树
-
-#### 实时电力监控
-
-**GET /energy/realtime** - 获取实时功率数据  
-**GET /energy/realtime/summary** - 获取电力汇总 (PUE/今日/本月)
-
-**响应示例**:
-```json
-{
-  "current_power": 1250.5,
-  "it_power": 850.3,
-  "cooling_power": 300.2,
-  "other_power": 100.0,
-  "pue": 1.47,
-  "today_energy": 28500.0,
-  "month_energy": 850000.0,
-  "timestamp": "2026-03-01T10:30:00"
-}
-```
-
-#### PUE 监控
-
-**GET /energy/pue** - 获取当前 PUE  
-**GET /energy/pue/trend** - 获取 PUE 历史趋势
-
-**响应示例**:
-```json
-{
-  "current_pue": 1.47,
-  "target_pue": 1.40,
-  "trend": [
-    {"timestamp": "2026-03-01T00:00:00", "pue": 1.45},
-    {"timestamp": "2026-03-01T01:00:00", "pue": 1.46},
-    {"timestamp": "2026-03-01T02:00:00", "pue": 1.47}
-  ]
-}
-```
-
-#### 能耗统计
-
-**GET /energy/statistics/daily** - 日能耗统计  
-**GET /energy/statistics/monthly** - 月能耗统计  
-**GET /energy/statistics/summary** - 能耗汇总  
-**GET /energy/statistics/trend** - 能耗趋势  
-**GET /energy/statistics/comparison** - 同比/环比分析
-
-**日统计响应示例**:
-```json
-{
-  "date": "2026-03-01",
-  "total_energy": 28500.0,
-  "peak_energy": 5200.0,
-  "valley_energy": 8500.0,
-  "flat_energy": 14800.0,
-  "cost": 18500.0,
-  "by_device_type": {
-    "IT设备": 18000.0,
-    "空调": 8500.0,
-    "照明": 2000.0
-  }
-}
-```
-
-#### 电价管理
-
-**GET /energy/pricing** - 获取电价配置  
-**POST /energy/pricing** - 创建电价配置  
-**PUT /energy/pricing/{id}** - 更新电价配置  
-**DELETE /energy/pricing/{id}** - 删除电价配置
-
-**电价配置示例**:
-```json
-{
-  "id": 1,
-  "name": "工业电价",
-  "peak_price": 1.2,
-  "flat_price": 0.8,
-  "valley_price": 0.4,
-  "peak_hours": "08:00-11:00,18:00-23:00",
-  "valley_hours": "23:00-07:00",
-  "effective_date": "2026-01-01"
-}
-```
-
-#### 节能建议
-
-**GET /energy/suggestions** - 获取节能建议列表  
-**PUT /energy/suggestions/{id}/accept** - 接受建议  
-**PUT /energy/suggestions/{id}/reject** - 拒绝建议  
-**PUT /energy/suggestions/{id}/complete** - 完成建议
-
-**建议示例**:
-```json
-{
-  "id": 1,
-  "type": "peak_valley_arbitrage",
-  "title": "峰谷套利优化",
-  "description": "将部分负载从高峰时段转移到低谷时段",
-  "potential_saving": 5000.0,
-  "status": "pending",
-  "created_at": "2026-03-01T08:00:00"
-}
-```
-
-#### 节能潜力分析
-
-**GET /energy/saving/potential** - 获取节能潜力分析
-
-**响应示例**:
-```json
-{
-  "total_potential": 50000.0,
-  "by_category": {
-    "peak_valley_arbitrage": 15000.0,
-    "demand_optimization": 10000.0,
-    "pue_optimization": 12000.0,
-    "cooling_optimization": 8000.0,
-    "load_balancing": 3000.0,
-    "renewable_energy": 2000.0
-  }
-}
-```
-
-#### 配电拓扑
-
-**GET /energy/distribution** - 获取配电拓扑图
-
-**响应示例**:
-```json
-{
-  "nodes": [
-    {"id": "T1", "type": "transformer", "name": "变压器1", "capacity": 1000},
-    {"id": "M1", "type": "meter", "name": "总表", "parent": "T1"},
-    {"id": "P1", "type": "panel", "name": "配电柜1", "parent": "M1"}
-  ],
-  "edges": [
-    {"from": "T1", "to": "M1"},
-    {"from": "M1", "to": "P1"}
-  ]
-}
-```
-
-#### 导出功能
-
-**GET /energy/export/daily** - 导出日报 (Excel/CSV)  
-**GET /energy/export/monthly** - 导出月报 (Excel/CSV)
-
-### 5. 资产管理模块 (/assets)
-
-#### GET /assets
-获取资产列表
-
-**查询参数**:
-- `page`, `page_size`: 分页
-- `asset_type`: 资产类型
-- `status`: 状态 (in_stock/in_use/maintenance/retired)
-- `location`: 位置
-- `keyword`: 关键词
-
-#### POST /assets
-创建资产
-
-**请求体**:
-```json
-{
-  "asset_code": "SRV-001",
-  "asset_name": "服务器 Dell R740",
-  "asset_type": "服务器",
-  "manufacturer": "Dell",
-  "model": "PowerEdge R740",
-  "serial_number": "SN123456",
-  "purchase_date": "2026-01-01",
-  "warranty_expire": "2029-01-01",
-  "status": "in_stock",
-  "location": "仓库A"
-}
-```
-
-#### GET /assets/{id}/lifecycle
-获取资产生命周期记录
-
-**响应**:
-```json
-{
-  "asset_id": 1,
-  "events": [
-    {"type": "purchase", "date": "2026-01-01", "note": "采购入库"},
-    {"type": "deploy", "date": "2026-01-15", "location": "A区机柜01", "note": "上架部署"},
-    {"type": "maintenance", "date": "2026-02-01", "note": "定期维护"}
-  ]
-}
-```
-
-#### GET /assets/cabinets/{id}/u-position
-获取机柜 U 位占用情况
-
-**响应**:
-```json
-{
-  "cabinet_id": 1,
-  "total_u": 42,
-  "used_u": 28,
-  "available_u": 14,
-  "positions": [
-    {"u_start": 1, "u_end": 2, "asset_id": 10, "asset_name": "服务器1"},
-    {"u_start": 3, "u_end": 4, "asset_id": 11, "asset_name": "服务器2"}
-  ]
-}
-```
-
-### 6. 容量管理模块 (/capacity)
-
-#### GET /capacity/summary
-获取四维容量汇总
-
-**响应**:
-```json
-{
-  "space": {"total": 100, "used": 65, "available": 35, "usage_rate": 0.65},
-  "power": {"total": 1000, "used": 750, "available": 250, "usage_rate": 0.75},
-  "cooling": {"total": 800, "used": 600, "available": 200, "usage_rate": 0.75},
-  "weight": {"total": 50000, "used": 35000, "available": 15000, "usage_rate": 0.70}
-}
-```
-
-#### GET /capacity/trend
-获取容量趋势
-
-**查询参数**:
-- `dimension`: space/power/cooling/weight
-- `period`: 3m/6m/12m
-
-**响应**:
-```json
-{
-  "dimension": "power",
-  "historical": [
-    {"date": "2026-01-01", "usage_rate": 0.70},
-    {"date": "2026-02-01", "usage_rate": 0.72},
-    {"date": "2026-03-01", "usage_rate": 0.75}
-  ],
-  "prediction": [
-    {"date": "2026-04-01", "usage_rate": 0.78},
-    {"date": "2026-05-01", "usage_rate": 0.81},
-    {"date": "2026-06-01", "usage_rate": 0.84}
-  ],
-  "threshold_warning": 0.80,
-  "threshold_critical": 0.90
-}
-```
-
-#### POST /capacity/recommend-cabinet
-智能上架推荐
-
-**请求体**:
-```json
-{
-  "asset_type": "服务器",
-  "power_requirement": 5.0,
-  "cooling_requirement": 4.0,
-  "u_requirement": 2,
-  "weight": 50.0
-}
-```
-
-**响应**:
-```json
-{
-  "recommendations": [
-    {
-      "cabinet_id": 5,
-      "cabinet_name": "A区机柜05",
-      "score": 95,
-      "reasons": ["电力充足", "制冷充足", "U位充足", "三相平衡"],
-      "available_power": 10.0,
-      "available_cooling": 8.0,
-      "available_u": 14
-    }
-  ]
-}
-```
-
-### 7. 运维管理模块 (/operation)
-
-#### 工单管理
-
-**GET /operation/workorders** - 获取工单列表  
-**POST /operation/workorders** - 创建工单  
-**PUT /operation/workorders/{id}** - 更新工单  
-**POST /operation/workorders/{id}/assign** - 分配工单  
-**POST /operation/workorders/{id}/complete** - 完成工单
-
-**工单示例**:
-```json
-{
-  "id": 1,
-  "title": "UPS 1号机电池更换",
-  "type": "maintenance",
-  "priority": "high",
-  "status": "in_progress",
-  "assignee": "张三",
-  "created_by": "李四",
-  "created_at": "2026-03-01T08:00:00",
-  "due_date": "2026-03-03T18:00:00"
-}
-```
-
-#### 巡检管理
-
-**GET /operation/inspections** - 获取巡检任务列表  
-**POST /operation/inspections** - 创建巡检计划  
-**POST /operation/inspections/{id}/execute** - 执行巡检  
-**POST /operation/inspections/{id}/submit** - 提交巡检结果
-
-#### 知识库
-
-**GET /operation/knowledge** - 获取知识库文章列表  
-**POST /operation/knowledge** - 创建知识库文章  
-**GET /operation/knowledge/{id}** - 获取文章详情  
-**GET /operation/knowledge/search** - 搜索知识库
-
-### 8. 实时数据模块 (/realtime)
-
-#### GET /realtime/points
-获取多个点位的实时数据
-
-**查询参数**:
-- `point_ids`: 点位 ID 列表 (逗号分隔)
-
-**响应**:
-```json
-{
-  "data": [
-    {
-      "point_id": 1,
-      "point_code": "UPS-01-V",
-      "value": 220.5,
-      "unit": "V",
-      "quality": "good",
-      "timestamp": "2026-03-01T10:30:00"
-    }
-  ]
-}
-```
-
-#### WebSocket 实时推送
-
-**连接**: `ws://localhost:8080/ws/realtime?token=<jwt_token>`
-
-**推送消息格式**:
-```json
-{
-  "type": "realtime_data",
-  "data": {
-    "point_id": 1,
-    "value": 220.5,
-    "timestamp": "2026-03-01T10:30:00"
-  }
-}
-```
-
-## 通用响应格式
-
-### 成功响应
-
-```json
-{
-  "code": 200,
-  "message": "success",
-  "data": { ... }
-}
-```
-
-### 分页响应
-
-```json
-{
-  "items": [ ... ],
-  "total": 100,
-  "page": 1,
-  "page_size": 20
-}
-```
-
-### 错误响应
-
-```json
-{
-  "code": 400,
-  "message": "参数错误",
-  "detail": "device_code 不能为空"
-}
-```
-
-## HTTP 状态码
-
-- `200 OK`: 请求成功
-- `201 Created`: 创建成功
-- `400 Bad Request`: 请求参数错误
-- `401 Unauthorized`: 未认证
-- `403 Forbidden`: 无权限
-- `404 Not Found`: 资源不存在
-- `409 Conflict`: 资源冲突
-- `422 Unprocessable Entity`: 验证失败
-- `429 Too Many Requests`: 请求过于频繁
-- `500 Internal Server Error`: 服务器错误
-
-## 认证与权限
-
-### JWT Token 格式
-
-```
-Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
-```
-
-### 权限级别
-
-| 级别 | 说明 | 可访问端点 |
-|------|------|----------|
-| viewer | 查看者 | GET 端点 |
-| operator | 操作员 | GET + POST/PUT (非敏感) |
-| admin | 管理员 | 所有端点 |
-
-### 权限装饰器
-
-- `require_viewer`: 需要 viewer 及以上权限
-- `require_operator`: 需要 operator 及以上权限
-- `require_admin`: 需要 admin 权限
-
-## WebSocket 通道
-
-| 通道 | URL | 用途 |
-|------|-----|------|
-| realtime | /ws/realtime?token=xxx | 实时数据推送 |
-| alarms | /ws/alarms?token=xxx | 告警通知 |
-| system | /ws/system?token=xxx | 系统状态 |
-
-## API 文档
-
-完整的 API 文档可通过 Swagger UI 访问:
-
-**URL**: http://localhost:8080/docs
-
-Swagger UI 提供:
-- 所有端点的详细说明
-- 请求/响应 Schema
-- 在线测试功能
-- 示例代码生成
-
-## 更新记录
-
-- 2026-03-01: 初始版本，涵盖 V3.2.1 所有 48 个 API 模块
+生成时间: 2026-03-17
+项目版本: V4.2.0
+
+## 概览
+
+- 总端点数: 817
+- 模块数: 57
+- 认证方式: JWT Bearer Token (OAuth2)
+- 基础路径: /api/v1
+- 角色: admin / operator / viewer
+
+## 认证说明
+
+| 标记 | 含义 |
+|------|------|
+| viewer | 需要 viewer 及以上角色 |
+| operator | 需要 operator 及以上角色 |
+| admin | 需要 admin 角色 |
+| 公开 | 无需认证 |
+| 登录 | 需要登录（任意角色） |
+
+---
+
+## 1. 认证 (auth)
+
+前缀: `/api/v1/auth`
+
+| 方法 | 路径 | 认证 | 描述 |
+|------|------|------|------|
+| POST | /login | 公开 | 用户登录获取令牌 |
+| POST | /logout | 登录 | 用户登出 |
+| POST | /refresh | 登录 | 刷新访问令牌 |
+| GET | /me | 登录 | 获取当前用户信息 |
+| PUT | /password | 登录 | 修改密码 |
+| GET | /permissions | 登录 | 获取当前用户权限 |
+| GET | /password-policy | 登录 | 获取密码策略 |
+| PUT | /password-policy | admin | 更新密码策略 |
+
+## 2. 用户管理 (users)
+
+前缀: `/api/v1/users`
+
+| 方法 | 路径 | 认证 | 描述 |
+|------|------|------|------|
+| GET | / | admin | 获取用户列表 |
+| POST | / | admin | 创建用户 |
+| GET | /sites/{site_id}/users | admin | 获取站点下的用户列表 |
+| GET | /{user_id} | admin | 获取用户详情 |
+| PUT | /{user_id} | admin | 更新用户 |
+| DELETE | /{user_id} | admin | 删除用户 |
+| POST | /batch-delete | admin | 批量删除用户 |
+| PUT | /{user_id}/status | admin | 启用/禁用用户 |
+| PUT | /{user_id}/reset-password | admin | 重置密码 |
+| GET | /{user_id}/login-history | admin | 获取登录历史 |
+| GET | /{user_id}/sites | admin | 获取用户站点列表 |
+| PUT | /{user_id}/sites | admin | 设置用户站点权限 |
+
+## 3. 设备管理 (devices)
+
+前缀: `/api/v1/devices`
+
+| 方法 | 路径 | 认证 | 描述 |
+|------|------|------|------|
+| GET | / | viewer | 获取设备列表 |
+| GET | /tree | viewer | 获取设备树结构 |
+| GET | /status-summary | viewer | 获取设备状态汇总 |
+| GET | /status-board | viewer | 获取设备状态看板 |
+| GET | /{device_id} | viewer | 获取设备详情 |
+| GET | /{device_id}/points | viewer | 获取设备下的点位 |
+| GET | /{device_id}/detail | viewer | 获取设备详情（聚合） |
+| POST | / | operator | 创建设备 |
+| PUT | /{device_id} | operator | 更新设备 |
+| GET | /{device_id}/delete-impact | viewer | 删除影响分析 |
+| DELETE | /{device_id} | admin | 删除设备 |
+
+## 4. 点位管理 (points)
+
+前缀: `/api/v1/points`
+
+| 方法 | 路径 | 认证 | 描述 |
+|------|------|------|------|
+| GET | / | viewer | 获取点位列表 |
+| GET | /types-summary | viewer | 获取点位类型统计 |
+| GET | /groups | viewer | 获取点位分组 |
+| POST | /groups | operator | 创建点位分组 |
+| GET | /export | operator | 导出点位配置CSV |
+| POST | /batch-import | operator | 批量导入点位 |
+| GET | /{point_id} | viewer | 获取点位详情 |
+| POST | / | operator | 创建点位 |
+| PUT | /{point_id} | operator | 更新点位 |
+| DELETE | /{point_id} | admin | 删除点位 |
+| PUT | /{point_id}/enable | operator | 启用点位 |
+| PUT | /{point_id}/disable | operator | 禁用点位 |
+| PUT | /{point_id}/link-device | operator | 关联点位到用能设备 |
+| DELETE | /{point_id}/link-device | operator | 取消点位与用能设备关联 |
+
+## 5. 实时数据 (realtime)
+
+前缀: `/api/v1/realtime`
+
+| 方法 | 路径 | 认证 | 描述 |
+|------|------|------|------|
+| GET | / | viewer | 获取所有点位实时数据 |
+| GET | /summary | viewer | 获取实时数据汇总 |
+| GET | /dashboard | viewer | 获取仪表盘数据 |
+| GET | /energy-dashboard | viewer | 获取能源仪表盘数据 |
+| GET | /{point_id} | viewer | 获取单个点位实时数据 |
+| GET | /by-type/{point_type} | viewer | 按类型获取实时数据 |
+| GET | /by-area/{area_code} | viewer | 按区域获取实时数据 |
+| POST | /control/{point_id} | operator | 下发控制指令 |
+
+## 6. 告警管理 (alarms)
+
+前缀: `/api/v1/alarms`
+
+| 方法 | 路径 | 认证 | 描述 |
+|------|------|------|------|
+| GET | / | viewer | 获取告警列表 |
+| GET | /active | viewer | 获取活动告警 |
+| GET | /count | viewer | 获取各级别告警数量 |
+| GET | /statistics | viewer | 获取告警统计 |
+| GET | /trend | viewer | 获取告警趋势 |
+| GET | /top-points | viewer | 获取高频告警点位 |
+| GET | /export | operator | 导出告警记录CSV |
+| PUT | /batch-acknowledge | operator | 批量确认告警 |
+| GET | /rules | viewer | 获取告警规则列表 |
+| POST | /rules | operator | 创建告警规则 |
+| GET | /rules/{rule_id} | viewer | 获取告警规则详情 |
+| PUT | /rules/{rule_id} | operator | 更新告警规则 |
+| DELETE | /rules/{rule_id} | operator | 删除告警规则 |
+| PUT | /rules/{rule_id}/toggle | operator | 切换告警规则启用状态 |
+| GET | /shields | viewer | 获取告警屏蔽列表 |
+| POST | /shields | operator | 创建告警屏蔽 |
+| DELETE | /shields/{shield_id} | operator | 删除告警屏蔽 |
+| GET | /{alarm_id} | viewer | 获取告警详情 |
+| PUT | /{alarm_id}/acknowledge | operator | 确认告警 |
+| PUT | /{alarm_id}/resolve | operator | 解决告警 |
+| PUT | /{alarm_id}/process | operator | 处理告警 |
+
+## 7. 阈值配置 (thresholds)
+
+前缀: `/api/v1/thresholds`
+
+| 方法 | 路径 | 认证 | 描述 |
+|------|------|------|------|
+| GET | / | viewer | 获取阈值配置列表 |
+| GET | /point/{point_id} | viewer | 获取点位阈值配置 |
+| POST | / | operator | 创建阈值配置 |
+| POST | /batch | operator | 批量配置阈值 |
+| POST | /copy | operator | 复制阈值配置到其他点位 |
+| GET | /version | 公开 | 获取阈值配置版本号 |
+| PUT | /point/{point_id}/four-level | operator | 4级阈值一体化配置 |
+| POST | /batch-by-device-type | operator | 按设备类型批量配置阈值 |
+| PUT | /{threshold_id} | operator | 更新阈值配置 |
+| DELETE | /{threshold_id} | operator | 删除阈值配置 |
+
+## 8. 历史数据 (history)
+
+前缀: `/api/v1/history`
+
+| 方法 | 路径 | 认证 | 描述 |
+|------|------|------|------|
+| GET | /{point_id} | viewer | 获取点位历史数据 |
+| GET | /{point_id}/trend | viewer | 获取趋势数据 |
+| GET | /{point_id}/statistics | viewer | 获取统计数据 |
+| GET | /compare | viewer | 多点位对比查询 |
+| GET | /changes/{point_id} | viewer | 获取DI点位变化记录 |
+| GET | /export | operator | 导出历史数据 |
+| DELETE | /cleanup | admin | 清理过期数据 |
+
+## 9. 能源管理 (energy)
+
+前缀: `/api/v1/energy`
+
+| 方法 | 路径 | 认证 | 描述 |
+|------|------|------|------|
+| GET | /devices | viewer | 获取用电设备列表 |
+| GET | /devices/tree | viewer | 获取用电设备树 |
+| POST | /devices | operator | 创建用电设备 |
+| GET | /devices/shift-ratio/recommendations | viewer | 获取设备转移比例推荐值 |
+| POST | /devices/shift-ratio/accept-all | operator | 接受全部推荐值 |
+| POST | /devices/shift-ratio/batch-update | operator | 批量更新设备转移比例 |
+| GET | /devices/shiftable | viewer | 获取可转移负荷设备列表 |
+| GET | /devices/adjustable | viewer | 获取可调节参数设备列表 |
+| POST | /devices/generate-configs | operator | 批量生成设备配置 |
+| PUT | /devices/{device_id}/shift-ratio | operator | 更新单个设备转移比例 |
+| GET | /devices/{device_id} | viewer | 获取用电设备详情 |
+| PUT | /devices/{device_id} | operator | 更新用电设备 |
+| DELETE | /devices/{device_id} | admin | 删除用电设备 |
+| GET | /realtime | viewer | 获取实时电力数据 |
+| GET | /realtime/summary | viewer | 获取电力汇总 |
+| GET | /realtime/{device_id} | viewer | 获取设备实时电力 |
+| GET | /pue | viewer | 获取当前PUE |
+| GET | /pue/trend | viewer | 获取PUE趋势 |
+| GET | /statistics/daily | viewer | 获取日能耗统计 |
+| GET | /statistics/monthly | viewer | 获取月能耗统计 |
+| GET | /statistics/summary | viewer | 获取能耗汇总 |
+| GET | /statistics/trend | viewer | 获取能耗趋势 |
+| GET | /statistics/comparison | viewer | 获取能耗对比 |
+| GET | /cost/daily | viewer | 获取日电费统计 |
+| GET | /cost/monthly | viewer | 获取月电费统计 |
+| GET | /pricing | viewer | 获取电价配置 |
+| POST | /pricing | operator | 创建电价配置 |
+| PUT | /pricing/{pricing_id} | operator | 更新电价配置 |
+| DELETE | /pricing/{pricing_id} | operator | 删除电价配置 |
+| GET | /pricing/current | viewer | 获取当前电价配置 |
+| GET | /suggestions | viewer | 获取节能建议 |
+| GET | /suggestions/templates | viewer | 获取建议模板列表 |
+| POST | /suggestions/analyze | operator | 触发建议分析 |
+| GET | /suggestions/enhanced | viewer | 获取增强建议列表 |
+| GET | /suggestions/summary | viewer | 获取建议汇总统计 |
+| GET | /suggestions/enhanced/{id} | viewer | 获取增强建议详情 |
+| GET | /suggestions/detail/{id} | viewer | 获取建议完整详情 |
+| POST | /suggestions/{id}/recalculate | operator | 调整参数并重算 |
+| GET | /saving/potential | viewer | 获取节能潜力 |
+| GET | /distribution | viewer | 获取配电图数据 |
+| GET | /export/daily | operator | 导出日能耗数据 |
+| GET | /export/monthly | operator | 导出月能耗数据 |
+| GET | /transformers | viewer | 获取变压器列表 |
+| POST | /transformers | operator | 创建变压器 |
+| PUT | /transformers/{id} | operator | 更新变压器 |
+| DELETE | /transformers/{id} | operator | 删除变压器 |
+| GET | /meter-points | viewer | 获取计量点列表 |
+| POST | /meter-points | operator | 创建计量点 |
+| GET | /meter-points/{id} | viewer | 获取计量点详情 |
+| PUT | /meter-points/{id} | operator | 更新计量点 |
+| DELETE | /meter-points/{id} | operator | 删除计量点 |
+| GET | /panels | viewer | 获取配电柜列表 |
+| GET | /panels/{panel_id} | viewer | 获取配电柜详情 |
+| POST | /panels | operator | 创建配电柜 |
+| PUT | /panels/{panel_id} | operator | 更新配电柜 |
+| DELETE | /panels/{panel_id} | operator | 删除配电柜 |
+| GET | /circuits | viewer | 获取配电回路列表 |
+| POST | /circuits | operator | 创建配电回路 |
+| PUT | /circuits/{circuit_id} | operator | 更新配电回路 |
+| DELETE | /circuits/{circuit_id} | operator | 删除配电回路 |
+| GET | /topology | viewer | 获取配电系统拓扑 |
+| GET | /power-curve | viewer | 获取功率曲线 |
+| GET | /analysis/plugins | viewer | 获取分析插件列表 |
+| POST | /analysis/plugins/{id}/enable | operator | 启用插件 |
+| POST | /analysis/plugins/{id}/disable | operator | 禁用插件 |
+| POST | /analysis/run | operator | 执行节能分析 |
+| POST | /analysis/run/{plugin_id} | operator | 执行单个分析插件 |
+| GET | /analysis/summary | viewer | 获取分析汇总 |
+| GET | /demand/15min-curve | viewer | 获取15分钟需量曲线 |
+| GET | /demand/aggregated-curve | viewer | 获取聚合需量曲线 |
+| GET | /demand/peak-analysis | viewer | 需量峰值分析 |
+| GET | /demand/optimization-plan | viewer | 需量优化方案 |
+| POST | /demand/forecast | operator | 需量预测 |
+| GET | /report/preview | viewer | 能效报告预览 |
+| GET | /report/export | operator | 导出能效报告 |
+| POST | /ocr/bill | operator | 电费单OCR识别 |
+| GET | /pricing-schemes | viewer | 获取电价方案列表 |
+| GET | /pricing-schemes/{id} | viewer | 获取电价方案详情 |
+| POST | /pricing-schemes | operator | 创建电价方案 |
+| PUT | /pricing-schemes/{id} | operator | 更新电价方案 |
+| DELETE | /pricing-schemes/{id} | operator | 删除电价方案 |
+| POST | /pricing-schemes/{id}/validate | operator | 验证电价方案 |
+| POST | /pricing-schemes/{id}/activate | operator | 激活电价方案 |
+| POST | /pricing-schemes/{id}/deactivate | operator | 停用电价方案 |
+| GET | /pricing-schemes/{id}/audit-logs | viewer | 获取电价方案审计日志 |
+
+## 10. 制冷系统 (cooling)
+
+前缀: `/api/v1/cooling`
+
+| 方法 | 路径 | 认证 | 描述 |
+|------|------|------|------|
+| GET | /overview | viewer | 制冷系统总览 |
+| GET | /units | viewer | 获取空调列表 |
+| GET | /units/{unit_id} | viewer | 获取空调详情 |
+| POST | /units | operator | 创建空调 |
+| PUT | /units/{unit_id} | operator | 更新空调 |
+| DELETE | /units/{unit_id} | admin | 删除空调 |
+| GET | /groups | viewer | 获取群控组列表 |
+| GET | /groups/{group_id} | viewer | 获取群控组详情 |
+| POST | /groups | operator | 创建群控组 |
+| PUT | /groups/{group_id} | operator | 更新群控组 |
+| DELETE | /groups/{group_id} | admin | 删除群控组 |
+| GET | /cold-aisles | viewer | 获取冷通道列表 |
+| GET | /cold-aisles/{aisle_id} | viewer | 获取冷通道详情 |
+| POST | /cold-aisles | operator | 创建冷通道 |
+| PUT | /cold-aisles/{aisle_id} | operator | 更新冷通道 |
+| DELETE | /cold-aisles/{aisle_id} | admin | 删除冷通道 |
+
+## 11. 智能诊断 (diagnosis)
+
+前缀: `/api/v1/diagnosis`
+
+| 方法 | 路径 | 认证 | 描述 |
+|------|------|------|------|
+| GET | /categories | viewer | 获取诊断分类 |
+| GET | /fault-trees | viewer | 获取故障树列表 |
+| POST | /rules/reload | admin | 重载诊断规则 |
+| GET | /rules | viewer | 获取诊断规则列表 |
+| GET | /rules/{rule_id} | viewer | 获取诊断规则详情 |
+| POST | /rules | admin | 创建诊断规则 |
+| PUT | /rules/{rule_id} | admin | 更新诊断规则 |
+| DELETE | /rules/{rule_id} | admin | 删除诊断规则 |
+| PUT | /rules/{rule_id}/toggle | admin | 切换规则启用状态 |
+| GET | /health | viewer | 获取诊断引擎健康状态 |
+| GET | /sessions | viewer | 获取诊断会话列表 |
+| GET | /sessions/{session_id} | viewer | 获取诊断会话详情 |
+| GET | /sessions/{session_id}/audit-log | viewer | 获取会话审计日志 |
+| GET | /results/by-alarm/{alarm_id} | viewer | 按告警查询诊断结果 |
+| GET | /results | viewer | 获取诊断结果列表 |
+| GET | /results/{result_id} | viewer | 获取诊断结果详情 |
+| POST | /analyze/{alarm_id} | operator | 触发告警诊断分析 |
+| POST | /annotations | operator | 创建诊断标注 |
+| GET | /annotations | viewer | 获取诊断标注列表 |
+| DELETE | /annotations/{id} | operator | 删除诊断标注 |
+| GET | /annotations/stats | viewer | 获取标注统计 |
+| GET | /battery-soh/latest | viewer | 获取最新电池SOH |
+| GET | /battery-soh/{device_id} | viewer | 获取设备电池SOH |
+| POST | /battery-soh/calculate/{device_id} | operator | 计算设备电池SOH |
+| GET | /config/soh-weights | viewer | 获取SOH权重配置 |
+| PUT | /config/soh-weights | admin | 更新SOH权重配置 |
+| POST | /breaker-profiles | admin | 创建断路器档案 |
+| GET | /breaker-profiles | viewer | 获取断路器档案列表 |
+| GET | /breaker-profiles/{id} | viewer | 获取断路器档案详情 |
+| PUT | /breaker-profiles/{id} | admin | 更新断路器档案 |
+| DELETE | /breaker-profiles/{id} | admin | 删除断路器档案 |
+| GET | /trend-warnings | viewer | 获取趋势预警列表 |
+| POST | /trend-warnings/{id}/acknowledge | operator | 确认趋势预警 |
+| GET | /sensor-fusion | viewer | 获取传感器融合记录 |
+| GET | /trend-config | viewer | 获取趋势配置 |
+| PUT | /trend-config | admin | 更新趋势配置 |
+| POST | /counterfactual/{session_id} | operator | 触发反事实分析 |
+| GET | /counterfactual/{session_id} | viewer | 获取反事实分析结果 |
+| GET | /counterfactual/{session_id}/progress | viewer | 获取分析进度 |
+| GET | /counterfactual | viewer | 获取反事实分析列表 |
+| DELETE | /counterfactual/{session_id} | admin | 删除反事实分析 |
+| GET | /reports/misdiagnosis | viewer | 获取误判报告列表 |
+| POST | /reports/misdiagnosis/generate | admin | 生成误判报告 |
+| GET | /reports/misdiagnosis/export | admin | 导出误判报告 |
+| POST | /time-window-tuning/analyze | admin | 触发时间窗口调参分析 |
+| GET | /time-window-tuning/adjustments | viewer | 获取调参建议列表 |
+| POST | /time-window-tuning/adjustments/{id}/approve | admin | 批准调参建议 |
+| POST | /time-window-tuning/adjustments/{id}/reject | admin | 拒绝调参建议 |
+| GET | /time-window-tuning/config | viewer | 获取调参配置 |
+| PUT | /time-window-tuning/config | admin | 更新调参配置 |
+| GET | /training-audit | admin | 查询训练数据异常检测历史 |
+| GET | /hmac-key/status | admin | 查询HMAC密钥状态 |
+| POST | /hmac-key/rotate | admin | 执行HMAC密钥轮换 |
+| POST | /hmac-key/verify-all | admin | 批量验证签名完整性 |
+| GET | /hmac-key/rotation-logs | admin | 查询密钥轮换历史 |
+
+## 12. 负荷转移 (shift)
+
+前缀: `/api/v1/energy/shift`
+
+| 方法 | 路径 | 认证 | 描述 |
+|------|------|------|------|
+| GET | /plans | 登录 | 获取转移计划列表 |
+| POST | /plans | operator | 创建转移计划 |
+| GET | /plans/{plan_id} | 登录 | 获取转移计划详情 |
+| PUT | /plans/{plan_id} | operator | 更新转移计划 |
+| DELETE | /plans/{plan_id} | operator | 删除转移计划 |
+| POST | /plans/{plan_id}/submit | operator | 提交计划审批 |
+| POST | /plans/{plan_id}/approve | operator | 审批计划 |
+| POST | /plans/{plan_id}/execute | operator | 开始执行计划 |
+| POST | /opportunities/analyze | operator | 触发机会分析 |
+| GET | /opportunities | 登录 | 获取机会列表 |
+| GET | /opportunities/{opp_id} | 登录 | 获取机会详情 |
+| POST | /opportunities/{opp_id}/convert | operator | 将机会转换为计划 |
+| POST | /analysis/feasibility | 登录 | 分析转移可行性 |
+| POST | /analysis/constraints | 登录 | 检查约束条件 |
+| POST | /analysis/benefit | 登录 | 计算收益 |
+| POST | /analysis/risk | 登录 | 评估转移风险 |
+| GET | /devices/shiftable | 登录 | 获取可转移设备及潜力 |
+| GET | /devices/{device_id}/potential | 登录 | 获取设备转移潜力 |
+| GET | /dashboard/overview | 登录 | 获取仪表盘概览 |
+| GET | /dashboard/realtime | 登录 | 获取实时转移数据 |
+| GET | /dashboard/trends | 登录 | 获取转移趋势 |
+| GET | /statistics/summary | 登录 | 获取转移统计汇总 |
+| GET | /cooling/config | 登录 | 获取制冷联动配置 |
+| PUT | /cooling/config | 登录 | 更新制冷联动配置 |
+| GET | /cooling/status | 登录 | 获取制冷联动状态 |
+| GET | /cooling/history | 登录 | 获取制冷联动历史 |
+| GET | /reports/{report_type} | 登录 | 获取负荷转移报表 |
+| POST | /reports/export | 登录 | 导出负荷转移报表 |
+| GET | /constraints | 登录 | 获取所有约束配置 |
+| POST | /constraints | 登录 | 创建约束配置 |
+| PUT | /constraints/{constraint_id} | 登录 | 更新约束配置 |
+| DELETE | /constraints/{constraint_id} | 登录 | 删除约束配置 |
+
+## 13. 预冷系统 (precool)
+
+前缀: `/api/v1/precool`
+
+| 方法 | 路径 | 认证 | 描述 |
+|------|------|------|------|
+| POST | /zones/{zone_id}/predict | operator | 温度轨迹预测 |
+| GET | /zones/{zone_id}/parameters | viewer | 查询RC标定参数历史 |
+| GET | /zones/{zone_id}/validation | viewer | 模型验证报告 |
+| GET | /dashboard | viewer | 预冷仪表盘聚合数据 |
+| GET | /zones/{zone_id}/rollback-status | viewer | 查询zone回退保护状态 |
+| GET | /zones/{zone_id}/rollback-history | viewer | 查询回退历史事件 |
+| GET | /rollback-overview | viewer | 全局回退状态概览 |
+| POST | /zones/{zone_id}/schedule | operator | 生成预冷计划 |
+| GET | /zones/{zone_id}/schedule | viewer | 查询预冷计划列表 |
+| GET | /schedules/{schedule_id} | viewer | 查询预冷计划详情 |
+| POST | /schedules/{schedule_id}/abort | operator | 中止预冷计划 |
+| GET | /zones/{zone_id}/config | viewer | 查询预冷配置 |
+| PUT | /zones/{zone_id}/config | operator | 更新预冷配置 |
+| POST | /zones/{zone_id}/calibrate | operator | 触发手动RC校准 |
+| GET | /zones/{zone_id}/calibration-history | viewer | 查询校准历史 |
+| GET | /deployment-phase | viewer | 查询当前部署阶段 |
+| PUT | /deployment-phase | admin | 切换部署阶段 |
+| GET | /vpp/capacity | viewer | 查询VPP可调容量 |
+| POST | /vpp/dispatch | operator | 接收VPP调控指令 |
+| GET | /vpp/dispatches | viewer | 查询VPP调控指令列表 |
+| GET | /vpp/statistics | viewer | 查询VPP需求响应统计 |
+
+## 14. VPP方案分析 (vpp)
+
+前缀: `/api/v1/vpp`
+
+| 方法 | 路径 | 认证 | 描述 |
+|------|------|------|------|
+| POST | /analysis | 公开 | 生成VPP方案完整分析 |
+| GET | /load-metrics | 公开 | 获取负荷特性指标 |
+| GET | /cost-structure/{month} | 公开 | 获取电费结构分析 |
+| GET | /transfer-potential | 公开 | 获取峰谷转移潜力 |
+| GET | /vpp-revenue | 公开 | 获取VPP收益测算 |
+| GET | /roi | 公开 | 获取投资回报分析 |
+| GET | /formula-reference | 公开 | 获取所有计算公式参考 |
+
+## 15. 空间拓扑 (spatial)
+
+前缀: `/api/v1/spatial`
+
+| 方法 | 路径 | 认证 | 描述 |
+|------|------|------|------|
+| GET | /sites | viewer | 获取站点列表 |
+| GET | /sites/summary | viewer | 跨站点汇总数据 |
+| POST | /sites | operator | 创建站点 |
+| PUT | /sites/{site_id} | operator | 更新站点 |
+| DELETE | /sites/{site_id} | operator | 删除站点 |
+| PUT | /sites/{site_id}/status | operator | 更新站点状态 |
+| GET | /sites/{site_id}/acl-rules | viewer | 获取站点MQTT ACL规则 |
+| GET | /floors | viewer | 获取楼层列表 |
+| POST | /floors | operator | 创建楼层 |
+| PUT | /floors/{floor_id} | operator | 更新楼层 |
+| DELETE | /floors/{floor_id} | operator | 删除楼层 |
+| GET | /rooms | viewer | 获取房间列表 |
+| POST | /rooms | operator | 创建房间 |
+| PUT | /rooms/{room_id} | operator | 更新房间 |
+| DELETE | /rooms/{room_id} | operator | 删除房间 |
+| GET | /rows | viewer | 获取行列表 |
+| POST | /rows | operator | 创建行 |
+| PUT | /rows/{row_id} | operator | 更新行 |
+| DELETE | /rows/{row_id} | operator | 删除行 |
+| GET | /tree | viewer | 获取完整空间拓扑树 |
+| PUT | /cabinets/{cabinet_id}/position | operator | 更新机柜空间位置 |
+| POST | /import | operator | Excel导入空间拓扑 |
+| GET | /export | viewer | 导出空间拓扑Excel |
+| GET | /templates | viewer | 获取布局模板列表 |
+| POST | /templates/{template_id}/apply | operator | 应用模板到房间 |
+
+## 16. 联动管理 (linkage)
+
+前缀: `/api/v1/linkage`
+
+| 方法 | 路径 | 认证 | 描述 |
+|------|------|------|------|
+| POST | /fire-protection/reload | admin | 重载YAML消防策略 |
+| GET | /fire-protection/status | viewer | 获取消防策略加载状态 |
+| GET | /policies | viewer | 获取联动策略列表 |
+| GET | /policies/{policy_id} | viewer | 获取联动策略详情 |
+| POST | /policies | admin | 创建联动策略 |
+| PUT | /policies/{policy_id} | admin | 更新联动策略 |
+| DELETE | /policies/{policy_id} | admin | 删除联动策略 |
+| PUT | /policies/{policy_id}/toggle | operator | 切换策略启用状态 |
+| POST | /policies/{policy_id}/test | operator | 测试联动策略 |
+| GET | /executions | viewer | 获取联动执行记录列表 |
+| GET | /executions/recoverable | operator | 获取可恢复的执行记录 |
+| GET | /executions/{execution_id} | viewer | 获取执行记录详情 |
+| POST | /executions/{execution_id}/recover | operator | 发起联动恢复 |
+| GET | /timeline/{execution_id} | viewer | 获取事件时间线报告 |
+| GET | /timeline/{execution_id}/export | operator | 导出时间线报告Excel |
+| GET | /recoveries | viewer | 获取恢复记录列表 |
+| GET | /recoveries/{recovery_id} | viewer | 获取恢复记录详情 |
+| POST | /recoveries/{id}/step/{order}/execute | operator | 手动执行恢复步骤 |
+| POST | /recoveries/{id}/step/{order}/skip | operator | 跳过恢复步骤 |
+| GET | /action-types | viewer | 获取所有支持的动作类型 |
+
+## 17. 报表 (reports)
+
+前缀: `/api/v1/reports`
+
+| 方法 | 路径 | 认证 | 描述 |
+|------|------|------|------|
+| GET | /templates | viewer | 获取报表模板 |
+| POST | /templates | operator | 创建报表模板 |
+| PUT | /templates/{template_id} | operator | 更新报表模板 |
+| DELETE | /templates/{template_id} | operator | 删除报表模板 |
+| POST | /generate | operator | 生成报表 |
+| GET | /records | viewer | 获取报表记录 |
+| GET | /download/{record_id} | viewer | 下载报表 |
+| GET | /daily | viewer | 获取日报数据 |
+| GET | /weekly | viewer | 获取周报数据 |
+| GET | /monthly | viewer | 获取月报数据 |
+| POST | /auto-generate | operator | 自动生成运行报表 |
+| GET | /schedules | viewer | 获取报表调度列表 |
+| POST | /schedules | operator | 创建报表调度 |
+| PUT | /schedules/{schedule_id} | operator | 更新报表调度 |
+| DELETE | /schedules/{schedule_id} | operator | 删除报表调度 |
+| GET | /summary-panel | viewer | 获取智能摘要面板 |
+| GET | /auto-report-pdf/{record_id} | viewer | 导出自动报表为PDF |
+| POST | /device-health/calculate | operator | 计算设备健康度 |
+| GET | /device-health | viewer | 获取设备健康度列表 |
+| GET | /device-health/{device_id} | viewer | 获取单个设备健康度 |
+
+## 18. 日志 (logs)
+
+前缀: `/api/v1/logs`
+
+| 方法 | 路径 | 认证 | 描述 |
+|------|------|------|------|
+| GET | /operations | admin | 获取操作日志 |
+| GET | /systems | admin | 获取系统日志 |
+| GET | /communications | admin | 获取通讯日志 |
+| GET | /export | admin | 导出日志CSV |
+| GET | /statistics | admin | 获取日志统计 |
+
+## 19. 系统配置 (configs)
+
+前缀: `/api/v1/configs`
+
+| 方法 | 路径 | 认证 | 描述 |
+|------|------|------|------|
+| GET | / | admin | 获取系统配置 |
+| PUT | / | admin | 批量更新系统配置 |
+| GET | /dictionaries | viewer | 获取数据字典 |
+| GET | /license | viewer | 获取授权信息 |
+| POST | /license/activate | admin | 激活授权 |
+| GET | /backup | admin | 导出系统配置备份 |
+| POST | /restore | admin | 从备份恢复系统配置 |
+| GET | /dynamic-threshold-rules | viewer | 查询动态阈值规则 |
+| PUT | /dynamic-threshold-rules | admin | 更新动态阈值规则 |
+| GET | /dynamic-threshold-status | viewer | 查询动态阈值特性状态 |
+| POST | /dynamic-threshold-toggle | admin | 切换动态阈值特性开关 |
+| POST | /dynamic-threshold-rules/test | admin | 测试动态阈值规则 |
+| GET | /dynamic-threshold-rules/history | admin | 查询规则修改历史 |
+| POST | /dynamic-threshold-rules/rollback | admin | 回滚到历史版本 |
+| GET | /dynamic-threshold-metrics | admin | 查询动态阈值监控指标 |
+
+## 20. 网关管理 (gateways)
+
+前缀: `/api/v1/gateways`
+
+| 方法 | 路径 | 认证 | 描述 |
+|------|------|------|------|
+| GET | / | viewer | 获取网关列表 |
+| POST | / | operator | 创建网关 |
+| GET | /summary | viewer | 网关状态汇总 |
+| GET | /{gateway_id} | viewer | 获取网关详情 |
+| GET | /{gateway_id}/events | viewer | 网关事件历史 |
+| POST | /{gateway_id}/push-config | operator | 下发配置到网关 |
+| GET | /{gateway_id}/config-history | viewer | 配置下发历史 |
+| PUT | /{gateway_id} | operator | 更新网关 |
+| PUT | /{gateway_id}/site | admin | 分配网关到站点 |
+| DELETE | /{gateway_id} | admin | 删除网关 |
+
+## 21. 统计分析 (`/statistics`)
+
+> 文件: `backend/app/api/v1/statistics.py`
+
+| 方法 | 路径 | 认证 | 描述 |
+|------|------|------|------|
+| GET | /overview | viewer | 获取系统概览统计 |
+| GET | /points | viewer | 获取点位统计 |
+| GET | /alarms | viewer | 获取告警统计 |
+| GET | /energy | viewer | 获取能耗统计 |
+| GET | /availability | viewer | 获取可用性统计 |
+| GET | /comparison | viewer | 获取同比/环比数据 |
+
+## 22. 供配电管理 (`/power`)
+
+> 文件: `backend/app/api/v1/power.py`
+
+| 方法 | 路径 | 认证 | 描述 |
+|------|------|------|------|
+| GET | /overview | viewer | 供配电总览 |
+| GET | /ups | viewer | UPS设备列表 |
+| GET | /ups/{ups_id} | viewer | UPS设备详情 |
+| POST | /ups | operator | 创建UPS设备 |
+| PUT | /ups/{ups_id} | operator | 更新UPS设备 |
+| DELETE | /ups/{ups_id} | admin | 删除UPS设备 |
+| GET | /batteries | viewer | 电池组列表 |
+| GET | /batteries/{bg_id} | viewer | 电池组详情 |
+| POST | /batteries | operator | 创建电池组 |
+| PUT | /batteries/{bg_id} | operator | 更新电池组 |
+| DELETE | /batteries/{bg_id} | admin | 删除电池组 |
+| GET | /cabinets | viewer | 配电柜列表 |
+| GET | /cabinets/{device_id}/branches | viewer | 配电柜支路详情 |
+| GET | /pdus | viewer | PDU列表 |
+
+## 23. 电力冗余 (`/power`)
+
+> 文件: `backend/app/api/v1/power_redundancy.py`
+
+| 方法 | 路径 | 认证 | 描述 |
+|------|------|------|------|
+| GET | /devices/{device_id}/redundancy | viewer | 查询设备冗余配置 |
+| PUT | /devices/{device_id}/redundancy | operator | 更新设备冗余配置 |
+
+## 24. 负荷调控 (`/regulation`)
+
+> 文件: `backend/app/api/v1/regulation.py`
+
+| 方法 | 路径 | 认证 | 描述 |
+|------|------|------|------|
+| GET | /configs | viewer | 获取调控配置列表 |
+| GET | /configs/{config_id} | viewer | 获取调控配置详情 |
+| POST | /configs | operator | 创建调控配置 |
+| PUT | /configs/{config_id} | operator | 更新调控配置 |
+| DELETE | /configs/{config_id} | admin | 删除调控配置 |
+| POST | /simulate | operator | 模拟调控效果 |
+| POST | /apply | operator | 应用调控方案 |
+| GET | /history | viewer | 获取调控历史 |
+| GET | /recommendations | viewer | 获取调控建议 |
+
+## 25. 资产管理 (`/asset`)
+
+> 文件: `backend/app/api/v1/asset.py`
+
+| 方法 | 路径 | 认证 | 描述 |
+|------|------|------|------|
+| GET | /cabinets | viewer | 获取机柜列表 |
+| GET | /cabinets/{cabinet_id} | viewer | 获取机柜详情 |
+| GET | /cabinets/{cabinet_id}/usage | viewer | 获取机柜U位使用情况 |
+| PUT | /cabinets/{cabinet_id}/move-asset | operator | 拖拽移动资产U位 |
+| POST | /cabinets | operator | 创建机柜 |
+| PUT | /cabinets/{cabinet_id} | operator | 更新机柜 |
+| DELETE | /cabinets/{cabinet_id} | admin | 删除机柜 |
+| GET | /assets | viewer | 获取资产列表 |
+| POST | /assets/import | operator | 批量导入资产 |
+| GET | /assets/export | viewer | 导出资产列表 |
+| GET | /assets/{asset_id} | viewer | 获取资产详情 |
+| POST | /assets | operator | 创建资产 |
+| PUT | /assets/{asset_id} | operator | 更新资产 |
+| DELETE | /assets/{asset_id} | admin | 删除资产 |
+| GET | /assets/{asset_id}/lifecycle | viewer | 获取资产生命周期记录 |
+| POST | /maintenance | operator | 创建维护记录 |
+| PUT | /maintenance/{record_id}/complete | operator | 完成维护 |
+| GET | /maintenance | viewer | 获取维护记录列表 |
+| POST | /inventory | operator | 创建资产盘点 |
+| GET | /inventory | viewer | 获取盘点列表 |
+| GET | /inventory/{inventory_id}/items | viewer | 获取盘点明细 |
+| PUT | /inventory/items/{item_id} | operator | 更新盘点明细 |
+| GET | /statistics | viewer | 获取资产统计信息 |
+| GET | /warranty-alerts | viewer | 获取保修预警汇总 |
+| GET | /warranty-expiring | viewer | 获取即将过保资产 |
+
+## 26. 容量管理 (`/capacity`)
+
+> 文件: `backend/app/api/v1/capacity.py`
+
+| 方法 | 路径 | 认证 | 描述 |
+|------|------|------|------|
+| GET | /space | viewer | 获取空间容量列表 |
+| POST | /space | operator | 创建空间容量 |
+| GET | /space/{id} | viewer | 获取空间容量详情 |
+| PUT | /space/{id} | operator | 更新空间容量 |
+| DELETE | /space/{id} | admin | 删除空间容量 |
+| GET | /power | viewer | 获取电力容量列表 |
+| POST | /power | operator | 创建电力容量 |
+| GET | /power/{id} | viewer | 获取电力容量详情 |
+| PUT | /power/{id} | operator | 更新电力容量 |
+| DELETE | /power/{id} | admin | 删除电力容量 |
+| GET | /cooling | viewer | 获取制冷容量列表 |
+| POST | /cooling | operator | 创建制冷容量 |
+| GET | /cooling/{id} | viewer | 获取制冷容量详情 |
+| PUT | /cooling/{id} | operator | 更新制冷容量 |
+| DELETE | /cooling/{id} | admin | 删除制冷容量 |
+| GET | /weight | viewer | 获取承重容量列表 |
+| POST | /weight | operator | 创建承重容量 |
+| GET | /weight/{id} | viewer | 获取承重容量详情 |
+| PUT | /weight/{id} | operator | 更新承重容量 |
+| DELETE | /weight/{id} | admin | 删除承重容量 |
+| POST | /recommend | operator | 智能上架推荐 |
+| GET | /plans | viewer | 获取容量规划列表 |
+| POST | /plans | operator | 创建容量规划 |
+| GET | /plans/{id} | viewer | 获取容量规划详情 |
+| PUT | /plans/{id}/override-cabinet | operator | 覆盖推荐机柜 |
+| DELETE | /plans/{id} | admin | 删除容量规划 |
+| GET | /trend | viewer | 获取容量趋势数据 |
+| GET | /forecast | viewer | 获取容量预测数据 |
+| GET | /statistics | viewer | 获取容量统计信息 |
+| GET | /statistics/by-location | viewer | 按区域维度聚合容量统计 |
+
+## 27. 运维管理 (`/operation`)
+
+> 文件: `backend/app/api/v1/operation.py`
+
+| 方法 | 路径 | 认证 | 描述 |
+|------|------|------|------|
+| GET | /workorders | viewer | 获取工单列表 |
+| POST | /workorders | operator | 创建工单 |
+| GET | /workorders/{id} | viewer | 获取工单详情 |
+| PUT | /workorders/{id} | operator | 更新工单 |
+| DELETE | /workorders/{id} | admin | 删除工单 |
+| POST | /workorders/{id}/assign | operator | 派单 |
+| POST | /workorders/{id}/accept | operator | 接单 |
+| POST | /workorders/{id}/start | operator | 开始处理工单 |
+| POST | /workorders/{id}/complete | operator | 完成工单 |
+| POST | /workorders/{id}/close | operator | 关闭工单 |
+| GET | /workorders/{id}/logs | viewer | 获取工单日志 |
+| POST | /workorders/{id}/logs | operator | 添加工单日志 |
+| POST | /workorders/{id}/submit-approval | operator | 提交工单审批 |
+| GET | /approvals | viewer | 获取审批列表 |
+| GET | /approvals/{id} | viewer | 获取审批详情 |
+| POST | /approvals/{id}/approve | admin | 批准审批 |
+| POST | /approvals/{id}/reject | admin | 驳回审批 |
+| GET | /plans | viewer | 获取巡检计划列表 |
+| POST | /plans | operator | 创建巡检计划 |
+| GET | /plans/{id} | viewer | 获取巡检计划详情 |
+| PUT | /plans/{id} | operator | 更新巡检计划 |
+| DELETE | /plans/{id} | admin | 删除巡检计划 |
+| GET | /tasks | viewer | 获取巡检任务列表 |
+| POST | /tasks | operator | 创建巡检任务 |
+| GET | /tasks/{id} | viewer | 获取巡检任务详情 |
+| PUT | /tasks/{id} | operator | 更新巡检任务 |
+| POST | /tasks/{id}/start | operator | 开始巡检任务 |
+| POST | /tasks/{id}/complete | operator | 完成巡检任务 |
+| DELETE | /tasks/{id} | admin | 删除巡检任务 |
+| POST | /plans/{id}/generate-tasks | operator | 从计划生成巡检任务 |
+| GET | /alarm-rules | viewer | 获取告警工单规则列表 |
+| POST | /alarm-rules/check | operator | 检查告警并自动创建工单 |
+| POST | /alarm-rules | operator | 创建告警工单规则 |
+| PUT | /alarm-rules/{id} | operator | 更新告警工单规则 |
+| DELETE | /alarm-rules/{id} | admin | 删除告警工单规则 |
+| GET | /knowledge | viewer | 获取知识库列表 |
+| POST | /knowledge | operator | 创建知识库文章 |
+| GET | /knowledge/{id} | viewer | 获取知识库文章详情 |
+| PUT | /knowledge/{id} | operator | 更新知识库文章 |
+| DELETE | /knowledge/{id} | admin | 删除知识库文章 |
+
+## 28. 楼层地图 (`/floor-map`)
+
+> 文件: `backend/app/api/v1/floor_map.py`
+
+| 方法 | 路径 | 认证 | 描述 |
+|------|------|------|------|
+| GET | /floors | viewer | 获取楼层列表 |
+| GET | /{floor_code}/{map_type} | viewer | 获取楼层图 |
+| GET | /default | viewer | 获取默认楼层图 |
+
+## 29. 节能方案 (`/proposals`)
+
+> 文件: `backend/app/api/v1/proposal.py`
+
+| 方法 | 路径 | 认证 | 描述 |
+|------|------|------|------|
+| GET | /templates | viewer | 获取模板列表 |
+| POST | /analyze | operator | 智能分析并生成方案 |
+| GET | /as-suggestions | viewer | 获取方案列表（建议格式） |
+| GET | /saving-potential | viewer | 获取节能潜力统计 |
+| POST | /generate | operator | 生成节能方案 |
+| POST | /generate-ml-enhanced | operator | ML增强方案生成 |
+| GET | /{proposal_id}/ml-analysis | viewer | 获取ML分析详情 |
+| GET | /{proposal_id}/enhanced | viewer | 获取方案增强详情（含电价和设备数据） |
+| POST | /rl/train | admin | 执行RL在线训练 |
+| GET | /rl/model-info | viewer | 获取RL模型信息 |
+| PUT | /rl/exploration-rate | admin | 更新探索率 |
+| POST | /rl/save-checkpoint | admin | 保存模型检查点 |
+| GET | /{proposal_id} | viewer | 获取方案详情 |
+| GET | / | viewer | 获取方案列表 |
+| POST | /{proposal_id}/accept | operator | 接受方案 |
+| POST | /{proposal_id}/execute | operator | 执行方案 |
+| GET | /{proposal_id}/execution-summary | viewer | 获取执行摘要 |
+| GET | /{proposal_id}/monitoring | viewer | 获取监控数据 |
+| DELETE | /{proposal_id} | admin | 删除方案 |
+| GET | /{proposal_id}/measures/{measure_id}/detail | viewer | 获取措施详情（含ML和追溯） |
+| PATCH | /{proposal_id}/measures/{measure_id}/status | operator | 更新措施状态 |
+| POST | /{proposal_id}/measures/batch-status | operator | 批量更新措施状态 |
+| POST | /{proposal_id}/monitoring/start | operator | 启动效果监测 |
+| POST | /{proposal_id}/monitoring/stop | operator | 停止效果监测 |
+| GET | /{proposal_id}/monitoring/status | viewer | 获取监测状态 |
+| GET | /{proposal_id}/effect-report | viewer | 获取效果达成率报告 |
+| GET | /{proposal_id}/effect-summary | viewer | 获取效果汇总 |
+| POST | /{proposal_id}/rl-feedback | operator | 触发RL反馈 |
+| POST | /{proposal_id}/rl/optimize | operator | 执行RL优化 |
+| GET | /{proposal_id}/rl/status | viewer | 获取方案RL优化状态 |
+| GET | /{proposal_id}/rl/history | viewer | 获取RL优化历史 |
+| POST | /{proposal_id}/rl/apply/{optimization_id} | operator | 应用RL优化建议 |
+| POST | /{proposal_id}/rl/train-from-monitoring | admin | 从监测数据训练 |
+
+## 30. 电价管理 (`/pricing`)
+
+> 文件: `backend/app/api/v1/pricing.py`
+
+| 方法 | 路径 | 认证 | 描述 |
+|------|------|------|------|
+| GET | /full-config | viewer | 获取完整电价配置 |
+| GET | /global-config | viewer | 获取全局电价配置 |
+| POST | /global-config | admin | 创建全局电价配置 |
+| PUT | /global-config/{config_id} | admin | 更新全局电价配置 |
+| POST | /calculate-bill | operator | 计算电费账单 |
+| POST | /estimate-savings | operator | 估算优化节省 |
+| GET | /time-periods | viewer | 获取时段电价 |
+| GET | /peak-valley-spread | viewer | 获取峰谷电价差 |
+
+## 31. 节能机会 (`/opportunities`)
+
+> 文件: `backend/app/api/v1/opportunities.py`
+
+| 方法 | 路径 | 认证 | 描述 |
+|------|------|------|------|
+| GET | /dashboard | viewer | 获取机会仪表盘数据 |
+| POST | /detect | operator | 手动触发节能机会检测 |
+| GET | /{opportunity_id}/detail | viewer | 获取机会详情 |
+| POST | /{opportunity_id}/simulate | operator | 模拟参数调整效果 |
+| GET | /{opportunity_id}/devices | viewer | 获取可参与设备列表 |
+| POST | /{opportunity_id}/select-devices | operator | 选择参与设备 |
+| POST | /{opportunity_id}/execute | operator | 确认执行 |
+| GET | / | viewer | 获取机会列表 |
+| POST | / | operator | 创建节能机会 |
+| PUT | /{opportunity_id} | operator | 更新节能机会 |
+| DELETE | /{opportunity_id} | admin | 删除节能机会 |
+
+## 32. 执行管理 (`/execution`)
+
+> 文件: `backend/app/api/v1/execution.py`
+
+| 方法 | 路径 | 认证 | 描述 |
+|------|------|------|------|
+| POST | /plans/from-shift | operator | 从负荷转移配置创建执行计划 |
+| GET | /plans | viewer | 获取执行计划列表 |
+| GET | /plans/{plan_id} | viewer | 获取执行计划详情 |
+| PUT | /plans/{plan_id}/status | operator | 更新计划状态 |
+| GET | /plans/{plan_id}/checklist | viewer | 生成执行清单 |
+| POST | /tasks/{task_id}/execute | operator | 执行自动任务 |
+| POST | /tasks/{task_id}/complete | operator | 完成手动任务 |
+| GET | /tasks/{task_id} | viewer | 获取任务详情 |
+| GET | /plans/{plan_id}/tracking | viewer | 获取效果追踪数据 |
+| POST | /plans/{plan_id}/tracking | operator | 创建追踪任务 |
+| GET | /results | viewer | 获取追踪结果列表 |
+| GET | /stats/summary | viewer | 获取执行统计汇总 |
+
+## 33. 需量管理 (`/demand`)
+
+> 文件: `backend/app/api/v1/demand.py`
+
+| 方法 | 路径 | 认证 | 描述 |
+|------|------|------|------|
+| GET | /comparison | viewer | 需量配置对比数据 |
+| GET | /curve-mini | viewer | 迷你需量曲线 |
+| GET | /load-period | viewer | 负荷时段分布 |
+| GET | /power-factor-trend | viewer | 功率因数趋势 |
+
+## 34. 调度管理 (`/dispatch`)
+
+> 文件: `backend/app/api/v1/dispatch.py`
+
+| 方法 | 路径 | 认证 | 描述 |
+|------|------|------|------|
+| GET | /devices | viewer | 获取可调度设备列表 |
+| GET | /devices/{device_id} | viewer | 获取单个可调度设备 |
+| POST | /devices | operator | 创建可调度设备 |
+| PUT | /devices/{device_id} | operator | 更新可调度设备 |
+| DELETE | /devices/{device_id} | admin | 删除可调度设备 |
+| GET | /devices/summary/stats | viewer | 获取设备统计 |
+| GET | /storage | viewer | 获取储能系统列表 |
+| GET | /storage/{storage_id} | viewer | 获取单个储能系统 |
+| POST | /storage | operator | 创建储能系统 |
+| PUT | /storage/{storage_id} | operator | 更新储能系统 |
+| DELETE | /storage/{storage_id} | admin | 删除储能系统 |
+| GET | /pv | viewer | 获取光伏系统列表 |
+| GET | /pv/{pv_id} | viewer | 获取单个光伏系统 |
+| POST | /pv | operator | 创建光伏系统 |
+| PUT | /pv/{pv_id} | operator | 更新光伏系统 |
+| DELETE | /pv/{pv_id} | admin | 删除光伏系统 |
+| GET | /summary | viewer | 获取所有可调度资源汇总 |
+
+## 35. 需量监控 (`/monitoring`)
+
+> 文件: `backend/app/api/v1/monitoring.py`
+
+| 方法 | 路径 | 认证 | 描述 |
+|------|------|------|------|
+| GET | /realtime/status | viewer | 获取实时需量状态 |
+| GET | /realtime/alerts | viewer | 获取当前预警列表 |
+| GET | /realtime/curve | viewer | 获取实时功率曲线数据 |
+| GET | /monthly/current | viewer | 获取当月电费汇总 |
+| GET | /monthly/history | viewer | 获取历史月度电费 |
+| GET | /demand/daily-trend | viewer | 获取日需量趋势 |
+| GET | /dispatch/status | viewer | 获取实时调度状态 |
+| POST | /dispatch/command | operator | 发送调度指令 |
+| PUT | /dispatch/command/{command_id}/complete | operator | 完成调度指令 |
+
+## 36. 配电拓扑 (`/topology`)
+
+> 文件: `backend/app/api/v1/topology.py`
+
+| 方法 | 路径 | 认证 | 描述 |
+|------|------|------|------|
+| POST | /nodes | operator | 创建拓扑节点 |
+| PUT | /nodes | operator | 更新拓扑节点 |
+| DELETE | /nodes | admin | 删除拓扑节点 |
+| POST | /batch | operator | 批量拓扑操作 |
+| GET | /export | viewer | 导出拓扑数据 |
+| POST | /import | operator | 导入拓扑数据 |
+| POST | /device-points | operator | 创建设备测点配置 |
+| GET | /device-points/{device_id} | viewer | 获取设备测点配置 |
+| PUT | /device-points/{point_id} | operator | 更新设备测点配置 |
+| DELETE | /device-points/{device_id} | admin | 删除设备所有测点 |
+| DELETE | /device-points/point/{point_id} | admin | 删除单个点位 |
+| POST | /connections | operator | 创建拓扑连接 |
+| DELETE | /connections | admin | 删除拓扑连接 |
+| POST | /sync | operator | 同步设备与点位关联 |
+| GET | /sync/status | viewer | 获取同步状态统计 |
+| GET | /device/{device_id}/points | viewer | 获取设备关联的所有点位 |
+| GET | /unlinked-devices | viewer | 获取未关联拓扑的设备列表 |
+| POST | /sync-devices | operator | 同步拓扑节点与动环设备 |
+| GET | /cascade/{node_id} | viewer | 向下级联分析 |
+| GET | /upstream/{device_id} | viewer | 向上溯源分析 |
+
+## 37. 拓扑配置 (`/topology-config`)
+
+> 文件: `backend/app/api/v1/topology_config.py`
+
+| 方法 | 路径 | 认证 | 描述 |
+|------|------|------|------|
+| GET | /power-phase | viewer | 获取电力相位映射列表 |
+| GET | /power-phase/cabinet/{cabinet_id} | viewer | 获取机柜电力相位映射 |
+| GET | /power-phase/pdu/{pdu_device_id}/balance | viewer | 获取PDU相位平衡 |
+| POST | /power-phase | operator | 创建电力相位映射 |
+| PUT | /power-phase/{mapping_id} | operator | 更新电力相位映射 |
+| DELETE | /power-phase/{mapping_id} | admin | 删除电力相位映射 |
+| GET | /cooling-zones | viewer | 获取制冷区域列表 |
+| GET | /cooling-zones/{zone_id} | viewer | 获取制冷区域详情 |
+| POST | /cooling-zones | operator | 创建制冷区域 |
+| PUT | /cooling-zones/{zone_id} | operator | 更新制冷区域 |
+| DELETE | /cooling-zones/{zone_id} | admin | 删除制冷区域 |
+| GET | /cooling-zones/{zone_id}/capacity | viewer | 获取制冷区域容量 |
+| GET | /cabinet/{cabinet_id}/topology-summary | viewer | 获取机柜拓扑汇总 |
+| POST | /smart-site-selection | operator | 智能选址 |
+| POST | /fault-impact-analysis | operator | 故障影响分析 |
+
+## 38. 数据追溯 (`/trace`)
+
+> 文件: `backend/app/api/v1/trace.py`
+
+| 方法 | 路径 | 认证 | 描述 |
+|------|------|------|------|
+| GET | /{trace_id} | viewer | 获取追溯记录详情 |
+| GET | /{trace_id}/tree | viewer | 获取追溯树 |
+| GET | /proposal/{proposal_id} | viewer | 获取方案追溯汇总 |
+| GET | /measure/{measure_id} | viewer | 获取措施追溯记录 |
+| GET | /proposal/{proposal_id}/ml | viewer | 获取方案ML预测追溯 |
+| GET | /measure/{measure_id}/ml | viewer | 获取措施ML预测追溯 |
+| GET | /mappings/list | viewer | 获取数据源映射列表 |
+| POST | /mappings | operator | 创建数据源映射 |
+| GET | /templates/{template_id}/params | viewer | 获取模板参数列表 |
+| POST | /templates/params | operator | 创建模板参数配置 |
+| POST | /mappings/init | operator | 初始化默认数据源映射 |
+
+## 39. 日前优化 (`/optimization`)
+
+> 文件: `backend/app/api/v1/optimization.py`
+
+| 方法 | 路径 | 认证 | 描述 |
+|------|------|------|------|
+| GET | /forecast | viewer | 获取负荷预测 |
+| POST | /day-ahead | operator | 执行日前优化 |
+| GET | /day-ahead/{date} | viewer | 获取日前调度计划 |
+| PUT | /schedule/{schedule_id} | operator | 更新调度状态 |
+| GET | /summary | viewer | 获取优化汇总 |
+| GET | /compare | viewer | 计划vs实际对比 |
+| GET | /learning/metrics | viewer | 获取学习指标 |
+| POST | /learning/adjust | operator | 执行参数调整 |
+| GET | /learning/report | viewer | 获取优化效果报告 |
+| POST | /learning/feedback | operator | 提交反馈数据 |
+| POST | /integration/create-opportunity | operator | 从优化结果创建节能机会 |
+| POST | /integration/auto-generate | operator | 自动生成节能机会 |
+| GET | /integration/statistics | viewer | 获取优化统计 |
+
+## 40. 数据源管理 (`/datasources`)
+
+> 文件: `backend/app/api/v1/datasources.py`
+
+| 方法 | 路径 | 认证 | 描述 |
+|------|------|------|------|
+| PUT | /{datasource_id}/write-permission | admin | 切换数据源写入权限 |
+| GET | / | viewer | 获取数据源列表 |
+| POST | / | operator | 创建数据源 |
+| POST | /test-connection | operator | 测试数据源连接 |
+| GET | /export-report | viewer | 导出对接报告 |
+| GET | /communication-status | viewer | 获取数据源通信状态 |
+| GET | /{datasource_id} | viewer | 获取数据源详情 |
+| PUT | /{datasource_id} | operator | 更新数据源 |
+| POST | /{datasource_id}/test-connection | operator | 测试已有数据源连接 |
+| POST | /{datasource_id}/points/validate | operator | 预校验点位Excel |
+| POST | /{datasource_id}/points/import | operator | 批量导入点位 |
+| DELETE | /{datasource_id} | admin | 删除数据源 |
+
+## 41. 设备模板 (`/device-templates`)
+
+> 文件: `backend/app/api/v1/device_templates.py`
+
+| 方法 | 路径 | 认证 | 描述 |
+|------|------|------|------|
+| GET | / | viewer | 获取设备模板列表 |
+| POST | / | operator | 创建设备模板 |
+| GET | /{template_id} | viewer | 获取模板详情 |
+| PUT | /{template_id} | operator | 更新模板 |
+| DELETE | /{template_id} | admin | 删除模板 |
+| POST | /{template_id}/create-datasource | operator | 从模板创建数据源 |
+
+## 42. 系统健康 (`/system`)
+
+> 文件: `backend/app/api/v1/system_health.py`
+
+| 方法 | 路径 | 认证 | 描述 |
+|------|------|------|------|
+| GET | /health | viewer | 系统健康状态 |
+| GET | /backup/config | admin | 获取备份配置 |
+| PUT | /backup/config | admin | 更新备份配置 |
+| POST | /backup/manual | admin | 手动备份 |
+| GET | /backup/list | admin | 获取备份列表 |
+| POST | /backup/restore | admin | 恢复备份 |
+
+## 43. 数据质量 (`/data-quality`)
+
+> 文件: `backend/app/api/v1/data_quality.py`
+
+| 方法 | 路径 | 认证 | 描述 |
+|------|------|------|------|
+| GET | /status | viewer | 数据质量概览 |
+| GET | /points | viewer | 数据质量点位列表 |
+
+## 44. 告警升级 (`/escalations`)
+
+> 文件: `backend/app/api/v1/escalation.py`
+
+| 方法 | 路径 | 认证 | 描述 |
+|------|------|------|------|
+| GET | / | viewer | 获取升级规则列表 |
+| POST | / | operator | 创建升级规则 |
+| GET | /{escalation_id} | viewer | 获取升级规则详情 |
+| PUT | /{escalation_id} | operator | 更新升级规则 |
+| DELETE | /{escalation_id} | admin | 删除升级规则 |
+| PUT | /{escalation_id}/toggle | operator | 切换升级规则启用状态 |
+
+## 45. 设备控制 (`/command`)
+
+> 文件: `backend/app/api/v1/command.py`
+
+| 方法 | 路径 | 认证 | 描述 |
+|------|------|------|------|
+| POST | /submit | operator | 提交控制命令 |
+| GET | /approvals | viewer | 审批工单列表 |
+| GET | /approvals/{approval_id} | viewer | 审批工单详情 |
+| POST | /approvals/{approval_id}/approve | admin | 批准审批 |
+| POST | /approvals/{approval_id}/reject | admin | 驳回审批 |
+| GET | /audit-logs | viewer | 审计日志列表 |
+| GET | /risk-configs | admin | 获取风险等级配置 |
+| PUT | /risk-configs | admin | 更新风险等级配置 |
+
+## 46. 漂移检测 (`/drift`)
+
+> 文件: `backend/app/api/v1/drift.py`
+
+| 方法 | 路径 | 认证 | 描述 |
+|------|------|------|------|
+| POST | /detect | operator | 触发漂移检测 |
+| GET | /results | viewer | 漂移检测结果列表 |
+| GET | /summary | viewer | 漂移检测概览 |
+| GET | /results/{result_id} | viewer | 漂移检测结果详情 |
+| POST | /results/{result_id}/resolve | operator | 手动解除漂移标记 |
+
+## 47. 视频监控 (`/video`)
+
+> 文件: `backend/app/api/v1/video.py`
+
+| 方法 | 路径 | 认证 | 描述 |
+|------|------|------|------|
+| POST | /nvrs | operator | 创建NVR |
+| GET | /nvrs | viewer | NVR列表 |
+| GET | /nvrs/{nvr_id} | viewer | NVR详情 |
+| PUT | /nvrs/{nvr_id} | operator | 更新NVR |
+| DELETE | /nvrs/{nvr_id} | admin | 删除NVR |
+| GET | /cameras/by-alarm/{alarm_id} | viewer | 按告警查询关联摄像头 |
+| GET | /cameras/by-area/{area_code} | viewer | 按区域查询摄像头 |
+| GET | /cameras/by-device/{device_id} | viewer | 按设备查询摄像头 |
+| POST | /cameras | operator | 创建摄像头 |
+| GET | /cameras | viewer | 摄像头列表 |
+| GET | /cameras/{camera_id} | viewer | 摄像头详情 |
+| PUT | /cameras/{camera_id} | operator | 更新摄像头 |
+| DELETE | /cameras/{camera_id} | admin | 删除摄像头 |
+| POST | /ptz/control | operator | 云台控制 |
+| POST | /ptz/preset | operator | 调用预置位 |
+| POST | /recording/start | operator | 开始录像 |
+| POST | /recording/stop | operator | 停止录像 |
+| GET | /events | viewer | 视频事件列表 |
+| GET | /playback/alarm/{alarm_id} | viewer | 告警回放信息 |
+| GET | /playback/segments | viewer | 录像片段列表 |
+
+## 48. OTA升级 (`/ota`)
+
+> 文件: `backend/app/api/v1/ota.py`
+
+| 方法 | 路径 | 认证 | 描述 |
+|------|------|------|------|
+| POST | /firmware | operator | 注册固件包 |
+| GET | /firmware | viewer | 固件包列表 |
+| DELETE | /firmware/{firmware_id} | admin | 删除固件包 |
+| POST | /tasks | operator | 创建升级任务 |
+| GET | /tasks | viewer | 任务列表 |
+| GET | /tasks/{task_id} | viewer | 任务详情 |
+| POST | /tasks/{task_id}/start | operator | 启动任务 |
+| POST | /tasks/{task_id}/cancel | operator | 取消任务 |
+| POST | /tasks/{task_id}/pause | operator | 暂停任务 |
+| POST | /tasks/{task_id}/resume | operator | 恢复任务 |
+
+## 49. 故障树版本 (`/fault-trees/{tree_id}/versions`)
+
+> 文件: `backend/app/api/v1/fault_tree_versions.py`
+
+| 方法 | 路径 | 认证 | 描述 |
+|------|------|------|------|
+| POST | / | admin | 创建故障树版本 |
+| POST | /{version_id}/review | admin | 审核故障树版本 |
+| POST | /{version_id}/activate | admin | 激活故障树版本 |
+| POST | /rollback | admin | 回滚故障树版本 |
+| GET | / | viewer | 获取故障树版本列表 |
+
+## 50. 传感器元数据 (`/diagnosis/sensor-metadata`)
+
+> 文件: `backend/app/api/v1/sensor_metadata.py`
+
+| 方法 | 路径 | 认证 | 描述 |
+|------|------|------|------|
+| POST | / | operator | 创建传感器元数据 |
+| GET | / | viewer | 获取传感器元数据列表 |
+| GET | /{metadata_id} | viewer | 获取传感器元数据详情 |
+| PUT | /{metadata_id} | operator | 更新传感器元数据 |
+| DELETE | /{metadata_id} | operator | 删除传感器元数据 |
+| GET | /calibration-status/{point_id} | viewer | 获取校准状态 |
+| POST | /check-expired-calibrations | operator | 检查过期校准 |
+
+## 51. 概率调参 (`/diagnosis/probability-tuning`)
+
+> 文件: `backend/app/api/v1/probability_tuning.py`
+
+| 方法 | 路径 | 认证 | 描述 |
+|------|------|------|------|
+| POST | /trigger | admin | 触发概率分析 |
+| GET | /adjustments | viewer | 获取概率调整列表 |
+| POST | /adjustments/{adjustment_id}/approve | admin | 批准概率调整 |
+| POST | /adjustments/{adjustment_id}/reject | admin | 驳回概率调整 |
+| POST | /rollback/{tree_id} | admin | 回滚概率调整 |
+
+## 52. A/B 测试 (`/diagnosis/ab-tests`)
+
+> 文件: `backend/app/api/v1/ab_testing.py`
+
+| 方法 | 路径 | 认证 | 描述 |
+|------|------|------|------|
+| POST | / | operator | 创建A/B测试 |
+| GET | / | viewer | 获取A/B测试列表 |
+| GET | /{ab_test_id} | viewer | 获取A/B测试详情 |
+| GET | /{ab_test_id}/report | viewer | 获取A/B测试报告 |
+| PATCH | /{ab_test_id} | operator | 更新A/B测试 |
+| POST | /{ab_test_id}/complete | operator | 完成A/B测试 |
+| DELETE | /{ab_test_id} | admin | 删除A/B测试 |
+
+## 53. 误判分析 (`/diagnosis/misdiagnosis-reports`)
+
+> 文件: `backend/app/api/v1/misdiagnosis_reports.py`
+
+| 方法 | 路径 | 认证 | 描述 |
+|------|------|------|------|
+| GET | / | admin | 获取误判报告列表 |
+| GET | /{report_id} | admin | 获取误判报告详情 |
+| GET | /{report_id}/download | admin | 下载误判报告 |
+| POST | /generate | operator | 生成误判分析报告 |
+
+## 54. 灾难恢复演练 (`/diagnosis/chaos`)
+
+> 文件: `backend/app/api/v1/chaos_drill.py`
+
+| 方法 | 路径 | 认证 | 描述 |
+|------|------|------|------|
+| GET | /schedule | admin | 获取演练计划 |
+| PUT | /schedule | admin | 更新演练计划 |
+| POST | /schedule/confirm | operator | 确认演练计划 |
+| POST | /trigger | operator | 触发演练 |
+| POST | /stop | operator | 停止演练 |
+| GET | /history | admin | 获取演练历史 |
+
+## 55. 机器学习 (`/ml`)
+
+> 文件: `backend/app/api/v1/ml.py` (条件加载，需 torch)
+
+| 方法 | 路径 | 认证 | 描述 |
+|------|------|------|------|
+| GET | /status | viewer | 获取ML模块状态 |
+| POST | /analyze/loads | operator | 分析负荷数据 |
+| POST | /calculate/peak-valley-saving | operator | 计算峰谷节省 |
+| POST | /analyze/conflicts | operator | 分析冲突 |
+| POST | /optimize/actions | operator | 优化动作 |
+| POST | /rl/update | admin | 更新RL模型 |
+| POST | /scheme/generate | operator | 生成方案 |
+| POST | /train | admin | 训练模型 |
+| POST | /integrate/opportunity-engine | operator | 集成机会引擎 |
+
+## 56. 测试端点 (`/test-simple`)
+
+> 文件: `backend/app/api/v1/test_endpoint.py`
+
+| 方法 | 路径 | 认证 | 描述 |
+|------|------|------|------|
+| GET | /test-simple | 无 | 简单测试端点 |
+
+## 57. 故障树详情 (内联路由)
+
+> 文件: `backend/app/api/v1/__init__.py` (内联定义)
+
+| 方法 | 路径 | 认证 | 描述 |
+|------|------|------|------|
+| GET | /fault-trees/{tree_id} | viewer | 获取故障树详情 |
+
+---
+
+## 统计汇总
+
+| 指标 | 数值 |
+|------|------|
+| API 模块总数 | 57 |
+| 端点总数 | ~817 |
+| 认证方式 | JWT Bearer Token (OAuth2) |
+| 角色体系 | admin / operator / viewer |
+| WebSocket 通道 | 3 (realtime / alarms / system) |
+
+---
+
+*文档生成时间: 2026-03-17 | 项目版本: V4.2.0*

@@ -2,241 +2,105 @@
 
 > 本知识库由 BMAD Document Project 工作流自动生成
 > 扫描模式: exhaustive (详尽扫描)
-> 生成时间: 2026-02-04 (重新扫描更新)
+> 生成时间: 2026-03-17
+> 项目版本: V4.2.0
 
 ---
 
-## 📋 快速导航
+## 项目概要
 
-| 文档 | 说明 | 适用读者 |
-|------|------|----------|
-| [项目概览](project-overview.md) | 系统功能、技术栈、版本历史概述 | 所有人 |
-| [开发指南](development-guide.md) | 环境配置、启动方式、开发工作流 | 开发者 |
-| [部署指南](deployment-guide.md) | Docker/手动部署、生产配置、备份 | 运维人员 |
-| [集成架构](integration-architecture.md) | 多部分通信、数据流、认证机制 | 架构师、开发者 |
-| [后端架构](backend-architecture.md) | API 设计、数据模型、服务层 | 后端开发者 |
-| [前端架构](frontend-architecture.md) | 组件体系、状态管理、路由 | 前端开发者 |
-| [源码目录树](source-tree.md) | 完整文件结构和注释 | 开发者、维护者 |
-| [遗留系统分析](legacy-system-analysis.md) | V4.0 原系统保留清单与增强策略 | 架构师、开发者 |
-| [监测设备接口规范](device-interface-spec.md) | 华为动环监测标准设备接口协议 | 后端开发者、集成工程师 |
+| 属性 | 值 |
+|------|------|
+| 项目类型 | Multi-part (3 部件) |
+| 主要语言 | Python, TypeScript |
+| 架构模式 | 三层架构 (前端 → 代理 → 后端) |
 
----
+### 部件概览
 
-## 📊 系统概要
+| 部件 | 类型 | 技术栈 | 根目录 |
+|------|------|--------|--------|
+| backend | FastAPI 后端 | Python 3.11 / SQLAlchemy 2.0 | `backend/` |
+| frontend | Vue 3 前端 | TypeScript 5.9 / Vite 5 | `frontend/` |
+| proxy | Express 代理 | Node.js / Express 4.18 | `proxy/` |
 
-### 技术栈
-
-| 部分 | 核心技术 | 版本 |
-|------|----------|------|
-| **前端** | Vue 3 + TypeScript + Vite | 3.4.15 / 5.9.3 / 5.0.11 |
-| **UI** | Element Plus + ECharts + Three.js | 2.5.3 / 5.6.0 / 0.182.0 |
-| **后端** | FastAPI + SQLAlchemy + PyTorch | 0.109.0 / 2.0.25 / 2.0+ |
-| **数据库** | SQLite (开发) / PostgreSQL (生产) | - |
-| **代理** | Express + http-proxy-middleware | 4.18 / 2.0 |
-
-### 规模统计 (2026-02-04 更新)
+### 规模统计
 
 | 指标 | 数量 |
 |------|------|
-| **前端** | |
-| Vue 文件 | 99 |
-| TypeScript 文件 | 90+ |
-| 代码行数 | ~55,000 |
-| 页面视图 | 23 |
-| 组件 | 67 |
-| Composables | 19 (含 12 大屏相关) |
-| API 模块 | 27 |
-| Pinia Store | 7 |
-| **后端** | |
-| Python 文件 | ~120 |
-| API 路由模块 | 32 |
-| 数据库模型 | 70+ |
-| Pydantic Schema | 60+ |
-| 服务文件 | 53 |
-| 分析插件 | 7 |
-| ML 模块 | 15 (Transformer/GNN/RL) |
+| 后端 Python 文件 | 350 |
+| API 端点模块 | 57 |
+| REST API 端点 | 300+ |
+| ORM 数据模型 | 134 |
+| 业务服务 | 147 |
+| 数据库迁移 | 54 |
+| 前端 Vue/TS 文件 | 483 |
+| 页面视图 | 97 |
+| 可复用组件 | 101 |
+| Pinia Store | 8 |
+| 前端 API 模块 | 45 |
+| 路由定义 | 68 |
+| 后端测试文件 | 195 |
+| 文档文件 | 168+ |
 
 ---
 
-## 📁 文档详情
+## V4.2.0 生成文档
 
-### 1. 项目概览 (`project-overview.md`)
+| 文档 | 说明 | 适用读者 |
+|------|------|----------|
+| [项目概览](project-overview.md) | 系统功能、技术栈、核心模块概述 | 所有人 |
+| [系统架构](architecture-overview.md) | 整体架构设计、分层模式、技术决策 | 架构师、开发者 |
+| [源代码目录结构](source-tree-analysis.md) | 完整目录树、关键目录说明、入口点 | 开发者 |
+| [开发指南](development-guide.md) | 环境配置、启动方式、常用命令、FAQ | 开发者 |
+| [后端 API 接口](api-contracts-summary.md) | 57 个 API 模块、300+ 端点详细文档 | 后端开发者 |
+| [后端数据模型](data-models-summary.md) | 30 个模型文件、134 个 ORM 模型列级文档 | 后端开发者 |
+| [前端组件清单](component-inventory-frontend.md) | 97 页面 + 101 组件 + 8 Store 详细清单 | 前端开发者 |
 
-**内容:**
-- 系统简介和定位
-- 8 大功能模块详解
-- 技术架构图
-- 版本迭代历史 (V1.0 → V3.0)
-- 快速启动命令
+## 历史版本文档 (V4.0/V4.1)
 
-**适用场景:** 了解系统全貌、向新成员介绍项目
+以下文档来自早期版本扫描，部分内容可能已过时，但仍有参考价值：
 
----
+| 文档 | 说明 |
+|------|------|
+| [部署指南](deployment-guide.md) | Docker/手动部署、生产配置 |
+| [集成架构](integration-architecture.md) | 多部件通信、数据流、认证机制 |
+| [后端架构](backend-architecture.md) | API 设计、服务层详解 |
+| [前端架构](frontend-architecture.md) | 组件体系、状态管理、路由 |
+| [遗留系统分析](legacy-system-analysis.md) | V4.0 原系统保留清单与增强策略 |
+| [监测设备接口规范](device-interface-spec.md) | 14 类设备接口协议 |
+| [源码目录树 (旧版)](source-tree.md) | V4.0 时期目录结构 |
+| [后端 API 接口 (旧版)](api-contracts-backend.md) | V4.0 时期 API 文档 |
+| [架构变更日志](architecture-v4.1.0-changelog.md) | V4.1.0 架构变更记录 |
+| [热力学配置参考](thermal-config-reference.md) | RC 热力学模型配置参考 |
 
-### 2. 开发指南 (`development-guide.md`)
+## 其他文档
 
-**内容:**
-- 环境要求 (Python 3.11+, Node.js 18+)
-- 三种启动方式 (一键脚本 / 手动 / Docker)
-- 项目目录结构
-- 后端开发工作流
-- 前端开发工作流
-- 测试方法
-- 数据库迁移 (Alembic)
-- 代码规范
-- 常见问题
-
-**适用场景:** 新开发者入门、日常开发参考
-
----
-
-### 3. 部署指南 (`deployment-guide.md`)
-
-**内容:**
-- 部署架构图
-- Docker Compose 部署 (推荐)
-- Windows 手动部署
-- Linux 手动部署 + Nginx 配置
-- systemd 服务管理
-- PostgreSQL 生产配置
-- 数据备份策略
-- 安全配置 (SECRET_KEY, CORS, HTTPS)
-- 监控与日志
-
-**适用场景:** 生产部署、运维管理
+| 文档 | 说明 |
+|------|------|
+| [项目上下文](project-context.md) | AI 开发上下文摘要 |
+| [大屏 PRD](prd-digital-twin-bigscreen.md) | 3D 数字孪生大屏需求文档 |
 
 ---
 
-### 4. 集成架构 (`integration-architecture.md`)
-
-**内容:**
-- 多部分架构图 (浏览器→代理→后端→数据库)
-- 通信矩阵 (HTTP/WebSocket/文件系统)
-- Proxy 服务详解
-- 前端 → 后端 API 集成
-- WebSocket 实时通信 (3 个频道)
-- 数据流图 (实时数据流/告警流/API 请求流)
-- JWT 认证机制
-- 状态管理 (7 个 Pinia Store)
-- 错误处理
-- 配置同步
-- 性能优化
-
-**适用场景:** 理解系统通信、集成问题排查
-
----
-
-### 5. 后端架构 (`backend-architecture.md`)
-
-**内容:**
-- 技术栈详情
-- 应用分层结构 (core/models/schemas/api/services/ml_models)
-- 系统启动流程 (lifespan)
-- API 路由结构 (31+ 端点分类列表)
-- 数据库模型详解 (50+ 表)
-  - 用户与权限
-  - 设备与点位
-  - 告警系统
-  - 能源管理 (核心)
-  - 时序数据
-  - 节能方案
-  - 电费优化
-- 服务层架构 (30+ 服务)
-- 分析插件系统 (6 个内置插件)
-- 机器学习模块 (GNN/RL/Transformer)
-- 认证与权限 (JWT + RBAC)
-- 数据库迁移 (Alembic)
-
-**适用场景:** 后端开发、API 设计、数据建模
-
----
-
-### 6. 前端架构 (`frontend-architecture.md`)
-
-**内容:**
-- 技术栈详情
-- 应用分层架构图
-- 路由结构 (23 个页面)
-- 状态管理 (7 个 Pinia Store)
-- API 层 (18 个模块)
-- WebSocket 通信封装
-- 组合式函数 (19 个 Composables)
-  - useRealtime, useAlarm, usePermission, useEnergy, useSound
-  - 大屏相关 (8 个)
-- 组件库 (69 个组件分类)
-- 样式系统 (CSS 变量 + 主题)
-- 布局系统 (MainLayout)
-- 构建配置 (Vite)
-- 关键业务流程
-
-**适用场景:** 前端开发、组件设计、状态管理
-
----
-
-### 7. 遗留系统分析 (`legacy-system-analysis.md`)
-
-**内容:**
-- V4.0 原系统保留清单
-- 保留的前端页面（23 个页面的处理策略）
-- 保留的后端功能需求（FR-1 到 FR-12）
-- 保留的 Pinia Store（7 个 Store）
-- 保留的技术架构
-- V4.0 影响总结（不变/增强/重组织）
-
-**适用场景:** V4.0 开发时确认哪些模块可以安全修改、哪些必须保持兼容
-
----
-
-### 8. 监测设备接口规范 (`device-interface-spec.md`)
-
-**内容:**
-- 接口协议总览（14 类设备）
-- UPS 接口详细规范（主机/电池组/配电柜/PDU 寄存器映射）
-- 制冷系统接口规范（精密空调室内/外机）
-- 环境传感器接口规范（温湿度/水浸/烟雾/红外）
-- 安防消防接口规范（门禁/NVR/消防主机）
-- 智能基础设施接口规范
-- 系统接入架构图
-- 协议适配器设计要求（FR-22.1 ~ FR-22.5）
-- 开发者指南（Point 映射、point_code 命名、模拟器扩展）
-
-**适用场景:** 新增设备类型接入、协议适配器开发、模拟器扩展
-
----
-
-### 9. 源码目录树 (`source-tree.md`)
-
-**内容:**
-- 完整项目目录结构
-- 每个文件/目录的简要说明
-- 统计摘要
-
-**适用场景:** 快速定位文件、理解项目结构
-
----
-
-## 🔧 快速参考
+## 快速参考
 
 ### 启动命令
 
 ```bash
 # Windows 一键启动
-start.bat
+start.bat            # http://localhost:3000
 
-# Linux/Mac 一键启动
-./start.sh
+# 停止所有服务
+stop.bat
+
+# 手动启动后端
+cd backend && .venv\Scripts\activate && uvicorn app.main:app --reload --host 0.0.0.0 --port 8080
+
+# 手动启动前端 (开发模式, 自动热更新)
+cd frontend && npm run dev    # http://localhost:5173
 
 # Docker 启动
 docker-compose up -d
-
-# 手动启动后端
-cd backend && uvicorn app.main:app --host 0.0.0.0 --port 8080
-
-# 手动启动前端 (开发模式)
-cd frontend && npm run dev
-
-# 手动启动代理
-cd proxy && node server.js
 ```
 
 ### 访问地址
@@ -246,7 +110,7 @@ cd proxy && node server.js
 | 系统入口 | http://localhost:3000 |
 | 大屏展示 | http://localhost:3000/bigscreen |
 | API 文档 | http://localhost:8080/docs |
-| ReDoc | http://localhost:8080/redoc |
+| 开发前端 | http://localhost:5173 |
 
 ### 默认账户
 
@@ -254,33 +118,17 @@ cd proxy && node server.js
 |--------|------|------|
 | admin | admin123 | 管理员 |
 
-### 核心目录
+---
 
-```
-mytest1/
-├── frontend/src/          # 前端源码
-├── backend/app/           # 后端源码
-├── proxy/server.js        # 代理入口
-├── docs/project-knowledge/ # 本知识库
-└── docker-compose.yml     # 容器编排
-```
+## 维护说明
+
+本知识库由 BMAD Document Project 工作流自动生成。
+
+重新生成: 运行 `/bmad-bmm-document-project` 并选择扫描模式。
+
+手动更新: 直接编辑 `docs/project-knowledge/` 下的 markdown 文件。
 
 ---
 
-## 📝 维护说明
-
-本知识库由 **BMAD Document Project** 工作流自动生成。
-
-**重新生成文档:**
-1. 运行 `/bmad-bmm-document-project`
-2. 选择项目类型和扫描级别
-3. 等待扫描完成
-4. 文档将生成到 `docs/project-knowledge/` 目录
-
-**手动更新:**
-直接编辑 `docs/project-knowledge/` 下的 markdown 文件。
-
----
-
-*生成工具: BMAD Framework v6.0.0*
-*最后更新: 2026-02-15*
+*生成工具: BMAD Framework v6.0.4*
+*最后更新: 2026-03-17*

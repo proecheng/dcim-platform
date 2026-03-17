@@ -1,0 +1,49 @@
+{
+  "workflow_version": "1.2.0",
+  "timestamps": {"started": "2026-03-17T20:30:00", "last_updated": "2026-03-17T23:50:00"},
+  "mode": "full_rescan",
+  "scan_level": "exhaustive",
+  "project_root": "D:\\mytest1",
+  "project_knowledge": "D:\\mytest1\\docs",
+  "project_types": [
+    {"part_id": "backend", "project_type_id": "backend", "display_name": "FastAPI Backend"},
+    {"part_id": "frontend", "project_type_id": "web", "display_name": "Vue 3 Frontend"},
+    {"part_id": "proxy", "project_type_id": "backend", "display_name": "Express Proxy"}
+  ],
+  "repository_type": "multi-part",
+  "completed_steps": [
+    {"step": "step_0.5", "status": "completed", "timestamp": "2026-03-17T20:30:00", "summary": "Loaded 12 project type documentation requirements"},
+    {"step": "step_1", "status": "completed", "timestamp": "2026-03-17T20:35:00", "summary": "Classified as multi-part with 3 parts: backend(FastAPI), frontend(Vue3), proxy(Express)"},
+    {"step": "step_2", "status": "completed", "timestamp": "2026-03-17T20:40:00", "summary": "Source tree analysis completed"},
+    {"step": "step_3", "status": "completed", "timestamp": "2026-03-17T20:45:00", "summary": "Architecture patterns identified"},
+    {"step": "step_4", "status": "completed", "timestamp": "2026-03-17T21:00:00", "summary": "API contracts scanned: 57 modules, 300+ endpoints"},
+    {"step": "step_5", "status": "completed", "timestamp": "2026-03-17T21:30:00", "summary": "Data models scanned: 30 files, 134 ORM models, 8 enums"},
+    {"step": "step_6", "status": "completed", "timestamp": "2026-03-17T21:35:00", "summary": "Deployment config scanned"},
+    {"step": "step_7", "status": "completed", "timestamp": "2026-03-17T21:40:00", "summary": "Integration architecture analyzed"},
+    {"step": "step_8", "status": "completed", "timestamp": "2026-03-17T22:00:00", "summary": "Architecture docs generated"},
+    {"step": "step_9", "status": "completed", "timestamp": "2026-03-17T23:00:00", "summary": "All content documents generated: project-overview, source-tree-analysis, development-guide, architecture-overview, api-contracts-summary, data-models-summary, component-inventory-frontend"},
+    {"step": "step_10", "status": "completed", "timestamp": "2026-03-17T23:45:00", "summary": "Master index.md updated for V4.2.0"},
+    {"step": "step_11", "status": "completed", "timestamp": "2026-03-17T23:50:00", "summary": "Validation complete, all documents generated successfully"}
+  ],
+  "current_step": "completed",
+  "findings": {
+    "project_classification": "Multi-part: backend(FastAPI Python), frontend(Vue3 TS), proxy(Express.js)",
+    "metrics": {
+      "backend_files": 350, "api_modules": 57, "orm_models": 134, "services": 147, "test_files": 195,
+      "frontend_files": 483, "views": 97, "components": 101, "stores": 8,
+      "migrations": 54, "docs": 168, "docker_services": 5
+    }
+  },
+  "outputs_generated": [
+    "project-scan-report.json",
+    "project-overview.md",
+    "source-tree-analysis.md",
+    "development-guide.md",
+    "architecture-overview.md",
+    "api-contracts-summary.md",
+    "data-models-summary.md",
+    "component-inventory-frontend.md",
+    "index.md"
+  ],
+  "resume_instructions": "Workflow completed"
+}
