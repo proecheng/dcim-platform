@@ -44,7 +44,7 @@ from ...schemas.diagnosis import (
     CounterfactualAnalysisListResponse,
 )
 from ...engines.diagnosis_engine import diagnosis_engine
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 logger = logging.getLogger(__name__)
 
@@ -59,7 +59,15 @@ class TimeWindowApproveRequest(BaseModel):
 
 
 class TimeWindowRejectRequest(BaseModel):
-    reason: str = Field(..., min_length=1, strip_whitespace=True, description="拒绝理由（必填）")
+    reason: str = Field(..., min_length=1, description="拒绝理由（必填）")
+
+    @field_validator("reason")
+    @classmethod
+    def reason_not_blank(cls, v: str) -> str:
+        v = v.strip()
+        if not v:
+            raise ValueError("拒绝理由不能为空白")
+        return v
 
 
 class HMACKeyRotateRequest(BaseModel):

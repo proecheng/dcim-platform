@@ -1,143 +1,74 @@
 # Test Automation Summary
 
-**Date**: 2026-03-15
-**Scope**: API Endpoint Coverage Gap Analysis & Test Generation
-**Framework**: pytest 7.4.0 + pytest-asyncio
+## 生成日期: 2026-03-17
 
----
+## 背景
+对抗性审查修复了 7 个诊断 API 文件中的 34+ 处安全/健壮性问题。本次 QA 自动化生成补充 E2E 测试，覆盖修复引入的新行为。
 
-## Gap Analysis Results
-
-### Before This Run
-- **API modules with tests**: 47 / 55 (85.5%)
-- **API modules without tests**: 5 modules, ~24 endpoints
-- **Total existing test files**: ~350 (backend ~189, frontend ~161)
-
-### After This Run
-- **API modules with tests**: 52 / 55 (94.5%)
-- **New tests generated**: 55
-- **New test files**: 5
-
----
-
-## Generated Tests (Round 2 - 2026-03-15)
+## Generated Tests
 
 ### API Tests
+- [x] `tests/api/test_audit_fix_coverage.py` — 28 个测试用例，7 个测试类
 
-- [x] `tests/api/test_device_templates.py` — 16 tests
-  - List: empty, with data, filter by manufacturer, keyword search, pagination (5)
-  - Create: happy path (operator), viewer forbidden (2)
-  - Get detail: happy path, 404 not found (2)
-  - Update: happy path (operator), 404 not found (2)
-  - Delete: happy path (admin), operator forbidden, 404 not found (3)
-  - Create datasource from template: happy path, 404 template not found (2)
+## 测试类别覆盖
 
-- [x] `tests/api/test_data_quality.py` — 7 tests
-  - Status: empty stats, mixed quality, precise counts (3)
-  - Points: list all, filter by quality (2)
-  - Auth: status unauthorized, points unauthorized (2)
+### 1. Pydantic 模型验证 (5 tests)
+- [x] `test_reject_time_window_whitespace_reason` — strip + min_length=1
+- [x] `test_reject_time_window_valid_reason` — 正常 reason 通过
+- [x] `test_hmac_key_rotate_short_key` — key < 32 字符 → 422
+- [x] `test_hmac_key_rotate_missing_key` — 缺少 new_key → 422
+- [x] `test_approve_time_window_optional_reason` — reason 可选
 
-- [x] `tests/api/test_chaos_drill.py` — 10 tests
-  - GET /schedule: success (admin), 403 (viewer) (2)
-  - PUT /schedule: success, 400 on ValueError (2)
-  - POST /schedule/confirm: success, 400 on ValueError (2)
-  - POST /trigger: success 202 (admin), 403 (viewer) (2)
-  - POST /stop: success (admin) (1)
-  - GET /history: success with pagination (1)
+### 2. 分页参数边界 (6 tests)
+- [x] `test_ab_tests_page_size_exceeds_limit` — page_size > 100 → 422
+- [x] `test_ab_tests_page_size_at_limit` — page_size=100 → 200
+- [x] `test_ab_tests_page_zero` — page=0 → 422
+- [x] `test_fault_tree_versions_page_size_exceeds_limit` — page_size > 100 → 422
+- [x] `test_battery_soh_limit_exceeds_max` — limit > 500 → 422
+- [x] `test_battery_soh_limit_at_max` — limit=500 → 200
 
-- [x] `tests/api/test_fault_tree_versions.py` — 11 tests
-  - List: versions, filter by status (2)
-  - Review: success, same creator (400), not draft (400), not found (404), wrong tree_id (5)
-  - Create: with mock VersionManager (1)
-  - Activate: with mock VersionManager (1)
-  - Rollback: success, no versions (404) (2)
+### 3. RBAC 依赖注入替换 (7 tests)
+- [x] `test_sensor_metadata_viewer_cannot_create` — viewer → 403
+- [x] `test_sensor_metadata_viewer_cannot_delete` — viewer → 403
+- [x] `test_sensor_metadata_operator_cannot_delete` — operator → 403
+- [x] `test_sensor_metadata_operator_can_update` — operator → 200
+- [x] `test_fault_tree_versions_viewer_can_list` — viewer → 200
+- [x] `test_probability_adjustments_viewer_can_list` — viewer → 200
+- [x] `test_probability_adjustments_no_auth` — 无认证 → 401
 
-- [x] `tests/api/test_probability_tuning.py` — 11 tests
-  - Trigger: with mock ProbabilityTuningService (1)
-  - List: empty, with data, filter by status (3)
-  - Approve: success, nonexistent (404), already approved (400/404) (3)
-  - Reject: success, nonexistent (404) (2)
-  - Rollback: success, no version (404) (2)
+### 4. 审计日志写入 (1 test)
+- [x] `test_ab_test_create_writes_audit_log` — 创建后验证 OperationLog
 
----
+### 5. GET→POST 方法变更 (2 tests)
+- [x] `test_reload_rules_get_not_200` — GET 不再返回 200
+- [x] `test_reload_rules_post_works` — POST 正常工作
 
-## Generated Tests (Round 1 - 2026-03-14)
+### 6. 边界修复 (4 tests)
+- [x] `test_export_format_invalid` — Literal["pdf"] → 非 pdf 返回 422
+- [x] `test_export_format_pdf_valid` — pdf 格式通过验证
+- [x] `test_sensor_check_expired_returns_200` — 202→200 修复
+- [x] `test_misdiagnosis_end_date_boundary` — end_date < vs <= 边界
 
-### API Tests
-
-- [x] `tests/api/test_gateway_video_ota_coverage.py` — 97 tests
-- [x] `tests/api/test_operation_coverage.py` — 82 tests
-- [x] `tests/api/test_spatial_topology_linkage_coverage.py` — 130 tests
-- [x] `tests/api/test_shift_opportunities_coverage.py` — 104 tests
-
----
+### 7. 通用错误消息 (3 tests)
+- [x] `test_probability_approve_error_generic` — 不泄露异常详情
+- [x] `test_time_window_approve_nonexistent_generic` — 404 通用消息
+- [x] `test_time_window_reject_nonexistent_generic` — 404 通用消息
 
 ## Coverage
 
-### API Endpoint Coverage (Before → After)
+| 模块 | 新增测试 |
+|------|---------|
+| ab_testing.py | 4 |
+| misdiagnosis_reports.py | 2 |
+| fault_tree_versions.py | 2 |
+| sensor_metadata.py | 5 |
+| probability_tuning.py | 3 |
+| diagnosis.py | 12 |
+| **总计** | **28** |
 
-| Category | Round 1 Start | Round 1 End | Round 2 End |
-|----------|---------------|-------------|-------------|
-| Modules tested | 35/55 | 47/55 | 52/55 |
-| Module coverage | 63.6% | 85.5% | 94.5% |
-| Endpoints tested | ~105 | ~289 | ~313 |
-| Total API tests | ~580 | ~993 | ~1048 |
-
-### Remaining Uncovered API Modules (3)
-
-| Module | Endpoints | Priority | Notes |
-|--------|-----------|----------|-------|
-| ml | varies | P3 | Optional module (torch dependency) |
-| command | varies | P3 | Low priority |
-| drift | varies | P3 | Covered by drift_detection service tests |
-
-### Test Pattern Coverage
-
-| Pattern | Status |
-|---------|--------|
-| Happy path (200) | Covered |
-| Authentication (401/403) | Covered |
-| Not found (404) | Covered |
-| CRUD lifecycle | Covered |
-| Workflow transitions | Covered (work orders, shift plans) |
-| Pagination | Covered |
-| Filter/Search | Covered |
-| RBAC (admin vs viewer vs operator) | Covered |
-| Optimistic locking (409) | Covered |
-| Service mocking | Covered |
-
----
-
-## Test Results
-
-### Round 2 (2026-03-15)
-```
-55 passed in 44.21s
-```
-All 55 new tests pass. No regressions introduced.
-
-### Full Suite
-```
-3355 passed, 77 failed, 10 skipped, 32 errors in 1225.38s
-```
-77 failures + 32 errors are pre-existing (integration tests requiring Redis/TimescaleDB, mqtt adapter tests).
-
----
-
-## Discoveries During Testing
-
-1. **`probability_tuning.py` reject endpoint**: `RejectRequest` model is declared as a Pydantic body parameter, but FastAPI treats `reason` as a **query parameter**. Tests adapted to use `params=` instead of `json=`.
-
-2. **`ws_manager.broadcast_to_role` doesn't exist**: The `probability_tuning.py` API calls `ws_manager.broadcast_to_role()` but `ConnectionManager` only has `broadcast()`, `broadcast_diagnosis()`, etc. This is a latent bug — the method will raise `AttributeError` at runtime when approve/reject succeeds.
-
-3. **`list_adjustments` endpoint auth gap**: Despite having no explicit auth dependency, the endpoint returns 401 without auth headers, suggesting middleware-level auth enforcement is occurring.
-
----
+## 源码修复（测试中发现）
+- `diagnosis.py`: `strip_whitespace=True`（Pydantic V2 废弃）→ 改用 `@field_validator` 实现空白检查
 
 ## Next Steps
-
-- [ ] Fix `ws_manager.broadcast_to_role` → use `broadcast_diagnosis` or add the method
-- [ ] Fix `RejectRequest` to properly use body parameter instead of query
-- [ ] Fix pre-existing test failures (77 failures across integration tests)
-- [ ] Add remaining 3 uncovered API modules (low priority)
-- [ ] Run tests in CI pipeline
+- 所有 28 个新测试已通过
+- 全量回归测试进行中
