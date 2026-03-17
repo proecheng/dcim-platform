@@ -321,8 +321,9 @@ async def test_diagnosis_engine_match(session_factory, seed_rule):
         "zone": "A1",
     }
 
-    # Patch async_session 使引擎使用测试数据库
-    with patch("app.engines.diagnosis_engine.async_session", session_factory):
+    # Patch async_session 使引擎和结果存储都使用测试数据库
+    with patch("app.engines.diagnosis_engine.async_session", session_factory), \
+         patch("app.services.diagnosis.result_store.async_session", session_factory):
         await engine._do_diagnose(payload)
 
     # 验证诊断结果已写入数据库
@@ -400,8 +401,9 @@ async def test_diagnosis_dedup(session_factory, seed_rule):
         "zone": "A1",
     }
 
-    # Patch async_session 使引擎使用测试数据库
-    with patch("app.engines.diagnosis_engine.async_session", session_factory):
+    # Patch async_session 使引擎和结果存储都使用测试数据库
+    with patch("app.engines.diagnosis_engine.async_session", session_factory), \
+         patch("app.services.diagnosis.result_store.async_session", session_factory):
         # 第一次诊断
         await engine._do_diagnose(payload)
         assert 8888 in engine._recent
@@ -412,11 +414,15 @@ async def test_diagnosis_dedup(session_factory, seed_rule):
         # 时间戳不应更新（被去重跳过）
         assert engine._recent[8888] == first_time
 
-        # 模拟超过去重窗口
-        engine._recent[8888] = time.time() - engine.DEDUP_WINDOW - 1
+        # 模拟超过去重窗口（major 级别窗口为 180s）
+        from app.engines.diagnosis_engine import DEDUP_WINDOW_BY_LEVEL
+        major_window = DEDUP_WINDOW_BY_LEVEL["major"]
+        past_time = time.time() - major_window - 10
+        engine._recent[8888] = past_time
+        before_call = time.time()
         await engine._do_diagnose(payload)
-        # 时间戳应更新
-        assert engine._recent[8888] > first_time
+        # 时间戳应更新（大于调用前时间，说明去重缓存已刷新）
+        assert engine._recent[8888] >= before_call
 
 
 @pytest.mark.anyio
