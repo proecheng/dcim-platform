@@ -2257,21 +2257,24 @@ async def calculate_cooling_transferable(self, zone_id: int) -> float:
 ### 22.1 架构总览
 
 ```
-AlarmEngine ──创建告警──> Alarm 记录
+ingest_pipeline._evaluate_alarms() ──创建告警──> Alarm 记录
+    │  （实际告警创建入口，非独立 AlarmEngine 类）
     │
     ├──同步──> ws_manager.broadcast_alarm()     [现有，WebSocket 推送前端]
     ├──同步──> escalation_engine.check()         [现有，告警级别升级]
     ├──同步──> linkage_engine.evaluate()          [现有，联动策略执行]
     └──异步──> notification_dispatcher.dispatch() [新增，外部通知分发]
+                    │  （通过 asyncio.create_task 异步调用，不阻塞告警流程）
                     │
+                    ├── 构造 AlarmNotificationContext DTO（从 Alarm ORM 提取必要字段）
                     ├── 查询 NotificationPolicy（站点×级别×时段）
-                    ├── 解析通知对象 → UserNotificationContact
-                    ├── 告警风暴检测（60s 窗口合并）
+                    ├── 解析通知对象 → UserNotificationContact（验证 UserSite 站点权限）
+                    ├── 告警风暴检测（Redis INCR + 内存降级，60s 窗口合并）
                     └── 分发到渠道适配器（并行）
                          ├── SmsAdapter
                          ├── ImAdapter（钉钉/企业微信）
                          ├── VoiceCallAdapter
-                         └── EmailAdapter（现有 EmailService 包装）
+                         └── EmailAdapter（包装现有 EmailService，通过 asyncio.to_thread 异步化）
 ```
 
 **关键设计决策：**
@@ -2286,11 +2289,12 @@ AlarmEngine ──创建告警──> Alarm 记录
 
 ### 22.2 数据模型扩展
 
-#### User 表扩展字段
+#### User 表现有字段（复用）
 
 ```python
-# 在现有 User 模型中新增
-phone: Mapped[str | None]           # 手机号（短信+语音电话）
+# User 模型已有以下字段，无需新增：
+phone: Mapped[str | None]           # 手机号（短信+语音电话）— 已存在于 user.py
+email: Mapped[str | None]           # 邮箱 — 已存在于 user.py
 ```
 
 #### UserNotificationContact 表（新增）
@@ -2307,6 +2311,12 @@ class UserNotificationContact(Base):
     is_enabled: Mapped[bool]         # 是否启用
     created_at: Mapped[datetime]
 ```
+
+**与 User.phone/email 的关系：**
+- User.phone 和 User.email 是用户基本信息字段（登录、个人资料），保持不变
+- UserNotificationContact 是通知专用联系方式表，支持一个用户多渠道多联系方式（如多个钉钉账号、不同时段使用不同手机号）
+- 创建 UserNotificationContact 时，可从 User.phone/email 自动填充初始值，但后续独立维护
+- 通知分发器仅查询 UserNotificationContact 表，不直接读取 User.phone/email
 
 #### NotificationPolicy 表（新增）
 
@@ -2327,6 +2337,16 @@ class NotificationPolicy(Base):
     is_enabled: Mapped[bool]
 ```
 
+**跨午夜时段处理：**
+- 当 `time_range_start > time_range_end`（如 "22:00" > "06:00"）时，表示跨午夜时段
+- 匹配逻辑：`current_time >= start OR current_time < end`（而非 AND）
+- 示例："22:00"~"06:00" 匹配 23:00（>=22:00）和 03:00（<06:00），不匹配 12:00
+
+**notify_user_ids 站点权限约束：**
+- 通知分发器在 `_resolve_contacts()` 中，通过 `UserSite` 表（`user_sites`）验证每个 user_id 是否有该策略 site_id 的访问权限
+- 无权限的 user_id 静默跳过（不报错），记录 warning 日志
+- 全局策略（site_id=NULL）不做站点权限校验
+
 #### NotificationRecord 表（新增）
 
 ```python
@@ -2335,6 +2355,7 @@ class NotificationRecord(Base):
 
     id: Mapped[int]
     alarm_id: Mapped[int]            # FK → alarms.id
+    policy_id: Mapped[int | None]    # FK → notification_policies.id（追溯触发策略）
     user_id: Mapped[int]             # FK → users.id
     channel_type: Mapped[str]        # sms | im | voice | email
     contact_value: Mapped[str]       # 实际发送的联系方式
@@ -2349,12 +2370,23 @@ class NotificationRecord(Base):
 ### 22.3 渠道适配器架构
 
 ```python
+@dataclass
+class AlarmNotificationContext:
+    """通知上下文 DTO — 避免跨层传递 ORM 对象"""
+    alarm_id: int
+    alarm_level: str          # critical | major | minor | info
+    alarm_message: str
+    device_name: str | None
+    point_name: str | None
+    site_id: int | None
+    created_at: datetime
+
 class NotificationAdapter(ABC):
     """通知渠道适配器基类，与现有 EmailService 同级"""
 
     @abstractmethod
     async def send(self, contact: str, subject: str, content: str,
-                   alarm: Alarm) -> NotificationResult: ...
+                   context: AlarmNotificationContext) -> NotificationResult: ...
 
     @abstractmethod
     async def health_check(self) -> bool: ...
@@ -2369,7 +2401,10 @@ class VoiceCallAdapter(NotificationAdapter):
     """语音电话适配器 — 对接语音通知 API"""
 
 class EmailNotificationAdapter(NotificationAdapter):
-    """邮件适配器 — 包装现有 EmailService"""
+    """邮件适配器 — 包装现有 EmailService
+    注意：EmailService 使用同步 smtplib.SMTP（无 timeout 参数），
+    必须通过 asyncio.to_thread() 包装为异步调用，并设置 socket timeout 防止线程池阻塞。
+    """
 ```
 
 **适配器注册表：**
@@ -2389,26 +2424,70 @@ NOTIFICATION_ADAPTERS: dict[str, type[NotificationAdapter]] = {
 class NotificationDispatcher:
     """异步通知分发器"""
 
-    async def dispatch(self, alarm: Alarm):
-        # 1. 告警风暴检测
-        if self._is_storm(alarm.site_id):
-            return await self._send_storm_summary(alarm.site_id)
+    async def dispatch(self, context: AlarmNotificationContext):
+        """接收 DTO 而非 ORM 对象，由调用方（ingest_pipeline）构造 context"""
+        # 1. 告警风暴检测（Redis INCR + 内存降级）
+        if await self._is_storm(context.site_id):
+            return await self._send_storm_summary(context.site_id)
 
         # 2. 查询通知策略（站点×级别×当前时段）
-        policy = await self._get_policy(alarm.site_id, alarm.level)
+        policy = await self._get_policy(context.site_id, context.alarm_level)
 
-        # 3. 解析通知对象的联系方式
+        # 3. 解析通知对象的联系方式（验证 UserSite 站点权限）
         contacts = await self._resolve_contacts(policy)
 
-        # 4. 并行发送所有渠道
-        tasks = [self._send_one(adapter, contact, alarm)
+        # 4. 并行发送所有渠道，逐个处理结果
+        tasks = [self._send_one(adapter, contact, context)
                  for adapter, contact in contacts]
-        await asyncio.gather(*tasks, return_exceptions=True)
+        results = await asyncio.gather(*tasks, return_exceptions=True)
 
-        # 5. 启动渠道升级计时器（如果启用）
+        # 5. 处理发送结果：成功→NotificationRecord.status='sent'
+        #    失败→NotificationRecord.status='failed'，加入重试队列
+        for (adapter, contact), result in zip(contacts, results):
+            if isinstance(result, Exception):
+                await self._handle_failure(context, contact, result)
+
+        # 6. 启动渠道升级计时器（如果启用）
         if policy.channel_escalation_enabled:
-            await self._schedule_escalation(alarm, policy)
+            await self._schedule_escalation(context, policy)
 ```
+
+**重试机制：**
+```python
+# 使用 asyncio.Queue 实现异步重试队列
+_retry_queue: asyncio.Queue[NotificationRecord] = asyncio.Queue(maxsize=1000)
+
+async def _handle_failure(self, context: AlarmNotificationContext, contact, error):
+    """发送失败处理：写入 NotificationRecord 并加入重试队列"""
+    record = NotificationRecord(
+        alarm_id=context.alarm_id, user_id=contact.user_id,
+        channel_type=contact.channel_type, contact_value=contact.contact_value,
+        status="failed", error_message=str(error), retry_count=0, max_retries=3,
+    )
+    await self._save_record(record)
+    if record.retry_count < record.max_retries:
+        try:
+            self._retry_queue.put_nowait(record)
+        except asyncio.QueueFull:
+            logger.error("重试队列已满，丢弃通知重试: alarm_id=%d", context.alarm_id)
+
+async def _retry_worker(self):
+    """后台重试工作协程 — 在 background_tasks 中启动，随应用生命周期管理"""
+    while True:
+        record = await self._retry_queue.get()
+        await asyncio.sleep(min(30 * (2 ** record.retry_count), 300))  # 指数退避，最大5分钟
+        success = await self._retry_send(record)
+        if not success and record.retry_count < record.max_retries:
+            record.retry_count += 1
+            try:
+                self._retry_queue.put_nowait(record)
+            except asyncio.QueueFull:
+                pass
+```
+
+**Queue 生命周期管理：**
+- _retry_worker 在应用启动时通过 `asyncio.create_task` 启动
+- 应用关闭时（shutdown event），先停止接收新任务，然后等待队列排空（最多30秒），超时后记录未处理的重试到数据库
 
 ### 22.5 渠道升级状态机
 
@@ -2427,12 +2506,18 @@ class NotificationDispatcher:
 ### 22.6 告警风暴抑制
 
 ```python
-STORM_WINDOW = 60        # 秒
-STORM_THRESHOLD = 20     # 同站点告警数
+STORM_WINDOW = 60        # 秒（可通过 SystemConfig 'notification.storm_window' 配置）
+STORM_THRESHOLD = 20     # 同站点告警数（可通过 SystemConfig 'notification.storm_threshold' 配置）
 
 async def _is_storm(self, site_id: int) -> bool:
-    """检测同站点 60s 内告警数是否超过阈值"""
-    count = await self._get_recent_alarm_count(site_id, STORM_WINDOW)
+    """检测同站点 60s 内告警数是否超过阈值
+
+    实现方式：
+    1. 优先使用 Redis INCR + TTL（原子操作，高性能）
+       key: notification:storm:{site_id}，TTL=STORM_WINDOW
+    2. Redis 不可用时降级为内存计数器（asyncio.Lock 保护并发）
+    """
+    count = await self._incr_storm_counter(site_id)
     return count >= STORM_THRESHOLD
 ```
 
@@ -2447,8 +2532,8 @@ async def _is_storm(self, site_id: int) -> bool:
 ### 23.1 架构总览
 
 ```
-设备历史数据（PointHistory）
-    │
+设备历史数据（PointHistoryArchive — hourly 聚合数据，优先）
+    │         （PointHistory — 原始数据，仅在归档不足时降级使用）
     ▼
 DegradationAnalyzer（劣化分析器）
     ├── UPSDegradationPlugin        ── 扩展现有 SOH
@@ -2480,6 +2565,10 @@ MaintenanceAdvisor（维护建议引擎）
 class DegradationPlugin(ABC):
     """劣化分析插件基类"""
 
+    # 该插件对应的设备类型（用于注册表映射，如 'ups'/'hvac'/'pdu'/'battery'）
+    @abstractmethod
+    def get_device_type(self) -> str: ...
+
     # 该设备类型的最低数据需求
     @abstractmethod
     def get_required_points(self) -> list[str]: ...
@@ -2496,6 +2585,7 @@ class DegradationPlugin(ABC):
 
 @dataclass
 class DegradationResult:
+    device_id: int                  # 设备ID（避免调用方维护映射关系）
     score: float                    # 0~100 劣化评分
     confidence: float               # 评估置信度（0~1，数据点越多越高）
     available_points: int           # 实际可用数据点数
@@ -2509,9 +2599,9 @@ class DegradationResult:
 
 | 设备类型 | 必需数据点 | 可选数据点 | 健康度权重 |
 |---------|-----------|-----------|-----------|
-| UPS 主机 | 输入/输出电压、效率 | 切换次数、温度 | 劣化趋势 40%、告警频次 30%、维保 30% |
-| 电池组 | SOH、内阻 | 充放电循环、温度 | SOH 50%、告警频次 20%、维保 30% |
-| 精密空调 | 回风温度、运行状态 | COP/EER、压缩机时长、冷媒压力 | 劣化趋势 40%、告警频次 30%、维保 30% |
+| UPS 主机 | 输入/输出电压 | 效率（通常为虚拟点位=输出功率/输入功率）、切换次数、温度 | 劣化趋势 40%、告警频次 30%、维保 30% |
+| 电池组 | SOH（从 BatterySOHRecord 读取）、内阻 | 充放电循环、温度 | SOH 50%、告警频次 20%、维保 30% |
+| 精密空调 | 回风温度、运行状态 | COP/EER（通常为虚拟点位=制冷量/功耗）、压缩机时长、冷媒压力 | 劣化趋势 40%、告警频次 30%、维保 30% |
 | PDU | 负载率、电压 | 谐波畸变率、温升 | 劣化趋势 35%、告警频次 35%、维保 30% |
 
 ### 23.3 健康度评分计算器增强
@@ -2520,7 +2610,7 @@ class DegradationResult:
 class DeviceHealthScoreCalculator:
     """增强现有 DeviceHealthScore 计算逻辑"""
 
-    # 设备类型 → 加权配置
+    # 设备类型 → 加权配置（Device.device_type → 插件 device_type 映射：UPS→ups, AC→hvac, PDU→pdu）
     WEIGHT_CONFIG: dict[str, dict] = {
         "ups": {"degradation": 0.4, "alarm": 0.3, "maintenance": 0.3},
         "battery": {"degradation": 0.5, "alarm": 0.2, "maintenance": 0.3},
@@ -2528,35 +2618,51 @@ class DeviceHealthScoreCalculator:
         "pdu": {"degradation": 0.35, "alarm": 0.35, "maintenance": 0.3},
     }
 
-    async def calculate(self, device_id: int, device_type: str) -> DeviceHealthScore:
-        # 1. 获取劣化分析结果
-        degradation = await self.degradation_analyzer.analyze(device_id)
-
-        # 2. 获取现有因子（告警频次、维保记录）
+    async def calculate(self, device_id: int, device_type: str,
+                        degradation: DegradationResult) -> DeviceHealthScore:
+        """接收外部传入的 DegradationResult，避免内部耦合 Analyzer"""
+        # 1. 获取现有因子（告警频次、维保记录）
         alarm_score = await self._calc_alarm_score(device_id)
         maintenance_score = await self._calc_maintenance_score(device_id)
 
-        # 3. 加权合并
+        # 2. 数据充分度降级：minimal 时劣化权重归零
         weights = self.WEIGHT_CONFIG.get(device_type, self.WEIGHT_CONFIG["ups"])
+        if degradation.data_sufficiency == "minimal":
+            effective_weights = {"degradation": 0, "alarm": 0.5, "maintenance": 0.5}
+        else:
+            effective_weights = weights
+
+        # 3. 加权合并
         final_score = (
-            degradation.score * weights["degradation"] +
-            alarm_score * weights["alarm"] +
-            maintenance_score * weights["maintenance"]
+            degradation.score * effective_weights["degradation"] +
+            alarm_score * effective_weights["alarm"] +
+            maintenance_score * effective_weights["maintenance"]
         )
 
         # 4. 写入 DeviceHealthScore（复用现有表）
         return DeviceHealthScore(
             score=final_score,
             health_level=self._score_to_level(final_score),
-            # 新增：记录数据充分度
             data_sufficiency=degradation.data_sufficiency,
+            degradation_score=degradation.score,
+            score_factors={
+                "degradation": degradation.score,
+                "alarm": alarm_score,
+                "maintenance": maintenance_score,
+                "weights": effective_weights,
+                "trend_factors": degradation.trend_factors,
+            },
         )
 ```
 
 **与现有 DeviceHealthScore 的关系：**
 - 复用现有 `DeviceHealthScore` 表，不新建表
 - 现有的 `alarm_count` / `maintenance_count` 驱动的简单评分逻辑替换为加权合并算法
-- `DeviceHealthScore` 表新增 `data_sufficiency` 字段（full/partial/minimal），前端据此显示评估精度提示
+- `DeviceHealthScore` 表新增字段（Alembic 迁移）：
+  - `data_sufficiency` (String(20), default="minimal") — 数据充分度：full/partial/minimal
+  - `degradation_score` (Float, nullable) — 劣化趋势评分 0-100
+  - `score_factors` (JSON, nullable) — 评分因子详情（各因子分值、权重、趋势数据）
+- 现有技术债务修复：`battery_soh_service.py` 中 `update_device_health_score()` 引用了不存在的 `total_score` 和 `score_factors` 字段，需在本次迁移中一并修复
 - 迁移策略：新算法上线后，对所有设备重新计算一次健康度评分
 
 ### 23.4 维护建议引擎
@@ -2568,8 +2674,18 @@ class MaintenanceAdvisor:
     async def evaluate(self, health_score: DeviceHealthScore,
                        degradation: DegradationResult):
         if health_score.health_level in ("预警", "危险"):
+            # 防重复：检查是否已有 pending 建议，有则更新而非新建
+            existing = await self._get_pending_advice(health_score.device_id)
+            if existing:
+                existing.health_score = health_score.score
+                existing.reason = degradation.primary_concern
+                existing.urgency = self._calc_urgency(health_score, degradation)
+                await self._save_advice(existing)
+                return
+
             advice = MaintenanceAdvice(
                 device_id=health_score.device_id,
+                site_id=...,  # 从 Device.site_id 获取
                 urgency=self._calc_urgency(health_score, degradation),
                 reason=degradation.primary_concern,
                 suggested_action=self._generate_action(degradation),
@@ -2577,6 +2693,10 @@ class MaintenanceAdvisor:
             )
             await self._save_advice(advice)
             # 不自动创建工单，等待运维人员确认
+
+        elif health_score.health_level in ("健康", "关注"):
+            # 设备恢复时自动关闭 pending 建议
+            await self._auto_close_pending(health_score.device_id)
 ```
 
 #### MaintenanceAdvice 表（新增）
@@ -2587,11 +2707,12 @@ class MaintenanceAdvice(Base):
 
     id: Mapped[int]
     device_id: Mapped[int]           # FK → devices.id
-    site_id: Mapped[int]             # FK → sites.id
+    site_id: Mapped[int]             # FK → sites.id（从 Device.site_id 获取）
+    health_score: Mapped[float]      # 触发时的健康度评分
     urgency: Mapped[str]             # high | medium | low
     reason: Mapped[str]              # 劣化原因描述
     suggested_action: Mapped[str]    # 建议措施
-    status: Mapped[str]              # pending | confirmed | rejected | converted
+    status: Mapped[str]              # pending | confirmed | rejected | converted | auto_closed
     feedback: Mapped[str | None]     # 运维人员反馈（误报原因等）
     work_order_id: Mapped[int | None]  # 转为工单后的工单 ID
     created_at: Mapped[datetime]
@@ -2619,6 +2740,7 @@ class MaintenanceAdvice(Base):
 | `/api/v1/predictive-maintenance/advices/{id}/confirm` | POST | 确认建议并转工单 |
 | `/api/v1/predictive-maintenance/advices/{id}/reject` | POST | 标记为误报 |
 | `/api/v1/predictive-maintenance/config` | GET/PUT | 劣化分析配置（权重、周期） |
+| `/api/v1/predictive-maintenance/recalculate` | POST | 手动触发全量健康度重算（admin only） |
 
 ---
 
@@ -2643,12 +2765,18 @@ class MaintenanceAdvice(Base):
 | 平台侧适配 | 复用现有 BACnet/IP 适配器（Section 6） | 转换网关对平台透明，平台看到的是标准 BACnet/IP 设备 |
 | 网关管理 | 扩展现有 DeviceTemplate，不新建模块 | 转换网关作为一种网关类型纳入现有管理体系 |
 
-### 24.2 设备模板扩展
+### 24.2 设备模板与数据源关联扩展
 
-在现有 `DeviceTemplate` 中新增 BACnet MS/TP 转换网关模板：
+**DeviceTemplate 扩展：** 新增 `extra_config` JSON 字段（独立于 point_config），存放网关配置。point_config 保持原语义（点位数组）。
 
 ```python
-# DeviceTemplate.point_config JSON 扩展
+# DeviceTemplate 新增字段（Alembic 迁移）
+extra_config = Column(JSON, nullable=True, comment="扩展配置（网关参数等）")
+```
+
+**extra_config JSON 结构（MS/TP 网关模板）：**
+
+```json
 {
     "gateway_type": "bacnet_mstp_to_ip",
     "bacnet_ip": {
@@ -2676,37 +2804,60 @@ class MaintenanceAdvice(Base):
 }
 ```
 
-### 24.3 故障隔离架构
+### 24.3 数据源关联与故障隔离架构
 
-```
-平台监控
-    │
-    ├── BACnet/IP 连接状态 ──断开──> 标记网关离线
-    │       │                         └── 该网关下所有 MS/TP 设备标记为"网关离线"
-    │       │
-    │       └──正常──> 逐个检查 MS/TP 设备
-    │                   ├── 设备响应正常 → 在线
-    │                   └── 设备无响应 → 标记该设备为"设备离线"
-    │
-    └── DataSource.consecutive_failures
-            ├── 网关层：BACnet/IP 连接失败计数
-            └── 设备层：单个 BACnet 对象读取失败计数（独立计数）
+**DataSource 扩展：** 新增 `parent_datasource_id` 外键，MS/TP 设备的 DataSource 通过此字段关联到网关的 DataSource。
+
+```python
+# DataSource 新增字段（Alembic 迁移）
+parent_datasource_id = Column(
+    Integer, ForeignKey("datasources.id", ondelete="SET NULL"),
+    nullable=True, default=None, index=True,
+    comment="父数据源ID（MS/TP设备指向其网关DataSource）"
+)
 ```
 
-**实现方式：**
-- 网关层故障检测：复用现有 `DataSource.consecutive_failures`，BACnet/IP 连接中断时触发
-- 设备层故障检测：在 BACnet/IP 适配器的 `read_object` 方法中，按设备实例号独立计数读取失败次数
-- 前端展示：网关离线时显示"协议转换网关离线（影响 N 台 MS/TP 设备）"；单设备离线时显示"设备离线（网关正常）"
+**关联模型：**
+```
+网关 DataSource (protocol_type='bacnet_ip', is_enabled=False)
+    ├── 设备1 DataSource (parent_datasource_id → 网关, is_enabled=True)
+    ├── 设备2 DataSource (parent_datasource_id → 网关, is_enabled=True)
+    └── 设备N DataSource (parent_datasource_id → 网关, is_enabled=True)
+```
+- 网关 DataSource 的 `is_enabled=False`，不参与采集调度，仅作为父节点和心跳探测目标
+- 网关可达性通过定时任务 `check_mstp_gateway_health()` 中的 `test_connection()` 探测
+
+**双层故障隔离：**
+
+```
+平台监控（gateway_monitor.py 新增 check_mstp_gateway_health）
+    │
+    ├── 网关层：test_connection() 探测网关 DataSource
+    │       ├── 失败 → consecutive_failures++
+    │       │       └── >= 阈值 → 网关 status='gateway_offline'
+    │       │                    └── 批量 UPDATE 子 DataSource status='gateway_offline'
+    │       └── 成功 → consecutive_failures=0, status='connected'
+    │
+    └── 设备层：各子 DataSource 独立采集
+            ├── 采集成功 → status='connected'
+            └── consecutive_failures >= 阈值 且 网关在线 → status='device_offline'
+```
+
+**DataSource.status 值域扩展：**
+- 现有值：`connected`, `disconnected`, `error`
+- 新增值：`gateway_offline`（网关层故障）, `device_offline`（设备层故障）
 
 ### 24.4 与现有架构的集成点
 
 | 集成点 | 现有组件 | 扩展方式 |
 |--------|---------|---------|
 | 协议适配 | `bacnet_ip.py`（Section 6） | 无需修改，转换网关对适配器透明 |
-| 网关管理 | Gateway 模型（FR15-FR20） | 新增 gateway_type="bacnet_mstp_bridge" |
-| 设备模板 | DeviceTemplate | 新增 MS/TP 转换网关模板（point_config JSON） |
-| 故障检测 | DataSource.consecutive_failures | 扩展为网关层+设备层双层计数 |
-| 告警 | AlarmEngine | 新增"网关离线"告警类型，区分于"设备离线" |
+| 网关管理 | Gateway 模型（FR15-FR20） | 无需修改 Gateway 表，网关信息通过 DataSource 管理 |
+| 设备模板 | DeviceTemplate | 新增 `extra_config` JSON 字段存放 MS/TP 网关配置 |
+| 数据源关联 | DataSource | 新增 `parent_datasource_id` 外键，建立网关-设备父子关系 |
+| 故障检测 | gateway_monitor.py | 新增 `check_mstp_gateway_health()` 定时任务（30s 周期） |
+| 告警 | AlarmEngine | 新增 `mstp_gateway_offline`（major）和 `mstp_device_offline`（minor）告警类型 |
+| 数据源状态 | DataSource.status | 新增 `gateway_offline` 和 `device_offline` 状态值 |
 
 ---
 
@@ -2722,8 +2873,8 @@ class MaintenanceAdvice(Base):
    - 渠道升级机制：独立于现有告警级别升级（AlarmEscalation），各自维护超时计时器
    - 告警风暴抑制：60s 窗口内同站点 ≥20 条告警自动合并为摘要通知
    - 异步分发：不阻塞告警创建和 WebSocket 推送流程
-   - 新增数据模型：UserNotificationContact、NotificationPolicy、NotificationRecord
-   - User 表扩展 phone 字段
+   - 新增数据模型：UserNotificationContact、NotificationPolicy、NotificationRecord（含 policy_id 审计追溯）
+   - User 表已有 phone/email 字段（复用，无需新增）
 
 2. **预测性维护扩展架构（Section 23）**
    - 劣化分析插件架构：UPS/电池/空调/PDU 四种设备类型，可扩展
