@@ -1,5 +1,5 @@
 ---
-stepsCompleted: [tech-stack, architecture-pattern, data-architecture, api-design, deployment, protocol-adapters, linkage-engine, video-integration, physical-topology, nfr-support, demo-module, ingest-pipeline, architecture-update, device-binding, intelligent-diagnosis, tcl-precool-model]
+stepsCompleted: [tech-stack, architecture-pattern, data-architecture, api-design, deployment, protocol-adapters, linkage-engine, video-integration, physical-topology, nfr-support, demo-module, ingest-pipeline, architecture-update, device-binding, intelligent-diagnosis, tcl-precool-model, notification-engine, predictive-maintenance, bacnet-mstp]
 inputDocuments: [_bmad-output/planning-artifacts/prd.md, _bmad-output/planning-artifacts/product-brief.md, docs/project-knowledge/project-context.md, docs/project-knowledge/backend-architecture.md, docs/project-knowledge/frontend-architecture.md, docs/project-knowledge/integration-architecture.md]
 workflowType: 'architecture'
 project_name: 'DCIM'
@@ -11,7 +11,7 @@ date: '2026-03-01'
 
 **Author:** proecheng
 **Date:** 2026-02-15
-**Status:** 完整版（V4.2.0 更新，新增预冷 TCL 模型架构 2026-03-10；V4.0.0 智能诊断系统架构 2026-03-05；V3.2.0 演示系统模块化、统一数据管线、设备双向绑定 2026-03-01）
+**Status:** 完整版（V4.3.0 更新，新增多渠道通知/预测性维护/BACnet MS/TP 架构 2026-03-18；V4.2.0 预冷 TCL 模型架构 2026-03-10；V4.0.0 智能诊断系统架构 2026-03-05；V3.2.0 演示系统模块化、统一数据管线、设备双向绑定 2026-03-01）
 
 ---
 
@@ -2250,7 +2250,497 @@ async def calculate_cooling_transferable(self, zone_id: int) -> float:
 
 ---
 
+## 22. 多渠道通知引擎架构（V4.3.0 新增）
+
+> 📌 响应客户 RFP P0 需求（FR-N01~N07），在现有告警引擎基础上新增外部通知渠道能力。
+
+### 22.1 架构总览
+
+```
+AlarmEngine ──创建告警──> Alarm 记录
+    │
+    ├──同步──> ws_manager.broadcast_alarm()     [现有，WebSocket 推送前端]
+    ├──同步──> escalation_engine.check()         [现有，告警级别升级]
+    ├──同步──> linkage_engine.evaluate()          [现有，联动策略执行]
+    └──异步──> notification_dispatcher.dispatch() [新增，外部通知分发]
+                    │
+                    ├── 查询 NotificationPolicy（站点×级别×时段）
+                    ├── 解析通知对象 → UserNotificationContact
+                    ├── 告警风暴检测（60s 窗口合并）
+                    └── 分发到渠道适配器（并行）
+                         ├── SmsAdapter
+                         ├── ImAdapter（钉钉/企业微信）
+                         ├── VoiceCallAdapter
+                         └── EmailAdapter（现有 EmailService 包装）
+```
+
+**关键设计决策：**
+
+| 决策 | 选择 | 理由 |
+|------|------|------|
+| 通知引擎与告警引擎的关系 | 异步调用，不阻塞告警流程 | 第三方 API 延迟不可控，不能影响告警创建和 WebSocket 推送的实时性 |
+| 通知分发方式 | 并行发送所有渠道 | 单条告警可能需通知多人多渠道，串行会导致延迟累积 |
+| 渠道升级 vs 告警级别升级 | 两套独立机制，各自维护超时计时器 | 渠道升级（切换通知方式）和级别升级（提升严重程度）语义不同，互不干扰 |
+| 通知对象数据来源 | User 表扩展 + UserNotificationContact 表 | User 表新增 phone 字段；独立 contact 表支持一个用户多渠道多联系方式 |
+| 站点隔离 | NotificationPolicy 按 site_id 配置 | 1主+5小机房场景，各站点独立通知策略，避免跨站点通知轰炸 |
+
+### 22.2 数据模型扩展
+
+#### User 表扩展字段
+
+```python
+# 在现有 User 模型中新增
+phone: Mapped[str | None]           # 手机号（短信+语音电话）
+```
+
+#### UserNotificationContact 表（新增）
+
+```python
+class UserNotificationContact(Base):
+    __tablename__ = "user_notification_contacts"
+
+    id: Mapped[int]                  # 主键
+    user_id: Mapped[int]             # FK → users.id
+    channel_type: Mapped[str]        # sms | im | voice | email
+    platform: Mapped[str | None]     # dingtalk | wecom | null（sms/voice 无需）
+    contact_value: Mapped[str]       # 手机号 / 钉钉userId / 企业微信userId / 邮箱
+    is_enabled: Mapped[bool]         # 是否启用
+    created_at: Mapped[datetime]
+```
+
+#### NotificationPolicy 表（新增）
+
+```python
+class NotificationPolicy(Base):
+    __tablename__ = "notification_policies"
+
+    id: Mapped[int]
+    site_id: Mapped[int | None]      # FK → sites.id，NULL=全局默认
+    alarm_level: Mapped[str]         # critical | major | minor | info
+    time_range_start: Mapped[str]    # "00:00" 时段开始
+    time_range_end: Mapped[str]      # "08:00" 时段结束
+    channels: Mapped[dict]           # JSON: ["im", "sms"] 渠道组合
+    notify_user_ids: Mapped[list]    # JSON: [1, 2, 3] 通知对象
+    channel_escalation_enabled: Mapped[bool]  # 是否启用渠道升级
+    escalation_timeout_minutes: Mapped[int]   # 渠道升级超时（分钟）
+    escalation_channel_order: Mapped[list]    # JSON: ["im", "sms", "voice"] 升级顺序
+    is_enabled: Mapped[bool]
+```
+
+#### NotificationRecord 表（新增）
+
+```python
+class NotificationRecord(Base):
+    __tablename__ = "notification_records"
+
+    id: Mapped[int]
+    alarm_id: Mapped[int]            # FK → alarms.id
+    user_id: Mapped[int]             # FK → users.id
+    channel_type: Mapped[str]        # sms | im | voice | email
+    contact_value: Mapped[str]       # 实际发送的联系方式
+    status: Mapped[str]              # pending | sent | failed | retrying
+    retry_count: Mapped[int]         # 已重试次数
+    max_retries: Mapped[int]         # 最大重试次数
+    sent_at: Mapped[datetime | None]
+    error_message: Mapped[str | None]
+    created_at: Mapped[datetime]
+```
+
+### 22.3 渠道适配器架构
+
+```python
+class NotificationAdapter(ABC):
+    """通知渠道适配器基类，与现有 EmailService 同级"""
+
+    @abstractmethod
+    async def send(self, contact: str, subject: str, content: str,
+                   alarm: Alarm) -> NotificationResult: ...
+
+    @abstractmethod
+    async def health_check(self) -> bool: ...
+
+class SmsAdapter(NotificationAdapter):
+    """短信适配器 — 对接阿里云/腾讯云短信 API"""
+
+class ImAdapter(NotificationAdapter):
+    """即时通讯适配器 — 钉钉/企业微信 Webhook"""
+
+class VoiceCallAdapter(NotificationAdapter):
+    """语音电话适配器 — 对接语音通知 API"""
+
+class EmailNotificationAdapter(NotificationAdapter):
+    """邮件适配器 — 包装现有 EmailService"""
+```
+
+**适配器注册表：**
+
+```python
+NOTIFICATION_ADAPTERS: dict[str, type[NotificationAdapter]] = {
+    "sms": SmsAdapter,
+    "im": ImAdapter,
+    "voice": VoiceCallAdapter,
+    "email": EmailNotificationAdapter,
+}
+```
+
+### 22.4 通知分发器
+
+```python
+class NotificationDispatcher:
+    """异步通知分发器"""
+
+    async def dispatch(self, alarm: Alarm):
+        # 1. 告警风暴检测
+        if self._is_storm(alarm.site_id):
+            return await self._send_storm_summary(alarm.site_id)
+
+        # 2. 查询通知策略（站点×级别×当前时段）
+        policy = await self._get_policy(alarm.site_id, alarm.level)
+
+        # 3. 解析通知对象的联系方式
+        contacts = await self._resolve_contacts(policy)
+
+        # 4. 并行发送所有渠道
+        tasks = [self._send_one(adapter, contact, alarm)
+                 for adapter, contact in contacts]
+        await asyncio.gather(*tasks, return_exceptions=True)
+
+        # 5. 启动渠道升级计时器（如果启用）
+        if policy.channel_escalation_enabled:
+            await self._schedule_escalation(alarm, policy)
+```
+
+### 22.5 渠道升级状态机
+
+```
+通知已发送 ──超时未确认──> 升级到下一渠道 ──超时未确认──> 升级到下一渠道 ──> 所有渠道已用尽
+     │                        │                        │
+     └──告警已确认──> 停止升级  └──告警已确认──> 停止升级  └──告警已确认──> 停止升级
+```
+
+**与现有 AlarmEscalation 的关系：**
+- `AlarmEscalation`（现有）：告警级别升级（minor → major → critical），修改 `Alarm.level`
+- `NotificationPolicy.channel_escalation`（新增）：通知渠道升级（IM → SMS → Voice），不修改告警级别
+- 两者各自维护独立的超时计时器，可同时触发，互不干扰
+- 告警级别升级后，新级别会触发新的通知策略查询（可能使用不同的渠道组合）
+
+### 22.6 告警风暴抑制
+
+```python
+STORM_WINDOW = 60        # 秒
+STORM_THRESHOLD = 20     # 同站点告警数
+
+async def _is_storm(self, site_id: int) -> bool:
+    """检测同站点 60s 内告警数是否超过阈值"""
+    count = await self._get_recent_alarm_count(site_id, STORM_WINDOW)
+    return count >= STORM_THRESHOLD
+```
+
+风暴期间合并为摘要通知："A 站点在过去 1 分钟内触发 N 条告警，最高级别：紧急，请登录系统查看详情"。
+
+---
+
+## 23. 预测性维护扩展架构（V4.3.0 新增）
+
+> 📌 响应客户 RFP P0 需求（FR-PM01~PM06），将预测性维护从"仅 UPS 电池 SOH"扩展到所有关键设备类型。
+
+### 23.1 架构总览
+
+```
+设备历史数据（PointHistory）
+    │
+    ▼
+DegradationAnalyzer（劣化分析器）
+    ├── UPSDegradationPlugin        ── 扩展现有 SOH
+    ├── BatteryDegradationPlugin    ── 复用 BatterySOHRecord
+    ├── HVACDegradationPlugin       ── 新增：COP/压缩机/回风
+    └── PDUDegradationPlugin        ── 新增：负载率/谐波/温升
+    │
+    ▼
+DeviceHealthScoreCalculator（健康度评分计算器）
+    ├── 劣化趋势因子（新增，来自 DegradationAnalyzer）
+    ├── 告警频次因子（现有 alarm_count）
+    └── 维保记录因子（现有 maintenance_count）
+    │ 加权合并（权重按设备类型配置）
+    ▼
+DeviceHealthScore 表（现有，扩展输入因子）
+    │
+    ▼
+MaintenanceAdvisor（维护建议引擎）
+    ├── 生成维护建议（评分降至"预警"时触发）
+    └── 对接工单系统（FR67-FR71，需人工确认）
+    │
+    ▼
+运维人员反馈（有效/误报标注）→ 模型参数优化
+```
+
+### 23.2 劣化分析插件架构
+
+```python
+class DegradationPlugin(ABC):
+    """劣化分析插件基类"""
+
+    # 该设备类型的最低数据需求
+    @abstractmethod
+    def get_required_points(self) -> list[str]: ...
+
+    # 该设备类型的可选数据点（有则更精确）
+    @abstractmethod
+    def get_optional_points(self) -> list[str]: ...
+
+    # 执行劣化分析
+    @abstractmethod
+    async def analyze(self, device_id: int,
+                      point_history: dict[str, list],
+                      window_days: int = 30) -> DegradationResult: ...
+
+@dataclass
+class DegradationResult:
+    score: float                    # 0~100 劣化评分
+    confidence: float               # 评估置信度（0~1，数据点越多越高）
+    available_points: int           # 实际可用数据点数
+    total_points: int               # 理想数据点数
+    trend_factors: dict[str, float] # 各指标趋势值
+    primary_concern: str | None     # 主要劣化原因
+    data_sufficiency: str           # full | partial | minimal
+```
+
+#### 各设备类型插件配置
+
+| 设备类型 | 必需数据点 | 可选数据点 | 健康度权重 |
+|---------|-----------|-----------|-----------|
+| UPS 主机 | 输入/输出电压、效率 | 切换次数、温度 | 劣化趋势 40%、告警频次 30%、维保 30% |
+| 电池组 | SOH、内阻 | 充放电循环、温度 | SOH 50%、告警频次 20%、维保 30% |
+| 精密空调 | 回风温度、运行状态 | COP/EER、压缩机时长、冷媒压力 | 劣化趋势 40%、告警频次 30%、维保 30% |
+| PDU | 负载率、电压 | 谐波畸变率、温升 | 劣化趋势 35%、告警频次 35%、维保 30% |
+
+### 23.3 健康度评分计算器增强
+
+```python
+class DeviceHealthScoreCalculator:
+    """增强现有 DeviceHealthScore 计算逻辑"""
+
+    # 设备类型 → 加权配置
+    WEIGHT_CONFIG: dict[str, dict] = {
+        "ups": {"degradation": 0.4, "alarm": 0.3, "maintenance": 0.3},
+        "battery": {"degradation": 0.5, "alarm": 0.2, "maintenance": 0.3},
+        "hvac": {"degradation": 0.4, "alarm": 0.3, "maintenance": 0.3},
+        "pdu": {"degradation": 0.35, "alarm": 0.35, "maintenance": 0.3},
+    }
+
+    async def calculate(self, device_id: int, device_type: str) -> DeviceHealthScore:
+        # 1. 获取劣化分析结果
+        degradation = await self.degradation_analyzer.analyze(device_id)
+
+        # 2. 获取现有因子（告警频次、维保记录）
+        alarm_score = await self._calc_alarm_score(device_id)
+        maintenance_score = await self._calc_maintenance_score(device_id)
+
+        # 3. 加权合并
+        weights = self.WEIGHT_CONFIG.get(device_type, self.WEIGHT_CONFIG["ups"])
+        final_score = (
+            degradation.score * weights["degradation"] +
+            alarm_score * weights["alarm"] +
+            maintenance_score * weights["maintenance"]
+        )
+
+        # 4. 写入 DeviceHealthScore（复用现有表）
+        return DeviceHealthScore(
+            score=final_score,
+            health_level=self._score_to_level(final_score),
+            # 新增：记录数据充分度
+            data_sufficiency=degradation.data_sufficiency,
+        )
+```
+
+**与现有 DeviceHealthScore 的关系：**
+- 复用现有 `DeviceHealthScore` 表，不新建表
+- 现有的 `alarm_count` / `maintenance_count` 驱动的简单评分逻辑替换为加权合并算法
+- `DeviceHealthScore` 表新增 `data_sufficiency` 字段（full/partial/minimal），前端据此显示评估精度提示
+- 迁移策略：新算法上线后，对所有设备重新计算一次健康度评分
+
+### 23.4 维护建议引擎
+
+```python
+class MaintenanceAdvisor:
+    """维护建议引擎 — 生成建议，需人工确认后转工单"""
+
+    async def evaluate(self, health_score: DeviceHealthScore,
+                       degradation: DegradationResult):
+        if health_score.health_level in ("预警", "危险"):
+            advice = MaintenanceAdvice(
+                device_id=health_score.device_id,
+                urgency=self._calc_urgency(health_score, degradation),
+                reason=degradation.primary_concern,
+                suggested_action=self._generate_action(degradation),
+                status="pending",  # 待人工确认
+            )
+            await self._save_advice(advice)
+            # 不自动创建工单，等待运维人员确认
+```
+
+#### MaintenanceAdvice 表（新增）
+
+```python
+class MaintenanceAdvice(Base):
+    __tablename__ = "maintenance_advices"
+
+    id: Mapped[int]
+    device_id: Mapped[int]           # FK → devices.id
+    site_id: Mapped[int]             # FK → sites.id
+    urgency: Mapped[str]             # high | medium | low
+    reason: Mapped[str]              # 劣化原因描述
+    suggested_action: Mapped[str]    # 建议措施
+    status: Mapped[str]              # pending | confirmed | rejected | converted
+    feedback: Mapped[str | None]     # 运维人员反馈（误报原因等）
+    work_order_id: Mapped[int | None]  # 转为工单后的工单 ID
+    created_at: Mapped[datetime]
+    confirmed_at: Mapped[datetime | None]
+    confirmed_by: Mapped[int | None]   # FK → users.id
+```
+
+### 23.5 数据充分度与精度提示
+
+当设备暴露的数据点不足时，系统采用降级评估策略：
+
+| 数据充分度 | 条件 | 评估策略 | 前端提示 |
+|-----------|------|---------|---------|
+| full | 必需+可选数据点均可用 | 完整劣化分析 | 无特殊提示 |
+| partial | 仅必需数据点可用 | 基于必需点位分析，置信度降低 | "评估精度：中等（部分数据点不可用）" |
+| minimal | 必需数据点也不完整 | 仅基于告警频次和维保记录 | "评估精度：有限（可用数据点 N/M），建议补充采集配置" |
+
+### 23.6 API 设计
+
+| 端点 | 方法 | 说明 |
+|------|------|------|
+| `/api/v1/predictive-maintenance/dashboard` | GET | 预测性维护仪表盘（按站点） |
+| `/api/v1/predictive-maintenance/devices/{id}/degradation` | GET | 设备劣化详情 |
+| `/api/v1/predictive-maintenance/advices` | GET | 维护建议列表 |
+| `/api/v1/predictive-maintenance/advices/{id}/confirm` | POST | 确认建议并转工单 |
+| `/api/v1/predictive-maintenance/advices/{id}/reject` | POST | 标记为误报 |
+| `/api/v1/predictive-maintenance/config` | GET/PUT | 劣化分析配置（权重、周期） |
+
+---
+
+## 24. BACnet MS/TP 设备接入架构（V4.3.0 新增）
+
+> 📌 响应客户大金 VRV 空调对接需求（FR-BN01~BN04）。技术方案：硬件协议转换网关 + 平台侧复用现有 BACnet/IP 适配器。
+
+### 24.1 架构总览
+
+```
+大金 VRV 空调 ──BACnet MS/TP (RS-485)──> 协议转换网关 ──BACnet/IP──> 平台 BACnet/IP 适配器
+                                              │
+                                    硬件设备（非平台组件）
+                                    如：Intesis MAPS、Loytec L-IP
+```
+
+**关键设计决策：**
+
+| 决策 | 选择 | 理由 |
+|------|------|------|
+| 协议处理方式 | 硬件网关转换，平台不实现 MS/TP 协议栈 | MS/TP 是串口协议，需物理 RS-485 接口；硬件网关成熟可靠，平台侧零改动 |
+| 平台侧适配 | 复用现有 BACnet/IP 适配器（Section 6） | 转换网关对平台透明，平台看到的是标准 BACnet/IP 设备 |
+| 网关管理 | 扩展现有 DeviceTemplate，不新建模块 | 转换网关作为一种网关类型纳入现有管理体系 |
+
+### 24.2 设备模板扩展
+
+在现有 `DeviceTemplate` 中新增 BACnet MS/TP 转换网关模板：
+
+```python
+# DeviceTemplate.point_config JSON 扩展
+{
+    "gateway_type": "bacnet_mstp_to_ip",
+    "bacnet_ip": {
+        "port": 47808,                    # BACnet/IP 端口
+        "device_instance": 100            # 网关自身的 BACnet 设备实例号
+    },
+    "mstp_config": {
+        "network_number": 1,              # MS/TP 网络号
+        "mac_range": [1, 127],            # MS/TP MAC 地址范围
+        "baud_rate": 9600,                # 串口波特率
+        "parity": "none"                  # 奇偶校验
+    },
+    "bbmd_config": {                      # 跨子网场景（可选）
+        "enabled": false,
+        "bdt_entries": []
+    },
+    "downstream_devices": [               # 网关下挂的 MS/TP 设备列表
+        {
+            "mac_address": 1,
+            "device_instance": 201,
+            "device_name": "大金VRV-B区-1",
+            "model": "RXYQ16TAY1"
+        }
+    ]
+}
+```
+
+### 24.3 故障隔离架构
+
+```
+平台监控
+    │
+    ├── BACnet/IP 连接状态 ──断开──> 标记网关离线
+    │       │                         └── 该网关下所有 MS/TP 设备标记为"网关离线"
+    │       │
+    │       └──正常──> 逐个检查 MS/TP 设备
+    │                   ├── 设备响应正常 → 在线
+    │                   └── 设备无响应 → 标记该设备为"设备离线"
+    │
+    └── DataSource.consecutive_failures
+            ├── 网关层：BACnet/IP 连接失败计数
+            └── 设备层：单个 BACnet 对象读取失败计数（独立计数）
+```
+
+**实现方式：**
+- 网关层故障检测：复用现有 `DataSource.consecutive_failures`，BACnet/IP 连接中断时触发
+- 设备层故障检测：在 BACnet/IP 适配器的 `read_object` 方法中，按设备实例号独立计数读取失败次数
+- 前端展示：网关离线时显示"协议转换网关离线（影响 N 台 MS/TP 设备）"；单设备离线时显示"设备离线（网关正常）"
+
+### 24.4 与现有架构的集成点
+
+| 集成点 | 现有组件 | 扩展方式 |
+|--------|---------|---------|
+| 协议适配 | `bacnet_ip.py`（Section 6） | 无需修改，转换网关对适配器透明 |
+| 网关管理 | Gateway 模型（FR15-FR20） | 新增 gateway_type="bacnet_mstp_bridge" |
+| 设备模板 | DeviceTemplate | 新增 MS/TP 转换网关模板（point_config JSON） |
+| 故障检测 | DataSource.consecutive_failures | 扩展为网关层+设备层双层计数 |
+| 告警 | AlarmEngine | 新增"网关离线"告警类型，区分于"设备离线" |
+
+---
+
 ## 附录: 架构变更日志
+
+### V4.3.0 (2026-03-18)
+
+**重大变更**:
+
+1. **多渠道通知引擎架构（Section 22）**
+   - 新增外部通知渠道：短信、即时通讯（钉钉/企业微信）、语音电话，可插拔适配器架构
+   - 通知策略按站点×告警级别×时段三维配置，支持站点隔离
+   - 渠道升级机制：独立于现有告警级别升级（AlarmEscalation），各自维护超时计时器
+   - 告警风暴抑制：60s 窗口内同站点 ≥20 条告警自动合并为摘要通知
+   - 异步分发：不阻塞告警创建和 WebSocket 推送流程
+   - 新增数据模型：UserNotificationContact、NotificationPolicy、NotificationRecord
+   - User 表扩展 phone 字段
+
+2. **预测性维护扩展架构（Section 23）**
+   - 劣化分析插件架构：UPS/电池/空调/PDU 四种设备类型，可扩展
+   - DeviceHealthScore 计算增强：劣化趋势+告警频次+维保记录加权合并，权重按设备类型配置
+   - 数据充分度分级（full/partial/minimal），前端显示评估精度提示
+   - 维护建议引擎：需人工确认后转工单，支持误报反馈闭环
+   - 新增数据模型：MaintenanceAdvice 表
+
+3. **BACnet MS/TP 设备接入架构（Section 24）**
+   - 硬件协议转换网关方案，平台侧复用现有 BACnet/IP 适配器，零协议栈改动
+   - DeviceTemplate 扩展 MS/TP 转换网关配置模板
+   - 双层故障隔离：网关层（BACnet/IP 连接）+ 设备层（单设备读取）独立计数
+
+**PRD 对应关系**:
+- Section 22 → FR-N01~N07（多渠道通知引擎）
+- Section 23 → FR-PM01~PM06（预测性维护扩展）+ FR75 更新
+- Section 24 → FR-BN01~BN04（BACnet MS/TP 接入）
 
 ### V4.2.0 (2026-03-10)
 
