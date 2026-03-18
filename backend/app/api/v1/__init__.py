@@ -60,6 +60,7 @@ from .ab_testing import router as ab_testing_router
 from .misdiagnosis_reports import router as misdiagnosis_reports_router
 from .chaos_drill import router as chaos_drill_router
 from .precool import router as precool_router
+from .user_notification_contacts import router as notification_contacts_router
 
 # 深度学习节能优化模块 (需要安装 torch)
 try:
@@ -127,6 +128,7 @@ api_router.include_router(ab_testing_router, tags=["A/B Testing"])
 api_router.include_router(misdiagnosis_reports_router, tags=["误判分析报告"])
 api_router.include_router(chaos_drill_router, tags=["灾难恢复演练"])
 api_router.include_router(precool_router, prefix="/precool", tags=["预冷系统"])
+api_router.include_router(notification_contacts_router, prefix="/users", tags=["通知联系方式"])
 
 # 深度学习节能优化API
 if _ml_available:

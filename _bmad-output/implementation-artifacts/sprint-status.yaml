@@ -384,3 +384,12 @@ development_status:
   33-2-vpp-control-command-reception-and-execution: done
   33-3-frontend-vpp-integration-status-monitoring: done
   epic-33-retrospective: done  # 2026-03-14
+
+  # ============================================================
+  # 多渠道通知引擎 (Epic 34)
+  # 新增于 2026-03-18，基于 PRD V4.3 FR-N01~N07 + Architecture Section 22
+  # ============================================================
+
+  # Epic 34: 多渠道通知引擎 (P0)
+  epic-34: in-progress
+  34-1-user-notification-contacts: done  # 完成: 数据模型、Schema、CRUD+导入API、迁移脚本、23个测试全通过

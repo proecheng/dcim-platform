@@ -112,6 +112,7 @@ from .load_shift import (
     DeviceLifespanImpact,
 )
 from .thermal import ThermalParameter, TemperaturePredictionLog, PrecoolSchedule, VppDispatch
+from .user_notification_contact import UserNotificationContact
 
 __all__ = [
     # 枚举
@@ -124,6 +125,7 @@ __all__ = [
     "UserSession",
     "UserSite",
     "PasswordHistory",
+    "UserNotificationContact",
     # 设备
     "Device",
     # 点位
