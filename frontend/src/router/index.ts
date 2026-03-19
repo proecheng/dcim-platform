@@ -273,6 +273,7 @@ const routes: RouteRecordRaw[] = [
           { path: 'users', name: 'UserManagement', component: () => import('@/views/system/user.vue'), meta: { title: '用户管理', icon: 'User' } },
           { path: 'sites', name: 'SiteManagement', component: () => import('@/views/system/sites.vue'), meta: { title: '站点管理', icon: 'OfficeBuilding' } },
           { path: 'audit-log', name: 'AuditLog', component: () => import('@/views/system/audit-log.vue'), meta: { title: '操作审计', icon: 'Document' } },
+          { path: 'notification', name: 'NotificationManagement', component: () => import('@/views/system/notification.vue'), meta: { title: '通知管理', icon: 'Bell' } },
           { path: 'settings', name: 'SystemSettings', component: () => import('@/views/settings/index.vue'), meta: { title: '系统设置', icon: 'Setting' } },
           { path: 'site-selection', name: 'SiteSelection', component: () => import('@/views/topology/site-selection.vue'), meta: { title: '智能选址', icon: 'MapLocation' } }
         ]

@@ -125,29 +125,75 @@
     <el-dialog append-to-body
       v-model="dialogVisible"
       :title="isEdit ? '编辑用户' : '新建用户'"
-      width="520px"
-      
+      :width="isEdit ? '680px' : '520px'"
+
     >
-      <el-form
-        ref="formRef"
-        :model="form"
-        :rules="formRules"
-        label-width="80px"
-      >
+      <el-tabs v-if="isEdit" v-model="dialogTab">
+        <el-tab-pane label="基本信息" name="basic">
+          <el-form ref="formRef" :model="form" :rules="formRules" label-width="80px">
+            <el-form-item label="用户名" prop="username">
+              <el-input v-model="form.username" placeholder="请输入用户名" :disabled="isEdit" />
+            </el-form-item>
+            <el-form-item label="真实姓名" prop="real_name">
+              <el-input v-model="form.real_name" placeholder="请输入真实姓名" />
+            </el-form-item>
+            <el-form-item label="邮箱" prop="email">
+              <el-input v-model="form.email" placeholder="请输入邮箱" />
+            </el-form-item>
+            <el-form-item label="手机" prop="phone">
+              <el-input v-model="form.phone" placeholder="请输入手机号" />
+            </el-form-item>
+            <el-form-item label="角色" prop="role">
+              <el-select v-model="form.role" placeholder="请选择角色" style="width: 100%;">
+                <el-option v-for="item in roleOptions" :key="item.value" :label="item.label" :value="item.value" />
+              </el-select>
+            </el-form-item>
+            <el-form-item label="部门" prop="department">
+              <el-input v-model="form.department" placeholder="请输入部门" />
+            </el-form-item>
+          </el-form>
+        </el-tab-pane>
+        <el-tab-pane label="通知联系方式" name="contacts">
+          <div class="contacts-toolbar">
+            <el-button type="primary" size="small" :icon="Plus" @click="handleCreateContact">新增</el-button>
+            <el-button size="small" @click="handleImportContacts">从账户导入</el-button>
+          </div>
+          <el-table :data="contactList" stripe border v-loading="contactLoading" size="small">
+            <el-table-column prop="channel_type" label="渠道" width="100" align="center">
+              <template #default="{ row }">
+                {{ contactChannelCn[row.channel_type] || row.channel_type }}
+              </template>
+            </el-table-column>
+            <el-table-column prop="platform" label="平台" width="100">
+              <template #default="{ row }">{{ row.platform || '--' }}</template>
+            </el-table-column>
+            <el-table-column prop="contact_value" label="联系方式" min-width="160" show-overflow-tooltip />
+            <el-table-column prop="is_enabled" label="状态" width="80" align="center">
+              <template #default="{ row }">
+                <el-tag :type="row.is_enabled ? 'success' : 'info'" size="small">{{ row.is_enabled ? '启用' : '禁用' }}</el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column label="操作" width="120" fixed="right">
+              <template #default="{ row }">
+                <el-button type="primary" link size="small" @click="handleEditContact(row)">编辑</el-button>
+                <el-popconfirm title="确定删除该联系方式？" @confirm="handleDeleteContact(row.id)">
+                  <template #reference>
+                    <el-button type="danger" link size="small">删除</el-button>
+                  </template>
+                </el-popconfirm>
+              </template>
+            </el-table-column>
+          </el-table>
+          <el-empty v-if="!contactLoading && contactList.length === 0" description="暂无联系方式" :image-size="60" />
+        </el-tab-pane>
+      </el-tabs>
+      <!-- 新增用户时不显示 Tab，直接显示表单 -->
+      <el-form v-if="!isEdit" ref="formRef" :model="form" :rules="formRules" label-width="80px">
         <el-form-item label="用户名" prop="username">
-          <el-input
-            v-model="form.username"
-            placeholder="请输入用户名"
-            :disabled="isEdit"
-          />
+          <el-input v-model="form.username" placeholder="请输入用户名" />
         </el-form-item>
-        <el-form-item v-if="!isEdit" label="密码" prop="password">
-          <el-input
-            v-model="form.password"
-            type="password"
-            placeholder="请输入密码"
-            show-password
-          />
+        <el-form-item label="密码" prop="password">
+          <el-input v-model="form.password" type="password" placeholder="请输入密码" show-password />
         </el-form-item>
         <el-form-item label="真实姓名" prop="real_name">
           <el-input v-model="form.real_name" placeholder="请输入真实姓名" />
@@ -160,12 +206,7 @@
         </el-form-item>
         <el-form-item label="角色" prop="role">
           <el-select v-model="form.role" placeholder="请选择角色" style="width: 100%;">
-            <el-option
-              v-for="item in roleOptions"
-              :key="item.value"
-              :label="item.label"
-              :value="item.value"
-            />
+            <el-option v-for="item in roleOptions" :key="item.value" :label="item.label" :value="item.value" />
           </el-select>
         </el-form-item>
         <el-form-item label="部门" prop="department">
@@ -174,7 +215,37 @@
       </el-form>
       <template #footer>
         <el-button @click="dialogVisible = false">取消</el-button>
-        <el-button type="primary" :loading="submitting" @click="handleSubmit">确定</el-button>
+        <el-button v-if="!isEdit || dialogTab === 'basic'" type="primary" :loading="submitting" @click="handleSubmit">确定</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 联系方式编辑对话框 -->
+    <el-dialog append-to-body v-model="contactDialogVisible" :title="contactIsEdit ? '编辑联系方式' : '新增联系方式'" width="420px">
+      <el-form ref="contactFormRef" :model="contactForm" :rules="contactRules" label-width="80px">
+        <el-form-item label="渠道" prop="channel_type">
+          <el-select v-model="contactForm.channel_type" placeholder="请选择" style="width: 100%;">
+            <el-option label="短信" value="sms" />
+            <el-option label="邮件" value="email" />
+            <el-option label="即时通讯" value="im" />
+            <el-option label="语音" value="voice" />
+          </el-select>
+        </el-form-item>
+        <el-form-item v-if="contactForm.channel_type === 'im'" label="平台">
+          <el-select v-model="contactForm.platform" placeholder="请选择平台" clearable style="width: 100%;">
+            <el-option label="钉钉" value="dingtalk" />
+            <el-option label="企业微信" value="wecom" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="联系方式" prop="contact_value">
+          <el-input v-model="contactForm.contact_value" placeholder="请输入联系方式" />
+        </el-form-item>
+        <el-form-item label="启用">
+          <el-switch v-model="contactForm.is_enabled" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="contactDialogVisible = false">取消</el-button>
+        <el-button type="primary" :loading="contactSubmitting" @click="handleSubmitContact">确定</el-button>
       </template>
     </el-dialog>
 
@@ -227,6 +298,14 @@ import {
   batchDeleteUsers
 } from '@/api/modules/user'
 import type { UserInfo, UserCreateParams, UserUpdateParams } from '@/api/modules/user'
+import {
+  getUserContacts,
+  createContact as apiCreateContact,
+  updateContact as apiUpdateContact,
+  deleteContact as apiDeleteContact,
+  importFromProfile,
+} from '@/api/modules/notification'
+import type { ContactItem, ContactForm } from '@/api/modules/notification'
 
 type FormInstance = InstanceType<typeof import('element-plus')['ElForm']>
 
@@ -387,6 +466,8 @@ function handleCreate() {
 function handleEdit(row: UserInfo) {
   isEdit.value = true
   editingId.value = row.id
+  dialogTab.value = 'basic'
+  contactList.value = []
   Object.assign(form, {
     username: row.username,
     password: '',
@@ -528,6 +609,116 @@ function formatDateTime(dateStr?: string): string {
     minute: '2-digit'
   })
 }
+
+// ===== 通知联系方式 =====
+const dialogTab = ref('basic')
+const contactChannelCn: Record<string, string> = { sms: '短信', email: '邮件', im: '即时通讯', voice: '语音' }
+const contactLoading = ref(false)
+const contactList = ref<ContactItem[]>([])
+
+// 联系方式对话框
+const contactDialogVisible = ref(false)
+const contactIsEdit = ref(false)
+const contactEditId = ref<number | null>(null)
+const contactSubmitting = ref(false)
+const contactFormRef = ref<FormInstance>()
+const contactForm = reactive<ContactForm>({
+  channel_type: '',
+  platform: null,
+  contact_value: '',
+  is_enabled: true,
+})
+const contactRules = {
+  channel_type: [{ required: true, message: '请选择渠道', trigger: 'change' }],
+  contact_value: [{ required: true, message: '请输入联系方式', trigger: 'blur' }],
+}
+
+async function loadContacts() {
+  if (!editingId.value) return
+  contactLoading.value = true
+  try {
+    const res = await getUserContacts(editingId.value) as any
+    contactList.value = res.data || res || []
+  } catch (e) {
+    console.error('加载联系方式失败', e)
+  } finally {
+    contactLoading.value = false
+  }
+}
+
+watch(dialogTab, (tab) => {
+  if (tab === 'contacts' && contactList.value.length === 0) {
+    loadContacts()
+  }
+})
+
+function handleCreateContact() {
+  contactIsEdit.value = false
+  contactEditId.value = null
+  Object.assign(contactForm, { channel_type: '', platform: null, contact_value: '', is_enabled: true })
+  contactDialogVisible.value = true
+}
+
+function handleEditContact(row: ContactItem) {
+  contactIsEdit.value = true
+  contactEditId.value = row.id
+  Object.assign(contactForm, {
+    channel_type: row.channel_type,
+    platform: row.platform,
+    contact_value: row.contact_value,
+    is_enabled: row.is_enabled,
+  })
+  contactDialogVisible.value = true
+}
+
+async function handleSubmitContact() {
+  try {
+    await contactFormRef.value?.validate()
+  } catch { return }
+
+  if (!editingId.value) return
+  contactSubmitting.value = true
+  try {
+    if (contactIsEdit.value && contactEditId.value) {
+      await apiUpdateContact(editingId.value, contactEditId.value, { ...contactForm })
+      ElMessage.success('更新成功')
+    } else {
+      await apiCreateContact(editingId.value, { ...contactForm })
+      ElMessage.success('创建成功')
+    }
+    contactDialogVisible.value = false
+    loadContacts()
+  } catch (e) {
+    console.error('操作失败', e)
+    ElMessage.error('操作失败')
+  } finally {
+    contactSubmitting.value = false
+  }
+}
+
+async function handleDeleteContact(contactId: number) {
+  if (!editingId.value) return
+  try {
+    await apiDeleteContact(editingId.value, contactId)
+    ElMessage.success('删除成功')
+    loadContacts()
+  } catch (e) {
+    console.error('删除失败', e)
+    ElMessage.error('删除失败')
+  }
+}
+
+async function handleImportContacts() {
+  if (!editingId.value) return
+  try {
+    await importFromProfile(editingId.value)
+    ElMessage.success('导入成功')
+    loadContacts()
+  } catch (e) {
+    console.error('导入失败', e)
+    ElMessage.error('导入失败')
+  }
+}
 </script>
 
 <style scoped lang="scss">
@@ -609,6 +800,12 @@ function formatDateTime(dateStr?: string): string {
     .el-dialog__footer {
       border-top: 1px solid var(--border-color);
     }
+  }
+
+  .contacts-toolbar {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 12px;
   }
 
   :deep(.el-form-item__label) {

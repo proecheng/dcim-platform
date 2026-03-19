@@ -24,6 +24,7 @@ export const SITE_FILTER_EXCLUDED_PATHS = [
   '/v1/demo/',           // Demo 系统
   '/v1/configs/',        // 全局配置
   '/v1/logs/',           // 系统日志
+  '/v1/notification/',   // 通知管理
 ]
 
 export function shouldInjectSiteId(url: string): boolean {
