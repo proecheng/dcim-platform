@@ -117,6 +117,34 @@ class RedisService:
         except Exception as e:
             logger.warning("Redis SADD 失败 key=%s: %s", key, e)
 
+    async def incr_with_ttl(self, key: str, ttl: int = 60) -> int:
+        """原子递增+TTL，Redis 不可用时返回 -1"""
+        if not self.is_available:
+            return -1
+        try:
+            pipe = self._pool.pipeline()
+            pipe.incr(key)
+            pipe.expire(key, ttl)
+            results = await pipe.execute()
+            return results[0]
+        except Exception as e:
+            logger.warning("Redis INCR 失败 key=%s: %s", key, e)
+            return -1
+
+    async def incrby_with_ttl(self, key: str, amount: int, ttl: int = 60) -> int:
+        """原子批量递增+TTL，Redis 不可用时返回 -1"""
+        if not self.is_available:
+            return -1
+        try:
+            pipe = self._pool.pipeline()
+            pipe.incrby(key, amount)
+            pipe.expire(key, ttl)
+            results = await pipe.execute()
+            return results[0]
+        except Exception as e:
+            logger.warning("Redis INCRBY 失败 key=%s: %s", key, e)
+            return -1
+
     def set_with_expiry(self, key: str, value: str, ttl: int) -> bool:
         """同步方式设置值+TTL（用于分布式锁），返回是否成功"""
         if not self.is_available:

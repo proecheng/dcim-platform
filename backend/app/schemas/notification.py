@@ -110,6 +110,43 @@ def render_notification(template: str, context: AlarmNotificationContext) -> str
     return template.format(**values)
 
 
+# ==================== 风暴摘要模板 (Story 34.6) ====================
+
+STORM_SUMMARY_TEMPLATE = (
+    "[告警风暴] {site_name} 在 {window}s 内触发 {total_count} 条告警\n"
+    "级别分布: {level_summary}\n"
+    "{critical_detail}"
+)
+
+
+def build_storm_summary(
+    site_name: str,
+    alarm_data_list: list[dict],
+    window: int,
+) -> str:
+    """构建风暴摘要通知内容。window 必传，从 StormDetector.get_config() 获取。"""
+    from collections import Counter
+
+    level_counter = Counter(d["alarm_level"] for d in alarm_data_list)
+    level_summary = ", ".join(
+        f"{ALARM_LEVEL_CN.get(k, k)} {v}条" for k, v in level_counter.most_common()
+    )
+
+    critical_detail = ""
+    critical_alarms = [d for d in alarm_data_list if d["alarm_level"] == "critical"]
+    if critical_alarms:
+        devices = set(d.get("device_name") or "未知设备" for d in critical_alarms)
+        critical_detail = f"⚠ 紧急告警 {len(critical_alarms)} 条，涉及设备: {', '.join(sorted(devices)[:5])}\n"
+
+    return STORM_SUMMARY_TEMPLATE.format(
+        site_name=site_name or "未知站点",
+        window=window,
+        total_count=len(alarm_data_list),
+        level_summary=level_summary,
+        critical_detail=critical_detail,
+    )
+
+
 # ==================== API Schema ====================
 
 class ChannelTestRequest(BaseModel):

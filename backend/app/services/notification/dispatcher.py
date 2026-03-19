@@ -3,6 +3,7 @@
 Story 34.2 — 通知渠道适配器框架
 Story 34.4 — 通知分发器与告警引擎集成
 Story 34.5 — 通知渠道升级
+Story 34.6 — 告警风暴抑制
 """
 
 import asyncio
@@ -60,6 +61,7 @@ class NotificationDispatcher:
     async def dispatch(self, alarm_data_list: list[dict]) -> dict[int, int]:
         """
         批量分发通知，返回 {alarm_id: sent_count} 映射。
+        Story 34.6: 集成风暴检测 — 同站点告警超阈值时合并为摘要通知。
 
         alarm_data_list 结构（纯数据 dict，非 ORM 对象）:
         [{"alarm_id", "alarm_level", "alarm_message", "trigger_value",
@@ -69,9 +71,54 @@ class NotificationDispatcher:
         if not alarm_data_list:
             return {}
 
+        from app.services.notification.storm import storm_detector
+
         result_map: dict[int, int] = {}
+
+        # 按 site_id 分组（site_id=None 的跳过风暴检测，直接逐条分发）
+        site_groups: dict[int, list[dict]] = {}
+        no_site_alarms: list[dict] = []
+        for alarm_data in alarm_data_list:
+            sid = alarm_data.get("site_id")
+            if sid is not None:
+                site_groups.setdefault(sid, []).append(alarm_data)
+            else:
+                no_site_alarms.append(alarm_data)
+
         async with async_session() as db:
-            for alarm_data in alarm_data_list:
+            # 有站点的告警：风暴检测
+            for site_id, group in site_groups.items():
+                # 一次性递增整组数量，判断是否风暴
+                is_storm = await storm_detector.check_storm(
+                    site_id, count=len(group)
+                )
+
+                if is_storm:
+                    # 风暴模式：合并为摘要通知
+                    sent = await self._dispatch_storm_summary(
+                        db, site_id, group
+                    )
+                    for alarm_data in group:
+                        result_map[alarm_data["alarm_id"]] = (
+                            1 if sent > 0 else 0
+                        )
+                else:
+                    # 正常模式：逐条分发
+                    for alarm_data in group:
+                        try:
+                            sent = await self._dispatch_single(db, alarm_data)
+                            result_map[alarm_data["alarm_id"]] = sent
+                        except Exception as e:
+                            logger.error(
+                                "分发告警 %s 通知失败: %s",
+                                alarm_data.get("alarm_id"),
+                                e,
+                                exc_info=True,
+                            )
+                            result_map[alarm_data["alarm_id"]] = 0
+
+            # 无站点告警：直接逐条分发，不做风暴检测
+            for alarm_data in no_site_alarms:
                 try:
                     sent = await self._dispatch_single(db, alarm_data)
                     result_map[alarm_data["alarm_id"]] = sent
@@ -83,7 +130,89 @@ class NotificationDispatcher:
                         exc_info=True,
                     )
                     result_map[alarm_data["alarm_id"]] = 0
+
         return result_map
+
+    async def _dispatch_storm_summary(
+        self, db, site_id: int, alarm_data_list: list[dict]
+    ) -> int:
+        """风暴模式：合并告警为摘要通知发送"""
+        from app.schemas.notification import build_storm_summary
+        from app.services.notification.storm import storm_detector
+
+        if not alarm_data_list:
+            return 0
+
+        # 使用最高级别告警来匹配策略
+        level_priority = {"critical": 0, "major": 1, "minor": 2, "info": 3}
+        sorted_alarms = sorted(
+            alarm_data_list,
+            key=lambda d: level_priority.get(d["alarm_level"], 99),
+        )
+        top_alarm = sorted_alarms[0]
+        site_name = top_alarm.get("site_name") or "未知站点"
+
+        # 匹配策略
+        policy = await self._match_policy(
+            db, site_id, top_alarm["alarm_level"]
+        )
+        if not policy:
+            return 0
+
+        user_ids = policy.notify_user_ids
+        if isinstance(user_ids, str):
+            user_ids = json.loads(user_ids)
+        if not user_ids:
+            return 0
+
+        channels = policy.channels
+        if isinstance(channels, str):
+            channels = json.loads(channels)
+
+        # 构建摘要（从 StormDetector 获取实际 window 值）
+        _, window = await storm_detector.get_config()
+        summary_text = build_storm_summary(
+            site_name, alarm_data_list, window
+        )
+
+        # 构建 context（使用最高级别告警的信息）
+        context = AlarmNotificationContext(
+            alarm_id=top_alarm["alarm_id"],
+            alarm_level=top_alarm["alarm_level"],
+            alarm_message=summary_text,
+            device_name=top_alarm.get("device_name"),
+            point_name=top_alarm.get("point_name"),
+            current_value=None,
+            threshold_value=None,
+            site_id=site_id,
+            site_name=site_name,
+            created_at=top_alarm.get("created_at") or datetime.now(),
+        )
+
+        sent_count = 0
+        for channel in channels:
+            contacts = await self._get_user_contacts(db, user_ids, channel)
+            if not contacts:
+                continue
+            for user_id, contact_value, platform in contacts:
+                try:
+                    await self.send_notification(
+                        context, channel, contact_value, user_id,
+                        policy_id=policy.id, platform=platform,
+                    )
+                    sent_count += 1
+                except Exception as e:
+                    logger.error(
+                        "风暴摘要通知发送异常: %s", e, exc_info=True
+                    )
+
+        if sent_count > 0:
+            logger.info(
+                "告警风暴摘要: 站点 %s, %d 条告警合并, 发送 %d 条通知",
+                site_name, len(alarm_data_list), sent_count,
+            )
+
+        return sent_count
 
     async def _dispatch_single(self, db, alarm_data: dict) -> int:
         """处理单个告警的通知分发，返回发送数量"""

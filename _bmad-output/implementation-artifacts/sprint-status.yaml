@@ -397,3 +397,4 @@ development_status:
   34-3-notification-policy-config: done  # 完成: NotificationPolicy模型、Schema(含去重/extra=forbid)、时段冲突检测(分钟区间/跨午夜)、站点权限校验、CRUD API、种子数据4条、迁移脚本、26个测试场景验证通过
   34-4-notification-dispatcher-integration: done  # 完成: dispatch批量分发、_match_policy策略匹配(站点优先+时段过滤)、_dispatch_single串行发送、ingest_pipeline集成(LEFT JOIN缓存+create_task异步分发+批量回写)、26个测试全通过
   34-5-notification-channel-escalation: done  # 完成: check_channel_escalations+_escalate_single_alarm、MAX(sent_at)超时判断、幂等渠道推进、定时任务注册、13个测试全通过
+  34-6-notification-storm-suppression: done  # 完成: StormDetector(Redis优先+内存降级)、build_storm_summary摘要模板、dispatch()风暴检测集成(site_id分组+批量计数)、incr_with_ttl/incrby_with_ttl、28个测试全通过
