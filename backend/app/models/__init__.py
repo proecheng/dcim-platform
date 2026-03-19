@@ -113,6 +113,7 @@ from .load_shift import (
 )
 from .thermal import ThermalParameter, TemperaturePredictionLog, PrecoolSchedule, VppDispatch
 from .user_notification_contact import UserNotificationContact
+from .notification_record import NotificationRecord
 
 __all__ = [
     # 枚举
@@ -126,6 +127,7 @@ __all__ = [
     "UserSite",
     "PasswordHistory",
     "UserNotificationContact",
+    "NotificationRecord",
     # 设备
     "Device",
     # 点位
