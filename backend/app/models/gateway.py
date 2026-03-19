@@ -2,6 +2,7 @@
 
 from datetime import datetime
 from sqlalchemy import Column, Integer, String, Boolean, Float, DateTime, JSON, Index, UniqueConstraint, ForeignKey
+from sqlalchemy.orm import relationship, backref
 
 from ..core.database import Base
 
@@ -49,8 +50,19 @@ class DataSource(Base):
     retry_max_failures = Column(Integer, default=5, comment="连续失败阈值")
     site_id = Column(Integer, ForeignKey("sites.id"), nullable=True, default=None, comment="站点 ID")
     is_enabled = Column(Boolean, default=True, comment="是否启用")
+    parent_datasource_id = Column(
+        Integer, ForeignKey("datasources.id", ondelete="SET NULL"),
+        nullable=True, default=None, index=True,
+        comment="父数据源ID（MS/TP设备指向其网关DataSource）"
+    )
     created_at = Column(DateTime, default=datetime.now, comment="创建时间")
     updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now, comment="更新时间")
+
+    children = relationship(
+        "DataSource",
+        backref=backref("parent", remote_side="DataSource.id"),
+        lazy="noload",
+    )
 
 
 class DataSourcePoint(Base):
@@ -188,6 +200,7 @@ class DeviceTemplate(Base):
     protocol_type = Column(String(30), nullable=False, comment="协议类型")
     description = Column(String(500), comment="描述")
     point_config = Column(JSON, nullable=False, comment="预置点位配置列表")
+    extra_config = Column(JSON, nullable=True, comment="扩展配置（网关参数等，与 point_config 点位配置分离）")
     created_at = Column(DateTime, default=datetime.now, comment="创建时间")
     updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now, comment="更新时间")
 

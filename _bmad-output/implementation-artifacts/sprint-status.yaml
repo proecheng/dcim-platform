@@ -400,3 +400,15 @@ development_status:
   34-6-notification-storm-suppression: done  # 完成: StormDetector(Redis优先+内存降级)、build_storm_summary摘要模板、dispatch()风暴检测集成(site_id分组+批量计数)、incr_with_ttl/incrby_with_ttl、28个测试全通过
   34-7-notification-management-frontend: done  # 完成: GET /records API(outerjoin Alarm获取alarm_level)+NotificationRecordInfo Schema+14个测试全通过、notification.ts前端API模块、notification.vue三Tab页面(策略/记录/渠道)、UserManagement联系方式Tab、路由+excludedPaths
   epic-34-retrospective: done  # 2026-03-19
+
+  # ============================================================
+  # BACnet MS/TP 设备接入 (Epic 35)
+  # 新增于 2026-03-19，基于 PRD V4.3 FR-BN01~BN04 + Architecture Section 24
+  # ============================================================
+
+  # Epic 35: BACnet MS/TP 设备接入
+  epic-35: in-progress
+  35-1-bacnet-mstp-gateway-template-and-datasource: done  # 完成: DeviceTemplate.extra_config+DataSource.parent_datasource_id模型扩展、MstpGatewayExtraConfig验证Schema(mac/device_instance唯一性+baud_rate/parity/mac_range校验)、POST create-mstp-datasources批量创建端点(网关+N子设备+点位)、IPv4验证+规范化、迁移脚本+种子数据、28个测试全通过
+  35-2-dual-layer-fault-isolation: backlog
+  35-3-gateway-offline-alarm-and-frontend: backlog
+  epic-35-retrospective: optional
