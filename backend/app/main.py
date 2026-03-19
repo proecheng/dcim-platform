@@ -472,6 +472,19 @@ async def lifespan(app: FastAPI):
 
     escalation_task = asyncio.create_task(_escalation_engine_loop())
 
+    # 启动渠道升级扫描（每 60 秒检查）— Story 34.5
+    async def _channel_escalation_loop():
+        while True:
+            await asyncio.sleep(60)
+            try:
+                async with async_session() as session:
+                    from app.services.notification.dispatcher import check_channel_escalations
+                    await check_channel_escalations(session)
+            except Exception as e:
+                logger.warning("渠道升级检查失败: %s", e)
+
+    channel_escalation_task = asyncio.create_task(_channel_escalation_loop())
+
     # 启动 PUE 历史记录定时写入（每 15 分钟）
     async def _pue_history_loop():
         await asyncio.sleep(10)  # 启动后短暂等待

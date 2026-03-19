@@ -2,6 +2,7 @@
 通知分发器 + 重试队列
 Story 34.2 — 通知渠道适配器框架
 Story 34.4 — 通知分发器与告警引擎集成
+Story 34.5 — 通知渠道升级
 """
 
 import asyncio
@@ -10,7 +11,7 @@ import logging
 from datetime import datetime
 from typing import Optional
 
-from sqlalchemy import select, update
+from sqlalchemy import select, update, func
 
 from app.core.database import async_session
 from app.models.notification_record import NotificationRecord
@@ -378,3 +379,155 @@ class NotificationDispatcher:
 
 # 全局单例
 notification_dispatcher = NotificationDispatcher()
+
+
+# ==================== Story 34.5: 渠道升级 ====================
+
+
+async def check_channel_escalations(session) -> int:
+    """
+    扫描需要渠道升级的告警，返回本次升级发送数量。
+    由 main.py 定时任务每 60 秒调用。
+    """
+    from app.models.alarm import Alarm
+
+    now = datetime.now()
+    escalated_count = 0
+
+    # 查询所有已通知但未确认的活动告警
+    result = await session.execute(
+        select(Alarm.id, Alarm.alarm_level, Alarm.point_id)
+        .where(
+            Alarm.status == "active",
+            Alarm.is_notified == True,
+        )
+    )
+    active_alarms = result.all()
+
+    if not active_alarms:
+        return 0
+
+    dispatcher = notification_dispatcher
+
+    for alarm_id, alarm_level, point_id in active_alarms:
+        try:
+            sent = await _escalate_single_alarm(
+                session, dispatcher, alarm_id, alarm_level, point_id, now
+            )
+            escalated_count += sent
+        except Exception as e:
+            logger.error("渠道升级告警 %s 失败: %s", alarm_id, e, exc_info=True)
+
+    return escalated_count
+
+
+async def _escalate_single_alarm(
+    session, dispatcher, alarm_id: int, alarm_level: str,
+    point_id: int, now: datetime
+) -> int:
+    """处理单个告警的渠道升级，返回发送数量"""
+    from app.models.notification_record import NotificationRecord
+
+    # 1. 查询该告警最近一次 sent_at（MAX，确保每步升级间有完整超时窗口）
+    max_sent_result = await session.execute(
+        select(func.max(NotificationRecord.sent_at))
+        .where(
+            NotificationRecord.alarm_id == alarm_id,
+            NotificationRecord.status == "sent",
+        )
+    )
+    max_sent_at = max_sent_result.scalar()
+    if max_sent_at is None:
+        return 0  # 无成功发送记录，跳过
+
+    # 2. 获取 site_id 和点位元数据
+    from app.services.ingest_pipeline import _point_meta_cache
+    meta = _point_meta_cache.get(point_id, {})
+    site_id = meta.get("site_id")
+
+    # 3. 匹配策略
+    policy = await dispatcher._match_policy(session, site_id, alarm_level)
+    if not policy or not policy.channel_escalation_enabled:
+        return 0
+
+    # 4. 检查超时（基于最近一次发送时间）
+    timeout_minutes = policy.escalation_timeout_minutes or 5
+    elapsed = (now - max_sent_at).total_seconds() / 60
+    if elapsed < timeout_minutes:
+        return 0  # 未超时
+
+    # 5. 获取升级渠道顺序（JSON 列安全处理）
+    escalation_order = policy.escalation_channel_order
+    if isinstance(escalation_order, str):
+        escalation_order = json.loads(escalation_order)
+    if not escalation_order:
+        return 0
+
+    # 6. 查询已发送的渠道
+    sent_channels_result = await session.execute(
+        select(NotificationRecord.channel_type)
+        .where(
+            NotificationRecord.alarm_id == alarm_id,
+            NotificationRecord.status == "sent",
+        )
+        .distinct()
+    )
+    sent_channels = {row[0] for row in sent_channels_result.all()}
+
+    # 7. 找到下一个未发送的渠道
+    next_channel = None
+    for ch in escalation_order:
+        if ch not in sent_channels:
+            next_channel = ch
+            break
+
+    if next_channel is None:
+        logger.debug(
+            "告警 %d 所有升级渠道已用尽: %s", alarm_id, escalation_order
+        )
+        return 0
+
+    # 8. 获取用户列表（JSON 列安全处理）
+    user_ids = policy.notify_user_ids
+    if isinstance(user_ids, str):
+        user_ids = json.loads(user_ids)
+    if not user_ids:
+        return 0
+
+    contacts = await dispatcher._get_user_contacts(session, user_ids, next_channel)
+    if not contacts:
+        logger.debug("告警 %d 渠道 %s 无可用联系方式", alarm_id, next_channel)
+        return 0
+
+    # 9. 构建 context 并发送
+    context = AlarmNotificationContext(
+        alarm_id=alarm_id,
+        alarm_level=alarm_level,
+        alarm_message=f"[渠道升级] 告警未确认，升级至 {next_channel}",
+        device_name=meta.get("device_name"),
+        point_name=meta.get("point_name"),
+        current_value=None,
+        threshold_value=None,
+        site_id=site_id,
+        site_name=meta.get("site_name") or "未知站点",
+        created_at=max_sent_at,
+    )
+
+    sent_count = 0
+    for user_id, contact_value, platform in contacts:
+        try:
+            await dispatcher.send_notification(
+                context, next_channel, contact_value, user_id,
+                policy_id=policy.id, platform=platform,
+            )
+            sent_count += 1
+        except Exception as e:
+            logger.error("渠道升级发送异常: %s", e, exc_info=True)
+
+    if sent_count > 0:
+        logger.info(
+            "告警 %d 渠道升级: %s → %s, 发送 %d 条",
+            alarm_id, sent_channels, next_channel, sent_count,
+        )
+
+    return sent_count
