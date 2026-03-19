@@ -19,6 +19,8 @@ from ..core.database import async_session
 from ..core.redis import redis_service
 from ..engines.alarm_engine import alarm_engine
 from ..models import Point, PointRealtime, PointHistory, Alarm
+from ..models.device import Device
+from ..models.spatial import Site
 from ..models.gateway import PointDataLatest
 from ..services.websocket import ws_manager
 
@@ -83,7 +85,12 @@ async def _ensure_point_cache(session: AsyncSession) -> None:
             Point.unit,
             Point.is_enabled,
             Point.store_interval,  # 新增：存储间隔
+            Device.site_id,
+            Device.device_name,
+            Site.site_name,
         )
+        .outerjoin(Device, Point.device_id == Device.id)
+        .outerjoin(Site, Device.site_id == Site.id)
     )
     for row in result.all():
         _point_meta_cache[row[0]] = {
@@ -96,6 +103,9 @@ async def _ensure_point_cache(session: AsyncSession) -> None:
             "unit": row[7],
             "is_enabled": row[8],
             "store_interval": row[9] or 300,  # 默认5分钟
+            "site_id": row[10],
+            "device_name": row[11],
+            "site_name": row[12],
         }
     _cache_loaded = True
     logger.info("点位元数据缓存已加载: %d 条", len(_point_meta_cache))
@@ -582,6 +592,51 @@ async def _evaluate_alarms(
         except Exception as e:
             logger.error("告警提交失败: %s", e)
             await session.rollback()
+            alarm_events = []  # commit 失败，清空事件防止 dispatch 使用无效数据
+
+    # Story 34.4: 异步通知分发（commit 成功后，构建纯数据列表）
+    if alarm_events:
+        import asyncio as _asyncio
+
+        alarm_data_list = []
+        for evt in alarm_events:
+            _alarm = evt["alarm"]
+            _meta = evt["point_meta"]
+            alarm_data_list.append({
+                "alarm_id": _alarm.id,
+                "alarm_level": _alarm.alarm_level,
+                "alarm_message": _alarm.alarm_message,
+                "trigger_value": _alarm.trigger_value,
+                "threshold_value": _alarm.threshold_value,
+                "created_at": _alarm.created_at,
+                "site_id": _meta.get("site_id"),
+                "site_name": _meta.get("site_name"),
+                "device_name": _meta.get("device_name"),
+                "point_name": _meta.get("point_name"),
+            })
+
+        from ..services.notification import notification_dispatcher as _dispatcher
+
+        async def _dispatch_and_update(data_list):
+            """分发通知并按告警回写 is_notified + notify_count"""
+            try:
+                result_map = await _dispatcher.dispatch(data_list)
+                notified = {aid: cnt for aid, cnt in result_map.items() if cnt > 0}
+                if notified:
+                    async with async_session() as _db:
+                        for aid, cnt in notified.items():
+                            await _db.execute(
+                                update(Alarm)
+                                .where(Alarm.id == aid)
+                                .values(is_notified=True, notify_count=cnt)
+                            )
+                        await _db.commit()
+            except Exception as _e:
+                logger.error("通知分发异常: %s", _e, exc_info=True)
+
+        _task = _asyncio.create_task(_dispatch_and_update(alarm_data_list))
+        _dispatcher._pending_tasks.add(_task)
+        _task.add_done_callback(_dispatcher._pending_tasks.discard)
 
     # 重置大面积告警统计
     alarm_engine.reset_cycle_stats()
