@@ -1,7 +1,7 @@
 @echo off
 REM ============================================================
 REM Port Cleanup Module
-REM 清理指定端口的占用进程
+REM Clean occupied ports
 REM ============================================================
 
 setlocal EnableDelayedExpansion

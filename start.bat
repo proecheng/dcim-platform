@@ -1,7 +1,7 @@
 @echo off
 REM ============================================================
 REM DCIM System Launcher v8.0 (Refactored)
-REM 模块化启动脚本
+REM Modular launcher script
 REM ============================================================
 
 setlocal EnableDelayedExpansion

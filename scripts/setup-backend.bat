@@ -1,7 +1,7 @@
 @echo off
 REM ============================================================
 REM Backend Setup Module
-REM 准备后端环境和数据库
+REM Setup backend environment and database
 REM ============================================================
 
 setlocal EnableDelayedExpansion

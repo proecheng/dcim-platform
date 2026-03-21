@@ -1,7 +1,7 @@
 @echo off
 REM ============================================================
 REM Start Services Module
-REM 启动后端和代理服务
+REM Start backend and proxy services
 REM ============================================================
 
 setlocal EnableDelayedExpansion

@@ -1,7 +1,7 @@
 @echo off
 REM ============================================================
 REM DCIM System Stopper v4.0 (Refactored)
-REM 使用模块化端口清理
+REM Modular port cleanup
 REM ============================================================
 
 setlocal EnableDelayedExpansion

@@ -1,7 +1,7 @@
 @echo off
 REM ============================================================
 REM DCIM Smart Launcher v8.1
-REM 智能启动脚本 - 自动处理端口冲突
+REM Smart launcher - auto port conflict resolution
 REM ============================================================
 
 setlocal EnableDelayedExpansion

@@ -1,7 +1,7 @@
 @echo off
 REM ============================================================
 REM DCIM Quick Start (No Environment Check)
-REM 快速启动脚本 - 跳过环境检查和依赖安装
+REM Quick start script - skip environment check and dependency install
 REM ============================================================
 
 setlocal EnableDelayedExpansion

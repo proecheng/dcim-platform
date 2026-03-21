@@ -1,7 +1,7 @@
 @echo off
 REM ============================================================
 REM Proxy Setup Module
-REM 准备代理服务环境
+REM Setup proxy service environment
 REM ============================================================
 
 setlocal EnableDelayedExpansion

@@ -1,7 +1,7 @@
 @echo off
 REM ============================================================
 REM Port Cleanup Module (Enhanced with Fallback)
-REM 清理指定端口的占用进程，失败时返回备用端口
+REM Clean occupied ports with fallback to alternative ports
 REM ============================================================
 
 setlocal EnableDelayedExpansion

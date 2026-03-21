@@ -1,7 +1,7 @@
 @echo off
 REM ============================================================
 REM DCIM Quick Start (Skip Port Check)
-REM 快速启动脚本 - 使用备用端口，跳过端口清理
+REM Quick start script - use alternative ports, skip port cleanup
 REM ============================================================
 
 setlocal EnableDelayedExpansion

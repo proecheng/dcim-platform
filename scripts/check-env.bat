@@ -1,7 +1,7 @@
 @echo off
 REM ============================================================
 REM Environment Check Module
-REM 检查 Python 和 Node.js 环境
+REM Check Python and Node.js environment
 REM ============================================================
 
 setlocal EnableDelayedExpansion

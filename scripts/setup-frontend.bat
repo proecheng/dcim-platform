@@ -1,7 +1,7 @@
 @echo off
 REM ============================================================
 REM Frontend Setup Module
-REM 准备前端环境和构建
+REM Setup frontend environment and build
 REM ============================================================
 
 setlocal EnableDelayedExpansion
