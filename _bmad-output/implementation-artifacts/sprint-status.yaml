@@ -412,4 +412,4 @@ development_status:
   35-2-dual-layer-fault-isolation: done  # 完成: check_mstp_gateway_health()+_probe_gateway()网关探测、communication_monitor双层状态(device_offline/gateway_offline)、asyncio.wait_for超时保护、parent_status_map预加载、定时任务注册(45s错开)、6个测试全通过+4个回归通过
   35-3-gateway-offline-alarm-and-frontend: done  # 完成: Alarm.source列+point_id可空、datasource_alarm.py(幂等创建/Python计算duration/批量关闭)、gateway_monitor告警创建+恢复+级联关闭、communication_monitor设备离线告警、API NULL point_id保护、前端gateway_offline/device_offline状态展示、迁移脚本、8个测试全通过
   epic-35: done
-  epic-35-retrospective: optional
+  epic-35-retrospective: done  # 2026-03-21
