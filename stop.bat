@@ -29,7 +29,8 @@ taskkill /F /FI "WINDOWTITLE eq Proxy*" >nul 2>&1
 if not errorlevel 1 echo       Proxy window closed
 taskkill /F /FI "WINDOWTITLE eq Monitor-Backend*" >nul 2>&1
 taskkill /F /FI "WINDOWTITLE eq Monitor-Proxy*" >nul 2>&1
-taskkill /F /FI "WINDOWTITLE eq DCIM*" >nul 2>&1
+taskkill /F /FI "WINDOWTITLE eq DCIM-Backend*" >nul 2>&1
+taskkill /F /FI "WINDOWTITLE eq DCIM-Proxy*" >nul 2>&1
 
 echo       Service windows closed
 

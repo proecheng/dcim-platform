@@ -16,12 +16,13 @@ if "%FALLBACK_MODE%"=="" set "FALLBACK_MODE=0"
 
 echo Cleaning ports %PORT_8080% and %PORT_3000%...
 
-REM Kill processes by window title first
+REM Kill service processes by window title (not launcher/stopper windows)
 taskkill /F /FI "WINDOWTITLE eq Backend*" >nul 2>&1
 taskkill /F /FI "WINDOWTITLE eq Proxy*" >nul 2>&1
 taskkill /F /FI "WINDOWTITLE eq Monitor-Backend*" >nul 2>&1
 taskkill /F /FI "WINDOWTITLE eq Monitor-Proxy*" >nul 2>&1
-taskkill /F /FI "WINDOWTITLE eq DCIM*" >nul 2>&1
+taskkill /F /FI "WINDOWTITLE eq DCIM-Backend*" >nul 2>&1
+taskkill /F /FI "WINDOWTITLE eq DCIM-Proxy*" >nul 2>&1
 
 REM Kill processes on port 8080
 set "KILLED_8080=0"
