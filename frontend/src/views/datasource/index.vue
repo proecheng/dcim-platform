@@ -32,6 +32,8 @@
             <el-option label="已连接" value="connected" />
             <el-option label="未连接" value="disconnected" />
             <el-option label="通信中断" value="interrupted" />
+            <el-option label="网关离线" value="gateway_offline" />
+            <el-option label="设备离线" value="device_offline" />
           </el-select>
         </el-form-item>
         <el-form-item>
@@ -555,31 +557,13 @@ function getProtocolLabel(type: string): string {
   return map[type] || type
 }
 
-function getStatusType(status: string): TagType {
-  const map: Record<string, TagType> = {
-    connected: 'success',
-    disconnected: 'info',
-    interrupted: 'danger',
-    communication_error: 'danger',
-  }
-  return map[status] || 'info'
-}
-
-function getStatusLabel(status: string): string {
-  const map: Record<string, string> = {
-    connected: '已连接',
-    disconnected: '未连接',
-    interrupted: '通信中断',
-    communication_error: '通信中断',
-  }
-  return map[status] || status
-}
-
 function commStatusType(status: string): TagType {
   const map: Record<string, TagType> = {
     connected: 'success',
     disconnected: 'warning',
     interrupted: 'danger',
+    gateway_offline: 'danger',
+    device_offline: 'warning',
   }
   return map[status] || 'info'
 }
@@ -589,6 +573,8 @@ function commStatusText(status: string): string {
     connected: '已连接',
     disconnected: '已断开',
     interrupted: '通信中断',
+    gateway_offline: '网关离线',
+    device_offline: '设备离线',
   }
   return map[status] || status
 }

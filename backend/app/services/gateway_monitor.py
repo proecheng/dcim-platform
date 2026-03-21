@@ -1,4 +1,4 @@
-"""网关状态监控服务 — Story 2.2 + Story 35.2 双层故障隔离"""
+"""网关状态监控服务 — Story 2.2 + Story 35.2 双层故障隔离 + Story 35.3 告警"""
 
 import asyncio
 import logging
@@ -7,6 +7,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update, distinct
 
 from ..models.gateway import DataSource, GatewayEvent
+from .datasource_alarm import (
+    create_datasource_alarm,
+    resolve_datasource_alarm,
+    resolve_datasource_alarms_batch,
+)
 from gateway.adapters.bacnet_ip import BacnetIpAdapter
 from gateway.adapters.base import DataSourceConfig
 
@@ -79,8 +84,8 @@ async def check_resource_warnings(
 # ─── Story 35.2: 双层故障隔离 ───────────────────────────────────
 
 
-async def _probe_gateway(gw_ds: DataSource, db: AsyncSession) -> None:
-    """探测单个网关可达性，更新 consecutive_failures 和 status"""
+async def _probe_gateway(gw_ds: DataSource, db: AsyncSession) -> list[dict]:
+    """探测单个网关可达性，更新 consecutive_failures/status，触发告警。返回待推送消息列表。"""
     adapter = BacnetIpAdapter()
     config = DataSourceConfig(
         datasource_id=str(gw_ds.id),
@@ -112,14 +117,16 @@ async def _probe_gateway(gw_ds: DataSource, db: AsyncSession) -> None:
             pass
 
     now = datetime.now()
-    pre_probe_status = gw_ds.status  # 在 SQL UPDATE 之前捕获（ORM identity map 会被 synchronize_session 同步）
+    pre_probe_status = gw_ds.status  # 在 SQL UPDATE 之前捕获
+    broadcasts = []
+
     if reachable:
         # 探测成功：重置失败计数
         await db.execute(
             update(DataSource).where(DataSource.id == gw_ds.id)
             .values(consecutive_failures=0, status="connected", updated_at=now)
         )
-        # 仅当网关之前是 gateway_offline 时才恢复子设备
+        # 仅当网关之前是 gateway_offline 时才恢复子设备 + 关闭告警
         if pre_probe_status == "gateway_offline":
             await db.execute(
                 update(DataSource)
@@ -129,6 +136,26 @@ async def _probe_gateway(gw_ds: DataSource, db: AsyncSession) -> None:
                 )
                 .values(status="disconnected", updated_at=now)
             )
+            # Story 35.3: 关闭网关自身告警
+            resolved_count = await resolve_datasource_alarm(db, gw_ds.id, now)
+            if resolved_count > 0:
+                broadcasts.append({
+                    "action": "resolve",
+                    "source": f"datasource:{gw_ds.id}",
+                    "status": "resolved",
+                })
+            # 批量关闭子设备告警
+            child_result = await db.execute(
+                select(DataSource.id).where(DataSource.parent_datasource_id == gw_ds.id)
+            )
+            child_ids = [r[0] for r in child_result.fetchall()]
+            batch_count = await resolve_datasource_alarms_batch(db, child_ids, now)
+            if batch_count > 0:
+                broadcasts.append({
+                    "action": "resolve_batch",
+                    "count": batch_count,
+                    "source": f"gateway:{gw_ds.id}:children",
+                })
     else:
         # 探测失败：SQL 级别递增
         await db.execute(
@@ -159,6 +186,31 @@ async def _probe_gateway(gw_ds: DataSource, db: AsyncSession) -> None:
                 )
                 .values(status="gateway_offline", updated_at=now)
             )
+            # Story 35.3: 查询子设备名称，创建网关离线告警
+            child_result = await db.execute(
+                select(DataSource.id, DataSource.name)
+                .where(DataSource.parent_datasource_id == gw_ds.id)
+            )
+            children = child_result.fetchall()
+            device_names = ", ".join([c.name for c in children[:10]])
+            if len(children) > 10:
+                device_names += f" 等{len(children)}台"
+            alarm = await create_datasource_alarm(
+                db, gw_ds, "mstp_gateway_offline", "major",
+                f"协议转换网关 {gw_ds.name} 离线，影响 {len(children)} 台 MS/TP 设备：{device_names}",
+            )
+            if alarm:
+                broadcasts.append({
+                    "action": "new",
+                    "id": alarm.id,
+                    "alarm_no": alarm.alarm_no,
+                    "alarm_level": alarm.alarm_level,
+                    "alarm_type": alarm.alarm_type,
+                    "alarm_message": alarm.alarm_message,
+                    "status": "active",
+                })
+
+    return broadcasts
 
 
 async def check_mstp_gateway_health(db: AsyncSession) -> None:
@@ -180,10 +232,25 @@ async def check_mstp_gateway_health(db: AsyncSession) -> None:
     if not gateway_datasources:
         return  # 所有引用的网关均已删除
 
+    # Story 35.3: 收集待推送消息，commit 后推送
+    pending_broadcasts = []
     for gw_ds in gateway_datasources:
         try:
-            await _probe_gateway(gw_ds, db)
+            broadcasts = await _probe_gateway(gw_ds, db)
+            pending_broadcasts.extend(broadcasts)
         except Exception as e:
             logger.error("网关 %s 探测异常未捕获: %s", gw_ds.id, e)
 
     await db.commit()
+
+    # commit 成功后 WebSocket 推送
+    if pending_broadcasts:
+        try:
+            from ..services.websocket import ws_manager
+            for msg in pending_broadcasts:
+                try:
+                    await ws_manager.broadcast_alarm(msg)
+                except Exception:
+                    pass
+        except ImportError:
+            pass  # WebSocket 模块不可用时静默跳过

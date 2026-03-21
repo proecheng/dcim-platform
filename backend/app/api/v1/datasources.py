@@ -87,6 +87,7 @@ async def list_datasources(
     gateway_id: Optional[int] = Query(None, description="网关 ID"),
     site_id: Optional[int] = Query(None, description="站点ID"),
     status: Optional[str] = Query(None, description="状态"),
+    parent_datasource_id: Optional[int] = Query(None, description="父数据源ID（过滤网关下的子设备）"),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_viewer),
     user_site_ids: Optional[list[int]] = Depends(get_user_site_ids),
@@ -103,6 +104,8 @@ async def list_datasources(
         query = query.where(DataSource.gateway_id == gateway_id)
     if status:
         query = query.where(DataSource.status == status)
+    if parent_datasource_id is not None:
+        query = query.where(DataSource.parent_datasource_id == parent_datasource_id)
 
     count_query = select(func.count()).select_from(query.subquery())
     total = (await db.execute(count_query)).scalar()

@@ -65,7 +65,9 @@ async def get_alarms(
     if point_id:
         query = query.where(Alarm.point_id == point_id)
     if device_type:
-        query = query.join(Point, Alarm.point_id == Point.id).where(Point.device_type == device_type)
+        query = query.join(Point, Alarm.point_id == Point.id, isouter=True).where(
+            Point.device_type == device_type, Alarm.point_id.isnot(None)
+        )
     if start_time:
         query = query.where(Alarm.created_at >= start_time)
     if end_time:
@@ -86,12 +88,13 @@ async def get_alarms(
     # 获取点位信息
     alarm_list = []
     for alarm in alarms:
-        point_result = await db.execute(select(Point).where(Point.id == alarm.point_id))
-        point = point_result.scalar_one_or_none()
         alarm_info = AlarmInfo.model_validate(alarm)
-        if point:
-            alarm_info.point_code = point.point_code
-            alarm_info.point_name = point.point_name
+        if alarm.point_id:
+            point_result = await db.execute(select(Point).where(Point.id == alarm.point_id))
+            point = point_result.scalar_one_or_none()
+            if point:
+                alarm_info.point_code = point.point_code
+                alarm_info.point_name = point.point_name
         alarm_list.append(alarm_info)
 
     return PageResponse(items=alarm_list, total=total, page=page, page_size=page_size)
@@ -113,12 +116,13 @@ async def get_active_alarms(db: AsyncSession = Depends(get_db), _: User = Depend
 
     alarm_list = []
     for alarm in alarms:
-        point_result = await db.execute(select(Point).where(Point.id == alarm.point_id))
-        point = point_result.scalar_one_or_none()
         alarm_info = AlarmInfo.model_validate(alarm)
-        if point:
-            alarm_info.point_code = point.point_code
-            alarm_info.point_name = point.point_name
+        if alarm.point_id:
+            point_result = await db.execute(select(Point).where(Point.id == alarm.point_id))
+            point = point_result.scalar_one_or_none()
+            if point:
+                alarm_info.point_code = point.point_code
+                alarm_info.point_name = point.point_name
         alarm_list.append(alarm_info)
 
     return alarm_list
@@ -189,11 +193,11 @@ async def get_alarm_statistics(
     )
     by_status = {row[0]: row[1] for row in status_result.all()}
 
-    # 按设备类型统计（JOIN Point 表）
+    # 按设备类型统计（JOIN Point 表，排除无 point_id 的数据源告警）
     device_type_result = await db.execute(
         select(Point.device_type, func.count(Alarm.id))
         .join(Point, Alarm.point_id == Point.id)
-        .where(base_filter)
+        .where(base_filter, Alarm.point_id.isnot(None))
         .group_by(Point.device_type)
     )
     by_device_type = {row[0]: row[1] for row in device_type_result.all() if row[0]}
@@ -257,7 +261,7 @@ async def get_top_alarm_points(
 
     result = await db.execute(
         select(Alarm.point_id, func.count(Alarm.id).label("alarm_count"))
-        .where(Alarm.created_at >= start_time)
+        .where(Alarm.created_at >= start_time, Alarm.point_id.isnot(None))
         .group_by(Alarm.point_id)
         .order_by(func.count(Alarm.id).desc())
         .limit(limit)
@@ -606,13 +610,13 @@ async def get_alarm(alarm_id: int, db: AsyncSession = Depends(get_db), _: User =
     if not alarm:
         raise HTTPException(status_code=404, detail="告警不存在")
 
-    point_result = await db.execute(select(Point).where(Point.id == alarm.point_id))
-    point = point_result.scalar_one_or_none()
-
     alarm_info = AlarmInfo.model_validate(alarm)
-    if point:
-        alarm_info.point_code = point.point_code
-        alarm_info.point_name = point.point_name
+    if alarm.point_id:
+        point_result = await db.execute(select(Point).where(Point.id == alarm.point_id))
+        point = point_result.scalar_one_or_none()
+        if point:
+            alarm_info.point_code = point.point_code
+            alarm_info.point_name = point.point_name
 
     return alarm_info
 
@@ -679,7 +683,7 @@ async def resolve_alarm(
         raise HTTPException(status_code=400, detail="告警已解决")
 
     now = datetime.now()
-    duration = max(0, int((now - alarm.created_at).total_seconds()))
+    duration = max(0, int((now - alarm.created_at).total_seconds())) if alarm.created_at else 0
 
     await db.execute(
         update(Alarm)

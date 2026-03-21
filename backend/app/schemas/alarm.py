@@ -15,7 +15,7 @@ class AlarmInfo(BaseModel):
 
     id: int
     alarm_no: str
-    point_id: int
+    point_id: Optional[int] = None
     point_code: Optional[str] = None
     point_name: Optional[str] = None
     alarm_level: str
@@ -40,6 +40,7 @@ class AlarmInfo(BaseModel):
     escalation_remark: Optional[str] = None
     last_escalated_at: Optional[datetime] = None
     data_source: Optional[str] = None
+    source: Optional[str] = None
     created_at: Optional[datetime] = None
 
 

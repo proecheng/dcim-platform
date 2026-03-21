@@ -9,6 +9,7 @@ from sqlalchemy import select, update
 from ..engines.alarm_engine import alarm_engine
 from ..models.gateway import DataSource, DataSourcePoint
 from ..models.point import PointRealtime
+from .datasource_alarm import create_datasource_alarm, resolve_datasource_alarm
 from .websocket import ws_manager
 
 
@@ -28,8 +29,10 @@ async def check_communication_status(session: AsyncSession):
         )
         parent_status_map = {r.id: r.status for r in parent_result.fetchall()}
 
-    # 收集广播消息，commit 成功后再发送（避免 DB 回滚但前端已收到通知的不一致）
+    # 收集广播消息，commit 成功后再发送
     pending_broadcasts = []
+    # Story 35.3: 收集告警 WebSocket 推送
+    pending_alarm_broadcasts = []
 
     for ds in datasources:
         # Story 35.2: 子设备双层故障隔离逻辑
@@ -59,7 +62,32 @@ async def check_communication_status(session: AsyncSession):
                         "timestamp": datetime.now().isoformat(),
                     }
                 )
+                # Story 35.3: 设备离线告警
+                if target_status == "device_offline":
+                    alarm = await create_datasource_alarm(
+                        session, ds, "mstp_device_offline", "minor",
+                        f"MS/TP 设备 {ds.name} 离线（网关正常）",
+                    )
+                    if alarm:
+                        pending_alarm_broadcasts.append({
+                            "action": "new",
+                            "id": alarm.id,
+                            "alarm_no": alarm.alarm_no,
+                            "alarm_level": alarm.alarm_level,
+                            "alarm_type": alarm.alarm_type,
+                            "alarm_message": alarm.alarm_message,
+                            "status": "active",
+                        })
         elif ds.status in ("interrupted", "device_offline") and ds.consecutive_failures == 0:
+            # Story 35.3: 设备恢复时关闭告警
+            if ds.status == "device_offline":
+                resolved_count = await resolve_datasource_alarm(session, ds.id)
+                if resolved_count > 0:
+                    pending_alarm_broadcasts.append({
+                        "action": "resolve",
+                        "source": f"datasource:{ds.id}",
+                        "status": "resolved",
+                    })
             await session.execute(update(DataSource).where(DataSource.id == ds.id).values(status="connected"))
             point_ids = await mark_unreliable_points(session, ds.id, quality=0)
             pending_broadcasts.append(
@@ -81,7 +109,12 @@ async def check_communication_status(session: AsyncSession):
         try:
             await ws_manager.broadcast_system(payload)
         except Exception:
-            pass  # WebSocket 失败不影响监控逻辑
+            pass
+    for msg in pending_alarm_broadcasts:
+        try:
+            await ws_manager.broadcast_alarm(msg)
+        except Exception:
+            pass
 
 
 async def mark_unreliable_points(session: AsyncSession, datasource_id: int, quality: int) -> List[int]:

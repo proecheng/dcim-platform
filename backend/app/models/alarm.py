@@ -41,10 +41,11 @@ class Alarm(Base):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     alarm_no = Column(String(50), unique=True, nullable=False, comment="告警编号")
-    point_id = Column(Integer, ForeignKey("points.id"), nullable=False, comment="点位ID")
+    point_id = Column(Integer, ForeignKey("points.id"), nullable=True, comment="点位ID（数据源告警为NULL）")
+    source = Column(String(100), nullable=True, index=True, comment="告警来源标识(如 datasource:123)")
     threshold_id = Column(Integer, ForeignKey("alarm_thresholds.id"), comment="阈值配置ID")
     alarm_level = Column(String(20), nullable=False, comment="告警级别")
-    alarm_type = Column(String(20), comment="告警类型: threshold/communication/system")
+    alarm_type = Column(String(50), comment="告警类型: threshold/communication/system/mstp_gateway_offline/mstp_device_offline")
     alarm_message = Column(Text, nullable=False, comment="告警消息")
     trigger_value = Column(Float, comment="触发值")
     threshold_value = Column(Float, comment="阈值")
