@@ -23,6 +23,7 @@ from .engines.alarm_engine import alarm_engine
 from .engines.linkage_engine import linkage_engine
 from .engines.event_bus import get_event_bus
 from .services.communication_monitor import check_communication_status
+from .services.gateway_monitor import check_mstp_gateway_health
 from .engines.escalation_engine import check_escalations
 from .engines.diagnosis_engine import diagnosis_engine
 from .services.pue_calculator import write_pue_history
@@ -459,6 +460,19 @@ async def lifespan(app: FastAPI):
                 logger.warning("通信监控检查失败: %s", e)
 
     comm_monitor_task = asyncio.create_task(_communication_monitor_loop())
+
+    # 启动 MS/TP 网关健康检查（每 30 秒，初始延迟 45s 错开通信监控）— Story 35.2
+    async def _mstp_gateway_health_loop():
+        await asyncio.sleep(45)  # 错开 comm_monitor 的 30s 周期
+        while True:
+            await asyncio.sleep(30)
+            try:
+                async with async_session() as session:
+                    await check_mstp_gateway_health(session)
+            except Exception as e:
+                logger.warning("MS/TP 网关健康检查失败: %s", e)
+
+    mstp_health_task = asyncio.create_task(_mstp_gateway_health_loop())
 
     # 启动告警升级引擎（每 60 秒检查）
     async def _escalation_engine_loop():
@@ -1146,6 +1160,7 @@ async def lifespan(app: FastAPI):
         await demo_shutdown()
     refresh_task.cancel()
     comm_monitor_task.cancel()
+    mstp_health_task.cancel()  # Story 35.2
     escalation_task.cancel()
     pue_history_task.cancel()
     energy_agg_task.cancel()
