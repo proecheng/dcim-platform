@@ -1039,6 +1039,30 @@ async def lifespan(app: FastAPI):
             name='Hourly 数据归档',
         )
         logger.info("✓ Hourly 数据归档任务已启动（每小时第5分钟执行）")
+
+        # Story 36.2: 每日健康度评分定时任务
+        async def _run_health_score_calculation():
+            """全量设备健康度评分计算"""
+            try:
+                from app.services.predictive_maintenance.health_calculator import DeviceHealthScoreCalculator
+                async with async_session() as session:
+                    calculator = DeviceHealthScoreCalculator(session)
+                    await calculator.calculate_all_health_scores()
+                    await session.commit()
+            except Exception as e:
+                logger.error("健康度评分计算任务失败: %s", e)
+
+        scheduler.add_job(
+            _run_health_score_calculation,
+            'cron',
+            hour=2,
+            minute=7,
+            id='health_score_calculation',
+            max_instances=1,
+            coalesce=True,
+            name='每日健康度评分计算',
+        )
+        logger.info("✓ 每日健康度评分计算任务已启动（每日 02:07 执行）")
     except ImportError:
         logger.warning("⚠️  APScheduler 未安装，使用降级方案（asyncio.create_task）")
         async def _calibration_check_loop():
@@ -1115,6 +1139,27 @@ async def lifespan(app: FastAPI):
                 await asyncio.sleep(3600)
 
         asyncio.create_task(_archive_hourly_loop())
+
+        # Story 36.2: 健康度评分降级方案（每日凌晨 02:07）
+        async def _health_score_loop():
+            await asyncio.sleep(600)  # 启动后延迟10分钟
+            while True:
+                try:
+                    now = datetime.now()
+                    target = now.replace(hour=2, minute=7, second=0, microsecond=0)
+                    if now >= target:
+                        target = target + timedelta(days=1)
+                    await asyncio.sleep((target - now).total_seconds())
+                    from app.services.predictive_maintenance.health_calculator import DeviceHealthScoreCalculator
+                    async with async_session() as session:
+                        calculator = DeviceHealthScoreCalculator(session)
+                        await calculator.calculate_all_health_scores()
+                        await session.commit()
+                except Exception as e:
+                    logger.error("健康度评分计算任务失败: %s", e)
+                    await asyncio.sleep(3600)
+
+        asyncio.create_task(_health_score_loop())
 
         scheduler = None
     except Exception as e:

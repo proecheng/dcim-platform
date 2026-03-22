@@ -585,7 +585,7 @@ async def update_device_health_score(device_id: int, soh_percent: float):
     """
     将 SOH 反馈到设备健康度评估（FR75）
 
-    SOH 作为评分因子之一，权重占比 20%
+    通过 DeviceHealthScoreCalculator 加权合并，而非直接操作评分字段。
 
     Args:
         device_id: 设备 ID
@@ -593,60 +593,61 @@ async def update_device_health_score(device_id: int, soh_percent: float):
     """
     try:
         async with async_session() as db:
-            from app.models.report import DeviceHealthScore
+            from app.services.predictive_maintenance.base import DegradationResult
+            from app.services.predictive_maintenance.health_calculator import DeviceHealthScoreCalculator
 
-            # 查询或创建设备健康度记录
-            result = await db.execute(
-                select(DeviceHealthScore)
-                .where(DeviceHealthScore.device_id == device_id)
-                .order_by(desc(DeviceHealthScore.calculated_at))
-                .limit(1)
+            calculator = DeviceHealthScoreCalculator(db)
+
+            # 构造 DegradationResult（SOH 作为劣化评分）
+            dr = DegradationResult(
+                device_id=device_id,
+                score=soh_percent,
+                confidence=0.8,
+                available_points=1,
+                total_points=1,
+                data_sufficiency="partial",
+                primary_concern="battery_soh",
             )
-            health_record = result.scalar_one_or_none()
 
-            if not health_record:
-                # 创建新记录
-                health_record = DeviceHealthScore(
-                    device_id=device_id,
-                    total_score=0.0,
-                    calculated_at=datetime.now(timezone.utc)
+            # 批量查询告警和维保
+            alarm_counts = await calculator._batch_alarm_counts(
+                [device_id],
+                datetime.now() - timedelta(days=30),
+            )
+            maint_map = await calculator._batch_maintenance_dates([device_id])
+
+            alarm_count = alarm_counts.get(device_id, 0)
+            last_maint = maint_map.get(device_id)
+            days_since = (datetime.now() - last_maint).days if last_maint else None
+
+            weights = await calculator._load_weight_config("battery")
+            score, health_level, score_factors = calculator.calculate(
+                dr, alarm_count, days_since, "battery", weights
+            )
+
+            # 查询设备信息用于 upsert
+            from app.models.device import Device
+            dev_result = await db.execute(
+                select(Device).where(Device.id == device_id)
+            )
+            device = dev_result.scalar_one_or_none()
+            if device:
+                await calculator._upsert_health_score(
+                    device=device,
+                    score=score,
+                    health_level=health_level,
+                    alarm_count=alarm_count,
+                    days_since=days_since,
+                    last_maint=last_maint,
+                    score_factors=score_factors,
+                    data_sufficiency="partial",
+                    degradation_score=soh_percent,
                 )
-                db.add(health_record)
-
-            # 更新 SOH 评分因子（权重 20%）
-            # 假设 health_record.score_factors 是 JSON 字段: {"soh": 85.0, "uptime": 95.0, ...}
-            if health_record.score_factors is None:
-                health_record.score_factors = {}
-
-            health_record.score_factors["soh"] = soh_percent
-
-            # 重新计算总分（简化版：各因子加权平均）
-            # 实际项目中应调用完整的健康度评估服务
-            factors = health_record.score_factors
-            weights = {
-                "soh": 0.20,
-                "uptime": 0.25,
-                "alarm_rate": 0.20,
-                "maintenance": 0.15,
-                "performance": 0.20
-            }
-
-            total_score = 0.0
-            total_weight = 0.0
-            for factor_name, weight in weights.items():
-                if factor_name in factors:
-                    total_score += factors[factor_name] * weight
-                    total_weight += weight
-
-            if total_weight > 0:
-                health_record.total_score = total_score / total_weight
-
-            health_record.calculated_at = datetime.now(timezone.utc)
-            await db.commit()
+                await db.commit()
 
             logger.info(
                 f"设备 {device_id} 健康度评分已更新: "
-                f"SOH={soh_percent:.1f}%, 总分={health_record.total_score:.1f}"
+                f"SOH={soh_percent:.1f}%, 总分={score:.1f}"
             )
 
     except Exception as e:

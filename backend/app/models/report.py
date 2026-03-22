@@ -66,7 +66,7 @@ class DeviceHealthScore(Base):
     __tablename__ = "device_health_scores"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    device_id = Column(Integer, ForeignKey("devices.id"), nullable=False, comment="设备ID")
+    device_id = Column(Integer, ForeignKey("devices.id"), nullable=False, unique=True, comment="设备ID")
     device_name = Column(String(100), comment="设备名称")
     device_type = Column(String(50), comment="设备类型")
     score = Column(Float, nullable=False, default=100, comment="健康度评分 0-100")
@@ -74,4 +74,7 @@ class DeviceHealthScore(Base):
     alarm_count = Column(Integer, default=0, comment="近期告警数")
     maintenance_count = Column(Integer, default=0, comment="维保记录数")
     last_maintenance_at = Column(DateTime, comment="最近维保时间")
+    score_factors = Column(Text, comment="评分因子详情(JSON)")
+    data_sufficiency = Column(String(20), default="minimal", comment="数据充分度: full/partial/minimal")
+    degradation_score = Column(Float, comment="劣化趋势评分 0-100")
     calculated_at = Column(DateTime, default=datetime.now, comment="计算时间")
