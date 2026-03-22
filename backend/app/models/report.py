@@ -3,7 +3,7 @@
 """
 
 from datetime import datetime
-from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, Boolean, Float
+from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, Boolean, Float, Index
 
 from ..core.database import Base
 
@@ -78,3 +78,29 @@ class DeviceHealthScore(Base):
     data_sufficiency = Column(String(20), default="minimal", comment="数据充分度: full/partial/minimal")
     degradation_score = Column(Float, comment="劣化趋势评分 0-100")
     calculated_at = Column(DateTime, default=datetime.now, comment="计算时间")
+
+
+class MaintenanceAdvice(Base):
+    """维护建议表 — Story 36.3"""
+
+    __tablename__ = "maintenance_advices"
+    __table_args__ = (
+        Index("ix_maintenance_advices_device_status", "device_id", "status"),
+    )
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    device_id = Column(Integer, ForeignKey("devices.id"), nullable=False, comment="设备ID")
+    device_name = Column(String(100), comment="设备名称")
+    device_type = Column(String(50), comment="设备类型")
+    health_score = Column(Float, comment="触发时健康度评分")
+    urgency = Column(String(20), comment="紧急度: high/medium")
+    reason = Column(Text, comment="劣化原因描述")
+    suggested_action = Column(Text, comment="建议维护措施")
+    status = Column(String(20), default="pending", nullable=False,
+                    comment="状态: pending/converted/rejected/auto_closed")
+    feedback = Column(Text, comment="误报反馈原因")
+    work_order_id = Column(Integer, ForeignKey("work_orders.id"), nullable=True, comment="关联工单ID")
+    created_at = Column(DateTime, default=datetime.now, comment="创建时间")
+    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now, comment="更新时间")
+    confirmed_at = Column(DateTime, comment="确认时间")
+    confirmed_by = Column(Integer, ForeignKey("users.id"), nullable=True, comment="确认人")

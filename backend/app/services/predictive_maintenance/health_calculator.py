@@ -18,6 +18,7 @@ from ...models.point import Point
 from ...models.report import DeviceHealthScore
 from .base import DegradationResult
 from .analyzer import DegradationAnalyzer
+from .advisor import MaintenanceAdvisor
 from .config import DEVICE_TYPE_MAP
 
 logger = logging.getLogger(__name__)
@@ -197,7 +198,9 @@ class DeviceHealthScoreCalculator:
 
         # 4. 劣化分析 + 加权计算
         analyzer = DegradationAnalyzer(self.db)
+        advisor = MaintenanceAdvisor(self.db)
         count = 0
+        auto_close_ids = []  # 健康度≥60 的设备 ID，批量关闭 pending 建议
 
         for device in devices:
             try:
@@ -246,11 +249,20 @@ class DeviceHealthScoreCalculator:
                         "设备健康度预警: device_id=%d, name=%s, score=%.1f, level=%s",
                         device.id, device.device_name, score, health_level,
                     )
+                    await advisor.evaluate(device, score, dr, plugin_key)
+                elif score >= 60:
+                    # 设计意图：41-59 分（"关注"/"预警"区间）不触发也不关闭建议
+                    # pending 建议在此区间保持，等待人工判断或恢复到≥60 自动关闭
+                    auto_close_ids.append(device.id)
 
                 count += 1
             except Exception as e:
                 logger.error("设备 %d (%s) 健康度计算失败: %s", device.id, device.device_name, e)
                 continue
+
+        # 5. 批量自动关闭健康度≥60 设备的 pending 建议
+        if auto_close_ids:
+            await advisor.auto_close_pending_batch(auto_close_ids)
 
         await self.db.flush()
         logger.info("健康度评分计算完成: %d/%d 设备", count, len(devices))

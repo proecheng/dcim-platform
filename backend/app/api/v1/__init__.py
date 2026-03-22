@@ -63,6 +63,7 @@ from .precool import router as precool_router
 from .user_notification_contacts import router as notification_contacts_router
 from .notification import router as notification_router
 from .notification_policy import router as notification_policy_router
+from .predictive_maintenance import router as predictive_maintenance_router
 
 # 深度学习节能优化模块 (需要安装 torch)
 try:
@@ -133,6 +134,7 @@ api_router.include_router(precool_router, prefix="/precool", tags=["预冷系统
 api_router.include_router(notification_contacts_router, prefix="/users", tags=["通知联系方式"])
 api_router.include_router(notification_router, prefix="/notification", tags=["通知管理"])
 api_router.include_router(notification_policy_router, prefix="/notification/policies", tags=["通知策略"])
+api_router.include_router(predictive_maintenance_router, prefix="/predictive-maintenance", tags=["预测性维护"])
 
 # 深度学习节能优化API
 if _ml_available:
