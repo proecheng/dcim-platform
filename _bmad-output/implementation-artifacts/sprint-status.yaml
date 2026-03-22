@@ -413,3 +413,17 @@ development_status:
   35-3-gateway-offline-alarm-and-frontend: done  # 完成: Alarm.source列+point_id可空、datasource_alarm.py(幂等创建/Python计算duration/批量关闭)、gateway_monitor告警创建+恢复+级联关闭、communication_monitor设备离线告警、API NULL point_id保护、前端gateway_offline/device_offline状态展示、迁移脚本、8个测试全通过
   epic-35: done
   epic-35-retrospective: done  # 2026-03-21
+
+  # ============================================================
+  # 预测性维护扩展 (Epic 36)
+  # 新增于 2026-03-22，基于 PRD V4.3 FR-PM01~PM06 + Architecture Section 23
+  # ============================================================
+
+  # Epic 36: 预测性维护扩展
+  epic-36: in-progress
+  36-1-degradation-plugin-framework-and-hvac-plugin: done  # 劣化分析插件框架与 HVAC 插件
+  36-2-device-health-score-enhancement-and-weighted-merge: backlog  # DeviceHealthScore 增强与加权合并
+  36-3-maintenance-advice-engine: backlog  # 维护建议引擎
+  36-4-predictive-maintenance-dashboard-frontend: backlog  # 预测性维护仪表盘前端
+  36-5-ups-and-pdu-degradation-plugins: backlog  # UPS 主机与 PDU 劣化分析插件
+  epic-36-retrospective: optional

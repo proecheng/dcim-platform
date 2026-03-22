@@ -1017,6 +1017,28 @@ async def lifespan(app: FastAPI):
         logger.info("✓ 预冷计划扫描任务已启动（每分钟执行）")
         logger.info("✓ 预冷计划执行推进任务已启动（每 5 分钟执行）")
         logger.info("✓ 月度RC参数自动校准任务已注册（每月1日 03:37）")
+
+        # Story 36.1: Hourly 归档定时任务
+        async def _run_archive_hourly():
+            """聚合上一小时 PointHistory 写入 PointHistoryArchive"""
+            try:
+                from app.services.predictive_maintenance.archiver import archive_hourly
+                async with async_session() as session:
+                    await archive_hourly(session)
+                    await session.commit()
+            except Exception as e:
+                logger.error("Hourly 归档任务失败: %s", e)
+
+        scheduler.add_job(
+            _run_archive_hourly,
+            'cron',
+            minute=5,  # 每小时第5分钟执行，避开整点其他任务
+            id='archive_hourly',
+            max_instances=1,
+            coalesce=True,
+            name='Hourly 数据归档',
+        )
+        logger.info("✓ Hourly 数据归档任务已启动（每小时第5分钟执行）")
     except ImportError:
         logger.warning("⚠️  APScheduler 未安装，使用降级方案（asyncio.create_task）")
         async def _calibration_check_loop():
@@ -1078,6 +1100,21 @@ async def lifespan(app: FastAPI):
                     await asyncio.sleep(3600)
 
         asyncio.create_task(_accuracy_daily_loop())
+
+        # Story 36.1: Hourly 归档降级方案（每小时第5分钟）
+        async def _archive_hourly_loop():
+            await asyncio.sleep(300)  # 启动后延迟5分钟
+            while True:
+                try:
+                    from app.services.predictive_maintenance.archiver import archive_hourly
+                    async with async_session() as session:
+                        await archive_hourly(session)
+                        await session.commit()
+                except Exception as e:
+                    logger.error("Hourly 归档任务失败: %s", e)
+                await asyncio.sleep(3600)
+
+        asyncio.create_task(_archive_hourly_loop())
 
         scheduler = None
     except Exception as e:

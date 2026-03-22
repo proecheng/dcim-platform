@@ -33,6 +33,9 @@ class PointHistoryArchive(Base):
     """历史数据归档表（聚合数据）"""
 
     __tablename__ = "point_history_archive"
+    __table_args__ = (
+        Index("idx_archive_point_type_time", "point_id", "archive_type", "recorded_at", unique=True),
+    )
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     point_id = Column(Integer, ForeignKey("points.id"), nullable=False, comment="点位ID")
