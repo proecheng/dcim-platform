@@ -32,6 +32,7 @@ export interface AlarmInfo {
   escalated_from?: string | null
   escalation_remark?: string | null
   data_source?: string
+  source?: string  // 告警来源标识 — Story 35.3
 }
 
 export interface AlarmCount {

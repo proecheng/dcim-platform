@@ -5,10 +5,12 @@ import { siteEvents } from '@/utils/siteEvents'
 
 export interface Alarm {
   id: number
+  alarm_no?: string
   point_id?: number
   point_code: string
   point_name: string
   alarm_level: string
+  alarm_type?: string
   alarm_message: string
   status: string
   created_at: string
@@ -16,16 +18,17 @@ export interface Alarm {
   threshold_value?: number
   acknowledged_by?: number
   acknowledged_at?: string
-  process_remark?: string
-  processed_by?: number
-  processed_at?: string
+  ack_remark?: string
   resolved_by?: number
   resolved_at?: string
+  resolve_remark?: string
+  resolve_type?: string
   duration_seconds?: number
   escalation_count?: number
   escalated_from?: string | null
   escalation_remark?: string | null
   data_source?: string
+  source?: string
 }
 
 export const useAlarmStore = defineStore('alarm', () => {

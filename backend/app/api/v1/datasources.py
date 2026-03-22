@@ -10,7 +10,7 @@ from sqlalchemy import select, func, update, delete
 
 from ..deps import get_db, require_viewer, require_operator, require_admin, get_user_site_ids
 from ...models.user import User
-from ...models.gateway import DataSource
+from ...models.gateway import DataSource, DataSourceStatus
 from ...schemas.gateway import DataSourceCreate, DataSourceUpdate, DataSourceResponse, ConnectionTestRequest
 from ...services.connection_test import test_datasource_connection
 from gateway.adapters.registry import ADAPTER_REGISTRY as _ADAPTER_REGISTRY
@@ -265,7 +265,7 @@ async def get_communication_status(
 
         # 计算中断时长
         interruption_seconds = None
-        if ds.status == "interrupted" and ds.last_communication:
+        if ds.status == DataSourceStatus.INTERRUPTED and ds.last_communication:
             interruption_seconds = int((datetime.now() - ds.last_communication).total_seconds())
 
         status_list.append(

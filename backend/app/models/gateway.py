@@ -7,6 +7,15 @@ from sqlalchemy.orm import relationship, backref
 from ..core.database import Base
 
 
+class DataSourceStatus:
+    """数据源连接状态常量（集中定义，避免硬编码散落）"""
+    CONNECTED = "connected"
+    DISCONNECTED = "disconnected"
+    INTERRUPTED = "interrupted"
+    DEVICE_OFFLINE = "device_offline"
+    GATEWAY_OFFLINE = "gateway_offline"
+
+
 class Gateway(Base):
     """采集网关"""
 

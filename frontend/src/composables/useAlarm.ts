@@ -142,6 +142,11 @@ export function useAlarm(options: UseAlarmOptions = {}) {
 
   // 处理 WebSocket 消息（所有状态操作委托给 AlarmStore）
   const handleAlarmMessage = (message: any) => {
+    // 诊断消息记录日志（Story 24.6，共用 alarms 通道）
+    if (message.type === 'diagnosis_alert' || message.type === 'diagnosis_suggestion') {
+      console.info('[WS] 诊断消息:', message.type, message.data)
+      return
+    }
     if (message.type !== 'alarm') return
 
     const { action, data } = message
@@ -177,6 +182,11 @@ export function useAlarm(options: UseAlarmOptions = {}) {
           alarm_level: data.alarm_level,
           escalated_from: data.previous_level
         })
+        window.dispatchEvent(new Event('alarm-status-changed'))
+        break
+      case 'resolve_batch':
+        // 网关恢复时批量关闭子设备告警 — Story 35.2
+        alarmStore.fetchActiveAlarms()
         window.dispatchEvent(new Event('alarm-status-changed'))
         break
     }

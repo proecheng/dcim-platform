@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update
 
 from ..engines.alarm_engine import alarm_engine
-from ..models.gateway import DataSource, DataSourcePoint
+from ..models.gateway import DataSource, DataSourcePoint, DataSourceStatus
 from ..models.point import PointRealtime
 from .datasource_alarm import create_datasource_alarm, resolve_datasource_alarm
 from .websocket import ws_manager
@@ -39,16 +39,16 @@ async def check_communication_status(session: AsyncSession):
         if ds.parent_datasource_id is not None:
             parent_status = parent_status_map.get(ds.parent_datasource_id)
             # 父网关已 gateway_offline → 跳过（由 gateway_health 管理）
-            if parent_status == "gateway_offline":
+            if parent_status == DataSourceStatus.GATEWAY_OFFLINE:
                 continue
             # 当前状态为 gateway_offline → 跳过恢复（由 gateway_health 管理）
-            if ds.status == "gateway_offline":
+            if ds.status == DataSourceStatus.GATEWAY_OFFLINE:
                 continue
 
         if ds.consecutive_failures >= ds.retry_max_failures:
             # Story 35.2: 有父网关且父在线 → 用 device_offline
-            target_status = "device_offline" if ds.parent_datasource_id is not None else "interrupted"
-            if ds.status != target_status and ds.status != "gateway_offline":
+            target_status = DataSourceStatus.DEVICE_OFFLINE if ds.parent_datasource_id is not None else DataSourceStatus.INTERRUPTED
+            if ds.status != target_status and ds.status != DataSourceStatus.GATEWAY_OFFLINE:
                 await session.execute(update(DataSource).where(DataSource.id == ds.id).values(status=target_status))
                 point_ids = await mark_unreliable_points(session, ds.id, quality=2)
                 pending_broadcasts.append(
@@ -63,7 +63,7 @@ async def check_communication_status(session: AsyncSession):
                     }
                 )
                 # Story 35.3: 设备离线告警
-                if target_status == "device_offline":
+                if target_status == DataSourceStatus.DEVICE_OFFLINE:
                     alarm = await create_datasource_alarm(
                         session, ds, "mstp_device_offline", "minor",
                         f"MS/TP 设备 {ds.name} 离线（网关正常）",
@@ -78,9 +78,9 @@ async def check_communication_status(session: AsyncSession):
                             "alarm_message": alarm.alarm_message,
                             "status": "active",
                         })
-        elif ds.status in ("interrupted", "device_offline") and ds.consecutive_failures == 0:
+        elif ds.status in (DataSourceStatus.INTERRUPTED, DataSourceStatus.DEVICE_OFFLINE) and ds.consecutive_failures == 0:
             # Story 35.3: 设备恢复时关闭告警
-            if ds.status == "device_offline":
+            if ds.status == DataSourceStatus.DEVICE_OFFLINE:
                 resolved_count = await resolve_datasource_alarm(session, ds.id)
                 if resolved_count > 0:
                     pending_alarm_broadcasts.append({
@@ -88,7 +88,7 @@ async def check_communication_status(session: AsyncSession):
                         "source": f"datasource:{ds.id}",
                         "status": "resolved",
                     })
-            await session.execute(update(DataSource).where(DataSource.id == ds.id).values(status="connected"))
+            await session.execute(update(DataSource).where(DataSource.id == ds.id).values(status=DataSourceStatus.CONNECTED))
             point_ids = await mark_unreliable_points(session, ds.id, quality=0)
             pending_broadcasts.append(
                 {

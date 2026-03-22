@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update, distinct
 
-from ..models.gateway import DataSource, GatewayEvent
+from ..models.gateway import DataSource, DataSourceStatus, GatewayEvent
 from .datasource_alarm import (
     create_datasource_alarm,
     resolve_datasource_alarm,
@@ -124,17 +124,17 @@ async def _probe_gateway(gw_ds: DataSource, db: AsyncSession) -> list[dict]:
         # 探测成功：重置失败计数
         await db.execute(
             update(DataSource).where(DataSource.id == gw_ds.id)
-            .values(consecutive_failures=0, status="connected", updated_at=now)
+            .values(consecutive_failures=0, status=DataSourceStatus.CONNECTED, updated_at=now)
         )
         # 仅当网关之前是 gateway_offline 时才恢复子设备 + 关闭告警
-        if pre_probe_status == "gateway_offline":
+        if pre_probe_status == DataSourceStatus.GATEWAY_OFFLINE:
             await db.execute(
                 update(DataSource)
                 .where(
                     DataSource.parent_datasource_id == gw_ds.id,
-                    DataSource.status == "gateway_offline",
+                    DataSource.status == DataSourceStatus.GATEWAY_OFFLINE,
                 )
-                .values(status="disconnected", updated_at=now)
+                .values(status=DataSourceStatus.DISCONNECTED, updated_at=now)
             )
             # Story 35.3: 关闭网关自身告警
             resolved_count = await resolve_datasource_alarm(db, gw_ds.id, now)
@@ -175,16 +175,16 @@ async def _probe_gateway(gw_ds: DataSource, db: AsyncSession) -> list[dict]:
         if row.consecutive_failures >= row.retry_max_failures:
             await db.execute(
                 update(DataSource).where(DataSource.id == gw_ds.id)
-                .values(status="gateway_offline", updated_at=now)
+                .values(status=DataSourceStatus.GATEWAY_OFFLINE, updated_at=now)
             )
             # 批量级联子设备
             await db.execute(
                 update(DataSource)
                 .where(
                     DataSource.parent_datasource_id == gw_ds.id,
-                    DataSource.status != "gateway_offline",
+                    DataSource.status != DataSourceStatus.GATEWAY_OFFLINE,
                 )
-                .values(status="gateway_offline", updated_at=now)
+                .values(status=DataSourceStatus.GATEWAY_OFFLINE, updated_at=now)
             )
             # Story 35.3: 查询子设备名称，创建网关离线告警
             child_result = await db.execute(

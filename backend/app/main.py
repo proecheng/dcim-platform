@@ -1249,6 +1249,8 @@ async def lifespan(app: FastAPI):
     detection_task.cancel()
     effect_tracking_task.cancel()
     soh_calculation_task.cancel()
+    channel_escalation_task.cancel()  # Story 34.5
+    rollback_task.cancel()  # Story 30.2
 
     # 停止校准检查定时任务
     if scheduler:
