@@ -424,6 +424,6 @@ development_status:
   36-1-degradation-plugin-framework-and-hvac-plugin: done  # 劣化分析插件框架与 HVAC 插件
   36-2-device-health-score-enhancement-and-weighted-merge: done  # DeviceHealthScore 增强与加权合并
   36-3-maintenance-advice-engine: done  # 完成: MaintenanceAdvice模型、MaintenanceAdvisor服务(evaluate幂等/auto_close条件UPDATE/confirm转工单/reject误报)、4个API端点(RBAC)、Pydantic Schema(Literal校验)、health_calculator集成、迁移脚本、18个测试全通过
-  36-4-predictive-maintenance-dashboard-frontend: backlog  # 预测性维护仪表盘前端
+  36-4-predictive-maintenance-dashboard-frontend: done  # 完成: DashboardSummary/DeviceHealthItem/DashboardResponse/ScoreFactorDetail/DeviceDetailResponse Schema、GET /dashboard(SQL聚合+site_id过滤)、GET /devices/{id}/detail(防御性json.loads)、predictiveMaintenance.ts前端API模块、predictive.vue仪表盘页面(统计卡片+筛选+设备卡片网格+详情弹窗+确认拒绝操作)、路由注册、26个测试全通过
   36-5-ups-and-pdu-degradation-plugins: backlog  # UPS 主机与 PDU 劣化分析插件
   epic-36-retrospective: optional

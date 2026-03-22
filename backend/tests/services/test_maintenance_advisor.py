@@ -470,3 +470,194 @@ async def test_auto_close_batch(async_db):
     advisor = MaintenanceAdvisor(async_db)
     count = await advisor.auto_close_pending_batch([d1.id, d2.id])
     assert count == 2
+
+
+# ==================== Story 36.4: Dashboard + Device Detail API ====================
+
+
+async def _make_health_score(db, device, score=75.0, health_level="关注", data_sufficiency="full"):
+    """创建 DeviceHealthScore 记录"""
+    import json
+    score_factors = json.dumps({
+        "degradation": {"score": 80.0, "weight": 0.4},
+        "alarm": {"score": 70.0, "weight": 0.3, "count": 3},
+        "maintenance": {"score": 60.0, "weight": 0.3, "days_since": 90},
+        "data_sufficiency": data_sufficiency,
+        "plugin_key": "hvac",
+    }, ensure_ascii=False)
+    hs = DeviceHealthScore(
+        device_id=device.id,
+        device_name=device.device_name,
+        device_type=device.device_type,
+        score=score,
+        health_level=health_level,
+        alarm_count=3,
+        score_factors=score_factors,
+        data_sufficiency=data_sufficiency,
+        degradation_score=80.0,
+    )
+    db.add(hs)
+    await db.flush()
+    return hs
+
+
+# ==================== 7.1 Dashboard 端点测试 ====================
+
+@pytest.mark.asyncio
+async def test_api_dashboard_basic(client, async_db, admin_token):
+    """API: GET /predictive-maintenance/dashboard 基础统计"""
+    d1 = await _make_device(async_db, "AC", "DB01")
+    d2 = await _make_device(async_db, "UPS", "DB02")
+    await _make_health_score(async_db, d1, score=85.0, health_level="健康")
+    await _make_health_score(async_db, d2, score=35.0, health_level="危险")
+    await async_db.commit()
+
+    resp = await client.get(
+        "/api/v1/predictive-maintenance/dashboard",
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["summary"]["total"] == 2
+    assert data["summary"]["healthy"] == 1
+    assert data["summary"]["danger"] == 1
+    # 低分优先排序
+    assert data["devices"][0]["score"] < data["devices"][1]["score"]
+
+
+@pytest.mark.asyncio
+async def test_api_dashboard_filter_by_type(client, async_db, admin_token):
+    """API: GET /predictive-maintenance/dashboard?device_type=AC 按类型筛选"""
+    d1 = await _make_device(async_db, "AC", "DF01")
+    d2 = await _make_device(async_db, "UPS", "DF02")
+    await _make_health_score(async_db, d1, score=70.0, health_level="关注")
+    await _make_health_score(async_db, d2, score=50.0, health_level="预警")
+    await async_db.commit()
+
+    resp = await client.get(
+        "/api/v1/predictive-maintenance/dashboard?device_type=AC",
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    # summary 统计全量
+    assert data["summary"]["total"] == 2
+    # devices 筛选后只有 AC
+    assert len(data["devices"]) == 1
+    assert data["devices"][0]["device_type"] == "AC"
+
+
+@pytest.mark.asyncio
+async def test_api_dashboard_filter_by_level(client, async_db, admin_token):
+    """API: GET /predictive-maintenance/dashboard?health_level=危险 按等级筛选"""
+    d1 = await _make_device(async_db, "AC", "DL01")
+    d2 = await _make_device(async_db, "AC", "DL02")
+    await _make_health_score(async_db, d1, score=85.0, health_level="健康")
+    await _make_health_score(async_db, d2, score=30.0, health_level="危险")
+    await async_db.commit()
+
+    resp = await client.get(
+        "/api/v1/predictive-maintenance/dashboard?health_level=危险",
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    data = resp.json()
+    assert len(data["devices"]) == 1
+    assert data["devices"][0]["health_level"] == "危险"
+
+
+@pytest.mark.asyncio
+async def test_api_dashboard_empty(client, async_db, admin_token):
+    """API: GET /predictive-maintenance/dashboard 空数据"""
+    resp = await client.get(
+        "/api/v1/predictive-maintenance/dashboard",
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["summary"]["total"] == 0
+    assert data["devices"] == []
+
+
+# ==================== 7.2 Device Detail 端点测试 ====================
+
+@pytest.mark.asyncio
+async def test_api_device_detail(client, async_db, admin_token):
+    """API: GET /predictive-maintenance/devices/{id}/detail 因子+建议"""
+    device = await _make_device(async_db, "AC", "DD01")
+    await _make_health_score(async_db, device, score=35.0, health_level="危险", data_sufficiency="partial")
+    await _make_pending_advice(async_db, device, score=35.0)
+    await async_db.commit()
+
+    resp = await client.get(
+        f"/api/v1/predictive-maintenance/devices/{device.id}/detail",
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["health"]["device_id"] == device.id
+    assert data["health"]["score"] == 35.0
+    # score_factors 解析正确
+    assert data["factors"] is not None
+    assert data["factors"]["degradation"]["score"] == 80.0
+    assert data["factors"]["alarm"]["count"] == 3
+    assert data["factors"]["data_sufficiency"] == "partial"
+    # 建议列表
+    assert len(data["advices"]) >= 1
+    assert data["advices"][0]["status"] == "pending"
+
+
+@pytest.mark.asyncio
+async def test_api_device_detail_not_found(client, admin_token):
+    """API: GET /predictive-maintenance/devices/99999/detail 不存在"""
+    resp = await client.get(
+        "/api/v1/predictive-maintenance/devices/99999/detail",
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    assert resp.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_api_device_detail_null_score_factors(client, async_db, admin_token):
+    """API: score_factors 为 None 时不崩溃"""
+    device = await _make_device(async_db, "AC", "DN01")
+    hs = DeviceHealthScore(
+        device_id=device.id,
+        device_name=device.device_name,
+        device_type=device.device_type,
+        score=50.0,
+        health_level="预警",
+        alarm_count=0,
+        score_factors=None,
+        data_sufficiency="minimal",
+    )
+    async_db.add(hs)
+    await async_db.commit()
+
+    resp = await client.get(
+        f"/api/v1/predictive-maintenance/devices/{device.id}/detail",
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["factors"] is None
+
+
+# ==================== 7.3 data_sufficiency 字段传递测试 ====================
+
+@pytest.mark.asyncio
+async def test_api_dashboard_data_sufficiency(client, async_db, admin_token):
+    """Dashboard 中 data_sufficiency 字段正确传递"""
+    d1 = await _make_device(async_db, "AC", "DS01")
+    d2 = await _make_device(async_db, "AC", "DS02")
+    await _make_health_score(async_db, d1, score=70.0, health_level="关注", data_sufficiency="partial")
+    await _make_health_score(async_db, d2, score=30.0, health_level="危险", data_sufficiency="minimal")
+    await async_db.commit()
+
+    resp = await client.get(
+        "/api/v1/predictive-maintenance/dashboard",
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    data = resp.json()
+    devices_by_id = {d["device_id"]: d for d in data["devices"]}
+    assert devices_by_id[d1.id]["data_sufficiency"] == "partial"
+    assert devices_by_id[d2.id]["data_sufficiency"] == "minimal"

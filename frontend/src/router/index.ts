@@ -177,7 +177,8 @@ const routes: RouteRecordRaw[] = [
           { path: 'inspection', name: 'Inspection', component: () => import('@/views/operation/inspection.vue'), meta: { title: '巡检管理', icon: 'List' } },
           { path: 'knowledge', name: 'Knowledge', component: () => import('@/views/operation/knowledge.vue'), meta: { title: '知识库', icon: 'Reading' } },
           { path: 'reports', name: 'Reports', component: () => import('@/views/report/index.vue'), meta: { title: '报表分析', icon: 'Document' } },
-          { path: 'history', name: 'History', component: () => import('@/views/history/index.vue'), meta: { title: '历史数据', icon: 'TrendCharts' } }
+          { path: 'history', name: 'History', component: () => import('@/views/history/index.vue'), meta: { title: '历史数据', icon: 'TrendCharts' } },
+          { path: 'predictive', name: 'Predictive', component: () => import('@/views/operation/predictive.vue'), meta: { title: '预测性维护', icon: 'TrendCharts' } }
         ]
       },
 
