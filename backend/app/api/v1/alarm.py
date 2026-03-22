@@ -85,16 +85,20 @@ async def get_alarms(
     result = await db.execute(query)
     alarms = result.scalars().all()
 
-    # 获取点位信息
+    # 批量预查询 Point 信息（避免 N+1）
+    point_ids = {a.point_id for a in alarms if a.point_id}
+    point_map: dict[int, Point] = {}
+    if point_ids:
+        point_result = await db.execute(select(Point).where(Point.id.in_(point_ids)))
+        point_map = {p.id: p for p in point_result.scalars().all()}
+
     alarm_list = []
     for alarm in alarms:
         alarm_info = AlarmInfo.model_validate(alarm)
-        if alarm.point_id:
-            point_result = await db.execute(select(Point).where(Point.id == alarm.point_id))
-            point = point_result.scalar_one_or_none()
-            if point:
-                alarm_info.point_code = point.point_code
-                alarm_info.point_name = point.point_name
+        if alarm.point_id and alarm.point_id in point_map:
+            point = point_map[alarm.point_id]
+            alarm_info.point_code = point.point_code
+            alarm_info.point_name = point.point_name
         alarm_list.append(alarm_info)
 
     return PageResponse(items=alarm_list, total=total, page=page, page_size=page_size)
@@ -114,15 +118,20 @@ async def get_active_alarms(db: AsyncSession = Depends(get_db), _: User = Depend
     result = await db.execute(query)
     alarms = result.scalars().all()
 
+    # 批量预查询 Point 信息（避免 N+1）
+    point_ids = {a.point_id for a in alarms if a.point_id}
+    point_map: dict[int, Point] = {}
+    if point_ids:
+        point_result = await db.execute(select(Point).where(Point.id.in_(point_ids)))
+        point_map = {p.id: p for p in point_result.scalars().all()}
+
     alarm_list = []
     for alarm in alarms:
         alarm_info = AlarmInfo.model_validate(alarm)
-        if alarm.point_id:
-            point_result = await db.execute(select(Point).where(Point.id == alarm.point_id))
-            point = point_result.scalar_one_or_none()
-            if point:
-                alarm_info.point_code = point.point_code
-                alarm_info.point_name = point.point_name
+        if alarm.point_id and alarm.point_id in point_map:
+            point = point_map[alarm.point_id]
+            alarm_info.point_code = point.point_code
+            alarm_info.point_name = point.point_name
         alarm_list.append(alarm_info)
 
     return alarm_list
@@ -267,10 +276,18 @@ async def get_top_alarm_points(
         .limit(limit)
     )
 
+    rows = result.all()
+
+    # 批量预查询 Point 信息（避免 N+1）
+    point_ids = {row[0] for row in rows if row[0]}
+    point_map: dict[int, Point] = {}
+    if point_ids:
+        point_result = await db.execute(select(Point).where(Point.id.in_(point_ids)))
+        point_map = {p.id: p for p in point_result.scalars().all()}
+
     top_points = []
-    for row in result.all():
-        point_result = await db.execute(select(Point).where(Point.id == row[0]))
-        point = point_result.scalar_one_or_none()
+    for row in rows:
+        point = point_map.get(row[0])
         if point:
             top_points.append(
                 {
@@ -517,8 +534,6 @@ async def get_alarm_shields(
     """
     获取告警屏蔽列表（分页、筛选）
     """
-    from ...models.point import Point
-
     query = select(AlarmShield)
 
     if point_id:
@@ -534,6 +549,13 @@ async def get_alarm_shields(
     result = await db.execute(query)
     shields = result.scalars().all()
 
+    # 批量预查询 Point 信息（避免 N+1）
+    point_ids = {s.point_id for s in shields if s.point_id}
+    point_map: dict[int, Point] = {}
+    if point_ids:
+        point_result = await db.execute(select(Point).where(Point.id.in_(point_ids)))
+        point_map = {p.id: p for p in point_result.scalars().all()}
+
     # 获取关联信息
     shield_list = []
     now = datetime.now()
@@ -541,12 +563,10 @@ async def get_alarm_shields(
         shield_info = AlarmShieldInfo.model_validate(shield)
 
         # 获取点位信息
-        if shield.point_id:
-            point_result = await db.execute(select(Point).where(Point.id == shield.point_id))
-            point = point_result.scalar_one_or_none()
-            if point:
-                shield_info.point_code = point.point_code
-                shield_info.point_name = point.point_name
+        if shield.point_id and shield.point_id in point_map:
+            point = point_map[shield.point_id]
+            shield_info.point_code = point.point_code
+            shield_info.point_name = point.point_name
 
         # 计算状态
         if shield.end_time < now:
