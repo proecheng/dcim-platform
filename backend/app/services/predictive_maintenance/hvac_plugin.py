@@ -1,28 +1,11 @@
 """HVAC 劣化分析插件 — Story 36.1"""
 
 import logging
-from .base import DegradationPlugin, DegradationResult
+from .base import DegradationPlugin, DegradationResult, _linear_regression_slope
 from .registry import register_degradation_plugin
 from .config import HVAC_CONFIG
 
 logger = logging.getLogger(__name__)
-
-
-def _linear_regression_slope(timestamps: list[float], values: list[float]) -> float:
-    """计算线性回归斜率（最小二乘法）
-    timestamps 使用天数偏移量（0, 1, 2, ...），斜率单位为 值/天
-    """
-    n = len(values)
-    if n < 2:
-        return 0.0
-    sum_x = sum(timestamps)
-    sum_y = sum(values)
-    sum_xy = sum(x * y for x, y in zip(timestamps, values))
-    sum_x2 = sum(x * x for x in timestamps)
-    denominator = n * sum_x2 - sum_x * sum_x
-    if denominator == 0:
-        return 0.0
-    return (n * sum_xy - sum_x * sum_y) / denominator
 
 
 @register_degradation_plugin("hvac")
@@ -211,17 +194,6 @@ class HVACDegradationPlugin(DegradationPlugin):
             data_sufficiency=data_sufficiency,
             detail=detail,
         )
-
-    def _find_point_data(
-        self, point_history: dict[str, list], suffixes: list[str]
-    ) -> list | None:
-        """从 point_history 中按精确后缀匹配查找第一个有数据的点位"""
-        for suffix in suffixes:
-            # 精确匹配 key == suffix 或后缀匹配 key.endswith("_" + suffix)
-            for key, data in point_history.items():
-                if (key == suffix or key.endswith("_" + suffix)) and data:
-                    return data
-        return None
 
     def _determine_sufficiency(
         self, available_count: int, return_temp_data: list | None, window_days: int

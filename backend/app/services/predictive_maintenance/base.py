@@ -1,7 +1,25 @@
-"""劣化分析插件基类与数据结构 — Story 36.1"""
+"""劣化分析插件基类与数据结构 — Story 36.1 / 36.5"""
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
+
+
+def _linear_regression_slope(timestamps: list[float], values: list[float]) -> float:
+    """计算线性回归斜率（最小二乘法）
+
+    timestamps 使用天数偏移量（0, 1, 2, ...），斜率单位为 值/天
+    """
+    n = len(values)
+    if n < 2:
+        return 0.0
+    sum_x = sum(timestamps)
+    sum_y = sum(values)
+    sum_xy = sum(x * y for x, y in zip(timestamps, values))
+    sum_x2 = sum(x * x for x in timestamps)
+    denominator = n * sum_x2 - sum_x * sum_x
+    if denominator == 0:
+        return 0.0
+    return (n * sum_xy - sum_x * sum_y) / denominator
 
 
 @dataclass
@@ -45,3 +63,13 @@ class DegradationPlugin(ABC):
     ) -> DegradationResult:
         """执行劣化分析，返回分析结果"""
         ...
+
+    def _find_point_data(
+        self, point_history: dict[str, list], suffixes: list[str]
+    ) -> list | None:
+        """从 point_history 中按精确后缀匹配查找第一个有数据的点位"""
+        for suffix in suffixes:
+            for key, data in point_history.items():
+                if (key == suffix or key.endswith("_" + suffix)) and data:
+                    return data
+        return None

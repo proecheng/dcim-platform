@@ -1,4 +1,4 @@
-"""DegradationAnalyzer 调度器 — Story 36.1"""
+"""DegradationAnalyzer 调度器 — Story 36.1 / 36.5"""
 
 import logging
 from datetime import datetime, timedelta
@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ...models.device import Device
 from ...models.point import Point
 from ...models.history import PointHistoryArchive, PointHistory
+from ...models.diagnosis import BatterySOHRecord
 from .base import DegradationResult
 from .registry import get_degradation_plugin
 from .config import DEVICE_TYPE_MAP, DEFAULT_WINDOW_DAYS, FALLBACK_HISTORY_DAYS, VALID_QUALITY_THRESHOLD
@@ -46,7 +47,8 @@ class DegradationAnalyzer:
 
         plugin = plugin_cls()
         point_history = await self._fetch_point_history(
-            device_id, plugin.get_required_points() + plugin.get_optional_points()
+            device_id, plugin.get_required_points() + plugin.get_optional_points(),
+            plugin_key=plugin_key,
         )
 
         return await plugin.analyze(device_id, point_history, self.window_days)
@@ -73,7 +75,8 @@ class DegradationAnalyzer:
         return results
 
     async def _fetch_point_history(
-        self, device_id: int, point_suffixes: list[str]
+        self, device_id: int, point_suffixes: list[str],
+        plugin_key: str | None = None,
     ) -> dict[str, list]:
         """获取设备的点位历史数据
 
@@ -158,5 +161,24 @@ class DegradationAnalyzer:
                     point_history[suffix] = data
                 else:
                     point_history[suffix] = []
+
+        # Battery 插件：注入 BatterySOHRecord 数据为虚拟 point_history 条目
+        if plugin_key == "battery":
+            soh_result = await self.db.execute(
+                select(BatterySOHRecord)
+                .where(
+                    BatterySOHRecord.device_id == device_id,
+                    BatterySOHRecord.calculated_at >= cutoff,
+                )
+                .order_by(BatterySOHRecord.calculated_at)
+            )
+            soh_records = soh_result.scalars().all()
+            if soh_records:
+                soh_data = []
+                for r in soh_records:
+                    if r.calculated_at:
+                        day_offset = (r.calculated_at - cutoff).total_seconds() / 86400
+                        soh_data.append((round(day_offset, 2), r.soh_percent))
+                point_history["soh_percent"] = soh_data
 
         return point_history
