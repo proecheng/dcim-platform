@@ -7,6 +7,21 @@ const path = require('path');
 const app = express();
 const PORT = parseInt(process.env.PROXY_PORT || '3000', 10);
 const BACKEND_PORT = parseInt(process.env.BACKEND_PORT || '8080', 10);
+
+// Validate port values
+function validatePort(value, name) {
+    if (isNaN(value) || value < 1 || value > 65535) {
+        console.error('[FATAL] Invalid ' + name + ': ' + process.env[name] + ' (must be 1-65535)');
+        process.exit(1);
+    }
+}
+validatePort(PORT, 'PROXY_PORT');
+validatePort(BACKEND_PORT, 'BACKEND_PORT');
+if (PORT === BACKEND_PORT) {
+    console.error('[FATAL] PROXY_PORT and BACKEND_PORT must differ (both are ' + PORT + ')');
+    process.exit(1);
+}
+
 const BACKEND_URL = 'http://localhost:' + BACKEND_PORT;
 const BACKEND_WS_URL = 'ws://localhost:' + BACKEND_PORT;
 

@@ -22,6 +22,24 @@ REM Find Python
 set "PYTHON_CMD=backend\.venv\Scripts\python.exe"
 if not exist "%PYTHON_CMD%" set "PYTHON_CMD=python"
 
+REM Pre-check alternative ports
+echo Checking alternative ports...
+set "PORT_BLOCKED=0"
+for /f "tokens=5" %%a in ('netstat -ano ^| findstr ":8083" ^| findstr "LISTENING"') do (
+    echo   [ERROR] Port 8083 is already in use (PID %%a^)
+    set "PORT_BLOCKED=1"
+)
+for /f "tokens=5" %%a in ('netstat -ano ^| findstr ":3002" ^| findstr "LISTENING"') do (
+    echo   [ERROR] Port 3002 is already in use (PID %%a^)
+    set "PORT_BLOCKED=1"
+)
+if "!PORT_BLOCKED!"=="1" (
+    echo.
+    echo   Please free ports 8083/3002 first, or use start-smart.bat for auto port selection
+    pause
+    exit /b 1
+)
+
 echo [1/2] Starting backend on port 8083...
 start "DCIM-Backend-8083" cmd /k "title Backend [Port 8083] && cd /d %SCRIPT_DIR%backend && echo Starting backend on port 8083... && "%PYTHON_CMD%" -m uvicorn app.main:app --host 0.0.0.0 --port 8083"
 

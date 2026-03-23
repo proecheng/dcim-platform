@@ -96,6 +96,17 @@ if "!PORT_OK!"=="0" (
         if not errorlevel 1 set "ALT1=8084"
         netstat -ano | findstr ":3002" | findstr "LISTENING" >nul 2>&1
         if not errorlevel 1 set "ALT2=3003"
+        REM Verify alt ports are actually free
+        netstat -ano | findstr ":!ALT1!" | findstr "LISTENING" >nul 2>&1
+        if not errorlevel 1 (
+            echo   [ERROR] No free alternative backend port found (8083, 8084 all occupied^)
+            exit /b 1
+        )
+        netstat -ano | findstr ":!ALT2!" | findstr "LISTENING" >nul 2>&1
+        if not errorlevel 1 (
+            echo   [ERROR] No free alternative proxy port found (3002, 3003 all occupied^)
+            exit /b 1
+        )
         echo   Alternative ports: Backend=!ALT1!, Proxy=!ALT2!
         echo !ALT1!> "%TEMP%\dcim_backend_port.txt"
         echo !ALT2!> "%TEMP%\dcim_proxy_port.txt"

@@ -48,6 +48,9 @@ if "%PORT_RESULT%"=="0" (
     echo       Using alternative ports
     set /p BACKEND_PORT=<"%TEMP%\dcim_backend_port.txt"
     set /p PROXY_PORT=<"%TEMP%\dcim_proxy_port.txt"
+    REM Trim trailing whitespace from set /p
+    for /f "tokens=*" %%x in ("!BACKEND_PORT!") do set "BACKEND_PORT=%%x"
+    for /f "tokens=*" %%x in ("!PROXY_PORT!") do set "PROXY_PORT=%%x"
     echo       Backend: !BACKEND_PORT!, Proxy: !PROXY_PORT!
 ) else (
     echo       Port cleanup failed
