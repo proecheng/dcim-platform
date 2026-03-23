@@ -5,8 +5,8 @@ const cors = require('cors');
 const path = require('path');
 
 const app = express();
-const PORT = 3000;
-const BACKEND_PORT = 8080;
+const PORT = parseInt(process.env.PROXY_PORT || '3000', 10);
+const BACKEND_PORT = parseInt(process.env.BACKEND_PORT || '8080', 10);
 const BACKEND_URL = 'http://localhost:' + BACKEND_PORT;
 const BACKEND_WS_URL = 'ws://localhost:' + BACKEND_PORT;
 

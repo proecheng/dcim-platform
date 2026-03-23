@@ -37,7 +37,7 @@ REM Step 2: Smart Port Cleanup (with fallback)
 REM ============================================================
 echo.
 echo [2/6] Cleaning occupied ports (smart mode)...
-call scripts\clean-ports-enhanced.bat 8080 3000 1
+call scripts\clean-ports.bat 8080 3000 1
 set "PORT_RESULT=%errorlevel%"
 
 if "%PORT_RESULT%"=="0" (
@@ -111,17 +111,8 @@ start "Monitor-Backend" cmd /k "title Backend [Port !BACKEND_PORT!] && cd /d %BA
 echo Waiting for backend to start...
 timeout /t 6 /nobreak >nul 2>&1
 
-REM Create dynamic proxy config if using alternative ports
-if not "!PROXY_PORT!"=="3000" (
-    echo Creating dynamic proxy configuration...
-    call :create_proxy_config !BACKEND_PORT! !PROXY_PORT!
-    set "PROXY_SCRIPT=server-dynamic.js"
-) else (
-    set "PROXY_SCRIPT=server.js"
-)
-
 echo Starting proxy service (port !PROXY_PORT!)...
-start "Monitor-Proxy" cmd /k "title Proxy [Port !PROXY_PORT!] && cd /d %PROXY_DIR% && echo Starting proxy... && node !PROXY_SCRIPT!"
+start "Monitor-Proxy" cmd /k "title Proxy [Port !PROXY_PORT!] && cd /d %PROXY_DIR% && set PROXY_PORT=!PROXY_PORT! && set BACKEND_PORT=!BACKEND_PORT! && echo Starting proxy... && node server.js"
 
 echo.
 timeout /t 5 /nobreak >nul 2>&1
@@ -171,42 +162,5 @@ REM Cleanup temp files
 del "%TEMP%\dcim_python_cmd.txt" >nul 2>&1
 del "%TEMP%\dcim_backend_port.txt" >nul 2>&1
 del "%TEMP%\dcim_proxy_port.txt" >nul 2>&1
-
-exit /b 0
-
-REM ============================================================
-REM Subroutine: Create Dynamic Proxy Config
-REM ============================================================
-:create_proxy_config
-set "BE_PORT=%~1"
-set "PR_PORT=%~2"
-
-(
-echo const express = require('express'^);
-echo const { createProxyMiddleware } = require('http-proxy-middleware'^);
-echo const httpProxy = require('http-proxy'^);
-echo const cors = require('cors'^);
-echo const path = require('path'^);
-echo.
-echo const app = express(^);
-echo const PORT = %PR_PORT%;
-echo const BACKEND_PORT = %BE_PORT%;
-echo const BACKEND_URL = 'http://localhost:' + BACKEND_PORT;
-echo const BACKEND_WS_URL = 'ws://localhost:' + BACKEND_PORT;
-echo.
-echo app.use(cors({ origin: '*', credentials: true }^)^);
-echo app.use((req, res, next^) =^> { console.log('[' + new Date(^).toISOString(^) + '] ' + req.method + ' ' + req.url^); next(^); }^);
-echo app.get('/health', (req, res^) =^> { res.json({ status: 'ok', timestamp: new Date(^).toISOString(^) }^); }^);
-echo app.use('/api', createProxyMiddleware({ target: BACKEND_URL, changeOrigin: true, onError: (err, req, res^) =^> { console.error('Proxy error: ' + err.message^); if (res ^&^& typeof res.status === 'function'^) { res.status(502^).json({ error: 'Backend service unavailable' }^); } else if (res ^&^& typeof res.end === 'function'^) { res.end(^); } } }^)^);
-echo app.use('/docs', createProxyMiddleware({ target: BACKEND_URL, changeOrigin: true }^)^);
-echo app.use('/openapi.json', createProxyMiddleware({ target: BACKEND_URL, changeOrigin: true }^)^);
-echo const frontendDist = path.join(__dirname, '..', 'frontend', 'dist'^);
-echo app.use(express.static(frontendDist^)^);
-echo app.get('*', (req, res^) =^> { res.sendFile(path.join(frontendDist, 'index.html'^)^); }^);
-echo const server = app.listen(PORT, '0.0.0.0', (^) =^> { console.log('========================================'^); console.log('   DCIM Proxy Server Started (Dynamic Ports^)'^); console.log('========================================'^); console.log('   Local:    http://localhost:' + PORT^); console.log('   Backend:  http://localhost:' + BACKEND_PORT^); console.log('========================================'^); }^);
-echo const wsProxy = httpProxy.createProxyServer({ target: BACKEND_WS_URL, ws: true, changeOrigin: true }^);
-echo wsProxy.on('error', (err, req, res^) =^> { console.error('WebSocket proxy error:', err.message^); }^);
-echo server.on('upgrade', (req, socket, head^) =^> { if (req.url.startsWith('/ws'^)^) { console.log('[WS] Upgrading:', req.url^); wsProxy.ws(req, socket, head^); } }^);
-) > "%PROXY_DIR%\server-dynamic.js"
 
 exit /b 0
