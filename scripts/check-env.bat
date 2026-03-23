@@ -25,11 +25,18 @@ if exist "%SCRIPT_DIR%\backend\.venv\Scripts\python.exe" (
         )
     )
     if "!PYTHON_CMD!"=="" (
-        if exist "C:\Python311\python.exe" set "PYTHON_CMD=C:\Python311\python.exe"
-        if exist "C:\Python310\python.exe" set "PYTHON_CMD=C:\Python310\python.exe"
-        if exist "C:\Python39\python.exe" set "PYTHON_CMD=C:\Python39\python.exe"
-        if exist "%LOCALAPPDATA%\Programs\Python\Python311\python.exe" set "PYTHON_CMD=%LOCALAPPDATA%\Programs\Python\Python311\python.exe"
-        if exist "%LOCALAPPDATA%\Programs\Python\Python310\python.exe" set "PYTHON_CMD=%LOCALAPPDATA%\Programs\Python\Python310\python.exe"
+        REM Try hardcoded paths (prefer newer versions first, use else-if to keep first match)
+        if exist "C:\Python311\python.exe" (
+            set "PYTHON_CMD=C:\Python311\python.exe"
+        ) else if exist "%LOCALAPPDATA%\Programs\Python\Python311\python.exe" (
+            set "PYTHON_CMD=%LOCALAPPDATA%\Programs\Python\Python311\python.exe"
+        ) else if exist "C:\Python310\python.exe" (
+            set "PYTHON_CMD=C:\Python310\python.exe"
+        ) else if exist "%LOCALAPPDATA%\Programs\Python\Python310\python.exe" (
+            set "PYTHON_CMD=%LOCALAPPDATA%\Programs\Python\Python310\python.exe"
+        ) else if exist "C:\Python39\python.exe" (
+            set "PYTHON_CMD=C:\Python39\python.exe"
+        )
     )
 )
 

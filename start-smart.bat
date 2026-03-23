@@ -31,6 +31,7 @@ if errorlevel 1 (
 
 REM Get Python command from temp file
 set /p PYTHON_CMD=<"%TEMP%\dcim_python_cmd.txt"
+for /f "tokens=*" %%x in ("!PYTHON_CMD!") do set "PYTHON_CMD=%%x"
 
 REM ============================================================
 REM Step 2: Smart Port Cleanup (with fallback)

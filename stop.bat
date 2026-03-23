@@ -35,11 +35,15 @@ taskkill /F /FI "WINDOWTITLE eq DCIM-Proxy*" >nul 2>&1
 echo       Service windows closed
 
 REM ============================================================
-REM Step 2: Clean Ports (using module)
+REM Step 2: Clean Ports (default + alternative)
 REM ============================================================
 echo.
-echo [2/3] Cleaning ports...
+echo [2/3] Cleaning default ports (8080, 3000)...
 call scripts\clean-ports.bat 8080 3000
+
+echo.
+echo       Cleaning alternative ports (8083, 3002)...
+call scripts\clean-ports.bat 8083 3002
 
 REM ============================================================
 REM Step 3: Final Verification
@@ -48,15 +52,12 @@ echo.
 echo [3/3] Final verification...
 
 set "ALL_CLEAR=1"
-netstat -ano | findstr ":8080" | findstr "LISTENING" >nul 2>&1
-if not errorlevel 1 (
-    echo       [WARNING] Port 8080 still in use (may be zombie port)
-    set "ALL_CLEAR=0"
-)
-netstat -ano | findstr ":3000" | findstr "LISTENING" >nul 2>&1
-if not errorlevel 1 (
-    echo       [WARNING] Port 3000 still in use (may be zombie port)
-    set "ALL_CLEAR=0"
+for %%p in (8080 3000 8083 3002) do (
+    netstat -ano | findstr ":%%p" | findstr "LISTENING" >nul 2>&1
+    if not errorlevel 1 (
+        echo       [WARNING] Port %%p still in use (may be zombie port^)
+        set "ALL_CLEAR=0"
+    )
 )
 
 if "!ALL_CLEAR!"=="0" (
@@ -66,15 +67,23 @@ if "!ALL_CLEAR!"=="0" (
 )
 
 REM ============================================================
-REM Success Message
+REM Result Message
 REM ============================================================
 echo.
 echo ========================================================
-echo              All Services Stopped
-echo ========================================================
-echo.
-echo   Ports 8080 and 3000 are now free
-echo   You can safely restart the system with start.bat
+if "!ALL_CLEAR!"=="1" (
+    echo              All Services Stopped
+    echo ========================================================
+    echo.
+    echo   All ports are now free
+    echo   You can safely restart the system with start.bat
+) else (
+    echo          Services Stopped (with warnings)
+    echo ========================================================
+    echo.
+    echo   Some ports may still be occupied (see warnings above^)
+    echo   Wait a few minutes or restart the computer
+)
 echo.
 echo ========================================================
 echo.
