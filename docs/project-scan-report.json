@@ -1,6 +1,6 @@
 {
   "workflow_version": "1.2.0",
-  "timestamps": {"started": "2026-03-17T20:30:00", "last_updated": "2026-03-17T23:50:00"},
+  "timestamps": {"started": "2026-03-23T10:00:00", "last_updated": "2026-03-23T11:00:00"},
   "mode": "full_rescan",
   "scan_level": "exhaustive",
   "project_root": "D:\\mytest1",
@@ -12,38 +12,37 @@
   ],
   "repository_type": "multi-part",
   "completed_steps": [
-    {"step": "step_0.5", "status": "completed", "timestamp": "2026-03-17T20:30:00", "summary": "Loaded 12 project type documentation requirements"},
-    {"step": "step_1", "status": "completed", "timestamp": "2026-03-17T20:35:00", "summary": "Classified as multi-part with 3 parts: backend(FastAPI), frontend(Vue3), proxy(Express)"},
-    {"step": "step_2", "status": "completed", "timestamp": "2026-03-17T20:40:00", "summary": "Source tree analysis completed"},
-    {"step": "step_3", "status": "completed", "timestamp": "2026-03-17T20:45:00", "summary": "Architecture patterns identified"},
-    {"step": "step_4", "status": "completed", "timestamp": "2026-03-17T21:00:00", "summary": "API contracts scanned: 57 modules, 300+ endpoints"},
-    {"step": "step_5", "status": "completed", "timestamp": "2026-03-17T21:30:00", "summary": "Data models scanned: 30 files, 134 ORM models, 8 enums"},
-    {"step": "step_6", "status": "completed", "timestamp": "2026-03-17T21:35:00", "summary": "Deployment config scanned"},
-    {"step": "step_7", "status": "completed", "timestamp": "2026-03-17T21:40:00", "summary": "Integration architecture analyzed"},
-    {"step": "step_8", "status": "completed", "timestamp": "2026-03-17T22:00:00", "summary": "Architecture docs generated"},
-    {"step": "step_9", "status": "completed", "timestamp": "2026-03-17T23:00:00", "summary": "All content documents generated: project-overview, source-tree-analysis, development-guide, architecture-overview, api-contracts-summary, data-models-summary, component-inventory-frontend"},
-    {"step": "step_10", "status": "completed", "timestamp": "2026-03-17T23:45:00", "summary": "Master index.md updated for V4.2.0"},
-    {"step": "step_11", "status": "completed", "timestamp": "2026-03-17T23:50:00", "summary": "Validation complete, all documents generated successfully"}
+    {"step": "step_0.5", "status": "completed", "timestamp": "2026-03-23T10:00:00", "summary": "Loaded 12 project type documentation requirements from CSV"},
+    {"step": "step_1", "status": "completed", "timestamp": "2026-03-23T10:05:00", "summary": "Classified as multi-part with 3 parts: backend(FastAPI 380 files), frontend(Vue3 487 files), proxy(Express 3 files)"},
+    {"step": "step_2", "status": "completed", "timestamp": "2026-03-23T10:10:00", "summary": "Found 169 existing docs. No additional user context."},
+    {"step": "step_3", "status": "completed", "timestamp": "2026-03-23T10:15:00", "summary": "Tech stack: FastAPI+SQLAlchemy2.0+Pydantic2 backend, Vue3+TS+Vite+ElementPlus+ECharts+Three.js frontend, Express proxy. Architecture: layered async service pattern."},
+    {"step": "step_4", "status": "completed", "timestamp": "2026-03-23T10:45:00", "summary": "Exhaustive conditional analysis: 836 API endpoints across 60 modules, 194 ORM models across 36 files, 487 frontend files (98 views, 90 components, 10 stores, 46 API modules, 38 composables). Generated 3 inventory docs."},
+    {"step": "step_5", "status": "completed", "timestamp": "2026-03-23T10:50:00", "summary": "Generated annotated source tree with full directory structure and key metrics."},
+    {"step": "step_6", "status": "completed", "timestamp": "2026-03-23T10:55:00", "summary": "Generated dev-ops-guide with full dependency versions, startup commands, testing, env vars, WebSocket channels, scheduled tasks."},
+    {"step": "step_7", "status": "completed", "timestamp": "2026-03-23T10:57:00", "summary": "Generated integration-architecture with system diagram, data flows, cross-layer communication, RBAC model."},
+    {"step": "step_8", "status": "completed", "timestamp": "2026-03-23T10:58:00", "summary": "Updated backend-architecture.md and frontend-architecture.md with current metrics (194 models, 98 views, 90 components)."},
+    {"step": "step_10", "status": "completed", "timestamp": "2026-03-23T11:00:00", "summary": "Updated master index.md with all new docs, current metrics, and proper categorization."}
   ],
   "current_step": "completed",
   "findings": {
-    "project_classification": "Multi-part: backend(FastAPI Python), frontend(Vue3 TS), proxy(Express.js)",
+    "project_classification": "Multi-part: backend(FastAPI Python 380 files), frontend(Vue3 TS 487 files), proxy(Express.js 3 files)",
     "metrics": {
-      "backend_files": 350, "api_modules": 57, "orm_models": 134, "services": 147, "test_files": 195,
-      "frontend_files": 483, "views": 97, "components": 101, "stores": 8,
-      "migrations": 54, "docs": 168, "docker_services": 5
-    }
+      "backend_app_files": 380, "api_modules": 60, "api_endpoints": 836, "model_files": 36, "orm_models": 194, "schema_files": 46, "services": 157, "test_files": 203,
+      "frontend_src_files": 487, "views": 98, "components": 90, "stores": 10, "frontend_api_modules": 46, "composables": 38,
+      "proxy_files": 3, "migrations": 58, "docs": 169
+    },
+    "existing_docs_count": 169,
+    "technology_stack": "FastAPI 0.109+SQLAlchemy 2.0+Pydantic 2.5 | Vue 3.4+Vite 5+Element Plus 2.5+ECharts 5.6+Three.js 0.182 | Express 4.18 proxy"
   },
   "outputs_generated": [
     "project-scan-report.json",
-    "project-overview.md",
-    "source-tree-analysis.md",
-    "development-guide.md",
-    "architecture-overview.md",
-    "api-contracts-summary.md",
-    "data-models-summary.md",
-    "component-inventory-frontend.md",
-    "index.md"
+    "docs/project-knowledge/api-contracts-backend.md",
+    "docs/project-knowledge/data-models-backend.md",
+    "docs/project-knowledge/component-inventory-frontend.md",
+    "docs/project-knowledge/source-tree.md",
+    "docs/project-knowledge/dev-ops-guide.md",
+    "docs/project-knowledge/integration-architecture.md",
+    "docs/project-knowledge/index.md"
   ],
-  "resume_instructions": "Workflow completed"
+  "resume_instructions": "Workflow completed. All documentation generated and index updated."
 }

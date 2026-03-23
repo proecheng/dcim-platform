@@ -420,7 +420,7 @@ development_status:
   # ============================================================
 
   # Epic 36: 预测性维护扩展
-  epic-36: in-progress
+  epic-36: done
   36-1-degradation-plugin-framework-and-hvac-plugin: done  # 劣化分析插件框架与 HVAC 插件
   36-2-device-health-score-enhancement-and-weighted-merge: done  # DeviceHealthScore 增强与加权合并
   36-3-maintenance-advice-engine: done  # 完成: MaintenanceAdvice模型、MaintenanceAdvisor服务(evaluate幂等/auto_close条件UPDATE/confirm转工单/reject误报)、4个API端点(RBAC)、Pydantic Schema(Literal校验)、health_calculator集成、迁移脚本、18个测试全通过

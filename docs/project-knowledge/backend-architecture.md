@@ -25,8 +25,8 @@ backend/app/
 │   ├── database.py   # 数据库连接 + 初始化
 │   ├── security.py   # JWT + 密码哈希 + 权限装饰器
 │   └── logging.py    # 日志配置
-├── models/           # SQLAlchemy ORM 模型 (13个文件)
-├── schemas/          # Pydantic 验证方案 (18个文件)
+├── models/           # SQLAlchemy ORM 模型 (36个文件, 194个模型)
+├── schemas/          # Pydantic 验证方案 (46个文件)
 ├── api/              # REST API 路由
 │   ├── deps.py       # 依赖注入
 │   └── v1/           # v1 API (31个端点)
