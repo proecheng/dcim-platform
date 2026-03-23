@@ -26,11 +26,11 @@ REM Pre-check alternative ports
 echo Checking alternative ports...
 set "PORT_BLOCKED=0"
 for /f "tokens=5" %%a in ('netstat -ano ^| findstr ":8083" ^| findstr "LISTENING"') do (
-    echo   [ERROR] Port 8083 is already in use (PID %%a^)
+    echo   [ERROR] Port 8083 is already in use ^(PID %%a^)
     set "PORT_BLOCKED=1"
 )
 for /f "tokens=5" %%a in ('netstat -ano ^| findstr ":3002" ^| findstr "LISTENING"') do (
-    echo   [ERROR] Port 3002 is already in use (PID %%a^)
+    echo   [ERROR] Port 3002 is already in use ^(PID %%a^)
     set "PORT_BLOCKED=1"
 )
 if "!PORT_BLOCKED!"=="1" (

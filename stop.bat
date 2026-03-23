@@ -42,8 +42,9 @@ echo [2/3] Cleaning default ports (8080, 3000)...
 call scripts\clean-ports.bat 8080 3000
 
 echo.
-echo       Cleaning alternative ports (8083, 3002)...
+echo       Cleaning alternative ports (8083-8084, 3002-3003)...
 call scripts\clean-ports.bat 8083 3002
+call scripts\clean-ports.bat 8084 3003
 
 REM ============================================================
 REM Step 3: Final Verification
@@ -52,10 +53,10 @@ echo.
 echo [3/3] Final verification...
 
 set "ALL_CLEAR=1"
-for %%p in (8080 3000 8083 3002) do (
+for %%p in (8080 3000 8083 3002 8084 3003) do (
     netstat -ano | findstr ":%%p" | findstr "LISTENING" >nul 2>&1
     if not errorlevel 1 (
-        echo       [WARNING] Port %%p still in use (may be zombie port^)
+        echo       [WARNING] Port %%p still in use ^(may be zombie port^)
         set "ALL_CLEAR=0"
     )
 )
@@ -78,10 +79,10 @@ if "!ALL_CLEAR!"=="1" (
     echo   All ports are now free
     echo   You can safely restart the system with start.bat
 ) else (
-    echo          Services Stopped (with warnings)
+    echo          Services Stopped ^(with warnings^)
     echo ========================================================
     echo.
-    echo   Some ports may still be occupied (see warnings above^)
+    echo   Some ports may still be occupied ^(see warnings above^)
     echo   Wait a few minutes or restart the computer
 )
 echo.

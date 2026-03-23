@@ -74,7 +74,7 @@ if not errorlevel 1 (
 if "!PORT_OK!"=="0" (
     set /a RETRY+=1
     if !RETRY! LEQ 2 (
-        echo   Retrying port cleanup (attempt !RETRY!/2^)...
+        echo   Retrying port cleanup ^(attempt !RETRY!/2^)...
         for /f "tokens=5" %%a in ('netstat -ano ^| findstr ":%PORT1%" ^| findstr "LISTENING"') do (
             taskkill /F /PID %%a >nul 2>&1
             powershell -Command "Stop-Process -Id %%a -Force -ErrorAction SilentlyContinue" >nul 2>&1
@@ -99,12 +99,12 @@ if "!PORT_OK!"=="0" (
         REM Verify alt ports are actually free
         netstat -ano | findstr ":!ALT1!" | findstr "LISTENING" >nul 2>&1
         if not errorlevel 1 (
-            echo   [ERROR] No free alternative backend port found (8083, 8084 all occupied^)
+            echo   [ERROR] No free alternative backend port found ^(8083, 8084 all occupied^)
             exit /b 1
         )
         netstat -ano | findstr ":!ALT2!" | findstr "LISTENING" >nul 2>&1
         if not errorlevel 1 (
-            echo   [ERROR] No free alternative proxy port found (3002, 3003 all occupied^)
+            echo   [ERROR] No free alternative proxy port found ^(3002, 3003 all occupied^)
             exit /b 1
         )
         echo   Alternative ports: Backend=!ALT1!, Proxy=!ALT2!
@@ -116,15 +116,15 @@ if "!PORT_OK!"=="0" (
     echo.
     echo   [ERROR] Failed to free ports after 3 attempts
     echo.
-    echo   This is likely a zombie port issue (Windows TCP/IP stack problem)
+    echo   This is likely a zombie port issue ^(Windows TCP/IP stack problem^)
     echo.
     echo   Solutions:
     echo   1. Wait 5-10 minutes for Windows to auto-release the port
-    echo   2. Restart your computer (most reliable)
+    echo   2. Restart your computer ^(most reliable^)
     echo   3. Check Task Manager for hidden processes
     echo.
     echo   If you need to start immediately:
-    echo   - Use start-smart.bat (auto fallback to alternative ports)
+    echo   - Use start-smart.bat ^(auto fallback to alternative ports^)
     echo   - Or modify proxy/server.js to use different ports
     echo.
     exit /b 1
