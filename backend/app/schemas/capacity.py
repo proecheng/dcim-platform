@@ -289,6 +289,23 @@ class RackingRecommendationResponse(BaseModel):
     qualified_count: int = Field(0, description="合格候选数")
 
 
+class CapacityConstraintRequest(BaseModel):
+    """容量约束检查请求"""
+
+    site_id: Optional[int] = Field(None, description="站点ID")
+    room_id: Optional[int] = Field(None, description="房间ID")
+    required_u: int = Field(0, description="所需U位数量")
+    required_power_kva: float = Field(0.0, description="所需电力(kVA)")
+    required_cooling_kw: float = Field(0.0, description="所需制冷(kW)")
+
+
+class CapacityConstraintResponse(BaseModel):
+    """容量约束检查响应"""
+
+    feasible: bool = Field(..., description="是否满足约束")
+    details: List[str] = Field(default_factory=list, description="检查详情")
+
+
 # ==================== 容量趋势预测 Schemas ====================
 
 

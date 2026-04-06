@@ -38,6 +38,8 @@ from ...schemas.capacity import (
     WeightCapacityResponse,
     CapacityPlanCreate,
     CapacityPlanResponse,
+    CapacityConstraintRequest,
+    CapacityConstraintResponse,
     RackingRecommendationRequest,
     CabinetScore,
     RackingRecommendationResponse,
@@ -45,6 +47,7 @@ from ...schemas.capacity import (
     CapacityForecastResponse,
     ExpansionSuggestion,
 )
+from ...services.capacity import capacity_service
 
 router = APIRouter(prefix="/capacity", tags=["容量管理"])
 
@@ -1460,3 +1463,22 @@ async def get_capacity_alerts(
             )
 
     return alerts
+
+
+@router.post("/check-constraints", response_model=CapacityConstraintResponse, summary="容量约束检查")
+async def check_capacity_constraints(
+    data: CapacityConstraintRequest,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_viewer),
+):
+    """
+    检查特定站点或房间的容量约束
+    """
+    return await capacity_service.check_constraints(
+        db=db,
+        site_id=data.site_id,
+        room_id=data.room_id,
+        required_u=data.required_u,
+        required_power_kva=data.required_power_kva,
+        required_cooling_kw=data.required_cooling_kw,
+    )

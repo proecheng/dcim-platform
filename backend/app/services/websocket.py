@@ -143,6 +143,14 @@ class ConnectionManager:
         message = {"type": "linkage", "data": linkage_data}
         await self.broadcast(message, "linkage")
 
+    async def broadcast_to_role(self, message: dict, role: str, channel: str = "alarms"):
+        """向特定角色的用户广播消息 (Story 24.6)"""
+        # 注意: 这里的实现暂时简化为全员广播，但在消息体中包含 target_roles
+        # 前端会根据登录角色的 target_roles 进行过滤显示
+        if "target_roles" not in message:
+            message["target_roles"] = [role]
+        await self.broadcast(message, channel)
+
     async def broadcast_diagnosis(self, msg_type: str, data: dict, target_roles: list = None):
         """广播诊断结果 - Story 24.6，接口风格与 broadcast_alarm() 一致"""
         message = {

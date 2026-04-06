@@ -11,6 +11,7 @@ from datetime import datetime, date
 from enum import Enum
 from sqlalchemy import Column, Integer, String, Boolean, DateTime, Text, Float, ForeignKey, JSON, Index, Date
 
+from sqlalchemy.ext.hybrid import hybrid_property
 from ..core.database import Base
 
 
@@ -138,6 +139,14 @@ class DiagnosisAnnotation(Base):
     annotated_at = Column(DateTime, nullable=False, default=datetime.now, comment="标注时间")
     created_at = Column(DateTime, default=datetime.now, comment="创建时间")
     updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now, comment="更新时间")
+
+    @hybrid_property
+    def is_accurate(self) -> bool:
+        return self.annotation == "accurate"
+
+    @is_accurate.expression
+    def is_accurate(cls):
+        return cls.annotation == "accurate"
 
 
 class BatterySOHRecord(Base):

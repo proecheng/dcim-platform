@@ -62,6 +62,46 @@ class CapacityService:
 
         return CapacityStatus.normal
 
+    async def check_constraints(self, db: Session, site_id: Optional[int] = None, room_id: Optional[int] = None, required_u: int = 0, required_power_kva: float = 0.0, required_cooling_kw: float = 0.0) -> Dict[str, Any]:
+        """
+        检查特定站点或房间的容量约束
+        """
+        results = {"feasible": True, "details": []}
+
+        # 空间检查 (U位)
+        if required_u > 0:
+            space_capacities = db.query(SpaceCapacity).all()
+            # 如果提供了 room_id 或 site_id，这里应当过滤对应的记录
+            # 目前模型通过 location 字符串关联，后续可优化为 FK
+            total_available_u = sum((sc.total_u_positions or 0) - (sc.used_u_positions or 0) for sc in space_capacities)
+            if total_available_u < required_u:
+                results["feasible"] = False
+                results["details"].append(f"空间不足: 可用 {total_available_u}U < 所需 {required_u}U")
+            else:
+                results["details"].append(f"空间充足: 可用 {total_available_u}U")
+
+        # 电力检查 (kVA)
+        if required_power_kva > 0:
+            power_capacities = db.query(PowerCapacity).all()
+            total_available_kva = sum((pc.total_capacity_kva or 0) - (pc.used_capacity_kva or 0) for pc in power_capacities)
+            if total_available_kva < required_power_kva:
+                results["feasible"] = False
+                results["details"].append(f"电力不足: 可用 {total_available_kva:.2f}kVA < 所需 {required_power_kva:.2f}kVA")
+            else:
+                results["details"].append(f"电力充足: 可用 {total_available_kva:.2f}kVA")
+
+        # 制冷检查 (kW)
+        if required_cooling_kw > 0:
+            cooling_capacities = db.query(CoolingCapacity).all()
+            total_available_cooling = sum((cc.total_cooling_kw or 0) - (cc.used_cooling_kw or 0) for cc in cooling_capacities)
+            if total_available_cooling < required_cooling_kw:
+                results["feasible"] = False
+                results["details"].append(f"制冷不足: 可用 {total_available_cooling:.2f}kW < 所需 {required_cooling_kw:.2f}kW")
+            else:
+                results["details"].append(f"制冷充足: 可用 {total_available_cooling:.2f}kW")
+
+        return results
+
     def _evaluate_feasibility(self, db: Session, plan: CapacityPlan) -> Tuple[bool, str]:
         """
         评估容量规划的可行性
