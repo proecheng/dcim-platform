@@ -32,15 +32,13 @@ def _build_engine_kwargs() -> dict:
         )
     elif url.startswith("sqlite"):
         # SQLite 并发优化配置 + WAL 模式
+        # aiosqlite 使用 NullPool，不支持 pool_size/max_overflow
         kwargs.update(
             {
                 "connect_args": {
                     "timeout": 60,  # 增加超时时间到 60 秒
                     "check_same_thread": False,
                 },
-                "pool_size": 5,
-                "max_overflow": 10,
-                "pool_pre_ping": True,  # 连接健康检查
             }
         )
     return kwargs
