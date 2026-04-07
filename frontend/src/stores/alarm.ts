@@ -57,6 +57,7 @@ export const useAlarmStore = defineStore('alarm', () => {
     } catch (e) {
       if (version !== fetchVersion) return
       console.error('获取活跃告警失败:', e)
+      throw e
     } finally {
       if (version === fetchVersion) {
         loading.value = false
