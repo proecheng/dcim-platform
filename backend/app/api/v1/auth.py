@@ -187,7 +187,11 @@ async def login(request: Request, form_data: OAuth2PasswordRequestForm = Depends
 
 
 @router.post("/logout", summary="用户登出")
-async def logout(token: str = Depends(oauth2_scheme), current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+async def logout(
+    token: str = Depends(oauth2_scheme),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
     """
     用户登出（失效当前会话）
     """
@@ -198,11 +202,7 @@ async def logout(token: str = Depends(oauth2_scheme), current_user: User = Depen
 
         if jti:
             # 失效当前会话
-            await db.execute(
-                update(UserSession)
-                .where(UserSession.token_jti == jti)
-                .values(is_active=False)
-            )
+            await db.execute(update(UserSession).where(UserSession.token_jti == jti).values(is_active=False))
             await db.commit()
     except Exception:
         pass  # 即使失败也返回成功，避免泄露信息

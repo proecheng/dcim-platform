@@ -70,10 +70,8 @@ class HMACKeyManagementService:
 
             if not versions:
                 # 无版本需要重签名，记录日志并返回
-                old_prefix = old_key[:4] if old_key and len(old_key) >= 4 else '(空)'
-                await self._save_rotation_log(
-                    session, operator_id, 0, [], new_key[:4], old_prefix, "success"
-                )
+                old_prefix = old_key[:4] if old_key and len(old_key) >= 4 else "(空)"
+                await self._save_rotation_log(session, operator_id, 0, [], new_key[:4], old_prefix, "success")
                 return {
                     "versions_resigned": 0,
                     "resigned_version_ids": [],

@@ -29,29 +29,15 @@ logger = logging.getLogger(__name__)
 settings = get_settings()
 
 # Prometheus 监控指标
-counterfactual_analysis_total = Counter(
-    "counterfactual_analysis_total",
-    "反事实分析总次数",
-    ["status"]
-)
+counterfactual_analysis_total = Counter("counterfactual_analysis_total", "反事实分析总次数", ["status"])
 counterfactual_analysis_duration = Histogram(
-    "counterfactual_analysis_duration_seconds",
-    "反事实分析耗时",
-    buckets=[0.1, 0.5, 1.0, 2.0, 5.0, 10.0]
+    "counterfactual_analysis_duration_seconds", "反事实分析耗时", buckets=[0.1, 0.5, 1.0, 2.0, 5.0, 10.0]
 )
-counterfactual_evidence_removed = Counter(
-    "counterfactual_evidence_removed_total",
-    "反事实分析移除证据总数"
-)
+counterfactual_evidence_removed = Counter("counterfactual_evidence_removed_total", "反事实分析移除证据总数")
 counterfactual_lock_wait_duration = Histogram(
-    "counterfactual_lock_wait_seconds",
-    "Redis 锁等待时间",
-    buckets=[0.001, 0.01, 0.1, 0.5, 1.0]
+    "counterfactual_lock_wait_seconds", "Redis 锁等待时间", buckets=[0.001, 0.01, 0.1, 0.5, 1.0]
 )
-counterfactual_cache_hit_total = Counter(
-    "counterfactual_cache_hit_total",
-    "缓存命中次数"
-)
+counterfactual_cache_hit_total = Counter("counterfactual_cache_hit_total", "缓存命中次数")
 
 
 # 配置常量
@@ -98,10 +84,7 @@ async def get_config(key: str, default: Any) -> Any:
     try:
         async with async_session() as session:
             result = await session.execute(
-                select(SystemConfig).where(
-                    SystemConfig.config_group == "diagnosis",
-                    SystemConfig.config_key == key
-                )
+                select(SystemConfig).where(SystemConfig.config_group == "diagnosis", SystemConfig.config_key == key)
             )
             config = result.scalar_one_or_none()
             if config:
@@ -133,13 +116,7 @@ async def _acquire_redis_lock(session_id: int) -> Optional[str]:
 
         # 尝试获取锁（带重试）
         for attempt in range(REDIS_LOCK_MAX_RETRIES):
-            result = await redis_client.eval(
-                REDIS_LOCK_SCRIPT,
-                1,
-                lock_key,
-                lock_token,
-                str(REDIS_LOCK_TTL)
-            )
+            result = await redis_client.eval(REDIS_LOCK_SCRIPT, 1, lock_key, lock_token, str(REDIS_LOCK_TTL))
 
             if result == 1:
                 # 获取锁成功
@@ -183,12 +160,7 @@ async def _release_redis_lock(session_id: int, lock_token: str) -> bool:
     try:
         redis_client = redis.from_url(settings.REDIS_URL)
 
-        result = await redis_client.eval(
-            REDIS_UNLOCK_SCRIPT,
-            1,
-            lock_key,
-            lock_token
-        )
+        result = await redis_client.eval(REDIS_UNLOCK_SCRIPT, 1, lock_key, lock_token)
 
         if result == 1:
             logger.debug(f"Released lock for session {session_id}")
@@ -224,7 +196,7 @@ def calculate_evidence_weight(evidence: Dict[str, Any], path_decay_factor: float
     path_length = evidence.get("path_length", 1)
 
     # 使用指数衰减
-    path_contribution = path_decay_factor ** path_length
+    path_contribution = path_decay_factor**path_length
 
     return evidence_prob * sensor_weight * path_contribution
 
@@ -251,8 +223,7 @@ async def _check_cache(session_id: int, db: AsyncSession) -> Optional[Counterfac
         # 查询现有记录
         result = await db.execute(
             select(CounterfactualAnalysis).where(
-                CounterfactualAnalysis.session_id == session_id,
-                CounterfactualAnalysis.deleted_at.is_(None)
+                CounterfactualAnalysis.session_id == session_id, CounterfactualAnalysis.deleted_at.is_(None)
             )
         )
         cached = result.scalar_one_or_none()
@@ -272,9 +243,7 @@ async def _check_cache(session_id: int, db: AsyncSession) -> Optional[Counterfac
         current_config_version = await _get_config_version()
 
         # 查询当前诊断结果的故障树版本
-        diagnosis_result = await db.execute(
-            select(DiagnosisResult).where(DiagnosisResult.session_id == session_id)
-        )
+        diagnosis_result = await db.execute(select(DiagnosisResult).where(DiagnosisResult.session_id == session_id))
         current_result = diagnosis_result.scalar_one_or_none()
 
         if current_result:
@@ -297,9 +266,7 @@ async def _check_cache(session_id: int, db: AsyncSession) -> Optional[Counterfac
 
 
 async def analyze_counterfactual(
-    session_id: int,
-    top_n: int = 5,
-    db: Optional[AsyncSession] = None
+    session_id: int, top_n: int = 5, db: Optional[AsyncSession] = None
 ) -> Optional[CounterfactualAnalysis]:
     """
     执行反事实分析（带 Redis 锁和缓存检查）
@@ -358,25 +325,18 @@ async def analyze_counterfactual(
 
 
 async def _analyze_counterfactual_impl(
-    session_id: int,
-    top_n: int,
-    db: AsyncSession,
-    start_time: float
+    session_id: int, top_n: int, db: AsyncSession, start_time: float
 ) -> Optional[CounterfactualAnalysis]:
     """反事实分析实现（内部函数）"""
 
     # 1. 查询诊断会话和结果
-    session_result = await db.execute(
-        select(DiagnosisSession).where(DiagnosisSession.id == session_id)
-    )
+    session_result = await db.execute(select(DiagnosisSession).where(DiagnosisSession.id == session_id))
     diagnosis_session = session_result.scalar_one_or_none()
     if not diagnosis_session:
         logger.warning(f"Diagnosis session {session_id} not found")
         return None
 
-    result_query = await db.execute(
-        select(DiagnosisResult).where(DiagnosisResult.session_id == session_id)
-    )
+    result_query = await db.execute(select(DiagnosisResult).where(DiagnosisResult.session_id == session_id))
     diagnosis_result = result_query.scalar_one_or_none()
     if not diagnosis_result:
         logger.warning(f"Diagnosis result for session {session_id} not found")
@@ -403,14 +363,16 @@ async def _analyze_counterfactual_impl(
     weighted_evidences = []
     for ev in evidence_list:
         weight = calculate_evidence_weight(ev, path_decay_factor)
-        weighted_evidences.append({
-            "node_id": ev.get("node_id"),
-            "evidence_type": ev.get("evidence_type", "unknown"),
-            "probability": ev.get("probability", 0.5),
-            "sensor_weight": ev.get("sensor_weight", 1.0),
-            "path_length": ev.get("path_length", 1),
-            "weight": weight
-        })
+        weighted_evidences.append(
+            {
+                "node_id": ev.get("node_id"),
+                "evidence_type": ev.get("evidence_type", "unknown"),
+                "probability": ev.get("probability", 0.5),
+                "sensor_weight": ev.get("sensor_weight", 1.0),
+                "path_length": ev.get("path_length", 1),
+                "weight": weight,
+            }
+        )
 
     # 按权重降序排序
     weighted_evidences.sort(key=lambda x: x["weight"], reverse=True)
@@ -420,12 +382,9 @@ async def _analyze_counterfactual_impl(
     try:
         analysis_results = await asyncio.wait_for(
             _perform_counterfactual_inference(
-                top_evidences,
-                original_root_cause,
-                original_confidence,
-                diagnosis_result.reasoning_path or []
+                top_evidences, original_root_cause, original_confidence, diagnosis_result.reasoning_path or []
             ),
-            timeout=ANALYSIS_TIMEOUT_SECONDS
+            timeout=ANALYSIS_TIMEOUT_SECONDS,
         )
     except asyncio.TimeoutError:
         logger.error(f"Counterfactual inference timeout for session {session_id}")
@@ -440,9 +399,7 @@ async def _analyze_counterfactual_impl(
 
     # 删除旧的分析记录（缓存失效时可能存在旧记录）
     existing_result = await db.execute(
-        select(CounterfactualAnalysis).where(
-            CounterfactualAnalysis.session_id == session_id
-        )
+        select(CounterfactualAnalysis).where(CounterfactualAnalysis.session_id == session_id)
     )
     existing = existing_result.scalar_one_or_none()
     if existing:
@@ -454,17 +411,20 @@ async def _analyze_counterfactual_impl(
         session_id=session_id,
         original_root_cause=original_root_cause,
         original_confidence=original_confidence,
-        top_evidences=[{
-            "node_id": ev["node_id"],
-            "evidence_type": ev["evidence_type"],
-            "probability": ev["probability"],
-            "sensor_weight": ev["sensor_weight"],
-            "path_length": ev["path_length"]
-        } for ev in top_evidences],
+        top_evidences=[
+            {
+                "node_id": ev["node_id"],
+                "evidence_type": ev["evidence_type"],
+                "probability": ev["probability"],
+                "sensor_weight": ev["sensor_weight"],
+                "path_length": ev["path_length"],
+            }
+            for ev in top_evidences
+        ],
         analysis_results=analysis_results,
         analysis_time_ms=analysis_time_ms,
         fault_tree_version=fault_tree_version,
-        config_version=config_version
+        config_version=config_version,
     )
 
     db.add(counterfactual)
@@ -489,7 +449,7 @@ async def _perform_counterfactual_inference(
     top_evidences: List[Dict[str, Any]],
     original_root_cause: Optional[str],
     original_confidence: float,
-    reasoning_path: List[Any]
+    reasoning_path: List[Any],
 ) -> List[Dict[str, Any]]:
     """
     执行反事实推理
@@ -524,7 +484,8 @@ async def _perform_counterfactual_inference(
 
             # 构建移除证据后的输入数据
             filtered_reasoning_path = [
-                item for item in reasoning_path
+                item
+                for item in reasoning_path
                 if isinstance(item, dict) and item.get("node_id") not in removed_evidence_ids
             ]
 
@@ -533,9 +494,9 @@ async def _perform_counterfactual_inference(
                 infer_fault_tree(
                     fault_tree_id=1,  # 假设使用默认故障树
                     sensor_data={},  # 需要从原始诊断结果中提取
-                    reasoning_path=filtered_reasoning_path
+                    reasoning_path=filtered_reasoning_path,
                 ),
-                timeout=5.0
+                timeout=5.0,
             )
 
             new_confidence = inference_result.get("confidence", 0.0)
@@ -545,10 +506,7 @@ async def _perform_counterfactual_inference(
             # 降级到模拟逻辑
             logger.warning(f"L2 inference failed for evidence {evidence['node_id']}, using simulation: {e}")
             new_confidence = _simulate_confidence_without_evidence(
-                original_confidence,
-                evidence["weight"],
-                removed_evidence_ids,
-                reasoning_path
+                original_confidence, evidence["weight"], removed_evidence_ids, reasoning_path
             )
             new_root_cause = _simulate_new_root_cause(reasoning_path, removed_evidence_ids)
 
@@ -556,13 +514,15 @@ async def _perform_counterfactual_inference(
         confidence_change = new_confidence - original_confidence
         conclusion_changed = abs(confidence_change) >= relative_threshold
 
-        scenarios.append({
-            "removed_evidence_id": evidence["node_id"],
-            "new_root_cause": new_root_cause,
-            "new_confidence": round(new_confidence, 4),
-            "confidence_change": round(confidence_change, 4),
-            "conclusion_changed": conclusion_changed
-        })
+        scenarios.append(
+            {
+                "removed_evidence_id": evidence["node_id"],
+                "new_root_cause": new_root_cause,
+                "new_confidence": round(new_confidence, 4),
+                "confidence_change": round(confidence_change, 4),
+                "conclusion_changed": conclusion_changed,
+            }
+        )
 
     return scenarios
 
@@ -591,10 +551,7 @@ def _get_evidence_cascade(node_id: int, reasoning_path: List[Any]) -> List[int]:
 
 
 def _simulate_confidence_without_evidence(
-    original_confidence: float,
-    evidence_weight: float,
-    removed_evidence_ids: List[int],
-    reasoning_path: List[Any]
+    original_confidence: float, evidence_weight: float, removed_evidence_ids: List[int], reasoning_path: List[Any]
 ) -> float:
     """
     模拟移除证据后的置信度
@@ -643,8 +600,7 @@ async def _get_config_version() -> str:
         async with async_session() as session:
             result = await session.execute(
                 select(SystemConfig).where(
-                    SystemConfig.config_group == "diagnosis",
-                    SystemConfig.config_key == "config_version"
+                    SystemConfig.config_group == "diagnosis", SystemConfig.config_key == "config_version"
                 )
             )
             config = result.scalar_one_or_none()
@@ -656,10 +612,7 @@ async def _get_config_version() -> str:
         return "1.0.0"
 
 
-async def get_counterfactual_analysis(
-    session_id: int,
-    db: AsyncSession
-) -> Optional[CounterfactualAnalysis]:
+async def get_counterfactual_analysis(session_id: int, db: AsyncSession) -> Optional[CounterfactualAnalysis]:
     """
     获取反事实分析结果（带缓存）
 
@@ -672,17 +625,13 @@ async def get_counterfactual_analysis(
     """
     result = await db.execute(
         select(CounterfactualAnalysis).where(
-            CounterfactualAnalysis.session_id == session_id,
-            CounterfactualAnalysis.deleted_at.is_(None)
+            CounterfactualAnalysis.session_id == session_id, CounterfactualAnalysis.deleted_at.is_(None)
         )
     )
     return result.scalar_one_or_none()
 
 
-async def invalidate_cache_if_needed(
-    session_id: int,
-    db: AsyncSession
-) -> bool:
+async def invalidate_cache_if_needed(session_id: int, db: AsyncSession) -> bool:
     """
     检查并失效缓存（如果版本不匹配）
 
@@ -698,9 +647,7 @@ async def invalidate_cache_if_needed(
         return False
 
     # 获取当前版本
-    result = await db.execute(
-        select(DiagnosisResult).where(DiagnosisResult.session_id == session_id)
-    )
+    result = await db.execute(select(DiagnosisResult).where(DiagnosisResult.session_id == session_id))
     diagnosis_result = result.scalar_one_or_none()
     if not diagnosis_result:
         return False
@@ -709,8 +656,7 @@ async def invalidate_cache_if_needed(
     current_config_version = await _get_config_version()
 
     # 检查版本是否匹配
-    if (analysis.fault_tree_version != current_fault_tree_version or
-        analysis.config_version != current_config_version):
+    if analysis.fault_tree_version != current_fault_tree_version or analysis.config_version != current_config_version:
         # 软删除旧分析
         analysis.deleted_at = datetime.now()
         await db.commit()
@@ -721,6 +667,7 @@ async def invalidate_cache_if_needed(
 
 
 # ==================== SSE 进度推送 ====================
+
 
 async def stream_counterfactual_progress(session_id: int):
     """
@@ -754,9 +701,7 @@ async def stream_counterfactual_progress(session_id: int):
 
         # 4. 查询诊断结果
         async with async_session() as db:
-            result_query = await db.execute(
-                select(DiagnosisResult).where(DiagnosisResult.session_id == session_id)
-            )
+            result_query = await db.execute(select(DiagnosisResult).where(DiagnosisResult.session_id == session_id))
             diagnosis_result = result_query.scalar_one_or_none()
 
             if not diagnosis_result:
@@ -777,10 +722,7 @@ async def stream_counterfactual_progress(session_id: int):
             weighted_evidences = []
             for ev in evidence_list:
                 weight = calculate_evidence_weight(ev, path_decay_factor)
-                weighted_evidences.append({
-                    "node_id": ev.get("node_id"),
-                    "weight": weight
-                })
+                weighted_evidences.append({"node_id": ev.get("node_id"), "weight": weight})
 
             weighted_evidences.sort(key=lambda x: x["weight"], reverse=True)
             top_n = min(5, len(weighted_evidences))
@@ -789,7 +731,7 @@ async def stream_counterfactual_progress(session_id: int):
             # 7. 逐个分析证据
             for i, evidence in enumerate(top_evidences):
                 progress = 30 + int((i / top_n) * 60)
-                yield f"data: {json.dumps({'status': 'analyzing', 'progress': progress, 'message': f'分析证据 {i+1}/{top_n}', 'evidence_id': evidence['node_id']})}\n\n"
+                yield f"data: {json.dumps({'status': 'analyzing', 'progress': progress, 'message': f'分析证据 {i + 1}/{top_n}', 'evidence_id': evidence['node_id']})}\n\n"
                 await asyncio.sleep(0.5)  # 模拟分析耗时
 
             # 8. 发送保存结果消息
@@ -807,4 +749,3 @@ async def stream_counterfactual_progress(session_id: int):
     except Exception as e:
         logger.error(f"SSE stream error for session {session_id}: {e}", exc_info=True)
         yield f"data: {json.dumps({'status': 'error', 'message': str(e)})}\n\n"
-

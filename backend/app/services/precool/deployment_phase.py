@@ -10,7 +10,6 @@ Story 32.2: 分阶段部署控制
 
 import json
 import logging
-from datetime import datetime
 from typing import Any
 
 from sqlalchemy import select, func
@@ -142,11 +141,13 @@ class DeploymentPhaseService:
                 target_id=0,
                 target_name=f"phase_{old_phase}_to_{new_phase}",
                 old_value=json.dumps({"phase": old_phase}),
-                new_value=json.dumps({
-                    "phase": new_phase,
-                    "force": force,
-                    "check_result": check_result,
-                }),
+                new_value=json.dumps(
+                    {
+                        "phase": new_phase,
+                        "force": force,
+                        "check_result": check_result,
+                    }
+                ),
             )
             session.add(log)
 
@@ -159,7 +160,10 @@ class DeploymentPhaseService:
 
             logger.info(
                 "部署阶段切换: %d → %d (force=%s, user=%s)",
-                old_phase, new_phase, force, username,
+                old_phase,
+                new_phase,
+                force,
+                username,
             )
             return {
                 "phase": new_phase,
@@ -189,9 +193,7 @@ class DeploymentPhaseService:
             .distinct()
         ).scalar_subquery()
 
-        zones = (await session.execute(
-            select(CoolingZone).where(CoolingZone.id.notin_(demo_zone_ids))
-        )).scalars().all()
+        zones = (await session.execute(select(CoolingZone).where(CoolingZone.id.notin_(demo_zone_ids)))).scalars().all()
 
         # 无非 demo zone 时视为通过
         if not zones:
@@ -199,25 +201,21 @@ class DeploymentPhaseService:
 
         failures = []
         for zone in zones:
-            param = (await session.execute(
-                select(ThermalParameter)
-                .where(ThermalParameter.cooling_zone_id == zone.id)
-                .where(ThermalParameter.is_active == True)  # noqa: E712
-                .where(ThermalParameter.is_demo == False)  # noqa: E712
-            )).scalar_one_or_none()
+            param = (
+                await session.execute(
+                    select(ThermalParameter)
+                    .where(ThermalParameter.cooling_zone_id == zone.id)
+                    .where(ThermalParameter.is_active == True)  # noqa: E712
+                    .where(ThermalParameter.is_demo == False)  # noqa: E712
+                )
+            ).scalar_one_or_none()
 
             if param is None or param.fitting_method not in ("auto_fit", "manual"):
                 method = getattr(param, "fitting_method", None) if param else None
-                failures.append(
-                    f"区域{zone.zone_name}(id={zone.id})未校准"
-                    f"(fitting_method={method})"
-                )
+                failures.append(f"区域{zone.zone_name}(id={zone.id})未校准(fitting_method={method})")
             elif param.fitting_r_squared is None or param.fitting_r_squared < PHASE3_MIN_R_SQUARED:
                 r2 = param.fitting_r_squared or 0
-                failures.append(
-                    f"区域{zone.zone_name}(id={zone.id}) "
-                    f"R²={r2:.2f}<{PHASE3_MIN_R_SQUARED}"
-                )
+                failures.append(f"区域{zone.zone_name}(id={zone.id}) R²={r2:.2f}<{PHASE3_MIN_R_SQUARED}")
 
         return {"passed": len(failures) == 0, "details": failures}
 
@@ -226,8 +224,9 @@ class DeploymentPhaseService:
         from app.models.thermal import PrecoolSchedule
 
         result = await session.execute(
-            select(func.count(func.distinct(PrecoolSchedule.schedule_date)))
-            .where(PrecoolSchedule.status == "completed")
+            select(func.count(func.distinct(PrecoolSchedule.schedule_date))).where(
+                PrecoolSchedule.status == "completed"
+            )
         )
         completed_days = result.scalar() or 0
 

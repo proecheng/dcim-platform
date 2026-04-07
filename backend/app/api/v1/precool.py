@@ -19,7 +19,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Literal, Optional
 
-from ...api.deps import get_db, get_current_user, require_role
+from ...api.deps import get_db, require_role
 from ...schemas.precool import (
     PredictRequest,
     PredictResponse,
@@ -88,7 +88,12 @@ async def predict_temperature(
                 return {"code": 503, "message": f"数据不可用: {result.get('details', error_type)}", "data": None}
 
             # 422: 参数/计算错误
-            if error_type in ("numerical_instability", "invalid_parameters", "invalid_q_cool_schedule", "temperature_out_of_bounds"):
+            if error_type in (
+                "numerical_instability",
+                "invalid_parameters",
+                "invalid_q_cool_schedule",
+                "temperature_out_of_bounds",
+            ):
                 return {"code": 422, "message": f"参数错误: {result.get('details', error_type)}", "data": None}
 
             # 500: 其他错误
@@ -163,10 +168,7 @@ async def get_thermal_parameters(
         from ...models.thermal import ThermalParameter
 
         # 查询总数
-        count_query = (
-            select(func.count(ThermalParameter.id))
-            .where(ThermalParameter.cooling_zone_id == zone_id)
-        )
+        count_query = select(func.count(ThermalParameter.id)).where(ThermalParameter.cooling_zone_id == zone_id)
         total_result = await db.execute(count_query)
         total = total_result.scalar() or 0
 
@@ -181,10 +183,7 @@ async def get_thermal_parameters(
         result = await db.execute(data_query)
         items = result.scalars().all()
 
-        items_out = [
-            ThermalParameterOut.model_validate(item).model_dump()
-            for item in items
-        ]
+        items_out = [ThermalParameterOut.model_validate(item).model_dump() for item in items]
 
         return {
             "code": 200,
@@ -211,15 +210,12 @@ async def get_validation_report(
 
         # 查询最近 7 天已回填的有效预测记录
         # 排除哨兵值 -999.0（数据不可用），仅使用 deviation IS NOT NULL 的记录
-        query = (
-            select(TemperaturePredictionLog)
-            .where(
-                and_(
-                    TemperaturePredictionLog.cooling_zone_id == zone_id,
-                    TemperaturePredictionLog.created_at >= seven_days_ago,
-                    TemperaturePredictionLog.actual_temp > 0,
-                    TemperaturePredictionLog.deviation.isnot(None),
-                )
+        query = select(TemperaturePredictionLog).where(
+            and_(
+                TemperaturePredictionLog.cooling_zone_id == zone_id,
+                TemperaturePredictionLog.created_at >= seven_days_ago,
+                TemperaturePredictionLog.actual_temp > 0,
+                TemperaturePredictionLog.deviation.isnot(None),
             )
         )
         result = await db.execute(query)
@@ -297,8 +293,7 @@ async def get_dashboard(
 
         # 2. 批量查询所有 zone 的 active thermal_parameters
         active_params_result = await db.execute(
-            select(ThermalParameter.cooling_zone_id)
-            .where(ThermalParameter.is_active == True)
+            select(ThermalParameter.cooling_zone_id).where(ThermalParameter.is_active == True)
         )
         calibrated_zone_ids = set(row[0] for row in active_params_result.all())
 
@@ -404,9 +399,7 @@ async def get_rollback_status(
         from ...models.topology_config import CoolingZone
 
         # 校验 zone_id 存在
-        zone = (await db.execute(
-            select(CoolingZone).where(CoolingZone.id == zone_id)
-        )).scalar_one_or_none()
+        zone = (await db.execute(select(CoolingZone).where(CoolingZone.id == zone_id))).scalar_one_or_none()
 
         if zone is None:
             return {"code": 404, "message": f"制冷区域 {zone_id} 不存在", "data": None}
@@ -419,9 +412,7 @@ async def get_rollback_status(
             "data": RollbackStatusResponse(
                 zone_id=status["zone_id"],
                 has_active_rollback=status["has_active_rollback"],
-                active_triggers=[
-                    RollbackTriggerInfo(**t) for t in status["active_triggers"]
-                ],
+                active_triggers=[RollbackTriggerInfo(**t) for t in status["active_triggers"]],
             ).model_dump(),
         }
 
@@ -446,9 +437,7 @@ async def get_rollback_history(
         from ...models.topology_config import CoolingZone
 
         # 校验 zone_id 存在
-        zone = (await db.execute(
-            select(CoolingZone).where(CoolingZone.id == zone_id)
-        )).scalar_one_or_none()
+        zone = (await db.execute(select(CoolingZone).where(CoolingZone.id == zone_id))).scalar_one_or_none()
 
         if zone is None:
             return {"code": 404, "message": f"制冷区域 {zone_id} 不存在", "data": None}
@@ -468,10 +457,7 @@ async def get_rollback_history(
         result = await db.execute(query)
         items = result.scalars().all()
 
-        items_out = [
-            RollbackEventOut.model_validate(item).model_dump()
-            for item in items
-        ]
+        items_out = [RollbackEventOut.model_validate(item).model_dump() for item in items]
 
         return {
             "code": 200,
@@ -510,9 +496,7 @@ async def get_rollback_overview(
                 RollbackStatusResponse(
                     zone_id=status["zone_id"],
                     has_active_rollback=status["has_active_rollback"],
-                    active_triggers=[
-                        RollbackTriggerInfo(**t) for t in status["active_triggers"]
-                    ],
+                    active_triggers=[RollbackTriggerInfo(**t) for t in status["active_triggers"]],
                 )
             )
 
@@ -526,10 +510,9 @@ async def get_rollback_overview(
         # 查询最近 24h 事件数
         now = datetime.now()
         day_ago = now - timedelta(hours=24)
-        recent_count = (await db.execute(
-            select(func.count(RollbackEvent.id))
-            .where(RollbackEvent.created_at >= day_ago)
-        )).scalar() or 0
+        recent_count = (
+            await db.execute(select(func.count(RollbackEvent.id)).where(RollbackEvent.created_at >= day_ago))
+        ).scalar() or 0
 
         return {
             "code": 200,
@@ -613,9 +596,7 @@ async def create_schedule(
         )
 
         # 校验 zone 存在
-        zone = (await db.execute(
-            select(CoolingZone).where(CoolingZone.id == zone_id)
-        )).scalar_one_or_none()
+        zone = (await db.execute(select(CoolingZone).where(CoolingZone.id == zone_id))).scalar_one_or_none()
         if zone is None:
             return {"code": 404, "message": f"制冷区域 {zone_id} 不存在", "data": None}
 
@@ -670,7 +651,9 @@ async def create_schedule(
 
         logger.info(
             "预冷计划已创建: zone=%d, date=%s, saving=%.2f kWh",
-            zone_id, schedule_date, plan.planned_savings_kwh or 0,
+            zone_id,
+            schedule_date,
+            plan.planned_savings_kwh or 0,
         )
 
         return {"code": 200, "message": "success", "data": _schedule_to_detail(plan)}
@@ -697,16 +680,12 @@ async def list_schedules(
         from ...models.thermal import PrecoolSchedule
 
         # 校验 zone 存在
-        zone = (await db.execute(
-            select(CoolingZone).where(CoolingZone.id == zone_id)
-        )).scalar_one_or_none()
+        zone = (await db.execute(select(CoolingZone).where(CoolingZone.id == zone_id))).scalar_one_or_none()
         if zone is None:
             return {"code": 404, "message": f"制冷区域 {zone_id} 不存在", "data": None}
 
         # 构建查询
-        query = select(PrecoolSchedule).where(
-            PrecoolSchedule.cooling_zone_id == zone_id
-        )
+        query = select(PrecoolSchedule).where(PrecoolSchedule.cooling_zone_id == zone_id)
         if status is not None:
             query = query.where(PrecoolSchedule.status == status)
 
@@ -742,9 +721,7 @@ async def get_schedule(
     try:
         from ...models.thermal import PrecoolSchedule
 
-        plan = (await db.execute(
-            select(PrecoolSchedule).where(PrecoolSchedule.id == schedule_id)
-        )).scalar_one_or_none()
+        plan = (await db.execute(select(PrecoolSchedule).where(PrecoolSchedule.id == schedule_id))).scalar_one_or_none()
 
         if plan is None:
             return {"code": 404, "message": f"预冷计划 {schedule_id} 不存在", "data": None}
@@ -768,9 +745,7 @@ async def abort_schedule(
         from ...models.thermal import PrecoolSchedule
         from ...services.precool.executor import precool_executor
 
-        plan = (await db.execute(
-            select(PrecoolSchedule).where(PrecoolSchedule.id == schedule_id)
-        )).scalar_one_or_none()
+        plan = (await db.execute(select(PrecoolSchedule).where(PrecoolSchedule.id == schedule_id))).scalar_one_or_none()
 
         if plan is None:
             return {"code": 404, "message": f"预冷计划 {schedule_id} 不存在", "data": None}
@@ -815,18 +790,14 @@ async def get_precool_config(
         from ...models.load_shift import CoolingLinkageConfig
 
         # 校验 zone 存在
-        zone = (await db.execute(
-            select(CoolingZone).where(CoolingZone.id == zone_id)
-        )).scalar_one_or_none()
+        zone = (await db.execute(select(CoolingZone).where(CoolingZone.id == zone_id))).scalar_one_or_none()
         if zone is None:
             return {"code": 404, "message": f"制冷区域 {zone_id} 不存在", "data": None}
 
         # 查询配置
-        config = (await db.execute(
-            select(CoolingLinkageConfig).where(
-                CoolingLinkageConfig.cooling_zone_id == zone_id
-            )
-        )).scalar_one_or_none()
+        config = (
+            await db.execute(select(CoolingLinkageConfig).where(CoolingLinkageConfig.cooling_zone_id == zone_id))
+        ).scalar_one_or_none()
 
         if config is None:
             # 返回默认值
@@ -869,18 +840,14 @@ async def update_precool_config(
         from ...models.log import OperationLog
 
         # 校验 zone 存在
-        zone = (await db.execute(
-            select(CoolingZone).where(CoolingZone.id == zone_id)
-        )).scalar_one_or_none()
+        zone = (await db.execute(select(CoolingZone).where(CoolingZone.id == zone_id))).scalar_one_or_none()
         if zone is None:
             return {"code": 404, "message": f"制冷区域 {zone_id} 不存在", "data": None}
 
         # 查询或创建配置
-        config = (await db.execute(
-            select(CoolingLinkageConfig).where(
-                CoolingLinkageConfig.cooling_zone_id == zone_id
-            )
-        )).scalar_one_or_none()
+        config = (
+            await db.execute(select(CoolingLinkageConfig).where(CoolingLinkageConfig.cooling_zone_id == zone_id))
+        ).scalar_one_or_none()
 
         is_new = config is None
         if is_new:
@@ -957,14 +924,13 @@ async def trigger_calibration(
         from ...models.topology_config import CoolingZone
 
         # 校验 zone 存在
-        zone = (await db.execute(
-            select(CoolingZone).where(CoolingZone.id == zone_id)
-        )).scalar_one_or_none()
+        zone = (await db.execute(select(CoolingZone).where(CoolingZone.id == zone_id))).scalar_one_or_none()
         if zone is None:
             return {"code": 404, "message": f"制冷区域 {zone_id} 不存在", "data": None}
 
         # 调用校准服务（self-managing session）
         from ...services.precool.calibrator import rc_calibrator
+
         result = await rc_calibrator.calibrate(zone_id)
 
         if "error" in result:
@@ -994,9 +960,7 @@ async def get_calibration_history(
         from ...models.thermal import ThermalParameter
 
         # 校验 zone 存在
-        zone = (await db.execute(
-            select(CoolingZone).where(CoolingZone.id == zone_id)
-        )).scalar_one_or_none()
+        zone = (await db.execute(select(CoolingZone).where(CoolingZone.id == zone_id))).scalar_one_or_none()
         if zone is None:
             return {"code": 404, "message": f"制冷区域 {zone_id} 不存在", "data": None}
 
@@ -1020,10 +984,7 @@ async def get_calibration_history(
         )
         records = result.scalars().all()
 
-        items = [
-            ThermalParameterOut.model_validate(r).model_dump()
-            for r in records
-        ]
+        items = [ThermalParameterOut.model_validate(r).model_dump() for r in records]
 
         return {
             "code": 200,
@@ -1043,6 +1004,7 @@ async def get_deployment_phase(
     """返回当前预冷功能部署阶段"""
     try:
         from ...services.precool.deployment_phase import deployment_phase_service
+
         result = await deployment_phase_service.get_current_phase()
         return {"code": 200, "message": "success", "data": result}
     except Exception as e:
@@ -1058,6 +1020,7 @@ async def update_deployment_phase(
     """切换预冷功能部署阶段（仅 admin）"""
     try:
         from ...services.precool.deployment_phase import deployment_phase_service
+
         result = await deployment_phase_service.update_phase(
             new_phase=request.phase,
             force=request.force,
@@ -1090,6 +1053,7 @@ async def get_vpp_capacity(
     try:
         # 1. 检查部署阶段
         from ...services.precool.deployment_phase import deployment_phase_service
+
         phase_info = await deployment_phase_service.get_current_phase()
         if phase_info["current_phase"] != 4:
             return {"code": 403, "message": "VPP 接口仅在部署阶段 4 可用", "data": None}
@@ -1120,6 +1084,7 @@ async def get_vpp_capacity(
 async def verify_vpp_api_key(x_vpp_api_key: str = Header(None)):
     """VPP 独立 API Key 认证（与 JWT 分离）"""
     from ...core.config import get_settings
+
     settings = get_settings()
     if not x_vpp_api_key or x_vpp_api_key != settings.VPP_API_KEY:
         return None
@@ -1164,6 +1129,7 @@ async def receive_vpp_dispatch(
     # 3. 部署阶段检查
     try:
         from ...services.precool.deployment_phase import deployment_phase_service
+
         phase_info = await deployment_phase_service.get_current_phase()
         if phase_info["current_phase"] != 4:
             return {
@@ -1178,6 +1144,7 @@ async def receive_vpp_dispatch(
     # 4. 速率限制
     try:
         from ...services.precool.vpp_dispatch import vpp_dispatch_service
+
         rate_ok = await vpp_dispatch_service.check_rate_limit()
         if not rate_ok:
             return {
@@ -1192,6 +1159,7 @@ async def receive_vpp_dispatch(
     # 5. 调用 dispatch 服务
     try:
         from ...services.precool.vpp_dispatch import vpp_dispatch_service
+
         result = await vpp_dispatch_service.validate_and_execute(request)
         return {"code": 200, "message": "success", "data": result}
     except Exception as e:
@@ -1218,9 +1186,8 @@ async def list_vpp_dispatches(
     """
     try:
         from ...services.precool.vpp_dispatch import vpp_dispatch_service
-        result = await vpp_dispatch_service.list_dispatches(
-            page, page_size, status
-        )
+
+        result = await vpp_dispatch_service.list_dispatches(page, page_size, status)
         return {"code": 200, "message": "success", "data": result}
     except Exception as e:
         logger.error(f"查询 VPP 调控指令列表失败: {e}", exc_info=True)
@@ -1234,6 +1201,7 @@ async def get_vpp_statistics(
     """查询 VPP 需求响应统计（日/月汇总，JWT 认证）"""
     try:
         from ...services.precool.vpp_dispatch import vpp_dispatch_service
+
         result = await vpp_dispatch_service.get_statistics()
         return {"code": 200, "message": "success", "data": result}
     except Exception as e:

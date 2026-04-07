@@ -56,11 +56,7 @@ async def get_point_history(
         ]
         if source:
             conditions.append(PointHistory.source == source)
-        query = (
-            select(PointHistory)
-            .where(and_(*conditions))
-            .order_by(PointHistory.recorded_at.desc())
-        )
+        query = select(PointHistory).where(and_(*conditions)).order_by(PointHistory.recorded_at.desc())
 
         count_query = select(func.count()).select_from(query.subquery())
         total = (await db.execute(count_query)).scalar()

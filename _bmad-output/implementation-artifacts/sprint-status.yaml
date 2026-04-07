@@ -2,7 +2,7 @@
 # project: admin
 # project_key: NOKEY
 # tracking_system: file-system
-# story_location: D:\mytest1\_bmad-output\implementation-artifacts\stories
+# story_location: D:\Work\DCIM\_bmad-output\implementation-artifacts\stories
 
 # STATUS DEFINITIONS:
 # ==================
@@ -57,10 +57,11 @@
 # P3: Epic 33 (VPP虚拟电厂集成) — Phase 3
 
 generated: 2026-03-11
+last_updated: 2026-04-07
 project: admin
 project_key: NOKEY
 tracking_system: file-system
-story_location: D:\mytest1\_bmad-output\implementation-artifacts\stories
+story_location: D:\Work\DCIM\_bmad-output\implementation-artifacts\stories
 
 development_status:
   # Epic 1: 采集网关框架 + Modbus/SNMP 适配器 (MVP)

@@ -1660,7 +1660,14 @@ export interface RatioRecommendation {
     peak_ratio: number
     flexibility_factor: number
     type_max_ratio: number
-    constraints: number[]
+    constraints: {
+      temperature?: { max_ratio: number | null; reason?: string }
+      redundancy?: { max_ratio: number | null; reason?: string }
+      pue?: { max_ratio: number | null; reason?: string }
+      device?: { max_ratio: number | null; reason?: string }
+    }
+    warnings?: string[]
+    limiting_factor?: string
     raw_ratio: number
   }
 }

@@ -4,14 +4,13 @@ Story 25.7: 趋势分析与多传感器融合
 """
 
 import logging
-from datetime import datetime, timedelta
-from typing import Optional, Dict, List
-from sqlalchemy import select, text
+from datetime import datetime
+from typing import Optional, Dict
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 import numpy as np
 
 from app.models.diagnosis import SensorFusionRecord
-from app.models.point import Point
 
 logger = logging.getLogger(__name__)
 
@@ -28,7 +27,7 @@ class SensorFusionResult:
         evidence_type: str = "normal",
         is_evidence: bool = False,
         probability: Optional[float] = None,
-        message: Optional[str] = None
+        message: Optional[str] = None,
     ):
         self.zone_id = zone_id
         self.sensor_count = sensor_count
@@ -46,10 +45,7 @@ class SensorFusionService:
     def __init__(self, db: AsyncSession):
         self.db = db
 
-    async def calculate_temperature_variance(
-        self,
-        zone_id: int
-    ) -> SensorFusionResult:
+    async def calculate_temperature_variance(self, zone_id: int) -> SensorFusionResult:
         """
         计算同区域温度传感器加权标准差（改进版：精度加权、高度分组）
 
@@ -75,10 +71,7 @@ class SensorFusionService:
 
         if len(sensors) < 2:
             return SensorFusionResult(
-                zone_id=zone_id,
-                sensor_count=len(sensors),
-                evidence_type="insufficient_sensors",
-                is_evidence=False
+                zone_id=zone_id, sensor_count=len(sensors), evidence_type="insufficient_sensors", is_evidence=False
             )
 
         # 2. 按高度分组（地板层 0-0.5m，机柜层 0.5-2.5m，天花板层 >2.5m）
@@ -116,7 +109,7 @@ class SensorFusionService:
             # 加权标准差计算公式：
             # weighted_std = sqrt(sum(w_i * (x_i - weighted_mean)^2) / sum(w_i))
             weighted_mean = np.average(values, weights=weights)
-            weighted_var = np.average((np.array(values) - weighted_mean)**2, weights=weights)
+            weighted_var = np.average((np.array(values) - weighted_mean) ** 2, weights=weights)
             weighted_std = np.sqrt(weighted_var)
             layer_variances[layer] = float(weighted_std)
 
@@ -137,7 +130,7 @@ class SensorFusionService:
                 evidence_type="airflow_uneven",
                 is_evidence=True,
                 probability=0.85,
-                message=f"区域 {zone_id} 机柜层温度加权标准差 {std_dev:.2f}℃ > {threshold:.2f}℃，气流不均匀"
+                message=f"区域 {zone_id} 机柜层温度加权标准差 {std_dev:.2f}℃ > {threshold:.2f}℃，气流不均匀",
             )
         elif std_dev >= threshold * 0.4:  # 动态中等阈值
             # 中等程度，不作为证据但记录
@@ -148,7 +141,7 @@ class SensorFusionService:
                 layer_variances=layer_variances,
                 evidence_type="moderate_variance",
                 is_evidence=False,
-                message=f"区域 {zone_id} 机柜层温度加权标准差 {std_dev:.2f}℃ 处于中等水平"
+                message=f"区域 {zone_id} 机柜层温度加权标准差 {std_dev:.2f}℃ 处于中等水平",
             )
         else:
             # 正常
@@ -158,13 +151,10 @@ class SensorFusionService:
                 std_dev=std_dev,
                 layer_variances=layer_variances,
                 evidence_type="normal",
-                is_evidence=False
+                is_evidence=False,
             )
 
-    async def check_differential_pressure(
-        self,
-        zone_id: int
-    ) -> Optional[SensorFusionResult]:
+    async def check_differential_pressure(self, zone_id: int) -> Optional[SensorFusionResult]:
         """
         检查地板下压差传感器（改进版：多传感器平均、故障检测）
 
@@ -203,7 +193,7 @@ class SensorFusionService:
                 continue
 
             # 检查数据质量
-            if s.quality_flag == 'poor':
+            if s.quality_flag == "poor":
                 logger.warning(f"Pressure sensor {s.id} has poor data quality")
                 continue
 
@@ -212,8 +202,7 @@ class SensorFusionService:
         # 3. 至少需要 2 个有效传感器
         if len(valid_sensors) < 2:
             logger.warning(
-                f"Zone {zone_id} has insufficient valid pressure sensors "
-                f"({len(valid_sensors)}/{len(sensors)})"
+                f"Zone {zone_id} has insufficient valid pressure sensors ({len(valid_sensors)}/{len(sensors)})"
             )
             return None
 
@@ -229,7 +218,7 @@ class SensorFusionService:
                 evidence_type="air_supply_abnormal",
                 is_evidence=True,
                 probability=0.80,
-                message=f"区域 {zone_id} 地板下平均压差 {avg_pressure:.1f}Pa < 设定值 {avg_threshold:.1f}Pa，送风系统异常"
+                message=f"区域 {zone_id} 地板下平均压差 {avg_pressure:.1f}Pa < 设定值 {avg_threshold:.1f}Pa，送风系统异常",
             )
 
         return None
@@ -261,7 +250,7 @@ class SensorFusionService:
             is_evidence=fusion_result.is_evidence,
             probability=fusion_result.probability,
             message=fusion_result.message,
-            created_at=datetime.now()
+            created_at=datetime.now(),
         )
         self.db.add(record)
         await self.db.commit()

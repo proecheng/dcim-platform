@@ -223,8 +223,10 @@ class GatewayAssignSite(BaseModel):
 
 # --- BACnet MS/TP 网关相关 Schema ---
 
+
 class MstpDownstreamDevice(BaseModel):
     """MS/TP 下挂设备"""
+
     mac_address: int = Field(ge=1, le=127, description="MS/TP MAC 地址")
     device_instance: int = Field(ge=0, le=4194302, description="BACnet 设备实例号")
     device_name: str = Field(description="设备名称")
@@ -233,6 +235,7 @@ class MstpDownstreamDevice(BaseModel):
 
 class MstpConfig(BaseModel):
     """MS/TP 总线配置"""
+
     network_number: int = Field(default=1, ge=1, description="网络号")
     mac_range: list[int] = Field(default=[1, 127], description="MAC 地址范围 [min, max]")
     baud_rate: Literal[9600, 19200, 38400, 76800, 115200] = Field(default=9600, description="波特率")
@@ -253,12 +256,14 @@ class MstpConfig(BaseModel):
 
 class BbmdConfig(BaseModel):
     """BBMD 配置"""
+
     enabled: bool = Field(default=False, description="是否启用 BBMD")
     bdt_entries: list[str] = Field(default_factory=list, description="BDT 条目列表")
 
 
 class MstpGatewayExtraConfig(BaseModel):
     """MS/TP 转换网关 extra_config 验证 Schema"""
+
     gateway_type: Literal["bacnet_mstp_to_ip"]
     gateway_device_instance: int = Field(ge=0, le=4194302, description="网关自身 BACnet 设备实例号")
     mstp_config: MstpConfig = Field(default_factory=MstpConfig)
@@ -282,6 +287,7 @@ class MstpGatewayExtraConfig(BaseModel):
 
 class CreateMstpDatasourcesRequest(BaseModel):
     """批量创建 MS/TP 数据源请求"""
+
     gateway_ip: str = Field(description="网关 IP 地址（IPv4）")
     port: int = Field(default=47808, ge=1, le=65535, description="BACnet/IP 端口")
     site_id: Optional[int] = Field(default=None, description="站点 ID")
@@ -301,6 +307,7 @@ class CreateMstpDatasourcesRequest(BaseModel):
 
 class CreateMstpDatasourcesResponse(BaseModel):
     """批量创建 MS/TP 数据源响应"""
+
     gateway: DataSourceResponse
     devices: list[DataSourceResponse]
     total_devices: int

@@ -12,7 +12,7 @@ export const defaultNetworkOptions: Options = {
   // 节点配置
   nodes: {
     shape: 'box',
-    margin: 10,
+    margin: { top: 10, right: 10, bottom: 10, left: 10 },
     widthConstraint: {
       minimum: 100,
       maximum: 200

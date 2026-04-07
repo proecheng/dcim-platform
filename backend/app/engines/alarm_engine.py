@@ -81,6 +81,7 @@ class AlarmEngine:
         self._loaded = False
         # 加载锁（P0-2 修复）
         import asyncio
+
         self._load_lock = asyncio.Lock()
 
     async def load_thresholds(self) -> int:

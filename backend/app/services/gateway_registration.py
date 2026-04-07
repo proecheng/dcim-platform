@@ -29,11 +29,12 @@ def verify_gateway_signature(payload: dict, signature: str) -> bool:
         return False
 
     # 从配置读取共享密钥（生产环境应使用环境变量）
-    secret_key = getattr(settings, 'gateway_secret_key', 'default-secret-key-change-in-production')
+    secret_key = getattr(settings, "gateway_secret_key", "default-secret-key-change-in-production")
 
     # 计算消息签名（排除 signature 字段）
-    message_data = {k: v for k, v in payload.items() if k != 'signature'}
+    message_data = {k: v for k, v in payload.items() if k != "signature"}
     import json
+
     message = json.dumps(message_data, sort_keys=True)
     expected = hmac.new(secret_key.encode(), message.encode(), hashlib.sha256).hexdigest()
 
@@ -48,7 +49,7 @@ def is_gateway_authorized(gw_id: str) -> bool:
     开发环境可以设置 GATEWAY_AUTO_REGISTER=true 跳过验证。
     """
     # 开发模式：允许自动注册
-    if getattr(settings, 'gateway_auto_register', False):
+    if getattr(settings, "gateway_auto_register", False):
         return True
 
     # 生产模式：检查白名单（这里简化为检查 gw_id 格式）
@@ -57,7 +58,7 @@ def is_gateway_authorized(gw_id: str) -> bool:
         return False
 
     # 临时实现：允许以 gw- 开头的网关 ID
-    return gw_id.startswith('gw-')
+    return gw_id.startswith("gw-")
 
 
 async def _resolve_site_id(site_id_str: str | None, db: AsyncSession) -> int | None:

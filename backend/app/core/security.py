@@ -4,15 +4,12 @@
 
 from datetime import datetime, timedelta
 from typing import Optional
-from jose import JWTError, jwt
+from jose import jwt
 from passlib.context import CryptContext
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException
 from fastapi.security import OAuth2PasswordBearer
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
 
 from .config import get_settings
-from .database import get_db
 
 settings = get_settings()
 
@@ -46,6 +43,7 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
 
 
 # P1-5 修复: 删除重复的 get_current_user，统一使用 api.deps.get_current_user
+
 
 # 保留 get_current_admin_user 以兼容旧代码
 async def get_current_admin_user(current_user=Depends("api.deps.get_current_user")):

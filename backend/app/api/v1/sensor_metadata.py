@@ -5,14 +5,14 @@ Story 25.5: 传感器元数据与精度加权
 
 import json
 import logging
-from typing import List, Optional
+from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.api.deps import get_current_user, require_admin, require_operator, require_viewer
+from app.api.deps import get_current_user, require_admin, require_operator
 from app.models.diagnosis import SensorMetadata
 from app.models.user import User
 from app.schemas.diagnosis import (
@@ -20,12 +20,9 @@ from app.schemas.diagnosis import (
     SensorMetadataUpdate,
     SensorMetadataResponse,
     SensorMetadataListResponse,
-    CalibrationStatusResponse
+    CalibrationStatusResponse,
 )
-from app.services.diagnosis.sensor_metadata_service import (
-    check_calibration_status,
-    check_expired_calibrations
-)
+from app.services.diagnosis.sensor_metadata_service import check_calibration_status, check_expired_calibrations
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -44,9 +41,7 @@ async def create_sensor_metadata(
     """
 
     # 检查点位是否已存在元数据
-    result = await db.execute(
-        select(SensorMetadata).where(SensorMetadata.point_id == data.point_id)
-    )
+    result = await db.execute(select(SensorMetadata).where(SensorMetadata.point_id == data.point_id))
     existing = result.scalar_one_or_none()
     if existing:
         raise HTTPException(status_code=400, detail=f"点位 {data.point_id} 已存在元数据")
@@ -71,7 +66,7 @@ async def list_sensor_metadata(
     page: int = Query(1, ge=1, description="页码"),
     page_size: int = Query(20, ge=1, le=100, description="每页数量"),
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
 ):
     """
     查询传感器元数据列表
@@ -88,6 +83,7 @@ async def list_sensor_metadata(
 
     # 获取总数
     from sqlalchemy import func
+
     count_query = select(func.count()).select_from(SensorMetadata)
     if point_id is not None:
         count_query = count_query.where(SensorMetadata.point_id == point_id)
@@ -103,28 +99,19 @@ async def list_sensor_metadata(
     result = await db.execute(query)
     metadata_list = result.scalars().all()
 
-    return {
-        "total": total,
-        "page": page,
-        "page_size": page_size,
-        "items": metadata_list
-    }
+    return {"total": total, "page": page, "page_size": page_size, "items": metadata_list}
 
 
 @router.get("/{metadata_id}", response_model=SensorMetadataResponse)
 async def get_sensor_metadata(
-    metadata_id: int,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    metadata_id: int, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)
 ):
     """
     获取传感器元数据详情
 
     权限: 所有登录用户
     """
-    result = await db.execute(
-        select(SensorMetadata).where(SensorMetadata.id == metadata_id)
-    )
+    result = await db.execute(select(SensorMetadata).where(SensorMetadata.id == metadata_id))
     metadata = result.scalar_one_or_none()
 
     if not metadata:
@@ -146,9 +133,7 @@ async def update_sensor_metadata(
     权限: admin/operator
     """
 
-    result = await db.execute(
-        select(SensorMetadata).where(SensorMetadata.id == metadata_id)
-    )
+    result = await db.execute(select(SensorMetadata).where(SensorMetadata.id == metadata_id))
     metadata = result.scalar_one_or_none()
 
     if not metadata:
@@ -181,9 +166,7 @@ async def delete_sensor_metadata(
     权限: admin
     """
 
-    result = await db.execute(
-        select(SensorMetadata).where(SensorMetadata.id == metadata_id)
-    )
+    result = await db.execute(select(SensorMetadata).where(SensorMetadata.id == metadata_id))
     metadata = result.scalar_one_or_none()
 
     if not metadata:
@@ -201,9 +184,7 @@ async def delete_sensor_metadata(
 
 @router.get("/calibration-status/{point_id}", response_model=CalibrationStatusResponse)
 async def get_calibration_status(
-    point_id: int,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    point_id: int, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)
 ):
     """
     查询传感器校准状态
@@ -235,16 +216,13 @@ async def _publish_metadata_update(point_id: int):
     try:
         import redis.asyncio as redis
         from app.core.config import get_settings
+
         settings = get_settings()
 
-        redis_client = redis.Redis(
-            host=settings.redis_host,
-            port=settings.redis_port,
-            decode_responses=True
-        )
+        redis_client = redis.Redis(host=settings.redis_host, port=settings.redis_port, decode_responses=True)
         try:
             payload = json.dumps({"point_id": point_id})
-            await redis_client.publish('sensor:metadata_update', payload)
+            await redis_client.publish("sensor:metadata_update", payload)
         finally:
             await redis_client.close()
     except ImportError:

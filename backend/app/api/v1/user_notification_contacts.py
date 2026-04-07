@@ -147,9 +147,7 @@ async def import_from_profile(
     user = await _get_user_or_404(db, user_id)
 
     # 查询现有联系方式
-    result = await db.execute(
-        select(UserNotificationContact).where(UserNotificationContact.user_id == user_id)
-    )
+    result = await db.execute(select(UserNotificationContact).where(UserNotificationContact.user_id == user_id))
     existing = result.scalars().all()
     existing_set = {(c.channel_type, c.contact_value) for c in existing}
 

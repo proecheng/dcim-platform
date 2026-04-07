@@ -10,6 +10,7 @@ from app.core.database import Base
 
 class NotificationRecord(Base):
     """通知发送记录"""
+
     __tablename__ = "notification_records"
 
     id = Column(Integer, primary_key=True, autoincrement=True)

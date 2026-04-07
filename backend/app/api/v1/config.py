@@ -10,6 +10,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update
 import json
 import io
+import logging
+
+logger = logging.getLogger(__name__)
 
 from ..deps import get_db, require_viewer, require_admin
 from ...models.user import User
@@ -334,6 +337,7 @@ async def restore_configs(
 # 动态阈值规则管理 API (Story 25.6)
 # ============================================================
 
+
 @router.get("/dynamic-threshold-rules", summary="查询动态阈值规则")
 async def get_dynamic_threshold_rules(
     db: AsyncSession = Depends(get_db),
@@ -349,8 +353,7 @@ async def get_dynamic_threshold_rules(
     """
     result = await db.execute(
         select(SystemConfig).where(
-            SystemConfig.config_group == "alarm",
-            SystemConfig.config_key == "dynamic_threshold_rules"
+            SystemConfig.config_group == "alarm", SystemConfig.config_key == "dynamic_threshold_rules"
         )
     )
     config = result.scalar_one_or_none()
@@ -366,7 +369,7 @@ async def get_dynamic_threshold_rules(
     return {
         "rules": rules,
         "version": config.version or 1,
-        "updated_at": config.updated_at.isoformat() if config.updated_at else None
+        "updated_at": config.updated_at.isoformat() if config.updated_at else None,
     }
 
 
@@ -394,43 +397,35 @@ async def update_dynamic_threshold_rules(
     for rule in rules:
         if "condition" not in rule or "adjustment" not in rule or "description" not in rule:
             raise HTTPException(
-                status_code=400,
-                detail="规则格式错误：每条规则必须包含 condition, adjustment, description"
+                status_code=400, detail="规则格式错误：每条规则必须包含 condition, adjustment, description"
             )
 
         # 验证 condition 表达式
         try:
             from ...services.diagnosis.condition_parser import parse_and_evaluate
+
             # 测试解析（使用空上下文）
             parse_and_evaluate(rule["condition"], {})
         except Exception as e:
-            raise HTTPException(
-                status_code=400,
-                detail=f"规则条件表达式无效: {rule['condition']} - {str(e)}"
-            )
+            raise HTTPException(status_code=400, detail=f"规则条件表达式无效: {rule['condition']} - {str(e)}")
 
         # 验证 adjustment 格式
         try:
             float(rule["adjustment"])
         except (ValueError, TypeError):
             raise HTTPException(
-                status_code=400,
-                detail=f"调整值格式错误: {rule['adjustment']}，必须是数字或带 +/- 前缀的字符串"
+                status_code=400, detail=f"调整值格式错误: {rule['adjustment']}，必须是数字或带 +/- 前缀的字符串"
             )
 
         # 验证 priority
         priority = rule.get("priority", 0)
         if not isinstance(priority, int) or priority < 0:
-            raise HTTPException(
-                status_code=400,
-                detail=f"优先级必须是非负整数: {priority}"
-            )
+            raise HTTPException(status_code=400, detail=f"优先级必须是非负整数: {priority}")
 
     # 查询当前配置
     result = await db.execute(
         select(SystemConfig).where(
-            SystemConfig.config_group == "alarm",
-            SystemConfig.config_key == "dynamic_threshold_rules"
+            SystemConfig.config_group == "alarm", SystemConfig.config_key == "dynamic_threshold_rules"
         )
     )
     config = result.scalar_one_or_none()
@@ -442,20 +437,20 @@ async def update_dynamic_threshold_rules(
     current_version = config.version or 1
     if expected_version is not None and expected_version != current_version:
         raise HTTPException(
-            status_code=409,
-            detail=f"版本冲突：期望版本 {expected_version}，当前版本 {current_version}。请刷新后重试。"
+            status_code=409, detail=f"版本冲突：期望版本 {expected_version}，当前版本 {current_version}。请刷新后重试。"
         )
 
     # 保存旧值到历史表（如果存在）
     try:
         from ...models.config import ConfigHistory
+
         history = ConfigHistory(
             config_id=config.id,
             old_value=config.config_value,
             new_value=json.dumps(rules, ensure_ascii=False),
             version=current_version,
             updated_by=current_user.id,
-            updated_at=datetime.now()
+            updated_at=datetime.now(),
         )
         db.add(history)
     except Exception as e:
@@ -470,7 +465,7 @@ async def update_dynamic_threshold_rules(
             config_value=json.dumps(rules, ensure_ascii=False),
             version=new_version,
             updated_by=current_user.id,
-            updated_at=datetime.now()
+            updated_at=datetime.now(),
         )
     )
     await db.commit()
@@ -478,6 +473,7 @@ async def update_dynamic_threshold_rules(
     # 触发缓存重新加载
     try:
         from ...services.diagnosis.dynamic_threshold_service import DynamicThresholdService
+
         await DynamicThresholdService.clear_cache()
     except Exception as e:
         logger.warning(f"清除动态阈值缓存失败: {e}")
@@ -502,8 +498,7 @@ async def get_dynamic_threshold_status(
     # 查询特性开关
     enabled_result = await db.execute(
         select(SystemConfig).where(
-            SystemConfig.config_group == "alarm",
-            SystemConfig.config_key == "DYNAMIC_THRESHOLDS_ENABLED"
+            SystemConfig.config_group == "alarm", SystemConfig.config_key == "DYNAMIC_THRESHOLDS_ENABLED"
         )
     )
     enabled_config = enabled_result.scalar_one_or_none()
@@ -512,8 +507,7 @@ async def get_dynamic_threshold_status(
     # 查询规则配置
     rules_result = await db.execute(
         select(SystemConfig).where(
-            SystemConfig.config_group == "alarm",
-            SystemConfig.config_key == "dynamic_threshold_rules"
+            SystemConfig.config_group == "alarm", SystemConfig.config_key == "dynamic_threshold_rules"
         )
     )
     rules_config = rules_result.scalar_one_or_none()
@@ -531,12 +525,7 @@ async def get_dynamic_threshold_status(
         rule_version = rules_config.version or 1
         updated_at = rules_config.updated_at.isoformat() if rules_config.updated_at else None
 
-    return {
-        "is_enabled": is_enabled,
-        "rule_count": rule_count,
-        "rule_version": rule_version,
-        "updated_at": updated_at
-    }
+    return {"is_enabled": is_enabled, "rule_count": rule_count, "rule_version": rule_version, "updated_at": updated_at}
 
 
 @router.post("/dynamic-threshold-toggle", summary="切换动态阈值特性开关")
@@ -559,8 +548,7 @@ async def toggle_dynamic_threshold(
 
     result = await db.execute(
         select(SystemConfig).where(
-            SystemConfig.config_group == "alarm",
-            SystemConfig.config_key == "DYNAMIC_THRESHOLDS_ENABLED"
+            SystemConfig.config_group == "alarm", SystemConfig.config_key == "DYNAMIC_THRESHOLDS_ENABLED"
         )
     )
     config = result.scalar_one_or_none()
@@ -571,11 +559,7 @@ async def toggle_dynamic_threshold(
     await db.execute(
         update(SystemConfig)
         .where(SystemConfig.id == config.id)
-        .values(
-            config_value="true" if enabled else "false",
-            updated_by=current_user.id,
-            updated_at=datetime.now()
-        )
+        .values(config_value="true" if enabled else "false", updated_by=current_user.id, updated_at=datetime.now())
     )
     await db.commit()
 
@@ -618,12 +602,14 @@ async def test_dynamic_threshold_rules(
             if parse_and_evaluate(rule["condition"], context):
                 adjustment = float(rule["adjustment"])
                 total_adjustment += adjustment
-                matched_rules.append({
-                    "condition": rule["condition"],
-                    "adjustment": adjustment,
-                    "description": rule["description"],
-                    "priority": rule.get("priority", 0)
-                })
+                matched_rules.append(
+                    {
+                        "condition": rule["condition"],
+                        "adjustment": adjustment,
+                        "description": rule["description"],
+                        "priority": rule.get("priority", 0),
+                    }
+                )
         except Exception as e:
             logger.warning(f"规则评估失败: {rule['condition']} - {e}")
 
@@ -639,18 +625,9 @@ async def test_dynamic_threshold_rules(
         else:
             adjusted = value - total_adjustment
 
-        sample_results.append({
-            "name": name,
-            "original": value,
-            "adjusted": adjusted,
-            "adjustment": total_adjustment
-        })
+        sample_results.append({"name": name, "original": value, "adjusted": adjusted, "adjustment": total_adjustment})
 
-    return {
-        "matched_rules": matched_rules,
-        "total_adjustment": total_adjustment,
-        "sample_results": sample_results
-    }
+    return {"matched_rules": matched_rules, "total_adjustment": total_adjustment, "sample_results": sample_results}
 
 
 @router.get("/dynamic-threshold-rules/history", summary="查询规则修改历史")
@@ -675,8 +652,7 @@ async def get_dynamic_threshold_history(
         # 查询配置 ID
         config_result = await db.execute(
             select(SystemConfig.id).where(
-                SystemConfig.config_group == "alarm",
-                SystemConfig.config_key == "dynamic_threshold_rules"
+                SystemConfig.config_group == "alarm", SystemConfig.config_key == "dynamic_threshold_rules"
             )
         )
         config_id = config_result.scalar_one_or_none()
@@ -686,6 +662,7 @@ async def get_dynamic_threshold_history(
 
         # 查询历史记录
         from sqlalchemy import func, desc
+
         count_result = await db.execute(
             select(func.count(ConfigHistory.id)).where(ConfigHistory.config_id == config_id)
         )
@@ -706,21 +683,18 @@ async def get_dynamic_threshold_history(
             user_result = await db.execute(select(User.username).where(User.id == record.updated_by))
             username = user_result.scalar_one_or_none() or "Unknown"
 
-            items.append({
-                "id": record.id,
-                "version": record.version,
-                "updated_by": username,
-                "updated_at": record.updated_at.isoformat() if record.updated_at else None,
-                "old_value": record.old_value,
-                "new_value": record.new_value
-            })
+            items.append(
+                {
+                    "id": record.id,
+                    "version": record.version,
+                    "updated_by": username,
+                    "updated_at": record.updated_at.isoformat() if record.updated_at else None,
+                    "old_value": record.old_value,
+                    "new_value": record.new_value,
+                }
+            )
 
-        return {
-            "items": items,
-            "total": total,
-            "page": page,
-            "page_size": page_size
-        }
+        return {"items": items, "total": total, "page": page, "page_size": page_size}
 
     except Exception as e:
         logger.error(f"查询规则历史失败: {e}")
@@ -753,8 +727,7 @@ async def rollback_dynamic_threshold_rules(
         # 查询配置
         config_result = await db.execute(
             select(SystemConfig).where(
-                SystemConfig.config_group == "alarm",
-                SystemConfig.config_key == "dynamic_threshold_rules"
+                SystemConfig.config_group == "alarm", SystemConfig.config_key == "dynamic_threshold_rules"
             )
         )
         config = config_result.scalar_one_or_none()
@@ -765,10 +738,7 @@ async def rollback_dynamic_threshold_rules(
         # 查询目标版本的历史记录
         history_result = await db.execute(
             select(ConfigHistory)
-            .where(
-                ConfigHistory.config_id == config.id,
-                ConfigHistory.version == target_version
-            )
+            .where(ConfigHistory.config_id == config.id, ConfigHistory.version == target_version)
             .order_by(ConfigHistory.updated_at.desc())
         )
         history = history_result.scalars().first()
@@ -784,7 +754,7 @@ async def rollback_dynamic_threshold_rules(
             new_value=history.new_value,  # 回滚到的值
             version=current_version,
             updated_by=current_user.id,
-            updated_at=datetime.now()
+            updated_at=datetime.now(),
         )
         db.add(current_history)
 
@@ -797,7 +767,7 @@ async def rollback_dynamic_threshold_rules(
                 config_value=history.new_value,
                 version=new_version,
                 updated_by=current_user.id,
-                updated_at=datetime.now()
+                updated_at=datetime.now(),
             )
         )
         await db.commit()
@@ -805,6 +775,7 @@ async def rollback_dynamic_threshold_rules(
         # 清除缓存
         try:
             from ...services.diagnosis.dynamic_threshold_service import DynamicThresholdService
+
             await DynamicThresholdService.clear_cache()
         except Exception as e:
             logger.warning(f"清除动态阈值缓存失败: {e}")
@@ -986,4 +957,3 @@ async def get_dynamic_threshold_metrics(
     except Exception as e:
         logger.error(f"查询监控指标失败: {e}")
         raise HTTPException(status_code=500, detail=f"查询失败: {str(e)}")
-

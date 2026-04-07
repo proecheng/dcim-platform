@@ -26,11 +26,11 @@ def _get_period_type_for_hour(hour: int, pricing_records) -> str:
     for p in pricing_records:
         start = p.start_time
         end = p.end_time
-        
+
         # 将 00:00 视为 24:00 以正确处理跨日时段
         if end == "00:00":
             end = "24:00"
-        
+
         # 处理跨日时段（如 22:00 - 24:00）
         if start < end:
             if start <= time_str < end:
@@ -135,12 +135,14 @@ async def aggregate_daily(db: AsyncSession, target_date: Optional[date] = None):
     if target_date is None:
         # P1-3 修复: 使用 UTC 时区而不是本地时区
         from datetime import timezone
+
         utc_now = datetime.now(timezone.utc)
         target_date = (utc_now - timedelta(days=1)).date()
 
     # 获取电价配置（用于五时段分类：尖峰/高峰/平段/低谷/深谷）
     # P1-3 修复: 使用 UTC 日期
     from datetime import timezone
+
     today = datetime.now(timezone.utc).date()
     pricing_result = await db.execute(
         select(ElectricityPricing)
@@ -260,6 +262,7 @@ async def aggregate_monthly(db: AsyncSession, target_year: Optional[int] = None,
     if target_year is None or target_month is None:
         # P1-3 修复: 使用 UTC 时区而不是本地时区
         from datetime import timezone
+
         utc_now = datetime.now(timezone.utc)
         last_month = utc_now.replace(day=1) - timedelta(days=1)
         target_year = last_month.year

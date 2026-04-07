@@ -11,11 +11,16 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...core.database import async_session
-from ...models.topology_config import CoolingZone, CabinetTemperatureSensor, CabinetITLoad, CoolingZoneUnit, CoolingZoneCabinet
+from ...models.topology_config import (
+    CoolingZone,
+    CabinetTemperatureSensor,
+    CabinetITLoad,
+    CoolingZoneUnit,
+    CoolingZoneCabinet,
+)
 from ...models.thermal import ThermalParameter, TemperaturePredictionLog
 from ...models.point import Point
 from ...models.history import PointHistory
-from ...models.asset import Cabinet
 from ...models.cooling import CoolingUnit
 from ...models.device import Device
 
@@ -36,12 +41,8 @@ class ThermalModel:
     def __init__(self):
         self._dependencies_checked = False
 
-
     async def predict_temperature(
-        self,
-        zone_id: int,
-        hours: float = 1.0,
-        q_cool_schedule: Optional[List[float]] = None
+        self, zone_id: int, hours: float = 1.0, q_cool_schedule: Optional[List[float]] = None
     ) -> Dict:
         """
         预测制冷区域温度变化
@@ -84,7 +85,7 @@ class ThermalModel:
                 return {
                     "error": "invalid_q_cool_schedule",
                     "zone_id": zone_id,
-                    "details": f"Expected length {steps}, got {len(q_cool_schedule)}"
+                    "details": f"Expected length {steps}, got {len(q_cool_schedule)}",
                 }
 
         # 3. 加载 RC 参数
@@ -99,7 +100,7 @@ class ThermalModel:
                 return {
                     "error": "parameters_not_calibrated",
                     "zone_id": zone_id,
-                    "details": "thermal_R or thermal_C is NULL"
+                    "details": "thermal_R or thermal_C is NULL",
                 }
 
             R = zone.thermal_R  # °C/kW
@@ -111,7 +112,7 @@ class ThermalModel:
                 return {
                     "error": "invalid_parameters",
                     "zone_id": zone_id,
-                    "details": f"thermal_R and thermal_C must be positive (R={R}, C={C})"
+                    "details": f"thermal_R and thermal_C must be positive (R={R}, C={C})",
                 }
 
             # 4. 数值稳定性检查
@@ -122,7 +123,7 @@ class ThermalModel:
                     "error": "numerical_instability",
                     "zone_id": zone_id,
                     "details": f"Requested {hours}h exceeds stability limit",
-                    "suggested_max_hours": round(max_hours, 2)
+                    "suggested_max_hours": round(max_hours, 2),
                 }
 
             # 5. 加载历史数据
@@ -139,11 +140,7 @@ class ThermalModel:
 
             except Exception as e:
                 logger.error(f"Failed to load historical data for zone {zone_id}: {e}")
-                return {
-                    "error": "data_fetch_failed",
-                    "zone_id": zone_id,
-                    "details": str(e)
-                }
+                return {"error": "data_fetch_failed", "zone_id": zone_id, "details": str(e)}
 
             # 6. 数据质量检查
             quality_result = await self._check_data_quality(session, zone_id, q_it, t_ambient, t_current)
@@ -184,15 +181,10 @@ class ThermalModel:
 
                 # 8.5 边界条件检查
                 if T_next < 0 or T_next > 50:
-                    return {
-                        "error": "temperature_out_of_bounds",
-                        "zone_id": zone_id,
-                        "step": k,
-                        "temperature": T_next
-                    }
+                    return {"error": "temperature_out_of_bounds", "zone_id": zone_id, "step": k, "temperature": T_next}
 
                 T.append(T_next)
-                time_steps.append(time_steps[0] + timedelta(minutes=(k+1)*5))
+                time_steps.append(time_steps[0] + timedelta(minutes=(k + 1) * 5))
 
             # 9. 写入预测日志
             thermal_param_result = await self._get_active_thermal_param(session, zone_id)
@@ -211,9 +203,8 @@ class ThermalModel:
                 "temperature_trajectory": T,
                 "time_steps": [ts.isoformat() for ts in time_steps],
                 "model_version": model_version,
-                "data_quality": quality_result
+                "data_quality": quality_result,
             }
-
 
     async def _check_dependencies(self) -> Dict:
         """检查 Story 29.1 的依赖是否满足"""
@@ -228,7 +219,11 @@ class ThermalModel:
                 # 检查 CoolingZone 表字段
                 zone = (await session.execute(select(CoolingZone).limit(1))).scalar_one_or_none()
                 if zone:
-                    if not hasattr(zone, 'thermal_R') or not hasattr(zone, 'thermal_C') or not hasattr(zone, 'bypass_beta'):
+                    if (
+                        not hasattr(zone, "thermal_R")
+                        or not hasattr(zone, "thermal_C")
+                        or not hasattr(zone, "bypass_beta")
+                    ):
                         raise RuntimeError("CoolingZone table missing required fields")
 
                 return {"success": True}
@@ -237,25 +232,18 @@ class ThermalModel:
                 logger.error(f"Dependency check failed: {e}")
                 return {
                     "error": "dependencies_not_met",
-                    "details": "Story 29.1 (thermodynamic data model) must be completed first"
+                    "details": "Story 29.1 (thermodynamic data model) must be completed first",
                 }
-
 
     async def _get_zone(self, session: AsyncSession, zone_id: int) -> Dict:
         """获取制冷区域"""
-        result = await session.execute(
-            select(CoolingZone).where(CoolingZone.id == zone_id)
-        )
+        result = await session.execute(select(CoolingZone).where(CoolingZone.id == zone_id))
         zone = result.scalar_one_or_none()
 
         if not zone:
-            return {
-                "error": "zone_not_found",
-                "zone_id": zone_id
-            }
+            return {"error": "zone_not_found", "zone_id": zone_id}
 
         return {"zone": zone}
-
 
     async def _load_historical_data(self, session: AsyncSession, zone_id: int, hours: float) -> Dict:
         """
@@ -270,7 +258,7 @@ class ThermalModel:
                 "t_outdoor": Optional[float]  # 室外温度（°C）
             }
         """
-        from sqlalchemy import func, and_
+        from sqlalchemy import and_
 
         now = datetime.now()
         lookback_hours = max(24, hours)  # 至少查询 24 小时历史数据
@@ -283,12 +271,7 @@ class ThermalModel:
             .join(Point, PointHistory.point_id == Point.id)
             .join(CabinetITLoad, Point.id == CabinetITLoad.power_point_id)
             .join(CoolingZoneCabinet, CabinetITLoad.cabinet_id == CoolingZoneCabinet.cabinet_id)
-            .where(
-                and_(
-                    CoolingZoneCabinet.cooling_zone_id == zone_id,
-                    PointHistory.timestamp >= start_time
-                )
-            )
+            .where(and_(CoolingZoneCabinet.cooling_zone_id == zone_id, PointHistory.timestamp >= start_time))
             .order_by(PointHistory.timestamp.desc())
         )
 
@@ -300,7 +283,7 @@ class ThermalModel:
                 "error": "insufficient_history",
                 "field": "Q_IT",
                 "available_minutes": len(q_it_rows) * 5,
-                "zone_id": zone_id
+                "zone_id": zone_id,
             }
 
         # 聚合到 5 分钟间隔（平均值）
@@ -321,8 +304,8 @@ class ThermalModel:
             .where(
                 and_(
                     CoolingZoneUnit.cooling_zone_id == zone_id,
-                    Point.point_code.like('%_return_temp'),
-                    PointHistory.timestamp >= start_time
+                    Point.point_code.like("%_return_temp"),
+                    PointHistory.timestamp >= start_time,
                 )
             )
             .order_by(PointHistory.timestamp.desc())
@@ -332,18 +315,16 @@ class ThermalModel:
         t_ambient_rows = t_ambient_result.fetchall()
 
         if not t_ambient_rows:
-            return {
-                "error": "insufficient_data",
-                "missing_fields": ["T_ambient"],
-                "zone_id": zone_id
-            }
+            return {"error": "insufficient_data", "missing_fields": ["T_ambient"], "zone_id": zone_id}
 
         # 聚合到 5 分钟间隔（平均值）
         t_ambient_data = self._aggregate_timeseries(t_ambient_rows, interval_minutes=5, agg_func="mean")
 
         # 应用线性插值
         t_ambient_timestamps = [row[0] for row in t_ambient_rows]
-        t_ambient_timestamps_interp, t_ambient_data = self._interpolate_timeseries(t_ambient_timestamps, t_ambient_data, interval_minutes=5)
+        t_ambient_timestamps_interp, t_ambient_data = self._interpolate_timeseries(
+            t_ambient_timestamps, t_ambient_data, interval_minutes=5
+        )
 
         # 3. 获取当前温度 T_current（进风温度传感器）
         # 路径：CoolingZone → CoolingZoneCabinet → CabinetTemperatureSensor(inlet) → Point → PointHistory
@@ -356,8 +337,8 @@ class ThermalModel:
             .where(
                 and_(
                     CoolingZoneCabinet.cooling_zone_id == zone_id,
-                    CabinetTemperatureSensor.sensor_location == 'inlet',
-                    PointHistory.timestamp >= now - timedelta(minutes=5)
+                    CabinetTemperatureSensor.sensor_location == "inlet",
+                    PointHistory.timestamp >= now - timedelta(minutes=5),
                 )
             )
             .order_by(PointHistory.timestamp.desc())
@@ -367,11 +348,7 @@ class ThermalModel:
         t_current_rows = t_current_result.fetchall()
 
         if not t_current_rows:
-            return {
-                "error": "insufficient_data",
-                "missing_fields": ["T_current"],
-                "zone_id": zone_id
-            }
+            return {"error": "insufficient_data", "missing_fields": ["T_current"], "zone_id": zone_id}
 
         # 聚合到 5 分钟间隔，取最大值（保守估计）
         t_current_data = self._aggregate_timeseries(t_current_rows, interval_minutes=5, agg_func="max")
@@ -386,8 +363,8 @@ class ThermalModel:
             .where(
                 and_(
                     CoolingZoneCabinet.cooling_zone_id == zone_id,
-                    CabinetTemperatureSensor.sensor_location == 'outlet',
-                    PointHistory.timestamp >= now - timedelta(minutes=5)
+                    CabinetTemperatureSensor.sensor_location == "outlet",
+                    PointHistory.timestamp >= now - timedelta(minutes=5),
                 )
             )
             .order_by(PointHistory.timestamp.desc())
@@ -415,9 +392,9 @@ class ThermalModel:
             .where(
                 and_(
                     CoolingZoneUnit.cooling_zone_id == zone_id,
-                    Point.point_code.like('%_ambient_temp'),
-                    Device.device_type == 'AC',  # 精密空调设备
-                    PointHistory.timestamp >= now - timedelta(minutes=5)
+                    Point.point_code.like("%_ambient_temp"),
+                    Device.device_type == "AC",  # 精密空调设备
+                    PointHistory.timestamp >= now - timedelta(minutes=5),
                 )
             )
             .order_by(PointHistory.timestamp.desc())
@@ -443,9 +420,8 @@ class ThermalModel:
             "t_ambient": t_ambient_filled,
             "t_current": t_current,
             "t_outlet": t_outlet,
-            "t_outdoor": t_outdoor
+            "t_outdoor": t_outdoor,
         }
-
 
     def _aggregate_timeseries(self, rows: list, interval_minutes: int, agg_func: str) -> List[float]:
         """
@@ -490,7 +466,6 @@ class ThermalModel:
 
         return aggregated
 
-
     def _fill_timeseries(self, data: List[float], target_length: int) -> List[float]:
         """
         填充时间序列数据到目标长度
@@ -522,12 +497,8 @@ class ThermalModel:
 
         return filled
 
-
     def _interpolate_timeseries(
-        self,
-        timestamps: List[datetime],
-        values: List[float],
-        interval_minutes: int = 5
+        self, timestamps: List[datetime], values: List[float], interval_minutes: int = 5
     ) -> tuple[List[datetime], List[float]]:
         """
         对时间序列数据进行线性插值，填补间隔 > 10 分钟的缺失点
@@ -551,9 +522,9 @@ class ThermalModel:
         interpolated_values = [values[0]]
 
         for i in range(1, len(timestamps)):
-            prev_time = timestamps[i-1]
+            prev_time = timestamps[i - 1]
             curr_time = timestamps[i]
-            prev_value = values[i-1]
+            prev_value = values[i - 1]
             curr_value = values[i]
 
             # 计算时间间隔（分钟）
@@ -576,14 +547,8 @@ class ThermalModel:
         # 反转回从新到旧
         return list(reversed(interpolated_timestamps)), list(reversed(interpolated_values))
 
-
     async def _check_data_quality(
-        self,
-        session: AsyncSession,
-        zone_id: int,
-        q_it: List[float],
-        t_ambient: List[float],
-        t_current: float
+        self, session: AsyncSession, zone_id: int, q_it: List[float], t_ambient: List[float], t_current: float
     ) -> Dict:
         """
         检查数据质量
@@ -615,20 +580,11 @@ class ThermalModel:
             missing_fields.append("T_current")
 
         if missing_fields:
-            return {
-                "error": "insufficient_data",
-                "missing_fields": missing_fields,
-                "zone_id": zone_id
-            }
+            return {"error": "insufficient_data", "missing_fields": missing_fields, "zone_id": zone_id}
 
         # 2. 温度异常检查
         if t_current < 0 or t_current > 50:
-            return {
-                "error": "invalid_temperature",
-                "field": "T_current",
-                "value": t_current,
-                "zone_id": zone_id
-            }
+            return {"error": "invalid_temperature", "field": "T_current", "value": t_current, "zone_id": zone_id}
 
         for i, t in enumerate(t_ambient):
             if t < 0 or t > 50:
@@ -637,14 +593,14 @@ class ThermalModel:
                     "field": "T_ambient",
                     "index": i,
                     "value": t,
-                    "zone_id": zone_id
+                    "zone_id": zone_id,
                 }
 
         # 3. 温度突变检查（警告）
         t_ambient_quality = "good"
         for i in range(1, len(t_ambient)):
-            if abs(t_ambient[i] - t_ambient[i-1]) > 3.0:
-                logger.warning(f"Zone {zone_id}: Temperature spike detected: {t_ambient[i-1]} -> {t_ambient[i]}")
+            if abs(t_ambient[i] - t_ambient[i - 1]) > 3.0:
+                logger.warning(f"Zone {zone_id}: Temperature spike detected: {t_ambient[i - 1]} -> {t_ambient[i]}")
                 t_ambient_quality = "warning"
 
         # 4. 传感器离线检查
@@ -654,7 +610,7 @@ class ThermalModel:
                 "error": "sensor_offline",
                 "sensor": "inlet",
                 "last_update": latest_temp_time.isoformat(),
-                "zone_id": zone_id
+                "zone_id": zone_id,
             }
 
         # 5. 检查 Q_IT 数据（可估算）
@@ -673,7 +629,7 @@ class ThermalModel:
                     "error": "insufficient_history",
                     "field": "Q_IT",
                     "available_minutes": len(q_it) * 5 if q_it else 0,
-                    "zone_id": zone_id
+                    "zone_id": zone_id,
                 }
         else:
             # 检查 Q_IT 过期
@@ -681,18 +637,16 @@ class ThermalModel:
             if latest_q_it_time and (datetime.now() - latest_q_it_time).total_seconds() > 86400:
                 # 触发告警
                 logger.error(f"Zone {zone_id}: Q_IT data stale (last update: {latest_q_it_time})")
-                return {
-                    "error": "q_it_data_stale",
-                    "last_update": latest_q_it_time.isoformat(),
-                    "zone_id": zone_id
-                }
+                return {"error": "q_it_data_stale", "last_update": latest_q_it_time.isoformat(), "zone_id": zone_id}
 
             # 检查 Q_IT 异常
             rated_power = await self._get_rated_power(session, zone_id)
             if rated_power:
                 for i, q in enumerate(q_it):
                     if q < 0 or q > rated_power * 1.5:
-                        logger.warning(f"Zone {zone_id}: Q_IT anomaly detected at index {i}: {q} kW (rated: {rated_power} kW)")
+                        logger.warning(
+                            f"Zone {zone_id}: Q_IT anomaly detected at index {i}: {q} kW (rated: {rated_power} kW)"
+                        )
                         q_it[i] = rated_power * 0.7  # 使用估算值
                         q_it_quality = "estimated"
 
@@ -701,9 +655,8 @@ class ThermalModel:
             "missing_fields": [],
             "q_it_quality": q_it_quality,
             "t_ambient_quality": t_ambient_quality,
-            "t_current_quality": "good"
+            "t_current_quality": "good",
         }
-
 
     async def _get_latest_temp_timestamp(self, session: AsyncSession, zone_id: int) -> Optional[datetime]:
         """获取最新温度数据时间戳"""
@@ -714,15 +667,11 @@ class ThermalModel:
             .join(Point, PointHistory.point_id == Point.id)
             .join(CabinetTemperatureSensor, Point.id == CabinetTemperatureSensor.point_id)
             .join(CoolingZoneCabinet, CabinetTemperatureSensor.cabinet_id == CoolingZoneCabinet.cabinet_id)
-            .where(
-                CoolingZoneCabinet.cooling_zone_id == zone_id,
-                CabinetTemperatureSensor.sensor_location == 'inlet'
-            )
+            .where(CoolingZoneCabinet.cooling_zone_id == zone_id, CabinetTemperatureSensor.sensor_location == "inlet")
         )
 
         result = await session.execute(query)
         return result.scalar_one_or_none()
-
 
     async def _get_latest_q_it_timestamp(self, session: AsyncSession, zone_id: int) -> Optional[datetime]:
         """获取最新 Q_IT 数据时间戳"""
@@ -739,7 +688,6 @@ class ThermalModel:
         result = await session.execute(query)
         return result.scalar_one_or_none()
 
-
     async def _get_rated_power(self, session: AsyncSession, zone_id: int) -> Optional[float]:
         """获取机柜额定功率总和"""
         from sqlalchemy import func
@@ -752,7 +700,6 @@ class ThermalModel:
 
         result = await session.execute(query)
         return result.scalar_one_or_none()
-
 
     async def _get_current_cooling(self, session: AsyncSession, zone_id: int) -> Dict:
         """
@@ -777,8 +724,8 @@ class ThermalModel:
             .where(
                 and_(
                     CoolingZoneUnit.cooling_zone_id == zone_id,
-                    Point.point_code.like('%_power'),
-                    PointHistory.timestamp >= now - timedelta(minutes=5)
+                    Point.point_code.like("%_power"),
+                    PointHistory.timestamp >= now - timedelta(minutes=5),
                 )
             )
             .order_by(PointHistory.timestamp.desc())
@@ -790,16 +737,12 @@ class ThermalModel:
 
         if not rows:
             logger.warning(f"Zone {zone_id}: current cooling power not found")
-            return {
-                "error": "current_cooling_not_found",
-                "details": "No recent cooling power data available"
-            }
+            return {"error": "current_cooling_not_found", "details": "No recent cooling power data available"}
 
         # 取平均值
         avg_power = sum(row[0] for row in rows) / len(rows)
 
         return {"value": avg_power}
-
 
     def _get_seasonal_cop(self, t_outdoor: Optional[float]) -> float:
         """
@@ -821,13 +764,11 @@ class ThermalModel:
         else:
             return 4.0  # 冬季
 
-
     async def _get_active_thermal_param(self, session: AsyncSession, zone_id: int) -> Dict:
         """获取当前生效的热参数"""
         result = await session.execute(
             select(ThermalParameter).where(
-                ThermalParameter.cooling_zone_id == zone_id,
-                ThermalParameter.is_active == True
+                ThermalParameter.cooling_zone_id == zone_id, ThermalParameter.is_active == True
             )
         )
         param = result.scalar_one_or_none()
@@ -837,14 +778,13 @@ class ThermalModel:
         else:
             return {}
 
-
     async def _log_prediction(
         self,
         session: AsyncSession,
         zone_id: int,
         predicted_temp: float,
         prediction_horizon_min: int,
-        model_version: str
+        model_version: str,
     ):
         """写入预测日志"""
         log = TemperaturePredictionLog(
@@ -852,7 +792,7 @@ class ThermalModel:
             predicted_temp=predicted_temp,
             prediction_horizon_min=prediction_horizon_min,
             model_version=model_version,
-            created_at=datetime.now()
+            created_at=datetime.now(),
         )
         session.add(log)
         await session.commit()

@@ -10,7 +10,7 @@ Story 29.5: 模型精度验证与记录
 import logging
 from datetime import datetime, timedelta
 
-from sqlalchemy import select, and_, delete, update, func
+from sqlalchemy import select, and_, delete, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...core.database import async_session
@@ -25,23 +25,23 @@ logger = logging.getLogger(__name__)
 # ==================== 精度验证常量 ====================
 
 # MAE 阈值（与架构 V4.2.0 一致）
-MAE_EXCELLENT_1H = 1.0    # 1h 预测 MAE ≤ 1.0°C — 优秀
-MAE_ACCEPTABLE_3H = 2.0   # 3h 预测 MAE ≤ 2.0°C — 合格
-MAX_DEVIATION_SAFE = 3.0   # 最大偏差 ≤ 3.0°C — 安全
+MAE_EXCELLENT_1H = 1.0  # 1h 预测 MAE ≤ 1.0°C — 优秀
+MAE_ACCEPTABLE_3H = 2.0  # 3h 预测 MAE ≤ 2.0°C — 合格
+MAX_DEVIATION_SAFE = 3.0  # 最大偏差 ≤ 3.0°C — 安全
 
 # 自动回退阈值
-CONSECUTIVE_ERROR_THRESHOLD = 2.0   # 连续误差阈值 °C
-CONSECUTIVE_ERROR_COUNT = 3          # 连续误差次数
+CONSECUTIVE_ERROR_THRESHOLD = 2.0  # 连续误差阈值 °C
+CONSECUTIVE_ERROR_COUNT = 3  # 连续误差次数
 
 # 每日精度退化警告阈值
-DAILY_MAE_1H_WARNING = 1.5   # mae_1h > 1.5°C 时警告
-DAILY_MAE_3H_WARNING = 3.0   # mae_3h > 3.0°C 时警告
+DAILY_MAE_1H_WARNING = 1.5  # mae_1h > 1.5°C 时警告
+DAILY_MAE_3H_WARNING = 3.0  # mae_3h > 3.0°C 时警告
 
 # 回填限制
-BACKFILL_BATCH_SIZE = 100         # 每次最多处理 100 条
-BACKFILL_TIMEOUT_HOURS = 1        # 超时 1 小时标记为数据不可用
-SENTINEL_VALUE = -999.0            # 哨兵值: 数据不可用
-TEMP_WINDOW_MINUTES = 2.5         # 查询前后 2.5 分钟窗口
+BACKFILL_BATCH_SIZE = 100  # 每次最多处理 100 条
+BACKFILL_TIMEOUT_HOURS = 1  # 超时 1 小时标记为数据不可用
+SENTINEL_VALUE = -999.0  # 哨兵值: 数据不可用
+TEMP_WINDOW_MINUTES = 2.5  # 查询前后 2.5 分钟窗口
 
 
 async def backfill_actual_temperatures():
@@ -80,9 +80,7 @@ async def backfill_actual_temperatures():
                     continue
 
                 # 查询实际温度
-                actual_temp = await _query_actual_temperature(
-                    session, log.cooling_zone_id, target_time
-                )
+                actual_temp = await _query_actual_temperature(session, log.cooling_zone_id, target_time)
 
                 if actual_temp is not None:
                     # 回填实际温度和偏差
@@ -99,10 +97,7 @@ async def backfill_actual_temperatures():
             await session.commit()
 
             if backfilled_count > 0 or sentinel_count > 0:
-                logger.info(
-                    f"精度回填完成: 回填 {backfilled_count} 条, "
-                    f"标记不可用 {sentinel_count} 条"
-                )
+                logger.info(f"精度回填完成: 回填 {backfilled_count} 条, 标记不可用 {sentinel_count} 条")
 
             # 对回填过的 zone 检查连续误差
             for zone_id in zones_to_check:
@@ -177,13 +172,10 @@ async def _check_consecutive_errors(session: AsyncSession, zone_id: int):
         return
 
     # 检查是否已经没有 active 参数（幂等）
-    active_query = (
-        select(ThermalParameter)
-        .where(
-            and_(
-                ThermalParameter.cooling_zone_id == zone_id,
-                ThermalParameter.is_active == True,
-            )
+    active_query = select(ThermalParameter).where(
+        and_(
+            ThermalParameter.cooling_zone_id == zone_id,
+            ThermalParameter.is_active == True,
         )
     )
     active_result = await session.execute(active_query)
@@ -222,14 +214,11 @@ async def run_daily_accuracy_report():
             twenty_four_hours_ago = datetime.now() - timedelta(hours=24)
 
             # 查询过去 24 小时所有有效的预测记录（排除哨兵值）
-            query = (
-                select(TemperaturePredictionLog)
-                .where(
-                    and_(
-                        TemperaturePredictionLog.created_at >= twenty_four_hours_ago,
-                        TemperaturePredictionLog.actual_temp > 0,
-                        TemperaturePredictionLog.deviation.isnot(None),
-                    )
+            query = select(TemperaturePredictionLog).where(
+                and_(
+                    TemperaturePredictionLog.created_at >= twenty_four_hours_ago,
+                    TemperaturePredictionLog.actual_temp > 0,
+                    TemperaturePredictionLog.deviation.isnot(None),
                 )
             )
             result = await session.execute(query)
@@ -255,14 +244,8 @@ async def run_daily_accuracy_report():
                     if log.prediction_horizon_min <= 180:
                         deviations_3h.append(abs_dev)
 
-                mae_1h = (
-                    round(sum(deviations_1h) / len(deviations_1h), 3)
-                    if deviations_1h else None
-                )
-                mae_3h = (
-                    round(sum(deviations_3h) / len(deviations_3h), 3)
-                    if deviations_3h else None
-                )
+                mae_1h = round(sum(deviations_1h) / len(deviations_1h), 3) if deviations_1h else None
+                mae_3h = round(sum(deviations_3h) / len(deviations_3h), 3) if deviations_3h else None
 
                 # 检查退化
                 degraded = False
@@ -272,15 +255,9 @@ async def run_daily_accuracy_report():
                     degraded = True
 
                 if degraded:
-                    logger.error(
-                        f"Zone {zone_id} 精度退化: "
-                        f"mae_1h={mae_1h}°C, mae_3h={mae_3h}°C，建议重新校准"
-                    )
+                    logger.error(f"Zone {zone_id} 精度退化: mae_1h={mae_1h}°C, mae_3h={mae_3h}°C，建议重新校准")
                 else:
-                    logger.info(
-                        f"Zone {zone_id} 精度正常: "
-                        f"mae_1h={mae_1h}°C, mae_3h={mae_3h}°C"
-                    )
+                    logger.info(f"Zone {zone_id} 精度正常: mae_1h={mae_1h}°C, mae_3h={mae_3h}°C")
 
     except Exception as e:
         logger.error(f"每日精度统计任务失败: {e}", exc_info=True)

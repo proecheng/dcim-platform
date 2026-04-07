@@ -141,7 +141,7 @@ function updateBubbles() {
   // 移除已解除的告警
   const activeAlarmIds = new Set(store.activeAlarms.map(a => a.id))
   bubbleMap.forEach((bubble, alarmId) => {
-    if (!activeAlarmIds.has(alarmId)) {
+    if (!activeAlarmIds.has(Number(alarmId))) {
       scene.value!.remove(bubble)
       if (bubble.element && bubble.element.parentNode) {
         bubble.element.parentNode.removeChild(bubble.element)

@@ -6,6 +6,7 @@ Architecture Reference: Section 18.13 边缘推理架构（FR34-33~34）
 - 边缘执行 L1 规则匹配，复杂场景上报中心
 - 多节点一致性: 中心节点作为仲裁者
 """
+
 from abc import ABC, abstractmethod
 from typing import Any
 

@@ -1,19 +1,13 @@
 """
 故障树版本管理器 - Story 24.4
 """
+
 import json
 import logging
-from typing import Dict, List, Optional
 from datetime import datetime, timedelta
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update, func
-from app.models.fault_tree import (
-    FaultTree,
-    FaultTreeNode,
-    FaultTreeEdge,
-    FaultTreeDeviceMapping,
-    FaultTreeVersion
-)
+from app.models.fault_tree import FaultTree, FaultTreeNode, FaultTreeEdge, FaultTreeDeviceMapping, FaultTreeVersion
 from app.services.diagnosis.hmac_manager import HMACManager
 from app.services.diagnosis.dag_validator import DAGValidator
 from app.core.redis_lock import get_redis_client
@@ -29,23 +23,15 @@ class VersionManager:
     """故障树版本管理器"""
 
     @staticmethod
-    async def create_version(
-        session: AsyncSession,
-        tree_id: int,
-        created_by: int
-    ) -> FaultTreeVersion:
+    async def create_version(session: AsyncSession, tree_id: int, created_by: int) -> FaultTreeVersion:
         """创建新版本"""
         # 查询故障树及其节点和边
         tree = await session.get(FaultTree, tree_id)
         if not tree:
             raise ValueError(f"Fault tree {tree_id} not found")
 
-        nodes = await session.execute(
-            select(FaultTreeNode).where(FaultTreeNode.tree_id == tree_id)
-        )
-        edges = await session.execute(
-            select(FaultTreeEdge).where(FaultTreeEdge.tree_id == tree_id)
-        )
+        nodes = await session.execute(select(FaultTreeNode).where(FaultTreeNode.tree_id == tree_id))
+        edges = await session.execute(select(FaultTreeEdge).where(FaultTreeEdge.tree_id == tree_id))
         device_mappings = await session.execute(
             select(FaultTreeDeviceMapping).where(FaultTreeDeviceMapping.tree_id == tree_id)
         )
@@ -62,31 +48,20 @@ class VersionManager:
                     "description": n.description,
                     "prior_probability": n.prior_probability,
                     "evidence_point_id": n.evidence_point_id,
-                    "config": n.config
+                    "config": n.config,
                 }
                 for n in nodes.scalars()
             ],
-            "edges": [
-                {"parent_node_id": e.parent_node_id, "child_node_id": e.child_node_id}
-                for e in edges.scalars()
-            ],
+            "edges": [{"parent_node_id": e.parent_node_id, "child_node_id": e.child_node_id} for e in edges.scalars()],
             "device_mappings": [
-                {
-                    "device_type": dm.device_type,
-                    "alarm_type": dm.alarm_type,
-                    "priority": dm.priority
-                }
+                {"device_type": dm.device_type, "alarm_type": dm.alarm_type, "priority": dm.priority}
                 for dm in device_mappings.scalars()
-            ]
+            ],
         }
         snapshot_json = json.dumps(snapshot, sort_keys=True)
 
         # 使用 SELECT FOR UPDATE 锁定整个 tree 的版本记录（防止并发创建）
-        await session.execute(
-            select(FaultTreeVersion.id)
-            .where(FaultTreeVersion.tree_id == tree_id)
-            .with_for_update()
-        )
+        await session.execute(select(FaultTreeVersion.id).where(FaultTreeVersion.tree_id == tree_id).with_for_update())
 
         # 获取下一个版本号
         result = await session.execute(
@@ -100,11 +75,7 @@ class VersionManager:
 
         # 创建版本记录
         version = FaultTreeVersion(
-            tree_id=tree_id,
-            version_number=next_version,
-            status="draft",
-            snapshot=snapshot_json,
-            created_by=created_by
+            tree_id=tree_id, version_number=next_version, status="draft", snapshot=snapshot_json, created_by=created_by
         )
         session.add(version)
         await session.commit()
@@ -112,10 +83,7 @@ class VersionManager:
         return version
 
     @staticmethod
-    async def activate_version(
-        session: AsyncSession,
-        version_id: int
-    ) -> FaultTreeVersion:
+    async def activate_version(session: AsyncSession, version_id: int) -> FaultTreeVersion:
         """激活版本"""
         version = await session.get(FaultTreeVersion, version_id)
         if not version:
@@ -149,9 +117,7 @@ class VersionManager:
 
         # 使用 SELECT FOR UPDATE 锁定同一 tree 的所有版本（不限状态）
         await session.execute(
-            select(FaultTreeVersion.id)
-            .where(FaultTreeVersion.tree_id == version.tree_id)
-            .with_for_update()
+            select(FaultTreeVersion.id).where(FaultTreeVersion.tree_id == version.tree_id).with_for_update()
         )
 
         # 在单个事务中完成状态切换
@@ -173,6 +139,7 @@ class VersionManager:
         # P1-5 修复: 使故障树缓存失效
         try:
             from app.services.diagnosis.fault_tree import _fault_tree_cache
+
             await _fault_tree_cache.invalidate(version.tree_id)
             logger.info(f"故障树 {version.tree_id} 缓存已失效（版本 {version.version_number} 激活）")
         except Exception as e:
@@ -181,21 +148,21 @@ class VersionManager:
         # 发布版本切换事件（失败不影响激活）
         try:
             redis = await get_redis_client()
-            await redis.publish("diagnosis:tree_version_change", json.dumps({
-                "tree_id": version.tree_id,
-                "version_id": version.id,
-                "version_number": version.version_number
-            }))
+            await redis.publish(
+                "diagnosis:tree_version_change",
+                json.dumps(
+                    {"tree_id": version.tree_id, "version_id": version.id, "version_number": version.version_number}
+                ),
+            )
         except Exception as e:
-            logger.error(f"Failed to publish version change event for tree {version.tree_id}, version {version.id}: {e}")
+            logger.error(
+                f"Failed to publish version change event for tree {version.tree_id}, version {version.id}: {e}"
+            )
 
         return version
 
     @staticmethod
-    async def rollback_version(
-        session: AsyncSession,
-        tree_id: int
-    ) -> FaultTreeVersion:
+    async def rollback_version(session: AsyncSession, tree_id: int) -> FaultTreeVersion:
         """回滚到上一个版本"""
         # 检查回滚频率限制（统计最近的 archived -> active 状态转换）
         cutoff_time = datetime.utcnow() - ROLLBACK_RATE_LIMIT_WINDOW
@@ -213,7 +180,7 @@ class VersionManager:
             .where(FaultTreeVersion.tree_id == tree_id)
             .where(FaultTreeVersion.status == "active")
         )
-        current_active = current_active_result.scalar_one_or_none()
+        current_active_result.scalar_one_or_none()
 
         # 如果当前 active 版本是最近激活的，说明可能是回滚操作
         # 简化逻辑：如果最近激活次数 >= 限制，拒绝回滚

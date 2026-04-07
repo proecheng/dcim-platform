@@ -67,28 +67,28 @@ export function getDashboard(params?: {
   health_level?: string
   site_id?: number
 }) {
-  return request.get<any, DashboardResponse>('/v1/predictive-maintenance/dashboard', { params })
+  return request.get<DashboardResponse>('/v1/predictive-maintenance/dashboard', { params })
 }
 
 export function getDeviceDetail(deviceId: number) {
-  return request.get<any, DeviceDetailResponse>(`/v1/predictive-maintenance/devices/${deviceId}/detail`)
+  return request.get<DeviceDetailResponse>(`/v1/predictive-maintenance/devices/${deviceId}/detail`)
 }
 
 export function getAdviceList(params?: {
   status?: string
   device_type?: string
 }) {
-  return request.get<any, MaintenanceAdviceInfo[]>('/v1/predictive-maintenance/advices', { params })
+  return request.get<MaintenanceAdviceInfo[]>('/v1/predictive-maintenance/advices', { params })
 }
 
 export function confirmAdvice(adviceId: number) {
-  return request.post<any, { advice_id: number; work_order_id: number; work_order_no: string; status: string }>(
+  return request.post<{ advice_id: number; work_order_id: number; work_order_no: string; status: string }>(
     `/v1/predictive-maintenance/advices/${adviceId}/confirm`
   )
 }
 
 export function rejectAdvice(adviceId: number, feedback: string) {
-  return request.post<any, MaintenanceAdviceInfo>(
+  return request.post<MaintenanceAdviceInfo>(
     `/v1/predictive-maintenance/advices/${adviceId}/reject`,
     { feedback }
   )

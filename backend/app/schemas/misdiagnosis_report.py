@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field, field_validator, ConfigDict
 
 class MisdiagnosisReportGenerateRequest(BaseModel):
     """手动生成报告请求"""
+
     start_date: date = Field(..., description="统计开始日期")
     end_date: date = Field(..., description="统计结束日期")
 
@@ -30,6 +31,7 @@ class MisdiagnosisReportGenerateRequest(BaseModel):
             if v.month != start_date.month or v.year != start_date.year:
                 # 跨月了，检查是否是上个月的最后一天
                 import calendar
+
                 last_day = calendar.monthrange(start_date.year, start_date.month)[1]
                 if v.day != last_day or v.month != start_date.month:
                     raise ValueError("end_date 必须是月末")
@@ -38,6 +40,7 @@ class MisdiagnosisReportGenerateRequest(BaseModel):
 
 class DiagnosisSummary(BaseModel):
     """诊断概览统计"""
+
     total_diagnosis_count: int
     annotated_count: int
     annotation_coverage_rate: float
@@ -45,6 +48,7 @@ class DiagnosisSummary(BaseModel):
 
 class MisdiagnosisDistribution(BaseModel):
     """误判类型分布"""
+
     false_positive_count: int
     false_positive_rate: float
     false_negative_count: int
@@ -54,6 +58,7 @@ class MisdiagnosisDistribution(BaseModel):
 
 class TopMisdiagnosedNode(BaseModel):
     """高频误判节点"""
+
     node_id: str
     node_name: str
     misdiagnosis_count: int
@@ -63,6 +68,7 @@ class TopMisdiagnosedNode(BaseModel):
 
 class DeviceTypeMisdiagnosis(BaseModel):
     """设备类型误判分布"""
+
     device_type: str
     total_count: int
     misdiagnosis_count: int
@@ -71,6 +77,7 @@ class DeviceTypeMisdiagnosis(BaseModel):
 
 class MisdiagnosisReportDetailResponse(BaseModel):
     """报告详情响应"""
+
     id: int
     report_name: str
     report_type: str
@@ -88,6 +95,7 @@ class MisdiagnosisReportDetailResponse(BaseModel):
 
 class MisdiagnosisReportListItem(BaseModel):
     """报告列表项"""
+
     id: int
     report_name: str
     report_type: str
@@ -102,6 +110,7 @@ class MisdiagnosisReportListItem(BaseModel):
 
 class MisdiagnosisReportListResponse(BaseModel):
     """报告列表响应"""
+
     total: int
     page: int
     page_size: int

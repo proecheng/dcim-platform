@@ -115,6 +115,7 @@ def require_permission(permission: str):
     Returns:
         权限检查函数
     """
+
     async def permission_checker(current_user: User = Depends(get_current_user)) -> User:
         # Admin 拥有所有权限
         if current_user.role == "admin":
@@ -132,10 +133,7 @@ def require_permission(permission: str):
 
         allowed_roles = permission_map.get(permission, [])
         if current_user.role not in allowed_roles:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"权限不足: 需要 {permission} 权限"
-            )
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=f"权限不足: 需要 {permission} 权限")
 
         return current_user
 

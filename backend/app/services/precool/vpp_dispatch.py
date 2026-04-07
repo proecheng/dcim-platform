@@ -76,6 +76,7 @@ class VppDispatchService:
             # 3. 获取当前可调容量
             try:
                 from .vpp_capacity import vpp_capacity_service
+
                 capacity = await vpp_capacity_service.calculate_capacity()
             except Exception as e:
                 logger.error("VPP 调控 - 容量计算失败: %s", e, exc_info=True)
@@ -93,10 +94,7 @@ class VppDispatchService:
             # 5. 安全约束校验
             if request["target_power_kw"] > max_kw:
                 dispatch.status = "rejected"
-                dispatch.reject_reason = (
-                    f"请求功率 {request['target_power_kw']:.1f} kW "
-                    f"超过可调容量 {max_kw:.1f} kW"
-                )
+                dispatch.reject_reason = f"请求功率 {request['target_power_kw']:.1f} kW 超过可调容量 {max_kw:.1f} kW"
                 dispatch.max_adjustable_kw = max_kw
                 await session.commit()
                 return self._build_response(dispatch)
@@ -109,9 +107,7 @@ class VppDispatchService:
 
             # 7. 接受指令
             dispatch.status = "accepted"
-            dispatch.accepted_power_kw = min(
-                request["target_power_kw"], max_kw
-            )
+            dispatch.accepted_power_kw = min(request["target_power_kw"], max_kw)
             await session.commit()
 
             logger.info(
@@ -123,9 +119,7 @@ class VppDispatchService:
 
             return self._build_response(dispatch)
 
-    async def _check_and_abort_conflicts(
-        self, session
-    ) -> Optional[int]:
+    async def _check_and_abort_conflicts(self, session) -> Optional[int]:
         """检查并中止与 VPP down_adjust 冲突的执行中预冷计划
 
         冲突条件：当前有 executing 状态的预冷计划且处于预冷时段
@@ -152,9 +146,8 @@ class VppDispatchService:
         plan = active_plans[0]
         try:
             from .executor import precool_executor
-            await precool_executor.abort_plan_by_api(
-                plan, "vpp_override", session
-            )
+
+            await precool_executor.abort_plan_by_api(plan, "vpp_override", session)
             logger.info(
                 "VPP 指令中止预冷计划: schedule_id=%d, zone_id=%d",
                 plan.id,
@@ -164,18 +157,16 @@ class VppDispatchService:
         except Exception as e:
             logger.error(
                 "中止预冷计划失败: schedule_id=%d, error=%s",
-                plan.id, e, exc_info=True,
+                plan.id,
+                e,
+                exc_info=True,
             )
             return None
 
-    async def list_dispatches(
-        self, page: int = 1, page_size: int = 20, status: str = None
-    ) -> dict:
+    async def list_dispatches(self, page: int = 1, page_size: int = 20, status: str = None) -> dict:
         """查询 VPP 调控指令列表（分页）"""
         async with async_session() as session:
-            query = select(VppDispatch).order_by(
-                VppDispatch.created_at.desc()
-            )
+            query = select(VppDispatch).order_by(VppDispatch.created_at.desc())
             count_query = select(func.count()).select_from(VppDispatch)
 
             if status:
@@ -200,20 +191,14 @@ class VppDispatchService:
         """查询 VPP 需求响应统计（日/月）"""
         async with async_session() as session:
             now = datetime.now()
-            today_start = now.replace(
-                hour=0, minute=0, second=0, microsecond=0
-            )
-            month_start = now.replace(
-                day=1, hour=0, minute=0, second=0, microsecond=0
-            )
+            today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+            month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
 
             # 日统计
             daily_result = await session.execute(
                 select(
                     func.count().label("count"),
-                    func.sum(VppDispatch.accepted_power_kw).label(
-                        "total_power"
-                    ),
+                    func.sum(VppDispatch.accepted_power_kw).label("total_power"),
                 ).where(
                     VppDispatch.status == "accepted",
                     VppDispatch.created_at >= today_start,
@@ -225,9 +210,7 @@ class VppDispatchService:
             monthly_result = await session.execute(
                 select(
                     func.count().label("count"),
-                    func.sum(VppDispatch.accepted_power_kw).label(
-                        "total_power"
-                    ),
+                    func.sum(VppDispatch.accepted_power_kw).label("total_power"),
                 ).where(
                     VppDispatch.status == "accepted",
                     VppDispatch.created_at >= month_start,
@@ -246,16 +229,12 @@ class VppDispatchService:
                 "daily": {
                     "count": daily_count,
                     "total_power_kw": round(daily_power, 1),
-                    "estimated_savings_yuan": round(
-                        daily_power * PRICE_DIFF, 2
-                    ),
+                    "estimated_savings_yuan": round(daily_power * PRICE_DIFF, 2),
                 },
                 "monthly": {
                     "count": monthly_count,
                     "total_power_kw": round(monthly_power, 1),
-                    "estimated_savings_yuan": round(
-                        monthly_power * PRICE_DIFF, 2
-                    ),
+                    "estimated_savings_yuan": round(monthly_power * PRICE_DIFF, 2),
                 },
             }
 
@@ -271,11 +250,7 @@ class VppDispatchService:
             "max_adjustable_kw": dispatch.max_adjustable_kw,
             "accepted_power_kw": dispatch.accepted_power_kw,
             "aborted_schedule_id": dispatch.aborted_schedule_id,
-            "created_at": (
-                dispatch.created_at.isoformat()
-                if dispatch.created_at
-                else None
-            ),
+            "created_at": (dispatch.created_at.isoformat() if dispatch.created_at else None),
         }
 
 

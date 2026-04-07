@@ -25,15 +25,16 @@ def _linear_regression_slope(timestamps: list[float], values: list[float]) -> fl
 @dataclass
 class DegradationResult:
     """劣化分析结果"""
+
     device_id: int
-    score: float                    # 0~100 劣化评分（100=健康）
-    confidence: float               # 0~1 评估置信度
-    available_points: int           # 实际可用数据点数
-    total_points: int               # 理想数据点数
+    score: float  # 0~100 劣化评分（100=健康）
+    confidence: float  # 0~1 评估置信度
+    available_points: int  # 实际可用数据点数
+    total_points: int  # 理想数据点数
     trend_factors: dict[str, float] = field(default_factory=dict)
     primary_concern: str | None = None
     data_sufficiency: str = "minimal"  # full | partial | minimal
-    detail: dict | None = None       # 各指标详细分析结果（供 36.3 使用）
+    detail: dict | None = None  # 各指标详细分析结果（供 36.3 使用）
 
 
 class DegradationPlugin(ABC):
@@ -64,9 +65,7 @@ class DegradationPlugin(ABC):
         """执行劣化分析，返回分析结果"""
         ...
 
-    def _find_point_data(
-        self, point_history: dict[str, list], suffixes: list[str]
-    ) -> list | None:
+    def _find_point_data(self, point_history: dict[str, list], suffixes: list[str]) -> list | None:
         """从 point_history 中按精确后缀匹配查找第一个有数据的点位"""
         for suffix in suffixes:
             for key, data in point_history.items():

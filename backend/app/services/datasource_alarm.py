@@ -49,17 +49,13 @@ async def create_datasource_alarm(
     return alarm
 
 
-async def resolve_datasource_alarm(
-    db: AsyncSession, ds_id: int, now: Optional[datetime] = None
-) -> int:
+async def resolve_datasource_alarm(db: AsyncSession, ds_id: int, now: Optional[datetime] = None) -> int:
     """恢复指定 DataSource 的所有 active 告警，返回关闭数量"""
     if now is None:
         now = datetime.now()
     source_key = f"datasource:{ds_id}"
 
-    result = await db.execute(
-        select(Alarm).where(Alarm.source == source_key, Alarm.status == "active")
-    )
+    result = await db.execute(select(Alarm).where(Alarm.source == source_key, Alarm.status == "active"))
     alarms = result.scalars().all()
     for alarm in alarms:
         alarm.status = "resolved"
@@ -70,9 +66,7 @@ async def resolve_datasource_alarm(
     return len(alarms)
 
 
-async def resolve_datasource_alarms_batch(
-    db: AsyncSession, ds_ids: list[int], now: Optional[datetime] = None
-) -> int:
+async def resolve_datasource_alarms_batch(db: AsyncSession, ds_ids: list[int], now: Optional[datetime] = None) -> int:
     """批量恢复多个 DataSource 的 active 告警"""
     if not ds_ids:
         return 0
@@ -80,9 +74,7 @@ async def resolve_datasource_alarms_batch(
         now = datetime.now()
     source_keys = [f"datasource:{did}" for did in ds_ids]
 
-    result = await db.execute(
-        select(Alarm).where(Alarm.source.in_(source_keys), Alarm.status == "active")
-    )
+    result = await db.execute(select(Alarm).where(Alarm.source.in_(source_keys), Alarm.status == "active"))
     alarms = result.scalars().all()
     for alarm in alarms:
         alarm.status = "resolved"

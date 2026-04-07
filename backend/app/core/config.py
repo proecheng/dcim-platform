@@ -108,22 +108,14 @@ class Settings(BaseSettings):
     mqtt_client_id: str = "dcim-backend"
     # 电价配置模式
     pricing_strict_mode: bool = Field(
-        default=True,
-        description="电价配置严格模式：True=不完整时抛出异常，False=使用默认电价填补"
+        default=True, description="电价配置严格模式：True=不完整时抛出异常，False=使用默认电价填补"
     )
-    pricing_default_price: float = Field(
-        default=0.7,
-        description="默认电价（元/kWh），用于填补缺失时段"
-    )
+    pricing_default_price: float = Field(default=0.7, description="默认电价（元/kWh），用于填补缺失时段")
 
     # 故障树 HMAC 密钥（Story 24.4）
-    fault_tree_hmac_key: str = Field(
-        default="",
-        description="故障树 HMAC 签名密钥（至少 32 字符）"
-    )
+    fault_tree_hmac_key: str = Field(default="", description="故障树 HMAC 签名密钥（至少 32 字符）")
     fault_tree_hmac_key_previous: Optional[str] = Field(
-        default=None,
-        description="故障树 HMAC 旧密钥（密钥轮换时使用）"
+        default=None, description="故障树 HMAC 旧密钥（密钥轮换时使用）"
     )
 
     @field_validator("fault_tree_hmac_key")

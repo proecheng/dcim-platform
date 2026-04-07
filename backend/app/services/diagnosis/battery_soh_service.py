@@ -2,11 +2,12 @@
 """
 Story 25.3: UPS电池SOH预测服务
 """
+
 import logging
 import json
 from typing import Optional
 from datetime import datetime, timedelta, timezone
-from sqlalchemy import select, desc, func
+from sqlalchemy import select, desc
 import redis.asyncio as redis
 
 from app.core.config import get_settings
@@ -21,36 +22,29 @@ settings = get_settings()
 # Prometheus 监控指标（条件注册，避免测试时重复）
 try:
     battery_soh_calculation_duration = Histogram(
-        'battery_soh_calculation_duration_seconds',
-        'Time spent calculating battery SOH'
+        "battery_soh_calculation_duration_seconds", "Time spent calculating battery SOH"
     )
 except ValueError:
-    battery_soh_calculation_duration = REGISTRY._names_to_collectors['battery_soh_calculation_duration_seconds']
+    battery_soh_calculation_duration = REGISTRY._names_to_collectors["battery_soh_calculation_duration_seconds"]
 
 try:
-    battery_soh_calculation_total = Counter(
-        'battery_soh_calculation_total',
-        'Total battery SOH calculations'
-    )
+    battery_soh_calculation_total = Counter("battery_soh_calculation_total", "Total battery SOH calculations")
 except ValueError:
-    battery_soh_calculation_total = REGISTRY._names_to_collectors['battery_soh_calculation_total']
+    battery_soh_calculation_total = REGISTRY._names_to_collectors["battery_soh_calculation_total"]
 
 try:
     battery_soh_calculation_errors = Counter(
-        'battery_soh_calculation_errors_total',
-        'Total battery SOH calculation errors'
+        "battery_soh_calculation_errors_total", "Total battery SOH calculation errors"
     )
 except ValueError:
-    battery_soh_calculation_errors = REGISTRY._names_to_collectors['battery_soh_calculation_errors_total']
+    battery_soh_calculation_errors = REGISTRY._names_to_collectors["battery_soh_calculation_errors_total"]
 
 try:
     battery_soh_alarm_triggered = Counter(
-        'battery_soh_alarm_triggered_total',
-        'Total battery SOH alarms triggered',
-        ['level']
+        "battery_soh_alarm_triggered_total", "Total battery SOH alarms triggered", ["level"]
     )
 except ValueError:
-    battery_soh_alarm_triggered = REGISTRY._names_to_collectors['battery_soh_alarm_triggered_total']
+    battery_soh_alarm_triggered = REGISTRY._names_to_collectors["battery_soh_alarm_triggered_total"]
 
 
 def clip(value: float, min_val: float, max_val: float) -> float:
@@ -75,7 +69,7 @@ async def get_rated_parameters(device_id: int) -> Optional[dict]:
             config = result.scalar_one_or_none()
 
             if not config or not config.config_value:
-                logger.warning(f"system_configs 中未找到 ups_rated_params 配置")
+                logger.warning("system_configs 中未找到 ups_rated_params 配置")
                 return None
 
             # 解析 JSON
@@ -91,10 +85,7 @@ async def get_rated_parameters(device_id: int) -> Optional[dict]:
                 )
                 return None
 
-            return {
-                "rated_resistance_mohm": float(rated_resistance),
-                "rated_cycle_count": int(rated_cycle_count)
-            }
+            return {"rated_resistance_mohm": float(rated_resistance), "rated_cycle_count": int(rated_cycle_count)}
 
     except Exception as e:
         logger.error(f"查询额定参数失败: {e}")
@@ -119,7 +110,9 @@ async def get_soh_weights() -> dict:
 
             if config and config.config_value:
                 # 解析 JSON
-                weights = json.loads(config.config_value) if isinstance(config.config_value, str) else config.config_value
+                weights = (
+                    json.loads(config.config_value) if isinstance(config.config_value, str) else config.config_value
+                )
                 return weights
 
             # 首次运行：初始化默认配置到数据库
@@ -130,7 +123,7 @@ async def get_soh_weights() -> dict:
                 config_value=json.dumps(default_weights),
                 value_type="json",
                 description="UPS电池SOH计算权重配置",
-                is_editable=True
+                is_editable=True,
             )
             db.add(new_config)
             await db.commit()
@@ -226,6 +219,7 @@ async def get_point_latest_value(point_id: int, time_window: int) -> Optional[fl
     # 降级：从数据库查询
     try:
         from app.models import PointHistory
+
         async with async_session() as db:
             cutoff_time = datetime.now(timezone.utc) - timedelta(seconds=time_window)
             result = await db.execute(
@@ -255,11 +249,10 @@ async def _get_point_id_by_type(device_id: int, point_type: str) -> Optional[int
     """
     try:
         from app.models import Point
+
         async with async_session() as db:
             result = await db.execute(
-                select(Point.id)
-                .where(Point.device_id == device_id)
-                .where(Point.point_type == point_type)
+                select(Point.id).where(Point.device_id == device_id).where(Point.point_type == point_type)
             )
             point_id = result.scalar_one_or_none()
             return point_id
@@ -367,20 +360,12 @@ async def calculate_soh(device_id: int) -> Optional[float]:
             if current_resistance <= rated_resistance:
                 resistance_factor = 1.0  # 新电池或正常电池
             else:
-                resistance_factor = clip(
-                    1.0 - (current_resistance - rated_resistance) / rated_resistance,
-                    0.0,
-                    1.0
-                )
+                resistance_factor = clip(1.0 - (current_resistance - rated_resistance) / rated_resistance, 0.0, 1.0)
 
             # cycle_factor: 循环次数越多，因子越低
             if rated_cycle_count <= 0:
                 rated_cycle_count = 1
-            cycle_factor = clip(
-                1.0 - current_cycle_count / rated_cycle_count,
-                0.0,
-                1.0
-            )
+            cycle_factor = clip(1.0 - current_cycle_count / rated_cycle_count, 0.0, 1.0)
 
             soh_percent = (resistance_factor * w_r + cycle_factor * w_c) * 100.0
             soh_percent = clip(soh_percent, 0.0, 100.0)
@@ -399,7 +384,7 @@ async def calculate_soh(device_id: int) -> Optional[float]:
                     resistance_mohm=current_resistance,
                     cycle_count=int(current_cycle_count),
                     weights_version=weights_version,
-                    calculated_at=datetime.now(timezone.utc)
+                    calculated_at=datetime.now(timezone.utc),
                 )
                 db.add(record)
                 await db.commit()
@@ -427,10 +412,7 @@ async def run_daily_soh_calculation():
     try:
         # 查询所有 UPS 设备
         async with async_session() as db:
-            result = await db.execute(
-                select(Device.id, Device.device_name)
-                .where(Device.device_type == "UPS")
-            )
+            result = await db.execute(select(Device.id, Device.device_name).where(Device.device_type == "UPS"))
             ups_devices = result.all()
 
         logger.info(f"找到 {len(ups_devices)} 台 UPS 设备")
@@ -461,10 +443,7 @@ async def run_daily_soh_calculation():
                 error_count += 1
 
         elapsed = (datetime.now(timezone.utc) - start_time).total_seconds()
-        logger.info(
-            f"每日 SOH 计算任务完成: 成功 {success_count} 台, 失败 {error_count} 台, "
-            f"耗时 {elapsed:.2f} 秒"
-        )
+        logger.info(f"每日 SOH 计算任务完成: 成功 {success_count} 台, 失败 {error_count} 台, 耗时 {elapsed:.2f} 秒")
 
     except Exception as e:
         logger.error(f"每日 SOH 计算任务异常: {e}")
@@ -518,7 +497,7 @@ async def trigger_soh_alarm(device_id: int, device_name: str, soh_percent: float
                 alarm_type="BATTERY_SOH",
                 level=alarm_level,
                 message=f"UPS设备 {device_name} 电池健康度为 {soh_percent:.1f}%，建议检查电池状态",
-                created_at=datetime.now(timezone.utc)
+                created_at=datetime.now(timezone.utc),
             )
             db.add(alarm)
             await db.commit()
@@ -553,9 +532,7 @@ async def update_fault_tree_prior_probability(device_id: int, soh_percent: float
 
             # 查找 UPS 相关的叶节点（通过 device_type 或 device_id 关联）
             result = await db.execute(
-                select(FaultTreeNode)
-                .where(FaultTreeNode.device_type == "UPS")
-                .where(FaultTreeNode.is_leaf == True)
+                select(FaultTreeNode).where(FaultTreeNode.device_type == "UPS").where(FaultTreeNode.is_leaf == True)
             )
             leaf_nodes = result.scalars().all()
 
@@ -621,15 +598,12 @@ async def update_device_health_score(device_id: int, soh_percent: float):
             days_since = (datetime.now() - last_maint).days if last_maint else None
 
             weights = await calculator._load_weight_config("battery")
-            score, health_level, score_factors = calculator.calculate(
-                dr, alarm_count, days_since, "battery", weights
-            )
+            score, health_level, score_factors = calculator.calculate(dr, alarm_count, days_since, "battery", weights)
 
             # 查询设备信息用于 upsert
             from app.models.device import Device
-            dev_result = await db.execute(
-                select(Device).where(Device.id == device_id)
-            )
+
+            dev_result = await db.execute(select(Device).where(Device.id == device_id))
             device = dev_result.scalar_one_or_none()
             if device:
                 await calculator._upsert_health_score(
@@ -645,10 +619,7 @@ async def update_device_health_score(device_id: int, soh_percent: float):
                 )
                 await db.commit()
 
-            logger.info(
-                f"设备 {device_id} 健康度评分已更新: "
-                f"SOH={soh_percent:.1f}%, 总分={score:.1f}"
-            )
+            logger.info(f"设备 {device_id} 健康度评分已更新: SOH={soh_percent:.1f}%, 总分={score:.1f}")
 
     except Exception as e:
         logger.error(f"更新设备健康度评分失败: device_id={device_id}, error={e}")
@@ -670,8 +641,7 @@ async def track_point_unavailable(device_id: int):
 
             # 查询或创建追踪记录
             result = await db.execute(
-                select(SOHPointUnavailableTracking)
-                .where(SOHPointUnavailableTracking.device_id == device_id)
+                select(SOHPointUnavailableTracking).where(SOHPointUnavailableTracking.device_id == device_id)
             )
             tracking = result.scalar_one_or_none()
 
@@ -683,7 +653,7 @@ async def track_point_unavailable(device_id: int):
                     last_unavailable_date=today,
                     alarm_triggered=False,
                     created_at=datetime.now(timezone.utc),
-                    updated_at=datetime.now(timezone.utc)
+                    updated_at=datetime.now(timezone.utc),
                 )
                 db.add(tracking)
                 logger.info(f"设备 {device_id} 点位首次不可用，开始追踪")
@@ -715,7 +685,7 @@ async def track_point_unavailable(device_id: int):
                     alarm_type="SOH_POINT_UNAVAILABLE",
                     level="major",  # WARNING 级别
                     message=f"UPS设备点位连续 {tracking.consecutive_days} 天不可用，无法计算 SOH",
-                    created_at=datetime.now(timezone.utc)
+                    created_at=datetime.now(timezone.utc),
                 )
                 db.add(alarm)
                 tracking.alarm_triggered = True
@@ -739,13 +709,14 @@ async def reset_point_unavailable_tracking(device_id: int):
             from app.models.diagnosis import SOHPointUnavailableTracking
 
             result = await db.execute(
-                select(SOHPointUnavailableTracking)
-                .where(SOHPointUnavailableTracking.device_id == device_id)
+                select(SOHPointUnavailableTracking).where(SOHPointUnavailableTracking.device_id == device_id)
             )
             tracking = result.scalar_one_or_none()
 
             if tracking and tracking.consecutive_days > 0:
-                logger.info(f"设备 {device_id} 点位已恢复，重置追踪记录（之前连续不可用 {tracking.consecutive_days} 天）")
+                logger.info(
+                    f"设备 {device_id} 点位已恢复，重置追踪记录（之前连续不可用 {tracking.consecutive_days} 天）"
+                )
                 await db.delete(tracking)
                 await db.commit()
 

@@ -25,10 +25,10 @@ logger = logging.getLogger(__name__)
 
 # 设备类型 → 三因子权重（劣化 / 告警 / 维保）
 WEIGHT_CONFIG: dict[str, dict[str, float]] = {
-    "ups":     {"degradation": 0.4, "alarm": 0.3, "maintenance": 0.3},
+    "ups": {"degradation": 0.4, "alarm": 0.3, "maintenance": 0.3},
     "battery": {"degradation": 0.5, "alarm": 0.2, "maintenance": 0.3},
-    "hvac":    {"degradation": 0.4, "alarm": 0.3, "maintenance": 0.3},
-    "pdu":     {"degradation": 0.35, "alarm": 0.35, "maintenance": 0.3},
+    "hvac": {"degradation": 0.4, "alarm": 0.3, "maintenance": 0.3},
+    "pdu": {"degradation": 0.35, "alarm": 0.35, "maintenance": 0.3},
 }
 
 # data_sufficiency == "minimal" 时降级权重
@@ -145,19 +145,18 @@ class DeviceHealthScoreCalculator:
         else:
             w = weights
 
-        score = (
-            w["degradation"] * degradation_score
-            + w["alarm"] * alarm_score
-            + w["maintenance"] * maintenance_score
-        )
+        score = w["degradation"] * degradation_score + w["alarm"] * alarm_score + w["maintenance"] * maintenance_score
         score = round(min(100.0, max(0.0, score)), 1)
         health_level = _score_to_level(score)
 
         score_factors = {
             "degradation": {"score": degradation_score, "weight": w["degradation"]},
             "alarm": {"score": alarm_score, "weight": w["alarm"], "count": alarm_count},
-            "maintenance": {"score": maintenance_score, "weight": w["maintenance"],
-                           "days_since": days_since_maintenance},
+            "maintenance": {
+                "score": maintenance_score,
+                "weight": w["maintenance"],
+                "days_since": days_since_maintenance,
+            },
             "data_sufficiency": degradation_result.data_sufficiency,
             "plugin_key": plugin_key,
         }
@@ -172,9 +171,7 @@ class DeviceHealthScoreCalculator:
         """
         # 1. 查询所有支持的设备
         supported_types = list(DEVICE_TYPE_MAP.keys())
-        result = await self.db.execute(
-            select(Device).where(Device.device_type.in_(supported_types))
-        )
+        result = await self.db.execute(select(Device).where(Device.device_type.in_(supported_types)))
         devices = result.scalars().all()
         if not devices:
             return 0
@@ -192,9 +189,7 @@ class DeviceHealthScoreCalculator:
         existing_result = await self.db.execute(
             select(DeviceHealthScore).where(DeviceHealthScore.device_id.in_(device_ids))
         )
-        self._existing_scores: dict[int, DeviceHealthScore] = {
-            r.device_id: r for r in existing_result.scalars().all()
-        }
+        self._existing_scores: dict[int, DeviceHealthScore] = {r.device_id: r for r in existing_result.scalars().all()}
 
         # 4. 劣化分析 + 加权计算
         analyzer = DegradationAnalyzer(self.db)
@@ -227,9 +222,7 @@ class DeviceHealthScoreCalculator:
                 if last_maint:
                     days_since = (datetime.now() - last_maint).days
 
-                score, health_level, score_factors = self.calculate(
-                    dr, alarm_count, days_since, plugin_key, weights
-                )
+                score, health_level, score_factors = self.calculate(dr, alarm_count, days_since, plugin_key, weights)
 
                 # Upsert DeviceHealthScore
                 await self._upsert_health_score(
@@ -247,7 +240,10 @@ class DeviceHealthScoreCalculator:
                 if score <= 40:
                     logger.warning(
                         "设备健康度预警: device_id=%d, name=%s, score=%.1f, level=%s",
-                        device.id, device.device_name, score, health_level,
+                        device.id,
+                        device.device_name,
+                        score,
+                        health_level,
                     )
                     await advisor.evaluate(device, score, dr, plugin_key)
                 elif score >= 60:
@@ -268,9 +264,7 @@ class DeviceHealthScoreCalculator:
         logger.info("健康度评分计算完成: %d/%d 设备", count, len(devices))
         return count
 
-    async def _batch_alarm_counts(
-        self, device_ids: list[int], cutoff: datetime
-    ) -> dict[int, int]:
+    async def _batch_alarm_counts(self, device_ids: list[int], cutoff: datetime) -> dict[int, int]:
         """批量查询设备近30天告警数（通过 Alarm.point_id → Point.device_id）
 
         注意：仅统计有 point_id 的告警，datasource 级告警（point_id=NULL）被排除。
@@ -288,9 +282,7 @@ class DeviceHealthScoreCalculator:
         result = await self.db.execute(stmt)
         return {row[0]: row[1] for row in result.fetchall()}
 
-    async def _batch_maintenance_dates(
-        self, device_ids: list[int]
-    ) -> dict[int, datetime | None]:
+    async def _batch_maintenance_dates(self, device_ids: list[int]) -> dict[int, datetime | None]:
         """批量查询设备最后维保时间（WorkOrder status=已完成）"""
         stmt = (
             select(WorkOrder.device_id, func.max(WorkOrder.completed_at))
@@ -317,11 +309,9 @@ class DeviceHealthScoreCalculator:
     ):
         """Upsert DeviceHealthScore 记录"""
         # 优先使用批量预加载的缓存
-        record = getattr(self, '_existing_scores', {}).get(device.id)
+        record = getattr(self, "_existing_scores", {}).get(device.id)
         if record is None:
-            result = await self.db.execute(
-                select(DeviceHealthScore).where(DeviceHealthScore.device_id == device.id)
-            )
+            result = await self.db.execute(select(DeviceHealthScore).where(DeviceHealthScore.device_id == device.id))
             record = result.scalar_one_or_none()
 
         if record is None:

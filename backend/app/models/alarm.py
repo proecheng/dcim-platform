@@ -45,7 +45,9 @@ class Alarm(Base):
     source = Column(String(100), nullable=True, index=True, comment="告警来源标识(如 datasource:123)")
     threshold_id = Column(Integer, ForeignKey("alarm_thresholds.id"), comment="阈值配置ID")
     alarm_level = Column(String(20), nullable=False, comment="告警级别")
-    alarm_type = Column(String(50), comment="告警类型: threshold/communication/system/mstp_gateway_offline/mstp_device_offline")
+    alarm_type = Column(
+        String(50), comment="告警类型: threshold/communication/system/mstp_gateway_offline/mstp_device_offline"
+    )
     alarm_message = Column(Text, nullable=False, comment="告警消息")
     trigger_value = Column(Float, comment="触发值")
     threshold_value = Column(Float, comment="阈值")
@@ -67,7 +69,9 @@ class Alarm(Base):
     escalated_from = Column(String(20), comment="升级前告警级别")
     escalation_remark = Column(Text, comment="升级备注")
     last_escalated_at = Column(DateTime, comment="最后升级时间")
-    data_source = Column(String(20), default="unknown", server_default="unknown", comment="触发数据来源: demo/mqtt/bridge/unknown")
+    data_source = Column(
+        String(20), default="unknown", server_default="unknown", comment="触发数据来源: demo/mqtt/bridge/unknown"
+    )
     created_at = Column(DateTime, default=datetime.now, comment="创建时间")
 
 

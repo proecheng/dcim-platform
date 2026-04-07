@@ -6,16 +6,13 @@ Story 26.4: 时间窗口自适应
 import logging
 import json
 import statistics
-from datetime import datetime, timedelta
 from typing import Optional
-from sqlalchemy import select, and_, func, text
+from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import async_session
 from app.models.diagnosis import TimeWindowAdjustmentLog
-from app.models.alarm import Alarm
 from app.models.config import SystemConfig
-from app.schemas.time_window_tuning import TimeWindowAdjustmentCreate
 
 logger = logging.getLogger(__name__)
 
@@ -63,18 +60,13 @@ class TimeWindowTuningService:
                 query += " AND dr.device_type = :device_type"
 
             result = await session.execute(
-                text(query),
-                {"device_type": device_type_filter} if device_type_filter else {}
+                text(query), {"device_type": device_type_filter} if device_type_filter else {}
             )
             device_types = [row[0] for row in result.fetchall()]
 
             if not device_types:
                 logger.info(f"未找到有准确诊断的设备类型（过滤条件: {device_type_filter or '无'}），分析结束")
-                return {
-                    "analyzed_device_types": 0,
-                    "total_adjustments": 0,
-                    "pending_approvals": 0
-                }
+                return {"analyzed_device_types": 0, "total_adjustments": 0, "pending_approvals": 0}
 
             logger.info(f"找到 {len(device_types)} 个设备类型需要分析")
 
@@ -89,12 +81,14 @@ class TimeWindowTuningService:
 
             await session.commit()
 
-        logger.info(f"时间窗口调参分析完成: 分析了 {analyzed_device_types} 个设备类型，生成 {total_adjustments} 条调参建议")
+        logger.info(
+            f"时间窗口调参分析完成: 分析了 {analyzed_device_types} 个设备类型，生成 {total_adjustments} 条调参建议"
+        )
 
         return {
             "analyzed_device_types": analyzed_device_types,
             "total_adjustments": total_adjustments,
-            "pending_approvals": total_adjustments
+            "pending_approvals": total_adjustments,
         }
 
     async def _analyze_device_type(self, session: AsyncSession, device_type: str) -> Optional[TimeWindowAdjustmentLog]:
@@ -149,7 +143,9 @@ class TimeWindowTuningService:
 
         # 如果计算结果 < 1 分钟，强制设为 1 分钟
         if proposed_window_minutes < 1:
-            logger.info(f"设备类型 {device_type} 计算的时间窗口 < 1 分钟（P90={p90_duration_seconds:.1f}秒 × 1.2 = {proposed_window_seconds:.1f}秒），设为最小值 1 分钟")
+            logger.info(
+                f"设备类型 {device_type} 计算的时间窗口 < 1 分钟（P90={p90_duration_seconds:.1f}秒 × 1.2 = {proposed_window_seconds:.1f}秒），设为最小值 1 分钟"
+            )
             proposed_window_minutes = 1
 
         # 限制范围 [1, 120]
@@ -182,11 +178,13 @@ class TimeWindowTuningService:
             sample_count=len(durations),
             p50_duration_seconds=p50_duration_seconds,
             p90_duration_seconds=p90_duration_seconds,
-            status='pending'
+            status="pending",
         )
 
         session.add(adjustment)
-        logger.info(f"生成调参建议: {device_type}, {current_window_minutes} -> {proposed_window_minutes} 分钟 ({adjustment_percent:.2f}%)")
+        logger.info(
+            f"生成调参建议: {device_type}, {current_window_minutes} -> {proposed_window_minutes} 分钟 ({adjustment_percent:.2f}%)"
+        )
 
         return adjustment
 
@@ -205,14 +203,14 @@ class TimeWindowTuningService:
         # config_key = 'diagnosis_time_windows'
         # config_value = JSON: { "UPS": 30, "空调": 60, ... }
 
-        result = await session.execute(
-            select(SystemConfig).where(SystemConfig.config_key == 'diagnosis_time_windows')
-        )
+        result = await session.execute(select(SystemConfig).where(SystemConfig.config_key == "diagnosis_time_windows"))
         config = result.scalar_one_or_none()
 
         if config and config.config_value:
             try:
-                time_windows = json.loads(config.config_value) if isinstance(config.config_value, str) else config.config_value
+                time_windows = (
+                    json.loads(config.config_value) if isinstance(config.config_value, str) else config.config_value
+                )
                 return time_windows.get(device_type, 30)  # 默认 30 分钟
             except (json.JSONDecodeError, AttributeError) as e:
                 logger.error(f"解析 diagnosis_time_windows 配置失败: {e}")
@@ -234,9 +232,7 @@ class TimeWindowTuningService:
         from app.models.user import User
 
         async with async_session() as session:
-            admin_result = await session.execute(
-                select(User).where(User.role == 'admin', User.is_active == True)
-            )
+            admin_result = await session.execute(select(User).where(User.role == "admin", User.is_active == True))
             admins = admin_result.scalars().all()
 
             if not admins:
@@ -255,20 +251,18 @@ class TimeWindowTuningService:
                                 body = f"""
                                 <h2>时间窗口调参审批通知</h2>
                                 <p>您好，{admin.real_name or admin.username}：</p>
-                                <p>系统已完成时间窗口调参分析，有 <strong>{result['pending_approvals']}</strong> 条调参建议待您审批。</p>
+                                <p>系统已完成时间窗口调参分析，有 <strong>{result["pending_approvals"]}</strong> 条调参建议待您审批。</p>
                                 <p>请登录系统查看详情并进行审批。</p>
                                 <p>分析结果：</p>
                                 <ul>
-                                    <li>分析的设备类型数量: {result['analyzed_device_types']}</li>
-                                    <li>生成的调参建议总数: {result['total_adjustments']}</li>
-                                    <li>待审批的调参建议数量: {result['pending_approvals']}</li>
+                                    <li>分析的设备类型数量: {result["analyzed_device_types"]}</li>
+                                    <li>生成的调参建议总数: {result["total_adjustments"]}</li>
+                                    <li>待审批的调参建议数量: {result["pending_approvals"]}</li>
                                 </ul>
                                 <p>此邮件由系统自动发送，请勿回复。</p>
                                 """
                                 await email_service.send_html_email(
-                                    to_email=admin.email,
-                                    subject=subject,
-                                    html_content=body
+                                    to_email=admin.email, subject=subject, html_content=body
                                 )
                                 logger.info(f"已发送邮件通知给管理员: {admin.username} ({admin.email})")
                             except Exception as e:
@@ -284,9 +278,9 @@ class TimeWindowTuningService:
 
                 message = {
                     "type": "time_window_tuning_approval",
-                    "pending_count": result['pending_approvals'],
-                    "analyzed_device_types": result['analyzed_device_types'],
-                    "total_adjustments": result['total_adjustments']
+                    "pending_count": result["pending_approvals"],
+                    "analyzed_device_types": result["analyzed_device_types"],
+                    "total_adjustments": result["total_adjustments"],
                 }
 
                 for admin in admins:

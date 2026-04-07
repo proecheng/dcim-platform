@@ -72,7 +72,7 @@
           限制转移功率的范围和变化率，防止功率变化过快导致系统不稳定。
         </el-descriptions-item>
         <el-descriptions-item label="三相平衡">
-          确保三相负载平衡，不平衡度建议 <10%。超过此值可能导致设备损坏或效率降低。
+          确保三相负载平衡，不平衡度建议 &lt;10%。超过此值可能导致设备损坏或效率降低。
         </el-descriptions-item>
         <el-descriptions-item label="温度约束">
           限制设备温度和温升速率，防止过热导致设备损坏。
@@ -240,20 +240,20 @@ const handleDelete = async (row: Constraint) => {
   }
 }
 
-type TagType = '' | 'primary' | 'success' | 'warning' | 'info' | 'danger'
+type TagType = 'primary' | 'success' | 'warning' | 'info' | 'danger'
 
-const getTypeColor = (type: string) => {
+const getTypeColor = (type: string): TagType => {
   const map: Record<string, TagType> = {
     device: 'primary',
     time: 'success',
     power: 'warning',
     phase_balance: 'danger',
     temperature: 'info',
-    device_lifetime: '',
+    device_lifetime: 'info',
     datacenter_load: 'success',
     ups_capacity: 'danger',
   }
-  return map[type] || ''
+  return map[type] || 'info'
 }
 
 const getTypeLabel = (type: string) => {
@@ -270,14 +270,14 @@ const getTypeLabel = (type: string) => {
   return map[type] || type
 }
 
-const getPriorityColor = (priority: string) => {
+const getPriorityColor = (priority: string): TagType => {
   const p = toPriorityLabel(priority)
   const map: Record<string, TagType> = {
     high: 'danger',
     medium: 'warning',
     low: 'info'
   }
-  return map[p] || ''
+  return map[p] || 'info'
 }
 
 const getPriorityLabel = (priority: string) => {

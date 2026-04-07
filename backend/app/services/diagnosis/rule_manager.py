@@ -3,8 +3,14 @@
 负责规则热更新监听
 """
 
+from __future__ import annotations
+
 import asyncio
 import logging
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from .l1_engine import L1RuleEngine
 
 logger = logging.getLogger(__name__)
 
@@ -12,7 +18,7 @@ logger = logging.getLogger(__name__)
 class RuleManager:
     """规则管理器 - 监听规则更新事件"""
 
-    def __init__(self, l1_engine: 'L1RuleEngine', redis_service):
+    def __init__(self, l1_engine: "L1RuleEngine", redis_service):
         """
         初始化规则管理器
 

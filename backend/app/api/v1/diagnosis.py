@@ -34,10 +34,8 @@ from ...schemas.diagnosis import (
     BreakerProfileUpdate,
     BreakerProfileResponse,
     TrendWarningListResponse,
-    TrendWarningResponse,
     TrendWarningAcknowledge,
     SensorFusionRecordListResponse,
-    SensorFusionRecordResponse,
     TrendConfigUpdate,
     TrendConfigResponse,
     CounterfactualAnalysisResponse,
@@ -72,6 +70,7 @@ class TimeWindowRejectRequest(BaseModel):
 
 class HMACKeyRotateRequest(BaseModel):
     new_key: str = Field(..., min_length=32, description="新 HMAC 密钥（>=32 字符）")
+
 
 # 分类映射
 CATEGORY_MAP = {
@@ -917,7 +916,6 @@ async def acknowledge_trend_warning(
 ):
     """确认趋势预警"""
     from ...models.diagnosis import TrendWarning
-    from ...schemas.diagnosis import TrendWarningAcknowledge
 
     warning = await db.get(TrendWarning, warning_id)
     if not warning:
@@ -1023,7 +1021,6 @@ async def update_trend_config(
 ):
     """更新趋势阈值配置"""
     from ...models import SystemConfig
-    from ...schemas.diagnosis import TrendConfigUpdate
 
     # 更新配置
     updates = {}
@@ -1108,7 +1105,6 @@ async def get_counterfactual_analysis(
     权限要求: diagnosis:view_advanced (admin, operator)
     """
     from ...services.diagnosis.counterfactual_service import get_counterfactual_analysis as get_analysis
-    from ...models.diagnosis import CounterfactualAnalysis
 
     analysis = await get_analysis(session_id, db)
 

@@ -44,17 +44,11 @@ async def get_dashboard(
     # 1. site_id 基础条件（共享给 summary 和 device 两个查询）
     base_cond = []
     if site_id:
-        base_cond.append(
-            DeviceHealthScore.device_id.in_(
-                select(Device.id).where(Device.site_id == site_id)
-            )
-        )
+        base_cond.append(DeviceHealthScore.device_id.in_(select(Device.id).where(Device.site_id == site_id)))
 
     # 2. summary 聚合查询（GROUP BY health_level，只受 site_id 过滤）
     summary_stmt = (
-        select(DeviceHealthScore.health_level, func.count())
-        .where(*base_cond)
-        .group_by(DeviceHealthScore.health_level)
+        select(DeviceHealthScore.health_level, func.count()).where(*base_cond).group_by(DeviceHealthScore.health_level)
     )
     summary_result = await db.execute(summary_stmt)
     level_counts = {row[0]: row[1] for row in summary_result.fetchall()}
@@ -89,9 +83,7 @@ async def get_device_detail(
 ):
     """设备健康度详情 — 因子明细 + 维护建议列表"""
     # 1. 查询 DeviceHealthScore
-    result = await db.execute(
-        select(DeviceHealthScore).where(DeviceHealthScore.device_id == device_id)
-    )
+    result = await db.execute(select(DeviceHealthScore).where(DeviceHealthScore.device_id == device_id))
     health = result.scalar_one_or_none()
     if not health:
         raise HTTPException(status_code=404, detail="设备健康度记录不存在")

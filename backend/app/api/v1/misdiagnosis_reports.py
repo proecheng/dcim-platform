@@ -4,7 +4,7 @@ Misdiagnosis Report API - Story 26.6
 
 import logging
 from datetime import datetime, timedelta, timezone
-from typing import Literal, Optional
+from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import FileResponse
 from sqlalchemy import select, func
@@ -40,9 +40,7 @@ async def list_misdiagnosis_reports(
     权限: 仅管理员
     """
     # 构建查询
-    query = select(ReportRecord).where(
-        ReportRecord.report_type == "diagnosis_monthly"
-    )
+    query = select(ReportRecord).where(ReportRecord.report_type == "diagnosis_monthly")
 
     # 时间范围过滤
     if start_date:
@@ -81,7 +79,9 @@ async def list_misdiagnosis_reports(
     )
 
 
-@router.get("/{report_id}", response_model=MisdiagnosisReportDetailResponse, dependencies=[Depends(require_role(["admin"]))])
+@router.get(
+    "/{report_id}", response_model=MisdiagnosisReportDetailResponse, dependencies=[Depends(require_role(["admin"]))]
+)
 async def get_misdiagnosis_report(
     report_id: int,
     db: AsyncSession = Depends(get_db),
@@ -91,10 +91,7 @@ async def get_misdiagnosis_report(
 
     权限: 仅管理员
     """
-    stmt = select(ReportRecord).where(
-        ReportRecord.id == report_id,
-        ReportRecord.report_type == "diagnosis_monthly"
-    )
+    stmt = select(ReportRecord).where(ReportRecord.id == report_id, ReportRecord.report_type == "diagnosis_monthly")
     result = await db.execute(stmt)
     report = result.scalar_one_or_none()
 
@@ -114,10 +111,7 @@ async def download_misdiagnosis_report(
 
     权限: 仅管理员
     """
-    stmt = select(ReportRecord).where(
-        ReportRecord.id == report_id,
-        ReportRecord.report_type == "diagnosis_monthly"
-    )
+    stmt = select(ReportRecord).where(ReportRecord.id == report_id, ReportRecord.report_type == "diagnosis_monthly")
     result = await db.execute(stmt)
     report = result.scalar_one_or_none()
 
@@ -128,6 +122,7 @@ async def download_misdiagnosis_report(
         raise HTTPException(status_code=404, detail="报告文件不存在")
 
     import os
+
     # 路径遍历防护：确保文件在允许的报告目录内
     reports_dir = os.path.realpath(os.path.join(os.path.dirname(__file__), "..", "..", "..", "reports"))
     real_path = os.path.realpath(report.file_path)
@@ -151,7 +146,7 @@ async def download_misdiagnosis_report(
 async def generate_misdiagnosis_report(
     request: MisdiagnosisReportGenerateRequest,
     db: AsyncSession = Depends(get_db),
-    current_user = Depends(require_role(["admin"])),
+    current_user=Depends(require_role(["admin"])),
 ):
     """
     手动触发报告生成（仅用于测试）

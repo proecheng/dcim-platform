@@ -13,7 +13,6 @@ from app.models.user import UserSite
 
 
 class NotificationPolicyService:
-
     @staticmethod
     def _to_minutes(hhmm: str) -> int:
         """将 'HH:MM' 转为分钟数 0~1439"""
@@ -21,9 +20,7 @@ class NotificationPolicyService:
         return int(h) * 60 + int(m)
 
     @staticmethod
-    def _segments(
-        start: Optional[str], end: Optional[str]
-    ) -> list[tuple[int, int]]:
+    def _segments(start: Optional[str], end: Optional[str]) -> list[tuple[int, int]]:
         """将时段转为分钟区间列表，全天返回 [(0, 1440)]，跨午夜拆为两段"""
         if start is None or end is None:
             return [(0, 1440)]
@@ -62,9 +59,7 @@ class NotificationPolicyService:
         exclude_id: Optional[int] = None,
     ) -> Optional[int]:
         """检测时段冲突，返回冲突策略 ID 或 None（检查所有策略含禁用的）"""
-        query = select(NotificationPolicy).where(
-            NotificationPolicy.alarm_level == alarm_level
-        )
+        query = select(NotificationPolicy).where(NotificationPolicy.alarm_level == alarm_level)
         if site_id is None:
             query = query.where(NotificationPolicy.site_id.is_(None))
         else:
@@ -89,9 +84,7 @@ class NotificationPolicyService:
         return result.scalar_one_or_none() is not None
 
     @staticmethod
-    async def validate_user_site_access(
-        db: AsyncSession, site_id: Optional[int], user_ids: list[int]
-    ) -> list[int]:
+    async def validate_user_site_access(db: AsyncSession, site_id: Optional[int], user_ids: list[int]) -> list[int]:
         """校验用户站点权限，返回无权限的 user_id 列表"""
         if site_id is None or not user_ids:
             return []

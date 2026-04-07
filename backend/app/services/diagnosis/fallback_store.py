@@ -7,7 +7,7 @@ import json
 import logging
 import uuid
 from datetime import datetime
-from typing import Optional, Dict, Any
+from typing import Dict, Any
 
 from app.core.redis_lock import get_redis_client
 
@@ -73,11 +73,7 @@ class DiagnosisFallbackStore:
             key = f"{DiagnosisFallbackStore.PENDING_KEY_PREFIX}{pending_id}"
 
             # 添加元数据
-            data_with_meta = {
-                "_version": "1.0",
-                "_fallback_reason": reason,
-                **data
-            }
+            data_with_meta = {"_version": "1.0", "_fallback_reason": reason, **data}
 
             # 自动转换 datetime 字段
             converted_data = _convert_datetime_to_iso(data_with_meta)
@@ -85,10 +81,7 @@ class DiagnosisFallbackStore:
             serialized = json.dumps(converted_data, ensure_ascii=False)
 
             # P1-4 修复: 设置 1 秒超时
-            await asyncio.wait_for(
-                client.set(key, serialized, ex=DiagnosisFallbackStore.PENDING_TTL),
-                timeout=1.0
-            )
+            await asyncio.wait_for(client.set(key, serialized, ex=DiagnosisFallbackStore.PENDING_TTL), timeout=1.0)
 
             logger.info("诊断结果已写入 Redis 降级存储: %s (reason: %s)", key, reason)
             return key
@@ -96,9 +89,7 @@ class DiagnosisFallbackStore:
         except (asyncio.TimeoutError, ConnectionError, Exception) as e:
             # P1-4 修复: Redis 写入失败，降级到本地文件
             logger.warning(f"Redis 写入失败，降级到本地文件: {e}")
-            await DiagnosisFallbackStore._save_to_local_file(
-                data, "redis_unavailable", ""
-            )
+            await DiagnosisFallbackStore._save_to_local_file(data, "redis_unavailable", "")
             return "local_file"
 
     @staticmethod
@@ -115,10 +106,7 @@ class DiagnosisFallbackStore:
         # 尝试获取分布式锁
         lock_token = str(uuid.uuid4())
         lock_acquired = await client.set(
-            DiagnosisFallbackStore.RECOVERY_LOCK_KEY,
-            lock_token,
-            nx=True,
-            ex=DiagnosisFallbackStore.RECOVERY_LOCK_TTL
+            DiagnosisFallbackStore.RECOVERY_LOCK_KEY, lock_token, nx=True, ex=DiagnosisFallbackStore.RECOVERY_LOCK_TTL
         )
 
         if not lock_acquired:
@@ -178,9 +166,7 @@ class DiagnosisFallbackStore:
                         ttl = await client.ttl(key)
                         if ttl > 0 and ttl < DiagnosisFallbackStore.TTL_EXPIRING_THRESHOLD:
                             # 写入本地文件
-                            await DiagnosisFallbackStore._save_to_local_file(
-                                data, "redis_expired", key
-                            )
+                            await DiagnosisFallbackStore._save_to_local_file(data, "redis_expired", key)
                             await client.delete(key)
                             logger.warning("Redis key 即将过期，已写入本地文件: %s", key)
 
@@ -196,11 +182,7 @@ class DiagnosisFallbackStore:
                     failed_count += 1
                     continue  # 跳过当前数据，继续处理下一条
 
-            return {
-                "success": success_count,
-                "failed": failed_count,
-                "skipped": skipped_count
-            }
+            return {"success": success_count, "failed": failed_count, "skipped": skipped_count}
 
         finally:
             # 释放锁时验证 token
@@ -221,7 +203,6 @@ class DiagnosisFallbackStore:
             reason: 降级原因（redis_unavailable 或 redis_expired）
             key: Redis key（用于日志）
         """
-        import os
         from pathlib import Path
 
         # 确定文件路径
@@ -239,7 +220,7 @@ class DiagnosisFallbackStore:
             "_fallback_reason": reason,
             "_redis_key": key,
             "_timestamp": datetime.now().isoformat(),
-            **data
+            **data,
         }
 
         # 转换 datetime

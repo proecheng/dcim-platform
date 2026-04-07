@@ -5,7 +5,6 @@ import uuid
 from typing import Optional
 from datetime import datetime
 from redis.asyncio import Redis
-from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
 from app.core.database import async_session
@@ -26,17 +25,14 @@ logger = logging.getLogger(__name__)
 # 告警级别到优先级的映射（数字越小优先级越高）
 ALARM_LEVEL_PRIORITY = {
     "critical": 0,  # 紧急
-    "major": 1,     # 重要
-    "minor": 2,     # 次要
-    "warning": 3    # 提示
+    "major": 1,  # 重要
+    "minor": 2,  # 次要
+    "warning": 3,  # 提示
 }
 
 # 推理级别超时配置（秒）
-INFERENCE_TIMEOUT = {
-    "L1": 2,
-    "L2": 10,
-    "L3": 60
-}
+INFERENCE_TIMEOUT = {"L1": 2, "L2": 10, "L3": 60}
+
 
 class DiagnosisScheduler:
     """
@@ -46,6 +42,7 @@ class DiagnosisScheduler:
     - 控制并发推理任务
     - 保存诊断结果
     """
+
     def __init__(self, max_workers: int = 10, queue_size: int = 50):
         self.queue = CancellablePriorityQueue(maxsize=queue_size)
         self.semaphore = asyncio.Semaphore(max_workers)
@@ -65,7 +62,6 @@ class DiagnosisScheduler:
         self.circuit_breaker = CircuitBreaker(
             on_state_change=self._on_breaker_state_change,
         )
-
 
     async def start(self):
         """
@@ -104,7 +100,7 @@ class DiagnosisScheduler:
         except Exception as e:
             logger.error(f"Failed to load L1 rules: {e}", exc_info=True)
             self.running = False
-            raise RuntimeError(f"Cannot start scheduler: L1 engine initialization failed") from e
+            raise RuntimeError("Cannot start scheduler: L1 engine initialization failed") from e
 
         # 启动 worker 协程
         for i in range(self.max_workers):
@@ -211,7 +207,6 @@ class DiagnosisScheduler:
         self._subscriber_task = None
         logger.info("DiagnosisScheduler stopped")
 
-
     async def _subscribe_alarms(self):
         """
         订阅 Redis alarm:new 事件（带重连机制）
@@ -248,7 +243,7 @@ class DiagnosisScheduler:
                     try:
                         await pubsub.unsubscribe("alarm:new")
                         await pubsub.close()
-                    except:
+                    except Exception:
                         pass
                 await asyncio.sleep(retry_delay)
                 # 指数退避，最大 60 秒
@@ -274,6 +269,7 @@ class DiagnosisScheduler:
         # 演练模式保护：真实告警强制 L1 (Story 26.7)
         try:
             from app.services.diagnosis.chaos_drill_service import ChaosDrillService
+
             if ChaosDrillService.is_drill_active:
                 inference_level = "L1"
                 logger.info(f"演练模式: 告警 {alarm_id} 强制降级为 L1")
@@ -285,7 +281,7 @@ class DiagnosisScheduler:
             "device_id": device_id,
             "alarm_level": alarm_level,
             "inference_level": inference_level,
-            "alarm_data": alarm_data
+            "alarm_data": alarm_data,
         }
 
         # 提交到队列
@@ -293,7 +289,6 @@ class DiagnosisScheduler:
 
         if not success:
             logger.warning(f"Alarm {alarm_id} dropped (queue full, low priority)")
-
 
     async def _worker(self, worker_id: str):
         """
@@ -371,10 +366,7 @@ class DiagnosisScheduler:
             timeout = INFERENCE_TIMEOUT.get(inference_level, 2)
 
             if inference_level == "L1":
-                result = await asyncio.wait_for(
-                    self.l1_engine.match_rules(alarm_data),
-                    timeout=timeout
-                )
+                result = await asyncio.wait_for(self.l1_engine.match_rules(alarm_data), timeout=timeout)
             elif inference_level == "L2":
                 # TODO: Story 24.5 实现 L2 引擎
                 logger.warning(f"L2 inference not implemented yet for alarm {alarm_id}")
@@ -448,8 +440,7 @@ class DiagnosisScheduler:
                     async with async_session() as db_session:
                         existing_l2 = await db_session.execute(
                             select(DiagnosisResult).where(
-                                DiagnosisResult.alarm_id == alarm_id,
-                                DiagnosisResult.diagnosis_level == "L2"
+                                DiagnosisResult.alarm_id == alarm_id, DiagnosisResult.diagnosis_level == "L2"
                             )
                         )
                         if existing_l2.scalar_one_or_none() is None:
@@ -511,13 +502,7 @@ class DiagnosisScheduler:
             except Exception as save_err:
                 logger.error(f"Failed to save error result: {save_err}")
 
-
-    async def trigger_manual(
-        self,
-        device_id: int,
-        level: str = "auto",
-        alarm_data: Optional[dict] = None
-    ) -> dict:
+    async def trigger_manual(self, device_id: int, level: str = "auto", alarm_data: Optional[dict] = None) -> dict:
         """
         手动触发诊断
         """
@@ -539,7 +524,7 @@ class DiagnosisScheduler:
             "device_id": device_id,
             "alarm_level": "manual",
             "inference_level": level,
-            "alarm_data": alarm_data or {}
+            "alarm_data": alarm_data or {},
         }
 
         # 手动触发优先级设为 1（重要）
@@ -569,6 +554,7 @@ class DiagnosisScheduler:
         """熔断器状态变更回调 -- 推送 WebSocket 告警 (Story 24.7)"""
         try:
             from app.services.websocket import ws_manager
+
             await ws_manager.broadcast_diagnosis(
                 msg_type="system_diagnosis_breaker",
                 data=data,
@@ -603,6 +589,7 @@ class DiagnosisScheduler:
                                 # 推送 WebSocket 告警给管理员
                                 try:
                                     from app.services.websocket import ws_manager
+
                                     await ws_manager.broadcast_diagnosis(
                                         msg_type="annotation_anomaly_alert",
                                         data={
@@ -617,6 +604,7 @@ class DiagnosisScheduler:
                                 # 写入系统内通知表（持久化）
                                 try:
                                     from app.models.notification import SystemNotification
+
                                     notification = SystemNotification(
                                         title="标注偏差告警",
                                         content=f"检测到 {len(anomalies)} 个用户标注率异常",
@@ -661,7 +649,9 @@ class DiagnosisScheduler:
                 if result["success"] + result["failed"] + result["expired"] > 0:
                     logger.info(
                         "推送重试队列处理完成: success=%d, failed=%d, expired=%d",
-                        result["success"], result["failed"], result["expired"]
+                        result["success"],
+                        result["failed"],
+                        result["expired"],
                     )
             except Exception as e:
                 logger.error(f"Push retry loop error: {e}", exc_info=True)
@@ -675,7 +665,6 @@ class DiagnosisScheduler:
         每周日凌晨 2:00 执行一次
         """
         from app.services.diagnosis.probability_tuning_service import ProbabilityTuningService
-        import calendar
 
         # 启动延迟 30 秒，避免与其他任务冲突
         await asyncio.sleep(30)
@@ -708,7 +697,7 @@ class DiagnosisScheduler:
                             )
 
                             # 如果有待审批的调参建议，通知管理员
-                            if result['pending_approvals'] > 0:
+                            if result["pending_approvals"] > 0:
                                 await service.notify_admins(result)
 
                         except Exception as e:
@@ -823,6 +812,7 @@ class DiagnosisScheduler:
                             # 通知管理员
                             try:
                                 from app.services.websocket import ws_manager
+
                                 await ws_manager.broadcast_diagnosis(
                                     msg_type="misdiagnosis_report_generated",
                                     data={
@@ -846,7 +836,10 @@ class DiagnosisScheduler:
                             retry_count = 0
                             last_attempt_month = current_month_key
                         except Exception as e:
-                            logger.error(f"月度误判分析报告生成失败 (尝试 {retry_count + 1}/{max_retries + 1}): {e}", exc_info=True)
+                            logger.error(
+                                f"月度误判分析报告生成失败 (尝试 {retry_count + 1}/{max_retries + 1}): {e}",
+                                exc_info=True,
+                            )
 
                             # 增加重试计数
                             retry_count += 1
@@ -857,6 +850,7 @@ class DiagnosisScheduler:
                                 logger.error(f"月度误判分析报告生成失败，已达最大重试次数 ({max_retries})")
                                 try:
                                     from app.services.websocket import ws_manager
+
                                     await ws_manager.broadcast_diagnosis(
                                         msg_type="misdiagnosis_report_failed",
                                         data={
@@ -923,9 +917,8 @@ class DiagnosisScheduler:
                 # 根据设备类型查询对应的故障树ID
                 # 实际实现：从配置表或规则引擎查询设备类型对应的故障树
                 from app.models.fault_tree import FaultTree
-                fault_tree_stmt = select(FaultTree.id).where(
-                    FaultTree.status == "active"
-                ).limit(1)
+
+                fault_tree_stmt = select(FaultTree.id).where(FaultTree.status == "active").limit(1)
                 fault_tree_result = await db_session.execute(fault_tree_stmt)
                 fault_tree_id = fault_tree_result.scalar_one_or_none()
 
@@ -943,17 +936,15 @@ class DiagnosisScheduler:
                 )
 
                 logger.debug(
-                    f"A/B testing selected version {version_id} for device {device_id} "
-                    f"(fault_tree={fault_tree_id})"
+                    f"A/B testing selected version {version_id} for device {device_id} (fault_tree={fault_tree_id})"
                 )
                 return version_id
 
         except Exception as e:
             # 异常降级：返回 None，调用方将使用 active 版本
             logger.error(
-                f"Failed to select fault tree version for device {device_id}: {e}, "
-                f"will use active version as fallback",
-                exc_info=True
+                f"Failed to select fault tree version for device {device_id}: {e}, will use active version as fallback",
+                exc_info=True,
             )
             return None
 
@@ -961,6 +952,7 @@ class DiagnosisScheduler:
 # 全局调度器实例
 _scheduler: Optional[DiagnosisScheduler] = None
 _scheduler_lock = asyncio.Lock()
+
 
 async def get_scheduler() -> DiagnosisScheduler:
     """
@@ -971,4 +963,3 @@ async def get_scheduler() -> DiagnosisScheduler:
         if _scheduler is None:
             _scheduler = DiagnosisScheduler()
         return _scheduler
-

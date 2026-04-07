@@ -67,9 +67,7 @@ async def create_policy(
         db, data.site_id, data.alarm_level, data.time_range_start, data.time_range_end
     )
     if conflict_id is not None:
-        raise HTTPException(
-            status_code=422, detail=f"与策略 {conflict_id} 时段重叠"
-        )
+        raise HTTPException(status_code=422, detail=f"与策略 {conflict_id} 时段重叠")
 
     policy = NotificationPolicy(
         name=data.name,
@@ -98,9 +96,7 @@ async def update_policy(
     _=Depends(require_admin),
 ):
     """更新通知策略"""
-    result = await db.execute(
-        select(NotificationPolicy).where(NotificationPolicy.id == policy_id)
-    )
+    result = await db.execute(select(NotificationPolicy).where(NotificationPolicy.id == policy_id))
     policy = result.scalar_one_or_none()
     if not policy:
         raise HTTPException(status_code=404, detail="策略不存在")
@@ -108,16 +104,8 @@ async def update_policy(
     provided = data.model_fields_set
 
     # 合并时段：用 DB 现有值填充未提供的字段
-    effective_start = (
-        data.time_range_start
-        if "time_range_start" in provided
-        else policy.time_range_start
-    )
-    effective_end = (
-        data.time_range_end
-        if "time_range_end" in provided
-        else policy.time_range_end
-    )
+    effective_start = data.time_range_start if "time_range_start" in provided else policy.time_range_start
+    effective_end = data.time_range_end if "time_range_end" in provided else policy.time_range_end
     # 合并后校验：必须同时有值或同时为 None
     if (effective_start is None) != (effective_end is None):
         raise HTTPException(
@@ -132,11 +120,7 @@ async def update_policy(
         )
 
     # 合并 notify_user_ids
-    effective_user_ids = (
-        data.notify_user_ids
-        if "notify_user_ids" in provided
-        else policy.notify_user_ids
-    )
+    effective_user_ids = data.notify_user_ids if "notify_user_ids" in provided else policy.notify_user_ids
     effective_site_id = policy.site_id  # site_id 不可更新
 
     # 用户站点权限校验
@@ -161,9 +145,7 @@ async def update_policy(
             exclude_id=policy_id,
         )
         if conflict_id is not None:
-            raise HTTPException(
-                status_code=422, detail=f"与策略 {conflict_id} 时段重叠"
-            )
+            raise HTTPException(status_code=422, detail=f"与策略 {conflict_id} 时段重叠")
 
     # escalation 联动校验
     effective_escalation = (
@@ -172,9 +154,7 @@ async def update_policy(
         else policy.channel_escalation_enabled
     )
     effective_order = (
-        data.escalation_channel_order
-        if "escalation_channel_order" in provided
-        else policy.escalation_channel_order
+        data.escalation_channel_order if "escalation_channel_order" in provided else policy.escalation_channel_order
     )
     if effective_escalation and not effective_order:
         raise HTTPException(
@@ -198,9 +178,7 @@ async def delete_policy(
     _=Depends(require_admin),
 ):
     """删除通知策略（is_default=True 不可删除）"""
-    result = await db.execute(
-        select(NotificationPolicy).where(NotificationPolicy.id == policy_id)
-    )
+    result = await db.execute(select(NotificationPolicy).where(NotificationPolicy.id == policy_id))
     policy = result.scalar_one_or_none()
     if not policy:
         raise HTTPException(status_code=404, detail="策略不存在")

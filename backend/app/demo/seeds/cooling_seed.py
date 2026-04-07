@@ -527,8 +527,7 @@ async def seed_cooling_devices():
             # 检查是否已存在 demo 热参数（去重逻辑）
             existing_param = await session.execute(
                 select(ThermalParameter).where(
-                    ThermalParameter.cooling_zone_id == zone.id,
-                    ThermalParameter.is_demo == True
+                    ThermalParameter.cooling_zone_id == zone.id, ThermalParameter.is_demo == True
                 )
             )
             if existing_param.scalar_one_or_none():

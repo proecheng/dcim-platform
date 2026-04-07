@@ -175,7 +175,7 @@ function bindNetworkEvents() {
   network.value.on('doubleClick', (params) => {
     if (params.nodes.length > 0) {
       const nodeId = params.nodes[0]
-      const node = nodes.value.get(nodeId)
+      const node = nodes.value.get(nodeId) as unknown as VisNode | null
       if (node) {
         emit('node-double-click', node)
       }

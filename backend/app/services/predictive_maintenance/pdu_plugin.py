@@ -68,8 +68,10 @@ class PDUDegradationPlugin(DegradationPlugin):
                     load_score = 100.0
                 scores.append(("load_trend", load_score, weights["load_trend"]))
                 detail["load_trend"] = {
-                    "mean": round(load_mean, 2), "slope_per_month": slope_per_month,
-                    "score": load_score, "data_points": len(load_data),
+                    "mean": round(load_mean, 2),
+                    "slope_per_month": slope_per_month,
+                    "score": load_score,
+                    "data_points": len(load_data),
                 }
         else:
             detail["load_trend"] = {"status": "no_data"}
@@ -132,7 +134,11 @@ class PDUDegradationPlugin(DegradationPlugin):
             else:
                 tr_score = 100.0
             scores.append(("temperature_rise", tr_score, weights["temperature_rise"]))
-            detail["temperature_rise"] = {"slope_per_month": slope_per_month, "score": tr_score, "data_points": len(temp_data)}
+            detail["temperature_rise"] = {
+                "slope_per_month": slope_per_month,
+                "score": tr_score,
+                "data_points": len(temp_data),
+            }
         else:
             detail["temperature_rise"] = {"status": "no_data"}
 
@@ -141,9 +147,13 @@ class PDUDegradationPlugin(DegradationPlugin):
 
         if not scores:
             return DegradationResult(
-                device_id=device_id, score=100.0, confidence=0.0,
-                available_points=0, total_points=total_count,
-                trend_factors=trend_factors, primary_concern=None,
+                device_id=device_id,
+                score=100.0,
+                confidence=0.0,
+                available_points=0,
+                total_points=total_count,
+                trend_factors=trend_factors,
+                primary_concern=None,
                 data_sufficiency="minimal" if not zero_load else "partial",
                 detail=detail,
             )
@@ -177,8 +187,12 @@ class PDUDegradationPlugin(DegradationPlugin):
         )
 
     def _determine_sufficiency(
-        self, available_count: int, load_data: list | None,
-        voltage_data: list | None, window_days: int, zero_load: bool,
+        self,
+        available_count: int,
+        load_data: list | None,
+        voltage_data: list | None,
+        window_days: int,
+        zero_load: bool,
     ) -> str:
         """PDU 数据充分度判定"""
         if not load_data and not voltage_data:

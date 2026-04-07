@@ -66,7 +66,9 @@ class PointRealtime(Base):
     quality = Column(Integer, default=0, comment="数据质量: 0=好 1=不确定 2=坏")
     status = Column(String(20), default="normal", comment="状态: normal/alarm/offline")
     alarm_level = Column(String(20), comment="当前告警级别")
-    source = Column(String(20), default="unknown", server_default="unknown", comment="数据来源: demo/mqtt/bridge/unknown")
+    source = Column(
+        String(20), default="unknown", server_default="unknown", comment="数据来源: demo/mqtt/bridge/unknown"
+    )
     change_count = Column(Integer, default=0, comment="变化次数")
     last_change_at = Column(DateTime, comment="最后变化时间")
     updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now, comment="更新时间")

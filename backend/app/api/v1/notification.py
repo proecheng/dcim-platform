@@ -65,13 +65,9 @@ async def test_send_notification(
 ):
     adapter = ADAPTER_REGISTRY.get(data.channel_type)
     if not adapter:
-        return ChannelTestResponse(
-            success=False, error_message=f"渠道 {data.channel_type} 未注册"
-        )
+        return ChannelTestResponse(success=False, error_message=f"渠道 {data.channel_type} 未注册")
     if not adapter.is_enabled():
-        return ChannelTestResponse(
-            success=False, error_message=f"渠道 {data.channel_type} 未启用"
-        )
+        return ChannelTestResponse(success=False, error_message=f"渠道 {data.channel_type} 未启用")
 
     # 构造测试上下文
     test_context = AlarmNotificationContext(
@@ -86,17 +82,11 @@ async def test_send_notification(
         site_name="测试站点",
         created_at=datetime.now(),
     )
-    subject = render_notification(
-        get_subject_for_channel(data.channel_type), test_context
-    )
-    content = render_notification(
-        get_template_for_channel(data.channel_type), test_context
-    )
+    subject = render_notification(get_subject_for_channel(data.channel_type), test_context)
+    content = render_notification(get_template_for_channel(data.channel_type), test_context)
 
     result = await adapter.send(data.contact_value, subject, content, test_context)
-    return ChannelTestResponse(
-        success=result.success, error_message=result.error_message
-    )
+    return ChannelTestResponse(success=result.success, error_message=result.error_message)
 
 
 @router.get("/records", summary="查询通知记录")
@@ -138,9 +128,7 @@ async def list_notification_records(
     total = (await session.execute(count_query)).scalar() or 0
 
     # 分页
-    result = await session.execute(
-        query.offset((page - 1) * page_size).limit(page_size)
-    )
+    result = await session.execute(query.offset((page - 1) * page_size).limit(page_size))
     rows = result.all()
 
     items = []

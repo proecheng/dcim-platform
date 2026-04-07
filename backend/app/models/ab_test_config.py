@@ -6,6 +6,7 @@ from datetime import datetime
 
 class ABTestConfig(Base):
     """A/B 测试配置模型"""
+
     __tablename__ = "ab_test_configs"
 
     id = Column(Integer, primary_key=True, index=True)
@@ -38,6 +39,7 @@ class ABTestConfig(Base):
 
 class ABTestDeviceAssignment(Base):
     """A/B 测试设备版本分配记录"""
+
     __tablename__ = "ab_test_device_assignments"
 
     id = Column(Integer, primary_key=True, index=True)
@@ -53,6 +55,7 @@ class ABTestDeviceAssignment(Base):
 
 class ABTestArchive(Base):
     """A/B 测试归档数据"""
+
     __tablename__ = "ab_test_archives"
 
     id = Column(Integer, primary_key=True, index=True)

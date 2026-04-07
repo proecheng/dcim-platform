@@ -7,6 +7,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 class MaintenanceAdviceInfo(BaseModel):
     """维护建议信息"""
+
     id: int
     device_id: int
     device_name: str | None = None
@@ -27,11 +28,13 @@ class MaintenanceAdviceInfo(BaseModel):
 
 class AdviceRejectRequest(BaseModel):
     """拒绝建议请求"""
+
     feedback: str = Field(..., min_length=2, max_length=500)
 
 
 class AdviceConfirmResponse(BaseModel):
     """确认建议响应"""
+
     advice_id: int
     work_order_id: int
     work_order_no: str
@@ -43,15 +46,17 @@ class AdviceConfirmResponse(BaseModel):
 
 class DashboardSummary(BaseModel):
     """仪表盘统计概览"""
+
     total: int
-    healthy: int    # 健康
+    healthy: int  # 健康
     attention: int  # 关注
-    warning: int    # 预警
-    danger: int     # 危险
+    warning: int  # 预警
+    danger: int  # 危险
 
 
 class DeviceHealthItem(BaseModel):
     """设备健康度列表项"""
+
     device_id: int
     device_name: str | None = None
     device_type: str | None = None
@@ -66,12 +71,14 @@ class DeviceHealthItem(BaseModel):
 
 class DashboardResponse(BaseModel):
     """仪表盘响应"""
+
     summary: DashboardSummary
     devices: list[DeviceHealthItem]
 
 
 class ScoreFactorDetail(BaseModel):
     """评分因子明细"""
+
     degradation: dict | None = None
     alarm: dict | None = None
     maintenance: dict | None = None
@@ -81,6 +88,7 @@ class ScoreFactorDetail(BaseModel):
 
 class DeviceDetailResponse(BaseModel):
     """设备健康度详情响应"""
+
     health: DeviceHealthItem
     factors: ScoreFactorDetail | None = None
     advices: list[MaintenanceAdviceInfo] = []

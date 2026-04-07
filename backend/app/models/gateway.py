@@ -9,6 +9,7 @@ from ..core.database import Base
 
 class DataSourceStatus:
     """数据源连接状态常量（集中定义，避免硬编码散落）"""
+
     CONNECTED = "connected"
     DISCONNECTED = "disconnected"
     INTERRUPTED = "interrupted"
@@ -60,9 +61,12 @@ class DataSource(Base):
     site_id = Column(Integer, ForeignKey("sites.id"), nullable=True, default=None, comment="站点 ID")
     is_enabled = Column(Boolean, default=True, comment="是否启用")
     parent_datasource_id = Column(
-        Integer, ForeignKey("datasources.id", ondelete="SET NULL"),
-        nullable=True, default=None, index=True,
-        comment="父数据源ID（MS/TP设备指向其网关DataSource）"
+        Integer,
+        ForeignKey("datasources.id", ondelete="SET NULL"),
+        nullable=True,
+        default=None,
+        index=True,
+        comment="父数据源ID（MS/TP设备指向其网关DataSource）",
     )
     created_at = Column(DateTime, default=datetime.now, comment="创建时间")
     updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now, comment="更新时间")
@@ -132,7 +136,9 @@ class PointDataLatest(Base):
     quality = Column(Integer, default=0, comment="质量码: 0=正常, 1=不可靠, 2=异常")
     timestamp = Column(DateTime, comment="采集时间")
     gateway_id = Column(String(50), comment="来源网关")
-    source = Column(String(20), default="unknown", server_default="unknown", comment="数据来源: demo/mqtt/bridge/unknown")
+    source = Column(
+        String(20), default="unknown", server_default="unknown", comment="数据来源: demo/mqtt/bridge/unknown"
+    )
     updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now, comment="更新时间")
 
 

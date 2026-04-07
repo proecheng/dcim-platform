@@ -255,7 +255,7 @@
 import * as echarts from 'echarts'
 import {
   getThresholdList, createThreshold, updateThreshold, deleteThreshold,
-  setFourLevelThresholds, batchSetByDeviceType,
+  getPointThresholds, setFourLevelThresholds, batchSetByDeviceType,
   type ThresholdInfo
 } from '@/api/modules/threshold'
 import { getPointList, type PointInfo } from '@/api/modules/point'

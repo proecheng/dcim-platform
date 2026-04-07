@@ -8,9 +8,11 @@ DEGRADATION_PLUGIN_REGISTRY: dict[str, Type[DegradationPlugin]] = {}
 
 def register_degradation_plugin(device_type: str):
     """装饰器 — 注册劣化分析插件"""
+
     def decorator(cls: Type[DegradationPlugin]) -> Type[DegradationPlugin]:
         DEGRADATION_PLUGIN_REGISTRY[device_type] = cls
         return cls
+
     return decorator
 
 

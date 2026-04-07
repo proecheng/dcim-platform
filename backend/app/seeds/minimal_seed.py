@@ -2,6 +2,7 @@
 
 Story 28.2: Demo 配置分离与最小化种子
 """
+
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 from app.core.database import async_session
@@ -68,9 +69,7 @@ async def _is_first_run(session: AsyncSession) -> bool:
 async def _create_default_admin_user():
     """创建默认管理员用户（幂等，独立事务）"""
     async with async_session() as session:
-        result = await session.execute(
-            select(User).where(User.username == "admin")
-        )
+        result = await session.execute(select(User).where(User.username == "admin"))
         user = result.scalar_one_or_none()
 
         if user:
@@ -81,7 +80,7 @@ async def _create_default_admin_user():
             username="admin",
             hashed_password=get_password_hash(settings.default_admin_password),
             role="admin",
-            is_active=True
+            is_active=True,
         )
         session.add(user)
         await session.commit()
@@ -91,9 +90,7 @@ async def _create_default_admin_user():
 
 async def _create_default_site(session: AsyncSession) -> Site:
     """创建默认站点（幂等）"""
-    result = await session.execute(
-        select(Site).where(Site.site_code == DEFAULT_SITE_CODE)
-    )
+    result = await session.execute(select(Site).where(Site.site_code == DEFAULT_SITE_CODE))
     site = result.scalar_one_or_none()
 
     if site:
@@ -101,10 +98,7 @@ async def _create_default_site(session: AsyncSession) -> Site:
         return site
 
     site = Site(
-        site_name=settings.default_site_name,
-        site_code=DEFAULT_SITE_CODE,
-        address="",
-        data_source=DataSourceType.SEED
+        site_name=settings.default_site_name, site_code=DEFAULT_SITE_CODE, address="", data_source=DataSourceType.SEED
     )
     session.add(site)
     await session.flush()
@@ -117,12 +111,7 @@ async def _create_default_floors_and_rooms(session: AsyncSession, site_id: int):
     for floor_num in range(1, settings.default_floor_count + 1):
         floor_code = f"{floor_num}F"
         # 检查楼层是否存在
-        result = await session.execute(
-            select(Floor).where(
-                Floor.site_id == site_id,
-                Floor.floor_code == floor_code
-            )
-        )
+        result = await session.execute(select(Floor).where(Floor.site_id == site_id, Floor.floor_code == floor_code))
         floor = result.scalar_one_or_none()
 
         if not floor:
@@ -131,7 +120,7 @@ async def _create_default_floors_and_rooms(session: AsyncSession, site_id: int):
                 floor_name=f"{floor_num}F",
                 floor_code=floor_code,
                 sort_order=floor_num,
-                data_source=DataSourceType.SEED
+                data_source=DataSourceType.SEED,
             )
             session.add(floor)
             await session.flush()
@@ -140,12 +129,7 @@ async def _create_default_floors_and_rooms(session: AsyncSession, site_id: int):
         # 创建机房（使用 ROOM_001 格式）
         for room_num in range(1, settings.default_room_count + 1):
             room_code = f"ROOM_{room_num:03d}"
-            result = await session.execute(
-                select(Room).where(
-                    Room.floor_id == floor.id,
-                    Room.room_code == room_code
-                )
-            )
+            result = await session.execute(select(Room).where(Room.floor_id == floor.id, Room.room_code == room_code))
             room = result.scalar_one_or_none()
 
             if not room:
@@ -153,7 +137,7 @@ async def _create_default_floors_and_rooms(session: AsyncSession, site_id: int):
                     floor_id=floor.id,
                     room_name=f"机房{room_num:03d}",
                     room_code=room_code,
-                    data_source=DataSourceType.SEED
+                    data_source=DataSourceType.SEED,
                 )
                 session.add(room)
                 logger.info(f"✓ 创建机房: {room.room_name}")
@@ -162,9 +146,9 @@ async def _create_default_floors_and_rooms(session: AsyncSession, site_id: int):
 async def _create_default_pricing(session: AsyncSession):
     """创建默认五级电价配置（幂等）"""
     result = await session.execute(
-        select(func.count()).select_from(ElectricityPricing).where(
-            ElectricityPricing.pricing_name == DEFAULT_PRICING_NAME
-        )
+        select(func.count())
+        .select_from(ElectricityPricing)
+        .where(ElectricityPricing.pricing_name == DEFAULT_PRICING_NAME)
     )
     count = result.scalar()
 
@@ -181,20 +165,70 @@ async def _create_default_pricing(session: AsyncSession):
 
     pricing_periods = [
         # 尖峰时段
-        {"period_type": PricingPeriodType.SHARP_PEAK, "start_time": "10:00", "end_time": "12:00", "price": settings.default_sharp_peak_price},
-        {"period_type": PricingPeriodType.SHARP_PEAK, "start_time": "18:00", "end_time": "21:00", "price": settings.default_sharp_peak_price},
+        {
+            "period_type": PricingPeriodType.SHARP_PEAK,
+            "start_time": "10:00",
+            "end_time": "12:00",
+            "price": settings.default_sharp_peak_price,
+        },
+        {
+            "period_type": PricingPeriodType.SHARP_PEAK,
+            "start_time": "18:00",
+            "end_time": "21:00",
+            "price": settings.default_sharp_peak_price,
+        },
         # 峰时段
-        {"period_type": PricingPeriodType.PEAK, "start_time": "08:00", "end_time": "10:00", "price": settings.default_peak_price},
-        {"period_type": PricingPeriodType.PEAK, "start_time": "14:00", "end_time": "18:00", "price": settings.default_peak_price},
+        {
+            "period_type": PricingPeriodType.PEAK,
+            "start_time": "08:00",
+            "end_time": "10:00",
+            "price": settings.default_peak_price,
+        },
+        {
+            "period_type": PricingPeriodType.PEAK,
+            "start_time": "14:00",
+            "end_time": "18:00",
+            "price": settings.default_peak_price,
+        },
         # 平时段
-        {"period_type": PricingPeriodType.FLAT, "start_time": "07:00", "end_time": "08:00", "price": settings.default_flat_price},
-        {"period_type": PricingPeriodType.FLAT, "start_time": "12:00", "end_time": "14:00", "price": settings.default_flat_price},
-        {"period_type": PricingPeriodType.FLAT, "start_time": "21:00", "end_time": "23:00", "price": settings.default_flat_price},
+        {
+            "period_type": PricingPeriodType.FLAT,
+            "start_time": "07:00",
+            "end_time": "08:00",
+            "price": settings.default_flat_price,
+        },
+        {
+            "period_type": PricingPeriodType.FLAT,
+            "start_time": "12:00",
+            "end_time": "14:00",
+            "price": settings.default_flat_price,
+        },
+        {
+            "period_type": PricingPeriodType.FLAT,
+            "start_time": "21:00",
+            "end_time": "23:00",
+            "price": settings.default_flat_price,
+        },
         # 谷时段
-        {"period_type": PricingPeriodType.VALLEY, "start_time": "06:00", "end_time": "07:00", "price": settings.default_valley_price},
-        {"period_type": PricingPeriodType.VALLEY, "start_time": "23:00", "end_time": "24:00", "price": settings.default_valley_price},
+        {
+            "period_type": PricingPeriodType.VALLEY,
+            "start_time": "06:00",
+            "end_time": "07:00",
+            "price": settings.default_valley_price,
+        },
+        {
+            "period_type": PricingPeriodType.VALLEY,
+            "start_time": "23:00",
+            "end_time": "24:00",
+            "price": settings.default_valley_price,
+        },
         # 深谷时段
-        {"period_type": PricingPeriodType.DEEP_VALLEY, "start_time": "00:00", "end_time": "06:00", "price": settings.default_deep_valley_price},
+        {
+            "period_type": PricingPeriodType.DEEP_VALLEY,
+            "start_time": "00:00",
+            "end_time": "06:00",
+            "price": settings.default_deep_valley_price,
+        },
     ]
 
     effective_date = date.today()
@@ -208,7 +242,7 @@ async def _create_default_pricing(session: AsyncSession):
             price=period["price"],
             effective_date=effective_date,
             is_enabled=True,
-            data_source=DataSourceType.SEED
+            data_source=DataSourceType.SEED,
         )
         session.add(pricing)
 

@@ -51,6 +51,7 @@ from ..models.energy import (
     OptimizationResult,
 )
 from ..models.alarm import Alarm
+from ..models.cooling import ColdAisle, CoolingGroup, CoolingUnit
 from .data.building_points import get_all_points, get_threshold_for_point
 from ..services.floor_map_generator import FloorMapGenerator, FLOOR_CONFIG
 from ..services.point_device_matcher import PointDeviceMatcher
@@ -1064,6 +1065,7 @@ class DemoDataService:
             # 停止实时模拟器以避免数据库锁冲突
             from .engine import simulator
             from .lifecycle import _simulator_task
+
             was_running = simulator.running
             if was_running:
                 simulator.stop()
@@ -1145,6 +1147,7 @@ class DemoDataService:
                 self.loading = False
                 # 重启模拟器
                 from .engine import simulator
+
                 if not simulator.running:
                     asyncio.create_task(simulator.start())
 
@@ -1209,6 +1212,7 @@ class DemoDataService:
             # 停止实时模拟器以避免数据库锁冲突
             from .engine import simulator
             from .lifecycle import _simulator_task
+
             was_running = simulator.running
             if was_running:
                 simulator.stop()
@@ -1834,8 +1838,6 @@ class DemoDataService:
         if callback:
             callback(progress, message)
 
-
-
     async def _clear_demo_data_safe(self):
         """安全清理演示数据 - 仅删除 is_demo=True 的记录"""
         async with async_session() as session:
@@ -1844,9 +1846,7 @@ class DemoDataService:
             async def _execute_delete_where_demo(model, label: str):
                 """删除指定模型中 is_demo=True 的记录"""
                 try:
-                    result = await session.execute(
-                        delete(model).where(model.is_demo == True)
-                    )
+                    result = await session.execute(delete(model).where(model.is_demo == True))
                     deleted_counts[label] = result.rowcount
                     logger.info(f"删除 {label}: {result.rowcount} 条记录")
                 except Exception as e:
@@ -1857,11 +1857,7 @@ class DemoDataService:
                 """通过外键关联删除记录"""
                 try:
                     result = await session.execute(
-                        delete(model).where(
-                            fk_column.in_(
-                                select(parent_model.id).where(parent_filter)
-                            )
-                        )
+                        delete(model).where(fk_column.in_(select(parent_model.id).where(parent_filter)))
                     )
                     deleted_counts[label] = result.rowcount
                     logger.info(f"删除 {label}: {result.rowcount} 条记录")
@@ -1884,17 +1880,12 @@ class DemoDataService:
 
                 # 1. 删除 demo Point 关联的数据（通过外键）
                 await _execute_delete_by_fk(
-                    PointHistory, "PointHistory",
-                    PointHistory.point_id, Point, Point.is_demo == True
+                    PointHistory, "PointHistory", PointHistory.point_id, Point, Point.is_demo == True
                 )
                 await _execute_delete_by_fk(
-                    PointRealtime, "PointRealtime",
-                    PointRealtime.point_id, Point, Point.is_demo == True
+                    PointRealtime, "PointRealtime", PointRealtime.point_id, Point, Point.is_demo == True
                 )
-                await _execute_delete_by_fk(
-                    Alarm, "Alarm",
-                    Alarm.point_id, Point, Point.is_demo == True
-                )
+                await _execute_delete_by_fk(Alarm, "Alarm", Alarm.point_id, Point, Point.is_demo == True)
 
                 # 2. 删除告警阈值和点位
                 await _execute_delete_where_demo(AlarmThreshold, "AlarmThreshold")
@@ -1982,7 +1973,7 @@ class DemoDataService:
         """获取 demo 数据统计"""
         async with async_session() as session:
             stats = {}
-            
+
             models = [
                 (Device, "devices"),
                 (Point, "points"),
@@ -2002,15 +1993,13 @@ class DemoDataService:
                 (FloorMap, "floor_maps"),
                 (ElectricityPricing, "electricity_pricing"),
             ]
-            
+
             for model, label in models:
-                result = await session.execute(
-                    select(func.count()).select_from(model).where(model.is_demo == True)
-                )
+                result = await session.execute(select(func.count()).select_from(model).where(model.is_demo == True))
                 count = result.scalar() or 0
                 if count > 0:
                     stats[label] = count
-            
+
             return stats
 
 

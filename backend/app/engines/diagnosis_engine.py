@@ -14,8 +14,7 @@ from sqlalchemy import select, func
 
 from ..core.database import async_session
 from ..models.alarm import Alarm
-from ..models.diagnosis import DiagnosisRule, DiagnosisResult
-from ..services.websocket import ws_manager
+from ..models.diagnosis import DiagnosisRule
 from ..services.diagnosis.result_store import DiagnosisResultStore
 from ..services.diagnosis.push_service import DiagnosisPushService
 from .event_bus import Event
@@ -33,9 +32,9 @@ _LEVEL_BOOST = {
 # P1-6 修复: 根据告警级别动态调整去重窗口
 DEDUP_WINDOW_BY_LEVEL = {
     "critical": 300,  # 5 分钟
-    "major": 180,     # 3 分钟
-    "warning": 120,   # 2 分钟
-    "info": 60,       # 1 分钟
+    "major": 180,  # 3 分钟
+    "warning": 120,  # 2 分钟
+    "info": 60,  # 1 分钟
 }
 
 
@@ -114,8 +113,7 @@ class DiagnosisEngine:
         # 防止 _alarm_counter 无限增长：超过 10000 个 key 时清理最旧的一半
         if len(self._alarm_counter) > 10000:
             oldest_keys = sorted(
-                self._alarm_counter.keys(),
-                key=lambda k: min(self._alarm_counter[k]) if self._alarm_counter[k] else 0
+                self._alarm_counter.keys(), key=lambda k: min(self._alarm_counter[k]) if self._alarm_counter[k] else 0
             )[:5000]
             for k in oldest_keys:
                 del self._alarm_counter[k]
@@ -235,6 +233,7 @@ class DiagnosisEngine:
         # start_time 根据 elapsed_ms 反推，end_time 取当前时间
         end_dt = datetime.now()
         from datetime import timedelta
+
         start_dt = end_dt - timedelta(milliseconds=elapsed_ms)
 
         # 使用 DiagnosisResultStore 统一存储
@@ -270,15 +269,13 @@ class DiagnosisEngine:
             if device_type in ["transformer", "panel", "circuit", "device"]:
                 try:
                     from ..services.diagnosis.power_topology_service import analyze_downstream_impact
+
                     device_id = payload.get("device_id")
                     if device_id:
                         # 构建节点 ID
-                        node_prefix = {
-                            "transformer": "T",
-                            "panel": "P",
-                            "circuit": "C",
-                            "device": "D"
-                        }.get(device_type, "D")
+                        node_prefix = {"transformer": "T", "panel": "P", "circuit": "C", "device": "D"}.get(
+                            device_type, "D"
+                        )
                         fault_node_id = f"{node_prefix}-{device_id}"
 
                         # 执行级联分析
@@ -286,10 +283,15 @@ class DiagnosisEngine:
 
                         # 将级联分析结果添加到输出数据
                         if cascade_impact and "error" not in cascade_impact:
-                            output_data = {"causes": all_causes, "elapsed_ms": elapsed_ms, "cascade_impact": cascade_impact}
+                            output_data = {
+                                "causes": all_causes,
+                                "elapsed_ms": elapsed_ms,
+                                "cascade_impact": cascade_impact,
+                            }
                             # 更新诊断结果的输出数据
                             async with async_session() as db:
                                 from ..models.diagnosis import DiagnosisResult
+
                                 result = await db.execute(
                                     select(DiagnosisResult).where(DiagnosisResult.id == result_id)
                                 )
@@ -298,7 +300,9 @@ class DiagnosisEngine:
                                     diagnosis_result.output_data = output_data
                                     await db.commit()
 
-                            logger.info(f"级联分析完成: 故障节点 {fault_node_id}, 受影响设备 {len(cascade_impact.get('affected_devices', []))} 个")
+                            logger.info(
+                                f"级联分析完成: 故障节点 {fault_node_id}, 受影响设备 {len(cascade_impact.get('affected_devices', []))} 个"
+                            )
 
                 except ImportError:
                     logger.debug("级联分析服务不可用，跳过级联分析")
@@ -350,6 +354,7 @@ class DiagnosisEngine:
         if point_id:
             try:
                 from ..services.diagnosis.sensor_metadata_service import get_sensor_weight, apply_evidence_weight
+
                 sensor_weight = get_sensor_weight(point_id)
                 # 防止 sensor_weight=0 导致除零或无效计算
                 sensor_weight = max(sensor_weight, 0.01)

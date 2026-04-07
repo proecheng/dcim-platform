@@ -189,9 +189,9 @@ const hasPowerTrajectory = computed(() => {
 })
 
 // ========== 工具函数 ==========
-function statusTagType(status: string): '' | 'success' | 'info' | 'warning' | 'danger' {
-  const map: Record<string, '' | 'success' | 'info' | 'warning' | 'danger'> = {
-    pending: '',
+function statusTagType(status: string): 'success' | 'info' | 'warning' | 'danger' {
+  const map: Record<string, 'success' | 'info' | 'warning' | 'danger'> = {
+    pending: 'info',
     executing: 'success',
     completed: 'info',
     aborted: 'danger',

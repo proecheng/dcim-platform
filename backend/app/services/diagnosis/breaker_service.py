@@ -34,21 +34,19 @@ BREAKER_FAILURE_THRESHOLD_MULTIPLIER = 2.0
 # Prometheus 监控指标（条件注册，避免重复）
 try:
     diagnosis_breaker_check_duration_seconds = Histogram(
-        'diagnosis_breaker_check_duration_seconds',
-        'Duration of breaker action check operations in seconds',
-        buckets=[0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0]
+        "diagnosis_breaker_check_duration_seconds",
+        "Duration of breaker action check operations in seconds",
+        buckets=[0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0],
     )
 except ValueError:
-    diagnosis_breaker_check_duration_seconds = REGISTRY._names_to_collectors['diagnosis_breaker_check_duration_seconds']
+    diagnosis_breaker_check_duration_seconds = REGISTRY._names_to_collectors["diagnosis_breaker_check_duration_seconds"]
 
 try:
     diagnosis_breaker_action_total = Counter(
-        'diagnosis_breaker_action_total',
-        'Total number of breaker action checks',
-        ['action_type']
+        "diagnosis_breaker_action_total", "Total number of breaker action checks", ["action_type"]
     )
 except ValueError:
-    diagnosis_breaker_action_total = REGISTRY._names_to_collectors['diagnosis_breaker_action_total']
+    diagnosis_breaker_action_total = REGISTRY._names_to_collectors["diagnosis_breaker_action_total"]
 
 
 # 断路器脱扣曲线常量
@@ -57,9 +55,9 @@ except ValueError:
 # C型: 5-10倍额定电流脱扣（用于配电、电机）
 # D型: 10-50倍额定电流脱扣（用于变压器、大电机）
 BREAKER_CURVES = {
-    'B': [(3, 3, 45), (5, 0.04, 0.1)],      # (倍数, 最小时间s, 最大时间s)
-    'C': [(5, 1.3, 15), (10, 0.04, 0.1)],
-    'D': [(10, 1, 8), (50, 0.04, 0.1)]
+    "B": [(3, 3, 45), (5, 0.04, 0.1)],  # (倍数, 最小时间s, 最大时间s)
+    "C": [(5, 1.3, 15), (10, 0.04, 0.1)],
+    "D": [(10, 1, 8), (50, 0.04, 0.1)],
 }
 
 
@@ -76,6 +74,7 @@ class BreakerActionResult(BaseModel):
         actual_time: 实际动作时间（秒）
         error: 错误信息（仅在发生错误时）
     """
+
     action_type: str
     confidence: float
     explanation: str
@@ -167,9 +166,7 @@ async def check_breaker_action(alarm: Alarm, session: AsyncSession) -> BreakerAc
     try:
         # 从告警对象获取 point_id，查询点位关联的 power_device_id
         # 通过 power_devices.current_point_id 反向查询
-        result = await session.execute(
-            select(PowerDevice).where(PowerDevice.current_point_id == alarm.point_id)
-        )
+        result = await session.execute(select(PowerDevice).where(PowerDevice.current_point_id == alarm.point_id))
         power_device = result.scalar_one_or_none()
 
         if not power_device:
@@ -180,7 +177,7 @@ async def check_breaker_action(alarm: Alarm, session: AsyncSession) -> BreakerAc
                 explanation="点位未关联到配电设备",
                 overload_ratio=0.0,
                 expected_time_range=(0, 0),
-                actual_time=0.0
+                actual_time=0.0,
             )
             diagnosis_breaker_action_total.labels(action_type=action_type).inc()
             return result
@@ -199,7 +196,7 @@ async def check_breaker_action(alarm: Alarm, session: AsyncSession) -> BreakerAc
                 explanation="设备未配置断路器特性",
                 overload_ratio=0.0,
                 expected_time_range=(0, 0),
-                actual_time=0.0
+                actual_time=0.0,
             )
             diagnosis_breaker_action_total.labels(action_type=action_type).inc()
             return result
@@ -216,7 +213,7 @@ async def check_breaker_action(alarm: Alarm, session: AsyncSession) -> BreakerAc
                 overload_ratio=0.0,
                 expected_time_range=(0, 0),
                 actual_time=0.0,
-                error="Invalid trigger_value"
+                error="Invalid trigger_value",
             )
 
         # 计算过载倍数
@@ -239,7 +236,7 @@ async def check_breaker_action(alarm: Alarm, session: AsyncSession) -> BreakerAc
                 explanation=f"断路器在预期时间范围内动作（{min_time:.2f}s - {max_time:.2f}s），实际动作时间 {actual_time:.2f}s",
                 overload_ratio=overload_ratio,
                 expected_time_range=(min_time, max_time),
-                actual_time=actual_time
+                actual_time=actual_time,
             )
         elif actual_time < min_time:
             # 动作时间 < min_time → "动作过快，可能误动作"
@@ -251,7 +248,7 @@ async def check_breaker_action(alarm: Alarm, session: AsyncSession) -> BreakerAc
                 explanation=f"断路器动作过快（预期 ≥{min_time:.2f}s，实际 {actual_time:.2f}s），可能存在误动作",
                 overload_ratio=overload_ratio,
                 expected_time_range=(min_time, max_time),
-                actual_time=actual_time
+                actual_time=actual_time,
             )
         elif actual_time > max_time and actual_time <= max_time * BREAKER_FAILURE_THRESHOLD_MULTIPLIER:
             # 动作时间 > max_time 且 < max_time × 2 → "动作过慢，断路器老化"
@@ -263,7 +260,7 @@ async def check_breaker_action(alarm: Alarm, session: AsyncSession) -> BreakerAc
                 explanation=f"断路器动作过慢（预期 ≤{max_time:.2f}s，实际 {actual_time:.2f}s），可能存在老化",
                 overload_ratio=overload_ratio,
                 expected_time_range=(min_time, max_time),
-                actual_time=actual_time
+                actual_time=actual_time,
             )
         else:
             # 动作时间 > max_time × 2 → "断路器故障，未动作"
@@ -275,7 +272,7 @@ async def check_breaker_action(alarm: Alarm, session: AsyncSession) -> BreakerAc
                 explanation=f"断路器未在预期时间内动作（预期 ≤{max_time:.2f}s，实际 {actual_time:.2f}s），可能存在故障",
                 overload_ratio=overload_ratio,
                 expected_time_range=(min_time, max_time),
-                actual_time=actual_time
+                actual_time=actual_time,
             )
 
     except Exception as e:
@@ -291,7 +288,7 @@ async def check_breaker_action(alarm: Alarm, session: AsyncSession) -> BreakerAc
             overload_ratio=0.0,
             expected_time_range=(0, 0),
             actual_time=0.0,
-            error=str(e)
+            error=str(e),
         )
 
     finally:

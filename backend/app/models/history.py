@@ -20,7 +20,12 @@ class PointHistory(Base):
     min_value = Column(Float, comment="周期内最小值")
     max_value = Column(Float, comment="周期内最大值")
     avg_value = Column(Float, comment="周期内平均值")
-    source = Column(String(20), default="unknown", server_default="unknown", comment="数据来源: demo/mqtt/bridge/demo_backfill/unknown")
+    source = Column(
+        String(20),
+        default="unknown",
+        server_default="unknown",
+        comment="数据来源: demo/mqtt/bridge/demo_backfill/unknown",
+    )
     recorded_at = Column(DateTime, default=datetime.now, comment="记录时间")
 
     __table_args__ = (
@@ -33,9 +38,7 @@ class PointHistoryArchive(Base):
     """历史数据归档表（聚合数据）"""
 
     __tablename__ = "point_history_archive"
-    __table_args__ = (
-        Index("idx_archive_point_type_time", "point_id", "archive_type", "recorded_at", unique=True),
-    )
+    __table_args__ = (Index("idx_archive_point_type_time", "point_id", "archive_type", "recorded_at", unique=True),)
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     point_id = Column(Integer, ForeignKey("points.id"), nullable=False, comment="点位ID")

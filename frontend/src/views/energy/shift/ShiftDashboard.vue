@@ -132,9 +132,12 @@
 
 <script setup lang="ts">
 import { ref, reactive, onMounted, onUnmounted } from 'vue'
+import { useRouter } from 'vue-router'
 import * as echarts from 'echarts'
 import { getDashboardOverview, getRealtimeData, getTrends } from '@/api/modules/shift'
 import { ElMessage } from 'element-plus'
+
+const router = useRouter()
 
 const overview = reactive<any>({})
 const realtime = reactive<any>({})

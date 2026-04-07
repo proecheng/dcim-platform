@@ -13,7 +13,7 @@
       label-width="120px"
     >
       <el-form-item label="会话ID">
-        <el-input v-model="sessionId" disabled />
+        <el-input :model-value="sessionId" disabled />
       </el-form-item>
 
       <el-form-item label="标注结果" prop="annotation">

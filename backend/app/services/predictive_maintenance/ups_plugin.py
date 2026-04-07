@@ -67,7 +67,11 @@ class UPSDegradationPlugin(DegradationPlugin):
             else:
                 eff_score = 100.0
             scores.append(("efficiency_trend", eff_score, weights["efficiency_trend"]))
-            detail["efficiency"] = {"slope_per_month": slope_per_month, "score": eff_score, "data_points": len(efficiency_data)}
+            detail["efficiency"] = {
+                "slope_per_month": slope_per_month,
+                "score": eff_score,
+                "data_points": len(efficiency_data),
+            }
         else:
             detail["efficiency"] = {"status": "no_data"}
 
@@ -109,7 +113,11 @@ class UPSDegradationPlugin(DegradationPlugin):
             else:
                 temp_score = 100.0
             scores.append(("temperature", temp_score, weights["temperature"]))
-            detail["temperature"] = {"slope_per_month": slope_per_month, "score": temp_score, "data_points": len(temp_data)}
+            detail["temperature"] = {
+                "slope_per_month": slope_per_month,
+                "score": temp_score,
+                "data_points": len(temp_data),
+            }
         else:
             detail["temperature"] = {"status": "no_data"}
 
@@ -118,10 +126,15 @@ class UPSDegradationPlugin(DegradationPlugin):
 
         if not scores:
             return DegradationResult(
-                device_id=device_id, score=100.0, confidence=0.0,
-                available_points=0, total_points=total_count,
-                trend_factors=trend_factors, primary_concern=None,
-                data_sufficiency="minimal", detail=detail,
+                device_id=device_id,
+                score=100.0,
+                confidence=0.0,
+                available_points=0,
+                total_points=total_count,
+                trend_factors=trend_factors,
+                primary_concern=None,
+                data_sufficiency="minimal",
+                detail=detail,
             )
 
         total_weight = sum(w for _, _, w in scores)
@@ -161,7 +174,7 @@ class UPSDegradationPlugin(DegradationPlugin):
 
         segment_stds = []
         for i in range(0, n, seg_size):
-            seg = voltage_data[i:i + seg_size]
+            seg = voltage_data[i : i + seg_size]
             if len(seg) >= 2:
                 vals = [d[1] for d in seg]
                 mean = sum(vals) / len(vals)
@@ -205,9 +218,7 @@ class UPSDegradationPlugin(DegradationPlugin):
         info["score"] = round(score, 1)
         return round(score, 1), info
 
-    def _determine_sufficiency(
-        self, available_count: int, voltage_data: list | None, window_days: int
-    ) -> str:
+    def _determine_sufficiency(self, available_count: int, voltage_data: list | None, window_days: int) -> str:
         """UPS 数据充分度判定"""
         if not voltage_data:
             return "minimal"

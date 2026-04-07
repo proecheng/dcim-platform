@@ -15,8 +15,8 @@ describe('useDAGValidation', () => {
   let validation: ReturnType<typeof useDAGValidation>
 
   beforeEach(() => {
-    nodes = ref(new DataSet([]))
-    edges = ref(new DataSet([]))
+    nodes = ref(new DataSet([])) as unknown as ReturnType<typeof ref<DataSet<VisNode>>>
+    edges = ref(new DataSet([])) as unknown as ReturnType<typeof ref<DataSet<VisEdge>>>
     validation = useDAGValidation(nodes, edges)
   })
 

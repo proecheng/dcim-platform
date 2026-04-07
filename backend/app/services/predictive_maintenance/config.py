@@ -52,11 +52,11 @@ UPS_CONFIG = {
         "transfer_count": 0.20,
         "temperature": 0.20,
     },
-    "voltage_std_threshold": 2.0,                    # 电压标准差劣化阈值（V）
-    "efficiency_slope_threshold_per_month": -0.5,    # 效率月度下降阈值（%）
-    "transfer_count_threshold": 5,                   # 30天切换次数劣化阈值
-    "voltage_segment_count": 7,                      # 电压分段数
-    "min_segments_for_trend": 3,                     # 最少段数才做趋势
+    "voltage_std_threshold": 2.0,  # 电压标准差劣化阈值（V）
+    "efficiency_slope_threshold_per_month": -0.5,  # 效率月度下降阈值（%）
+    "transfer_count_threshold": 5,  # 30天切换次数劣化阈值
+    "voltage_segment_count": 7,  # 电压分段数
+    "min_segments_for_trend": 3,  # 最少段数才做趋势
 }
 
 # PDU 插件配置 — Story 36.5
@@ -69,16 +69,16 @@ PDU_CONFIG = {
         "thd_trend": 0.20,
         "temperature_rise": 0.20,
     },
-    "load_high_threshold": 80.0,                     # 负载率高位阈值（%）
-    "thd_slope_threshold_per_month": 0.5,            # THD 月度上升阈值（%）
-    "voltage_std_threshold": 0.5,                    # PDU 电压稳定性阈值（V，低于 UPS）
+    "load_high_threshold": 80.0,  # 负载率高位阈值（%）
+    "thd_slope_threshold_per_month": 0.5,  # THD 月度上升阈值（%）
+    "voltage_std_threshold": 0.5,  # PDU 电压稳定性阈值（V，低于 UPS）
 }
 
 # Battery 插件配置 — Story 36.5
 BATTERY_CONFIG = {
     "required_point_suffixes": ["internal_resistance"],
     "optional_point_suffixes": ["cycle_count", "temperature"],
-    "virtual_point_suffixes": ["soh_percent"],       # 由 Analyzer 从 BatterySOHRecord 注入
+    "virtual_point_suffixes": ["soh_percent"],  # 由 Analyzer 从 BatterySOHRecord 注入
     "weights": {
         "soh": 0.50,
         "resistance_trend": 0.30,

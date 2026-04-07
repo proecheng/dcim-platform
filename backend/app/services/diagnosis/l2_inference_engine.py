@@ -3,8 +3,7 @@
 Story 24.5 + 25.2: L2 故障树推理引擎
 支持电气参数的 Sigmoid 连续映射证据收集
 """
-import asyncio
-import json
+
 import logging
 from typing import Optional
 from sqlalchemy import select, desc
@@ -23,12 +22,10 @@ logger = logging.getLogger(__name__)
 # Prometheus 监控指标（条件注册）
 try:
     electrical_param_evidence_total = Counter(
-        'electrical_param_evidence_total',
-        'Total electrical parameter evidence calculations',
-        ['point_type']
+        "electrical_param_evidence_total", "Total electrical parameter evidence calculations", ["point_type"]
     )
 except ValueError:
-    electrical_param_evidence_total = REGISTRY._names_to_collectors['electrical_param_evidence_total']
+    electrical_param_evidence_total = REGISTRY._names_to_collectors["electrical_param_evidence_total"]
 
 # 电气参数默认配置
 ELECTRICAL_PARAM_DEFAULTS = {
@@ -90,9 +87,7 @@ async def get_point_by_id(point_id: int) -> Optional[Point]:
     """
     try:
         async with async_session() as db:
-            result = await db.execute(
-                select(Point).where(Point.id == point_id)
-            )
+            result = await db.execute(select(Point).where(Point.id == point_id))
             return result.scalar_one_or_none()
     except Exception as e:
         logger.error(f"查询点位元数据失败: {e}")
@@ -149,7 +144,7 @@ async def collect_leaf_evidence(node: FaultTreeNode, time_window: int) -> float:
             threshold=threshold,
             threshold_type=threshold_type,
             sigmoid_k=sigmoid_k,
-            prior=node.prior_probability or 0.5
+            prior=node.prior_probability or 0.5,
         )
 
         # 记录监控指标
@@ -216,8 +211,7 @@ async def collect_leaf_evidence(node: FaultTreeNode, time_window: int) -> float:
                         # 断路器故障，显著降低证据可信度
                         raw_probability = raw_probability * 0.5
                         logger.error(
-                            f"断路器故障未动作: point_id={node.evidence_point_id}, "
-                            f"adjusted_prob={raw_probability:.3f}"
+                            f"断路器故障未动作: point_id={node.evidence_point_id}, adjusted_prob={raw_probability:.3f}"
                         )
 
         except ImportError:

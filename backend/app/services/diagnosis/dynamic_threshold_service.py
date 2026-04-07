@@ -11,7 +11,6 @@ import logging
 import time
 from typing import Dict, Any, Optional, List, Tuple
 from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import async_session
 from app.core.redis import redis_service
@@ -29,13 +28,8 @@ _loop_lock = asyncio.Lock()
 
 class DynamicThresholdRule:
     """动态阈值规则"""
-    def __init__(
-        self,
-        condition: str,
-        adjustment: str,
-        description: str,
-        priority: int
-    ):
+
+    def __init__(self, condition: str, adjustment: str, description: str, priority: int):
         self.condition = condition
         self.adjustment = adjustment
         self.description = description
@@ -65,10 +59,7 @@ class DynamicThresholdService:
 
     @classmethod
     def calculate_dynamic_threshold_sync(
-        cls,
-        point_id: int,
-        static_threshold: float,
-        threshold_direction: str
+        cls, point_id: int, static_threshold: float, threshold_direction: str
     ) -> Tuple[float, Dict[str, Any]]:
         """
         计算动态阈值（同步版本，用于告警引擎）
@@ -96,10 +87,8 @@ class DynamicThresholdService:
                 return result
             else:
                 # 已有运行中的事件循环，使用 run_coroutine_threadsafe
-                import concurrent.futures
                 future = asyncio.run_coroutine_threadsafe(
-                    cls.calculate_dynamic_threshold(point_id, static_threshold, threshold_direction),
-                    loop
+                    cls.calculate_dynamic_threshold(point_id, static_threshold, threshold_direction), loop
                 )
                 return future.result(timeout=5.0)  # 5秒超时
         except Exception as e:
@@ -108,10 +97,7 @@ class DynamicThresholdService:
 
     @classmethod
     async def calculate_dynamic_threshold(
-        cls,
-        point_id: int,
-        static_threshold: float,
-        threshold_direction: str
+        cls, point_id: int, static_threshold: float, threshold_direction: str
     ) -> Tuple[float, Dict[str, Any]]:
         """
         计算动态阈值
@@ -149,7 +135,7 @@ class DynamicThresholdService:
                 return static_threshold, {
                     "is_enabled": True,
                     "skipped": True,
-                    "reason": f"Point type '{point_type}' not applicable"
+                    "reason": f"Point type '{point_type}' not applicable",
                 }
 
             # 获取环境上下文
@@ -170,12 +156,14 @@ class DynamicThresholdService:
                 if rule.evaluate(context):
                     adjustment = rule.get_adjustment_value()
                     total_adjustment += adjustment
-                    matched_rules.append({
-                        "condition": rule.condition,
-                        "adjustment": adjustment,
-                        "description": rule.description,
-                        "priority": rule.priority
-                    })
+                    matched_rules.append(
+                        {
+                            "condition": rule.condition,
+                            "adjustment": adjustment,
+                            "description": rule.description,
+                            "priority": rule.priority,
+                        }
+                    )
                     # 记录规则匹配
                     await cls._record_rule_match(rule.condition, rule.priority)
 
@@ -201,7 +189,7 @@ class DynamicThresholdService:
                 total_time,
                 context_time=context_time,
                 eval_time=eval_time,
-                matched_count=len(matched_rules)
+                matched_count=len(matched_rules),
             )
 
             # 构建元数据
@@ -212,7 +200,7 @@ class DynamicThresholdService:
                 "matched_rules": matched_rules,
                 "context": context,
                 "rule_version": rule_version,
-                "is_enabled": True
+                "is_enabled": True,
             }
 
             return adjusted_threshold, metadata
@@ -235,9 +223,7 @@ class DynamicThresholdService:
         """
         try:
             async with async_session() as session:
-                result = await session.execute(
-                    select(Point.unit).where(Point.id == point_id)
-                )
+                result = await session.execute(select(Point.unit).where(Point.id == point_id))
                 unit = result.scalar_one_or_none()
 
                 if not unit:
@@ -266,7 +252,7 @@ class DynamicThresholdService:
         context_time: float = 0.0,
         eval_time: float = 0.0,
         matched_count: int = 0,
-        error: Optional[str] = None
+        error: Optional[str] = None,
     ):
         """
         记录监控指标到 Redis
@@ -288,7 +274,7 @@ class DynamicThresholdService:
             await redis_service.set(
                 f"dynamic_threshold:count:{point_id}:{status}",
                 str(timestamp),
-                ttl=86400  # 24小时
+                ttl=86400,  # 24小时
             )
 
             # 记录调整幅度（用于 P50/P95/P99 分析）
@@ -296,7 +282,7 @@ class DynamicThresholdService:
                 await redis_service.set(
                     f"dynamic_threshold:adjustment:{point_id}:{timestamp}",
                     str(adjustment),
-                    ttl=3600  # 1小时
+                    ttl=3600,  # 1小时
                 )
 
             # 记录性能耗时
@@ -304,21 +290,13 @@ class DynamicThresholdService:
                 "total_time": total_time,
                 "context_time": context_time,
                 "eval_time": eval_time,
-                "matched_count": matched_count
+                "matched_count": matched_count,
             }
-            await redis_service.set_json(
-                f"dynamic_threshold:perf:{timestamp}",
-                perf_data,
-                ttl=3600
-            )
+            await redis_service.set_json(f"dynamic_threshold:perf:{timestamp}", perf_data, ttl=3600)
 
             # 记录降级次数
             if status == "degraded" and error:
-                await redis_service.set(
-                    f"dynamic_threshold:degraded:{timestamp}",
-                    error,
-                    ttl=86400
-                )
+                await redis_service.set(f"dynamic_threshold:degraded:{timestamp}", error, ttl=86400)
 
         except Exception as e:
             logger.warning(f"记录监控指标失败: {e}")
@@ -398,7 +376,7 @@ class DynamicThresholdService:
                         condition=r["condition"],
                         adjustment=r["adjustment"],
                         description=r["description"],
-                        priority=r.get("priority", 0)
+                        priority=r.get("priority", 0),
                     )
                     for r in rules_data
                 ]
@@ -421,8 +399,7 @@ class DynamicThresholdService:
             async with async_session() as session:
                 result = await session.execute(
                     select(SystemConfig).where(
-                        SystemConfig.config_group == "alarm",
-                        SystemConfig.config_key == config_key
+                        SystemConfig.config_group == "alarm", SystemConfig.config_key == config_key
                     )
                 )
                 return result.scalar_one_or_none()

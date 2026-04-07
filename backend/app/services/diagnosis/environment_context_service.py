@@ -13,7 +13,6 @@ import time
 from datetime import datetime
 from typing import Dict, Any, Optional
 from sqlalchemy import select, and_
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import async_session
 from app.core.redis import redis_service
@@ -81,7 +80,7 @@ class EnvironmentContextService:
             "outdoor_temp": 25.0,  # 默认室外温度 25℃
             "it_load_percent": 50.0,  # 默认 IT 负载 50%
             "season": cls._get_current_season(),
-            "timestamp": now
+            "timestamp": now,
         }
 
         try:
@@ -96,9 +95,7 @@ class EnvironmentContextService:
                 except (ValueError, TypeError):
                     data_age = cls._data_freshness_threshold + 1  # 视为过期
                 if data_age > cls._data_freshness_threshold:
-                    logger.warning(
-                        f"室外温度数据过期（{data_age:.0f}秒），使用默认值 {context['outdoor_temp']}℃"
-                    )
+                    logger.warning(f"室外温度数据过期（{data_age:.0f}秒），使用默认值 {context['outdoor_temp']}℃")
                 elif outdoor_temp_value:
                     try:
                         context["outdoor_temp"] = float(outdoor_temp_value)
@@ -150,14 +147,20 @@ class EnvironmentContextService:
                         Point.unit.like("%kW%"),
                         Point.is_enabled == True,
                         # 过滤：仅包含机柜相关的功率点位
-                        (Point.point_name.like("%rack%") | Point.point_name.like("%cabinet%") | Point.point_name.like("%机柜%"))
+                        (
+                            Point.point_name.like("%rack%")
+                            | Point.point_name.like("%cabinet%")
+                            | Point.point_name.like("%机柜%")
+                        ),
                     )
                 )
                 power_points_result = await session.execute(power_points_query)
                 power_points = power_points_result.all()
 
                 if not power_points:
-                    logger.warning("未找到机柜功率点位（point_type=AI, unit=kW, name contains rack/cabinet），无法计算 IT 负载")
+                    logger.warning(
+                        "未找到机柜功率点位（point_type=AI, unit=kW, name contains rack/cabinet），无法计算 IT 负载"
+                    )
                     return None
 
                 logger.debug(f"找到 {len(power_points)} 个机柜功率点位")
@@ -181,11 +184,7 @@ class EnvironmentContextService:
 
                 # 3. 查询所有机柜的额定功率
                 racks_query = select(Device.rated_power).where(
-                    and_(
-                        Device.device_type == "rack",
-                        Device.enabled == True,
-                        Device.rated_power.isnot(None)
-                    )
+                    and_(Device.device_type == "rack", Device.enabled == True, Device.rated_power.isnot(None))
                 )
                 racks_result = await session.execute(racks_query)
                 rated_powers = racks_result.scalars().all()
@@ -241,4 +240,3 @@ class EnvironmentContextService:
         """清除缓存（用于测试或手动刷新）"""
         async with cls._cache_lock:
             cls._cache = {}
-

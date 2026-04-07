@@ -1,6 +1,7 @@
 """
 故障树版本管理 API - Story 24.4
 """
+
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
@@ -9,11 +10,7 @@ from app.core.database import get_db
 from app.api.deps import require_role, require_viewer, get_current_user
 from app.services.diagnosis.version_manager import VersionManager
 from app.models.fault_tree import FaultTreeVersion
-from app.schemas.fault_tree_version import (
-    FaultTreeVersionCreate,
-    FaultTreeVersionResponse,
-    FaultTreeVersionListResponse
-)
+from app.schemas.fault_tree_version import FaultTreeVersionResponse, FaultTreeVersionListResponse
 import logging
 
 logger = logging.getLogger(__name__)
@@ -21,11 +18,7 @@ router = APIRouter(prefix="/fault-trees/{tree_id}/versions", tags=["fault-tree-v
 
 
 @router.post("/", response_model=FaultTreeVersionResponse, dependencies=[Depends(require_role(["admin"]))])
-async def create_version(
-    tree_id: int,
-    current_user = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db)
-):
+async def create_version(tree_id: int, current_user=Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     """
     创建新版本
 
@@ -41,12 +34,11 @@ async def create_version(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="故障树不存在或无法创建版本")
 
 
-@router.post("/{version_id}/review", response_model=FaultTreeVersionResponse, dependencies=[Depends(require_role(["admin"]))])
+@router.post(
+    "/{version_id}/review", response_model=FaultTreeVersionResponse, dependencies=[Depends(require_role(["admin"]))]
+)
 async def review_version(
-    tree_id: int,
-    version_id: int,
-    current_user = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db)
+    tree_id: int, version_id: int, current_user=Depends(get_current_user), db: AsyncSession = Depends(get_db)
 ):
     """
     审批版本
@@ -64,16 +56,12 @@ async def review_version(
 
     if version.status != "draft":
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"只有 draft 状态的版本可以审批，当前状态: {version.status}"
+            status_code=status.HTTP_400_BAD_REQUEST, detail=f"只有 draft 状态的版本可以审批，当前状态: {version.status}"
         )
 
     # 验证审批者与创建者不同
     if version.created_by == current_user.id:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="不能审批自己创建的版本"
-        )
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="不能审批自己创建的版本")
 
     version.status = "reviewed"
     version.reviewed_by = current_user.id
@@ -83,12 +71,10 @@ async def review_version(
     return version
 
 
-@router.post("/{version_id}/activate", response_model=FaultTreeVersionResponse, dependencies=[Depends(require_role(["admin"]))])
-async def activate_version(
-    tree_id: int,
-    version_id: int,
-    db: AsyncSession = Depends(get_db)
-):
+@router.post(
+    "/{version_id}/activate", response_model=FaultTreeVersionResponse, dependencies=[Depends(require_role(["admin"]))]
+)
+async def activate_version(tree_id: int, version_id: int, db: AsyncSession = Depends(get_db)):
     """
     激活版本
 
@@ -113,10 +99,7 @@ async def activate_version(
 
 
 @router.post("/rollback", response_model=FaultTreeVersionResponse, dependencies=[Depends(require_role(["admin"]))])
-async def rollback_version(
-    tree_id: int,
-    db: AsyncSession = Depends(get_db)
-):
+async def rollback_version(tree_id: int, db: AsyncSession = Depends(get_db)):
     """
     回滚到上一个版本
 

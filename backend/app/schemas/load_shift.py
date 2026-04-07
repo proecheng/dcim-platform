@@ -5,55 +5,61 @@ Load Shift Schemas - Pydantic models for load shifting API
 
 from enum import Enum
 from typing import Optional, List, Dict, Any
-from pydantic import BaseModel, Field, field_validator, ConfigDict
+from pydantic import BaseModel, Field, ConfigDict
 from datetime import datetime, date, time
 
 
 # ========== Enums ==========
 
+
 class ShiftPeriodType(str, Enum):
     """Shift period type - 转移时段类型"""
-    PEAK = "peak"           # 尖峰时段
-    SHARP = "sharp"         # 高峰时段
-    FLAT = "flat"           # 平段
-    VALLEY = "valley"       # 谷段
+
+    PEAK = "peak"  # 尖峰时段
+    SHARP = "sharp"  # 高峰时段
+    FLAT = "flat"  # 平段
+    VALLEY = "valley"  # 谷段
 
 
 class ShiftPlanStatus(str, Enum):
     """Shift plan status - 转移计划状态"""
-    DRAFT = "draft"                     # 草稿
+
+    DRAFT = "draft"  # 草稿
     PENDING_APPROVAL = "pending_approval"  # 待审批
-    APPROVED = "approved"               # 已批准
-    REJECTED = "rejected"               # 已拒绝
-    EXECUTING = "executing"             # 执行中
-    COMPLETED = "completed"             # 已完成
-    FAILED = "failed"                   # 执行失败
-    CANCELLED = "cancelled"             # 已取消
+    APPROVED = "approved"  # 已批准
+    REJECTED = "rejected"  # 已拒绝
+    EXECUTING = "executing"  # 执行中
+    COMPLETED = "completed"  # 已完成
+    FAILED = "failed"  # 执行失败
+    CANCELLED = "cancelled"  # 已取消
 
 
 class ApprovalStatus(str, Enum):
     """Approval status - 审批状态"""
-    PENDING = "pending"     # 待审批
-    APPROVED = "approved"   # 已批准
-    REJECTED = "rejected"   # 已拒绝
+
+    PENDING = "pending"  # 待审批
+    APPROVED = "approved"  # 已批准
+    REJECTED = "rejected"  # 已拒绝
 
 
 class ExecutionStatus(str, Enum):
     """Execution status - 执行状态"""
+
     NOT_STARTED = "not_started"  # 未开始
     IN_PROGRESS = "in_progress"  # 进行中
-    COMPLETED = "completed"      # 已完成
-    FAILED = "failed"            # 失败
-    CANCELLED = "cancelled"      # 已取消
+    COMPLETED = "completed"  # 已完成
+    FAILED = "failed"  # 失败
+    CANCELLED = "cancelled"  # 已取消
 
 
 class ConstraintType(str, Enum):
     """Constraint type - 约束类型"""
-    POWER = "power"         # 功率约束
-    TIME = "time"           # 时间约束
-    DEVICE = "device"       # 设备约束
-    COOLING = "cooling"     # 制冷约束
-    SAFETY = "safety"       # 安全约束
+
+    POWER = "power"  # 功率约束
+    TIME = "time"  # 时间约束
+    DEVICE = "device"  # 设备约束
+    COOLING = "cooling"  # 制冷约束
+    SAFETY = "safety"  # 安全约束
     ELECTRICAL = "electrical"  # 电气约束
     DATACENTER_LOAD = "datacenter_load"  # 算力中心负载占比约束
     UPS_CAPACITY = "ups_capacity"  # UPS 容量约束
@@ -61,30 +67,36 @@ class ConstraintType(str, Enum):
 
 class OpportunityStatus(str, Enum):
     """Opportunity status - 机会状态"""
-    PENDING = "pending"         # 待处理
-    CONVERTED = "converted"     # 已转换为计划
-    REJECTED = "rejected"       # 已拒绝
-    EXPIRED = "expired"         # 已过期
+
+    PENDING = "pending"  # 待处理
+    CONVERTED = "converted"  # 已转换为计划
+    REJECTED = "rejected"  # 已拒绝
+    EXPIRED = "expired"  # 已过期
+
 
 class OpportunityPriority(str, Enum):
     """Opportunity priority - 机会优先级"""
-    HIGH = "high"       # 高优先级
-    MEDIUM = "medium"   # 中优先级
-    LOW = "low"         # 低优先级
+
+    HIGH = "high"  # 高优先级
+    MEDIUM = "medium"  # 中优先级
+    LOW = "low"  # 低优先级
 
 
 class AnalysisType(str, Enum):
     """Analysis type - 分析类型"""
+
     FEASIBILITY = "feasibility"  # 可行性分析
-    CONSTRAINT = "constraint"    # 约束检查
-    RISK = "risk"                # 风险评估
-    BENEFIT = "benefit"          # 效益分析
+    CONSTRAINT = "constraint"  # 约束检查
+    RISK = "risk"  # 风险评估
+    BENEFIT = "benefit"  # 效益分析
 
 
 # ========== Shift Plan Schemas ==========
 
+
 class ShiftPlanBase(BaseModel):
     """Shift plan base model - 转移计划基础模型"""
+
     plan_name: str = Field(..., description="计划名称")
     shift_from_period: ShiftPeriodType = Field(..., description="转出时段")
     shift_to_period: ShiftPeriodType = Field(..., description="转入时段")
@@ -101,11 +113,13 @@ class ShiftPlanBase(BaseModel):
 
 class ShiftPlanCreate(ShiftPlanBase):
     """Create shift plan - 创建转移计划"""
+
     pass
 
 
 class ShiftPlanUpdate(BaseModel):
     """Update shift plan - 更新转移计划"""
+
     plan_name: Optional[str] = None
     shift_from_period: Optional[ShiftPeriodType] = None
     shift_to_period: Optional[ShiftPeriodType] = None
@@ -123,6 +137,7 @@ class ShiftPlanUpdate(BaseModel):
 
 class ShiftPlanResponse(ShiftPlanBase):
     """Shift plan response - 转移计划响应"""
+
     id: int
     plan_code: str
     status: ShiftPlanStatus
@@ -144,6 +159,7 @@ class ShiftPlanResponse(ShiftPlanBase):
 
 class ShiftPlanDetail(ShiftPlanResponse):
     """Shift plan detail - 转移计划详情"""
+
     constraint_check_result: Optional[Dict[str, Any]] = None
     risk_assessment: Optional[Dict[str, Any]] = None
     device_details: Optional[List[Dict[str, Any]]] = None
@@ -152,14 +168,17 @@ class ShiftPlanDetail(ShiftPlanResponse):
 
 class ShiftPlanApproval(BaseModel):
     """Shift plan approval - 转移计划审批"""
+
     approval_status: ApprovalStatus = Field(..., description="审批状态")
     approval_comment: Optional[str] = Field(None, description="审批意见")
 
 
 # ========== Shift Execution Schemas ==========
 
+
 class ShiftExecutionBase(BaseModel):
     """Shift execution base model - 转移执行基础模型"""
+
     plan_id: int = Field(..., description="计划ID")
     execution_status: ExecutionStatus = Field(..., description="执行状态")
     start_time: datetime = Field(..., description="开始时间")
@@ -174,11 +193,13 @@ class ShiftExecutionBase(BaseModel):
 
 class ShiftExecutionCreate(ShiftExecutionBase):
     """Create shift execution - 创建转移执行记录"""
+
     pass
 
 
 class ShiftExecutionResponse(ShiftExecutionBase):
     """Shift execution response - 转移执行响应"""
+
     id: int
     execution_code: str
     duration_minutes: Optional[int] = None
@@ -191,6 +212,7 @@ class ShiftExecutionResponse(ShiftExecutionBase):
 
 class ShiftExecutionDetail(ShiftExecutionResponse):
     """Shift execution detail - 转移执行详情"""
+
     plan_details: Optional[ShiftPlanResponse] = None
     device_execution_list: Optional[List[Dict[str, Any]]] = None
     cooling_linkage_records: Optional[List[Dict[str, Any]]] = None
@@ -198,8 +220,10 @@ class ShiftExecutionDetail(ShiftExecutionResponse):
 
 # ========== Shift Opportunity Schemas ==========
 
+
 class ShiftOpportunityBase(BaseModel):
     """Shift opportunity base model - 转移机会基础模型"""
+
     recommended_date: date = Field(..., description="推荐日期")
     shift_from_period: ShiftPeriodType = Field(..., description="转出时段")
     shift_to_period: ShiftPeriodType = Field(..., description="转入时段")
@@ -213,6 +237,7 @@ class ShiftOpportunityBase(BaseModel):
 
 class ShiftOpportunityResponse(ShiftOpportunityBase):
     """Shift opportunity response - 转移机会响应"""
+
     id: int
     opportunity_code: str
     opportunity_name: str = Field(..., description="机会名称")
@@ -227,6 +252,7 @@ class ShiftOpportunityResponse(ShiftOpportunityBase):
 
 class ShiftOpportunityDetail(ShiftOpportunityResponse):
     """Shift opportunity detail - 转移机会详情"""
+
     feasibility_analysis: Optional[Dict[str, Any]] = None
     constraint_check: Optional[Dict[str, Any]] = None
     risk_assessment: Optional[Dict[str, Any]] = None
@@ -234,14 +260,17 @@ class ShiftOpportunityDetail(ShiftOpportunityResponse):
 
 class ConvertOpportunityRequest(BaseModel):
     """Convert opportunity to plan - 转换机会为计划"""
+
     plan_name: str = Field(..., description="计划名称")
     description: Optional[str] = Field(None, description="计划描述")
 
 
 # ========== Shift Constraint Schemas ==========
 
+
 class ShiftConstraintBase(BaseModel):
     """Shift constraint base model - 转移约束基础模型"""
+
     constraint_name: str = Field(..., description="约束名称")
     constraint_type: ConstraintType = Field(..., description="约束类型")
     constraint_config: Dict[str, Any] = Field(..., description="约束配置")
@@ -253,11 +282,13 @@ class ShiftConstraintBase(BaseModel):
 
 class ShiftConstraintCreate(ShiftConstraintBase):
     """Create shift constraint - 创建转移约束"""
+
     pass
 
 
 class ShiftConstraintUpdate(BaseModel):
     """Update shift constraint - 更新转移约束"""
+
     constraint_name: Optional[str] = None
     constraint_type: Optional[ConstraintType] = None
     constraint_config: Optional[Dict[str, Any]] = None
@@ -269,14 +300,17 @@ class ShiftConstraintUpdate(BaseModel):
 
 class ShiftConstraintResponse(ShiftConstraintBase):
     """Shift constraint response - 转移约束响应"""
+
     id: int
     created_at: datetime
     updated_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
 
+
 class FeasibilityAnalysisRequest(BaseModel):
     """Feasibility analysis request - 可行性分析请求"""
+
     shift_date: date = Field(..., description="转移日期")
     shift_from_period: ShiftPeriodType = Field(..., description="转出时段")
     shift_to_period: ShiftPeriodType = Field(..., description="转入时段")
@@ -286,6 +320,7 @@ class FeasibilityAnalysisRequest(BaseModel):
 
 class FeasibilityAnalysisResponse(BaseModel):
     """Feasibility analysis response - 可行性分析响应"""
+
     is_feasible: bool = Field(..., description="是否可行")
     feasibility_score: float = Field(..., ge=0, le=1, description="可行性评分 0-1")
     available_devices: List[Dict[str, Any]] = Field(default_factory=list, description="可用设备列表")
@@ -297,6 +332,7 @@ class FeasibilityAnalysisResponse(BaseModel):
 
 class ConstraintCheckResult(BaseModel):
     """Constraint check result - 约束检查结果"""
+
     is_valid: bool = Field(..., description="是否通过")
     violated_constraints: List[Dict[str, Any]] = Field(default_factory=list, description="违反的约束")
     warnings: List[str] = Field(default_factory=list, description="警告信息")
@@ -305,6 +341,7 @@ class ConstraintCheckResult(BaseModel):
 
 class RiskAssessmentResponse(BaseModel):
     """Risk assessment response - 风险评估响应"""
+
     overall_risk_level: str = Field(..., description="总体风险等级: low/medium/high")
     risk_score: float = Field(..., ge=0, le=1, description="风险评分 0-1")
     risk_factors: List[Dict[str, Any]] = Field(default_factory=list, description="风险因素")
@@ -313,6 +350,7 @@ class RiskAssessmentResponse(BaseModel):
 
 class BenefitAnalysisResponse(BaseModel):
     """Benefit analysis response - 效益分析响应"""
+
     cost_saving: float = Field(..., description="成本节省 元")
     energy_saving: float = Field(..., description="节能量 kWh")
     peak_reduction: float = Field(..., description="削峰量 kW")
@@ -324,8 +362,10 @@ class BenefitAnalysisResponse(BaseModel):
 
 # ========== Device Schemas ==========
 
+
 class DeviceShiftPotentialResponse(BaseModel):
     """Device shift potential response - 设备转移潜力响应"""
+
     device_id: int
     device_name: str
     device_type: str
@@ -341,8 +381,10 @@ class DeviceShiftPotentialResponse(BaseModel):
 
 # ========== Dashboard Schemas ==========
 
+
 class ShiftDashboardOverview(BaseModel):
     """Shift dashboard overview - 转移仪表盘概览"""
+
     total_plans: int = Field(0, description="总计划数")
     pending_approval: int = Field(0, description="待审批数")
     executing: int = Field(0, description="执行中数")
@@ -356,6 +398,7 @@ class ShiftDashboardOverview(BaseModel):
 
 class ShiftRealtimeData(BaseModel):
     """Shift realtime data - 转移实时数据"""
+
     current_shift_power: float = Field(0, description="当前转移功率 kW")
     target_shift_power: float = Field(0, description="目标转移功率 kW")
     completion_rate: float = Field(0, ge=0, le=1, description="完成率")
@@ -366,6 +409,7 @@ class ShiftRealtimeData(BaseModel):
 
 class ShiftTrendData(BaseModel):
     """Shift trend data - 转移趋势数据"""
+
     date: date
     total_plans: int = Field(0, description="计划数")
     completed_plans: int = Field(0, description="完成数")
@@ -377,8 +421,10 @@ class ShiftTrendData(BaseModel):
 
 # ========== Statistics Schemas ==========
 
+
 class ShiftStatisticsSummary(BaseModel):
     """Shift statistics summary - 转移统计汇总"""
+
     period: str = Field(..., description="统计周期: daily/weekly/monthly/yearly")
     start_date: date
     end_date: date
@@ -395,6 +441,7 @@ class ShiftStatisticsSummary(BaseModel):
 
 class ShiftMonthlyReport(BaseModel):
     """Shift monthly report - 转移月度报告"""
+
     year: int
     month: int
     summary: ShiftStatisticsSummary
@@ -406,6 +453,7 @@ class ShiftMonthlyReport(BaseModel):
 
 class ShiftYearlyReport(BaseModel):
     """Shift yearly report - 转移年度报告"""
+
     year: int
     summary: ShiftStatisticsSummary
     monthly_trends: List[Dict[str, Any]] = Field(default_factory=list, description="月趋势")

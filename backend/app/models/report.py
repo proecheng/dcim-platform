@@ -84,9 +84,7 @@ class MaintenanceAdvice(Base):
     """维护建议表 — Story 36.3"""
 
     __tablename__ = "maintenance_advices"
-    __table_args__ = (
-        Index("ix_maintenance_advices_device_status", "device_id", "status"),
-    )
+    __table_args__ = (Index("ix_maintenance_advices_device_status", "device_id", "status"),)
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     device_id = Column(Integer, ForeignKey("devices.id"), nullable=False, comment="设备ID")
@@ -96,8 +94,9 @@ class MaintenanceAdvice(Base):
     urgency = Column(String(20), comment="紧急度: high/medium")
     reason = Column(Text, comment="劣化原因描述")
     suggested_action = Column(Text, comment="建议维护措施")
-    status = Column(String(20), default="pending", nullable=False,
-                    comment="状态: pending/converted/rejected/auto_closed")
+    status = Column(
+        String(20), default="pending", nullable=False, comment="状态: pending/converted/rejected/auto_closed"
+    )
     feedback = Column(Text, comment="误报反馈原因")
     work_order_id = Column(Integer, ForeignKey("work_orders.id"), nullable=True, comment="关联工单ID")
     created_at = Column(DateTime, default=datetime.now, comment="创建时间")

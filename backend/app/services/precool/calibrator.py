@@ -71,9 +71,7 @@ class RCCalibrator:
                     return {"error": "no_temperature_sensors"}
 
                 # 3. 为每个事件提取温度轨迹
-                samples = await self._build_fitting_samples(
-                    events, point_ids, session
-                )
+                samples = await self._build_fitting_samples(events, point_ids, session)
 
                 # 4. 异常值过滤
                 filtered = self._filter_outliers(samples)
@@ -89,9 +87,7 @@ class RCCalibrator:
                     return fit_result
 
                 # 6. 物理合理性检查
-                validation = self._validate_result(
-                    fit_result["R"], fit_result["C"]
-                )
+                validation = self._validate_result(fit_result["R"], fit_result["C"])
                 if "error" in validation:
                     return validation
 
@@ -135,9 +131,7 @@ class RCCalibrator:
                 logger.error(f"Zone {zone_id} 校准异常: {e}", exc_info=True)
                 return {"error": "calibration_exception", "detail": str(e)}
 
-    async def _collect_calibration_events(
-        self, zone_id: int, session: AsyncSession
-    ) -> list[dict]:
+    async def _collect_calibration_events(self, zone_id: int, session: AsyncSession) -> list[dict]:
         """从 CoolingLinkageRecord 提取校准事件数据
 
         通过 CoolingLinkageRecord → ShiftExecution → ShiftPlan.selected_devices
@@ -154,9 +148,7 @@ class RCCalibrator:
 
         # 获取 zone 关联的空调设备 ID
         unit_result = await session.execute(
-            select(CoolingZoneUnit.cooling_unit_id).where(
-                CoolingZoneUnit.zone_id == zone_id
-            )
+            select(CoolingZoneUnit.cooling_unit_id).where(CoolingZoneUnit.zone_id == zone_id)
         )
         zone_unit_ids = {r[0] for r in unit_result.all()}
         if not zone_unit_ids:
@@ -173,9 +165,7 @@ class RCCalibrator:
                 ShiftExecution,
                 CoolingLinkageRecord.execution_id == ShiftExecution.id,
             )
-            .where(
-                CoolingLinkageRecord.event_type.in_(["adjust", "recovery"])
-            )
+            .where(CoolingLinkageRecord.event_type.in_(["adjust", "recovery"]))
             .where(CoolingLinkageRecord.timestamp >= cutoff_date)
             .where(CoolingLinkageRecord.before_power > 0)
             .order_by(CoolingLinkageRecord.timestamp)
@@ -190,9 +180,7 @@ class RCCalibrator:
         # 批量查询 ShiftPlan 获取 selected_devices
         plan_ids = {r[1] for r in rows}
         plan_result = await session.execute(
-            select(ShiftPlan.id, ShiftPlan.selected_devices).where(
-                ShiftPlan.id.in_(plan_ids)
-            )
+            select(ShiftPlan.id, ShiftPlan.selected_devices).where(ShiftPlan.id.in_(plan_ids))
         )
         plan_devices = {r[0]: r[1] for r in plan_result.all()}
 
@@ -236,15 +224,10 @@ class RCCalibrator:
                 }
             )
 
-        logger.info(
-            f"Zone {zone_id} 收集到 {len(events)} 个校准事件 "
-            f"(窗口: {CALIBRATION_WINDOW_DAYS} 天)"
-        )
+        logger.info(f"Zone {zone_id} 收集到 {len(events)} 个校准事件 (窗口: {CALIBRATION_WINDOW_DAYS} 天)")
         return events
 
-    async def _get_temperature_point_ids(
-        self, zone_id: int, session: AsyncSession
-    ) -> list[int]:
+    async def _get_temperature_point_ids(self, zone_id: int, session: AsyncSession) -> list[int]:
         """获取 zone 关联的回风温度传感器 point_id 列表"""
         from app.models.topology_config import (
             CoolingZoneCabinet,
@@ -255,8 +238,7 @@ class RCCalibrator:
             select(CabinetTemperatureSensor.point_id)
             .join(
                 CoolingZoneCabinet,
-                CabinetTemperatureSensor.cabinet_id
-                == CoolingZoneCabinet.cabinet_id,
+                CabinetTemperatureSensor.cabinet_id == CoolingZoneCabinet.cabinet_id,
             )
             .where(CoolingZoneCabinet.zone_id == zone_id)
             .where(CabinetTemperatureSensor.sensor_location == "ambient")
@@ -290,9 +272,7 @@ class RCCalibrator:
                     func.avg(PointHistory.value).label("avg_temp"),
                 )
                 .where(PointHistory.point_id.in_(point_ids))
-                .where(
-                    PointHistory.recorded_at.between(event_time, end_time)
-                )
+                .where(PointHistory.recorded_at.between(event_time, end_time))
                 .group_by(PointHistory.recorded_at)
                 .order_by(PointHistory.recorded_at)
             )
@@ -334,9 +314,7 @@ class RCCalibrator:
         # 提取数据用于统计
         env_temps = np.array([s["env_temp"] for s in samples])
         power_changes = np.array([abs(s["power_change"]) for s in samples])
-        before_powers = np.array(
-            [max(s["before_power"], 0.01) for s in samples]
-        )
+        before_powers = np.array([max(s["before_power"], 0.01) for s in samples])
 
         # 1. 3σ 过滤环境温度异常值
         if len(env_temps) > 2:
@@ -353,9 +331,7 @@ class RCCalibrator:
         mask_power = (power_changes / before_powers) <= MAX_POWER_CHANGE_RATIO
 
         # 3. 环境温度范围过滤
-        mask_env = (env_temps >= ENV_TEMP_LOWER) & (
-            env_temps <= ENV_TEMP_UPPER
-        )
+        mask_env = (env_temps >= ENV_TEMP_LOWER) & (env_temps <= ENV_TEMP_UPPER)
 
         # 组合过滤
         valid_mask = mask_3sigma & mask_power & mask_env
@@ -495,9 +471,7 @@ class RCCalibrator:
 
         # 4. 同步更新 CoolingZone
         await session.execute(
-            update(CoolingZone)
-            .where(CoolingZone.id == zone_id)
-            .values(thermal_R=R, thermal_C=C, r_calibrated_at=now)
+            update(CoolingZone).where(CoolingZone.id == zone_id).values(thermal_R=R, thermal_C=C, r_calibrated_at=now)
         )
 
     async def run_monthly_calibration(self) -> dict[str, Any]:
@@ -520,45 +494,27 @@ class RCCalibrator:
                 .where(ThermalParameter.is_demo == True)  # noqa: E712
                 .where(ThermalParameter.is_active == True)  # noqa: E712
             )
-            zone_result = await session.execute(
-                select(CoolingZone.id).where(
-                    CoolingZone.id.notin_(demo_zone_subq)
-                )
-            )
+            zone_result = await session.execute(select(CoolingZone.id).where(CoolingZone.id.notin_(demo_zone_subq)))
             zone_ids = [r[0] for r in zone_result.all()]
 
         for zone_id in zone_ids:
             try:
                 result = await self.calibrate(zone_id)
                 if result.get("success"):
-                    results["success"].append(
-                        {"zone_id": zone_id, **result}
-                    )
+                    results["success"].append({"zone_id": zone_id, **result})
                 elif result.get("error") in (
                     "no_events",
                     "insufficient_data",
                     "no_temperature_sensors",
                 ):
-                    results["skipped"].append(
-                        {"zone_id": zone_id, **result}
-                    )
-                    logger.warning(
-                        f"Zone {zone_id} 校准跳过: {result.get('error')}"
-                    )
+                    results["skipped"].append({"zone_id": zone_id, **result})
+                    logger.warning(f"Zone {zone_id} 校准跳过: {result.get('error')}")
                 else:
-                    results["failed"].append(
-                        {"zone_id": zone_id, **result}
-                    )
-                    logger.warning(
-                        f"Zone {zone_id} 校准失败: {result.get('error')}"
-                    )
+                    results["failed"].append({"zone_id": zone_id, **result})
+                    logger.warning(f"Zone {zone_id} 校准失败: {result.get('error')}")
             except Exception as e:
-                results["failed"].append(
-                    {"zone_id": zone_id, "error": str(e)}
-                )
-                logger.error(
-                    f"Zone {zone_id} 校准异常: {e}", exc_info=True
-                )
+                results["failed"].append({"zone_id": zone_id, "error": str(e)})
+                logger.error(f"Zone {zone_id} 校准异常: {e}", exc_info=True)
 
         logger.info(
             f"月度校准完成: 成功={len(results['success'])}, "

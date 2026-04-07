@@ -7,7 +7,7 @@ Story 25.5: 传感器元数据与精度加权
 Story 25.7: 趋势分析与多传感器融合
 """
 
-from datetime import datetime, date
+from datetime import datetime
 from enum import Enum
 from sqlalchemy import Column, Integer, String, Boolean, DateTime, Text, Float, ForeignKey, JSON, Index, Date
 

@@ -4,16 +4,13 @@ Story 26.3: 闭环学习自动调参
 """
 
 import logging
-from datetime import datetime
-from typing import Optional
-from sqlalchemy import select, and_, func, desc
+from sqlalchemy import select, func
 from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import async_session
 from app.models.diagnosis import ProbabilityAdjustmentLog, DiagnosisResult, DiagnosisAnnotation
 from app.models.fault_tree import FaultTreeNode
-from app.schemas.probability_tuning import ProbabilityAdjustmentCreate
 
 logger = logging.getLogger(__name__)
 
@@ -41,6 +38,7 @@ class ProbabilityTuningService:
         audit_result = None
         try:
             from app.services.diagnosis.training_data_audit_service import training_data_audit_service
+
             audit_result = await training_data_audit_service.run_anomaly_detection()
             if audit_result.get("status") == "aborted":
                 logger.critical("训练数据质量检查未通过，中止概率调参")
@@ -89,7 +87,7 @@ class ProbabilityTuningService:
             "analyzed_trees": analyzed_trees,
             "analyzed_nodes": 0,
             "total_adjustments": total_adjustments,
-            "pending_approvals": total_adjustments
+            "pending_approvals": total_adjustments,
         }
 
     async def _analyze_tree(self, session: AsyncSession, tree_id: int) -> list[ProbabilityAdjustmentLog]:
@@ -120,25 +118,20 @@ class ProbabilityTuningService:
             # 查询该节点的标注数据统计
             annotation_stats = await self._get_annotation_stats(session, node.id)
 
-            if annotation_stats['total_count'] < 50:
+            if annotation_stats["total_count"] < 50:
                 logger.info(f"节点 {node.id} 样本数不足（{annotation_stats['total_count']} < 50），跳过调参")
                 continue
 
             # 根据节点类型计算调参建议
-            if node.node_type == 'root':
+            if node.node_type == "root":
                 proposed_prob, adjustment_pct = self._calculate_root_node_adjustment(
-                    node.id,
-                    node.prior_probability,
-                    annotation_stats['accurate_count'],
-                    annotation_stats['total_count']
+                    node.id, node.prior_probability, annotation_stats["accurate_count"], annotation_stats["total_count"]
                 )
             else:
                 # 中间/叶节点
                 diagnoses_with_node = await self._get_diagnoses_with_node(session, node.id)
                 proposed_prob, adjustment_pct, should_adjust = self._calculate_intermediate_node_adjustment(
-                    node.id,
-                    node.prior_probability,
-                    diagnoses_with_node
+                    node.id, node.prior_probability, diagnoses_with_node
                 )
 
                 if not should_adjust:
@@ -153,11 +146,11 @@ class ProbabilityTuningService:
                 current_probability=node.prior_probability,
                 proposed_probability=proposed_prob,
                 adjustment_percent=adjustment_pct,
-                sample_count=annotation_stats['total_count'],
-                accurate_count=annotation_stats['accurate_count'],
-                inaccurate_count=annotation_stats['inaccurate_count'],
-                accuracy_rate=annotation_stats['accuracy_rate'],
-                status='pending'
+                sample_count=annotation_stats["total_count"],
+                accurate_count=annotation_stats["accurate_count"],
+                inaccurate_count=annotation_stats["inaccurate_count"],
+                accuracy_rate=annotation_stats["accuracy_rate"],
+                status="pending",
             )
 
             session.add(adjustment)
@@ -185,22 +178,15 @@ class ProbabilityTuningService:
         # 通过 root_cause 字段匹配节点名称（因为 root_cause 存储的是节点名称）
         node = await session.get(FaultTreeNode, node_id)
         if not node:
-            return {
-                "total_count": 0,
-                "accurate_count": 0,
-                "inaccurate_count": 0,
-                "accuracy_rate": 0.0
-            }
+            return {"total_count": 0, "accurate_count": 0, "inaccurate_count": 0, "accuracy_rate": 0.0}
 
         result = await session.execute(
             select(
-                func.count(DiagnosisAnnotation.id).label('total_count'),
-                func.sum(
-                    func.case((DiagnosisAnnotation.annotation == 'accurate', 1), else_=0)
-                ).label('accurate_count'),
-                func.sum(
-                    func.case((DiagnosisAnnotation.annotation == 'inaccurate', 1), else_=0)
-                ).label('inaccurate_count')
+                func.count(DiagnosisAnnotation.id).label("total_count"),
+                func.sum(func.case((DiagnosisAnnotation.annotation == "accurate", 1), else_=0)).label("accurate_count"),
+                func.sum(func.case((DiagnosisAnnotation.annotation == "inaccurate", 1), else_=0)).label(
+                    "inaccurate_count"
+                ),
             )
             .select_from(DiagnosisAnnotation)
             .join(DiagnosisResult, DiagnosisAnnotation.result_id == DiagnosisResult.id)
@@ -219,7 +205,7 @@ class ProbabilityTuningService:
             "total_count": total_count,
             "accurate_count": accurate_count,
             "inaccurate_count": inaccurate_count,
-            "accuracy_rate": accuracy_rate
+            "accuracy_rate": accuracy_rate,
         }
 
     async def _get_diagnoses_with_node(self, session: AsyncSession, node_id: int) -> list[DiagnosisResult]:
@@ -243,18 +229,14 @@ class ProbabilityTuningService:
         # 如果节点参与了诊断，其名称会出现在 evidence 中
         result = await session.execute(
             select(DiagnosisResult)
-            .where(DiagnosisResult.evidence.like(f'%{node.name}%'))
+            .where(DiagnosisResult.evidence.like(f"%{node.name}%"))
             .options(selectinload(DiagnosisResult.annotation))
         )
 
         return list(result.scalars().all())
 
     def _calculate_root_node_adjustment(
-        self,
-        node_id: int,
-        current_prior: float,
-        accurate_count: int,
-        total_count: int
+        self, node_id: int, current_prior: float, accurate_count: int, total_count: int
     ) -> tuple[float, float]:
         """
         计算根因节点的调参建议
@@ -301,10 +283,7 @@ class ProbabilityTuningService:
         return proposed_probability, adjustment_percent
 
     def _calculate_intermediate_node_adjustment(
-        self,
-        node_id: int,
-        current_prior: float,
-        diagnoses_with_node: list[DiagnosisResult]
+        self, node_id: int, current_prior: float, diagnoses_with_node: list[DiagnosisResult]
     ) -> tuple[float, float, bool]:
         """
         计算中间/叶节点的调参建议
@@ -322,8 +301,9 @@ class ProbabilityTuningService:
         """
         # 统计该节点参与的所有诊断中，最终结论被标注为"准确"的比例
         accurate_diagnoses = [
-            d for d in diagnoses_with_node
-            if hasattr(d, 'annotation') and d.annotation and d.annotation.annotation == 'accurate'
+            d
+            for d in diagnoses_with_node
+            if hasattr(d, "annotation") and d.annotation and d.annotation.annotation == "accurate"
         ]
 
         if not diagnoses_with_node:
@@ -378,9 +358,7 @@ class ProbabilityTuningService:
 
         # 查询所有管理员
         async with async_session() as session:
-            admins_result = await session.execute(
-                select(User).where(User.role == 'admin', User.is_active == True)
-            )
+            admins_result = await session.execute(select(User).where(User.role == "admin", User.is_active == True))
             admins = admins_result.scalars().all()
 
         if not admins:
@@ -394,13 +372,13 @@ class ProbabilityTuningService:
             <html>
             <body>
                 <h2>概率调参审批通知</h2>
-                <p>系统已完成概率调参分析，生成了 <strong>{result['pending_approvals']}</strong> 条待审批的调参建议。</p>
+                <p>系统已完成概率调参分析，生成了 <strong>{result["pending_approvals"]}</strong> 条待审批的调参建议。</p>
                 <h3>分析摘要</h3>
                 <ul>
-                    <li>分析故障树数量: {result['analyzed_trees']}</li>
-                    <li>分析节点数量: {result['analyzed_nodes']}</li>
-                    <li>生成调参建议: {result['total_adjustments']}</li>
-                    <li>待审批数量: {result['pending_approvals']}</li>
+                    <li>分析故障树数量: {result["analyzed_trees"]}</li>
+                    <li>分析节点数量: {result["analyzed_nodes"]}</li>
+                    <li>生成调参建议: {result["total_adjustments"]}</li>
+                    <li>待审批数量: {result["pending_approvals"]}</li>
                 </ul>
                 <p>请登录系统查看详情并进行审批。</p>
             </body>
@@ -411,9 +389,7 @@ class ProbabilityTuningService:
                 if admin.email:
                     try:
                         await email_service.send_html_email(
-                            to_email=admin.email,
-                            subject=subject,
-                            html_content=html_content
+                            to_email=admin.email, subject=subject, html_content=html_content
                         )
                     except Exception as e:
                         logger.error(f"发送邮件给 {admin.email} 失败: {e}")
@@ -424,12 +400,12 @@ class ProbabilityTuningService:
                 await ws_manager.send_to_user(
                     admin.id,
                     {
-                        'type': 'probability_tuning_approval',
-                        'pending_count': result['pending_approvals'],
-                        'analyzed_trees': result['analyzed_trees'],
-                        'analyzed_nodes': result['analyzed_nodes'],
-                        'total_adjustments': result['total_adjustments']
-                    }
+                        "type": "probability_tuning_approval",
+                        "pending_count": result["pending_approvals"],
+                        "analyzed_trees": result["analyzed_trees"],
+                        "analyzed_nodes": result["analyzed_nodes"],
+                        "total_adjustments": result["total_adjustments"],
+                    },
                 )
             except Exception as e:
                 logger.error(f"发送 WebSocket 通知给用户 {admin.id} 失败: {e}")

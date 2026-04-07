@@ -163,6 +163,7 @@ interface OutdoorUnit {
   compressor_status?: string
   high_pressure?: number
   low_pressure?: number
+  cooling_capacity_kw?: number
   status: string
 }
 

@@ -17,7 +17,6 @@ from ...schemas.energy import (
     EnergyOpportunityCreate,
     EnergyOpportunityUpdate,
     EnergyOpportunityResponse,
-    OpportunityMeasureResponse,
     DashboardResponse,
     DashboardSummaryCards,
     OpportunitySummary,
@@ -490,7 +489,12 @@ async def list_opportunities(
 
     # 获取数据（selectinload 避免 MissingGreenlet）
 
-    query = query.options(selectinload(EnergyOpportunity.measures)).order_by(EnergyOpportunity.discovered_at.desc()).offset(skip).limit(limit)
+    query = (
+        query.options(selectinload(EnergyOpportunity.measures))
+        .order_by(EnergyOpportunity.discovered_at.desc())
+        .offset(skip)
+        .limit(limit)
+    )
     result = await db.execute(query)
     items = result.scalars().all()
 

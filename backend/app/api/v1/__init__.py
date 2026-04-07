@@ -146,11 +146,17 @@ from sqlalchemy.ext.asyncio import AsyncSession as _AsyncSession
 from sqlalchemy import select as _select
 from app.core.database import get_db as _get_db
 from app.api.deps import require_role as _require_role
-from app.models.fault_tree import FaultTree as _FaultTree, FaultTreeNode as _FaultTreeNode, FaultTreeEdge as _FaultTreeEdge
+from app.models.fault_tree import (
+    FaultTree as _FaultTree,
+    FaultTreeNode as _FaultTreeNode,
+    FaultTreeEdge as _FaultTreeEdge,
+)
 
 
 @api_router.get("/fault-trees/{tree_id}", tags=["故障树"])
-async def get_fault_tree_detail(tree_id: int, db: _AsyncSession = Depends(_get_db), _=Depends(_require_role(["admin", "operator", "viewer"]))):
+async def get_fault_tree_detail(
+    tree_id: int, db: _AsyncSession = Depends(_get_db), _=Depends(_require_role(["admin", "operator", "viewer"]))
+):
     """获取故障树详情（含节点和边）"""
     result = await db.execute(_select(_FaultTree).where(_FaultTree.id == tree_id))
     tree = result.scalar_one_or_none()
@@ -172,15 +178,24 @@ async def get_fault_tree_detail(tree_id: int, db: _AsyncSession = Depends(_get_d
         "updated_at": str(tree.updated_at) if tree.updated_at else None,
         "nodes": [
             {
-                "id": n.id, "name": n.name, "node_type": n.node_type,
-                "gate_type": n.gate_type, "description": n.description,
+                "id": n.id,
+                "name": n.name,
+                "node_type": n.node_type,
+                "gate_type": n.gate_type,
+                "description": n.description,
                 "prior_probability": n.prior_probability,
                 "evidence_point_id": n.evidence_point_id,
             }
             for n in nodes
         ],
         "edges": [
-            {"id": e.id, "from_node_id": e.parent_node_id, "to_node_id": e.child_node_id, "parent_node_id": e.parent_node_id, "child_node_id": e.child_node_id}
+            {
+                "id": e.id,
+                "from_node_id": e.parent_node_id,
+                "to_node_id": e.child_node_id,
+                "parent_node_id": e.parent_node_id,
+                "child_node_id": e.child_node_id,
+            }
             for e in edges
         ],
     }

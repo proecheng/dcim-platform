@@ -3,12 +3,14 @@ import heapq
 from typing import Any, Optional
 from dataclasses import dataclass, field
 
+
 @dataclass(order=True)
 class PriorityTask:
     priority: int
     task_id: str = field(compare=False)
     data: Any = field(compare=False)
     _cancelled: bool = field(default=False, compare=False)
+
 
 class CancellablePriorityQueue:
     """
@@ -17,6 +19,7 @@ class CancellablePriorityQueue:
     - 支持任务取消（标记法，不立即移除）
     - 支持队列满时的替换策略
     """
+
     def __init__(self, maxsize: int = 50):
         self._queue: list[PriorityTask] = []
         self._maxsize = maxsize

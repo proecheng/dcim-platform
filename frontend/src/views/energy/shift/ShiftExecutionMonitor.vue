@@ -254,8 +254,8 @@ const stopAutoRefresh = () => {
   }
 }
 
-const getDeviceStatusType = (status: string) => {
-  const map: Record<string, string> = {
+const getDeviceStatusType = (status: string): 'info' | 'warning' | 'success' | 'danger' => {
+  const map: Record<string, 'info' | 'warning' | 'success' | 'danger'> = {
     pending: 'info',
     running: 'warning',
     completed: 'success',

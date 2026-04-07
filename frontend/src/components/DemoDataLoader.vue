@@ -118,6 +118,8 @@ const unloading = ref(false)
 const errorMessage = ref('')
 let progressTimer: number | null = null
 
+const estimatedPoints = 200
+
 const status = reactive({
   is_loaded: false,
   demo_point_count: 0,

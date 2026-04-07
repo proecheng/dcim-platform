@@ -28,21 +28,21 @@ logger = logging.getLogger(__name__)
 # Prometheus 监控指标（条件注册，避免重复）
 try:
     diagnosis_redundancy_check_duration_seconds = Histogram(
-        'diagnosis_redundancy_check_duration_seconds',
-        'Duration of redundancy check operations in seconds',
-        buckets=[0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0]
+        "diagnosis_redundancy_check_duration_seconds",
+        "Duration of redundancy check operations in seconds",
+        buckets=[0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0],
     )
 except ValueError:
-    diagnosis_redundancy_check_duration_seconds = REGISTRY._names_to_collectors['diagnosis_redundancy_check_duration_seconds']
+    diagnosis_redundancy_check_duration_seconds = REGISTRY._names_to_collectors[
+        "diagnosis_redundancy_check_duration_seconds"
+    ]
 
 try:
     diagnosis_redundancy_check_total = Counter(
-        'diagnosis_redundancy_check_total',
-        'Total number of redundancy checks',
-        ['has_backup']
+        "diagnosis_redundancy_check_total", "Total number of redundancy checks", ["has_backup"]
     )
 except ValueError:
-    diagnosis_redundancy_check_total = REGISTRY._names_to_collectors['diagnosis_redundancy_check_total']
+    diagnosis_redundancy_check_total = REGISTRY._names_to_collectors["diagnosis_redundancy_check_total"]
 
 
 class RedundancyStatus(BaseModel):
@@ -56,6 +56,7 @@ class RedundancyStatus(BaseModel):
         backup_count: 备用设备数量
         error: 错误信息（仅在发生错误时）
     """
+
     has_backup: bool
     redundancy_type: Optional[str] = None
     backup_devices: List[int] = []
@@ -96,49 +97,35 @@ async def check_redundancy_backup(device_id: int, session: AsyncSession) -> Redu
 
     try:
         # 查询该设备的冗余配置
-        result = await session.execute(
-            select(PowerDevice).where(PowerDevice.id == device_id)
-        )
+        result = await session.execute(select(PowerDevice).where(PowerDevice.id == device_id))
         device = result.scalar_one_or_none()
 
         if not device:
             status = RedundancyStatus(
-                has_backup=False,
-                error=f"Device {device_id} not found",
-                backup_devices=[],
-                backup_count=0
+                has_backup=False, error=f"Device {device_id} not found", backup_devices=[], backup_count=0
             )
-            diagnosis_redundancy_check_total.labels(has_backup='false').inc()
+            diagnosis_redundancy_check_total.labels(has_backup="false").inc()
             return status
 
         # 如果没有配置冗余类型，返回无冗余
         if not device.redundancy_type:
-            status = RedundancyStatus(
-                has_backup=False,
-                redundancy_type=None,
-                backup_devices=[],
-                backup_count=0
-            )
-            diagnosis_redundancy_check_total.labels(has_backup='false').inc()
+            status = RedundancyStatus(has_backup=False, redundancy_type=None, backup_devices=[], backup_count=0)
+            diagnosis_redundancy_check_total.labels(has_backup="false").inc()
             return status
 
         # 查询备用设备
         backup_query = select(PowerDevice).where(
             PowerDevice.id != device_id,  # 排除自身
             PowerDevice.device_type == device.device_type,  # 同类设备
-            PowerDevice.is_enabled == True  # 设备可用
+            PowerDevice.is_enabled == True,  # 设备可用
         )
 
         # 优先按 redundancy_group_id 查询
         if device.redundancy_group_id:
-            backup_query = backup_query.where(
-                PowerDevice.redundancy_group_id == device.redundancy_group_id
-            )
+            backup_query = backup_query.where(PowerDevice.redundancy_group_id == device.redundancy_group_id)
         # 否则按 circuit_id 查询
         elif device.circuit_id:
-            backup_query = backup_query.where(
-                PowerDevice.circuit_id == device.circuit_id
-            )
+            backup_query = backup_query.where(PowerDevice.circuit_id == device.circuit_id)
         else:
             # 既没有冗余组也没有回路ID，无法判断冗余
             return RedundancyStatus(
@@ -146,7 +133,7 @@ async def check_redundancy_backup(device_id: int, session: AsyncSession) -> Redu
                 redundancy_type=device.redundancy_type,
                 backup_devices=[],
                 backup_count=0,
-                error="No redundancy_group_id or circuit_id configured"
+                error="No redundancy_group_id or circuit_id configured",
             )
 
         result = await session.execute(backup_query)
@@ -156,24 +143,19 @@ async def check_redundancy_backup(device_id: int, session: AsyncSession) -> Redu
 
         # 判断备用路径是否充足
         has_backup = False
-        if device.redundancy_type == 'N+1':
+        if device.redundancy_type == "N+1":
             # N+1: 至少 1 台备用设备可用
             has_backup = backup_count >= 1
-        elif device.redundancy_type == '2N':
+        elif device.redundancy_type == "2N":
             # 2N: 至少与当前设备数量相等的备用设备可用
             # 计算同组/同回路设备总数（包括自身）
             total_query = select(PowerDevice).where(
-                PowerDevice.device_type == device.device_type,
-                PowerDevice.is_enabled == True
+                PowerDevice.device_type == device.device_type, PowerDevice.is_enabled == True
             )
             if device.redundancy_group_id:
-                total_query = total_query.where(
-                    PowerDevice.redundancy_group_id == device.redundancy_group_id
-                )
+                total_query = total_query.where(PowerDevice.redundancy_group_id == device.redundancy_group_id)
             elif device.circuit_id:
-                total_query = total_query.where(
-                    PowerDevice.circuit_id == device.circuit_id
-                )
+                total_query = total_query.where(PowerDevice.circuit_id == device.circuit_id)
 
             result = await session.execute(total_query)
             total_devices = len(result.scalars().all())
@@ -187,7 +169,7 @@ async def check_redundancy_backup(device_id: int, session: AsyncSession) -> Redu
             has_backup=has_backup,
             redundancy_type=device.redundancy_type,
             backup_devices=backup_device_ids,
-            backup_count=backup_count
+            backup_count=backup_count,
         )
 
         # 记录监控指标
@@ -199,12 +181,9 @@ async def check_redundancy_backup(device_id: int, session: AsyncSession) -> Redu
         # 数据库查询失败时记录错误日志，返回默认值
         logger.error(f"Redundancy check failed for device {device_id}: {e}")
         status = RedundancyStatus(
-            has_backup=False,
-            error=f"Database query failed: {str(e)}",
-            backup_devices=[],
-            backup_count=0
+            has_backup=False, error=f"Database query failed: {str(e)}", backup_devices=[], backup_count=0
         )
-        diagnosis_redundancy_check_total.labels(has_backup='false').inc()
+        diagnosis_redundancy_check_total.labels(has_backup="false").inc()
         return status
 
     finally:

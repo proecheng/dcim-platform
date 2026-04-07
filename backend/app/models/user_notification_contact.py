@@ -10,6 +10,7 @@ from app.core.database import Base
 
 class UserNotificationContact(Base):
     """用户通知联系方式（EAV模式）"""
+
     __tablename__ = "user_notification_contacts"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -21,6 +22,4 @@ class UserNotificationContact(Base):
     created_at = Column(DateTime, default=datetime.now, comment="创建时间")
     updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now, comment="更新时间")
 
-    __table_args__ = (
-        Index("ix_unc_user_id", "user_id"),
-    )
+    __table_args__ = (Index("ix_unc_user_id", "user_id"),)

@@ -1,13 +1,13 @@
 """
 A/B 测试 API 路由 - Story 26.5
 """
+
 import json
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List
 
 from app.core.database import get_db
-from app.api.deps import get_current_user
 from app.api.deps import require_role
 from app.models.user import User
 from app.models.log import OperationLog
@@ -232,7 +232,7 @@ async def delete_ab_test(
     if ab_test.status != "paused":
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"只能删除 paused 状态的 A/B 测试（当前状态: {ab_test.status}）"
+            detail=f"只能删除 paused 状态的 A/B 测试（当前状态: {ab_test.status}）",
         )
 
     # 记录审计日志

@@ -2,6 +2,7 @@
 
 用于系统集成测试和未来开发时的占位验证。
 """
+
 import logging
 from typing import Any
 

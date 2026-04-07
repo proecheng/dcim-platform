@@ -2,30 +2,28 @@
 Cooling Linkage Service
 制冷联动服务 - 负荷转移时自动调整制冷系统
 """
+
 from typing import Dict, Any, List, Optional
-from datetime import datetime, timedelta
+from datetime import datetime
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_, desc
 from app.models.load_shift import CoolingLinkageConfig, CoolingLinkageRecord
-from app.core.database import async_session
 
 
 class CoolingLinkageService:
     """制冷联动服务"""
-    
+
     @staticmethod
     async def get_config(db: AsyncSession) -> Optional[Dict[str, Any]]:
         """
         获取制冷联动配置
-        
+
         Returns:
             配置字典，如果不存在则返回默认配置
         """
-        result = await db.execute(
-            select(CoolingLinkageConfig).limit(1)
-        )
+        result = await db.execute(select(CoolingLinkageConfig).limit(1))
         config = result.scalar_one_or_none()
-        
+
         if not config:
             # 返回默认配置
             return {
@@ -45,9 +43,9 @@ class CoolingLinkageService:
                 "adjust_interval_minutes": 10,
                 "safety_protection_enabled": True,
                 "min_cooling_power": 100,
-                "max_cooling_power": 2000
+                "max_cooling_power": 2000,
             }
-        
+
         return {
             "id": config.id,
             "enabled": config.enabled,
@@ -67,26 +65,24 @@ class CoolingLinkageService:
             "safety_protection_enabled": config.safety_protection_enabled,
             "min_cooling_power": float(config.min_cooling_power) if config.min_cooling_power else 100,
             "max_cooling_power": float(config.max_cooling_power) if config.max_cooling_power else 2000,
-            "updated_at": config.updated_at.isoformat() if config.updated_at else None
+            "updated_at": config.updated_at.isoformat() if config.updated_at else None,
         }
-    
+
     @staticmethod
     async def update_config(db: AsyncSession, config_data: Dict[str, Any]) -> Dict[str, Any]:
         """
         更新制冷联动配置
-        
+
         Args:
             db: 数据库会话
             config_data: 配置数据
-            
+
         Returns:
             更新后的配置
         """
-        result = await db.execute(
-            select(CoolingLinkageConfig).limit(1)
-        )
+        result = await db.execute(select(CoolingLinkageConfig).limit(1))
         config = result.scalar_one_or_none()
-        
+
         if not config:
             # 创建新配置
             config = CoolingLinkageConfig(
@@ -106,7 +102,7 @@ class CoolingLinkageService:
                 adjust_interval_minutes=config_data.get("adjust_interval_minutes", 10),
                 safety_protection_enabled=config_data.get("safety_protection_enabled", True),
                 min_cooling_power=config_data.get("min_cooling_power", 100),
-                max_cooling_power=config_data.get("max_cooling_power", 2000)
+                max_cooling_power=config_data.get("max_cooling_power", 2000),
             )
             db.add(config)
         else:
@@ -115,17 +111,17 @@ class CoolingLinkageService:
                 if hasattr(config, key):
                     setattr(config, key, value)
             config.updated_at = datetime.now()
-        
+
         await db.commit()
         await db.refresh(config)
-        
+
         return await CoolingLinkageService.get_config(db)
-    
+
     @staticmethod
     async def get_status(db: AsyncSession) -> Dict[str, Any]:
         """
         获取制冷联动当前状态
-        
+
         Returns:
             状态字典
         """
@@ -140,44 +136,41 @@ class CoolingLinkageService:
             "last_adjust_time": datetime.now().isoformat(),
             "adjust_count": 12,
             "total_energy_saving": 1250.0,
-            "total_cost_saving": 875.0
+            "total_cost_saving": 875.0,
         }
-    
+
     @staticmethod
     async def get_history(
-        db: AsyncSession,
-        limit: int = 50,
-        start_time: Optional[datetime] = None,
-        end_time: Optional[datetime] = None
+        db: AsyncSession, limit: int = 50, start_time: Optional[datetime] = None, end_time: Optional[datetime] = None
     ) -> List[Dict[str, Any]]:
         """
         获取制冷联动历史记录
-        
+
         Args:
             db: 数据库会话
             limit: 返回记录数量限制
             start_time: 开始时间
             end_time: 结束时间
-            
+
         Returns:
             历史记录列表
         """
         query = select(CoolingLinkageRecord)
-        
+
         conditions = []
         if start_time:
             conditions.append(CoolingLinkageRecord.timestamp >= start_time)
         if end_time:
             conditions.append(CoolingLinkageRecord.timestamp <= end_time)
-        
+
         if conditions:
             query = query.where(and_(*conditions))
-        
+
         query = query.order_by(desc(CoolingLinkageRecord.timestamp)).limit(limit)
-        
+
         result = await db.execute(query)
         records = result.scalars().all()
-        
+
         return [
             {
                 "id": record.id,
@@ -193,11 +186,11 @@ class CoolingLinkageService:
                 "return_temp_before": float(record.return_temp_before) if record.return_temp_before else 0,
                 "return_temp_after": float(record.return_temp_after) if record.return_temp_after else 0,
                 "reason": record.reason,
-                "execution_id": record.execution_id
+                "execution_id": record.execution_id,
             }
             for record in records
         ]
-    
+
     @staticmethod
     async def create_history_record(
         db: AsyncSession,
@@ -211,11 +204,11 @@ class CoolingLinkageService:
         return_temp_before: float,
         return_temp_after: float,
         reason: str,
-        execution_id: Optional[int] = None
+        execution_id: Optional[int] = None,
     ) -> Dict[str, Any]:
         """
         创建制冷联动历史记录
-        
+
         Args:
             db: 数据库会话
             event_type: 事件类型 (adjust/alarm/recovery/manual)
@@ -229,7 +222,7 @@ class CoolingLinkageService:
             return_temp_after: 调整后回水温度
             reason: 调整原因
             execution_id: 关联的执行记录ID
-            
+
         Returns:
             创建的历史记录
         """
@@ -246,13 +239,13 @@ class CoolingLinkageService:
             return_temp_before=return_temp_before,
             return_temp_after=return_temp_after,
             reason=reason,
-            execution_id=execution_id
+            execution_id=execution_id,
         )
-        
+
         db.add(record)
         await db.commit()
         await db.refresh(record)
-        
+
         return {
             "id": record.id,
             "timestamp": record.timestamp.isoformat(),
@@ -262,5 +255,5 @@ class CoolingLinkageService:
             "power_change": float(record.power_change),
             "cop_before": float(record.cop_before),
             "cop_after": float(record.cop_after),
-            "reason": record.reason
+            "reason": record.reason,
         }

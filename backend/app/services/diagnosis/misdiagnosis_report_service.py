@@ -7,7 +7,7 @@ Story 26.6: 月度误判分析报告（使用 ReportRecord 模型）
 import logging
 import json
 import os
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from typing import Optional, Dict, List, Any
 from sqlalchemy import select, func, and_, or_, text
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -119,24 +119,18 @@ class MisdiagnosisReportService:
             annotated_count = annotated_count_result.scalar() or 0
 
             # 6. 识别误报（诊断有结论但标注为"不准确"）
-            false_positives = await MisdiagnosisReportService._identify_false_positives(
-                start_date, end_date, db
-            )
+            false_positives = await MisdiagnosisReportService._identify_false_positives(start_date, end_date, db)
             false_positive_count = len(false_positives)
 
             # 7. 识别漏报（告警产生但诊断引擎无结论或失败）
-            false_negatives = await MisdiagnosisReportService._identify_false_negatives(
-                start_date, end_date, db
-            )
+            false_negatives = await MisdiagnosisReportService._identify_false_negatives(start_date, end_date, db)
             false_negative_count = len(false_negatives)
 
             # 8. 计算准确率
             if annotated_count + false_negative_count == 0:
                 accuracy_rate = None
             else:
-                accuracy_rate = (annotated_count - false_positive_count) / (
-                    annotated_count + false_negative_count
-                )
+                accuracy_rate = (annotated_count - false_positive_count) / (annotated_count + false_negative_count)
 
             # 9. 统计高频误判节点
             top_misdiagnosed_nodes = await MisdiagnosisReportService._get_top_misdiagnosed_nodes(
@@ -154,9 +148,7 @@ class MisdiagnosisReportService:
             )
 
             # 12. 查询历史趋势（最多3个月）
-            accuracy_trend = await MisdiagnosisReportService._get_accuracy_trend(
-                period, db
-            )
+            accuracy_trend = await MisdiagnosisReportService._get_accuracy_trend(period, db)
 
             # 13. 生成改进建议
             improvement_suggestions = await MisdiagnosisReportService._generate_improvement_suggestions(
@@ -374,9 +366,7 @@ class MisdiagnosisReportService:
                 "misdiagnosis_count": count,
                 "percentage": count / total,
             }
-            for device_type, count in sorted(
-                device_type_counts.items(), key=lambda x: x[1], reverse=True
-            )
+            for device_type, count in sorted(device_type_counts.items(), key=lambda x: x[1], reverse=True)
         ]
 
     @staticmethod
@@ -415,10 +405,12 @@ class MisdiagnosisReportService:
             report = result.scalar_one_or_none()
 
             if report and report.summary:
-                trend.append({
-                    "period": period,
-                    "accuracy_rate": report.summary.get("accuracy_rate"),
-                })
+                trend.append(
+                    {
+                        "period": period,
+                        "accuracy_rate": report.summary.get("accuracy_rate"),
+                    }
+                )
 
         return list(reversed(trend))
 
@@ -434,15 +426,15 @@ class MisdiagnosisReportService:
         # 为误报节点生成建议
         for node in top_misdiagnosed_nodes:
             node_id = node["node_id"]
-            rule = await MisdiagnosisReportService._find_improvement_rule(
-                "false_positive", node_id=node_id, db=db
-            )
+            rule = await MisdiagnosisReportService._find_improvement_rule("false_positive", node_id=node_id, db=db)
             if rule:
-                suggestions.append({
-                    "type": "false_positive",
-                    "target": node_id,
-                    "suggestion": rule.suggestion_template,
-                })
+                suggestions.append(
+                    {
+                        "type": "false_positive",
+                        "target": node_id,
+                        "suggestion": rule.suggestion_template,
+                    }
+                )
 
         # 为漏报故障类型生成建议
         for fault in top_missed_fault_types:
@@ -451,11 +443,13 @@ class MisdiagnosisReportService:
                 "false_negative", fault_type=fault_type, db=db
             )
             if rule:
-                suggestions.append({
-                    "type": "false_negative",
-                    "target": fault_type,
-                    "suggestion": rule.suggestion_template,
-                })
+                suggestions.append(
+                    {
+                        "type": "false_negative",
+                        "target": fault_type,
+                        "suggestion": rule.suggestion_template,
+                    }
+                )
 
         return suggestions
 
@@ -615,7 +609,7 @@ class MisdiagnosisReportService:
 |------|--------|---------|
 """
         for trend_item in accuracy_trend:
-            rate_str = f"{trend_item['accuracy_rate']:.1%}" if trend_item['accuracy_rate'] is not None else "N/A"
+            rate_str = f"{trend_item['accuracy_rate']:.1%}" if trend_item["accuracy_rate"] is not None else "N/A"
             content += f"| {trend_item['period']} | {rate_str} | system_reports.summary |\n"
 
         if not accuracy_trend:
@@ -634,7 +628,7 @@ class MisdiagnosisReportService:
         content += f"""
 ---
 
-*报告生成时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}*
+*报告生成时间: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}*
 *数据来源: diagnosis_results, diagnosis_annotations, alarms, work_orders*
 """
         return content
@@ -653,17 +647,14 @@ class MisdiagnosisReportServiceV2:
 
     def __init__(self, db: AsyncSession):
         self.db = db
-        self.db_type = getattr(getattr(self.db, 'bind', None), 'dialect', None)
+        self.db_type = getattr(getattr(self.db, "bind", None), "dialect", None)
         if self.db_type:
             self.db_type = self.db_type.name
         else:
-            self.db_type = 'sqlite'
+            self.db_type = "sqlite"
 
     async def generate_monthly_report_v2(
-        self,
-        start_date: datetime,
-        end_date: datetime,
-        generated_by: Optional[int] = None
+        self, start_date: datetime, end_date: datetime, generated_by: Optional[int] = None
     ) -> int:
         """
         生成月度误判分析报告（Story 26.6）
@@ -708,12 +699,8 @@ class MisdiagnosisReportServiceV2:
             # 5. 执行统计查询
             summary = await self._query_diagnosis_summary(start_date, end_date)
             false_positive_stats = await self._query_false_positive_stats(start_date, end_date)
-            false_negative_stats = await self._query_false_negative_stats(
-                start_date, end_date, work_orders_exists
-            )
-            top_nodes = await self._query_top_misdiagnosed_nodes(
-                start_date, end_date, fault_tree_nodes_exists
-            )
+            false_negative_stats = await self._query_false_negative_stats(start_date, end_date, work_orders_exists)
+            top_nodes = await self._query_top_misdiagnosed_nodes(start_date, end_date, fault_tree_nodes_exists)
             device_type_dist = await self._query_device_type_distribution(start_date, end_date)
 
             # 6. 生成改进建议
@@ -737,14 +724,10 @@ class MisdiagnosisReportServiceV2:
             }
 
             # 8. 渲染 Markdown 报告
-            markdown_content = self._render_markdown_report(
-                start_date, end_date, report_data
-            )
+            markdown_content = self._render_markdown_report(start_date, end_date, report_data)
 
             # 9. 保存 Markdown 文件
-            file_path, file_size = await self._save_markdown_file(
-                start_date, markdown_content
-            )
+            file_path, file_size = await self._save_markdown_file(start_date, markdown_content)
 
             # 10. 更新报告记录
             report.file_path = file_path
@@ -760,15 +743,18 @@ class MisdiagnosisReportServiceV2:
                 target_type="misdiagnosis_report",
                 target_id=report_id,
                 target_name=report_name,
-                new_value=json.dumps({
-                    "start_date": start_date.isoformat(),
-                    "end_date": end_date.isoformat(),
-                    "total_diagnosis_count": summary["total_diagnosis_count"],
-                    "annotation_coverage_rate": summary["annotation_coverage_rate"],
-                    "false_positive_rate": false_positive_stats["false_positive_rate"],
-                    "false_negative_rate": false_negative_stats["false_negative_rate"],
-                    "generated_by": "scheduled_task" if generated_by is None else "manual",
-                }, ensure_ascii=False),
+                new_value=json.dumps(
+                    {
+                        "start_date": start_date.isoformat(),
+                        "end_date": end_date.isoformat(),
+                        "total_diagnosis_count": summary["total_diagnosis_count"],
+                        "annotation_coverage_rate": summary["annotation_coverage_rate"],
+                        "false_positive_rate": false_positive_stats["false_positive_rate"],
+                        "false_negative_rate": false_negative_stats["false_negative_rate"],
+                        "generated_by": "scheduled_task" if generated_by is None else "manual",
+                    },
+                    ensure_ascii=False,
+                ),
                 ip_address="127.0.0.1",
             )
             self.db.add(audit_log)
@@ -786,15 +772,13 @@ class MisdiagnosisReportServiceV2:
             logger.error(f"报告生成失败: {report_name}, error={e}")
             raise
 
-    async def _check_existing_report(
-        self, start_date: datetime, end_date: datetime
-    ) -> Optional[ReportRecord]:
+    async def _check_existing_report(self, start_date: datetime, end_date: datetime) -> Optional[ReportRecord]:
         """检查相同周期的报告是否已存在"""
         stmt = select(ReportRecord).where(
             ReportRecord.report_type == "diagnosis_monthly",
             ReportRecord.start_time == start_date,
             ReportRecord.end_time == end_date,
-            ReportRecord.status.in_(["completed", "generating"])
+            ReportRecord.status.in_(["completed", "generating"]),
         )
         result = await self.db.execute(stmt)
         return result.scalar_one_or_none()
@@ -802,20 +786,14 @@ class MisdiagnosisReportServiceV2:
     async def _check_table_exists(self, table_name: str) -> bool:
         """检查表是否存在"""
         if self.db_type == "sqlite":
-            query = text(
-                "SELECT name FROM sqlite_master WHERE type='table' AND name=:table_name"
-            )
+            query = text("SELECT name FROM sqlite_master WHERE type='table' AND name=:table_name")
         else:  # postgresql
-            query = text(
-                "SELECT tablename FROM pg_tables WHERE tablename=:table_name"
-            )
+            query = text("SELECT tablename FROM pg_tables WHERE tablename=:table_name")
 
         result = await self.db.execute(query, {"table_name": table_name})
         return result.scalar_one_or_none() is not None
 
-    async def _query_diagnosis_summary(
-        self, start_date: datetime, end_date: datetime
-    ) -> Dict[str, Any]:
+    async def _query_diagnosis_summary(self, start_date: datetime, end_date: datetime) -> Dict[str, Any]:
         """查询诊断概览统计"""
         if self.db_type == "sqlite":
             query = text("""
@@ -854,9 +832,7 @@ class MisdiagnosisReportServiceV2:
             "annotation_coverage_rate": row.annotation_coverage_rate or 0.0,
         }
 
-    async def _query_false_positive_stats(
-        self, start_date: datetime, end_date: datetime
-    ) -> Dict[str, Any]:
+    async def _query_false_positive_stats(self, start_date: datetime, end_date: datetime) -> Dict[str, Any]:
         """查询误报统计"""
         if self.db_type == "sqlite":
             query = text("""
@@ -1042,9 +1018,7 @@ class MisdiagnosisReportServiceV2:
             for row in rows
         ]
 
-    async def _query_device_type_distribution(
-        self, start_date: datetime, end_date: datetime
-    ) -> List[Dict[str, Any]]:
+    async def _query_device_type_distribution(self, start_date: datetime, end_date: datetime) -> List[Dict[str, Any]]:
         """查询设备类型误判分布"""
         if self.db_type == "sqlite":
             query = text("""
@@ -1098,9 +1072,7 @@ class MisdiagnosisReportServiceV2:
             total_count = node["total_count"]
 
             if total_count < 10:
-                recommendations.append(
-                    f"节点 {node_name} 样本量不足（{total_count}），建议继续收集标注数据"
-                )
+                recommendations.append(f"节点 {node_name} 样本量不足（{total_count}），建议继续收集标注数据")
             elif misdiagnosis_rate > 0.3:
                 recommendations.append(
                     f"节点 {node_name} 误判率 {misdiagnosis_rate:.1%}（样本量 {total_count}），建议检查先验概率或增加证据维度"
@@ -1120,9 +1092,7 @@ class MisdiagnosisReportServiceV2:
 
         return recommendations
 
-    def _render_markdown_report(
-        self, start_date: datetime, end_date: datetime, report_data: Dict[str, Any]
-    ) -> str:
+    def _render_markdown_report(self, start_date: datetime, end_date: datetime, report_data: Dict[str, Any]) -> str:
         """渲染 Markdown 报告"""
         summary = report_data["summary"]
         misdiagnosis_dist = report_data["misdiagnosis_distribution"]
@@ -1135,8 +1105,8 @@ class MisdiagnosisReportServiceV2:
             false_negative_section = f"""
 | 指标 | 数值 |
 |------|------|
-| 漏报次数 | {misdiagnosis_dist['false_negative_count']} |
-| 漏报率 | {misdiagnosis_dist['false_negative_rate']:.1%} |
+| 漏报次数 | {misdiagnosis_dist["false_negative_count"]} |
+| 漏报率 | {misdiagnosis_dist["false_negative_rate"]:.1%} |
 """
         else:
             false_negative_section = "\n⚠️ 工单系统未配置，漏报统计不可用\n"
@@ -1171,8 +1141,8 @@ class MisdiagnosisReportServiceV2:
         # 生成完整报告
         content = f"""# {start_date.year}年{start_date.month}月误判分析报告
 
-**生成时间**: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')}
-**统计周期**: {start_date.strftime('%Y-%m-%d')} 至 {end_date.strftime('%Y-%m-%d')}
+**生成时间**: {datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")}
+**统计周期**: {start_date.strftime("%Y-%m-%d")} 至 {end_date.strftime("%Y-%m-%d")}
 
 ---
 
@@ -1180,9 +1150,9 @@ class MisdiagnosisReportServiceV2:
 
 | 指标 | 数值 |
 |------|------|
-| 总诊断次数 | {summary['total_diagnosis_count']} |
-| 已标注次数 | {summary['annotated_count']} |
-| 标注覆盖率 | {summary['annotation_coverage_rate']:.1%} |
+| 总诊断次数 | {summary["total_diagnosis_count"]} |
+| 已标注次数 | {summary["annotated_count"]} |
+| 标注覆盖率 | {summary["annotation_coverage_rate"]:.1%} |
 
 ---
 
@@ -1194,8 +1164,8 @@ class MisdiagnosisReportServiceV2:
 
 | 指标 | 数值 |
 |------|------|
-| 误报次数 | {misdiagnosis_dist['false_positive_count']} |
-| 误报率 | {misdiagnosis_dist['false_positive_rate']:.1%} |
+| 误报次数 | {misdiagnosis_dist["false_positive_count"]} |
+| 误报率 | {misdiagnosis_dist["false_positive_rate"]:.1%} |
 
 ### 2.2 漏报统计
 
@@ -1232,9 +1202,7 @@ class MisdiagnosisReportServiceV2:
 """
         return content
 
-    async def _save_markdown_file(
-        self, start_date: datetime, markdown_content: str
-    ) -> tuple[str, int]:
+    async def _save_markdown_file(self, start_date: datetime, markdown_content: str) -> tuple[str, int]:
         """保存 Markdown 文件到磁盘"""
         # 获取报告目录
         report_dir = getattr(settings, "REPORT_DIR", "reports")

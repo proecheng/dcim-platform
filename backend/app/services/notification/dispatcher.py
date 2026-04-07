@@ -22,7 +22,7 @@ from app.schemas.notification import (
     get_template_for_channel,
     render_notification,
 )
-from .adapters import ADAPTER_REGISTRY, NotificationResult
+from .adapters import ADAPTER_REGISTRY
 
 logger = logging.getLogger(__name__)
 
@@ -89,19 +89,13 @@ class NotificationDispatcher:
             # 有站点的告警：风暴检测
             for site_id, group in site_groups.items():
                 # 一次性递增整组数量，判断是否风暴
-                is_storm = await storm_detector.check_storm(
-                    site_id, count=len(group)
-                )
+                is_storm = await storm_detector.check_storm(site_id, count=len(group))
 
                 if is_storm:
                     # 风暴模式：合并为摘要通知
-                    sent = await self._dispatch_storm_summary(
-                        db, site_id, group
-                    )
+                    sent = await self._dispatch_storm_summary(db, site_id, group)
                     for alarm_data in group:
-                        result_map[alarm_data["alarm_id"]] = (
-                            1 if sent > 0 else 0
-                        )
+                        result_map[alarm_data["alarm_id"]] = 1 if sent > 0 else 0
                 else:
                     # 正常模式：逐条分发
                     for alarm_data in group:
@@ -133,9 +127,7 @@ class NotificationDispatcher:
 
         return result_map
 
-    async def _dispatch_storm_summary(
-        self, db, site_id: int, alarm_data_list: list[dict]
-    ) -> int:
+    async def _dispatch_storm_summary(self, db, site_id: int, alarm_data_list: list[dict]) -> int:
         """风暴模式：合并告警为摘要通知发送"""
         from app.schemas.notification import build_storm_summary
         from app.services.notification.storm import storm_detector
@@ -153,9 +145,7 @@ class NotificationDispatcher:
         site_name = top_alarm.get("site_name") or "未知站点"
 
         # 匹配策略
-        policy = await self._match_policy(
-            db, site_id, top_alarm["alarm_level"]
-        )
+        policy = await self._match_policy(db, site_id, top_alarm["alarm_level"])
         if not policy:
             return 0
 
@@ -171,9 +161,7 @@ class NotificationDispatcher:
 
         # 构建摘要（从 StormDetector 获取实际 window 值）
         _, window = await storm_detector.get_config()
-        summary_text = build_storm_summary(
-            site_name, alarm_data_list, window
-        )
+        summary_text = build_storm_summary(site_name, alarm_data_list, window)
 
         # 构建 context（使用最高级别告警的信息）
         context = AlarmNotificationContext(
@@ -197,19 +185,23 @@ class NotificationDispatcher:
             for user_id, contact_value, platform in contacts:
                 try:
                     await self.send_notification(
-                        context, channel, contact_value, user_id,
-                        policy_id=policy.id, platform=platform,
+                        context,
+                        channel,
+                        contact_value,
+                        user_id,
+                        policy_id=policy.id,
+                        platform=platform,
                     )
                     sent_count += 1
                 except Exception as e:
-                    logger.error(
-                        "风暴摘要通知发送异常: %s", e, exc_info=True
-                    )
+                    logger.error("风暴摘要通知发送异常: %s", e, exc_info=True)
 
         if sent_count > 0:
             logger.info(
                 "告警风暴摘要: 站点 %s, %d 条告警合并, 发送 %d 条通知",
-                site_name, len(alarm_data_list), sent_count,
+                site_name,
+                len(alarm_data_list),
+                sent_count,
             )
 
         return sent_count
@@ -296,16 +288,12 @@ class NotificationDispatcher:
         # 站点策略优先
         if site_id is not None:
             for p in candidates:
-                if p.site_id == site_id and self._is_time_in_range(
-                    now, p.time_range_start, p.time_range_end
-                ):
+                if p.site_id == site_id and self._is_time_in_range(now, p.time_range_start, p.time_range_end):
                     return p
 
         # 全局策略兜底
         for p in candidates:
-            if p.site_id is None and self._is_time_in_range(
-                now, p.time_range_start, p.time_range_end
-            ):
+            if p.site_id is None and self._is_time_in_range(now, p.time_range_start, p.time_range_end):
                 return p
 
         return None
@@ -316,9 +304,7 @@ class NotificationDispatcher:
         h, m = hhmm.split(":")
         return int(h) * 60 + int(m)
 
-    def _is_time_in_range(
-        self, current_time: str, start: Optional[str], end: Optional[str]
-    ) -> bool:
+    def _is_time_in_range(self, current_time: str, start: Optional[str], end: Optional[str]) -> bool:
         """判断当前时间是否在策略时段内"""
         if start is None or end is None:
             return True
@@ -330,9 +316,7 @@ class NotificationDispatcher:
         else:  # 跨午夜
             return now_min >= s_min or now_min < e_min
 
-    async def _get_user_contacts(
-        self, db, user_ids: list[int], channel: str
-    ) -> list[tuple]:
+    async def _get_user_contacts(self, db, user_ids: list[int], channel: str) -> list[tuple]:
         """查询用户的通知联系方式，返回 [(user_id, contact_value, platform), ...]"""
         from app.models.user_notification_contact import UserNotificationContact
 
@@ -419,9 +403,7 @@ class NotificationDispatcher:
         """后台重试协程 — 指数退避"""
         while not self._shutdown_event.is_set():
             try:
-                record_id = await asyncio.wait_for(
-                    self._retry_queue.get(), timeout=5.0
-                )
+                record_id = await asyncio.wait_for(self._retry_queue.get(), timeout=5.0)
             except asyncio.TimeoutError:
                 continue
             except asyncio.CancelledError:
@@ -432,7 +414,7 @@ class NotificationDispatcher:
                 record = await session.get(NotificationRecord, record_id)
                 if not record or record.retry_count >= record.max_retries:
                     continue
-                delay = min(30 * (2 ** record.retry_count), 300)
+                delay = min(30 * (2**record.retry_count), 300)
                 channel_type = record.channel_type
                 contact_value = record.contact_value
                 content_summary = record.content_summary
@@ -525,8 +507,7 @@ async def check_channel_escalations(session) -> int:
 
     # 查询所有已通知但未确认的活动告警
     result = await session.execute(
-        select(Alarm.id, Alarm.alarm_level, Alarm.point_id)
-        .where(
+        select(Alarm.id, Alarm.alarm_level, Alarm.point_id).where(
             Alarm.status == "active",
             Alarm.is_notified == True,
         )
@@ -540,9 +521,7 @@ async def check_channel_escalations(session) -> int:
 
     for alarm_id, alarm_level, point_id in active_alarms:
         try:
-            sent = await _escalate_single_alarm(
-                session, dispatcher, alarm_id, alarm_level, point_id, now
-            )
+            sent = await _escalate_single_alarm(session, dispatcher, alarm_id, alarm_level, point_id, now)
             escalated_count += sent
         except Exception as e:
             logger.error("渠道升级告警 %s 失败: %s", alarm_id, e, exc_info=True)
@@ -551,16 +530,14 @@ async def check_channel_escalations(session) -> int:
 
 
 async def _escalate_single_alarm(
-    session, dispatcher, alarm_id: int, alarm_level: str,
-    point_id: int, now: datetime
+    session, dispatcher, alarm_id: int, alarm_level: str, point_id: int, now: datetime
 ) -> int:
     """处理单个告警的渠道升级，返回发送数量"""
     from app.models.notification_record import NotificationRecord
 
     # 1. 查询该告警最近一次 sent_at（MAX，确保每步升级间有完整超时窗口）
     max_sent_result = await session.execute(
-        select(func.max(NotificationRecord.sent_at))
-        .where(
+        select(func.max(NotificationRecord.sent_at)).where(
             NotificationRecord.alarm_id == alarm_id,
             NotificationRecord.status == "sent",
         )
@@ -571,6 +548,7 @@ async def _escalate_single_alarm(
 
     # 2. 获取 site_id 和点位元数据
     from app.services.ingest_pipeline import _point_meta_cache
+
     meta = _point_meta_cache.get(point_id, {})
     site_id = meta.get("site_id")
 
@@ -611,9 +589,7 @@ async def _escalate_single_alarm(
             break
 
     if next_channel is None:
-        logger.debug(
-            "告警 %d 所有升级渠道已用尽: %s", alarm_id, escalation_order
-        )
+        logger.debug("告警 %d 所有升级渠道已用尽: %s", alarm_id, escalation_order)
         return 0
 
     # 8. 获取用户列表（JSON 列安全处理）
@@ -646,8 +622,12 @@ async def _escalate_single_alarm(
     for user_id, contact_value, platform in contacts:
         try:
             await dispatcher.send_notification(
-                context, next_channel, contact_value, user_id,
-                policy_id=policy.id, platform=platform,
+                context,
+                next_channel,
+                contact_value,
+                user_id,
+                policy_id=policy.id,
+                platform=platform,
             )
             sent_count += 1
         except Exception as e:
@@ -656,7 +636,10 @@ async def _escalate_single_alarm(
     if sent_count > 0:
         logger.info(
             "告警 %d 渠道升级: %s → %s, 发送 %d 条",
-            alarm_id, sent_channels, next_channel, sent_count,
+            alarm_id,
+            sent_channels,
+            next_channel,
+            sent_count,
         )
 
     return sent_count

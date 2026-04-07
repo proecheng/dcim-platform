@@ -2,6 +2,7 @@
 
 Story 28.3: 将硬编码的 demo 设备映射规则从主系统迁移到 demo 模块
 """
+
 import logging
 
 logger = logging.getLogger(__name__)
@@ -59,6 +60,7 @@ def register_demo_rules():
     """注册 Demo 规则到主系统"""
     try:
         from app.services.point_device_matcher import MatcherRegistry
+
         MatcherRegistry.register(DEMO_LEGACY_RULES, source="demo")
         logger.info("✓ Demo legacy 规则注册成功")
     except Exception as e:
@@ -70,6 +72,7 @@ def unregister_demo_rules():
     """卸载 Demo 规则"""
     try:
         from app.services.point_device_matcher import MatcherRegistry
+
         MatcherRegistry.unregister(source="demo")
         logger.info("✓ Demo legacy 规则卸载成功")
     except Exception as e:

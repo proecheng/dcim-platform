@@ -253,8 +253,8 @@ const loadSchemes = async () => {
   loading.value = true
   try {
     const res = await getPricingSchemes()
-    if (res.data.code === 200) {
-      schemes.value = res.data.data
+    if (res.code === 200) {
+      schemes.value = res.data
     }
   } catch (error) {
     ElMessage.error('加载方案列表失败')
@@ -266,8 +266,8 @@ const loadSchemes = async () => {
 const loadPricings = async () => {
   try {
     const res = await getElectricityPricings()
-    if (res.data.code === 200) {
-      pricings.value = res.data.data
+    if (res.code === 200) {
+      pricings.value = res.data
     }
   } catch (error) {
     ElMessage.error('加载时段列表失败')
@@ -308,7 +308,7 @@ const handleSubmit = async () => {
     try {
       if (formMode.value === 'create') {
         const res = await createPricingScheme(formData.value)
-        if (res.data.code === 200) {
+        if (res.code === 200) {
           ElMessage.success('创建成功')
           formVisible.value = false
           await loadSchemes()
@@ -316,7 +316,7 @@ const handleSubmit = async () => {
       } else {
         const updateData: PricingSchemeUpdate = { ...formData.value }
         const res = await updatePricingScheme(currentSchemeId.value!, updateData)
-        if (res.data.code === 200) {
+        if (res.code === 200) {
           ElMessage.success('更新成功')
           formVisible.value = false
           await loadSchemes()
@@ -339,7 +339,7 @@ const handleDelete = async (row: PricingScheme) => {
     )
 
     const res = await deletePricingScheme(row.id)
-    if (res.data.code === 200) {
+    if (res.code === 200) {
       ElMessage.success('删除成功')
       await loadSchemes()
     }
@@ -353,8 +353,8 @@ const handleDelete = async (row: PricingScheme) => {
 const handleValidate = async (row: PricingScheme) => {
   try {
     const res = await validatePricingScheme(row.id)
-    if (res.data.code === 200) {
-      const result = res.data.data
+    if (res.code === 200) {
+      const result = res.data
       if (result.valid) {
         ElMessage.success(`校验通过！覆盖率: ${result.coverage}/24小时`)
       } else {
@@ -381,7 +381,7 @@ const handleActivate = async (row: PricingScheme) => {
     )
 
     const res = await activatePricingScheme(row.id)
-    if (res.data.code === 200) {
+    if (res.code === 200) {
       ElMessage.success('激活成功')
       await loadSchemes()
       emit('scheme-activated')
@@ -404,10 +404,10 @@ const handleDeactivate = async (row: PricingScheme) => {
     )
 
     const res = await deactivatePricingScheme(row.id)
-    if (res.data.code === 200) {
+    if (res.code === 200) {
       ElMessage.success('停用成功')
-      if (res.data.data?.warning) {
-        ElMessage.warning(res.data.data.warning)
+      if (res.data?.warning) {
+        ElMessage.warning(res.data.warning)
       }
       await loadSchemes()
       emit('scheme-activated')

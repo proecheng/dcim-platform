@@ -1467,11 +1467,11 @@ class PricingScheme(Base):
     is_active = Column(Boolean, default=False, nullable=False, comment="是否激活（全局唯一）")
     effective_date = Column(Date, nullable=False, comment="生效日期")
     expire_date = Column(Date, comment="失效日期")
-    
+
     # 校验结果缓存
     validation_result = Column(JSON, comment="校验结果缓存")
     validation_time = Column(DateTime, comment="校验时间")
-    
+
     created_at = Column(DateTime, default=datetime.now, comment="创建时间")
     updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now, comment="更新时间")
 
@@ -1487,7 +1487,9 @@ class SchemePricingRelation(Base):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     scheme_id = Column(Integer, ForeignKey("pricing_schemes.id", ondelete="CASCADE"), nullable=False, comment="方案ID")
-    pricing_id = Column(Integer, ForeignKey("electricity_pricing.id", ondelete="CASCADE"), nullable=False, comment="时段ID")
+    pricing_id = Column(
+        Integer, ForeignKey("electricity_pricing.id", ondelete="CASCADE"), nullable=False, comment="时段ID"
+    )
     created_at = Column(DateTime, default=datetime.now, comment="创建时间")
 
     # 关系

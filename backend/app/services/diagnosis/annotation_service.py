@@ -6,9 +6,8 @@ import logging
 from datetime import datetime
 from typing import Optional, List, Tuple
 
-from sqlalchemy import select, func, and_, or_, case
+from sqlalchemy import select, func, and_, case
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import joinedload
 
 from app.models.diagnosis import DiagnosisAnnotation, DiagnosisSession
 from app.models.user import User
@@ -54,9 +53,7 @@ class DiagnosisAnnotationService:
             raise ValueError("actual_root_cause is required when annotation is 'inaccurate'")
 
         # 验证会话是否存在
-        session_result = await db.execute(
-            select(DiagnosisSession).where(DiagnosisSession.id == data.session_id)
-        )
+        session_result = await db.execute(select(DiagnosisSession).where(DiagnosisSession.id == data.session_id))
         session = session_result.scalar_one_or_none()
         if not session:
             raise ValueError(f"Diagnosis session {data.session_id} not found")
@@ -75,9 +72,7 @@ class DiagnosisAnnotationService:
         await db.commit()
         await db.refresh(annotation)
 
-        logger.info(
-            f"Created annotation {annotation.id} for session {data.session_id} by user {annotator_id}"
-        )
+        logger.info(f"Created annotation {annotation.id} for session {data.session_id} by user {annotator_id}")
 
         return DiagnosisAnnotationResponse.model_validate(annotation)
 
@@ -161,9 +156,7 @@ class DiagnosisAnnotationService:
             PermissionError: 权限不足
         """
         # 查询标注
-        result = await db.execute(
-            select(DiagnosisAnnotation).where(DiagnosisAnnotation.id == annotation_id)
-        )
+        result = await db.execute(select(DiagnosisAnnotation).where(DiagnosisAnnotation.id == annotation_id))
         annotation = result.scalar_one_or_none()
 
         if not annotation:

@@ -83,6 +83,7 @@ async def init_db():
             await conn.execute(text("PRAGMA synchronous=NORMAL"))
             await conn.execute(text("PRAGMA cache_size=-64000"))  # 64MB 缓存
 
+
 def is_postgresql() -> bool:
     """判断当前是否使用 PostgreSQL"""
     url = settings.database_url

@@ -107,13 +107,22 @@ export const useAlarmStore = defineStore('alarm', () => {
     }
   }
 
+  // 告警声音控制
+  const soundEnabled = ref(true)
+
+  function toggleSound() {
+    soundEnabled.value = !soundEnabled.value
+  }
+
   return {
     activeAlarms,
     alarmCount,
     loading,
+    soundEnabled,
     fetchActiveAlarms,
     addAlarm,
     removeAlarm,
     updateAlarm,
+    toggleSound,
   }
 })

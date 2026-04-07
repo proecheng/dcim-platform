@@ -27,9 +27,7 @@ class DegradationAnalyzer:
     async def analyze_device(self, device_id: int, device: Device | None = None) -> DegradationResult | None:
         """对单个设备执行劣化分析"""
         if device is None:
-            result = await self.db.execute(
-                select(Device).where(Device.id == device_id)
-            )
+            result = await self.db.execute(select(Device).where(Device.id == device_id))
             device = result.scalar_one_or_none()
         if not device:
             logger.warning("设备 %d 不存在", device_id)
@@ -47,7 +45,8 @@ class DegradationAnalyzer:
 
         plugin = plugin_cls()
         point_history = await self._fetch_point_history(
-            device_id, plugin.get_required_points() + plugin.get_optional_points(),
+            device_id,
+            plugin.get_required_points() + plugin.get_optional_points(),
             plugin_key=plugin_key,
         )
 
@@ -56,9 +55,7 @@ class DegradationAnalyzer:
     async def analyze_all_devices(self) -> list[DegradationResult]:
         """批量分析所有支持的设备类型"""
         supported_types = list(DEVICE_TYPE_MAP.keys())
-        result = await self.db.execute(
-            select(Device).where(Device.device_type.in_(supported_types))
-        )
+        result = await self.db.execute(select(Device).where(Device.device_type.in_(supported_types)))
         devices = result.scalars().all()
 
         results: list[DegradationResult] = []
@@ -75,7 +72,9 @@ class DegradationAnalyzer:
         return results
 
     async def _fetch_point_history(
-        self, device_id: int, point_suffixes: list[str],
+        self,
+        device_id: int,
+        point_suffixes: list[str],
         plugin_key: str | None = None,
     ) -> dict[str, list]:
         """获取设备的点位历史数据
@@ -84,9 +83,7 @@ class DegradationAnalyzer:
         返回: {point_code_suffix: [(day_offset, value), ...]}
         """
         # 查找设备关联的点位
-        result = await self.db.execute(
-            select(Point).where(Point.device_id == device_id, Point.is_enabled == True)
-        )
+        result = await self.db.execute(select(Point).where(Point.device_id == device_id, Point.is_enabled == True))
         points = result.scalars().all()
         if not points:
             return {}

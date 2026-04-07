@@ -4,7 +4,6 @@ L1 规则引擎 - Story 24.1
 Story 25.4: 集成冗余检测与断路器保护判定
 """
 
-import json
 import time
 import logging
 from typing import Dict, List, Optional
@@ -20,22 +19,16 @@ settings = get_settings()
 
 # Prometheus 监控指标（条件注册）- Story 25.4
 try:
-    redundancy_check_total = Counter(
-        'redundancy_check_total',
-        'Total redundancy checks performed',
-        ['has_backup']
-    )
+    redundancy_check_total = Counter("redundancy_check_total", "Total redundancy checks performed", ["has_backup"])
 except ValueError:
-    redundancy_check_total = REGISTRY._names_to_collectors['redundancy_check_total']
+    redundancy_check_total = REGISTRY._names_to_collectors["redundancy_check_total"]
 
 try:
     breaker_action_check_total = Counter(
-        'breaker_action_check_total',
-        'Total breaker action checks performed',
-        ['action_type']
+        "breaker_action_check_total", "Total breaker action checks performed", ["action_type"]
     )
 except ValueError:
-    breaker_action_check_total = REGISTRY._names_to_collectors['breaker_action_check_total']
+    breaker_action_check_total = REGISTRY._names_to_collectors["breaker_action_check_total"]
 
 
 class L1RuleEngine:
@@ -125,7 +118,7 @@ class L1RuleEngine:
                 "matched": False,
                 "conclusion": "L1未匹配到规则",
                 "confidence": 0.0,
-                "inference_time_ms": int((time.time() - start_time) * 1000)
+                "inference_time_ms": int((time.time() - start_time) * 1000),
             }
             # Story 25.4: 附加冗余和断路器信息
             if redundancy_status:
@@ -167,7 +160,7 @@ class L1RuleEngine:
                     "confidence": diagnosis_logic.get("confidence", 0.5),
                     "suggested_actions": diagnosis_logic.get("suggested_actions", []),
                     "rule_code": rule.rule_code,
-                    "inference_time_ms": int((time.time() - start_time) * 1000)
+                    "inference_time_ms": int((time.time() - start_time) * 1000),
                 }
                 # Story 25.4: 附加冗余和断路器信息
                 if redundancy_status:
@@ -181,7 +174,7 @@ class L1RuleEngine:
             "matched": False,
             "conclusion": "L1未匹配到规则",
             "confidence": 0.0,
-            "inference_time_ms": int((time.time() - start_time) * 1000)
+            "inference_time_ms": int((time.time() - start_time) * 1000),
         }
         # Story 25.4: 附加冗余和断路器信息
         if redundancy_status:
@@ -279,16 +272,14 @@ class L1RuleEngine:
                 redundancy_status = await check_redundancy_backup(device_id, session)
 
             # 记录监控指标
-            redundancy_check_total.labels(
-                has_backup=str(redundancy_status.has_backup)
-            ).inc()
+            redundancy_check_total.labels(has_backup=str(redundancy_status.has_backup)).inc()
 
             return {
                 "has_backup": redundancy_status.has_backup,
                 "redundancy_type": redundancy_status.redundancy_type,
                 "backup_count": redundancy_status.backup_count,
                 "backup_devices": redundancy_status.backup_devices,
-                "error": redundancy_status.error
+                "error": redundancy_status.error,
             }
         except Exception as e:
             logger.error(f"冗余检测失败 device_id={device_id}: {e}")
@@ -309,9 +300,7 @@ class L1RuleEngine:
 
             async with async_session() as session:
                 # 查询告警对象
-                result = await session.execute(
-                    select(Alarm).where(Alarm.id == alarm_id)
-                )
+                result = await session.execute(select(Alarm).where(Alarm.id == alarm_id))
                 alarm = result.scalar_one_or_none()
 
                 if not alarm:
@@ -321,9 +310,7 @@ class L1RuleEngine:
                 breaker_result = await check_breaker_action(alarm, session)
 
             # 记录监控指标
-            breaker_action_check_total.labels(
-                action_type=breaker_result.action_type
-            ).inc()
+            breaker_action_check_total.labels(action_type=breaker_result.action_type).inc()
 
             return {
                 "action_type": breaker_result.action_type,
@@ -332,7 +319,7 @@ class L1RuleEngine:
                 "overload_ratio": breaker_result.overload_ratio,
                 "expected_time_range": breaker_result.expected_time_range,
                 "actual_time": breaker_result.actual_time,
-                "error": breaker_result.error
+                "error": breaker_result.error,
             }
         except Exception as e:
             logger.error(f"断路器判定失败 alarm_id={alarm_id}: {e}")

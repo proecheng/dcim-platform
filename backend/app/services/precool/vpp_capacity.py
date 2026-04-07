@@ -7,7 +7,7 @@ Story 33.1: 计算各制冷区域的分向可调容量（向下=削峰/向上=�
 
 import logging
 from datetime import datetime
-from typing import Dict, List, Optional
+from typing import List, Optional
 
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -23,14 +23,14 @@ TEMP_MIN = 18.0  # °C
 
 # 容量计算阈值
 HEADROOM_DOWN_THRESHOLD = 1.0  # °C，向下可调最小裕度
-HEADROOM_UP_THRESHOLD = 0.5   # °C，向上可调最小裕度
+HEADROOM_UP_THRESHOLD = 0.5  # °C，向上可调最小裕度
 
 # 默认响应窗口
 DEFAULT_RESPONSE_WINDOW = 1.0  # 小时
 
 # 负载率假设
 DEFAULT_LOAD_FACTOR = 0.7  # 稳态近似: 制冷功率 ≈ 额定容量 × 70%
-Q_MIN_RATIO = 0.3           # 安全下限: 保留 30% 制冷
+Q_MIN_RATIO = 0.3  # 安全下限: 保留 30% 制冷
 
 # 默认 COP
 DEFAULT_COP = 3.5
@@ -115,9 +115,7 @@ class VppCapacityService:
                 "cached_at": None,
             }
 
-    async def _calculate_zone_capacity(
-        self, zone, session: AsyncSession
-    ) -> Optional[dict]:
+    async def _calculate_zone_capacity(self, zone, session: AsyncSession) -> Optional[dict]:
         """
         单区域容量计算
 
@@ -151,9 +149,7 @@ class VppCapacityService:
             return None
 
         # 2. 获取 Q_total（额定制冷功率总和）
-        q_total = await self._get_total_cooling_capacity(
-            zone_id, session, CoolingZoneUnit, CoolingUnit
-        )
+        q_total = await self._get_total_cooling_capacity(zone_id, session, CoolingZoneUnit, CoolingUnit)
         if q_total is None or q_total <= 0:
             logger.warning(f"Zone {zone_id}: 无制冷功率数据，跳过")
             return None
@@ -217,7 +213,7 @@ class VppCapacityService:
                 .join(CoolingZoneCabinet, CoolingZoneCabinet.cabinet_id == CabinetTemperatureSensor.cabinet_id)
                 .where(
                     CoolingZoneCabinet.zone_id == zone_id,
-                    CabinetTemperatureSensor.sensor_location == 'inlet',
+                    CabinetTemperatureSensor.sensor_location == "inlet",
                 )
             )
             result = await session.execute(query)
@@ -226,9 +222,7 @@ class VppCapacityService:
             logger.error(f"Zone {zone_id}: 查询温度失败: {e}")
             return None
 
-    async def _get_total_cooling_capacity(
-        self, zone_id, session, CoolingZoneUnit, CoolingUnit
-    ) -> Optional[float]:
+    async def _get_total_cooling_capacity(self, zone_id, session, CoolingZoneUnit, CoolingUnit) -> Optional[float]:
         """获取 zone 总额定制冷功率"""
         try:
             query = (
@@ -258,7 +252,7 @@ class VppCapacityService:
                 .join(CoolingZoneUnit, CoolingUnit.id == CoolingZoneUnit.cooling_unit_id)
                 .where(
                     CoolingZoneUnit.zone_id == zone_id,
-                    Point.point_code.like('%_ambient_temp'),
+                    Point.point_code.like("%_ambient_temp"),
                 )
                 .limit(1)
             )
@@ -276,11 +270,11 @@ class VppCapacityService:
         if t_outdoor is None:
             return DEFAULT_COP
         if t_outdoor >= 30.0:
-            return 2.8   # 夏季
+            return 2.8  # 夏季
         elif t_outdoor >= 15.0:
-            return 3.5   # 过渡季
+            return 3.5  # 过渡季
         else:
-            return 4.0   # 冬季
+            return 4.0  # 冬季
 
     async def get_cached_capacity(self) -> Optional[dict]:
         """从 Redis 读取缓存的容量数据"""

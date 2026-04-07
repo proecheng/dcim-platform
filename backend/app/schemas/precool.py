@@ -12,20 +12,16 @@ from pydantic import BaseModel, Field
 
 class PredictRequest(BaseModel):
     """温度预测请求"""
+
     q_cool_schedule: Optional[List[float]] = Field(
-        default=None,
-        description="制冷功率计划(kW)，长度=int(hours×12)，null则使用当前功率"
+        default=None, description="制冷功率计划(kW)，长度=int(hours×12)，null则使用当前功率"
     )
-    hours: float = Field(
-        default=1.0,
-        ge=0.5,
-        le=24.0,
-        description="预测时长(小时)"
-    )
+    hours: float = Field(default=1.0, ge=0.5, le=24.0, description="预测时长(小时)")
 
 
 class PredictResponse(BaseModel):
     """温度预测响应"""
+
     model_config = {"protected_namespaces": ()}
 
     zone_id: int
@@ -40,6 +36,7 @@ class PredictResponse(BaseModel):
 
 class ThermalParameterOut(BaseModel):
     """热参数标定记录输出"""
+
     model_config = {"from_attributes": True, "protected_namespaces": ()}
 
     id: int
@@ -54,9 +51,9 @@ class ThermalParameterOut(BaseModel):
     created_at: datetime
 
 
-
 class ValidationReport(BaseModel):
     """模型验证报告"""
+
     zone_id: int
     mae_1h: Optional[float] = None
     mae_3h: Optional[float] = None
@@ -67,6 +64,7 @@ class ValidationReport(BaseModel):
 
 class DashboardZone(BaseModel):
     """仪表盘单个区域数据"""
+
     model_config = {"protected_namespaces": ()}
 
     zone_id: int
@@ -79,6 +77,7 @@ class DashboardZone(BaseModel):
 
 class DashboardResponse(BaseModel):
     """仪表盘聚合响应"""
+
     zones: List[DashboardZone]
     status_summary: Dict[str, int]
     today_savings: float = 0.0
@@ -89,6 +88,7 @@ class DashboardResponse(BaseModel):
 
 class RollbackTriggerInfo(BaseModel):
     """回退触发条件信息"""
+
     trigger_type: str
     since: Optional[datetime] = None
     event_id: Optional[int] = None
@@ -97,6 +97,7 @@ class RollbackTriggerInfo(BaseModel):
 
 class RollbackStatusResponse(BaseModel):
     """回退状态响应"""
+
     zone_id: int
     has_active_rollback: bool
     active_triggers: List[RollbackTriggerInfo]
@@ -104,6 +105,7 @@ class RollbackStatusResponse(BaseModel):
 
 class RollbackEventOut(BaseModel):
     """回退事件历史输出"""
+
     model_config = {"from_attributes": True}
 
     id: int
@@ -120,6 +122,7 @@ class RollbackEventOut(BaseModel):
 
 class RollbackOverviewResponse(BaseModel):
     """回退全局概览"""
+
     total_zones: int
     zones_with_active_rollback: int
     total_active_triggers: int
@@ -133,6 +136,7 @@ class RollbackOverviewResponse(BaseModel):
 
 class ScheduleCreateRequest(BaseModel):
     """预冷计划生成请求"""
+
     schedule_date: Optional[str] = Field(
         default=None,
         description="计划日期 YYYY-MM-DD，默认明天",
@@ -141,6 +145,7 @@ class ScheduleCreateRequest(BaseModel):
 
 class ScheduleListItem(BaseModel):
     """预冷计划列表项（不含 trajectory，减少传输量）"""
+
     model_config = {"from_attributes": True}
 
     id: int
@@ -162,6 +167,7 @@ class ScheduleListItem(BaseModel):
 
 class ScheduleDetailOut(BaseModel):
     """预冷计划详情（含完整 trajectory）"""
+
     model_config = {"from_attributes": True}
 
     id: int
@@ -185,6 +191,7 @@ class ScheduleDetailOut(BaseModel):
 
 class ScheduleAbortRequest(BaseModel):
     """中止计划请求"""
+
     reason: Optional[str] = Field(
         default="manual_abort",
         max_length=500,
@@ -194,6 +201,7 @@ class ScheduleAbortRequest(BaseModel):
 
 class ScheduleAbortResponse(BaseModel):
     """中止计划响应"""
+
     status: str
     abort_reason: Optional[str] = None
 
@@ -203,6 +211,7 @@ class ScheduleAbortResponse(BaseModel):
 
 class PrecoolConfigOut(BaseModel):
     """预冷配置输出"""
+
     zone_id: int
     precool_enabled: bool = False
     precool_target_temp: float = 18.0
@@ -210,6 +219,7 @@ class PrecoolConfigOut(BaseModel):
 
 class PrecoolConfigUpdate(BaseModel):
     """预冷配置更新请求"""
+
     precool_enabled: Optional[bool] = Field(
         default=None,
         description="是否启用预冷功能",
@@ -227,6 +237,7 @@ class PrecoolConfigUpdate(BaseModel):
 
 class DeploymentPhaseOut(BaseModel):
     """部署阶段查询响应"""
+
     current_phase: int = Field(ge=1, le=4)
     phase_name: str
     description: str
@@ -235,12 +246,14 @@ class DeploymentPhaseOut(BaseModel):
 
 class DeploymentPhaseUpdate(BaseModel):
     """部署阶段切换请求"""
+
     phase: int = Field(ge=1, le=4, description="目标阶段: 1=THM, 2=校准, 3=TCL上线, 4=VPP接入")
     force: bool = Field(default=False, description="强制跳过前置检查（仅 admin）")
 
 
 class PreconditionCheckResult(BaseModel):
     """前置检查结果"""
+
     passed: bool
     details: List[str] = []
 
@@ -250,13 +263,14 @@ class PreconditionCheckResult(BaseModel):
 
 class VppZoneCapacity(BaseModel):
     """VPP 单区域可调容量"""
+
     model_config = {"from_attributes": True}
 
     zone_id: int
     zone_name: str
     T_current: Optional[float] = None
     headroom_down: float  # TEMP_MAX - T_current（温度上升空间，用于向下可调）
-    headroom_up: float    # T_current - TEMP_MIN（温度下降空间，用于向上可调）
+    headroom_up: float  # T_current - TEMP_MIN（温度下降空间，用于向上可调）
     down_adjustable_thermal_kw: float
     up_adjustable_thermal_kw: float
     down_adjustable_kw: float
@@ -266,6 +280,7 @@ class VppZoneCapacity(BaseModel):
 
 class VppDispatchRequest(BaseModel):
     """VPP 调控指令请求"""
+
     command_type: str  # Literal 验证在端点层做
     target_power_kw: float
     duration_minutes: int
@@ -274,6 +289,7 @@ class VppDispatchRequest(BaseModel):
 
 class VppDispatchResponse(BaseModel):
     """VPP 调控指令响应"""
+
     dispatch_id: str
     command_type: str
     target_power_kw: float
@@ -287,6 +303,7 @@ class VppDispatchResponse(BaseModel):
 
 class VppDispatchListItem(BaseModel):
     """VPP 调控指令列表项（Story 33.3）"""
+
     dispatch_id: str
     command_type: str
     target_power_kw: float
@@ -301,19 +318,21 @@ class VppDispatchListItem(BaseModel):
 
 class VppStatisticsResponse(BaseModel):
     """VPP 需求响应统计（Story 33.3）"""
-    daily: dict   # {count, total_power_kw, estimated_savings_yuan}
+
+    daily: dict  # {count, total_power_kw, estimated_savings_yuan}
     monthly: dict  # {count, total_power_kw, estimated_savings_yuan}
 
 
 class VppCapacityResponse(BaseModel):
     """VPP 聚合可调容量响应"""
-    down_adjustable_kw: float       # 聚合向下可调电功率
-    up_adjustable_kw: float         # 聚合向上可调电功率
+
+    down_adjustable_kw: float  # 聚合向下可调电功率
+    up_adjustable_kw: float  # 聚合向上可调电功率
     down_adjustable_thermal_kw: float
     up_adjustable_thermal_kw: float
     T_current: Optional[float] = None  # 代表温度（所有区域最高）
-    headroom_down: float            # 各区域最小向下裕度
-    headroom_up: float              # 各区域最小向上裕度
+    headroom_down: float  # 各区域最小向下裕度
+    headroom_up: float  # 各区域最小向上裕度
     response_window_hours: float
     zones: List[VppZoneCapacity]
     cached_at: Optional[str] = None

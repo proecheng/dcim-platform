@@ -354,8 +354,8 @@ function levelClass(level: string): string {
   return map[level] || ''
 }
 
-function levelTagType(level: string): '' | 'success' | 'warning' | 'danger' | 'info' {
-  const map: Record<string, '' | 'success' | 'warning' | 'danger' | 'info'> = {
+function levelTagType(level: string): 'success' | 'warning' | 'danger' | 'info' {
+  const map: Record<string, 'success' | 'warning' | 'danger' | 'info'> = {
     '健康': 'success',
     '关注': 'warning',
     '预警': 'danger',
@@ -370,10 +370,10 @@ function sufficiencyText(ds: string | null): string {
   return ''
 }
 
-function sufficiencyType(ds: string | null | undefined): '' | 'warning' | 'danger' {
+function sufficiencyType(ds: string | null | undefined): 'info' | 'warning' | 'danger' {
   if (ds === 'partial') return 'warning'
   if (ds === 'minimal') return 'danger'
-  return ''
+  return 'info'
 }
 
 function sufficiencyLabel(ds: string): string {
@@ -385,8 +385,8 @@ function sufficiencyLabel(ds: string): string {
   return map[ds] || ds
 }
 
-function adviceStatusType(status: string): '' | 'success' | 'warning' | 'danger' | 'info' {
-  const map: Record<string, '' | 'success' | 'warning' | 'danger' | 'info'> = {
+function adviceStatusType(status: string): 'success' | 'warning' | 'danger' | 'info' {
+  const map: Record<string, 'success' | 'warning' | 'danger' | 'info'> = {
     pending: 'warning',
     converted: 'success',
     rejected: 'info',

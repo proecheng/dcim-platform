@@ -5,12 +5,11 @@ Chaos Drill API - Story 26.7
 
 import json
 import logging
-from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.api.deps import require_role, get_current_user
+from app.api.deps import require_role
 from app.models.log import OperationLog
 from app.models.user import User
 from app.schemas.chaos_drill import (
@@ -33,6 +32,7 @@ def _get_breaker():
     """尝试获取调度器的 CircuitBreaker 实例"""
     try:
         from app.services.diagnosis.scheduler import _scheduler
+
         if _scheduler and hasattr(_scheduler, "circuit_breaker"):
             return _scheduler.circuit_breaker
     except Exception:
@@ -93,15 +93,17 @@ async def trigger_drill(
         )
 
         # 审计日志
-        db.add(OperationLog(
-            user_id=current_user.id,
-            username=current_user.username,
-            module="chaos_drill",
-            action="trigger_drill",
-            target_type="drill",
-            target_id=drill_id,
-            new_value=json.dumps({"scenarios": request.scenarios}, ensure_ascii=False),
-        ))
+        db.add(
+            OperationLog(
+                user_id=current_user.id,
+                username=current_user.username,
+                module="chaos_drill",
+                action="trigger_drill",
+                target_type="drill",
+                target_id=drill_id,
+                new_value=json.dumps({"scenarios": request.scenarios}, ensure_ascii=False),
+            )
+        )
         await db.commit()
 
         return DrillTriggerResponse(message="演练已启动", drill_id=drill_id)
@@ -122,14 +124,16 @@ async def stop_drill(
         drill_id = await service.stop_drill(breaker=breaker)
 
         # 审计日志
-        db.add(OperationLog(
-            user_id=current_user.id,
-            username=current_user.username,
-            module="chaos_drill",
-            action="stop_drill",
-            target_type="drill",
-            target_id=drill_id,
-        ))
+        db.add(
+            OperationLog(
+                user_id=current_user.id,
+                username=current_user.username,
+                module="chaos_drill",
+                action="stop_drill",
+                target_type="drill",
+                target_id=drill_id,
+            )
+        )
         await db.commit()
 
         return DrillStopResponse(

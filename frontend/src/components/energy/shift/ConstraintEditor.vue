@@ -88,7 +88,7 @@
       <template v-if="constraint.type === 'phase_balance'">
         <el-form-item label="最大不平衡度">
           <el-input-number v-model="constraint.params.max_imbalance" :min="0" :max="30" :step="1" :precision="1" />
-          <span style="margin-left: 10px">%（建议 <10%）</span>
+          <span style="margin-left: 10px">%（建议 &lt;10%）</span>
         </el-form-item>
         <el-form-item label="检查范围">
           <el-select v-model="constraint.params.check_scope" placeholder="请选择检查范围">

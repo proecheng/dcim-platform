@@ -27,6 +27,7 @@ _syncing: contextvars.ContextVar[bool] = contextvars.ContextVar("_device_syncing
 # 日志记录器
 logger = logging.getLogger(__name__)
 
+
 class DeviceSyncService:
     """设备双向同步服务"""
 
@@ -665,9 +666,7 @@ class DeviceSyncService:
         dev_type = device.device_type
 
         if not code:
-            logger.warning(
-                f"Device {device.id} (type: {dev_type}) has no device_code, cannot infer circuit"
-            )
+            logger.warning(f"Device {device.id} (type: {dev_type}) has no device_code, cannot infer circuit")
             return None
 
         floors = self._extract_floors_from_circuits(circuit_map)
@@ -685,15 +684,10 @@ class DeviceSyncService:
             result = circuit_map.get("C-LIGHT")
 
         if result is None:
-            logger.debug(
-                f"No circuit found for device {code} "
-                f"(type: {dev_type}, area: {device.area_code})"
-            )
+            logger.debug(f"No circuit found for device {code} (type: {dev_type}, area: {device.area_code})")
         else:
             circuit_code = next((k for k, v in circuit_map.items() if v == result), "?")
-            logger.debug(
-                f"Inferred circuit for device {code}: {circuit_code} (id: {result})"
-            )
+            logger.debug(f"Inferred circuit for device {code}: {circuit_code} (id: {result})")
 
         return result
 
@@ -704,14 +698,12 @@ class DeviceSyncService:
                 return circuit_map.get(f"C-{floor}-UPS-01")
         return None
 
-    def _infer_pdu_circuit(
-        self, code: str, area_code: Optional[str], circuit_map: dict, floors: list
-    ) -> Optional[int]:
+    def _infer_pdu_circuit(self, code: str, area_code: Optional[str], circuit_map: dict, floors: list) -> Optional[int]:
         """PDU 设备回路推断"""
         for floor in floors:
             prefix = f"PDU-{floor}-"
             if code.startswith(prefix):
-                suffix = code[len(prefix):]
+                suffix = code[len(prefix) :]
                 try:
                     index = int(suffix)
                     circuit_suffix = "01" if index % 2 == 1 else "02"
@@ -791,9 +783,7 @@ class DeviceSyncService:
 
         return None
 
-    def _infer_it_circuit(
-        self, code: str, area_code: Optional[str], circuit_map: dict
-    ) -> Optional[int]:
+    def _infer_it_circuit(self, code: str, area_code: Optional[str], circuit_map: dict) -> Optional[int]:
         """IT 设备回路推断"""
         area = area_code or ""
         if "A1" in area or "A" in code:

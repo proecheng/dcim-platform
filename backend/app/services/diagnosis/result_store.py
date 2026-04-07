@@ -26,8 +26,7 @@ class DiagnosisResultStore:
     SENSITIVE_SUFFIXES = {"_password", "_token", "_secret", "_key", "_api_key"}
     # 字符串值中的敏感模式
     SENSITIVE_VALUE_PATTERN = re.compile(
-        r'(password|token|key|secret|authorization)\s*[:=]\s*\S+(\s+\S+)?|bearer\s+\S+',
-        re.IGNORECASE
+        r"(password|token|key|secret|authorization)\s*[:=]\s*\S+(\s+\S+)?|bearer\s+\S+", re.IGNORECASE
     )
     # 审计数据最大大小 64KB
     MAX_AUDIT_SIZE = 64 * 1024
@@ -122,25 +121,21 @@ class DiagnosisResultStore:
                     if device_id != db_session.device_id:
                         logger.error(
                             "数据一致性错误: result.device_id=%s != session.device_id=%s",
-                            device_id, db_session.device_id
+                            device_id,
+                            db_session.device_id,
                         )
-                        raise ValueError(
-                            f"device_id 不一致: result={device_id}, session={db_session.device_id}"
-                        )
+                        raise ValueError(f"device_id 不一致: result={device_id}, session={db_session.device_id}")
 
                 if inference_time_ms != db_session.inference_time_ms:
                     logger.warning(
                         "inference_time_ms 不一致: result=%d, session=%d (可能是计算误差)",
-                        inference_time_ms, db_session.inference_time_ms
+                        inference_time_ms,
+                        db_session.inference_time_ms,
                     )
 
                 # 3. 创建审计日志（脱敏处理）
-                sanitized_input = DiagnosisResultStore._sanitize_audit_data(
-                    input_data or {}
-                )
-                sanitized_output = DiagnosisResultStore._sanitize_audit_data(
-                    output_data or {}
-                )
+                sanitized_input = DiagnosisResultStore._sanitize_audit_data(input_data or {})
+                sanitized_output = DiagnosisResultStore._sanitize_audit_data(output_data or {})
 
                 db_audit = DiagnosisAuditLog(
                     session_id=db_session.id,
@@ -177,7 +172,7 @@ class DiagnosisResultStore:
                         "status": status,
                         "max_confidence": max_confidence,
                         "start_time": start_time,  # datetime 对象
-                        "end_time": end_time,      # datetime 对象
+                        "end_time": end_time,  # datetime 对象
                         "inference_time_ms": inference_time_ms,
                         "alarm_id": alarm_id,
                         "alarm_no": alarm_no,
@@ -212,9 +207,7 @@ class DiagnosisResultStore:
                     logger.critical("Redis 降级写入也失败: %s (原始DB错误: %s)", redis_err, e)
                     # Redis 也失败，尝试写入本地文件
                     try:
-                        await DiagnosisFallbackStore._save_to_local_file(
-                            fallback_data, "redis_unavailable"
-                        )
+                        await DiagnosisFallbackStore._save_to_local_file(fallback_data, "redis_unavailable")
                         return (None, None)  # 仍返回 (None, None)，表示已降级处理
                     except Exception as file_err:
                         logger.critical("本地文件降级也失败: %s", file_err)
@@ -225,11 +218,7 @@ class DiagnosisResultStore:
         """更新诊断会话的推送状态"""
         async with async_session() as session:
             try:
-                stmt = (
-                    update(DiagnosisSession)
-                    .where(DiagnosisSession.id == session_id)
-                    .values(push_status=push_status)
-                )
+                stmt = update(DiagnosisSession).where(DiagnosisSession.id == session_id).values(push_status=push_status)
                 await session.execute(stmt)
                 await session.commit()
                 logger.debug("推送状态已更新: session_id=%d, status=%s", session_id, push_status)
@@ -256,9 +245,8 @@ class DiagnosisResultStore:
         for key, value in data.items():
             # 检查是否为敏感字段（AC2 第二轮审查问题 2）
             key_lower = key.lower()
-            is_sensitive = (
-                key_lower in DiagnosisResultStore.SENSITIVE_KEYS or
-                any(key_lower.endswith(suffix) for suffix in DiagnosisResultStore.SENSITIVE_SUFFIXES)
+            is_sensitive = key_lower in DiagnosisResultStore.SENSITIVE_KEYS or any(
+                key_lower.endswith(suffix) for suffix in DiagnosisResultStore.SENSITIVE_SUFFIXES
             )
 
             if is_sensitive:
@@ -281,9 +269,7 @@ class DiagnosisResultStore:
                 sanitized[key] = value
 
         # 大小控制
-        return DiagnosisResultStore._truncate_to_size(
-            sanitized, DiagnosisResultStore.MAX_AUDIT_SIZE
-        )
+        return DiagnosisResultStore._truncate_to_size(sanitized, DiagnosisResultStore.MAX_AUDIT_SIZE)
 
     @staticmethod
     def _sanitize_string_value(value: str) -> str:
@@ -293,6 +279,7 @@ class DiagnosisResultStore:
         例如: "Authorization: Bearer abc123" -> "Authorization: ***REDACTED***"
               "password=secret123" -> "password=***REDACTED***"
         """
+
         def replace_sensitive(match):
             full = match.group(0)
             # Bearer 模式

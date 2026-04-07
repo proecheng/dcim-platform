@@ -48,7 +48,7 @@ class HistoryGenerator:
 
     def generate_point_history(self, point: Point, hours: int, store_interval: int = 900) -> List[Dict]:
         """生成单个点位的历史数据
-        
+
         Args:
             point: 点位对象
             hours: 生成小时数

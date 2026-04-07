@@ -229,13 +229,13 @@ async def lifespan(app: FastAPI):
             thm_configs = {
                 "thm_safety_factor": "0.8",
                 "thm_absolute_max_ratio": "0.6",
-                "thm_min_headroom_celsius": "2.0"
+                "thm_min_headroom_celsius": "2.0",
             }
 
             for key, value in thm_configs.items():
-                existing = (await session.execute(
-                    select(SystemConfig).where(SystemConfig.key == key)
-                )).scalar_one_or_none()
+                existing = (
+                    await session.execute(select(SystemConfig).where(SystemConfig.key == key))
+                ).scalar_one_or_none()
 
                 if existing is None:
                     new_config = SystemConfig(key=key, value=value)
@@ -260,9 +260,9 @@ async def lifespan(app: FastAPI):
             }
 
             for key, value in constraint_configs.items():
-                existing = (await session.execute(
-                    select(SysConfig301).where(SysConfig301.config_key == key)
-                )).scalar_one_or_none()
+                existing = (
+                    await session.execute(select(SysConfig301).where(SysConfig301.config_key == key))
+                ).scalar_one_or_none()
 
                 if existing is None:
                     new_config = SysConfig301(
@@ -290,9 +290,9 @@ async def lifespan(app: FastAPI):
             }
 
             for key, value in rollback_configs.items():
-                existing = (await session.execute(
-                    select(SysConfig302).where(SysConfig302.config_key == key)
-                )).scalar_one_or_none()
+                existing = (
+                    await session.execute(select(SysConfig302).where(SysConfig302.config_key == key))
+                ).scalar_one_or_none()
 
                 if existing is None:
                     new_config = SysConfig302(
@@ -312,6 +312,7 @@ async def lifespan(app: FastAPI):
     # 初始化邮件服务（Story 26.2）
     if settings.smtp_enabled:
         from app.services.email_service import email_service
+
         email_service.configure(
             smtp_host=settings.smtp_host,
             smtp_port=settings.smtp_port,
@@ -329,6 +330,7 @@ async def lifespan(app: FastAPI):
         logger.info("=== Seed 阶段：执行最小化种子 ===")
         try:
             from app.seeds.minimal_seed import run_minimal_seed
+
             await run_minimal_seed()
             logger.info("✓ 最小化种子执行成功")
             seed_success = True
@@ -360,6 +362,7 @@ async def lifespan(app: FastAPI):
             if not settings.demo_enabled:
                 # 如果 demo 未启用，单独启动模拟器
                 from app.demo.lifecycle import start_simulator
+
                 await start_simulator()
             logger.info("✓ 数据模拟器启动成功")
         except Exception as e:
@@ -375,6 +378,7 @@ async def lifespan(app: FastAPI):
     # 加载传感器元数据缓存（Story 25.5）
     try:
         from app.services.diagnosis.sensor_metadata_service import SensorMetadataCache
+
         async with async_session() as session:
             await SensorMetadataCache.load_all(session)
         logger.info("✓ 传感器元数据缓存加载成功")
@@ -420,6 +424,7 @@ async def lifespan(app: FastAPI):
     # 初始化配电拓扑图（Story 25.1）
     try:
         from app.services.diagnosis.power_topology_service import initialize_power_topology_graph
+
         await initialize_power_topology_graph()
         logger.info("✓ 配电拓扑图初始化成功")
     except Exception as e:
@@ -427,11 +432,13 @@ async def lifespan(app: FastAPI):
 
     # 启动拓扑变更监听器（Story 25.1）
     from app.services.diagnosis.device_sync_service import start_device_sync_listener, stop_device_sync_listener
+
     listener_task = asyncio.create_task(start_device_sync_listener())
 
     # 启动传感器元数据 Redis 监听器（Story 25.5）
     try:
         from app.services.diagnosis.sensor_metadata_service import SensorMetadataCache
+
         redis_listener_task = await SensorMetadataCache.start_listener()
         logger.info("✓ 传感器元数据 Redis 监听器启动成功")
     except Exception as e:
@@ -493,6 +500,7 @@ async def lifespan(app: FastAPI):
             try:
                 async with async_session() as session:
                     from app.services.notification.dispatcher import check_channel_escalations
+
                     await check_channel_escalations(session)
             except Exception as e:
                 logger.warning("渠道升级检查失败: %s", e)
@@ -593,7 +601,6 @@ async def lifespan(app: FastAPI):
     # 启动 UPS 电池 SOH 计算定时任务（每日凌晨 3:00）- Story 25.3
     async def _battery_soh_calculation_loop():
         """UPS 电池 SOH 计算定时任务 - 每日凌晨 3:00"""
-        from datetime import time as dt_time
         await asyncio.sleep(60)  # 启动后延迟1分钟
         while True:
             try:
@@ -605,12 +612,13 @@ async def lifespan(app: FastAPI):
                     target_time = target_time + timedelta(days=1)
 
                 wait_seconds = (target_time - now).total_seconds()
-                logger.info(f"UPS 电池 SOH 计算任务将在 {wait_seconds/3600:.1f} 小时后执行（{target_time}）")
+                logger.info(f"UPS 电池 SOH 计算任务将在 {wait_seconds / 3600:.1f} 小时后执行（{target_time}）")
 
                 await asyncio.sleep(wait_seconds)
 
                 # 执行 SOH 计算
                 from app.services.diagnosis.battery_soh_service import run_daily_soh_calculation
+
                 await run_daily_soh_calculation()
 
             except Exception as e:
@@ -637,12 +645,7 @@ async def lifespan(app: FastAPI):
                 logger.error(f"传感器校准过期检查任务失败: {e}")
 
         scheduler.add_job(
-            _run_calibration_check,
-            'cron',
-            hour=2,
-            minute=0,
-            id='calibration_check',
-            name='传感器校准过期检查'
+            _run_calibration_check, "cron", hour=2, minute=0, id="calibration_check", name="传感器校准过期检查"
         )
 
         # 启动趋势分析定时任务（每小时执行）- Story 25.7
@@ -653,13 +656,12 @@ async def lifespan(app: FastAPI):
                 async with async_session() as session:
                     from app.services.diagnosis.trend_analysis_service import get_trend_analysis_service
                     from app.models.point import Point
-                    from app.models.diagnosis import TrendWarning
 
                     # 查询所有启用的温湿度点位
                     result = await session.execute(
                         select(Point).where(
                             Point.enabled == True,
-                            (Point.unit.like('%℃%')) | (Point.unit.like('%°C%')) | (Point.unit.like('%RH%'))
+                            (Point.unit.like("%℃%")) | (Point.unit.like("%°C%")) | (Point.unit.like("%RH%")),
                         )
                     )
                     points = result.scalars().all()
@@ -680,10 +682,10 @@ async def lifespan(app: FastAPI):
 
         scheduler.add_job(
             _run_trend_analysis,
-            'cron',
+            "cron",
             minute=0,  # 每小时整点执行
-            id='trend_analysis',
-            name='趋势分析任务'
+            id="trend_analysis",
+            name="趋势分析任务",
         )
 
         # 启动反事实分析定时任务（每小时执行）- Story 26.1
@@ -700,7 +702,7 @@ async def lifespan(app: FastAPI):
                         select(DiagnosisSession).where(
                             DiagnosisSession.created_at >= one_hour_ago,
                             DiagnosisSession.max_confidence >= 0.7,
-                            DiagnosisSession.status == "success"
+                            DiagnosisSession.status == "success",
                         )
                     )
                     sessions = result.scalars().all()
@@ -710,10 +712,11 @@ async def lifespan(app: FastAPI):
                     for sess in sessions:
                         # 检查是否已存在分析结果
                         from app.models.diagnosis import CounterfactualAnalysis
+
                         existing = await session.execute(
                             select(CounterfactualAnalysis).where(
                                 CounterfactualAnalysis.session_id == sess.id,
-                                CounterfactualAnalysis.deleted_at.is_(None)
+                                CounterfactualAnalysis.deleted_at.is_(None),
                             )
                         )
                         if existing.scalar_one_or_none():
@@ -730,10 +733,10 @@ async def lifespan(app: FastAPI):
 
         scheduler.add_job(
             _run_counterfactual_analysis,
-            'cron',
+            "cron",
             minute=30,  # 每小时30分执行
-            id='counterfactual_analysis',
-            name='反事实分析任务'
+            id="counterfactual_analysis",
+            name="反事实分析任务",
         )
 
         # 启动误诊报告月度定时任务（每月1日凌晨 0:00）- Story 26.2
@@ -760,11 +763,7 @@ async def lifespan(app: FastAPI):
                         if email_service.is_available:
                             # 查询管理员邮箱
                             admin_result = await session.execute(
-                                select(User).where(
-                                    User.role == "admin",
-                                    User.is_active == True,
-                                    User.email.isnot(None)
-                                )
+                                select(User).where(User.role == "admin", User.is_active == True, User.email.isnot(None))
                             )
                             admins = admin_result.scalars().all()
                             admin_emails = [admin.email for admin in admins if admin.email]
@@ -772,8 +771,7 @@ async def lifespan(app: FastAPI):
                             if admin_emails:
                                 # 加载邮件模板
                                 template_path = os.path.join(
-                                    os.path.dirname(__file__),
-                                    "templates/emails/misdiagnosis_report.html"
+                                    os.path.dirname(__file__), "templates/emails/misdiagnosis_report.html"
                                 )
                                 with open(template_path, "r", encoding="utf-8") as f:
                                     template_content = f.read()
@@ -791,13 +789,13 @@ async def lifespan(app: FastAPI):
                                     false_positive_count=summary.get("false_positive_count", 0),
                                     false_negative_count=summary.get("false_negative_count", 0),
                                     top_misdiagnosed_node=top_node,
-                                    report_url=f"http://localhost:3000/diagnosis/reports/misdiagnosis?period={period}"
+                                    report_url=f"http://localhost:3000/diagnosis/reports/misdiagnosis?period={period}",
                                 )
 
                                 success = await email_service.send_html_email(
                                     to_emails=admin_emails,
                                     subject=f"[DCIM] 误诊分析报告 - {period}",
-                                    html_content=html_content
+                                    html_content=html_content,
                                 )
                                 if success:
                                     logger.info(f"误诊报告邮件发送成功: to={admin_emails}")
@@ -814,12 +812,12 @@ async def lifespan(app: FastAPI):
 
         scheduler.add_job(
             _run_misdiagnosis_report,
-            'cron',
+            "cron",
             day=1,
             hour=0,
             minute=0,
-            id='misdiagnosis_report',
-            name='误诊分析报告生成任务'
+            id="misdiagnosis_report",
+            name="误诊分析报告生成任务",
         )
 
         # Story 26.4: 时间窗口自适应调参任务（每月1日凌晨3:00）
@@ -827,12 +825,13 @@ async def lifespan(app: FastAPI):
             """时间窗口调参分析任务"""
             try:
                 from app.services.diagnosis.time_window_tuning_service import TimeWindowTuningService
+
                 tuning_service = TimeWindowTuningService()
                 result = await tuning_service.analyze_all_device_types()
                 logger.info(f"时间窗口调参分析完成: {result}")
 
                 # 如果有待审批的调参建议，发送通知
-                if result['pending_approvals'] > 0:
+                if result["pending_approvals"] > 0:
                     try:
                         await tuning_service.notify_admins(result)
                     except Exception as notify_error:
@@ -842,15 +841,15 @@ async def lifespan(app: FastAPI):
 
         scheduler.add_job(
             _run_time_window_tuning,
-            'cron',
+            "cron",
             day=1,
             hour=3,
             minute=0,
             coalesce=True,
             max_instances=1,
             misfire_grace_time=300,
-            id='time_window_tuning',
-            name='时间窗口调参分析任务'
+            id="time_window_tuning",
+            name="时间窗口调参分析任务",
         )
 
         # Story 29.5: 精度回填定时任务（每 5 分钟）
@@ -858,34 +857,25 @@ async def lifespan(app: FastAPI):
             """回填实际温度"""
             try:
                 from app.services.precool.accuracy_monitor import backfill_actual_temperatures
+
                 await backfill_actual_temperatures()
             except Exception as e:
                 logger.error(f"精度回填任务失败: {e}")
 
-        scheduler.add_job(
-            _run_accuracy_backfill,
-            'interval',
-            minutes=5,
-            id='accuracy_backfill',
-            name='精度回填任务'
-        )
+        scheduler.add_job(_run_accuracy_backfill, "interval", minutes=5, id="accuracy_backfill", name="精度回填任务")
 
         # Story 29.5: 每日精度统计（凌晨 1:00）
         async def _run_accuracy_daily_report():
             """每日精度统计"""
             try:
                 from app.services.precool.accuracy_monitor import run_daily_accuracy_report
+
                 await run_daily_accuracy_report()
             except Exception as e:
                 logger.error(f"每日精度统计任务失败: {e}")
 
         scheduler.add_job(
-            _run_accuracy_daily_report,
-            'cron',
-            hour=1,
-            minute=0,
-            id='accuracy_daily_report',
-            name='每日精度统计任务'
+            _run_accuracy_daily_report, "cron", hour=1, minute=0, id="accuracy_daily_report", name="每日精度统计任务"
         )
 
         # Story 31.2: 预冷计划扫描（每分钟）
@@ -893,18 +883,19 @@ async def lifespan(app: FastAPI):
             """扫描 pending 预冷计划"""
             try:
                 from app.services.precool.executor import precool_executor
+
                 await precool_executor.scan_and_execute_plans()
             except Exception as e:
                 logger.error(f"预冷扫描异常: {e}")
 
         scheduler.add_job(
             _run_precool_scan,
-            'interval',
+            "interval",
             minutes=1,
             max_instances=1,
             coalesce=True,
-            id='precool_scan',
-            name='预冷计划扫描任务',
+            id="precool_scan",
+            name="预冷计划扫描任务",
         )
 
         # Story 31.2: 预冷计划执行推进（每 5 分钟）
@@ -912,18 +903,19 @@ async def lifespan(app: FastAPI):
             """推进 executing 预冷计划"""
             try:
                 from app.services.precool.executor import precool_executor
+
                 await precool_executor.tick_executing_plans()
             except Exception as e:
                 logger.error(f"预冷推进异常: {e}")
 
         scheduler.add_job(
             _run_precool_tick,
-            'interval',
+            "interval",
             minutes=5,
             max_instances=1,
             coalesce=True,
-            id='precool_tick',
-            name='预冷计划执行推进任务',
+            id="precool_tick",
+            name="预冷计划执行推进任务",
         )
 
         # Story 32.1: 月度 RC 参数自动校准
@@ -944,14 +936,14 @@ async def lifespan(app: FastAPI):
 
             scheduler.add_job(
                 _run_monthly_rc_calibration,
-                'cron',
+                "cron",
                 day=1,
                 hour=3,
                 minute=37,
-                id='monthly_rc_calibration',
+                id="monthly_rc_calibration",
                 max_instances=1,
                 replace_existing=True,
-                name='月度RC参数自动校准',
+                name="月度RC参数自动校准",
             )
         except ImportError:
             logger.warning("⚠️  calibrator 模块不可用（scipy 未安装），跳过月度RC校准任务")
@@ -968,13 +960,13 @@ async def lifespan(app: FastAPI):
 
             scheduler.add_job(
                 _refresh_vpp_capacity,
-                'interval',
+                "interval",
                 minutes=5,
                 max_instances=1,
                 coalesce=True,
-                id='vpp_capacity_refresh',
+                id="vpp_capacity_refresh",
                 replace_existing=True,
-                name='VPP可调容量刷新',
+                name="VPP可调容量刷新",
             )
         except ImportError:
             logger.warning("⚠️  vpp_capacity 模块不可用，跳过 VPP 容量刷新任务")
@@ -993,14 +985,14 @@ async def lifespan(app: FastAPI):
 
             scheduler.add_job(
                 _run_dependency_audit,
-                'cron',
-                day_of_week='mon',
+                "cron",
+                day_of_week="mon",
                 hour=3,
                 minute=30,
-                id='dependency_audit_weekly',
+                id="dependency_audit_weekly",
                 max_instances=1,
                 replace_existing=True,
-                name='依赖安全审计',
+                name="依赖安全审计",
             )
         except ImportError:
             logger.warning("⚠️  dependency_audit_service 模块不可用，跳过依赖安全扫描任务")
@@ -1023,6 +1015,7 @@ async def lifespan(app: FastAPI):
             """聚合上一小时 PointHistory 写入 PointHistoryArchive"""
             try:
                 from app.services.predictive_maintenance.archiver import archive_hourly
+
                 async with async_session() as session:
                     await archive_hourly(session)
                     await session.commit()
@@ -1031,12 +1024,12 @@ async def lifespan(app: FastAPI):
 
         scheduler.add_job(
             _run_archive_hourly,
-            'cron',
+            "cron",
             minute=5,  # 每小时第5分钟执行，避开整点其他任务
-            id='archive_hourly',
+            id="archive_hourly",
             max_instances=1,
             coalesce=True,
-            name='Hourly 数据归档',
+            name="Hourly 数据归档",
         )
         logger.info("✓ Hourly 数据归档任务已启动（每小时第5分钟执行）")
 
@@ -1045,6 +1038,7 @@ async def lifespan(app: FastAPI):
             """全量设备健康度评分计算"""
             try:
                 from app.services.predictive_maintenance.health_calculator import DeviceHealthScoreCalculator
+
                 async with async_session() as session:
                     calculator = DeviceHealthScoreCalculator(session)
                     await calculator.calculate_all_health_scores()
@@ -1054,17 +1048,18 @@ async def lifespan(app: FastAPI):
 
         scheduler.add_job(
             _run_health_score_calculation,
-            'cron',
+            "cron",
             hour=2,
             minute=7,
-            id='health_score_calculation',
+            id="health_score_calculation",
             max_instances=1,
             coalesce=True,
-            name='每日健康度评分计算',
+            name="每日健康度评分计算",
         )
         logger.info("✓ 每日健康度评分计算任务已启动（每日 02:07 执行）")
     except ImportError:
         logger.warning("⚠️  APScheduler 未安装，使用降级方案（asyncio.create_task）")
+
         async def _calibration_check_loop():
             """传感器校准过期检查定时任务 - 每日凌晨 2:00"""
             await asyncio.sleep(60)  # 启动后延迟1分钟
@@ -1078,12 +1073,13 @@ async def lifespan(app: FastAPI):
                         target_time = target_time + timedelta(days=1)
 
                     wait_seconds = (target_time - now).total_seconds()
-                    logger.info(f"传感器校准过期检查任务将在 {wait_seconds/3600:.1f} 小时后执行（{target_time}）")
+                    logger.info(f"传感器校准过期检查任务将在 {wait_seconds / 3600:.1f} 小时后执行（{target_time}）")
 
                     await asyncio.sleep(wait_seconds)
 
                     # 执行校准过期检查
                     from app.services.diagnosis.sensor_metadata_service import check_expired_calibrations
+
                     async with async_session() as session:
                         await check_expired_calibrations(session)
 
@@ -1100,6 +1096,7 @@ async def lifespan(app: FastAPI):
             while True:
                 try:
                     from app.services.precool.accuracy_monitor import backfill_actual_temperatures
+
                     await backfill_actual_temperatures()
                 except Exception as e:
                     logger.error(f"精度回填任务失败: {e}")
@@ -1118,6 +1115,7 @@ async def lifespan(app: FastAPI):
                         target = target + timedelta(days=1)
                     await asyncio.sleep((target - now).total_seconds())
                     from app.services.precool.accuracy_monitor import run_daily_accuracy_report
+
                     await run_daily_accuracy_report()
                 except Exception as e:
                     logger.error(f"每日精度统计任务失败: {e}")
@@ -1131,6 +1129,7 @@ async def lifespan(app: FastAPI):
             while True:
                 try:
                     from app.services.predictive_maintenance.archiver import archive_hourly
+
                     async with async_session() as session:
                         await archive_hourly(session)
                         await session.commit()
@@ -1151,6 +1150,7 @@ async def lifespan(app: FastAPI):
                         target = target + timedelta(days=1)
                     await asyncio.sleep((target - now).total_seconds())
                     from app.services.predictive_maintenance.health_calculator import DeviceHealthScoreCalculator
+
                     async with async_session() as session:
                         calculator = DeviceHealthScoreCalculator(session)
                         await calculator.calculate_all_health_scores()
@@ -1198,9 +1198,7 @@ async def lifespan(app: FastAPI):
         while True:
             try:
                 async with rollback_session() as session:
-                    zones = (await session.execute(
-                        select(CoolingZone.id)
-                    )).scalars().all()
+                    zones = (await session.execute(select(CoolingZone.id))).scalars().all()
 
                     for zone_id in zones:
                         try:
@@ -1232,6 +1230,7 @@ async def lifespan(app: FastAPI):
     if redis_listener_task:
         try:
             from app.services.diagnosis.sensor_metadata_service import SensorMetadataCache
+
             await SensorMetadataCache.stop_listener()
             logger.info("✓ 传感器元数据 Redis 监听器已停止")
         except Exception as e:

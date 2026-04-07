@@ -1,6 +1,7 @@
 """
 概率调参 API - Story 26.3
 """
+
 from fastapi import APIRouter, Body, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
@@ -25,8 +26,10 @@ router = APIRouter(prefix="/diagnosis/probability-tuning", tags=["probability-tu
 # Schemas
 # ============================================================
 
+
 class ProbabilityAdjustmentResponse(BaseModel):
     """调参记录响应"""
+
     id: int
     tree_id: int
     tree_name: str
@@ -51,22 +54,26 @@ class ProbabilityAdjustmentResponse(BaseModel):
 
 class ProbabilityAdjustmentListResponse(BaseModel):
     """调参记录列表响应"""
+
     items: List[ProbabilityAdjustmentResponse]
     total: int
 
 
 class ApproveRequest(BaseModel):
     """审批请求"""
+
     reason: Optional[str] = Field(None, description="审批理由（可选）")
 
 
 class RejectRequest(BaseModel):
     """拒绝请求"""
+
     reason: str = Field(..., description="拒绝理由（必填）")
 
 
 class TriggerAnalysisResponse(BaseModel):
     """触发分析响应"""
+
     analyzed_trees: int
     analyzed_nodes: int
     total_adjustments: int
@@ -77,11 +84,9 @@ class TriggerAnalysisResponse(BaseModel):
 # API Endpoints
 # ============================================================
 
+
 @router.post("/trigger", response_model=TriggerAnalysisResponse, dependencies=[Depends(require_role(["admin"]))])
-async def trigger_analysis(
-    tree_id: Optional[int] = None,
-    db: AsyncSession = Depends(get_db)
-):
+async def trigger_analysis(tree_id: Optional[int] = None, db: AsyncSession = Depends(get_db)):
     """
     触发概率调参分析
 
@@ -111,7 +116,7 @@ async def list_adjustments(
     - **limit**: 返回记录数
     - **返回**: 调参记录列表
     """
-    if status and status not in ('pending', 'approved', 'rejected'):
+    if status and status not in ("pending", "approved", "rejected"):
         raise HTTPException(status_code=400, detail="无效的状态值")
 
     query = select(ProbabilityAdjustmentLog)
@@ -134,9 +139,7 @@ async def list_adjustments(
 
     # 查询故障树名称
     tree_ids = list(set(adj.tree_id for adj in adjustments))
-    trees_result = await db.execute(
-        select(FaultTree).where(FaultTree.id.in_(tree_ids))
-    )
+    trees_result = await db.execute(select(FaultTree).where(FaultTree.id.in_(tree_ids)))
     trees = {tree.id: tree.name for tree in trees_result.scalars().all()}
 
     # 构建响应
@@ -159,7 +162,7 @@ async def list_adjustments(
             reason=adj.reason,
             approved_by=adj.approved_by,
             approved_at=adj.approved_at,
-            created_at=adj.created_at
+            created_at=adj.created_at,
         )
         for adj in adjustments
     ]
@@ -171,8 +174,8 @@ async def list_adjustments(
 async def approve_adjustment(
     adjustment_id: int,
     request: ApproveRequest,
-    current_user = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db)
+    current_user=Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
 ):
     """
     审批调参建议
@@ -186,49 +189,36 @@ async def approve_adjustment(
     """
     # 使用乐观锁查询
     result = await db.execute(
-        select(ProbabilityAdjustmentLog)
-        .where(
-            ProbabilityAdjustmentLog.id == adjustment_id,
-            ProbabilityAdjustmentLog.status == 'pending'
+        select(ProbabilityAdjustmentLog).where(
+            ProbabilityAdjustmentLog.id == adjustment_id, ProbabilityAdjustmentLog.status == "pending"
         )
     )
     adjustment = result.scalar_one_or_none()
 
     if not adjustment:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="调参记录不存在或状态不是 pending"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="调参记录不存在或状态不是 pending")
 
     # 记录当前版本号
     current_version = adjustment.version
 
     # 更新节点概率
     from app.models.fault_tree import FaultTreeNode
+
     node = await db.get(FaultTreeNode, adjustment.node_id)
     if not node:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"节点 {adjustment.node_id} 不存在"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"节点 {adjustment.node_id} 不存在")
 
     # 更新调参记录状态（使用乐观锁，必须在修改节点概率之前检查）
     update_result = await db.execute(
         select(ProbabilityAdjustmentLog)
-        .where(
-            ProbabilityAdjustmentLog.id == adjustment_id,
-            ProbabilityAdjustmentLog.version == current_version
-        )
+        .where(ProbabilityAdjustmentLog.id == adjustment_id, ProbabilityAdjustmentLog.version == current_version)
         .with_for_update()
     )
     locked_adjustment = update_result.scalar_one_or_none()
 
     if not locked_adjustment:
         await db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="调参记录已被其他用户修改，请刷新后重试"
-        )
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="调参记录已被其他用户修改，请刷新后重试")
 
     # 乐观锁检查通过后，更新节点概率
     node.prior_probability = adjustment.proposed_probability
@@ -239,12 +229,9 @@ async def approve_adjustment(
         logger.info(f"审批调参 {adjustment_id} 后创建版本 {version.id}")
     except Exception as e:
         logger.error(f"创建版本失败: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="创建版本失败，请稍后重试"
-        )
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="创建版本失败，请稍后重试")
 
-    locked_adjustment.status = 'approved'
+    locked_adjustment.status = "approved"
     locked_adjustment.reason = request.reason
     locked_adjustment.approved_by = current_user.id
     locked_adjustment.approved_at = func.now()
@@ -254,15 +241,15 @@ async def approve_adjustment(
 
     # 发送 WebSocket 通知
     await ws_manager.broadcast_diagnosis(
-        msg_type='probability_adjustment_updated',
+        msg_type="probability_adjustment_updated",
         data={
-            'adjustment_id': adjustment_id,
-            'tree_id': adjustment.tree_id,
-            'node_name': adjustment.node_name,
-            'status': 'approved',
-            'approved_by': current_user.username
+            "adjustment_id": adjustment_id,
+            "tree_id": adjustment.tree_id,
+            "node_name": adjustment.node_name,
+            "status": "approved",
+            "approved_by": current_user.username,
         },
-        target_roles=['admin']
+        target_roles=["admin"],
     )
 
     return {"message": "审批成功", "version_id": version.id}
@@ -272,8 +259,8 @@ async def approve_adjustment(
 async def reject_adjustment(
     adjustment_id: int,
     request: RejectRequest = Body(...),
-    current_user = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db)
+    current_user=Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
 ):
     """
     拒绝调参建议
@@ -287,19 +274,14 @@ async def reject_adjustment(
     """
     # 使用乐观锁查询
     result = await db.execute(
-        select(ProbabilityAdjustmentLog)
-        .where(
-            ProbabilityAdjustmentLog.id == adjustment_id,
-            ProbabilityAdjustmentLog.status == 'pending'
+        select(ProbabilityAdjustmentLog).where(
+            ProbabilityAdjustmentLog.id == adjustment_id, ProbabilityAdjustmentLog.status == "pending"
         )
     )
     adjustment = result.scalar_one_or_none()
 
     if not adjustment:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="调参记录不存在或状态不是 pending"
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="调参记录不存在或状态不是 pending")
 
     # 记录当前版本号
     current_version = adjustment.version
@@ -307,22 +289,16 @@ async def reject_adjustment(
     # 更新调参记录状态（使用乐观锁）
     update_result = await db.execute(
         select(ProbabilityAdjustmentLog)
-        .where(
-            ProbabilityAdjustmentLog.id == adjustment_id,
-            ProbabilityAdjustmentLog.version == current_version
-        )
+        .where(ProbabilityAdjustmentLog.id == adjustment_id, ProbabilityAdjustmentLog.version == current_version)
         .with_for_update()
     )
     locked_adjustment = update_result.scalar_one_or_none()
 
     if not locked_adjustment:
         await db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="调参记录已被其他用户修改，请刷新后重试"
-        )
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="调参记录已被其他用户修改，请刷新后重试")
 
-    locked_adjustment.status = 'rejected'
+    locked_adjustment.status = "rejected"
     locked_adjustment.reason = request.reason
     locked_adjustment.approved_by = current_user.id
     locked_adjustment.approved_at = func.now()
@@ -332,25 +308,22 @@ async def reject_adjustment(
 
     # 发送 WebSocket 通知
     await ws_manager.broadcast_diagnosis(
-        msg_type='probability_adjustment_updated',
+        msg_type="probability_adjustment_updated",
         data={
-            'adjustment_id': adjustment_id,
-            'tree_id': adjustment.tree_id,
-            'node_name': adjustment.node_name,
-            'status': 'rejected',
-            'approved_by': current_user.username
+            "adjustment_id": adjustment_id,
+            "tree_id": adjustment.tree_id,
+            "node_name": adjustment.node_name,
+            "status": "rejected",
+            "approved_by": current_user.username,
         },
-        target_roles=['admin']
+        target_roles=["admin"],
     )
 
     return {"message": "已拒绝"}
 
 
 @router.post("/rollback/{tree_id}", dependencies=[Depends(require_role(["admin"]))])
-async def rollback_tree(
-    tree_id: int,
-    db: AsyncSession = Depends(get_db)
-):
+async def rollback_tree(tree_id: int, db: AsyncSession = Depends(get_db)):
     """
     回滚故障树到上一个版本
 
@@ -363,11 +336,7 @@ async def rollback_tree(
     """
     try:
         version = await VersionManager.rollback_version(db, tree_id)
-        return {
-            "message": "回滚成功",
-            "version_id": version.id,
-            "version_number": version.version_number
-        }
+        return {"message": "回滚成功", "version_id": version.id, "version_number": version.version_number}
     except ValueError as e:
         logger.error(f"回滚故障树 {tree_id} 失败: {e}")
         error_msg = str(e)

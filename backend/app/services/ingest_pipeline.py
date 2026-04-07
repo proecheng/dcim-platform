@@ -244,7 +244,7 @@ async def _batch_upsert_realtime(
         batch_size = 300
         for i in range(0, len(to_update), batch_size):
             batch = to_update[i : i + batch_size]
-            ids = [pt.point_id for pt in batch]
+            [pt.point_id for pt in batch]
 
             params: dict[str, object] = {"now": now}
             value_cases_parts: list[str] = []
@@ -275,13 +275,13 @@ async def _batch_upsert_realtime(
             sql = text(
                 f"""
                 UPDATE point_realtime SET
-                    value = CASE point_id {' '.join(value_cases_parts)} END,
-                    raw_value = CASE point_id {' '.join(value_cases_parts)} END,
-                    quality = CASE point_id {' '.join(quality_cases_parts)} END,
-                    status = CASE point_id {' '.join(status_cases_parts)} END,
-                    source = CASE point_id {' '.join(source_cases_parts)} END,
+                    value = CASE point_id {" ".join(value_cases_parts)} END,
+                    raw_value = CASE point_id {" ".join(value_cases_parts)} END,
+                    quality = CASE point_id {" ".join(quality_cases_parts)} END,
+                    status = CASE point_id {" ".join(status_cases_parts)} END,
+                    source = CASE point_id {" ".join(source_cases_parts)} END,
                     updated_at = :now
-                WHERE point_id IN ({', '.join(id_placeholders)})
+                WHERE point_id IN ({", ".join(id_placeholders)})
                 """
             )
             await session.execute(sql, params)
@@ -376,21 +376,22 @@ async def _batch_insert_history(
     for pt in ai_points:
         point_id = pt.point_id
         timestamp = pt.timestamp or now
-        
+
         # 获取点位的 store_interval 配置
         meta = _point_meta_cache.get(point_id, {})
         store_interval = meta.get("store_interval", 300)  # 默认5分钟
-        
+
         # 检查是否需要存储（降采样）
         last_stored = _last_store_time.get(point_id)
         if last_stored:
             elapsed = (timestamp - last_stored).total_seconds()
             if elapsed < store_interval:
                 continue  # 跳过，未到存储间隔
-        
+
         # 写入历史
         session.add(PointHistory(point_id=point_id, value=pt.value, recorded_at=timestamp, source=pt.source))
         _last_store_time[point_id] = timestamp
+
 
 # ── Phase 2: 告警评估 ──────────────────────────────────────────
 
@@ -602,18 +603,20 @@ async def _evaluate_alarms(
         for evt in alarm_events:
             _alarm = evt["alarm"]
             _meta = evt["point_meta"]
-            alarm_data_list.append({
-                "alarm_id": _alarm.id,
-                "alarm_level": _alarm.alarm_level,
-                "alarm_message": _alarm.alarm_message,
-                "trigger_value": _alarm.trigger_value,
-                "threshold_value": _alarm.threshold_value,
-                "created_at": _alarm.created_at,
-                "site_id": _meta.get("site_id"),
-                "site_name": _meta.get("site_name"),
-                "device_name": _meta.get("device_name"),
-                "point_name": _meta.get("point_name"),
-            })
+            alarm_data_list.append(
+                {
+                    "alarm_id": _alarm.id,
+                    "alarm_level": _alarm.alarm_level,
+                    "alarm_message": _alarm.alarm_message,
+                    "trigger_value": _alarm.trigger_value,
+                    "threshold_value": _alarm.threshold_value,
+                    "created_at": _alarm.created_at,
+                    "site_id": _meta.get("site_id"),
+                    "site_name": _meta.get("site_name"),
+                    "device_name": _meta.get("device_name"),
+                    "point_name": _meta.get("point_name"),
+                }
+            )
 
         from ..services.notification import notification_dispatcher as _dispatcher
 
@@ -626,9 +629,7 @@ async def _evaluate_alarms(
                     async with async_session() as _db:
                         for aid, cnt in notified.items():
                             await _db.execute(
-                                update(Alarm)
-                                .where(Alarm.id == aid)
-                                .values(is_notified=True, notify_count=cnt)
+                                update(Alarm).where(Alarm.id == aid).values(is_notified=True, notify_count=cnt)
                             )
                         await _db.commit()
             except Exception as _e:

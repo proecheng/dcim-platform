@@ -9,10 +9,7 @@ from sqlalchemy import select
 from ..deps import get_db, require_viewer, require_admin
 from ...models.user import User
 from ...models.energy import PowerDevice
-from ...schemas.diagnosis import (
-    RedundancyConfigUpdate,
-    RedundancyConfigResponse
-)
+from ...schemas.diagnosis import RedundancyConfigUpdate, RedundancyConfigResponse
 
 router = APIRouter()
 
@@ -24,9 +21,7 @@ async def get_device_redundancy(
     _: User = Depends(require_viewer),
 ):
     """查询配电设备的冗余配置"""
-    result = await db.execute(
-        select(PowerDevice).where(PowerDevice.id == device_id)
-    )
+    result = await db.execute(select(PowerDevice).where(PowerDevice.id == device_id))
     device = result.scalar_one_or_none()
 
     if not device:
@@ -38,7 +33,7 @@ async def get_device_redundancy(
         device_name=device.device_name,
         device_type=device.device_type,
         redundancy_type=device.redundancy_type,
-        redundancy_group_id=device.redundancy_group_id
+        redundancy_group_id=device.redundancy_group_id,
     )
 
 
@@ -50,9 +45,7 @@ async def update_device_redundancy(
     _: User = Depends(require_admin),
 ):
     """更新配电设备的冗余配置（仅管理员）"""
-    result = await db.execute(
-        select(PowerDevice).where(PowerDevice.id == device_id)
-    )
+    result = await db.execute(select(PowerDevice).where(PowerDevice.id == device_id))
     device = result.scalar_one_or_none()
 
     if not device:
@@ -73,5 +66,5 @@ async def update_device_redundancy(
         device_name=device.device_name,
         device_type=device.device_type,
         redundancy_type=device.redundancy_type,
-        redundancy_group_id=device.redundancy_group_id
+        redundancy_group_id=device.redundancy_group_id,
     )

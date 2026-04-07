@@ -276,7 +276,7 @@ function parseTopology(topology: DistributionTopology) {
 async function loadAllCabinetPages(): Promise<PowerApiItem[]> {
   const allItems: PowerApiItem[] = []
   let requestPage = 1
-  let apiTotal = 0
+  let apiTotal: number
 
   do {
     const res = await getCabinetList({ page: requestPage, page_size: 100 })

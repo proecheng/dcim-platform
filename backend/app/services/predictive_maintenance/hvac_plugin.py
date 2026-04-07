@@ -38,9 +38,11 @@ class HVACDegradationPlugin(DegradationPlugin):
 
         # 统计可用数据
         available_count = 0
-        total_count = len(HVAC_CONFIG["required_point_suffixes"]) + \
-            len(HVAC_CONFIG["compressor_status_suffixes"][:1]) + \
-            len(HVAC_CONFIG["optional_point_suffixes"])
+        total_count = (
+            len(HVAC_CONFIG["required_point_suffixes"])
+            + len(HVAC_CONFIG["compressor_status_suffixes"][:1])
+            + len(HVAC_CONFIG["optional_point_suffixes"])
+        )
 
         # --- 1. 回风温度偏差趋势 ---
         return_temp_data = self._find_point_data(point_history, HVAC_CONFIG["required_point_suffixes"])
@@ -60,7 +62,11 @@ class HVACDegradationPlugin(DegradationPlugin):
             else:
                 temp_score = 100.0
             scores.append(("return_temp_trend", temp_score, weights["return_temp_trend"]))
-            detail["return_temp"] = {"slope_per_month": slope_per_month, "score": temp_score, "data_points": len(return_temp_data)}
+            detail["return_temp"] = {
+                "slope_per_month": slope_per_month,
+                "score": temp_score,
+                "data_points": len(return_temp_data),
+            }
         else:
             detail["return_temp"] = {"status": "no_data"}
 
@@ -124,7 +130,11 @@ class HVACDegradationPlugin(DegradationPlugin):
             else:
                 hours_score = 100.0
             scores.append(("compressor_hours", hours_score, weights["compressor_hours"]))
-            detail["compressor_hours"] = {"max_hours": max_hours, "maintenance_threshold": maint_hours, "score": hours_score}
+            detail["compressor_hours"] = {
+                "max_hours": max_hours,
+                "maintenance_threshold": maint_hours,
+                "score": hours_score,
+            }
         else:
             detail["compressor_hours"] = {"status": "no_data"}
 
@@ -195,9 +205,7 @@ class HVACDegradationPlugin(DegradationPlugin):
             detail=detail,
         )
 
-    def _determine_sufficiency(
-        self, available_count: int, return_temp_data: list | None, window_days: int
-    ) -> str:
+    def _determine_sufficiency(self, available_count: int, return_temp_data: list | None, window_days: int) -> str:
         """判定数据充分度"""
         if not return_temp_data:
             return "minimal"

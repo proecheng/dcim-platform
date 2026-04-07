@@ -69,7 +69,7 @@ describe('RollbackStatusCard 逻辑', () => {
 
       // 等待异步 fetchStatus
       await vi.waitFor(() => {
-        expect(wrapper.vm.statusTagType).toBe('danger')
+        expect((wrapper.vm as any).statusTagType).toBe('danger')
       })
     })
 
@@ -92,7 +92,7 @@ describe('RollbackStatusCard 逻辑', () => {
       })
 
       await vi.waitFor(() => {
-        expect(wrapper.vm.statusTagType).toBe('warning')
+        expect((wrapper.vm as any).statusTagType).toBe('warning')
       })
     })
 
@@ -115,7 +115,7 @@ describe('RollbackStatusCard 逻辑', () => {
       })
 
       await vi.waitFor(() => {
-        expect(wrapper.vm.statusTagType).toBe('success')
+        expect((wrapper.vm as any).statusTagType).toBe('success')
       })
     })
   })
@@ -140,7 +140,7 @@ describe('RollbackStatusCard 逻辑', () => {
       })
 
       await vi.waitFor(() => {
-        expect(wrapper.vm.statusText).toBe('回退中')
+        expect((wrapper.vm as any).statusText).toBe('回退中')
       })
     })
 
@@ -163,7 +163,7 @@ describe('RollbackStatusCard 逻辑', () => {
       })
 
       await vi.waitFor(() => {
-        expect(wrapper.vm.statusText).toBe('接近约束')
+        expect((wrapper.vm as any).statusText).toBe('接近约束')
       })
     })
 
@@ -186,7 +186,7 @@ describe('RollbackStatusCard 逻辑', () => {
       })
 
       await vi.waitFor(() => {
-        expect(wrapper.vm.statusText).toBe('正常')
+        expect((wrapper.vm as any).statusText).toBe('正常')
       })
     })
   })
@@ -198,7 +198,7 @@ describe('RollbackStatusCard 逻辑', () => {
         props: { zoneId: 1, headroom: 5 },
       })
 
-      const result = wrapper.vm.formatTime('2026-03-11T09:05:00')
+      const result = (wrapper.vm as any).formatTime('2026-03-11T09:05:00')
       expect(result).toBe('3/11 09:05')
     })
 
@@ -208,7 +208,7 @@ describe('RollbackStatusCard 逻辑', () => {
         props: { zoneId: 1, headroom: 5 },
       })
 
-      const result = wrapper.vm.formatTime('invalid-date')
+      const result = (wrapper.vm as any).formatTime('invalid-date')
       // 无效日期时 new Date 返回 NaN，formatTime 返回 NaN 相关字符串或原字符串
       expect(typeof result).toBe('string')
     })
@@ -229,7 +229,7 @@ describe('RollbackTimeline 逻辑', () => {
         props: { zoneId: 1 },
       })
 
-      const result = wrapper.vm.formatTime('2026-03-11T14:30:45')
+      const result = (wrapper.vm as any).formatTime('2026-03-11T14:30:45')
       expect(result).toBe('3/11 14:30:45')
     })
 
@@ -239,7 +239,7 @@ describe('RollbackTimeline 逻辑', () => {
         props: { zoneId: 1 },
       })
 
-      const result = wrapper.vm.formatTime(null)
+      const result = (wrapper.vm as any).formatTime(null)
       expect(result).toBe('-')
     })
   })
@@ -251,7 +251,7 @@ describe('RollbackTimeline 逻辑', () => {
         props: { zoneId: 1 },
       })
 
-      const map = wrapper.vm.triggerTypeMap
+      const map = (wrapper.vm as any).triggerTypeMap
       expect(map.temp_over_limit).toBe('温度超限')
       expect(map.rate_over_predicted).toBe('温升超预测')
       expect(map.rate_over_limit).toBe('温变速率超限')

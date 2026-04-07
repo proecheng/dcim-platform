@@ -140,9 +140,7 @@ class ChaosDrillService:
 
     # ---- 演练执行 ----
 
-    async def trigger_drill(
-        self, scenarios: List[str], breaker: Optional[CircuitBreaker] = None
-    ) -> str:
+    async def trigger_drill(self, scenarios: List[str], breaker: Optional[CircuitBreaker] = None) -> str:
         """手动触发演练"""
         # 验证场景
         invalid = set(scenarios) - VALID_SCENARIOS
@@ -232,9 +230,7 @@ class ChaosDrillService:
                 self.__class__._current_drill_id = None
                 self.__class__._stop_requested = False
 
-    async def _run_scenario(
-        self, name: str, breaker: Optional[CircuitBreaker] = None
-    ) -> dict:
+    async def _run_scenario(self, name: str, breaker: Optional[CircuitBreaker] = None) -> dict:
         """执行单个场景"""
         if name == "circuit_breaker_degradation":
             return await self._run_circuit_breaker_scenario(breaker)
@@ -243,9 +239,7 @@ class ChaosDrillService:
         else:
             return {"name": name, "status": "skipped", "details": {"error": "未知场景"}}
 
-    async def _run_circuit_breaker_scenario(
-        self, breaker: Optional[CircuitBreaker] = None
-    ) -> dict:
+    async def _run_circuit_breaker_scenario(self, breaker: Optional[CircuitBreaker] = None) -> dict:
         """场景 1: L2/L3 熔断降级验证"""
         result: Dict[str, Any] = {
             "name": "circuit_breaker_degradation",
@@ -341,9 +335,7 @@ class ChaosDrillService:
             }
 
             # 1. 测试 save_to_redis
-            redis_key = await DiagnosisFallbackStore.save_to_redis(
-                mock_data, reason="chaos_drill"
-            )
+            redis_key = await DiagnosisFallbackStore.save_to_redis(mock_data, reason="chaos_drill")
             result["details"]["redis_key"] = redis_key
             result["details"]["redis_fallback_working"] = bool(redis_key)
 
@@ -443,6 +435,7 @@ class ChaosDrillService:
         # 后台任务必须使用独立 session（请求作用域 session 已关闭）
         try:
             from app.core.database import async_session
+
             async with async_session() as db:
                 db.add(report)
                 await db.commit()
@@ -453,9 +446,7 @@ class ChaosDrillService:
 
     async def get_drill_history(self, page: int = 1, page_size: int = 10) -> dict:
         """查询演练历史"""
-        base_query = select(ReportRecord).where(
-            ReportRecord.report_type == "diagnosis_drill"
-        )
+        base_query = select(ReportRecord).where(ReportRecord.report_type == "diagnosis_drill")
 
         # 查询总数
         count_query = select(func.count()).select_from(base_query.subquery())

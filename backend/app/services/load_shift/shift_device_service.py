@@ -8,7 +8,7 @@ Device management and shift potential calculation
 """
 
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, and_, func
+from sqlalchemy import select, func
 from typing import List, Optional, Dict, Any
 from datetime import datetime, timedelta
 import logging
@@ -34,20 +34,19 @@ class ShiftDeviceService:
         """
         Get shiftable devices with shift potential
         获取可转移设备及转移潜力
-        
+
         Args:
             db: Database session
             device_type: Filter by device type (e.g., "空调", "UPS", "服务器")
             min_power: Minimum rated power (kW)
             max_power: Maximum rated power (kW)
             is_critical: Filter by critical device flag
-            
+
         Returns:
             List of DeviceShiftPotentialResponse with shift potential
         """
         logger.info(
-            f"Querying shiftable devices: type={device_type}, "
-            f"power={min_power}-{max_power}kW, critical={is_critical}"
+            f"Querying shiftable devices: type={device_type}, power={min_power}-{max_power}kW, critical={is_critical}"
         )
 
         # Build query
@@ -95,11 +94,11 @@ class ShiftDeviceService:
         """
         Get shift potential for a specific device
         获取指定设备的转移潜力
-        
+
         Args:
             db: Database session
             device_id: Device ID
-            
+
         Returns:
             DeviceShiftPotentialResponse
         """
@@ -135,19 +134,19 @@ class ShiftDeviceService:
         """
         Calculate shift potential for a device
         计算设备转移潜力
-        
+
         Considers:
         - Device rated power and current load
         - Historical shift success rate (last 90 days)
         - Device availability (uptime)
         - Recent shift frequency (lifespan impact)
         - Maintenance schedule
-        
+
         Args:
             db: Database session
             config: DeviceShiftConfig
             device: PowerDevice
-            
+
         Returns:
             DeviceShiftPotentialResponse with calculated potential
         """
@@ -160,13 +159,11 @@ class ShiftDeviceService:
 
         # Factor 2: Historical success rate (last 90 days)
         ninety_days_ago = datetime.now() - timedelta(days=90)
-        
+
         # Count total and successful shifts for this device
         query = select(
             func.count(ShiftExecution.id).label("total"),
-            func.sum(
-                func.case((ShiftExecution.status == "completed", 1), else_=0)
-            ).label("successful"),
+            func.sum(func.case((ShiftExecution.status == "completed", 1), else_=0)).label("successful"),
         ).where(
             ShiftExecution.created_at >= ninety_days_ago,
             # Note: ShiftExecution doesn't have device_id directly
@@ -236,10 +233,7 @@ class ShiftDeviceService:
             ),
         )
 
-        logger.debug(
-            f"Device {device_id} potential: {shift_potential_kw:.2f}kW "
-            f"(confidence={confidence_score:.2f})"
-        )
+        logger.debug(f"Device {device_id} potential: {shift_potential_kw:.2f}kW (confidence={confidence_score:.2f})")
 
         return potential_response
 
@@ -252,12 +246,12 @@ class ShiftDeviceService:
         """
         Generate notes about shift potential
         生成转移潜力说明
-        
+
         Args:
             success_rate: Historical success rate
             recent_shift_count: Recent shift count (30 days)
             frequency_penalty: Frequency penalty factor
-            
+
         Returns:
             Notes string
         """
@@ -265,9 +259,9 @@ class ShiftDeviceService:
 
         # Success rate notes
         if success_rate < 0.8:
-            notes.append(f"历史成功率较低({success_rate*100:.0f}%)，建议谨慎使用")
+            notes.append(f"历史成功率较低({success_rate * 100:.0f}%)，建议谨慎使用")
         elif success_rate >= 0.95:
-            notes.append(f"历史成功率高({success_rate*100:.0f}%)，可靠性好")
+            notes.append(f"历史成功率高({success_rate * 100:.0f}%)，可靠性好")
 
         # Frequency notes
         if recent_shift_count > 60:
@@ -294,12 +288,12 @@ class ShiftDeviceService:
         """
         Get device shift history
         获取设备转移历史
-        
+
         Args:
             db: Database session
             device_id: Device ID
             days: Number of days to look back
-            
+
         Returns:
             List of shift history records
         """
@@ -321,13 +315,15 @@ class ShiftDeviceService:
 
         history = []
         for impact in impacts:
-            history.append({
-                "date": impact.impact_date.isoformat(),
-                "shift_count": impact.shift_count,
-                "total_runtime_hours": impact.total_runtime_hours,
-                "estimated_lifespan_loss_days": impact.estimated_lifespan_loss_days,
-                "notes": impact.notes,
-            })
+            history.append(
+                {
+                    "date": impact.impact_date.isoformat(),
+                    "shift_count": impact.shift_count,
+                    "total_runtime_hours": impact.total_runtime_hours,
+                    "estimated_lifespan_loss_days": impact.estimated_lifespan_loss_days,
+                    "notes": impact.notes,
+                }
+            )
 
         logger.info(f"Found {len(history)} shift history records")
         return history
@@ -343,7 +339,7 @@ class ShiftDeviceService:
         """
         Update device lifespan impact after shift execution
         转移执行后更新设备寿命影响
-        
+
         Args:
             db: Database session
             device_id: Device ID
@@ -351,10 +347,7 @@ class ShiftDeviceService:
             shift_count: Number of shifts (start/stop cycles)
             runtime_hours: Total runtime hours
         """
-        logger.info(
-            f"Updating lifespan impact for device {device_id}: "
-            f"shifts={shift_count}, runtime={runtime_hours}h"
-        )
+        logger.info(f"Updating lifespan impact for device {device_id}: shifts={shift_count}, runtime={runtime_hours}h")
 
         # Calculate estimated lifespan loss
         # Frequent starts reduce lifespan 15-25%
@@ -392,7 +385,7 @@ class ShiftDeviceService:
                 notes=f"转移{shift_count}次，运行{runtime_hours:.1f}小时",
             )
             db.add(impact)
-            logger.debug(f"Created new lifespan impact record")
+            logger.debug("Created new lifespan impact record")
 
         await db.commit()
         logger.info(f"Lifespan impact updated: loss={total_lifespan_loss:.2f} days")

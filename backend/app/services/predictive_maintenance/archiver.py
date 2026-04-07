@@ -90,10 +90,13 @@ async def archive_hourly(db: AsyncSession) -> int:
         except IntegrityError:
             # 并发写入时可能触发 UNIQUE 约束冲突
             # 不调用 rollback，由外层 context manager 负责事务语义
-            logger.warning("归档 %s: 并发写入冲突，部分记录可能重复",
-                           hour_start.strftime("%Y-%m-%d %H:00"))
+            logger.warning("归档 %s: 并发写入冲突，部分记录可能重复", hour_start.strftime("%Y-%m-%d %H:00"))
             return 0
 
-    logger.info("归档 %s: 新增 %d 条，跳过 %d 条（已存在）",
-                hour_start.strftime("%Y-%m-%d %H:00"), created, len(existing_point_ids))
+    logger.info(
+        "归档 %s: 新增 %d 条，跳过 %d 条（已存在）",
+        hour_start.strftime("%Y-%m-%d %H:00"),
+        created,
+        len(existing_point_ids),
+    )
     return created

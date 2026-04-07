@@ -12,9 +12,11 @@ from pydantic import BaseModel, Field
 
 # ==================== AlarmNotificationContext DTO ====================
 
+
 @dataclass
 class AlarmNotificationContext:
     """通知上下文 DTO — 避免跨层传递 ORM 对象"""
+
     alarm_id: int
     alarm_level: str
     alarm_message: str
@@ -65,7 +67,9 @@ IM_MARKDOWN_TEMPLATE = """### ⚠️ {alarm_level_cn}告警
 - **时间：** {created_at}
 - **详情：** {alarm_message}"""
 
-VOICE_TTS_TEMPLATE = "{site_name}发生{alarm_level_cn}告警，设备{device_name}，点位{point_name}，当前值{current_value}，请及时处理。"
+VOICE_TTS_TEMPLATE = (
+    "{site_name}发生{alarm_level_cn}告警，设备{device_name}，点位{point_name}，当前值{current_value}，请及时处理。"
+)
 
 # 渠道 → 内容模板
 _CHANNEL_CONTENT_TEMPLATES = {
@@ -113,9 +117,7 @@ def render_notification(template: str, context: AlarmNotificationContext) -> str
 # ==================== 风暴摘要模板 (Story 34.6) ====================
 
 STORM_SUMMARY_TEMPLATE = (
-    "[告警风暴] {site_name} 在 {window}s 内触发 {total_count} 条告警\n"
-    "级别分布: {level_summary}\n"
-    "{critical_detail}"
+    "[告警风暴] {site_name} 在 {window}s 内触发 {total_count} 条告警\n级别分布: {level_summary}\n{critical_detail}"
 )
 
 
@@ -128,9 +130,7 @@ def build_storm_summary(
     from collections import Counter
 
     level_counter = Counter(d["alarm_level"] for d in alarm_data_list)
-    level_summary = ", ".join(
-        f"{ALARM_LEVEL_CN.get(k, k)} {v}条" for k, v in level_counter.most_common()
-    )
+    level_summary = ", ".join(f"{ALARM_LEVEL_CN.get(k, k)} {v}条" for k, v in level_counter.most_common())
 
     critical_detail = ""
     critical_alarms = [d for d in alarm_data_list if d["alarm_level"] == "critical"]
@@ -148,6 +148,7 @@ def build_storm_summary(
 
 
 # ==================== API Schema ====================
+
 
 class ChannelTestRequest(BaseModel):
     channel_type: str = Field(..., pattern="^(sms|im|voice|email)$")

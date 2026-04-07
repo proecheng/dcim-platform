@@ -469,7 +469,8 @@ async def seed_power_devices():
                     phase_count=ups_def["phase_count"],
                     battery_group_count=ups_def["battery_group_count"],
                     bypass_enabled=ups_def["bypass_enabled"],
-                , is_demo=True)
+                    is_demo=True,
+                )
                 session.add(ups_ext)
                 await session.flush()
 

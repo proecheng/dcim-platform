@@ -90,9 +90,7 @@ class ImAdapter(NotificationAdapter):
                     "notification.im.dingtalk.webhook_url",
                     "notification.im.dingtalk.secret",
                 ):
-                    result = await session.execute(
-                        select(SystemConfig).where(SystemConfig.key == key)
-                    )
+                    result = await session.execute(select(SystemConfig).where(SystemConfig.key == key))
                     cfg = result.scalar_one_or_none()
                     if cfg and cfg.value:
                         if "webhook_url" in key:
@@ -132,9 +130,7 @@ class ImAdapter(NotificationAdapter):
                 data = resp.json()
                 if data.get("errcode") == 0:
                     return NotificationResult(success=True)
-                return NotificationResult(
-                    success=False, error_message=f"钉钉API错误: {data}"
-                )
+                return NotificationResult(success=False, error_message=f"钉钉API错误: {data}")
         except Exception as e:
             return NotificationResult(success=False, error_message=str(e))
 
@@ -146,9 +142,7 @@ class SmsAdapter(NotificationAdapter):
     """短信适配器 — V4.3.1 交付，当前为桩实现"""
 
     async def send(self, contact_value, subject, content, context):
-        return NotificationResult(
-            success=False, error_message="SMS adapter not implemented"
-        )
+        return NotificationResult(success=False, error_message="SMS adapter not implemented")
 
     async def health_check(self):
         return False
@@ -161,9 +155,7 @@ class VoiceCallAdapter(NotificationAdapter):
     """语音电话适配器 — V4.3.1 交付，当前为桩实现"""
 
     async def send(self, contact_value, subject, content, context):
-        return NotificationResult(
-            success=False, error_message="Voice adapter not implemented"
-        )
+        return NotificationResult(success=False, error_message="Voice adapter not implemented")
 
     async def health_check(self):
         return False

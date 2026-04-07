@@ -346,7 +346,7 @@ function parseTopology(topology: DistributionTopology) {
 async function loadAllPduPages(): Promise<PowerApiItem[]> {
   const allItems: PowerApiItem[] = []
   let requestPage = 1
-  let apiTotal = 0
+  let apiTotal: number
 
   do {
     const res = await getPDUList({ page: requestPage, page_size: 100 })

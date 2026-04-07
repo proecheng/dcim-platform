@@ -1199,20 +1199,19 @@ async def _publish_topology_update(event_type: str, entity_id: int, entity_type:
     try:
         import redis.asyncio as redis
         from app.core.config import get_settings
+
         settings = get_settings()
 
-        redis_client = redis.Redis(
-            host=settings.redis_host,
-            port=settings.redis_port,
-            decode_responses=True
+        redis_client = redis.Redis(host=settings.redis_host, port=settings.redis_port, decode_responses=True)
+        payload = json.dumps(
+            {
+                "event_type": event_type,
+                "entity_id": entity_id,
+                "entity_type": entity_type,
+                "timestamp": datetime.now().isoformat(),
+            }
         )
-        payload = json.dumps({
-            "event_type": event_type,
-            "entity_id": entity_id,
-            "entity_type": entity_type,
-            "timestamp": datetime.now().isoformat()
-        })
-        await redis_client.publish('topology:config_update', payload)
+        await redis_client.publish("topology:config_update", payload)
         await redis_client.close()
         logger.debug(f"发布拓扑更新通知: {event_type} {entity_type} {entity_id}")
     except ImportError:

@@ -2,6 +2,7 @@
 Shift Constraint Service
 负荷转移约束管理服务
 """
+
 from typing import Dict, Any, List
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -53,9 +54,7 @@ class ShiftConstraintService:
         existing = 0
 
         for item in defaults:
-            exists = await db.execute(
-                select(ShiftConstraint).where(ShiftConstraint.constraint_type == item["type"])
-            )
+            exists = await db.execute(select(ShiftConstraint).where(ShiftConstraint.constraint_type == item["type"]))
             if exists.scalar_one_or_none() is not None:
                 existing += 1
                 continue
@@ -145,9 +144,7 @@ class ShiftConstraintService:
     @staticmethod
     async def update_constraint(db: AsyncSession, constraint_id: int, data: Dict[str, Any]) -> Dict[str, Any]:
         """更新约束"""
-        result = await db.execute(
-            select(ShiftConstraint).where(ShiftConstraint.id == constraint_id)
-        )
+        result = await db.execute(select(ShiftConstraint).where(ShiftConstraint.id == constraint_id))
         constraint = result.scalar_one_or_none()
 
         if not constraint:
@@ -181,9 +178,7 @@ class ShiftConstraintService:
     @staticmethod
     async def delete_constraint(db: AsyncSession, constraint_id: int) -> bool:
         """删除约束"""
-        result = await db.execute(
-            select(ShiftConstraint).where(ShiftConstraint.id == constraint_id)
-        )
+        result = await db.execute(select(ShiftConstraint).where(ShiftConstraint.id == constraint_id))
         constraint = result.scalar_one_or_none()
 
         if not constraint:

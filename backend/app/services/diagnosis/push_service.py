@@ -149,10 +149,7 @@ class DiagnosisPushService:
             "created_at": datetime.now().isoformat(),
         }
 
-        await client.rpush(
-            DiagnosisPushService.RETRY_QUEUE_KEY,
-            json.dumps(retry_data, ensure_ascii=False)
-        )
+        await client.rpush(DiagnosisPushService.RETRY_QUEUE_KEY, json.dumps(retry_data, ensure_ascii=False))
         logger.info("推送失败数据已写入重试队列: session_id=%d", session_id)
 
     @staticmethod
@@ -184,19 +181,13 @@ class DiagnosisPushService:
                 # 检查是否过期（超过 24 小时）
                 age_seconds = (datetime.now() - created_at).total_seconds()
                 if age_seconds > DiagnosisPushService.RETRY_TTL:
-                    logger.warning(
-                        "重试数据已过期: session_id=%d, age=%.0fs",
-                        data["session_id"], age_seconds
-                    )
+                    logger.warning("重试数据已过期: session_id=%d, age=%.0fs", data["session_id"], age_seconds)
                     expired_count += 1
                     continue
 
                 # 检查重试次数
                 if retry_count >= DiagnosisPushService.MAX_RETRY_COUNT:
-                    logger.warning(
-                        "重试次数已达上限: session_id=%d, retry_count=%d",
-                        data["session_id"], retry_count
-                    )
+                    logger.warning("重试次数已达上限: session_id=%d, retry_count=%d", data["session_id"], retry_count)
                     failed_count += 1
                     continue
 
@@ -218,10 +209,7 @@ class DiagnosisPushService:
                 else:
                     # 推送仍然失败，增加重试计数并重新入队
                     data["retry_count"] = retry_count + 1
-                    await client.rpush(
-                        DiagnosisPushService.RETRY_QUEUE_KEY,
-                        json.dumps(data, ensure_ascii=False)
-                    )
+                    await client.rpush(DiagnosisPushService.RETRY_QUEUE_KEY, json.dumps(data, ensure_ascii=False))
                     failed_count += 1
 
             except Exception as e:
@@ -231,15 +219,10 @@ class DiagnosisPushService:
 
         if success_count + failed_count + expired_count > 0:
             logger.info(
-                "重试队列处理完成: success=%d, failed=%d, expired=%d",
-                success_count, failed_count, expired_count
+                "重试队列处理完成: success=%d, failed=%d, expired=%d", success_count, failed_count, expired_count
             )
 
-        return {
-            "success": success_count,
-            "failed": failed_count,
-            "expired": expired_count
-        }
+        return {"success": success_count, "failed": failed_count, "expired": expired_count}
 
     @staticmethod
     def get_push_level(confidence: float) -> str:

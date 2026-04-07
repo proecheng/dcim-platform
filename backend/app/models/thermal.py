@@ -33,31 +33,18 @@ class ThermalParameter(Base):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     cooling_zone_id = Column(
-        Integer,
-        ForeignKey("cooling_zones.id", ondelete="CASCADE"),
-        nullable=False,
-        comment="关联制冷区域ID"
+        Integer, ForeignKey("cooling_zones.id", ondelete="CASCADE"), nullable=False, comment="关联制冷区域ID"
     )
     thermal_R = Column(Float, nullable=True, comment="热阻标定值 °C/kW")
     thermal_C = Column(Float, nullable=True, comment="热容标定值 kWh/°C（总热容，非单位面积）")
     fitting_r_squared = Column(Float, nullable=True, comment="拟合 R² 值")
-    fitting_method = Column(
-        String(20),
-        nullable=True,
-        default="manual",
-        comment="标定方法: auto_fit/manual/default"
-    )
+    fitting_method = Column(String(20), nullable=True, default="manual", comment="标定方法: auto_fit/manual/default")
     sample_count = Column(Integer, nullable=True, comment="样本数")
     calibrated_at = Column(DateTime, nullable=True, comment="标定时间")
     is_active = Column(Boolean, default=True, comment="是否为当前生效参数")
     is_demo = Column(Boolean, default=False, comment="是否为 demo 数据")
     created_at = Column(DateTime, default=datetime.now, comment="创建时间")
-    updated_at = Column(
-        DateTime,
-        default=datetime.now,
-        onupdate=datetime.now,
-        comment="更新时间"
-    )
+    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now, comment="更新时间")
 
     # 复合索引：cooling_zone_id + is_active
     __table_args__ = (
@@ -84,10 +71,7 @@ class TemperaturePredictionLog(Base):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     cooling_zone_id = Column(
-        Integer,
-        ForeignKey("cooling_zones.id", ondelete="CASCADE"),
-        nullable=False,
-        comment="关联制冷区域ID"
+        Integer, ForeignKey("cooling_zones.id", ondelete="CASCADE"), nullable=False, comment="关联制冷区域ID"
     )
     predicted_temp = Column(Float, nullable=False, comment="预测温度 °C")
     actual_temp = Column(Float, nullable=True, comment="实际温度 °C")
@@ -97,9 +81,7 @@ class TemperaturePredictionLog(Base):
     created_at = Column(DateTime, default=datetime.now, nullable=False, comment="记录时间")
 
     # 复合索引：cooling_zone_id ASC + created_at DESC（时序查询优化）
-    __table_args__ = (
-        Index("ix_temp_pred_zone_time", "cooling_zone_id", created_at.desc()),
-    )
+    __table_args__ = (Index("ix_temp_pred_zone_time", "cooling_zone_id", created_at.desc()),)
 
 
 class PrecoolSchedule(Base):
@@ -117,7 +99,7 @@ class PrecoolSchedule(Base):
         ForeignKey("cooling_zones.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
-        comment="关联制冷区域ID"
+        comment="关联制冷区域ID",
     )
     schedule_date = Column(Date, nullable=False, comment="计划日期")
 
@@ -135,19 +117,12 @@ class PrecoolSchedule(Base):
     actual_savings_kwh = Column(Float, nullable=True, comment="实际节省电量 kWh")
 
     # 执行状态
-    status = Column(
-        String(20),
-        default="pending",
-        index=True,
-        comment="状态: pending/executing/completed/aborted"
-    )
+    status = Column(String(20), default="pending", index=True, comment="状态: pending/executing/completed/aborted")
     abort_reason = Column(String(500), nullable=True, comment="中止原因")
 
     # 温度轨迹 JSON
     temperature_trajectory = Column(
-        JSON,
-        nullable=True,
-        comment="预测/实际温度轨迹 JSON: {predicted: [...], timestamps: [...]}"
+        JSON, nullable=True, comment="预测/实际温度轨迹 JSON: {predicted: [...], timestamps: [...]}"
     )
 
     # 验证信息
@@ -155,20 +130,9 @@ class PrecoolSchedule(Base):
     validated_at = Column(DateTime, nullable=True, comment="验证时间")
 
     created_at = Column(DateTime, default=datetime.now, comment="创建时间")
-    updated_at = Column(
-        DateTime,
-        default=datetime.now,
-        onupdate=datetime.now,
-        comment="更新时间"
-    )
+    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now, comment="更新时间")
 
-    __table_args__ = (
-        UniqueConstraint(
-            "cooling_zone_id",
-            "schedule_date",
-            name="uq_zone_schedule_date"
-        ),
-    )
+    __table_args__ = (UniqueConstraint("cooling_zone_id", "schedule_date", name="uq_zone_schedule_date"),)
 
 
 class VppDispatch(Base):
@@ -177,6 +141,7 @@ class VppDispatch(Base):
     记录 VPP 平台下发的负荷调控指令及处理结果。
     Story 33.2: VPP 调控指令接收与执行
     """
+
     __tablename__ = "vpp_dispatches"
 
     id = Column(Integer, primary_key=True, index=True)
@@ -186,8 +151,7 @@ class VppDispatch(Base):
     duration_minutes = Column(Integer, nullable=False, comment="持续时间（分钟）")
     priority = Column(Integer, default=1, comment="优先级 1=普通 2=紧急")
 
-    status = Column(String(20), nullable=False, default="received",
-                    comment="状态: received/accepted/rejected")
+    status = Column(String(20), nullable=False, default="received", comment="状态: received/accepted/rejected")
 
     reject_reason = Column(String(500), nullable=True, comment="拒绝原因")
     max_adjustable_kw = Column(Float, nullable=True, comment="拒绝时返回的最大可调容量")
@@ -195,9 +159,7 @@ class VppDispatch(Base):
 
     aborted_schedule_id = Column(Integer, nullable=True, comment="被中止的预冷计划 ID")
 
-    created_at = Column(
-        DateTime, default=datetime.now, comment="创建时间"
-    )
+    created_at = Column(DateTime, default=datetime.now, comment="创建时间")
 
     __table_args__ = (
         Index("ix_vpp_dispatches_status", "status"),

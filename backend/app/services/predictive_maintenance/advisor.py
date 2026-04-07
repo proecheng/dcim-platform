@@ -117,7 +117,9 @@ class MaintenanceAdvisor:
             existing.updated_at = datetime.now()
             logger.info(
                 "更新维护建议: advice_id=%d, device_id=%d, score=%.1f",
-                existing.id, device.id, health_score,
+                existing.id,
+                device.id,
+                health_score,
             )
             return existing
 
@@ -136,7 +138,10 @@ class MaintenanceAdvisor:
         await self.db.flush()  # 确保 ID 分配
         logger.info(
             "生成维护建议: advice_id=%d, device_id=%d, score=%.1f, urgency=%s",
-            advice.id, device.id, health_score, urgency,
+            advice.id,
+            device.id,
+            health_score,
+            urgency,
         )
         return advice
 
@@ -220,7 +225,9 @@ class MaintenanceAdvisor:
 
         logger.info(
             "维护建议确认转工单: advice_id=%d, work_order_id=%d, order_no=%s",
-            advice_id, wo.id, order_no,
+            advice_id,
+            wo.id,
+            order_no,
         )
         return wo
 
@@ -248,10 +255,6 @@ class MaintenanceAdvisor:
         today = datetime.now().strftime("%Y%m%d")
         prefix = f"MA-{today}-"
 
-        result = await self.db.execute(
-            select(func.count(WorkOrder.id)).where(
-                WorkOrder.order_no.like(f"{prefix}%")
-            )
-        )
+        result = await self.db.execute(select(func.count(WorkOrder.id)).where(WorkOrder.order_no.like(f"{prefix}%")))
         count = result.scalar() or 0
         return f"{prefix}{count + 1:03d}"

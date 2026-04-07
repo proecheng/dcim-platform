@@ -1,11 +1,12 @@
 """
 A/B 测试服务 - Story 26.5
 """
+
 import hashlib
 import json
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Optional, Dict, Any, List
-from sqlalchemy import select, func, and_, or_
+from sqlalchemy import select, func, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 from redis import asyncio as aioredis
 
@@ -40,10 +41,7 @@ class ABTestingService:
         """创建 A/B 测试配置"""
         # 检查是否已有活跃的 A/B 测试
         stmt = select(ABTestConfig).where(
-            and_(
-                ABTestConfig.fault_tree_id == fault_tree_id,
-                ABTestConfig.status == "active"
-            )
+            and_(ABTestConfig.fault_tree_id == fault_tree_id, ABTestConfig.status == "active")
         )
         result = await self.db.execute(stmt)
         existing = result.scalar_one_or_none()
@@ -98,7 +96,9 @@ class ABTestingService:
             else:
                 max_allowed = old_percentage * 2
             if new_percentage > max_allowed:
-                raise ValueError(f"灰度扩大不能超过限制（当前 {old_percentage}%，最大允许 {max_allowed}%，请求 {new_percentage}%）")
+                raise ValueError(
+                    f"灰度扩大不能超过限制（当前 {old_percentage}%，最大允许 {max_allowed}%，请求 {new_percentage}%）"
+                )
 
         # 更新配置
         ab_test.strategy_params = strategy_params
@@ -127,9 +127,7 @@ class ABTestingService:
             return await self._get_active_version_id(fault_tree_id)
 
         # 获取或分配设备版本
-        version_id = await self._get_or_assign_device_version(
-            ab_test, device_id, device_type, site_id
-        )
+        version_id = await self._get_or_assign_device_version(ab_test, device_id, device_type, site_id)
         return version_id
 
     async def _get_active_ab_test(self, fault_tree_id: int) -> Optional[ABTestConfig]:
@@ -160,10 +158,7 @@ class ABTestingService:
 
         # 从数据库读取
         stmt = select(ABTestConfig).where(
-            and_(
-                ABTestConfig.fault_tree_id == fault_tree_id,
-                ABTestConfig.status == "active"
-            )
+            and_(ABTestConfig.fault_tree_id == fault_tree_id, ABTestConfig.status == "active")
         )
         result = await self.db.execute(stmt)
         ab_test = result.scalar_one_or_none()
@@ -198,10 +193,7 @@ class ABTestingService:
         """获取或分配设备版本"""
         # 查询设备是否已分配版本
         stmt = select(ABTestDeviceAssignment).where(
-            and_(
-                ABTestDeviceAssignment.ab_test_id == ab_test.id,
-                ABTestDeviceAssignment.device_id == device_id
-            )
+            and_(ABTestDeviceAssignment.ab_test_id == ab_test.id, ABTestDeviceAssignment.device_id == device_id)
         )
         result = await self.db.execute(stmt)
         assignment = result.scalar_one_or_none()
@@ -213,9 +205,7 @@ class ABTestingService:
         # 设备未分配，根据分流策略计算版本
         if ab_test.strategy == "hash" or ab_test.strategy == "percentage":
             percentage = ab_test.strategy_params.get("percentage", 0)
-            version_id = self._select_version_by_hash(
-                device_id, percentage, ab_test.version_a_id, ab_test.version_b_id
-            )
+            version_id = self._select_version_by_hash(device_id, percentage, ab_test.version_a_id, ab_test.version_b_id)
         elif ab_test.strategy == "device_type":
             device_types_a = ab_test.strategy_params.get("device_types_a", [])
             version_id = self._select_version_by_device_type(
@@ -223,9 +213,7 @@ class ABTestingService:
             )
         elif ab_test.strategy == "site":
             site_ids_a = ab_test.strategy_params.get("site_ids_a", [])
-            version_id = self._select_version_by_site(
-                site_id, site_ids_a, ab_test.version_a_id, ab_test.version_b_id
-            )
+            version_id = self._select_version_by_site(site_id, site_ids_a, ab_test.version_a_id, ab_test.version_b_id)
         else:
             # 未知策略，使用版本B（对照版本）
             version_id = ab_test.version_b_id
@@ -250,9 +238,7 @@ class ABTestingService:
 
         return version_id
 
-    def _select_version_by_hash(
-        self, device_id: str, percentage: int, version_a_id: int, version_b_id: int
-    ) -> int:
+    def _select_version_by_hash(self, device_id: str, percentage: int, version_a_id: int, version_b_id: int) -> int:
         """使用一致性哈希确保同一设备始终使用同一版本"""
         # 使用 MD5 足够满足分流需求，性能优于 SHA-256
         hash_value = int(hashlib.md5(device_id.encode()).hexdigest(), 16)
@@ -265,9 +251,7 @@ class ABTestingService:
         """按设备类型分流"""
         return version_a_id if device_type in device_types_a else version_b_id
 
-    def _select_version_by_site(
-        self, site_id: int, site_ids_a: List[int], version_a_id: int, version_b_id: int
-    ) -> int:
+    def _select_version_by_site(self, site_id: int, site_ids_a: List[int], version_a_id: int, version_b_id: int) -> int:
         """按站点分流"""
         return version_a_id if site_id in site_ids_a else version_b_id
 
@@ -283,25 +267,21 @@ class ABTestingService:
 
         # 查询 active 版本
         stmt = select(FaultTreeVersion.id, FaultTreeVersion.version_number).where(
-            and_(
-                FaultTreeVersion.tree_id == fault_tree_id,
-                FaultTreeVersion.status == "active"
-            )
+            and_(FaultTreeVersion.tree_id == fault_tree_id, FaultTreeVersion.status == "active")
         )
         result = await self.db.execute(stmt)
         row = result.first()
 
         if not row:
             # 查询该故障树的所有版本状态
-            stmt_all = select(FaultTreeVersion.status, func.count()).where(
-                FaultTreeVersion.tree_id == fault_tree_id
-            ).group_by(FaultTreeVersion.status)
+            stmt_all = (
+                select(FaultTreeVersion.status, func.count())
+                .where(FaultTreeVersion.tree_id == fault_tree_id)
+                .group_by(FaultTreeVersion.status)
+            )
             result_all = await self.db.execute(stmt_all)
             status_counts = {status: count for status, count in result_all.all()}
-            raise ValueError(
-                f"故障树 {fault_tree_id} 没有 active 版本。"
-                f"现有版本状态: {status_counts or '无版本'}"
-            )
+            raise ValueError(f"故障树 {fault_tree_id} 没有 active 版本。现有版本状态: {status_counts or '无版本'}")
 
         return row[0]
 
@@ -376,7 +356,7 @@ class ABTestingService:
         stmt = select(func.count(DiagnosisResult.id)).where(
             and_(
                 DiagnosisResult.fault_tree_version_id == version_id,
-                DiagnosisResult.created_at.between(start_date, end_date)
+                DiagnosisResult.created_at.between(start_date, end_date),
             )
         )
         result = await self.db.execute(stmt)
@@ -404,19 +384,22 @@ class ABTestingService:
             "false_negative_rate": false_negative_rate,
         }
 
-    async def _calculate_accuracy_rate(
-        self, version_id: int, start_date: datetime, end_date: datetime
-    ) -> float:
+    async def _calculate_accuracy_rate(self, version_id: int, start_date: datetime, end_date: datetime) -> float:
         """计算准确率"""
-        stmt = select(
-            func.count(DiagnosisAnnotation.id).filter(DiagnosisAnnotation.is_accurate == True).label("accurate_count"),
-            func.count(DiagnosisAnnotation.id).label("total_count")
-        ).select_from(DiagnosisResult).join(
-            DiagnosisAnnotation, DiagnosisResult.id == DiagnosisAnnotation.diagnosis_result_id
-        ).where(
-            and_(
-                DiagnosisResult.fault_tree_version_id == version_id,
-                DiagnosisResult.created_at.between(start_date, end_date)
+        stmt = (
+            select(
+                func.count(DiagnosisAnnotation.id)
+                .filter(DiagnosisAnnotation.is_accurate == True)
+                .label("accurate_count"),
+                func.count(DiagnosisAnnotation.id).label("total_count"),
+            )
+            .select_from(DiagnosisResult)
+            .join(DiagnosisAnnotation, DiagnosisResult.id == DiagnosisAnnotation.diagnosis_result_id)
+            .where(
+                and_(
+                    DiagnosisResult.fault_tree_version_id == version_id,
+                    DiagnosisResult.created_at.between(start_date, end_date),
+                )
             )
         )
         result = await self.db.execute(stmt)
@@ -425,39 +408,37 @@ class ABTestingService:
             return 0.0
         return row.accurate_count / row.total_count
 
-    async def _calculate_avg_inference_time(
-        self, version_id: int, start_date: datetime, end_date: datetime
-    ) -> float:
+    async def _calculate_avg_inference_time(self, version_id: int, start_date: datetime, end_date: datetime) -> float:
         """计算平均推理耗时"""
         stmt = select(func.avg(DiagnosisResult.inference_time_ms)).where(
             and_(
                 DiagnosisResult.fault_tree_version_id == version_id,
                 DiagnosisResult.created_at.between(start_date, end_date),
-                DiagnosisResult.inference_time_ms.isnot(None)
+                DiagnosisResult.inference_time_ms.isnot(None),
             )
         )
         result = await self.db.execute(stmt)
         avg_time = result.scalar()
         return float(avg_time) if avg_time else 0.0
 
-    async def _calculate_false_positive_rate(
-        self, version_id: int, start_date: datetime, end_date: datetime
-    ) -> float:
+    async def _calculate_false_positive_rate(self, version_id: int, start_date: datetime, end_date: datetime) -> float:
         """计算误报率"""
-        stmt = select(
-            func.count(DiagnosisResult.id).filter(
+        stmt = (
+            select(
+                func.count(DiagnosisResult.id)
+                .filter(and_(DiagnosisResult.root_cause.isnot(None), DiagnosisAnnotation.is_accurate == False))
+                .label("false_positive_count"),
+                func.count(DiagnosisResult.id)
+                .filter(DiagnosisResult.root_cause.isnot(None))
+                .label("total_positive_count"),
+            )
+            .select_from(DiagnosisResult)
+            .join(DiagnosisAnnotation, DiagnosisResult.id == DiagnosisAnnotation.diagnosis_result_id)
+            .where(
                 and_(
-                    DiagnosisResult.root_cause.isnot(None),
-                    DiagnosisAnnotation.is_accurate == False
+                    DiagnosisResult.fault_tree_version_id == version_id,
+                    DiagnosisResult.created_at.between(start_date, end_date),
                 )
-            ).label("false_positive_count"),
-            func.count(DiagnosisResult.id).filter(DiagnosisResult.root_cause.isnot(None)).label("total_positive_count")
-        ).select_from(DiagnosisResult).join(
-            DiagnosisAnnotation, DiagnosisResult.id == DiagnosisAnnotation.diagnosis_result_id
-        ).where(
-            and_(
-                DiagnosisResult.fault_tree_version_id == version_id,
-                DiagnosisResult.created_at.between(start_date, end_date)
             )
         )
         result = await self.db.execute(stmt)
@@ -466,9 +447,7 @@ class ABTestingService:
             return 0.0
         return row.false_positive_count / row.total_positive_count
 
-    async def _calculate_false_negative_rate(
-        self, version_id: int, start_date: datetime, end_date: datetime
-    ) -> float:
+    async def _calculate_false_negative_rate(self, version_id: int, start_date: datetime, end_date: datetime) -> float:
         """
         计算漏报率
         注意：当前简化实现返回 0.0，实际应通过工单系统关联真实故障数据计算
@@ -490,7 +469,7 @@ class ABTestingService:
                 "method": "unavailable",
                 "p_value": None,
                 "is_significant": False,
-                "warning": f"{missing_lib} 未安装，无法执行统计检验"
+                "warning": f"{missing_lib} 未安装，无法执行统计检验",
             }
 
         # 计算准确和不准确的次数
@@ -507,7 +486,7 @@ class ABTestingService:
                 "method": "insufficient_sample",
                 "p_value": None,
                 "is_significant": False,
-                "warning": f"样本量不足（版本A: {total_a}, 版本B: {total_b}），建议至少各 10 次诊断"
+                "warning": f"样本量不足（版本A: {total_a}, 版本B: {total_b}），建议至少各 10 次诊断",
             }
 
         # 构建列联表
@@ -525,7 +504,7 @@ class ABTestingService:
                 "p_value": p_value_fisher,
                 "odds_ratio": float(oddsratio),
                 "is_significant": p_value_fisher < 0.05,
-                "note": "期望频数 < 5，使用 Fisher 精确检验"
+                "note": "期望频数 < 5，使用 Fisher 精确检验",
             }
 
         return {
@@ -533,7 +512,7 @@ class ABTestingService:
             "chi2_statistic": float(chi2),
             "p_value": float(p_value),
             "degrees_of_freedom": int(dof),
-            "is_significant": p_value < 0.05
+            "is_significant": p_value < 0.05,
         }
 
     def _check_completion_requirements(
@@ -655,9 +634,7 @@ class ABTestingService:
     async def _promote_version(self, new_active_id: int, old_active_id: int):
         """将新版本设为 active，旧版本归档（事务保护）"""
         # 查询两个版本（在同一事务中）
-        stmt = select(FaultTreeVersion).where(
-            FaultTreeVersion.id.in_([old_active_id, new_active_id])
-        )
+        stmt = select(FaultTreeVersion).where(FaultTreeVersion.id.in_([old_active_id, new_active_id]))
         result = await self.db.execute(stmt)
         versions = {v.id: v for v in result.scalars().all()}
 
@@ -675,4 +652,3 @@ class ABTestingService:
         new_version.activated_at = datetime.utcnow()
 
         # 不在此处提交，由调用方统一提交确保原子性
-

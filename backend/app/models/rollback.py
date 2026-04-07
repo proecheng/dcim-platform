@@ -14,13 +14,14 @@ from app.core.database import Base
 
 class RollbackTriggerType(str, Enum):
     """回退触发类型"""
-    TEMP_OVER_LIMIT = "temp_over_limit"           # 条件1: T_inlet > 26°C
-    RATE_OVER_PREDICTED = "rate_over_predicted"    # 条件2: 温升超预测 150%
-    RATE_OVER_LIMIT = "rate_over_limit"            # 条件3: |dT/dt| > 5°C/h
-    AC_FAULT = "ac_fault"                          # 条件4: 空调故障告警
-    SENSOR_OFFLINE = "sensor_offline"              # 条件5: 温度传感器离线
-    UPS_ACTIVE = "ups_active"                      # 条件6: 市电中断切 UPS
-    HUMIDITY_DEW_POINT = "humidity_dew_point"       # 条件7: 湿度接近露点
+
+    TEMP_OVER_LIMIT = "temp_over_limit"  # 条件1: T_inlet > 26°C
+    RATE_OVER_PREDICTED = "rate_over_predicted"  # 条件2: 温升超预测 150%
+    RATE_OVER_LIMIT = "rate_over_limit"  # 条件3: |dT/dt| > 5°C/h
+    AC_FAULT = "ac_fault"  # 条件4: 空调故障告警
+    SENSOR_OFFLINE = "sensor_offline"  # 条件5: 温度传感器离线
+    UPS_ACTIVE = "ups_active"  # 条件6: 市电中断切 UPS
+    HUMIDITY_DEW_POINT = "humidity_dew_point"  # 条件7: 湿度接近露点
 
 
 class RollbackEvent(Base):

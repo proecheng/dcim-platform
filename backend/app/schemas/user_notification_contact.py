@@ -46,6 +46,7 @@ class NotificationContactCreate(BaseModel):
 
 class NotificationContactUpdate(BaseModel):
     """更新时 contact_value 格式校验在 API 层执行（需从 DB 读取 channel_type）"""
+
     contact_value: Optional[str] = Field(None, min_length=1, max_length=200)
     is_enabled: Optional[bool] = None
 
@@ -65,5 +66,6 @@ class NotificationContactInfo(BaseModel):
 
 class ImportFromProfileResponse(BaseModel):
     """从账户信息导入的返回值"""
+
     created: list[NotificationContactInfo] = []
     skipped: int = 0

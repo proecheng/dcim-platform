@@ -23,6 +23,7 @@ class MatcherRegistry:
 
     Story 28.3: 支持动态注册和卸载规则，实现 Demo 与主系统解耦
     """
+
     _rules: Dict[str, Dict] = {}
     _lock = RLock()
     _registered_sources: Set[str] = set()
@@ -51,10 +52,7 @@ class MatcherRegistry:
             source: 规则来源标识
         """
         with cls._lock:
-            keys_to_remove = [
-                k for k, v in cls._rules.items()
-                if v.get("_source") == source
-            ]
+            keys_to_remove = [k for k, v in cls._rules.items() if v.get("_source") == source]
             for key in keys_to_remove:
                 del cls._rules[key]
             cls._registered_sources.discard(source)

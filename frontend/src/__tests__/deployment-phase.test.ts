@@ -9,29 +9,28 @@ import { setActivePinia, createPinia } from 'pinia'
 // Mock API 模块
 vi.mock('@/api/modules/precool', () => ({
   getDeploymentPhase: vi.fn().mockResolvedValue({
-    data: { code: 200, data: { current_phase: 1, phase_name: 'THM 模式', description: '仅使用 THM 估算', updated_at: null } },
+    code: 200, message: 'ok', data: { current_phase: 1, phase_name: 'THM 模式', description: '仅使用 THM 估算', updated_at: null },
   }),
   updateDeploymentPhase: vi.fn().mockResolvedValue({
-    data: { code: 200, data: { phase: 2, old_phase: 1, force_used: false } },
+    code: 200, message: 'ok', data: { phase: 2, old_phase: 1, force_used: false },
   }),
   getDashboard: vi.fn().mockResolvedValue({
+    code: 200,
+    message: 'ok',
     data: {
-      code: 200,
-      data: {
-        zones: [
-          { zone_id: 1, zone_name: '测试区域A', current_temp: 22.0, headroom: 5.0, model_mode: 'THM', shiftable_ratio: 0.3 },
-          { zone_id: 2, zone_name: '测试区域B', current_temp: 23.0, headroom: 4.0, model_mode: 'TCL', shiftable_ratio: 0.4 },
-        ],
-        status_summary: { total_zones: 2, thm_zones: 1, tcl_zones: 1, offline_zones: 0 },
-        today_savings: 50.0,
-      },
+      zones: [
+        { zone_id: 1, zone_name: '测试区域A', current_temp: 22.0, headroom: 5.0, model_mode: 'THM', shiftable_ratio: 0.3 },
+        { zone_id: 2, zone_name: '测试区域B', current_temp: 23.0, headroom: 4.0, model_mode: 'TCL', shiftable_ratio: 0.4 },
+      ],
+      status_summary: { total_zones: 2, thm_zones: 1, tcl_zones: 1, offline_zones: 0 },
+      today_savings: 50.0,
     },
   }),
   triggerCalibration: vi.fn().mockResolvedValue({
-    data: { code: 200, data: { success: true, R: 0.005, C: 500, r_squared: 0.92, sample_count: 120 } },
+    code: 200, message: 'ok', data: { success: true, R: 0.005, C: 500, r_squared: 0.92, sample_count: 120 },
   }),
   getCalibrationHistory: vi.fn().mockResolvedValue({
-    data: { code: 200, data: { items: [], total: 0 } },
+    code: 200, message: 'ok', data: { items: [], total: 0 },
   }),
 }))
 
@@ -182,9 +181,9 @@ describe('DeploymentPhaseView API 调用', () => {
   it('getDeploymentPhase 返回正确格式', async () => {
     const { getDeploymentPhase } = await import('@/api/modules/precool')
     const res = await getDeploymentPhase()
-    expect(res.data.code).toBe(200)
-    expect(res.data.data.current_phase).toBe(1)
-    expect(res.data.data.phase_name).toBe('THM 模式')
+    expect(res.code).toBe(200)
+    expect(res.data.current_phase).toBe(1)
+    expect(res.data.phase_name).toBe('THM 模式')
   })
 
   it('updateDeploymentPhase 传递正确参数', async () => {
@@ -196,45 +195,43 @@ describe('DeploymentPhaseView API 调用', () => {
   it('getDashboard 返回区域列表', async () => {
     const { getDashboard } = await import('@/api/modules/precool')
     const res = await getDashboard()
-    expect(res.data.code).toBe(200)
-    expect(res.data.data.zones).toHaveLength(2)
-    expect(res.data.data.zones[0].zone_name).toBe('测试区域A')
+    expect(res.code).toBe(200)
+    expect(res.data.zones).toHaveLength(2)
+    expect(res.data.zones[0].zone_name).toBe('测试区域A')
   })
 
   it('triggerCalibration 返回校准结果', async () => {
     const { triggerCalibration } = await import('@/api/modules/precool')
     const res = await triggerCalibration(1)
-    expect(res.data.code).toBe(200)
-    expect(res.data.data.r_squared).toBe(0.92)
+    expect(res.code).toBe(200)
+    expect(res.data.r_squared).toBe(0.92)
   })
 
   it('getCalibrationHistory 返回分页数据', async () => {
     const { getCalibrationHistory } = await import('@/api/modules/precool')
     const res = await getCalibrationHistory(1, { limit: 1 })
-    expect(res.data.code).toBe(200)
-    expect(res.data.data.items).toHaveLength(0)
+    expect(res.code).toBe(200)
+    expect(res.data.items).toHaveLength(0)
   })
 
   it('updateDeploymentPhase 前置条件失败场景', async () => {
     const { updateDeploymentPhase } = await import('@/api/modules/precool')
     ;(updateDeploymentPhase as any).mockResolvedValueOnce({
-      data: {
-        code: 422,
-        message: '前置条件不满足',
-        data: { error: 'precondition_failed', details: ['区域A未校准'] },
-      },
+      code: 422,
+      message: '前置条件不满足',
+      data: { error: 'precondition_failed', details: ['区域A未校准'] },
     })
     const res = await updateDeploymentPhase({ phase: 3 })
-    expect(res.data.code).toBe(422)
-    expect(res.data.data.details).toContain('区域A未校准')
+    expect(res.code).toBe(422)
+    expect(res.data.details).toContain('区域A未校准')
   })
 
   it('triggerCalibration scipy 未安装场景', async () => {
     const { triggerCalibration } = await import('@/api/modules/precool')
     ;(triggerCalibration as any).mockResolvedValueOnce({
-      data: { code: 503, message: 'scipy 未安装，校准功能不可用', data: null },
+      code: 503, message: 'scipy 未安装，校准功能不可用', data: null,
     })
     const res = await triggerCalibration(1)
-    expect(res.data.code).toBe(503)
+    expect(res.code).toBe(503)
   })
 })

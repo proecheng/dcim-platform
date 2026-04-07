@@ -42,6 +42,7 @@ L2_INFERENCE_TIMEOUT = 10.0
 @dataclass
 class EvidenceItem:
     """证据项"""
+
     point_id: Optional[int] = None
     point_name: Optional[str] = None
     value: Optional[float] = None
@@ -53,6 +54,7 @@ class EvidenceItem:
 @dataclass
 class DiagnosisContext:
     """诊断上下文 - 用于 L2→L3 引擎通信"""
+
     device_id: int
     device_type: str
     alarm_type: str
@@ -161,9 +163,7 @@ class FaultTreeCache:
             return
 
         candidates = [
-            (tree_id, self._last_access[tree_id])
-            for tree_id in self._cache
-            if self._ref_count.get(tree_id, 0) == 0
+            (tree_id, self._last_access[tree_id]) for tree_id in self._cache if self._ref_count.get(tree_id, 0) == 0
         ]
 
         if candidates:
@@ -219,7 +219,7 @@ def or_gate(child_probs: List[float]) -> float:
 
     product = 1.0
     for p in child_probs:
-        product *= (1.0 - p)
+        product *= 1.0 - p
 
     return 1.0 - product
 
@@ -290,9 +290,7 @@ class FaultTreeInferenceEngine:
         self.session = session
         self.cache = _fault_tree_cache
 
-    async def select_fault_tree(
-        self, device_type: str, alarm_type: Optional[str] = None
-    ) -> Optional[int]:
+    async def select_fault_tree(self, device_type: str, alarm_type: Optional[str] = None) -> Optional[int]:
         """选择适用的故障树
 
         优先级 (数值越小越优先):
@@ -317,8 +315,7 @@ class FaultTreeInferenceEngine:
             mapping = result.scalars().first()
             if mapping:
                 logger.info(
-                    f"精确匹配 device_type={device_type} alarm_type={alarm_type}, "
-                    f"使用故障树: {mapping.tree_id}"
+                    f"精确匹配 device_type={device_type} alarm_type={alarm_type}, 使用故障树: {mapping.tree_id}"
                 )
                 return mapping.tree_id
 
@@ -372,9 +369,7 @@ class FaultTreeInferenceEngine:
         graph = nx.DiGraph()
 
         # 加载节点
-        result = await self.session.execute(
-            select(FaultTreeNode).where(FaultTreeNode.tree_id == tree_id)
-        )
+        result = await self.session.execute(select(FaultTreeNode).where(FaultTreeNode.tree_id == tree_id))
         nodes = result.scalars().all()
 
         for node in nodes:
@@ -400,9 +395,7 @@ class FaultTreeInferenceEngine:
             )
 
         # 加载边 (反转方向: child → parent)
-        result = await self.session.execute(
-            select(FaultTreeEdge).where(FaultTreeEdge.tree_id == tree_id)
-        )
+        result = await self.session.execute(select(FaultTreeEdge).where(FaultTreeEdge.tree_id == tree_id))
         edges = result.scalars().all()
 
         for edge in edges:
@@ -419,9 +412,7 @@ class FaultTreeInferenceEngine:
         # put 存入原图, 返回深拷贝供调用方使用
         return copy.deepcopy(graph)
 
-    async def collect_evidence(
-        self, graph: nx.DiGraph, time_window_minutes: int = 5
-    ) -> Dict[int, EvidenceItem]:
+    async def collect_evidence(self, graph: nx.DiGraph, time_window_minutes: int = 5) -> Dict[int, EvidenceItem]:
         """并发收集叶节点证据
 
         超时保护:
@@ -519,10 +510,7 @@ class FaultTreeInferenceEngine:
                 )
 
         # 并发收集所有证据,总超时 3 秒
-        tasks = [
-            asyncio.wait_for(collect_single_evidence(node_id), timeout=1.0)
-            for node_id in leaf_nodes
-        ]
+        tasks = [asyncio.wait_for(collect_single_evidence(node_id), timeout=1.0) for node_id in leaf_nodes]
 
         try:
             await asyncio.wait_for(asyncio.gather(*tasks, return_exceptions=True), timeout=3.0)
@@ -539,11 +527,7 @@ class FaultTreeInferenceEngine:
 
         return evidence
 
-    async def _integrate_sensor_fusion_and_trends(
-        self,
-        graph: nx.DiGraph,
-        evidence: Dict[int, EvidenceItem]
-    ) -> None:
+    async def _integrate_sensor_fusion_and_trends(self, graph: nx.DiGraph, evidence: Dict[int, EvidenceItem]) -> None:
         """集成多传感器融合和趋势预警到证据收集 - Story 25.7"""
         try:
             from app.services.diagnosis.sensor_fusion_service import get_sensor_fusion_service
@@ -578,7 +562,7 @@ class FaultTreeInferenceEngine:
                                 value=temp_fusion.std_dev,
                                 threshold=None,
                                 timestamp=datetime.now(),
-                                status="abnormal"
+                                status="abnormal",
                             )
                             # 直接设置节点概率
                             graph.nodes[node_id]["fusion_probability"] = temp_fusion.probability
@@ -601,7 +585,7 @@ class FaultTreeInferenceEngine:
                                     value=None,
                                     threshold=None,
                                     timestamp=datetime.now(),
-                                    status="abnormal"
+                                    status="abnormal",
                                 )
                                 graph.nodes[node_id]["fusion_probability"] = pressure_fusion.probability
                                 logger.info(f"添加送风系统异常证据: 概率 {pressure_fusion.probability}")
@@ -673,9 +657,7 @@ class FaultTreeInferenceEngine:
         else:  # timeout, error — 不确定性, 使用先验概率
             return prior
 
-    async def propagate_probabilities(
-        self, graph: nx.DiGraph, evidence: Dict[int, EvidenceItem]
-    ) -> Dict[int, float]:
+    async def propagate_probabilities(self, graph: nx.DiGraph, evidence: Dict[int, EvidenceItem]) -> Dict[int, float]:
         """从叶到根传播概率
 
         使用拓扑排序确保子节点先于父节点计算。
@@ -752,28 +734,22 @@ class FaultTreeInferenceEngine:
                 # AND 门：优先正向偏离策略（第二轮审查问题 1）
                 # 1. 优先选择概率高于先验的子节点
                 positive_deviations = [
-                    n for n in child_nodes
+                    n
+                    for n in child_nodes
                     if graph.nodes[n]["probability"] > graph.nodes[n].get("prior_probability", 0.5)
                 ]
                 if positive_deviations:
                     # 2. 多个正向偏离，选偏离最大的
                     best_child = max(
                         positive_deviations,
-                        key=lambda n: (
-                            graph.nodes[n]["probability"]
-                            - graph.nodes[n].get("prior_probability", 0.5)
-                        ),
+                        key=lambda n: graph.nodes[n]["probability"] - graph.nodes[n].get("prior_probability", 0.5),
                     )
                 else:
                     # 3. 所有子节点都低于或等于先验，选概率最高的
-                    best_child = max(
-                        child_nodes, key=lambda n: graph.nodes[n]["probability"]
-                    )
+                    best_child = max(child_nodes, key=lambda n: graph.nodes[n]["probability"])
             else:
                 # OR 门 / 默认: 选概率最大的子节点
-                best_child = max(
-                    child_nodes, key=lambda n: graph.nodes[n]["probability"]
-                )
+                best_child = max(child_nodes, key=lambda n: graph.nodes[n]["probability"])
 
             path.append(best_child)
             current_node = best_child
@@ -793,7 +769,7 @@ class FaultTreeInferenceEngine:
             # 整个推理流程设置 10 秒超时
             return await asyncio.wait_for(
                 self._diagnose_l2_impl(device_id, device_type, alarm_type, time_window_minutes),
-                timeout=L2_INFERENCE_TIMEOUT
+                timeout=L2_INFERENCE_TIMEOUT,
             )
         except asyncio.TimeoutError:
             logger.error(f"L2 推理超时 ({L2_INFERENCE_TIMEOUT}s): 设备 {device_id}")
@@ -842,9 +818,7 @@ class FaultTreeInferenceEngine:
             context.fault_tree_id = tree_id
 
             # 获取故障树名称
-            result = await self.session.execute(
-                select(FaultTree).where(FaultTree.id == tree_id)
-            )
+            result = await self.session.execute(select(FaultTree).where(FaultTree.id == tree_id))
             tree = result.scalars().first()
             if tree:
                 context.fault_tree_name = tree.name
@@ -873,10 +847,7 @@ class FaultTreeInferenceEngine:
             context.node_probabilities = node_probs
 
             # 记录叶节点概率
-            context.leaf_probabilities = {
-                nid: prob for nid, prob in node_probs.items()
-                if graph.in_degree(nid) == 0
-            }
+            context.leaf_probabilities = {nid: prob for nid, prob in node_probs.items() if graph.in_degree(nid) == 0}
 
             # 5. 提取根因路径
             path_start = time.time()
@@ -900,9 +871,7 @@ class FaultTreeInferenceEngine:
             from app.models.energy import PowerDevice
 
             # 查询设备是否为配电设备
-            result = await self.session.execute(
-                select(PowerDevice).where(PowerDevice.id == device_id)
-            )
+            result = await self.session.execute(select(PowerDevice).where(PowerDevice.id == device_id))
             power_device = result.scalar_one_or_none()
 
             if power_device:
@@ -913,12 +882,6 @@ class FaultTreeInferenceEngine:
                     # 有活跃备用路径，降低故障影响等级
                     # 建议的等级降级映射（记录到 warnings，不修改告警表）
                     # critical → major, major → warning, warning/info 不降级
-                    suggested_downgrade = {
-                        "critical": "major",
-                        "major": "warning",
-                        "warning": "warning",
-                        "info": "info"
-                    }
 
                     # 记录到 context 的 warnings 中
                     context.warnings.append(
@@ -952,6 +915,7 @@ class FaultTreeInferenceEngine:
         except Exception as e:
             # 未知异常：记录 ERROR 级别日志，重新抛出（第二轮审查问题 7）
             from sqlalchemy.exc import DatabaseError, OperationalError
+
             if isinstance(e, (DatabaseError, OperationalError)):
                 logger.error(f"L2 推理数据库错误: {e}")
                 context.errors.append(f"数据库错误: {str(e)}")

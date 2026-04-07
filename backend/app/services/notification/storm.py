@@ -42,12 +42,9 @@ class StormDetector:
 
             async with async_session() as session:
                 result = await session.execute(
-                    select(SystemConfig.config_key, SystemConfig.config_value)
-                    .where(
+                    select(SystemConfig.config_key, SystemConfig.config_value).where(
                         SystemConfig.config_group == "notification",
-                        SystemConfig.config_key.in_([
-                            "storm_threshold", "storm_window"
-                        ]),
+                        SystemConfig.config_key.in_(["storm_threshold", "storm_window"]),
                     )
                 )
                 rows = {r[0]: r[1] for r in result.all()}
@@ -74,13 +71,9 @@ class StormDetector:
         if redis_service.is_available:
             try:
                 if count == 1:
-                    total = await redis_service.incr_with_ttl(
-                        f"notification:storm:{site_id}", ttl=window
-                    )
+                    total = await redis_service.incr_with_ttl(f"notification:storm:{site_id}", ttl=window)
                 else:
-                    total = await redis_service.incrby_with_ttl(
-                        f"notification:storm:{site_id}", count, ttl=window
-                    )
+                    total = await redis_service.incrby_with_ttl(f"notification:storm:{site_id}", count, ttl=window)
                 if total >= 0:
                     return total >= threshold
             except Exception as e:
@@ -89,16 +82,12 @@ class StormDetector:
         # 内存降级
         return await self._check_storm_memory(site_id, count, threshold, window)
 
-    async def _check_storm_memory(
-        self, site_id: int, count: int, threshold: int, window: int
-    ) -> bool:
+    async def _check_storm_memory(self, site_id: int, count: int, threshold: int, window: int) -> bool:
         """内存滑动窗口计数（asyncio.Lock 保护）"""
         async with self._lock:
             now = time.time()
             # 清理过期时间戳
-            timestamps = [
-                t for t in self._counter[site_id] if now - t < window
-            ]
+            timestamps = [t for t in self._counter[site_id] if now - t < window]
             if not timestamps and count == 0:
                 # 无活跃记录且无新增，清理 key 防内存泄漏
                 self._counter.pop(site_id, None)

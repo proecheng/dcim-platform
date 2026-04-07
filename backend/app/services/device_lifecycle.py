@@ -38,9 +38,7 @@ class DeviceLifecycleService:
             return None
 
         # 获取该设备下所有点位 ID
-        point_ids_result = await self.db.execute(
-            select(Point.id).where(Point.device_id == device_id)
-        )
+        point_ids_result = await self.db.execute(select(Point.id).where(Point.device_id == device_id))
         point_ids = [row[0] for row in point_ids_result.all()]
 
         impacts = []

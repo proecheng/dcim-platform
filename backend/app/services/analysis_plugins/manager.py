@@ -35,6 +35,7 @@ PLUGIN_TIMEOUT = 30
 # P1-3 修复: 定义数据加载错误异常
 class DataLoadError(Exception):
     """数据加载错误（用于区分无数据和数据库连接失败）"""
+
     pass
 
 
@@ -278,7 +279,7 @@ class PluginManager:
                 load_rate = device.avg_load_rate or 0
                 active_power = rated_power * (load_rate / 100) if load_rate else rated_power
                 apparent_power = active_power / pf if pf > 0 else active_power
-                reactive_power = (apparent_power ** 2 - active_power ** 2) ** 0.5 if apparent_power > active_power else 0
+                reactive_power = (apparent_power**2 - active_power**2) ** 0.5 if apparent_power > active_power else 0
                 current = (active_power * 1000 / (rated_voltage * 1.732)) if rated_voltage > 0 else 0
 
                 power_data.append(
@@ -478,10 +479,7 @@ class PluginManager:
 
                 # 执行分析（带超时控制，P0-1 修复）
                 try:
-                    results = await asyncio.wait_for(
-                        plugin.analyze(context),
-                        timeout=PLUGIN_TIMEOUT
-                    )
+                    results = await asyncio.wait_for(plugin.analyze(context), timeout=PLUGIN_TIMEOUT)
                     all_results.extend(results)
                     logger.info(f"插件 {plugin.plugin_id} 生成 {len(results)} 条建议")
                 except asyncio.TimeoutError:
@@ -531,7 +529,7 @@ class PluginManager:
                             EnergySuggestion.suggestion_type == result.suggestion_type.value,
                             EnergySuggestion.title == result.title,
                             EnergySuggestion.status == "pending",
-                            EnergySuggestion.created_at >= datetime.now() - timedelta(hours=24)
+                            EnergySuggestion.created_at >= datetime.now() - timedelta(hours=24),
                         )
                     )
                 )

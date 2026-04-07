@@ -25,30 +25,33 @@ logger = logging.getLogger(__name__)
 @dataclass
 class TimeSlot:
     """电价时段"""
-    start_hour: float   # 0-24
-    end_hour: float     # 0-24
-    price: float        # 元/kWh
-    period_type: str    # sharp/peak/flat/valley/deep_valley
+
+    start_hour: float  # 0-24
+    end_hour: float  # 0-24
+    price: float  # 元/kWh
+    period_type: str  # sharp/peak/flat/valley/deep_valley
 
 
 @dataclass
 class ScheduleStep:
     """单步调度结果"""
+
     step: int
-    time_minutes: float       # 从 00:00 起的分钟数
+    time_minutes: float  # 从 00:00 起的分钟数
     period_type: str
     price: float
-    Q_cool: float             # 制冷电功率 kW
-    Q_cool_effective: float   # 实际制冷量 kW（= Q_cool * COP）
-    T_room: float             # 步末温度 °C
-    cost: float               # 该步电费 元
+    Q_cool: float  # 制冷电功率 kW
+    Q_cool_effective: float  # 实际制冷量 kW（= Q_cool * COP）
+    T_room: float  # 步末温度 °C
+    cost: float  # 该步电费 元
 
 
 @dataclass
 class TrajectoryViolation:
     """轨迹约束违规"""
+
     step: int
-    violation_type: str   # temperature_high / temperature_low / rate_of_change
+    violation_type: str  # temperature_high / temperature_low / rate_of_change
     current_value: float
     threshold: float
     message: str
@@ -57,6 +60,7 @@ class TrajectoryViolation:
 @dataclass
 class PrecoolPlanResult:
     """计划生成结果"""
+
     schedule: Optional[PrecoolSchedule] = None
     steps: List[ScheduleStep] = field(default_factory=list)
     total_cost: float = 0.0
@@ -69,6 +73,7 @@ class PrecoolPlanResult:
 
 class PrecoolPlanError(Exception):
     """预冷计划生成错误"""
+
     def __init__(self, error: str, reason: str, suggestions: List[str]):
         self.error = error
         self.reason = reason
@@ -85,9 +90,9 @@ from app.services.precool.constraints import (
 )
 
 # 默认功率参数
-DEFAULT_Q_COOL_MIN = 0.0      # kW
-DEFAULT_Q_COOL_MAX = 2000.0   # kW
-DEFAULT_POWER_STEP = 20.0     # kW/step
+DEFAULT_Q_COOL_MIN = 0.0  # kW
+DEFAULT_Q_COOL_MAX = 2000.0  # kW
+DEFAULT_POWER_STEP = 20.0  # kW/step
 DEFAULT_COP = 3.5
 
 
@@ -97,10 +102,10 @@ DEFAULT_COP = 3.5
 def get_default_time_slots() -> List[TimeSlot]:
     """兜底默认电价时段（仅在 DB 无数据时使用）"""
     return [
-        TimeSlot(0, 8, 0.25, "valley"),    # 00:00-08:00 谷时
-        TimeSlot(8, 11, 0.65, "flat"),     # 08:00-11:00 平时
-        TimeSlot(11, 17, 1.05, "peak"),    # 11:00-17:00 峰时
-        TimeSlot(17, 21, 1.80, "sharp"),   # 17:00-21:00 尖峰
+        TimeSlot(0, 8, 0.25, "valley"),  # 00:00-08:00 谷时
+        TimeSlot(8, 11, 0.65, "flat"),  # 08:00-11:00 平时
+        TimeSlot(11, 17, 1.05, "peak"),  # 11:00-17:00 峰时
+        TimeSlot(17, 21, 1.80, "sharp"),  # 17:00-21:00 尖峰
         TimeSlot(21, 24, 0.25, "valley"),  # 21:00-24:00 谷时
     ]
 
@@ -109,6 +114,7 @@ async def load_time_slots_from_db(session: AsyncSession) -> List[TimeSlot]:
     """从 ElectricityPricing 表读取当前有效电价时段"""
     try:
         from app.models.energy import ElectricityPricing
+
         result = await session.execute(
             select(ElectricityPricing).where(
                 ElectricityPricing.is_enabled == True  # noqa: E712
@@ -153,8 +159,8 @@ class PrecoolScheduler:
     O(N) 复杂度（N≤288，5min 步长），谷时加大制冷预冷，峰时削减制冷释放温度缓冲。
     """
 
-    DT = 5 / 60       # 5 分钟步长（小时）= 1/12
-    N_MAX = 288        # 24h / 5min = 288 步
+    DT = 5 / 60  # 5 分钟步长（小时）= 1/12
+    N_MAX = 288  # 24h / 5min = 288 步
 
     async def generate_precool_plan(
         self,
@@ -195,7 +201,7 @@ class PrecoolScheduler:
         if self.DT >= 2 * R * C:
             raise PrecoolPlanError(
                 error="numerical_instability",
-                reason=f"时间步长 {self.DT:.4f}h 超过稳定性限制 2*R*C={2*R*C:.4f}h",
+                reason=f"时间步长 {self.DT:.4f}h 超过稳定性限制 2*R*C={2 * R * C:.4f}h",
                 suggestions=["检查 R/C 参数是否合理"],
             )
 
@@ -234,8 +240,15 @@ class PrecoolScheduler:
 
             # 根据时段类型决定制冷策略
             Q_cool = self._decide_cooling(
-                slot.period_type, Q_IT, T, R, C, T_amb,
-                Q_cool_min, Q_cool_max, precool_target_temp,
+                slot.period_type,
+                Q_IT,
+                T,
+                R,
+                C,
+                T_amb,
+                Q_cool_min,
+                Q_cool_max,
+                precool_target_temp,
             )
 
             # 功率限幅 + 速率限幅
@@ -249,21 +262,31 @@ class PrecoolScheduler:
 
             # 安全校正
             T_new, Q_cool = self._safety_correction(
-                T_new, Q_cool, Q_IT, T, T_amb, R, C, COP, beta,
+                T_new,
+                Q_cool,
+                Q_IT,
+                T,
+                T_amb,
+                R,
+                C,
+                COP,
+                beta,
             )
 
             cost = Q_cool * self.DT * slot.price
 
-            steps.append(ScheduleStep(
-                step=step,
-                time_minutes=step * 5,
-                period_type=slot.period_type,
-                price=slot.price,
-                Q_cool=round(Q_cool, 2),
-                Q_cool_effective=round(Q_cool * COP, 2),
-                T_room=round(T_new, 3),
-                cost=round(cost, 4),
-            ))
+            steps.append(
+                ScheduleStep(
+                    step=step,
+                    time_minutes=step * 5,
+                    period_type=slot.period_type,
+                    price=slot.price,
+                    Q_cool=round(Q_cool, 2),
+                    Q_cool_effective=round(Q_cool * COP, 2),
+                    T_room=round(T_new, 3),
+                    cost=round(cost, 4),
+                )
+            )
 
             prev_Q = Q_cool
             T = T_new
@@ -276,14 +299,21 @@ class PrecoolScheduler:
 
         # 6. 构建计划
         plan = self._build_plan(
-            zone_id, schedule_date, steps,
-            precool_target_temp, time_slots,
-            saving, total_cost,
+            zone_id,
+            schedule_date,
+            steps,
+            precool_target_temp,
+            time_slots,
+            saving,
+            total_cost,
         )
 
         # 7. 约束验证 + 重试
         validated_plan = await self._validate_with_retry(
-            plan, steps, zone_id, session,
+            plan,
+            steps,
+            zone_id,
+            session,
         )
 
         return PrecoolPlanResult(
@@ -359,13 +389,17 @@ class PrecoolScheduler:
         if T_new > DEFAULT_TEMP_MAX:
             # 温度过高：增加制冷
             T_inlet_corrected = T * (1 - beta) + T_amb * beta
-            Q_cool_effective_needed = Q_IT + (T_amb - T_inlet_corrected) / R + C * (T - DEFAULT_TEMP_MAX + 1.0) / self.DT
+            Q_cool_effective_needed = (
+                Q_IT + (T_amb - T_inlet_corrected) / R + C * (T - DEFAULT_TEMP_MAX + 1.0) / self.DT
+            )
             Q_cool = Q_cool_effective_needed / COP
             T_new = DEFAULT_TEMP_MAX - 0.5  # 修正到安全值
         elif T_new < DEFAULT_TEMP_MIN:
             # 温度过低：减少制冷
             T_inlet_corrected = T * (1 - beta) + T_amb * beta
-            Q_cool_effective_needed = Q_IT + (T_amb - T_inlet_corrected) / R - C * (DEFAULT_TEMP_MIN - T + 0.5) / self.DT
+            Q_cool_effective_needed = (
+                Q_IT + (T_amb - T_inlet_corrected) / R - C * (DEFAULT_TEMP_MIN - T + 0.5) / self.DT
+            )
             Q_cool = max(0, Q_cool_effective_needed / COP)
             T_new = DEFAULT_TEMP_MIN + 0.5  # 修正到安全值
         return T_new, Q_cool
@@ -381,33 +415,39 @@ class PrecoolScheduler:
         for s in steps:
             # 温度上限
             if s.T_room > DEFAULT_TEMP_MAX:
-                violations.append(TrajectoryViolation(
-                    step=s.step,
-                    violation_type="temperature_high",
-                    current_value=s.T_room,
-                    threshold=DEFAULT_TEMP_MAX,
-                    message=f"步 {s.step} 温度 {s.T_room:.1f}°C 超上限 {DEFAULT_TEMP_MAX}°C",
-                ))
+                violations.append(
+                    TrajectoryViolation(
+                        step=s.step,
+                        violation_type="temperature_high",
+                        current_value=s.T_room,
+                        threshold=DEFAULT_TEMP_MAX,
+                        message=f"步 {s.step} 温度 {s.T_room:.1f}°C 超上限 {DEFAULT_TEMP_MAX}°C",
+                    )
+                )
             # 温度下限
             if s.T_room < DEFAULT_TEMP_MIN:
-                violations.append(TrajectoryViolation(
-                    step=s.step,
-                    violation_type="temperature_low",
-                    current_value=s.T_room,
-                    threshold=DEFAULT_TEMP_MIN,
-                    message=f"步 {s.step} 温度 {s.T_room:.1f}°C 低于下限 {DEFAULT_TEMP_MIN}°C",
-                ))
+                violations.append(
+                    TrajectoryViolation(
+                        step=s.step,
+                        violation_type="temperature_low",
+                        current_value=s.T_room,
+                        threshold=DEFAULT_TEMP_MIN,
+                        message=f"步 {s.step} 温度 {s.T_room:.1f}°C 低于下限 {DEFAULT_TEMP_MIN}°C",
+                    )
+                )
             # 温变速率
             if s.step > 0:
                 rate = abs(s.T_room - steps[s.step - 1].T_room) / self.DT
                 if rate > DEFAULT_RATE_LIMIT:
-                    violations.append(TrajectoryViolation(
-                        step=s.step,
-                        violation_type="rate_of_change",
-                        current_value=rate,
-                        threshold=DEFAULT_RATE_LIMIT,
-                        message=f"步 {s.step} 温变速率 {rate:.1f}°C/h 超限 {DEFAULT_RATE_LIMIT}°C/h",
-                    ))
+                    violations.append(
+                        TrajectoryViolation(
+                            step=s.step,
+                            violation_type="rate_of_change",
+                            current_value=rate,
+                            threshold=DEFAULT_RATE_LIMIT,
+                            message=f"步 {s.step} 温变速率 {rate:.1f}°C/h 超限 {DEFAULT_RATE_LIMIT}°C/h",
+                        )
+                    )
         return violations
 
     async def _validate_with_retry(
@@ -428,7 +468,9 @@ class PrecoolScheduler:
 
             logger.warning(
                 "Zone %d 预冷计划约束验证失败（第 %d 次），%d 个违规",
-                zone_id, attempt + 1, len(violations),
+                zone_id,
+                attempt + 1,
+                len(violations),
             )
 
             if attempt < max_retries:
@@ -464,8 +506,7 @@ class PrecoolScheduler:
             peak_end = datetime.combine(date.today(), plan.peak_end_time)
             new_end = peak_end - timedelta(minutes=30)
             plan.peak_end_time = new_end.time()
-            logger.info("放宽策略: 同时放宽 target_temp=%.1f°C, peak_end=%s",
-                         plan.target_temp, plan.peak_end_time)
+            logger.info("放宽策略: 同时放宽 target_temp=%.1f°C, peak_end=%s", plan.target_temp, plan.peak_end_time)
 
         # 注意：不修改步的温度值（会破坏热力学一致性），
         # 仅放宽计划参数后由 _validate_trajectory 重新检查。
@@ -558,10 +599,9 @@ class PrecoolScheduler:
         """检查预冷功能是否启用"""
         try:
             from app.models.load_shift import CoolingLinkageConfig
+
             result = await session.execute(
-                select(CoolingLinkageConfig).where(
-                    CoolingLinkageConfig.cooling_zone_id == zone_id
-                )
+                select(CoolingLinkageConfig).where(CoolingLinkageConfig.cooling_zone_id == zone_id)
             )
             config = result.scalar_one_or_none()
             if config and not config.precool_enabled:
@@ -590,10 +630,9 @@ class PrecoolScheduler:
         """加载制冷联动配置"""
         try:
             from app.models.load_shift import CoolingLinkageConfig
+
             result = await session.execute(
-                select(CoolingLinkageConfig).where(
-                    CoolingLinkageConfig.cooling_zone_id == zone_id
-                )
+                select(CoolingLinkageConfig).where(CoolingLinkageConfig.cooling_zone_id == zone_id)
             )
             config = result.scalar_one_or_none()
             if config:
@@ -643,7 +682,8 @@ class PrecoolScheduler:
     async def _get_it_load(self, zone_id: int, session: AsyncSession) -> float:
         """获取 IT 热负荷估算值"""
         try:
-            from app.models.topology_config import CoolingZoneCabinet, CoolingZoneUnit, CoolingUnit
+            from app.models.topology_config import CoolingZoneUnit, CoolingUnit
+
             # 使用额定制冷功率 × 0.7 估算
             result = await session.execute(
                 select(CoolingUnit.cooling_capacity_kw)

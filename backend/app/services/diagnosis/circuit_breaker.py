@@ -205,7 +205,9 @@ class CircuitBreaker:
         self._state = new_state
         logger.warning(
             "CircuitBreaker 状态变更: %s -> %s (reason=%s)",
-            old_state.value, new_state.value, reason,
+            old_state.value,
+            new_state.value,
+            reason,
         )
 
         if self._on_state_change:
@@ -214,9 +216,7 @@ class CircuitBreaker:
                     "state": new_state.value,
                     "previous_state": old_state.value,
                     "reason": reason,
-                    "timestamp": datetime.fromtimestamp(
-                        self._time_func(), tz=timezone.utc
-                    ).isoformat(),
+                    "timestamp": datetime.fromtimestamp(self._time_func(), tz=timezone.utc).isoformat(),
                     **kwargs,
                 }
                 result = self._on_state_change(cb_data)

@@ -7,7 +7,6 @@ Story 25.6: 动态告警阈值
 """
 
 import logging
-import re
 from typing import Any, Dict
 from enum import Enum
 
@@ -16,6 +15,7 @@ logger = logging.getLogger(__name__)
 
 class TokenType(Enum):
     """Token 类型"""
+
     NUMBER = "NUMBER"
     STRING = "STRING"
     IDENTIFIER = "IDENTIFIER"
@@ -29,6 +29,7 @@ class TokenType(Enum):
 
 class Token:
     """Token 对象"""
+
     def __init__(self, type_: TokenType, value: Any):
         self.type = type_
         self.value = value
@@ -39,6 +40,7 @@ class Token:
 
 class Lexer:
     """词法分析器"""
+
     def __init__(self, text: str):
         self.text = text
         self.pos = 0
@@ -60,7 +62,7 @@ class Lexer:
     def read_number(self) -> float:
         """读取数字"""
         num_str = ""
-        while self.current_char is not None and (self.current_char.isdigit() or self.current_char == '.'):
+        while self.current_char is not None and (self.current_char.isdigit() or self.current_char == "."):
             num_str += self.current_char
             self.advance()
         return float(num_str)
@@ -79,12 +81,12 @@ class Lexer:
     def read_identifier(self) -> str:
         """读取标识符（限制为字母、数字、下划线）"""
         identifier = ""
-        while self.current_char is not None and (self.current_char.isalnum() or self.current_char == '_'):
+        while self.current_char is not None and (self.current_char.isalnum() or self.current_char == "_"):
             identifier += self.current_char
             self.advance()
 
         # 安全检查: 变量名只能包含字母、数字、下划线
-        if not identifier or not all(c.isalnum() or c == '_' for c in identifier):
+        if not identifier or not all(c.isalnum() or c == "_" for c in identifier):
             raise ValueError(f"Invalid identifier: {identifier}")
 
         return identifier
@@ -102,28 +104,28 @@ class Lexer:
             if self.current_char in ('"', "'"):
                 return Token(TokenType.STRING, self.read_string())
 
-            if self.current_char.isalpha() or self.current_char == '_':
+            if self.current_char.isalpha() or self.current_char == "_":
                 identifier = self.read_identifier()
-                if identifier.upper() == 'AND':
-                    return Token(TokenType.AND, 'AND')
-                elif identifier.upper() == 'OR':
-                    return Token(TokenType.OR, 'OR')
+                if identifier.upper() == "AND":
+                    return Token(TokenType.AND, "AND")
+                elif identifier.upper() == "OR":
+                    return Token(TokenType.OR, "OR")
                 else:
                     return Token(TokenType.IDENTIFIER, identifier)
 
-            if self.current_char == '(':
+            if self.current_char == "(":
                 self.advance()
-                return Token(TokenType.LPAREN, '(')
+                return Token(TokenType.LPAREN, "(")
 
-            if self.current_char == ')':
+            if self.current_char == ")":
                 self.advance()
-                return Token(TokenType.RPAREN, ')')
+                return Token(TokenType.RPAREN, ")")
 
             # 运算符
-            if self.current_char in ('>', '<', '=', '!'):
+            if self.current_char in (">", "<", "=", "!"):
                 op = self.current_char
                 self.advance()
-                if self.current_char == '=':
+                if self.current_char == "=":
                     op += self.current_char
                     self.advance()
                 return Token(TokenType.OPERATOR, op)
@@ -135,6 +137,7 @@ class Lexer:
 
 class Parser:
     """语法分析器"""
+
     MAX_RECURSION_DEPTH = 20  # P1-1 修复: 最大递归深度
 
     def __init__(self, lexer: Lexer):
@@ -167,7 +170,7 @@ class Parser:
 
             while self.current_token.type == TokenType.OR:
                 self.eat(TokenType.OR)
-                node = ('OR', node, self.and_expr())
+                node = ("OR", node, self.and_expr())
 
             return node
         finally:
@@ -182,7 +185,7 @@ class Parser:
 
             while self.current_token.type == TokenType.AND:
                 self.eat(TokenType.AND)
-                node = ('AND', node, self.comparison())
+                node = ("AND", node, self.comparison())
 
             return node
         finally:
@@ -217,24 +220,25 @@ class Parser:
             else:
                 raise ValueError(f"Expected NUMBER/STRING/IDENTIFIER, got {right.type}")
 
-            return ('CMP', left.value, op.value, right.value, right.type)
+            return ("CMP", left.value, op.value, right.value, right.type)
         finally:
             self._recursion_depth -= 1  # P1-1 修复
 
 
 class ConditionEvaluator:
     """条件求值器"""
+
     def __init__(self, context: Dict[str, Any]):
         self.context = context
 
     def evaluate(self, node) -> bool:
         """求值表达式树"""
         if isinstance(node, tuple):
-            if node[0] == 'OR':
+            if node[0] == "OR":
                 return self.evaluate(node[1]) or self.evaluate(node[2])
-            elif node[0] == 'AND':
+            elif node[0] == "AND":
                 return self.evaluate(node[1]) and self.evaluate(node[2])
-            elif node[0] == 'CMP':
+            elif node[0] == "CMP":
                 right_type = node[4] if len(node) > 4 else None
                 return self.evaluate_comparison(node[1], node[2], node[3], right_type)
         return False
@@ -254,17 +258,17 @@ class ConditionEvaluator:
 
         # 执行比较
         try:
-            if op == '>':
+            if op == ">":
                 return left_value > right_value
-            elif op == '<':
+            elif op == "<":
                 return left_value < right_value
-            elif op == '>=':
+            elif op == ">=":
                 return left_value >= right_value
-            elif op == '<=':
+            elif op == "<=":
                 return left_value <= right_value
-            elif op == '==':
+            elif op == "==":
                 return left_value == right_value
-            elif op == '!=':
+            elif op == "!=":
                 return left_value != right_value
             else:
                 return False

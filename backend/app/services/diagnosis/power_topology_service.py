@@ -12,25 +12,14 @@ logger = logging.getLogger(__name__)
 
 # Prometheus 监控指标
 topology_graph_build_duration = Histogram(
-    'topology_graph_build_duration_seconds',
-    'Time spent building power topology graph'
+    "topology_graph_build_duration_seconds", "Time spent building power topology graph"
 )
 topology_cascade_analysis_duration = Histogram(
-    'topology_cascade_analysis_duration_seconds',
-    'Time spent analyzing cascade impact'
+    "topology_cascade_analysis_duration_seconds", "Time spent analyzing cascade impact"
 )
-topology_update_duration = Histogram(
-    'topology_update_duration_seconds',
-    'Time spent updating topology graph'
-)
-topology_graph_nodes = Gauge(
-    'topology_graph_nodes_total',
-    'Total number of nodes in topology graph'
-)
-topology_graph_edges = Gauge(
-    'topology_graph_edges_total',
-    'Total number of edges in topology graph'
-)
+topology_update_duration = Histogram("topology_update_duration_seconds", "Time spent updating topology graph")
+topology_graph_nodes = Gauge("topology_graph_nodes_total", "Total number of nodes in topology graph")
+topology_graph_edges = Gauge("topology_graph_edges_total", "Total number of edges in topology graph")
 
 # 全局图缓存（线程安全）
 _power_topology_graph: nx.DiGraph | None = None
@@ -229,6 +218,7 @@ async def _get_device_status(node_id: str) -> dict:
 
         if status_data:
             import json
+
             return json.loads(status_data)
 
     except Exception as e:
@@ -290,18 +280,15 @@ async def analyze_downstream_impact(fault_node_id: str) -> dict:
         for node_id in downstream_nodes:
             node_data = graph.nodes[node_id]
             status = await _get_device_status(node_id)
-            affected_devices.append({
-                "node_id": node_id,
-                "type": node_data["type"],
-                "name": node_data["name"],
-                "status": status
-            })
+            affected_devices.append(
+                {"node_id": node_id, "type": node_data["type"], "name": node_data["name"], "status": status}
+            )
 
         logger.info(f"级联分析完成: {fault_node_id} 影响 {len(affected_devices)} 个下游设备")
         return {
             "fault_node": fault_node_id,
             "affected_count": len(affected_devices),
-            "affected_devices": affected_devices
+            "affected_devices": affected_devices,
         }
 
 
@@ -326,18 +313,10 @@ async def analyze_upstream_path(device_id: int) -> dict:
     for node_id in upstream_nodes:
         node_data = graph.nodes[node_id]
         status = await _get_device_status(node_id)
-        power_path.append({
-            "node_id": node_id,
-            "type": node_data["type"],
-            "name": node_data["name"],
-            "status": status
-        })
+        power_path.append({"node_id": node_id, "type": node_data["type"], "name": node_data["name"], "status": status})
 
     # 按层级排序: Transformer → Panel → Circuit
     power_path.sort(key=lambda x: {"transformer": 0, "panel": 1, "circuit": 2}.get(x["type"], 3))
 
     logger.info(f"溯源分析完成: 设备 {device_id} 的供电链路包含 {len(power_path)} 个上游设备")
-    return {
-        "device_id": device_id,
-        "power_path": power_path
-    }
+    return {"device_id": device_id, "power_path": power_path}

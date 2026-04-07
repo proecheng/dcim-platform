@@ -3,6 +3,7 @@
 Story 25.2: 电气参数证据概率计算模块
 使用 Sigmoid 连续映射函数计算电气参数的证据概率
 """
+
 import math
 import logging
 from prometheus_client import Histogram, Counter, REGISTRY
@@ -12,36 +13,28 @@ logger = logging.getLogger(__name__)
 # Prometheus 监控指标（条件注册，避免测试时重复）
 try:
     electrical_param_evidence_duration = Histogram(
-        'electrical_param_evidence_duration_seconds',
-        'Time spent calculating electrical parameter evidence'
+        "electrical_param_evidence_duration_seconds", "Time spent calculating electrical parameter evidence"
     )
 except ValueError:
-    electrical_param_evidence_duration = REGISTRY._names_to_collectors['electrical_param_evidence_duration_seconds']
+    electrical_param_evidence_duration = REGISTRY._names_to_collectors["electrical_param_evidence_duration_seconds"]
 
 try:
     electrical_param_evidence_total = Counter(
-        'electrical_param_evidence_total',
-        'Total electrical parameter evidence calculations',
-        ['point_type']
+        "electrical_param_evidence_total", "Total electrical parameter evidence calculations", ["point_type"]
     )
 except ValueError:
-    electrical_param_evidence_total = REGISTRY._names_to_collectors['electrical_param_evidence_total']
+    electrical_param_evidence_total = REGISTRY._names_to_collectors["electrical_param_evidence_total"]
 
 try:
     electrical_param_evidence_errors = Counter(
-        'electrical_param_evidence_errors_total',
-        'Total electrical parameter evidence calculation errors'
+        "electrical_param_evidence_errors_total", "Total electrical parameter evidence calculation errors"
     )
 except ValueError:
-    electrical_param_evidence_errors = REGISTRY._names_to_collectors['electrical_param_evidence_errors_total']
+    electrical_param_evidence_errors = REGISTRY._names_to_collectors["electrical_param_evidence_errors_total"]
 
 
 def calc_evidence_probability(
-    value: float,
-    threshold: float,
-    threshold_type: str,
-    sigmoid_k: float = 2.0,
-    prior: float = 0.5
+    value: float, threshold: float, threshold_type: str, sigmoid_k: float = 2.0, prior: float = 0.5
 ) -> float:
     """
     计算电气参数的证据概率（Sigmoid 连续映射）

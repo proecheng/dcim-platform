@@ -3,7 +3,7 @@
  * Story 25.8: 故障树图形化编辑器
  */
 
-import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, type Ref } from 'vue'
 import { DataSet, Network } from 'vis-network/standalone'
 import type { Data, Options, Node, Edge } from 'vis-network'
 import { nanoid } from 'nanoid'
@@ -36,8 +36,8 @@ export function useFaultTreeEditor(treeId: number) {
   const container = ref<HTMLElement | null>(null)
 
   // 数据集
-  const nodes = ref<DataSet<VisNode>>(new DataSet([]))
-  const edges = ref<DataSet<VisEdge>>(new DataSet([]))
+  const nodes = ref(new DataSet([])) as Ref<DataSet<VisNode>>
+  const edges = ref(new DataSet([])) as Ref<DataSet<VisEdge>>
 
   // 故障树数据
   const faultTree = ref<FaultTree | null>(null)
@@ -451,7 +451,7 @@ export function useFaultTreeEditor(treeId: number) {
     const nodesToAdd: VisNode[] = []
 
     tempIdMap.forEach((index, tempId) => {
-      const realId = savedTree.nodes[index].id
+      const realId = Number(savedTree.nodes[index].id)
       idMapping.set(tempId, realId)
       const oldNode = nodes.value.get(tempId)
       if (oldNode) {
@@ -504,11 +504,11 @@ export function useFaultTreeEditor(treeId: number) {
         const positions = network.value!.getPositions(params.nodes)
         const updates: VisNode[] = []
 
-        params.nodes.forEach(nodeId => {
+        params.nodes.forEach((nodeId: string | number) => {
           const pos = positions[nodeId]
-          const node = nodes.value.get(nodeId)
+          const node = nodes.value.get(nodeId) as VisNode | null
           if (node && pos) {
-            updates.push({ ...node, x: pos.x, y: pos.y })
+            updates.push({ ...node, x: pos.x, y: pos.y } as VisNode)
           }
         })
 

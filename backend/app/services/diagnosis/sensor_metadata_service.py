@@ -49,9 +49,7 @@ class SensorMetadataCache:
         """重新加载指定点位的元数据"""
         try:
             async with async_session() as session:
-                result = await session.execute(
-                    select(SensorMetadata).where(SensorMetadata.point_id == point_id)
-                )
+                result = await session.execute(select(SensorMetadata).where(SensorMetadata.point_id == point_id))
                 metadata = result.scalar_one_or_none()
 
                 async with cls._lock:
@@ -72,34 +70,32 @@ class SensorMetadataCache:
     @classmethod
     async def start_listener(cls) -> asyncio.Task:
         """启动 Redis Pub/Sub 监听器"""
+
         async def listener_loop():
             """监听器循环"""
             try:
                 import redis.asyncio as redis
                 from app.core.config import get_settings
+
                 settings = get_settings()
 
-                redis_client = redis.Redis(
-                    host=settings.redis_host,
-                    port=settings.redis_port,
-                    decode_responses=True
-                )
+                redis_client = redis.Redis(host=settings.redis_host, port=settings.redis_port, decode_responses=True)
                 pubsub = redis_client.pubsub()
-                await pubsub.subscribe('sensor:metadata_update')
+                await pubsub.subscribe("sensor:metadata_update")
 
                 logger.info("Started Redis listener for sensor metadata updates")
 
                 while True:
                     try:
                         message = await pubsub.get_message(ignore_subscribe_messages=True, timeout=1.0)
-                        if message and message['type'] == 'message':
-                            payload = json.loads(message['data'])
-                            point_id = payload.get('point_id')
+                        if message and message["type"] == "message":
+                            payload = json.loads(message["data"])
+                            point_id = payload.get("point_id")
                             if point_id:
                                 await cls.reload_point(point_id)
                     except asyncio.CancelledError:
                         logger.info("Redis listener cancelled, shutting down gracefully")
-                        await pubsub.unsubscribe('sensor:metadata_update')
+                        await pubsub.unsubscribe("sensor:metadata_update")
                         await redis_client.close()
                         break
                     except Exception as e:
@@ -151,11 +147,7 @@ def get_sensor_weight(point_id: int) -> float:
         return 0.85  # 默认权重
 
     # 计算基础权重
-    base_weight_map = {
-        0.2: 1.0,
-        0.5: 0.9,
-        1.0: 0.8
-    }
+    base_weight_map = {0.2: 1.0, 0.5: 0.9, 1.0: 0.8}
     base_weight = base_weight_map.get(metadata.accuracy_class, 0.85)
 
     # 检查校准过期
@@ -205,9 +197,7 @@ async def check_calibration_status(point_id: int, session: AsyncSession) -> Dict
     Returns:
         校准状态信息字典
     """
-    result = await session.execute(
-        select(SensorMetadata).where(SensorMetadata.point_id == point_id)
-    )
+    result = await session.execute(select(SensorMetadata).where(SensorMetadata.point_id == point_id))
     metadata = result.scalar_one_or_none()
 
     if not metadata:
@@ -216,7 +206,7 @@ async def check_calibration_status(point_id: int, session: AsyncSession) -> Dict
             "status": CalibrationStatus.NO_METADATA.value,
             "expired_days": None,
             "calibration_date": None,
-            "next_calibration_date": None
+            "next_calibration_date": None,
         }
 
     if metadata.calibration_date is None:
@@ -225,7 +215,7 @@ async def check_calibration_status(point_id: int, session: AsyncSession) -> Dict
             "status": CalibrationStatus.NOT_CALIBRATED.value,
             "expired_days": None,
             "calibration_date": None,
-            "next_calibration_date": None
+            "next_calibration_date": None,
         }
 
     days_since_calibration = (date.today() - metadata.calibration_date).days
@@ -238,7 +228,7 @@ async def check_calibration_status(point_id: int, session: AsyncSession) -> Dict
             "status": CalibrationStatus.EXPIRED.value,
             "expired_days": expired_days,
             "calibration_date": metadata.calibration_date,
-            "next_calibration_date": next_calibration
+            "next_calibration_date": next_calibration,
         }
 
     return {
@@ -246,7 +236,7 @@ async def check_calibration_status(point_id: int, session: AsyncSession) -> Dict
         "status": CalibrationStatus.VALID.value,
         "expired_days": None,
         "calibration_date": metadata.calibration_date,
-        "next_calibration_date": next_calibration
+        "next_calibration_date": next_calibration,
     }
 
 
@@ -259,9 +249,7 @@ async def check_expired_calibrations(session: AsyncSession) -> None:
     """
     try:
         # 查询所有有校准日期的传感器元数据
-        result = await session.execute(
-            select(SensorMetadata).where(SensorMetadata.calibration_date.isnot(None))
-        )
+        result = await session.execute(select(SensorMetadata).where(SensorMetadata.calibration_date.isnot(None)))
         metadata_list = result.scalars().all()
 
         from app.models.alarm import Alarm
@@ -277,18 +265,16 @@ async def check_expired_calibrations(session: AsyncSession) -> None:
                 existing_alarm = await session.execute(
                     select(Alarm).where(
                         Alarm.point_id == metadata.point_id,
-                        Alarm.alarm_type == 'maintenance',
-                        Alarm.status == 'active',
-                        Alarm.additional_info.contains('"alarm_source": "sensor_calibration"')
+                        Alarm.alarm_type == "maintenance",
+                        Alarm.status == "active",
+                        Alarm.additional_info.contains('"alarm_source": "sensor_calibration"'),
                     )
                 )
                 if existing_alarm.scalar_one_or_none():
                     continue  # 已存在告警，跳过
 
                 # 获取点位名称
-                point_result = await session.execute(
-                    select(Point).where(Point.id == metadata.point_id)
-                )
+                point_result = await session.execute(select(Point).where(Point.id == metadata.point_id))
                 point = point_result.scalar_one_or_none()
                 point_name = point.point_name if point else f"Point {metadata.point_id}"
 
@@ -296,17 +282,17 @@ async def check_expired_calibrations(session: AsyncSession) -> None:
                 suggested_date = date.today() + timedelta(days=7)
                 alarm = Alarm(
                     point_id=metadata.point_id,
-                    alarm_type='maintenance',
-                    alarm_level='info',
+                    alarm_type="maintenance",
+                    alarm_level="info",
                     alarm_message=f"传感器需校准: {point_name} (已过期 {expired_days} 天)",
-                    status='active',
+                    status="active",
                     additional_info={
                         "alarm_source": "sensor_calibration",
                         "point_id": metadata.point_id,
                         "expired_days": expired_days,
-                        "suggested_calibration_date": suggested_date.isoformat()
+                        "suggested_calibration_date": suggested_date.isoformat(),
                     },
-                    created_at=datetime.now()
+                    created_at=datetime.now(),
                 )
                 session.add(alarm)
                 expired_count += 1

@@ -1,6 +1,7 @@
 """
 故障树 DAG 验证器 - Story 24.3
 """
+
 import networkx as nx
 from typing import List, Dict, Tuple
 
@@ -33,8 +34,8 @@ class DAGValidator:
         intermediate_nodes = []
 
         for node in nodes:
-            if 'id' not in node:
-                return False, '节点缺少 id 字段'
+            if "id" not in node:
+                return False, "节点缺少 id 字段"
             node_id = node["id"]
             node_ids.add(node_id)
             G.add_node(node_id, **node)
@@ -55,8 +56,8 @@ class DAGValidator:
 
         # 添加边
         for edge in edges:
-            if 'parent_node_id' not in edge or 'child_node_id' not in edge:
-                return False, '边缺少 parent_node_id 或 child_node_id 字段'
+            if "parent_node_id" not in edge or "child_node_id" not in edge:
+                return False, "边缺少 parent_node_id 或 child_node_id 字段"
             parent_id = edge["parent_node_id"]
             child_id = edge["child_node_id"]
 

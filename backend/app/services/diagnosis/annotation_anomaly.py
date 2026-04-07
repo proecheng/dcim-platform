@@ -43,7 +43,9 @@ class AnnotationAnomalyDetector:
         total_annotations = total_result.scalar() or 0
 
         if total_annotations < AnnotationAnomalyDetector.MIN_SAMPLE_SIZE:
-            logger.info(f"Sample size {total_annotations} < {AnnotationAnomalyDetector.MIN_SAMPLE_SIZE}, skip detection")
+            logger.info(
+                f"Sample size {total_annotations} < {AnnotationAnomalyDetector.MIN_SAMPLE_SIZE}, skip detection"
+            )
             return []
 
         # 查询每个用户的标注数和标注率

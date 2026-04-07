@@ -1,6 +1,7 @@
 """
 故障树数据模型 - Story 24.3
 """
+
 from sqlalchemy import Column, Integer, String, Text, Float, ForeignKey, TIMESTAMP, CheckConstraint, func
 from sqlalchemy.orm import relationship
 from app.core.database import Base
@@ -8,6 +9,7 @@ from app.core.database import Base
 
 class FaultTree(Base):
     """故障树元数据"""
+
     __tablename__ = "fault_trees"
 
     id = Column(Integer, primary_key=True, index=True)
@@ -28,6 +30,7 @@ class FaultTree(Base):
 
 class FaultTreeNode(Base):
     """故障树节点"""
+
     __tablename__ = "fault_tree_nodes"
 
     id = Column(Integer, primary_key=True, index=True)
@@ -52,12 +55,17 @@ class FaultTreeNode(Base):
     )
 
     tree = relationship("FaultTree", back_populates="nodes")
-    parent_edges = relationship("FaultTreeEdge", foreign_keys="FaultTreeEdge.child_node_id", back_populates="child_node")
-    child_edges = relationship("FaultTreeEdge", foreign_keys="FaultTreeEdge.parent_node_id", back_populates="parent_node")
+    parent_edges = relationship(
+        "FaultTreeEdge", foreign_keys="FaultTreeEdge.child_node_id", back_populates="child_node"
+    )
+    child_edges = relationship(
+        "FaultTreeEdge", foreign_keys="FaultTreeEdge.parent_node_id", back_populates="parent_node"
+    )
 
 
 class FaultTreeEdge(Base):
     """故障树边"""
+
     __tablename__ = "fault_tree_edges"
 
     id = Column(Integer, primary_key=True, index=True)
@@ -66,9 +74,7 @@ class FaultTreeEdge(Base):
     child_node_id = Column(Integer, ForeignKey("fault_tree_nodes.id", ondelete="CASCADE"), nullable=False, index=True)
     created_at = Column(TIMESTAMP, nullable=False, server_default=func.now())
 
-    __table_args__ = (
-        CheckConstraint("parent_node_id != child_node_id", name="check_no_self_loop"),
-    )
+    __table_args__ = (CheckConstraint("parent_node_id != child_node_id", name="check_no_self_loop"),)
 
     tree = relationship("FaultTree", back_populates="edges")
     parent_node = relationship("FaultTreeNode", foreign_keys=[parent_node_id], back_populates="child_edges")
@@ -77,6 +83,7 @@ class FaultTreeEdge(Base):
 
 class FaultTreeDeviceMapping(Base):
     """故障树设备映射"""
+
     __tablename__ = "fault_tree_device_mapping"
 
     id = Column(Integer, primary_key=True, index=True)
@@ -91,6 +98,7 @@ class FaultTreeDeviceMapping(Base):
 
 class FaultTreeVersion(Base):
     """故障树版本"""
+
     __tablename__ = "fault_tree_versions"
 
     id = Column(Integer, primary_key=True, index=True)

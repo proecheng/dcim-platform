@@ -255,7 +255,7 @@ async function mapTempIdsToRealIds(
   const nodesToAdd: VisNode[] = []
 
   tempIdMap.forEach((index, tempId) => {
-    const realId = savedTree.nodes[index].id
+    const realId = Number(savedTree.nodes[index].id)
     idMapping.set(tempId, realId)
     const oldNode = nodes.get(tempId)
     if (oldNode) {

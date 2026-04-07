@@ -70,7 +70,7 @@ export function useWebSocket(options: UseWebSocketOptions) {
   }
 
   // handler → wrapper 映射，确保 off 能找到正确的包装函数
-  const handlerMap = new Map<Function, Function>()
+  const handlerMap = new Map<(...args: any[]) => void, (...args: any[]) => void>()
 
   const on = (type: string, handler: (data: any) => void) => {
     const wrapper = (message: any) => {

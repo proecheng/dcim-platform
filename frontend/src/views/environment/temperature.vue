@@ -308,7 +308,7 @@ async function handleSensorClick(sensor: RealtimeData) {
   selectedSensor.value = sensor
   // 从 AlarmStore 加载关联告警（Story 27.7 AC1）
   const alarmStore = useAlarmStore()
-  sensorAlarms.value = alarmStore.activeAlarms.filter(a => a.point_id === sensor.point_id)
+  sensorAlarms.value = alarmStore.activeAlarms.filter(a => a.point_id === sensor.point_id) as unknown as AlarmInfo[]
   // 加载趋势图
   await nextTick()
   loadTrendChart(sensor.point_id, sensor.point_name, sensor.unit)

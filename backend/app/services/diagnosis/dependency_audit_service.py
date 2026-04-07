@@ -4,6 +4,7 @@ Architecture Reference: Section 18.11 安全加固架构（FR34-37 SBOM 管理�
 - 集成 pip-audit 定期扫描
 - 发现漏洞时触发系统告警
 """
+
 import asyncio
 import json
 import logging
@@ -32,13 +33,13 @@ class DependencyAuditService:
         """
         try:
             proc = await asyncio.create_subprocess_exec(
-                "pip-audit", "--format", "json",
+                "pip-audit",
+                "--format",
+                "json",
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
             )
-            stdout, stderr = await asyncio.wait_for(
-                proc.communicate(), timeout=120
-            )
+            stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=120)
 
             if stdout:
                 raw_data = json.loads(stdout.decode())
@@ -52,14 +53,16 @@ class DependencyAuditService:
                 pkg_version = pkg_entry.get("version", "unknown")
                 vulns = pkg_entry.get("vulns", [])
                 for vuln in vulns:
-                    vulnerable_packages.append({
-                        "package": pkg_name,
-                        "version": pkg_version,
-                        "vuln_id": vuln.get("id", "unknown"),
-                        "fix_versions": vuln.get("fix_versions", []),
-                        "aliases": vuln.get("aliases", []),
-                        "description": vuln.get("description", ""),
-                    })
+                    vulnerable_packages.append(
+                        {
+                            "package": pkg_name,
+                            "version": pkg_version,
+                            "vuln_id": vuln.get("id", "unknown"),
+                            "fix_versions": vuln.get("fix_versions", []),
+                            "aliases": vuln.get("aliases", []),
+                            "description": vuln.get("description", ""),
+                        }
+                    )
 
             result = {
                 "scan_time": datetime.now().isoformat(),

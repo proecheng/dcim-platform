@@ -151,8 +151,10 @@ class RedisService:
             return False
         try:
             import redis
+
             # 从配置获取 Redis URL
             from app.core.config import get_settings
+
             settings = get_settings()
 
             # 使用同步 Redis 客户端进行 SET NX EX 操作
@@ -173,8 +175,10 @@ class RedisService:
             return
         try:
             import redis
+
             # 从配置获取 Redis URL
             from app.core.config import get_settings
+
             settings = get_settings()
 
             sync_client = redis.from_url(

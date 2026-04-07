@@ -113,7 +113,9 @@ async def calculate_realtime_pue(db: AsyncSession) -> PUEResult:
             # 如果有 UPS 数据但不合理，记录警告
             logger.warning(
                 "UPS 功率数据异常 (ups_total=%.2f < it_power=%.2f)，使用效率模型估算 ups_loss=%.2f",
-                ups_total, it_power, ups_loss
+                ups_total,
+                it_power,
+                ups_loss,
             )
 
     # IT 负载过低时不计算 PUE（避免除零或异常大的 PUE 值）
@@ -157,9 +159,7 @@ async def write_pue_history(db: AsyncSession) -> None:
     record_time = datetime.now().replace(second=0, microsecond=0)
 
     # P1-1 修复: 检查是否已存在
-    existing = await db.execute(
-        select(PUEHistory).where(PUEHistory.recorded_at == record_time)
-    )
+    existing = await db.execute(select(PUEHistory).where(PUEHistory.recorded_at == record_time))
     existing_record = existing.scalar_one_or_none()
 
     if existing_record:

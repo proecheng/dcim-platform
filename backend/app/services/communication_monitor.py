@@ -47,7 +47,9 @@ async def check_communication_status(session: AsyncSession):
 
         if ds.consecutive_failures >= ds.retry_max_failures:
             # Story 35.2: 有父网关且父在线 → 用 device_offline
-            target_status = DataSourceStatus.DEVICE_OFFLINE if ds.parent_datasource_id is not None else DataSourceStatus.INTERRUPTED
+            target_status = (
+                DataSourceStatus.DEVICE_OFFLINE if ds.parent_datasource_id is not None else DataSourceStatus.INTERRUPTED
+            )
             if ds.status != target_status and ds.status != DataSourceStatus.GATEWAY_OFFLINE:
                 await session.execute(update(DataSource).where(DataSource.id == ds.id).values(status=target_status))
                 point_ids = await mark_unreliable_points(session, ds.id, quality=2)
@@ -65,30 +67,42 @@ async def check_communication_status(session: AsyncSession):
                 # Story 35.3: 设备离线告警
                 if target_status == DataSourceStatus.DEVICE_OFFLINE:
                     alarm = await create_datasource_alarm(
-                        session, ds, "mstp_device_offline", "minor",
+                        session,
+                        ds,
+                        "mstp_device_offline",
+                        "minor",
                         f"MS/TP 设备 {ds.name} 离线（网关正常）",
                     )
                     if alarm:
-                        pending_alarm_broadcasts.append({
-                            "action": "new",
-                            "id": alarm.id,
-                            "alarm_no": alarm.alarm_no,
-                            "alarm_level": alarm.alarm_level,
-                            "alarm_type": alarm.alarm_type,
-                            "alarm_message": alarm.alarm_message,
-                            "status": "active",
-                        })
-        elif ds.status in (DataSourceStatus.INTERRUPTED, DataSourceStatus.DEVICE_OFFLINE) and ds.consecutive_failures == 0:
+                        pending_alarm_broadcasts.append(
+                            {
+                                "action": "new",
+                                "id": alarm.id,
+                                "alarm_no": alarm.alarm_no,
+                                "alarm_level": alarm.alarm_level,
+                                "alarm_type": alarm.alarm_type,
+                                "alarm_message": alarm.alarm_message,
+                                "status": "active",
+                            }
+                        )
+        elif (
+            ds.status in (DataSourceStatus.INTERRUPTED, DataSourceStatus.DEVICE_OFFLINE)
+            and ds.consecutive_failures == 0
+        ):
             # Story 35.3: 设备恢复时关闭告警
             if ds.status == DataSourceStatus.DEVICE_OFFLINE:
                 resolved_count = await resolve_datasource_alarm(session, ds.id)
                 if resolved_count > 0:
-                    pending_alarm_broadcasts.append({
-                        "action": "resolve",
-                        "source": f"datasource:{ds.id}",
-                        "status": "resolved",
-                    })
-            await session.execute(update(DataSource).where(DataSource.id == ds.id).values(status=DataSourceStatus.CONNECTED))
+                    pending_alarm_broadcasts.append(
+                        {
+                            "action": "resolve",
+                            "source": f"datasource:{ds.id}",
+                            "status": "resolved",
+                        }
+                    )
+            await session.execute(
+                update(DataSource).where(DataSource.id == ds.id).values(status=DataSourceStatus.CONNECTED)
+            )
             point_ids = await mark_unreliable_points(session, ds.id, quality=0)
             pending_broadcasts.append(
                 {

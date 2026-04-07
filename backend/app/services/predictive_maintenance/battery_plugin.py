@@ -84,7 +84,11 @@ class BatteryDegradationPlugin(DegradationPlugin):
             else:
                 r_score = 100.0
             scores.append(("resistance_trend", r_score, weights["resistance_trend"]))
-            detail["resistance"] = {"slope_per_month": slope_per_month, "score": r_score, "data_points": len(resistance_data)}
+            detail["resistance"] = {
+                "slope_per_month": slope_per_month,
+                "score": r_score,
+                "data_points": len(resistance_data),
+            }
         else:
             detail["resistance"] = {"status": "no_data"}
 
@@ -105,7 +109,11 @@ class BatteryDegradationPlugin(DegradationPlugin):
             else:
                 temp_score = 100.0
             scores.append(("temperature", temp_score, weights["temperature"]))
-            detail["temperature"] = {"slope_per_month": slope_per_month, "score": temp_score, "data_points": len(temp_data)}
+            detail["temperature"] = {
+                "slope_per_month": slope_per_month,
+                "score": temp_score,
+                "data_points": len(temp_data),
+            }
         else:
             detail["temperature"] = {"status": "no_data"}
 
@@ -114,10 +122,15 @@ class BatteryDegradationPlugin(DegradationPlugin):
 
         if not scores:
             return DegradationResult(
-                device_id=device_id, score=100.0, confidence=0.0,
-                available_points=0, total_points=total_count,
-                trend_factors=trend_factors, primary_concern=None,
-                data_sufficiency="minimal", detail=detail,
+                device_id=device_id,
+                score=100.0,
+                confidence=0.0,
+                available_points=0,
+                total_points=total_count,
+                trend_factors=trend_factors,
+                primary_concern=None,
+                data_sufficiency="minimal",
+                detail=detail,
             )
 
         total_weight = sum(w for _, _, w in scores)
@@ -165,8 +178,11 @@ class BatteryDegradationPlugin(DegradationPlugin):
             return max(0, 10 - (40 - soh_percent) * 0.5)
 
     def _determine_sufficiency(
-        self, available_count: int, soh_data: list | None,
-        resistance_data: list | None, window_days: int,
+        self,
+        available_count: int,
+        soh_data: list | None,
+        resistance_data: list | None,
+        window_days: int,
     ) -> str:
         """Battery 数据充分度判定"""
         if not soh_data and not resistance_data:

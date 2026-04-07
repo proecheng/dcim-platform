@@ -15,12 +15,8 @@ class NotificationPolicyCreate(BaseModel):
     name: str = Field(..., min_length=1, max_length=100)
     site_id: Optional[int] = None
     alarm_level: str = Field(..., pattern="^(critical|major|minor|info)$")
-    time_range_start: Optional[str] = Field(
-        None, pattern=r"^([01]\d|2[0-3]):[0-5]\d$"
-    )
-    time_range_end: Optional[str] = Field(
-        None, pattern=r"^([01]\d|2[0-3]):[0-5]\d$"
-    )
+    time_range_start: Optional[str] = Field(None, pattern=r"^([01]\d|2[0-3]):[0-5]\d$")
+    time_range_end: Optional[str] = Field(None, pattern=r"^([01]\d|2[0-3]):[0-5]\d$")
     channels: list[str]
     notify_user_ids: list[int] = Field(default_factory=list)
     channel_escalation_enabled: bool = False
@@ -34,10 +30,7 @@ class NotificationPolicyCreate(BaseModel):
         if (self.time_range_start is None) != (self.time_range_end is None):
             raise ValueError("time_range_start 和 time_range_end 必须同时提供或同时为空")
         # start == end 零长度时段
-        if (
-            self.time_range_start is not None
-            and self.time_range_start == self.time_range_end
-        ):
+        if self.time_range_start is not None and self.time_range_start == self.time_range_end:
             raise ValueError("time_range_start 和 time_range_end 不能相同（零长度时段无效）")
         # channels 校验
         if not self.channels:
@@ -49,9 +42,7 @@ class NotificationPolicyCreate(BaseModel):
         # escalation 联动
         if self.channel_escalation_enabled:
             if not self.escalation_channel_order:
-                raise ValueError(
-                    "启用渠道升级时必须提供 escalation_channel_order"
-                )
+                raise ValueError("启用渠道升级时必须提供 escalation_channel_order")
             invalid_esc = set(self.escalation_channel_order) - VALID_CHANNELS
             if invalid_esc:
                 raise ValueError(f"escalation_channel_order 包含无效渠道: {invalid_esc}")
@@ -62,12 +53,8 @@ class NotificationPolicyUpdate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     name: Optional[str] = Field(None, min_length=1, max_length=100)
-    time_range_start: Optional[str] = Field(
-        None, pattern=r"^([01]\d|2[0-3]):[0-5]\d$"
-    )
-    time_range_end: Optional[str] = Field(
-        None, pattern=r"^([01]\d|2[0-3]):[0-5]\d$"
-    )
+    time_range_start: Optional[str] = Field(None, pattern=r"^([01]\d|2[0-3]):[0-5]\d$")
+    time_range_end: Optional[str] = Field(None, pattern=r"^([01]\d|2[0-3]):[0-5]\d$")
     channels: Optional[list[str]] = None
     notify_user_ids: Optional[list[int]] = None
     channel_escalation_enabled: Optional[bool] = None
@@ -89,9 +76,7 @@ class NotificationPolicyUpdate(BaseModel):
         if self.escalation_channel_order is not None:
             invalid_esc = set(self.escalation_channel_order) - VALID_CHANNELS
             if invalid_esc:
-                raise ValueError(
-                    f"escalation_channel_order 包含无效渠道: {invalid_esc}"
-                )
+                raise ValueError(f"escalation_channel_order 包含无效渠道: {invalid_esc}")
         return self
 
 

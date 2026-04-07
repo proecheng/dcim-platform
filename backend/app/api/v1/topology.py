@@ -712,6 +712,7 @@ from typing import List, Dict, Any
 
 class AffectedDevice(BaseModel):
     """受影响设备"""
+
     node_id: str
     type: str
     name: str
@@ -720,6 +721,7 @@ class AffectedDevice(BaseModel):
 
 class CascadeAnalysisResponse(BaseModel):
     """级联分析响应"""
+
     fault_node: str
     affected_count: int
     affected_devices: List[AffectedDevice]
@@ -728,6 +730,7 @@ class CascadeAnalysisResponse(BaseModel):
 
 class UpstreamDevice(BaseModel):
     """上游设备"""
+
     node_id: str
     type: str
     name: str
@@ -736,6 +739,7 @@ class UpstreamDevice(BaseModel):
 
 class UpstreamAnalysisResponse(BaseModel):
     """溯源分析响应"""
+
     device_id: int
     power_path: List[UpstreamDevice]
     error: str | None = None

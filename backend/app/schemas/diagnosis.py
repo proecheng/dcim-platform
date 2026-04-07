@@ -242,7 +242,7 @@ class SOHWeightsConfig(BaseModel):
     w_c: float = Field(ge=0, le=1, description="循环次数权重")
     version: str = Field(default="v1.0", description="配置版本")
 
-    @model_validator(mode='after')
+    @model_validator(mode="after")
     def validate_weights_sum(self):
         """验证权重之和约为 1.0（允许 ±0.1 误差）"""
         total = self.w_r + self.w_c
@@ -261,11 +261,11 @@ class BreakerProfileCreate(BaseModel):
     trip_curve_type: str = Field(..., description="脱扣曲线类型: B/C/D")
     rated_current: float = Field(..., gt=0, description="额定电流 A")
 
-    @field_validator('trip_curve_type')
+    @field_validator("trip_curve_type")
     @classmethod
     def validate_trip_curve_type(cls, v: str) -> str:
         """验证脱扣曲线类型"""
-        if v not in ('B', 'C', 'D'):
+        if v not in ("B", "C", "D"):
             raise ValueError("脱扣曲线类型必须是 'B', 'C', 或 'D'")
         return v
 
@@ -276,11 +276,11 @@ class BreakerProfileUpdate(BaseModel):
     trip_curve_type: Optional[str] = Field(None, description="脱扣曲线类型: B/C/D")
     rated_current: Optional[float] = Field(None, gt=0, description="额定电流 A")
 
-    @field_validator('trip_curve_type')
+    @field_validator("trip_curve_type")
     @classmethod
     def validate_trip_curve_type(cls, v: Optional[str]) -> Optional[str]:
         """验证脱扣曲线类型"""
-        if v is not None and v not in ('B', 'C', 'D'):
+        if v is not None and v not in ("B", "C", "D"):
             raise ValueError("脱扣曲线类型必须是 'B', 'C', 或 'D'")
         return v
 
@@ -307,11 +307,11 @@ class RedundancyConfigUpdate(BaseModel):
     redundancy_type: Optional[str] = Field(None, description="冗余类型: N+1/2N/NULL")
     redundancy_group_id: Optional[str] = Field(None, max_length=50, description="冗余组标识")
 
-    @field_validator('redundancy_type')
+    @field_validator("redundancy_type")
     @classmethod
     def validate_redundancy_type(cls, v: Optional[str]) -> Optional[str]:
         """验证冗余类型"""
-        if v is not None and v not in ('N+1', '2N'):
+        if v is not None and v not in ("N+1", "2N"):
             raise ValueError("冗余类型必须是 'N+1' 或 '2N'")
         return v
 
@@ -342,7 +342,7 @@ class SensorMetadataCreate(BaseModel):
     calibration_interval_days: int = Field(365, gt=0, description="校准周期天数")
     calibration_result: Optional[str] = Field(None, max_length=500, description="校准结果描述")
 
-    @field_validator('accuracy_class')
+    @field_validator("accuracy_class")
     @classmethod
     def validate_accuracy_class(cls, v: float) -> float:
         """验证精度等级"""
@@ -360,7 +360,7 @@ class SensorMetadataUpdate(BaseModel):
     calibration_interval_days: Optional[int] = Field(None, gt=0, description="校准周期天数")
     calibration_result: Optional[str] = Field(None, max_length=500, description="校准结果描述")
 
-    @field_validator('accuracy_class')
+    @field_validator("accuracy_class")
     @classmethod
     def validate_accuracy_class(cls, v: Optional[float]) -> Optional[float]:
         """验证精度等级"""

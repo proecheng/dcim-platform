@@ -15,8 +15,8 @@ describe('useHistoryManager', () => {
   let history: ReturnType<typeof useHistoryManager>
 
   beforeEach(() => {
-    nodes = ref(new DataSet([]))
-    edges = ref(new DataSet([]))
+    nodes = ref(new DataSet([])) as unknown as ReturnType<typeof ref<DataSet<VisNode>>>
+    edges = ref(new DataSet([])) as unknown as ReturnType<typeof ref<DataSet<VisEdge>>>
     history = useHistoryManager(nodes, edges)
   })
 

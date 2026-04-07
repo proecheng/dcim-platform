@@ -83,6 +83,8 @@ class TraceNodeResponse(BaseModel):
     children: List["TraceNodeResponse"] = Field(default_factory=list, description="子节点列表")
 
     model_config = ConfigDict(from_attributes=True)
+
+
 TraceNodeResponse.model_rebuild()
 
 

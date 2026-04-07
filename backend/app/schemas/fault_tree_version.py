@@ -1,18 +1,21 @@
 """
 故障树版本 Schema - Story 24.4
 """
-from pydantic import BaseModel, Field, ConfigDict
+
+from pydantic import BaseModel, ConfigDict
 from typing import Optional
 from datetime import datetime
 
 
 class FaultTreeVersionCreate(BaseModel):
     """创建版本请求"""
+
     pass  # 所有参数从路径和当前用户获取
 
 
 class FaultTreeVersionResponse(BaseModel):
     """版本响应"""
+
     id: int
     tree_id: int
     version_number: int
@@ -30,6 +33,7 @@ class FaultTreeVersionResponse(BaseModel):
 
 class FaultTreeVersionListResponse(BaseModel):
     """版本列表响应"""
+
     id: int
     version_number: int
     status: str

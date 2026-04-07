@@ -4,7 +4,6 @@ HMAC 签名管理器 - Story 24.4
 
 import hmac
 import hashlib
-from typing import Optional
 from app.core.config import get_settings
 
 

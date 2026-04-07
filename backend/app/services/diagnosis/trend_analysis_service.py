@@ -40,16 +40,16 @@ class TrendAnalysisService:
             return None
 
         # 根据点位单位确定使用哪个连续聚合视图
-        if point_info.unit in ['℃', '°C']:
-            view_name = 'temp_7d_avg'
-        elif 'RH' in point_info.unit or '湿度' in point_info.unit:
-            view_name = 'humidity_7d_avg'
+        if point_info.unit in ["℃", "°C"]:
+            view_name = "temp_7d_avg"
+        elif "RH" in point_info.unit or "湿度" in point_info.unit:
+            view_name = "humidity_7d_avg"
         else:
             logger.debug(f"Point {point_id} unit '{point_info.unit}' not supported for trend analysis")
             return None
 
         # SQL 注入防护：白名单校验视图名
-        ALLOWED_VIEWS = {'temp_7d_avg', 'humidity_7d_avg'}
+        ALLOWED_VIEWS = {"temp_7d_avg", "humidity_7d_avg"}
         if view_name not in ALLOWED_VIEWS:
             logger.warning(f"非法视图名: {view_name}")
             return None
@@ -82,16 +82,15 @@ class TrendAnalysisService:
         values = [float(row.avg_value) for row in last_3_days if row.avg_value is not None]
 
         # 容差设置
-        tolerance = 0.1 if point_info.unit in ['℃', '°C'] else 0.5  # 温度 0.1℃，湿度 0.5%RH
+        tolerance = 0.1 if point_info.unit in ["℃", "°C"] else 0.5  # 温度 0.1℃，湿度 0.5%RH
 
         # 趋势检测（允许容差）
-        is_increasing = all(values[i+1] - values[i] > -tolerance for i in range(len(values)-1))
-        is_decreasing = all(values[i] - values[i+1] > -tolerance for i in range(len(values)-1))
+        is_increasing = all(values[i + 1] - values[i] > -tolerance for i in range(len(values) - 1))
+        is_decreasing = all(values[i] - values[i + 1] > -tolerance for i in range(len(values) - 1))
 
         # 整体趋势判断
         overall_change = values[-1] - values[0]
-        has_trend = (is_increasing and overall_change > tolerance) or \
-                    (is_decreasing and overall_change < -tolerance)
+        has_trend = (is_increasing and overall_change > tolerance) or (is_decreasing and overall_change < -tolerance)
 
         if not has_trend:
             return None
@@ -119,7 +118,7 @@ class TrendAnalysisService:
                 total_change=total_change,
                 message=message,
                 level="info",  # 明确级别
-                detected_at=datetime.now()
+                detected_at=datetime.now(),
             )
 
         return None
@@ -142,7 +141,7 @@ class TrendAnalysisService:
                 await self._create_system_alarm(
                     point_id=point_id,
                     message=f"点位 {point_id} 连续 3 小时数据不足（仅 {available_days} 天），请检查数据采集",
-                    level="warning"
+                    level="warning",
                 )
                 await self.redis.delete(cache_key)  # 重置计数
         except Exception as e:
@@ -150,23 +149,21 @@ class TrendAnalysisService:
 
     async def _get_point_info(self, point_id: int) -> Optional[Point]:
         """获取点位信息"""
-        result = await self.db.execute(
-            select(Point).where(Point.id == point_id)
-        )
+        result = await self.db.execute(select(Point).where(Point.id == point_id))
         return result.scalar_one_or_none()
 
     async def _get_trend_threshold(self, unit: str) -> float:
         """从配置读取趋势阈值"""
         # 根据点位单位确定配置键
-        if unit in ['℃', '°C']:
-            config_key = 'trend_threshold_temperature'
+        if unit in ["℃", "°C"]:
+            config_key = "trend_threshold_temperature"
             default_value = 0.5
-        elif 'RH' in unit or '湿度' in unit:
-            config_key = 'trend_threshold_humidity'
+        elif "RH" in unit or "湿度" in unit:
+            config_key = "trend_threshold_humidity"
             default_value = 3.0
         else:
             # 默认使用温度阈值
-            config_key = 'trend_threshold_temperature'
+            config_key = "trend_threshold_temperature"
             default_value = 0.5
 
         # 从 system_configs 表读取
@@ -194,7 +191,7 @@ class TrendAnalysisService:
                 level=level,
                 message=message,
                 status="active",
-                triggered_at=datetime.now()
+                triggered_at=datetime.now(),
             )
             self.db.add(alarm)
             await self.db.commit()
@@ -203,11 +200,7 @@ class TrendAnalysisService:
             logger.error(f"Failed to create system alarm for point {point_id}: {e}")
             await self.db.rollback()
 
-    async def get_recent_warnings(
-        self,
-        zone_id: Optional[int] = None,
-        hours: int = 24
-    ) -> List[TrendWarning]:
+    async def get_recent_warnings(self, zone_id: Optional[int] = None, hours: int = 24) -> List[TrendWarning]:
         """
         获取最近的趋势预警
 
@@ -218,9 +211,7 @@ class TrendAnalysisService:
         Returns:
             趋势预警列表
         """
-        query = select(TrendWarning).where(
-            TrendWarning.detected_at >= datetime.now() - timedelta(hours=hours)
-        )
+        query = select(TrendWarning).where(TrendWarning.detected_at >= datetime.now() - timedelta(hours=hours))
 
         if zone_id is not None:
             # 关联 points 表过滤区域

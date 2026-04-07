@@ -62,7 +62,15 @@ class CapacityService:
 
         return CapacityStatus.normal
 
-    async def check_constraints(self, db: Session, site_id: Optional[int] = None, room_id: Optional[int] = None, required_u: int = 0, required_power_kva: float = 0.0, required_cooling_kw: float = 0.0) -> Dict[str, Any]:
+    async def check_constraints(
+        self,
+        db: Session,
+        site_id: Optional[int] = None,
+        room_id: Optional[int] = None,
+        required_u: int = 0,
+        required_power_kva: float = 0.0,
+        required_cooling_kw: float = 0.0,
+    ) -> Dict[str, Any]:
         """
         检查特定站点或房间的容量约束
         """
@@ -83,20 +91,28 @@ class CapacityService:
         # 电力检查 (kVA)
         if required_power_kva > 0:
             power_capacities = db.query(PowerCapacity).all()
-            total_available_kva = sum((pc.total_capacity_kva or 0) - (pc.used_capacity_kva or 0) for pc in power_capacities)
+            total_available_kva = sum(
+                (pc.total_capacity_kva or 0) - (pc.used_capacity_kva or 0) for pc in power_capacities
+            )
             if total_available_kva < required_power_kva:
                 results["feasible"] = False
-                results["details"].append(f"电力不足: 可用 {total_available_kva:.2f}kVA < 所需 {required_power_kva:.2f}kVA")
+                results["details"].append(
+                    f"电力不足: 可用 {total_available_kva:.2f}kVA < 所需 {required_power_kva:.2f}kVA"
+                )
             else:
                 results["details"].append(f"电力充足: 可用 {total_available_kva:.2f}kVA")
 
         # 制冷检查 (kW)
         if required_cooling_kw > 0:
             cooling_capacities = db.query(CoolingCapacity).all()
-            total_available_cooling = sum((cc.total_cooling_kw or 0) - (cc.used_cooling_kw or 0) for cc in cooling_capacities)
+            total_available_cooling = sum(
+                (cc.total_cooling_kw or 0) - (cc.used_cooling_kw or 0) for cc in cooling_capacities
+            )
             if total_available_cooling < required_cooling_kw:
                 results["feasible"] = False
-                results["details"].append(f"制冷不足: 可用 {total_available_cooling:.2f}kW < 所需 {required_cooling_kw:.2f}kW")
+                results["details"].append(
+                    f"制冷不足: 可用 {total_available_cooling:.2f}kW < 所需 {required_cooling_kw:.2f}kW"
+                )
             else:
                 results["details"].append(f"制冷充足: 可用 {total_available_cooling:.2f}kW")
 

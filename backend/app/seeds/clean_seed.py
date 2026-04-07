@@ -5,6 +5,7 @@ Story 28.2: 提供清理种子数据的工具
 使用方法:
     python -m app.seeds.clean_seed
 """
+
 import asyncio
 from sqlalchemy import delete
 from app.core.database import async_session
@@ -31,11 +32,13 @@ async def clean_seed_data():
             result = await session.execute(delete(Site).where(Site.data_source == DataSourceType.SEED))
             logger.info(f"✓ 删除 {result.rowcount} 个种子站点")
 
-            result = await session.execute(delete(ElectricityPricing).where(ElectricityPricing.data_source == DataSourceType.SEED))
+            result = await session.execute(
+                delete(ElectricityPricing).where(ElectricityPricing.data_source == DataSourceType.SEED)
+            )
             logger.info(f"✓ 删除 {result.rowcount} 个种子电价配置")
 
             # 删除默认管理员
-            result = await session.execute(delete(User).where(User.username == 'admin'))
+            result = await session.execute(delete(User).where(User.username == "admin"))
             logger.info(f"✓ 删除 {result.rowcount} 个默认管理员用户")
 
             await session.commit()

@@ -8,8 +8,8 @@ Dashboard data aggregation and statistics
 """
 
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, and_, or_, case
-from typing import List, Dict, Any, Optional
+from sqlalchemy import select, func, case
+from typing import List, Optional
 from datetime import datetime, date, timedelta
 import logging
 
@@ -17,7 +17,6 @@ from ...models.load_shift import (
     ShiftPlan,
     ShiftExecution,
     ShiftOpportunity,
-    ShiftAnalysisRecord,
 )
 from ...schemas.load_shift import (
     ShiftDashboardOverview,
@@ -45,12 +44,12 @@ class ShiftDashboardService:
         """
         Get dashboard overview with key metrics
         获取仪表盘概览及关键指标
-        
+
         Args:
             db: Database session
             start_date: Start date for statistics (default: 30 days ago)
             end_date: End date for statistics (default: today)
-            
+
         Returns:
             ShiftDashboardOverview with aggregated metrics
         """
@@ -121,16 +120,12 @@ class ShiftDashboardService:
 
         # Query 4: Today's plans
         today = datetime.now().date()
-        today_query = select(func.count(ShiftPlan.id)).where(
-            ShiftPlan.shift_date == today
-        )
+        today_query = select(func.count(ShiftPlan.id)).where(ShiftPlan.shift_date == today)
         result = await db.execute(today_query)
         today_plans = result.scalar() or 0
 
         # Query 5: Currently executing plan
-        executing_query = select(ShiftPlan).where(
-            ShiftPlan.status == ShiftPlanStatus.EXECUTING
-        ).limit(1)
+        executing_query = select(ShiftPlan).where(ShiftPlan.status == ShiftPlanStatus.EXECUTING).limit(1)
         result = await db.execute(executing_query)
         current_plan = result.scalar_one_or_none()
 
@@ -156,8 +151,7 @@ class ShiftDashboardService:
         )
 
         logger.info(
-            f"Dashboard overview: {total_plans} plans, {completed_plans} completed, "
-            f"¥{total_cost_saving:.2f} saved"
+            f"Dashboard overview: {total_plans} plans, {completed_plans} completed, ¥{total_cost_saving:.2f} saved"
         )
 
         return overview
@@ -167,19 +161,17 @@ class ShiftDashboardService:
         """
         Get realtime shift data for currently executing plan
         获取当前执行计划的实时数据
-        
+
         Args:
             db: Database session
-            
+
         Returns:
             ShiftRealtimeData if plan is executing, None otherwise
         """
         logger.info("Getting realtime shift data")
 
         # Query currently executing plan
-        plan_query = select(ShiftPlan).where(
-            ShiftPlan.status == ShiftPlanStatus.EXECUTING
-        ).limit(1)
+        plan_query = select(ShiftPlan).where(ShiftPlan.status == ShiftPlanStatus.EXECUTING).limit(1)
         result = await db.execute(plan_query)
         plan = result.scalar_one_or_none()
 
@@ -204,10 +196,7 @@ class ShiftDashboardService:
         # Calculate progress
         now = datetime.now()
         start_time = execution.start_time
-        end_time = execution.end_time or datetime.combine(
-            plan.shift_date,
-            plan.end_time
-        )
+        end_time = execution.end_time or datetime.combine(plan.shift_date, plan.end_time)
 
         total_duration = (end_time - start_time).total_seconds()
         elapsed_duration = (now - start_time).total_seconds()
@@ -233,10 +222,7 @@ class ShiftDashboardService:
             energy_saving=round(execution.energy_saving or 0.0, 2),
         )
 
-        logger.info(
-            f"Realtime data: plan={plan.id}, progress={progress:.1f}%, "
-            f"power={current_shift_power:.2f}kW"
-        )
+        logger.info(f"Realtime data: plan={plan.id}, progress={progress:.1f}%, power={current_shift_power:.2f}kW")
 
         return realtime_data
 
@@ -248,18 +234,18 @@ class ShiftDashboardService:
         """
         Get shift trends over time
         获取转移趋势数据
-        
+
         Args:
             db: Database session
             days: Number of days to look back (default: 7)
-            
+
         Returns:
             List of ShiftTrendData with daily statistics
         """
         logger.info(f"Getting shift trends for last {days} days")
 
         start_date = (datetime.now() - timedelta(days=days)).date()
-        end_date = datetime.now().date()
+        datetime.now().date()
 
         # Generate date range
         date_range = [start_date + timedelta(days=i) for i in range(days + 1)]
@@ -270,9 +256,7 @@ class ShiftDashboardService:
             plan_query = select(
                 func.count(ShiftPlan.id).label("total"),
                 func.sum(case((ShiftPlan.status == ShiftPlanStatus.COMPLETED, 1), else_=0)).label("completed"),
-            ).where(
-                ShiftPlan.shift_date == current_date
-            )
+            ).where(ShiftPlan.shift_date == current_date)
             result = await db.execute(plan_query)
             plan_stats = result.first()
 
@@ -321,30 +305,34 @@ class ShiftDashboardService:
         """
         Get comprehensive statistics summary
         获取综合统计摘要
-        
+
         Args:
             db: Database session
             start_date: Start date
             end_date: End date
-            
+
         Returns:
             ShiftStatisticsSummary with detailed statistics
         """
         logger.info(f"Getting statistics summary: {start_date} to {end_date}")
 
         # Query plan statistics by period
-        period_query = select(
-            ShiftPlan.shift_from_period,
-            ShiftPlan.shift_to_period,
-            func.count(ShiftPlan.id).label("count"),
-            func.sum(ShiftPlan.target_shift_power).label("total_power"),
-        ).where(
-            ShiftPlan.shift_date >= start_date,
-            ShiftPlan.shift_date <= end_date,
-            ShiftPlan.status == ShiftPlanStatus.COMPLETED,
-        ).group_by(
-            ShiftPlan.shift_from_period,
-            ShiftPlan.shift_to_period,
+        period_query = (
+            select(
+                ShiftPlan.shift_from_period,
+                ShiftPlan.shift_to_period,
+                func.count(ShiftPlan.id).label("count"),
+                func.sum(ShiftPlan.target_shift_power).label("total_power"),
+            )
+            .where(
+                ShiftPlan.shift_date >= start_date,
+                ShiftPlan.shift_date <= end_date,
+                ShiftPlan.status == ShiftPlanStatus.COMPLETED,
+            )
+            .group_by(
+                ShiftPlan.shift_from_period,
+                ShiftPlan.shift_to_period,
+            )
         )
         result = await db.execute(period_query)
         period_stats = result.all()
@@ -364,9 +352,9 @@ class ShiftDashboardService:
             func.sum(ShiftExecution.actual_shift_power).label("total_power"),
             func.sum(ShiftExecution.cost_saving).label("total_cost"),
             func.sum(ShiftExecution.energy_saving).label("total_energy"),
-            func.avg(
-                func.extract("epoch", ShiftExecution.end_time - ShiftExecution.start_time) / 3600
-            ).label("avg_duration"),
+            func.avg(func.extract("epoch", ShiftExecution.end_time - ShiftExecution.start_time) / 3600).label(
+                "avg_duration"
+            ),
         ).where(
             ShiftExecution.status == ExecutionStatus.COMPLETED,
             func.date(ShiftExecution.start_time) >= start_date,
@@ -416,12 +404,12 @@ class ShiftDashboardService:
         """
         Get monthly report
         获取月度报告
-        
+
         Args:
             db: Database session
             year: Year
             month: Month (1-12)
-            
+
         Returns:
             ShiftMonthlyReport with monthly statistics
         """
@@ -466,11 +454,11 @@ class ShiftDashboardService:
         """
         Get yearly report
         获取年度报告
-        
+
         Args:
             db: Database session
             year: Year
-            
+
         Returns:
             ShiftYearlyReport with yearly statistics
         """
