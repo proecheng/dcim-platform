@@ -77,6 +77,7 @@ async def test_demo_flow_load_generate_unload_with_api(async_db, client, monkeyp
     monkeypatch.setattr("app.demo.seeds.datacenter_seed.seed_datacenter", _noop)
     monkeypatch.setattr("app.demo.seeds.power_seed.seed_power_devices", _noop)
     monkeypatch.setattr("app.demo.seeds.cooling_seed.seed_cooling_devices", _noop)
+    monkeypatch.setattr("app.demo.seeds.asset_capacity_seed.seed_asset_capacity", _noop)
     monkeypatch.setattr("app.services.device_sync.DeviceSyncService", _FakeSyncService)
     monkeypatch.setattr(svc, "_create_points", _create_points)
     monkeypatch.setattr(svc, "_create_distribution_system", _noop)

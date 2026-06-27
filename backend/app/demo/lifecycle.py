@@ -39,10 +39,12 @@ async def startup() -> None:
     from .seeds.datacenter_seed import seed_datacenter
     from .seeds.power_seed import seed_power_devices
     from .seeds.cooling_seed import seed_cooling_devices
+    from .seeds.asset_capacity_seed import seed_asset_capacity
 
     await seed_datacenter()
     await seed_power_devices()
     await seed_cooling_devices()
+    await seed_asset_capacity()
     logger.info("演示模块: 种子数据已初始化")
 
     # 双向同步: 拓扑节点 ↔ 动环设备 (通过 device_code 匹配关联)

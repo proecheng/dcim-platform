@@ -81,6 +81,7 @@ async def test_load_demo_data_happy_path(async_db, monkeypatch):
     monkeypatch.setattr("app.demo.seeds.datacenter_seed.seed_datacenter", _seed_noop)
     monkeypatch.setattr("app.demo.seeds.power_seed.seed_power_devices", _seed_noop)
     monkeypatch.setattr("app.demo.seeds.cooling_seed.seed_cooling_devices", _seed_noop)
+    monkeypatch.setattr("app.demo.seeds.asset_capacity_seed.seed_asset_capacity", _seed_noop)
     monkeypatch.setattr(demo_service_module, "async_session", _SessionCtx(async_db))
     monkeypatch.setattr("app.services.device_sync.DeviceSyncService", _FakeSyncService)
     monkeypatch.setattr(svc, "_create_points", _create_points)

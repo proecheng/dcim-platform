@@ -56,6 +56,7 @@ async def test_lifecycle_startup_initializes_seeds_and_simulator(async_db, monke
     seed_dc = AsyncMock()
     seed_power = AsyncMock()
     seed_cooling = AsyncMock()
+    seed_asset_capacity = AsyncMock()
     sim_start = AsyncMock()
     fake_task = _FakeTask()
 
@@ -75,6 +76,7 @@ async def test_lifecycle_startup_initializes_seeds_and_simulator(async_db, monke
     monkeypatch.setattr("app.demo.seeds.datacenter_seed.seed_datacenter", seed_dc)
     monkeypatch.setattr("app.demo.seeds.power_seed.seed_power_devices", seed_power)
     monkeypatch.setattr("app.demo.seeds.cooling_seed.seed_cooling_devices", seed_cooling)
+    monkeypatch.setattr("app.demo.seeds.asset_capacity_seed.seed_asset_capacity", seed_asset_capacity)
     monkeypatch.setattr("app.services.device_sync.DeviceSyncService", _FakeSyncService)
     monkeypatch.setattr("app.core.database.async_session", _SessionCtx(async_db))
     monkeypatch.setattr("app.demo.engine.simulator.start", sim_start)
@@ -91,6 +93,7 @@ async def test_lifecycle_startup_initializes_seeds_and_simulator(async_db, monke
     seed_dc.assert_awaited_once()
     seed_power.assert_awaited_once()
     seed_cooling.assert_awaited_once()
+    seed_asset_capacity.assert_awaited_once()
     sim_start.assert_called_once_with(interval=5)
     assert lifecycle._simulator_task is fake_task
 

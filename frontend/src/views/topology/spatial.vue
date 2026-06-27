@@ -247,7 +247,8 @@ import {
   createRow, updateRow, deleteRow,
   updateCabinetPosition,
   importSpatialExcel, exportSpatialExcel,
-  getTemplates, applyTemplate
+  getTemplates, applyTemplate,
+  normalizeSpatialTreeResponse
 } from '@/api/modules/spatial'
 import type {
   SpatialTreeNode, TreeCabinet, TreeRoom, LayoutTemplate,
@@ -316,7 +317,7 @@ const rawTreeData = ref<SpatialTreeNode[]>([])
 async function loadTree() {
   try {
     const res = await getSpatialTree()
-    const sites = (res as unknown as { code: number; data: SpatialTreeNode[] }).data || []
+    const sites = normalizeSpatialTreeResponse(res)
     rawTreeData.value = sites
     treeData.value = buildTreeData(sites)
     // 如果之前选中了房间，刷新选中状态

@@ -284,6 +284,14 @@ export function getSpatialTree() {
   return request.get<ResponseModel<SpatialTreeNode[]>>('/v1/spatial/tree')
 }
 
+export function normalizeSpatialTreeResponse(res: unknown): SpatialTreeNode[] {
+  if (Array.isArray(res)) {
+    return res as SpatialTreeNode[]
+  }
+  const data = (res as { data?: unknown } | null)?.data
+  return Array.isArray(data) ? (data as SpatialTreeNode[]) : []
+}
+
 // ==================== 机柜位置 API ====================
 
 /** 更新机柜位置 */

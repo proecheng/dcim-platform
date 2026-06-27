@@ -1092,10 +1092,12 @@ class DemoDataService:
                 from .seeds.datacenter_seed import seed_datacenter
                 from .seeds.power_seed import seed_power_devices
                 from .seeds.cooling_seed import seed_cooling_devices
+                from .seeds.asset_capacity_seed import seed_asset_capacity
 
                 await seed_datacenter()
                 await seed_power_devices()
                 await seed_cooling_devices()
+                await seed_asset_capacity()
 
                 # Phase 2: 创建点位 (10-35%)
                 self._update_progress(10, "创建监控点位...", progress_callback)
