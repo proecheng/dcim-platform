@@ -35,7 +35,15 @@
           <template #default="{ row }">
             <el-button type="primary" link @click="viewUsage(row)">U位图</el-button>
             <el-button type="primary" link @click="editCabinet(row)">编辑</el-button>
-            <el-button type="danger" link @click="confirmDelete(row)">删除</el-button>
+            <el-button
+              type="danger"
+              link
+              :disabled="(row.used_u || 0) > 0"
+              :title="(row.used_u || 0) > 0 ? '机柜存在关联资产，不能删除' : '删除机柜'"
+              @click="confirmDelete(row)"
+            >
+              删除
+            </el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -437,7 +445,7 @@ async function viewUsage(row: Cabinet) {
 
 // 提交表单
 async function submitForm() {
-  const valid = await formRef.value?.validate()
+  const valid = await formRef.value?.validate().catch(() => false)
   if (!valid) return
 
   submitting.value = true
@@ -526,7 +534,7 @@ function getProgressColor(percentage: number): string {
 }
 
 // 检查U位是否被占用（用于拖拽预校验）
-function isUnitOccupied(unitNumber: number): boolean {
+function _isUnitOccupied(unitNumber: number): boolean {
   if (!currentUsage.value?.assets) return false
   return currentUsage.value.assets.some(
     asset => unitNumber >= asset.u_position && unitNumber < asset.u_position + asset.u_height

@@ -92,6 +92,21 @@
           <el-menu-item index="/energy/regulation">负荷调节</el-menu-item>
           <el-menu-item index="/energy/execution">执行管理</el-menu-item>
           <el-menu-item index="/energy/report">能效报告</el-menu-item>
+          <el-sub-menu index="/energy/shift">
+            <template #title>负荷转移</template>
+            <el-menu-item index="/energy/shift/dashboard">转移仪表盘</el-menu-item>
+            <el-menu-item index="/energy/shift/list">计划列表</el-menu-item>
+            <el-menu-item index="/energy/shift/create">新建计划</el-menu-item>
+            <el-menu-item index="/energy/shift/opportunities">转移机会</el-menu-item>
+            <el-menu-item index="/energy/shift/executions">执行记录</el-menu-item>
+            <el-menu-item index="/energy/shift/cooling-config">制冷联动配置</el-menu-item>
+            <el-menu-item index="/energy/shift/cooling-monitor">制冷状态监控</el-menu-item>
+            <el-menu-item index="/energy/shift/constraints">约束管理</el-menu-item>
+            <el-menu-item index="/energy/shift/reports">收益报表</el-menu-item>
+            <el-menu-item index="/energy/shift/precool-schedule">预冷计划</el-menu-item>
+            <el-menu-item index="/energy/shift/deployment">部署管理</el-menu-item>
+            <el-menu-item index="/energy/shift/vpp-monitor">VPP集成监控</el-menu-item>
+          </el-sub-menu>
         </el-sub-menu>
 
         <el-sub-menu index="/asset">
@@ -115,6 +130,7 @@
           <el-menu-item index="/operation/knowledge">知识库</el-menu-item>
           <el-menu-item index="/operation/reports">报表分析</el-menu-item>
           <el-menu-item index="/operation/history">历史数据</el-menu-item>
+          <el-menu-item index="/operation/predictive">预测性维护</el-menu-item>
         </el-sub-menu>
 
         <el-sub-menu index="/vpp">
@@ -168,6 +184,9 @@
               <template #title>智能诊断</template>
               <el-menu-item index="/strategy/diagnosis/results">诊断结果</el-menu-item>
               <el-menu-item v-if="isAdmin" index="/strategy/diagnosis/rules">诊断规则</el-menu-item>
+              <el-menu-item index="/strategy/diagnosis/reports">误诊报告</el-menu-item>
+              <el-menu-item index="/strategy/diagnosis/time-window-tuning">时间窗口调参</el-menu-item>
+              <el-menu-item index="/strategy/diagnosis/probability-tuning">概率调参</el-menu-item>
             </el-sub-menu>
           </el-sub-menu>
 
@@ -179,6 +198,7 @@
             <el-menu-item index="/system/users">用户管理</el-menu-item>
             <el-menu-item index="/system/sites">站点管理</el-menu-item>
             <el-menu-item index="/system/audit-log">操作审计</el-menu-item>
+            <el-menu-item index="/system/notification">通知管理</el-menu-item>
             <el-menu-item index="/system/settings">系统设置</el-menu-item>
             <el-menu-item index="/system/site-selection">智能选址</el-menu-item>
           </el-sub-menu>
@@ -247,15 +267,20 @@ import { ref, computed, onMounted, provide } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useWebSocketManager } from '@/composables/useWebSocketManager'
 import {
-  Monitor, Cpu, Bell, TrendCharts, Setting, Document,
-  Expand, Fold, UserFilled, ArrowDown,
-  Lightning, Odometer, Share, DataAnalysis,
-  Grid, SetUp, Tickets, List, Reading,
-  Opportunity, Operation, VideoPlay,
-  IceCream, Sunny, Lock, OfficeBuilding, DataBoard, Tools, Connection,
-  Coin, Menu,
-  Key, VideoCamera, Camera, Warning, View, Timer,
-  RefreshRight, FirstAidKit, User, MapLocation, Box, Files
+  Monitor,
+  Bell,
+  Setting,
+  UserFilled,
+  ArrowDown,
+  Lightning,
+  SetUp,
+  Opportunity,
+  IceCream,
+  Sunny,
+  Lock,
+  OfficeBuilding,
+  Tools,
+  Connection
 } from '@element-plus/icons-vue'
 import { storeToRefs } from 'pinia'
 import { useUserStore, useAlarmStore, useAppStore } from '@/stores'

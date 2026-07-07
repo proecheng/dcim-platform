@@ -21,7 +21,7 @@ class ProbabilityTuningService:
     def __init__(self):
         pass
 
-    async def analyze_all_trees(self) -> dict:
+    async def analyze_all_trees(self, tree_id_filter: int | None = None) -> dict:
         """
         分析所有活跃故障树，生成调参建议
 
@@ -33,6 +33,8 @@ class ProbabilityTuningService:
             }
         """
         logger.info("开始执行概率调参分析")
+        if tree_id_filter is not None:
+            logger.info(f"限定故障树 {tree_id_filter} 执行概率调参分析")
 
         # Story 26.9: 前置训练数据质量检查
         audit_result = None

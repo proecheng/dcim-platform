@@ -15,7 +15,26 @@ const pageSize = ref(20);
 
 const dialogVisible = ref(false);
 const dialogMode = ref<'create'|'edit'>('create');
-const currentRule = reactive<any>({ rule_code: '', name: '', category: '', is_enabled: true, is_system: false, priority: 0 });
+const defaultTriggerCondition = () => ({
+  expression: 'true',
+  source: 'manual'
+});
+const defaultDiagnosisLogic = () => ({
+  causes: [],
+  suggested_actions: []
+});
+const defaultRule = () => ({
+  rule_code: '',
+  name: '',
+  description: '',
+  category: 'temperature',
+  is_enabled: true,
+  is_system: false,
+  priority: 0,
+  trigger_condition: defaultTriggerCondition(),
+  diagnosis_logic: defaultDiagnosisLogic()
+});
+const currentRule = reactive<any>(defaultRule());
 const ruleForm = ref(null);
 
 const categoryLabelMap: Record<string, string> = {
@@ -46,7 +65,7 @@ async function loadRules() {
 
 function openCreate() {
   dialogMode.value = 'create';
-  Object.assign(currentRule, { rule_code: '', name: '', category: '', is_enabled: true, is_system: false, priority: 0 });
+  Object.assign(currentRule, defaultRule());
   dialogVisible.value = true;
 }
 
@@ -58,11 +77,23 @@ function editRule(rule: any) {
 
 async function saveRule() {
   try {
+    const payload = {
+      name: currentRule.name,
+      description: currentRule.description || '',
+      category: currentRule.category || 'temperature',
+      trigger_condition: currentRule.trigger_condition ?? defaultTriggerCondition(),
+      diagnosis_logic: currentRule.diagnosis_logic ?? defaultDiagnosisLogic(),
+      priority: currentRule.priority ?? 0,
+      is_enabled: currentRule.is_enabled ?? true
+    };
     if (dialogMode.value === 'create') {
-      await createDiagnosisRule(currentRule);
+      await createDiagnosisRule({
+        rule_code: currentRule.rule_code,
+        ...payload
+      });
       ElMessage({ type: 'success', message: '创建成功' });
     } else {
-      await updateDiagnosisRule(currentRule.id, currentRule);
+      await updateDiagnosisRule(currentRule.id, payload);
       ElMessage({ type: 'success', message: '更新成功' });
     }
     await loadRules();

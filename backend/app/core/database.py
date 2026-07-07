@@ -82,6 +82,69 @@ async def init_db():
             await conn.execute(text("PRAGMA journal_mode=WAL"))
             await conn.execute(text("PRAGMA synchronous=NORMAL"))
             await conn.execute(text("PRAGMA cache_size=-64000"))  # 64MB 缓存
+            await _ensure_sqlite_legacy_columns(conn)
+
+
+async def _ensure_sqlite_legacy_columns(conn):
+    """补齐旧 SQLite 数据库缺失的后续迁移字段。
+
+    Base.metadata.create_all 只会创建新表，不会为既有表补列。开发/演示环境常直接
+    启动旧 dcim.db，因此这里用白名单补齐已知兼容字段，避免页面接口因缺列返回 500。
+    """
+    additions = {
+        "alarms": [
+            ("source", "VARCHAR(100)"),
+        ],
+        "datasources": [
+            ("parent_datasource_id", "INTEGER"),
+        ],
+        "device_health_scores": [
+            ("score_factors", "TEXT"),
+            ("data_sufficiency", "VARCHAR(20) DEFAULT 'minimal'"),
+            ("degradation_score", "FLOAT"),
+        ],
+        "device_templates": [
+            ("extra_config", "JSON"),
+        ],
+        "cooling_zones": [
+            ("site_id", "INTEGER"),
+            ("area_m2", "FLOAT"),
+            ("height_m", "FLOAT DEFAULT 3.0"),
+            ("thermal_R", "FLOAT"),
+            ("thermal_C", "FLOAT"),
+            ("bypass_beta", "FLOAT DEFAULT 0.1"),
+            ("r_calibrated_at", "DATETIME"),
+        ],
+        "cooling_linkage_configs": [
+            ("cooling_zone_id", "INTEGER"),
+            ("precool_target_temp", "FLOAT"),
+            ("precool_enabled", "BOOLEAN DEFAULT 0"),
+        ],
+    }
+
+    table_rows = await conn.execute(text("SELECT name FROM sqlite_master WHERE type='table'"))
+    existing_tables = {row[0] for row in table_rows.fetchall()}
+
+    for table_name, columns in additions.items():
+        if table_name not in existing_tables:
+            continue
+
+        column_rows = await conn.execute(text(f"PRAGMA table_info({table_name})"))
+        existing_columns = {row[1] for row in column_rows.fetchall()}
+        for column_name, column_sql in columns:
+            if column_name not in existing_columns:
+                await conn.execute(text(f"ALTER TABLE {table_name} ADD COLUMN {column_name} {column_sql}"))
+
+    await conn.execute(text("CREATE INDEX IF NOT EXISTS ix_alarms_source ON alarms (source)"))
+    await conn.execute(text("CREATE INDEX IF NOT EXISTS ix_datasources_parent_id ON datasources (parent_datasource_id)"))
+
+    try:
+        await conn.execute(
+            text("CREATE UNIQUE INDEX IF NOT EXISTS uq_device_health_scores_device_id ON device_health_scores (device_id)")
+        )
+    except Exception:
+        # 旧库如果已有重复 device_id，保留数据优先；业务读写仍可使用新增列。
+        pass
 
 
 def is_postgresql() -> bool:

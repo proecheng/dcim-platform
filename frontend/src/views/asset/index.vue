@@ -822,7 +822,7 @@ function showMaintenanceDialog(row: Asset) {
 
 // 提交表单
 async function submitForm() {
-  const valid = await formRef.value?.validate()
+  const valid = await formRef.value?.validate().catch(() => false)
   if (!valid) return
 
   submitting.value = true
@@ -865,7 +865,7 @@ async function submitForm() {
 
 // 提交维护记录
 async function submitMaintenance() {
-  const valid = await maintenanceFormRef.value?.validate()
+  const valid = await maintenanceFormRef.value?.validate().catch(() => false)
   if (!valid || !currentAsset.value) return
 
   submitting.value = true
@@ -1004,7 +1004,7 @@ async function handleDownloadTemplate() {
     a.download = '资产导入模板.xlsx'
     a.click()
     window.URL.revokeObjectURL(url)
-  } catch (e) {
+  } catch {
     ElMessage.error('下载模板失败')
   }
 }
@@ -1026,7 +1026,7 @@ async function handleExport() {
     a.download = `资产列表_${new Date().toISOString().slice(0, 10)}.xlsx`
     a.click()
     window.URL.revokeObjectURL(url)
-  } catch (e) {
+  } catch {
     ElMessage.error('导出失败')
   }
 }

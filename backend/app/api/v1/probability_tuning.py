@@ -85,6 +85,7 @@ class TriggerAnalysisResponse(BaseModel):
 # ============================================================
 
 
+@router.post("/analyze", response_model=TriggerAnalysisResponse, dependencies=[Depends(require_role(["admin"]))])
 @router.post("/trigger", response_model=TriggerAnalysisResponse, dependencies=[Depends(require_role(["admin"]))])
 async def trigger_analysis(tree_id: Optional[int] = None, db: AsyncSession = Depends(get_db)):
     """

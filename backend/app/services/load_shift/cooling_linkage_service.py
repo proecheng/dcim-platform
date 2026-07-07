@@ -8,10 +8,55 @@ from datetime import datetime
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_, desc
 from app.models.load_shift import CoolingLinkageConfig, CoolingLinkageRecord
+from app.models.topology_config import CoolingZone
+
+
+CONFIG_FIELDS = {
+    "enabled",
+    "lag_time_minutes",
+    "target_cop",
+    "cop_lower_threshold",
+    "cop_upper_threshold",
+    "target_supply_temp",
+    "supply_temp_lower",
+    "supply_temp_upper",
+    "target_return_temp",
+    "return_temp_lower",
+    "return_temp_upper",
+    "power_adjust_step",
+    "max_adjust_ratio",
+    "adjust_interval_minutes",
+    "safety_protection_enabled",
+    "min_cooling_power",
+    "max_cooling_power",
+    "precool_target_temp",
+    "precool_enabled",
+}
 
 
 class CoolingLinkageService:
     """制冷联动服务"""
+
+    @staticmethod
+    async def _resolve_cooling_zone_id(db: AsyncSession, requested_zone_id: Optional[int] = None) -> int:
+        """Return a valid cooling zone id for global linkage config."""
+        if requested_zone_id:
+            return int(requested_zone_id)
+
+        result = await db.execute(select(CoolingZone).order_by(CoolingZone.id).limit(1))
+        zone = result.scalar_one_or_none()
+        if zone:
+            return int(zone.id)
+
+        zone = CoolingZone(
+            zone_code="DEFAULT-COOLING-ZONE",
+            zone_name="默认制冷区域",
+            design_capacity_kw=2000,
+            description="系统自动创建，用于全局制冷联动配置",
+        )
+        db.add(zone)
+        await db.flush()
+        return int(zone.id)
 
     @staticmethod
     async def get_config(db: AsyncSession) -> Optional[Dict[str, Any]]:
@@ -85,7 +130,11 @@ class CoolingLinkageService:
 
         if not config:
             # 创建新配置
+            cooling_zone_id = await CoolingLinkageService._resolve_cooling_zone_id(
+                db, config_data.get("cooling_zone_id")
+            )
             config = CoolingLinkageConfig(
+                cooling_zone_id=cooling_zone_id,
                 enabled=config_data.get("enabled", True),
                 lag_time_minutes=config_data.get("lag_time_minutes", 20),
                 target_cop=config_data.get("target_cop", 3.0),
@@ -107,8 +156,12 @@ class CoolingLinkageService:
             db.add(config)
         else:
             # 更新现有配置
+            if not config.cooling_zone_id:
+                config.cooling_zone_id = await CoolingLinkageService._resolve_cooling_zone_id(
+                    db, config_data.get("cooling_zone_id")
+                )
             for key, value in config_data.items():
-                if hasattr(config, key):
+                if key in CONFIG_FIELDS:
                     setattr(config, key, value)
             config.updated_at = datetime.now()
 
