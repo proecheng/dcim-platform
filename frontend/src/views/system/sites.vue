@@ -187,6 +187,25 @@ import { useSiteStore } from '@/stores/site'
 type FormInstance = InstanceType<typeof import('element-plus')['ElForm']>
 type TagType = 'info' | 'warning' | 'success' | 'danger' | 'primary'
 
+function getApiErrorMessage(error: unknown, fallback: string): string {
+  const data = (error as any)?.response?.data
+  return (
+    (typeof data?.detail === 'string' && data.detail) ||
+    (typeof data?.error?.message === 'string' && data.error.message) ||
+    (typeof data?.error === 'string' && data.error) ||
+    (typeof data?.message === 'string' && data.message) ||
+    fallback
+  )
+}
+
+function showApiError(error: unknown, fallback: string, logLabel = fallback) {
+  const status = (error as any)?.response?.status
+  if (status !== 400 && status !== 409) {
+    console.error(logLabel, error)
+  }
+  ElMessage.error(getApiErrorMessage(error, fallback))
+}
+
 // Store
 const siteStore = useSiteStore()
 const currentSiteId = computed(() => siteStore.currentSiteId)
@@ -374,8 +393,7 @@ async function handleSubmit() {
     // 同步 store
     siteStore.fetchSites()
   } catch (e) {
-    console.error('操作失败', e)
-    ElMessage.error('操作失败')
+    showApiError(e, '操作失败')
   } finally {
     submitting.value = false
   }
@@ -394,8 +412,7 @@ async function handleDelete(row: Site) {
       siteStore.switchSite(null)
     }
   } catch (e) {
-    console.error('删除失败', e)
-    ElMessage.error('删除失败，可能存在关联数据')
+    showApiError(e, '删除失败，可能存在关联数据', '删除失败')
   }
 }
 

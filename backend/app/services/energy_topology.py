@@ -12,6 +12,7 @@ from sqlalchemy.orm import selectinload
 from datetime import datetime
 
 from ..models.energy import Transformer, MeterPoint, DistributionPanel, DistributionCircuit, PowerDevice
+from ..models.device import Device
 from ..models.point import Point, PointRealtime
 from ..schemas.energy import (
     TopologyNodeType,
@@ -487,6 +488,25 @@ class EnergyTopologyService:
             return f"{device_code}_{timestamp}"
 
     @staticmethod
+    async def _assert_unique_code(
+        db: AsyncSession,
+        model,
+        code_column,
+        code: str,
+        current_id: int,
+        label: str,
+    ) -> None:
+        """Validate code uniqueness before updates to avoid database 500s."""
+        result = await db.execute(
+            select(model.id).where(
+                code_column == code,
+                model.id != current_id,
+            )
+        )
+        if result.scalar_one_or_none() is not None:
+            raise ValueError(f"{label}已存在: {code}")
+
+    @staticmethod
     async def create_node(db: AsyncSession, data: TopologyNodeCreate) -> Tuple[int, str]:
         """
         创建拓扑节点
@@ -690,6 +710,14 @@ class EnergyTopologyService:
             if data.name is not None:
                 node.transformer_name = data.name
             if data.code is not None:
+                await EnergyTopologyService._assert_unique_code(
+                    db,
+                    Transformer,
+                    Transformer.transformer_code,
+                    data.code,
+                    node.id,
+                    "变压器编码",
+                )
                 node.transformer_code = data.code
             if data.status is not None:
                 node.status = data.status
@@ -716,6 +744,14 @@ class EnergyTopologyService:
             if data.name is not None:
                 node.meter_name = data.name
             if data.code is not None:
+                await EnergyTopologyService._assert_unique_code(
+                    db,
+                    MeterPoint,
+                    MeterPoint.meter_code,
+                    data.code,
+                    node.id,
+                    "计量点编码",
+                )
                 node.meter_code = data.code
             if data.status is not None:
                 node.status = data.status
@@ -744,6 +780,23 @@ class EnergyTopologyService:
             if data.name is not None:
                 node.panel_name = data.name
             if data.code is not None:
+                await EnergyTopologyService._assert_unique_code(
+                    db,
+                    DistributionPanel,
+                    DistributionPanel.panel_code,
+                    data.code,
+                    node.id,
+                    "配电柜编码",
+                )
+                if node.device_id:
+                    await EnergyTopologyService._assert_unique_code(
+                        db,
+                        Device,
+                        Device.device_code,
+                        data.code,
+                        node.device_id,
+                        "动环设备编码",
+                    )
                 node.panel_code = data.code
             if data.status is not None:
                 node.status = data.status
@@ -764,6 +817,14 @@ class EnergyTopologyService:
             if data.name is not None:
                 node.circuit_name = data.name
             if data.code is not None:
+                await EnergyTopologyService._assert_unique_code(
+                    db,
+                    DistributionCircuit,
+                    DistributionCircuit.circuit_code,
+                    data.code,
+                    node.id,
+                    "回路编码",
+                )
                 node.circuit_code = data.code
             if data.is_enabled is not None:
                 node.is_enabled = data.is_enabled
@@ -782,6 +843,23 @@ class EnergyTopologyService:
             if data.name is not None:
                 node.device_name = data.name
             if data.code is not None:
+                await EnergyTopologyService._assert_unique_code(
+                    db,
+                    PowerDevice,
+                    PowerDevice.device_code,
+                    data.code,
+                    node.id,
+                    "用电设备编码",
+                )
+                if node.monitor_device_id:
+                    await EnergyTopologyService._assert_unique_code(
+                        db,
+                        Device,
+                        Device.device_code,
+                        data.code,
+                        node.monitor_device_id,
+                        "动环设备编码",
+                    )
                 node.device_code = data.code
             if data.is_enabled is not None:
                 node.is_enabled = data.is_enabled
@@ -800,6 +878,14 @@ class EnergyTopologyService:
             if data.name is not None:
                 node.point_name = data.name
             if data.code is not None:
+                await EnergyTopologyService._assert_unique_code(
+                    db,
+                    Point,
+                    Point.point_code,
+                    data.code,
+                    node.id,
+                    "点位编码",
+                )
                 node.point_code = data.code
             if data.is_enabled is not None:
                 node.is_enabled = data.is_enabled

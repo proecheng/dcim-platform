@@ -10,6 +10,7 @@ Updated: 2026-01-29 - Added sync endpoint and device points query
 from fastapi import APIRouter, Depends, HTTPException, Body, Path, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 
 from ..deps import get_db
 from ...services.energy_topology import EnergyTopologyService
@@ -77,6 +78,9 @@ async def create_topology_node(data: TopologyNodeCreate, db: AsyncSession = Depe
     except ValueError as e:
         await db.rollback()
         raise HTTPException(status_code=400, detail=str(e))
+    except IntegrityError:
+        await db.rollback()
+        raise HTTPException(status_code=400, detail="编码已存在，请使用唯一编码")
     except Exception as e:
         await db.rollback()
         raise HTTPException(status_code=500, detail=f"创建失败: {str(e)}")
@@ -117,9 +121,15 @@ async def update_topology_node(data: TopologyNodeUpdate, db: AsyncSession = Depe
         )
 
         return {"success": True, "message": "节点更新成功"}
+    except ValueError as e:
+        await db.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
     except HTTPException:
         await db.rollback()
         raise
+    except IntegrityError:
+        await db.rollback()
+        raise HTTPException(status_code=400, detail="编码已存在，请使用唯一编码")
     except Exception as e:
         await db.rollback()
         raise HTTPException(status_code=500, detail=f"更新失败: {str(e)}")

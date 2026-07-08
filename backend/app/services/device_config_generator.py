@@ -429,13 +429,6 @@ class DeviceConfigAutoGenerator:
 
     async def _generate_regulation_config(self, device: PowerDevice, force: bool = False) -> bool:
         """生成设备调节配置"""
-        # 检查是否已存在配置
-        existing = await self.db.execute(
-            select(LoadRegulationConfig).where(LoadRegulationConfig.device_id == device.id)
-        )
-        if existing.scalar_one_or_none() and not force:
-            return False
-
         device_type = device.device_type.upper() if device.device_type else ""
         subtype = infer_load_subtype(device)
         template_key = self._template_key_for_subtype(device_type, subtype)
@@ -449,6 +442,18 @@ class DeviceConfigAutoGenerator:
             # 该类型设备不支持调节
             return False
 
+        regulation_type = template["regulation_type"]
+        existing = await self.db.execute(
+            select(LoadRegulationConfig.id)
+            .where(
+                LoadRegulationConfig.device_id == device.id,
+                LoadRegulationConfig.regulation_type == regulation_type,
+            )
+            .limit(1)
+        )
+        if existing.scalar_one_or_none() is not None and not force:
+            return False
+
         # 计算base_power和power_curve
         base_power = device.rated_power or 0
         power_curve = [
@@ -458,7 +463,7 @@ class DeviceConfigAutoGenerator:
 
         config_data = {
             "device_id": device.id,
-            "regulation_type": template["regulation_type"],
+            "regulation_type": regulation_type,
             "min_value": template["min_value"],
             "max_value": template["max_value"],
             "default_value": template["default_value"],
@@ -478,7 +483,10 @@ class DeviceConfigAutoGenerator:
         # 如果已存在则删除
         if force:
             await self.db.execute(
-                LoadRegulationConfig.__table__.delete().where(LoadRegulationConfig.device_id == device.id)
+                LoadRegulationConfig.__table__.delete().where(
+                    LoadRegulationConfig.device_id == device.id,
+                    LoadRegulationConfig.regulation_type == regulation_type,
+                )
             )
 
         # 创建配置

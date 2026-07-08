@@ -309,6 +309,25 @@ import type { ContactItem, ContactForm } from '@/api/modules/notification'
 
 type FormInstance = InstanceType<typeof import('element-plus')['ElForm']>
 
+function getApiErrorMessage(error: unknown, fallback: string): string {
+  const data = (error as any)?.response?.data
+  return (
+    (typeof data?.detail === 'string' && data.detail) ||
+    (typeof data?.error?.message === 'string' && data.error.message) ||
+    (typeof data?.error === 'string' && data.error) ||
+    (typeof data?.message === 'string' && data.message) ||
+    fallback
+  )
+}
+
+function showApiError(error: unknown, fallback: string, logLabel = fallback) {
+  const status = (error as any)?.response?.status
+  if (status !== 400 && status !== 409) {
+    console.error(logLabel, error)
+  }
+  ElMessage.error(getApiErrorMessage(error, fallback))
+}
+
 // 角色映射
 const roleMap: Record<string, string> = {
   admin: '管理员',
@@ -516,8 +535,7 @@ async function handleSubmit() {
     dialogVisible.value = false
     loadUsers()
   } catch (e) {
-    console.error('操作失败', e)
-    ElMessage.error('操作失败')
+    showApiError(e, '操作失败')
   } finally {
     submitting.value = false
   }
@@ -530,8 +548,7 @@ async function handleDelete(row: UserInfo) {
     ElMessage.success('删除成功')
     loadUsers()
   } catch (e) {
-    console.error('删除失败', e)
-    ElMessage.error('删除失败')
+    showApiError(e, '删除失败')
   }
 }
 
@@ -550,8 +567,7 @@ async function handleBatchDelete() {
     loadUsers()
   } catch (e) {
     if (e !== 'cancel') {
-      console.error('批量删除失败', e)
-      ElMessage.error('批量删除失败')
+      showApiError(e, '批量删除失败')
     }
   }
 }
@@ -563,8 +579,7 @@ async function handleToggleStatus(row: UserInfo, val: boolean) {
     ElMessage.success(val ? '已启用' : '已禁用')
     loadUsers()
   } catch (e) {
-    console.error('状态切换失败', e)
-    ElMessage.error('状态切换失败')
+    showApiError(e, '状态切换失败')
   }
 }
 
@@ -590,8 +605,7 @@ async function submitResetPassword() {
     ElMessage.success('密码重置成功')
     resetPwdVisible.value = false
   } catch (e) {
-    console.error('密码重置失败', e)
-    ElMessage.error('密码重置失败')
+    showApiError(e, '密码重置失败')
   } finally {
     submitting.value = false
   }
@@ -689,8 +703,7 @@ async function handleSubmitContact() {
     contactDialogVisible.value = false
     loadContacts()
   } catch (e) {
-    console.error('操作失败', e)
-    ElMessage.error('操作失败')
+    showApiError(e, '操作失败')
   } finally {
     contactSubmitting.value = false
   }
@@ -703,8 +716,7 @@ async function handleDeleteContact(contactId: number) {
     ElMessage.success('删除成功')
     loadContacts()
   } catch (e) {
-    console.error('删除失败', e)
-    ElMessage.error('删除失败')
+    showApiError(e, '删除失败')
   }
 }
 
@@ -715,8 +727,7 @@ async function handleImportContacts() {
     ElMessage.success('导入成功')
     loadContacts()
   } catch (e) {
-    console.error('导入失败', e)
-    ElMessage.error('导入失败')
+    showApiError(e, '导入失败')
   }
 }
 </script>

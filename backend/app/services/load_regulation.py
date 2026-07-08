@@ -166,6 +166,17 @@ class LoadRegulationService:
 
     async def create_config(self, data: LoadRegulationConfigCreate) -> LoadRegulationConfig:
         """创建负荷调节配置"""
+        existing = await self.db.execute(
+            select(LoadRegulationConfig.id)
+            .where(
+                LoadRegulationConfig.device_id == data.device_id,
+                LoadRegulationConfig.regulation_type == data.regulation_type,
+            )
+            .limit(1)
+        )
+        if existing.scalar_one_or_none() is not None:
+            raise ValueError("该设备已存在同类型负荷调节配置")
+
         # 获取调节类型默认配置
         type_config = self.REGULATION_TYPES.get(data.regulation_type, {})
 

@@ -41,6 +41,7 @@ const ROUTE_START = Math.max(1, Number(process.env.ROUTE_START ?? 1))
 const ROUTE_END = Number(process.env.ROUTE_END ?? 0)
 const ARTIFACT_DIR = path.join(process.cwd(), 'artifacts', 'manual-walkthrough')
 const PAGE_SCOPE_SELECTOR = '.main'
+const RUN_ID = Date.now().toString(36).slice(-6)
 
 const routes: RouteSpec[] = [
   { path: '/bigscreen', title: '数字孪生大屏' },
@@ -131,6 +132,7 @@ const routeSlice = routes.slice(ROUTE_START - 1, ROUTE_END > 0 ? ROUTE_END : rou
 const sessionEndingButtonText = /退出登录|登出|注销|返回登录/
 const confirmButtonText = /确定|确认|确认删除|删除|保存|提交|应用|完成|启用|禁用|下发|执行/
 const closeButtonText = /取消|关闭|返回/
+const expectedBusinessHttpConsoleText = /Failed to load resource: the server responded with a status of (400|409) /
 
 test.describe.configure({ mode: 'serial' })
 test.use({
@@ -155,6 +157,9 @@ test('manual headed walkthrough of every routed page and safe functions', async 
 
   page.on('console', (message) => {
     if (message.type() === 'error') {
+      if (expectedBusinessHttpConsoleText.test(message.text())) {
+        return
+      }
       issues.push({
         route: currentRoute,
         type: 'console.error',
@@ -804,7 +809,7 @@ function testValueFor(label: string, inputType: string, tagName: string, index: 
     return String((index % 9) + 1)
   }
   if (inputType === 'email' || /邮箱|email/i.test(label)) {
-    return `walkthrough${index}@example.com`
+    return `walkthrough-${RUN_ID}-${index}@example.com`
   }
   if (inputType === 'tel' || /电话|手机|phone/i.test(label)) {
     return '13800138000'
@@ -813,15 +818,15 @@ function testValueFor(label: string, inputType: string, tagName: string, index: 
     return 'https://example.com'
   }
   if (inputType === 'password') {
-    return 'Admin123456!'
+    return 'admin123'
   }
   if (tagName === 'textarea' || /描述|备注|说明|内容|原因/.test(label)) {
-    return `自动化可视巡检编辑内容 ${index + 1}`
+    return `自动化可视巡检编辑内容 ${RUN_ID}-${index + 1}`
   }
   if (/编码|编号|code/i.test(label)) {
-    return `AUTO-${Date.now().toString().slice(-6)}-${index}`
+    return `AUTO-${RUN_ID}-${Date.now().toString(36).slice(-5)}-${index}`
   }
-  return `自动化巡检${index + 1}`
+  return `自动化巡检${RUN_ID}-${index + 1}`
 }
 
 function normalize(value: string) {

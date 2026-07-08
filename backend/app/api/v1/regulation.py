@@ -48,7 +48,10 @@ async def get_regulation_config(config_id: int, db: AsyncSession = Depends(get_d
 async def create_regulation_config(data: LoadRegulationConfigCreate, db: AsyncSession = Depends(get_db)):
     """创建负荷调节配置"""
     service = LoadRegulationService(db)
-    config = await service.create_config(data)
+    try:
+        config = await service.create_config(data)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     return await service.get_config_by_id(config.id)
 
 
