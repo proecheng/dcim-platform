@@ -1202,7 +1202,7 @@ async def _publish_topology_update(event_type: str, entity_id: int, entity_type:
 
         settings = get_settings()
 
-        redis_client = redis.Redis(host=settings.redis_host, port=settings.redis_port, decode_responses=True)
+        redis_client = redis.from_url(settings.effective_redis_url, decode_responses=True)
         payload = json.dumps(
             {
                 "event_type": event_type,

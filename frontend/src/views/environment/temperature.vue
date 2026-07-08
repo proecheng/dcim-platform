@@ -223,11 +223,10 @@
 import * as echarts from 'echarts'
 import { Sunny, Search, WarnTriangleFilled, Odometer, Monitor, CircleCheck, WarningFilled, TrendCharts } from '@element-plus/icons-vue'
 import { getPointTrend, type TrendData } from '@/api/modules/history'
-import { type AlarmInfo } from '@/api/modules/alarm'
 import { useTemperatureData, type ZoneGroup } from '@/composables/useTemperatureData'
 import DataQualityTag from '@/components/common/DataQualityTag.vue'
 import type { RealtimeData } from '@/api/modules/realtime'
-import { useAlarmStore } from '@/stores/alarm'
+import { useAlarmStore, type Alarm } from '@/stores/alarm'
 
 const {
   thSensors,
@@ -293,7 +292,7 @@ const statCards = computed(() => [
 const drawerVisible = ref(false)
 const selectedZone = ref<ZoneGroup | null>(null)
 const selectedSensor = ref<RealtimeData | null>(null)
-const sensorAlarms = ref<AlarmInfo[]>([])
+const sensorAlarms = ref<Alarm[]>([])
 const trendChartRef = ref<HTMLElement | null>(null)
 let trendChart: echarts.ECharts | null = null
 
@@ -308,7 +307,7 @@ async function handleSensorClick(sensor: RealtimeData) {
   selectedSensor.value = sensor
   // 从 AlarmStore 加载关联告警（Story 27.7 AC1）
   const alarmStore = useAlarmStore()
-  sensorAlarms.value = alarmStore.activeAlarms.filter(a => a.point_id === sensor.point_id) as unknown as AlarmInfo[]
+  sensorAlarms.value = alarmStore.activeAlarms.filter(a => a.point_id === sensor.point_id)
   // 加载趋势图
   await nextTick()
   loadTrendChart(sensor.point_id, sensor.point_name, sensor.unit)

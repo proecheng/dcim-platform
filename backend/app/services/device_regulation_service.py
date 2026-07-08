@@ -12,6 +12,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ..models.energy import PowerDevice, DeviceShiftConfig, LoadRegulationConfig, EnergyHourly, EnergyDaily
 from ..models.point import Point
 from ..models.history import PointHistory
+from .cooling_flexibility import (
+    control_score,
+    get_profile,
+    infer_load_subtype,
+    normalize_control_params,
+    normalize_thermal_storage_config,
+    storage_ratio_limit,
+)
+from .cooling_dispatch_strategy import build_cooling_dispatch_strategy
 
 
 class DeviceRegulationService:
@@ -549,32 +558,7 @@ class DeviceRegulationService:
 
     # ========== shiftable_power_ratio 智能推荐 ==========
 
-    # 设备类型柔性系数
-    FLEXIBILITY_FACTORS = {
-        "PUMP": 0.7,
-        "AC": 0.5,
-        "HVAC": 0.6,
-        "LIGHTING": 0.8,
-        "CHILLER": 0.4,
-        "COOLING_TOWER": 0.5,
-        "AHU": 0.5,
-        "COMPRESSOR": 0.4,
-    }
-
-    # 设备类型最大可转移比例
-    TYPE_MAX_RATIOS = {
-        "PUMP": 0.50,
-        "AC": 0.40,
-        "HVAC": 0.45,
-        "LIGHTING": 0.60,
-        "CHILLER": 0.30,
-        "COOLING_TOWER": 0.40,
-        "AHU": 0.35,
-        "COMPRESSOR": 0.30,
-        "UPS": 0.0,
-        "IT_SERVER": 0.0,
-        "IT_STORAGE": 0.0,
-    }
+    NON_SHIFTABLE_TYPES = {"UPS", "IT_SERVER", "IT_STORAGE"}
 
     async def get_ratio_recommendations(self, days: int = 30) -> Dict[str, Any]:
         """
@@ -608,7 +592,7 @@ class DeviceRegulationService:
 
             # 跳过不可转移的设备类型
             device_type = (device.device_type or "").upper()
-            if device_type in ["UPS", "IT_SERVER", "IT_STORAGE"]:
+            if device_type in self.NON_SHIFTABLE_TYPES:
                 continue
 
             # 获取历史数据统计
@@ -691,6 +675,10 @@ class DeviceRegulationService:
         rated_power = device.rated_power
         current_ratio = shift_config.shiftable_power_ratio if shift_config else 0
         device_type = (device.device_type or "").upper()
+        load_subtype = infer_load_subtype(device)
+        profile = get_profile(load_subtype)
+        control_params = normalize_control_params(getattr(device, "controllable_params", None), profile)
+        thermal_storage = normalize_thermal_storage_config(getattr(device, "thermal_storage_config", None))
 
         # CRITICAL: 验证额定功率有效性
         if not rated_power or rated_power <= 0:
@@ -699,6 +687,10 @@ class DeviceRegulationService:
                 "device_code": device.device_code,
                 "device_name": device.device_name,
                 "device_type": device.device_type,
+                "load_subtype": load_subtype,
+                "load_subtype_label": profile.label,
+                "control_modes": control_params,
+                "thermal_storage": thermal_storage,
                 "rated_power": 0,
                 "current_ratio": round(current_ratio, 2),
                 "recommended_ratio": 0,
@@ -710,40 +702,48 @@ class DeviceRegulationService:
                 "calculation_details": {"error": "设备额定功率无效"},
             }
 
-        # 获取历史统计（如果没有数据则使用估算值）
+        # 获取历史统计（如果没有数据则使用细分设备画像估算，避免同类型设备全部相同）
         if hourly_stats["has_data"]:
             avg_power = hourly_stats["avg_power"]
             max_power = hourly_stats["max_power"]
             min_power = hourly_stats["min_power"]
         else:
-            # 无历史数据时使用默认估算
-            avg_power = rated_power * 0.7
-            max_power = rated_power * 0.9
-            min_power = rated_power * 0.3
+            min_power = rated_power * profile.default_min_power_ratio
+            avg_power = rated_power * max(profile.default_min_power_ratio + profile.default_variability_ratio / 2, 0.45)
+            max_power = min(rated_power, avg_power + rated_power * profile.default_variability_ratio)
 
-        peak_ratio = daily_stats["peak_ratio"]
+        peak_ratio = daily_stats["peak_ratio"] if daily_stats["has_data"] else profile.default_peak_ratio
         data_days = max(hourly_stats.get("data_days", 0), daily_stats.get("data_days", 0))
 
-        # 获取设备类型参数
-        flexibility = self.FLEXIBILITY_FACTORS.get(device_type, 0.3)
-        type_max = self.TYPE_MAX_RATIOS.get(device_type, 0.3)
+        control_factor = control_score(control_params, profile)
+        manual_factor = getattr(device, "flexibility_factor", None)
+        if manual_factor is not None:
+            control_factor = max(0.2, min(1.25, control_factor * float(manual_factor)))
+        type_max = profile.max_ratio
+        storage_limit = storage_ratio_limit(thermal_storage, rated_power)
 
-        # 计算四个约束条件
+        # 计算约束条件
         # 约束1: 最低功率约束 - 设备必须保持的最低功率不可转移
-        constraint_1 = max(0, 1 - min_power / rated_power) if rated_power > 0 else 0
+        constraint_1 = max(0, min(type_max, 1 - min_power / rated_power)) if rated_power > 0 else 0
 
         # 约束2: 负荷波动空间 - 历史最大与平均之差代表可削减空间
-        constraint_2 = max(0, (max_power - avg_power) / rated_power) if rated_power > 0 else 0
+        constraint_2 = max(0, min(type_max, (max_power - avg_power) / rated_power)) if rated_power > 0 else 0
 
         # 约束3: 峰时用电可转移 - 峰时占比越高，可转移潜力越大
-        constraint_3 = peak_ratio * flexibility
+        constraint_3 = min(type_max, peak_ratio * (0.55 + control_factor * 0.35))
 
-        # 约束4: 设备类型上限
-        constraint_4 = type_max
+        # 约束4: 控制能力上限 - 具体可控参数越完整，可转移上限越高
+        constraint_4 = min(type_max, profile.base_ratio * control_factor)
+
+        # 约束5: 蓄冷放冷能力上限 - 受蓄冷罐可用容量和最大放冷功率限制
+        constraint_5 = storage_limit if storage_limit is not None else type_max
+
+        # 约束6: 设备类型上限
+        constraint_6 = type_max
 
         # 综合计算：取最小值 × 安全系数
-        raw_ratio = min(constraint_1, constraint_2, constraint_3, constraint_4)
-        safety_factor = 0.85
+        raw_ratio = min(constraint_1, constraint_2, constraint_3, constraint_4, constraint_5, constraint_6)
+        safety_factor = 0.9
         recommended = round(raw_ratio * safety_factor, 2)
 
         # 确保推荐值在合理范围内
@@ -759,12 +759,24 @@ class DeviceRegulationService:
 
         # 判断是否有变化（差异超过1%）
         has_change = abs(recommended - current_ratio) > 0.01
+        cooling_strategy = build_cooling_dispatch_strategy(
+            device=device,
+            load_subtype=load_subtype,
+            control_params=control_params,
+            thermal_storage=thermal_storage,
+            recommended_ratio=recommended,
+            rated_power=rated_power,
+        )
 
         return {
             "device_id": device.id,
             "device_code": device.device_code,
             "device_name": device.device_name,
             "device_type": device.device_type,
+            "load_subtype": load_subtype,
+            "load_subtype_label": profile.label,
+            "control_modes": control_params,
+            "thermal_storage": thermal_storage,
             "rated_power": round(rated_power, 2),
             "current_ratio": round(current_ratio, 2),
             "recommended_ratio": recommended,
@@ -778,32 +790,49 @@ class DeviceRegulationService:
                 "max_power": round(max_power, 2),
                 "min_power": round(min_power, 2),
                 "peak_ratio": round(peak_ratio, 3),
-                "flexibility_factor": flexibility,
+                "flexibility_factor": round(control_factor, 3),
                 "type_max_ratio": type_max,
+                "load_subtype": load_subtype,
+                "load_subtype_label": profile.label,
+                "control_modes": control_params,
+                "thermal_storage": thermal_storage,
+                "formula_version": "cooling-flex-v1",
+                "cooling_strategy": cooling_strategy,
+                "warnings": [] if data_days > 0 else ["暂无历史功率数据，使用设备细分类型和控制能力画像估算"],
                 "constraints": {
-                    "temperature": {
+                    "minimum_power": {
                         "max_ratio": round(constraint_1, 3),
                         "reason": "最低功率约束 - 设备必须保持的最低运行功率不可转移",
                     },
-                    "redundancy": {
+                    "load_variability": {
                         "max_ratio": round(constraint_2, 3),
                         "reason": "负荷波动空间 - 历史最大与平均功率之差代表可削减空间",
                     },
-                    "pue": {
+                    "peak_window": {
                         "max_ratio": round(constraint_3, 3),
                         "reason": "峰时用电可转移 - 峰时占比越高，可转移潜力越大",
                     },
-                    "device": {
+                    "control_capability": {
                         "max_ratio": round(constraint_4, 3),
+                        "reason": "控制能力上限 - 由温度设定、风机/泵变频、阀门、蓄冷等可控项决定",
+                    },
+                    "thermal_storage": {
+                        "max_ratio": round(constraint_5, 3),
+                        "reason": "蓄冷能力上限 - 由蓄冷容量、可用SOC和最大放冷功率决定",
+                    },
+                    "device": {
+                        "max_ratio": round(constraint_6, 3),
                         "reason": "设备类型上限 - 该类型设备的最大可调节比例",
                     },
                 },
                 "limiting_factor": min(
                     [
-                        ("temperature", constraint_1),
-                        ("redundancy", constraint_2),
-                        ("pue", constraint_3),
-                        ("device", constraint_4),
+                        ("minimum_power", constraint_1),
+                        ("load_variability", constraint_2),
+                        ("peak_window", constraint_3),
+                        ("control_capability", constraint_4),
+                        ("thermal_storage", constraint_5),
+                        ("device", constraint_6),
                     ],
                     key=lambda x: x[1],
                 )[0],

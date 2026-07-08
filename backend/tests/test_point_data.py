@@ -11,6 +11,8 @@ from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sess
 
 from app.core.database import Base
 from app.models.gateway import PointDataLatest
+from app.models.point import Point, PointRealtime
+from app.services.ingest_pipeline import invalidate_point_cache
 from app.services.point_data import handle_point_data
 from gateway.adapters.base import NormalizedReading, DataQuality
 from gateway.mqtt_client import format_point_data, GatewayMqttClient
@@ -111,6 +113,44 @@ async def test_handle_point_data_update_existing(db_session):
     result = await db_session.execute(select(PointDataLatest).where(PointDataLatest.point_id == "p001"))
     record = result.scalar_one()
     assert record.value == "20.0"
+
+
+# ---- 6.1 已映射业务点位进入统一入库管道 ----
+
+
+async def test_handle_point_data_mapped_point_code_updates_realtime(db_session):
+    point = Point(
+        point_code="ds1_input_voltage_a",
+        point_name="A phase input voltage",
+        point_type="AI",
+        device_type="UPS",
+        area_code="A1",
+        unit="V",
+        is_enabled=True,
+        store_interval=1,
+    )
+    db_session.add(point)
+    await db_session.commit()
+    await db_session.refresh(point)
+    invalidate_point_cache()
+
+    payload = {
+        "gw_id": "gw-001",
+        "points": [{"id": "ds1_input_voltage_a", "v": 220.5, "q": 0, "t": int(time.time())}],
+    }
+
+    count = await handle_point_data(payload, db_session)
+
+    assert count == 1
+    result = await db_session.execute(select(PointRealtime).where(PointRealtime.point_id == point.id))
+    realtime = result.scalar_one()
+    assert realtime.value == 220.5
+    assert realtime.source == "mqtt"
+
+    result = await db_session.execute(select(PointDataLatest).where(PointDataLatest.point_id == "ds1_input_voltage_a"))
+    latest = result.scalar_one()
+    assert latest.value == "220.5"
+    assert latest.source == "mqtt"
 
 
 # ---- 7. 无效 payload 返回 0 ----

@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 
 from app.core.database import Base
 from app.models.gateway import Gateway, DataSource, DataSourcePoint, ConfigPushRecord
+from app.models.point import Point
 from app.services.config_push import build_gateway_config, push_config_to_gateway
 from gateway.config_receiver import ConfigReceiver
 
@@ -77,6 +78,50 @@ class TestConfigPushService:
         assert ds_cfg["connection_params"] == {"host": "127.0.0.1", "port": 502}
         assert len(ds_cfg["points"]) == 1
         assert ds_cfg["points"][0]["address"] == "40001"
+
+    async def test_build_gateway_config_uses_point_code_for_linked_points(self, db_session):
+        """下发给网关的点位 ID 必须是 Point.point_code，保证 MQTT 上报能映射到业务点位。"""
+        gw = Gateway(gateway_id="gw-cfg-code", name="点位编码网关", site_id=1)
+        db_session.add(gw)
+        await db_session.flush()
+
+        ds = DataSource(
+            name="UPS5000",
+            protocol_type="modbus_tcp",
+            gateway_id=gw.id,
+            connection_config={"host": "127.0.0.1", "port": 502},
+            is_enabled=True,
+        )
+        db_session.add(ds)
+        await db_session.flush()
+
+        point = Point(
+            point_code="ds1_input_voltage_a",
+            point_name="A phase input voltage",
+            point_type="AI",
+            device_type="UPS",
+            area_code="A1",
+            unit="V",
+            is_enabled=True,
+        )
+        db_session.add(point)
+        await db_session.flush()
+
+        db_session.add(
+            DataSourcePoint(
+                datasource_id=ds.id,
+                point_id=point.id,
+                address="HR:40001",
+                data_type="uint16",
+                scale=0.1,
+            )
+        )
+        await db_session.commit()
+
+        config = await build_gateway_config(gw.id, db_session)
+
+        assert config["datasources"][0]["points"][0]["point_id"] == "ds1_input_voltage_a"
+        assert config["datasources"][0]["points"][0]["address"] == "HR:40001"
 
     async def test_build_gateway_config_no_datasources(self, db_session):
         """无数据源时返回空列表"""

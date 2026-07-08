@@ -1199,32 +1199,32 @@ export function getRegulationConfigs(params?: {
   regulation_type?: string
   is_enabled?: boolean
 }) {
-  return request.get<ResponseModel<LoadRegulationConfig[]>>('/v1/regulation/configs', { params })
+  return request.get<LoadRegulationConfig[]>('/v1/regulation/configs', { params })
 }
 
 /** 获取单个调节配置 */
 export function getRegulationConfig(configId: number) {
-  return request.get<ResponseModel<LoadRegulationConfig>>(`/v1/regulation/configs/${configId}`)
+  return request.get<LoadRegulationConfig>(`/v1/regulation/configs/${configId}`)
 }
 
 /** 创建调节配置 */
 export function createRegulationConfig(data: LoadRegulationConfigCreate) {
-  return request.post<ResponseModel<LoadRegulationConfig>>('/v1/regulation/configs', data)
+  return request.post<LoadRegulationConfig>('/v1/regulation/configs', data)
 }
 
 /** 更新调节配置 */
 export function updateRegulationConfig(configId: number, data: LoadRegulationConfigUpdate) {
-  return request.put<ResponseModel<LoadRegulationConfig>>(`/v1/regulation/configs/${configId}`, data)
+  return request.put<LoadRegulationConfig>(`/v1/regulation/configs/${configId}`, data)
 }
 
 /** 删除调节配置 */
 export function deleteRegulationConfig(configId: number) {
-  return request.delete<ResponseModel>(`/v1/regulation/configs/${configId}`)
+  return request.delete<{ message: string }>(`/v1/regulation/configs/${configId}`)
 }
 
 /** 模拟调节效果 */
 export function simulateRegulation(data: { config_id: number; target_value: number }) {
-  return request.post<ResponseModel<RegulationSimulateResponse>>('/v1/regulation/simulate', data)
+  return request.post<RegulationSimulateResponse>('/v1/regulation/simulate', data)
 }
 
 /** 应用调节方案 */
@@ -1234,7 +1234,7 @@ export function applyRegulation(data: {
   reason?: string
   remark?: string
 }) {
-  return request.post<ResponseModel<RegulationHistory>>('/v1/regulation/apply', data)
+  return request.post<RegulationHistory>('/v1/regulation/apply', data)
 }
 
 /** 获取调节历史 */
@@ -1243,7 +1243,7 @@ export function getRegulationHistory(params?: {
   config_id?: number
   limit?: number
 }) {
-  return request.get<ResponseModel<RegulationHistory[]>>('/v1/regulation/history', { params })
+  return request.get<RegulationHistory[]>('/v1/regulation/history', { params })
 }
 
 /** 获取调节建议 */
@@ -1251,7 +1251,7 @@ export function getRegulationRecommendations(params?: {
   current_demand?: number
   declared_demand?: number
 }) {
-  return request.get<ResponseModel<RegulationRecommendation[]>>('/v1/regulation/recommendations', { params })
+  return request.get<RegulationRecommendation[]>('/v1/regulation/recommendations', { params })
 }
 
 // ==================== V2.3 电费分析增强 ====================
@@ -1607,6 +1607,10 @@ export interface ShiftableDevice {
   device_code: string
   device_name: string
   device_type: string
+  load_subtype?: string
+  load_subtype_label?: string
+  control_modes?: string[]
+  thermal_storage?: Record<string, number>
   rated_power: number
   shiftable_power: number
   shiftable_ratio: number
@@ -1644,6 +1648,10 @@ export interface RatioRecommendation {
   device_code: string
   device_name: string
   device_type: string
+  load_subtype?: string
+  load_subtype_label?: string
+  control_modes?: string[]
+  thermal_storage?: Record<string, number>
   rated_power: number
   current_ratio: number
   recommended_ratio: number
@@ -1654,21 +1662,40 @@ export interface RatioRecommendation {
   has_change: boolean
   calculation_details?: {
     error?: string  // 计算失败时的错误信息
-    avg_power: number
-    max_power: number
-    min_power: number
-    peak_ratio: number
-    flexibility_factor: number
-    type_max_ratio: number
-    constraints: {
-      temperature?: { max_ratio: number | null; reason?: string }
-      redundancy?: { max_ratio: number | null; reason?: string }
-      pue?: { max_ratio: number | null; reason?: string }
-      device?: { max_ratio: number | null; reason?: string }
-    }
+    avg_power?: number
+    max_power?: number
+    min_power?: number
+    peak_ratio?: number
+    flexibility_factor?: number
+    type_max_ratio?: number
+    raw_ratio?: number
     warnings?: string[]
-    limiting_factor?: string
-    raw_ratio: number
+    limiting_factor?: 'minimum_power' | 'load_variability' | 'peak_window' | 'control_capability' | 'thermal_storage' | 'device' | string
+    constraints?: Record<string, {
+      max_ratio: number | null
+      reason?: string
+    }>
+    cooling_strategy?: {
+      version: string
+      strategy_type: string
+      recommended_shift_kw: number
+      periods?: Record<string, number[]>
+      storage_metrics?: Record<string, number>
+      steps: Array<{
+        phase: string
+        period: string
+        hours: number[]
+        action: string
+        target: string
+        controls?: string[]
+      }>
+      formulas?: Array<{
+        name: string
+        expression: string
+        meaning: string
+      }>
+      interlocks?: string[]
+    } | null
   }
 }
 /** ratio推荐响应 */

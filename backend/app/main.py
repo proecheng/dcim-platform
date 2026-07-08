@@ -222,8 +222,7 @@ async def lifespan(app: FastAPI):
 
     # Story 29.3: 初始化 THM 配置项
     try:
-        from app.models.system_config import SystemConfig
-        from app.core.database import async_session
+        from app.models.config import SystemConfig
 
         async with async_session() as session:
             thm_configs = {
@@ -233,12 +232,21 @@ async def lifespan(app: FastAPI):
             }
 
             for key, value in thm_configs.items():
-                existing = (
-                    await session.execute(select(SystemConfig).where(SystemConfig.key == key))
-                ).scalar_one_or_none()
+                existing = (await session.execute(
+                    select(SystemConfig).where(
+                        SystemConfig.config_group == "thm",
+                        SystemConfig.config_key == key,
+                    )
+                )).scalar_one_or_none()
 
                 if existing is None:
-                    new_config = SystemConfig(key=key, value=value)
+                    new_config = SystemConfig(
+                        config_group="thm",
+                        config_key=key,
+                        config_value=value,
+                        value_type="number",
+                        description=f"THM 参数: {key}",
+                    )
                     session.add(new_config)
                     logger.info(f"✓ 初始化 THM 配置项: {key}={value}")
 
@@ -370,7 +378,7 @@ async def lifespan(app: FastAPI):
 
     # 连接 Redis 缓存
     if settings.redis_enabled:
-        await redis_service.connect(settings.redis_url)
+        await redis_service.connect(settings.effective_redis_url)
 
     # 加载告警引擎阈值缓存
     await alarm_engine.load_thresholds()
@@ -431,19 +439,20 @@ async def lifespan(app: FastAPI):
         logger.error(f"✗ 配电拓扑图初始化失败: {e}")
 
     # 启动拓扑变更监听器（Story 25.1）
-    from app.services.diagnosis.device_sync_service import start_device_sync_listener, stop_device_sync_listener
-
-    listener_task = asyncio.create_task(start_device_sync_listener())
+    listener_task = None
+    if settings.redis_enabled:
+        from app.services.diagnosis.device_sync_service import start_device_sync_listener, stop_device_sync_listener
+        listener_task = asyncio.create_task(start_device_sync_listener())
 
     # 启动传感器元数据 Redis 监听器（Story 25.5）
-    try:
-        from app.services.diagnosis.sensor_metadata_service import SensorMetadataCache
-
-        redis_listener_task = await SensorMetadataCache.start_listener()
-        logger.info("✓ 传感器元数据 Redis 监听器启动成功")
-    except Exception as e:
-        logger.error(f"✗ 传感器元数据 Redis 监听器启动失败: {e}")
-        redis_listener_task = None
+    redis_listener_task = None
+    if settings.redis_enabled:
+        try:
+            from app.services.diagnosis.sensor_metadata_service import SensorMetadataCache
+            redis_listener_task = await SensorMetadataCache.start_listener()
+            logger.info("✓ 传感器元数据 Redis 监听器启动成功")
+        except Exception as e:
+            logger.error(f"✗ 传感器元数据 Redis 监听器启动失败: {e}")
 
     # 启动告警引擎定时刷新（每 30 秒检查阈值版本）
     async def _alarm_engine_refresh_loop():
@@ -1220,11 +1229,13 @@ async def lifespan(app: FastAPI):
     yield
 
     # 停止拓扑变更监听器（Story 25.1）
-    await stop_device_sync_listener()
-    try:
-        await asyncio.wait_for(listener_task, timeout=5.0)
-    except asyncio.TimeoutError:
-        logger.warning("拓扑监听器停止超时")
+    if listener_task:
+        from app.services.diagnosis.device_sync_service import stop_device_sync_listener
+        await stop_device_sync_listener()
+        try:
+            await asyncio.wait_for(listener_task, timeout=5.0)
+        except asyncio.TimeoutError:
+            logger.warning("拓扑监听器停止超时")
 
     # 停止传感器元数据 Redis 监听器（Story 25.5）
     if redis_listener_task:

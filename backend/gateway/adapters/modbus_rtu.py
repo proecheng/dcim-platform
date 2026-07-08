@@ -23,7 +23,7 @@ from .base import (
     PointValue,
 )
 from .registry import register_adapter
-from .modbus_tcp import _parse_address, _convert_value, _READ_METHODS, _ILLEGAL_ADDRESS
+from .modbus_tcp import _parse_address_spec, _convert_value, _extract_bit_value, _READ_METHODS, _ILLEGAL_ADDRESS
 
 logger = logging.getLogger(__name__)
 
@@ -181,10 +181,10 @@ class ModbusRtuAdapter(BaseProtocolAdapter):
 
         for point in points:
             try:
-                reg_type, addr, count = _parse_address(point.address, point.data_type)
-                read_method = getattr(self._client, _READ_METHODS[reg_type])
+                spec = _parse_address_spec(point.address, point.data_type)
+                read_method = getattr(self._client, _READ_METHODS[spec.reg_type])
 
-                response, quality = await self._read_with_retry(read_method, addr, count)
+                response, quality = await self._read_with_retry(read_method, spec.address, spec.count)
 
                 if response is None:
                     results[point.point_id] = PointValue(
@@ -196,14 +196,17 @@ class ModbusRtuAdapter(BaseProtocolAdapter):
                     continue
 
                 # 提取原始值
-                if reg_type in ("CO", "DI"):
-                    raw_values = response.bits[:count]
+                if spec.reg_type in ("CO", "DI"):
+                    raw_values = response.bits[: spec.count]
                 else:
-                    raw_values = response.registers[:count]
+                    raw_values = response.registers[: spec.count]
 
                 # 类型转换
                 try:
-                    value = _convert_value(raw_values, point.data_type, self._word_order)
+                    if spec.has_bit_selector:
+                        value = _extract_bit_value(raw_values[0], spec, point.data_type)
+                    else:
+                        value = _convert_value(raw_values, point.data_type, self._word_order)
                 except Exception:
                     # 自动转换尝试: 原始值 → float
                     try:
@@ -257,17 +260,21 @@ class ModbusRtuAdapter(BaseProtocolAdapter):
             return False
 
         try:
-            reg_type, addr, count = _parse_address(point_cfg.address, point_cfg.data_type)
+            spec = _parse_address_spec(point_cfg.address, point_cfg.data_type)
 
-            if reg_type in ("IR", "DI"):
-                logger.error("不支持写入 %s 类型寄存器（只读）", reg_type)
+            if spec.has_bit_selector:
+                logger.error("不支持写入寄存器位段地址: %s", point_cfg.address)
                 return False
 
-            if reg_type == "CO":
-                response = await self._client.write_coil(addr, bool(value), slave=self._device_id)
-            elif reg_type == "HR":
-                if count == 1:
-                    response = await self._client.write_register(addr, int(value), slave=self._device_id)
+            if spec.reg_type in ("IR", "DI"):
+                logger.error("不支持写入 %s 类型寄存器（只读）", spec.reg_type)
+                return False
+
+            if spec.reg_type == "CO":
+                response = await self._client.write_coil(spec.address, bool(value), slave=self._device_id)
+            elif spec.reg_type == "HR":
+                if spec.count == 1:
+                    response = await self._client.write_register(spec.address, int(value), slave=self._device_id)
                 else:
                     DATATYPE = AsyncModbusSerialClient.DATATYPE
                     dt_map = {
@@ -280,9 +287,9 @@ class ModbusRtuAdapter(BaseProtocolAdapter):
                         logger.error("不支持的多寄存器写入类型: %s", point_cfg.data_type)
                         return False
                     regs = AsyncModbusSerialClient.convert_to_registers(value, dt, word_order=self._word_order)
-                    response = await self._client.write_registers(addr, regs, slave=self._device_id)
+                    response = await self._client.write_registers(spec.address, regs, slave=self._device_id)
             else:
-                logger.error("不支持写入 %s 类型寄存器", reg_type)
+                logger.error("不支持写入 %s 类型寄存器", spec.reg_type)
                 return False
 
             if response.isError():

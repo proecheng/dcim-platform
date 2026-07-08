@@ -67,8 +67,11 @@ async def startup() -> None:
     from ..core.config import get_settings
 
     settings = get_settings()
-    _simulator_task = asyncio.create_task(simulator.start(interval=settings.simulation_interval))
-    logger.info(f"演示模块: 模拟器已启动 (interval={settings.simulation_interval}s)")
+    if settings.simulation_enabled:
+        _simulator_task = asyncio.create_task(simulator.start(interval=settings.simulation_interval))
+        logger.info(f"演示模块: 模拟器已启动 (interval={settings.simulation_interval}s)")
+    else:
+        logger.info("演示模块: 模拟器未启用，仅保留演示种子数据")
 
     # 启动历史数据清理任务
     global _cleanup_task

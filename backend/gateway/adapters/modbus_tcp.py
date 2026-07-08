@@ -3,6 +3,7 @@
 import asyncio
 import logging
 import time
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any, Optional
 
@@ -46,36 +47,91 @@ _DEFAULT_COUNT: dict[str, int] = {
 }
 
 
-def _parse_address(address: str, data_type: str) -> tuple[str, int, int]:
-    """解析点位地址格式: {type}:{address} 或 {type}:{address}:{count}
+@dataclass(frozen=True)
+class ModbusAddress:
+    """Parsed Modbus point address."""
+
+    reg_type: str
+    address: int
+    count: int
+    bit_start: Optional[int] = None
+    bit_end: Optional[int] = None
+
+    @property
+    def has_bit_selector(self) -> bool:
+        return self.bit_start is not None
+
+
+def _parse_int(value: str, field_name: str) -> int:
+    """Parse decimal or 0x-prefixed integer values."""
+    try:
+        return int(value, 0)
+    except ValueError as e:
+        raise ValueError(f"无效{field_name}: {value}") from e
+
+
+def _parse_bit_selector(address_part: str) -> tuple[str, Optional[int], Optional[int]]:
+    """Split address and optional bit selector.
+
+    Supported forms:
+    - 40300.0     -> bit 0
+    - 40131.7-9   -> bits 7..9, returned as an integer field value
+    - 0x0800.15   -> hexadecimal register address with bit selector
+    """
+    if "." not in address_part:
+        return address_part, None, None
+
+    base, selector = address_part.rsplit(".", 1)
+    if not base or not selector:
+        raise ValueError(f"无效位段地址格式: {address_part}")
+
+    if "-" in selector:
+        start_raw, end_raw = selector.split("-", 1)
+        start = _parse_int(start_raw, "位段起始位")
+        end = _parse_int(end_raw, "位段结束位")
+    else:
+        start = end = _parse_int(selector, "位")
+
+    if start < 0 or end < 0 or start > 15 or end > 15 or start > end:
+        raise ValueError(f"无效位段范围: {selector}，支持 0-15 且起始位不能大于结束位")
+
+    return base, start, end
+
+
+def _parse_address_spec(address: str, data_type: str) -> ModbusAddress:
+    """解析点位地址格式: {type}:{address}[.{bit|start-end}] 或 {type}:{address}:{count}
 
     Returns:
-        (reg_type, address, count)
+        ModbusAddress
     """
     parts = address.split(":")
     if len(parts) < 2 or len(parts) > 3:
-        raise ValueError(f"无效地址格式: {address}，期望 {{type}}:{{address}}[:{{count}}]")
+        raise ValueError(f"无效地址格式: {address}，期望 {{type}}:{{address}}[.{{bit}}][:{{count}}]")
 
     reg_type = parts[0].upper()
     if reg_type not in _READ_METHODS:
         raise ValueError(f"未知寄存器类型: {reg_type}，支持: {list(_READ_METHODS.keys())}")
 
-    try:
-        addr = int(parts[1])
-    except ValueError as e:
-        raise ValueError(f"无效寄存器地址: {parts[1]}") from e
+    address_part, bit_start, bit_end = _parse_bit_selector(parts[1])
+    addr = _parse_int(address_part, "寄存器地址")
 
     if len(parts) == 3:
-        try:
-            count = int(parts[2])
-        except ValueError as e:
-            raise ValueError(f"无效寄存器数量: {parts[2]}") from e
+        count = _parse_int(parts[2], "寄存器数量")
     else:
         if data_type == "string":
             raise ValueError(f"string 类型必须显式指定寄存器数量，如 {reg_type}:{addr}:4")
         count = _DEFAULT_COUNT.get(data_type, 1)
 
-    return reg_type, addr, count
+    if count < 1:
+        raise ValueError(f"无效寄存器数量: {count}")
+
+    return ModbusAddress(reg_type=reg_type, address=addr, count=count, bit_start=bit_start, bit_end=bit_end)
+
+
+def _parse_address(address: str, data_type: str) -> tuple[str, int, int]:
+    """Backward-compatible address parser used by existing tests and callers."""
+    spec = _parse_address_spec(address, data_type)
+    return spec.reg_type, spec.address, spec.count
 
 
 def _convert_value(registers_or_bits: list, data_type: str, word_order: str = "big") -> Any:
@@ -105,6 +161,19 @@ def _convert_value(registers_or_bits: list, data_type: str, word_order: str = "b
         return AsyncModbusTcpClient.convert_from_registers(registers_or_bits, DATATYPE.STRING, string_encoding="utf-8")
 
     raise ValueError(f"不支持的数据类型: {data_type}")
+
+
+def _extract_bit_value(raw_register: int, spec: ModbusAddress, data_type: str) -> Any:
+    """Extract a single bit or bit range from one 16-bit register."""
+    if spec.bit_start is None or spec.bit_end is None:
+        raise ValueError("地址未配置位段")
+
+    width = spec.bit_end - spec.bit_start + 1
+    mask = (1 << width) - 1
+    value = (int(raw_register) >> spec.bit_start) & mask
+    if width == 1 and data_type == "bool":
+        return bool(value)
+    return value
 
 
 @register_adapter("modbus_tcp")
@@ -193,9 +262,9 @@ class ModbusTcpAdapter(BaseProtocolAdapter):
 
         for point in points:
             try:
-                reg_type, addr, count = _parse_address(point.address, point.data_type)
-                read_method = getattr(self._client, _READ_METHODS[reg_type])
-                response = await read_method(addr, count=count, slave=self._device_id)
+                spec = _parse_address_spec(point.address, point.data_type)
+                read_method = getattr(self._client, _READ_METHODS[spec.reg_type])
+                response = await read_method(spec.address, count=spec.count, slave=self._device_id)
 
                 # 检查错误响应
                 if isinstance(response, ExceptionResponse):
@@ -222,15 +291,18 @@ class ModbusTcpAdapter(BaseProtocolAdapter):
                     continue
 
                 # 提取原始值
-                if reg_type in ("CO", "DI"):
-                    raw_values = response.bits[:count]
+                if spec.reg_type in ("CO", "DI"):
+                    raw_values = response.bits[: spec.count]
                 else:
-                    raw_values = response.registers[:count]
+                    raw_values = response.registers[: spec.count]
 
                 # 类型转换
                 quality = DataQuality.NORMAL
                 try:
-                    value = _convert_value(raw_values, point.data_type, self._word_order)
+                    if spec.has_bit_selector:
+                        value = _extract_bit_value(raw_values[0], spec, point.data_type)
+                    else:
+                        value = _convert_value(raw_values, point.data_type, self._word_order)
                 except Exception:
                     # 自动转换尝试: 原始值 → float（精度可能有损，标记为 UNRELIABLE）
                     try:
@@ -284,13 +356,17 @@ class ModbusTcpAdapter(BaseProtocolAdapter):
             return False
 
         try:
-            reg_type, addr, count = _parse_address(point_cfg.address, point_cfg.data_type)
+            spec = _parse_address_spec(point_cfg.address, point_cfg.data_type)
 
-            if reg_type == "CO":
-                response = await self._client.write_coil(addr, bool(value), slave=self._device_id)
-            elif reg_type == "HR":
-                if count == 1:
-                    response = await self._client.write_register(addr, int(value), slave=self._device_id)
+            if spec.has_bit_selector:
+                logger.error("不支持写入寄存器位段地址: %s", point_cfg.address)
+                return False
+
+            if spec.reg_type == "CO":
+                response = await self._client.write_coil(spec.address, bool(value), slave=self._device_id)
+            elif spec.reg_type == "HR":
+                if spec.count == 1:
+                    response = await self._client.write_register(spec.address, int(value), slave=self._device_id)
                 else:
                     DATATYPE = AsyncModbusTcpClient.DATATYPE
                     dt_map = {
@@ -303,9 +379,9 @@ class ModbusTcpAdapter(BaseProtocolAdapter):
                         logger.error("不支持的多寄存器写入类型: %s", point_cfg.data_type)
                         return False
                     regs = AsyncModbusTcpClient.convert_to_registers(value, dt, word_order=self._word_order)
-                    response = await self._client.write_registers(addr, regs, slave=self._device_id)
+                    response = await self._client.write_registers(spec.address, regs, slave=self._device_id)
             else:
-                logger.error("不支持写入 %s 类型寄存器", reg_type)
+                logger.error("不支持写入 %s 类型寄存器", spec.reg_type)
                 return False
 
             if response.isError():

@@ -112,7 +112,7 @@ async def _acquire_redis_lock(session_id: int) -> Optional[str]:
     lock_wait_start = time.time()
 
     try:
-        redis_client = redis.from_url(settings.REDIS_URL)
+        redis_client = redis.from_url(settings.effective_redis_url)
 
         # 尝试获取锁（带重试）
         for attempt in range(REDIS_LOCK_MAX_RETRIES):
@@ -158,7 +158,7 @@ async def _release_redis_lock(session_id: int, lock_token: str) -> bool:
 
     redis_client = None
     try:
-        redis_client = redis.from_url(settings.REDIS_URL)
+        redis_client = redis.from_url(settings.effective_redis_url)
 
         result = await redis_client.eval(REDIS_UNLOCK_SCRIPT, 1, lock_key, lock_token)
 

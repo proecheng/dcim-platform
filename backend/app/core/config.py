@@ -3,6 +3,7 @@
 """
 
 import secrets
+from urllib.parse import urlparse
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import Field, field_validator
 from functools import lru_cache
@@ -83,21 +84,21 @@ class Settings(BaseSettings):
     redis_url: str = "redis://localhost:6379/0"
 
     @property
+    def effective_redis_url(self) -> str:
+        """Canonical Redis URL used by all Redis clients."""
+        return self.redis_url or self.REDIS_URL
+
+    @property
     def redis_host(self) -> str:
         """从 redis_url 解析主机"""
-        # redis://localhost:6379/0 -> localhost
-        url = self.redis_url.replace("redis://", "")
-        return url.split(":")[0]
+        parsed = urlparse(self.effective_redis_url)
+        return parsed.hostname or "localhost"
 
     @property
     def redis_port(self) -> int:
         """从 redis_url 解析端口"""
-        # redis://localhost:6379/0 -> 6379
-        url = self.redis_url.replace("redis://", "")
-        if ":" in url:
-            port_part = url.split(":")[1].split("/")[0]
-            return int(port_part)
-        return 6379
+        parsed = urlparse(self.effective_redis_url)
+        return parsed.port or 6379
 
     # MQTT 配置
     mqtt_enabled: bool = True

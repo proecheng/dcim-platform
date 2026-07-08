@@ -152,14 +152,12 @@ class RedisService:
         try:
             import redis
 
-            # 从配置获取 Redis URL
             from app.core.config import get_settings
 
             settings = get_settings()
 
-            # 使用同步 Redis 客户端进行 SET NX EX 操作
             sync_client = redis.from_url(
-                settings.REDIS_URL,
+                settings.effective_redis_url,
                 decode_responses=True,
             )
             result = sync_client.set(key, value, nx=True, ex=ttl)
@@ -169,20 +167,19 @@ class RedisService:
             logger.warning("Redis SET NX 失败 key=%s: %s", key, e)
             return False
 
-    def delete(self, key: str) -> None:
+    def delete_sync(self, key: str) -> None:
         """同步方式删除 key（用于释放分布式锁）"""
         if not self.is_available:
             return
         try:
             import redis
 
-            # 从配置获取 Redis URL
             from app.core.config import get_settings
 
             settings = get_settings()
 
             sync_client = redis.from_url(
-                settings.REDIS_URL,
+                settings.effective_redis_url,
                 decode_responses=True,
             )
             sync_client.delete(key)

@@ -14,7 +14,7 @@
           <el-tag size="small" style="margin-left: 8px;">{{ getDeviceTypeText(device?.device_type) }}</el-tag>
         </div>
         <div class="header-meta" style="margin-top: 4px; color: var(--text-secondary, #909399); font-size: 13px;">
-          {{ device?.device_code }} · 额定功率 {{ device?.rated_power }} kW
+          {{ device?.device_code }} · {{ device?.load_subtype_label || getLoadSubtypeText(device?.load_subtype) }} · 额定功率 {{ device?.rated_power }} kW
         </div>
       </div>
     </template>
@@ -74,6 +74,11 @@
       <!-- 约束条件可视化 -->
       <div class="constraints-section" v-if="device?.calculation_details">
         <div class="section-title">约束条件分析</div>
+        <div v-if="device.control_modes && device.control_modes.length > 0" class="control-tags">
+          <el-tag v-for="mode in device.control_modes" :key="mode" size="small" type="info">
+            {{ getControlText(mode) }}
+          </el-tag>
+        </div>
 
         <!-- 错误提示：calculation_details 只有 error 字段时 -->
         <el-alert
@@ -107,9 +112,7 @@
         <div v-if="device.calculation_details.limiting_factor" style="margin-bottom: 12px; padding: 8px; background: rgba(24,144,255,0.1); border-radius: 4px; font-size: 13px;">
           <strong>限制因素：</strong>
           <span style="color: #1890ff;">
-            {{ device.calculation_details.limiting_factor === 'temperature' ? '温度约束' : 
-               device.calculation_details.limiting_factor === 'redundancy' ? '冗余约束' :
-               device.calculation_details.limiting_factor === 'pue' ? 'PUE约束' : '设备特性约束' }}
+            {{ getLimitingFactorText(device.calculation_details.limiting_factor) }}
           </span>
         </div>
 
@@ -135,6 +138,62 @@
               :show-text="false"
             />
             <div class="constraint-desc">{{ c.description }}</div>
+          </div>
+        </div>
+
+        <div v-if="device.calculation_details.cooling_strategy" class="cooling-strategy">
+          <div class="section-subtitle">水冷/蓄冷执行策略</div>
+          <div class="strategy-summary">
+            <span>策略版本 {{ device.calculation_details.cooling_strategy.version }}</span>
+            <span>推荐削峰 {{ device.calculation_details.cooling_strategy.recommended_shift_kw.toFixed(1) }} kW</span>
+          </div>
+          <div class="strategy-steps">
+            <div
+              v-for="step in device.calculation_details.cooling_strategy.steps"
+              :key="`${step.phase}-${step.period}`"
+              class="strategy-step"
+            >
+              <div class="strategy-step-head">
+                <el-tag size="small">{{ step.period }}</el-tag>
+                <strong>{{ step.action }}</strong>
+              </div>
+              <div class="strategy-step-target">{{ step.target }}</div>
+              <div class="strategy-step-controls" v-if="step.controls && step.controls.length">
+                <el-tag v-for="mode in step.controls" :key="`${step.phase}-${mode}`" size="small" type="info">
+                  {{ getControlText(mode) }}
+                </el-tag>
+              </div>
+            </div>
+          </div>
+          <div
+            v-if="device.calculation_details.cooling_strategy.storage_metrics && Object.keys(device.calculation_details.cooling_strategy.storage_metrics).length"
+            class="strategy-metrics"
+          >
+            <div
+              v-for="(value, key) in device.calculation_details.cooling_strategy.storage_metrics"
+              :key="key"
+              class="strategy-metric"
+            >
+              <span>{{ getStrategyMetricText(key) }}</span>
+              <strong>{{ Number(value).toFixed(2) }}</strong>
+            </div>
+          </div>
+          <div v-if="device.calculation_details.cooling_strategy.formulas?.length" class="strategy-formulas">
+            <div
+              v-for="formula in device.calculation_details.cooling_strategy.formulas"
+              :key="formula.name"
+              class="strategy-formula"
+            >
+              <div class="formula-title">{{ formula.name }}</div>
+              <code>{{ formula.expression }}</code>
+              <div class="formula-meaning">{{ formula.meaning }}</div>
+            </div>
+          </div>
+          <div v-if="device.calculation_details.cooling_strategy.interlocks?.length" class="strategy-interlocks">
+            <div class="interlock-title">执行联锁</div>
+            <ul>
+              <li v-for="item in device.calculation_details.cooling_strategy.interlocks" :key="item">{{ item }}</li>
+            </ul>
           </div>
         </div>
       </div>
@@ -164,7 +223,7 @@ import {
   getDevicePowerTrend,
   type TypicalDayProfileResponse,
   type PowerTrendResponse,
-type RatioRecommendation
+  type RatioRecommendation
 } from '@/api/modules/energy'
 
 const props = defineProps<{
@@ -207,6 +266,77 @@ function getDeviceTypeText(type?: string) {
   return DEVICE_TYPE_MAP[(type || '').toUpperCase()] || type || '--'
 }
 
+function getLoadSubtypeText(subtype?: string) {
+  const map: Record<string, string> = {
+    row_ac: '行级/微模块空调',
+    cabinet_ac: '柜类空调',
+    room_ac: '房间级空调',
+    chilled_water_terminal: '冷冻水末端',
+    water_cooled_chiller: '大型水冷冷机',
+    pump_vfd: '变频水泵',
+    cooling_tower: '冷却塔',
+    thermal_storage: '蓄冷系统',
+    lighting: '照明',
+    ups: 'UPS',
+    other: '其他'
+  }
+  return subtype ? (map[subtype] || subtype) : '--'
+}
+
+function getControlText(mode: string) {
+  const map: Record<string, string> = {
+    power_switch: '开关机控制',
+    temperature_setpoint: '温度设定',
+    humidity_setpoint: '湿度设定',
+    supply_air_temperature: '送风温度',
+    return_air_temperature: '回风温度',
+    chilled_water_supply_temperature: '冷冻水供水温度',
+    chilled_water_return_temperature: '冷冻水回水温度',
+    chilled_water_valve: '冷冻水阀门',
+    fan_speed: '风机转速',
+    indoor_fan_output: '室内风机输出',
+    compressor_frequency: '压缩机频率',
+    cooling_output: '制冷输出',
+    pump_frequency: '水泵变频',
+    flow_rate: '水流量',
+    cooling_tower_fan: '冷却塔风机',
+    storage_charge: '蓄冷充冷',
+    storage_discharge: '蓄冷放冷',
+    storage_soc: '蓄冷余量',
+    brightness: '照明亮度'
+  }
+  return map[mode] || mode
+}
+
+function getLimitingFactorText(factor?: string) {
+  const map: Record<string, string> = {
+    minimum_power: '最低运行约束',
+    load_variability: '波动空间约束',
+    peak_window: '峰时转移约束',
+    control_capability: '控制能力约束',
+    thermal_storage: '蓄冷能力约束',
+    device: '设备安全上限',
+    temperature: '温度约束',
+    redundancy: '冗余约束',
+    pue: 'PUE约束'
+  }
+  return factor ? (map[factor] || factor) : '--'
+}
+
+function getStrategyMetricText(key: string) {
+  const map: Record<string, string> = {
+    usable_cooling_kwh: '可用蓄冷量(kWh)',
+    discharge_kwth: '峰时放冷(kWth)',
+    charge_kwth: '谷时充冷(kWth)',
+    equivalent_reduction_kw: '等效削峰(kW)',
+    equivalent_ratio: '等效比例',
+    recommended_kw: '推荐功率(kW)',
+    peak_duration_hours: '峰时持续(h)',
+    charge_duration_hours: '充冷持续(h)'
+  }
+  return map[key] || key
+}
+
 // 约束条件计算
 const constraintItems = computed(() => {
   const details = props.device?.calculation_details
@@ -215,47 +345,26 @@ const constraintItems = computed(() => {
   const constraints = details.constraints
   const limitingFactor = details.limiting_factor
 
-  const items = []
-  
-  // 温度约束
-  if (constraints.temperature && constraints.temperature.max_ratio !== null) {
-    items.push({
-      name: '温度约束',
-      value: constraints.temperature.max_ratio,
-      description: constraints.temperature.reason || '确保机柜温度不超限（ASHRAE 18-27℃）',
-      isBinding: limitingFactor === 'temperature'
-    })
+  const labelMap: Record<string, string> = {
+    minimum_power: '最低运行约束',
+    load_variability: '波动空间约束',
+    peak_window: '峰时转移约束',
+    control_capability: '控制能力约束',
+    thermal_storage: '蓄冷能力约束',
+    device: '设备安全上限',
+    temperature: '温度约束',
+    redundancy: '冗余约束',
+    pue: 'PUE约束'
   }
-  
-  // 冗余约束
-  if (constraints.redundancy && constraints.redundancy.max_ratio !== null) {
-    items.push({
-      name: '冗余约束',
-      value: constraints.redundancy.max_ratio,
-      description: constraints.redundancy.reason || '确保N+1冗余，设备故障时系统仍可运行',
-      isBinding: limitingFactor === 'redundancy'
-    })
-  }
-  
-  // PUE 约束
-  if (constraints.pue && constraints.pue.max_ratio !== null) {
-    items.push({
-      name: 'PUE约束',
-      value: constraints.pue.max_ratio,
-      description: constraints.pue.reason || '保持数据中心能效在合理范围（1.2-2.0）',
-      isBinding: limitingFactor === 'pue'
-    })
-  }
-  
-  // 设备特性约束
-  if (constraints.device && constraints.device.max_ratio !== null) {
-    items.push({
-      name: '设备特性约束',
-      value: constraints.device.max_ratio,
-      description: constraints.device.reason || '设备启停特性、最小运行时间等',
-      isBinding: limitingFactor === 'device'
-    })
-  }
+
+  const items = Object.entries(constraints)
+    .filter(([, value]: any) => value && value.max_ratio !== null)
+    .map(([key, value]: any) => ({
+      name: labelMap[key] || key,
+      value: value.max_ratio,
+      description: value.reason || '该约束限制可转移比例',
+      isBinding: limitingFactor === key
+    }))
 
   return items
 })
@@ -274,7 +383,7 @@ const PERIOD_LABELS: Record<string, string> = {
   valley: '低谷', deep_valley: '深谷'
 }
 
-function buildChart() {
+function _buildChart() {
   if (!chartRef.value || !profile.value) return
 
   if (chart) {
@@ -436,7 +545,7 @@ function buildTrendChart() {
       trigger: 'axis',
       formatter: (params: any) => {
         if (!Array.isArray(params) || params.length === 0) return ''
-        const date = params[0].axisValue
+        const _date = params[0].axisValue
         const point = data[params[0].dataIndex]
         let html = `<b>${point.date}</b><br/>`
         html += `平均功率: ${point.avg_power.toFixed(2)} kW<br/>`
@@ -697,6 +806,13 @@ onUnmounted(() => {
     margin-bottom: 12px;
   }
 
+  .control-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 12px;
+  }
+
   .constraint-list {
     display: flex;
     flex-direction: column;
@@ -738,6 +854,137 @@ onUnmounted(() => {
       font-size: 11px;
       color: var(--text-secondary);
       margin-top: 6px;
+    }
+  }
+
+  .cooling-strategy {
+    margin-top: 18px;
+    padding-top: 14px;
+    border-top: 1px solid var(--border-color);
+  }
+
+  .section-subtitle {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 8px;
+  }
+
+  .strategy-summary {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 16px;
+    font-size: 12px;
+    color: var(--text-secondary);
+    margin-bottom: 10px;
+  }
+
+  .strategy-steps {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .strategy-step {
+    padding: 10px 12px;
+    border-radius: 6px;
+    border: 1px solid var(--border-color);
+    background: rgba(24, 144, 255, 0.06);
+  }
+
+  .strategy-step-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    color: var(--text-primary);
+  }
+
+  .strategy-step-target {
+    margin-top: 6px;
+    font-size: 12px;
+    line-height: 1.5;
+    color: var(--text-secondary);
+  }
+
+  .strategy-step-controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 8px;
+  }
+
+  .strategy-metrics {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+    margin-top: 12px;
+  }
+
+  .strategy-metric {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 8px 10px;
+    border-radius: 6px;
+    background: var(--bg-tertiary, rgba(17, 34, 64, 0.8));
+    font-size: 12px;
+    color: var(--text-secondary);
+
+    strong {
+      color: var(--text-primary);
+      white-space: nowrap;
+    }
+  }
+
+  .strategy-formulas {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 12px;
+  }
+
+  .strategy-formula {
+    padding: 8px 10px;
+    border-radius: 6px;
+    background: rgba(103, 194, 58, 0.08);
+    font-size: 12px;
+
+    .formula-title {
+      font-weight: 600;
+      color: var(--text-primary);
+      margin-bottom: 4px;
+    }
+
+    code {
+      display: block;
+      color: #67c23a;
+      white-space: normal;
+      word-break: break-word;
+      margin-bottom: 4px;
+    }
+
+    .formula-meaning {
+      color: var(--text-secondary);
+      line-height: 1.5;
+    }
+  }
+
+  .strategy-interlocks {
+    margin-top: 12px;
+    font-size: 12px;
+    color: var(--text-secondary);
+
+    .interlock-title {
+      font-weight: 600;
+      color: var(--text-primary);
+      margin-bottom: 4px;
+    }
+
+    ul {
+      margin: 0;
+      padding-left: 18px;
+      line-height: 1.6;
     }
   }
 }

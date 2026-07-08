@@ -214,6 +214,46 @@ class TestReadRegisterTypes:
         mock_instance.read_holding_registers.assert_awaited_once_with(100, count=1, slave=1)
 
     @patch("gateway.adapters.modbus_rtu.AsyncModbusSerialClient")
+    async def test_read_holding_register_bit_selector(self, MockClient):
+        mock_instance = _mock_client()
+        MockClient.return_value = mock_instance
+
+        response = MagicMock()
+        response.isError.return_value = False
+        response.registers = [0b1000]
+        mock_instance.read_holding_registers = AsyncMock(return_value=response)
+
+        adapter = ModbusRtuAdapter()
+        await adapter.connect(_make_config())
+
+        points = [PointConfig(point_id="alarm", address="HR:0x080C.3", data_type="bool")]
+        results = await adapter.read_points(points)
+
+        assert results["alarm"].value is True
+        assert results["alarm"].quality == DataQuality.NORMAL
+        mock_instance.read_holding_registers.assert_awaited_once_with(0x080C, count=1, slave=1)
+
+    @patch("gateway.adapters.modbus_rtu.AsyncModbusSerialClient")
+    async def test_read_holding_register_bit_range(self, MockClient):
+        mock_instance = _mock_client()
+        MockClient.return_value = mock_instance
+
+        response = MagicMock()
+        response.isError.return_value = False
+        response.registers = [0b101 << 7]
+        mock_instance.read_holding_registers = AsyncMock(return_value=response)
+
+        adapter = ModbusRtuAdapter()
+        await adapter.connect(_make_config())
+
+        points = [PointConfig(point_id="state", address="HR:40131.7-9", data_type="uint16")]
+        results = await adapter.read_points(points)
+
+        assert results["state"].value == 0b101
+        assert results["state"].quality == DataQuality.NORMAL
+        mock_instance.read_holding_registers.assert_awaited_once_with(40131, count=1, slave=1)
+
+    @patch("gateway.adapters.modbus_rtu.AsyncModbusSerialClient")
     async def test_read_input_registers(self, MockClient):
         mock_instance = _mock_client()
         MockClient.return_value = mock_instance

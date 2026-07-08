@@ -21,6 +21,10 @@ class PowerDeviceBase(BaseModel):
     rated_voltage: Optional[float] = Field(None, description="额定电压 V")
     rated_current: Optional[float] = Field(None, description="额定电流 A")
     phase_type: Optional[str] = Field("3P", description="相位类型: 1P/3P")
+    load_subtype: Optional[str] = Field(None, description="负荷细分类型")
+    controllable_params: Optional[List[str] | Dict[str, Any]] = Field(None, description="可控参数/控制能力画像")
+    thermal_storage_config: Optional[Dict[str, Any]] = Field(None, description="蓄冷系统配置")
+    flexibility_factor: Optional[float] = Field(None, ge=0, le=1, description="人工修正柔性系数 0-1")
     parent_device_id: Optional[int] = Field(None, description="上级设备ID")
     circuit_id: Optional[int] = Field(None, description="所属回路ID")
     circuit_no: Optional[str] = Field(None, description="回路编号")
@@ -54,6 +58,10 @@ class PowerDeviceUpdate(BaseModel):
     rated_voltage: Optional[float] = None
     rated_current: Optional[float] = None
     phase_type: Optional[str] = None
+    load_subtype: Optional[str] = None
+    controllable_params: Optional[List[str] | Dict[str, Any]] = None
+    thermal_storage_config: Optional[Dict[str, Any]] = None
+    flexibility_factor: Optional[float] = Field(None, ge=0, le=1)
     parent_device_id: Optional[int] = None
     circuit_id: Optional[int] = None
     circuit_no: Optional[str] = None
@@ -1043,6 +1051,10 @@ class RatioRecommendation(BaseModel):
     device_code: str
     device_name: str
     device_type: str
+    load_subtype: Optional[str] = Field(None, description="负荷细分类型")
+    load_subtype_label: Optional[str] = Field(None, description="负荷细分类型名称")
+    control_modes: List[str] = Field(default_factory=list, description="参与推荐计算的可控项")
+    thermal_storage: Dict[str, Any] = Field(default_factory=dict, description="蓄冷配置摘要")
     rated_power: float = Field(..., description="额定功率 kW")
     current_ratio: float = Field(..., description="当前 shiftable_power_ratio")
     recommended_ratio: float = Field(..., description="推荐 shiftable_power_ratio")

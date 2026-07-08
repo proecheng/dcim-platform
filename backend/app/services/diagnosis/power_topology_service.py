@@ -206,7 +206,7 @@ async def _get_device_status(node_id: str) -> dict:
         import redis.asyncio as redis
 
         settings = get_settings()
-        redis_client = redis.from_url(settings.REDIS_URL)
+        redis_client = redis.from_url(settings.effective_redis_url)
 
         # 从 Redis 查询设备状态（假设 key 格式: device:status:{device_id}）
         parts = node_id.split("-")

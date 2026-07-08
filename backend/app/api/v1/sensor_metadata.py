@@ -219,7 +219,7 @@ async def _publish_metadata_update(point_id: int):
 
         settings = get_settings()
 
-        redis_client = redis.Redis(host=settings.redis_host, port=settings.redis_port, decode_responses=True)
+        redis_client = redis.from_url(settings.effective_redis_url, decode_responses=True)
         try:
             payload = json.dumps({"point_id": point_id})
             await redis_client.publish("sensor:metadata_update", payload)

@@ -25,7 +25,7 @@ async def start_device_sync_listener():
 
         redis_client = None
         try:
-            redis_client = redis.from_url(settings.REDIS_URL)
+            redis_client = redis.from_url(settings.effective_redis_url)
             pubsub = redis_client.pubsub()
             await pubsub.subscribe("device:topology_change")
 

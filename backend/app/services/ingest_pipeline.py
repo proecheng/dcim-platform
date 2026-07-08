@@ -346,7 +346,7 @@ async def _batch_upsert_latest(
 
     if update_rows:
         await session.execute(
-            update(PointDataLatest)
+            PointDataLatest.__table__.update()
             .where(PointDataLatest.point_id == bindparam("b_point_id"))
             .values(
                 value=bindparam("value"),
@@ -355,7 +355,8 @@ async def _batch_upsert_latest(
                 gateway_id=bindparam("gateway_id"),
                 source=bindparam("source"),
                 updated_at=bindparam("updated_at"),
-            ),
+            )
+            .execution_options(synchronize_session=False),
             update_rows,
         )
 

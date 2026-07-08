@@ -3,7 +3,12 @@
 """
 
 import pytest
-from app.models.gateway import DeviceTemplate
+from sqlalchemy import select
+
+from app.models.asset import Asset, Cabinet
+from app.models.energy import DeviceShiftConfig, LoadRegulationConfig, PowerDevice
+from app.models.gateway import DataSourcePoint, DeviceTemplate
+from app.models.point import Point
 
 URL = "/api/v1/device-templates"
 
@@ -127,6 +132,58 @@ async def test_create_template_viewer_forbidden(client, async_db, viewer_token):
     assert resp.status_code == 403
 
 
+# ==================== 内置协议模板 ====================
+
+
+@pytest.mark.asyncio
+async def test_list_builtin_templates(client, async_db, viewer_token):
+    """viewer 可以查看内置协议模板"""
+    resp = await client.get(f"{URL}/builtins", headers=auth_headers(viewer_token))
+    assert resp.status_code == 200
+    body = resp.json()
+    keys = {item["key"] for item in body}
+    assert "huawei-ups5000-modbus" in keys
+    assert "huawei-fusioncol5000a-modbus-rtu" in keys
+    ups = next(item for item in body if item["key"] == "huawei-ups5000-modbus")
+    assert ups["protocol_type"] == "modbus_tcp"
+    assert ups["point_count"] == len(ups["point_config"])
+    assert any(p["address"] == "HR:40300.0" for p in ups["point_config"])
+
+
+@pytest.mark.asyncio
+async def test_install_builtin_template_idempotent(client, async_db, operator_token):
+    """operator 安装内置模板，重复安装更新同一条记录"""
+    url = f"{URL}/builtins/huawei-ups5000-modbus/install"
+    resp1 = await client.post(url, headers=auth_headers(operator_token))
+    assert resp1.status_code == 200
+    body1 = resp1.json()
+    assert body1["model"] == "UPS5000"
+    assert body1["extra_config"]["builtin_template_key"] == "huawei-ups5000-modbus"
+    assert any(p["address"] == "HR:40131.7-9" for p in body1["point_config"])
+
+    resp2 = await client.post(url, headers=auth_headers(operator_token))
+    assert resp2.status_code == 200
+    body2 = resp2.json()
+    assert body2["id"] == body1["id"]
+
+    result = await async_db.execute(select(DeviceTemplate).where(DeviceTemplate.model == "UPS5000"))
+    assert len(result.scalars().all()) == 1
+
+
+@pytest.mark.asyncio
+async def test_install_builtin_template_viewer_forbidden(client, async_db, viewer_token):
+    """viewer 不能安装内置模板"""
+    resp = await client.post(f"{URL}/builtins/huawei-ups5000-modbus/install", headers=auth_headers(viewer_token))
+    assert resp.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_install_builtin_template_not_found(client, async_db, operator_token):
+    """未知内置模板 key 返回 404"""
+    resp = await client.post(f"{URL}/builtins/missing/install", headers=auth_headers(operator_token))
+    assert resp.status_code == 404
+
+
 # ==================== 详情 ====================
 
 
@@ -227,6 +284,159 @@ async def test_create_datasource_from_template(client, async_db, operator_token)
     body = resp.json()
     assert body["name"] == "数据源-来自模板"
     assert body["id"] is not None
+
+
+@pytest.mark.asyncio
+async def test_create_datasource_from_installed_builtin_template(client, async_db, operator_token):
+    """从安装后的 UPS5000 内置模板创建数据源时填充 PDF 协议点位"""
+    install_resp = await client.post(
+        f"{URL}/builtins/huawei-ups5000-modbus/install",
+        headers=auth_headers(operator_token),
+    )
+    assert install_resp.status_code == 200
+    template_id = install_resp.json()["id"]
+
+    payload = {
+        "name": "UPS5000-试点",
+        "protocol_type": "modbus_tcp",
+        "connection_config": {
+            "host": "192.168.1.100",
+            "port": 502,
+            "device_id": 1,
+            "device_code": "UPS5000-A01",
+            "device_name": "UPS5000 A01",
+            "rated_power": 200,
+            "rated_voltage": 380,
+            "rated_current": 300,
+            "area_code": "A2",
+        },
+    }
+    resp = await client.post(
+        f"{URL}/{template_id}/create-datasource",
+        json=payload,
+        headers=auth_headers(operator_token),
+    )
+    assert resp.status_code == 200
+    datasource_id = resp.json()["id"]
+
+    result = await async_db.execute(
+        select(DataSourcePoint).where(DataSourcePoint.datasource_id == datasource_id)
+    )
+    points = result.scalars().all()
+    addresses = {p.address for p in points}
+    assert "HR:40001" in addresses
+    assert "HR:40131.7-9" in addresses
+    assert "HR:40300.0" in addresses
+    assert len(points) == len(install_resp.json()["point_config"])
+    assert all(p.point_id is not None for p in points)
+
+    point_ids = [p.point_id for p in points]
+    point_result = await async_db.execute(select(Point).where(Point.id.in_(point_ids)))
+    business_points = point_result.scalars().all()
+    points_by_code = {p.point_code: p for p in business_points}
+    point_codes = set(points_by_code)
+    assert f"ds{datasource_id}_input_voltage_a" in point_codes
+    assert all(p.device_type == "UPS" for p in business_points)
+
+    device_result = await async_db.execute(select(PowerDevice).where(PowerDevice.device_code == "UPS5000-A01"))
+    device = device_result.scalar_one()
+    assert device.device_name == "UPS5000 A01"
+    assert device.device_type == "UPS"
+    assert device.rated_power == 200
+    assert device.area_code == "A2"
+    assert device.power_point_id == points_by_code[f"ds{datasource_id}_output_active_power_a"].id
+    assert device.voltage_point_id == points_by_code[f"ds{datasource_id}_output_voltage_a"].id
+    assert device.current_point_id == points_by_code[f"ds{datasource_id}_output_current_a"].id
+    assert all(p.energy_device_id == device.id for p in business_points)
+
+    reg_result = await async_db.execute(
+        select(LoadRegulationConfig).where(LoadRegulationConfig.device_id == device.id)
+    )
+    regulation_config = reg_result.scalar_one()
+    assert regulation_config.regulation_type == "mode"
+
+
+@pytest.mark.asyncio
+async def test_create_datasource_from_fusioncol_template_creates_ac_power_device(client, async_db, operator_token):
+    """从 FusionCol5000-A 模板创建数据源时生成 AC 用电设备和调节配置"""
+    cabinet = Cabinet(cabinet_code="CAB-A01", cabinet_name="A01机柜", total_u=42)
+    async_db.add(cabinet)
+    await async_db.commit()
+
+    install_resp = await client.post(
+        f"{URL}/builtins/huawei-fusioncol5000a-modbus-rtu/install",
+        headers=auth_headers(operator_token),
+    )
+    assert install_resp.status_code == 200
+    template_id = install_resp.json()["id"]
+
+    payload = {
+        "name": "FusionCol5000-A-01",
+        "protocol_type": "modbus_rtu",
+        "connection_config": {
+            "port": "COM3",
+            "baudrate": 9600,
+            "device_id": 1,
+            "device_code": "FCOL-A01",
+            "device_name": "FusionCol A01",
+            "rated_power": 35,
+            "area_code": "B1",
+            "load_subtype": "row_ac",
+            "controllable_params": ["temperature_setpoint", "indoor_fan_output", "cooling_output"],
+            "asset_code": "ASSET-FCOL-A01",
+            "cabinet_code": "CAB-A01",
+            "u_position": 38,
+            "u_height": 4,
+        },
+    }
+    resp = await client.post(
+        f"{URL}/{template_id}/create-datasource",
+        json=payload,
+        headers=auth_headers(operator_token),
+    )
+    assert resp.status_code == 200
+    datasource_id = resp.json()["id"]
+
+    ds_points_result = await async_db.execute(
+        select(DataSourcePoint).where(DataSourcePoint.datasource_id == datasource_id)
+    )
+    ds_points = ds_points_result.scalars().all()
+    assert len(ds_points) == len(install_resp.json()["point_config"])
+    assert all(p.point_id is not None for p in ds_points)
+
+    point_result = await async_db.execute(select(Point).where(Point.id.in_([p.point_id for p in ds_points])))
+    business_points = point_result.scalars().all()
+    points_by_code = {p.point_code: p for p in business_points}
+
+    device_result = await async_db.execute(select(PowerDevice).where(PowerDevice.device_code == "FCOL-A01"))
+    device = device_result.scalar_one()
+    assert device.device_name == "FusionCol A01"
+    assert device.device_type == "AC"
+    assert device.area_code == "B1"
+    assert device.rated_power == 35
+    assert device.load_subtype == "row_ac"
+    assert "indoor_fan_output" in device.controllable_params
+    assert device.voltage_point_id == points_by_code[f"ds{datasource_id}_ab_line_voltage"].id
+    assert device.power_point_id is None
+    assert all(p.energy_device_id == device.id for p in business_points)
+
+    reg_result = await async_db.execute(
+        select(LoadRegulationConfig).where(LoadRegulationConfig.device_id == device.id)
+    )
+    regulation_config = reg_result.scalar_one()
+    assert regulation_config.regulation_type == "temperature"
+    assert regulation_config.base_power == 35
+
+    shift_result = await async_db.execute(select(DeviceShiftConfig).where(DeviceShiftConfig.device_id == device.id))
+    shift_config = shift_result.scalar_one()
+    assert shift_config.is_shiftable is True
+    assert shift_config.shiftable_power_ratio != 0.30
+
+    asset_result = await async_db.execute(select(Asset).where(Asset.asset_code == "ASSET-FCOL-A01"))
+    asset = asset_result.scalar_one()
+    assert asset.cabinet_id == cabinet.id
+    assert asset.u_position == 38
+    assert asset.u_height == 4
 
 
 @pytest.mark.asyncio

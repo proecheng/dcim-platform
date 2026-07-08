@@ -215,6 +215,11 @@ class DeviceTemplateResponse(DeviceTemplateBase):
     updated_at: Optional[datetime] = None
 
 
+class BuiltinDeviceTemplateResponse(DeviceTemplateBase):
+    key: str
+    point_count: int = 0
+
+
 class GatewayAssignSite(BaseModel):
     """网关站点分配请求"""
 

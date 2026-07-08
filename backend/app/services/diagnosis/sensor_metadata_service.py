@@ -79,7 +79,7 @@ class SensorMetadataCache:
 
                 settings = get_settings()
 
-                redis_client = redis.Redis(host=settings.redis_host, port=settings.redis_port, decode_responses=True)
+                redis_client = redis.from_url(settings.effective_redis_url, decode_responses=True)
                 pubsub = redis_client.pubsub()
                 await pubsub.subscribe("sensor:metadata_update")
 

@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
 from ..models.gateway import Gateway, DataSource, DataSourcePoint, ConfigPushRecord
+from ..models.point import Point
 
 logger = logging.getLogger(__name__)
 
@@ -31,6 +32,13 @@ async def build_gateway_config(gateway_id: int, db: AsyncSession) -> dict:
     for ds in datasources:
         pt_result = await db.execute(select(DataSourcePoint).where(DataSourcePoint.datasource_id == ds.id))
         points = pt_result.scalars().all()
+        linked_point_ids = {pt.point_id for pt in points if pt.point_id is not None}
+        point_code_by_id: dict[int, str] = {}
+        if linked_point_ids:
+            point_result = await db.execute(
+                select(Point.id, Point.point_code).where(Point.id.in_(linked_point_ids))
+            )
+            point_code_by_id = {row[0]: row[1] for row in point_result.all()}
 
         ds_config = {
             "datasource_id": str(ds.id),
@@ -40,7 +48,7 @@ async def build_gateway_config(gateway_id: int, db: AsyncSession) -> dict:
             "write_enabled": ds.write_enabled,
             "points": [
                 {
-                    "point_id": str(pt.point_id or pt.id),
+                    "point_id": point_code_by_id.get(pt.point_id) or str(pt.point_id or pt.id),
                     "address": pt.address,
                     "data_type": pt.data_type,
                     "scale": pt.scale,

@@ -203,7 +203,7 @@ async def get_point_latest_value(point_id: int, time_window: int) -> Optional[fl
     redis_client = None
     try:
         # 优先从 Redis 查询
-        redis_client = redis.from_url(settings.REDIS_URL)
+        redis_client = redis.from_url(settings.effective_redis_url)
         value_str = await redis_client.get(f"point:value:{point_id}")
         if value_str:
             return float(value_str)
@@ -225,8 +225,8 @@ async def get_point_latest_value(point_id: int, time_window: int) -> Optional[fl
             result = await db.execute(
                 select(PointHistory.value)
                 .where(PointHistory.point_id == point_id)
-                .where(PointHistory.timestamp >= cutoff_time)
-                .order_by(desc(PointHistory.timestamp))
+                .where(PointHistory.recorded_at >= cutoff_time)
+                .order_by(desc(PointHistory.recorded_at))
                 .limit(1)
             )
             row = result.scalar_one_or_none()

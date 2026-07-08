@@ -46,7 +46,8 @@ async def link_datasource_to_point(
 ) -> bool:
     """建立 DataSourcePoint 到 Point 的映射关系
 
-    通过在 Point 表的 register_address 字段存储 datasource_point_id 实现映射。
+    采集配置通过 DataSourcePoint.point_id 指向业务 Point.id。网关配置下发时会
+    使用 Point.point_code 作为上报标识，后端 MQTT 入口再按 point_code 入库。
 
     Returns:
         True if link was created successfully
@@ -63,14 +64,24 @@ async def link_datasource_to_point(
     if not point:
         return False
 
-    # 存储映射关系
+    # 存储映射关系，并把协议地址回写到 Point 方便排查和导出。
+    await session.execute(
+        update(DataSourcePoint)
+        .where(DataSourcePoint.id == datasource_point_id)
+        .values(point_id=point_id, updated_at=datetime.now())
+    )
     await session.execute(
         update(Point)
-        .where(Point.id == point_id)
+        .where(Point.id == point.id)
         .values(
-            energy_device_id=datasource_point_id,  # 复用此字段存储映射
+            register_address=ds_point.address,
+            scale_factor=ds_point.scale,
+            offset=ds_point.offset,
             updated_at=datetime.now(),
         )
     )
     await session.commit()
+    from .ingest_pipeline import invalidate_point_cache
+
+    invalidate_point_cache()
     return True

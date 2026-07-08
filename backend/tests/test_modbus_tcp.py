@@ -15,6 +15,7 @@ from gateway.adapters.registry import ADAPTER_REGISTRY
 from gateway.adapters.modbus_tcp import (
     ModbusTcpAdapter,
     _parse_address,
+    _parse_address_spec,
     _convert_value,
 )
 
@@ -685,6 +686,28 @@ class TestAddressParsing:
         _, _, count = _parse_address("HR:0", "int32")
         assert count == 2
 
+    def test_hex_address(self):
+        spec = _parse_address_spec("HR:0x2801", "int16")
+        assert spec.reg_type == "HR"
+        assert spec.address == 0x2801
+        assert spec.count == 1
+
+    def test_single_bit_selector(self):
+        spec = _parse_address_spec("HR:40300.3", "bool")
+        assert spec.address == 40300
+        assert spec.bit_start == 3
+        assert spec.bit_end == 3
+
+    def test_bit_range_selector(self):
+        spec = _parse_address_spec("HR:40131.7-9", "uint16")
+        assert spec.address == 40131
+        assert spec.bit_start == 7
+        assert spec.bit_end == 9
+
+    def test_invalid_bit_range(self):
+        with pytest.raises(ValueError, match="无效位段范围"):
+            _parse_address_spec("HR:40131.9-7", "uint16")
+
 
 # ---------------------------------------------------------------------------
 # 补充: 单点失败不影响其他点位
@@ -723,6 +746,49 @@ class TestSinglePointFailureIsolation:
         assert results["ok1"].quality == DataQuality.NORMAL
         assert results["bad"].quality == DataQuality.ABNORMAL
         assert results["ok2"].quality == DataQuality.NORMAL
+
+
+class TestBitSelectorRead:
+    """测试寄存器 bit 位和位段读取"""
+
+    @patch("gateway.adapters.modbus_tcp.AsyncModbusTcpClient")
+    async def test_read_single_bit_selector(self, MockClient):
+        mock_instance = _mock_client()
+        MockClient.return_value = mock_instance
+
+        response = MagicMock()
+        response.isError.return_value = False
+        response.registers = [0b1000]
+        mock_instance.read_holding_registers = AsyncMock(return_value=response)
+
+        adapter = ModbusTcpAdapter()
+        await adapter.connect(_make_config())
+
+        points = [PointConfig(point_id="alarm", address="HR:40300.3", data_type="bool")]
+        results = await adapter.read_points(points)
+
+        assert results["alarm"].value is True
+        assert results["alarm"].quality == DataQuality.NORMAL
+        mock_instance.read_holding_registers.assert_awaited_once_with(40300, count=1, slave=1)
+
+    @patch("gateway.adapters.modbus_tcp.AsyncModbusTcpClient")
+    async def test_read_bit_range_selector(self, MockClient):
+        mock_instance = _mock_client()
+        MockClient.return_value = mock_instance
+
+        response = MagicMock()
+        response.isError.return_value = False
+        response.registers = [0b101 << 7]
+        mock_instance.read_holding_registers = AsyncMock(return_value=response)
+
+        adapter = ModbusTcpAdapter()
+        await adapter.connect(_make_config())
+
+        points = [PointConfig(point_id="state", address="HR:40131.7-9", data_type="uint16")]
+        results = await adapter.read_points(points)
+
+        assert results["state"].value == 0b101
+        assert results["state"].quality == DataQuality.NORMAL
 
 
 # ---------------------------------------------------------------------------

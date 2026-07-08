@@ -379,6 +379,16 @@
               {{ getDeviceTypeText(row.device_type) }}
             </template>
           </el-table-column>
+          <el-table-column label="细分负荷" min-width="135">
+            <template #default="{ row }">
+              <el-tag size="small" type="info">{{ row.load_subtype_label || getLoadSubtypeText(row.load_subtype) }}</el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column label="可控项" min-width="150">
+            <template #default="{ row }">
+              <span class="control-summary">{{ summarizeControls(row.control_modes) }}</span>
+            </template>
+          </el-table-column>
           <el-table-column prop="rated_power" label="额定功率" width="100">
             <template #default="{ row }">
               {{ row.rated_power }} kW
@@ -853,7 +863,7 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Plus, Upload, Edit, Check, Refresh, Setting } from '@element-plus/icons-vue'
+import { Plus, Upload, Check, Refresh, Setting } from '@element-plus/icons-vue'
 import DeviceShiftDetailDrawer from '@/components/energy/DeviceShiftDetailDrawer.vue'
 import PricingSchemeManager from '@/components/energy/PricingSchemeManager.vue'
 import {
@@ -943,15 +953,15 @@ const hasLowConfidenceItems = computed(() =>
 const schemeManagerVisible = ref(false)
 
 // 需量配置计算属性
-const totalCapacity = computed(() =>
+const _totalCapacity = computed(() =>
   transformers.value.reduce((sum, t) => sum + (t.rated_capacity || 0), 0)
 )
 
-const totalDeclaredDemand = computed(() =>
+const _totalDeclaredDemand = computed(() =>
   transformers.value.reduce((sum, t) => sum + (t.declared_demand || 0), 0)
 )
 
-const configuredCount = computed(() =>
+const _configuredCount = computed(() =>
   transformers.value.filter(t => t.declared_demand).length
 )
 
@@ -1331,7 +1341,7 @@ const handleOcrConfirm = async () => {
 }
 
 // 需量配置方法
-const showDemandDialog = (row?: Transformer) => {
+const _showDemandDialog = (row?: Transformer) => {
   if (row) {
     demandForm.value = {
       id: row.id,
@@ -1399,12 +1409,12 @@ const handleSaveMeterDemand = async () => {
   }
 }
 
-const getDemandUtilization = (row: Transformer) => {
+const getDemandUtilization = (_row: Transformer) => {
   // TODO: 需要从后端获取当前需量使用情况
   return 75 // 暂时返回示例值
 }
 
-const getDemandStatus = (row: Transformer): 'success' | 'warning' | 'exception' => {
+const _getDemandStatus = (row: Transformer): 'success' | 'warning' | 'exception' => {
   const util = getDemandUtilization(row)
   if (util >= 90) return 'exception'
   if (util >= 70) return 'warning'
@@ -1420,6 +1430,54 @@ const getDeviceTypeText = (type: string) => {
     UPS: 'UPS', IT_SERVER: '服务器', COMPRESSOR: '压缩机'
   }
   return map[type?.toUpperCase()] || type || '-'
+}
+
+const getLoadSubtypeText = (subtype?: string) => {
+  const map: Record<string, string> = {
+    row_ac: '行级/微模块空调',
+    cabinet_ac: '柜类空调',
+    room_ac: '房间级空调',
+    chilled_water_terminal: '冷冻水末端',
+    water_cooled_chiller: '大型水冷冷机',
+    pump_vfd: '变频水泵',
+    cooling_tower: '冷却塔',
+    thermal_storage: '蓄冷系统',
+    lighting: '照明',
+    ups: 'UPS',
+    other: '其他'
+  }
+  return subtype ? (map[subtype] || subtype) : '-'
+}
+
+const getControlText = (mode: string) => {
+  const map: Record<string, string> = {
+    power_switch: '开关机',
+    temperature_setpoint: '温度',
+    humidity_setpoint: '湿度',
+    supply_air_temperature: '送风',
+    return_air_temperature: '回风',
+    chilled_water_supply_temperature: '供水温度',
+    chilled_water_return_temperature: '回水温度',
+    chilled_water_valve: '水阀',
+    fan_speed: '风速',
+    indoor_fan_output: '室内风机',
+    compressor_frequency: '压缩机',
+    cooling_output: '制冷输出',
+    pump_frequency: '水泵变频',
+    flow_rate: '流量',
+    cooling_tower_fan: '冷却塔风机',
+    storage_charge: '充冷',
+    storage_discharge: '放冷',
+    storage_soc: '蓄冷余量',
+    brightness: '照明亮度'
+  }
+  return map[mode] || mode
+}
+
+const summarizeControls = (modes?: string[]) => {
+  if (!modes || modes.length === 0) return '-'
+  const labels = modes.slice(0, 3).map(getControlText)
+  return modes.length > 3 ? `${labels.join('、')}等` : labels.join('、')
 }
 
 const getConfidenceTagType = (confidence: string): TagType => {
@@ -1828,6 +1886,11 @@ onMounted(() => {
   color: var(--success-color);
   font-size: 12px;
   margin-left: 4px;
+}
+
+.control-summary {
+  color: var(--text-secondary);
+  font-size: 12px;
 }
 
 .power-preview {

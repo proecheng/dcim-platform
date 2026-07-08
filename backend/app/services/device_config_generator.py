@@ -5,8 +5,15 @@
 
 from typing import Dict, Any
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 
 from ..models.energy import PowerDevice, DeviceShiftConfig, LoadRegulationConfig
+from .cooling_flexibility import (
+    default_controllable_params_for_subtype,
+    get_profile,
+    infer_load_subtype,
+    normalize_control_params,
+)
 
 
 class DeviceConfigAutoGenerator:
@@ -85,6 +92,42 @@ class DeviceConfigAutoGenerator:
             "max_ramp_rate": 2.0,
             "shift_notice_time": 60,
             "requires_manual_approval": True,
+        },
+        "AHU": {
+            "is_shiftable": True,
+            "shiftable_power_ratio": 0.32,
+            "is_critical": False,
+            "allowed_shift_hours": [0, 1, 2, 3, 4, 5, 6, 7, 12, 13, 14, 15, 16, 22, 23],
+            "forbidden_shift_hours": [9, 10, 11, 18, 19, 20],
+            "min_continuous_runtime": 0.5,
+            "max_shift_duration": 4.0,
+            "max_ramp_rate": 8.0,
+            "shift_notice_time": 15,
+            "requires_manual_approval": False,
+        },
+        "COOLING_TOWER": {
+            "is_shiftable": True,
+            "shiftable_power_ratio": 0.30,
+            "is_critical": False,
+            "allowed_shift_hours": list(range(24)),
+            "forbidden_shift_hours": [],
+            "min_continuous_runtime": 0.5,
+            "max_shift_duration": 8.0,
+            "max_ramp_rate": 8.0,
+            "shift_notice_time": 10,
+            "requires_manual_approval": False,
+        },
+        "THERMAL_STORAGE": {
+            "is_shiftable": True,
+            "shiftable_power_ratio": 0.60,
+            "is_critical": False,
+            "allowed_shift_hours": list(range(24)),
+            "forbidden_shift_hours": [],
+            "min_continuous_runtime": 1.0,
+            "max_shift_duration": 6.0,
+            "max_ramp_rate": 20.0,
+            "shift_notice_time": 5,
+            "requires_manual_approval": False,
         },
     }
 
@@ -203,6 +246,63 @@ class DeviceConfigAutoGenerator:
                 {"value": 12.0, "power_ratio": 0.65},
             ],
         },
+        "AHU": {
+            "regulation_type": "temperature",
+            "min_value": 18.0,
+            "max_value": 28.0,
+            "default_value": 23.0,
+            "step_size": 0.5,
+            "unit": "°C",
+            "power_factor": -3.5,
+            "priority": 3,
+            "comfort_impact": "medium",
+            "performance_impact": "none",
+            "power_curve": [
+                {"value": 18.0, "power_ratio": 1.20},
+                {"value": 21.0, "power_ratio": 1.00},
+                {"value": 24.0, "power_ratio": 0.82},
+                {"value": 26.0, "power_ratio": 0.70},
+                {"value": 28.0, "power_ratio": 0.60},
+            ],
+        },
+        "COOLING_TOWER": {
+            "regulation_type": "load",
+            "min_value": 25.0,
+            "max_value": 50.0,
+            "default_value": 45.0,
+            "step_size": 1.0,
+            "unit": "Hz",
+            "power_factor": 2.0,
+            "priority": 4,
+            "comfort_impact": "none",
+            "performance_impact": "low",
+            "power_curve": [
+                {"value": 25, "power_ratio": 0.13},
+                {"value": 30, "power_ratio": 0.22},
+                {"value": 35, "power_ratio": 0.34},
+                {"value": 40, "power_ratio": 0.51},
+                {"value": 45, "power_ratio": 0.73},
+                {"value": 50, "power_ratio": 1.0},
+            ],
+        },
+        "THERMAL_STORAGE": {
+            "regulation_type": "load",
+            "min_value": 15.0,
+            "max_value": 90.0,
+            "default_value": 60.0,
+            "step_size": 5.0,
+            "unit": "%SOC",
+            "power_factor": 0.0,
+            "priority": 2,
+            "comfort_impact": "none",
+            "performance_impact": "low",
+            "power_curve": [
+                {"value": 15, "power_ratio": 0.15, "label": "最低保留SOC"},
+                {"value": 40, "power_ratio": 0.45, "label": "低可用SOC"},
+                {"value": 60, "power_ratio": 0.70, "label": "常规可用SOC"},
+                {"value": 90, "power_ratio": 1.00, "label": "满蓄冷SOC"},
+            ],
+        },
         "UPS": {
             "regulation_type": "mode",
             "min_value": 0,
@@ -223,6 +323,19 @@ class DeviceConfigAutoGenerator:
 
     def __init__(self, db: AsyncSession):
         self.db = db
+
+    def _template_key_for_subtype(self, device_type: str, subtype: str) -> str:
+        if subtype == "thermal_storage":
+            return "THERMAL_STORAGE"
+        if subtype == "water_cooled_chiller":
+            return "CHILLER"
+        if subtype == "pump_vfd":
+            return "PUMP"
+        if subtype == "cooling_tower":
+            return "COOLING_TOWER"
+        if subtype == "chilled_water_terminal":
+            return "AHU" if device_type in {"HVAC", "AHU"} else device_type
+        return device_type
 
     async def generate_configs_for_device(self, device: PowerDevice, force: bool = False) -> Dict[str, Any]:
         """
@@ -259,27 +372,39 @@ class DeviceConfigAutoGenerator:
 
     async def _generate_shift_config(self, device: PowerDevice, force: bool = False) -> bool:
         """生成设备转移配置"""
-        from sqlalchemy import select
-
         # 检查是否已存在配置
         existing = await self.db.execute(select(DeviceShiftConfig).where(DeviceShiftConfig.device_id == device.id))
         if existing.scalar_one_or_none() and not force:
             return False
 
         device_type = device.device_type.upper() if device.device_type else ""
-        template = self.SHIFT_TEMPLATES.get(device_type)
+        subtype = infer_load_subtype(device)
+        template_key = self._template_key_for_subtype(device_type, subtype)
+        template = self.SHIFT_TEMPLATES.get(template_key) or self.SHIFT_TEMPLATES.get(device_type)
+        profile = get_profile(subtype)
+        controls = normalize_control_params(getattr(device, "controllable_params", None), profile)
+        dynamic_ratio = (
+            0.0
+            if subtype in {"other", "ups"}
+            else min(profile.max_ratio, round(profile.base_ratio * (0.9 + min(len(controls), 4) * 0.05), 2))
+        )
 
         # 构建配置
         if template:
             # 使用模板
-            min_power = device.rated_power * 0.2 if device.rated_power and template["is_shiftable"] else None
-            config_data = {"device_id": device.id, **template, "min_power": min_power}
+            min_power = device.rated_power * profile.default_min_power_ratio if device.rated_power else None
+            config_data = {
+                "device_id": device.id,
+                **template,
+                "shiftable_power_ratio": dynamic_ratio,
+                "min_power": min_power,
+            }
         else:
             # 默认配置 - 不可转移
             config_data = {
                 "device_id": device.id,
-                "is_shiftable": False,
-                "shiftable_power_ratio": 0.0,
+                "is_shiftable": dynamic_ratio > 0,
+                "shiftable_power_ratio": dynamic_ratio,
                 "is_critical": device.is_critical or False,
                 "allowed_shift_hours": [],
                 "forbidden_shift_hours": list(range(24)),
@@ -304,8 +429,6 @@ class DeviceConfigAutoGenerator:
 
     async def _generate_regulation_config(self, device: PowerDevice, force: bool = False) -> bool:
         """生成设备调节配置"""
-        from sqlalchemy import select
-
         # 检查是否已存在配置
         existing = await self.db.execute(
             select(LoadRegulationConfig).where(LoadRegulationConfig.device_id == device.id)
@@ -314,7 +437,13 @@ class DeviceConfigAutoGenerator:
             return False
 
         device_type = device.device_type.upper() if device.device_type else ""
-        template = self.REGULATION_TEMPLATES.get(device_type)
+        subtype = infer_load_subtype(device)
+        template_key = self._template_key_for_subtype(device_type, subtype)
+        template = self.REGULATION_TEMPLATES.get(template_key) or self.REGULATION_TEMPLATES.get(device_type)
+        if getattr(device, "load_subtype", None) is None:
+            device.load_subtype = subtype
+        if getattr(device, "controllable_params", None) is None:
+            device.controllable_params = default_controllable_params_for_subtype(subtype)
 
         if not template:
             # 该类型设备不支持调节
@@ -370,8 +499,6 @@ class DeviceConfigAutoGenerator:
         Returns:
             批量生成结果
         """
-        from sqlalchemy import select
-
         results = []
         shift_count = 0
         reg_count = 0
@@ -400,4 +527,38 @@ class DeviceConfigAutoGenerator:
             "shift_configs_created": shift_count,
             "regulation_configs_created": reg_count,
             "details": results,
+        }
+
+    async def ensure_missing_regulation_configs(self) -> Dict[str, Any]:
+        """为支持参数调节但尚未配置的启用设备补齐调节配置。
+
+        该方法只创建缺失配置，不会覆盖已有配置，适合页面/API 查询前做幂等修复。
+        """
+        result = await self.db.execute(select(PowerDevice).where(PowerDevice.is_enabled == True))
+        devices = result.scalars().all()
+
+        created_count = 0
+        skipped_count = 0
+        unsupported_count = 0
+
+        for device in devices:
+            device_type = device.device_type.upper() if device.device_type else ""
+            if device_type not in self.REGULATION_TEMPLATES:
+                unsupported_count += 1
+                continue
+
+            created = await self._generate_regulation_config(device, force=False)
+            if created:
+                created_count += 1
+            else:
+                skipped_count += 1
+
+        if created_count:
+            await self.db.commit()
+
+        return {
+            "total_devices": len(devices),
+            "created": created_count,
+            "skipped_existing": skipped_count,
+            "unsupported": unsupported_count,
         }

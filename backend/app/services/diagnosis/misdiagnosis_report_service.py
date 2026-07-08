@@ -227,7 +227,7 @@ class MisdiagnosisReportService:
             # 释放分布式锁
             if lock_acquired and redis_service.is_available:
                 try:
-                    redis_service.delete(lock_key)
+                    redis_service.delete_sync(lock_key)
                 except Exception as e:
                     logger.warning("释放 Redis 锁失败: %s", e)
 

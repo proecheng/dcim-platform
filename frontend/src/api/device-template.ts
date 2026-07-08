@@ -8,8 +8,14 @@ export interface DeviceTemplate {
   protocol_type: string
   description: string | null
   point_config: Array<Record<string, any>>
+  extra_config?: Record<string, any> | null
   created_at: string
   updated_at: string
+}
+
+export interface BuiltinDeviceTemplate extends Omit<DeviceTemplate, 'id' | 'created_at' | 'updated_at'> {
+  key: string
+  point_count: number
 }
 
 export function getTemplates(params?: any) {
@@ -34,4 +40,12 @@ export function deleteTemplate(id: number) {
 
 export function createDatasourceFromTemplate(templateId: number, data: any) {
   return request.post(`/v1/device-templates/${templateId}/create-datasource`, data)
+}
+
+export function getBuiltinTemplates() {
+  return request.get('/v1/device-templates/builtins')
+}
+
+export function installBuiltinTemplate(key: string) {
+  return request.post(`/v1/device-templates/builtins/${key}/install`)
 }
