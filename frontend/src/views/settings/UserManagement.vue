@@ -468,7 +468,7 @@ async function handleToggleStatus(row: UserInfo): Promise<boolean> {
     ElMessage.success(newStatus ? '已启用' : '已禁用')
     loadStats()
     return true
-  } catch (e) {
+  } catch {
     ElMessage.error('操作失败')
     return false
   }
@@ -540,7 +540,7 @@ function resetForm() {
   })
 }
 
-function handleResetPwdClose() {
+function _handleResetPwdClose() {
   resetPwdFormRef.value?.clearValidate()
   pwdForm.password = ''
   pwdForm.confirmPassword = ''

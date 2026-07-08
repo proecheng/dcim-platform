@@ -433,6 +433,19 @@ class TestRegulationConfigs:
         assert resp.status_code == 200
         assert len(resp.json()) >= 1
 
+    async def test_get_configs_auto_generates_missing_adjustable_device(self, client, async_db):
+        dev = await _create_power_device(async_db, "DEV004", "自动补齐空调")
+        await async_db.commit()
+
+        resp = await client.get("/api/v1/regulation/configs")
+
+        assert resp.status_code == 200
+        generated = next(item for item in resp.json() if item["device_id"] == dev.id)
+        assert generated["regulation_type"] == "temperature"
+        assert generated["min_value"] == 18.0
+        assert generated["max_value"] == 28.0
+        assert generated["current_value"] == 23.0
+
     async def test_get_configs_filter_device(self, client, async_db):
         dev = await _create_power_device(async_db, "DEV002", "设备2")
         await _create_regulation_config(async_db, dev.id)

@@ -130,7 +130,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, watch, computed, nextTick } from 'vue'
+import { ref, onMounted, onUnmounted, computed, nextTick } from 'vue'
 import { Cpu, Refresh } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import * as echarts from 'echarts'
@@ -441,7 +441,7 @@ function renderGanttChart() {
   }
 
   // 添加设备行
-  schedules.forEach((device, deviceIdx) => {
+  schedules.forEach((device, _deviceIdx) => {
     categories.push(device.device_name)
     const catIdx = categories.length - 1
 
@@ -473,7 +473,7 @@ function renderGanttChart() {
   }
 
   // 生成24小时刻度
-  const hours = Array.from({ length: 25 }, (_, i) => `${String(i).padStart(2, '0')}:00`)
+  const _hours = Array.from({ length: 25 }, (_, i) => `${String(i).padStart(2, '0')}:00`)
 
   const option: echarts.EChartsOption = {
     tooltip: {

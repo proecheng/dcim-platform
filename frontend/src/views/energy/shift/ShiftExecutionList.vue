@@ -90,13 +90,13 @@
 import { ref, reactive, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { getExecutions } from '@/api/modules/shift'
+import { getExecutions, type ShiftExecution, type ShiftExecutionQuery } from '@/api/modules/shift'
 
 const router = useRouter()
 
 const loading = ref(false)
-const executionList = ref([])
-const dateRange = ref([])
+const executionList = ref<ShiftExecution[]>([])
+const dateRange = ref<Date[]>([])
 
 const filterForm = reactive({
   status: ''
@@ -115,7 +115,7 @@ onMounted(() => {
 const fetchExecutions = async () => {
   loading.value = true
   try {
-    const params: any = {
+    const params: ShiftExecutionQuery = {
       skip: (pagination.page - 1) * pagination.pageSize,
       limit: pagination.pageSize
     }
@@ -132,7 +132,7 @@ const fetchExecutions = async () => {
     const res = await getExecutions(params)
     executionList.value = res.data || []
     pagination.total = res.total || executionList.value.length
-  } catch (error) {
+  } catch {
     ElMessage.error('获取执行记录失败')
   } finally {
     loading.value = false
@@ -150,7 +150,7 @@ const handleReset = () => {
   handleQuery()
 }
 
-const handleView = (row: any) => {
+const handleView = (row: ShiftExecution) => {
   router.push(`/energy/shift/execution/${row.id}`)
 }
 
@@ -165,15 +165,17 @@ const getSuccessRateColor = (rate: number) => {
   return '#f56c6c'
 }
 
-const getStatusType = (status: string) => {
-  const map: Record<string, any> = {
+type TagType = 'primary' | 'success' | 'info' | 'warning' | 'danger'
+
+const getStatusType = (status: string): TagType => {
+  const map: Record<string, TagType> = {
     not_started: 'info',
-    in_progress: '',
+    in_progress: 'warning',
     completed: 'success',
     failed: 'danger',
     cancelled: 'info'
   }
-  return map[status] || ''
+  return map[status] || 'info'
 }
 
 const getStatusLabel = (status: string) => {

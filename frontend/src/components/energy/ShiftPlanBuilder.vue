@@ -347,7 +347,7 @@ const periodPrices: Record<string, number> = {
 }
 
 // 时段名称
-const periodNames: Record<string, string> = {
+const _periodNames: Record<string, string> = {
   sharp: '尖峰',
   peak: '峰时',
   flat: '平时',
@@ -444,7 +444,7 @@ const totalDailySaving = computed(() => {
   return total
 })
 
-const totalMonthlySaving = computed(() => totalDailySaving.value * 22)
+const _totalMonthlySaving = computed(() => totalDailySaving.value * 22)
 const totalAnnualSaving = computed(() => totalDailySaving.value * 250)
 
 // 方法

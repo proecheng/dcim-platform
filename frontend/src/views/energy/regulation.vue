@@ -345,6 +345,13 @@ const totalPowerSaving = computed(() => {
 
 const historyCount = computed(() => history.value.length)
 
+function unwrapResponse<T>(response: T | { data?: T } | undefined): T | undefined {
+  if (response && typeof response === 'object' && 'data' in response) {
+    return (response as { data?: T }).data
+  }
+  return response as T | undefined
+}
+
 onMounted(async () => {
   await loadAllData()
 })
@@ -366,7 +373,7 @@ async function loadAllData() {
 async function loadConfigs() {
   try {
     const res = await getRegulationConfigs()
-    configs.value = res.data || []
+    configs.value = unwrapResponse<LoadRegulationConfig[]>(res) || []
   } catch (e) {
     console.error('加载配置失败', e)
   }
@@ -375,7 +382,7 @@ async function loadConfigs() {
 async function loadHistory() {
   try {
     const res = await getRegulationHistory({ limit: 50 })
-    history.value = res.data || []
+    history.value = unwrapResponse<RegulationHistory[]>(res) || []
   } catch (e) {
     console.error('加载历史失败', e)
   }
@@ -384,7 +391,7 @@ async function loadHistory() {
 async function loadRecommendations() {
   try {
     const res = await getRegulationRecommendations()
-    recommendations.value = res.data || []
+    recommendations.value = unwrapResponse<RegulationRecommendation[]>(res) || []
   } catch (e) {
     console.error('加载建议失败', e)
   }
@@ -393,7 +400,7 @@ async function loadRecommendations() {
 async function loadDevices() {
   try {
     const res = await getPowerDevices({ is_enabled: true })
-    devices.value = res.data || []
+    devices.value = unwrapResponse<PowerDevice[]>(res) || []
   } catch (e) {
     console.error('加载设备失败', e)
   }
@@ -410,10 +417,10 @@ async function simulateConfig(config: LoadRegulationConfig, targetValue?: number
       config_id: config.id,
       target_value: targetValue ?? config.current_value ?? config.default_value ?? config.min_value
     })
-    simulateResult.value = res.data
+    simulateResult.value = unwrapResponse<RegulationSimulateResponse>(res) || null
     currentSimulateConfig.value = config
     simulateDialogVisible.value = true
-  } catch (e) {
+  } catch {
     ElMessage.error('模拟失败')
   }
 }
@@ -430,7 +437,7 @@ async function applySimulateResult() {
     ElMessage.success('调节已应用')
     simulateDialogVisible.value = false
     await loadAllData()
-  } catch (e) {
+  } catch {
     ElMessage.error('应用失败')
   }
 }
@@ -459,7 +466,7 @@ async function toggleConfig(config: LoadRegulationConfig) {
   try {
     await updateRegulationConfig(config.id, { is_enabled: config.is_enabled })
     ElMessage.success(config.is_enabled ? '已启用' : '已禁用')
-  } catch (e) {
+  } catch {
     ElMessage.error('操作失败')
     config.is_enabled = !config.is_enabled
   }
@@ -509,7 +516,7 @@ async function submitCreate() {
     ElMessage.success('创建成功')
     createDialogVisible.value = false
     await loadConfigs()
-  } catch (e) {
+  } catch {
     ElMessage.error('创建失败')
   }
 }

@@ -9,6 +9,7 @@ from sqlalchemy import select, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..models.energy import LoadRegulationConfig, RegulationHistory, PowerDevice
+from .device_config_generator import DeviceConfigAutoGenerator
 from ..schemas.energy import (
     LoadRegulationConfigCreate,
     LoadRegulationConfigUpdate,
@@ -73,6 +74,8 @@ class LoadRegulationService:
         self, device_id: Optional[int] = None, regulation_type: Optional[str] = None, is_enabled: bool = True
     ) -> List[LoadRegulationConfigResponse]:
         """获取负荷调节配置列表"""
+        await DeviceConfigAutoGenerator(self.db).ensure_missing_regulation_configs()
+
         query = select(LoadRegulationConfig, PowerDevice).join(
             PowerDevice, LoadRegulationConfig.device_id == PowerDevice.id
         )

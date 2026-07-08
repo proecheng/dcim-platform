@@ -3,14 +3,14 @@ Load Shift API - 负荷转移 API
 """
 
 from typing import List, Optional, Dict, Any
-from datetime import date, datetime
+from datetime import date, time, datetime
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, func
 
 from ..deps import get_db, get_current_user, require_operator
 from ...models.user import User
-from ...models.load_shift import ShiftPlan
+from ...models.load_shift import ShiftPlan, ShiftExecution
 from ...models.energy import PowerDevice, DeviceShiftConfig
 from ...schemas.load_shift import (
     # Plan schemas
@@ -35,14 +35,105 @@ from ...schemas.load_shift import (
     # Statistics schemas
     ShiftStatisticsSummary,
     # Opportunity schemas
-    ShiftOpportunityResponse,
-    ShiftOpportunityDetail,
+    ShiftOpportunityAnalyzeResponse,
+    ShiftOpportunityPayload,
+    ShiftExecutionListResponse,
+    ShiftExecutionDetailResponse,
+    ShiftExecutionRealtimeResponse,
 )
 from ...services.load_shift.shift_plan_service import ShiftPlanService
 from ...services.load_shift.algorithms.constraint_checker import ConstraintChecker
 from ...services.load_shift.algorithms.benefit_calculator import BenefitCalculator
 
 router = APIRouter(tags=["Load Shift"])
+
+
+def _to_float(value):
+    return float(value) if value is not None else None
+
+
+def _build_execution_payload(execution: ShiftExecution, plan: Optional[ShiftPlan] = None) -> Dict[str, Any]:
+    device_details = execution.device_execution_details or []
+    if isinstance(device_details, dict):
+        device_details = [device_details]
+    cooling_linkage = execution.cooling_linkage_data or None
+
+    return {
+        "id": execution.id,
+        "execution_code": execution.execution_code,
+        "plan_id": execution.plan_id,
+        "plan_name": plan.plan_name if plan else None,
+        "status": execution.status,
+        "execution_status": execution.status,
+        "start_time": execution.start_time,
+        "end_time": execution.end_time,
+        "duration_minutes": execution.duration_minutes,
+        "duration": (execution.duration_minutes or 60) * 60 * 1000,
+        "target_shift_power": _to_float(plan.target_shift_power) if plan else None,
+        "expected_cost_saving": _to_float(plan.expected_cost_saving) if plan else None,
+        "expected_energy_saving": _to_float(plan.expected_energy_saving) if plan else None,
+        "before_power": _to_float(execution.before_total_power),
+        "after_power": _to_float(execution.after_total_power),
+        "before_total_power": _to_float(execution.before_total_power),
+        "after_total_power": _to_float(execution.after_total_power),
+        "actual_shift_power": _to_float(execution.actual_shift_power),
+        "actual_cost_saving": _to_float(execution.actual_cost_saving),
+        "actual_energy_saving": _to_float(execution.actual_energy_saving),
+        "success_rate": execution.success_rate,
+        "device_execution_details": device_details,
+        "device_execution_list": device_details,
+        "device_executions": device_details,
+        "cooling_linkage_data": cooling_linkage,
+        "cooling_linkage": cooling_linkage,
+        "error_message": execution.failure_reason,
+        "failure_reason": execution.failure_reason,
+        "error_details": execution.error_details,
+        "executed_by": execution.executed_by,
+        "executor_name": None,
+        "notes": None,
+        "created_at": execution.created_at,
+    }
+
+
+def _build_opportunity_payload(opportunity) -> Dict[str, Any]:
+    recommended_devices = opportunity.recommended_devices or []
+    if isinstance(recommended_devices, dict):
+        recommended_devices = [recommended_devices]
+    estimated_cost_saving = _to_float(opportunity.estimated_cost_saving)
+    estimated_energy_saving = _to_float(opportunity.estimated_energy_saving)
+    recommended_date = opportunity.recommended_date
+    analysis_data = opportunity.analysis_data or {}
+    if not isinstance(analysis_data, dict):
+        analysis_data = {}
+
+    return {
+        "id": opportunity.id,
+        "opportunity_code": opportunity.opportunity_code,
+        "opportunity_name": opportunity.opportunity_name,
+        "recommended_date": recommended_date,
+        "analysis_date": recommended_date,
+        "analysis_period": opportunity.analysis_period,
+        "shift_from_period": opportunity.recommended_shift_from,
+        "shift_to_period": opportunity.recommended_shift_to,
+        "recommended_shift_from": opportunity.recommended_shift_from,
+        "recommended_shift_to": opportunity.recommended_shift_to,
+        "recommended_shift_power": _to_float(opportunity.recommended_shift_power),
+        "recommended_devices": recommended_devices,
+        "estimated_cost_saving": estimated_cost_saving,
+        "estimated_energy_saving": estimated_energy_saving,
+        "predicted_cost_saving": estimated_cost_saving,
+        "predicted_energy_saving": estimated_energy_saving,
+        "confidence_score": opportunity.confidence_score,
+        "analysis_data": analysis_data,
+        "reason": analysis_data.get("reason"),
+        "status": opportunity.status,
+        "priority": opportunity.priority,
+        "converted_plan_id": opportunity.converted_to_plan_id,
+        "converted_to_plan_id": opportunity.converted_to_plan_id,
+        "converted_at": opportunity.converted_at,
+        "created_at": opportunity.created_at,
+        "updated_at": opportunity.updated_at,
+    }
 
 
 # ========== Plan Management Endpoints ==========
@@ -229,8 +320,7 @@ async def execute_plan(
 
 # ========== Opportunity Endpoints ==========
 
-
-@router.post("/opportunities/analyze")
+@router.post("/opportunities/analyze", response_model=ShiftOpportunityAnalyzeResponse)
 async def analyze_opportunities(
     analysis_date: date = Query(default_factory=date.today),
     lookback_days: int = Query(30, ge=7, le=90),
@@ -255,24 +345,11 @@ async def analyze_opportunities(
     return {
         "analysis_date": analysis_date,
         "opportunities_found": len(opportunities),
-        "opportunities": [
-            {
-                "id": opp.id,
-                "opportunity_code": opp.opportunity_code,
-                "opportunity_name": opp.opportunity_name,
-                "recommended_shift_from": opp.recommended_shift_from,
-                "recommended_shift_to": opp.recommended_shift_to,
-                "recommended_shift_power": opp.recommended_shift_power,
-                "predicted_cost_saving": float(opp.predicted_cost_saving),
-                "confidence_score": opp.confidence_score,
-                "priority": opp.priority,
-            }
-            for opp in opportunities
-        ],
+        "opportunities": [_build_opportunity_payload(opp) for opp in opportunities],
     }
 
 
-@router.get("/opportunities", response_model=List[ShiftOpportunityResponse])
+@router.get("/opportunities", response_model=List[ShiftOpportunityPayload])
 async def get_opportunities(
     skip: int = Query(0, ge=0),
     limit: int = Query(20, ge=1, le=100),
@@ -300,10 +377,10 @@ async def get_opportunities(
     result = await db.execute(stmt)
     opportunities = result.scalars().all()
 
-    return opportunities
+    return [_build_opportunity_payload(opportunity) for opportunity in opportunities]
 
 
-@router.get("/opportunities/{opp_id}", response_model=ShiftOpportunityDetail)
+@router.get("/opportunities/{opp_id}", response_model=ShiftOpportunityPayload)
 async def get_opportunity_detail(
     opp_id: int,
     db: AsyncSession = Depends(get_db),
@@ -325,7 +402,7 @@ async def get_opportunity_detail(
             detail=f"机会 ID {opp_id} 不存在",
         )
 
-    return opportunity
+    return _build_opportunity_payload(opportunity)
 
 
 @router.post("/opportunities/{opp_id}/convert", response_model=ShiftPlanResponse)
@@ -339,7 +416,6 @@ async def convert_opportunity_to_plan(
     将机会转换为转移计划
     """
     from ...models.load_shift import ShiftOpportunity
-    from datetime import time
 
     # Get opportunity
     stmt = select(ShiftOpportunity).where(ShiftOpportunity.id == opp_id)
@@ -365,19 +441,31 @@ async def convert_opportunity_to_plan(
         shift_to_period=opportunity.recommended_shift_to,
         shift_date=opportunity.recommended_date,
         start_time=time(1, 0),  # Default 01:00
-        end_time=time(5, 0),  # Default 05:00
-        target_shift_power=opportunity.recommended_shift_power,
-        selected_devices=[d["device_id"] for d in opportunity.recommended_devices],
-        constraints={"safety_factor": 0.85, "cooling_lag_minutes": 20, "three_phase_balance_threshold": 0.1},
-        expected_cost_saving=opportunity.predicted_cost_saving,
-        expected_energy_saving=opportunity.recommended_shift_power * 4,  # 4 hours
-        description=f"由机会 {opportunity.opportunity_code} 自动生成，置信度 {opportunity.confidence_score}",
+        end_time=time(5, 0),    # Default 05:00
+        target_shift_power=float(opportunity.recommended_shift_power or 0),
+        selected_devices=[
+            d.get("device_id", d) if isinstance(d, dict) else d
+            for d in (opportunity.recommended_devices or [])
+        ],
+        constraints={
+            "safety_factor": 0.85,
+            "cooling_lag_minutes": 20,
+            "three_phase_balance_threshold": 0.1
+        },
+        expected_cost_saving=_to_float(opportunity.estimated_cost_saving),
+        expected_energy_saving=(
+            _to_float(opportunity.estimated_energy_saving)
+            or (_to_float(opportunity.recommended_shift_power) or 0.0) * 4
+        ),  # 4 hours
+        description=f"由机会 {opportunity.opportunity_code} 自动生成，置信度 {opportunity.confidence_score}"
     )
 
-    plan = await ShiftPlanService.create_plan(db=db, plan_data=plan_data, created_by=current_user.id)
+    plan = await ShiftPlanService.create_plan(db=db, plan_data=plan_data, user_id=current_user.id)
 
     # Update opportunity status
     opportunity.status = "converted"
+    opportunity.converted_to_plan_id = plan.id
+    opportunity.converted_at = datetime.now()
     await db.commit()
 
     return plan
@@ -480,6 +568,116 @@ async def assess_risk(
             "建议避免频繁启停关键设备",
         ],
     )
+
+
+# ========== Execution Endpoints ==========
+
+@router.get("/executions", response_model=ShiftExecutionListResponse)
+async def get_executions(
+    skip: int = Query(0, ge=0),
+    limit: int = Query(20, ge=1, le=100),
+    status_filter: Optional[str] = Query(None, alias="status"),
+    start_date: Optional[date] = None,
+    end_date: Optional[date] = None,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Get shift execution records
+    获取转移执行记录列表
+    """
+    filters = []
+    if status_filter:
+        filters.append(ShiftExecution.status == status_filter)
+    if start_date:
+        filters.append(ShiftExecution.start_time >= datetime.combine(start_date, time.min))
+    if end_date:
+        filters.append(ShiftExecution.start_time <= datetime.combine(end_date, time.max))
+
+    total_result = await db.execute(select(func.count()).select_from(ShiftExecution).where(*filters))
+    total = total_result.scalar_one()
+
+    stmt = (
+        select(ShiftExecution, ShiftPlan)
+        .outerjoin(ShiftPlan, ShiftExecution.plan_id == ShiftPlan.id)
+        .where(*filters)
+        .order_by(ShiftExecution.start_time.desc())
+        .offset(skip)
+        .limit(limit)
+    )
+    result = await db.execute(stmt)
+    items = [_build_execution_payload(execution, plan) for execution, plan in result.all()]
+
+    return {
+        "data": items,
+        "total": total,
+        "skip": skip,
+        "limit": limit,
+    }
+
+
+@router.get("/executions/{execution_id}", response_model=ShiftExecutionDetailResponse)
+async def get_execution_detail(
+    execution_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Get shift execution detail
+    获取转移执行详情
+    """
+    result = await db.execute(
+        select(ShiftExecution, ShiftPlan)
+        .outerjoin(ShiftPlan, ShiftExecution.plan_id == ShiftPlan.id)
+        .where(ShiftExecution.id == execution_id)
+    )
+    row = result.first()
+    if not row:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"执行记录 ID {execution_id} 不存在",
+        )
+
+    execution, plan = row
+    return {"data": _build_execution_payload(execution, plan)}
+
+
+@router.get("/executions/{execution_id}/realtime", response_model=ShiftExecutionRealtimeResponse)
+async def get_execution_realtime(
+    execution_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Get shift execution realtime snapshot
+    获取转移执行实时快照
+    """
+    result = await db.execute(
+        select(ShiftExecution, ShiftPlan)
+        .outerjoin(ShiftPlan, ShiftExecution.plan_id == ShiftPlan.id)
+        .where(ShiftExecution.id == execution_id)
+    )
+    row = result.first()
+    if not row:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"执行记录 ID {execution_id} 不存在",
+        )
+
+    execution, plan = row
+    return {
+        "data": {
+            "execution_id": execution.id,
+            "execution_code": execution.execution_code,
+            "status": execution.status,
+            "target_power": _to_float(plan.target_shift_power) if plan else 0.0,
+            "actual_power": _to_float(execution.actual_shift_power) or 0.0,
+            "completion_rate": execution.success_rate or 0.0,
+            "device_status": execution.device_execution_details or [],
+            "alarms": [],
+            "timestamp": datetime.now(),
+        }
+    }
 
 
 # ========== Device Endpoints ==========

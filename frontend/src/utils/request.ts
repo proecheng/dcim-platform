@@ -1,4 +1,4 @@
-import axios, { AxiosRequestConfig, AxiosResponse } from 'axios'
+import axios, { AxiosRequestConfig } from 'axios'
 import { ElMessage } from 'element-plus'
 import router from '@/router'
 import { degradationFlags } from '@/stores/degradation'
@@ -14,6 +14,10 @@ const instance = axios.create({
   baseURL: getBaseURL(),
   timeout: 10000
 })
+
+export interface RequestConfig extends AxiosRequestConfig {
+  silentError?: boolean
+}
 
 // 不需要站点过滤的 API 路径（Story 27.6）
 export const SITE_FILTER_EXCLUDED_PATHS = [
@@ -84,6 +88,7 @@ instance.interceptors.response.use(
     return response.data
   },
   (error) => {
+    const silentError = Boolean((error.config as RequestConfig | undefined)?.silentError)
     if (error.response) {
       const { status, data } = error.response
       if (status === 401) {
@@ -102,12 +107,12 @@ instance.interceptors.response.use(
             }, 3000)
           }
         }
-      } else if (status === 403) {
+      } else if (!silentError && status === 403) {
         ElMessage.error('没有权限执行此操作')
-      } else {
+      } else if (!silentError) {
         ElMessage.error(data.detail || '请求失败')
       }
-    } else {
+    } else if (!silentError) {
       ElMessage.error('网络错误')
     }
     return Promise.reject(error)
@@ -116,19 +121,19 @@ instance.interceptors.response.use(
 
 // 封装请求方法，返回数据而非AxiosResponse
 const request = {
-  get<T = any>(url: string, config?: AxiosRequestConfig): Promise<T> {
+  get<T = any>(url: string, config?: RequestConfig): Promise<T> {
     return instance.get(url, config) as Promise<T>
   },
-  post<T = any>(url: string, data?: any, config?: AxiosRequestConfig): Promise<T> {
+  post<T = any>(url: string, data?: any, config?: RequestConfig): Promise<T> {
     return instance.post(url, data, config) as Promise<T>
   },
-  put<T = any>(url: string, data?: any, config?: AxiosRequestConfig): Promise<T> {
+  put<T = any>(url: string, data?: any, config?: RequestConfig): Promise<T> {
     return instance.put(url, data, config) as Promise<T>
   },
-  delete<T = any>(url: string, config?: AxiosRequestConfig): Promise<T> {
+  delete<T = any>(url: string, config?: RequestConfig): Promise<T> {
     return instance.delete(url, config) as Promise<T>
   },
-  patch<T = any>(url: string, data?: any, config?: AxiosRequestConfig): Promise<T> {
+  patch<T = any>(url: string, data?: any, config?: RequestConfig): Promise<T> {
     return instance.patch(url, data, config) as Promise<T>
   }
 }

@@ -68,7 +68,7 @@ function doorStatusText(status: DoorStatus): string {
  * ⚠️ 技术债务: 此映射关系依赖后端告警分类规则。如果后端修改了 alarm_type/alarm_level 的
  *    语义或新增了告警类型，此推导逻辑需要同步更新。
  */
-function deriveEventType(alarm: AlarmInfo, firePolicyNames: Set<string>): AccessEventType {
+function deriveEventType(alarm: AlarmInfo, _firePolicyNames: Set<string>): AccessEventType {
   const msg = (alarm.alarm_message || '').toLowerCase()
 
   // 消防联动: 告警消息包含消防/联动关键字

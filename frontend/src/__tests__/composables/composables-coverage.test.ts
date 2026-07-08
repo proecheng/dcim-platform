@@ -6,6 +6,7 @@ import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest'
 import { setActivePinia, createPinia } from 'pinia'
 import { nextTick, defineComponent } from 'vue'
 import { mount } from '@vue/test-utils'
+import { useEnergy } from '@/composables/useEnergy'
 
 // ==================== Mocks ====================
 
@@ -245,15 +246,13 @@ describe('useEnergy', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
     localStorage.clear()
-    vi.useFakeTimers()
   })
 
   afterEach(() => {
     vi.useRealTimers()
   })
 
-  async function setup() {
-    const { useEnergy } = await import('@/composables/useEnergy')
+  function setup() {
     return useEnergy()
   }
 
@@ -407,6 +406,14 @@ describe('useEnergy', () => {
   // --- startPolling / stopPolling ---
 
   describe('轮询控制', () => {
+    beforeEach(() => {
+      vi.useFakeTimers()
+    })
+
+    afterEach(() => {
+      vi.useRealTimers()
+    })
+
     it('startPolling 创建定时器', async () => {
       const e = await setup()
       e.startPolling(10000)

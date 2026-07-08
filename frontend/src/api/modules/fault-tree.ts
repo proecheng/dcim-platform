@@ -3,14 +3,14 @@
  * Story 25.8: 故障树图形化编辑器
  */
 
-import request from '@/utils/request'
+import request, { type RequestConfig } from '@/utils/request'
 import type { FaultTree, SaveFaultTreePayload, PointInfo } from '@/types/fault-tree'
 
 /**
  * 获取故障树详情
  */
-export function getFaultTree(id: number) {
-  return request.get<FaultTree>(`/v1/fault-trees/${id}`)
+export function getFaultTree(id: number, config?: RequestConfig) {
+  return request.get<FaultTree>(`/v1/fault-trees/${id}`, config)
 }
 
 /**

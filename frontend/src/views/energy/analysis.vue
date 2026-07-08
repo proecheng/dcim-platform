@@ -516,7 +516,6 @@ import {
   getMeterPoints,
   type DemandConfigAnalysisResult,
   type DeviceShiftAnalysisResult,
-  type DeviceShiftPotential,
   type Demand15MinDataPoint,
   type DemandPeakAnalysisResponse,
   type DemandOptimizationPlanResponse,
@@ -1044,7 +1043,7 @@ function initChart() {
   }
 }
 
-async function loadCurveData() {
+async function _loadCurveData() {
   if (!selectedMeterPointId.value) return
   loading.value.curve = true
   try {

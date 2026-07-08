@@ -3,9 +3,9 @@
  * Story 25.8: 故障树图形化编辑器
  */
 
-import { ref, computed, onMounted, onBeforeUnmount, type Ref } from 'vue'
+import { ref, shallowRef, computed } from 'vue'
 import { DataSet, Network } from 'vis-network/standalone'
-import type { Data, Options, Node, Edge } from 'vis-network'
+import type { Data, Options } from 'vis-network'
 import { nanoid } from 'nanoid'
 import { debounce } from 'lodash-es'
 import { ElMessage } from 'element-plus'
@@ -17,11 +17,9 @@ import type {
   VisNode,
   VisEdge,
   NodeType,
-  GateType,
   SaveFaultTreePayload
 } from '@/types/fault-tree'
 import {
-  defaultNetworkOptions,
   smallTreeOptions,
   largeTreeOptions,
   nodeColors,
@@ -36,8 +34,8 @@ export function useFaultTreeEditor(treeId: number) {
   const container = ref<HTMLElement | null>(null)
 
   // 数据集
-  const nodes = ref(new DataSet([])) as Ref<DataSet<VisNode>>
-  const edges = ref(new DataSet([])) as Ref<DataSet<VisEdge>>
+  const nodes = shallowRef<DataSet<VisNode>>(new DataSet([]))
+  const edges = shallowRef<DataSet<VisEdge>>(new DataSet([]))
 
   // 故障树数据
   const faultTree = ref<FaultTree | null>(null)
@@ -52,7 +50,7 @@ export function useFaultTreeEditor(treeId: number) {
   const { validateDAG, highlightErrors, clearHighlights } = useDAGValidation(nodes, edges)
 
   // 历史管理
-  const { push: pushHistory, undo, redo, canUndo, canRedo, clear: clearHistory } = useHistoryManager(nodes, edges)
+  const { push: pushHistory, undo, redo, canUndo, canRedo } = useHistoryManager(nodes, edges)
 
   // 防抖的校验和历史记录函数
   const debouncedValidate = debounce(() => {
@@ -446,14 +444,14 @@ export function useFaultTreeEditor(treeId: number) {
     })
 
     // 更新前端 DataSet 中的节点 ID（使用 remove + add）
-    const idMapping = new Map<string | number, number>()
+    const idMapping = new Map<string | number, string | number>()
     const nodesToRemove: (string | number)[] = []
     const nodesToAdd: VisNode[] = []
 
     tempIdMap.forEach((index, tempId) => {
       const realId = Number(savedTree.nodes[index].id)
       idMapping.set(tempId, realId)
-      const oldNode = nodes.value.get(tempId)
+      const oldNode = nodes.value.get(tempId) as VisNode | null
       if (oldNode) {
         nodesToRemove.push(tempId)
         nodesToAdd.push({ ...oldNode, id: realId })
@@ -489,8 +487,8 @@ export function useFaultTreeEditor(treeId: number) {
     // 双击节点事件
     network.value.on('doubleClick', (params) => {
       if (params.nodes.length > 0) {
-        const nodeId = params.nodes[0]
-        const node = nodes.value.get(nodeId)
+        const nodeId = params.nodes[0] as string | number
+        const node = nodes.value.get(nodeId) as VisNode | null
         if (node) {
           // 触发外部事件
           // 由父组件处理
@@ -504,9 +502,10 @@ export function useFaultTreeEditor(treeId: number) {
         const positions = network.value!.getPositions(params.nodes)
         const updates: VisNode[] = []
 
-        params.nodes.forEach((nodeId: string | number) => {
-          const pos = positions[nodeId]
-          const node = nodes.value.get(nodeId) as VisNode | null
+        params.nodes.forEach(nodeId => {
+          const id = nodeId as string | number
+          const pos = positions[String(id)]
+          const node = nodes.value.get(id) as VisNode | null
           if (node && pos) {
             updates.push({ ...node, x: pos.x, y: pos.y } as VisNode)
           }

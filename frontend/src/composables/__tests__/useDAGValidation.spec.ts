@@ -4,19 +4,19 @@
  */
 
 import { describe, it, expect, beforeEach } from 'vitest'
-import { ref } from 'vue'
+import { shallowRef } from 'vue'
 import { DataSet } from 'vis-data'
 import { useDAGValidation } from '@/composables/useDAGValidation'
 import type { VisNode, VisEdge } from '@/types/fault-tree'
 
 describe('useDAGValidation', () => {
-  let nodes: ReturnType<typeof ref<DataSet<VisNode>>>
-  let edges: ReturnType<typeof ref<DataSet<VisEdge>>>
+  let nodes: ReturnType<typeof shallowRef<DataSet<VisNode>>>
+  let edges: ReturnType<typeof shallowRef<DataSet<VisEdge>>>
   let validation: ReturnType<typeof useDAGValidation>
 
   beforeEach(() => {
-    nodes = ref(new DataSet([])) as unknown as ReturnType<typeof ref<DataSet<VisNode>>>
-    edges = ref(new DataSet([])) as unknown as ReturnType<typeof ref<DataSet<VisEdge>>>
+    nodes = shallowRef(new DataSet([]))
+    edges = shallowRef(new DataSet([]))
     validation = useDAGValidation(nodes, edges)
   })
 

@@ -250,7 +250,7 @@ async function mapTempIdsToRealIds(
     }
   })
 
-  const idMapping = new Map<string | number, number>()
+  const idMapping = new Map<string | number, string | number>()
   const nodesToRemove: (string | number)[] = []
   const nodesToAdd: VisNode[] = []
 

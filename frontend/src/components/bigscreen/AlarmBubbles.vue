@@ -21,6 +21,7 @@ const ALARM_COLORS = {
   critical: '#ff3300',
   major: '#ff6600',
   minor: '#ffcc00',
+  warning: '#ffcc00',
   info: '#00ccff'
 }
 
@@ -139,7 +140,7 @@ function updateBubbles() {
   if (!scene?.value) return
 
   // 移除已解除的告警
-  const activeAlarmIds = new Set(store.activeAlarms.map(a => a.id))
+  const activeAlarmIds = new Set<number | string>(store.activeAlarms.map(a => a.id))
   bubbleMap.forEach((bubble, alarmId) => {
     if (!activeAlarmIds.has(Number(alarmId))) {
       scene.value!.remove(bubble)

@@ -1,27 +1,37 @@
 import { test, expect, type Page } from '@playwright/test'
+import fs from 'fs'
+import path from 'path'
 
 /**
  * Story 1-1: 用户管理页面 E2E 测试
  * 认证状态由 auth.setup.ts 注入，无需重复登录
  */
 
-const ADMIN_USER = 'admin'
-const ADMIN_PASS = 'admin123'
+const authFile = path.join(__dirname, '.auth', 'admin.json')
+const appOrigin = 'http://127.0.0.1:3000'
 
 async function navigateToUserManagement(page: Page) {
-  await page.goto('/settings')
-  await page.waitForLoadState('networkidle')
-  await page.locator('.el-tabs__item').filter({ hasText: '用户管理' }).click()
-  await page.waitForSelector('.user-management', { timeout: 5000 })
-  await page.waitForTimeout(1000)
+  await page.goto('/system/settings', { waitUntil: 'domcontentloaded' })
+  await expect(page).toHaveURL(/\/system\/settings/)
+  const userTab = page.getByRole('tab', { name: '用户管理' })
+  await expect(userTab).toBeVisible({ timeout: 15000 })
+  await userTab.click()
+  await expect(page.locator('.user-management')).toBeVisible({ timeout: 10000 })
+  await expect(page.locator('.user-management .el-table')).toBeVisible({ timeout: 10000 })
 }
 
-// 通过 API 获取 admin token（不走浏览器登录，不触发限流计数）
-async function getAdminToken(page: Page): Promise<string> {
-  const res = await page.request.post('/api/v1/auth/login', {
-    form: { username: ADMIN_USER, password: ADMIN_PASS }
-  })
-  return (await res.json()).access_token
+// 复用 auth.setup.ts 写入的 admin token，避免额外登录挤掉 setup 会话。
+function getAdminTokenFromStorageState(): string {
+  const storage = JSON.parse(fs.readFileSync(authFile, 'utf-8')) as {
+    origins?: Array<{ origin: string; localStorage?: Array<{ name: string; value: string }> }>
+  }
+  const token = storage.origins
+    ?.flatMap(item => item.localStorage ?? [])
+    .find(item => item.name === 'token')?.value
+  if (!token) {
+    throw new Error(`未在 ${authFile} 中找到 admin token，请先运行 auth.setup.ts`)
+  }
+  return token
 }
 
 test.describe('Story 1-1: 用户管理页面', () => {
@@ -125,7 +135,7 @@ test.describe('Story 1-1: 用户管理页面', () => {
   // AC #5: 重置密码（用临时用户测试，不动 admin 密码）
   test('AC5: 重置用户密码', async ({ page }) => {
     // 通过 API 创建临时用户
-    const token = await getAdminToken(page)
+    const token = getAdminTokenFromStorageState()
     const tempUser = `pwd_test_${Date.now()}`
     await page.request.post('/api/v1/users', {
       headers: { Authorization: `Bearer ${token}` },
@@ -187,7 +197,7 @@ test.describe('Story 1-1: 用户管理页面', () => {
   // AC #8: 非 admin 看不到用户管理 tab（通过 API 创建用户 + 新 context 登录）
   test('AC8: 非admin用户看不到用户管理tab', async ({ page, browser }) => {
     // 通过 API 创建 operator 用户
-    const token = await getAdminToken(page)
+    const token = getAdminTokenFromStorageState()
     const testUser = `op_ac8_${Date.now()}`
     await page.request.post('/api/v1/users', {
       headers: { Authorization: `Bearer ${token}` },
@@ -197,14 +207,14 @@ test.describe('Story 1-1: 用户管理页面', () => {
     // 用全新 context（无 admin 认证状态）登录 operator
     const ctx = await browser.newContext()
     const opPage = await ctx.newPage()
-    await opPage.goto('http://localhost:3000/login')
+    await opPage.goto(`${appOrigin}/login`)
     await opPage.waitForLoadState('networkidle')
     await opPage.locator('input').first().fill(testUser)
     await opPage.locator('input[type="password"]').fill('Test@12345')
     await opPage.locator('button').filter({ hasText: '登' }).click()
     await opPage.waitForURL('**/dashboard', { timeout: 15000 })
 
-    await opPage.goto('http://localhost:3000/settings')
+    await opPage.goto(`${appOrigin}/settings`)
     await opPage.waitForLoadState('networkidle')
     await opPage.waitForTimeout(1000)
 

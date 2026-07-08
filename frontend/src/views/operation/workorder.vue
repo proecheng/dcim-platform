@@ -867,7 +867,7 @@ async function showDetailDialog(row: WorkOrder) {
     if (res.data) {
       currentOrderApprovals.value = Array.isArray(res.data) ? res.data : (res.data as any).items || []
     }
-  } catch (e) {
+  } catch {
     currentOrderApprovals.value = []
   }
 }
@@ -1029,7 +1029,7 @@ async function toggleRuleEnabled(row: AlarmWorkOrderRule) {
   try {
     await updateAlarmWorkOrderRule(row.id, { is_enabled: row.is_enabled })
     ElMessage.success(row.is_enabled ? '已启用' : '已禁用')
-  } catch (e) {
+  } catch {
     row.is_enabled = !row.is_enabled
     ElMessage.error('操作失败')
   }
@@ -1042,7 +1042,7 @@ function confirmDeleteRule(row: AlarmWorkOrderRule) {
         await deleteAlarmWorkOrderRule(row.id)
         ElMessage.success('删除成功')
         loadAlarmRules()
-      } catch (e) {
+      } catch {
         ElMessage.error('删除失败')
       }
     }).catch(() => {})

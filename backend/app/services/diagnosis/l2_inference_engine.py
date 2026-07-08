@@ -61,8 +61,8 @@ async def get_point_latest_value(point_id: int, time_window: int) -> Optional[fl
             result = await db.execute(
                 select(PointHistory.value)
                 .where(PointHistory.point_id == point_id)
-                .where(PointHistory.timestamp >= cutoff_time)
-                .order_by(desc(PointHistory.timestamp))
+                .where(PointHistory.recorded_at >= cutoff_time)
+                .order_by(desc(PointHistory.recorded_at))
                 .limit(1)
             )
             row = result.scalar_one_or_none()

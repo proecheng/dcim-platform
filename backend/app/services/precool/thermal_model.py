@@ -267,12 +267,17 @@ class ThermalModel:
         # 1. 获取 IT 热负荷 Q_IT
         # 路径：CoolingZone → CoolingZoneCabinet → CabinetITLoad → Point → PointHistory
         q_it_query = (
-            select(PointHistory.timestamp, PointHistory.value)
+            select(PointHistory.recorded_at, PointHistory.value)
             .join(Point, PointHistory.point_id == Point.id)
             .join(CabinetITLoad, Point.id == CabinetITLoad.power_point_id)
             .join(CoolingZoneCabinet, CabinetITLoad.cabinet_id == CoolingZoneCabinet.cabinet_id)
-            .where(and_(CoolingZoneCabinet.cooling_zone_id == zone_id, PointHistory.timestamp >= start_time))
-            .order_by(PointHistory.timestamp.desc())
+            .where(
+                and_(
+                    CoolingZoneCabinet.zone_id == zone_id,
+                    PointHistory.recorded_at >= start_time
+                )
+            )
+            .order_by(PointHistory.recorded_at.desc())
         )
 
         q_it_result = await session.execute(q_it_query)
@@ -296,19 +301,19 @@ class ThermalModel:
         # 2. 获取等效环境温度 T_ambient（精密空调回风温度）
         # 路径：CoolingZone → CoolingZoneUnit → CoolingUnit → Device → Point → PointHistory
         t_ambient_query = (
-            select(PointHistory.timestamp, PointHistory.value)
+            select(PointHistory.recorded_at, PointHistory.value)
             .join(Point, PointHistory.point_id == Point.id)
             .join(Device, Point.device_id == Device.id)
             .join(CoolingUnit, Device.id == CoolingUnit.device_id)
             .join(CoolingZoneUnit, CoolingUnit.id == CoolingZoneUnit.cooling_unit_id)
             .where(
                 and_(
-                    CoolingZoneUnit.cooling_zone_id == zone_id,
-                    Point.point_code.like("%_return_temp"),
-                    PointHistory.timestamp >= start_time,
+                    CoolingZoneUnit.zone_id == zone_id,
+                    Point.point_code.like('%_return_temp'),
+                    PointHistory.recorded_at >= start_time
                 )
             )
-            .order_by(PointHistory.timestamp.desc())
+            .order_by(PointHistory.recorded_at.desc())
         )
 
         t_ambient_result = await session.execute(t_ambient_query)
@@ -330,18 +335,18 @@ class ThermalModel:
         # 路径：CoolingZone → CoolingZoneCabinet → CabinetTemperatureSensor(inlet) → Point → PointHistory
         # 聚合策略：取最大值（保守估计安全裕度）
         t_current_query = (
-            select(PointHistory.timestamp, PointHistory.value)
+            select(PointHistory.recorded_at, PointHistory.value)
             .join(Point, PointHistory.point_id == Point.id)
             .join(CabinetTemperatureSensor, Point.id == CabinetTemperatureSensor.point_id)
             .join(CoolingZoneCabinet, CabinetTemperatureSensor.cabinet_id == CoolingZoneCabinet.cabinet_id)
             .where(
                 and_(
-                    CoolingZoneCabinet.cooling_zone_id == zone_id,
-                    CabinetTemperatureSensor.sensor_location == "inlet",
-                    PointHistory.timestamp >= now - timedelta(minutes=5),
+                    CoolingZoneCabinet.zone_id == zone_id,
+                    CabinetTemperatureSensor.sensor_location == 'inlet',
+                    PointHistory.recorded_at >= now - timedelta(minutes=5)
                 )
             )
-            .order_by(PointHistory.timestamp.desc())
+            .order_by(PointHistory.recorded_at.desc())
         )
 
         t_current_result = await session.execute(t_current_query)
@@ -362,12 +367,12 @@ class ThermalModel:
             .join(CoolingZoneCabinet, CabinetTemperatureSensor.cabinet_id == CoolingZoneCabinet.cabinet_id)
             .where(
                 and_(
-                    CoolingZoneCabinet.cooling_zone_id == zone_id,
-                    CabinetTemperatureSensor.sensor_location == "outlet",
-                    PointHistory.timestamp >= now - timedelta(minutes=5),
+                    CoolingZoneCabinet.zone_id == zone_id,
+                    CabinetTemperatureSensor.sensor_location == 'outlet',
+                    PointHistory.recorded_at >= now - timedelta(minutes=5)
                 )
             )
-            .order_by(PointHistory.timestamp.desc())
+            .order_by(PointHistory.recorded_at.desc())
             .limit(10)
         )
 
@@ -391,13 +396,13 @@ class ThermalModel:
             .join(CoolingZoneUnit, CoolingUnit.id == CoolingZoneUnit.cooling_unit_id)
             .where(
                 and_(
-                    CoolingZoneUnit.cooling_zone_id == zone_id,
-                    Point.point_code.like("%_ambient_temp"),
-                    Device.device_type == "AC",  # 精密空调设备
-                    PointHistory.timestamp >= now - timedelta(minutes=5),
+                    CoolingZoneUnit.zone_id == zone_id,
+                    Point.point_code.like('%_ambient_temp'),
+                    Device.device_type == 'AC',  # 精密空调设备
+                    PointHistory.recorded_at >= now - timedelta(minutes=5)
                 )
             )
-            .order_by(PointHistory.timestamp.desc())
+            .order_by(PointHistory.recorded_at.desc())
             .limit(10)
         )
 
@@ -663,11 +668,14 @@ class ThermalModel:
         from sqlalchemy import func
 
         query = (
-            select(func.max(PointHistory.timestamp))
+            select(func.max(PointHistory.recorded_at))
             .join(Point, PointHistory.point_id == Point.id)
             .join(CabinetTemperatureSensor, Point.id == CabinetTemperatureSensor.point_id)
             .join(CoolingZoneCabinet, CabinetTemperatureSensor.cabinet_id == CoolingZoneCabinet.cabinet_id)
-            .where(CoolingZoneCabinet.cooling_zone_id == zone_id, CabinetTemperatureSensor.sensor_location == "inlet")
+            .where(
+                CoolingZoneCabinet.zone_id == zone_id,
+                CabinetTemperatureSensor.sensor_location == 'inlet'
+            )
         )
 
         result = await session.execute(query)
@@ -678,11 +686,11 @@ class ThermalModel:
         from sqlalchemy import func
 
         query = (
-            select(func.max(PointHistory.timestamp))
+            select(func.max(PointHistory.recorded_at))
             .join(Point, PointHistory.point_id == Point.id)
             .join(CabinetITLoad, Point.id == CabinetITLoad.power_point_id)
             .join(CoolingZoneCabinet, CabinetITLoad.cabinet_id == CoolingZoneCabinet.cabinet_id)
-            .where(CoolingZoneCabinet.cooling_zone_id == zone_id)
+            .where(CoolingZoneCabinet.zone_id == zone_id)
         )
 
         result = await session.execute(query)
@@ -695,7 +703,7 @@ class ThermalModel:
         query = (
             select(func.sum(CabinetITLoad.rated_power_kw))
             .join(CoolingZoneCabinet, CabinetITLoad.cabinet_id == CoolingZoneCabinet.cabinet_id)
-            .where(CoolingZoneCabinet.cooling_zone_id == zone_id)
+            .where(CoolingZoneCabinet.zone_id == zone_id)
         )
 
         result = await session.execute(query)
@@ -723,12 +731,12 @@ class ThermalModel:
             .join(CoolingZoneUnit, CoolingUnit.id == CoolingZoneUnit.cooling_unit_id)
             .where(
                 and_(
-                    CoolingZoneUnit.cooling_zone_id == zone_id,
-                    Point.point_code.like("%_power"),
-                    PointHistory.timestamp >= now - timedelta(minutes=5),
+                    CoolingZoneUnit.zone_id == zone_id,
+                    Point.point_code.like('%_power'),
+                    PointHistory.recorded_at >= now - timedelta(minutes=5)
                 )
             )
-            .order_by(PointHistory.timestamp.desc())
+            .order_by(PointHistory.recorded_at.desc())
             .limit(10)
         )
 

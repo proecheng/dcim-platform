@@ -258,11 +258,116 @@ class ShiftOpportunityDetail(ShiftOpportunityResponse):
     risk_assessment: Optional[Dict[str, Any]] = None
 
 
+class ShiftOpportunityPayload(BaseModel):
+    """Frontend opportunity contract - 前端机会接口契约"""
+    id: int
+    opportunity_code: str
+    opportunity_name: str
+    recommended_date: Optional[date] = None
+    analysis_date: Optional[date] = None
+    analysis_period: Optional[str] = None
+    shift_from_period: Optional[str] = None
+    shift_to_period: Optional[str] = None
+    recommended_shift_from: Optional[str] = None
+    recommended_shift_to: Optional[str] = None
+    recommended_shift_power: Optional[float] = None
+    recommended_devices: List[Any] = Field(default_factory=list)
+    estimated_cost_saving: Optional[float] = None
+    estimated_energy_saving: Optional[float] = None
+    predicted_cost_saving: Optional[float] = None
+    predicted_energy_saving: Optional[float] = None
+    confidence_score: Optional[float] = None
+    analysis_data: Dict[str, Any] = Field(default_factory=dict)
+    reason: Optional[str] = None
+    status: str
+    priority: str
+    converted_plan_id: Optional[int] = None
+    converted_to_plan_id: Optional[int] = None
+    converted_at: Optional[datetime] = None
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+
+class ShiftOpportunityAnalyzeResponse(BaseModel):
+    """Opportunity analysis response - 机会分析响应"""
+    analysis_date: date
+    opportunities_found: int
+    opportunities: List[ShiftOpportunityPayload] = Field(default_factory=list)
+
+
 class ConvertOpportunityRequest(BaseModel):
     """Convert opportunity to plan - 转换机会为计划"""
 
     plan_name: str = Field(..., description="计划名称")
     description: Optional[str] = Field(None, description="计划描述")
+
+
+class ShiftExecutionPayload(BaseModel):
+    """Frontend execution contract - 前端执行记录接口契约"""
+    id: int
+    execution_code: str
+    plan_id: int
+    plan_name: Optional[str] = None
+    status: str
+    execution_status: str
+    start_time: Optional[datetime] = None
+    end_time: Optional[datetime] = None
+    duration_minutes: Optional[int] = None
+    duration: int
+    target_shift_power: Optional[float] = None
+    expected_cost_saving: Optional[float] = None
+    expected_energy_saving: Optional[float] = None
+    before_power: Optional[float] = None
+    after_power: Optional[float] = None
+    before_total_power: Optional[float] = None
+    after_total_power: Optional[float] = None
+    actual_shift_power: Optional[float] = None
+    actual_cost_saving: Optional[float] = None
+    actual_energy_saving: Optional[float] = None
+    success_rate: Optional[float] = None
+    device_execution_details: List[Any] = Field(default_factory=list)
+    device_execution_list: List[Any] = Field(default_factory=list)
+    device_executions: List[Any] = Field(default_factory=list)
+    cooling_linkage_data: Optional[Dict[str, Any]] = None
+    cooling_linkage: Optional[Dict[str, Any]] = None
+    error_message: Optional[str] = None
+    failure_reason: Optional[str] = None
+    error_details: Optional[Dict[str, Any]] = None
+    executed_by: Optional[int] = None
+    executor_name: Optional[str] = None
+    notes: Optional[str] = None
+    created_at: Optional[datetime] = None
+
+
+class ShiftExecutionListResponse(BaseModel):
+    """Paginated execution list response - 执行记录分页响应"""
+    data: List[ShiftExecutionPayload] = Field(default_factory=list)
+    total: int
+    skip: int
+    limit: int
+
+
+class ShiftExecutionDetailResponse(BaseModel):
+    """Execution detail response - 执行详情响应"""
+    data: ShiftExecutionPayload
+
+
+class ShiftExecutionRealtimePayload(BaseModel):
+    """Execution realtime payload - 执行实时数据"""
+    execution_id: int
+    execution_code: str
+    status: str
+    target_power: float
+    actual_power: float
+    completion_rate: float
+    device_status: List[Any] = Field(default_factory=list)
+    alarms: List[Dict[str, Any]] = Field(default_factory=list)
+    timestamp: datetime
+
+
+class ShiftExecutionRealtimeResponse(BaseModel):
+    """Execution realtime response - 执行实时响应"""
+    data: ShiftExecutionRealtimePayload
 
 
 # ========== Shift Constraint Schemas ==========

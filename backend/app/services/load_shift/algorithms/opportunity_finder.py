@@ -13,7 +13,6 @@ from app.models.load_shift import ShiftOpportunity
 from app.models.energy import PowerDevice
 from app.models.history import PointHistory
 
-
 class OpportunityFinder:
     """
     转移机会发现器
@@ -187,6 +186,7 @@ class OpportunityFinder:
             shift_pair["price_diff"],
             duration_hours=4,  # 假设转移 4 小时
         )
+        predicted_energy_saving = shift_pair["recommended_power"] * 4
 
         # 计算置信度
         confidence = self._calculate_confidence_score(lookback_days, len(recommended_devices))
@@ -201,11 +201,13 @@ class OpportunityFinder:
         opportunity = ShiftOpportunity(
             opportunity_code=opportunity_code,
             opportunity_name=f"{shift_pair['from_period']}→{shift_pair['to_period']} 转移机会",
-            analysis_date=analysis_date,
+            recommended_date=analysis_date,
+            analysis_period=shift_pair["from_period"],
             recommended_shift_from=shift_pair["from_period"],
             recommended_shift_to=shift_pair["to_period"],
             recommended_shift_power=shift_pair["recommended_power"],
             estimated_cost_saving=predicted_saving,
+            estimated_energy_saving=predicted_energy_saving,
             confidence_score=confidence,
             status="pending",
             priority=self._determine_priority(predicted_saving, confidence),

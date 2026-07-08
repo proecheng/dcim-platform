@@ -23,8 +23,7 @@ from ..models.topology_config import CoolingZoneUnit, CoolingZoneCabinet, Cabine
 
 # 尝试导入 Story 29.1 和 29.2 的依赖
 try:
-    from ..models.precool import ThermalParameter
-
+    from ..models.thermal import ThermalParameter
     _thermal_parameter_available = True
 except ImportError:
     _thermal_parameter_available = False
@@ -39,8 +38,7 @@ except ImportError:
     logging.error("ThermalModel not available - Story 29.2 may not be completed")
 
 try:
-    from ..models.system_config import SystemConfig
-
+    from ..models.config import SystemConfig
     _system_config_available = True
 except ImportError:
     _system_config_available = False
@@ -696,6 +694,9 @@ async def calculate_shiftable_power_for_zone(zone_id: int, session: AsyncSession
     if not _system_config_available:
         return {"error": "system_config_missing", "zone_id": zone_id, "details": "SystemConfig table not available"}
 
+    if session is None:
+        return {"error": "session_missing", "zone_id": zone_id, "details": "AsyncSession is required"}
+
     # Story 30.1: 前置约束检查（ASHRAE 温度 + 温变速率）
     try:
         from app.services.precool.constraints import check_all_constraints
@@ -805,8 +806,8 @@ async def _get_zone_supply_temperature(zone_id: int, session: AsyncSession) -> f
         select(CoolingUnit, Point)
         .join(CoolingZoneUnit, CoolingZoneUnit.cooling_unit_id == CoolingUnit.id)
         .join(Point, Point.device_code == CoolingUnit.device_code)
-        .where(CoolingZoneUnit.cooling_zone_id == zone_id)
-        .where(Point.point_code.like("%_supply_temp"))
+        .where(CoolingZoneUnit.zone_id == zone_id)
+        .where(Point.point_code.like('%_supply_temp'))
     )
 
     result = await session.execute(query)
@@ -826,8 +827,8 @@ async def _get_zone_supply_temperature(zone_id: int, session: AsyncSession) -> f
         history_query = (
             select(PointHistory.value)
             .where(PointHistory.point_id == point.id)
-            .where(PointHistory.timestamp >= five_min_ago)
-            .order_by(PointHistory.timestamp.desc())
+            .where(PointHistory.recorded_at >= five_min_ago)
+            .order_by(PointHistory.recorded_at.desc())
         )
 
         history_result = await session.execute(history_query)
@@ -861,15 +862,15 @@ async def _calculate_temperature_rise_rate(zone_id: int, session: AsyncSession) 
 
     # 获取该区域所有机柜的进风温度传感器
     query = (
-        select(PointHistory.timestamp, PointHistory.value)
+        select(PointHistory.recorded_at, PointHistory.value)
         .join(Point, Point.id == PointHistory.point_id)
         .join(CabinetTemperatureSensor, CabinetTemperatureSensor.point_id == Point.id)
         .join(Cabinet, Cabinet.id == CabinetTemperatureSensor.cabinet_id)
         .join(CoolingZoneCabinet, CoolingZoneCabinet.cabinet_id == Cabinet.id)
-        .where(CoolingZoneCabinet.cooling_zone_id == zone_id)
-        .where(CabinetTemperatureSensor.sensor_location == "inlet")
-        .where(PointHistory.timestamp >= one_hour_ago)
-        .order_by(PointHistory.timestamp)
+        .where(CoolingZoneCabinet.zone_id == zone_id)
+        .where(CabinetTemperatureSensor.sensor_location == 'inlet')
+        .where(PointHistory.recorded_at >= one_hour_ago)
+        .order_by(PointHistory.recorded_at)
     )
 
     result = await session.execute(query)
@@ -976,9 +977,9 @@ async def _calculate_shiftable_power_thm(zone_id: int, session: AsyncSession) ->
         .join(CabinetTemperatureSensor, CabinetTemperatureSensor.point_id == Point.id)
         .join(Cabinet, Cabinet.id == CabinetTemperatureSensor.cabinet_id)
         .join(CoolingZoneCabinet, CoolingZoneCabinet.cabinet_id == Cabinet.id)
-        .where(CoolingZoneCabinet.cooling_zone_id == zone_id)
-        .where(CabinetTemperatureSensor.sensor_location == "inlet")
-        .where(PointHistory.timestamp >= five_min_ago)
+        .where(CoolingZoneCabinet.zone_id == zone_id)
+        .where(CabinetTemperatureSensor.sensor_location == 'inlet')
+        .where(PointHistory.recorded_at >= five_min_ago)
     )
 
     result = await session.execute(query)
@@ -987,13 +988,13 @@ async def _calculate_shiftable_power_thm(zone_id: int, session: AsyncSession) ->
     if T_current_max is None:
         # 检查是否有历史数据
         history_check_query = (
-            select(func.max(PointHistory.timestamp))
+            select(func.max(PointHistory.recorded_at))
             .join(Point, Point.id == PointHistory.point_id)
             .join(CabinetTemperatureSensor, CabinetTemperatureSensor.point_id == Point.id)
             .join(Cabinet, Cabinet.id == CabinetTemperatureSensor.cabinet_id)
             .join(CoolingZoneCabinet, CoolingZoneCabinet.cabinet_id == Cabinet.id)
-            .where(CoolingZoneCabinet.cooling_zone_id == zone_id)
-            .where(CabinetTemperatureSensor.sensor_location == "inlet")
+            .where(CoolingZoneCabinet.zone_id == zone_id)
+            .where(CabinetTemperatureSensor.sensor_location == 'inlet')
         )
 
         last_timestamp_result = await session.execute(history_check_query)
@@ -1137,9 +1138,9 @@ async def _calculate_shiftable_power_tcl(zone_id: int, session: AsyncSession) ->
         .join(CabinetTemperatureSensor, CabinetTemperatureSensor.point_id == Point.id)
         .join(Cabinet, Cabinet.id == CabinetTemperatureSensor.cabinet_id)
         .join(CoolingZoneCabinet, CoolingZoneCabinet.cabinet_id == Cabinet.id)
-        .where(CoolingZoneCabinet.cooling_zone_id == zone_id)
-        .where(CabinetTemperatureSensor.sensor_location == "inlet")
-        .where(PointHistory.timestamp >= five_min_ago)
+        .where(CoolingZoneCabinet.zone_id == zone_id)
+        .where(CabinetTemperatureSensor.sensor_location == 'inlet')
+        .where(PointHistory.recorded_at >= five_min_ago)
     )
 
     result = await session.execute(query)

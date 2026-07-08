@@ -48,7 +48,7 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import { useBigscreenStore } from '@/stores/bigscreen'
 import { DraggablePanel } from '@/components/bigscreen/ui'
-import { getFloors, getFloorMap, type FloorInfo, type FloorMapData } from '@/api/modules/floorMap'
+import { getFloors, getFloorMap, type FloorInfo } from '@/api/modules/floorMap'
 
 const props = defineProps<{
   modelValue?: string

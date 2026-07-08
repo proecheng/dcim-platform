@@ -181,7 +181,6 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, watch, type ShallowRef } from 'vue'
-import { useRouter } from 'vue-router'
 import { ArrowDown, FullScreen, Bell, Loading, VideoPlay, VideoPause, Back } from '@element-plus/icons-vue'
 import * as THREE from 'three'
 import type { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
@@ -218,7 +217,6 @@ import type { SceneMode } from '@/types/bigscreen'
 
 const store = useBigscreenStore()
 const siteStore = useSiteStore()
-const router = useRouter()
 const threeSceneRef = ref<InstanceType<typeof ThreeScene> | null>(null)
 const isSceneReady = ref(false)
 
@@ -229,7 +227,7 @@ const floorMapData2D = ref<MapData2D | null>(null)
 const floor3DActive = ref(false)
 
 // 屏幕自适应
-const screenAdapt = useScreenAdapt({
+const _screenAdapt = useScreenAdapt({
   designWidth: 1920,
   designHeight: 1080
 })
@@ -241,7 +239,7 @@ const entranceAnimation = useEntranceAnimation({
 })
 
 // 主题管理
-const { currentThemeName, setTheme } = useTheme()
+const { currentThemeName: _currentThemeName, setTheme: _setTheme } = useTheme()
 
 // 历史数据弹窗状态
 const historyDialogVisible = ref(false)
@@ -289,7 +287,7 @@ const bigscreenData = useBigscreenData({
 })
 
 // 最后更新时间
-const lastUpdateTime = computed(() => {
+const _lastUpdateTime = computed(() => {
   if (!bigscreenData.lastUpdate.value) return '--'
   return bigscreenData.lastUpdate.value.toLocaleTimeString('zh-CN')
 })
@@ -542,7 +540,7 @@ onMounted(() => {
   siteStore.fetchSites()
 
   // 初始化键盘快捷键
-  const keyboardShortcuts = useKeyboardShortcuts({
+  const _keyboardShortcuts = useKeyboardShortcuts({
     onCameraPreset: (preset) => setCamera(preset),
     onToggleFullscreen: toggleFullscreen,
     onToggleTour: handleToggleTour,

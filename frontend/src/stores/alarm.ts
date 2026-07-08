@@ -41,6 +41,7 @@ export const useAlarmStore = defineStore('alarm', () => {
     total: 0
   })
   const loading = ref(false)
+  const soundEnabled = ref(localStorage.getItem('alarm_sound_enabled') !== 'false')
 
   // Story 27.6: 版本号模式防竞态（替代 AbortController，因 API 函数不接受 signal）
   let fetchVersion = 0
@@ -108,11 +109,9 @@ export const useAlarmStore = defineStore('alarm', () => {
     }
   }
 
-  // 告警声音控制
-  const soundEnabled = ref(true)
-
   function toggleSound() {
     soundEnabled.value = !soundEnabled.value
+    localStorage.setItem('alarm_sound_enabled', String(soundEnabled.value))
   }
 
   return {

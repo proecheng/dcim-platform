@@ -99,13 +99,18 @@
 import { ref, onMounted, onUnmounted, computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { getExecutionDetail, getExecutionRealtime } from '@/api/modules/shift'
+import {
+  getExecutionDetail,
+  getExecutionRealtime,
+  type ShiftExecution,
+  type ShiftExecutionRealtimePayload
+} from '@/api/modules/shift'
 import * as echarts from 'echarts'
 
 const route = useRoute()
 const loading = ref(false)
-const execution = ref<any>({})
-const realtimeData = ref<any>({})
+const execution = ref<Partial<ShiftExecution>>({})
+const realtimeData = ref<Partial<ShiftExecutionRealtimePayload>>({})
 const deviceStatus = ref<any[]>([])
 const alarms = ref<any[]>([])
 const chartRef = ref<HTMLElement>()
@@ -207,7 +212,7 @@ const initChart = () => {
   chartInstance.value.setOption(option)
 }
 
-const updateChart = (data: any) => {
+const updateChart = (data: ShiftExecutionRealtimePayload) => {
   if (!chartInstance.value) return
   const now = new Date()
   const targetData = chartInstance.value.getOption().series[0].data || []
@@ -254,8 +259,10 @@ const stopAutoRefresh = () => {
   }
 }
 
-const getDeviceStatusType = (status: string): 'info' | 'warning' | 'success' | 'danger' => {
-  const map: Record<string, 'info' | 'warning' | 'success' | 'danger'> = {
+type TagType = 'primary' | 'success' | 'info' | 'warning' | 'danger'
+
+const getDeviceStatusType = (status: string): TagType => {
+  const map: Record<string, TagType> = {
     pending: 'info',
     running: 'warning',
     completed: 'success',

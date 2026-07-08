@@ -240,8 +240,7 @@ const runConstraintPreview = async () => {
 const loadPlan = async () => {
   try {
     const id = Number(route.params.id)
-    const res = await getShiftPlan(id)
-    const plan = res.data || {}
+    const plan = await getShiftPlan(id)
     Object.assign(form, {
       plan_name: plan.plan_name,
       shift_date: plan.shift_date,

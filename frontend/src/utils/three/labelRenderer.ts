@@ -1,5 +1,4 @@
 // frontend/src/utils/three/labelRenderer.ts
-import * as THREE from 'three'
 import { CSS2DRenderer, CSS2DObject } from 'three/examples/jsm/renderers/CSS2DRenderer.js'
 
 // 创建 CSS2D 渲染器

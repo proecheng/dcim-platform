@@ -10,7 +10,6 @@ import {
   getRecoveries,
   type LinkagePolicy,
   type LinkageExecution,
-  type LinkageLog,
   type LinkageRecovery,
 } from '@/api/modules/linkage'
 

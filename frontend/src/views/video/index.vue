@@ -371,7 +371,7 @@ const nvrOptions = ref<NVRItem[]>([])
 
 async function loadNvrOptions() {
   try {
-    const res = await getNVRList({ page: 1, page_size: 200 })
+    const res = await getNVRList({ page: 1, page_size: 100 })
     nvrOptions.value = res.items || []
   } catch { /* 静默 */ }
 }

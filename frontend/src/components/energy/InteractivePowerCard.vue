@@ -51,7 +51,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useRouter } from 'vue-router'
-import { InfoFilled, Top, Bottom, Minus } from '@element-plus/icons-vue'
+import { InfoFilled, Top, Bottom } from '@element-plus/icons-vue'
 import Sparkline from '@/components/charts/Sparkline.vue'
 
 interface DetailItem {

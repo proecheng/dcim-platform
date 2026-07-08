@@ -5,7 +5,7 @@
  * composable 负责 WS 订阅、轮询、生命周期管理。
  * Story 27.5: WebSocket 连接管理统一到 useWebSocketManager
  */
-import { computed, onMounted, onUnmounted, watch } from 'vue'
+import { onMounted, onUnmounted } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useWebSocketManager } from './useWebSocketManager'
 import { useRealtimeStore, type RealtimeData } from '@/stores/realtime'

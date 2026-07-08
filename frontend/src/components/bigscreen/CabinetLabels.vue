@@ -6,7 +6,7 @@
 </template>
 
 <script setup lang="ts">
-import { inject, watch, onMounted, onUnmounted, shallowRef, type ShallowRef } from 'vue'
+import { inject, watch, onMounted, onUnmounted, type ShallowRef } from 'vue'
 import * as THREE from 'three'
 import { CSS2DObject } from 'three/examples/jsm/renderers/CSS2DRenderer.js'
 import { useBigscreenStore } from '@/stores/bigscreen'
@@ -35,11 +35,7 @@ function createLabel(cabinetId: string, name: string, power: number, position: T
 }
 
 // 更新标签内容 - 紧凑型设计，使用安全的DOM操作防止XSS
-function updateLabelDiv(div: HTMLDivElement, name: string, power: number) {
-  // 提取机柜编号（如 A-01 从 "A区1号柜" 中提取）
-  const shortName = name.match(/([A-Z])[区]?(\d+)/i)
-  const displayName = shortName ? `${shortName[1]}${shortName[2]}` : name.slice(0, 4)
-
+function updateLabelDiv(div: HTMLDivElement, _name: string, power: number) {
   // 清空现有内容
   div.innerHTML = ''
 

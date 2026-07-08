@@ -360,8 +360,10 @@ const getTempColor = (temp: number, type: 'supply' | 'return') => {
   return '#67C23A'
 }
 
-const getEventTypeColor = (type: string): 'primary' | 'danger' | 'success' | 'warning' | 'info' => {
-  const map: Record<string, 'primary' | 'danger' | 'success' | 'warning' | 'info'> = {
+type TagType = 'primary' | 'success' | 'info' | 'warning' | 'danger'
+
+const getEventTypeColor = (type: string): TagType => {
+  const map: Record<string, TagType> = {
     adjust: 'primary',
     alarm: 'danger',
     recovery: 'success',

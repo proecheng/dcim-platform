@@ -1,11 +1,179 @@
 import request from '@/utils/request'
 
+export type ShiftPeriod = 'peak' | 'sharp' | 'flat' | 'valley'
+export type ShiftPlanStatus =
+  | 'draft'
+  | 'pending_approval'
+  | 'approved'
+  | 'rejected'
+  | 'executing'
+  | 'completed'
+  | 'failed'
+  | 'cancelled'
+
+export interface ShiftPlan {
+  id: number
+  plan_code: string
+  plan_name: string
+  shift_from_period: ShiftPeriod
+  shift_to_period: ShiftPeriod
+  shift_date: string
+  start_time: string
+  end_time: string
+  target_shift_power: number
+  selected_devices: any[]
+  constraints?: Record<string, unknown> | null
+  expected_cost_saving?: number | null
+  expected_energy_saving?: number | null
+  description?: string | null
+  status: ShiftPlanStatus
+  approval_status: string
+  execution_status: string
+  actual_shift_power?: number | null
+  actual_cost_saving?: number | null
+  actual_energy_saving?: number | null
+  created_by: number
+  created_at: string
+  updated_at: string
+  approved_by?: number | null
+  approved_at?: string | null
+  approval_comment?: string | null
+  executed_at?: string | null
+  completed_at?: string | null
+}
+
+export interface ShiftPlanQuery {
+  skip?: number
+  limit?: number
+  status?: ShiftPlanStatus | string
+  shift_date_from?: string
+  shift_date_to?: string
+}
+
+export interface ShiftOpportunity {
+  id: number
+  opportunity_code: string
+  opportunity_name: string
+  recommended_date?: string | null
+  analysis_date?: string | null
+  analysis_period?: string | null
+  shift_from_period?: string | null
+  shift_to_period?: string | null
+  recommended_shift_from?: string | null
+  recommended_shift_to?: string | null
+  recommended_shift_power?: number | null
+  recommended_devices: Array<Record<string, any> | number>
+  estimated_cost_saving?: number | null
+  estimated_energy_saving?: number | null
+  predicted_cost_saving?: number | null
+  predicted_energy_saving?: number | null
+  confidence_score?: number | null
+  analysis_data: Record<string, any>
+  reason?: string | null
+  status: string
+  priority: string
+  converted_plan_id?: number | null
+  converted_to_plan_id?: number | null
+  converted_at?: string | null
+  created_at?: string | null
+  updated_at?: string | null
+}
+
+export interface ShiftOpportunityQuery {
+  skip?: number
+  limit?: number
+  status?: string
+  priority?: string
+}
+
+export interface AnalyzeOpportunitiesParams {
+  analysis_date?: string
+  lookback_days?: number
+}
+
+export interface ShiftOpportunityAnalyzeResponse {
+  analysis_date: string
+  opportunities_found: number
+  opportunities: ShiftOpportunity[]
+}
+
+export interface ShiftExecution {
+  id: number
+  execution_code: string
+  plan_id: number
+  plan_name?: string | null
+  status: string
+  execution_status: string
+  start_time?: string | null
+  end_time?: string | null
+  duration_minutes?: number | null
+  duration: number
+  target_shift_power?: number | null
+  expected_cost_saving?: number | null
+  expected_energy_saving?: number | null
+  before_power?: number | null
+  after_power?: number | null
+  before_total_power?: number | null
+  after_total_power?: number | null
+  actual_shift_power?: number | null
+  actual_cost_saving?: number | null
+  actual_energy_saving?: number | null
+  success_rate?: number | null
+  device_execution_details: any[]
+  device_execution_list: any[]
+  device_executions: any[]
+  cooling_linkage_data?: Record<string, any> | null
+  cooling_linkage?: Record<string, any> | null
+  error_message?: string | null
+  failure_reason?: string | null
+  error_details?: Record<string, any> | null
+  executed_by?: number | null
+  executor_name?: string | null
+  notes?: string | null
+  created_at?: string | null
+}
+
+export interface ShiftExecutionQuery {
+  skip?: number
+  limit?: number
+  status?: string
+  start_date?: string
+  end_date?: string
+}
+
+export interface ShiftExecutionListResponse {
+  data: ShiftExecution[]
+  total: number
+  skip: number
+  limit: number
+}
+
+export interface ShiftExecutionDetailResponse {
+  data: ShiftExecution
+}
+
+export interface ShiftExecutionRealtimePayload {
+  execution_id: number
+  execution_code: string
+  status: string
+  target_power: number
+  actual_power: number
+  completion_rate: number
+  device_status: any[]
+  alarms: any[]
+  timestamp: string
+}
+
+export interface ShiftExecutionRealtimeResponse {
+  data: ShiftExecutionRealtimePayload
+}
+
 // ========== 计划管理 ==========
-export function getShiftPlans(params?: any) {
+export function getShiftPlans(params?: ShiftPlanQuery): Promise<ShiftPlan[]> {
   return request.get('/v1/energy/shift/plans', { params })
 }
 
-export function getShiftPlan(id: number) {
+export function getShiftPlan(id: number): Promise<ShiftPlan> {
   return request.get(`/v1/energy/shift/plans/${id}`)
 }
 
@@ -67,19 +235,19 @@ export function assessRisk(data: any) {
   return request.post('/v1/energy/shift/analysis/risk', data)
 }
 // ========== 机会分析接口 ==========
-export function analyzeOpportunities(params?: any) {
+export function analyzeOpportunities(params?: AnalyzeOpportunitiesParams): Promise<ShiftOpportunityAnalyzeResponse> {
   return request.post('/v1/energy/shift/opportunities/analyze', null, { params })
 }
 
-export function getOpportunities(params?: any) {
+export function getOpportunities(params?: ShiftOpportunityQuery): Promise<ShiftOpportunity[]> {
   return request.get('/v1/energy/shift/opportunities', { params })
 }
 
-export function getOpportunityDetail(id: number) {
+export function getOpportunityDetail(id: number): Promise<ShiftOpportunity> {
   return request.get(`/v1/energy/shift/opportunities/${id}`)
 }
 
-export function convertOpportunityToPlan(id: number) {
+export function convertOpportunityToPlan(id: number): Promise<ShiftPlan> {
   return request.post(`/v1/energy/shift/opportunities/${id}/convert`)
 }
 
@@ -111,15 +279,15 @@ export function getStatisticsSummary(params?: any) {
 }
 
 // ========== 执行记录接口 ==========
-export function getExecutions(params?: any) {
+export function getExecutions(params?: ShiftExecutionQuery): Promise<ShiftExecutionListResponse> {
   return request.get('/v1/energy/shift/executions', { params })
 }
 
-export function getExecutionDetail(id: number) {
+export function getExecutionDetail(id: number): Promise<ShiftExecutionDetailResponse> {
   return request.get(`/v1/energy/shift/executions/${id}`)
 }
 
-export function getExecutionRealtime(id: number) {
+export function getExecutionRealtime(id: number): Promise<ShiftExecutionRealtimeResponse> {
   return request.get(`/v1/energy/shift/executions/${id}/realtime`)
 }
 

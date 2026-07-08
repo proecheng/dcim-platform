@@ -209,12 +209,12 @@ const alarmCount = computed(() => unitList.value.filter(u => u.status === 'alarm
 
 type TagType = 'success' | 'warning' | 'danger' | 'info'
 
-function statusTagType(status: string): TagType {
+function _statusTagType(status: string): TagType {
   const map: Record<string, TagType> = { normal: 'success', online: 'success', alarm: 'danger', warning: 'warning', offline: 'info' }
   return map[status] || 'info'
 }
 
-function statusLabel(status: string): string {
+function _statusLabel(status: string): string {
   const map: Record<string, string> = { normal: '正常', online: '在线', alarm: '告警', warning: '预警', offline: '离线' }
   return map[status] || status
 }
@@ -259,7 +259,7 @@ async function openDetail(row: OutdoorUnit) {
     detail.value = {
       device_code: unitData?.device_code ?? row.device_code,
       device_name: unitData?.device_name ?? row.device_name,
-      cooling_capacity_kw: unitData?.cooling_capacity_kw ?? row.cooling_capacity_kw,
+      cooling_capacity_kw: unitData?.cooling_capacity_kw ?? row.cooling_capacity_kw ?? 0,
       points: data?.points ?? unitData?.points ?? []
     }
     if (detail.value.points && detail.value.points.length > 0) {
@@ -275,7 +275,7 @@ async function openDetail(row: OutdoorUnit) {
     }
   } catch {
     console.warn('室外机详情API未就绪，使用模拟数据')
-    detail.value = { device_code: row.device_code, device_name: row.device_name, cooling_capacity_kw: row.cooling_capacity_kw }
+    detail.value = { device_code: row.device_code, device_name: row.device_name, cooling_capacity_kw: row.cooling_capacity_kw ?? 0 }
     detailParams.value = mockOutdoorDetailParams
   } finally {
     detailLoading.value = false

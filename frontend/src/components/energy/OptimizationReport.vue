@@ -484,7 +484,7 @@ const runAutoAdjust = async () => {
       ElMessage.success('参数已自动调整')
       loadReport()
     }
-  } catch (error) {
+  } catch {
     ElMessage.error('自动调整失败')
   } finally {
     adjusting.value = false

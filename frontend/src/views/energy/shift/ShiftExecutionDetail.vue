@@ -146,12 +146,12 @@
 import { ref, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { getExecutionDetail } from '@/api/modules/shift'
+import { getExecutionDetail, type ShiftExecution } from '@/api/modules/shift'
 
 const route = useRoute()
 const router = useRouter()
 const loading = ref(false)
-const execution = ref<any>({})
+const execution = ref<Partial<ShiftExecution>>({})
 
 const executionSteps = computed(() => {
   const steps = []
@@ -165,7 +165,7 @@ const executionSteps = computed(() => {
     })
   }
   if (execution.value.device_executions) {
-    execution.value.device_executions.forEach((device: any) => {
+    execution.value.device_executions.forEach((device) => {
       if (device.start_time) {
         steps.push({
           timestamp: device.start_time,
@@ -202,8 +202,10 @@ const fetchDetail = async () => {
   }
 }
 
-const getStatusType = (status: string): 'info' | 'warning' | 'success' | 'danger' => {
-  const map: Record<string, 'info' | 'warning' | 'success' | 'danger'> = {
+type TagType = 'primary' | 'success' | 'info' | 'warning' | 'danger'
+
+const getStatusType = (status: string): TagType => {
+  const map: Record<string, TagType> = {
     pending: 'info',
     running: 'warning',
     completed: 'success',
@@ -224,8 +226,8 @@ const getStatusLabel = (status: string) => {
   return map[status] || status
 }
 
-const getDeviceStatusType = (status: string): 'info' | 'warning' | 'success' | 'danger' => {
-  const map: Record<string, 'info' | 'warning' | 'success' | 'danger'> = {
+const getDeviceStatusType = (status: string): TagType => {
+  const map: Record<string, TagType> = {
     pending: 'info',
     running: 'warning',
     completed: 'success',
@@ -244,7 +246,7 @@ const getDeviceStatusLabel = (status: string) => {
   return map[status] || status
 }
 
-const getDuration = (exec: any) => {
+const getDuration = (exec: Partial<ShiftExecution>) => {
   if (!exec.start_time) return '-'
   const start = new Date(exec.start_time).getTime()
   const end = exec.end_time ? new Date(exec.end_time).getTime() : Date.now()
@@ -252,7 +254,7 @@ const getDuration = (exec: any) => {
   return `${duration} 分钟`
 }
 
-const getCompletionRate = (exec: any) => {
+const getCompletionRate = (exec: Partial<ShiftExecution>) => {
   if (!exec.target_shift_power || exec.target_shift_power === 0) return 0
   return ((exec.actual_shift_power || 0) / exec.target_shift_power * 100).toFixed(1)
 }

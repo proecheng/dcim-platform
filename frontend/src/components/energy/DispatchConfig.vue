@@ -517,7 +517,7 @@ async function saveDevice() {
     }
     deviceDialog.visible = false
     loadDevices()
-  } catch (e) {
+  } catch {
     ElMessage.error('保存失败')
   } finally {
     loading.saveDevice = false
@@ -530,7 +530,7 @@ async function deleteDevice(id: number) {
     await deleteDispatchableDevice(id)
     ElMessage.success('删除成功')
     loadDevices()
-  } catch (e) {
+  } catch {
     // 用户取消
   }
 }
@@ -595,7 +595,7 @@ async function saveStorage() {
     }
     storageDialog.visible = false
     loadStorage()
-  } catch (e) {
+  } catch {
     ElMessage.error('保存失败')
   } finally {
     loading.saveStorage = false
@@ -608,7 +608,7 @@ async function deleteStorage(id: number) {
     await deleteStorageSystem(id)
     ElMessage.success('删除成功')
     loadStorage()
-  } catch (e) {
+  } catch {
     // 用户取消
   }
 }
@@ -659,7 +659,7 @@ async function savePV() {
     }
     pvDialog.visible = false
     loadPV()
-  } catch (e) {
+  } catch {
     ElMessage.error('保存失败')
   } finally {
     loading.savePV = false
@@ -672,7 +672,7 @@ async function deletePV(id: number) {
     await deletePVSystem(id)
     ElMessage.success('删除成功')
     loadPV()
-  } catch (e) {
+  } catch {
     // 用户取消
   }
 }

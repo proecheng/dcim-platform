@@ -133,13 +133,19 @@
 import { ref, reactive, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { getOpportunities, analyzeOpportunities, convertOpportunityToPlan } from '@/api/modules/shift'
+import {
+  getOpportunities,
+  analyzeOpportunities,
+  convertOpportunityToPlan,
+  type ShiftOpportunity,
+  type ShiftOpportunityQuery
+} from '@/api/modules/shift'
 
 const router = useRouter()
 
 const loading = ref(false)
 const analyzing = ref(false)
-const opportunityList = ref([])
+const opportunityList = ref<ShiftOpportunity[]>([])
 
 const filterForm = reactive({
   status: '',
@@ -165,16 +171,16 @@ onMounted(() => {
 const fetchOpportunities = async () => {
   loading.value = true
   try {
-    const params = {
+    const params: ShiftOpportunityQuery = {
       skip: (pagination.page - 1) * pagination.pageSize,
       limit: pagination.pageSize,
       status: filterForm.status || undefined,
       priority: filterForm.priority || undefined
     }
     const res = await getOpportunities(params)
-    opportunityList.value = res.data || []
-    pagination.total = res.total || opportunityList.value.length
-  } catch (error) {
+    opportunityList.value = res
+    pagination.total = res.length
+  } catch {
     ElMessage.error('获取机会列表失败')
   } finally {
     loading.value = false
@@ -204,21 +210,21 @@ const handleConfirmAnalyze = async () => {
       lookback_days: analyzeForm.lookback_days
     }
     const res = await analyzeOpportunities(params)
-    ElMessage.success(`分析完成，发现 ${res.data.opportunities_found} 个机会`)
+    ElMessage.success(`分析完成，发现 ${res.opportunities_found} 个机会`)
     analyzeDialogVisible.value = false
     fetchOpportunities()
-  } catch (error) {
+  } catch {
     ElMessage.error('机会分析失败')
   } finally {
     analyzing.value = false
   }
 }
 
-const handleView = (row: any) => {
+const handleView = (row: ShiftOpportunity) => {
   router.push(`/energy/shift/opportunity/${row.id}`)
 }
 
-const handleConvert = async (row: any) => {
+const handleConvert = async (row: ShiftOpportunity) => {
   try {
     await ElMessageBox.confirm(
       `确认将机会 "${row.opportunity_name}" 转换为转移计划？`,
@@ -232,7 +238,7 @@ const handleConvert = async (row: any) => {
 
     const res = await convertOpportunityToPlan(row.id)
     ElMessage.success('转换成功')
-    router.push(`/energy/shift/detail/${res.data.id}`)
+    router.push(`/energy/shift/detail/${res.id}`)
   } catch (error: any) {
     if (error !== 'cancel') {
       ElMessage.error('转换失败')
@@ -246,8 +252,10 @@ const getConfidenceColor = (score: number) => {
   return '#f56c6c'
 }
 
-const getPriorityType = (priority: string) => {
-  const map: Record<string, any> = {
+type TagType = 'primary' | 'success' | 'info' | 'warning' | 'danger'
+
+const getPriorityType = (priority: string): TagType => {
+  const map: Record<string, TagType> = {
     high: 'danger',
     medium: 'warning',
     low: 'info'
@@ -264,14 +272,14 @@ const getPriorityLabel = (priority: string) => {
   return map[priority] || priority
 }
 
-const getStatusType = (status: string) => {
-  const map: Record<string, any> = {
-    pending: '',
+const getStatusType = (status: string): TagType => {
+  const map: Record<string, TagType> = {
+    pending: 'info',
     converted: 'success',
     rejected: 'danger',
     expired: 'info'
   }
-  return map[status] || ''
+  return map[status] || 'info'
 }
 
 const getStatusLabel = (status: string) => {

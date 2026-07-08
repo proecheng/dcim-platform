@@ -169,7 +169,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted, watch } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
 import { debounce } from 'lodash-es'
 import { InfoFilled, QuestionFilled } from '@element-plus/icons-vue'
 import {
@@ -178,8 +178,7 @@ import {
   recalculateSuggestion,
   type SuggestionDetail,
   type TimePeriod,
-  type ShiftableDevice,
-  type RecalculateResult
+  type ShiftableDevice
 } from '@/api/modules/energy'
 
 const props = defineProps<{

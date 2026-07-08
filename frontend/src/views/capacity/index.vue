@@ -779,7 +779,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted, watch, nextTick, onUnmounted } from 'vue'
+import { ref, reactive, onMounted, nextTick, onUnmounted } from 'vue'
 import { ElMessage, ElMessageBox, type FormInstance } from 'element-plus'
 import { Grid, Lightning, Odometer, Box, Plus, Search, WarningFilled } from '@element-plus/icons-vue'
 import * as echarts from 'echarts'
@@ -1263,7 +1263,7 @@ async function loadPlanList() {
     const map: Record<number, string> = {}
     cabs.forEach((c: any) => { map[c.id] = c.cabinet_name })
     cabinetMap.value = map
-  } catch (e) {
+  } catch {
     // 忽略，不影响主功能
   }
 }

@@ -1214,6 +1214,10 @@ async def delete_counterfactual_analysis(
 @router.get("/reports/misdiagnosis", response_model=dict)
 async def get_misdiagnosis_report(
     period: Optional[str] = Query(None, description="报告周期 YYYY-MM，默认为上月"),
+    page: Optional[int] = Query(None, ge=1, description="列表页码"),
+    page_size: Optional[int] = Query(None, ge=1, le=100, description="列表每页数量"),
+    start_period: Optional[str] = Query(None, description="起始报告周期 YYYY-MM"),
+    end_period: Optional[str] = Query(None, description="结束报告周期 YYYY-MM"),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_admin),
 ):
@@ -1224,6 +1228,37 @@ async def get_misdiagnosis_report(
     """
     from ...models.diagnosis import SystemReport
     from ...schemas.system_report import SystemReportInfo
+
+    if page is not None or page_size is not None or start_period or end_period:
+        page = page or 1
+        page_size = page_size or 20
+        filters = [
+            SystemReport.report_type == "misdiagnosis_monthly",
+            SystemReport.deleted_at.is_(None),
+        ]
+        if start_period:
+            filters.append(SystemReport.report_period >= start_period)
+        if end_period:
+            filters.append(SystemReport.report_period <= end_period)
+
+        total_result = await db.execute(
+            select(func.count()).select_from(SystemReport).where(*filters)
+        )
+        total = total_result.scalar_one()
+        result = await db.execute(
+            select(SystemReport)
+            .where(*filters)
+            .order_by(SystemReport.generated_at.desc())
+            .offset((page - 1) * page_size)
+            .limit(page_size)
+        )
+        reports = result.scalars().all()
+        return {
+            "items": [SystemReportInfo.model_validate(report).model_dump() for report in reports],
+            "total": total,
+            "page": page,
+            "page_size": page_size,
+        }
 
     # 如果未指定周期，默认为上月
     if not period:

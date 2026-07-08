@@ -57,13 +57,13 @@ test.describe('仪表盘测试', () => {
     await page.waitForLoadState('networkidle')
 
     // 点击供配电域卡片
-    const powerCard = page.locator('.domain-cards').locator('.el-card, .domain-card').filter({ hasText: '供配电' }).first()
+    const powerCard = page.locator('.domain-cards .domain-card').filter({ hasText: '供配电' }).first()
+    await expect(powerCard).toBeVisible()
+    await powerCard.scrollIntoViewIfNeeded()
     await powerCard.click()
-    await page.waitForLoadState('networkidle')
-    await page.waitForTimeout(1000)
 
     // 应跳转到供配电相关页面
-    expect(page.url()).toMatch(/\/power/)
+    await expect(page).toHaveURL(/\/power\/overview/, { timeout: 15000 })
   })
 
   test('刷新数据按钮可点击', async ({ page }) => {

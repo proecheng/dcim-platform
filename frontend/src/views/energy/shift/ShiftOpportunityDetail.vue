@@ -120,15 +120,20 @@
 import { ref, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { getOpportunityDetail, convertOpportunityToPlan } from '@/api/modules/shift'
+import { getOpportunityDetail, convertOpportunityToPlan, type ShiftOpportunity } from '@/api/modules/shift'
 
 const router = useRouter()
 const route = useRoute()
 
 const loading = ref(false)
-const opportunity = ref<any>({
+const opportunity = ref<ShiftOpportunity>({
+  id: 0,
+  opportunity_code: '',
+  opportunity_name: '',
   recommended_devices: [],
-  analysis_data: {}
+  analysis_data: {},
+  status: 'pending',
+  priority: 'medium'
 })
 
 onMounted(() => {
@@ -140,8 +145,8 @@ const fetchOpportunityDetail = async () => {
   try {
     const id = Number(route.params.id)
     const res = await getOpportunityDetail(id)
-    opportunity.value = res.data
-  } catch (error) {
+    opportunity.value = res
+  } catch {
     ElMessage.error('获取机会详情失败')
   } finally {
     loading.value = false
@@ -166,7 +171,7 @@ const handleConvert = async () => {
 
     const res = await convertOpportunityToPlan(opportunity.value.id)
     ElMessage.success('转换成功')
-    router.push(`/energy/shift/detail/${res.data.id}`)
+    router.push(`/energy/shift/detail/${res.id}`)
   } catch (error: any) {
     if (error !== 'cancel') {
       ElMessage.error('转换失败')
@@ -202,8 +207,10 @@ const getConfidenceColor = (score: number) => {
   return '#f56c6c'
 }
 
-const getPriorityType = (priority: string) => {
-  const map: Record<string, any> = {
+type TagType = 'primary' | 'success' | 'info' | 'warning' | 'danger'
+
+const getPriorityType = (priority: string): TagType => {
+  const map: Record<string, TagType> = {
     high: 'danger',
     medium: 'warning',
     low: 'info'
@@ -220,14 +227,14 @@ const getPriorityLabel = (priority: string) => {
   return map[priority] || priority
 }
 
-const getStatusType = (status: string) => {
-  const map: Record<string, any> = {
-    pending: '',
+const getStatusType = (status: string): TagType => {
+  const map: Record<string, TagType> = {
+    pending: 'info',
     converted: 'success',
     rejected: 'danger',
     expired: 'info'
   }
-  return map[status] || ''
+  return map[status] || 'info'
 }
 
 const getStatusLabel = (status: string) => {

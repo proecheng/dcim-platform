@@ -22,6 +22,7 @@ depends_on: Union[str, Sequence[str], None] = None
 def upgrade() -> None:
     conn = op.get_bind()
     inspector = inspect(conn)
+    dialect_name = conn.dialect.name
 
     # DeviceTemplate: 新增 extra_config
     dt_columns = [c["name"] for c in inspector.get_columns("device_templates")]
@@ -39,12 +40,20 @@ def upgrade() -> None:
             sa.Column(
                 "parent_datasource_id",
                 sa.Integer(),
-                sa.ForeignKey("datasources.id", ondelete="SET NULL"),
                 nullable=True,
                 comment="父数据源ID（MS/TP设备指向其网关DataSource）",
             ),
         )
         op.create_index("ix_datasources_parent_id", "datasources", ["parent_datasource_id"])
+        if dialect_name != "sqlite":
+            op.create_foreign_key(
+                "fk_datasources_parent_datasource_id",
+                "datasources",
+                "datasources",
+                ["parent_datasource_id"],
+                ["id"],
+                ondelete="SET NULL",
+            )
 
     # 种子数据: 预置大金VRV转换网关模板（幂等）
     count = conn.execute(
@@ -88,6 +97,7 @@ def upgrade() -> None:
 def downgrade() -> None:
     conn = op.get_bind()
     inspector = inspect(conn)
+    dialect_name = conn.dialect.name
 
     # 删除种子数据
     conn.execute(
@@ -97,6 +107,12 @@ def downgrade() -> None:
 
     ds_columns = [c["name"] for c in inspector.get_columns("datasources")]
     if "parent_datasource_id" in ds_columns:
+        if dialect_name != "sqlite":
+            op.drop_constraint(
+                "fk_datasources_parent_datasource_id",
+                "datasources",
+                type_="foreignkey",
+            )
         op.drop_index("ix_datasources_parent_id", table_name="datasources")
         op.drop_column("datasources", "parent_datasource_id")
 

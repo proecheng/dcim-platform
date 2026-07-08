@@ -11,8 +11,8 @@
     "typecheck": "vue-tsc --noEmit",
     "test": "vitest --run",
     "test:watch": "vitest",
-    "lint": "eslint src/",
-    "lint:fix": "eslint src/ --fix"
+    "lint": "eslint src/ --ignore-pattern \"src/**/*.d.ts\" --max-warnings=0",
+    "lint:fix": "eslint src/ --ignore-pattern \"src/**/*.d.ts\" --fix"
   },
   "dependencies": {
     "@element-plus/icons-vue": "^2.3.1",

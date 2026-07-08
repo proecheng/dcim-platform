@@ -222,7 +222,7 @@ import { ref, computed, onMounted, onUnmounted, onActivated, onDeactivated, mark
 import { Monitor, CircleCheck, Warning, Remove } from '@element-plus/icons-vue'
 import { Lightning, FullScreen, Refresh, Coin } from '@element-plus/icons-vue'
 import { IceCream, Sunny, Lock, OfficeBuilding, Opportunity } from '@element-plus/icons-vue'
-import { getDashboardData, type RealtimeData } from '@/api/modules/realtime'
+import { getDashboardData } from '@/api/modules/realtime'
 import { useAlarmStore } from '@/stores/alarm'
 import { useRealtimeStore } from '@/stores/realtime'
 import { useEnergyStore } from '@/stores/energy'
@@ -413,7 +413,7 @@ function getStatusText(status: string) {
 }
 
 // V2.3: PUE 等级颜色
-function getPueClass(pue: number | undefined) {
+function _getPueClass(pue: number | undefined) {
   if (!pue) return ''
   if (pue <= 1.4) return 'pue-excellent'
   if (pue <= 1.6) return 'pue-good'

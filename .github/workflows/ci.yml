@@ -40,6 +40,9 @@ jobs:
       - name: Ruff 格式检查
         run: ruff format --check app/
 
+      - name: Python 编译检查
+        run: python -m compileall app -q
+
       - name: 运行测试
         run: |
           pytest tests/ \
@@ -108,11 +111,84 @@ jobs:
       - name: ESLint 代码检查
         run: npm run lint
 
+      - name: 类型检查
+        run: npm run typecheck
+
       - name: 单元测试
         run: npm run test
 
       - name: 构建
         run: npm run build
 
-      - name: 类型检查
-        run: npm run typecheck
+  e2e-critical:
+    name: 关键 E2E 门禁
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: [backend-tests, frontend-checks]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+          cache-dependency-path: backend/requirements.txt
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: |
+            package-lock.json
+            frontend/package-lock.json
+
+      - name: 安装后端依赖
+        working-directory: backend
+        run: pip install -r requirements.txt
+
+      - name: 安装前端依赖
+        working-directory: frontend
+        run: npm ci
+
+      - name: 安装 E2E 依赖
+        run: npm ci
+
+      - name: 安装 Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: 启动后端
+        working-directory: backend
+        run: nohup python -m uvicorn app.main:app --host 127.0.0.1 --port 8080 > ../backend-ci.log 2>&1 &
+
+      - name: 启动前端
+        working-directory: frontend
+        run: nohup npm run dev -- --host 127.0.0.1 --port 3000 > ../frontend-ci.log 2>&1 &
+
+      - name: 等待服务就绪
+        run: |
+          for i in {1..60}; do
+            if curl -fsS http://127.0.0.1:8080/api/health >/dev/null && curl -fsS http://127.0.0.1:3000 >/dev/null; then
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "后端日志:"
+          cat backend-ci.log || true
+          echo "前端日志:"
+          cat frontend-ci.log || true
+          exit 1
+
+      - name: 运行关键 E2E
+        run: npx playwright test e2e/auth.spec.ts e2e/authorization-matrix.spec.ts e2e/invalid-detail-pages.spec.ts --project=chromium
+
+      - name: 上传 E2E 诊断日志
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-diagnostics
+          path: |
+            backend-ci.log
+            frontend-ci.log
+            e2e/test-results
+          retention-days: 14

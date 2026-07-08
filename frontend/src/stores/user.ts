@@ -87,7 +87,7 @@ export const useUserStore = defineStore('user', () => {
       try {
         await fetchUserInfo()
         await fetchPermissions()
-      } catch (e) {
+      } catch {
         // Token 无效，清除
         token.value = ''
         localStorage.removeItem('token')

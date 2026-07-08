@@ -50,7 +50,7 @@ interface MetricValue {
   parameters?: any
 }
 
-const props = defineProps<{
+defineProps<{
   metric: MetricValue | null | undefined
 }>()
 

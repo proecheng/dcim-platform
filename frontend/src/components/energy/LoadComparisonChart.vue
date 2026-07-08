@@ -346,7 +346,7 @@ function generatePeriodMarkAreas(): any[] {
 }
 
 // 计算节省金额
-function calculateSavingAtPoint(originalPower: number, shiftedPower: number, hour: number): number {
+function _calculateSavingAtPoint(originalPower: number, shiftedPower: number, hour: number): number {
   const period = getHourPeriod(hour)
   const price = periodPrices[period] || 0
   const powerDiff = originalPower - shiftedPower

@@ -87,12 +87,12 @@
 import { ref, reactive, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { getShiftPlans, deleteShiftPlan } from '@/api/modules/shift'
+import { getShiftPlans, deleteShiftPlan, type ShiftPlan, type ShiftPlanQuery } from '@/api/modules/shift'
 
 const router = useRouter()
 
 const loading = ref(false)
-const plans = ref<any[]>([])
+const plans = ref<ShiftPlan[]>([])
 const dateRange = ref<string[]>([])
 
 const queryForm = reactive({
@@ -127,7 +127,8 @@ const getPeriodLabel = (period: string) => periodLabels[period] || period
 const getStatusLabel = (status: string) => statusLabels[status] || status
 
 const getStatusType = (status: string) => {
-  const typeMap: Record<string, any> = {
+  type TagType = 'primary' | 'success' | 'warning' | 'info' | 'danger'
+  const typeMap: Record<string, TagType> = {
     draft: 'info',
     pending_approval: 'warning',
     approved: 'success',
@@ -143,7 +144,7 @@ const getStatusType = (status: string) => {
 const loadPlans = async () => {
   loading.value = true
   try {
-    const params: any = {
+    const params: ShiftPlanQuery = {
       skip: (pagination.page - 1) * pagination.size,
       limit: pagination.size,
     }
@@ -153,8 +154,8 @@ const loadPlans = async () => {
       params.shift_date_to = dateRange.value[1]
     }
     const res = await getShiftPlans(params)
-    plans.value = res.data || []
-    pagination.total = res.total || plans.value.length
+    plans.value = res
+    pagination.total = res.length
   } catch (error: any) {
     ElMessage.error(error.message || '加载计划列表失败')
   } finally {

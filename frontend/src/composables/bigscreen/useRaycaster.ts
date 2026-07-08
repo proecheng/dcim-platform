@@ -1,5 +1,5 @@
 // frontend/src/composables/bigscreen/useRaycaster.ts
-import { ref, shallowRef, onMounted, onUnmounted, type Ref, type ShallowRef } from 'vue'
+import { shallowRef, onMounted, onUnmounted, type Ref, type ShallowRef } from 'vue'
 import * as THREE from 'three'
 import { useBigscreenStore } from '@/stores/bigscreen'
 

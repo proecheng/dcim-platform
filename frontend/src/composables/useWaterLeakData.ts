@@ -5,7 +5,7 @@
  */
 import { ref, computed, onMounted } from 'vue'
 import { type RealtimeData } from '@/api/modules/realtime'
-import { getAlarmList, type AlarmInfo } from '@/api/modules/alarm'
+import { getAlarmList } from '@/api/modules/alarm'
 import { useRealtimeStore } from '@/stores/realtime'
 
 /** 水浸区域分组数据 */

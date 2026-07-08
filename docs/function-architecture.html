@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>算力中心智能监控系统 - 功能架构</title>
+  <style>
+    :root {
+      --bg0: #07111f;
+      --bg1: #0b172a;
+      --line: rgba(255, 255, 255, 0.12);
+      --text: #ecf4ff;
+      --muted: rgba(236, 244, 255, 0.68);
+      --cyan: #58d8ff;
+      --blue: #67a8ff;
+      --violet: #b88dff;
+      --amber: #ffcf6d;
+      --green: #67e4b2;
+      --rose: #ff8fb8;
+    }
+
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0;
+      min-height: 100%;
+      background:
+        radial-gradient(circle at 20% 10%, rgba(88, 216, 255, 0.14), transparent 30%),
+        radial-gradient(circle at 80% 0%, rgba(184, 141, 255, 0.12), transparent 26%),
+        linear-gradient(180deg, var(--bg0), var(--bg1));
+      color: var(--text);
+      font-family: "PingFang SC", "Microsoft YaHei", "Segoe UI", sans-serif;
+    }
+
+    body {
+      padding: 20px;
+    }
+
+    .shell {
+      max-width: 1760px;
+      margin: 0 auto;
+    }
+
+    .header {
+      display: flex;
+      align-items: end;
+      justify-content: space-between;
+      gap: 24px;
+      margin-bottom: 16px;
+    }
+
+    .title {
+      margin: 0;
+      font-size: 30px;
+      line-height: 1.1;
+      letter-spacing: 0;
+      font-weight: 700;
+    }
+
+    .subtitle {
+      margin-top: 8px;
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    .chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      justify-content: flex-end;
+    }
+
+    .pill {
+      padding: 8px 14px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.05);
+      color: var(--text);
+      font-size: 12px;
+      line-height: 1;
+      backdrop-filter: blur(8px);
+      white-space: nowrap;
+    }
+
+    .board {
+      position: relative;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 24px;
+      background:
+        linear-gradient(180deg, rgba(255,255,255,0.035), rgba(255,255,255,0.015)),
+        rgba(10, 18, 32, 0.84);
+      box-shadow: 0 28px 80px rgba(0, 0, 0, 0.38);
+      overflow: hidden;
+    }
+
+    svg {
+      display: block;
+      width: 100%;
+      height: auto;
+    }
+
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px 18px;
+      align-items: center;
+      margin-top: 14px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .legend-item {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .swatch {
+      width: 12px;
+      height: 12px;
+      border-radius: 999px;
+      display: inline-block;
+      box-shadow: 0 0 0 3px rgba(255,255,255,0.04);
+    }
+
+    @media (max-width: 900px) {
+      body { padding: 12px; }
+      .header {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+      .chips { justify-content: flex-start; }
+      .title { font-size: 24px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <div class="header">
+      <div>
+        <h1 class="title">算力中心智能监控系统 功能架构</h1>
+        <div class="subtitle">前端展示 · 后端引擎 · 采集通信 · 数据底座 · 外部系统</div>
+      </div>
+      <div class="chips">
+        <span class="pill">前端</span>
+        <span class="pill">后端</span>
+        <span class="pill">通信</span>
+        <span class="pill">数据</span>
+        <span class="pill">外部系统</span>
+      </div>
+    </div>
+
+    <div class="board">
+      <svg id="arch" viewBox="0 0 1600 1280" preserveAspectRatio="xMidYMin meet" role="img" aria-label="系统功能架构图">
+        <defs>
+          <linearGradient id="bgPanel" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stop-color="rgba(255,255,255,0.09)" />
+            <stop offset="100%" stop-color="rgba(255,255,255,0.03)" />
+          </linearGradient>
+          <linearGradient id="userFill" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stop-color="rgba(88,216,255,0.18)" />
+            <stop offset="100%" stop-color="rgba(88,216,255,0.08)" />
+          </linearGradient>
+          <linearGradient id="frontFill" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stop-color="rgba(103,168,255,0.18)" />
+            <stop offset="100%" stop-color="rgba(103,168,255,0.08)" />
+          </linearGradient>
+          <linearGradient id="backFill" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stop-color="rgba(184,141,255,0.18)" />
+            <stop offset="100%" stop-color="rgba(184,141,255,0.08)" />
+          </linearGradient>
+          <linearGradient id="commFill" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stop-color="rgba(255,207,109,0.18)" />
+            <stop offset="100%" stop-color="rgba(255,207,109,0.08)" />
+          </linearGradient>
+          <linearGradient id="dataFill" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stop-color="rgba(103,228,178,0.16)" />
+            <stop offset="100%" stop-color="rgba(103,228,178,0.08)" />
+          </linearGradient>
+          <linearGradient id="externalFill" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stop-color="rgba(255,143,184,0.16)" />
+            <stop offset="100%" stop-color="rgba(255,143,184,0.08)" />
+          </linearGradient>
+          <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+            <feDropShadow dx="0" dy="10" stdDeviation="12" flood-color="rgba(0,0,0,0.38)" />
+          </filter>
+          <marker id="arrowCyan" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto">
+            <path d="M0,0 L12,6 L0,12 z" fill="#58d8ff"></path>
+          </marker>
+          <marker id="arrowBlue" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto">
+            <path d="M0,0 L12,6 L0,12 z" fill="#67a8ff"></path>
+          </marker>
+          <marker id="arrowViolet" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto">
+            <path d="M0,0 L12,6 L0,12 z" fill="#b88dff"></path>
+          </marker>
+          <marker id="arrowAmber" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto">
+            <path d="M0,0 L12,6 L0,12 z" fill="#ffcf6d"></path>
+          </marker>
+          <marker id="arrowGreen" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto">
+            <path d="M0,0 L12,6 L0,12 z" fill="#67e4b2"></path>
+          </marker>
+        </defs>
+      </svg>
+    </div>
+
+    <div class="legend">
+      <span class="legend-item"><span class="swatch" style="background: var(--cyan)"></span>入口</span>
+      <span class="legend-item"><span class="swatch" style="background: var(--blue)"></span>展示</span>
+      <span class="legend-item"><span class="swatch" style="background: var(--violet)"></span>引擎</span>
+      <span class="legend-item"><span class="swatch" style="background: var(--amber)"></span>通信</span>
+      <span class="legend-item"><span class="swatch" style="background: var(--green)"></span>存储</span>
+      <span class="legend-item"><span class="swatch" style="background: var(--rose)"></span>外部</span>
+    </div>
+  </div>
+
+  <script>
+    const svg = document.getElementById('arch');
+    const NS = 'http://www.w3.org/2000/svg';
+
+    function el(name, attrs = {}, text = '') {
+      const node = document.createElementNS(NS, name);
+      for (const [key, value] of Object.entries(attrs)) {
+        if (value !== null && value !== undefined) node.setAttribute(key, String(value));
+      }
+      if (text) node.textContent = text;
+      return node;
+    }
+
+    function append(parent, name, attrs = {}, text = '') {
+      const node = el(name, attrs, text);
+      parent.appendChild(node);
+      return node;
+    }
+
+    function chip(parent, x, y, w, h, label, accent) {
+      const group = append(parent, 'g', { filter: 'url(#shadow)' });
+      append(group, 'rect', {
+        x, y, width: w, height: h, rx: 16, ry: 16,
+        fill: 'rgba(255,255,255,0.05)',
+        stroke: `rgba(${accent},0.42)`,
+        'stroke-width': 1.2
+      });
+      append(group, 'rect', {
+        x: x + 1, y: y + 1, width: w - 2, height: h - 2, rx: 15, ry: 15,
+        fill: 'rgba(255,255,255,0.02)'
+      });
+      append(group, 'circle', {
+        cx: x + 18, cy: y + h / 2, r: 5.5,
+        fill: `rgb(${accent})`
+      });
+      append(group, 'text', {
+        x: x + 34, y: y + h / 2 + 5,
+        fill: '#eef6ff',
+        'font-size': 18,
+        'font-weight': 600,
+        'text-anchor': 'start'
+      }, label);
+      return {
+        x, y, w, h,
+        cx: x + w / 2,
+        cy: y + h / 2,
+        left: x,
+        right: x + w,
+        top: y,
+        bottom: y + h,
+        label
+      };
+    }
+
+    function panel(parent, cfg) {
+      const group = append(parent, 'g', { filter: 'url(#shadow)' });
+      const { x, y, w, h, title, accent, fill, note, items, cols, chipX, chipY, chipH = 48, gapX = 12, gapY = 14, chipAccent = accent } = cfg;
+
+      append(group, 'rect', {
+        x, y, width: w, height: h, rx: 28, ry: 28,
+        fill,
+        stroke: `rgba(${accent},0.45)`,
+        'stroke-width': 1.4
+      });
+
+      append(group, 'rect', {
+        x: x + 12, y: y + 12, width: 6, height: h - 24, rx: 3,
+        fill: `rgb(${accent})`
+      });
+
+      append(group, 'text', {
+        x: x + 32, y: y + 38,
+        fill: '#f5faff',
+        'font-size': 21,
+        'font-weight': 700
+      }, title);
+
+      if (note) {
+        append(group, 'text', {
+          x: x + w - 28, y: y + 38,
+          fill: 'rgba(255,255,255,0.55)',
+          'font-size': 12,
+          'text-anchor': 'end'
+        }, note);
+      }
+
+      const chips = [];
+      const chipAreaX = chipX ?? (x + 220);
+      const chipAreaY = chipY ?? (y + 68);
+      const chipW = Math.floor((w - (chipAreaX - x) - 28 - (cols - 1) * gapX) / cols);
+
+      items.forEach((item, idx) => {
+        const row = Math.floor(idx / cols);
+        const col = idx % cols;
+        const cx = chipAreaX + col * (chipW + gapX);
+        const cy = chipAreaY + row * (chipH + gapY);
+        chips.push(chip(group, cx, cy, chipW, chipH, item, chipAccent));
+      });
+
+      return {
+        group,
+        x, y, w, h,
+        cx: x + w / 2,
+        cy: y + h / 2,
+        right: x + w,
+        left: x,
+        top: y,
+        bottom: y + h,
+        chips
+      };
+    }
+
+    function flowArrow(parent, from, to, color, markerId, dashed = false) {
+      const path = append(parent, 'path', {
+        d: `M ${from.x} ${from.y} C ${from.x} ${(from.y + to.y) / 2}, ${to.x} ${(from.y + to.y) / 2}, ${to.x} ${to.y}`,
+        fill: 'none',
+        stroke: color,
+        'stroke-width': 3.5,
+        'stroke-linecap': 'round',
+        'stroke-dasharray': dashed ? '10 10' : '0',
+        'marker-end': `url(#${markerId})`,
+        opacity: dashed ? 0.72 : 0.92
+      });
+      return path;
+    }
+
+    function chipByLabel(panelRef, label) {
+      return panelRef.chips.find(item => item.label === label);
+    }
+
+    const root = svg;
+    const base = append(root, 'g');
+
+    append(base, 'rect', {
+      x: 30, y: 30, width: 1540, height: 1220, rx: 34, ry: 34,
+      fill: 'url(#bgPanel)',
+      stroke: 'rgba(255,255,255,0.08)',
+      'stroke-width': 1
+    });
+
+    append(base, 'text', {
+      x: 60, y: 70,
+      fill: '#f7fbff',
+      'font-size': 28,
+      'font-weight': 700
+    }, '功能架构');
+
+    const user = panel(base, {
+      x: 58, y: 96, w: 1084, h: 104,
+      title: '角色入口',
+      note: '用户',
+      accent: '88,216,255',
+      fill: 'url(#userFill)',
+      items: ['运维', '管理', '架构', '值班'],
+      cols: 4,
+      chipX: 260,
+      chipY: 126,
+      chipH: 42,
+      gapX: 16,
+      gapY: 12,
+      chipAccent: '88,216,255'
+    });
+
+    const frontend = panel(base, {
+      x: 58, y: 240, w: 1084, h: 242,
+      title: '前端展示层',
+      note: 'UI',
+      accent: '103,168,255',
+      fill: 'url(#frontFill)',
+      items: ['大屏', '监控', '告警', '能源', '资产', '拓扑', '运维', '视频', '系统', '报表'],
+      cols: 5,
+      chipX: 260,
+      chipY: 286,
+      chipH: 48,
+      gapX: 12,
+      gapY: 16,
+      chipAccent: '103,168,255'
+    });
+
+    const backend = panel(base, {
+      x: 58, y: 532, w: 1084, h: 252,
+      title: '后端服务层',
+      note: 'API / Engine',
+      accent: '184,141,255',
+      fill: 'url(#backFill)',
+      items: ['认证', '点位', '告警', '联动', '诊断', '能源', '容量', '运维', '视频/OTA', '通知'],
+      cols: 5,
+      chipX: 260,
+      chipY: 578,
+      chipH: 48,
+      gapX: 12,
+      gapY: 16,
+      chipAccent: '184,141,255'
+    });
+
+    const comm = panel(base, {
+      x: 58, y: 834, w: 1084, h: 190,
+      title: '采集通信层',
+      note: 'Gateway',
+      accent: '255,207,109',
+      fill: 'url(#commFill)',
+      items: ['网关', '协议', '配置', '缓存', 'MQTT', '质量'],
+      cols: 3,
+      chipX: 260,
+      chipY: 882,
+      chipH: 48,
+      gapX: 14,
+      gapY: 16,
+      chipAccent: '255,207,109'
+    });
+
+    const data = panel(base, {
+      x: 58, y: 1074, w: 1084, h: 146,
+      title: '数据基础层',
+      note: 'Storage',
+      accent: '103,228,178',
+      fill: 'url(#dataFill)',
+      items: ['PG / TSDB', 'Redis', '文件 / 报表'],
+      cols: 3,
+      chipX: 260,
+      chipY: 1118,
+      chipH: 48,
+      gapX: 14,
+      gapY: 16,
+      chipAccent: '103,228,178'
+    });
+
+    const external = panel(base, {
+      x: 1180, y: 240, w: 362, h: 980,
+      title: '外部对象',
+      note: 'Devices / Systems',
+      accent: '255,143,184',
+      fill: 'url(#externalFill)',
+      items: ['UPS / PDU', '空调 / 传感器', '摄像头 / NVR', '第三方系统'],
+      cols: 2,
+      chipX: 1214,
+      chipY: 292,
+      chipH: 54,
+      gapX: 18,
+      gapY: 28,
+      chipAccent: '255,143,184'
+    });
+
+    // 主流程箭头
+    flowArrow(base,
+      { x: user.cx, y: user.bottom },
+      { x: frontend.cx, y: frontend.top },
+      '#58d8ff',
+      'arrowCyan'
+    );
+    flowArrow(base,
+      { x: frontend.cx, y: frontend.bottom },
+      { x: backend.cx, y: backend.top },
+      '#67a8ff',
+      'arrowBlue'
+    );
+    flowArrow(base,
+      { x: backend.cx, y: backend.bottom },
+      { x: comm.cx, y: comm.top },
+      '#b88dff',
+      'arrowViolet'
+    );
+    flowArrow(base,
+      { x: comm.cx, y: comm.bottom },
+      { x: data.cx, y: data.top },
+      '#67e4b2',
+      'arrowGreen'
+    );
+
+    // 外部系统虚线连接
+    flowArrow(base,
+      { x: chipByLabel(external, 'UPS / PDU').left, y: chipByLabel(external, 'UPS / PDU').cy },
+      { x: comm.right, y: chipByLabel(comm, '配置').cy },
+      '#ffcf6d',
+      'arrowAmber',
+      true
+    );
+    flowArrow(base,
+      { x: chipByLabel(external, '空调 / 传感器').left, y: chipByLabel(external, '空调 / 传感器').cy },
+      { x: comm.right, y: chipByLabel(comm, '协议').cy },
+      '#ffcf6d',
+      'arrowAmber',
+      true
+    );
+    flowArrow(base,
+      { x: chipByLabel(external, '摄像头 / NVR').left, y: chipByLabel(external, '摄像头 / NVR').cy },
+      { x: backend.right, y: chipByLabel(backend, '视频/OTA').cy },
+      '#ff8fb8',
+      'arrowViolet',
+      true
+    );
+    flowArrow(base,
+      { x: chipByLabel(external, '第三方系统').left, y: chipByLabel(external, '第三方系统').cy },
+      { x: backend.right, y: chipByLabel(backend, '通知').cy },
+      '#ff8fb8',
+      'arrowViolet',
+      true
+    );
+  </script>
+</body>
+</html>

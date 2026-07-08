@@ -8,12 +8,9 @@ import type {
   DashboardResponse,
   EnergyOpportunity,
   OpportunityMeasure,
-  OpportunitySummary,
   SimulationResponse,
   DeviceCapability,
   ExecutionPlan,
-  ExecutionTask,
-  ExecutionResult,
   PlanDetail,
   ExecutionStats,
   OpportunityCategory

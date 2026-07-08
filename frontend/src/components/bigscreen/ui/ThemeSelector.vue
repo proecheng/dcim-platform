@@ -37,7 +37,7 @@ import { useTheme } from '@/composables/bigscreen/useTheme'
 import type { ThemeName } from '@/types/theme'
 import { themes } from '@/config/themes'
 
-const props = withDefaults(defineProps<{
+withDefaults(defineProps<{
   showLabel?: boolean
 }>(), {
   showLabel: true

@@ -21,7 +21,7 @@ interface PanelState {
   visible: boolean
 }
 
-interface BigscreenState {
+interface _BigscreenState {
   // 场景模式
   mode: SceneMode
 

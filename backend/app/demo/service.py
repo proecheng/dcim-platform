@@ -13,6 +13,7 @@ from ..core.database import async_session, init_db
 from ..models import Point, PointRealtime, PointHistory, AlarmThreshold, PUEHistory, FloorMap
 from ..models.device import Device
 from ..models.spatial import Site, Floor, Room, Row
+from ..models.cooling import CoolingUnit, ColdAisle, CoolingGroup
 from ..models.energy import (
     Transformer,
     MeterPoint,
@@ -651,7 +652,7 @@ POWER_DEVICES = [
         "device_code": "SRV-001",
         "device_name": "服务器机柜1",
         "device_type": "IT",
-        "rated_power": 20,
+        "rated_power": 200,
         "is_it_load": True,
         "area_code": "A1",
         "circuit_code": "C-A1-01",
@@ -660,7 +661,7 @@ POWER_DEVICES = [
         "device_code": "SRV-002",
         "device_name": "服务器机柜2",
         "device_type": "IT",
-        "rated_power": 20,
+        "rated_power": 200,
         "is_it_load": True,
         "area_code": "A1",
         "circuit_code": "C-A1-01",
@@ -669,7 +670,7 @@ POWER_DEVICES = [
         "device_code": "SRV-003",
         "device_name": "服务器机柜3",
         "device_type": "IT",
-        "rated_power": 25,
+        "rated_power": 220,
         "is_it_load": True,
         "area_code": "A1",
         "circuit_code": "C-A1-02",
@@ -678,7 +679,7 @@ POWER_DEVICES = [
         "device_code": "SRV-004",
         "device_name": "服务器机柜4",
         "device_type": "IT",
-        "rated_power": 25,
+        "rated_power": 220,
         "is_it_load": True,
         "area_code": "A1",
         "circuit_code": "C-A1-02",
@@ -687,7 +688,7 @@ POWER_DEVICES = [
         "device_code": "NET-001",
         "device_name": "网络机柜1",
         "device_type": "IT",
-        "rated_power": 10,
+        "rated_power": 80,
         "is_it_load": True,
         "area_code": "A1",
         "circuit_code": "C-A1-03",
@@ -696,7 +697,7 @@ POWER_DEVICES = [
         "device_code": "STO-001",
         "device_name": "存储机柜1",
         "device_type": "IT",
-        "rated_power": 30,
+        "rated_power": 180,
         "is_it_load": True,
         "area_code": "A1",
         "circuit_code": "C-A1-03",
@@ -1076,6 +1077,9 @@ class DemoDataService:
                     except (asyncio.TimeoutError, asyncio.CancelledError):
                         pass
                 await asyncio.sleep(2)  # 额外等待确保所有写入完成
+            # 清空点位值缓存：重载后点位会被重建，旧 point_id 命中缓存会绕过
+            # 量程中点基准，污染 PUE 校准后的功率值；清空后模拟器从中点重新起算
+            simulator.value_cache.clear()
             try:
                 await init_db()
 
@@ -1114,6 +1118,11 @@ class DemoDataService:
                 async with async_session() as sync_session:
                     sync = DeviceSyncService(sync_session)
                     await sync.migrate_existing_data()
+
+                # Phase 3.6: 校准 PUE 功率口径 (44%) — 剔除误关联+重标定功率量程，
+                # 使实时 PUE 落在 ~1.34（详见 _calibrate_pue_demo 文档）
+                self._update_progress(44, "校准 PUE 功率口径...", progress_callback)
+                await self._calibrate_pue_demo(progress_callback)
 
                 # Phase 4: 生成历史数据 (45-85%)
                 self._update_progress(45, "生成历史数据...", progress_callback)
@@ -1722,6 +1731,123 @@ class DemoDataService:
             session.add_all(records)
             await session.commit()
             self._update_progress(88, f"生成 {len(records)} 条需量数据", progress_callback)
+
+    async def _calibrate_pue_demo(self, progress_callback=None):
+        """校准演示环境 PUE 功率口径，使实时 PUE 落在合理区间(~1.34)。
+
+        背景：演示数据存在三处缺陷，导致 calculate_realtime_pue() 算出 ~16：
+        1) 部分 AC/UPS 设备的 power_point_id 被 PointDeviceMatcher 误关联到
+           "回风温度(℃)" / "负载率(%)" 点位，被当作 kW 计入制冷/UPS 功率；
+        2) 冷水机组功率点位量程 0-500（中点 250kW 去冷 ~92kW IT，COP 0.37 失真）；
+        3) IT 实时功率相对制冷+UPS 偏小。
+        实时数据模拟器以"功率点位量程中点"为基准取值(app/demo/engine.py)，故本方法
+        集中、幂等地：① 剔除误关联(power_point_id 置空，原温度/负载率点位不动)；
+        ② 按目标在各设备间按 rated_power 比例分配并重标定功率点位量程(min=0,
+        max=2×目标，使中点=目标)与实时值。目标：IT≈1000 / 制冷≈226 / UPS≈110
+        (损耗口径) + 照明≈5 → 总≈1341 / PUE≈1.34。
+        注：PUE 历史(趋势)由 history_generator 合成(IT150×0.35)，本就正常；本方法
+        只修实时 PUE。仅作用于演示数据，不影响生产 PUE 计算逻辑。
+        """
+        from ..models.energy import PowerDevice
+
+        COOLING_TYPES = {"AC", "CHILLER", "CT", "PUMP"}
+        TARGET = {"IT": 1000.0, "COOL": 226.0, "UPS": 110.0}
+
+        def _category(dev) -> Optional[str]:
+            if dev.is_it_load or dev.device_type == "IT":
+                return "IT"
+            if dev.device_type in COOLING_TYPES:
+                return "COOL"
+            if dev.device_type == "UPS":
+                return "UPS"
+            return None
+
+        def _is_real_power_point(pt) -> bool:
+            unit = (pt.unit or "").strip()
+            name = pt.point_name or ""
+            code = (pt.point_code or "").lower()
+            return unit == "kW" and ("功率" in name or "_power" in code)
+
+        async with async_session() as session:
+            devices = (
+                await session.execute(
+                    select(PowerDevice).where(PowerDevice.is_enabled == True)
+                )
+            ).scalars().all()
+
+            pids = [d.power_point_id for d in devices if d.power_point_id]
+            point_map = {}
+            if pids:
+                pts = (
+                    await session.execute(select(Point).where(Point.id.in_(pids)))
+                ).scalars().all()
+                point_map = {p.id: p for p in pts}
+
+            # 第一遍：分类 + 剔除误关联（power_point_id 指向非功率点位的）
+            cat_items = {"IT": [], "COOL": [], "UPS": []}
+            nulled = 0
+            for d in devices:
+                cat = _category(d)
+                if cat is None:
+                    continue
+                pt = point_map.get(d.power_point_id) if d.power_point_id else None
+                if pt is None or not _is_real_power_point(pt):
+                    if d.power_point_id is not None:
+                        d.power_point_id = None  # 误关联到温度/负载率点位，剔除以免污染 PUE
+                        nulled += 1
+                    continue
+                cat_items[cat].append((d, pt))
+
+            # 第二遍：按 rated_power 比例分配目标功率，重标定量程与实时值
+            rt_targets = {}
+            recalibrated = 0
+            for cat, items in cat_items.items():
+                if not items:
+                    continue
+                total_rated = sum((d.rated_power or 0) for d, _ in items)
+                n = len(items)
+                for d, pt in items:
+                    share = ((d.rated_power or 0) / total_rated) if total_rated > 0 else (1.0 / n)
+                    target_val = round(TARGET[cat] * share, 2)
+                    pt.min_range = 0
+                    pt.max_range = round(target_val * 2, 1) or 1.0  # 中点=target_val
+                    rt_targets[pt.id] = target_val
+                    recalibrated += 1
+
+            await session.flush()
+
+            # 重写实时值，使当前 PUE 立即正确（不必等模拟器先跑一轮）
+            if rt_targets:
+                rts = (
+                    await session.execute(
+                        select(PointRealtime).where(
+                            PointRealtime.point_id.in_(list(rt_targets.keys()))
+                        )
+                    )
+                ).scalars().all()
+                seen = set()
+                now = datetime.now()
+                for rt in rts:
+                    rt.value = rt_targets[rt.point_id]
+                    rt.quality = 0
+                    rt.status = "normal"
+                    rt.updated_at = now
+                    seen.add(rt.point_id)
+                for pid, val in rt_targets.items():
+                    if pid not in seen:
+                        session.add(
+                            PointRealtime(
+                                point_id=pid, value=val, quality=0,
+                                status="normal", source="demo",
+                            )
+                        )
+
+            await session.commit()
+            logger.info(
+                "PUE 校准完成: 剔除误关联 %d 个, 重标定功率点位 %d 个 "
+                "(IT≈%.0f/制冷≈%.0f/UPS≈%.0f kW)",
+                nulled, recalibrated, TARGET["IT"], TARGET["COOL"], TARGET["UPS"],
+            )
 
     async def _generate_history(self, days: int, progress_callback) -> int:
         """生成历史数据"""

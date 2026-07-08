@@ -119,7 +119,7 @@ const props = defineProps<{
 }>()
 
 // 时段类型颜色映射
-const periodTypeColors: Record<string, string> = {
+const _periodTypeColors: Record<string, string> = {
   sharp: '#f56c6c',
   peak: '#e6a23c',
   normal: '#409eff',

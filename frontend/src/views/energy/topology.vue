@@ -1281,7 +1281,7 @@ const onPositionChange = () => {
   loadUnlinkedDevices()
 }
 
-const handleAddNode = (type: ExtendedNodeType) => {
+const _handleAddNode = (_type: ExtendedNodeType) => {
   // 保留此函数用于兼容，但现在主要通过 handleOpenAddDialog 调用
   addForm.name = ''
   addForm.link_device_id = null
@@ -1634,7 +1634,7 @@ const handleExport = async () => {
       URL.revokeObjectURL(url)
       ElMessage.success('导出成功')
     }
-  } catch (e) {
+  } catch {
     ElMessage.error('导出失败')
   }
 }
@@ -1663,7 +1663,7 @@ const handleConfirmImport = async () => {
     } else {
       ElMessage.error(res.message || '导入失败')
     }
-  } catch (e) {
+  } catch {
     ElMessage.error('导入失败，请检查文件格式')
   } finally {
     importing.value = false

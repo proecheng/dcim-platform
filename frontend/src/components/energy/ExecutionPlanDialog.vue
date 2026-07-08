@@ -58,7 +58,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, reactive, computed } from 'vue'
+import { ref, watch, reactive } from 'vue'
 import type { FormInstance, FormRules } from 'element-plus'
 
 interface DeviceRule {

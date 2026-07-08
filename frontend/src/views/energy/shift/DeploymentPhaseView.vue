@@ -246,7 +246,7 @@ async function handleCalibrate(row: ZoneRow) {
     } else {
       ElMessage.error(msg || '校准失败')
     }
-  } catch (e: any) {
+  } catch {
     ElMessage.error('校准请求异常')
   } finally {
     row.calibrating = false
@@ -285,7 +285,7 @@ async function handleSwitch() {
         message: typeof data?.details === 'string' ? data.details : (msg || '切换失败'),
       }
     }
-  } catch (e: any) {
+  } catch {
     switchError.value = { message: '请求异常' }
   } finally {
     switching.value = false

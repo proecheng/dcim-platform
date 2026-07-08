@@ -231,7 +231,7 @@ const currentPresets = computed(() => {
 
 async function loadCameras() {
   try {
-    const res = await getCameraList({ page: 1, page_size: 200 })
+    const res = await getCameraList({ page: 1, page_size: 100 })
     cameraList.value = res.items || []
   } catch {
     ElMessage.error('加载摄像头列表失败')

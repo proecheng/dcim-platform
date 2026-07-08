@@ -1,7 +1,7 @@
 // frontend/src/composables/bigscreen/useTheme.ts
 import { ref, computed, watch } from 'vue'
 import type { BigscreenTheme, ThemeName } from '@/types/theme'
-import { themes, defaultTheme, getTheme, getThemeList } from '@/config/themes'
+import { themes, getTheme, getThemeList } from '@/config/themes'
 
 const STORAGE_KEY = 'bigscreen-theme'
 

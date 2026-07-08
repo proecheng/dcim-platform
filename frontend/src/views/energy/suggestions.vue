@@ -355,7 +355,7 @@ async function triggerAnalysis() {
       ElMessage.info('分析完成，暂无新建议')
     }
     await loadData()
-  } catch (e) {
+  } catch {
     ElMessage.error('分析失败')
   } finally {
     analyzing.value = false

@@ -149,15 +149,14 @@
 
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { getShiftPlan, submitShiftPlan, approveShiftPlan, executeShiftPlan } from '@/api/modules/shift'
+import { getShiftPlan, submitShiftPlan, approveShiftPlan, executeShiftPlan, type ShiftPlan } from '@/api/modules/shift'
 
 const route = useRoute()
-const router = useRouter()
 
 const loading = ref(false)
-const plan = reactive<any>({})
+const plan = reactive<Partial<ShiftPlan>>({})
 const approvalDialogVisible = ref(false)
 const approvalForm = reactive({
   approved: true,
@@ -185,8 +184,10 @@ const statusLabels: Record<string, string> = {
 const getPeriodLabel = (period: string) => periodLabels[period] || period
 const getStatusLabel = (status: string) => statusLabels[status] || status
 
+type TagType = 'primary' | 'success' | 'warning' | 'info' | 'danger'
+
 const getStatusType = (status: string) => {
-  const typeMap: Record<string, any> = {
+  const typeMap: Record<string, TagType> = {
     draft: 'info',
     pending_approval: 'warning',
     approved: 'success',
@@ -204,7 +205,7 @@ const loadPlan = async () => {
   try {
     const id = Number(route.params.id)
     const res = await getShiftPlan(id)
-    Object.assign(plan, res.data || {})
+    Object.assign(plan, res)
   } catch (error: any) {
     ElMessage.error(error.message || '加载计划详情失败')
   } finally {

@@ -1159,7 +1159,7 @@ async function openTaskDetail(taskId: string) {
   try {
     const res = await getOtaTaskDetail(taskId)
     taskDetail.value = (res as any)?.data ?? res
-  } catch (e) {
+  } catch {
     ElMessage.error('获取任务详情失败')
   }
 }

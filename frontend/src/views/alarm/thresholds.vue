@@ -254,7 +254,7 @@
 <script setup lang="ts">
 import * as echarts from 'echarts'
 import {
-  getThresholdList, createThreshold, updateThreshold, deleteThreshold,
+  getThresholdList, updateThreshold, deleteThreshold,
   getPointThresholds, setFourLevelThresholds, batchSetByDeviceType,
   type ThresholdInfo
 } from '@/api/modules/threshold'

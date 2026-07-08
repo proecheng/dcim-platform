@@ -14,7 +14,7 @@ export interface EntranceAnimationOptions {
  */
 export function useEntranceAnimation(options: EntranceAnimationOptions = {}) {
   const {
-    duration = 0.6,
+    duration: _duration = 0.6,
     staggerDelay = 0.1,
     ease = 'power2.out'
   } = options

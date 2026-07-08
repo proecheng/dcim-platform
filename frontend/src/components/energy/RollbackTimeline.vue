@@ -157,6 +157,11 @@ onMounted(() => {
 onUnmounted(() => {
   wsManager.off('alarms', 'alarm', handleRollbackMessage)
 })
+
+defineExpose({
+  formatTime,
+  triggerTypeMap,
+})
 </script>
 
 <style scoped>

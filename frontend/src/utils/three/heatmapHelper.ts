@@ -54,8 +54,8 @@ export function createHeatmapPlane(
 export function updateHeatmapColors(
   mesh: THREE.Mesh,
   temperatureData: Array<{ x: number; z: number; temp: number }>,
-  width: number,
-  length: number
+  _width: number,
+  _length: number
 ): void {
   const geometry = mesh.geometry as THREE.PlaneGeometry
   const colors = geometry.attributes.color as THREE.BufferAttribute

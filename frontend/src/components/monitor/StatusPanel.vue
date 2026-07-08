@@ -78,7 +78,7 @@ interface Props {
   animate?: boolean
 }
 
-const props = withDefaults(defineProps<Props>(), {
+withDefaults(defineProps<Props>(), {
   title: '状态面板',
   showRefresh: true,
   loading: false,

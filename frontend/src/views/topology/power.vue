@@ -399,7 +399,7 @@ function openMappingDialog(row?: PowerPhaseMappingResponse) {
   mappingDialogVisible.value = true
 }
 
-function resetMappingForm() {
+function _resetMappingForm() {
   isEditMapping.value = false
   editingMappingId.value = 0
 }

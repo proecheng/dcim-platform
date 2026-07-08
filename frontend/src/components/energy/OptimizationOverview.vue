@@ -229,7 +229,7 @@ import {
 import { useOpportunityStore } from '@/stores/opportunity'
 import { triggerDetection, executeOpportunity } from '@/api/modules/opportunities'
 
-const props = defineProps<{ activeTab?: string }>()
+defineProps<{ activeTab?: string }>()
 const emit = defineEmits<{ (e: 'update:activeTab', value: string): void }>()
 
 const router = useRouter()
@@ -307,7 +307,7 @@ async function runAnalysis() {
     } else {
       ElMessage.info('分析完成，暂无新建议')
     }
-  } catch (e) {
+  } catch {
     ElMessage.error('分析失败')
   } finally {
     analyzing.value = false
@@ -337,7 +337,7 @@ async function handleTriggerDetection() {
         ElMessage.info('检测完成，暂无新机会')
       }
     }
-  } catch (e) {
+  } catch {
     ElMessage.error('检测失败')
   } finally {
     detectLoading.value = false

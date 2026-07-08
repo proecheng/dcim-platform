@@ -101,7 +101,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, watch, onMounted, onUnmounted } from 'vue'
+import { computed, ref, reactive, watch, onMounted, onUnmounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Download, Delete, Refresh } from '@element-plus/icons-vue'
 import { getDemoStatus, loadDemoData, getDemoProgress, unloadDemoData, refreshDemoDataDates } from '@/api/modules/demo'
@@ -118,8 +118,6 @@ const unloading = ref(false)
 const errorMessage = ref('')
 let progressTimer: number | null = null
 
-const estimatedPoints = 200
-
 const status = reactive({
   is_loaded: false,
   demo_point_count: 0,
@@ -128,6 +126,8 @@ const status = reactive({
   progress: 0,
   progress_message: ''
 })
+
+const estimatedPoints = computed(() => status.demo_point_count || 500)
 
 watch(() => props.modelValue, (val) => {
   visible.value = val

@@ -4,8 +4,10 @@ from pathlib import Path
 
 from sqlalchemy import engine_from_config
 from sqlalchemy import pool
+from sqlalchemy import inspect, text
 
 from alembic import context
+from alembic.script import ScriptDirectory
 
 # Add parent directory to path so we can import app modules
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -89,10 +91,26 @@ def run_migrations_online() -> None:
     )
 
     with connectable.connect() as connection:
+        if connection.dialect.name == "sqlite":
+            inspector = inspect(connection)
+            user_tables = [name for name in inspector.get_table_names() if name != "alembic_version"]
+            if not user_tables:
+                Base.metadata.create_all(connection, checkfirst=True)
+                script = ScriptDirectory.from_config(config)
+                head = script.get_current_head()
+                connection.execute(text("CREATE TABLE IF NOT EXISTS alembic_version (version_num VARCHAR(32) NOT NULL)"))
+                connection.execute(text("DELETE FROM alembic_version"))
+                connection.execute(text("INSERT INTO alembic_version (version_num) VALUES (:head)"), {"head": head})
+                connection.commit()
+                return
+
         context.configure(connection=connection, target_metadata=target_metadata)
 
         with context.begin_transaction():
             context.run_migrations()
+
+        if connection.dialect.name == "sqlite" and connection.in_transaction():
+            connection.commit()
 
 
 if context.is_offline_mode():

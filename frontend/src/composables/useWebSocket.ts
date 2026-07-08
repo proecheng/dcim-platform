@@ -69,23 +69,25 @@ export function useWebSocket(options: UseWebSocketOptions) {
     wsClient.unsubscribe(channels)
   }
 
-  // handler → wrapper 映射，确保 off 能找到正确的包装函数
-  const handlerMap = new Map<(...args: any[]) => void, (...args: any[]) => void>()
+  type MessageHandler = (data: any) => void
 
-  const on = (type: string, handler: (data: any) => void) => {
-    const wrapper = (message: any) => {
+  // handler → wrapper 映射，确保 off 能找到正确的包装函数
+  const handlerMap = new Map<MessageHandler, MessageHandler>()
+
+  const on = (type: string, handler: MessageHandler) => {
+    const wrapper: MessageHandler = (message) => {
       lastMessage.value = message
       handler(message)
     }
     handlerMap.set(handler, wrapper)
-    wsClient.on(type, wrapper as (data: any) => void)
+    wsClient.on(type, wrapper)
   }
 
-  const off = (type: string, handler?: (data: any) => void) => {
+  const off = (type: string, handler?: MessageHandler) => {
     if (handler) {
       const wrapper = handlerMap.get(handler)
       if (wrapper) {
-        wsClient.off(type, wrapper as (data: any) => void)
+        wsClient.off(type, wrapper)
         handlerMap.delete(handler)
       }
     } else {

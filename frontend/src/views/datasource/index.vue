@@ -190,14 +190,14 @@
             <el-input-number v-model="form.connection_config.port" :min="1" :max="65535" />
           </el-form-item>
           <el-form-item label="从站地址">
-            <el-input-number v-model="form.connection_config.slave_id" :min="1" :max="247" />
+            <el-input-number v-model="form.connection_config.device_id" :min="1" :max="247" />
           </el-form-item>
         </template>
 
         <!-- Modbus RTU -->
         <template v-if="form.protocol_type === 'modbus_rtu'">
           <el-form-item label="串口">
-            <el-input v-model="form.connection_config.serial_port" placeholder="COM1 或 /dev/ttyUSB0" />
+            <el-input v-model="form.connection_config.port" placeholder="COM1 或 /dev/ttyUSB0" />
           </el-form-item>
           <el-form-item label="波特率">
             <el-select v-model="form.connection_config.baudrate">
@@ -205,7 +205,7 @@
             </el-select>
           </el-form-item>
           <el-form-item label="数据位">
-            <el-select v-model="form.connection_config.data_bits">
+            <el-select v-model="form.connection_config.bytesize">
               <el-option v-for="b in [7, 8]" :key="b" :label="b" :value="b" />
             </el-select>
           </el-form-item>
@@ -217,9 +217,12 @@
             </el-select>
           </el-form-item>
           <el-form-item label="停止位">
-            <el-select v-model="form.connection_config.stop_bits">
+            <el-select v-model="form.connection_config.stopbits">
               <el-option v-for="s in [1, 2]" :key="s" :label="s" :value="s" />
             </el-select>
+          </el-form-item>
+          <el-form-item label="从站地址">
+            <el-input-number v-model="form.connection_config.device_id" :min="1" :max="247" />
           </el-form-item>
         </template>
 
@@ -492,9 +495,9 @@ const protocolOptions = [
 function getDefaultConfig(protocolType: string): Record<string, any> {
   switch (protocolType) {
     case 'modbus_tcp':
-      return { host: '', port: 502, slave_id: 1 }
+      return { host: '', port: 502, device_id: 1, timeout: 3, word_order: 'big' }
     case 'modbus_rtu':
-      return { serial_port: '', baudrate: 9600, data_bits: 8, parity: 'N', stop_bits: 1 }
+      return { port: 'COM1', baudrate: 9600, bytesize: 8, parity: 'N', stopbits: 1, device_id: 1, timeout: 3, word_order: 'big' }
     case 'snmp_v2c':
       return { host: '', port: 161, community: 'public' }
     case 'snmp_v3':
@@ -819,7 +822,7 @@ function handleOpenImport(row: DataSource) {
   importDialogVisible.value = true
 }
 
-function resetImportState() {
+function _resetImportState() {
   importFile.value = null
   importReport.value = null
   validating.value = false

@@ -2,19 +2,36 @@
   <div class="fault-tree-editor">
     <div class="editor-header">
       <el-breadcrumb separator="/">
-        <el-breadcrumb-item :to="{ path: '/diagnosis/fault-trees' }">故障树管理</el-breadcrumb-item>
-        <el-breadcrumb-item>{{ faultTree?.name || '加载中...' }}</el-breadcrumb-item>
+        <el-breadcrumb-item :to="{ path: '/strategy/diagnosis/rules' }">故障树管理</el-breadcrumb-item>
+        <el-breadcrumb-item>{{ faultTree?.name || loadError?.title || '加载中...' }}</el-breadcrumb-item>
       </el-breadcrumb>
 
-      <div class="header-actions">
-        <el-button @click="handleSave" type="primary" :loading="saving" :disabled="!canSave">
+      <div v-if="!loadError" class="header-actions">
+        <el-button @click="handleSave" type="primary" :loading="saving" :disabled="loading || !canSave">
           保存
         </el-button>
         <el-button @click="handleCancel">取消</el-button>
       </div>
     </div>
 
-    <div class="editor-content">
+    <el-result
+      v-if="loadError"
+      class="editor-result"
+      icon="warning"
+      :title="loadError.title"
+      :sub-title="loadError.description"
+    >
+      <template #extra>
+        <el-button type="primary" @click="router.push('/strategy/diagnosis/rules')">返回诊断规则</el-button>
+        <el-button @click="loadFaultTree">重试</el-button>
+      </template>
+    </el-result>
+
+    <div v-else-if="loading" class="editor-loading">
+      <el-skeleton :rows="6" animated />
+    </div>
+
+    <div v-else class="editor-content">
       <!-- 左侧工具面板 -->
       <NodeToolbar @add-node="handleAddNode" />
 
@@ -59,17 +76,45 @@ const selectedNode = ref<VisNode | null>(null)
 const canSave = ref(true)
 const saving = ref(false)
 const hasUnsavedChanges = ref(false)
+const loading = ref(true)
+const loadError = ref<{ title: string; description: string } | null>(null)
 
 // 加载故障树数据
-onMounted(async () => {
-  try {
-    const response = await getFaultTree(treeId.value)
-    faultTree.value = response
-  } catch (error) {
-    ElMessage.error('加载故障树失败')
-    console.error(error)
+async function loadFaultTree() {
+  const id = treeId.value
+  if (!Number.isInteger(id) || id <= 0) {
+    faultTree.value = null
+    canSave.value = false
+    loadError.value = {
+      title: '故障树 ID 无效',
+      description: '当前地址中的故障树 ID 不合法，请返回诊断规则重新选择。'
+    }
+    return
   }
-})
+
+  loading.value = true
+  loadError.value = null
+  try {
+    const response = await getFaultTree(id, { silentError: true })
+    faultTree.value = response
+    canSave.value = true
+  } catch (error: any) {
+    faultTree.value = null
+    canSave.value = false
+    const status = error?.response?.status
+    loadError.value = status === 404
+      ? {
+          title: '未找到故障树',
+          description: `故障树 ${id} 不存在，可能已被删除或您当前无权查看。`
+        }
+      : {
+          title: '故障树加载失败',
+          description: '暂时无法获取故障树数据，请稍后重试。'
+        }
+  } finally {
+    loading.value = false
+  }
+}
 
 // 添加节点
 function handleAddNode(nodeType: string) {
@@ -127,12 +172,12 @@ function handleCancel() {
       cancelButtonText: '取消',
       type: 'warning'
     }).then(() => {
-      router.push('/diagnosis/fault-trees')
+      router.push('/strategy/diagnosis/rules')
     }).catch(() => {
       // 用户取消
     })
   } else {
-    router.push('/diagnosis/fault-trees')
+    router.push('/strategy/diagnosis/rules')
   }
 }
 
@@ -162,6 +207,7 @@ function handleBeforeUnload(e: BeforeUnloadEvent) {
 }
 
 onMounted(() => {
+  loadFaultTree()
   window.addEventListener('beforeunload', handleBeforeUnload)
 })
 
@@ -195,6 +241,16 @@ onBeforeUnmount(() => {
     flex: 1;
     display: flex;
     overflow: hidden;
+  }
+
+  .editor-loading,
+  .editor-result {
+    flex: 1;
+    background: #fff;
+  }
+
+  .editor-loading {
+    padding: 40px;
   }
 }
 </style>

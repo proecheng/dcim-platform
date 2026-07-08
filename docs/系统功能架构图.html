@@ -1,0 +1,590 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>DCIM · 算力中心智能监控系统 — 交互式功能架构</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#070b12; --panel:#0d1422; --panel-2:#111a2b;
+    --line:#1d2c44; --line-soft:#16223655;
+    --cyan:#2bd6ee; --cyan-dim:#1c8fa3; --amber:#ffb13d; --green:#39dd86;
+    --violet:#9d8bff; --blue:#5b86ff; --red:#ff5a6e; --pink:#ff8ed0; --slate:#94a8c4;
+    --text:#dbe6f5; --text-dim:#8493ab; --text-faint:#56627a;
+    --glow-cyan:0 0 0 1px #2bd6ee44, 0 0 24px -6px #2bd6ee55;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{background:var(--bg);color:var(--text);font-family:'Chakra Petch',sans-serif}
+  body{
+    min-height:100vh;
+    background:
+      radial-gradient(900px 500px at 12% -8%, #0e2030 0%, transparent 60%),
+      radial-gradient(800px 600px at 100% 0%, #1a1320 0%, transparent 55%),
+      radial-gradient(700px 700px at 50% 120%, #08161a 0%, transparent 60%),
+      var(--bg);
+    background-attachment:fixed;
+    padding:32px clamp(12px,3vw,48px) 80px;
+    position:relative;overflow-x:hidden;
+  }
+  body::before{content:"";position:fixed;inset:0;pointer-events:none;z-index:0;
+    background-image:linear-gradient(#ffffff05 1px,transparent 1px),linear-gradient(90deg,#ffffff05 1px,transparent 1px);
+    background-size:46px 46px;mask-image:radial-gradient(80% 75% at 50% 30%,#000 0%,transparent 100%);}
+  body::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:200;
+    background:repeating-linear-gradient(0deg,#0000 0 3px,#00000022 3px 4px);mix-blend-mode:overlay;opacity:.45;}
+  .wrap{position:relative;z-index:1;max-width:1520px;margin:0 auto}
+  .mono{font-family:'IBM Plex Mono',monospace}
+
+  /* ===== HEADER ===== */
+  header{display:flex;align-items:flex-end;justify-content:space-between;gap:22px;
+    border-bottom:1px solid var(--line);padding-bottom:18px;margin-bottom:22px;flex-wrap:wrap;}
+  .brand{display:flex;align-items:center;gap:16px}
+  .logo-mark{width:52px;height:52px;flex:none;border-radius:11px;position:relative;
+    background:linear-gradient(150deg,#10202c,#0a121d);border:1px solid #2bd6ee55;box-shadow:var(--glow-cyan);display:grid;place-items:center;}
+  .logo-mark svg{width:29px;height:29px}
+  .logo-mark::after{content:"";position:absolute;inset:0;border-radius:11px;
+    background:conic-gradient(from 0deg,#2bd6ee00,#2bd6ee44,#2bd6ee00 40%);animation:spin 6s linear infinite;mask:radial-gradient(closest-side,transparent 78%,#000 80%)}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  h1{font-size:clamp(20px,2.5vw,32px);font-weight:700;letter-spacing:.4px;line-height:1.05}
+  h1 .sub{display:block;font-size:12px;font-weight:500;color:var(--cyan);letter-spacing:3px;text-transform:uppercase;margin-top:4px}
+  .meta{text-align:right;font-size:12px;color:var(--text-dim);line-height:1.85}
+  .pill{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--line);border-radius:999px;padding:4px 11px;background:#0c1422aa;margin-left:6px}
+  .dot{width:7px;height:7px;border-radius:50%;background:var(--green);box-shadow:0 0 8px var(--green);animation:blink 1.8s infinite}
+  @keyframes blink{0%,72%,100%{opacity:1}80%{opacity:.25}}
+
+  /* ===== TOOLBAR (interactive controls) ===== */
+  .toolbar{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:24px}
+  .search{position:relative;flex:1 1 280px;max-width:420px}
+  .search svg{position:absolute;left:12px;top:50%;transform:translateY(-50%);width:16px;height:16px;color:var(--text-faint)}
+  .search input{width:100%;background:#0b1320;border:1px solid var(--line);border-radius:9px;color:var(--text);
+    font-family:'IBM Plex Mono',monospace;font-size:13px;padding:9px 30px 9px 36px;outline:none;transition:.2s}
+  .search input:focus{border-color:#2bd6ee66;box-shadow:0 0 0 3px #2bd6ee18}
+  .search input::placeholder{color:var(--text-faint)}
+  .search .clr{position:absolute;right:9px;top:50%;transform:translateY(-50%);cursor:pointer;color:var(--text-faint);
+    border:none;background:none;font-size:15px;line-height:1;display:none}
+  .search .clr:hover{color:var(--text)}
+  .filters{display:flex;gap:7px;flex-wrap:wrap}
+  .fbtn{font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.5px;color:var(--text-dim);cursor:pointer;
+    border:1px solid var(--line);background:#0b1320;border-radius:7px;padding:6px 11px;display:flex;align-items:center;gap:7px;transition:.18s;user-select:none}
+  .fbtn .sw{width:9px;height:9px;border-radius:3px;background:var(--fc,var(--text-dim))}
+  .fbtn:hover{color:var(--text);border-color:var(--fc,var(--cyan))}
+  .fbtn.on{color:#06121a;background:var(--fc,var(--cyan));border-color:var(--fc,var(--cyan));font-weight:600}
+  .fbtn.on .sw{background:#06121a}
+  .stat{margin-left:auto;display:flex;gap:18px;font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--text-faint)}
+  .stat b{color:var(--cyan);font-size:16px;font-weight:600}
+  .stat span{display:flex;flex-direction:column;align-items:flex-end;line-height:1.2}
+
+  /* ===== SECTION TITLES ===== */
+  .sec-tag{display:flex;align-items:center;gap:12px;margin:30px 0 14px}
+  .sec-tag .n{font-family:'IBM Plex Mono',monospace;font-size:12px;color:var(--cyan);border:1px solid var(--cyan-dim);border-radius:5px;padding:3px 8px;background:#0a1a1f}
+  .sec-tag h2{font-size:15px;font-weight:600;letter-spacing:2px;text-transform:uppercase;color:var(--text)}
+  .sec-tag .ln{flex:1;height:1px;background:linear-gradient(90deg,var(--line),transparent)}
+  .sec-tag .en{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--text-faint);letter-spacing:1px}
+  .hint{font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:var(--text-faint);border:1px dashed var(--line);border-radius:5px;padding:3px 8px}
+
+  /* ===== LAYER 1 : PIPELINE ===== */
+  .pipeline{border:1px solid var(--line);border-radius:14px;background:linear-gradient(180deg,#0c14228c,#0a0f1aee);
+    padding:22px clamp(12px,2.2vw,32px);position:relative;overflow:hidden;}
+  .pipeline::before{content:"";position:absolute;inset:0;background:radial-gradient(600px 120px at 50% 0%,#2bd6ee14,transparent 70%)}
+  .flow{display:flex;align-items:stretch;gap:0;position:relative;z-index:1;flex-wrap:wrap}
+  .node{flex:1 1 0;min-width:175px;background:linear-gradient(160deg,var(--panel-2),var(--panel));
+    border:1px solid var(--line);border-radius:11px;padding:15px;position:relative;transition:.25s;cursor:pointer}
+  .node:hover,.node:focus-visible{border-color:#2bd6ee66;box-shadow:0 0 22px -8px #2bd6ee55;transform:translateY(-2px);outline:none}
+  .node .ico{width:33px;height:33px;border-radius:8px;display:grid;place-items:center;border:1px solid var(--line);background:#0a1320;margin-bottom:9px}
+  .node .ico svg{width:18px;height:18px;color:var(--cyan)}
+  .node h3{font-size:14.5px;font-weight:600;display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
+  .node h3 .port{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--amber);background:#1c140833;border:1px solid #5a420f;border-radius:4px;padding:1px 6px}
+  .node p{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--text-dim);margin-top:6px;line-height:1.55}
+  .node .more{position:absolute;right:11px;bottom:9px;font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:var(--text-faint);opacity:0;transition:.2s}
+  .node:hover .more{opacity:1}
+  .arrow{flex:none;display:flex;align-items:center;justify-content:center;width:42px;position:relative}
+  .arrow svg{width:28px;height:18px;color:var(--cyan-dim)}
+  .arrow::after{content:"";position:absolute;width:5px;height:5px;border-radius:50%;background:var(--cyan);box-shadow:0 0 10px var(--cyan);left:6px;animation:run 1.8s linear infinite}
+  @keyframes run{0%{left:3px;opacity:0}15%{opacity:1}85%{opacity:1}100%{left:33px;opacity:0}}
+  .ws-branch{margin-top:15px;display:flex;align-items:center;gap:11px;flex-wrap:wrap;border-top:1px dashed var(--line);padding-top:13px;position:relative;z-index:1}
+  .ws-branch .lbl{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--cyan);letter-spacing:1px;display:flex;align-items:center;gap:7px}
+  .chan{font-family:'IBM Plex Mono',monospace;font-size:11px;border:1px solid var(--cyan-dim);background:#08191d;color:#bdeef5;border-radius:6px;padding:3px 9px;display:flex;align-items:center;gap:6px}
+  .chan b{color:var(--cyan);font-weight:600}
+  .pulse-sm{width:6px;height:6px;border-radius:50%;background:var(--cyan);box-shadow:0 0 7px var(--cyan);animation:blink 1.4s infinite}
+
+  /* ===== CHIPS ===== */
+  .chip{font-family:'IBM Plex Mono',monospace;font-size:10.5px;letter-spacing:.2px;border:1px solid var(--line);background:#0b1320;color:var(--text-dim);border-radius:5px;padding:3px 7px;white-space:nowrap;transition:.16s}
+  .chip:hover{color:var(--text)}
+
+  /* ===== LAYER 2 : DOMAIN ROWS ===== */
+  .row-block{display:grid;grid-template-columns:38px 1fr;gap:13px;margin-bottom:13px}
+  .row-rail{border:1px solid var(--line);border-radius:10px;background:#0b1320cc;display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden}
+  .row-rail span{writing-mode:vertical-rl;transform:rotate(180deg);font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:3px;text-transform:uppercase;color:var(--rc,var(--text-dim));font-weight:600}
+  .row-rail::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--rc,var(--cyan))}
+  .row-rail::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,var(--rc,#2bd6ee)14,transparent 60%)}
+  .cards{display:grid;gap:13px;grid-template-columns:repeat(auto-fit,minmax(258px,1fr))}
+
+  .card{--ac:var(--cyan);position:relative;border:1px solid var(--line);border-radius:12px;overflow:hidden;cursor:pointer;
+    background:linear-gradient(165deg,#0e1726f2,#0a0f1af2);padding:14px 14px 13px;transition:transform .28s cubic-bezier(.2,.7,.3,1),border-color .2s,box-shadow .2s,opacity .25s;
+    opacity:0;transform:translateY(14px)}
+  .card.in{opacity:1;transform:none}
+  .card::before{content:"";position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--ac),transparent 75%)}
+  .card::after{content:"";position:absolute;inset:0;background:radial-gradient(360px 120px at 20% -10%,var(--ac)14,transparent 70%);opacity:.6;pointer-events:none}
+  .card:hover,.card:focus-visible{transform:translateY(-4px);border-color:color-mix(in srgb,var(--ac) 55%,transparent);box-shadow:0 12px 34px -16px var(--ac),0 0 0 1px color-mix(in srgb,var(--ac) 25%,transparent) inset;outline:none}
+  .card.dim{opacity:.12;filter:grayscale(.7);pointer-events:none;transform:scale(.97)}
+  .card.hidden{display:none}
+  .card-hd{display:flex;align-items:center;gap:11px;margin-bottom:10px}
+  .card-ico{width:35px;height:35px;flex:none;border-radius:9px;display:grid;place-items:center;background:#0a1320;border:1px solid color-mix(in srgb,var(--ac) 35%,var(--line));box-shadow:0 0 18px -8px var(--ac)}
+  .card-ico svg{width:19px;height:19px;color:var(--ac)}
+  .card-hd .t{display:flex;flex-direction:column;gap:1px;min-width:0}
+  .card-hd .t b{font-size:15px;font-weight:600;letter-spacing:.3px;color:var(--text)}
+  .card-hd .t em{font-family:'IBM Plex Mono',monospace;font-style:normal;font-size:9px;letter-spacing:1.2px;text-transform:uppercase;color:var(--text-faint)}
+  .card-hd .idx{margin-left:auto;font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--text-faint);border:1px solid var(--line);border-radius:4px;padding:2px 5px;background:#0a111c}
+  .card .tags{display:flex;flex-wrap:wrap;gap:5px}
+  .card .meta-line{margin-top:9px;display:flex;gap:10px;font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:var(--text-faint)}
+  .card .meta-line span{display:flex;align-items:center;gap:4px}
+  .card .meta-line .num{color:color-mix(in srgb,var(--ac) 80%,#fff)}
+  mark{background:var(--cyan);color:#06121a;border-radius:2px;padding:0 1px}
+
+  .v-cyan{--ac:var(--cyan)}.v-red{--ac:var(--red)}.v-amber{--ac:var(--amber)}.v-green{--ac:var(--green)}
+  .v-violet{--ac:var(--violet)}.v-blue{--ac:var(--blue)}.v-slate{--ac:var(--slate)}.v-pink{--ac:var(--pink)}
+
+  .empty-msg{display:none;text-align:center;padding:40px;color:var(--text-faint);font-family:'IBM Plex Mono',monospace;font-size:13px;border:1px dashed var(--line);border-radius:12px}
+  .empty-msg.show{display:block}
+
+  /* ===== LAYER 3 : DATA BASE ===== */
+  .base{margin-top:6px;border:1px solid var(--line);border-radius:14px;background:linear-gradient(180deg,#0a1018,#0a0f1a);
+    padding:16px clamp(12px,2vw,26px);display:flex;flex-wrap:wrap;align-items:stretch;gap:11px;position:relative;overflow:hidden}
+  .base::before{content:"";position:absolute;inset:0;background:radial-gradient(700px 120px at 50% 110%,#39dd8612,transparent 70%)}
+  .base .seg{position:relative;z-index:1;flex:1 1 168px;border:1px solid var(--line);border-radius:10px;background:#0c1320cc;padding:11px 12px;transition:.22s}
+  .base .seg:hover{border-color:#39dd8655;transform:translateY(-2px)}
+  .base .seg .sh{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+  .base .seg .sh svg{width:15px;height:15px;color:var(--green)}
+  .base .seg .sh b{font-size:12.5px;font-weight:600;letter-spacing:.3px}
+  .base .seg p{font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--text-dim);line-height:1.6}
+
+  /* ===== DRAWER ===== */
+  .scrim{position:fixed;inset:0;background:#04070caa;backdrop-filter:blur(3px);opacity:0;pointer-events:none;transition:.28s;z-index:300}
+  .scrim.open{opacity:1;pointer-events:auto}
+  .drawer{position:fixed;top:0;right:0;height:100%;width:min(480px,94vw);z-index:310;
+    background:linear-gradient(165deg,#0d1626,#090e18 60%);border-left:1px solid var(--dc,var(--cyan));
+    box-shadow:-30px 0 80px -20px #000, -1px 0 0 color-mix(in srgb,var(--dc,var(--cyan)) 40%,transparent) inset;
+    transform:translateX(102%);transition:transform .34s cubic-bezier(.3,.8,.3,1);display:flex;flex-direction:column}
+  .drawer.open{transform:none}
+  .drawer .dh{padding:22px 22px 16px;border-bottom:1px solid var(--line);position:relative;overflow:hidden;flex:none}
+  .drawer .dh::before{content:"";position:absolute;inset:0;background:radial-gradient(420px 160px at 80% -20%,var(--dc,#2bd6ee)1f,transparent 70%)}
+  .drawer .dh-top{display:flex;align-items:center;gap:13px;position:relative}
+  .drawer .dh-ico{width:46px;height:46px;flex:none;border-radius:11px;display:grid;place-items:center;background:#0a1320;border:1px solid color-mix(in srgb,var(--dc,#2bd6ee) 40%,var(--line));box-shadow:0 0 26px -8px var(--dc,#2bd6ee)}
+  .drawer .dh-ico svg{width:26px;height:26px;color:var(--dc,var(--cyan))}
+  .drawer .dh-t b{font-size:20px;font-weight:700;letter-spacing:.3px;display:block}
+  .drawer .dh-t em{font-family:'IBM Plex Mono',monospace;font-style:normal;font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--text-faint)}
+  .drawer .dh-t .badge{display:inline-block;margin-top:5px;font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:color-mix(in srgb,var(--dc,#2bd6ee) 85%,#fff);border:1px solid color-mix(in srgb,var(--dc,#2bd6ee) 40%,var(--line));border-radius:4px;padding:1px 6px}
+  .drawer .close{position:absolute;top:18px;right:18px;width:30px;height:30px;border-radius:7px;border:1px solid var(--line);background:#0b1320;color:var(--text-dim);cursor:pointer;font-size:16px;line-height:1;display:grid;place-items:center;transition:.18s}
+  .drawer .close:hover{color:var(--text);border-color:var(--dc,var(--cyan));transform:rotate(90deg)}
+  .drawer .db{padding:18px 22px 30px;overflow-y:auto;flex:1}
+  .drawer .db::-webkit-scrollbar{width:8px}.drawer .db::-webkit-scrollbar-thumb{background:#1d2c44;border-radius:4px}
+  .drawer .summary{font-size:14px;line-height:1.7;color:#c9d6e8;margin-bottom:18px;border-left:2px solid color-mix(in srgb,var(--dc,#2bd6ee) 50%,transparent);padding-left:12px}
+  .drawer .grp{margin-bottom:18px}
+  .drawer .grp > h4{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:2.5px;text-transform:uppercase;color:var(--text-faint);margin-bottom:9px;display:flex;align-items:center;gap:8px}
+  .drawer .grp > h4::after{content:"";flex:1;height:1px;background:var(--line)}
+  .drawer .grp > h4 .c{color:color-mix(in srgb,var(--dc,#2bd6ee) 85%,#fff)}
+  .drawer .glist{display:flex;flex-wrap:wrap;gap:6px}
+  .gtag{font-family:'IBM Plex Mono',monospace;font-size:11px;border-radius:6px;padding:4px 9px;border:1px solid var(--line);background:#0b1320;color:var(--text-dim);transition:.16s}
+  .gtag.feat{border-color:color-mix(in srgb,var(--dc,#2bd6ee) 30%,var(--line));color:#cfe0f0;background:color-mix(in srgb,var(--dc,#2bd6ee) 8%,#0b1320)}
+  .gtag.api::before{content:"› ";color:var(--amber)}
+  .gtag.api{color:#e8d6b6}
+  .gtag.svc::before{content:"⚙ ";opacity:.6}
+  .gtag.view::before{content:"▤ ";color:var(--violet)}
+  .gtag.chan{border-color:var(--cyan-dim);color:#bdeef5;background:#08191d}
+  .drawer .empty-g{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--text-faint);opacity:.6}
+  .drawer .dn-foot{margin-top:6px;font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--text-faint);border-top:1px solid var(--line);padding-top:12px}
+
+  /* ===== FOOTER ===== */
+  footer{margin-top:30px;display:flex;flex-wrap:wrap;gap:14px 24px;align-items:center;justify-content:space-between;border-top:1px solid var(--line);padding-top:16px}
+  .foot-note{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--text-faint)}
+  .foot-tips{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--text-dim);display:flex;gap:14px;flex-wrap:wrap}
+  .foot-tips kbd{border:1px solid var(--line);border-bottom-width:2px;border-radius:4px;padding:1px 5px;background:#0b1320;color:var(--text);font-family:inherit;font-size:10px}
+
+  @media (max-width:680px){
+    .row-block{grid-template-columns:1fr}
+    .row-rail{height:28px}.row-rail span{writing-mode:horizontal-tb;transform:none}
+    .row-rail::before{width:100%;height:3px;bottom:auto}
+    .stat{margin-left:0;width:100%;justify-content:space-between}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- ===== HEADER ===== -->
+  <header>
+    <div class="brand">
+      <div class="logo-mark">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#2bd6ee" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="3" width="18" height="6" rx="1.4"/><rect x="3" y="14.5" width="18" height="6" rx="1.4"/>
+          <path d="M12 9.2v5.3"/><circle cx="12" cy="11.8" r="1"/></svg>
+      </div>
+      <div><h1>算力中心智能监控系统 <span class="sub">DCIM · Interactive Functional Map</span></h1></div>
+    </div>
+    <div class="meta">
+      <div>数据中心基础设施管理 · 监控 / 告警 / 能源 / 优化 / 数字孪生 / 诊断</div>
+      <div style="margin-top:6px">
+        <span class="pill mono"><span class="dot"></span>SYSTEM ONLINE</span>
+        <span class="pill mono">v4.2.1</span>
+        <span class="pill mono">FastAPI · Vue 3 · Three.js</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- ===== TOOLBAR ===== -->
+  <div class="toolbar">
+    <div class="search">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.5-4.5"/></svg>
+      <input id="q" type="text" placeholder="搜索模块 / 能力 / API …" autocomplete="off" spellcheck="false">
+      <button class="clr" id="qclr" title="清除">×</button>
+    </div>
+    <div class="filters" id="filters"><!-- injected --></div>
+    <div class="stat">
+      <span><b id="st-dom">0</b>功能域</span>
+      <span><b id="st-api">0</b>API 模块</span>
+      <span><b id="st-svc">0</b>业务服务</span>
+    </div>
+  </div>
+
+  <!-- ===== L1 ===== -->
+  <div class="sec-tag"><span class="n mono">L1</span><h2>接入与运行栈</h2><span class="ln"></span><span class="hint">点击节点查看详情</span></div>
+  <div class="pipeline">
+    <div class="flow" id="flow"><!-- injected --></div>
+    <div class="ws-branch">
+      <span class="lbl mono"><span class="pulse-sm"></span>WEBSOCKET PUSH ◂──</span>
+      <span class="chan mono"><span class="pulse-sm"></span><b>/ws/realtime</b> 实时数据 · 5s</span>
+      <span class="chan mono"><span class="pulse-sm"></span><b>/ws/alarms</b> 告警通知</span>
+      <span class="chan mono"><span class="pulse-sm"></span><b>/ws/system</b> 系统状态</span>
+      <span class="chan mono" style="border-color:#5a420f;color:#ffd9a0"><b style="color:var(--amber)">MQTT / EMQX</b> 现场设备接入</span>
+    </div>
+  </div>
+
+  <!-- ===== L2 ===== -->
+  <div class="sec-tag"><span class="n mono">L2</span><h2>核心功能域</h2><span class="ln"></span><span class="hint">点击卡片展开模块详情</span></div>
+  <div id="rows"><!-- injected rows --></div>
+  <div class="empty-msg" id="empty">— 没有匹配的模块 · 调整搜索或筛选 —</div>
+
+  <!-- ===== L3 ===== -->
+  <div class="sec-tag"><span class="n mono">L3</span><h2>数据底座与运行支撑</h2><span class="ln"></span><span class="en mono">data foundation</span></div>
+  <div class="base">
+    <div class="seg"><div class="sh"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M12 3v4M12 17v4M3 12h4M17 12h4"/><circle cx="12" cy="12" r="4"/></svg><b>数据模拟器</b></div><p>每 5s 生成点位数据 · AI 量程 ±2% 波动 · DI 0.5% 触发告警 · 写入 point_history（可关）</p></div>
+    <div class="seg"><div class="sh"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M3 6h12M3 12h18M3 18h9"/><circle cx="18.5" cy="6" r="2"/><circle cx="14.5" cy="18" r="2"/></svg><b>数据接入管线</b></div><p>采集 → 校验 → 去重 → 设备匹配 → 入库 · 网关 / EMQX 桥接 · 通信状态监控</p></div>
+    <div class="seg"><div class="sh"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><ellipse cx="12" cy="6" rx="8" ry="3"/><path d="M4 6v12c0 1.7 3.6 3 8 3s8-1.3 8-3V6M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"/></svg><b>持久化存储</b></div><p>SQLAlchemy 2.0 异步 ORM · Alembic 迁移 · 告警 / 报表 / 诊断 / 资产 等模型</p></div>
+    <div class="seg"><div class="sh"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M4 12a8 8 0 0 1 16 0M4 12a8 8 0 0 0 16 0"/><path d="M4 12h16"/></svg><b>实时推送通道</b></div><p>WebSocket × 3：realtime / alarms / system · JWT token 经 query 鉴权 · 广播管理</p></div>
+    <div class="seg"><div class="sh"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M8 13h8M8 16h5"/></svg><b>缓存与配置</b></div><p>配置单例 @lru_cache · 缓存服务 · 公式 / 溯源计算器 · 启动自动建表 + 种子数据</p></div>
+  </div>
+
+  <footer>
+    <div class="foot-tips"><span>交互：</span><span><kbd>点击</kbd> 卡片看详情</span><span><kbd>/</kbd> 聚焦搜索</span><span><kbd>Esc</kbd> 关闭面板</span><span><kbd>色块</kbd> 按域筛选</span></div>
+    <div class="foot-note mono">DCIM 功能架构 · 交互式总览 · 2026-05-11</div>
+  </footer>
+</div>
+
+<!-- ===== DRAWER ===== -->
+<div class="scrim" id="scrim"></div>
+<aside class="drawer" id="drawer" aria-hidden="true">
+  <div class="dh">
+    <div class="dh-top">
+      <div class="dh-ico" id="d-ico"></div>
+      <div class="dh-t"><b id="d-name"></b><em id="d-en"></em><div id="d-badge-wrap"></div></div>
+    </div>
+    <button class="close" id="d-close" title="关闭 (Esc)">×</button>
+  </div>
+  <div class="db" id="d-body"></div>
+</aside>
+
+<script>
+// ============ ICONS ============
+const I = {
+  client:'<path d="M12 3v3M5 21c1.4-3.4 4-5.2 7-5.2S17.6 17.6 19 21"/><circle cx="12" cy="9" r="3.6"/>',
+  proxy:'<path d="M4 7h9M4 17h9"/><path d="M11 3l5 4-5 4M11 13l5 4-5 4"/><path d="M19 7v10"/>',
+  server:'<path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"/><circle cx="12" cy="12" r="2.6"/><path d="M12 3v6.4M12 14.6V21M4 7.5l5.4 3M14.6 13.5l5.4 3"/>',
+  db:'<ellipse cx="12" cy="5.5" rx="7.5" ry="2.8"/><path d="M4.5 5.5v6c0 1.5 3.4 2.8 7.5 2.8s7.5-1.3 7.5-2.8v-6"/><path d="M4.5 11.5v6c0 1.5 3.4 2.8 7.5 2.8s7.5-1.3 7.5-2.8v-6"/>',
+  env:'<path d="M3 12h3l2.5-6 4 13 3-9 2 4h3.5"/>',
+  alarm:'<path d="M10.3 3.6 1.8 18.4A1.6 1.6 0 0 0 3.2 21h17.6a1.6 1.6 0 0 0 1.4-2.6L13.7 3.6a1.6 1.6 0 0 0-3.4 0Z"/><path d="M12 9v5M12 17.5v.01"/>',
+  video:'<rect x="3" y="5" width="18" height="13" rx="1.6"/><path d="M3 9h18"/><circle cx="8" cy="13.5" r="2"/><path d="M12 12h6M12 15h4"/>',
+  energy:'<path d="M13 2 4 14h7l-1 8 9-12h-7z"/>',
+  leaf:'<path d="M11 21c-4-1-7-4.5-7-9 0-5 4-8.5 8-9 0 2.5-1 4 1 6.5 1.8 2.2 5 2.5 5 6.5 0 3.2-2.6 6.4-7 8z"/><path d="M9 14c1.2-2 3-3 4.5-3.5"/>',
+  gear:'<path d="M12 3v4M12 17v4M3 12h4M17 12h4M5.6 5.6l2.8 2.8M15.6 15.6l2.8 2.8M18.4 5.6l-2.8 2.8M8.4 15.6l-2.8 2.8"/><circle cx="12" cy="12" r="3.2"/>',
+  tree:'<circle cx="6" cy="5" r="2.4"/><circle cx="18" cy="5" r="2.4"/><circle cx="12" cy="19" r="2.4"/><path d="M6 7.4v3.6a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V7.4M12 13v3.6"/>',
+  trend:'<path d="M3 17l5-6 4 4 5-7 4 5"/><path d="M3 21h18"/><circle cx="8" cy="11" r="1"/><circle cx="12" cy="15" r="1"/><circle cx="17" cy="8" r="1"/>',
+  ml:'<rect x="7" y="7" width="10" height="10" rx="2"/><path d="M12 3v4M12 17v4M3 12h4M17 12h4M9 1.5v1.5M15 1.5v1.5M9 21v1.5M15 21v1.5M1.5 9H3M1.5 15H3M21 9h1.5M21 15h1.5"/><circle cx="12" cy="12" r="1.6"/>',
+  asset:'<path d="M9 3h7l4 4v14H9z"/><path d="M9 3v6H3v12h6"/><path d="M12 12h5M12 16h5"/>',
+  cube:'<path d="M12 2 3 7v10l9 5 9-5V7z"/><path d="M3 7l9 5 9-5M12 12v10"/><path d="M7.5 9.5 16.5 4.5"/>',
+  clock:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/>',
+  rack:'<rect x="3" y="4" width="18" height="5" rx="1.4"/><rect x="3" y="10.5" width="18" height="5" rx="1.4"/><rect x="3" y="17" width="18" height="3.5" rx="1.2"/><circle cx="7" cy="6.5" r="1"/><circle cx="7" cy="13" r="1"/>',
+  source:'<path d="M4 7c0-2 3.6-3.4 8-3.4S20 5 20 7v10c0 2-3.6 3.4-8 3.4S4 19 4 17z"/><path d="M4 7c0 2 3.6 3.4 8 3.4S20 9 20 7M4 12c0 2 3.6 3.4 8 3.4S20 14 20 12"/>',
+  shield:'<path d="M12 3 4 6v5c0 5 3.4 8.7 8 10 4.6-1.3 8-5 8-10V6z"/><path d="M9 12l2 2 4-4.5"/>'
+};
+function svg(key,strokeVar){return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">'+(I[key]||'')+'</svg>';}
+
+// ============ DATA ============
+const PIPE = [
+  {id:'client', icon:'client', name:'用户 / 大屏', sub:'browser & big-screen', port:'', desc:'浏览器 Web 控制台 / NOC 大屏 / 移动端',
+   summary:'最终用户的接入端：运维值班通过浏览器访问系统控制台，NOC 大屏滚动展示关键指标与告警，移动端用于现场处置。',
+   feat:['Web 控制台','NOC 大屏','移动端','值班 / 运维 / 管理'], note:'入口 http://localhost:3000 · 大屏 /bigscreen'},
+  {id:'proxy', icon:'proxy', name:'代理层', sub:'reverse proxy', port:':3000', desc:'Dev → Vite Proxy · Prod → Express 静态+转发',
+   summary:'前后端之间的反向代理层。开发态由 Vite dev server 自动代理 /api 与 /ws；生产态由 Express（proxy/）托管前端静态资源并转发 API / WebSocket。',
+   feat:['/api 转发','/ws WebSocket 转发','静态资源托管','Vite ↔ Express 双模式'], note:'proxy/server.js · 端口 3000'},
+  {id:'backend', icon:'server', name:'应用服务', sub:'application backend', port:':8080', desc:'FastAPI · SQLAlchemy 2.0 异步 · JWT · RBAC · WebSocket',
+   summary:'核心后端：FastAPI + SQLAlchemy 2.0 异步。提供 30+ 个 REST API 模块、业务服务层、WebSocket 推送，启动时运行数据模拟器并自动建表 / 灌入种子数据。',
+   feat:['REST API ×30+','业务服务层','WebSocket 推送','JWT 认证 / RBAC','数据模拟器','自动建表 + 种子'], note:'app.main:app · uvicorn :8080 · /docs Swagger'},
+  {id:'db', icon:'db', name:'数据库', sub:'persistence', port:'', desc:'SQLite（开发）· PostgreSQL（生产）· Alembic',
+   summary:'持久化层。开发用 SQLite（dcim.db），生产用 PostgreSQL；通过 Alembic 管理迁移版本。存放点位历史、告警、报表、诊断、资产等全部 ORM 模型数据。',
+   feat:['SQLite / PostgreSQL','Alembic 迁移','point_history','ORM 模型 (告警/报表/诊断/资产…)'], note:'alembic upgrade head'}
+];
+
+const CATS = [
+  {key:'all',  label:'全部',          color:'var(--cyan)'},
+  {key:'cyan', label:'感知·监控',     color:'var(--cyan)'},
+  {key:'red',  label:'告警',          color:'var(--red)'},
+  {key:'amber',label:'能源·调度',     color:'var(--amber)'},
+  {key:'green',label:'优化·诊断·预测',color:'var(--green)'},
+  {key:'violet',label:'资产·容量',    color:'var(--violet)'},
+  {key:'blue', label:'数字孪生',      color:'var(--blue)'},
+  {key:'slate',label:'平台·安全',     color:'var(--slate)'},
+  {key:'pink', label:'机器学习',      color:'var(--pink)'}
+];
+
+const ROWS = [
+  {rc:'var(--cyan)',  label:'感知 · 监控', ids:['env','alarm','video']},
+  {rc:'var(--amber)', label:'能源 · 调度', ids:['energy','opt','dispatch']},
+  {rc:'var(--green)', label:'智能 · 诊断', ids:['diag','pdm','ml']},
+  {rc:'var(--violet)',label:'运维 · 孪生', ids:['asset','twin','cap']},
+  {rc:'var(--slate)', label:'平台 · 基础', ids:['device','ds','sec']}
+];
+
+const D = {
+  env:{idx:'01',color:'cyan',icon:'env',name:'环境监控',en:'Environment Monitoring',
+    summary:'对全场温湿度、漏水、烟感等点位做秒级实时采集与历史追溯：每 5 秒轮询一次，数据经 /ws/realtime 推送到前端并写入 point_history。',
+    feat:['实时采集·5s','点位管理','历史趋势曲线','传感器元数据','楼层平面图','温湿度 / 水浸 / 烟感','数据统计'],
+    api:['environment','point','sensor_metadata','history','statistics','monitoring','floor_map','realtime'],
+    svc:['point_data','point_import','point_device_matcher','history_generator','fire_protection'],
+    views:['environment','history','dashboard'], chan:['/ws/realtime']},
+  alarm:{idx:'02',color:'red',icon:'alarm',name:'告警管理',en:'Alarming',
+    summary:'四级告警分类、声音提醒、自动升级与多渠道通知；覆盖阈值配置、值班组 / 联系人管理与告警确认处理流程。',
+    feat:['4 级告警','声音通知','告警升级','多渠道通知','通知策略','阈值配置','联系人 / 值班组','告警确认 / 处理'],
+    api:['alarm','escalation','notification','notification_policy','threshold','user_notification_contacts'],
+    svc:['notification','email_service','datasource_alarm'], views:['alarm'], chan:['/ws/alarms']},
+  video:{idx:'03',color:'cyan',icon:'video',name:'视频监控',en:'Video Surveillance',
+    summary:'摄像头通道接入与实时画面调阅，可与告警 / 资产联动快速定位现场。',
+    feat:['摄像头接入','实时画面','通道管理','联动调阅'],
+    api:['video'], svc:['video_service'], views:['video'], chan:[]},
+  energy:{idx:'04',color:'amber',icon:'energy',name:'能源管理',en:'Energy & Power',
+    summary:'PUE 监控、配电拓扑可视化、需量管理与分时电价；支持能耗报表（PDF / Excel）导出、供电冗余分析与能流聚合。',
+    feat:['PUE 监控','配电拓扑','需量管理','分时电价','供电冗余','能耗报表 · PDF / Excel','能流聚合','用能分析'],
+    api:['energy','power','power_redundancy','demand','pricing','report','topology','topology_config'],
+    svc:['pue_calculator','energy_aggregator','energy_analysis','energy_topology','energy_config','energy_report_service','energy_report_pdf','energy_report_excel','demand_analysis_service','pricing_service','power_device','report_export','pdf_generator'],
+    views:['energy','power','topology','report'], chan:['/ws/realtime']},
+  opt:{idx:'05',color:'green',icon:'leaf',name:'节能优化',en:'Energy Optimization',
+    summary:'6 种分析插件识别节能机会，结合负荷转移、预冷调度（TCL 热力学模型）、制冷联动与虚拟电厂 VPP，并通过 A/B 测试与自适应寻优持续迭代。',
+    feat:['6× 分析插件','机会识别引擎','负荷转移','预冷调度 · TCL','制冷联动','虚拟电厂 VPP','效果监测','A/B 测试','自适应寻优','多设备协同'],
+    api:['opportunities','optimization','precool','cooling','linkage','vpp','ab_testing','shift'],
+    svc:['analysis_plugins','opportunity_detector','opportunity_engine','optimizer','optimization_integration','adaptive_optimization_service','load_shift','precool','datacenter_shift_strategy','multi_device_optimization','vpp_calculator','effect_monitoring_service','effect_tracker','suggestion_engine','feedback_learning','shift_validation'],
+    views:['energy','cooling','linkage','vpp'], chan:[]},
+  dispatch:{idx:'06',color:'amber',icon:'gear',name:'调度与执行',en:'Dispatch & Execution',
+    summary:'把优化方案落到设备：调度配置、实时调度、方案执行器、命令下发与设备调节，含执行计划、审批与回滚。',
+    feat:['调度配置','实时调度','方案执行器','设备调节','命令下发','执行计划','回滚 / 审批','负荷调节'],
+    api:['dispatch','execution','proposal','regulation','command'],
+    svc:['realtime_dispatch','execution_service','proposal_executor','device_regulation_service','device_control_service','command_service','load_regulation'],
+    views:['energy','operation'], chan:[]},
+  diag:{idx:'07',color:'green',icon:'tree',name:'智能诊断',en:'Intelligent Diagnosis',
+    summary:'基于故障树与 L2 推理引擎的根因诊断；含电池 SOH 评估、概率调优、误诊报告反馈与诊断标注闭环。',
+    feat:['故障树 / 版本管理','L2 推理引擎','诊断规则','电池 SOH','概率调优','误诊报告','诊断标注','根因分析'],
+    api:['diagnosis','fault_tree_versions','probability_tuning','misdiagnosis_reports'],
+    svc:['diagnosis','diagnosis_loader','feedback_learning'], views:['diagnosis'], chan:[]},
+  pdm:{idx:'08',color:'green',icon:'trend',name:'预测性维护',en:'Predictive Maintenance',
+    summary:'设备健康度评估、数据漂移检测与趋势预测，输出维护建议与寿命估计；支持混沌演练验证系统韧性。',
+    feat:['健康度评估','数据漂移检测','趋势预测','维护建议','寿命估计','混沌演练'],
+    api:['predictive_maintenance','drift','chaos_drill'],
+    svc:['predictive_maintenance','drift_detection','forecasting'], views:['diagnosis','operation'], chan:[]},
+  ml:{idx:'09',color:'pink',icon:'ml',name:'机器学习平台',en:'ML Platform · 可选',badge:'条件加载 · 依赖 torch',
+    summary:'可选 ML 子系统：依赖 torch，未安装则在 app.api.v1.__init__ 中跳过。提供模型训练、模板生成、推理服务与可溯源计算。',
+    feat:['模型训练','模板生成','推理服务','溯源计算','torch 条件加载'],
+    api:['ml'], svc:['ml_service','ml_template_generator','ml_traced_calculator','traced_formula_calculator','formula_calculator'],
+    views:['—'], chan:[]},
+  asset:{idx:'10',color:'violet',icon:'asset',name:'资产运维',en:'Asset & Operations',
+    summary:'资产台账、工单、巡检与知识库；覆盖设备生命周期、OTA 升级、运维时间线报表与 OCR 单据识别。',
+    feat:['资产台账','工单管理','巡检','知识库','设备生命周期','OTA 升级','时间线报表','OCR 识别'],
+    api:['asset','operation','ota'],
+    svc:['asset','operation','device_lifecycle','ota_service','ocr_service','timeline_report'],
+    views:['asset','operation'], chan:[]},
+  twin:{idx:'11',color:'blue',icon:'cube',name:'3D 数字孪生',en:'Digital Twin · Big Screen',
+    summary:'Three.js 机房三维模型与热力图，结合大屏可视化：楼层选择器、告警气泡、机柜标签、主题 / 上下文菜单与平面图自动生成。',
+    feat:['Three.js 模型','热力图','大屏可视化','楼层选择器','告警气泡','机柜标签','主题 / 上下文菜单','平面图生成'],
+    api:['floor_map','spatial','topology'],
+    svc:['floor_map_generator','topology_sync'], views:['bigscreen'], chan:['/ws/realtime','/ws/alarms']},
+  cap:{idx:'12',color:'violet',icon:'clock',name:'容量管理',en:'Capacity Planning',
+    summary:'机房容量约束检查、空间分配与机柜 U 位管理，评估功率与制冷余量，为新设备上架提供 check-constraints 端点。',
+    feat:['容量约束检查','空间分配','机柜 U 位','功率 / 制冷余量'],
+    api:['capacity','spatial'], svc:['capacity','device_selector_service'], views:['capacity'], chan:[]},
+  device:{idx:'13',color:'slate',icon:'rack',name:'设备管理',en:'Device Management',
+    summary:'设备台账与状态、设备模板、网关注册与监控、设备同步与配置下发；覆盖空调 / UPS / 电池 / 配电等设备类型与连接测试。',
+    feat:['设备台账 / 状态','设备模板','网关注册 / 监控','设备同步','配置下发','空调 / UPS / 电池 / 配电','连接测试'],
+    api:['device','device_templates','gateways'],
+    svc:['device_sync','device_config_generator','template_generator','gateway_registration','gateway_monitor','config_push','connection_test','power_device'],
+    views:['device','device-manage','device-status','device-template','gateway'], chan:[]},
+  ds:{idx:'14',color:'slate',icon:'source',name:'数据源管理',en:'Data Sources',
+    summary:'多源数据接入与接入管线（校验 → 去重 → 设备匹配 → 入库）；含数据质量、数据溯源 / 血缘、MQTT / EMQX ACL 与通信监控。',
+    feat:['多源接入','接入管线','数据质量','数据溯源 / 血缘','MQTT / EMQX ACL','通信监控','去重 / 桥接'],
+    api:['datasources','data_quality','trace','monitoring'],
+    svc:['ingest_pipeline','datasource_bridge','dedup_service','data_trace_service','emqx_acl','communication_monitor','datasource_alarm'],
+    views:['datasource'], chan:['MQTT / EMQX']},
+  sec:{idx:'15',color:'slate',icon:'shield',name:'安全与权限',en:'Security & RBAC',
+    summary:'JWT 认证 + RBAC 三角色（admin / operator / viewer）、用户管理、操作日志审计、系统配置与系统健康监测。',
+    feat:['JWT 认证','RBAC: admin / operator / viewer','用户管理','操作日志审计','系统配置','系统健康监测'],
+    api:['auth','user','log','config','system_health'],
+    svc:['cache_service'], views:['login','security','settings','system'], chan:['/ws/system']}
+};
+
+// ============ RENDER ============
+const $ = s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
+
+// stats
+(function(){
+  const apiSet=new Set(), svcSet=new Set(); let domN=0;
+  Object.values(D).forEach(d=>{domN++; (d.api||[]).forEach(a=>apiSet.add(a)); (d.svc||[]).forEach(s=>svcSet.add(s));});
+  $('#st-dom').textContent=domN; $('#st-api').textContent=apiSet.size; $('#st-svc').textContent=svcSet.size;
+})();
+
+// filters
+$('#filters').innerHTML = CATS.map(c=>`<button class="fbtn${c.key==='all'?' on':''}" data-cat="${c.key}" style="--fc:${c.color}"><span class="sw"></span>${c.label}</button>`).join('');
+
+// pipeline
+$('#flow').innerHTML = PIPE.map((n,i)=>{
+  const arrow = i<PIPE.length-1 ? `<div class="arrow"><svg viewBox="0 0 28 18" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M2 9h20"/><path d="M17 4l6 5-6 5"/></svg></div>` : '';
+  return `<div class="node" tabindex="0" data-pipe="${n.id}">
+      <div class="ico">${svg(n.icon)}</div>
+      <h3>${n.name}${n.port?`<span class="port mono">${n.port}</span>`:''}</h3>
+      <p>${n.desc.replace(/ · /g,'<br/>')}</p>
+      <span class="more mono">详情 ▸</span>
+    </div>${arrow}`;
+}).join('');
+
+// rows + cards
+$('#rows').innerHTML = ROWS.map(r=>{
+  const cards = r.ids.map(id=>{
+    const d=D[id];
+    const haystack=(d.name+' '+d.en+' '+d.feat.join(' ')+' '+d.api.join(' ')+' '+d.svc.join(' ')).toLowerCase();
+    return `<div class="card v-${d.color}" tabindex="0" data-id="${id}" data-cat="${d.color}" data-h="${haystack.replace(/"/g,'')}">
+      <div class="card-hd">
+        <div class="card-ico">${svg(d.icon)}</div>
+        <div class="t"><b data-name="${d.name}">${d.name}</b><em>${d.en}</em></div>
+        <span class="idx mono">${d.idx}</span>
+      </div>
+      <div class="tags">${d.feat.slice(0,6).map(f=>`<span class="chip" data-feat="${f}">${f}</span>`).join('')}${d.feat.length>6?`<span class="chip" style="opacity:.6">+${d.feat.length-6}</span>`:''}</div>
+      <div class="meta-line">
+        <span><span class="num">${d.api.length}</span> API</span>
+        <span><span class="num">${d.svc.length}</span> 服务</span>
+        <span><span class="num">${d.views.filter(v=>v!=='—').length}</span> 视图</span>
+        ${d.chan.length?`<span style="margin-left:auto;color:var(--cyan)">▣ ${d.chan.join(' · ')}</span>`:''}
+      </div>
+    </div>`;
+  }).join('');
+  return `<div class="row-block" style="--rc:${r.rc}"><div class="row-rail"><span>${r.label}</span></div><div class="cards">${cards}</div></div>`;
+}).join('');
+
+// reveal animation
+const cards=$$('.card');
+const io=new IntersectionObserver(es=>es.forEach(e=>{ if(e.isIntersecting){ const i=cards.indexOf(e.target); setTimeout(()=>e.target.classList.add('in'),(i%6)*50); io.unobserve(e.target);}}),{threshold:.15});
+cards.forEach(c=>io.observe(c));
+
+// ============ DRAWER ============
+const drawer=$('#drawer'), scrim=$('#scrim');
+function group(title, count, items, cls, emptyTxt){
+  const body = items && items.length && !(items.length===1&&items[0]==='—')
+    ? `<div class="glist">${items.map(x=>`<span class="gtag ${cls}">${x}</span>`).join('')}</div>`
+    : `<div class="empty-g">${emptyTxt||'—'}</div>`;
+  return `<div class="grp"><h4>${title}${count!=null?` <span class="c">[${count}]</span>`:''}</h4>${body}</div>`;
+}
+function openDomain(id){
+  const d=D[id]; if(!d) return;
+  drawer.style.setProperty('--dc',`var(--${d.color})`);
+  $('#d-ico').innerHTML=svg(d.icon);
+  $('#d-name').textContent=d.name;
+  $('#d-en').textContent=d.en+' · #'+d.idx;
+  $('#d-badge-wrap').innerHTML = d.badge?`<span class="badge">${d.badge}</span>`:'';
+  $('#d-body').innerHTML =
+    `<div class="summary">${d.summary}</div>`
+    + group('子能力 · CAPABILITIES', d.feat.length, d.feat, 'feat')
+    + group('后端 API 模块 · backend/app/api/v1', d.api.length, d.api.map(a=>a+'.py'), 'api','—')
+    + group('业务服务 · backend/app/services', d.svc.length, d.svc, 'svc','—')
+    + group('前端视图 · frontend/src/views', d.views.filter(v=>v!=='—').length, d.views, 'view','—')
+    + group('实时通道 · CHANNELS', null, d.chan, 'chan','无 WebSocket 通道')
+    + `<div class="dn-foot">提示：API / 服务 / 视图名称对应仓库实际目录，可据此定位源码。</div>`;
+  show();
+}
+function openPipe(id){
+  const n=PIPE.find(x=>x.id===id); if(!n) return;
+  drawer.style.setProperty('--dc','var(--cyan)');
+  $('#d-ico').innerHTML=svg(n.icon);
+  $('#d-name').textContent=n.name;
+  $('#d-en').textContent=n.sub+(n.port?' '+n.port:'');
+  $('#d-badge-wrap').innerHTML='<span class="badge">运行栈 · L1</span>';
+  $('#d-body').innerHTML =
+    `<div class="summary">${n.summary}</div>`
+    + group('要点 · NOTES', null, n.feat, 'feat')
+    + `<div class="dn-foot">${n.note||''}</div>`;
+  show();
+}
+function show(){ drawer.classList.add('open'); scrim.classList.add('open'); drawer.setAttribute('aria-hidden','false'); $('#d-close').focus(); }
+function hide(){ drawer.classList.remove('open'); scrim.classList.remove('open'); drawer.setAttribute('aria-hidden','true'); }
+
+document.addEventListener('click',e=>{
+  const card=e.target.closest('.card[data-id]'); if(card){ openDomain(card.dataset.id); return; }
+  const node=e.target.closest('.node[data-pipe]'); if(node){ openPipe(node.dataset.pipe); return; }
+});
+document.addEventListener('keydown',e=>{
+  if(e.key==='Escape'){ hide(); }
+  if(e.key==='/' && document.activeElement!==$('#q')){ e.preventDefault(); $('#q').focus(); }
+  if((e.key==='Enter'||e.key===' ') && document.activeElement.classList.contains('card')){ e.preventDefault(); openDomain(document.activeElement.dataset.id); }
+  if((e.key==='Enter'||e.key===' ') && document.activeElement.classList.contains('node')){ e.preventDefault(); openPipe(document.activeElement.dataset.pipe); }
+});
+$('#d-close').addEventListener('click',hide);
+scrim.addEventListener('click',hide);
+
+// ============ SEARCH + FILTER ============
+const q=$('#q'), qclr=$('#qclr'), empty=$('#empty');
+let curCat='all';
+function highlight(card, term){
+  const b=card.querySelector('b[data-name]'); const name=b.getAttribute('data-name');
+  if(term && name.toLowerCase().includes(term)){
+    const re=new RegExp('('+term.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+')','ig');
+    b.innerHTML=name.replace(re,'<mark>$1</mark>');
+  } else b.textContent=name;
+}
+function applyFilter(){
+  const term=q.value.trim().toLowerCase();
+  qclr.style.display=term?'block':'none';
+  let visible=0;
+  cards.forEach(card=>{
+    const matchCat = curCat==='all' || card.dataset.cat===curCat;
+    const matchTerm = !term || card.dataset.h.includes(term);
+    const ok = matchCat && matchTerm;
+    card.classList.toggle('hidden', !ok);
+    card.classList.toggle('dim', false);
+    if(ok) visible++;
+    highlight(card, term);
+  });
+  // hide empty rows
+  $$('.row-block').forEach(rb=>{ rb.style.display = [...rb.querySelectorAll('.card')].some(c=>!c.classList.contains('hidden'))?'':'none'; });
+  empty.classList.toggle('show', visible===0);
+}
+q.addEventListener('input',applyFilter);
+qclr.addEventListener('click',()=>{ q.value=''; applyFilter(); q.focus(); });
+$('#filters').addEventListener('click',e=>{
+  const btn=e.target.closest('.fbtn'); if(!btn) return;
+  curCat=btn.dataset.cat;
+  $$('.fbtn').forEach(b=>b.classList.toggle('on', b===btn));
+  applyFilter();
+});
+// click a feature chip → search it
+document.addEventListener('click',e=>{
+  const chip=e.target.closest('.chip[data-feat]');
+  if(chip && !e.target.closest('.drawer')){ e.stopPropagation(); q.value=chip.dataset.feat; applyFilter(); window.scrollTo({top:0,behavior:'smooth'}); }
+},true);
+</script>
+</body>
+</html>

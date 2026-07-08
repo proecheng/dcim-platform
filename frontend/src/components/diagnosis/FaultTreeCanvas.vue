@@ -51,9 +51,7 @@
 <script setup lang="ts">
 import { ref, onMounted, onBeforeUnmount, watch } from 'vue'
 import { Back, Right, FullScreen } from '@element-plus/icons-vue'
-import { ElMessage } from 'element-plus'
 import { useFaultTreeEditor } from '@/composables/useFaultTreeEditor'
-import { debounce } from 'lodash-es'
 import type { VisNode } from '@/types/fault-tree'
 
 interface Props {
@@ -174,8 +172,8 @@ function bindNetworkEvents() {
   // 监听双击节点
   network.value.on('doubleClick', (params) => {
     if (params.nodes.length > 0) {
-      const nodeId = params.nodes[0]
-      const node = nodes.value.get(nodeId) as unknown as VisNode | null
+      const nodeId = params.nodes[0] as string | number
+      const node = nodes.value.get(nodeId) as VisNode | null
       if (node) {
         emit('node-double-click', node)
       }
@@ -208,7 +206,7 @@ onMounted(async () => {
       canvasSupported.value = false
       return
     }
-  } catch (error) {
+  } catch {
     canvasSupported.value = false
     return
   }

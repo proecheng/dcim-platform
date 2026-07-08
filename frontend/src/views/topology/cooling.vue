@@ -288,7 +288,7 @@ function openZoneDialog(row?: CoolingZoneResponse) {
   zoneDialogVisible.value = true
 }
 
-function resetZoneForm() {
+function _resetZoneForm() {
   isEditZone.value = false
   editingZoneId.value = 0
 }

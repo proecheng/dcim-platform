@@ -432,7 +432,7 @@ import { getPointList, type PointInfo } from '@/api/modules/point'
 import {
   getThresholdList, createThreshold, updateThreshold, deleteThreshold,
   getPointThresholds, setFourLevelThresholds, batchSetByDeviceType,
-  type ThresholdInfo, type FourLevelThresholdItem
+  type ThresholdInfo
 } from '@/api/modules/threshold'
 import {
   getOperationLogs, getSystemLogs, exportLogs as apiExportLogs,
@@ -838,7 +838,7 @@ async function onDeviceTypeChange(deviceType: string) {
   try {
     const result = await getPointList({ device_type: deviceType, point_type: 'AI', page_size: 1 } as any)
     batchDeviceTypePointCount.value = result.total || 0
-  } catch (e) {
+  } catch {
     batchDeviceTypePointCount.value = 0
   }
 }

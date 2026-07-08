@@ -468,7 +468,7 @@ async function handleToggleEnabled(row: DeviceInfo): Promise<boolean> {
     row.is_enabled = newEnabled
     ElMessage.success(newEnabled ? '已启用' : '已禁用')
     return true
-  } catch (e) {
+  } catch {
     ElMessage.error('操作失败')
     return false
   }

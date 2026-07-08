@@ -9,8 +9,7 @@ import { ElNotification } from 'element-plus'
 import {
   acknowledgeAlarm,
   resolveAlarm,
-  type AlarmInfo,
-  type AlarmCount
+  type AlarmInfo
 } from '@/api/modules/alarm'
 import { useAlarmStore, type Alarm } from '@/stores/alarm'
 import { useAppStore } from '@/stores/app'

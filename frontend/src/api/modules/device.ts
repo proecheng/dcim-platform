@@ -1,7 +1,7 @@
 /**
  * 设备管理 API
  */
-import request from '@/utils/request'
+import request, { type RequestConfig } from '@/utils/request'
 import type { PageParams, PageResponse } from './types'
 
 export interface DeviceInfo {
@@ -166,8 +166,8 @@ export interface DeviceDetailResponse {
 /**
  * 获取设备详情（聚合：设备信息 + 点位实时数据 + 活动告警）
  */
-export function getDeviceDetail(id: number): Promise<DeviceDetailResponse> {
-  return request.get(`/v1/devices/${id}/detail`)
+export function getDeviceDetail(id: number, config?: RequestConfig): Promise<DeviceDetailResponse> {
+  return request.get(`/v1/devices/${id}/detail`, config)
 }
 
 /**
