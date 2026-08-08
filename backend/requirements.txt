@@ -23,6 +23,9 @@ email-validator==2.1.0
 # WebSocket
 websockets==12.0
 
+# Gateway protocol adapters
+pymodbus>=3.6,<4.0
+
 # Tools
 python-dotenv==1.0.0
 apscheduler==3.10.4
