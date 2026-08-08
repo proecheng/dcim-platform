@@ -1080,6 +1080,9 @@ class DemoDataService:
             # 清空点位值缓存：重载后点位会被重建，旧 point_id 命中缓存会绕过
             # 量程中点基准，污染 PUE 校准后的功率值；清空后模拟器从中点重新起算
             simulator.value_cache.clear()
+            from ..services.ingest_pipeline import invalidate_point_cache
+
+            invalidate_point_cache()
             try:
                 await init_db()
 
@@ -1156,10 +1159,10 @@ class DemoDataService:
                 return {"success": False, "message": str(e)}
             finally:
                 self.loading = False
-                # 重启模拟器
+                # 恢复加载前的模拟器运行状态
                 from .engine import simulator
 
-                if not simulator.running:
+                if was_running and not simulator.running:
                     asyncio.create_task(simulator.start())
 
     async def sync_device_point_relations(self) -> dict:
@@ -1507,6 +1510,7 @@ class DemoDataService:
                         store_interval=p.get("store_interval", 300),  # 新增：默认5分钟降采样
                         is_enabled=True,
                         source="demo",
+                        is_demo=True,
                     )
                     session.add(point)
                     await session.flush()
@@ -1530,6 +1534,7 @@ class DemoDataService:
                             alarm_level=t["level"],
                             alarm_message=t["message"],
                             is_enabled=True,
+                            is_demo=True,
                         )
                         session.add(threshold)
 
@@ -1549,7 +1554,7 @@ class DemoDataService:
             # 1. 创建变压器
             transformer_map = {}
             for t in TRANSFORMERS:
-                transformer = Transformer(**t)
+                transformer = Transformer(**t, is_demo=True)
                 session.add(transformer)
                 await session.flush()
                 transformer_map[t["transformer_code"]] = transformer.id
@@ -1561,7 +1566,7 @@ class DemoDataService:
                 data = mp.copy()
                 transformer_code = data.pop("transformer_code")
                 data["transformer_id"] = transformer_map.get(transformer_code)
-                meter_point = MeterPoint(**data)
+                meter_point = MeterPoint(**data, is_demo=True)
                 session.add(meter_point)
                 await session.flush()
                 meter_point_map[mp["meter_code"]] = meter_point.id
@@ -1577,7 +1582,7 @@ class DemoDataService:
                     data["parent_panel_id"] = panel_map[parent_code]
                 if meter_point_code and meter_point_code in meter_point_map:
                     data["meter_point_id"] = meter_point_map[meter_point_code]
-                panel = DistributionPanel(**data)
+                panel = DistributionPanel(**data, is_demo=True)
                 session.add(panel)
                 await session.flush()
                 panel_map[p["panel_code"]] = panel.id
@@ -1593,7 +1598,7 @@ class DemoDataService:
                     logger.error("配电回路 %s 引用了不存在的 panel_code=%s", data.get("circuit_code"), panel_code)
                     raise ValueError(f"配电回路引用了不存在的配电柜: {panel_code}")
                 data["panel_id"] = panel_id
-                circuit = DistributionCircuit(**data)
+                circuit = DistributionCircuit(**data, is_demo=True)
                 session.add(circuit)
                 await session.flush()
                 circuit_map[c["circuit_code"]] = circuit.id
@@ -1625,7 +1630,7 @@ class DemoDataService:
                 if point_ids["energy_point_id"]:
                     data["energy_point_id"] = point_ids["energy_point_id"]
 
-                device = PowerDevice(**data)
+                device = PowerDevice(**data, is_demo=True)
                 session.add(device)
                 await session.flush()
 
@@ -1656,7 +1661,7 @@ class DemoDataService:
 
             # 7. 创建电价配置
             for ep in ELECTRICITY_PRICING:
-                pricing = ElectricityPricing(**ep, effective_date=datetime.now().date())
+                pricing = ElectricityPricing(**ep, effective_date=datetime.now().date(), is_demo=True)
                 session.add(pricing)
             self._update_progress(45, f"创建 {len(ELECTRICITY_PRICING)} 条电价配置", progress_callback)
 
@@ -1937,6 +1942,7 @@ class DemoDataService:
                     map_type="2d",
                     map_data=json.dumps(map_2d, ensure_ascii=False),
                     is_default=(floor_code == "F1"),
+                    is_demo=True,
                 )
                 session.add(floor_map_2d)
 
@@ -1948,6 +1954,7 @@ class DemoDataService:
                     map_type="3d",
                     map_data=json.dumps(map_3d, ensure_ascii=False),
                     is_default=False,
+                    is_demo=True,
                 )
                 session.add(floor_map_3d)
 
@@ -2088,6 +2095,10 @@ class DemoDataService:
 
                 # 提交事务
                 await session.commit()
+
+                from ..services.ingest_pipeline import invalidate_point_cache
+
+                invalidate_point_cache()
 
                 logger.info(f"Demo 数据清理完成，共删除 {sum(deleted_counts.values())} 条记录")
                 return deleted_counts

@@ -40,6 +40,8 @@ async def test_demo_flow_load_generate_unload_with_api(async_db, client, monkeyp
             is_enabled=True,
             min_range=0,
             max_range=50,
+            source="demo",
+            is_demo=True,
         )
         di = Point(
             point_code="FLOW_DI_001",
@@ -49,6 +51,8 @@ async def test_demo_flow_load_generate_unload_with_api(async_db, client, monkeyp
             is_enabled=True,
             min_range=0,
             max_range=1,
+            source="demo",
+            is_demo=True,
         )
         ao = Point(
             point_code="FLOW_AO_001",
@@ -56,6 +60,8 @@ async def test_demo_flow_load_generate_unload_with_api(async_db, client, monkeyp
             point_type="AO",
             device_type="UPS",
             is_enabled=True,
+            source="demo",
+            is_demo=True,
         )
         async_db.add_all([ai, di, ao])
         await async_db.flush()

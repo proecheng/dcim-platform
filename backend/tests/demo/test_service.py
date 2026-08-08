@@ -112,6 +112,7 @@ async def test_unload_demo_data_integrity_and_fk_cleanup(async_db, monkeypatch):
         point_type="AI",
         device_type="TEST",
         is_enabled=True,
+        is_demo=True,
     )
     async_db.add(point)
     await async_db.flush()
@@ -125,6 +126,7 @@ async def test_unload_demo_data_integrity_and_fk_cleanup(async_db, monkeypatch):
         alarm_level="minor",
         alarm_message="阈值告警",
         is_enabled=True,
+        is_demo=True,
     )
     async_db.add(threshold)
     await async_db.flush()
@@ -141,11 +143,21 @@ async def test_unload_demo_data_integrity_and_fk_cleanup(async_db, monkeypatch):
         )
     )
 
-    transformer = Transformer(transformer_code="TR-T-001", transformer_name="测试变压器", rated_capacity=1000)
+    transformer = Transformer(
+        transformer_code="TR-T-001",
+        transformer_name="测试变压器",
+        rated_capacity=1000,
+        is_demo=True,
+    )
     async_db.add(transformer)
     await async_db.flush()
 
-    meter = MeterPoint(meter_code="M-T-001", meter_name="测试计量点", transformer_id=transformer.id)
+    meter = MeterPoint(
+        meter_code="M-T-001",
+        meter_name="测试计量点",
+        transformer_id=transformer.id,
+        is_demo=True,
+    )
     async_db.add(meter)
     await async_db.flush()
 
@@ -154,6 +166,7 @@ async def test_unload_demo_data_integrity_and_fk_cleanup(async_db, monkeypatch):
         panel_name="测试配电柜",
         panel_type="main",
         meter_point_id=meter.id,
+        is_demo=True,
     )
     async_db.add(panel)
     await async_db.flush()
@@ -162,6 +175,7 @@ async def test_unload_demo_data_integrity_and_fk_cleanup(async_db, monkeypatch):
         circuit_code="C-T-001",
         circuit_name="测试回路",
         panel_id=panel.id,
+        is_demo=True,
     )
     async_db.add(circuit)
     await async_db.flush()
@@ -172,6 +186,7 @@ async def test_unload_demo_data_integrity_and_fk_cleanup(async_db, monkeypatch):
         device_type="UPS",
         circuit_id=circuit.id,
         power_point_id=point.id,
+        is_demo=True,
     )
     async_db.add(power_device)
     await async_db.flush()
@@ -179,7 +194,15 @@ async def test_unload_demo_data_integrity_and_fk_cleanup(async_db, monkeypatch):
     async_db.add(EnergyHourly(device_id=power_device.id, stat_time=datetime.now(), total_energy=1.0))
     async_db.add(EnergyDaily(device_id=power_device.id, stat_date=date.today(), total_energy=2.0))
     async_db.add(EnergyMonthly(device_id=power_device.id, stat_year=2026, stat_month=3, total_energy=3.0))
-    async_db.add(FloorMap(floor_code="F1", floor_name="F1", map_type="2d", map_data="{}"))
+    async_db.add(
+        FloorMap(
+            floor_code="F1",
+            floor_name="F1",
+            map_type="2d",
+            map_data="{}",
+            is_demo=True,
+        )
+    )
     await async_db.commit()
 
     ingest_pipeline._point_meta_cache[point.id] = {"is_enabled": True}
