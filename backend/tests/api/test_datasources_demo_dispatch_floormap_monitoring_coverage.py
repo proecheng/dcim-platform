@@ -590,12 +590,13 @@ class TestDispatchSummary:
 class TestFloorMap:
     """楼层图 API"""
 
-    async def test_get_floors_empty(self, client, admin_user, async_db):
+    async def test_get_floors_uses_generated_defaults(self, client, admin_user, async_db):
         _, token = admin_user
         resp = await client.get("/api/v1/floor-map/floors", headers=auth_headers(token))
         assert resp.status_code == 200
-        body = resp.json()
-        assert body["data"]["floors"] == []
+        floors = resp.json()["data"]["floors"]
+        assert [floor["floor_code"] for floor in floors] == ["B1", "F1", "F2", "F3"]
+        assert all(floor["map_types"] == ["2d", "3d"] for floor in floors)
 
     async def test_get_floors_with_data(self, client, admin_user, async_db):
         _, token = admin_user
@@ -613,10 +614,14 @@ class TestFloorMap:
         assert resp.status_code == 200
         assert resp.json()["data"]["floor_code"] == "F1"
 
-    async def test_get_floor_map_not_found(self, client, admin_user, async_db):
+    async def test_get_floor_map_uses_generated_fallback(self, client, admin_user, async_db):
         _, token = admin_user
         resp = await client.get("/api/v1/floor-map/F9/3d", headers=auth_headers(token))
-        assert resp.status_code == 404
+        assert resp.status_code == 200
+        body = resp.json()["data"]
+        assert body["id"] == 0
+        assert body["floor_code"] == "F9"
+        assert body["map_type"] == "3d"
 
     async def test_get_floor_map_bad_type(self, client, admin_user, async_db):
         _, token = admin_user
@@ -634,14 +639,18 @@ class TestFloorMap:
         assert resp.status_code == 200
         assert resp.json()["data"]["is_default"] is True
 
-    async def test_get_default_floor_map_not_found(self, client, admin_user, async_db):
+    async def test_get_default_floor_map_uses_generated_fallback(self, client, admin_user, async_db):
         _, token = admin_user
         resp = await client.get(
             "/api/v1/floor-map/default",
             params={"map_type": "3d"},
             headers=auth_headers(token),
         )
-        assert resp.status_code == 404
+        assert resp.status_code == 200
+        body = resp.json()["data"]
+        assert body["id"] == 0
+        assert body["floor_code"] == "F1"
+        assert body["is_default"] is True
 
 
 # ==================== Monitoring ====================

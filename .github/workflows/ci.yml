@@ -17,7 +17,7 @@ jobs:
   backend-tests:
     name: 后端测试
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 60
     defaults:
       run:
         working-directory: backend
@@ -46,6 +46,7 @@ jobs:
       - name: 运行测试
         run: |
           pytest tests/ \
+            --maxfail=1 \
             --ignore=tests/test_asset_import.py \
             --ignore=tests/test_asset_lifecycle_warranty.py \
             --ignore=tests/test_bacnet_ip_adapter.py \

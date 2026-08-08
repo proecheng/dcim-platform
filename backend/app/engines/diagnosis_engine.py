@@ -11,6 +11,7 @@ from datetime import datetime, timedelta
 from typing import Dict, List, Optional
 
 from sqlalchemy import select, func
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..core.database import async_session
 from ..models.alarm import Alarm
@@ -54,50 +55,57 @@ class DiagnosisEngine:
         self._loaded = False
         self._load_lock = asyncio.Lock()  # P0-1 修复: 添加加载锁
 
-    async def load_rules(self) -> int:
+    async def load_rules(self, session: Optional[AsyncSession] = None) -> int:
         """从数据库加载启用的诊断规则到内存缓存（线程安全）"""
         async with self._load_lock:  # P0-1 修复: 使用锁保护
             # 双重检查
             if self._loaded:
                 return sum(len(v) for v in self._rule_cache.values())
 
-            async with async_session() as session:
-                result = await session.execute(
-                    select(DiagnosisRule).where(DiagnosisRule.is_enabled == True)  # noqa: E712
-                )
-                rules = result.scalars().all()
+            if session is not None:
+                return await self._load_rules_from_session(session)
 
-                # copy-on-write: 构建新缓存
-                new_cache: Dict[str, List[dict]] = defaultdict(list)
-                for r in rules:
-                    rule_dict = {
-                        "id": r.id,
-                        "rule_code": r.rule_code,
-                        "name": r.name,
-                        "category": r.category,
-                        "trigger_condition": r.trigger_condition or {},
-                        "diagnosis_logic": r.diagnosis_logic or {},
-                        "priority": r.priority or 0,
-                    }
-                    # 按 device_type 索引
-                    device_types = (r.trigger_condition or {}).get("device_type", ["*"])
-                    for dt in device_types:
-                        new_cache[dt].append(rule_dict)
+            async with async_session() as owned_session:
+                return await self._load_rules_from_session(owned_session)
 
-                # 每个 device_type 列表按 priority 降序
-                for dt in new_cache:
-                    new_cache[dt].sort(key=lambda x: x["priority"], reverse=True)
+    async def _load_rules_from_session(self, session: AsyncSession) -> int:
+        """从指定会话构建规则缓存。"""
+        result = await session.execute(
+            select(DiagnosisRule).where(DiagnosisRule.is_enabled == True)  # noqa: E712
+        )
+        rules = result.scalars().all()
 
-                self._rule_cache = dict(new_cache)
-                self._loaded = True
-                count = sum(len(v) for v in self._rule_cache.values())
-                logger.info("诊断引擎: 已加载 %d 条规则索引（%d 个 device_type 分组）", count, len(self._rule_cache))
-                return len(rules)
+        # copy-on-write: 构建新缓存
+        new_cache: Dict[str, List[dict]] = defaultdict(list)
+        for r in rules:
+            rule_dict = {
+                "id": r.id,
+                "rule_code": r.rule_code,
+                "name": r.name,
+                "category": r.category,
+                "trigger_condition": r.trigger_condition or {},
+                "diagnosis_logic": r.diagnosis_logic or {},
+                "priority": r.priority or 0,
+            }
+            # 按 device_type 索引
+            device_types = (r.trigger_condition or {}).get("device_type", ["*"])
+            for dt in device_types:
+                new_cache[dt].append(rule_dict)
 
-    async def reload_rules(self) -> int:
+        # 每个 device_type 列表按 priority 降序
+        for dt in new_cache:
+            new_cache[dt].sort(key=lambda x: x["priority"], reverse=True)
+
+        self._rule_cache = dict(new_cache)
+        self._loaded = True
+        count = sum(len(v) for v in self._rule_cache.values())
+        logger.info("诊断引擎: 已加载 %d 条规则索引（%d 个 device_type 分组）", count, len(self._rule_cache))
+        return len(rules)
+
+    async def reload_rules(self, session: Optional[AsyncSession] = None) -> int:
         """重载规则缓存"""
         self._loaded = False
-        return await self.load_rules()
+        return await self.load_rules(session)
 
     async def on_alarm_event(self, event: Event) -> None:
         """事件总线 handler — 用 create_task 不阻塞联动引擎"""

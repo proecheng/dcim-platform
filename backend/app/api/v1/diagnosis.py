@@ -138,7 +138,7 @@ async def reload_rules_from_yaml(
     from ...services.diagnosis_loader import reload
 
     count = await reload(db)
-    await diagnosis_engine.reload_rules()
+    await diagnosis_engine.reload_rules(db)
     return {"message": f"诊断规则重载完成，共 {count} 条", "count": count}
 
 
