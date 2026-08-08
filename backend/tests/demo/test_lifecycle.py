@@ -1,6 +1,7 @@
 """演示模块生命周期钩子测试。"""
 
 import asyncio
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
 
 from app.demo import lifecycle
@@ -79,6 +80,10 @@ async def test_lifecycle_startup_initializes_seeds_and_simulator(async_db, monke
     monkeypatch.setattr("app.demo.seeds.asset_capacity_seed.seed_asset_capacity", seed_asset_capacity)
     monkeypatch.setattr("app.services.device_sync.DeviceSyncService", _FakeSyncService)
     monkeypatch.setattr("app.core.database.async_session", _SessionCtx(async_db))
+    monkeypatch.setattr(
+        "app.core.config.get_settings",
+        lambda: SimpleNamespace(simulation_enabled=True, simulation_interval=5),
+    )
     monkeypatch.setattr("app.demo.engine.simulator.start", sim_start)
 
     def _fake_create_task(coro):
