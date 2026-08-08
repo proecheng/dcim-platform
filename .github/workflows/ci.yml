@@ -126,6 +126,12 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     needs: [backend-tests, frontend-checks]
+    env:
+      DATABASE_URL: sqlite+aiosqlite:///./e2e-ci.db
+      FAULT_TREE_HMAC_KEY: ci-e2e-fault-tree-hmac-key-at-least-32-characters
+      REDIS_ENABLED: "false"
+      DEMO_ENABLED: "false"
+      SIMULATION_ENABLED: "false"
 
     steps:
       - uses: actions/checkout@v4
