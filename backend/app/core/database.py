@@ -136,11 +136,15 @@ async def _ensure_sqlite_legacy_columns(conn):
                 await conn.execute(text(f"ALTER TABLE {table_name} ADD COLUMN {column_name} {column_sql}"))
 
     await conn.execute(text("CREATE INDEX IF NOT EXISTS ix_alarms_source ON alarms (source)"))
-    await conn.execute(text("CREATE INDEX IF NOT EXISTS ix_datasources_parent_id ON datasources (parent_datasource_id)"))
+    await conn.execute(
+        text("CREATE INDEX IF NOT EXISTS ix_datasources_parent_id ON datasources (parent_datasource_id)")
+    )
 
     try:
         await conn.execute(
-            text("CREATE UNIQUE INDEX IF NOT EXISTS uq_device_health_scores_device_id ON device_health_scores (device_id)")
+            text(
+                "CREATE UNIQUE INDEX IF NOT EXISTS uq_device_health_scores_device_id ON device_health_scores (device_id)"
+            )
         )
     except Exception:
         # 旧库如果已有重复 device_id，保留数据优先；业务读写仍可使用新增列。

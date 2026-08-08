@@ -232,12 +232,14 @@ async def lifespan(app: FastAPI):
             }
 
             for key, value in thm_configs.items():
-                existing = (await session.execute(
-                    select(SystemConfig).where(
-                        SystemConfig.config_group == "thm",
-                        SystemConfig.config_key == key,
+                existing = (
+                    await session.execute(
+                        select(SystemConfig).where(
+                            SystemConfig.config_group == "thm",
+                            SystemConfig.config_key == key,
+                        )
                     )
-                )).scalar_one_or_none()
+                ).scalar_one_or_none()
 
                 if existing is None:
                     new_config = SystemConfig(
@@ -442,6 +444,7 @@ async def lifespan(app: FastAPI):
     listener_task = None
     if settings.redis_enabled:
         from app.services.diagnosis.device_sync_service import start_device_sync_listener, stop_device_sync_listener
+
         listener_task = asyncio.create_task(start_device_sync_listener())
 
     # 启动传感器元数据 Redis 监听器（Story 25.5）
@@ -449,6 +452,7 @@ async def lifespan(app: FastAPI):
     if settings.redis_enabled:
         try:
             from app.services.diagnosis.sensor_metadata_service import SensorMetadataCache
+
             redis_listener_task = await SensorMetadataCache.start_listener()
             logger.info("✓ 传感器元数据 Redis 监听器启动成功")
         except Exception as e:
@@ -1231,6 +1235,7 @@ async def lifespan(app: FastAPI):
     # 停止拓扑变更监听器（Story 25.1）
     if listener_task:
         from app.services.diagnosis.device_sync_service import stop_device_sync_listener
+
         await stop_device_sync_listener()
         try:
             await asyncio.wait_for(listener_task, timeout=5.0)

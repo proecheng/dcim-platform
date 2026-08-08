@@ -1241,9 +1241,7 @@ async def get_misdiagnosis_report(
         if end_period:
             filters.append(SystemReport.report_period <= end_period)
 
-        total_result = await db.execute(
-            select(func.count()).select_from(SystemReport).where(*filters)
-        )
+        total_result = await db.execute(select(func.count()).select_from(SystemReport).where(*filters))
         total = total_result.scalar_one()
         result = await db.execute(
             select(SystemReport)

@@ -20,7 +20,7 @@ from ...models.capacity import (
 )
 from ...models.cooling import CoolingUnit
 from ...models.device import Device
-from ...models.energy import DistributionPanel, PowerDevice, Transformer
+from ...models.energy import PowerDevice, Transformer
 from ...models.spatial import Floor, Room, Row, Site
 
 logger = logging.getLogger(__name__)
@@ -212,8 +212,14 @@ async def _ensure_assets(session, cabinets: list[Cabinet]) -> int:
         cab_list.sort(key=lambda c: c.cabinet_code)
 
     power_devices = (
-        await session.execute(select(PowerDevice).where(PowerDevice.is_enabled == True).order_by(PowerDevice.device_code))
-    ).scalars().all()
+        (
+            await session.execute(
+                select(PowerDevice).where(PowerDevice.is_enabled == True).order_by(PowerDevice.device_code)
+            )
+        )
+        .scalars()
+        .all()
+    )
     for index, device in enumerate(power_devices):
         area_code = device.area_code or ""
         area_cabinets = cabinet_by_area.get(area_code) or cabinet_by_floor.get(area_code)
@@ -327,7 +333,9 @@ async def _ensure_capacity_records(session, layouts: list[RoomLayout], cabinets:
             cooling_by_area[str(area)] = float(cooling_kw or 0)
 
     transformer_total = float(
-        await session.scalar(select(func.coalesce(func.sum(Transformer.rated_capacity), 0)).where(Transformer.is_enabled == True))
+        await session.scalar(
+            select(func.coalesce(func.sum(Transformer.rated_capacity), 0)).where(Transformer.is_enabled == True)
+        )
         or 0
     )
     floor_layout_counts: dict[str, int] = {}
@@ -362,7 +370,9 @@ async def _ensure_capacity_records(session, layouts: list[RoomLayout], cabinets:
 
         floor_share = power_by_area.get(layout.floor_code, 0.0) / max(floor_layout_counts.get(layout.floor_code, 1), 1)
         used_power = round(power_by_area.get(layout.area_code, 0.0) + floor_share, 2)
-        total_power = max(used_power * 1.35, len(room_cabinets) * 8.0, transformer_total / 8 if transformer_total else 0)
+        total_power = max(
+            used_power * 1.35, len(room_cabinets) * 8.0, transformer_total / 8 if transformer_total else 0
+        )
         total_power = round(total_power, 2)
         if await _upsert_capacity(
             session,

@@ -320,6 +320,7 @@ async def execute_plan(
 
 # ========== Opportunity Endpoints ==========
 
+
 @router.post("/opportunities/analyze", response_model=ShiftOpportunityAnalyzeResponse)
 async def analyze_opportunities(
     analysis_date: date = Query(default_factory=date.today),
@@ -441,23 +442,18 @@ async def convert_opportunity_to_plan(
         shift_to_period=opportunity.recommended_shift_to,
         shift_date=opportunity.recommended_date,
         start_time=time(1, 0),  # Default 01:00
-        end_time=time(5, 0),    # Default 05:00
+        end_time=time(5, 0),  # Default 05:00
         target_shift_power=float(opportunity.recommended_shift_power or 0),
         selected_devices=[
-            d.get("device_id", d) if isinstance(d, dict) else d
-            for d in (opportunity.recommended_devices or [])
+            d.get("device_id", d) if isinstance(d, dict) else d for d in (opportunity.recommended_devices or [])
         ],
-        constraints={
-            "safety_factor": 0.85,
-            "cooling_lag_minutes": 20,
-            "three_phase_balance_threshold": 0.1
-        },
+        constraints={"safety_factor": 0.85, "cooling_lag_minutes": 20, "three_phase_balance_threshold": 0.1},
         expected_cost_saving=_to_float(opportunity.estimated_cost_saving),
         expected_energy_saving=(
             _to_float(opportunity.estimated_energy_saving)
             or (_to_float(opportunity.recommended_shift_power) or 0.0) * 4
         ),  # 4 hours
-        description=f"由机会 {opportunity.opportunity_code} 自动生成，置信度 {opportunity.confidence_score}"
+        description=f"由机会 {opportunity.opportunity_code} 自动生成，置信度 {opportunity.confidence_score}",
     )
 
     plan = await ShiftPlanService.create_plan(db=db, plan_data=plan_data, user_id=current_user.id)
@@ -571,6 +567,7 @@ async def assess_risk(
 
 
 # ========== Execution Endpoints ==========
+
 
 @router.get("/executions", response_model=ShiftExecutionListResponse)
 async def get_executions(

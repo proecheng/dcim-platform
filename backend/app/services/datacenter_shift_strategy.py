@@ -24,6 +24,7 @@ from ..models.topology_config import CoolingZoneUnit, CoolingZoneCabinet, Cabine
 # 尝试导入 Story 29.1 和 29.2 的依赖
 try:
     from ..models.thermal import ThermalParameter
+
     _thermal_parameter_available = True
 except ImportError:
     _thermal_parameter_available = False
@@ -39,6 +40,7 @@ except ImportError:
 
 try:
     from ..models.config import SystemConfig
+
     _system_config_available = True
 except ImportError:
     _system_config_available = False
@@ -807,7 +809,7 @@ async def _get_zone_supply_temperature(zone_id: int, session: AsyncSession) -> f
         .join(CoolingZoneUnit, CoolingZoneUnit.cooling_unit_id == CoolingUnit.id)
         .join(Point, Point.device_code == CoolingUnit.device_code)
         .where(CoolingZoneUnit.zone_id == zone_id)
-        .where(Point.point_code.like('%_supply_temp'))
+        .where(Point.point_code.like("%_supply_temp"))
     )
 
     result = await session.execute(query)
@@ -868,7 +870,7 @@ async def _calculate_temperature_rise_rate(zone_id: int, session: AsyncSession) 
         .join(Cabinet, Cabinet.id == CabinetTemperatureSensor.cabinet_id)
         .join(CoolingZoneCabinet, CoolingZoneCabinet.cabinet_id == Cabinet.id)
         .where(CoolingZoneCabinet.zone_id == zone_id)
-        .where(CabinetTemperatureSensor.sensor_location == 'inlet')
+        .where(CabinetTemperatureSensor.sensor_location == "inlet")
         .where(PointHistory.recorded_at >= one_hour_ago)
         .order_by(PointHistory.recorded_at)
     )
@@ -978,7 +980,7 @@ async def _calculate_shiftable_power_thm(zone_id: int, session: AsyncSession) ->
         .join(Cabinet, Cabinet.id == CabinetTemperatureSensor.cabinet_id)
         .join(CoolingZoneCabinet, CoolingZoneCabinet.cabinet_id == Cabinet.id)
         .where(CoolingZoneCabinet.zone_id == zone_id)
-        .where(CabinetTemperatureSensor.sensor_location == 'inlet')
+        .where(CabinetTemperatureSensor.sensor_location == "inlet")
         .where(PointHistory.recorded_at >= five_min_ago)
     )
 
@@ -994,7 +996,7 @@ async def _calculate_shiftable_power_thm(zone_id: int, session: AsyncSession) ->
             .join(Cabinet, Cabinet.id == CabinetTemperatureSensor.cabinet_id)
             .join(CoolingZoneCabinet, CoolingZoneCabinet.cabinet_id == Cabinet.id)
             .where(CoolingZoneCabinet.zone_id == zone_id)
-            .where(CabinetTemperatureSensor.sensor_location == 'inlet')
+            .where(CabinetTemperatureSensor.sensor_location == "inlet")
         )
 
         last_timestamp_result = await session.execute(history_check_query)
@@ -1139,7 +1141,7 @@ async def _calculate_shiftable_power_tcl(zone_id: int, session: AsyncSession) ->
         .join(Cabinet, Cabinet.id == CabinetTemperatureSensor.cabinet_id)
         .join(CoolingZoneCabinet, CoolingZoneCabinet.cabinet_id == Cabinet.id)
         .where(CoolingZoneCabinet.zone_id == zone_id)
-        .where(CabinetTemperatureSensor.sensor_location == 'inlet')
+        .where(CabinetTemperatureSensor.sensor_location == "inlet")
         .where(PointHistory.recorded_at >= five_min_ago)
     )
 

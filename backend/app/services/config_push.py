@@ -35,9 +35,7 @@ async def build_gateway_config(gateway_id: int, db: AsyncSession) -> dict:
         linked_point_ids = {pt.point_id for pt in points if pt.point_id is not None}
         point_code_by_id: dict[int, str] = {}
         if linked_point_ids:
-            point_result = await db.execute(
-                select(Point.id, Point.point_code).where(Point.id.in_(linked_point_ids))
-            )
+            point_result = await db.execute(select(Point.id, Point.point_code).where(Point.id.in_(linked_point_ids)))
             point_code_by_id = {row[0]: row[1] for row in point_result.all()}
 
         ds_config = {

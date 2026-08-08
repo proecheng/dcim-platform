@@ -59,8 +59,10 @@ def _storage_metrics(
     equivalent_reduction_kw = max(0.0, discharge_kwth * discharge_efficiency / equivalent_cop - auxiliary_power_kw)
 
     max_charge_kw = max(0.0, storage.get("max_charge_kw", 0.0) or 0.0)
-    charge_kwth = max_charge_kw if max_charge_kw else (
-        usable_cooling_kwh / max(charge_duration_hours, 0.25) if usable_cooling_kwh else 0.0
+    charge_kwth = (
+        max_charge_kw
+        if max_charge_kw
+        else (usable_cooling_kwh / max(charge_duration_hours, 0.25) if usable_cooling_kwh else 0.0)
     )
 
     return {
@@ -99,7 +101,14 @@ def build_cooling_dispatch_strategy(
     redundancy, PUE, and device constraints.
     """
     device_type = str(getattr(device, "device_type", "") or "").upper()
-    if load_subtype not in COOLING_SUBTYPES and device_type not in {"AC", "HVAC", "CHILLER", "PUMP", "COOLING_TOWER", "AHU"}:
+    if load_subtype not in COOLING_SUBTYPES and device_type not in {
+        "AC",
+        "HVAC",
+        "CHILLER",
+        "PUMP",
+        "COOLING_TOWER",
+        "AHU",
+    }:
         return None
 
     recommended_kw = max(0.0, rated_power * max(0.0, recommended_ratio))
@@ -126,7 +135,11 @@ def build_cooling_dispatch_strategy(
                     "hours": VALLEY_HOURS[:8],
                     "action": "预冷并建立热惯性",
                     "target": "机柜进风温度接近22-24℃，峰前30-60分钟完成",
-                    "controls": [c for c in control_params if c in {"temperature_setpoint", "supply_air_temperature", "fan_speed"}],
+                    "controls": [
+                        c
+                        for c in control_params
+                        if c in {"temperature_setpoint", "supply_air_temperature", "fan_speed"}
+                    ],
                 }
             )
             steps.append(
@@ -136,7 +149,11 @@ def build_cooling_dispatch_strategy(
                     "hours": PEAK_HOURS,
                     "action": "提高温度设定并降低压缩机/风机输出",
                     "target": f"削减约{_round(recommended_kw)} kW，温度设定每步0.5℃递增",
-                    "controls": [c for c in control_params if c in {"temperature_setpoint", "fan_speed", "cooling_output", "compressor_frequency"}],
+                    "controls": [
+                        c
+                        for c in control_params
+                        if c in {"temperature_setpoint", "fan_speed", "cooling_output", "compressor_frequency"}
+                    ],
                 }
             )
         formulas.append(
@@ -164,7 +181,9 @@ def build_cooling_dispatch_strategy(
                     "hours": PEAK_HOURS,
                     "action": "提高送风温度或限制阀门开度",
                     "target": f"削减约{_round(recommended_kw)} kW，保持回风温度和湿度边界",
-                    "controls": [c for c in control_params if c in {"supply_air_temperature", "chilled_water_valve", "fan_speed"}],
+                    "controls": [
+                        c for c in control_params if c in {"supply_air_temperature", "chilled_water_valve", "fan_speed"}
+                    ],
                 },
             ]
         )
@@ -178,7 +197,11 @@ def build_cooling_dispatch_strategy(
                     "hours": VALLEY_HOURS,
                     "action": "低价时段降低冷冻水供水温度用于预冷或蓄冷充冷",
                     "target": "供水温度按0.5℃步进，优先利用高COP运行窗口",
-                    "controls": [c for c in control_params if c in {"chilled_water_supply_temperature", "compressor_frequency", "storage_charge"}],
+                    "controls": [
+                        c
+                        for c in control_params
+                        if c in {"chilled_water_supply_temperature", "compressor_frequency", "storage_charge"}
+                    ],
                 },
                 {
                     "phase": "peak_chw_reset",
@@ -186,7 +209,11 @@ def build_cooling_dispatch_strategy(
                     "hours": PEAK_HOURS,
                     "action": "峰时提高冷冻水供水温度并限制冷机加载",
                     "target": f"供水温度上调1-2℃，目标削减约{_round(recommended_kw)} kW",
-                    "controls": [c for c in control_params if c in {"chilled_water_supply_temperature", "compressor_frequency", "pump_frequency"}],
+                    "controls": [
+                        c
+                        for c in control_params
+                        if c in {"chilled_water_supply_temperature", "compressor_frequency", "pump_frequency"}
+                    ],
                 },
             ]
         )
@@ -239,7 +266,11 @@ def build_cooling_dispatch_strategy(
                     "hours": VALLEY_HOURS,
                     "action": "蓄冷罐充冷并抬高峰时可用SOC",
                     "target": f"充冷功率约{storage_metrics.get('charge_kwth', 0)} kWth，SOC不超过上限",
-                    "controls": [c for c in control_params if c in {"storage_charge", "storage_soc", "pump_frequency", "flow_rate"}],
+                    "controls": [
+                        c
+                        for c in control_params
+                        if c in {"storage_charge", "storage_soc", "pump_frequency", "flow_rate"}
+                    ],
                 },
                 {
                     "phase": "storage_discharge",
@@ -250,7 +281,11 @@ def build_cooling_dispatch_strategy(
                         f"放冷约{storage_metrics.get('discharge_kwth', 0)} kWth，"
                         f"等效削减{storage_metrics.get('equivalent_reduction_kw', 0)} kW"
                     ),
-                    "controls": [c for c in control_params if c in {"storage_discharge", "storage_soc", "pump_frequency", "flow_rate"}],
+                    "controls": [
+                        c
+                        for c in control_params
+                        if c in {"storage_discharge", "storage_soc", "pump_frequency", "flow_rate"}
+                    ],
                 },
             ]
         )

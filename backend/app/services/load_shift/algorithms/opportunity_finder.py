@@ -13,6 +13,7 @@ from app.models.load_shift import ShiftOpportunity
 from app.models.energy import PowerDevice
 from app.models.history import PointHistory
 
+
 class OpportunityFinder:
     """
     转移机会发现器

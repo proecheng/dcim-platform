@@ -1769,18 +1769,12 @@ class DemoDataService:
             return unit == "kW" and ("功率" in name or "_power" in code)
 
         async with async_session() as session:
-            devices = (
-                await session.execute(
-                    select(PowerDevice).where(PowerDevice.is_enabled == True)
-                )
-            ).scalars().all()
+            devices = (await session.execute(select(PowerDevice).where(PowerDevice.is_enabled == True))).scalars().all()
 
             pids = [d.power_point_id for d in devices if d.power_point_id]
             point_map = {}
             if pids:
-                pts = (
-                    await session.execute(select(Point).where(Point.id.in_(pids)))
-                ).scalars().all()
+                pts = (await session.execute(select(Point).where(Point.id.in_(pids)))).scalars().all()
                 point_map = {p.id: p for p in pts}
 
             # 第一遍：分类 + 剔除误关联（power_point_id 指向非功率点位的）
@@ -1819,12 +1813,14 @@ class DemoDataService:
             # 重写实时值，使当前 PUE 立即正确（不必等模拟器先跑一轮）
             if rt_targets:
                 rts = (
-                    await session.execute(
-                        select(PointRealtime).where(
-                            PointRealtime.point_id.in_(list(rt_targets.keys()))
+                    (
+                        await session.execute(
+                            select(PointRealtime).where(PointRealtime.point_id.in_(list(rt_targets.keys())))
                         )
                     )
-                ).scalars().all()
+                    .scalars()
+                    .all()
+                )
                 seen = set()
                 now = datetime.now()
                 for rt in rts:
@@ -1837,16 +1833,22 @@ class DemoDataService:
                     if pid not in seen:
                         session.add(
                             PointRealtime(
-                                point_id=pid, value=val, quality=0,
-                                status="normal", source="demo",
+                                point_id=pid,
+                                value=val,
+                                quality=0,
+                                status="normal",
+                                source="demo",
                             )
                         )
 
             await session.commit()
             logger.info(
-                "PUE 校准完成: 剔除误关联 %d 个, 重标定功率点位 %d 个 "
-                "(IT≈%.0f/制冷≈%.0f/UPS≈%.0f kW)",
-                nulled, recalibrated, TARGET["IT"], TARGET["COOL"], TARGET["UPS"],
+                "PUE 校准完成: 剔除误关联 %d 个, 重标定功率点位 %d 个 (IT≈%.0f/制冷≈%.0f/UPS≈%.0f kW)",
+                nulled,
+                recalibrated,
+                TARGET["IT"],
+                TARGET["COOL"],
+                TARGET["UPS"],
             )
 
     async def _generate_history(self, days: int, progress_callback) -> int:

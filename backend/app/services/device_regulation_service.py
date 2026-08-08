@@ -674,7 +674,6 @@ class DeviceRegulationService:
 
         rated_power = device.rated_power
         current_ratio = shift_config.shiftable_power_ratio if shift_config else 0
-        device_type = (device.device_type or "").upper()
         load_subtype = infer_load_subtype(device)
         profile = get_profile(load_subtype)
         control_params = normalize_control_params(getattr(device, "controllable_params", None), profile)

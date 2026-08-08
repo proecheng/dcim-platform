@@ -159,9 +159,7 @@ async def write_pue_history(db: AsyncSession) -> None:
     record_time = datetime.now().replace(second=0, microsecond=0)
 
     # P1-1 修复: 检查是否已存在
-    existing = await db.execute(
-        select(PUEHistory).where(PUEHistory.record_time == record_time)
-    )
+    existing = await db.execute(select(PUEHistory).where(PUEHistory.record_time == record_time))
     existing_record = existing.scalar_one_or_none()
 
     if existing_record:

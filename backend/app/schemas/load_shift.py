@@ -260,6 +260,7 @@ class ShiftOpportunityDetail(ShiftOpportunityResponse):
 
 class ShiftOpportunityPayload(BaseModel):
     """Frontend opportunity contract - 前端机会接口契约"""
+
     id: int
     opportunity_code: str
     opportunity_name: str
@@ -290,6 +291,7 @@ class ShiftOpportunityPayload(BaseModel):
 
 class ShiftOpportunityAnalyzeResponse(BaseModel):
     """Opportunity analysis response - 机会分析响应"""
+
     analysis_date: date
     opportunities_found: int
     opportunities: List[ShiftOpportunityPayload] = Field(default_factory=list)
@@ -304,6 +306,7 @@ class ConvertOpportunityRequest(BaseModel):
 
 class ShiftExecutionPayload(BaseModel):
     """Frontend execution contract - 前端执行记录接口契约"""
+
     id: int
     execution_code: str
     plan_id: int
@@ -341,6 +344,7 @@ class ShiftExecutionPayload(BaseModel):
 
 class ShiftExecutionListResponse(BaseModel):
     """Paginated execution list response - 执行记录分页响应"""
+
     data: List[ShiftExecutionPayload] = Field(default_factory=list)
     total: int
     skip: int
@@ -349,11 +353,13 @@ class ShiftExecutionListResponse(BaseModel):
 
 class ShiftExecutionDetailResponse(BaseModel):
     """Execution detail response - 执行详情响应"""
+
     data: ShiftExecutionPayload
 
 
 class ShiftExecutionRealtimePayload(BaseModel):
     """Execution realtime payload - 执行实时数据"""
+
     execution_id: int
     execution_code: str
     status: str
@@ -367,6 +373,7 @@ class ShiftExecutionRealtimePayload(BaseModel):
 
 class ShiftExecutionRealtimeResponse(BaseModel):
     """Execution realtime response - 执行实时响应"""
+
     data: ShiftExecutionRealtimePayload
 
 

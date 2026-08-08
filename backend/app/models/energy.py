@@ -318,7 +318,9 @@ class PowerDevice(Base):
     power_factor = Column(Float, default=0.9, comment="额定功率因数")
     efficiency = Column(Float, default=95, comment="设备效率 %")
     phase_type = Column(String(10), default="3P", comment="相位类型: 1P/3P")
-    load_subtype = Column(String(50), comment="负荷细分类型: row_ac/cabinet_ac/chilled_water_terminal/thermal_storage等")
+    load_subtype = Column(
+        String(50), comment="负荷细分类型: row_ac/cabinet_ac/chilled_water_terminal/thermal_storage等"
+    )
     controllable_params = Column(JSON, comment="可控参数列表/控制能力画像")
     thermal_storage_config = Column(JSON, comment="蓄冷系统配置: 容量、充放冷功率、SOC上下限等")
     flexibility_factor = Column(Float, comment="人工修正柔性系数 0-1")
