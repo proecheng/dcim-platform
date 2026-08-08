@@ -258,7 +258,9 @@ class TestFloorMapFloors:
         assert resp.status_code == 200
         floors = resp.json()["data"]["floors"]
         assert len(floors) >= 1
-        assert floors[0]["floor_code"] == "F1"
+        floor_f1 = next(floor for floor in floors if floor["floor_code"] == "F1")
+        assert floor_f1["floor_name"] == "1楼"
+        assert "2d" in floor_f1["map_types"]
 
     async def test_get_floors_no_auth(self, client):
         resp = await client.get("/api/v1/floor-map/floors")
