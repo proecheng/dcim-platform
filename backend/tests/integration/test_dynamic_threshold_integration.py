@@ -19,102 +19,129 @@ Story 25.6: 动态告警阈值
 import pytest
 import time
 import asyncio
-from unittest.mock import patch, AsyncMock
-from sqlalchemy import select
+from unittest.mock import patch
 
-from app.core.database import async_session
+from sqlalchemy import update
+
 from app.models.config import SystemConfig
 from app.models.point import Point
 from app.models.alarm import AlarmThreshold
-from app.engines.alarm_engine import alarm_engine, EvaluateResult
+from app.engines.alarm_engine import alarm_engine
 from app.services.diagnosis.dynamic_threshold_service import DynamicThresholdService
 from app.services.diagnosis.environment_context_service import EnvironmentContextService
 from app.core.redis import redis_service
 
 
+class _SessionCtx:
+    def __init__(self, session):
+        self.session = session
+
+    def __call__(self):
+        return self
+
+    async def __aenter__(self):
+        return self.session
+
+    async def __aexit__(self, exc_type, exc, tb):
+        return False
+
+
 @pytest.fixture
-async def setup_test_data():
+async def setup_test_data(async_db, monkeypatch):
     """准备测试数据"""
-    async with async_session() as session:
-        # 创建测试点位（温度传感器）
-        point = Point(
-            id=9001,
-            point_code="TEST_TEMP_9001",
-            point_name="测试温度传感器",
-            point_type="AI",
-            unit="℃",
-            is_enabled=True
-        )
-        session.add(point)
+    session_context = _SessionCtx(async_db)
+    monkeypatch.setattr("app.services.diagnosis.dynamic_threshold_service.async_session", session_context)
+    monkeypatch.setattr("app.services.diagnosis.environment_context_service.async_session", session_context)
 
-        # 创建静态阈值配置
-        threshold = AlarmThreshold(
-            point_id=9001,
-            threshold_type="high",
-            threshold_value=30.0,
-            alarm_level="major",
-            alarm_message="温度过高",
-            is_enabled=True,
-            delay_seconds=0,
-            dead_band=0.0,
-            priority=10
-        )
-        session.add(threshold)
+    redis_values = {}
 
-        # 创建动态阈值配置
-        config_rules = SystemConfig(
-            config_group="alarm",
-            config_key="dynamic_threshold_rules",
-            config_value='[{"condition": "outdoor_temp >= 35", "adjustment": "+2.0", "description": "高温调整", "priority": 10}]',
-            value_type="json",
-            description="动态阈值规则",
-            version=1
-        )
-        session.add(config_rules)
+    async def redis_get(key):
+        return redis_values.get(key)
 
-        config_enabled = SystemConfig(
-            config_group="alarm",
-            config_key="DYNAMIC_THRESHOLDS_ENABLED",
-            config_value="true",
-            value_type="boolean",
-            description="动态阈值开关",
-            version=1
-        )
-        session.add(config_enabled)
+    async def redis_set(key, value, ttl=60):
+        redis_values[key] = value
 
-        config_safety = SystemConfig(
-            config_group="alarm",
-            config_key="dynamic_threshold_safety_boundary_percent",
-            config_value="20",
-            value_type="number",
-            description="安全边界",
-            version=1
-        )
-        session.add(config_safety)
+    monkeypatch.setattr(redis_service, "get", redis_get)
+    monkeypatch.setattr(redis_service, "set", redis_set)
 
-        config_types = SystemConfig(
-            config_group="alarm",
-            config_key="dynamic_threshold_applicable_point_types",
-            config_value='["temperature"]',
-            value_type="json",
-            description="适用点位类型",
-            version=1
-        )
-        session.add(config_types)
+    point = Point(
+        id=9001,
+        point_code="TEST_TEMP_9001",
+        point_name="测试温度传感器",
+        point_type="AI",
+        unit="℃",
+        is_enabled=True,
+    )
+    async_db.add(point)
 
-        await session.commit()
+    threshold = AlarmThreshold(
+        point_id=9001,
+        threshold_type="high",
+        threshold_value=30.0,
+        alarm_level="major",
+        alarm_message="温度过高",
+        is_enabled=True,
+        delay_seconds=0,
+        dead_band=0.0,
+        priority=10,
+    )
+    async_db.add(threshold)
+
+    async_db.add_all(
+        [
+            SystemConfig(
+                config_group="alarm",
+                config_key="dynamic_threshold_rules",
+                config_value='[{"condition": "outdoor_temp >= 35", "adjustment": "+2.0", "description": "高温调整", "priority": 10}]',
+                value_type="json",
+                description="动态阈值规则",
+                version=1,
+            ),
+            SystemConfig(
+                config_group="alarm",
+                config_key="DYNAMIC_THRESHOLDS_ENABLED",
+                config_value="true",
+                value_type="boolean",
+                description="动态阈值开关",
+                version=1,
+            ),
+            SystemConfig(
+                config_group="alarm",
+                config_key="dynamic_threshold_safety_boundary_percent",
+                config_value="20",
+                value_type="number",
+                description="安全边界",
+                version=1,
+            ),
+            SystemConfig(
+                config_group="alarm",
+                config_key="dynamic_threshold_applicable_point_types",
+                config_value='["temperature"]',
+                value_type="json",
+                description="适用点位类型",
+                version=1,
+            ),
+        ]
+    )
+    await async_db.commit()
 
     # 加载告警引擎配置
-    await alarm_engine.load_thresholds()
+    await alarm_engine.load_thresholds(session=async_db)
+    alarm_engine._last_alarm_time.clear()
+    alarm_engine._delay_first_exceed.clear()
+    alarm_engine._dead_band_triggered.clear()
+    alarm_engine._prev_values.clear()
+    await DynamicThresholdService.clear_cache()
+    await EnvironmentContextService.clear_cache()
 
-    yield
+    yield async_db
 
-    # 清理测试数据
-    async with async_session() as session:
-        await session.execute("DELETE FROM points WHERE id = 9001")
-        await session.execute("DELETE FROM alarm_thresholds WHERE point_id = 9001")
-        await session.execute("DELETE FROM system_configs WHERE config_key LIKE 'dynamic_threshold%' OR config_key = 'DYNAMIC_THRESHOLDS_ENABLED'")
-        await session.commit()
+    alarm_engine._last_alarm_time.clear()
+    alarm_engine._delay_first_exceed.clear()
+    alarm_engine._dead_band_triggered.clear()
+    alarm_engine._prev_values.clear()
+    await DynamicThresholdService.clear_cache()
+    await EnvironmentContextService.clear_cache()
 
 
 class TestDynamicThresholdIntegration:
@@ -138,11 +165,11 @@ class TestDynamicThresholdIntegration:
         await EnvironmentContextService.clear_cache()
 
         # 测试: 31℃ 不触发告警
-        results = alarm_engine.evaluate(9001, 31.0, "AI")
+        results = await alarm_engine.evaluate_async(9001, 31.0, "AI")
         assert len(results) == 0, "31℃ 应该不触发告警（动态阈值 32℃）"
 
         # 测试: 33℃ 触发告警
-        results = alarm_engine.evaluate(9001, 33.0, "AI")
+        results = await alarm_engine.evaluate_async(9001, 33.0, "AI")
         assert len(results) == 1, "33℃ 应该触发告警（动态阈值 32℃）"
         assert results[0].threshold_value == 30.0  # 原始静态阈值
         assert results[0].threshold_metadata["adjusted_threshold"] == 32.0  # 调整后阈值
@@ -156,21 +183,22 @@ class TestDynamicThresholdIntegration:
         场景: 关闭动态阈值特性，应使用静态阈值 30℃
         """
         # 关闭特性开关
-        async with async_session() as session:
-            await session.execute(
-                "UPDATE system_configs SET config_value = 'false' WHERE config_key = 'DYNAMIC_THRESHOLDS_ENABLED'"
-            )
-            await session.commit()
+        await setup_test_data.execute(
+            update(SystemConfig)
+            .where(SystemConfig.config_key == "DYNAMIC_THRESHOLDS_ENABLED")
+            .values(config_value="false")
+        )
+        await setup_test_data.commit()
 
         # 设置环境上下文
         await redis_service.set("outdoor_temp", "36.0")
 
         # 清除缓存
         await DynamicThresholdService.clear_cache()
-        await alarm_engine.load_thresholds()
+        await alarm_engine.load_thresholds(session=setup_test_data)
 
         # 测试: 31℃ 触发告警（使用静态阈值 30℃）
-        results = alarm_engine.evaluate(9001, 31.0, "AI")
+        results = await alarm_engine.evaluate_async(9001, 31.0, "AI")
         assert len(results) == 1, "31℃ 应该触发告警（静态阈值 30℃）"
         assert results[0].threshold_metadata.get("is_enabled") == False
 
@@ -182,17 +210,18 @@ class TestDynamicThresholdIntegration:
         场景: 配置 3 条规则，验证累加和优先级
         """
         # 配置多条规则
-        async with async_session() as session:
-            await session.execute(
-                """UPDATE system_configs
-                   SET config_value = '[
-                       {"condition": "outdoor_temp >= 35", "adjustment": "+2.0", "description": "高温", "priority": 10},
-                       {"condition": "it_load_percent > 80", "adjustment": "+1.0", "description": "高负载", "priority": 5},
-                       {"condition": "season == \\"summer\\"", "adjustment": "+0.5", "description": "夏季", "priority": 3}
-                   ]'
-                   WHERE config_key = 'dynamic_threshold_rules'"""
+        await setup_test_data.execute(
+            update(SystemConfig)
+            .where(SystemConfig.config_key == "dynamic_threshold_rules")
+            .values(
+                config_value="""[
+                    {"condition": "outdoor_temp >= 35", "adjustment": "+2.0", "description": "高温", "priority": 10},
+                    {"condition": "it_load_percent > 80", "adjustment": "+1.0", "description": "高负载", "priority": 5},
+                    {"condition": "season == \\"summer\\"", "adjustment": "+0.5", "description": "夏季", "priority": 3}
+                ]"""
             )
-            await session.commit()
+        )
+        await setup_test_data.commit()
 
         # 设置环境上下文（触发所有规则）
         await redis_service.set("outdoor_temp", "36.0")
@@ -203,7 +232,7 @@ class TestDynamicThresholdIntegration:
         await EnvironmentContextService.clear_cache()
 
         # 测试: 累加调整值 = 2.0 + 1.0 + 0.5 = 3.5
-        results = alarm_engine.evaluate(9001, 34.0, "AI")
+        results = await alarm_engine.evaluate_async(9001, 34.0, "AI")
         assert len(results) == 1
         assert results[0].threshold_metadata["adjustment"] == 3.5
         assert results[0].threshold_metadata["adjusted_threshold"] == 33.5
@@ -217,13 +246,15 @@ class TestDynamicThresholdIntegration:
         场景: 安全边界 20%，静态阈值 30℃，最大调整 ±6℃
         """
         # 配置极端规则（调整值 +10℃）
-        async with async_session() as session:
-            await session.execute(
-                """UPDATE system_configs
-                   SET config_value = '[{"condition": "outdoor_temp >= 35", "adjustment": "+10.0", "description": "极端调整", "priority": 10}]'
-                   WHERE config_key = 'dynamic_threshold_rules'"""
+        await setup_test_data.execute(
+            update(SystemConfig)
+            .where(SystemConfig.config_key == "dynamic_threshold_rules")
+            .values(
+                config_value='[{"condition": "outdoor_temp >= 35", "adjustment": "+10.0", '
+                '"description": "极端调整", "priority": 10}]'
             )
-            await session.commit()
+        )
+        await setup_test_data.commit()
 
         # 设置环境上下文
         await redis_service.set("outdoor_temp", "36.0")
@@ -232,7 +263,7 @@ class TestDynamicThresholdIntegration:
         await DynamicThresholdService.clear_cache()
 
         # 测试: 调整值被限制在 ±6℃（30 * 20% = 6）
-        results = alarm_engine.evaluate(9001, 37.0, "AI")
+        results = await alarm_engine.evaluate_async(9001, 37.0, "AI")
         assert len(results) == 1
         assert results[0].threshold_metadata["adjustment"] == 6.0  # 限制在 6℃
         assert results[0].threshold_metadata["adjusted_threshold"] == 36.0
@@ -245,15 +276,18 @@ class TestDynamicThresholdIntegration:
         场景: Redis 不可用，降级到静态阈值
         """
         # 模拟 Redis 异常
-        with patch.object(redis_service, 'get', side_effect=Exception("Redis error")):
+        with patch.object(redis_service, "get", side_effect=Exception("Redis error")):
             # 清除缓存
             await DynamicThresholdService.clear_cache()
             await EnvironmentContextService.clear_cache()
 
             # 测试: 降级到静态阈值 30℃
-            results = alarm_engine.evaluate(9001, 31.0, "AI")
+            results = await alarm_engine.evaluate_async(9001, 31.0, "AI")
             assert len(results) == 1
-            assert results[0].threshold_metadata.get("degraded") == True or results[0].threshold_metadata.get("is_enabled") == True
+            assert (
+                results[0].threshold_metadata.get("degraded") == True
+                or results[0].threshold_metadata.get("is_enabled") == True
+            )
 
     @pytest.mark.asyncio
     async def test_8_6_low_threshold_adjustment_direction(self, setup_test_data):
@@ -263,15 +297,21 @@ class TestDynamicThresholdIntegration:
         场景: 低阈值 10℃，调整 +2℃，实际阈值应为 8℃（减法）
         """
         # 创建低阈值配置
-        async with async_session() as session:
-            await session.execute(
-                """INSERT INTO alarm_thresholds (point_id, threshold_type, threshold_value, alarm_level, alarm_message, is_enabled, priority)
-                   VALUES (9001, 'low', 10.0, 'major', '温度过低', 1, 10)"""
+        setup_test_data.add(
+            AlarmThreshold(
+                point_id=9001,
+                threshold_type="low",
+                threshold_value=10.0,
+                alarm_level="major",
+                alarm_message="温度过低",
+                is_enabled=True,
+                priority=10,
             )
-            await session.commit()
+        )
+        await setup_test_data.commit()
 
         # 重新加载阈值
-        await alarm_engine.load_thresholds()
+        await alarm_engine.load_thresholds(session=setup_test_data)
 
         # 设置环境上下文
         await redis_service.set("outdoor_temp", "36.0")
@@ -280,12 +320,12 @@ class TestDynamicThresholdIntegration:
         await DynamicThresholdService.clear_cache()
 
         # 测试: 低阈值调整方向（10 - 2 = 8）
-        results = alarm_engine.evaluate(9001, 9.0, "AI")
+        results = await alarm_engine.evaluate_async(9001, 9.0, "AI")
         # 应该不触发告警（9 > 8）
         low_results = [r for r in results if r.threshold_type == "low"]
         assert len(low_results) == 0, "9℃ 不应触发低阈值告警（动态阈值 8℃）"
 
-        results = alarm_engine.evaluate(9001, 7.0, "AI")
+        results = await alarm_engine.evaluate_async(9001, 7.0, "AI")
         low_results = [r for r in results if r.threshold_type == "low"]
         assert len(low_results) == 1, "7℃ 应触发低阈值告警（动态阈值 8℃）"
         assert low_results[0].threshold_metadata["adjusted_threshold"] == 8.0
@@ -298,14 +338,13 @@ class TestDynamicThresholdIntegration:
         场景: 死区 1℃，动态阈值 32℃，恢复阈值 31℃
         """
         # 配置死区
-        async with async_session() as session:
-            await session.execute(
-                "UPDATE alarm_thresholds SET dead_band = 1.0 WHERE point_id = 9001"
-            )
-            await session.commit()
+        await setup_test_data.execute(
+            update(AlarmThreshold).where(AlarmThreshold.point_id == 9001).values(dead_band=1.0)
+        )
+        await setup_test_data.commit()
 
         # 重新加载阈值
-        await alarm_engine.load_thresholds()
+        await alarm_engine.load_thresholds(session=setup_test_data)
 
         # 设置环境上下文
         await redis_service.set("outdoor_temp", "36.0")
@@ -314,19 +353,20 @@ class TestDynamicThresholdIntegration:
         await DynamicThresholdService.clear_cache()
 
         # 第一次: 33℃ 触发告警（> 32℃）
-        results = alarm_engine.evaluate(9001, 33.0, "AI")
+        results = await alarm_engine.evaluate_async(9001, 33.0, "AI")
         assert len(results) == 1
+        alarm_engine._last_alarm_time.clear()
 
         # 第二次: 32.5℃ 不触发（已在死区内）
-        results = alarm_engine.evaluate(9001, 32.5, "AI")
+        results = await alarm_engine.evaluate_async(9001, 32.5, "AI")
         assert len(results) == 0
 
         # 第三次: 30.5℃ 恢复（< 31℃）
-        results = alarm_engine.evaluate(9001, 30.5, "AI")
+        results = await alarm_engine.evaluate_async(9001, 30.5, "AI")
         assert len(results) == 0
 
         # 第四次: 33℃ 再次触发
-        results = alarm_engine.evaluate(9001, 33.0, "AI")
+        results = await alarm_engine.evaluate_async(9001, 33.0, "AI")
         assert len(results) == 1
 
     @pytest.mark.asyncio
@@ -346,9 +386,11 @@ class TestDynamicThresholdIntegration:
         await DynamicThresholdService.clear_cache()
         await EnvironmentContextService.clear_cache()
 
+        await alarm_engine.evaluate_async(9001, 31.0, "AI")
+
         # 单次调整性能测试
         start = time.time()
-        results = alarm_engine.evaluate(9001, 33.0, "AI")
+        await alarm_engine.evaluate_async(9001, 33.0, "AI")
         elapsed = (time.time() - start) * 1000  # 转换为毫秒
 
         assert elapsed < 5.0, f"单次调整耗时 {elapsed:.2f}ms，超过 5ms 目标"
@@ -357,7 +399,7 @@ class TestDynamicThresholdIntegration:
         times = []
         for i in range(100):
             start = time.time()
-            alarm_engine.evaluate(9001, 33.0 + (i % 10) * 0.1, "AI")
+            await alarm_engine.evaluate_async(9001, 33.0 + (i % 10) * 0.1, "AI")
             times.append((time.time() - start) * 1000)
 
         avg_time = sum(times) / len(times)
@@ -399,7 +441,7 @@ class TestDynamicThresholdIntegration:
 
         # 触发多次调整
         for i in range(5):
-            alarm_engine.evaluate(9001, 33.0, "AI")
+            await alarm_engine.evaluate_async(9001, 33.0, "AI")
             await asyncio.sleep(0.1)
 
         # 验证监控指标
@@ -408,7 +450,9 @@ class TestDynamicThresholdIntegration:
             keys = []
             cursor = 0
             while True:
-                cursor, batch = await redis_service._pool.scan(cursor, match="dynamic_threshold:count:*:adjusted", count=100)
+                cursor, batch = await redis_service._pool.scan(
+                    cursor, match="dynamic_threshold:count:*:adjusted", count=100
+                )
                 keys.extend(batch)
                 if cursor == 0:
                     break
@@ -418,7 +462,9 @@ class TestDynamicThresholdIntegration:
             keys = []
             cursor = 0
             while True:
-                cursor, batch = await redis_service._pool.scan(cursor, match="dynamic_threshold:adjustment:*", count=100)
+                cursor, batch = await redis_service._pool.scan(
+                    cursor, match="dynamic_threshold:adjustment:*", count=100
+                )
                 keys.extend(batch)
                 if cursor == 0:
                     break
@@ -432,40 +478,42 @@ class TestDynamicThresholdIntegration:
         验证: 关闭动态阈值后，现有告警引擎功能正常
         """
         # 关闭动态阈值
-        async with async_session() as session:
-            await session.execute(
-                "UPDATE system_configs SET config_value = 'false' WHERE config_key = 'DYNAMIC_THRESHOLDS_ENABLED'"
-            )
-            await session.commit()
+        await setup_test_data.execute(
+            update(SystemConfig)
+            .where(SystemConfig.config_key == "DYNAMIC_THRESHOLDS_ENABLED")
+            .values(config_value="false")
+        )
+        await setup_test_data.commit()
 
         # 清除缓存
         await DynamicThresholdService.clear_cache()
-        await alarm_engine.load_thresholds()
+        await alarm_engine.load_thresholds(session=setup_test_data)
 
         # 测试静态阈值功能
-        results = alarm_engine.evaluate(9001, 31.0, "AI")
+        results = await alarm_engine.evaluate_async(9001, 31.0, "AI")
         assert len(results) == 1
         assert results[0].threshold_value == 30.0
         assert results[0].alarm_level == "major"
 
         # 测试死区功能
-        async with async_session() as session:
-            await session.execute(
-                "UPDATE alarm_thresholds SET dead_band = 1.0 WHERE point_id = 9001"
-            )
-            await session.commit()
-        await alarm_engine.load_thresholds()
+        await setup_test_data.execute(
+            update(AlarmThreshold).where(AlarmThreshold.point_id == 9001).values(dead_band=1.0)
+        )
+        await setup_test_data.commit()
+        await alarm_engine.load_thresholds(session=setup_test_data)
+        alarm_engine._last_alarm_time.clear()
 
         # 触发告警
-        results = alarm_engine.evaluate(9001, 31.0, "AI")
+        results = await alarm_engine.evaluate_async(9001, 31.0, "AI")
         assert len(results) == 1
+        alarm_engine._last_alarm_time.clear()
 
         # 死区内不重复触发
-        results = alarm_engine.evaluate(9001, 30.5, "AI")
+        results = await alarm_engine.evaluate_async(9001, 30.5, "AI")
         assert len(results) == 0
 
         # 恢复后再次触发
-        results = alarm_engine.evaluate(9001, 28.0, "AI")
+        results = await alarm_engine.evaluate_async(9001, 28.0, "AI")
         assert len(results) == 0
-        results = alarm_engine.evaluate(9001, 31.0, "AI")
+        results = await alarm_engine.evaluate_async(9001, 31.0, "AI")
         assert len(results) == 1

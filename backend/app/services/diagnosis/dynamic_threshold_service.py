@@ -54,6 +54,7 @@ class DynamicThresholdService:
     # 缓存
     _rules_cache: List[DynamicThresholdRule] = []
     _config_cache: Dict[str, Any] = {}
+    _point_type_cache: Dict[int, Optional[str]] = {}
     _cache_lock = asyncio.Lock()
     _cache_version: Optional[int] = None
 
@@ -221,22 +222,29 @@ class DynamicThresholdService:
         Returns:
             Optional[str]: 点位类型 (temperature/humidity/...)，无法判断返回 None
         """
+        if point_id in cls._point_type_cache:
+            return cls._point_type_cache[point_id]
+
         try:
             async with async_session() as session:
                 result = await session.execute(select(Point.unit).where(Point.id == point_id))
                 unit = result.scalar_one_or_none()
 
                 if not unit:
+                    cls._point_type_cache[point_id] = None
                     return None
 
                 # 根据单位判断类型
                 unit_lower = unit.lower()
                 if "℃" in unit or "°c" in unit_lower or "celsius" in unit_lower:
-                    return "temperature"
+                    point_type = "temperature"
                 elif "%rh" in unit_lower or ("%" in unit and "rh" in unit_lower):
-                    return "humidity"
+                    point_type = "humidity"
                 else:
-                    return None
+                    point_type = None
+
+                cls._point_type_cache[point_id] = point_type
+                return point_type
 
         except Exception as e:
             logger.error(f"查询点位 {point_id} 类型失败: {e}")
@@ -395,6 +403,9 @@ class DynamicThresholdService:
     @classmethod
     async def _get_config(cls, config_key: str) -> Optional[SystemConfig]:
         """获取配置项"""
+        if config_key in cls._config_cache:
+            return cls._config_cache[config_key]
+
         try:
             async with async_session() as session:
                 result = await session.execute(
@@ -402,7 +413,9 @@ class DynamicThresholdService:
                         SystemConfig.config_group == "alarm", SystemConfig.config_key == config_key
                     )
                 )
-                return result.scalar_one_or_none()
+                config = result.scalar_one_or_none()
+                cls._config_cache[config_key] = config
+                return config
         except Exception as e:
             logger.error(f"查询配置 {config_key} 失败: {e}")
             return None
@@ -419,4 +432,5 @@ class DynamicThresholdService:
         async with cls._cache_lock:
             cls._rules_cache = []
             cls._config_cache = {}
+            cls._point_type_cache = {}
             cls._cache_version = None

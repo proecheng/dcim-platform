@@ -15,9 +15,10 @@ from app.services.gateway_monitor import (
     RESOURCE_WARNING_COOLDOWN,
 )
 from app.services.gateway_registration import (
-    handle_gateway_status,
-    check_gateway_heartbeats,
     HEARTBEAT_TIMEOUT_SECONDS,
+    check_gateway_heartbeats,
+    handle_gateway_status,
+    sign_gateway_payload,
 )
 
 
@@ -140,6 +141,7 @@ class TestGatewayMonitorIntegration:
             "mem": 40.0,
             "disk": 20.0,
         }
+        payload["signature"] = sign_gateway_payload(payload)
         await handle_gateway_status(payload, db_session)
 
         result = await db_session.execute(
@@ -170,6 +172,7 @@ class TestGatewayMonitorIntegration:
             "ip": "10.0.0.2",
             "cpu": 30.0,
         }
+        payload["signature"] = sign_gateway_payload(payload)
         await handle_gateway_status(payload, db_session)
 
         result = await db_session.execute(

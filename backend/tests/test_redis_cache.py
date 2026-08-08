@@ -309,7 +309,7 @@ async def test_handle_point_data_calls_cache(db_session):
 
 async def test_handle_gateway_status_calls_cache(db_session):
     """测试 handle_gateway_status 集成 — 写入 DB 后同步写入缓存"""
-    from app.services.gateway_registration import handle_gateway_status
+    from app.services.gateway_registration import handle_gateway_status, sign_gateway_payload
 
     payload = {
         "gw_id": "gw-cache-001",
@@ -319,6 +319,7 @@ async def test_handle_gateway_status_calls_cache(db_session):
         "mem": 60.0,
         "disk": 30.0,
     }
+    payload["signature"] = sign_gateway_payload(payload)
 
     with patch("app.services.gateway_registration.cache_gateway_status", new_callable=AsyncMock) as mock_cache:
         await handle_gateway_status(payload, db_session)

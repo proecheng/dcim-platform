@@ -45,6 +45,7 @@ class IngestPoint:
     gateway_id: Optional[str] = None  # 网关 ID (MQTT 来源)
     point_key: Optional[str] = None  # 原始点位标识 (PointDataLatest 用)
     source: str = "unknown"  # 来源标识: mqtt / demo / bridge
+    alarm_level: Optional[str] = None  # 上游已判定的告警级别
 
 
 @dataclass
@@ -251,6 +252,7 @@ async def _batch_upsert_realtime(
             quality_cases_parts: list[str] = []
             status_cases_parts: list[str] = []
             source_cases_parts: list[str] = []
+            alarm_level_cases_parts: list[str] = []
             id_placeholders: list[str] = []
 
             for idx, pt in enumerate(batch):
@@ -259,17 +261,20 @@ async def _batch_upsert_realtime(
                 quality_key = f"quality_{idx}"
                 status_key = f"status_{idx}"
                 source_key = f"source_{idx}"
+                alarm_level_key = f"alarm_level_{idx}"
 
                 params[pid_key] = pt.point_id
                 params[value_key] = pt.value
                 params[quality_key] = pt.quality
                 params[status_key] = pt.status
                 params[source_key] = pt.source
+                params[alarm_level_key] = pt.alarm_level
 
                 value_cases_parts.append(f"WHEN :{pid_key} THEN :{value_key}")
                 quality_cases_parts.append(f"WHEN :{pid_key} THEN :{quality_key}")
                 status_cases_parts.append(f"WHEN :{pid_key} THEN :{status_key}")
                 source_cases_parts.append(f"WHEN :{pid_key} THEN :{source_key}")
+                alarm_level_cases_parts.append(f"WHEN :{pid_key} THEN :{alarm_level_key}")
                 id_placeholders.append(f":{pid_key}")
 
             sql = text(
@@ -280,6 +285,7 @@ async def _batch_upsert_realtime(
                     quality = CASE point_id {" ".join(quality_cases_parts)} END,
                     status = CASE point_id {" ".join(status_cases_parts)} END,
                     source = CASE point_id {" ".join(source_cases_parts)} END,
+                    alarm_level = CASE point_id {" ".join(alarm_level_cases_parts)} END,
                     updated_at = :now
                 WHERE point_id IN ({", ".join(id_placeholders)})
                 """
@@ -299,6 +305,7 @@ async def _batch_upsert_realtime(
                 raw_value=pt.value,
                 quality=pt.quality,
                 status=pt.status,
+                alarm_level=pt.alarm_level,
                 value_text=value_text,
                 source=pt.source,
             )
@@ -433,7 +440,7 @@ async def _evaluate_alarms(
 
     for pt in eval_points:
         meta = _point_meta_cache[pt.point_id]
-        triggered_list = alarm_engine.evaluate(pt.point_id, pt.value, meta["point_type"])
+        triggered_list = await alarm_engine.evaluate_async(pt.point_id, pt.value, meta["point_type"])
 
         if triggered_list:
             # 检查是否已有同阈值的活动告警
@@ -685,7 +692,7 @@ async def _update_redis_cache(points: list[IngestPoint], now: datetime) -> None:
                 "quality": pt.quality,
                 "status": pt.status,
                 "source": pt.source,
-                "alarm_level": None,
+                "alarm_level": pt.alarm_level,
                 "updated_at": now.isoformat(),
             }
         )

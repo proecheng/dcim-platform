@@ -3,12 +3,33 @@
 V2.5 扩展版本 - 新增基本电费、功率因数调整、固定费用支持
 """
 
+import logging
+from contextlib import asynccontextmanager
 from datetime import date, datetime
-from typing import Dict, List, Optional, Any
-from sqlalchemy import select, and_, or_
+from typing import Any, Dict, List, Optional
+
+from sqlalchemy import and_, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..models.energy import ElectricityPricing, PricingConfig
+
+logger = logging.getLogger(__name__)
+
+
+@asynccontextmanager
+async def transaction_scope(db: AsyncSession):
+    """在自动开启的读事务中安全执行并提交写操作。"""
+    if not db.in_transaction():
+        async with db.begin():
+            yield
+        return
+
+    try:
+        yield
+        await db.commit()
+    except Exception:
+        await db.rollback()
+        raise
 
 
 class PricingService:
@@ -791,7 +812,7 @@ class PricingService:
         """
         from ..models.energy import PricingScheme, SchemePricingRelation, PricingSchemeAuditLog
 
-        async with self.db.begin():
+        async with transaction_scope(self.db):
             # 创建方案
             scheme = PricingScheme(**scheme_data)
             self.db.add(scheme)
@@ -823,12 +844,22 @@ class PricingService:
             redis_client: Redis客户端（可选）
         """
         from ..core.redis_lock import RedisLock
+        from redis.exceptions import RedisError
 
         # 如果提供了Redis客户端，使用分布式锁
         if redis_client:
             lock = RedisLock(redis_client)
-            async with lock.acquire("pricing_scheme_activation", timeout=10):
-                await self._do_activate_scheme(scheme_id, user_id)
+            activated = False
+            try:
+                async with lock.acquire("pricing_scheme_activation", timeout=10):
+                    await self._do_activate_scheme(scheme_id, user_id)
+                    activated = True
+            except RedisError as exc:
+                if activated:
+                    logger.warning("电价方案已激活，但 Redis 锁释放失败: %s", exc)
+                else:
+                    logger.warning("Redis 锁不可用，降级为数据库事务: %s", exc)
+                    await self._do_activate_scheme(scheme_id, user_id)
         else:
             # 无Redis时直接执行（开发环境）
             await self._do_activate_scheme(scheme_id, user_id)
@@ -839,7 +870,7 @@ class PricingService:
         from fastapi import HTTPException
         from sqlalchemy import update, func, select
 
-        async with self.db.begin():
+        async with transaction_scope(self.db):
             # 1. 校验方案完整性
             validation = await self.validate_scheme(scheme_id)
             if not validation["valid"]:
@@ -909,7 +940,7 @@ class PricingService:
         from fastapi import HTTPException
         from sqlalchemy import update, select
 
-        async with self.db.begin():
+        async with transaction_scope(self.db):
             result = await self.db.execute(select(PricingScheme).where(PricingScheme.id == scheme_id))
             scheme = result.scalar_one_or_none()
 
@@ -973,7 +1004,7 @@ class PricingService:
 
         if not validation["valid"]:
             # 方案失效，自动停用
-            async with self.db.begin():
+            async with transaction_scope(self.db):
                 await self.db.execute(
                     update(PricingScheme)
                     .where(PricingScheme.id == active_scheme.id)

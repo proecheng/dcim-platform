@@ -2,6 +2,7 @@
 
 import hmac
 import hashlib
+import json
 import logging
 from datetime import datetime, timedelta
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -19,7 +20,15 @@ settings = get_settings()
 HEARTBEAT_TIMEOUT_SECONDS = 90
 
 
-def verify_gateway_signature(payload: dict, signature: str) -> bool:
+def sign_gateway_payload(payload: dict, secret_key: str | None = None) -> str:
+    """为网关消息生成 HMAC-SHA256 签名。"""
+    message_data = {key: value for key, value in payload.items() if key != "signature"}
+    message = json.dumps(message_data, sort_keys=True)
+    key = secret_key or settings.gateway_secret_key
+    return hmac.new(key.encode(), message.encode(), hashlib.sha256).hexdigest()
+
+
+def verify_gateway_signature(payload: dict, signature: str | None) -> bool:
     """验证网关消息签名 — P0-2 修复
 
     使用 HMAC-SHA256 验证消息完整性，防止消息伪造。
@@ -28,15 +37,7 @@ def verify_gateway_signature(payload: dict, signature: str) -> bool:
         logger.warning("消息缺少签名")
         return False
 
-    # 从配置读取共享密钥（生产环境应使用环境变量）
-    secret_key = getattr(settings, "gateway_secret_key", "default-secret-key-change-in-production")
-
-    # 计算消息签名（排除 signature 字段）
-    message_data = {k: v for k, v in payload.items() if k != "signature"}
-    import json
-
-    message = json.dumps(message_data, sort_keys=True)
-    expected = hmac.new(secret_key.encode(), message.encode(), hashlib.sha256).hexdigest()
+    expected = sign_gateway_payload(payload)
 
     # 使用 compare_digest 防止时序攻击
     return hmac.compare_digest(expected, signature)
@@ -49,7 +50,7 @@ def is_gateway_authorized(gw_id: str) -> bool:
     开发环境可以设置 GATEWAY_AUTO_REGISTER=true 跳过验证。
     """
     # 开发模式：允许自动注册
-    if getattr(settings, "gateway_auto_register", False):
+    if settings.gateway_auto_register:
         return True
 
     # 生产模式：检查白名单（这里简化为检查 gw_id 格式）

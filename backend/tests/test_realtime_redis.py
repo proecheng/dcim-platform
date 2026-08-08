@@ -57,7 +57,7 @@ class TestDatasourceBridge:
 
     async def test_sync_point_data(self, db_session: AsyncSession, sample_point: Point):
         """测试同步点位数据到 PointRealtime"""
-        with patch("app.services.datasource_bridge.redis_service") as mock_redis:
+        with patch("app.services.ingest_pipeline.redis_service") as mock_redis:
             mock_redis.is_available = False
 
             await sync_point_data(
@@ -78,7 +78,7 @@ class TestDatasourceBridge:
 
     async def test_sync_point_data_with_redis(self, db_session: AsyncSession, sample_point: Point):
         """测试同步点位数据同时写入 Redis"""
-        with patch("app.services.datasource_bridge.redis_service") as mock_redis:
+        with patch("app.services.ingest_pipeline.redis_service") as mock_redis:
             mock_redis.is_available = True
             mock_redis.set = AsyncMock()
 
@@ -101,7 +101,7 @@ class TestDatasourceBridge:
 
     async def test_sync_point_data_redis_failure(self, db_session: AsyncSession, sample_point: Point):
         """测试 Redis 写入失败不影响数据库更新"""
-        with patch("app.services.datasource_bridge.redis_service") as mock_redis:
+        with patch("app.services.ingest_pipeline.redis_service") as mock_redis:
             mock_redis.is_available = True
             mock_redis.set = AsyncMock(side_effect=Exception("Redis down"))
 
@@ -121,7 +121,7 @@ class TestDatasourceBridge:
 
     async def test_sync_preserves_alarm_level(self, db_session: AsyncSession, sample_point: Point):
         """测试同步保留告警级别"""
-        with patch("app.services.datasource_bridge.redis_service") as mock_redis:
+        with patch("app.services.ingest_pipeline.redis_service") as mock_redis:
             mock_redis.is_available = False
 
             await sync_point_data(

@@ -107,6 +107,11 @@ class Settings(BaseSettings):
     mqtt_username: str = ""
     mqtt_password: str = ""
     mqtt_client_id: str = "dcim-backend"
+
+    # 网关心跳认证
+    gateway_secret_key: str = "default-secret-key-change-in-production"
+    gateway_auto_register: bool = False
+
     # 电价配置模式
     pricing_strict_mode: bool = Field(
         default=True, description="电价配置严格模式：True=不完整时抛出异常，False=使用默认电价填补"

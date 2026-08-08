@@ -106,6 +106,9 @@ async def _ensure_sqlite_legacy_columns(conn):
         "device_templates": [
             ("extra_config", "JSON"),
         ],
+        "system_configs": [
+            ("version", "INTEGER NOT NULL DEFAULT 1"),
+        ],
         "cooling_zones": [
             ("site_id", "INTEGER"),
             ("area_m2", "FLOAT"),

@@ -8,7 +8,7 @@ from sqlalchemy import select
 
 from app.models.gateway import Gateway
 from app.models.spatial import Site
-from app.services.gateway_registration import handle_gateway_status, _resolve_site_id
+from app.services.gateway_registration import _resolve_site_id, handle_gateway_status, sign_gateway_payload
 from app.services.point_data import handle_point_data
 from app.services.dedup_service import is_duplicate, mark_processed
 from tests.conftest import auth_headers
@@ -106,6 +106,7 @@ class TestGatewayRegistrationSiteId:
     async def test_auto_register_with_valid_site(self, mock_cache, async_db, site_a):
         """自动注册时绑定有效 site_id"""
         payload = {"gw_id": "gw-new-01", "name": "新网关", "ip": "10.0.1.1"}
+        payload["signature"] = sign_gateway_payload(payload)
         await handle_gateway_status(payload, async_db, site_id=str(site_a.id))
 
         result = await async_db.execute(select(Gateway).where(Gateway.gateway_id == "gw-new-01"))
@@ -117,6 +118,7 @@ class TestGatewayRegistrationSiteId:
     async def test_auto_register_with_invalid_site(self, mock_cache, async_db):
         """自动注册时 site_id 无效，网关仍注册但 site_id 为 None"""
         payload = {"gw_id": "gw-new-02", "name": "新网关2"}
+        payload["signature"] = sign_gateway_payload(payload)
         await handle_gateway_status(payload, async_db, site_id="99999")
 
         result = await async_db.execute(select(Gateway).where(Gateway.gateway_id == "gw-new-02"))
@@ -128,6 +130,7 @@ class TestGatewayRegistrationSiteId:
     async def test_auto_register_without_site(self, mock_cache, async_db):
         """自动注册时不传 site_id"""
         payload = {"gw_id": "gw-new-03", "name": "新网关3"}
+        payload["signature"] = sign_gateway_payload(payload)
         await handle_gateway_status(payload, async_db)
 
         result = await async_db.execute(select(Gateway).where(Gateway.gateway_id == "gw-new-03"))
@@ -138,6 +141,7 @@ class TestGatewayRegistrationSiteId:
     async def test_heartbeat_fills_missing_site(self, mock_cache, async_db, site_a, gateway_no_site):
         """心跳更新时，网关无 site_id 且 topic 有，自动补充"""
         payload = {"gw_id": gateway_no_site.gateway_id, "name": "孤立网关"}
+        payload["signature"] = sign_gateway_payload(payload)
         await handle_gateway_status(payload, async_db, site_id=str(site_a.id))
 
         result = await async_db.execute(select(Gateway).where(Gateway.gateway_id == gateway_no_site.gateway_id))
@@ -148,6 +152,7 @@ class TestGatewayRegistrationSiteId:
     async def test_heartbeat_no_overwrite_on_mismatch(self, mock_cache, async_db, site_a, site_b, gateway_with_site):
         """心跳 site_id 与 DB 不一致时，不覆盖"""
         payload = {"gw_id": gateway_with_site.gateway_id, "name": "已绑定网关"}
+        payload["signature"] = sign_gateway_payload(payload)
         await handle_gateway_status(payload, async_db, site_id=str(site_b.id))
 
         result = await async_db.execute(select(Gateway).where(Gateway.gateway_id == gateway_with_site.gateway_id))
@@ -159,6 +164,7 @@ class TestGatewayRegistrationSiteId:
     async def test_heartbeat_same_site_no_change(self, mock_cache, async_db, site_a, gateway_with_site):
         """心跳 site_id 与 DB 一致时，正常更新"""
         payload = {"gw_id": gateway_with_site.gateway_id, "name": "已绑定网关"}
+        payload["signature"] = sign_gateway_payload(payload)
         await handle_gateway_status(payload, async_db, site_id=str(site_a.id))
 
         result = await async_db.execute(select(Gateway).where(Gateway.gateway_id == gateway_with_site.gateway_id))

@@ -7,9 +7,10 @@ import logging
 import time
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import Dict, List, Tuple
+from typing import Dict, List, Optional, Tuple
 
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..core.database import async_session
 from ..models.alarm import AlarmThreshold
@@ -84,71 +85,73 @@ class AlarmEngine:
 
         self._load_lock = asyncio.Lock()
 
-    async def load_thresholds(self) -> int:
+    async def load_thresholds(self, session: Optional[AsyncSession] = None) -> int:
         """从数据库批量加载所有启用的阈值配置到内存"""
         async with self._load_lock:
-            async with async_session() as session:
-                result = await session.execute(
-                    select(AlarmThreshold).where(AlarmThreshold.is_enabled == True)  # noqa: E712
-                )
-                thresholds = result.scalars().all()
+            if session is not None:
+                return await self._load_thresholds_from_session(session)
 
-                points_result = await session.execute(
-                    select(Point.id, Point.device_type).where(Point.is_enabled == True)  # noqa: E712
-                )
-                points = points_result.all()
+            async with async_session() as owned_session:
+                return await self._load_thresholds_from_session(owned_session)
 
-                # 重建缓存
-                new_cache: Dict[int, List[ThresholdCache]] = defaultdict(list)
-                for t in thresholds:
-                    cache_item = ThresholdCache(
-                        id=t.id,
-                        point_id=t.point_id,
-                        threshold_type=t.threshold_type,
-                        threshold_value=t.threshold_value or 0,
-                        alarm_level=t.alarm_level or "minor",
-                        alarm_message=t.alarm_message or "",
-                        delay_seconds=t.delay_seconds or 0,
-                        dead_band=t.dead_band or 0,
-                        priority=t.priority or 0,
-                    )
-                    new_cache[t.point_id].append(cache_item)
+    async def _load_thresholds_from_session(self, session: AsyncSession) -> int:
+        result = await session.execute(
+            select(AlarmThreshold).where(AlarmThreshold.is_enabled == True)  # noqa: E712
+        )
+        thresholds = result.scalars().all()
 
-                # 按 priority 降序排列
-                for point_id in new_cache:
-                    new_cache[point_id].sort(key=lambda x: x.priority, reverse=True)
+        points_result = await session.execute(
+            select(Point.id, Point.device_type).where(Point.is_enabled == True)  # noqa: E712
+        )
+        points = points_result.all()
 
-                self._thresholds = new_cache
+        new_cache: Dict[int, List[ThresholdCache]] = defaultdict(list)
+        for threshold in thresholds:
+            cache_item = ThresholdCache(
+                id=threshold.id,
+                point_id=threshold.point_id,
+                threshold_type=threshold.threshold_type,
+                threshold_value=threshold.threshold_value or 0,
+                alarm_level=threshold.alarm_level or "minor",
+                alarm_message=threshold.alarm_message or "",
+                delay_seconds=threshold.delay_seconds or 0,
+                dead_band=threshold.dead_band or 0,
+                priority=threshold.priority or 0,
+            )
+            new_cache[threshold.point_id].append(cache_item)
 
-                # 重建点位 -> device_type 映射
-                self._point_device_type.clear()
-                self._device_type_points.clear()
-                for point_id, device_type in points:
-                    if device_type:
-                        self._point_device_type[point_id] = device_type
-                        self._device_type_points[device_type].add(point_id)
+        for point_id in new_cache:
+            new_cache[point_id].sort(key=lambda item: item.priority, reverse=True)
 
-                # 加载点位数据质量缓存
-                quality_result = await session.execute(select(PointRealtime.point_id, PointRealtime.quality))
-                self._point_quality = {row[0]: (row[1] or 0) for row in quality_result.all()}
+        self._thresholds = new_cache
+        self._point_device_type.clear()
+        self._device_type_points.clear()
+        for point_id, device_type in points:
+            if device_type:
+                self._point_device_type[point_id] = device_type
+                self._device_type_points[device_type].add(point_id)
 
-                self._loaded = True
+        quality_result = await session.execute(select(PointRealtime.point_id, PointRealtime.quality))
+        self._point_quality = {row[0]: (row[1] or 0) for row in quality_result.all()}
+        self._loaded = True
 
-                # 清理已失效的状态缓存（防止内存无限增长）
-                valid_keys = set()
-                for pid, tc_list in new_cache.items():
-                    for tc in tc_list:
-                        valid_keys.add((pid, tc.id))
-                valid_point_ids = set(new_cache.keys()) | set(self._point_device_type.keys())
+        valid_keys = {
+            (point_id, threshold.id)
+            for point_id, thresholds_for_point in new_cache.items()
+            for threshold in thresholds_for_point
+        }
+        valid_point_ids = set(new_cache) | set(self._point_device_type)
 
-                self._last_alarm_time = {k: v for k, v in self._last_alarm_time.items() if k in valid_keys}
-                self._delay_first_exceed = {k: v for k, v in self._delay_first_exceed.items() if k in valid_keys}
-                self._dead_band_triggered = {k: v for k, v in self._dead_band_triggered.items() if k in valid_keys}
-                self._prev_values = {k: v for k, v in self._prev_values.items() if k in valid_point_ids}
+        self._last_alarm_time = {key: value for key, value in self._last_alarm_time.items() if key in valid_keys}
+        self._delay_first_exceed = {key: value for key, value in self._delay_first_exceed.items() if key in valid_keys}
+        self._dead_band_triggered = {
+            key: value for key, value in self._dead_band_triggered.items() if key in valid_keys
+        }
+        self._prev_values = {key: value for key, value in self._prev_values.items() if key in valid_point_ids}
 
-                count = sum(len(v) for v in new_cache.values())
-                logger.info("告警引擎: 已加载 %d 条阈值配置（覆盖 %d 个点位）", count, len(new_cache))
-                return count
+        count = sum(len(value) for value in new_cache.values())
+        logger.info("告警引擎: 已加载 %d 条阈值配置（覆盖 %d 个点位）", count, len(new_cache))
+        return count
 
     async def check_version(self) -> bool:
         """检查阈值版本号，版本变化时重新加载"""
@@ -235,6 +238,57 @@ class AlarmEngine:
         self._prev_values[point_id] = value
         return results
 
+    async def evaluate_async(self, point_id: int, value: float, point_type: str = "AI") -> List[EvaluateResult]:
+        """异步检测点位值，允许动态阈值读取异步数据源。"""
+        if not self._loaded:
+            return []
+
+        quality = self._point_quality.get(point_id, 0)
+        if quality == 2:
+            self._prev_values[point_id] = value
+            return []
+
+        cached = self._thresholds.get(point_id)
+        if not cached:
+            self._prev_values[point_id] = value
+            return []
+
+        results: List[EvaluateResult] = []
+        now = time.time()
+
+        for threshold in cached:
+            storm_key = (point_id, threshold.id)
+            if self._check_storm(storm_key):
+                continue
+
+            triggered, threshold_metadata = await self._check_threshold_with_dynamic_async(
+                point_id, value, threshold, now
+            )
+            if triggered:
+                results.append(
+                    EvaluateResult(
+                        threshold_id=threshold.id,
+                        threshold_type=threshold.threshold_type,
+                        threshold_value=threshold.threshold_value,
+                        alarm_level=threshold.alarm_level,
+                        alarm_message=threshold.alarm_message or f"点位 {point_id} {threshold.threshold_type} 告警",
+                        threshold_metadata=threshold_metadata,
+                    )
+                )
+                self._last_alarm_time[storm_key] = now
+
+        if results:
+            device_type = self._point_device_type.get(point_id)
+            if device_type:
+                self._current_cycle_triggered[device_type].add(point_id)
+
+        if quality == 1:
+            for result in results:
+                result.alarm_message = f"[数据质量不确定] {result.alarm_message}"
+
+        self._prev_values[point_id] = value
+        return results
+
     def _check_threshold(self, point_id: int, value: float, tc: ThresholdCache, now: float) -> bool:
         """检测单条阈值是否越限（含死区和延迟逻辑）"""
         key = (point_id, tc.id)
@@ -292,15 +346,7 @@ class AlarmEngine:
     def _check_threshold_with_dynamic(
         self, point_id: int, value: float, tc: ThresholdCache, now: float
     ) -> tuple[bool, dict]:
-        """
-        检测单条阈值是否越限（含动态阈值调整）
-
-        Returns:
-            tuple[bool, dict]: (是否触发, 动态阈值元数据)
-        """
-        key = (point_id, tc.id)
-
-        # ===== 动态阈值调整 =====
+        """同步检测单条阈值，供同步调用方兼容使用。"""
         threshold_value = tc.threshold_value
         threshold_metadata = {}
 
@@ -314,8 +360,53 @@ class AlarmEngine:
             threshold_value = adjusted_threshold
             threshold_metadata = metadata
         except Exception as e:
-            logger.warning(f"动态阈值调整失败: {e}，使用静态阈值")
-        # ===== 动态阈值调整结束 =====
+            logger.warning("动态阈值调整失败: %s，使用静态阈值", e)
+
+        return self._check_threshold_value(
+            point_id,
+            value,
+            tc,
+            now,
+            threshold_value,
+            threshold_metadata,
+        )
+
+    async def _check_threshold_with_dynamic_async(
+        self, point_id: int, value: float, tc: ThresholdCache, now: float
+    ) -> tuple[bool, dict]:
+        """异步检测单条阈值，避免在事件循环中阻塞等待。"""
+        threshold_value = tc.threshold_value
+        threshold_metadata = {}
+
+        try:
+            from ..services.diagnosis.dynamic_threshold_service import DynamicThresholdService
+
+            threshold_value, threshold_metadata = await DynamicThresholdService.calculate_dynamic_threshold(
+                point_id, tc.threshold_value, tc.threshold_type
+            )
+        except Exception as e:
+            logger.warning("动态阈值调整失败: %s，使用静态阈值", e)
+
+        return self._check_threshold_value(
+            point_id,
+            value,
+            tc,
+            now,
+            threshold_value,
+            threshold_metadata,
+        )
+
+    def _check_threshold_value(
+        self,
+        point_id: int,
+        value: float,
+        tc: ThresholdCache,
+        now: float,
+        threshold_value: float,
+        threshold_metadata: dict,
+    ) -> tuple[bool, dict]:
+        """使用已解析的阈值执行越限、死区和延迟判断。"""
+        key = (point_id, tc.id)
 
         exceeded = False
 

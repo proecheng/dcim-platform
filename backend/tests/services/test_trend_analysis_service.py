@@ -4,7 +4,6 @@ Story 25.7: 趋势分析与多传感器融合
 """
 
 import pytest
-from datetime import datetime, timedelta
 from unittest.mock import AsyncMock, MagicMock, patch
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -32,9 +31,7 @@ def mock_redis():
 @pytest.fixture
 def trend_service(mock_db, mock_redis):
     """创建趋势分析服务实例"""
-    service = TrendAnalysisService(mock_db)
-    service.redis = mock_redis
-    return service
+    return TrendAnalysisService(mock_db, redis=mock_redis)
 
 
 def _make_point(id=1, point_name="T-01", unit="℃"):
@@ -167,8 +164,8 @@ class TestAnalyzePointTrend:
         assert result.point_id == 1
 
     @pytest.mark.asyncio
-    async def test_humidity_uses_correct_view(self, trend_service, mock_db):
-        """测试湿度点位使用正确的视图"""
+    async def test_humidity_uses_history_aggregation(self, trend_service, mock_db):
+        """测试湿度点位使用统一的历史数据聚合"""
         point = _make_point(id=2, point_name="H-01", unit="%RH")
 
         point_result = MagicMock()
@@ -185,11 +182,11 @@ class TestAnalyzePointTrend:
 
         await trend_service.analyze_point_trend(2)
 
-        # 验证使用了 humidity_7d_avg 视图（在第二次 execute 调用中）
+        # 验证使用了规范化历史表（在第二次 execute 调用中）
         assert mock_db.execute.call_count >= 2
         second_call_args = mock_db.execute.call_args_list[1]
         query_text = str(second_call_args[0][0])
-        assert "humidity_7d_avg" in query_text
+        assert "point_history" in query_text
 
     @pytest.mark.asyncio
     async def test_point_not_found_returns_none(self, trend_service, mock_db):
@@ -219,11 +216,11 @@ class TestContinuousInsufficientData:
         """测试连续 3 次数据不足后创建告警"""
         mock_redis.incr.return_value = 3
 
-        with patch.object(trend_service, '_create_system_alarm', new_callable=AsyncMock) as mock_alarm:
+        with patch.object(trend_service, "_create_system_alarm", new_callable=AsyncMock) as mock_alarm:
             await trend_service._check_continuous_insufficient_data(1, 2)
 
             mock_alarm.assert_called_once()
-            assert "连续 3 小时数据不足" in mock_alarm.call_args[1]['message']
+            assert "连续 3 小时数据不足" in mock_alarm.call_args[1]["message"]
 
 
 class TestGetTrendThreshold:

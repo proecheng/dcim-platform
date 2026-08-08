@@ -1,6 +1,8 @@
 """状态上报心跳 30s。实现 Story: 2.1"""
 
 import asyncio
+import hashlib
+import hmac
 import json
 import logging
 import os
@@ -30,6 +32,7 @@ class StatusReporter:
         version: str = "1.0.0",
         capabilities: Optional[list[str]] = None,
         interval: int = 30,
+        secret_key: Optional[str] = None,
     ) -> None:
         self._gateway_id = gateway_id
         self._site_id = site_id
@@ -37,6 +40,7 @@ class StatusReporter:
         self._version = version
         self._capabilities = capabilities or []
         self._interval = interval
+        self._secret_key = secret_key or os.getenv("GATEWAY_SECRET_KEY", "default-secret-key-change-in-production")
         self._task: Optional[asyncio.Task] = None
         self._running = False
 
@@ -58,7 +62,7 @@ class StatusReporter:
     def build_status_message(self) -> dict[str, Any]:
         """构建心跳消息"""
         metrics = self.collect_metrics()
-        return {
+        message = {
             "gw_id": self._gateway_id,
             "name": self._name,
             "ip": self._get_ip(),
@@ -69,6 +73,9 @@ class StatusReporter:
             "disk": metrics["disk"],
             "ts": int(time.time()),
         }
+        canonical = json.dumps(message, sort_keys=True)
+        message["signature"] = hmac.new(self._secret_key.encode(), canonical.encode(), hashlib.sha256).hexdigest()
+        return message
 
     def _get_ip(self) -> str:
         """获取本机 IP（尽力而为）"""

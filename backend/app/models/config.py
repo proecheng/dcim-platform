@@ -20,6 +20,7 @@ class SystemConfig(Base):
     value_type = Column(String(20), comment="值类型: string/number/boolean/json")
     description = Column(String(200), comment="描述")
     is_editable = Column(Boolean, default=True, comment="是否可编辑")
+    version = Column(Integer, default=1, nullable=False, comment="配置版本")
     updated_by = Column(Integer, ForeignKey("users.id"), comment="更新人")
     created_at = Column(DateTime, default=datetime.now, comment="创建时间")
     updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now, comment="更新时间")

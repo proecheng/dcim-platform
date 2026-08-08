@@ -5,23 +5,28 @@ Story 25.7: 趋势分析与多传感器融合
 
 import logging
 from datetime import datetime, timedelta
-from typing import Optional, List
-from sqlalchemy import select, text
+from typing import Any, List, Optional
+
+from sqlalchemy import func, or_, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.diagnosis import TrendWarning
-from app.models.point import Point
 from app.core.redis_lock import get_redis_client
+from app.models.diagnosis import TrendWarning
+from app.models.history import PointHistory
+from app.models.point import Point
+from app.models.topology_config import CabinetTemperatureSensor, CoolingZoneCabinet
 
 logger = logging.getLogger(__name__)
+_REDIS_UNSET = object()
 
 
 class TrendAnalysisService:
     """趋势分析服务"""
 
-    def __init__(self, db: AsyncSession):
+    def __init__(self, db: AsyncSession, redis: Any = _REDIS_UNSET):
         self.db = db
-        self.redis = get_redis_client()
+        self.redis = None if redis is _REDIS_UNSET else redis
+        self._load_redis = redis is _REDIS_UNSET
 
     async def analyze_point_trend(self, point_id: int) -> Optional[TrendWarning]:
         """
@@ -39,30 +44,27 @@ class TrendAnalysisService:
             logger.warning(f"Point {point_id} not found")
             return None
 
-        # 根据点位单位确定使用哪个连续聚合视图
-        if point_info.unit in ["℃", "°C"]:
-            view_name = "temp_7d_avg"
-        elif "RH" in point_info.unit or "湿度" in point_info.unit:
-            view_name = "humidity_7d_avg"
-        else:
+        if point_info.unit not in ["℃", "°C"] and "RH" not in point_info.unit and "湿度" not in point_info.unit:
             logger.debug(f"Point {point_id} unit '{point_info.unit}' not supported for trend analysis")
             return None
 
-        # SQL 注入防护：白名单校验视图名
-        ALLOWED_VIEWS = {"temp_7d_avg", "humidity_7d_avg"}
-        if view_name not in ALLOWED_VIEWS:
-            logger.warning(f"非法视图名: {view_name}")
-            return None
-
-        # 1. 查询最近 7 天的日均值
-        query = text(f"""
-            SELECT day, avg_value, sample_count
-            FROM {view_name}
-            WHERE point_id = :point_id
-            AND day >= NOW() - INTERVAL '7 days'
-            ORDER BY day ASC
-        """)
-        result = await self.db.execute(query, {"point_id": point_id})
+        # 直接从规范化历史表聚合，兼容 PostgreSQL 与 SQLite 测试环境。
+        day = func.date(PointHistory.recorded_at)
+        query = (
+            select(
+                day.label("day"),
+                func.avg(PointHistory.value).label("avg_value"),
+                func.count(PointHistory.id).label("sample_count"),
+            )
+            .where(
+                PointHistory.point_id == point_id,
+                PointHistory.recorded_at >= datetime.now() - timedelta(days=7),
+                or_(PointHistory.quality.is_(None), PointHistory.quality != 2),
+            )
+            .group_by(day)
+            .order_by(day)
+        )
+        result = await self.db.execute(query)
         daily_avgs = result.fetchall()
 
         # 2. 检查数据充足性（至少 5 天有效数据）
@@ -125,6 +127,13 @@ class TrendAnalysisService:
 
     async def _check_continuous_insufficient_data(self, point_id: int, available_days: int):
         """检查连续数据不足，生成系统告警"""
+        if self._load_redis:
+            self._load_redis = False
+            try:
+                self.redis = await get_redis_client()
+            except Exception as exc:
+                logger.warning("Redis not available: %s", exc)
+
         # 检查 Redis 是否可用
         if not self.redis:
             logger.warning("Redis not available, skipping continuous insufficient data check")
@@ -214,8 +223,16 @@ class TrendAnalysisService:
         query = select(TrendWarning).where(TrendWarning.detected_at >= datetime.now() - timedelta(hours=hours))
 
         if zone_id is not None:
-            # 关联 points 表过滤区域
-            query = query.join(Point).where(Point.zone_id == zone_id)
+            query = (
+                query.join(Point, TrendWarning.point_id == Point.id)
+                .join(CabinetTemperatureSensor, CabinetTemperatureSensor.point_id == Point.id)
+                .join(
+                    CoolingZoneCabinet,
+                    CoolingZoneCabinet.cabinet_id == CabinetTemperatureSensor.cabinet_id,
+                )
+                .where(CoolingZoneCabinet.zone_id == zone_id)
+                .distinct()
+            )
 
         result = await self.db.execute(query)
         return list(result.scalars().all())
@@ -225,6 +242,6 @@ class TrendAnalysisService:
 trend_analysis_service: Optional[TrendAnalysisService] = None
 
 
-def get_trend_analysis_service(db: AsyncSession) -> TrendAnalysisService:
+def get_trend_analysis_service(db: AsyncSession, redis: Any = _REDIS_UNSET) -> TrendAnalysisService:
     """获取趋势分析服务实例"""
-    return TrendAnalysisService(db)
+    return TrendAnalysisService(db, redis=redis)

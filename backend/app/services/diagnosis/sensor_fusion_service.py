@@ -5,12 +5,16 @@ Story 25.7: 趋势分析与多传感器融合
 
 import logging
 from datetime import datetime
-from typing import Optional, Dict
-from sqlalchemy import text
-from sqlalchemy.ext.asyncio import AsyncSession
-import numpy as np
+from typing import Dict, Optional
 
-from app.models.diagnosis import SensorFusionRecord
+import numpy as np
+from sqlalchemy import case, or_, select, text
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.models.alarm import AlarmThreshold
+from app.models.diagnosis import SensorFusionRecord, SensorMetadata
+from app.models.point import Point, PointRealtime
+from app.models.topology_config import CabinetTemperatureSensor, CoolingZoneCabinet
 
 logger = logging.getLogger(__name__)
 
@@ -55,18 +59,35 @@ class SensorFusionService:
         Returns:
             SensorFusionResult 包含加权标准差、证据类型、概率
         """
-        # 1. 查询同区域所有温度传感器最新值（含精度和高度信息）
-        query = text("""
-            SELECT p.id, p.name, pr.value, p.height_level, sm.accuracy_class
-            FROM points p
-            JOIN point_realtime pr ON p.id = pr.point_id
-            LEFT JOIN sensor_metadata sm ON p.id = sm.point_id
-            WHERE p.zone_id = :zone_id
-            AND (p.unit LIKE '%℃%' OR p.unit LIKE '%°C%')
-            AND p.enabled = true
-            AND (pr.quality_flag IS NULL OR pr.quality_flag != 'poor')
-        """)
-        result = await self.db.execute(query, {"zone_id": zone_id})
+        # 1. 通过规范化制冷拓扑查询区域内温度传感器最新值。
+        height_level = case(
+            (CabinetTemperatureSensor.sensor_location == "ambient", 3.0),
+            (CabinetTemperatureSensor.sensor_location == "outlet", 1.8),
+            else_=1.5,
+        ).label("height_level")
+        query = (
+            select(
+                Point.id,
+                Point.point_name.label("name"),
+                PointRealtime.value,
+                height_level,
+                SensorMetadata.accuracy_class,
+            )
+            .join(CabinetTemperatureSensor, CabinetTemperatureSensor.point_id == Point.id)
+            .join(
+                CoolingZoneCabinet,
+                CoolingZoneCabinet.cabinet_id == CabinetTemperatureSensor.cabinet_id,
+            )
+            .join(PointRealtime, PointRealtime.point_id == Point.id)
+            .outerjoin(SensorMetadata, SensorMetadata.point_id == Point.id)
+            .where(
+                CoolingZoneCabinet.zone_id == zone_id,
+                or_(Point.unit.like("%℃%"), Point.unit.like("%°C%")),
+                Point.is_enabled.is_(True),
+                or_(PointRealtime.quality.is_(None), PointRealtime.quality != 2),
+            )
+        )
+        result = await self.db.execute(query)
         sensors = result.fetchall()
 
         if len(sensors) < 2:
@@ -164,18 +185,33 @@ class SensorFusionService:
         Returns:
             SensorFusionResult 或 None（无压差传感器或数据无效）
         """
-        # 1. 查询所有压差传感器（过滤 threshold_low 不为 NULL）
-        query = text("""
-            SELECT p.id, p.name, pr.value, pr.quality_flag, pr.updated_at, p.threshold_low
-            FROM points p
-            JOIN point_realtime pr ON p.id = pr.point_id
-            WHERE p.zone_id = :zone_id
-            AND p.point_type = 'AI'
-            AND p.unit LIKE '%Pa%'
-            AND p.enabled = true
-            AND p.threshold_low IS NOT NULL
-        """)
-        result = await self.db.execute(query, {"zone_id": zone_id})
+        # 1. 查询区域内配置了低阈值的压差传感器。
+        query = (
+            select(
+                Point.id,
+                Point.point_name.label("name"),
+                PointRealtime.value,
+                PointRealtime.quality.label("quality_flag"),
+                PointRealtime.updated_at,
+                AlarmThreshold.threshold_value.label("threshold_low"),
+            )
+            .join(CabinetTemperatureSensor, CabinetTemperatureSensor.point_id == Point.id)
+            .join(
+                CoolingZoneCabinet,
+                CoolingZoneCabinet.cabinet_id == CabinetTemperatureSensor.cabinet_id,
+            )
+            .join(PointRealtime, PointRealtime.point_id == Point.id)
+            .join(AlarmThreshold, AlarmThreshold.point_id == Point.id)
+            .where(
+                CoolingZoneCabinet.zone_id == zone_id,
+                Point.point_type == "AI",
+                Point.unit.like("%Pa%"),
+                Point.is_enabled.is_(True),
+                AlarmThreshold.threshold_type == "low",
+                AlarmThreshold.is_enabled.is_(True),
+            )
+        )
+        result = await self.db.execute(query)
         sensors = result.fetchall()
 
         if not sensors:
@@ -193,7 +229,7 @@ class SensorFusionService:
                 continue
 
             # 检查数据质量
-            if s.quality_flag == "poor":
+            if s.quality_flag in ("poor", 2):
                 logger.warning(f"Pressure sensor {s.id} has poor data quality")
                 continue
 

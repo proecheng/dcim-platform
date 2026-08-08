@@ -1212,6 +1212,10 @@ async def update_pricing(
     await db.execute(update(ElectricityPricing).where(ElectricityPricing.id == pricing_id).values(**update_data))
     await db.commit()
 
+    from ...services.pricing_service import PricingService
+
+    await PricingService(db).check_and_invalidate_schemes(pricing_id, current_user.id)
+
     result = await db.execute(select(ElectricityPricing).where(ElectricityPricing.id == pricing_id))
     updated = result.scalar_one()
 
@@ -3916,6 +3920,7 @@ async def update_pricing_scheme(
 ):
     """更新电价方案"""
     from ...models.energy import PricingScheme, SchemePricingRelation, PricingSchemeAuditLog
+    from ...services.pricing_service import transaction_scope
 
     scheme = await db.get(PricingScheme, scheme_id)
 
@@ -3926,7 +3931,7 @@ async def update_pricing_scheme(
     if scheme.is_active:
         raise HTTPException(status_code=400, detail="无法修改激活方案，请先停用")
 
-    async with db.begin():
+    async with transaction_scope(db):
         # 更新基本信息
         update_data = scheme_data.model_dump(exclude_unset=True, exclude={"pricing_ids"})
         for key, value in update_data.items():

@@ -10,9 +10,11 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from app.core.database import Base
 from app.models.gateway import Gateway
 from app.services.gateway_registration import (
-    handle_gateway_status,
-    check_gateway_heartbeats,
     HEARTBEAT_TIMEOUT_SECONDS,
+    check_gateway_heartbeats,
+    handle_gateway_status,
+    sign_gateway_payload,
+    verify_gateway_signature,
 )
 from app.mqtt.client import MqttService
 from gateway.status_reporter import StatusReporter
@@ -84,6 +86,7 @@ class TestStatusReporter:
         assert "disk" in msg
         assert "ts" in msg
         assert isinstance(msg["ts"], int)
+        assert verify_gateway_signature(msg, msg["signature"])
 
     async def test_status_reporter_stop_without_start(self):
         """未启动时调用 stop 不应抛出异常"""
@@ -111,6 +114,7 @@ class TestGatewayRegistration:
             "mem": 50.0,
             "disk": 20.0,
         }
+        payload["signature"] = sign_gateway_payload(payload)
         await handle_gateway_status(payload, db_session)
 
         result = await db_session.execute(select(Gateway).where(Gateway.gateway_id == "gw-new-001"))
@@ -142,6 +146,7 @@ class TestGatewayRegistration:
             "mem": 70.0,
             "disk": 40.0,
         }
+        payload["signature"] = sign_gateway_payload(payload)
         await handle_gateway_status(payload, db_session)
 
         result = await db_session.execute(select(Gateway).where(Gateway.gateway_id == "gw-exist-001"))
@@ -169,6 +174,7 @@ class TestGatewayRegistration:
             "name": "能力网关",
             "capabilities": ["modbus_tcp", "bacnet"],
         }
+        payload["signature"] = sign_gateway_payload(payload)
         await handle_gateway_status(payload, db_session)
 
         result = await db_session.execute(select(Gateway).where(Gateway.gateway_id == "gw-cap-001"))

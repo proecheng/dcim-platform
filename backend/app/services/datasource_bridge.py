@@ -35,6 +35,7 @@ async def sync_point_data(
         quality=quality,
         status=status,
         source="bridge",
+        alarm_level=alarm_level,
     )
     await process_payload([pt], session=session)
 
