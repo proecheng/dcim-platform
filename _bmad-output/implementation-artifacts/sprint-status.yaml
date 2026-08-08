@@ -55,9 +55,11 @@
 # P2: Epic 31 (预冷计划优化) — Phase 2b
 # P2: Epic 32 (热参数自动校准) — Phase 2b
 # P3: Epic 33 (VPP虚拟电厂集成) — Phase 3
+# P0: Epic 37 (协议模板与设备级制冷柔性一体化) — V4.4 基线补记
+# P0: Epic 38 (发布候选版流程与质量门禁) — V4.4 发布收口
 
 generated: 2026-03-11
-last_updated: 2026-04-07
+last_updated: 2026-08-09
 project: admin
 project_key: NOKEY
 tracking_system: file-system
@@ -428,3 +430,26 @@ development_status:
   36-4-predictive-maintenance-dashboard-frontend: done  # 完成: DashboardSummary/DeviceHealthItem/DashboardResponse/ScoreFactorDetail/DeviceDetailResponse Schema、GET /dashboard(SQL聚合+site_id过滤)、GET /devices/{id}/detail(防御性json.loads)、predictiveMaintenance.ts前端API模块、predictive.vue仪表盘页面(统计卡片+筛选+设备卡片网格+详情弹窗+确认拒绝操作)、路由注册、26个测试全通过
   36-5-ups-and-pdu-degradation-plugins: done  # 完成: UPSDegradationPlugin(电压分段标准差+效率+切换+温度)、PDUDegradationPlugin(负载率+电压+THD+温升+零负载保护)、BatteryDegradationPlugin(SOH虚拟注入+内阻+温度)、共享工具提取到base.py、BATTERY映射、18个测试全通过
   epic-36-retrospective: done  # 2026-03-22
+
+  # ============================================================
+  # V4.4 基线补记与发布收口 (Epic 37-38)
+  # 新增于 2026-08-08，依据 sprint-change-proposal-2026-08-08.md
+  # ============================================================
+
+  # Epic 37: 协议模板与设备级制冷柔性一体化
+  # 2026-07-08 已实现，2026-08-08 补齐规划追溯
+  epic-37: done
+  37-1-builtin-protocol-templates-and-address-validation: done
+  37-2-template-datasource-business-device-and-asset-binding: done
+  37-3-cooling-subtype-profiles-and-flexibility-recommendations: done
+  37-4-cooling-dispatch-config-generation-and-ui-integration: done
+  epic-37-retrospective: optional
+
+  # Epic 38: 发布候选版流程与质量门禁
+  # 2026-08-09: CI/CD 与 RC 证据完成
+  epic-38: done
+  38-1-load-shift-workflow-contract-stabilization: done
+  38-2-visible-workflow-and-fallback-hardening: done
+  38-3-ci-regression-gate-restoration: done
+  38-4-cd-images-and-release-candidate-evidence: done
+  epic-38-retrospective: optional

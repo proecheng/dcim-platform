@@ -1,5 +1,5 @@
 ---
-stepsCompleted: [tech-stack, architecture-pattern, data-architecture, api-design, deployment, protocol-adapters, linkage-engine, video-integration, physical-topology, nfr-support, demo-module, ingest-pipeline, architecture-update, device-binding, intelligent-diagnosis, tcl-precool-model, notification-engine, predictive-maintenance, bacnet-mstp]
+stepsCompleted: [tech-stack, architecture-pattern, data-architecture, api-design, deployment, protocol-adapters, linkage-engine, video-integration, physical-topology, nfr-support, demo-module, ingest-pipeline, architecture-update, device-binding, intelligent-diagnosis, tcl-precool-model, notification-engine, predictive-maintenance, bacnet-mstp, protocol-template-cooling-flexibility, release-gates]
 inputDocuments: [_bmad-output/planning-artifacts/prd.md, _bmad-output/planning-artifacts/product-brief.md, docs/project-knowledge/project-context.md, docs/project-knowledge/backend-architecture.md, docs/project-knowledge/frontend-architecture.md, docs/project-knowledge/integration-architecture.md]
 workflowType: 'architecture'
 project_name: 'DCIM'
@@ -11,7 +11,7 @@ date: '2026-03-01'
 
 **Author:** proecheng
 **Date:** 2026-02-15
-**Status:** 完整版（V4.3.0 更新，新增多渠道通知/预测性维护/BACnet MS/TP 架构 2026-03-18；V4.2.0 预冷 TCL 模型架构 2026-03-10；V4.0.0 智能诊断系统架构 2026-03-05；V3.2.0 演示系统模块化、统一数据管线、设备双向绑定 2026-03-01）
+**Status:** 完整版（V4.4.0 更新，新增协议模板/设备级制冷柔性/发布质量门禁 2026-08-08；V4.3.0 多渠道通知/预测性维护/BACnet MS/TP 架构 2026-03-18；V4.2.0 预冷 TCL 模型架构 2026-03-10；V4.0.0 智能诊断系统架构 2026-03-05；V3.2.0 演示系统模块化、统一数据管线、设备双向绑定 2026-03-01）
 
 ---
 
@@ -2861,7 +2861,195 @@ parent_datasource_id = Column(
 
 ---
 
+## 25. 协议模板、设备级制冷柔性与发布门禁架构（V4.4.0 新增）
+
+### 25.1 端到端集成边界
+
+V4.4 将协议层的点位定义与能源业务层的可调设备建立显式、幂等的绑定链路：
+
+```
+Built-in Protocol Template (source controlled)
+  -> install by builtin_template_key
+DeviceTemplate (database, user manageable)
+  -> create datasource with connection_config
+DataSource + Point[] (protocol ownership)
+  -> bind selected semantic points
+PowerDevice + Asset (business ownership)
+  -> generate missing shift/regulation configs
+DeviceShiftConfig + LoadRegulationConfig
+  -> calculate recommendation and dispatch strategy
+Energy API / Device Template API / Frontend
+```
+
+边界规则：
+
+1. `app/data/protocol_templates.py` 只保存版本化的内置定义，不直接持久化运行状态
+2. `DeviceTemplate.extra_config.builtin_template_key` 是安装幂等键；重复安装返回已有记录
+3. `DataSource` 和 `Point` 负责连接与采集语义，`PowerDevice` 和 `Asset` 负责能源、容量与资产语义
+4. `device_template_binding.py` 负责跨层绑定，允许补齐空字段，不覆盖人工维护的非空业务字段
+5. 数据源创建、点位创建和业务绑定在同一请求事务内完成，任一步失败整体回滚
+
+### 25.2 内置协议模板与点位校验
+
+内置模板结构：
+
+```text
+key, name, manufacturer, model, device_type, protocol_type
+extra_config.default_connection_config
+extra_config.business_device_type
+point_config[]:
+  point_id, name, address, register_type, data_type,
+  byte_order, word_order, scale, unit, writable
+```
+
+校验策略：
+
+- Modbus TCP/RTU 地址必须能被对应 `pymodbus` 适配器解析
+- 功能码/寄存器类型与读写属性必须一致，可写点位仅允许使用适配器支持的写操作
+- 默认连接参数按协议类型验证，不将串口字段误传给 TCP，也不将 IP 字段误传给 RTU
+- 点位创建前完成全量预校验，避免部分点位已落库后才暴露模板错误
+- 内置模板安装与数据源创建分别鉴权：查看为 viewer+，安装与创建为 operator+
+
+### 25.3 业务设备与资产绑定
+
+`bind_template_datasource_to_power_device()` 根据模板元数据推断业务设备类型，并按以下优先级选择关键点位：
+
+1. 模板声明的标准 `point_id`
+2. 同义点位候选列表
+3. 点位类别、单位和名称的保守 fallback
+4. 无可靠候选时保持字段为空，不进行猜测绑定
+
+UPS 优先绑定输出功率/电压/电流/电量/功率因数；制冷设备优先绑定输入功率、线电压、电流、电量和功率因数。资产创建使用规范化设备编码作为关联键，并在 U 位冲突时保留设备记录但不写入冲突位置。
+
+新增的 `PowerDevice` 柔性元数据：
+
+```text
+load_subtype             -> 设备细分类型
+controllable_params      -> JSON 控制参数列表
+thermal_storage_config   -> JSON 蓄冷容量/SOC/功率/COP
+flexibility_factor       -> 人工修正系数（受边界限制）
+```
+
+### 25.4 设备级制冷柔性计算
+
+`cooling_flexibility.py` 维护细分类型画像，覆盖：
+
+- row_ac / chilled_water_terminal
+- water_cooled_chiller
+- pump_vfd
+- cooling_tower
+- thermal_storage
+- ups / other（不可调或保守降级）
+
+推荐比例使用六类上限的最小值并乘安全系数：
+
+```text
+r_recommended = min(
+  r_minimum_power,
+  r_load_variability,
+  r_peak_window,
+  r_control_capability,
+  r_thermal_storage,
+  r_device_type
+) * safety_factor
+```
+
+约束说明：
+
+| 约束 | 数据来源 | 无数据时行为 |
+|------|----------|--------------|
+| minimum_power | 历史最小功率或类型画像 | 使用类型默认最低功率比例 |
+| load_variability | 历史最大/平均功率 | 使用类型默认波动范围 |
+| peak_window | 日统计峰时占比 | 使用类型默认峰时占比 |
+| control_capability | 可控参数完整度 + 人工系数 | 按细分类型默认控制项 |
+| thermal_storage | 容量、SOC、最大放冷功率、COP | 非蓄冷设备退化为类型上限 |
+| device_type | 细分类型安全上限 | 未知类型使用保守上限 |
+
+响应必须携带 `formula_version=cooling-flex-v1`、细分类型、控制模式、限制因子、数据天数和缺失数据警告，保证结果可解释、可审计。
+
+### 25.5 可解释调度策略
+
+`cooling_dispatch_strategy.py` 将推荐比例转换为设备特定步骤：
+
+- 行级/末端空调：按 0.5°C 步长调整设定温度，持续监控回风温度和湿度
+- 冷水机组：调整供水温度和机组负载，遵守最小运行时间与爬坡限制
+- 水泵/冷却塔：使用变频目标，限制频率变化率并监控压差/温差
+- 蓄冷设备：根据可用 SOC、容量、最大放冷功率和 COP 计算电侧可调量
+
+所有策略复用 Section 21 的 ASHRAE 温度硬约束、Section 30 对应实现的自动回退状态和既有调节审批机制。策略对象只提供建议与执行参数，不绕过 `LoadRegulationService` 的安全检查直接写设备。
+
+### 25.6 业务流程与降级契约
+
+负荷转移对象保持稳定关系：
+
+```
+ShiftOpportunity.id
+  -> ShiftPlan.opportunity_id
+  -> ShiftExecution.plan_id
+  -> monitoring / cancel / rollback
+```
+
+前端列表与详情使用数据库主键，不使用展示序号。状态只通过 Schema 定义的枚举传递，API 对旧状态值在边界层归一化。写操作提交后返回当前对象快照，避免前端立即查询时看到旧状态。
+
+楼层图属于可生成的演示拓扑：数据库为空时返回 `id=0` 的生成结果，并在楼层列表中暴露 `FLOOR_CONFIG` 支持的楼层。真实设备、站点、用户和业务执行对象不使用该降级规则，非法主键仍返回 404。
+
+### 25.7 诊断规则重载一致性
+
+规则重载包含两个连续动作：当前请求会话重建系统规则，诊断引擎使用同一会话刷新内存缓存。禁止在 API 请求内另开应用默认数据库会话，否则测试数据库、多租户连接或事务隔离环境会读取另一套规则。
+
+```
+POST /api/v1/diagnosis/rules/reload
+  -> diagnosis_loader.reload(request_db)
+  -> diagnosis_engine.reload_rules(request_db)
+  -> atomic cache replacement under _load_lock
+```
+
+后台启动和独立任务未提供会话时，诊断引擎仍使用 `async_session()` 自主管理会话。
+
+### 25.8 CI/CD 与发布证据
+
+CI 质量门禁：
+
+| Job | 必须通过的步骤 |
+|-----|----------------|
+| Backend | 依赖安装、Ruff lint、Ruff format、compileall、配置的完整 pytest 集合、coverage.xml |
+| Frontend | npm ci、ESLint、TypeScript、完整 Vitest、生产构建 |
+| Critical E2E | 隔离数据库、后端/前端就绪、认证、权限矩阵、非法详情页 |
+
+后端测试当前收集 3,347 项，实测单 Runner + coverage 超过 15 分钟，因此 Job 超时设置为 60 分钟；`--maxfail=1` 仅影响失败路径的反馈速度，不减少成功路径执行的测试。
+
+CD 只监听 `master` 的成功 CI，通过 `workflow_run.head_sha` 检出精确提交，同时构建并推送后端/前端镜像：
+
+```text
+ghcr.io/<repository>/backend:sha-<short-sha>
+ghcr.io/<repository>/backend:latest
+ghcr.io/<repository>/frontend:sha-<short-sha>
+ghcr.io/<repository>/frontend:latest
+```
+
+软件 RC 报告必须引用 CI/CD 运行 URL 和提交 SHA，并单独列出未覆盖的真实设备联调、生产密钥、安全处置、迁移演练和现场 UAT。
+
+---
+
 ## 附录: 架构变更日志
+
+### V4.4.0 (2026-08-08)
+
+**重大变更**:
+
+1. 新增内置协议模板的发现、幂等安装、地址校验和数据源/点位创建架构
+2. 新增协议模板到 `PowerDevice`/`Asset` 的业务绑定，明确跨层数据所有权和事务边界
+3. 新增设备级制冷细分画像、六约束柔性推荐和可解释调度策略
+4. 明确负荷转移稳定 ID/状态契约、可生成楼层图降级语义和真实对象 404 边界
+5. 诊断规则重载复用请求数据库会话，保证数据库与内存缓存一致
+6. 将完整后端、前端、关键 E2E 和 SHA 固定镜像发布纳入架构质量门禁
+
+**PRD 对应关系**:
+
+- Section 25.1-25.3 -> FR-PT01~PT04
+- Section 25.4-25.5 -> FR-CF01~CF04
+- Section 25.6-25.7 -> FR-WF01~WF02
+- Section 25.8 -> NFR-RC01~RC04
 
 ### V4.3.0 (2026-03-18)
 

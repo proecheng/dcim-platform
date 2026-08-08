@@ -1,6 +1,6 @@
 ---
-stepsCompleted: [requirements-inventory, epic-design, story-creation, coverage-map, phase2-supplement, tcl-precool-supplement]
-inputDocuments: [_bmad-output/planning-artifacts/prd.md, _bmad-output/planning-artifacts/architecture.md, docs/空调可转移功率算法调研与改进方案.md]
+stepsCompleted: [requirements-inventory, epic-design, story-creation, coverage-map, phase2-supplement, tcl-precool-supplement, v4.4-release-closure]
+inputDocuments: [_bmad-output/planning-artifacts/prd.md, _bmad-output/planning-artifacts/architecture.md, _bmad-output/planning-artifacts/sprint-change-proposal-2026-08-08.md, docs/空调可转移功率算法调研与改进方案.md]
 tcl_supplement_date: 2026-03-10
 tcl_supplement_epics: [29, 30, 31, 32, 33]
 workflowType: epics-and-stories
@@ -21,7 +21,7 @@ phase2_supplement_epics: [18, 19, 20, 21, 22, 23]
 
 ## 概述
 
-本文档将 PRD 中功能需求 FR1-FR99 和非功能需求按业务域组织为 33 个 Epic，每个 Epic 包含 1-10 个用户故事。所有故事按 PRD 分阶段计划标注阶段归属。Epic 24-26 为智能诊断系统（FR34-1~FR34-42），基于架构文档 V4.0.0 Section 18 设计。Epic 27 为前端数据链路统一，基于 `docs/data-flow-audit.md` 审查结果和架构文档 V4.0.0 Section 19 规范。Epic 28 为 Demo 系统解耦与数据隔离，基于 `docs/demo-system-audit.md` 审查结果和架构文档 V4.0.0 Section 20 规范。Epic 29-33 为预冷 TCL 模型（FR-TCL-1~23），基于架构文档 V4.2.0 Section 21 和 `docs/空调可转移功率算法调研与改进方案.md` 设计。
+本文档将 PRD 中功能需求 FR1-FR99、补充需求和非功能需求按业务域组织为 38 个 Epic，每个 Epic 包含可独立验证的用户故事。所有故事按 PRD 分阶段计划标注阶段归属。Epic 24-26 为智能诊断系统，Epic 27-28 为数据链路与 Demo 解耦，Epic 29-33 为预冷 TCL 模型，Epic 34-36 为 V4.3 客户 RFP 能力，Epic 37 为协议模板与设备级制冷柔性一体化，Epic 38 为 V4.4 发布候选版流程与质量门禁。
 
 ### Epic 总览
 
@@ -60,6 +60,11 @@ phase2_supplement_epics: [18, 19, 20, 21, 22, 23]
 | **31** | **预冷计划优化** | **Phase 2b (月9-10)** | **FR-TCL-10, 16, 18, 23** | **5** |
 | **32** | **热参数自动校准与分阶段部署** | **Phase 2b (月9-10)** | **FR-TCL-8, 13, 19** | **4** |
 | **33** | **VPP 虚拟电厂集成** | **Phase 3 (月11-12+)** | **FR-TCL-11, 12** | **3** |
+| **34** | **多渠道告警通知** | **V4.3 P0** | **FR-N01~N07** | **7** |
+| **35** | **BACnet MS/TP 设备接入** | **V4.3 P0** | **FR-BN01~BN04** | **3** |
+| **36** | **预测性维护扩展** | **V4.3 P0** | **FR-PM01~PM06** | **5** |
+| **37** | **协议模板与设备级制冷柔性一体化** | **V4.4 基线补记** | **FR-PT01~PT04, FR-CF01~CF04** | **4** |
+| **38** | **发布候选版流程与质量门禁** | **V4.4 发布收口** | **FR-WF01~WF02, NFR-RC01~RC04** | **4** |
 
 ### Epic 依赖关系
 
@@ -83,6 +88,8 @@ Epic 28 独立并行（demo 解耦，应在真实网关接入前完成，即 Epi
 Epic 6 --> Epic 29 --> Epic 30 --> Epic 31 --> Epic 33
 Epic 29 --> Epic 32 (校准依赖热模型)
 Epic 32 与 Epic 31 可并行
+Epic 3,29-33 --> Epic 37 --> Epic 38
+Epic 14 --> Epic 38 (发布门禁依赖质量与测试基础)
 ```
 
 ### 阶段规划
@@ -94,6 +101,7 @@ Epic 32 与 Epic 31 可并行
 | Phase 2a 月7-8 | 核心推理 | 6完整, 7完整, 8, 9, 10, 11, 12, 15-BACnet/OPC-UA, **24**, **29**, **30** |
 | Phase 2b 月9-10 | 专业扩展 | **25**, 16, **31**, **32** |
 | Phase 3 月11-12+ | 高级+灰度 | **26**, **33** |
+| V4.4 基线与发布收口 | 2026-07~08 | **37**, **38** |
 
 ---
 
@@ -5525,4 +5533,187 @@ except ImportError:
 
 ---
 
-*文档更新 - 共 36 个 Epic, 176+ 个 Stories, 覆盖 FR1-FR99 全部功能需求 + FR34-1~42 智能诊断子需求 + FR-TCL-1~23 预冷 TCL 模型（含 constraint_checker 集成）+ FR-N01~N07 多渠道通知引擎 + FR-BN01~BN04 BACnet MS/TP 设备接入 + FR-PM01~PM06 预测性维护扩展 + 关键 NFR + Phase 2 补充页面 + 前端数据链路统一 + Demo 系统解耦与数据隔离。V4.3 P0 新增 Epic 34-36（15 Stories）：Epic 34 多渠道告警通知（7 Stories，三轮对抗性审查修复37处）、Epic 35 BACnet MS/TP 设备接入（3 Stories，两轮对抗性审查修复18处）、Epic 36 预测性维护扩展（5 Stories，两轮对抗性审查修复18处）。Epic 29-33 经三轮对抗性审查修订+依赖关系审查修复+无依赖Story审查。*
+## V4.4 基线与发布收口 Epic 总览
+
+| # | Epic | FR/NFR 覆盖 | 故事数 | 依赖 |
+|---|------|-------------|--------|------|
+| 37 | 协议模板与设备级制冷柔性一体化 | FR-PT01~PT04, FR-CF01~CF04 | 4 | Epic 3, 29-33 |
+| 38 | 发布候选版流程与质量门禁 | FR-WF01~WF02, NFR-RC01~RC04 | 4 | Epic 14, 37 |
+
+---
+
+## Epic 37: 协议模板与设备级制冷柔性一体化
+
+**阶段:** V4.4 基线补记（2026-07 已实现）
+
+**目标:** 让集成工程师从可验证的协议模板快速创建数据源与点位，并将协议对象自动绑定为可参与能源调度的业务设备，向能源管理员提供设备级、可解释且受安全约束的制冷柔性建议。
+
+**FR 覆盖:** FR-PT01~PT04, FR-CF01~CF04
+
+**架构参考:** Architecture Section 25.1~25.5
+
+### Story 37.1: 内置协议模板与地址校验
+
+As a 集成工程师,
+I want 浏览并安装经过校验的内置设备协议模板,
+So that 我可以减少现场寄存器配置错误并快速建立试点设备连接。
+
+**Acceptance Criteria:**
+
+- Given 平台包含版本化的试点 Modbus 模板, When viewer 查询内置模板列表, Then 返回唯一键、厂商、型号、协议、默认连接参数和非空点位配置
+- Given operator 安装某内置模板, When 相同 `builtin_template_key` 再次安装, Then 返回同一数据库模板且不产生重复记录
+- Given viewer 尝试安装模板, When 提交安装请求, Then 返回权限错误
+- Given 内置 Modbus 模板参与自动化测试, When 遍历全部点位地址, Then TCP/RTU 适配器均可解析对应地址、寄存器类型和数据类型
+- And 可写点位集合与模板声明一致，默认连接参数通过协议类型校验
+
+**FR 追溯:** FR-PT01, FR-PT02, FR-PT03
+
+**实现证据:** `app/data/protocol_templates.py`, `tests/test_protocol_templates.py`, `tests/api/test_device_templates.py`
+
+### Story 37.2: 模板数据源、业务设备与资产绑定
+
+As a 集成工程师,
+I want 从已安装模板一次创建数据源、点位及其业务设备关联,
+So that 新接入设备可以立即进入监控、资产和能源管理流程。
+
+**Acceptance Criteria:**
+
+- Given 已安装模板和有效连接参数, When operator 创建模板数据源, Then DataSource 与全部 Point 在同一事务中创建
+- And 系统根据模板业务元数据创建或更新 `PowerDevice`，绑定功率、电压、电流、电量和功率因数点位
+- And 系统创建或更新对应 `Asset`，U 位冲突时不写入冲突位置且不丢失业务设备
+- Given 同一设备编码重复执行, When 再次绑定, Then 更新缺失字段而不重复创建、不覆盖人工维护的有效字段
+- Given 任一点位预校验或绑定失败, When 事务退出, Then 不保留半成品数据源/点位/业务对象
+
+**FR 追溯:** FR-PT03, FR-PT04
+
+**实现证据:** `app/services/device_template_binding.py`, `app/api/v1/device_templates.py`
+
+### Story 37.3: 制冷细分画像与可解释柔性推荐
+
+As a 能源管理员,
+I want 根据制冷设备细分类型、控制能力和蓄冷边界获得可解释的可调比例,
+So that 我不会用同一个固定比例调度物理特性不同的设备。
+
+**Acceptance Criteria:**
+
+- Given 行级空调、冷水机组、水泵、冷却塔、末端或蓄冷设备, When 生成建议, Then 系统识别 `load_subtype` 并返回中文类型标签与控制模式
+- And 推荐比例取最低功率、负荷波动、峰时占比、控制能力、蓄冷能力和设备类型六约束的最小值，再应用安全系数
+- Given 无历史功率数据, When 生成建议, Then 使用细分类型画像估算并返回明确 warning，不伪装为实测结果
+- Given 蓄冷设备配置容量、SOC、最大放冷功率和 COP, When 计算可调量, Then 热侧 kW 正确换算为电侧 kW 且不超过任一物理边界
+- And 响应包含限制因子、数据天数、`formula_version=cooling-flex-v1` 和完整计算明细
+
+**FR 追溯:** FR-CF01, FR-CF02
+
+**实现证据:** `app/services/cooling_flexibility.py`, `app/services/device_regulation_service.py`, `tests/test_device_regulation_recommendations.py`
+
+### Story 37.4: 调度策略、配置生成与前端集成
+
+As a 能源管理员,
+I want 将柔性建议转换为可审阅的设备调度步骤并补齐缺失配置,
+So that 建议可以安全进入负荷转移执行流程。
+
+**Acceptance Criteria:**
+
+- Given 已生成推荐比例, When 构建设备调度策略, Then 返回推荐功率、执行步骤、目标值、监控点和回退条件
+- And 冷水机组、水泵/冷却塔、末端空调与蓄冷设备使用各自的控制参数与物理边界
+- Given 启用设备缺少转移或调节配置, When 执行自动生成, Then 仅创建缺失配置；默认不覆盖已有人工配置
+- And 设备详情、模板和能源配置界面展示细分类型、控制模式、推荐值、限制因素和调度步骤
+- And 所有建议继续经过 ASHRAE 温度硬约束、调节审批和自动回退，不直接绕过服务层下发命令
+
+**FR 追溯:** FR-CF03, FR-CF04
+
+**实现证据:** `app/services/cooling_dispatch_strategy.py`, `app/services/device_config_generator.py`, `frontend/src/components/energy/DeviceShiftDetailDrawer.vue`
+
+### Epic 37 Story 依赖关系
+
+```text
+37.1 -> 37.2 -> 37.3 -> 37.4
+```
+
+---
+
+## Epic 38: 发布候选版流程与质量门禁
+
+**阶段:** V4.4 发布收口（2026-08）
+
+**目标:** 确保关键业务流程在可见 UI 中闭环运行，并用可重复的 CI、关键 E2E 和精确 SHA 镜像发布形成软件发布候选版证据。
+
+**FR/NFR 覆盖:** FR-WF01~WF02, NFR-RC01~RC04
+
+**架构参考:** Architecture Section 25.6~25.8
+
+### Story 38.1: 负荷转移流程契约稳定化
+
+As a 能源管理员,
+I want 机会、方案、执行、监控和回滚页面使用一致的业务 ID 与状态,
+So that 我可以从建议连续完成审批、执行和恢复，而不会遇到列表可见但详情/动作失败。
+
+**Acceptance Criteria:**
+
+- Given 负荷转移机会, When 创建方案并进入执行, Then Opportunity、Plan、Execution 使用稳定主键建立关联
+- And 列表/详情/动作 API 使用 Schema 定义的同一状态集合，旧状态在 API 边界归一化
+- Given 执行被取消或触发回滚, When 前端刷新, Then 状态、时间线和实际调控量一致
+- And 写操作返回更新后的对象快照，前端不使用展示序号或硬编码 ID 发起详情/动作请求
+- And 关键流程具有 API 与可见 E2E 回归证据
+
+**FR 追溯:** FR-WF01
+
+**实现证据:** `app/api/v1/shift.py`, `app/schemas/load_shift.py`, `frontend/src/api/modules/shift.ts`, `frontend/src/views/energy/shift/`
+
+### Story 38.2: 可见流程与降级状态加固
+
+As a 系统使用者,
+I want 站点、用户、设备、拓扑和调节页面在空数据或非法对象场景下返回确定结果,
+So that 演示和日常操作不会暴露无法解释的业务错误。
+
+**Acceptance Criteria:**
+
+- Given 数据库没有持久化楼层图, When 请求楼层列表或默认图, Then 返回生成器支持的楼层和 `id=0` 的降级图
+- Given 真实站点、用户、设备或执行对象 ID 非法, When 请求详情, Then 返回 404 或前端可识别的空状态，不返回伪造业务对象
+- And 诊断规则重载复用当前请求数据库会话，规则表与内存缓存来自同一数据源
+- And 站点/用户管理、设备详情、拓扑和调节页面的可见操作无控制台业务错误
+
+**FR 追溯:** FR-WF02
+
+**实现证据:** `app/api/v1/floor_map.py`, `app/engines/diagnosis_engine.py`, `e2e/manual-visible-walkthrough.spec.ts`
+
+### Story 38.3: CI 回归门禁恢复
+
+As a 发布负责人,
+I want 每次 master 变更运行完整且时限合理的后端/前端质量门禁,
+So that 依赖缺失、格式问题和业务回归在发布前被阻断。
+
+**Acceptance Criteria:**
+
+- Given 干净 Ubuntu Runner, When 安装 `backend/requirements.txt`, Then 所有被测试导入的协议适配依赖可用
+- And 后端 Ruff lint、Ruff format、compileall 和 CI 配置的完整 pytest 集合全部通过
+- And 后端 3,347 项测试在 60 分钟 Job 上限内完成；`--maxfail=1` 仅缩短失败反馈，不减少成功路径测试
+- And 前端 ESLint、typecheck、162 个测试文件/1700 个用例和生产构建全部通过
+- And coverage.xml 无论成功或失败均按配置上传（测试未完成时允许明确告警）
+
+**NFR 追溯:** NFR-RC01, NFR-RC02
+
+### Story 38.4: 关键 E2E、镜像发布与 RC 证据
+
+As a 发布负责人,
+I want 在同一提交上完成关键 E2E、后端/前端镜像发布和 RC 报告,
+So that 软件候选版本可追溯且不会被误认为已完成现场生产验收。
+
+**Acceptance Criteria:**
+
+- Given 后端和前端 Job 均成功, When E2E Job 启动隔离服务, Then 认证、权限矩阵和非法详情页用例全部通过
+- Given CI 结论为 success, When CD 接收 workflow_run, Then 按 `head_sha` 检出并同时推送后端/前端 `sha-*` 与 `latest` 镜像
+- And RC 报告记录提交 SHA、CI/CD URL、测试数量、本地补充验证和遗留风险
+- And RC 报告明确将真实协议设备联调、生产密钥/网络、安全扫描处置、迁移演练和现场 UAT 列为外部验收，不声明自动完成
+
+**NFR 追溯:** NFR-RC03, NFR-RC04
+
+### Epic 38 Story 依赖关系
+
+```text
+38.1 + 38.2 -> 38.3 -> 38.4
+```
+
+---
+
+*文档更新 - 共 38 个 Epic, 184+ 个 Stories, 覆盖 FR1-FR99 全部功能需求 + FR34-1~42 智能诊断子需求 + FR-TCL-1~23 预冷 TCL 模型 + FR-N01~N07 多渠道通知引擎 + FR-BN01~BN04 BACnet MS/TP 设备接入 + FR-PM01~PM06 预测性维护扩展 + FR-PT01~PT04 协议模板 + FR-CF01~CF04 设备级制冷柔性 + FR-WF01~WF02 业务流程契约 + NFR-RC01~RC04 发布质量门禁。V4.4 新增 Epic 37-38（8 Stories），依据 2026-08-08 Sprint Change Proposal 完成基线补记与发布收口。*

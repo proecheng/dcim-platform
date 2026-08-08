@@ -1,5 +1,5 @@
 ---
-stepsCompleted: ['step-01-init', 'step-02-discovery', 'step-03-success', 'step-04-journeys', 'step-05-domain', 'step-06-innovation', 'step-07-project-type', 'step-08-scoping', 'step-09-functional', 'step-10-nonfunctional', 'step-11-polish', 'step-12-complete', 'step-13-v3.1-supplement', 'step-intelligent-diagnosis-upgrade', 'step-diagnosis-deep-review-r1', 'step-diagnosis-adversarial-review-r2', 'step-v4.3-p0-rfp-requirements']
+stepsCompleted: ['step-01-init', 'step-02-discovery', 'step-03-success', 'step-04-journeys', 'step-05-domain', 'step-06-innovation', 'step-07-project-type', 'step-08-scoping', 'step-09-functional', 'step-10-nonfunctional', 'step-11-polish', 'step-12-complete', 'step-13-v3.1-supplement', 'step-intelligent-diagnosis-upgrade', 'step-diagnosis-deep-review-r1', 'step-diagnosis-adversarial-review-r2', 'step-v4.3-p0-rfp-requirements', 'step-v4.4-release-closure']
 classification:
   projectType: 'IoT Platform + Web App'
   domain: '数据中心动力环境综合管理（供配电系统、制冷系统、环境监控系统、安防与消防系统、智能基础设施、能效与运维管理）'
@@ -1112,6 +1112,29 @@ DCIM 算力中心智能监控系统是一个 IoT Platform + Web App 混合型产
 - FR-BN03: 平台可区分"MS/TP 终端设备离线"和"协议转换网关离线"两种故障场景：网关离线时（BACnet/IP 连接中断），该网关下所有 MS/TP 设备标记为"网关离线"；网关在线但某 MS/TP 设备无响应时，仅标记该设备为"设备离线"。复用现有 `DataSource.consecutive_failures` 机制，在网关层和设备层分别计数
 - FR-BN04: 协议优先级矩阵更新说明：BACnet/IP 适配器保持原 P2 优先级（已完成实现）。BACnet MS/TP 设备通过硬件网关转为 BACnet/IP 接入，平台侧无需新增协议栈，仅需扩展网关配置模板和故障隔离逻辑。硬件网关选型和部署属于项目实施范畴，不在软件 PRD 范围内
 
+### V4.4 补充功能 — 协议模板、制冷柔性与业务流程收口
+
+> 以下需求回写 2026-07 已实现并验证的集成能力，补齐协议配置、能源业务对象和可执行调度流程之间的产品契约。
+
+#### 内置协议模板与业务设备绑定
+
+- FR-PT01: 集成工程师可以浏览平台内置的试点设备协议模板。模板至少包含唯一键、厂商、型号、协议类型、默认连接参数和点位配置，内置模板源码与用户安装后的数据库记录相互隔离
+- FR-PT02: 具备操作员及以上权限的用户可以幂等安装内置模板；重复安装同一 `builtin_template_key` 返回同一模板记录，不产生重复数据。只读用户无安装权限
+- FR-PT03: 集成工程师可以基于已安装模板创建数据源和点位。系统在创建前校验 Modbus 寄存器地址、功能码、数据类型、字节序和可写属性，单个点位配置错误时返回可定位的错误信息，不生成半成品数据源
+- FR-PT04: 对具备业务语义的协议模板，系统在创建数据源后自动创建或更新对应 `PowerDevice` 和 `Asset`，绑定功率、电压、电流、电量、功率因数等关键点位；重复执行保持幂等，不覆盖人工维护的有效业务字段
+
+#### 设备级制冷柔性
+
+- FR-CF01: 系统根据设备类型、型号、名称和模板元数据识别制冷负荷细分类型，至少覆盖行级空调、冷水机组、冷冻/冷却水泵、冷却塔、末端 AHU/CRAH 和蓄冷设备；无法识别时降级为通用类型并明确标注
+- FR-CF02: 系统规范化设备可控参数和蓄冷配置，基于最低功率、负荷波动、峰时占比、控制能力、蓄冷能力和设备类型上限六类约束计算可转移比例；结果包含限制因子、公式版本、数据充分度警告和安全系数，不得只返回不可解释的比例值
+- FR-CF03: 系统根据负荷细分类型生成可解释的调度策略，包含推荐转移功率、执行步骤、目标设定值、监控点、回退条件和蓄冷 SOC/功率边界；所有建议必须遵守既有 ASHRAE 温度硬约束和自动回退机制
+- FR-CF04: 系统可以为尚未配置的启用设备幂等生成负荷转移与调节配置。已有人工配置默认保留，只有显式强制操作才允许覆盖；前端设备详情和能源配置页面展示细分类型、控制模式、建议比例及调度说明
+
+#### 业务流程契约
+
+- FR-WF01: 负荷转移业务支持“机会识别 → 方案创建 → 审批/执行 → 实时监控 → 完成/取消/回滚”的连续流程。列表、详情和动作 API 对同一对象使用稳定 ID 与一致状态值，前端不得使用展示序号代替业务主键
+- FR-WF02: 对可生成的演示拓扑或楼层图，数据库无持久化记录时系统返回 `id=0` 的明确降级响应；对真实业务对象的非法 ID 返回 404 或可识别空状态。站点、用户、设备、拓扑和调节页面必须在空数据、无权限和非法 ID 场景下提供确定性响应
+
 ## 非功能需求
 
 ### 性能
@@ -1271,6 +1294,17 @@ DCIM 算力中心智能监控系统是一个 IoT Platform + Web App 混合型产
 |------|------|
 | 协议接入方式 | 7 种：Modbus TCP/RTU、SNMP v2c/v3、BACnet/IP（含 MS/TP 网关代理）、OPC-UA、MQTT、HTTP REST |
 | BACnet MS/TP 故障隔离 | 平台可区分"协议转换网关离线"和"MS/TP 终端设备离线"，故障定位延迟 ≤ 30s |
+
+### V4.4 发布候选版质量门禁
+
+| ID | 门禁 | 通过标准 | 证据 |
+|----|------|---------|------|
+| NFR-RC01 | 后端质量与回归 | Ruff lint、Ruff format、Python compile 全部通过；CI 配置的完整后端测试集合零失败；运行时依赖与测试收集依赖闭合 | GitHub Actions 后端 Job + coverage.xml |
+| NFR-RC02 | 前端质量与回归 | ESLint、TypeScript typecheck、完整单元测试和生产构建全部通过；当前基线为 162 个测试文件、1700 个用例 | GitHub Actions 前端 Job |
+| NFR-RC03 | 关键业务 E2E | 认证、权限矩阵、非法详情页等关键 E2E 在干净隔离环境中全部通过，测试数据不得写入开发或生产数据库 | GitHub Actions E2E Job + 诊断日志 |
+| NFR-RC04 | 可追溯发布 | CD 仅在同一 SHA 的 CI 成功后执行，后端与前端镜像同时构建并推送 `sha-*` 与 `latest` 标签；RC 报告记录 CI/CD URL、提交 SHA、自动化范围和未完成的现场验收项 | GitHub Actions CD Job + RC 验证报告 |
+
+> 自动化软件 RC 通过不等同于生产验收。真实 Modbus/SNMP 设备联调、生产密钥与网络配置、安全扫描处置、数据库迁移演练和用户现场验收仍需在部署阶段单独签署。
 
 ### 附录：硬件基础设施清单
 
