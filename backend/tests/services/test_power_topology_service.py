@@ -1,6 +1,9 @@
 # backend/tests/services/test_power_topology_service.py
 import pytest
 import asyncio
+from contextlib import asynccontextmanager
+
+from app.services.diagnosis import power_topology_service
 from app.services.diagnosis.power_topology_service import (
     build_power_topology_graph,
     analyze_downstream_impact,
@@ -9,86 +12,67 @@ from app.services.diagnosis.power_topology_service import (
     initialize_power_topology_graph
 )
 from app.models.energy import Transformer, DistributionPanel, DistributionCircuit, PowerDevice
-from app.core.database import async_session
 
 
 @pytest.fixture(scope="function")
-async def setup_test_topology():
+async def setup_test_topology(async_db, monkeypatch):
     """创建测试拓扑数据"""
-    # 先清理可能存在的旧数据
-    async with async_session() as db:
-        from sqlalchemy import text
-        await db.execute(text("DELETE FROM power_devices WHERE id IN (9001, 9002)"))
-        await db.execute(text("DELETE FROM distribution_circuits WHERE id = 9001"))
-        await db.execute(text("DELETE FROM distribution_panels WHERE id = 9001"))
-        await db.execute(text("DELETE FROM transformers WHERE id = 9001"))
-        await db.commit()
 
-    async with async_session() as db:
-        # 创建 Transformer
-        t1 = Transformer(
-            id=9001,
-            transformer_code="TEST-TR-001",
-            transformer_name="测试变压器1",
-            rated_capacity=1000.0
-        )
-        db.add(t1)
+    @asynccontextmanager
+    async def isolated_async_session():
+        yield async_db
 
-        # 创建 DistributionPanel
-        p1 = DistributionPanel(
-            id=9001,
-            panel_code="TEST-PANEL-001",
-            panel_name="测试配电柜1",
-            panel_type="distribution",
-            transformer_id=9001
-        )
-        db.add(p1)
+    monkeypatch.setattr(power_topology_service, "async_session", isolated_async_session)
 
-        # 创建 DistributionCircuit
-        c1 = DistributionCircuit(
-            id=9001,
-            circuit_code="TEST-CIR-001",
-            circuit_name="测试回路1",
-            panel_id=9001
-        )
-        db.add(c1)
+    # 创建 Transformer
+    t1 = Transformer(
+        id=9001,
+        transformer_code="TEST-TR-001",
+        transformer_name="测试变压器1",
+        rated_capacity=1000.0
+    )
 
-        # 创建 PowerDevice
-        d1 = PowerDevice(
-            id=9001,
-            device_code="TEST-PDU-001",
-            device_name="测试PDU1",
-            device_type="OTHER",
-            circuit_id=9001
-        )
-        d2 = PowerDevice(
-            id=9002,
-            device_code="TEST-SRV-001",
-            device_name="测试服务器1",
-            device_type="IT_SERVER",
-            circuit_id=9001
-        )
-        db.add_all([d1, d2])
+    # 创建 DistributionPanel
+    p1 = DistributionPanel(
+        id=9001,
+        panel_code="TEST-PANEL-001",
+        panel_name="测试配电柜1",
+        panel_type="distribution",
+        transformer_id=9001
+    )
 
-        await db.commit()
+    # 创建 DistributionCircuit
+    c1 = DistributionCircuit(
+        id=9001,
+        circuit_code="TEST-CIR-001",
+        circuit_name="测试回路1",
+        panel_id=9001
+    )
+
+    # 创建 PowerDevice
+    d1 = PowerDevice(
+        id=9001,
+        device_code="TEST-PDU-001",
+        device_name="测试PDU1",
+        device_type="OTHER",
+        circuit_id=9001
+    )
+    d2 = PowerDevice(
+        id=9002,
+        device_code="TEST-SRV-001",
+        device_name="测试服务器1",
+        device_type="IT_SERVER",
+        circuit_id=9001
+    )
+    async_db.add_all([t1, p1, c1, d1, d2])
+    await async_db.flush()
 
     # 初始化拓扑图
     await initialize_power_topology_graph()
 
     yield
 
-    # 清理测试数据（按依赖顺序删除）
-    async with async_session() as db:
-        from sqlalchemy import text
-        # 先删除子表
-        await db.execute(text("DELETE FROM power_devices WHERE id IN (9001, 9002)"))
-        await db.execute(text("DELETE FROM distribution_circuits WHERE id = 9001"))
-        await db.execute(text("DELETE FROM distribution_panels WHERE id = 9001"))
-        await db.execute(text("DELETE FROM transformers WHERE id = 9001"))
-        await db.commit()
-
     # 清理全局图缓存
-    from app.services.diagnosis import power_topology_service
     power_topology_service._power_topology_graph = None
 
 

@@ -401,13 +401,17 @@ class TestQCoolScheduleValidation:
         """schedule 长度正确时不报错（错误来自后续步骤）"""
         model = ThermalModel()
         model._dependencies_checked = True
-        result = await model.predict_temperature(
-            zone_id=1,
-            hours=1.0,
-            q_cool_schedule=[50.0] * 12
-        )
-        # 不应是 schedule 长度错误
-        assert result.get("error") != "invalid_q_cool_schedule"
+
+        with patch.object(model, "_get_zone", return_value={"error": "zone_not_found", "zone_id": 1}), \
+             patch("app.services.precool.thermal_model.async_session",
+                   _make_async_session_ctx(AsyncMock())):
+            result = await model.predict_temperature(
+                zone_id=1,
+                hours=1.0,
+                q_cool_schedule=[50.0] * 12
+            )
+
+        assert result["error"] == "zone_not_found"
 
     @pytest.mark.asyncio
     async def test_schedule_half_hour(self):
