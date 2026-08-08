@@ -6,10 +6,12 @@ Story 9-4: 联动恢复流程
 import asyncio
 import logging
 import time
+from contextlib import asynccontextmanager
 from datetime import datetime
-from typing import Dict, List, Optional, Tuple
+from typing import AsyncIterator, Dict, List, Optional, Tuple
 
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..core.database import async_session
 from ..models.linkage import (
@@ -44,6 +46,16 @@ RECOVERY_ORDER: Dict[str, int] = {
 }
 # 未在映射中的 target_type 默认排在最后
 _DEFAULT_ORDER = 99
+
+
+@asynccontextmanager
+async def _session_scope(session: Optional[AsyncSession] = None) -> AsyncIterator[AsyncSession]:
+    if session is not None:
+        yield session
+        return
+
+    async with async_session() as owned_session:
+        yield owned_session
 
 
 class RecoveryEngine:
@@ -196,10 +208,15 @@ class RecoveryEngine:
         except Exception as e:
             logger.warning("恢复引擎: WebSocket 广播失败: %s", e)
 
-    async def execute_single_step(self, recovery_id: int, step_order: int) -> bool:
+    async def execute_single_step(
+        self,
+        recovery_id: int,
+        step_order: int,
+        session: Optional[AsyncSession] = None,
+    ) -> bool:
         """手动执行单个恢复步骤"""
-        async with async_session() as session:
-            result = await session.execute(
+        async with _session_scope(session) as active_session:
+            result = await active_session.execute(
                 select(LinkageRecoveryLog).where(
                     LinkageRecoveryLog.recovery_id == recovery_id,
                     LinkageRecoveryLog.step_order == step_order,
@@ -210,16 +227,21 @@ class RecoveryEngine:
                 return False
             step_id = step.id
 
-        ok = await self._execute_step_internal(step_id)
+        ok = await self._execute_step_internal(step_id, session=session)
 
         # 检查是否所有步骤都已完成，更新恢复记录状态
-        await self._check_recovery_completion(recovery_id)
+        await self._check_recovery_completion(recovery_id, session=session)
         return ok
 
-    async def skip_step(self, recovery_id: int, step_order: int) -> bool:
+    async def skip_step(
+        self,
+        recovery_id: int,
+        step_order: int,
+        session: Optional[AsyncSession] = None,
+    ) -> bool:
         """跳过单个恢复步骤"""
-        async with async_session() as session:
-            result = await session.execute(
+        async with _session_scope(session) as active_session:
+            result = await active_session.execute(
                 select(LinkageRecoveryLog).where(
                     LinkageRecoveryLog.recovery_id == recovery_id,
                     LinkageRecoveryLog.step_order == step_order,
@@ -233,18 +255,18 @@ class RecoveryEngine:
 
             step.status = "skipped"
             step.completed_at = datetime.now()
-            await session.commit()
+            await active_session.commit()
 
         # 检查是否所有步骤都已完成
-        await self._check_recovery_completion(recovery_id)
+        await self._check_recovery_completion(recovery_id, session=session)
         return True
 
-    async def _execute_step_internal(self, step_id: int) -> bool:
+    async def _execute_step_internal(self, step_id: int, session: Optional[AsyncSession] = None) -> bool:
         """执行单个恢复步骤（内部方法）"""
         step_start = time.time()
 
-        async with async_session() as session:
-            result = await session.execute(select(LinkageRecoveryLog).where(LinkageRecoveryLog.id == step_id))
+        async with _session_scope(session) as active_session:
+            result = await active_session.execute(select(LinkageRecoveryLog).where(LinkageRecoveryLog.id == step_id))
             step = result.scalar_one_or_none()
             if step is None:
                 return False
@@ -253,7 +275,7 @@ class RecoveryEngine:
 
             step.status = "executing"
             step.started_at = datetime.now()
-            await session.commit()
+            await active_session.commit()
 
             action_type = step.action_type
             action_config = step.action_config or {}
@@ -261,7 +283,7 @@ class RecoveryEngine:
         # 通过 ActionHandler 执行
         handler = self._handler_registry.get_handler(action_type)
         if handler is None:
-            await self._update_step(step_id, "failed", "未找到动作处理器", step_start)
+            await self._update_step(step_id, "failed", "未找到动作处理器", step_start, session=session)
             return False
 
         # 构建模拟事件（恢复操作）
@@ -278,35 +300,46 @@ class RecoveryEngine:
                 timeout=5,
             )
             if result.success:
-                await self._update_step(step_id, "success", None, step_start)
+                await self._update_step(step_id, "success", None, step_start, session=session)
                 return True
             else:
-                await self._update_step(step_id, "failed", result.error_message, step_start)
+                await self._update_step(step_id, "failed", result.error_message, step_start, session=session)
                 return False
         except asyncio.TimeoutError:
-            await self._update_step(step_id, "failed", "恢复步骤执行超时", step_start)
+            await self._update_step(step_id, "failed", "恢复步骤执行超时", step_start, session=session)
             return False
         except Exception as e:
-            await self._update_step(step_id, "failed", str(e), step_start)
+            await self._update_step(step_id, "failed", str(e), step_start, session=session)
             return False
 
-    async def _update_step(self, step_id: int, status: str, error_message: Optional[str], start_time: float) -> None:
+    async def _update_step(
+        self,
+        step_id: int,
+        status: str,
+        error_message: Optional[str],
+        start_time: float,
+        session: Optional[AsyncSession] = None,
+    ) -> None:
         """更新恢复步骤状态"""
         duration_ms = int((time.time() - start_time) * 1000)
-        async with async_session() as session:
-            result = await session.execute(select(LinkageRecoveryLog).where(LinkageRecoveryLog.id == step_id))
+        async with _session_scope(session) as active_session:
+            result = await active_session.execute(select(LinkageRecoveryLog).where(LinkageRecoveryLog.id == step_id))
             step = result.scalar_one_or_none()
             if step is not None:
                 step.status = status
                 step.error_message = error_message
                 step.completed_at = datetime.now()
                 step.duration_ms = duration_ms
-                await session.commit()
+                await active_session.commit()
 
-    async def _check_recovery_completion(self, recovery_id: int) -> None:
+    async def _check_recovery_completion(
+        self,
+        recovery_id: int,
+        session: Optional[AsyncSession] = None,
+    ) -> None:
         """检查恢复是否全部完成，更新恢复记录状态"""
-        async with async_session() as session:
-            result = await session.execute(
+        async with _session_scope(session) as active_session:
+            result = await active_session.execute(
                 select(LinkageRecoveryLog).where(
                     LinkageRecoveryLog.recovery_id == recovery_id,
                 )
@@ -317,7 +350,9 @@ class RecoveryEngine:
             if any(s.status in ("pending", "executing") for s in all_steps):
                 return
 
-            recovery_result = await session.execute(select(LinkageRecovery).where(LinkageRecovery.id == recovery_id))
+            recovery_result = await active_session.execute(
+                select(LinkageRecovery).where(LinkageRecovery.id == recovery_id)
+            )
             recovery = recovery_result.scalar_one_or_none()
             if recovery is None or recovery.status not in ("executing",):
                 return
@@ -336,7 +371,7 @@ class RecoveryEngine:
             recovery.completed_at = datetime.now()
             if recovery.started_at:
                 recovery.total_duration_ms = int((recovery.completed_at - recovery.started_at).total_seconds() * 1000)
-            await session.commit()
+            await active_session.commit()
 
 
 # 全局单例

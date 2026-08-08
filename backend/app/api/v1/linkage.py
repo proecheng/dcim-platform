@@ -688,10 +688,11 @@ async def get_recovery(
 async def execute_recovery_step(
     recovery_id: int,
     step_order: int,
+    db: AsyncSession = Depends(get_db),
     _: User = Depends(require_operator),
 ):
     """手动执行单个恢复步骤"""
-    ok = await recovery_engine.execute_single_step(recovery_id, step_order)
+    ok = await recovery_engine.execute_single_step(recovery_id, step_order, session=db)
     if not ok:
         raise HTTPException(status_code=400, detail="步骤执行失败或不存在")
     return {"message": "步骤执行完成"}
@@ -701,10 +702,11 @@ async def execute_recovery_step(
 async def skip_recovery_step(
     recovery_id: int,
     step_order: int,
+    db: AsyncSession = Depends(get_db),
     _: User = Depends(require_operator),
 ):
     """跳过单个恢复步骤"""
-    ok = await recovery_engine.skip_step(recovery_id, step_order)
+    ok = await recovery_engine.skip_step(recovery_id, step_order, session=db)
     if not ok:
         raise HTTPException(status_code=400, detail="步骤跳过失败或不存在")
     return {"message": "步骤已跳过"}
