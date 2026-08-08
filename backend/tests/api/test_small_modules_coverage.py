@@ -303,18 +303,27 @@ class TestFloorMapDetail:
         resp = await client.get("/api/v1/floor-map/F1/4d", headers=auth_headers(token))
         assert resp.status_code == 400
 
-    async def test_get_floor_map_not_found(self, client, admin_user):
+    async def test_get_floor_map_uses_generated_fallback(self, client, admin_user):
         _, token = admin_user
         resp = await client.get("/api/v1/floor-map/F99/2d", headers=auth_headers(token))
-        assert resp.status_code == 404
+        assert resp.status_code == 200
+        body = resp.json()["data"]
+        assert body["id"] == 0
+        assert body["floor_code"] == "F99"
+        assert body["map_type"] == "2d"
 
 
 @pytest.mark.asyncio
 class TestFloorMapDefault:
-    async def test_get_default_no_data(self, client, admin_user):
+    async def test_get_default_uses_generated_fallback(self, client, admin_user):
         _, token = admin_user
         resp = await client.get("/api/v1/floor-map/default", headers=auth_headers(token))
-        assert resp.status_code == 404
+        assert resp.status_code == 200
+        body = resp.json()["data"]
+        assert body["id"] == 0
+        assert body["floor_code"] == "F1"
+        assert body["map_type"] == "3d"
+        assert body["is_default"] is True
 
     async def test_get_default_with_default_flag(self, client, admin_user, async_db):
         _, token = admin_user
