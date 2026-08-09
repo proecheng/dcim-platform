@@ -443,7 +443,7 @@ development_status:
   37-2-template-datasource-business-device-and-asset-binding: done
   37-3-cooling-subtype-profiles-and-flexibility-recommendations: done
   37-4-cooling-dispatch-config-generation-and-ui-integration: done
-  epic-37-retrospective: optional
+  epic-37-retrospective: done  # 2026-08-09
 
   # Epic 38: 发布候选版流程与质量门禁
   # 2026-08-09: CI/CD 与 RC 证据完成
@@ -452,4 +452,4 @@ development_status:
   38-2-visible-workflow-and-fallback-hardening: done
   38-3-ci-regression-gate-restoration: done
   38-4-cd-images-and-release-candidate-evidence: done
-  epic-38-retrospective: optional
+  epic-38-retrospective: done  # 2026-08-09
