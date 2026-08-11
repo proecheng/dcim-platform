@@ -1,0 +1,18 @@
+{
+  "generated_at_utc": "2026-08-11T03:15:02.100602Z",
+  "fingerprint_sha256": "09a690ac691f42528f2048cf3f96c2cbe3181a1c4a03dc241184621503905516",
+  "values": {
+    "os": "Windows-10-10.0.26200-SP0",
+    "machine": "AMD64",
+    "python": "3.11.9",
+    "database_driver": "sqlite+aiosqlite",
+    "debug": true,
+    "redis_enabled": true,
+    "mqtt_enabled": true,
+    "simulation_enabled": true,
+    "backend_url": "http://127.0.0.1:8080",
+    "frontend_url": "http://127.0.0.1:3000",
+    "topology": "single local Uvicorn process plus Vite proxy",
+    "production_equivalent": false
+  }
+}

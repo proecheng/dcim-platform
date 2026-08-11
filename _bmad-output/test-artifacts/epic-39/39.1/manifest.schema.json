@@ -1,0 +1,250 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dcim.local/schemas/story-39-1-evidence-manifest.schema.json",
+  "title": "Story 39.1 evidence manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "story",
+    "changeset",
+    "images",
+    "environment",
+    "tools",
+    "execution",
+    "artifacts",
+    "metrics",
+    "acceptance_criteria",
+    "limitations",
+    "exceptions",
+    "decisions",
+    "ownership",
+    "approvals",
+    "production_gate"
+  ],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "story": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "key", "title"],
+      "properties": {
+        "id": { "const": "39.1" },
+        "key": { "const": "39-1-site-isolation-and-websocket-authorization" },
+        "title": { "type": "string", "minLength": 1 }
+      }
+    },
+    "changeset": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "git_sha",
+        "baseline_commit",
+        "working_tree_dirty",
+        "changeset_id",
+        "source_snapshot_sha256",
+        "source_file_count"
+      ],
+      "properties": {
+        "git_sha": { "$ref": "#/$defs/gitSha" },
+        "baseline_commit": { "$ref": "#/$defs/gitSha" },
+        "working_tree_dirty": { "type": "boolean" },
+        "changeset_id": { "type": "string", "minLength": 1 },
+        "source_snapshot_sha256": { "$ref": "#/$defs/sha256Hex" },
+        "source_file_count": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "images": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["backend", "frontend"],
+      "properties": {
+        "backend": { "$ref": "#/$defs/image" },
+        "frontend": { "$ref": "#/$defs/image" }
+      }
+    },
+    "environment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "kind", "fingerprint_sha256", "topology", "production_equivalent"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "kind": { "type": "string", "minLength": 1 },
+        "fingerprint_sha256": { "$ref": "#/$defs/sha256Hex" },
+        "topology": { "type": "string", "minLength": 1 },
+        "production_equivalent": { "type": "boolean" }
+      }
+    },
+    "tools": {
+      "type": "object",
+      "minProperties": 5,
+      "additionalProperties": { "type": "string", "minLength": 1 }
+    },
+    "execution": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["started_at_utc", "ended_at_utc", "operator", "commands"],
+      "properties": {
+        "started_at_utc": { "type": "string", "format": "date-time" },
+        "ended_at_utc": { "type": "string", "format": "date-time" },
+        "operator": { "type": "string", "minLength": 1 },
+        "commands": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "cwd", "command", "result"],
+            "properties": {
+              "id": { "type": "string", "minLength": 1 },
+              "cwd": { "type": "string", "minLength": 1 },
+              "command": { "type": "string", "minLength": 1 },
+              "result": { "enum": ["PASS", "FAIL", "BLOCKED"] }
+            }
+          }
+        }
+      }
+    },
+    "artifacts": {
+      "type": "array",
+      "minItems": 9,
+      "items": { "$ref": "#/$defs/artifact" }
+    },
+    "metrics": { "type": "object", "minProperties": 1 },
+    "acceptance_criteria": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["AC1", "AC2", "AC3", "AC4", "AC5"],
+      "properties": {
+        "AC1": { "$ref": "#/$defs/acResult" },
+        "AC2": { "$ref": "#/$defs/acResult" },
+        "AC3": { "$ref": "#/$defs/acResult" },
+        "AC4": { "$ref": "#/$defs/acResult" },
+        "AC5": { "$ref": "#/$defs/acResult" }
+      }
+    },
+    "limitations": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "exceptions": {
+      "type": "array",
+      "items": { "type": "object" }
+    },
+    "decisions": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "ownership": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["implementation_owner", "security_owner", "qa_owner"],
+      "properties": {
+        "implementation_owner": { "const": "Amelia" },
+        "security_owner": { "const": "Charlie" },
+        "qa_owner": { "const": "Dana" }
+      }
+    },
+    "approvals": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["security", "qa"],
+      "properties": {
+        "security": { "$ref": "#/$defs/approval" },
+        "qa": { "$ref": "#/$defs/approval" }
+      }
+    },
+    "production_gate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "blockers"],
+      "properties": {
+        "status": { "enum": ["BLOCKED", "CONDITIONAL REVIEW", "APPROVED"] },
+        "blockers": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "gitSha": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+    "sha256Hex": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "image": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["tag", "status", "digest", "repo_digests", "production_registry_digest"],
+      "properties": {
+        "tag": { "type": "string", "minLength": 1 },
+        "status": { "enum": ["BUILT", "NOT_BUILT", "FAILED"] },
+        "digest": {
+          "anyOf": [
+            { "type": "null" },
+            { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" }
+          ]
+        },
+        "repo_digests": { "type": "array", "items": { "type": "string" } },
+        "production_registry_digest": {
+          "anyOf": [
+            { "type": "null" },
+            { "type": "string", "pattern": "^[^@\\s]+@sha256:[0-9a-f]{64}$" }
+          ]
+        }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "status": { "const": "BUILT" } } },
+          "then": { "properties": { "digest": { "type": "string" } } }
+        }
+      ]
+    },
+    "artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256", "size_bytes", "media_type", "purpose", "acceptance_criteria"],
+      "properties": {
+        "path": {
+          "type": "string",
+          "pattern": "^_bmad-output/test-artifacts/epic-39/39\\.1/[A-Za-z0-9._-]+$"
+        },
+        "sha256": { "$ref": "#/$defs/sha256Hex" },
+        "size_bytes": { "type": "integer", "minimum": 1 },
+        "media_type": { "type": "string", "minLength": 1 },
+        "purpose": { "type": "string", "minLength": 1 },
+        "acceptance_criteria": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "enum": ["AC1", "AC2", "AC3", "AC4", "AC5"] },
+          "uniqueItems": true
+        }
+      }
+    },
+    "acResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["result", "evidence"],
+      "properties": {
+        "result": { "enum": ["PASS", "BLOCKED"] },
+        "evidence": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "approval": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "role", "status", "signed_at_utc", "signature"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "role": { "type": "string", "minLength": 1 },
+        "status": { "enum": ["PENDING", "APPROVED", "REJECTED"] },
+        "signed_at_utc": { "type": ["string", "null"], "format": "date-time" },
+        "signature": { "type": ["string", "null"] }
+      }
+    }
+  }
+}

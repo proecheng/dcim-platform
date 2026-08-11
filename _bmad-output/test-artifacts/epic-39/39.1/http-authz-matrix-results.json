@@ -1,0 +1,226 @@
+{
+  "generated_at_utc": "2026-08-11T03:15:02.119624Z",
+  "matrix": "HTTP authorization and inventory",
+  "result": "PASS",
+  "total": 36,
+  "passed": 36,
+  "failed_or_skipped": 0,
+  "cases": [
+    {
+      "classname": "tests.test_authorization_inventory",
+      "name": "test_checked_in_inventory_matches_runtime_surface",
+      "duration_seconds": 9.226,
+      "status": "PASS"
+    },
+    {
+      "classname": "tests.test_authorization_inventory",
+      "name": "test_candidate_builder_preserves_reviewed_http_classifications",
+      "duration_seconds": 3.66,
+      "status": "PASS"
+    },
+    {
+      "classname": "tests.test_authorization_inventory",
+      "name": "test_missing_runtime_route_is_rejected",
+      "duration_seconds": 3.499,
+      "status": "PASS"
+    },
+    {
+      "classname": "tests.test_authorization_inventory",
+      "name": "test_duplicate_policy_key_is_rejected",
+      "duration_seconds": 4.181,
+      "status": "PASS"
+    },
+    {
+      "classname": "tests.test_authorization_inventory",
+      "name": "test_unknown_access_type_is_rejected",
+      "duration_seconds": 3.563,
+      "status": "PASS"
+    },
+    {
+      "classname": "tests.test_authorization_inventory",
+      "name": "test_stale_policy_is_rejected",
+      "duration_seconds": 4.505,
+      "status": "PASS"
+    },
+    {
+      "classname": "tests.test_authorization_inventory",
+      "name": "test_missing_test_mapping_is_rejected",
+      "duration_seconds": 4.121,
+      "status": "PASS"
+    },
+    {
+      "classname": "tests.test_authorization_inventory",
+      "name": "test_site_policy_without_resolver_is_rejected",
+      "duration_seconds": 4.289,
+      "status": "PASS"
+    },
+    {
+      "classname": "tests.test_authorization_inventory",
+      "name": "test_unclassified_channel_is_rejected",
+      "duration_seconds": 5.747,
+      "status": "PASS"
+    },
+    {
+      "classname": "tests.test_authorization_inventory",
+      "name": "test_unclassified_websocket_endpoint_is_rejected",
+      "duration_seconds": 3.777,
+      "status": "PASS"
+    },
+    {
+      "classname": "tests.test_authorization_inventory",
+      "name": "test_unclassified_broadcast_producer_is_rejected",
+      "duration_seconds": 3.545,
+      "status": "PASS"
+    },
+    {
+      "classname": "tests.test_story_39_1",
+      "name": "test_protected_http_rejects_token_without_jti",
+      "duration_seconds": 3.632,
+      "status": "PASS"
+    },
+    {
+      "classname": "tests.test_story_39_1",
+      "name": "test_active_jti_must_belong_to_token_user",
+      "duration_seconds": 1.1,
+      "status": "PASS"
+    },
+    {
+      "classname": "tests.test_story_39_1",
+      "name": "test_site_access_context_distinguishes_admin_and_empty_scope",
+      "duration_seconds": 1.242,
+      "status": "PASS"
+    },
+    {
+      "classname": "tests.test_story_39_1",
+      "name": "test_explicit_site_and_object_id_use_different_status_codes",
+      "duration_seconds": 0.001,
+      "status": "PASS"
+    },
+    {
+      "classname": "tests.test_story_39_1",
+      "name": "test_scope_and_trusted_direct_indirect_resolvers",
+      "duration_seconds": 1.131,
+      "status": "PASS"
+    },
+    {
+      "classname": "tests.test_story_39_1",
+      "name": "test_non_admin_context_loads_real_user_site_rows",
+      "duration_seconds": 1.167,
+      "status": "PASS"
+    },
+    {
+      "classname": "tests.test_story_39_1",
+      "name": "test_inventory_gate_authenticates_topology_routes",
+      "duration_seconds": 1.295,
+      "status": "PASS"
+    },
+    {
+      "classname": "tests.test_story_39_1",
+      "name": "test_device_http_matrix_is_site_isolated",
+      "duration_seconds": 1.867,
+      "status": "PASS"
+    },
+    {
+      "classname": "tests.test_story_39_1",
+      "name": "test_point_http_matrix_uses_device_site",
+      "duration_seconds": 1.697,
+      "status": "PASS"
+    },
+    {
+      "classname": "tests.test_story_39_1",
+      "name": "test_alarm_http_matrix_scopes_aggregates_exports_and_batches",
+      "duration_seconds": 1.483,
+      "status": "PASS"
+    },
+    {
+      "classname": "tests.test_story_39_1",
+      "name": "test_threshold_realtime_and_history_follow_point_site_scope",
+      "duration_seconds": 1.635,
+      "status": "PASS"
+    },
+    {
+      "classname": "tests.test_story_39_1",
+      "name": "test_gateway_datasource_and_spatial_objects_are_site_isolated",
+      "duration_seconds": 1.739,
+      "status": "PASS"
+    },
+    {
+      "classname": "tests.test_story_39_1",
+      "name": "test_cooling_objects_and_overview_follow_device_site_scope",
+      "duration_seconds": 1.812,
+      "status": "PASS"
+    },
+    {
+      "classname": "tests.test_story_39_1",
+      "name": "test_topology_config_and_precool_follow_trusted_site_relations",
+      "duration_seconds": 2.068,
+      "status": "PASS"
+    },
+    {
+      "classname": "tests.test_story_39_1",
+      "name": "test_power_objects_and_aggregates_follow_device_site_scope",
+      "duration_seconds": 2.124,
+      "status": "PASS"
+    },
+    {
+      "classname": "tests.test_story_39_1",
+      "name": "test_statistics_aggregates_follow_point_device_site_scope",
+      "duration_seconds": 1.814,
+      "status": "PASS"
+    },
+    {
+      "classname": "tests.test_story_39_1",
+      "name": "test_report_globals_are_admin_only_and_device_health_is_site_scoped",
+      "duration_seconds": 1.924,
+      "status": "PASS"
+    },
+    {
+      "classname": "tests.test_story_39_1",
+      "name": "test_video_cameras_actions_and_playback_follow_trusted_site_relations",
+      "duration_seconds": 2.093,
+      "status": "PASS"
+    },
+    {
+      "classname": "tests.test_story_39_1",
+      "name": "test_ota_packages_and_tasks_follow_full_gateway_site_scope",
+      "duration_seconds": 2.409,
+      "status": "PASS"
+    },
+    {
+      "classname": "tests.test_story_39_1",
+      "name": "test_data_quality_floor_map_and_predictive_maintenance_authorization",
+      "duration_seconds": 2.271,
+      "status": "PASS"
+    },
+    {
+      "classname": "tests.test_story_39_1",
+      "name": "test_command_and_drift_routes_follow_device_and_point_site_scope",
+      "duration_seconds": 1.943,
+      "status": "PASS"
+    },
+    {
+      "classname": "tests.test_story_39_1",
+      "name": "test_asset_routes_follow_spatial_site_scope_and_keep_inventory_admin_only",
+      "duration_seconds": 3.154,
+      "status": "PASS"
+    },
+    {
+      "classname": "tests.test_story_39_1",
+      "name": "test_operation_work_orders_follow_device_scope_and_unowned_families_are_admin_only",
+      "duration_seconds": 1.832,
+      "status": "PASS"
+    },
+    {
+      "classname": "tests.test_story_39_1",
+      "name": "test_diagnosis_records_follow_device_and_point_scope_while_configuration_is_global_admin",
+      "duration_seconds": 2.035,
+      "status": "PASS"
+    },
+    {
+      "classname": "tests.test_story_39_1",
+      "name": "test_sensor_metadata_routes_follow_point_device_site_scope",
+      "duration_seconds": 1.763,
+      "status": "PASS"
+    }
+  ]
+}

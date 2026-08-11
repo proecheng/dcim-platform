@@ -1,0 +1,674 @@
+{
+  "generated_at_utc": "2026-08-11T03:14:57.890681Z",
+  "validation": "PASS",
+  "count": 29,
+  "producers": [
+    {
+      "discovered": {
+        "key": "app/api/v1/alarm.py::batch_acknowledge::broadcast_alarm#1",
+        "source": "app/api/v1/alarm.py",
+        "owner": "batch_acknowledge",
+        "call": "broadcast_alarm",
+        "channel": "alarms",
+        "has_site_id": true,
+        "global_message_is_true": false
+      },
+      "policy": {
+        "key": "app/api/v1/alarm.py::batch_acknowledge::broadcast_alarm#1",
+        "source": "app/api/v1/alarm.py",
+        "owner": "batch_acknowledge",
+        "call": "broadcast_alarm",
+        "channel": "alarms",
+        "scope": "SITE",
+        "resolver": "site.id",
+        "tests": [
+          "AUTHZ-INVENTORY-WS-PRODUCER-01"
+        ]
+      }
+    },
+    {
+      "discovered": {
+        "key": "app/api/v1/alarm.py::acknowledge_alarm::broadcast_alarm#1",
+        "source": "app/api/v1/alarm.py",
+        "owner": "acknowledge_alarm",
+        "call": "broadcast_alarm",
+        "channel": "alarms",
+        "has_site_id": true,
+        "global_message_is_true": false
+      },
+      "policy": {
+        "key": "app/api/v1/alarm.py::acknowledge_alarm::broadcast_alarm#1",
+        "source": "app/api/v1/alarm.py",
+        "owner": "acknowledge_alarm",
+        "call": "broadcast_alarm",
+        "channel": "alarms",
+        "scope": "SITE",
+        "resolver": "site.id",
+        "tests": [
+          "AUTHZ-INVENTORY-WS-PRODUCER-01"
+        ]
+      }
+    },
+    {
+      "discovered": {
+        "key": "app/api/v1/alarm.py::resolve_alarm::broadcast_alarm#1",
+        "source": "app/api/v1/alarm.py",
+        "owner": "resolve_alarm",
+        "call": "broadcast_alarm",
+        "channel": "alarms",
+        "has_site_id": true,
+        "global_message_is_true": false
+      },
+      "policy": {
+        "key": "app/api/v1/alarm.py::resolve_alarm::broadcast_alarm#1",
+        "source": "app/api/v1/alarm.py",
+        "owner": "resolve_alarm",
+        "call": "broadcast_alarm",
+        "channel": "alarms",
+        "scope": "SITE",
+        "resolver": "site.id",
+        "tests": [
+          "AUTHZ-INVENTORY-WS-PRODUCER-01"
+        ]
+      }
+    },
+    {
+      "discovered": {
+        "key": "app/api/v1/alarm.py::process_alarm::broadcast_alarm#1",
+        "source": "app/api/v1/alarm.py",
+        "owner": "process_alarm",
+        "call": "broadcast_alarm",
+        "channel": "alarms",
+        "has_site_id": true,
+        "global_message_is_true": false
+      },
+      "policy": {
+        "key": "app/api/v1/alarm.py::process_alarm::broadcast_alarm#1",
+        "source": "app/api/v1/alarm.py",
+        "owner": "process_alarm",
+        "call": "broadcast_alarm",
+        "channel": "alarms",
+        "scope": "SITE",
+        "resolver": "site.id",
+        "tests": [
+          "AUTHZ-INVENTORY-WS-PRODUCER-01"
+        ]
+      }
+    },
+    {
+      "discovered": {
+        "key": "app/api/v1/diagnosis.py::approve_time_window_adjustment::broadcast_diagnosis#1",
+        "source": "app/api/v1/diagnosis.py",
+        "owner": "approve_time_window_adjustment",
+        "call": "broadcast_diagnosis",
+        "channel": "alarms",
+        "has_site_id": false,
+        "global_message_is_true": true
+      },
+      "policy": {
+        "key": "app/api/v1/diagnosis.py::approve_time_window_adjustment::broadcast_diagnosis#1",
+        "source": "app/api/v1/diagnosis.py",
+        "owner": "approve_time_window_adjustment",
+        "call": "broadcast_diagnosis",
+        "channel": "alarms",
+        "scope": "GLOBAL",
+        "resolver": null,
+        "tests": [
+          "AUTHZ-INVENTORY-WS-PRODUCER-01"
+        ]
+      }
+    },
+    {
+      "discovered": {
+        "key": "app/api/v1/diagnosis.py::reject_time_window_adjustment::broadcast_diagnosis#1",
+        "source": "app/api/v1/diagnosis.py",
+        "owner": "reject_time_window_adjustment",
+        "call": "broadcast_diagnosis",
+        "channel": "alarms",
+        "has_site_id": false,
+        "global_message_is_true": true
+      },
+      "policy": {
+        "key": "app/api/v1/diagnosis.py::reject_time_window_adjustment::broadcast_diagnosis#1",
+        "source": "app/api/v1/diagnosis.py",
+        "owner": "reject_time_window_adjustment",
+        "call": "broadcast_diagnosis",
+        "channel": "alarms",
+        "scope": "GLOBAL",
+        "resolver": null,
+        "tests": [
+          "AUTHZ-INVENTORY-WS-PRODUCER-01"
+        ]
+      }
+    },
+    {
+      "discovered": {
+        "key": "app/api/v1/probability_tuning.py::approve_adjustment::broadcast_diagnosis#1",
+        "source": "app/api/v1/probability_tuning.py",
+        "owner": "approve_adjustment",
+        "call": "broadcast_diagnosis",
+        "channel": "alarms",
+        "has_site_id": false,
+        "global_message_is_true": true
+      },
+      "policy": {
+        "key": "app/api/v1/probability_tuning.py::approve_adjustment::broadcast_diagnosis#1",
+        "source": "app/api/v1/probability_tuning.py",
+        "owner": "approve_adjustment",
+        "call": "broadcast_diagnosis",
+        "channel": "alarms",
+        "scope": "GLOBAL",
+        "resolver": null,
+        "tests": [
+          "AUTHZ-INVENTORY-WS-PRODUCER-01"
+        ]
+      }
+    },
+    {
+      "discovered": {
+        "key": "app/api/v1/probability_tuning.py::reject_adjustment::broadcast_diagnosis#1",
+        "source": "app/api/v1/probability_tuning.py",
+        "owner": "reject_adjustment",
+        "call": "broadcast_diagnosis",
+        "channel": "alarms",
+        "has_site_id": false,
+        "global_message_is_true": true
+      },
+      "policy": {
+        "key": "app/api/v1/probability_tuning.py::reject_adjustment::broadcast_diagnosis#1",
+        "source": "app/api/v1/probability_tuning.py",
+        "owner": "reject_adjustment",
+        "call": "broadcast_diagnosis",
+        "channel": "alarms",
+        "scope": "GLOBAL",
+        "resolver": null,
+        "tests": [
+          "AUTHZ-INVENTORY-WS-PRODUCER-01"
+        ]
+      }
+    },
+    {
+      "discovered": {
+        "key": "app/engines/action_handlers.py::AlarmNotifyHandler.execute::broadcast_alarm#1",
+        "source": "app/engines/action_handlers.py",
+        "owner": "AlarmNotifyHandler.execute",
+        "call": "broadcast_alarm",
+        "channel": "alarms",
+        "has_site_id": true,
+        "global_message_is_true": false
+      },
+      "policy": {
+        "key": "app/engines/action_handlers.py::AlarmNotifyHandler.execute::broadcast_alarm#1",
+        "source": "app/engines/action_handlers.py",
+        "owner": "AlarmNotifyHandler.execute",
+        "call": "broadcast_alarm",
+        "channel": "alarms",
+        "scope": "SITE",
+        "resolver": "site.id",
+        "tests": [
+          "AUTHZ-INVENTORY-WS-PRODUCER-01"
+        ]
+      }
+    },
+    {
+      "discovered": {
+        "key": "app/engines/action_handlers.py::VideoPopupHandler.execute::broadcast_alarm#1",
+        "source": "app/engines/action_handlers.py",
+        "owner": "VideoPopupHandler.execute",
+        "call": "broadcast_alarm",
+        "channel": "alarms",
+        "has_site_id": true,
+        "global_message_is_true": false
+      },
+      "policy": {
+        "key": "app/engines/action_handlers.py::VideoPopupHandler.execute::broadcast_alarm#1",
+        "source": "app/engines/action_handlers.py",
+        "owner": "VideoPopupHandler.execute",
+        "call": "broadcast_alarm",
+        "channel": "alarms",
+        "scope": "SITE",
+        "resolver": "site.id",
+        "tests": [
+          "AUTHZ-INVENTORY-WS-PRODUCER-01"
+        ]
+      }
+    },
+    {
+      "discovered": {
+        "key": "app/engines/escalation_engine.py::check_escalations::broadcast_alarm#1",
+        "source": "app/engines/escalation_engine.py",
+        "owner": "check_escalations",
+        "call": "broadcast_alarm",
+        "channel": "alarms",
+        "has_site_id": true,
+        "global_message_is_true": false
+      },
+      "policy": {
+        "key": "app/engines/escalation_engine.py::check_escalations::broadcast_alarm#1",
+        "source": "app/engines/escalation_engine.py",
+        "owner": "check_escalations",
+        "call": "broadcast_alarm",
+        "channel": "alarms",
+        "scope": "SITE",
+        "resolver": "site.id",
+        "tests": [
+          "AUTHZ-INVENTORY-WS-PRODUCER-01"
+        ]
+      }
+    },
+    {
+      "discovered": {
+        "key": "app/engines/linkage_engine.py::LinkageEngine._execute_policy::broadcast_linkage#1",
+        "source": "app/engines/linkage_engine.py",
+        "owner": "LinkageEngine._execute_policy",
+        "call": "broadcast_linkage",
+        "channel": "linkage",
+        "has_site_id": true,
+        "global_message_is_true": false
+      },
+      "policy": {
+        "key": "app/engines/linkage_engine.py::LinkageEngine._execute_policy::broadcast_linkage#1",
+        "source": "app/engines/linkage_engine.py",
+        "owner": "LinkageEngine._execute_policy",
+        "call": "broadcast_linkage",
+        "channel": "linkage",
+        "scope": "SITE",
+        "resolver": "site.id",
+        "tests": [
+          "AUTHZ-INVENTORY-WS-PRODUCER-01"
+        ]
+      }
+    },
+    {
+      "discovered": {
+        "key": "app/engines/linkage_engine.py::LinkageEngine._execute_policy::broadcast_alarm#1",
+        "source": "app/engines/linkage_engine.py",
+        "owner": "LinkageEngine._execute_policy",
+        "call": "broadcast_alarm",
+        "channel": "alarms",
+        "has_site_id": true,
+        "global_message_is_true": false
+      },
+      "policy": {
+        "key": "app/engines/linkage_engine.py::LinkageEngine._execute_policy::broadcast_alarm#1",
+        "source": "app/engines/linkage_engine.py",
+        "owner": "LinkageEngine._execute_policy",
+        "call": "broadcast_alarm",
+        "channel": "alarms",
+        "scope": "SITE",
+        "resolver": "site.id",
+        "tests": [
+          "AUTHZ-INVENTORY-WS-PRODUCER-01"
+        ]
+      }
+    },
+    {
+      "discovered": {
+        "key": "app/engines/recovery_engine.py::RecoveryEngine._do_recovery::broadcast_linkage#1",
+        "source": "app/engines/recovery_engine.py",
+        "owner": "RecoveryEngine._do_recovery",
+        "call": "broadcast_linkage",
+        "channel": "linkage",
+        "has_site_id": true,
+        "global_message_is_true": false
+      },
+      "policy": {
+        "key": "app/engines/recovery_engine.py::RecoveryEngine._do_recovery::broadcast_linkage#1",
+        "source": "app/engines/recovery_engine.py",
+        "owner": "RecoveryEngine._do_recovery",
+        "call": "broadcast_linkage",
+        "channel": "linkage",
+        "scope": "SITE",
+        "resolver": "site.id",
+        "tests": [
+          "AUTHZ-INVENTORY-WS-PRODUCER-01"
+        ]
+      }
+    },
+    {
+      "discovered": {
+        "key": "app/services/communication_monitor.py::check_communication_status::broadcast_system#1",
+        "source": "app/services/communication_monitor.py",
+        "owner": "check_communication_status",
+        "call": "broadcast_system",
+        "channel": "system",
+        "has_site_id": true,
+        "global_message_is_true": false
+      },
+      "policy": {
+        "key": "app/services/communication_monitor.py::check_communication_status::broadcast_system#1",
+        "source": "app/services/communication_monitor.py",
+        "owner": "check_communication_status",
+        "call": "broadcast_system",
+        "channel": "system",
+        "scope": "SITE",
+        "resolver": "site.id",
+        "tests": [
+          "AUTHZ-INVENTORY-WS-PRODUCER-01"
+        ]
+      }
+    },
+    {
+      "discovered": {
+        "key": "app/services/communication_monitor.py::check_communication_status::broadcast_alarm#1",
+        "source": "app/services/communication_monitor.py",
+        "owner": "check_communication_status",
+        "call": "broadcast_alarm",
+        "channel": "alarms",
+        "has_site_id": true,
+        "global_message_is_true": false
+      },
+      "policy": {
+        "key": "app/services/communication_monitor.py::check_communication_status::broadcast_alarm#1",
+        "source": "app/services/communication_monitor.py",
+        "owner": "check_communication_status",
+        "call": "broadcast_alarm",
+        "channel": "alarms",
+        "scope": "SITE",
+        "resolver": "site.id",
+        "tests": [
+          "AUTHZ-INVENTORY-WS-PRODUCER-01"
+        ]
+      }
+    },
+    {
+      "discovered": {
+        "key": "app/services/diagnosis/probability_tuning_service.py::ProbabilityTuningService.notify_admins::send_to_user#1",
+        "source": "app/services/diagnosis/probability_tuning_service.py",
+        "owner": "ProbabilityTuningService.notify_admins",
+        "call": "send_to_user",
+        "channel": "direct",
+        "has_site_id": false,
+        "global_message_is_true": false
+      },
+      "policy": {
+        "key": "app/services/diagnosis/probability_tuning_service.py::ProbabilityTuningService.notify_admins::send_to_user#1",
+        "source": "app/services/diagnosis/probability_tuning_service.py",
+        "owner": "ProbabilityTuningService.notify_admins",
+        "call": "send_to_user",
+        "channel": "direct",
+        "scope": "USER",
+        "resolver": null,
+        "tests": [
+          "AUTHZ-INVENTORY-WS-PRODUCER-01"
+        ]
+      }
+    },
+    {
+      "discovered": {
+        "key": "app/services/diagnosis/push_service.py::DiagnosisPushService.push_diagnosis_result::broadcast_diagnosis#1",
+        "source": "app/services/diagnosis/push_service.py",
+        "owner": "DiagnosisPushService.push_diagnosis_result",
+        "call": "broadcast_diagnosis",
+        "channel": "alarms",
+        "has_site_id": true,
+        "global_message_is_true": false
+      },
+      "policy": {
+        "key": "app/services/diagnosis/push_service.py::DiagnosisPushService.push_diagnosis_result::broadcast_diagnosis#1",
+        "source": "app/services/diagnosis/push_service.py",
+        "owner": "DiagnosisPushService.push_diagnosis_result",
+        "call": "broadcast_diagnosis",
+        "channel": "alarms",
+        "scope": "SITE",
+        "resolver": "site.id",
+        "tests": [
+          "AUTHZ-INVENTORY-WS-PRODUCER-01"
+        ]
+      }
+    },
+    {
+      "discovered": {
+        "key": "app/services/diagnosis/scheduler.py::DiagnosisScheduler._on_breaker_state_change::broadcast_diagnosis#1",
+        "source": "app/services/diagnosis/scheduler.py",
+        "owner": "DiagnosisScheduler._on_breaker_state_change",
+        "call": "broadcast_diagnosis",
+        "channel": "alarms",
+        "has_site_id": false,
+        "global_message_is_true": true
+      },
+      "policy": {
+        "key": "app/services/diagnosis/scheduler.py::DiagnosisScheduler._on_breaker_state_change::broadcast_diagnosis#1",
+        "source": "app/services/diagnosis/scheduler.py",
+        "owner": "DiagnosisScheduler._on_breaker_state_change",
+        "call": "broadcast_diagnosis",
+        "channel": "alarms",
+        "scope": "GLOBAL",
+        "resolver": null,
+        "tests": [
+          "AUTHZ-INVENTORY-WS-PRODUCER-01"
+        ]
+      }
+    },
+    {
+      "discovered": {
+        "key": "app/services/diagnosis/scheduler.py::DiagnosisScheduler._anomaly_detection_loop::broadcast_diagnosis#1",
+        "source": "app/services/diagnosis/scheduler.py",
+        "owner": "DiagnosisScheduler._anomaly_detection_loop",
+        "call": "broadcast_diagnosis",
+        "channel": "alarms",
+        "has_site_id": false,
+        "global_message_is_true": true
+      },
+      "policy": {
+        "key": "app/services/diagnosis/scheduler.py::DiagnosisScheduler._anomaly_detection_loop::broadcast_diagnosis#1",
+        "source": "app/services/diagnosis/scheduler.py",
+        "owner": "DiagnosisScheduler._anomaly_detection_loop",
+        "call": "broadcast_diagnosis",
+        "channel": "alarms",
+        "scope": "GLOBAL",
+        "resolver": null,
+        "tests": [
+          "AUTHZ-INVENTORY-WS-PRODUCER-01"
+        ]
+      }
+    },
+    {
+      "discovered": {
+        "key": "app/services/diagnosis/scheduler.py::DiagnosisScheduler._misdiagnosis_report_loop::broadcast_diagnosis#1",
+        "source": "app/services/diagnosis/scheduler.py",
+        "owner": "DiagnosisScheduler._misdiagnosis_report_loop",
+        "call": "broadcast_diagnosis",
+        "channel": "alarms",
+        "has_site_id": false,
+        "global_message_is_true": true
+      },
+      "policy": {
+        "key": "app/services/diagnosis/scheduler.py::DiagnosisScheduler._misdiagnosis_report_loop::broadcast_diagnosis#1",
+        "source": "app/services/diagnosis/scheduler.py",
+        "owner": "DiagnosisScheduler._misdiagnosis_report_loop",
+        "call": "broadcast_diagnosis",
+        "channel": "alarms",
+        "scope": "GLOBAL",
+        "resolver": null,
+        "tests": [
+          "AUTHZ-INVENTORY-WS-PRODUCER-01"
+        ]
+      }
+    },
+    {
+      "discovered": {
+        "key": "app/services/diagnosis/scheduler.py::DiagnosisScheduler._misdiagnosis_report_loop::broadcast_diagnosis#2",
+        "source": "app/services/diagnosis/scheduler.py",
+        "owner": "DiagnosisScheduler._misdiagnosis_report_loop",
+        "call": "broadcast_diagnosis",
+        "channel": "alarms",
+        "has_site_id": false,
+        "global_message_is_true": true
+      },
+      "policy": {
+        "key": "app/services/diagnosis/scheduler.py::DiagnosisScheduler._misdiagnosis_report_loop::broadcast_diagnosis#2",
+        "source": "app/services/diagnosis/scheduler.py",
+        "owner": "DiagnosisScheduler._misdiagnosis_report_loop",
+        "call": "broadcast_diagnosis",
+        "channel": "alarms",
+        "scope": "GLOBAL",
+        "resolver": null,
+        "tests": [
+          "AUTHZ-INVENTORY-WS-PRODUCER-01"
+        ]
+      }
+    },
+    {
+      "discovered": {
+        "key": "app/services/diagnosis/time_window_tuning_service.py::TimeWindowTuningService.notify_admins::send_to_user#1",
+        "source": "app/services/diagnosis/time_window_tuning_service.py",
+        "owner": "TimeWindowTuningService.notify_admins",
+        "call": "send_to_user",
+        "channel": "direct",
+        "has_site_id": false,
+        "global_message_is_true": false
+      },
+      "policy": {
+        "key": "app/services/diagnosis/time_window_tuning_service.py::TimeWindowTuningService.notify_admins::send_to_user#1",
+        "source": "app/services/diagnosis/time_window_tuning_service.py",
+        "owner": "TimeWindowTuningService.notify_admins",
+        "call": "send_to_user",
+        "channel": "direct",
+        "scope": "USER",
+        "resolver": null,
+        "tests": [
+          "AUTHZ-INVENTORY-WS-PRODUCER-01"
+        ]
+      }
+    },
+    {
+      "discovered": {
+        "key": "app/services/gateway_monitor.py::check_mstp_gateway_health::broadcast_alarm#1",
+        "source": "app/services/gateway_monitor.py",
+        "owner": "check_mstp_gateway_health",
+        "call": "broadcast_alarm",
+        "channel": "alarms",
+        "has_site_id": true,
+        "global_message_is_true": false
+      },
+      "policy": {
+        "key": "app/services/gateway_monitor.py::check_mstp_gateway_health::broadcast_alarm#1",
+        "source": "app/services/gateway_monitor.py",
+        "owner": "check_mstp_gateway_health",
+        "call": "broadcast_alarm",
+        "channel": "alarms",
+        "scope": "SITE",
+        "resolver": "site.id",
+        "tests": [
+          "AUTHZ-INVENTORY-WS-PRODUCER-01"
+        ]
+      }
+    },
+    {
+      "discovered": {
+        "key": "app/services/ingest_pipeline.py::_evaluate_alarms::broadcast_alarm#1",
+        "source": "app/services/ingest_pipeline.py",
+        "owner": "_evaluate_alarms",
+        "call": "broadcast_alarm",
+        "channel": "alarms",
+        "has_site_id": true,
+        "global_message_is_true": false
+      },
+      "policy": {
+        "key": "app/services/ingest_pipeline.py::_evaluate_alarms::broadcast_alarm#1",
+        "source": "app/services/ingest_pipeline.py",
+        "owner": "_evaluate_alarms",
+        "call": "broadcast_alarm",
+        "channel": "alarms",
+        "scope": "SITE",
+        "resolver": "site.id",
+        "tests": [
+          "AUTHZ-INVENTORY-WS-PRODUCER-01"
+        ]
+      }
+    },
+    {
+      "discovered": {
+        "key": "app/services/ingest_pipeline.py::_evaluate_alarms::broadcast_alarm#2",
+        "source": "app/services/ingest_pipeline.py",
+        "owner": "_evaluate_alarms",
+        "call": "broadcast_alarm",
+        "channel": "alarms",
+        "has_site_id": true,
+        "global_message_is_true": false
+      },
+      "policy": {
+        "key": "app/services/ingest_pipeline.py::_evaluate_alarms::broadcast_alarm#2",
+        "source": "app/services/ingest_pipeline.py",
+        "owner": "_evaluate_alarms",
+        "call": "broadcast_alarm",
+        "channel": "alarms",
+        "scope": "SITE",
+        "resolver": "site.id",
+        "tests": [
+          "AUTHZ-INVENTORY-WS-PRODUCER-01"
+        ]
+      }
+    },
+    {
+      "discovered": {
+        "key": "app/services/ingest_pipeline.py::_broadcast_realtime::broadcast_realtime#1",
+        "source": "app/services/ingest_pipeline.py",
+        "owner": "_broadcast_realtime",
+        "call": "broadcast_realtime",
+        "channel": "realtime",
+        "has_site_id": true,
+        "global_message_is_true": false
+      },
+      "policy": {
+        "key": "app/services/ingest_pipeline.py::_broadcast_realtime::broadcast_realtime#1",
+        "source": "app/services/ingest_pipeline.py",
+        "owner": "_broadcast_realtime",
+        "call": "broadcast_realtime",
+        "channel": "realtime",
+        "scope": "SITE",
+        "resolver": "site.id",
+        "tests": [
+          "AUTHZ-INVENTORY-WS-PRODUCER-01"
+        ]
+      }
+    },
+    {
+      "discovered": {
+        "key": "app/services/precool/rollback_manager.py::RollbackManager._trigger_rollback::broadcast_alarm#1",
+        "source": "app/services/precool/rollback_manager.py",
+        "owner": "RollbackManager._trigger_rollback",
+        "call": "broadcast_alarm",
+        "channel": "alarms",
+        "has_site_id": true,
+        "global_message_is_true": false
+      },
+      "policy": {
+        "key": "app/services/precool/rollback_manager.py::RollbackManager._trigger_rollback::broadcast_alarm#1",
+        "source": "app/services/precool/rollback_manager.py",
+        "owner": "RollbackManager._trigger_rollback",
+        "call": "broadcast_alarm",
+        "channel": "alarms",
+        "scope": "SITE",
+        "resolver": "site.id",
+        "tests": [
+          "AUTHZ-INVENTORY-WS-PRODUCER-01"
+        ]
+      }
+    },
+    {
+      "discovered": {
+        "key": "app/services/precool/rollback_manager.py::RollbackManager._execute_recovery::broadcast_alarm#1",
+        "source": "app/services/precool/rollback_manager.py",
+        "owner": "RollbackManager._execute_recovery",
+        "call": "broadcast_alarm",
+        "channel": "alarms",
+        "has_site_id": true,
+        "global_message_is_true": false
+      },
+      "policy": {
+        "key": "app/services/precool/rollback_manager.py::RollbackManager._execute_recovery::broadcast_alarm#1",
+        "source": "app/services/precool/rollback_manager.py",
+        "owner": "RollbackManager._execute_recovery",
+        "call": "broadcast_alarm",
+        "channel": "alarms",
+        "scope": "SITE",
+        "resolver": "site.id",
+        "tests": [
+          "AUTHZ-INVENTORY-WS-PRODUCER-01"
+        ]
+      }
+    }
+  ]
+}
