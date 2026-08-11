@@ -18599,7 +18599,7 @@
             "schema": {
               "anyOf": [
                 {
-                  "$ref": "#/components/schemas/ApprovalStatus"
+                  "$ref": "#/components/schemas/app__models__operation__ApprovalStatus"
                 },
                 {
                   "type": "null"
@@ -22566,7 +22566,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/app__schemas__energy__DashboardResponse"
+                  "$ref": "#/components/schemas/DashboardResponse"
                 }
               }
             }
@@ -45256,7 +45256,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DashboardResponse"
+                  "$ref": "#/components/schemas/app__schemas__predictive_maintenance__DashboardResponse"
                 }
               }
             }
@@ -47668,14 +47668,12 @@
       "ApprovalStatus": {
         "type": "string",
         "enum": [
-          "待审批",
-          "已批准",
-          "已驳回",
-          "已超时",
-          "已升级"
+          "pending",
+          "approved",
+          "rejected"
         ],
         "title": "ApprovalStatus",
-        "description": "审批状态枚举"
+        "description": "Approval status - 审批状态"
       },
       "ApproveRequest": {
         "properties": {
@@ -54021,24 +54019,40 @@
       },
       "DashboardResponse": {
         "properties": {
-          "summary": {
-            "$ref": "#/components/schemas/DashboardSummary"
+          "summary_cards": {
+            "$ref": "#/components/schemas/DashboardSummaryCards"
           },
-          "devices": {
+          "opportunities": {
             "items": {
-              "$ref": "#/components/schemas/DeviceHealthItem"
+              "$ref": "#/components/schemas/OpportunitySummary"
             },
             "type": "array",
-            "title": "Devices"
+            "title": "Opportunities"
+          },
+          "by_category": {
+            "additionalProperties": {
+              "items": {
+                "$ref": "#/components/schemas/OpportunitySummary"
+              },
+              "type": "array"
+            },
+            "type": "object",
+            "title": "By Category"
+          },
+          "total_count": {
+            "type": "integer",
+            "title": "Total Count"
           }
         },
         "type": "object",
         "required": [
-          "summary",
-          "devices"
+          "summary_cards",
+          "opportunities",
+          "by_category",
+          "total_count"
         ],
         "title": "DashboardResponse",
-        "description": "仪表盘响应"
+        "description": "机会仪表盘响应"
       },
       "DashboardSummary": {
         "properties": {
@@ -78406,7 +78420,7 @@
       "ShiftPlanApproval": {
         "properties": {
           "approval_status": {
-            "$ref": "#/components/schemas/app__schemas__load_shift__ApprovalStatus",
+            "$ref": "#/components/schemas/ApprovalStatus",
             "description": "审批状态"
           },
           "approval_comment": {
@@ -78647,7 +78661,7 @@
             "$ref": "#/components/schemas/ShiftPlanStatus"
           },
           "approval_status": {
-            "$ref": "#/components/schemas/app__schemas__load_shift__ApprovalStatus"
+            "$ref": "#/components/schemas/ApprovalStatus"
           },
           "execution_status": {
             "$ref": "#/components/schemas/ExecutionStatus"
@@ -78930,7 +78944,7 @@
             "$ref": "#/components/schemas/ShiftPlanStatus"
           },
           "approval_status": {
-            "$ref": "#/components/schemas/app__schemas__load_shift__ApprovalStatus"
+            "$ref": "#/components/schemas/ApprovalStatus"
           },
           "execution_status": {
             "$ref": "#/components/schemas/ExecutionStatus"
@@ -85244,7 +85258,7 @@
             "description": "审批人"
           },
           "status": {
-            "$ref": "#/components/schemas/ApprovalStatus",
+            "$ref": "#/components/schemas/app__models__operation__ApprovalStatus",
             "description": "审批状态",
             "default": "待审批"
           },
@@ -86081,52 +86095,38 @@
         "title": "RejectRequest",
         "description": "拒绝请求"
       },
-      "app__schemas__energy__DashboardResponse": {
+      "app__models__operation__ApprovalStatus": {
+        "type": "string",
+        "enum": [
+          "待审批",
+          "已批准",
+          "已驳回",
+          "已超时",
+          "已升级"
+        ],
+        "title": "ApprovalStatus",
+        "description": "审批状态枚举"
+      },
+      "app__schemas__predictive_maintenance__DashboardResponse": {
         "properties": {
-          "summary_cards": {
-            "$ref": "#/components/schemas/DashboardSummaryCards"
+          "summary": {
+            "$ref": "#/components/schemas/DashboardSummary"
           },
-          "opportunities": {
+          "devices": {
             "items": {
-              "$ref": "#/components/schemas/OpportunitySummary"
+              "$ref": "#/components/schemas/DeviceHealthItem"
             },
             "type": "array",
-            "title": "Opportunities"
-          },
-          "by_category": {
-            "additionalProperties": {
-              "items": {
-                "$ref": "#/components/schemas/OpportunitySummary"
-              },
-              "type": "array"
-            },
-            "type": "object",
-            "title": "By Category"
-          },
-          "total_count": {
-            "type": "integer",
-            "title": "Total Count"
+            "title": "Devices"
           }
         },
         "type": "object",
         "required": [
-          "summary_cards",
-          "opportunities",
-          "by_category",
-          "total_count"
+          "summary",
+          "devices"
         ],
         "title": "DashboardResponse",
-        "description": "机会仪表盘响应"
-      },
-      "app__schemas__load_shift__ApprovalStatus": {
-        "type": "string",
-        "enum": [
-          "pending",
-          "approved",
-          "rejected"
-        ],
-        "title": "ApprovalStatus",
-        "description": "Approval status - 审批状态"
+        "description": "仪表盘响应"
       }
     },
     "securitySchemes": {

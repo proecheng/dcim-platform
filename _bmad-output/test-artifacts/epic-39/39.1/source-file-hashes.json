@@ -1,15 +1,15 @@
 {
-  "generated_at_utc": "2026-08-11T03:59:01.314179Z",
+  "generated_at_utc": "2026-08-11T07:21:21.398408Z",
   "scope": "Story 39.1 implementation and test files changed since the baseline commit",
-  "git_sha": "14c04b21311fd07a212a55696a866a1f6cdaadf8",
+  "git_sha": "d97f400e0fad45341178fa93ea0d677154bcbf5b",
   "working_tree_dirty": false,
-  "source_snapshot_sha256": "3e7df5c0a716d11d0eea4d7a642a1171c3188f96ff92d4d503c8856beec4140d",
-  "file_count": 99,
+  "source_snapshot_sha256": "3ad6f5b0d0e45e4e38ae8f48208b91db9873a11d84f1984dd8849ad9ece79645",
+  "file_count": 123,
   "files": [
     {
       "path": "_bmad-output/implementation-artifacts/39-1-site-isolation-and-websocket-authorization.md",
-      "size_bytes": 37597,
-      "sha256": "c8e034581dd7c566e08fd96f587c2d967312761b3daaf646c605bcce9b9602c8"
+      "size_bytes": 40234,
+      "sha256": "5ba5f5b212c0084e8d32ef46bcbbc22f5219b54f620c85a4d3dadd671ee110c3"
     },
     {
       "path": "backend/.dockerignore",
@@ -277,6 +277,11 @@
       "sha256": "47110eb7d84f1a5fc527934f70876fac759ecd54ab1d205b35c212e482162e59"
     },
     {
+      "path": "backend/tests/api/test_audit_fix_coverage.py",
+      "size_bytes": 21584,
+      "sha256": "44193a4beed24cbee65ce12480e3e3c9d30ecf42743dc35cb1418ba878a92b46"
+    },
+    {
       "path": "backend/tests/api/test_core_modules_coverage.py",
       "size_bytes": 50179,
       "sha256": "60a5d44b3d87b225b6092fa06eea00fb81207221fa53ff382147200be8b7bd5c"
@@ -285,6 +290,11 @@
       "path": "backend/tests/api/test_data_quality.py",
       "size_bytes": 6344,
       "sha256": "082a42c7b8063f5271ea8e22ccefe63c7c878f5447d771272777e79c4598885c"
+    },
+    {
+      "path": "backend/tests/api/test_device_coverage.py",
+      "size_bytes": 27239,
+      "sha256": "0352a23d7773e1170ab609039777b1973ff5352ddfd145a7c4de0efb53a6888e"
     },
     {
       "path": "backend/tests/api/test_diagnosis_annotation.py",
@@ -310,6 +320,11 @@
       "path": "backend/tests/api/test_gateway_video_ota_coverage.py",
       "size_bytes": 35232,
       "sha256": "54f78feabac1f032a39448ffc93ba94272e2fd7f9751739866eb76b475ff9471"
+    },
+    {
+      "path": "backend/tests/api/test_operation_coverage.py",
+      "size_bytes": 37056,
+      "sha256": "f055ee5521ad0dc7e1d09021534b55d1633d52fc365744eb28eeab76bd2ca658"
     },
     {
       "path": "backend/tests/api/test_precool.py",
@@ -342,6 +357,36 @@
       "sha256": "860ccf659e78f38eb1946f5d2d745988b6bb0e29c9e203834b9017280a71153e"
     },
     {
+      "path": "backend/tests/api/test_shift_opportunities_coverage.py",
+      "size_bytes": 39777,
+      "sha256": "5063b814f010b42d2c3efe4763d44ae8780fafcd1175c57a0c8c31458264d7e7"
+    },
+    {
+      "path": "backend/tests/api/test_small_modules_coverage.py",
+      "size_bytes": 38819,
+      "sha256": "2412283e3f8ecda55648a3aba1eb77c669885900c244cbba9411e64eef600fb0"
+    },
+    {
+      "path": "backend/tests/api/test_spatial_topology_linkage_coverage.py",
+      "size_bytes": 57781,
+      "sha256": "8f910df0bda4db3680cbba9a1acea1696a6f10a1f5ce23dbed86afb8a88b748e"
+    },
+    {
+      "path": "backend/tests/api/test_time_window_tuning.py",
+      "size_bytes": 13139,
+      "sha256": "20c69e5d1b3ede819182af700fa83e0fe0d02bd6473add07d8d27f61d802ccea"
+    },
+    {
+      "path": "backend/tests/api/test_vpp_dispatch.py",
+      "size_bytes": 12060,
+      "sha256": "9612c5ee32c88c0157ee58a3c4cfa339a76bd56f17c9458a34d44cfbcc364f16"
+    },
+    {
+      "path": "backend/tests/demo/test_integration_flow.py",
+      "size_bytes": 4659,
+      "sha256": "49c7ab443cc55862b7312567d62d2445514155e697d209c04936a89691b21609"
+    },
+    {
       "path": "backend/tests/services/test_counterfactual_boundary.py",
       "size_bytes": 14511,
       "sha256": "135efefbb5a2cab3b0e9994b38438efae208ac3cbefd03fe58a24f82883e4683"
@@ -350,6 +395,11 @@
       "path": "backend/tests/test_alarm_api.py",
       "size_bytes": 12667,
       "sha256": "4117741459509f5335acc3d283d37e5a9d413d73b8364c50e6fa5891aa62a378"
+    },
+    {
+      "path": "backend/tests/test_alarm_workorder_rule.py",
+      "size_bytes": 8374,
+      "sha256": "ee8ddf9fb572f03dd8b2ca4554ee874bd37e67dee3d814c40b39ae1e4a27223a"
     },
     {
       "path": "backend/tests/test_asset_import.py",
@@ -362,6 +412,11 @@
       "sha256": "ce1ef252365fe4c2322ebfd9872f377efc3aa9f75c381954d49e0609a2c0efe3"
     },
     {
+      "path": "backend/tests/test_audit_log.py",
+      "size_bytes": 5286,
+      "sha256": "cdc173880176f4e0b728d714bfac8e0a54d46cb5c0a9204ecb7bf519952ef0a5"
+    },
+    {
       "path": "backend/tests/test_auth_session.py",
       "size_bytes": 5556,
       "sha256": "c4586e8a876c20e4fc9e962deb09b894192a77ecf28d358c018719791769c073"
@@ -370,6 +425,16 @@
       "path": "backend/tests/test_authorization_inventory.py",
       "size_bytes": 3574,
       "sha256": "d903a9e328ae416a2430a7a3b0e85a6496449335f286c73c96112b9efc60141f"
+    },
+    {
+      "path": "backend/tests/test_backup_health.py",
+      "size_bytes": 5060,
+      "sha256": "fc88ef53424b7885880648132f8ad2c404ed249e7c6045841e835fba498a7219"
+    },
+    {
+      "path": "backend/tests/test_capacity_trend.py",
+      "size_bytes": 8937,
+      "sha256": "a7325efa22364d5019052a2c31aef54d61f67cf6eaa0734e24a0e757e2364d0f"
     },
     {
       "path": "backend/tests/test_command.py",
@@ -397,6 +462,26 @@
       "sha256": "8bdb7259dc87e3c6c8f701f142b01128940e85c3fef32acede05f5848899615b"
     },
     {
+      "path": "backend/tests/test_effect_tracker.py",
+      "size_bytes": 17352,
+      "sha256": "263c42b859b994b71c7fe9a1214032ddf54e6e5ec2722043027bf55efd2c88e7"
+    },
+    {
+      "path": "backend/tests/test_escalation.py",
+      "size_bytes": 14458,
+      "sha256": "211d712dd0ec3d1a4435e1f6f22ef8227b54a970adc9b3574a50270c67578aea"
+    },
+    {
+      "path": "backend/tests/test_fire_protection.py",
+      "size_bytes": 12649,
+      "sha256": "47993966b7eeb175cf58a27127709da535a963f33dd92bc40dcf8d1595863709"
+    },
+    {
+      "path": "backend/tests/test_graceful_degradation.py",
+      "size_bytes": 4125,
+      "sha256": "214f8466522b574c6945342422e553cd8f1e49495797f17757bc201354412e37"
+    },
+    {
       "path": "backend/tests/test_inspection.py",
       "size_bytes": 11225,
       "sha256": "9239fac294586ee70edfe46e41615d3a5b6eb7962fc5b80a5de0f2209655b54a"
@@ -407,6 +492,26 @@
       "sha256": "786f4e7466b1328a7216aae32180a4a0da4055f0842e87c3220c931375b7373a"
     },
     {
+      "path": "backend/tests/test_linkage.py",
+      "size_bytes": 7361,
+      "sha256": "ac0d7ea9fdfe16f5915f1440511cd95bccf01dd64d2829ee44f54b556a7a74a5"
+    },
+    {
+      "path": "backend/tests/test_opportunity_detector.py",
+      "size_bytes": 9563,
+      "sha256": "f0dbb1f56aeb59e3b77789597abd59f4d71ab8d85ea87c031907c40cc75c614c"
+    },
+    {
+      "path": "backend/tests/test_racking_recommendation.py",
+      "size_bytes": 12657,
+      "sha256": "99dcda628a8545a785e94760716df5d2ef5ac35c00d6358c63fe25fce70e7054"
+    },
+    {
+      "path": "backend/tests/test_recovery.py",
+      "size_bytes": 15270,
+      "sha256": "fd3311c64d15574e5f1813e1142ac29a7d7e3c126ce40b22469cc7b7affe8965"
+    },
+    {
       "path": "backend/tests/test_report_auto.py",
       "size_bytes": 15617,
       "sha256": "3b421c6118da6c4ab3525b57d5c4314ab5e051c88fd28ee0748b959f5e038e9f"
@@ -415,6 +520,11 @@
       "path": "backend/tests/test_site_isolation.py",
       "size_bytes": 9141,
       "sha256": "f060e14d5a5e0f2420ae9e5b55355cccc2fc1ab96157161fcc2ad4de520b2c82"
+    },
+    {
+      "path": "backend/tests/test_smart_site_selection.py",
+      "size_bytes": 10042,
+      "sha256": "2e3d7af88beb3d245e72cba3e30cc0145048d088df68f276d6739edf45a3e4f8"
     },
     {
       "path": "backend/tests/test_spatial.py",
@@ -437,9 +547,19 @@
       "sha256": "73ebb8e92e64ef580db99caeed53ba224cc836d1072f91c3c28d5cd00ccc2e2d"
     },
     {
+      "path": "backend/tests/test_timeline.py",
+      "size_bytes": 17099,
+      "sha256": "7887779fa42b0e35c475a9f2271bf2273598e982ab191392b8d6070a29da4a10"
+    },
+    {
       "path": "backend/tests/test_topology_config.py",
       "size_bytes": 18257,
       "sha256": "ea8dadac7384c714ffcce7668af7d3b48d26be2e105af8e8133610a868e2da83"
+    },
+    {
+      "path": "backend/tests/test_user_management.py",
+      "size_bytes": 7900,
+      "sha256": "6ba88a020990e7c8f5a9d6ca5b0f37080f3dafc55237ac7748eef0694ae357db"
     },
     {
       "path": "backend/tests/test_video.py",
