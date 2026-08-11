@@ -1,5 +1,6 @@
 """网关状态监控测试 — Story 2.2"""
 
+import uuid
 from datetime import datetime, timedelta
 
 import pytest_asyncio
@@ -9,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 
 from app.core.database import Base
 from app.models.gateway import Gateway, DataSource, DataSourcePoint, GatewayEvent
+from app.models.user import User, UserSession
 from app.services.gateway_monitor import (
     record_status_change,
     check_resource_warnings,
@@ -20,6 +22,7 @@ from app.services.gateway_registration import (
     handle_gateway_status,
     sign_gateway_payload,
 )
+from tests.conftest import _create_test_token, auth_headers
 
 
 # ============================================================
@@ -219,15 +222,7 @@ class TestGatewayMonitorIntegration:
 async def api_client():
     """创建 API 测试客户端"""
     from app.main import app
-    from app.api.deps import (
-        get_db,
-        require_viewer,
-        require_operator,
-        require_admin,
-        get_current_user,
-        get_user_site_ids,
-    )
-    from app.models.user import User
+    from app.api.deps import get_db
 
     engine = create_async_engine("sqlite+aiosqlite://", echo=True)
     async with engine.begin() as conn:
@@ -238,17 +233,22 @@ async def api_client():
         async with session_factory() as session:
             yield session
 
-    mock_user = User(id=1, username="test", role="admin")
-
     app.dependency_overrides[get_db] = override_get_db
-    app.dependency_overrides[require_viewer] = lambda: mock_user
-    app.dependency_overrides[require_operator] = lambda: mock_user
-    app.dependency_overrides[require_admin] = lambda: mock_user
-    app.dependency_overrides[get_current_user] = lambda: mock_user
-    app.dependency_overrides[get_user_site_ids] = lambda: None
 
     # 预填测试数据
     async with session_factory() as session:
+        admin = User(
+            username="gateway_monitor_admin",
+            password_hash="test-only",
+            real_name="网关监控管理员",
+            role="admin",
+            is_active=True,
+        )
+        session.add(admin)
+        await session.flush()
+        jti = uuid.uuid4().hex
+        session.add(UserSession(user_id=admin.id, token_jti=jti, is_active=True))
+
         gw1 = Gateway(
             gateway_id="gw-api-001",
             name="测试网关A",
@@ -289,7 +289,12 @@ async def api_client():
         session.add(evt)
         await session.commit()
 
-    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+    token = _create_test_token(admin.username, jti)
+    async with AsyncClient(
+        transport=ASGITransport(app=app),
+        base_url="http://test",
+        headers=auth_headers(token),
+    ) as client:
         yield client, session_factory
 
     app.dependency_overrides.clear()

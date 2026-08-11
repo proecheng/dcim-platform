@@ -1,5 +1,7 @@
 """故障影响分析 API 测试 — Story 8-4"""
 
+import uuid
+
 import pytest
 
 from httpx import AsyncClient, ASGITransport
@@ -11,8 +13,9 @@ from app.models.asset import Cabinet, Asset
 from app.models.device import Device
 from app.models.topology_config import PowerPhaseMapping, CoolingZone, CoolingZoneCabinet, CoolingZoneUnit
 from app.models.cooling import CoolingUnit
-from app.models.user import User
-from app.api.deps import get_db, require_viewer
+from app.models.user import User, UserSession
+from app.api.deps import get_db
+from tests.conftest import _create_test_token, auth_headers
 
 
 # ============================================================
@@ -39,6 +42,24 @@ def session_factory(engine):
     return async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
 
+@pytest.fixture(scope="module")
+async def admin_token(session_factory):
+    async with session_factory() as session:
+        admin = User(
+            username="fault_impact_admin",
+            password_hash="test-only",
+            real_name="故障影响管理员",
+            role="admin",
+            is_active=True,
+        )
+        session.add(admin)
+        await session.flush()
+        jti = uuid.uuid4().hex
+        session.add(UserSession(user_id=admin.id, token_jti=jti, is_active=True))
+        await session.commit()
+        return _create_test_token(admin.username, jti)
+
+
 @pytest.fixture
 async def db_session(session_factory):
     async with session_factory() as session:
@@ -55,35 +76,25 @@ async def db_session(session_factory):
 
 
 @pytest.fixture
-def mock_viewer():
-    user = User()
-    user.id = 1
-    user.username = "test_viewer"
-    user.role = "viewer"
-    user.is_active = True
-    return user
-
-
-@pytest.fixture
-async def app(db_session, mock_viewer):
+async def app(db_session):
     from app.main import app as _app
 
     async def override_get_db():
         yield db_session
 
-    async def override_require_viewer():
-        return mock_viewer
-
     _app.dependency_overrides[get_db] = override_get_db
-    _app.dependency_overrides[require_viewer] = override_require_viewer
     yield _app
     _app.dependency_overrides.clear()
 
 
 @pytest.fixture
-async def client(app):
+async def client(app, admin_token):
     transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://test") as c:
+    async with AsyncClient(
+        transport=transport,
+        base_url="http://test",
+        headers=auth_headers(admin_token),
+    ) as c:
         yield c
 
 
