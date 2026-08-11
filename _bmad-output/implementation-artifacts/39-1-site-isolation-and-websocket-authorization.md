@@ -406,6 +406,13 @@ GPT-5 Codex
 - Linux CI follow-up green: Replaced the remaining fault-impact and gateway-monitor API dependency bypasses with real admin users, active `UserSession` rows, JTI-bearing JWTs, and authenticated clients. The two focused files passed 17 tests, and the CI-aligned root tail from `test_fault_impact.py` passed 548 tests with 5 skips; Ruff and diff checks passed.
 - Evidence command follow-up: Added both repaired CI regression files to the raw JUnit and Ruff command contract and aligned the recorded Docker commands with the required `--provenance=false` builds before minting a replacement RC.
 - Evidence scope preflight: Excluded generated `backend/coverage.xml` and `backend/reports/` from the backend image context and excluded the coverage XML from Story source-dirty detection, preserving user artifacts without contaminating the RC or source snapshot.
+- Critical E2E CI red: Run `31472542898` passed the complete Linux backend and frontend jobs, then the admin setup timed out on `/login` even though login, active-JTI `/auth/me`, and permissions requests all returned `200`; diagnostics showed cold Vite dependency optimization reloaded during the router transition.
+- Critical E2E fix: Replaced URL-only login synchronization with explicit successful login/current-user responses, persisted-token observation, and a deterministic authenticated `/dashboard` navigation. The setup retains zero retries and uses no fixed waits.
+- Critical E2E preflight red: The hardened setup passed locally along with 11 business checks, while both lazy invalid-detail routes rendered blank during dev-server dependency optimization. This confirmed the cold Vite reload could recur after setup on newly discovered route dependencies.
+- Critical E2E preflight fix: Configured identical API/WS proxies for Vite dev and preview, changed the CI E2E server to a production build plus preview, and added an environment-overridable Playwright base URL for isolated verification. This removes runtime dependency optimization from the gate instead of adding retries.
+- Evidence snapshot scope follow-up: Added the CI workflow, Vite preview configuration, and authenticated browser setup to Story source hashing so replacement evidence covers the complete critical-E2E fix.
+- Critical E2E preview green: With `CI=1` and `E2E_BASE_URL=http://127.0.0.1:3001`, the exact CI selection passed all 14 zero-retry tests in 29.6 seconds, including both lazy invalid-detail routes; the isolated preview was then stopped and port 3001 released.
+- Frontend regression follow-up: The default Windows worker fan-out twice exhausted the pre-existing 5-second limit while importing the first `useAlarm` test; that file passed 11/11 in isolation, and the unchanged full suite passed 1,706/1,706 with four bounded local workers. The CI command remains unchanged because the Linux frontend job already passed with its default scheduling.
 
 ### Implementation Plan
 
@@ -426,6 +433,11 @@ GPT-5 Codex
 - Linux CI follow-up: Repaired the final two API fixtures that still bypassed strict identity dependencies. Both now authenticate through real active JTI sessions; the focused and post-failure CI tail regressions pass without changing production authorization. Task 8.4 and the production gate remain blocked pending independent Charlie/Dana approval.
 - Evidence command follow-up: Bound the repaired CI regressions into the generated raw test artifact and made the manifest's image build commands match the provenance-disabled RC procedure.
 - Evidence scope preflight: Hardened Docker and source-snapshot exclusions for generated coverage/report outputs so replacement RC evidence binds only implementation sources.
+- Critical E2E follow-up: Hardened admin setup against cold Vite dependency-optimization reloads while still requiring successful server authentication and active-session validation before saving browser state.
+- Critical E2E server follow-up: Moved the gate from cold `vite dev` to built `vite preview` with the same API/WS proxy contract, eliminating route-level optimizer reloads for all critical pages.
+- Evidence snapshot scope follow-up: Bound the CI workflow, preview proxy configuration, and authentication setup into the source snapshot used by the replacement RC evidence.
+- Critical E2E verification: Passed the complete CI browser selection against an isolated production preview with 14/14 tests and zero retries, then removed the temporary preview process without affecting the existing development services.
+- Frontend regression verification: Build, typecheck, full lint, and all 1,706 Vitest cases passed; local Windows workers were bounded to four after the default fan-out hit an import-time timeout, without changing product code or the CI command.
 
 ### File List
 
@@ -550,7 +562,10 @@ GPT-5 Codex
 - `frontend/src/composables/useWebSocketManager.ts`
 - `frontend/src/__tests__/api/websocket-auth.test.ts`
 - `e2e/site-isolation-websocket-authorization.spec.ts`
+- `e2e/auth.setup.ts`
 - `playwright.config.ts`
+- `.github/workflows/ci.yml`
+- `frontend/vite.config.ts`
 - `scripts/story_39_1_evidence.py`
 - `scripts/story_39_1_manifest.schema.json`
 - `_bmad-output/test-artifacts/epic-39/39.1/authorization-inventory.yaml`
@@ -570,6 +585,10 @@ GPT-5 Codex
 
 ## Change Log
 
+- 2026-08-11: Verified the complete 14-test critical E2E gate against an isolated production preview with zero retries.
+- 2026-08-11: Expanded Story source hashing to cover every file in the critical E2E preview fix before replacement RC evidence generation.
+- 2026-08-11: Replaced the critical E2E cold dev server with a proxied production preview after route-level optimizer reloads blanked lazy detail pages.
+- 2026-08-11: Made the critical E2E admin setup deterministic under cold Vite optimization without retries or fixed waits after Linux backend/frontend jobs passed.
 - 2026-08-11: Excluded generated coverage and report outputs from the backend RC context and Story source-dirty calculation.
 - 2026-08-11: Added the repaired CI regression files to the evidence command contract and corrected recorded RC build commands before issuing the replacement evidence package.
 - 2026-08-11: Replaced the final fault-impact and gateway-monitor API auth bypasses with real active-JTI clients; 17 focused and 548 CI-tail tests passed, while Task 8.4 remains pending and `BLOCKED`.

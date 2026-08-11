@@ -5,6 +5,17 @@ import Components from 'unplugin-vue-components/vite'
 import { ElementPlusResolver } from 'unplugin-vue-components/resolvers'
 import path from 'path'
 
+const proxy = {
+  '/api': {
+    target: 'http://127.0.0.1:8080',
+    changeOrigin: true
+  },
+  '/ws': {
+    target: 'ws://127.0.0.1:8080',
+    ws: true
+  }
+}
+
 export default defineConfig({
   plugins: [
     vue(),
@@ -38,15 +49,12 @@ export default defineConfig({
     port: 3000,
     host: '0.0.0.0',
     allowedHosts: ['powerlab.cn', 'localhost', '127.0.0.1'],
-    proxy: {
-      '/api': {
-        target: 'http://127.0.0.1:8080',
-        changeOrigin: true
-      },
-      '/ws': {
-        target: 'ws://127.0.0.1:8080',
-        ws: true
-      }
-    }
+    proxy
+  },
+  preview: {
+    port: 3000,
+    host: '0.0.0.0',
+    allowedHosts: ['powerlab.cn', 'localhost', '127.0.0.1'],
+    proxy
   }
 })

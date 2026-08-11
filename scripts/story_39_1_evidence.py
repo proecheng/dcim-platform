@@ -93,10 +93,13 @@ def _is_story_source(path: str) -> bool:
     if path.startswith("backend/"):
         return path != "backend/coverage.xml" and not path.startswith(("backend/reports/", "backend/.pytest_cache/"))
     return path in {
+        ".github/workflows/ci.yml",
         "frontend/src/api/websocket.ts",
         "frontend/src/composables/useWebSocket.ts",
         "frontend/src/composables/useWebSocketManager.ts",
         "frontend/src/__tests__/api/websocket-auth.test.ts",
+        "frontend/vite.config.ts",
+        "e2e/auth.setup.ts",
         "e2e/site-isolation-websocket-authorization.spec.ts",
         "playwright.config.ts",
         "scripts/story_39_1_evidence.py",

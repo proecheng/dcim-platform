@@ -170,7 +170,9 @@ jobs:
 
       - name: 启动前端
         working-directory: frontend
-        run: nohup npm run dev -- --host 127.0.0.1 --port 3000 > ../frontend-ci.log 2>&1 &
+        run: |
+          npm run build
+          nohup npm run preview -- --host 127.0.0.1 --port 3000 > ../frontend-ci.log 2>&1 &
 
       - name: 等待服务就绪
         run: |

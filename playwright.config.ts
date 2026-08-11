@@ -1,13 +1,14 @@
 import { defineConfig } from '@playwright/test'
 
 const isCI = !!process.env.CI
+const baseURL = process.env.E2E_BASE_URL || 'http://127.0.0.1:3000'
 
 export default defineConfig({
   testDir: './e2e',
   timeout: 60000,
   retries: 0,
   use: {
-    baseURL: 'http://127.0.0.1:3000',
+    baseURL,
     screenshot: 'only-on-failure',
     trace: 'retain-on-failure',
   },
