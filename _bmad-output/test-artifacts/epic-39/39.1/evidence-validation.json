@@ -1,5 +1,5 @@
 {
-  "validated_at_utc": "2026-08-11T08:15:38.745747Z",
+  "validated_at_utc": "2026-08-11T09:18:44.056647Z",
   "schema": "PASS",
   "path_and_hash_checks": "PASS",
   "artifact_count": 12,
@@ -12,62 +12,62 @@
     },
     {
       "path": "_bmad-output/test-artifacts/epic-39/39.1/authorization-inventory-diff.json",
-      "sha256": "a00d9a7d0d2e4d5d90777a4bca7f7dbac42471eb5b68706b645a880b116622b8",
+      "sha256": "8c830d0fff15fa4a8628ccae41d7cca5689f93b9a753216fef5a230c643b3302",
       "size_bytes": 118840,
       "status": "PASS"
     },
     {
       "path": "_bmad-output/test-artifacts/epic-39/39.1/openapi-authz-snapshot.json",
-      "sha256": "080d11e4e7a91dd0fae5197e669a52e5a50755dcf8ef9fef88c67ef25db7fe47",
-      "size_bytes": 2332056,
+      "sha256": "c870aa7d5dfd87ea677c17e27547af27cd24e92b89e511d5ad870fd7f15e5a4b",
+      "size_bytes": 2332024,
       "status": "PASS"
     },
     {
       "path": "_bmad-output/test-artifacts/epic-39/39.1/websocket-producer-inventory.json",
-      "sha256": "7f78c40edb49e97bc393de6653734c39fbe1f339ecec34646913134bed9b9b93",
+      "sha256": "ca718ade7329a52dc13cab348d28b305357dff6a4e6516add879dc0f5854a732",
       "size_bytes": 24055,
       "status": "PASS"
     },
     {
       "path": "_bmad-output/test-artifacts/epic-39/39.1/http-authz-matrix-results.json",
-      "sha256": "590bad93214c78031dd074d5d0fc110e1873e02b9d860d98073dc0c4bbaf3330",
-      "size_bytes": 7218,
+      "sha256": "538edcbbbdde2df42b953b5955d3758b57f806ede4afb10c64f102973021cae4",
+      "size_bytes": 7217,
       "status": "PASS"
     },
     {
       "path": "_bmad-output/test-artifacts/epic-39/39.1/websocket-authz-matrix-results.json",
-      "sha256": "5669b42a2a5cbacc59f63bbcd69d834816423e4bb0d883611b70d1b03ff8d85e",
-      "size_bytes": 8280,
+      "sha256": "57d6d6b8a6f66737956b1b2b0f8d23a9774b5eee7295eedb04edac21e4832c95",
+      "size_bytes": 8283,
       "status": "PASS"
     },
     {
       "path": "_bmad-output/test-artifacts/epic-39/39.1/pytest-authz.xml",
-      "sha256": "5b42332183f0cc5c0bd3dea607861cd0de80fc3a779ff60e2552c3d05ba9efaa",
-      "size_bytes": 25676,
+      "sha256": "803955e5bb5f7d26917e8b8f3297b62d915c29fa172782330403fa4e1863f6b4",
+      "size_bytes": 25675,
       "status": "PASS"
     },
     {
       "path": "_bmad-output/test-artifacts/epic-39/39.1/playwright-authz-results.json",
-      "sha256": "a90c704c0676ba77391d8a71b80dc29a4e13920bc675b0a15ecc87ccba868a45",
-      "size_bytes": 17026,
+      "sha256": "9ba7cbef697ba24bd3f6af744fe891acc0ec70a93d8d6988a87e046312cf3feb",
+      "size_bytes": 17025,
       "status": "PASS"
     },
     {
       "path": "_bmad-output/test-artifacts/epic-39/39.1/vitest-websocket-results.json",
-      "sha256": "ceeebea6411606881ad6ee93ef51a8ffc67f317ee22453bf2bfbc4a24909bc6e",
-      "size_bytes": 11127,
+      "sha256": "5676392c7dc61f5a443bffe39afb0328ea398dbf715181588cfbaf77b701316c",
+      "size_bytes": 11133,
       "status": "PASS"
     },
     {
       "path": "_bmad-output/test-artifacts/epic-39/39.1/environment-fingerprint.json",
-      "sha256": "daffc049d8d83648c46d84991895d490b6c8b737a3046d78c6b59362f0386bba",
+      "sha256": "818a49f03a4bb2aa852295d53841a4a071919b9afb932f4fb1591ded4c42f574",
       "size_bytes": 607,
       "status": "PASS"
     },
     {
       "path": "_bmad-output/test-artifacts/epic-39/39.1/source-file-hashes.json",
-      "sha256": "45b8c94d4fb1af3dc7b89095c205709a1a8d67e78e38279683f9ee77fd8a1fe8",
-      "size_bytes": 23179,
+      "sha256": "c6b5260b8791ca2903f6a969c3a8222565b07d6b8d64820282f70122dd3bdda2",
+      "size_bytes": 23678,
       "status": "PASS"
     },
     {
@@ -78,7 +78,7 @@
     }
   ],
   "source_files": "PASS",
-  "source_file_count": 125,
+  "source_file_count": 128,
   "automated_evidence": "PASS",
   "pending_approvals": [
     "security",

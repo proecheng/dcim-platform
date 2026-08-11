@@ -1,5 +1,5 @@
 {
-  "generated_at_utc": "2026-08-11T08:14:21.193128Z",
+  "generated_at_utc": "2026-08-11T09:18:29.853718Z",
   "matrix": "WebSocket authorization and revocation",
   "result": "PASS",
   "total": 39,
@@ -9,37 +9,37 @@
     {
       "classname": "tests.test_websocket_authorization",
       "name": "test_site_broadcast_only_reaches_authorized_connections",
-      "duration_seconds": 0.004,
+      "duration_seconds": 0.003,
       "status": "PASS"
     },
     {
       "classname": "tests.test_websocket_authorization",
       "name": "test_site_broadcast_without_trusted_site_is_rejected",
-      "duration_seconds": 0.008,
+      "duration_seconds": 0.003,
       "status": "PASS"
     },
     {
       "classname": "tests.test_websocket_authorization",
       "name": "test_role_filter_is_enforced_by_server",
-      "duration_seconds": 0.007,
+      "duration_seconds": 0.003,
       "status": "PASS"
     },
     {
       "classname": "tests.test_websocket_authorization",
       "name": "test_subscription_cannot_expand_site_or_channel_scope",
-      "duration_seconds": 0.006,
+      "duration_seconds": 0.002,
       "status": "PASS"
     },
     {
       "classname": "tests.test_websocket_authorization",
       "name": "test_subscription_filters_point_area_alarm_level_and_site",
-      "duration_seconds": 0.028,
+      "duration_seconds": 0.002,
       "status": "PASS"
     },
     {
       "classname": "tests.test_websocket_authorization",
       "name": "test_malformed_subscription_messages_are_rejected[None]",
-      "duration_seconds": 0.002,
+      "duration_seconds": 0.001,
       "status": "PASS"
     },
     {
@@ -51,7 +51,7 @@
     {
       "classname": "tests.test_websocket_authorization",
       "name": "test_malformed_subscription_messages_are_rejected[message2]",
-      "duration_seconds": 0.002,
+      "duration_seconds": 0.001,
       "status": "PASS"
     },
     {
@@ -63,7 +63,7 @@
     {
       "classname": "tests.test_websocket_authorization",
       "name": "test_malformed_subscription_messages_are_rejected[message4]",
-      "duration_seconds": 0.002,
+      "duration_seconds": 0.001,
       "status": "PASS"
     },
     {
@@ -87,31 +87,31 @@
     {
       "classname": "tests.test_websocket_authorization",
       "name": "test_failed_send_removes_connection_from_snapshot",
-      "duration_seconds": 0.027,
+      "duration_seconds": 0.003,
       "status": "PASS"
     },
     {
       "classname": "tests.test_websocket_authorization",
       "name": "test_revalidation_revocation_does_not_send_from_stale_snapshot",
-      "duration_seconds": 0.004,
+      "duration_seconds": 0.023,
       "status": "PASS"
     },
     {
       "classname": "tests.test_websocket_authorization",
       "name": "test_inventory_producers_declare_explicit_runtime_scope",
-      "duration_seconds": 3.847,
+      "duration_seconds": 3.653,
       "status": "PASS"
     },
     {
       "classname": "tests.test_websocket_authorization",
       "name": "test_jti_invalidation_closes_and_removes_connection",
-      "duration_seconds": 0.005,
+      "duration_seconds": 0.004,
       "status": "PASS"
     },
     {
       "classname": "tests.test_websocket_authorization",
       "name": "test_websocket_token_returns_full_active_session_context",
-      "duration_seconds": 0.935,
+      "duration_seconds": 0.958,
       "status": "PASS"
     },
     {
@@ -129,13 +129,13 @@
     {
       "classname": "tests.test_websocket_authorization",
       "name": "test_websocket_route_rejects_malformed_first_frame[None]",
-      "duration_seconds": 0.01,
+      "duration_seconds": 0.011,
       "status": "PASS"
     },
     {
       "classname": "tests.test_websocket_authorization",
       "name": "test_websocket_route_rejects_malformed_first_frame[frame1]",
-      "duration_seconds": 0.013,
+      "duration_seconds": 0.01,
       "status": "PASS"
     },
     {
@@ -147,7 +147,7 @@
     {
       "classname": "tests.test_websocket_authorization",
       "name": "test_websocket_route_rejects_malformed_first_frame[frame3]",
-      "duration_seconds": 0.01,
+      "duration_seconds": 0.009,
       "status": "PASS"
     },
     {
@@ -159,7 +159,7 @@
     {
       "classname": "tests.test_websocket_authorization",
       "name": "test_websocket_route_rejects_failed_authentication",
-      "duration_seconds": 0.011,
+      "duration_seconds": 0.012,
       "status": "PASS"
     },
     {
@@ -171,73 +171,73 @@
     {
       "classname": "tests.test_websocket_authorization",
       "name": "test_websocket_route_rejects_post_auth_scope_violations[message0]",
-      "duration_seconds": 0.012,
+      "duration_seconds": 0.011,
       "status": "PASS"
     },
     {
       "classname": "tests.test_websocket_authorization",
       "name": "test_websocket_route_rejects_post_auth_scope_violations[message1]",
-      "duration_seconds": 0.014,
+      "duration_seconds": 0.011,
       "status": "PASS"
     },
     {
       "classname": "tests.test_websocket_authorization",
       "name": "test_websocket_route_rejects_post_auth_scope_violations[message2]",
-      "duration_seconds": 0.02,
+      "duration_seconds": 0.012,
       "status": "PASS"
     },
     {
       "classname": "tests.test_websocket_authorization",
       "name": "test_websocket_route_rejects_post_auth_scope_violations[message3]",
-      "duration_seconds": 0.013,
+      "duration_seconds": 0.014,
       "status": "PASS"
     },
     {
       "classname": "tests.test_websocket_authorization",
       "name": "test_logout_commit_invalidates_current_jti",
-      "duration_seconds": 0.975,
+      "duration_seconds": 0.948,
       "status": "PASS"
     },
     {
       "classname": "tests.test_websocket_authorization",
       "name": "test_site_replacement_commit_invalidates_target_user",
-      "duration_seconds": 1.224,
+      "duration_seconds": 1.288,
       "status": "PASS"
     },
     {
       "classname": "tests.test_websocket_authorization",
       "name": "test_broadcast_revalidation_blocks_revoked_session",
-      "duration_seconds": 0.972,
+      "duration_seconds": 0.948,
       "status": "PASS"
     },
     {
       "classname": "tests.test_websocket_authorization",
       "name": "test_concurrent_session_eviction_invalidates_old_connection",
-      "duration_seconds": 1.791,
+      "duration_seconds": 1.774,
       "status": "PASS"
     },
     {
       "classname": "tests.test_websocket_authorization",
       "name": "test_user_authorization_mutations_invalidate_connections[role]",
-      "duration_seconds": 1.222,
+      "duration_seconds": 1.245,
       "status": "PASS"
     },
     {
       "classname": "tests.test_websocket_authorization",
       "name": "test_user_authorization_mutations_invalidate_connections[disable]",
-      "duration_seconds": 1.229,
+      "duration_seconds": 1.192,
       "status": "PASS"
     },
     {
       "classname": "tests.test_websocket_authorization",
       "name": "test_user_authorization_mutations_invalidate_connections[delete]",
-      "duration_seconds": 1.22,
+      "duration_seconds": 1.261,
       "status": "PASS"
     },
     {
       "classname": "tests.test_websocket_authorization",
       "name": "test_invalidation_failure_does_not_rollback_committed_role_change",
-      "duration_seconds": 1.254,
+      "duration_seconds": 1.209,
       "status": "PASS"
     }
   ]

@@ -1,15 +1,20 @@
 {
-  "generated_at_utc": "2026-08-11T08:13:59.226688Z",
+  "generated_at_utc": "2026-08-11T09:18:10.478581Z",
   "scope": "Story 39.1 implementation and test files changed since the baseline commit",
-  "git_sha": "e64720be44f8e2e65ca7efd25cbd2a5a7ba87827",
+  "git_sha": "09251c8f4cc38dcd38d39d7f210411c14e786470",
   "working_tree_dirty": false,
-  "source_snapshot_sha256": "d368a2945ad81637ffb86343ede3d5dccdfdb9625b6168baaaa64f805fbc8508",
-  "file_count": 125,
+  "source_snapshot_sha256": "dff7dd647c3bc059ecb0b9b2cd234c978443c444a406ef1a5a37ff6ca3036f88",
+  "file_count": 128,
   "files": [
     {
+      "path": ".github/workflows/ci.yml",
+      "size_bytes": 5753,
+      "sha256": "285d4f6cc90c9f69056077fc8c5d947a1cea4d5d295f8ff4fe98fa77aa537b5a"
+    },
+    {
       "path": "_bmad-output/implementation-artifacts/39-1-site-isolation-and-websocket-authorization.md",
-      "size_bytes": 42657,
-      "sha256": "945f50ce889a26610307dcab40e7d0687adcd3aa3f4572eb2105c0e7e4c9d096"
+      "size_bytes": 46422,
+      "sha256": "249fb618cb507a86cdb3db50a622b5af3cb2e788dc818c4d7d8dd19eb1df428b"
     },
     {
       "path": "backend/.dockerignore",
@@ -592,6 +597,11 @@
       "sha256": "a6f9158a89e3339269b2923a2a7020274a6ad48ea11c1e8485e848b825d875bb"
     },
     {
+      "path": "e2e/auth.setup.ts",
+      "size_bytes": 1585,
+      "sha256": "4837825773ef124359390cf469d062c1f6025559e35b033e9a95138a887442c7"
+    },
+    {
       "path": "e2e/site-isolation-websocket-authorization.spec.ts",
       "size_bytes": 10141,
       "sha256": "928e81615bcef2299e3c2182c86f0ec564708a8045bea75d9cdceed36f237f8b"
@@ -617,14 +627,19 @@
       "sha256": "1fa4b354270ee2b1a4b1514d534dc8dda0bcd754609f9bc262e5e201e4b8e792"
     },
     {
+      "path": "frontend/vite.config.ts",
+      "size_bytes": 1337,
+      "sha256": "cf24e67a9397d9372221b400c4e3fc047ad16e6a5fd66dda81b838d481660797"
+    },
+    {
       "path": "playwright.config.ts",
-      "size_bytes": 692,
-      "sha256": "7a2ad57f549695af2db2f5a6764532a784d4a7f564be6baa523010dfbdd000e6"
+      "size_bytes": 735,
+      "sha256": "2b0f61d8018f1658fde38cb7dba4293fffb86c1f3b5155a6fa947af73137c1b0"
     },
     {
       "path": "scripts/story_39_1_evidence.py",
-      "size_bytes": 32140,
-      "sha256": "ba6e3f8a5b558addf293490e09e448800cfc97857946fd280c158f833ae5a460"
+      "size_bytes": 32240,
+      "sha256": "c23561e82edb56a8c3262fb0963917c4cbe4280ff09188d563edea0480b24b7d"
     },
     {
       "path": "scripts/story_39_1_manifest.schema.json",

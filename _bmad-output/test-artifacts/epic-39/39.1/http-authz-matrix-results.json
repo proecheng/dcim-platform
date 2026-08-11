@@ -1,5 +1,5 @@
 {
-  "generated_at_utc": "2026-08-11T08:14:21.193128Z",
+  "generated_at_utc": "2026-08-11T09:18:29.853718Z",
   "matrix": "HTTP authorization and inventory",
   "result": "PASS",
   "total": 36,
@@ -9,85 +9,85 @@
     {
       "classname": "tests.test_authorization_inventory",
       "name": "test_checked_in_inventory_matches_runtime_surface",
-      "duration_seconds": 12.633,
+      "duration_seconds": 5.467,
       "status": "PASS"
     },
     {
       "classname": "tests.test_authorization_inventory",
       "name": "test_candidate_builder_preserves_reviewed_http_classifications",
-      "duration_seconds": 3.148,
+      "duration_seconds": 2.151,
       "status": "PASS"
     },
     {
       "classname": "tests.test_authorization_inventory",
       "name": "test_missing_runtime_route_is_rejected",
-      "duration_seconds": 4.048,
+      "duration_seconds": 2.163,
       "status": "PASS"
     },
     {
       "classname": "tests.test_authorization_inventory",
       "name": "test_duplicate_policy_key_is_rejected",
-      "duration_seconds": 3.644,
+      "duration_seconds": 2.478,
       "status": "PASS"
     },
     {
       "classname": "tests.test_authorization_inventory",
       "name": "test_unknown_access_type_is_rejected",
-      "duration_seconds": 2.94,
+      "duration_seconds": 2.28,
       "status": "PASS"
     },
     {
       "classname": "tests.test_authorization_inventory",
       "name": "test_stale_policy_is_rejected",
-      "duration_seconds": 3.216,
+      "duration_seconds": 2.57,
       "status": "PASS"
     },
     {
       "classname": "tests.test_authorization_inventory",
       "name": "test_missing_test_mapping_is_rejected",
-      "duration_seconds": 2.744,
+      "duration_seconds": 2.122,
       "status": "PASS"
     },
     {
       "classname": "tests.test_authorization_inventory",
       "name": "test_site_policy_without_resolver_is_rejected",
-      "duration_seconds": 2.759,
+      "duration_seconds": 2.208,
       "status": "PASS"
     },
     {
       "classname": "tests.test_authorization_inventory",
       "name": "test_unclassified_channel_is_rejected",
-      "duration_seconds": 3.56,
+      "duration_seconds": 2.737,
       "status": "PASS"
     },
     {
       "classname": "tests.test_authorization_inventory",
       "name": "test_unclassified_websocket_endpoint_is_rejected",
-      "duration_seconds": 3.23,
+      "duration_seconds": 2.222,
       "status": "PASS"
     },
     {
       "classname": "tests.test_authorization_inventory",
       "name": "test_unclassified_broadcast_producer_is_rejected",
-      "duration_seconds": 2.931,
+      "duration_seconds": 2.149,
       "status": "PASS"
     },
     {
       "classname": "tests.test_story_39_1",
       "name": "test_protected_http_rejects_token_without_jti",
-      "duration_seconds": 3.086,
+      "duration_seconds": 2.463,
       "status": "PASS"
     },
     {
       "classname": "tests.test_story_39_1",
       "name": "test_active_jti_must_belong_to_token_user",
-      "duration_seconds": 1.015,
+      "duration_seconds": 0.725,
       "status": "PASS"
     },
     {
       "classname": "tests.test_story_39_1",
       "name": "test_site_access_context_distinguishes_admin_and_empty_scope",
-      "duration_seconds": 0.787,
+      "duration_seconds": 0.709,
       "status": "PASS"
     },
     {
@@ -99,127 +99,127 @@
     {
       "classname": "tests.test_story_39_1",
       "name": "test_scope_and_trusted_direct_indirect_resolvers",
-      "duration_seconds": 0.814,
+      "duration_seconds": 0.71,
       "status": "PASS"
     },
     {
       "classname": "tests.test_story_39_1",
       "name": "test_non_admin_context_loads_real_user_site_rows",
-      "duration_seconds": 0.785,
+      "duration_seconds": 0.708,
       "status": "PASS"
     },
     {
       "classname": "tests.test_story_39_1",
       "name": "test_inventory_gate_authenticates_topology_routes",
-      "duration_seconds": 0.775,
+      "duration_seconds": 0.691,
       "status": "PASS"
     },
     {
       "classname": "tests.test_story_39_1",
       "name": "test_device_http_matrix_is_site_isolated",
-      "duration_seconds": 1.113,
+      "duration_seconds": 1.007,
       "status": "PASS"
     },
     {
       "classname": "tests.test_story_39_1",
       "name": "test_point_http_matrix_uses_device_site",
-      "duration_seconds": 1.174,
+      "duration_seconds": 1.021,
       "status": "PASS"
     },
     {
       "classname": "tests.test_story_39_1",
       "name": "test_alarm_http_matrix_scopes_aggregates_exports_and_batches",
-      "duration_seconds": 1.192,
+      "duration_seconds": 1.014,
       "status": "PASS"
     },
     {
       "classname": "tests.test_story_39_1",
       "name": "test_threshold_realtime_and_history_follow_point_site_scope",
-      "duration_seconds": 1.189,
+      "duration_seconds": 1.466,
       "status": "PASS"
     },
     {
       "classname": "tests.test_story_39_1",
       "name": "test_gateway_datasource_and_spatial_objects_are_site_isolated",
-      "duration_seconds": 1.215,
+      "duration_seconds": 1.156,
       "status": "PASS"
     },
     {
       "classname": "tests.test_story_39_1",
       "name": "test_cooling_objects_and_overview_follow_device_site_scope",
-      "duration_seconds": 1.288,
+      "duration_seconds": 1.066,
       "status": "PASS"
     },
     {
       "classname": "tests.test_story_39_1",
       "name": "test_topology_config_and_precool_follow_trusted_site_relations",
-      "duration_seconds": 1.532,
+      "duration_seconds": 1.225,
       "status": "PASS"
     },
     {
       "classname": "tests.test_story_39_1",
       "name": "test_power_objects_and_aggregates_follow_device_site_scope",
-      "duration_seconds": 1.442,
+      "duration_seconds": 1.132,
       "status": "PASS"
     },
     {
       "classname": "tests.test_story_39_1",
       "name": "test_statistics_aggregates_follow_point_device_site_scope",
-      "duration_seconds": 1.312,
+      "duration_seconds": 1.065,
       "status": "PASS"
     },
     {
       "classname": "tests.test_story_39_1",
       "name": "test_report_globals_are_admin_only_and_device_health_is_site_scoped",
-      "duration_seconds": 1.339,
+      "duration_seconds": 1.106,
       "status": "PASS"
     },
     {
       "classname": "tests.test_story_39_1",
       "name": "test_video_cameras_actions_and_playback_follow_trusted_site_relations",
-      "duration_seconds": 1.394,
+      "duration_seconds": 1.282,
       "status": "PASS"
     },
     {
       "classname": "tests.test_story_39_1",
       "name": "test_ota_packages_and_tasks_follow_full_gateway_site_scope",
-      "duration_seconds": 1.589,
+      "duration_seconds": 1.431,
       "status": "PASS"
     },
     {
       "classname": "tests.test_story_39_1",
       "name": "test_data_quality_floor_map_and_predictive_maintenance_authorization",
-      "duration_seconds": 1.495,
+      "duration_seconds": 1.441,
       "status": "PASS"
     },
     {
       "classname": "tests.test_story_39_1",
       "name": "test_command_and_drift_routes_follow_device_and_point_site_scope",
-      "duration_seconds": 1.311,
+      "duration_seconds": 1.219,
       "status": "PASS"
     },
     {
       "classname": "tests.test_story_39_1",
       "name": "test_asset_routes_follow_spatial_site_scope_and_keep_inventory_admin_only",
-      "duration_seconds": 1.516,
+      "duration_seconds": 1.456,
       "status": "PASS"
     },
     {
       "classname": "tests.test_story_39_1",
       "name": "test_operation_work_orders_follow_device_scope_and_unowned_families_are_admin_only",
-      "duration_seconds": 1.484,
+      "duration_seconds": 1.323,
       "status": "PASS"
     },
     {
       "classname": "tests.test_story_39_1",
       "name": "test_diagnosis_records_follow_device_and_point_scope_while_configuration_is_global_admin",
-      "duration_seconds": 1.554,
+      "duration_seconds": 1.485,
       "status": "PASS"
     },
     {
       "classname": "tests.test_story_39_1",
       "name": "test_sensor_metadata_routes_follow_point_device_site_scope",
-      "duration_seconds": 1.722,
+      "duration_seconds": 1.095,
       "status": "PASS"
     }
   ]

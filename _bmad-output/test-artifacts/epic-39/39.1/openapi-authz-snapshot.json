@@ -19514,7 +19514,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/app__api__v1__operation__CompleteTaskRequest"
+                "$ref": "#/components/schemas/CompleteTaskRequest"
               }
             }
           }
@@ -22566,7 +22566,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/DashboardResponse"
+                  "$ref": "#/components/schemas/app__schemas__energy__DashboardResponse"
                 }
               }
             }
@@ -23551,7 +23551,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/CompleteTaskRequest"
+                "$ref": "#/components/schemas/app__api__v1__execution__CompleteTaskRequest"
               }
             }
           }
@@ -45256,7 +45256,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/app__schemas__predictive_maintenance__DashboardResponse"
+                  "$ref": "#/components/schemas/DashboardResponse"
                 }
               }
             }
@@ -52043,7 +52043,7 @@
       },
       "CompleteTaskRequest": {
         "properties": {
-          "completed_by": {
+          "result": {
             "anyOf": [
               {
                 "type": "string"
@@ -52052,25 +52052,25 @@
                 "type": "null"
               }
             ],
-            "title": "Completed By",
-            "description": "完成人"
+            "title": "Result",
+            "description": "巡检结果(JSON)"
           },
-          "notes": {
+          "abnormal_count": {
             "anyOf": [
               {
-                "type": "string"
+                "type": "integer"
               },
               {
                 "type": "null"
               }
             ],
-            "title": "Notes",
-            "description": "备注"
+            "title": "Abnormal Count",
+            "description": "异常数量"
           }
         },
         "type": "object",
         "title": "CompleteTaskRequest",
-        "description": "完成任务请求"
+        "description": "完成巡检任务请求"
       },
       "CompleteWorkOrderRequest": {
         "properties": {
@@ -54021,40 +54021,24 @@
       },
       "DashboardResponse": {
         "properties": {
-          "summary_cards": {
-            "$ref": "#/components/schemas/DashboardSummaryCards"
+          "summary": {
+            "$ref": "#/components/schemas/DashboardSummary"
           },
-          "opportunities": {
+          "devices": {
             "items": {
-              "$ref": "#/components/schemas/OpportunitySummary"
+              "$ref": "#/components/schemas/DeviceHealthItem"
             },
             "type": "array",
-            "title": "Opportunities"
-          },
-          "by_category": {
-            "additionalProperties": {
-              "items": {
-                "$ref": "#/components/schemas/OpportunitySummary"
-              },
-              "type": "array"
-            },
-            "type": "object",
-            "title": "By Category"
-          },
-          "total_count": {
-            "type": "integer",
-            "title": "Total Count"
+            "title": "Devices"
           }
         },
         "type": "object",
         "required": [
-          "summary_cards",
-          "opportunities",
-          "by_category",
-          "total_count"
+          "summary",
+          "devices"
         ],
         "title": "DashboardResponse",
-        "description": "机会仪表盘响应"
+        "description": "仪表盘响应"
       },
       "DashboardSummary": {
         "properties": {
@@ -86032,9 +86016,9 @@
         "title": "WorkOrderUpdate",
         "description": "更新工单"
       },
-      "app__api__v1__operation__CompleteTaskRequest": {
+      "app__api__v1__execution__CompleteTaskRequest": {
         "properties": {
-          "result": {
+          "completed_by": {
             "anyOf": [
               {
                 "type": "string"
@@ -86043,25 +86027,62 @@
                 "type": "null"
               }
             ],
-            "title": "Result",
-            "description": "巡检结果(JSON)"
+            "title": "Completed By",
+            "description": "完成人"
           },
-          "abnormal_count": {
+          "notes": {
             "anyOf": [
               {
-                "type": "integer"
+                "type": "string"
               },
               {
                 "type": "null"
               }
             ],
-            "title": "Abnormal Count",
-            "description": "异常数量"
+            "title": "Notes",
+            "description": "备注"
           }
         },
         "type": "object",
         "title": "CompleteTaskRequest",
-        "description": "完成巡检任务请求"
+        "description": "完成任务请求"
+      },
+      "app__schemas__energy__DashboardResponse": {
+        "properties": {
+          "summary_cards": {
+            "$ref": "#/components/schemas/DashboardSummaryCards"
+          },
+          "opportunities": {
+            "items": {
+              "$ref": "#/components/schemas/OpportunitySummary"
+            },
+            "type": "array",
+            "title": "Opportunities"
+          },
+          "by_category": {
+            "additionalProperties": {
+              "items": {
+                "$ref": "#/components/schemas/OpportunitySummary"
+              },
+              "type": "array"
+            },
+            "type": "object",
+            "title": "By Category"
+          },
+          "total_count": {
+            "type": "integer",
+            "title": "Total Count"
+          }
+        },
+        "type": "object",
+        "required": [
+          "summary_cards",
+          "opportunities",
+          "by_category",
+          "total_count"
+        ],
+        "title": "DashboardResponse",
+        "description": "机会仪表盘响应"
       },
       "app__schemas__load_shift__ApprovalStatus": {
         "type": "string",
@@ -86106,27 +86127,6 @@
         ],
         "title": "RejectRequest",
         "description": "驳回审批请求"
-      },
-      "app__schemas__predictive_maintenance__DashboardResponse": {
-        "properties": {
-          "summary": {
-            "$ref": "#/components/schemas/DashboardSummary"
-          },
-          "devices": {
-            "items": {
-              "$ref": "#/components/schemas/DeviceHealthItem"
-            },
-            "type": "array",
-            "title": "Devices"
-          }
-        },
-        "type": "object",
-        "required": [
-          "summary",
-          "devices"
-        ],
-        "title": "DashboardResponse",
-        "description": "仪表盘响应"
       }
     },
     "securitySchemes": {
