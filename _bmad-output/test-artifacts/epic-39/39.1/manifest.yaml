@@ -4,29 +4,29 @@ story:
   key: 39-1-site-isolation-and-websocket-authorization
   title: Site isolation and server-side WebSocket authorization
 changeset:
-  git_sha: 1d6d33fed60a16e9c76e17aaabd800c853b9566e
+  git_sha: 14c04b21311fd07a212a55696a866a1f6cdaadf8
   baseline_commit: a9b872155f8554136f456e6d15116e721270761c
   working_tree_dirty: false
-  changeset_id: 1d6d33fed60a16e9c76e17aaabd800c853b9566e
-  source_snapshot_sha256: 64f32dd61e9e9de8dfed7a55be634e0a89256eb82236efa0b4bcbbe378681844
-  source_file_count: 98
+  changeset_id: 14c04b21311fd07a212a55696a866a1f6cdaadf8
+  source_snapshot_sha256: 3e7df5c0a716d11d0eea4d7a642a1171c3188f96ff92d4d503c8856beec4140d
+  source_file_count: 99
 images:
   backend:
-    tag: dcim-backend:story-39-1-a9b8721-dirty
+    tag: dcim-backend:story-39-1-14c04b2-rc1
     status: BUILT
-    digest: sha256:f2660b0cbcb8e4975e0e41390eaa9ee87532979539c434fbaf1abfb9c291f213
+    digest: sha256:0f96966ee7c1207534f8c58cc22af93a0c24a4e735c1a3f1d4cafcf9dbe7caff
     repo_digests:
-    - dcim-backend@sha256:f2660b0cbcb8e4975e0e41390eaa9ee87532979539c434fbaf1abfb9c291f213
-    - ghcr.io/proecheng/dcim-platform/backend@sha256:f2660b0cbcb8e4975e0e41390eaa9ee87532979539c434fbaf1abfb9c291f213
-    production_registry_digest: ghcr.io/proecheng/dcim-platform/backend@sha256:f2660b0cbcb8e4975e0e41390eaa9ee87532979539c434fbaf1abfb9c291f213
+    - dcim-backend@sha256:0f96966ee7c1207534f8c58cc22af93a0c24a4e735c1a3f1d4cafcf9dbe7caff
+    - ghcr.io/proecheng/dcim-platform/backend@sha256:0f96966ee7c1207534f8c58cc22af93a0c24a4e735c1a3f1d4cafcf9dbe7caff
+    production_registry_digest: ghcr.io/proecheng/dcim-platform/backend@sha256:0f96966ee7c1207534f8c58cc22af93a0c24a4e735c1a3f1d4cafcf9dbe7caff
   frontend:
-    tag: dcim-frontend:story-39-1-a9b8721-dirty
+    tag: dcim-frontend:story-39-1-14c04b2-rc1
     status: BUILT
-    digest: sha256:8c51053b659940488ac78277ee51a21c94639e880c82d5ff7eca3e21f733b546
+    digest: sha256:845d3612f0d7559fad904a37835847841bf3b003253199da315fbec38dd0b5f4
     repo_digests:
-    - dcim-frontend@sha256:8c51053b659940488ac78277ee51a21c94639e880c82d5ff7eca3e21f733b546
-    - ghcr.io/proecheng/dcim-platform/frontend@sha256:8c51053b659940488ac78277ee51a21c94639e880c82d5ff7eca3e21f733b546
-    production_registry_digest: ghcr.io/proecheng/dcim-platform/frontend@sha256:8c51053b659940488ac78277ee51a21c94639e880c82d5ff7eca3e21f733b546
+    - dcim-frontend@sha256:845d3612f0d7559fad904a37835847841bf3b003253199da315fbec38dd0b5f4
+    - ghcr.io/proecheng/dcim-platform/frontend@sha256:845d3612f0d7559fad904a37835847841bf3b003253199da315fbec38dd0b5f4
+    production_registry_digest: ghcr.io/proecheng/dcim-platform/frontend@sha256:845d3612f0d7559fad904a37835847841bf3b003253199da315fbec38dd0b5f4
 environment:
   id: local-windows-docker-desktop-story-39-1
   kind: local integration evidence
@@ -46,8 +46,8 @@ tools:
   sqlalchemy: 2.0.45
   jsonschema: 4.26.0
 execution:
-  started_at_utc: '2026-08-11T03:14:24.981Z'
-  ended_at_utc: '2026-08-11T03:15:48.523157Z'
+  started_at_utc: '2026-08-11T03:58:59.041Z'
+  ended_at_utc: '2026-08-11T04:00:01.507062Z'
   operator: Admin (Codex-assisted)
   commands:
   - id: PYTEST-AUTHZ
@@ -84,11 +84,11 @@ execution:
     result: PASS
   - id: BACKEND-IMAGE
     cwd: .
-    command: docker build -t dcim-backend:story-39-1-a9b8721-dirty backend
+    command: docker build --provenance=false -t dcim-backend:story-39-1-14c04b2-rc1 backend
     result: PASS
   - id: FRONTEND-IMAGE
     cwd: .
-    command: docker build -t dcim-frontend:story-39-1-a9b8721-dirty frontend
+    command: docker build --provenance=false -t dcim-frontend:story-39-1-14c04b2-rc1 frontend
     result: PASS
 artifacts:
 - path: _bmad-output/test-artifacts/epic-39/39.1/authorization-inventory.yaml
@@ -101,14 +101,14 @@ artifacts:
   - AC2
   - AC3
 - path: _bmad-output/test-artifacts/epic-39/39.1/authorization-inventory-diff.json
-  sha256: 15403ae1bc1503575b430f76edc6a0c3b0b54d9090305d0d81ed4e64c956c083
+  sha256: c367a27efe5f50e08291622f0dc4bafee0e1b7456fbfc5ac3bad46418340756a
   size_bytes: 118840
   media_type: application/json
   purpose: Runtime-to-policy drift comparison
   acceptance_criteria:
   - AC1
 - path: _bmad-output/test-artifacts/epic-39/39.1/openapi-authz-snapshot.json
-  sha256: 36db0359fe6cf3bc45537c6998944359768f6728df67aa8dac4fe6b3abd7e31d
+  sha256: b8237132f0740e3c4e99550ffeb2a7a8ec5099d2a4a88479dd4fe194d0c6e6ac
   size_bytes: 2332060
   media_type: application/json
   purpose: Mounted HTTP API snapshot
@@ -116,7 +116,7 @@ artifacts:
   - AC1
   - AC2
 - path: _bmad-output/test-artifacts/epic-39/39.1/websocket-producer-inventory.json
-  sha256: 4b3d23a902ff7536382cccc50ff0e2c977c0f29995fffee633e9b792dc3389ca
+  sha256: 0a17edbe7de8e3e3ed5b1cbfad7881b7f6e8ec5563ac79ec050e8ec5e62d249d
   size_bytes: 24055
   media_type: application/json
   purpose: Discovered producer scope inventory
@@ -124,16 +124,16 @@ artifacts:
   - AC1
   - AC3
 - path: _bmad-output/test-artifacts/epic-39/39.1/http-authz-matrix-results.json
-  sha256: ee829e1f9186f0a501785c56cc573cff94e59f62d14464b8a5d04d491e6e2b73
-  size_bytes: 7217
+  sha256: d508cf4dc05f95ecb970b2f8045b79207006846f6ac9270eb0135608c8550a9d
+  size_bytes: 7215
   media_type: application/json
   purpose: HTTP site and object authorization matrix
   acceptance_criteria:
   - AC2
   - AC5
 - path: _bmad-output/test-artifacts/epic-39/39.1/websocket-authz-matrix-results.json
-  sha256: e659f182719fe4e02931a2970706f769e3b10b2b50d3a507ec048e52d501022f
-  size_bytes: 8285
+  sha256: 55924428c82cc0930dee510ea76c612efec603b4a8633e531463bc8c8b52b891
+  size_bytes: 8284
   media_type: application/json
   purpose: WebSocket authorization and revocation matrix
   acceptance_criteria:
@@ -141,7 +141,7 @@ artifacts:
   - AC4
   - AC5
 - path: _bmad-output/test-artifacts/epic-39/39.1/pytest-authz.xml
-  sha256: c0a6b9c512290fe13915f920eaac4f3ca7b58c40c03a389b9b6879ea4d2841d3
+  sha256: 7fd89c751e1ef00d7a6cc48d509d3adc2a970deaec5cac9aced938f39efc81ca
   size_bytes: 23558
   media_type: application/xml
   purpose: Raw backend authorization regression results
@@ -170,15 +170,15 @@ artifacts:
   - AC3
   - AC4
 - path: _bmad-output/test-artifacts/epic-39/39.1/environment-fingerprint.json
-  sha256: 930e2ece8a75ed6ea3bed4ed91c1598b9c42899f815a50234b28ef509111f1be
+  sha256: 1902475513b956999f5d9030eff19291ca330423b771a2d7c687da32c130a951
   size_bytes: 607
   media_type: application/json
   purpose: Sanitized execution environment fingerprint
   acceptance_criteria:
   - AC5
 - path: _bmad-output/test-artifacts/epic-39/39.1/source-file-hashes.json
-  sha256: 9830b5d82b8d91e1cd2a5d72f4b109476cc4b2c8dacfe1d05a6691948096e29a
-  size_bytes: 18192
+  sha256: 8658bdeacdffb18b718bb113ec74af7aa9939831e833385d532f12450b06e2bd
+  size_bytes: 18361
   media_type: application/json
   purpose: Story implementation source snapshot
   acceptance_criteria:

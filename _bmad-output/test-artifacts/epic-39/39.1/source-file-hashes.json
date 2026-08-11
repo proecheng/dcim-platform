@@ -1,15 +1,15 @@
 {
-  "generated_at_utc": "2026-08-11T03:14:29.580560Z",
+  "generated_at_utc": "2026-08-11T03:59:01.314179Z",
   "scope": "Story 39.1 implementation and test files changed since the baseline commit",
-  "git_sha": "1d6d33fed60a16e9c76e17aaabd800c853b9566e",
+  "git_sha": "14c04b21311fd07a212a55696a866a1f6cdaadf8",
   "working_tree_dirty": false,
-  "source_snapshot_sha256": "64f32dd61e9e9de8dfed7a55be634e0a89256eb82236efa0b4bcbbe378681844",
-  "file_count": 98,
+  "source_snapshot_sha256": "3e7df5c0a716d11d0eea4d7a642a1171c3188f96ff92d4d503c8856beec4140d",
+  "file_count": 99,
   "files": [
     {
       "path": "_bmad-output/implementation-artifacts/39-1-site-isolation-and-websocket-authorization.md",
-      "size_bytes": 36760,
-      "sha256": "11b5e7ae8ab2c7141a3ad859d9a9e88d67ada780b6e3d68d2dfa3f63d339b82d"
+      "size_bytes": 37597,
+      "sha256": "c8e034581dd7c566e08fd96f587c2d967312761b3daaf646c605bcce9b9602c8"
     },
     {
       "path": "backend/.dockerignore",
@@ -23,38 +23,38 @@
     },
     {
       "path": "backend/app/api/deps.py",
-      "size_bytes": 27981,
-      "sha256": "84ee87a350b3703226cc5ae3dcf02cc4d81a5bdb831037fffaf63123fc81e322"
+      "size_bytes": 27824,
+      "sha256": "5943b5f83a42fc50d4674da4fab08730f1597d119175bda8aabec08bfe80fe10"
     },
     {
       "path": "backend/app/api/v1/alarm.py",
-      "size_bytes": 30592,
-      "sha256": "f7078c2da29cb01e307e424b96a91d86bbd63095b74753550177e366c77da56c"
+      "size_bytes": 30588,
+      "sha256": "acaef1f05ff3f9d09b83644609d5351c333193b79b6fb0dc174160ff1ec1ab73"
     },
     {
       "path": "backend/app/api/v1/asset.py",
-      "size_bytes": 54753,
-      "sha256": "4f16003d9d06fec7bfaa88b8d6cddf873eb1d43eb35689fa2f37923073804135"
+      "size_bytes": 54735,
+      "sha256": "83586ef87d8195e12ef1e94157af6e293f4520f14dc19e5f4478ba76e7b2764d"
     },
     {
       "path": "backend/app/api/v1/auth.py",
-      "size_bytes": 13632,
-      "sha256": "baf1fd3a01cce7ba8e26cb82777f78a6b7dbbda1a13d6125058145d0480a155d"
+      "size_bytes": 13633,
+      "sha256": "628af1ec462733c53515a86725d4a83cbe8852251a62ef4a80e554953b9b7d07"
     },
     {
       "path": "backend/app/api/v1/command.py",
-      "size_bytes": 9560,
-      "sha256": "ba4d65c1385e5eccce753a649074fbbb1d1fa216525a5ce1add140a4573cd589"
+      "size_bytes": 9554,
+      "sha256": "450cefb919c7d6a09a62e26a203250ad24174696d17f5c2d213f87b8e844ae7e"
     },
     {
       "path": "backend/app/api/v1/cooling.py",
-      "size_bytes": 22742,
-      "sha256": "b2bac7eefbee30abd8302836c28b846517149283b6a8557377d9452fd4ebca69"
+      "size_bytes": 22743,
+      "sha256": "b1d6b4dc2b3514fb75c555f2498d6bdfacfe452919b5c5eea3dbee50bb26a914"
     },
     {
       "path": "backend/app/api/v1/data_quality.py",
-      "size_bytes": 4231,
-      "sha256": "5fd511a908628b3b201cbe673ee9e0f8d72876880c6844a2facfb2488fac0e36"
+      "size_bytes": 4195,
+      "sha256": "0879508743d709c641effe636e4f54fe2e7e5f53e1fd0a1475ff6ab0f65d48d7"
     },
     {
       "path": "backend/app/api/v1/datasources.py",
@@ -68,13 +68,13 @@
     },
     {
       "path": "backend/app/api/v1/diagnosis.py",
-      "size_bytes": 70394,
-      "sha256": "2b5770d7f10207492655a06b8e136c0b1454efd67a43c357d8f47d1231b03fa1"
+      "size_bytes": 70368,
+      "sha256": "71bef983ba5bb1d21e0a2748e9414b88ec93555fdf64efe5aa99c882e2f4ab68"
     },
     {
       "path": "backend/app/api/v1/drift.py",
-      "size_bytes": 5914,
-      "sha256": "88781f936da80a59a9b2ef33e3c9bff74fba4cb3422cf5791d6a20f96f2f9b67"
+      "size_bytes": 5888,
+      "sha256": "0f6f6c533c5c028bf14abea10bb3e54f416442924ff9275ad5d1c1c1ec4ae2b7"
     },
     {
       "path": "backend/app/api/v1/floor_map.py",
@@ -108,13 +108,13 @@
     },
     {
       "path": "backend/app/api/v1/power.py",
-      "size_bytes": 23759,
-      "sha256": "30035b572b26d3cf5168222eb9828f443c5e9f1d4389f55b163bd9e6bac4a7dc"
+      "size_bytes": 23775,
+      "sha256": "8067c4ba7891a08ef02ddcbae3656b1ab605205bc96f936b2c6921e9656661bc"
     },
     {
       "path": "backend/app/api/v1/power_redundancy.py",
-      "size_bytes": 2827,
-      "sha256": "806983340b410781b11ab6430065c627f6a51f7072fad7bdb82f1d624d9c75c7"
+      "size_bytes": 2856,
+      "sha256": "0865250c0cbc0a57264c347be3f0d9492b6ba55db26e67963690cfe5ddd86c29"
     },
     {
       "path": "backend/app/api/v1/precool.py",
@@ -123,8 +123,8 @@
     },
     {
       "path": "backend/app/api/v1/predictive_maintenance.py",
-      "size_bytes": 8626,
-      "sha256": "7c07c45bdcc7f23821bd5aacf179ffb2678c689ee8bd487c74de5cc01c57741c"
+      "size_bytes": 8620,
+      "sha256": "cdf6db03e4ab3562b26b2a65c6a499ee7b942d70b49d5ebc7f95fa7e5128c268"
     },
     {
       "path": "backend/app/api/v1/probability_tuning.py",
@@ -133,8 +133,8 @@
     },
     {
       "path": "backend/app/api/v1/realtime.py",
-      "size_bytes": 26542,
-      "sha256": "163c6ab83453b82cd780c0eb289ca80c609548ecfff184bac03724c782aad3c4"
+      "size_bytes": 26625,
+      "sha256": "952229e4f9f1d13bdfde1decfd10d69006d77d6136d44dec4b524ff1ad67d26f"
     },
     {
       "path": "backend/app/api/v1/report.py",
@@ -153,18 +153,18 @@
     },
     {
       "path": "backend/app/api/v1/statistics.py",
-      "size_bytes": 14468,
-      "sha256": "e308e74311a71b09c7ac07fd06b3b217eb37c6114daa080faddde24d46d3cf88"
+      "size_bytes": 14454,
+      "sha256": "8b248012ea8d6cdebab55bd19bc2b31271f72bc29cbde8c786773e4c07662f8c"
     },
     {
       "path": "backend/app/api/v1/threshold.py",
-      "size_bytes": 14445,
-      "sha256": "5f266b58a87b2799831555c34ebeac3cdc6fc5f27883dac421812ba71fa4c0ca"
+      "size_bytes": 14447,
+      "sha256": "80669a2d6d7382a6822111cecc46f07c03374e5161da04f77e576f431d4c1754"
     },
     {
       "path": "backend/app/api/v1/topology_config.py",
-      "size_bytes": 55092,
-      "sha256": "7b226807893811df842c5f25e9a938babc001bfc54418e538d83fbcc109cacdb"
+      "size_bytes": 54940,
+      "sha256": "8701f491d39339b6faeb53a94ee97ec6476544433c16dcdae47fb42139481573"
     },
     {
       "path": "backend/app/api/v1/user.py",
@@ -178,8 +178,8 @@
     },
     {
       "path": "backend/app/core/authorization.py",
-      "size_bytes": 23914,
-      "sha256": "e1e8319be5be1f513a803a309bdd419944d5713cdb4c8f8f70251b3527be2198"
+      "size_bytes": 23880,
+      "sha256": "1148766d8711f18a5b0489b3005f0f2381591784fb2a7141d388d20ea4edd339"
     },
     {
       "path": "backend/app/engines/action_handlers.py",
@@ -193,8 +193,8 @@
     },
     {
       "path": "backend/app/engines/escalation_engine.py",
-      "size_bytes": 3017,
-      "sha256": "13dceedc3db7b73600fcea81755db8f6aabf10a9303134b5639b136f54c99193"
+      "size_bytes": 3037,
+      "sha256": "19eed190b44e31fa648e251d250186356b0cea34762b3ddad6c46cf6e706bc0f"
     },
     {
       "path": "backend/app/engines/linkage_engine.py",
@@ -208,8 +208,8 @@
     },
     {
       "path": "backend/app/main.py",
-      "size_bytes": 62516,
-      "sha256": "ffaee3e993373e33ae95e71b273f92699b4cf31077d1f0e767c84a9784ae1925"
+      "size_bytes": 62510,
+      "sha256": "436c919f62a7f5251c2bb8356a9958d95af02946b4bc0bb6af7ce4c673549197"
     },
     {
       "path": "backend/app/services/communication_monitor.py",
@@ -233,8 +233,8 @@
     },
     {
       "path": "backend/app/services/drift_detection.py",
-      "size_bytes": 8906,
-      "sha256": "75ca401478e73c5b7211790bf128819335969717c36fe0608ac42247683081f9"
+      "size_bytes": 8894,
+      "sha256": "e6881add45780c5f47b023b4ca54f0953e6168fdf582ae21b7f63c709c0ab25e"
     },
     {
       "path": "backend/app/services/gateway_monitor.py",
@@ -253,18 +253,23 @@
     },
     {
       "path": "backend/app/services/video_service.py",
-      "size_bytes": 19793,
-      "sha256": "9c54c17266fd5c15d306702911333edfe8751978eb9e05e4e987989ff6403c18"
+      "size_bytes": 19749,
+      "sha256": "eba3d90a7f0ebbea11ac7b5d1ff7a023eed08a324b55342f8691303b79b9b6a7"
     },
     {
       "path": "backend/app/services/websocket.py",
-      "size_bytes": 19564,
-      "sha256": "3663fc064bc928745790a6ed28defa552e973446bae73f9e8735724fc38a4a43"
+      "size_bytes": 19574,
+      "sha256": "021edc5b56ae2e61b098ffc1e2a67922e562f2848614ba0df36eb6d310274d22"
     },
     {
       "path": "backend/authz_inventory.yaml",
       "size_bytes": 296724,
       "sha256": "80163a0a89770805a510e0ca86610922624d4bbaaede972f9d5713cd86a7f48b"
+    },
+    {
+      "path": "backend/requirements.txt",
+      "size_bytes": 1560,
+      "sha256": "e4e29a46766a7ea075af701796d0b9b98531d38dd96c82563015c8fedc0516f2"
     },
     {
       "path": "backend/tests/api/test_alarm_coverage.py",
