@@ -1,20 +1,20 @@
 {
-  "generated_at_utc": "2026-08-11T07:21:21.398408Z",
+  "generated_at_utc": "2026-08-11T08:13:59.226688Z",
   "scope": "Story 39.1 implementation and test files changed since the baseline commit",
-  "git_sha": "d97f400e0fad45341178fa93ea0d677154bcbf5b",
+  "git_sha": "e64720be44f8e2e65ca7efd25cbd2a5a7ba87827",
   "working_tree_dirty": false,
-  "source_snapshot_sha256": "3ad6f5b0d0e45e4e38ae8f48208b91db9873a11d84f1984dd8849ad9ece79645",
-  "file_count": 123,
+  "source_snapshot_sha256": "d368a2945ad81637ffb86343ede3d5dccdfdb9625b6168baaaa64f805fbc8508",
+  "file_count": 125,
   "files": [
     {
       "path": "_bmad-output/implementation-artifacts/39-1-site-isolation-and-websocket-authorization.md",
-      "size_bytes": 40234,
-      "sha256": "5ba5f5b212c0084e8d32ef46bcbbc22f5219b54f620c85a4d3dadd671ee110c3"
+      "size_bytes": 42657,
+      "sha256": "945f50ce889a26610307dcab40e7d0687adcd3aa3f4572eb2105c0e7e4c9d096"
     },
     {
       "path": "backend/.dockerignore",
-      "size_bytes": 215,
-      "sha256": "c9d70e442c01c693303755dd3deaab35a3e667c3236ad33b790c4300c80b4ad0"
+      "size_bytes": 237,
+      "sha256": "ce7db73fd801f7c4beb3717075f2d1f79405b07b288ff7dfefae59ef510492fb"
     },
     {
       "path": "backend/Dockerfile",
@@ -472,9 +472,19 @@
       "sha256": "211d712dd0ec3d1a4435e1f6f22ef8227b54a970adc9b3574a50270c67578aea"
     },
     {
+      "path": "backend/tests/test_fault_impact.py",
+      "size_bytes": 9121,
+      "sha256": "b8b6c35a44ddafb55077ec299b8c4cd642b182645b0fdf40c8903e50525f75f1"
+    },
+    {
       "path": "backend/tests/test_fire_protection.py",
       "size_bytes": 12649,
       "sha256": "47993966b7eeb175cf58a27127709da535a963f33dd92bc40dcf8d1595863709"
+    },
+    {
+      "path": "backend/tests/test_gateway_monitor.py",
+      "size_bytes": 12836,
+      "sha256": "e4e7406498d9cbca2fc7442ba19b2c03c6f256b775b61cb55fdca7e845edc466"
     },
     {
       "path": "backend/tests/test_graceful_degradation.py",
@@ -613,8 +623,8 @@
     },
     {
       "path": "scripts/story_39_1_evidence.py",
-      "size_bytes": 31953,
-      "sha256": "08dfb1ac605722eca741acfae351c1c7564f08da42d9fdf3ca0fce43cc5f4f9e"
+      "size_bytes": 32140,
+      "sha256": "ba6e3f8a5b558addf293490e09e448800cfc97857946fd280c158f833ae5a460"
     },
     {
       "path": "scripts/story_39_1_manifest.schema.json",

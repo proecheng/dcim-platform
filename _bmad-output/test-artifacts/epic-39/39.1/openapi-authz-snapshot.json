@@ -18599,7 +18599,7 @@
             "schema": {
               "anyOf": [
                 {
-                  "$ref": "#/components/schemas/app__models__operation__ApprovalStatus"
+                  "$ref": "#/components/schemas/ApprovalStatus"
                 },
                 {
                   "type": "null"
@@ -18734,7 +18734,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/ApproveRequest"
+                "$ref": "#/components/schemas/app__schemas__operation__ApproveRequest"
               }
             }
           }
@@ -18792,7 +18792,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/RejectRequest"
+                "$ref": "#/components/schemas/app__schemas__operation__RejectRequest"
               }
             }
           }
@@ -42437,7 +42437,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/app__api__v1__probability_tuning__ApproveRequest"
+                "$ref": "#/components/schemas/ApproveRequest"
               }
             }
           }
@@ -42494,7 +42494,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/app__api__v1__probability_tuning__RejectRequest"
+                "$ref": "#/components/schemas/RejectRequest"
               }
             }
           }
@@ -47668,12 +47668,14 @@
       "ApprovalStatus": {
         "type": "string",
         "enum": [
-          "pending",
-          "approved",
-          "rejected"
+          "待审批",
+          "已批准",
+          "已驳回",
+          "已超时",
+          "已升级"
         ],
         "title": "ApprovalStatus",
-        "description": "Approval status - 审批状态"
+        "description": "审批状态枚举"
       },
       "ApproveRequest": {
         "properties": {
@@ -47687,12 +47689,12 @@
               }
             ],
             "title": "Reason",
-            "description": "审批意见"
+            "description": "审批理由（可选）"
           }
         },
         "type": "object",
         "title": "ApproveRequest",
-        "description": "批准审批请求"
+        "description": "审批请求"
       },
       "AssetCreate": {
         "properties": {
@@ -74756,7 +74758,7 @@
           "reason": {
             "type": "string",
             "title": "Reason",
-            "description": "驳回原因"
+            "description": "拒绝理由（必填）"
           }
         },
         "type": "object",
@@ -74764,7 +74766,7 @@
           "reason"
         ],
         "title": "RejectRequest",
-        "description": "驳回审批请求"
+        "description": "拒绝请求"
       },
       "RejectSuggestion": {
         "properties": {
@@ -78420,7 +78422,7 @@
       "ShiftPlanApproval": {
         "properties": {
           "approval_status": {
-            "$ref": "#/components/schemas/ApprovalStatus",
+            "$ref": "#/components/schemas/app__schemas__load_shift__ApprovalStatus",
             "description": "审批状态"
           },
           "approval_comment": {
@@ -78661,7 +78663,7 @@
             "$ref": "#/components/schemas/ShiftPlanStatus"
           },
           "approval_status": {
-            "$ref": "#/components/schemas/ApprovalStatus"
+            "$ref": "#/components/schemas/app__schemas__load_shift__ApprovalStatus"
           },
           "execution_status": {
             "$ref": "#/components/schemas/ExecutionStatus"
@@ -78944,7 +78946,7 @@
             "$ref": "#/components/schemas/ShiftPlanStatus"
           },
           "approval_status": {
-            "$ref": "#/components/schemas/ApprovalStatus"
+            "$ref": "#/components/schemas/app__schemas__load_shift__ApprovalStatus"
           },
           "execution_status": {
             "$ref": "#/components/schemas/ExecutionStatus"
@@ -85258,7 +85260,7 @@
             "description": "审批人"
           },
           "status": {
-            "$ref": "#/components/schemas/app__models__operation__ApprovalStatus",
+            "$ref": "#/components/schemas/ApprovalStatus",
             "description": "审批状态",
             "default": "待审批"
           },
@@ -86061,7 +86063,17 @@
         "title": "CompleteTaskRequest",
         "description": "完成巡检任务请求"
       },
-      "app__api__v1__probability_tuning__ApproveRequest": {
+      "app__schemas__load_shift__ApprovalStatus": {
+        "type": "string",
+        "enum": [
+          "pending",
+          "approved",
+          "rejected"
+        ],
+        "title": "ApprovalStatus",
+        "description": "Approval status - 审批状态"
+      },
+      "app__schemas__operation__ApproveRequest": {
         "properties": {
           "reason": {
             "anyOf": [
@@ -86073,19 +86085,19 @@
               }
             ],
             "title": "Reason",
-            "description": "审批理由（可选）"
+            "description": "审批意见"
           }
         },
         "type": "object",
         "title": "ApproveRequest",
-        "description": "审批请求"
+        "description": "批准审批请求"
       },
-      "app__api__v1__probability_tuning__RejectRequest": {
+      "app__schemas__operation__RejectRequest": {
         "properties": {
           "reason": {
             "type": "string",
             "title": "Reason",
-            "description": "拒绝理由（必填）"
+            "description": "驳回原因"
           }
         },
         "type": "object",
@@ -86093,19 +86105,7 @@
           "reason"
         ],
         "title": "RejectRequest",
-        "description": "拒绝请求"
-      },
-      "app__models__operation__ApprovalStatus": {
-        "type": "string",
-        "enum": [
-          "待审批",
-          "已批准",
-          "已驳回",
-          "已超时",
-          "已升级"
-        ],
-        "title": "ApprovalStatus",
-        "description": "审批状态枚举"
+        "description": "驳回审批请求"
       },
       "app__schemas__predictive_maintenance__DashboardResponse": {
         "properties": {
