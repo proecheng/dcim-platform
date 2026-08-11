@@ -19,6 +19,7 @@ from app.models.asset import (
     AssetInventoryItem,
 )
 from app.models.user import User
+from app.api.deps import SiteAccessContext
 from app.api.v1.asset import _check_u_position_conflict, import_assets, export_assets
 
 
@@ -107,6 +108,10 @@ async def test_user(db: AsyncSession):
     await db.commit()
     await db.refresh(user)
     return user
+
+
+def _admin_context(user: User) -> SiteAccessContext:
+    return SiteAccessContext(user.id, "admin", "test-jti", None)
 
 
 def _make_excel(rows: list[list]) -> BytesIO:
@@ -228,7 +233,13 @@ class TestImportAssets:
             ]
         )
         fake_file = FakeUploadFile(buf)
-        result = await import_assets(file=fake_file, mode="preview", db=db, current_user=test_user)
+        result = await import_assets(
+            file=fake_file,
+            mode="preview",
+            db=db,
+            current_user=test_user,
+            context=_admin_context(test_user),
+        )
         assert result["total"] == 2
         assert result["success_count"] == 2
         assert result["error_count"] == 0
@@ -243,7 +254,13 @@ class TestImportAssets:
             ]
         )
         fake_file = FakeUploadFile(buf)
-        result = await import_assets(file=fake_file, mode="preview", db=db, current_user=test_user)
+        result = await import_assets(
+            file=fake_file,
+            mode="preview",
+            db=db,
+            current_user=test_user,
+            context=_admin_context(test_user),
+        )
         assert result["error_count"] >= 1
         assert any(e["field"] == "asset_code" for e in result["errors"])
 
@@ -257,7 +274,13 @@ class TestImportAssets:
             ]
         )
         fake_file = FakeUploadFile(buf)
-        result = await import_assets(file=fake_file, mode="preview", db=db, current_user=test_user)
+        result = await import_assets(
+            file=fake_file,
+            mode="preview",
+            db=db,
+            current_user=test_user,
+            context=_admin_context(test_user),
+        )
         assert result["error_count"] >= 1
         assert any("已存在" in e["message"] for e in result["errors"])
 
@@ -271,7 +294,13 @@ class TestImportAssets:
             ]
         )
         fake_file = FakeUploadFile(buf)
-        result = await import_assets(file=fake_file, mode="preview", db=db, current_user=test_user)
+        result = await import_assets(
+            file=fake_file,
+            mode="preview",
+            db=db,
+            current_user=test_user,
+            context=_admin_context(test_user),
+        )
         assert result["error_count"] >= 1
         assert any("机柜编码不存在" in e["message"] for e in result["errors"])
 
@@ -285,7 +314,13 @@ class TestImportAssets:
             ]
         )
         fake_file = FakeUploadFile(buf)
-        result = await import_assets(file=fake_file, mode="confirm", db=db, current_user=test_user)
+        result = await import_assets(
+            file=fake_file,
+            mode="confirm",
+            db=db,
+            current_user=test_user,
+            context=_admin_context(test_user),
+        )
         assert result["success_count"] == 1
         assert len(result["created_ids"]) == 1
 
@@ -316,7 +351,13 @@ class TestImportAssets:
             ]
         )
         fake_file = FakeUploadFile(buf)
-        result = await import_assets(file=fake_file, mode="preview", db=db, current_user=test_user)
+        result = await import_assets(
+            file=fake_file,
+            mode="preview",
+            db=db,
+            current_user=test_user,
+            context=_admin_context(test_user),
+        )
         assert result["error_count"] >= 1
         assert any("Excel内编码重复" in e["message"] for e in result["errors"])
 
@@ -336,7 +377,14 @@ class TestExportAssets:
         await db.commit()
 
         response = await export_assets(
-            asset_type=None, status=None, cabinet_id=None, keyword=None, template=False, db=db, _=user
+            asset_type=None,
+            status=None,
+            cabinet_id=None,
+            keyword=None,
+            template=False,
+            db=db,
+            _=user,
+            context=_admin_context(user),
         )
 
         # 读取 StreamingResponse body

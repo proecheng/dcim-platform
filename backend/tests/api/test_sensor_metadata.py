@@ -7,7 +7,42 @@ import pytest
 from datetime import date, timedelta
 from httpx import AsyncClient
 
+from app.models.device import Device
 from app.models.diagnosis import SensorMetadata, CalibrationStatus
+from app.models.point import Point
+from app.models.spatial import Site
+from app.models.user import UserSite
+
+
+@pytest.fixture(autouse=True)
+async def sensor_points(async_db, operator_user):
+    operator, _ = operator_user
+    site = Site(site_code="SENSOR-METADATA-SITE", site_name="传感器元数据测试站点")
+    async_db.add(site)
+    await async_db.flush()
+    device = Device(
+        device_code="SENSOR-METADATA-DEVICE",
+        device_name="传感器元数据测试设备",
+        device_type="UPS",
+        area_code="A",
+        site_id=site.id,
+    )
+    async_db.add(device)
+    await async_db.flush()
+    async_db.add(UserSite(user_id=operator.id, site_id=site.id))
+    async_db.add_all(
+        [
+            Point(
+                id=point_id,
+                point_code=f"SENSOR-METADATA-{point_id}",
+                point_name=f"传感器点位 {point_id}",
+                point_type="AI",
+                device_id=device.id,
+            )
+            for point_id in [*range(1001, 1012), 2001, 2002]
+        ]
+    )
+    await async_db.flush()
 
 
 class TestSensorMetadataAPI:
@@ -260,13 +295,13 @@ class TestSensorMetadataAPI:
     async def test_get_calibration_status_no_metadata(self, client: AsyncClient, admin_token: str):
         """测试获取校准状态 - 无元数据"""
         response = await client.get(
-            "/api/v1/diagnosis/sensor-metadata/calibration-status/99999",
+            "/api/v1/diagnosis/sensor-metadata/calibration-status/1011",
             headers={"Authorization": f"Bearer {admin_token}"}
         )
 
         assert response.status_code == 200
         data = response.json()
-        assert data["point_id"] == 99999
+        assert data["point_id"] == 1011
         assert data["status"] == CalibrationStatus.NO_METADATA.value
 
     @pytest.mark.asyncio

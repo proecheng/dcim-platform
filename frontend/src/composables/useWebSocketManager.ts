@@ -8,26 +8,49 @@
  * - Story 27.6: 记录订阅信息，站点切换时 reconnectAll
  */
 import { WebSocketClient } from '@/api/websocket'
+import type { WebSocketSubscribeOptions } from '@/api/websocket'
 import { siteEvents } from '@/utils/siteEvents'
 
 // WebSocket 通道类型
 export type WebSocketChannel = 'alarms' | 'realtime' | 'system' | 'linkage'
 
-// 订阅选项类型
-interface SubscribeOptions {
-  channels?: string[]
-  filters?: {
-    point_ids?: number[]
-    area_codes?: string[]
-    alarm_levels?: string[]
-  }
-}
-
 // 连接池：每个通道一个 WebSocketClient 实例
 const clients = new Map<WebSocketChannel, WebSocketClient>()
 
 // Story 27.6: 订阅记录，disconnect 不丢失
-const subscriptions = new Map<WebSocketChannel, SubscribeOptions>()
+const subscriptions = new Map<WebSocketChannel, WebSocketSubscribeOptions>()
+
+function getCurrentSiteId(): number | null {
+  const storedSiteId = localStorage.getItem('current_site_id')
+  if (storedSiteId === null) return null
+  const siteId = Number(storedSiteId)
+  return Number.isInteger(siteId) && siteId > 0 ? siteId : null
+}
+
+function withoutSiteScope(options: WebSocketSubscribeOptions): WebSocketSubscribeOptions {
+  const filters = { ...options.filters }
+  delete filters.site_ids
+  return {
+    channels: options.channels ? [...options.channels] : undefined,
+    filters: Object.keys(filters).length > 0 ? filters : undefined,
+  }
+}
+
+function withSiteScope(
+  options: WebSocketSubscribeOptions,
+  siteId: number | null,
+): WebSocketSubscribeOptions {
+  const filters = { ...options.filters }
+  if (siteId === null) {
+    delete filters.site_ids
+  } else {
+    filters.site_ids = [siteId]
+  }
+  return {
+    channels: options.channels ? [...options.channels] : undefined,
+    filters: Object.keys(filters).length > 0 ? filters : undefined,
+  }
+}
 
 // 辅助函数：获取客户端或警告
 function getClientOrWarn(channel: WebSocketChannel): WebSocketClient | null {
@@ -45,7 +68,7 @@ const manager = {
    */
   connect(channel: WebSocketChannel): void {
     const existing = clients.get(channel)
-    if (existing?.isConnected) {
+    if (existing) {
       return
     }
 
@@ -103,12 +126,13 @@ const manager = {
   /**
    * 订阅频道/过滤器（Story 27.6: 同时记录订阅信息）
    */
-  subscribe(channel: WebSocketChannel, options: SubscribeOptions): void {
-    // 记录订阅信息，reconnectAll 时恢复
-    subscriptions.set(channel, options)
+  subscribe(channel: WebSocketChannel, options: WebSocketSubscribeOptions): void {
+    // 仅记录业务过滤器，站点范围始终由当前站点选择重新生成
+    const baseOptions = withoutSiteScope(options)
+    subscriptions.set(channel, baseOptions)
     const client = getClientOrWarn(channel)
     if (client) {
-      client.subscribe(options)
+      client.subscribe(withSiteScope(baseOptions, getCurrentSiteId()))
     }
   },
 
@@ -126,7 +150,7 @@ const manager = {
    * Story 27.6: 断开所有连接并基于订阅记录重连
    * 站点切换时调用，确保 WebSocket 推送数据与新站点一致
    */
-  reconnectAll(): void {
+  reconnectAll(siteId: number | null = getCurrentSiteId()): void {
     // 收集所有需要重连的通道（已连接或有订阅记录的）
     const channelsToReconnect = new Set<WebSocketChannel>([
       ...clients.keys(),
@@ -147,13 +171,10 @@ const manager = {
         heartbeatInterval: 30000,
         reconnectInterval: 3000,
         maxReconnectAttempts: 10,
-        onOpen: () => {
-          // 重连成功后自动重新订阅（如果有订阅记录）
-          if (options) {
-            client.subscribe(options)
-          }
-        },
       })
+      if (options) {
+        client.subscribe(withSiteScope(options, siteId))
+      }
       client.connect()
       clients.set(channel, client)
     }
@@ -161,8 +182,8 @@ const manager = {
 }
 
 // Story 27.6: 站点切换时自动重连 WebSocket
-function handleSiteChange() {
-  manager.reconnectAll()
+function handleSiteChange(siteId: number | null) {
+  manager.reconnectAll(siteId)
 }
 siteEvents.on(handleSiteChange)
 

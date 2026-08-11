@@ -4,9 +4,10 @@
 Story 31.3: 测试 4 个预冷计划 REST API 端点的功能、权限和错误处理。
 """
 
+from datetime import date, time
+from unittest.mock import AsyncMock, patch
+
 import pytest
-from datetime import date, time, datetime
-from unittest.mock import AsyncMock, MagicMock, patch
 
 from tests.conftest import auth_headers
 
@@ -134,8 +135,7 @@ class TestCreateSchedule:
             json={"schedule_date": "2026-03-15"},
             headers=auth_headers(token),
         )
-        assert resp.status_code == 200
-        assert resp.json()["code"] == 404
+        assert resp.status_code == 404
 
     async def test_create_schedule_invalid_date(self, client, admin_user, sample_zone):
         """日期格式错误返回 422"""
@@ -298,7 +298,7 @@ class TestListSchedules:
             "/api/v1/precool/zones/99999/schedule",
             headers=auth_headers(token),
         )
-        assert resp.json()["code"] == 404
+        assert resp.status_code == 404
 
     async def test_list_schedules_pagination(self, client, admin_user, sample_zone, sample_plan):
         """分页参数"""
@@ -337,7 +337,7 @@ class TestGetSchedule:
             "/api/v1/precool/schedules/99999",
             headers=auth_headers(token),
         )
-        assert resp.json()["code"] == 404
+        assert resp.status_code == 404
 
 
 # ==================== POST /schedules/{schedule_id}/abort 测试 ====================
@@ -388,7 +388,7 @@ class TestAbortSchedule:
             json={"reason": "测试"},
             headers=auth_headers(token),
         )
-        assert resp.json()["code"] == 404
+        assert resp.status_code == 404
 
     async def test_abort_default_reason(self, client, admin_user, executing_plan):
         """不传 reason 使用默认值"""

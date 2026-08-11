@@ -7,11 +7,20 @@ from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sess
 from sqlalchemy import delete
 
 from app.core.database import Base
+from app.models.device import Device
 from app.models.video import NVR, Camera, CameraPreset, VideoEvent
 from app.models.user import User
 from app.models.alarm import Alarm
 from app.models.point import Point
-from app.api.deps import get_db, require_admin, require_operator, require_viewer
+from app.api.deps import (
+    SiteAccessContext,
+    enforce_inventory_authorization,
+    get_db,
+    get_site_access_context,
+    require_admin,
+    require_operator,
+    require_viewer,
+)
 
 
 # ============================================================
@@ -47,6 +56,7 @@ async def db_session(session_factory):
         await session.execute(delete(NVR))
         await session.execute(delete(Alarm))
         await session.execute(delete(Point))
+        await session.execute(delete(Device))
         await session.commit()
         yield session
 
@@ -77,10 +87,18 @@ async def app(db_session, mock_admin):
     async def override_require_viewer():
         return mock_admin
 
+    async def override_inventory_authorization():
+        return None
+
+    async def override_site_access_context():
+        return SiteAccessContext(user_id=mock_admin.id, role="admin", jti="video-test-jti", site_ids=None)
+
     _app.dependency_overrides[get_db] = override_get_db
     _app.dependency_overrides[require_admin] = override_require_admin
     _app.dependency_overrides[require_operator] = override_require_operator
     _app.dependency_overrides[require_viewer] = override_require_viewer
+    _app.dependency_overrides[enforce_inventory_authorization] = override_inventory_authorization
+    _app.dependency_overrides[get_site_access_context] = override_site_access_context
     yield _app
     _app.dependency_overrides.clear()
 
@@ -422,15 +440,19 @@ async def test_get_cameras_by_area(client, db_session):
 @pytest.mark.anyio
 async def test_get_cameras_by_device(client, db_session):
     """GET /cameras/by-device/{device_id} 按设备联动查询"""
-    await _create_camera(db_session, "CAM-BD-001", "设备100摄像头", device_id=100)
-    await _create_camera(db_session, "CAM-BD-002", "设备200摄像头", device_id=200)
+    device_a = Device(device_code="DEV-CAM-100", device_name="设备100", device_type="CAM", area_code="A1")
+    device_b = Device(device_code="DEV-CAM-200", device_name="设备200", device_type="CAM", area_code="A2")
+    db_session.add_all([device_a, device_b])
+    await db_session.flush()
+    await _create_camera(db_session, "CAM-BD-001", "设备100摄像头", device_id=device_a.id)
+    await _create_camera(db_session, "CAM-BD-002", "设备200摄像头", device_id=device_b.id)
     await db_session.commit()
 
-    resp = await client.get(f"{BASE_URL}/cameras/by-device/100")
+    resp = await client.get(f"{BASE_URL}/cameras/by-device/{device_a.id}")
     assert resp.status_code == 200
     data = resp.json()
     assert len(data) == 1
-    assert data[0]["device_id"] == 100
+    assert data[0]["device_id"] == device_a.id
 
 
 # ============================================================

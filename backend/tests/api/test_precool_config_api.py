@@ -5,7 +5,6 @@ Story 31.4: 测试预冷配置查询和更新端点的功能、权限和审计�
 """
 
 import pytest
-from unittest.mock import AsyncMock, patch
 
 from tests.conftest import auth_headers
 
@@ -81,7 +80,7 @@ class TestGetPrecoolConfig:
             "/api/v1/precool/zones/99999/config",
             headers=auth_headers(token),
         )
-        assert resp.json()["code"] == 404
+        assert resp.status_code == 404
 
 
 # ==================== PUT /zones/{zone_id}/config 测试 ====================
@@ -138,7 +137,7 @@ class TestUpdatePrecoolConfig:
             json={"precool_enabled": True},
             headers=auth_headers(token),
         )
-        assert resp.json()["code"] == 404
+        assert resp.status_code == 404
 
     async def test_target_temp_below_min(self, client, admin_user, sample_zone):
         """precool_target_temp < 18 被 Pydantic 拒绝"""
@@ -199,9 +198,18 @@ class TestAuditLog:
 
 
 class TestConfigPermissions:
-    async def test_operator_can_read(self, client, operator_user, sample_zone):
+    async def test_operator_can_read(self, client, operator_user, sample_zone, async_db):
         """operator 可以查询配置"""
-        _, token = operator_user
+        from app.models.spatial import Site
+        from app.models.user import UserSite
+
+        operator, token = operator_user
+        site = Site(site_code="PRECOOL-CFG", site_name="预冷配置站点")
+        async_db.add(site)
+        await async_db.flush()
+        sample_zone.site_id = site.id
+        async_db.add(UserSite(user_id=operator.id, site_id=site.id))
+        await async_db.flush()
         resp = await client.get(
             f"/api/v1/precool/zones/{sample_zone.id}/config",
             headers=auth_headers(token),

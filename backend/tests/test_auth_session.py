@@ -68,6 +68,7 @@ async def app(db_session):
     login_limiter.attempts.clear()
     yield _app
     _app.dependency_overrides.clear()
+    login_limiter.attempts.clear()
 
 
 @pytest.fixture

@@ -3,6 +3,7 @@
  */
 import { ref, onMounted, onUnmounted, computed } from 'vue'
 import { WebSocketClient } from '@/api/websocket'
+import type { WebSocketSubscribeOptions } from '@/api/websocket'
 
 interface UseWebSocketOptions {
   url: string
@@ -54,14 +55,7 @@ export function useWebSocket(options: UseWebSocketOptions) {
     wsClient.send(data)
   }
 
-  const subscribe = (options: {
-    channels?: string[]
-    filters?: {
-      point_ids?: number[]
-      area_codes?: string[]
-      alarm_levels?: string[]
-    }
-  }) => {
+  const subscribe = (options: WebSocketSubscribeOptions) => {
     wsClient.subscribe(options)
   }
 

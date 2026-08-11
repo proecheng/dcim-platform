@@ -13,7 +13,15 @@ from app.models.diagnosis import DiagnosisRule, DiagnosisResult
 from app.models.alarm import Alarm
 from app.models.point import Point
 from app.models.user import User
-from app.api.deps import get_db, require_admin, require_operator, require_viewer
+from app.api.deps import (
+    SiteAccessContext,
+    enforce_inventory_authorization,
+    get_db,
+    get_site_access_context,
+    require_admin,
+    require_operator,
+    require_viewer,
+)
 
 
 # ============================================================
@@ -86,10 +94,18 @@ async def app(db_session, mock_admin, mock_viewer):
     async def override_require_viewer():
         return mock_viewer
 
+    async def override_inventory_authorization():
+        return None
+
+    async def override_site_access_context():
+        return SiteAccessContext(mock_admin.id, "admin", "test-jti", None)
+
     _app.dependency_overrides[get_db] = override_get_db
     _app.dependency_overrides[require_admin] = override_require_admin
     _app.dependency_overrides[require_operator] = override_require_operator
     _app.dependency_overrides[require_viewer] = override_require_viewer
+    _app.dependency_overrides[enforce_inventory_authorization] = override_inventory_authorization
+    _app.dependency_overrides[get_site_access_context] = override_site_access_context
     yield _app
     _app.dependency_overrides.clear()
 
@@ -169,9 +185,27 @@ async def seed_system_rule(db_session):
 @pytest.fixture
 async def seed_result(db_session, seed_rule):
     """创建测试诊断结果"""
-    result = DiagnosisResult(
-        alarm_id=100,
+    point = Point(
+        point_code="TEST_RESULT_PT_001",
+        point_name="测试结果点位",
+        point_type="AI",
+        device_type="TH",
+        area_code="A1",
+    )
+    db_session.add(point)
+    await db_session.flush()
+    alarm = Alarm(
         alarm_no="ALM-TEST-001",
+        point_id=point.id,
+        alarm_level="critical",
+        alarm_type="threshold",
+        alarm_message="诊断结果测试告警",
+    )
+    db_session.add(alarm)
+    await db_session.flush()
+    result = DiagnosisResult(
+        alarm_id=alarm.id,
+        alarm_no=alarm.alarm_no,
         rule_id=seed_rule.id,
         rule_code=seed_rule.rule_code,
         device_type="TH",
@@ -457,11 +491,11 @@ async def test_diagnosis_result_query(client, seed_result):
     assert len(detail["causes"]) == 2
 
     # 按告警ID查询
-    resp = await client.get(f"{BASE_URL}/results/by-alarm/100")
+    resp = await client.get(f"{BASE_URL}/results/by-alarm/{seed_result.alarm_id}")
     assert resp.status_code == 200
     results = resp.json()
     assert len(results) >= 1
-    assert results[0]["alarm_id"] == 100
+    assert results[0]["alarm_id"] == seed_result.alarm_id
 
     # 不存在的结果
     resp = await client.get(f"{BASE_URL}/results/99999")

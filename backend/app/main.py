@@ -6,17 +6,18 @@ V2.0 架构重构版
 import asyncio
 from datetime import datetime, timedelta
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Query
+from fastapi import Depends, FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import select, text
-from jose import jwt, JWTError
 
 from .core.config import get_settings
+from .core.authorization import validate_authorization_inventory
 from .core.database import init_db, async_session
 from .core.security import get_password_hash
 from .models import User
 from .api.v1 import api_router
-from .services.websocket import ws_manager
+from .api.deps import authenticate_access_token, build_site_access_context, enforce_inventory_authorization
+from .services.websocket import ConnectionContext, WebSocketAuthorizationContext, ws_manager
 from .demo.lifecycle import startup as demo_startup, shutdown as demo_shutdown
 from .core.redis import redis_service
 from .engines.alarm_engine import alarm_engine
@@ -41,22 +42,32 @@ logger = logging.getLogger(__name__)
 settings = get_settings()
 
 
-async def verify_websocket_token(token: str) -> bool:
-    """验证 WebSocket 连接的 JWT 令牌"""
-    if not token:
-        return False
+async def verify_websocket_token(
+    token: str, channel: str, *, db=None
+) -> WebSocketAuthorizationContext | None:
+    """返回严格活动会话授权上下文，不向连接池暴露原始令牌。"""
+    if not isinstance(token, str) or not token:
+        return None
+
+    async def _verify(session):
+        identity = await authenticate_access_token(token, session)
+        site_context = await build_site_access_context(identity.user, identity.jti, session)
+        return WebSocketAuthorizationContext(
+            user_id=identity.user.id,
+            jti=identity.jti,
+            role=identity.user.role,
+            allowed_site_ids=site_context.site_ids,
+            channel=channel,
+            username=identity.user.username,
+        )
+
     try:
-        payload = jwt.decode(token, settings.secret_key, algorithms=[settings.algorithm])
-        username = payload.get("sub")
-        if username is None:
-            return False
-        # 验证用户是否存在且活跃
+        if db is not None:
+            return await _verify(db)
         async with async_session() as session:
-            result = await session.execute(select(User).where(User.username == username))
-            user = result.scalar_one_or_none()
-            return user is not None and user.is_active
-    except JWTError:
-        return False
+            return await _verify(session)
+    except HTTPException:
+        return None
 
 
 async def init_default_data():
@@ -216,6 +227,9 @@ async def init_default_configs():
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # 清单漂移时，在启动任何工作线程或监听器之前失败。
+    validate_authorization_inventory(app)
+
     """应用生命周期管理 - Story 28.2: 分层启动"""
     # 启动时初始化数据库
     await init_db()
@@ -1286,6 +1300,7 @@ app = FastAPI(
     version=settings.app_version,
     description="机房动力环境监测系统 API - V2.0",
     lifespan=lifespan,
+    dependencies=[Depends(enforce_inventory_authorization)],
     docs_url="/docs",
     redoc_url="/redoc",
 )
@@ -1434,48 +1449,71 @@ async def get_app_metrics():
     return metrics
 
 
-# WebSocket 路由 - 需要 JWT 令牌认证
-@app.websocket("/ws/realtime")
-async def websocket_realtime(websocket: WebSocket, token: str = Query(None)):
-    """实时数据 WebSocket（需要认证）"""
-    if not await verify_websocket_token(token):
-        await websocket.close(code=4001, reason="Unauthorized")
-        return
-    await ws_manager.connect(websocket, "realtime")
+# WebSocket 使用首帧认证，避免原始 JWT 进入 URL。
+WS_AUTH_TIMEOUT_SECONDS = 5
+
+
+async def _serve_authorized_websocket(websocket: WebSocket, channel: str) -> None:
+    await websocket.accept()
+    context = None
     try:
+        try:
+            auth_frame = await asyncio.wait_for(websocket.receive_json(), timeout=WS_AUTH_TIMEOUT_SECONDS)
+        except Exception:
+            await websocket.close(code=4001, reason="Unauthorized")
+            return
+        if (
+            not isinstance(auth_frame, dict)
+            or set(auth_frame) != {"action", "token"}
+            or auth_frame.get("action") != "authenticate"
+            or not isinstance(auth_frame.get("token"), str)
+        ):
+            await websocket.close(code=4001, reason="Unauthorized")
+            return
+
+        authorization = await verify_websocket_token(auth_frame["token"], channel)
+        if authorization is None:
+            await websocket.close(code=4001, reason="Unauthorized")
+            return
+        context = ConnectionContext(
+            websocket=websocket,
+            user_id=authorization.user_id,
+            jti=authorization.jti,
+            role=authorization.role,
+            allowed_site_ids=authorization.allowed_site_ids,
+            channel=authorization.channel,
+            username=authorization.username,
+        )
+        await ws_manager.connect(context, already_accepted=True)
+        await websocket.send_json({"type": "authenticated"})
+
         while True:
-            await websocket.receive_text()
-            # 可以处理客户端发来的订阅请求
+            try:
+                message = await websocket.receive_json()
+                await ws_manager.handle_client_message(context, message)
+            except ValueError:
+                await websocket.close(code=4001, reason="Unauthorized")
+                return
     except WebSocketDisconnect:
-        ws_manager.disconnect(websocket, "realtime")
+        pass
+    finally:
+        if context is not None:
+            ws_manager.disconnect(context)
+
+
+@app.websocket("/ws/realtime")
+async def websocket_realtime(websocket: WebSocket):
+    await _serve_authorized_websocket(websocket, "realtime")
 
 
 @app.websocket("/ws/alarms")
-async def websocket_alarms(websocket: WebSocket, token: str = Query(None)):
-    """告警 WebSocket（需要认证）"""
-    if not await verify_websocket_token(token):
-        await websocket.close(code=4001, reason="Unauthorized")
-        return
-    await ws_manager.connect(websocket, "alarms")
-    try:
-        while True:
-            await websocket.receive_text()
-    except WebSocketDisconnect:
-        ws_manager.disconnect(websocket, "alarms")
+async def websocket_alarms(websocket: WebSocket):
+    await _serve_authorized_websocket(websocket, "alarms")
 
 
 @app.websocket("/ws/system")
-async def websocket_system(websocket: WebSocket, token: str = Query(None)):
-    """系统状态 WebSocket（需要认证）"""
-    if not await verify_websocket_token(token):
-        await websocket.close(code=4001, reason="Unauthorized")
-        return
-    await ws_manager.connect(websocket, "system")
-    try:
-        while True:
-            await websocket.receive_text()
-    except WebSocketDisconnect:
-        ws_manager.disconnect(websocket, "system")
+async def websocket_system(websocket: WebSocket):
+    await _serve_authorized_websocket(websocket, "system")
 
 
 if __name__ == "__main__":

@@ -19,7 +19,14 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Literal, Optional
 
-from ...api.deps import get_db, require_role
+from ...api.deps import (
+    SiteAccessContext,
+    apply_cooling_zone_site_scope,
+    get_authorized_cooling_zone,
+    get_db,
+    get_site_access_context,
+    require_role,
+)
 from ...schemas.precool import (
     PredictRequest,
     PredictResponse,
@@ -48,12 +55,31 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
+async def _get_authorized_schedule(db: AsyncSession, schedule_id: int, context: SiteAccessContext):
+    from ...models.thermal import PrecoolSchedule
+    from ...models.topology_config import CoolingZone
+
+    statement = (
+        select(PrecoolSchedule)
+        .join(CoolingZone, PrecoolSchedule.cooling_zone_id == CoolingZone.id)
+        .where(PrecoolSchedule.id == schedule_id)
+    )
+    statement = apply_cooling_zone_site_scope(statement, CoolingZone.site_id, context)
+    plan = (await db.execute(statement)).scalar_one_or_none()
+    if plan is None:
+        from fastapi import HTTPException
+
+        raise HTTPException(status_code=404, detail="预冷计划不存在")
+    return plan
+
+
 @router.post("/zones/{zone_id}/predict", summary="温度轨迹预测")
 async def predict_temperature(
     zone_id: int,
     request: PredictRequest,
     db: AsyncSession = Depends(get_db),
     _=Depends(require_role(["admin", "operator"])),
+    context: SiteAccessContext = Depends(get_site_access_context),
 ):
     """
     预测制冷区域温度变化
@@ -61,6 +87,7 @@ async def predict_temperature(
     - 如果 RC 参数已校准，使用 TCL 模型预测
     - 如果 RC 参数未校准，自动回退到 THM 兜底
     """
+    await get_authorized_cooling_zone(db, zone_id, context)
     try:
         from ...services.precool.thermal_model import ThermalModel
 
@@ -162,8 +189,10 @@ async def get_thermal_parameters(
     limit: int = Query(default=20, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
     _=Depends(require_role(["admin", "operator"])),
+    context: SiteAccessContext = Depends(get_site_access_context),
 ):
     """返回指定制冷区域的热参数标定历史"""
+    await get_authorized_cooling_zone(db, zone_id, context)
     try:
         from ...models.thermal import ThermalParameter
 
@@ -201,8 +230,10 @@ async def get_validation_report(
     zone_id: int,
     db: AsyncSession = Depends(get_db),
     _=Depends(require_role(["admin", "operator"])),
+    context: SiteAccessContext = Depends(get_site_access_context),
 ):
     """返回模型验证报告（最近 7 天）"""
+    await get_authorized_cooling_zone(db, zone_id, context)
     try:
         from ...models.thermal import TemperaturePredictionLog
 
@@ -273,6 +304,7 @@ async def get_validation_report(
 async def get_dashboard(
     db: AsyncSession = Depends(get_db),
     _=Depends(require_role(["admin", "operator"])),
+    context: SiteAccessContext = Depends(get_site_access_context),
 ):
     """返回预冷仪表盘聚合数据"""
     try:
@@ -288,12 +320,17 @@ async def get_dashboard(
         from ...services.datacenter_shift_strategy import calculate_shiftable_power_for_zone
 
         # 1. 查询所有 CoolingZone
-        zones_result = await db.execute(select(CoolingZone))
+        zones_statement = apply_cooling_zone_site_scope(select(CoolingZone), CoolingZone.site_id, context)
+        zones_result = await db.execute(zones_statement)
         zones = zones_result.scalars().all()
+        zone_ids = [zone.id for zone in zones]
 
         # 2. 批量查询所有 zone 的 active thermal_parameters
         active_params_result = await db.execute(
-            select(ThermalParameter.cooling_zone_id).where(ThermalParameter.is_active == True)
+            select(ThermalParameter.cooling_zone_id).where(
+                ThermalParameter.is_active == True,
+                ThermalParameter.cooling_zone_id.in_(zone_ids),
+            )
         )
         calibrated_zone_ids = set(row[0] for row in active_params_result.all())
 
@@ -314,6 +351,7 @@ async def get_dashboard(
                 and_(
                     CabinetTemperatureSensor.sensor_location == "inlet",
                     PointHistory.recorded_at >= five_min_ago,
+                    CoolingZoneCabinet.zone_id.in_(zone_ids),
                 )
             )
             .group_by(CoolingZoneCabinet.zone_id)
@@ -393,8 +431,10 @@ async def get_rollback_status(
     zone_id: int,
     db: AsyncSession = Depends(get_db),
     _=Depends(require_role(["admin", "operator", "viewer"])),
+    context: SiteAccessContext = Depends(get_site_access_context),
 ):
     """返回指定 zone 的实时回退保护状态"""
+    await get_authorized_cooling_zone(db, zone_id, context)
     try:
         from ...models.topology_config import CoolingZone
 
@@ -431,8 +471,10 @@ async def get_rollback_history(
     ),
     db: AsyncSession = Depends(get_db),
     _=Depends(require_role(["admin", "operator", "viewer"])),
+    context: SiteAccessContext = Depends(get_site_access_context),
 ):
     """查询指定 zone 的历史回退事件，支持分页和 status 筛选"""
+    await get_authorized_cooling_zone(db, zone_id, context)
     try:
         from ...models.topology_config import CoolingZone
 
@@ -474,13 +516,15 @@ async def get_rollback_history(
 async def get_rollback_overview(
     db: AsyncSession = Depends(get_db),
     _=Depends(require_role(["admin", "operator", "viewer"])),
+    context: SiteAccessContext = Depends(get_site_access_context),
 ):
     """返回所有 zone 的回退状态汇总"""
     try:
         from ...models.topology_config import CoolingZone
 
         # 查询所有 CoolingZone
-        zones_result = await db.execute(select(CoolingZone.id))
+        zones_statement = apply_cooling_zone_site_scope(select(CoolingZone.id), CoolingZone.site_id, context)
+        zones_result = await db.execute(zones_statement)
         zone_ids = zones_result.scalars().all()
         total_zones = len(zone_ids)
 
@@ -510,9 +554,17 @@ async def get_rollback_overview(
         # 查询最近 24h 事件数
         now = datetime.now()
         day_ago = now - timedelta(hours=24)
-        recent_count = (
-            await db.execute(select(func.count(RollbackEvent.id)).where(RollbackEvent.created_at >= day_ago))
-        ).scalar() or 0
+        if zone_ids:
+            recent_count = (
+                await db.execute(
+                    select(func.count(RollbackEvent.id)).where(
+                        RollbackEvent.created_at >= day_ago,
+                        RollbackEvent.zone_id.in_(zone_ids),
+                    )
+                )
+            ).scalar() or 0
+        else:
+            recent_count = 0
 
         return {
             "code": 200,
@@ -585,8 +637,10 @@ async def create_schedule(
     request: ScheduleCreateRequest,
     db: AsyncSession = Depends(get_db),
     _=Depends(require_role(["admin", "operator"])),
+    context: SiteAccessContext = Depends(get_site_access_context),
 ):
     """生成日前预冷计划（调用贪心优化算法）"""
+    await get_authorized_cooling_zone(db, zone_id, context)
     try:
         from ...models.topology_config import CoolingZone
         from ...services.precool.scheduler import (
@@ -673,8 +727,10 @@ async def list_schedules(
     ),
     db: AsyncSession = Depends(get_db),
     _=Depends(require_role(["admin", "operator"])),
+    context: SiteAccessContext = Depends(get_site_access_context),
 ):
     """查询指定 zone 的预冷计划列表（不含 trajectory）"""
+    await get_authorized_cooling_zone(db, zone_id, context)
     try:
         from ...models.topology_config import CoolingZone
         from ...models.thermal import PrecoolSchedule
@@ -716,16 +772,11 @@ async def get_schedule(
     schedule_id: int,
     db: AsyncSession = Depends(get_db),
     _=Depends(require_role(["admin", "operator"])),
+    context: SiteAccessContext = Depends(get_site_access_context),
 ):
     """查询单个预冷计划详情（含完整 trajectory）"""
+    plan = await _get_authorized_schedule(db, schedule_id, context)
     try:
-        from ...models.thermal import PrecoolSchedule
-
-        plan = (await db.execute(select(PrecoolSchedule).where(PrecoolSchedule.id == schedule_id))).scalar_one_or_none()
-
-        if plan is None:
-            return {"code": 404, "message": f"预冷计划 {schedule_id} 不存在", "data": None}
-
         return {"code": 200, "message": "success", "data": _schedule_to_detail(plan)}
 
     except Exception as e:
@@ -739,16 +790,12 @@ async def abort_schedule(
     request: ScheduleAbortRequest,
     db: AsyncSession = Depends(get_db),
     _=Depends(require_role(["admin", "operator"])),
+    context: SiteAccessContext = Depends(get_site_access_context),
 ):
     """中止执行中的预冷计划"""
+    plan = await _get_authorized_schedule(db, schedule_id, context)
     try:
-        from ...models.thermal import PrecoolSchedule
         from ...services.precool.executor import precool_executor
-
-        plan = (await db.execute(select(PrecoolSchedule).where(PrecoolSchedule.id == schedule_id))).scalar_one_or_none()
-
-        if plan is None:
-            return {"code": 404, "message": f"预冷计划 {schedule_id} 不存在", "data": None}
 
         if plan.status != "executing":
             return {
@@ -783,8 +830,10 @@ async def get_precool_config(
     zone_id: int,
     db: AsyncSession = Depends(get_db),
     _=Depends(require_role(["admin", "operator"])),
+    context: SiteAccessContext = Depends(get_site_access_context),
 ):
     """查询指定 zone 的预冷配置（precool_enabled, precool_target_temp）"""
+    await get_authorized_cooling_zone(db, zone_id, context)
     try:
         from ...models.topology_config import CoolingZone
         from ...models.load_shift import CoolingLinkageConfig
@@ -832,8 +881,10 @@ async def update_precool_config(
     request: PrecoolConfigUpdate,
     db: AsyncSession = Depends(get_db),
     current_user=Depends(require_role(["admin"])),
+    context: SiteAccessContext = Depends(get_site_access_context),
 ):
     """更新指定 zone 的预冷配置（admin only）"""
+    await get_authorized_cooling_zone(db, zone_id, context)
     try:
         from ...models.topology_config import CoolingZone
         from ...models.load_shift import CoolingLinkageConfig
@@ -918,8 +969,10 @@ async def trigger_calibration(
     zone_id: int,
     db: AsyncSession = Depends(get_db),
     _=Depends(require_role(["admin", "operator"])),
+    context: SiteAccessContext = Depends(get_site_access_context),
 ):
     """手动触发指定区域的 RC 参数校准"""
+    await get_authorized_cooling_zone(db, zone_id, context)
     try:
         from ...models.topology_config import CoolingZone
 
@@ -953,8 +1006,10 @@ async def get_calibration_history(
     limit: int = Query(default=20, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
     _=Depends(require_role(["admin", "operator", "viewer"])),
+    context: SiteAccessContext = Depends(get_site_access_context),
 ):
     """返回指定区域的校准历史记录（仅非 demo 记录）"""
+    await get_authorized_cooling_zone(db, zone_id, context)
     try:
         from ...models.topology_config import CoolingZone
         from ...models.thermal import ThermalParameter
@@ -999,7 +1054,7 @@ async def get_calibration_history(
 
 @router.get("/deployment-phase", summary="查询当前部署阶段")
 async def get_deployment_phase(
-    _=Depends(require_role(["admin", "operator", "viewer"])),
+    _=Depends(require_role(["admin"])),
 ):
     """返回当前预冷功能部署阶段"""
     try:
@@ -1042,7 +1097,7 @@ async def update_deployment_phase(
 
 @router.get("/vpp/capacity", summary="查询 VPP 可调容量")
 async def get_vpp_capacity(
-    _=Depends(require_role(["admin", "operator", "viewer"])),
+    _=Depends(require_role(["admin"])),
 ):
     """
     查询各区域聚合的分向可调容量（仅部署阶段 4 可用）
@@ -1175,7 +1230,7 @@ async def list_vpp_dispatches(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     status: str = Query(None),
-    _=Depends(require_role(["admin", "operator"])),
+    _=Depends(require_role(["admin"])),
 ):
     """
     查询 VPP 调控指令历史（JWT 认证，admin/operator 可访问）
@@ -1196,7 +1251,7 @@ async def list_vpp_dispatches(
 
 @router.get("/vpp/statistics", summary="查询 VPP 需求响应统计")
 async def get_vpp_statistics(
-    _=Depends(require_role(["admin", "operator"])),
+    _=Depends(require_role(["admin"])),
 ):
     """查询 VPP 需求响应统计（日/月汇总，JWT 认证）"""
     try:

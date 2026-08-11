@@ -12,9 +12,18 @@ from sqlalchemy import select, func, update, and_
 import csv
 import io
 
-from ..deps import get_db, require_viewer, require_operator
+from ..deps import (
+    SiteAccessContext,
+    get_db,
+    get_site_access_context,
+    require_context_site_access,
+    require_operator,
+    require_viewer,
+    resolve_point_site_id,
+)
 from ...models.user import User
 from ...models.alarm import Alarm, AlarmShield
+from ...models.device import Device
 from ...models.point import Point
 from ...schemas.alarm import (
     AlarmInfo,
@@ -38,6 +47,54 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
+def _alarm_scope(query, context: SiteAccessContext):
+    if context.site_ids is None:
+        return query
+    authorized_ids = (
+        select(Alarm.id)
+        .join(Point, Alarm.point_id == Point.id)
+        .join(Device, Point.device_id == Device.id)
+        .where(Device.site_id.in_(context.site_ids))
+    )
+    return query.where(Alarm.id.in_(authorized_ids))
+
+
+async def _authorized_alarm(db: AsyncSession, alarm_id: int, context: SiteAccessContext) -> Alarm:
+    result = await db.execute(_alarm_scope(select(Alarm).where(Alarm.id == alarm_id), context))
+    alarm = result.scalar_one_or_none()
+    if alarm is None:
+        raise HTTPException(status_code=404, detail="告警不存在")
+    return alarm
+
+
+def _alarm_shield_scope(query, context: SiteAccessContext):
+    if context.site_ids is None:
+        return query
+    authorized_point_ids = (
+        select(Point.id).join(Device, Point.device_id == Device.id).where(Device.site_id.in_(context.site_ids))
+    )
+    return query.where(AlarmShield.point_id.in_(authorized_point_ids))
+
+
+async def _authorize_shield_point(db: AsyncSession, point_id: Optional[int], context: SiteAccessContext) -> None:
+    if point_id is None:
+        if context.site_ids is not None:
+            raise HTTPException(status_code=403, detail="无权创建全局告警屏蔽")
+        return
+    site_id = await resolve_point_site_id(db, point_id)
+    require_context_site_access(site_id, context, hide_existence=True)
+
+
+async def _authorized_alarm_shield(
+    db: AsyncSession, shield_id: int, context: SiteAccessContext
+) -> AlarmShield:
+    result = await db.execute(_alarm_shield_scope(select(AlarmShield).where(AlarmShield.id == shield_id), context))
+    shield = result.scalar_one_or_none()
+    if shield is None:
+        raise HTTPException(status_code=404, detail="告警屏蔽不存在")
+    return shield
+
+
 @router.get("", response_model=PageResponse[AlarmInfo], summary="获取告警列表")
 async def get_alarms(
     page: int = Query(1, ge=1),
@@ -52,11 +109,12 @@ async def get_alarms(
     data_source: Optional[str] = Query(None, description="数据来源过滤: demo/mqtt/bridge"),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_viewer),
+    site_context: SiteAccessContext = Depends(get_site_access_context),
 ):
     """
     获取告警列表（多条件筛选、分页）
     """
-    query = select(Alarm)
+    query = _alarm_scope(select(Alarm), site_context)
 
     if status:
         query = query.where(Alarm.status == status)
@@ -65,9 +123,9 @@ async def get_alarms(
     if point_id:
         query = query.where(Alarm.point_id == point_id)
     if device_type:
-        query = query.join(Point, Alarm.point_id == Point.id, isouter=True).where(
-            Point.device_type == device_type, Alarm.point_id.isnot(None)
-        )
+        if site_context.site_ids is None:
+            query = query.join(Point, Alarm.point_id == Point.id, isouter=True)
+        query = query.where(Point.device_type == device_type, Alarm.point_id.isnot(None))
     if start_time:
         query = query.where(Alarm.created_at >= start_time)
     if end_time:
@@ -105,12 +163,16 @@ async def get_alarms(
 
 
 @router.get("/active", summary="获取活动告警")
-async def get_active_alarms(db: AsyncSession = Depends(get_db), _: User = Depends(require_viewer)):
+async def get_active_alarms(
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_viewer),
+    site_context: SiteAccessContext = Depends(get_site_access_context),
+):
     """
     获取所有未解决的告警
     """
     query = (
-        select(Alarm)
+        _alarm_scope(select(Alarm), site_context)
         .where(Alarm.status.in_(["active", "acknowledged"]))
         .order_by(Alarm.alarm_level.desc(), Alarm.created_at.desc())
     )
@@ -138,12 +200,16 @@ async def get_active_alarms(db: AsyncSession = Depends(get_db), _: User = Depend
 
 
 @router.get("/count", response_model=AlarmCount, summary="获取各级别告警数量")
-async def get_alarm_count(db: AsyncSession = Depends(get_db), _: User = Depends(require_viewer)):
+async def get_alarm_count(
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_viewer),
+    site_context: SiteAccessContext = Depends(get_site_access_context),
+):
     """
     获取各级别的活动告警数量
     """
     result = await db.execute(
-        select(Alarm.alarm_level, func.count(Alarm.id))
+        _alarm_scope(select(Alarm.alarm_level, func.count(Alarm.id)), site_context)
         .where(Alarm.status.in_(["active", "acknowledged"]))
         .group_by(Alarm.alarm_level)
     )
@@ -166,6 +232,7 @@ async def get_alarm_statistics(
     alarm_level: Optional[str] = Query(None, description="告警级别: critical/major/minor/info"),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_viewer),
+    site_context: SiteAccessContext = Depends(get_site_access_context),
 ):
     """
     获取告警统计信息（支持按设备类型和告警级别筛选）
@@ -187,25 +254,30 @@ async def get_alarm_statistics(
     base_filter = and_(*conditions)
 
     # 总数
-    total_result = await db.execute(select(func.count(Alarm.id)).where(base_filter))
+    total_result = await db.execute(_alarm_scope(select(func.count(Alarm.id)), site_context).where(base_filter))
     total = total_result.scalar() or 0
 
     # 按级别统计
     level_result = await db.execute(
-        select(Alarm.alarm_level, func.count(Alarm.id)).where(base_filter).group_by(Alarm.alarm_level)
+        _alarm_scope(select(Alarm.alarm_level, func.count(Alarm.id)), site_context)
+        .where(base_filter)
+        .group_by(Alarm.alarm_level)
     )
     by_level = {row[0]: row[1] for row in level_result.all()}
 
     # 按状态统计
     status_result = await db.execute(
-        select(Alarm.status, func.count(Alarm.id)).where(base_filter).group_by(Alarm.status)
+        _alarm_scope(select(Alarm.status, func.count(Alarm.id)), site_context)
+        .where(base_filter)
+        .group_by(Alarm.status)
     )
     by_status = {row[0]: row[1] for row in status_result.all()}
 
     # 按设备类型统计（JOIN Point 表，排除无 point_id 的数据源告警）
     device_type_result = await db.execute(
-        select(Point.device_type, func.count(Alarm.id))
-        .join(Point, Alarm.point_id == Point.id)
+        _alarm_scope(
+            select(Point.device_type, func.count(Alarm.id)).join(Point, Alarm.point_id == Point.id), site_context
+        )
         .where(base_filter, Alarm.point_id.isnot(None))
         .group_by(Point.device_type)
     )
@@ -213,7 +285,9 @@ async def get_alarm_statistics(
 
     # 平均处理时间
     avg_conditions = conditions + [Alarm.status == "resolved"]
-    avg_duration_result = await db.execute(select(func.avg(Alarm.duration_seconds)).where(and_(*avg_conditions)))
+    avg_duration_result = await db.execute(
+        _alarm_scope(select(func.avg(Alarm.duration_seconds)), site_context).where(and_(*avg_conditions))
+    )
     avg_duration = avg_duration_result.scalar() or 0
 
     return AlarmStatistics(
@@ -232,6 +306,7 @@ async def get_alarm_trend(
     days: int = Query(7, ge=1, le=90, description="天数"),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_viewer),
+    site_context: SiteAccessContext = Depends(get_site_access_context),
 ):
     """
     获取告警趋势数据（按天统计）
@@ -239,7 +314,14 @@ async def get_alarm_trend(
     start_time = datetime.now() - timedelta(days=days)
 
     result = await db.execute(
-        select(func.date(Alarm.created_at).label("date"), Alarm.alarm_level, func.count(Alarm.id).label("count"))
+        _alarm_scope(
+            select(
+                func.date(Alarm.created_at).label("date"),
+                Alarm.alarm_level,
+                func.count(Alarm.id).label("count"),
+            ),
+            site_context,
+        )
         .where(Alarm.created_at >= start_time)
         .group_by(func.date(Alarm.created_at), Alarm.alarm_level)
         .order_by("date")
@@ -262,6 +344,7 @@ async def get_top_alarm_points(
     limit: int = Query(10, ge=1, le=50),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_viewer),
+    site_context: SiteAccessContext = Depends(get_site_access_context),
 ):
     """
     获取告警最多的点位
@@ -269,7 +352,7 @@ async def get_top_alarm_points(
     start_time = datetime.now() - timedelta(days=days)
 
     result = await db.execute(
-        select(Alarm.point_id, func.count(Alarm.id).label("alarm_count"))
+        _alarm_scope(select(Alarm.point_id, func.count(Alarm.id).label("alarm_count")), site_context)
         .where(Alarm.created_at >= start_time, Alarm.point_id.isnot(None))
         .group_by(Alarm.point_id)
         .order_by(func.count(Alarm.id).desc())
@@ -308,11 +391,12 @@ async def export_alarms(
     status: Optional[str] = Query(None),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_operator),
+    site_context: SiteAccessContext = Depends(get_site_access_context),
 ):
     """
     导出告警记录为CSV
     """
-    query = select(Alarm)
+    query = _alarm_scope(select(Alarm), site_context)
 
     if start_time:
         query = query.where(Alarm.created_at >= start_time)
@@ -353,11 +437,36 @@ async def export_alarms(
 
 @router.put("/batch-acknowledge", summary="批量确认告警")
 async def batch_acknowledge(
-    data: BatchAcknowledgeRequest, db: AsyncSession = Depends(get_db), current_user: User = Depends(require_operator)
+    data: BatchAcknowledgeRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_operator),
+    site_context: SiteAccessContext = Depends(get_site_access_context),
 ):
     """
     批量确认告警
     """
+    authorized_ids = (
+        await db.execute(_alarm_scope(select(Alarm.id).where(Alarm.id.in_(data.alarm_ids)), site_context))
+    ).scalars().all()
+    if set(authorized_ids) != set(data.alarm_ids):
+        raise HTTPException(status_code=404, detail="告警不存在")
+    site_rows = (
+        await db.execute(
+            select(Alarm.id, Device.site_id)
+            .select_from(Alarm)
+            .join(Point, Alarm.point_id == Point.id)
+            .join(Device, Point.device_id == Device.id)
+            .where(Alarm.id.in_(data.alarm_ids))
+        )
+    ).all()
+    alarm_ids_by_site: dict[Optional[int], list[int]] = {}
+    for authorized_alarm_id, site_id in site_rows:
+        if site_id is not None:
+            alarm_ids_by_site.setdefault(site_id, []).append(authorized_alarm_id)
+    scoped_alarm_ids = {alarm_id for alarm_ids in alarm_ids_by_site.values() for alarm_id in alarm_ids}
+    unscoped_alarm_ids = sorted(set(data.alarm_ids) - scoped_alarm_ids)
+    if unscoped_alarm_ids:
+        alarm_ids_by_site[None] = unscoped_alarm_ids
     now = datetime.now()
     result = await db.execute(
         update(Alarm)
@@ -369,14 +478,16 @@ async def batch_acknowledge(
     actual_count = result.rowcount
 
     # WebSocket 广播批量确认消息
-    await ws_manager.broadcast_alarm(
-        {
-            "alarm_ids": data.alarm_ids,
-            "acknowledged_by": current_user.id,
-            "acknowledged_at": now.isoformat(),
-            "action": "batch_ack",
-        }
-    )
+    for site_id, site_alarm_ids in alarm_ids_by_site.items():
+        await ws_manager.broadcast_alarm(
+            {
+                "alarm_ids": site_alarm_ids,
+                "acknowledged_by": current_user.id,
+                "acknowledged_at": now.isoformat(),
+                "action": "batch_ack",
+            },
+            site_id=site_id,
+        )
 
     return {"message": f"已确认 {actual_count} 条告警", "count": actual_count}
 
@@ -530,13 +641,15 @@ async def get_alarm_shields(
     alarm_level: Optional[str] = Query(None, description="告警级别"),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_viewer),
+    site_context: SiteAccessContext = Depends(get_site_access_context),
 ):
     """
     获取告警屏蔽列表（分页、筛选）
     """
-    query = select(AlarmShield)
+    query = _alarm_shield_scope(select(AlarmShield), site_context)
 
     if point_id:
+        await _authorize_shield_point(db, point_id, site_context)
         query = query.where(AlarmShield.point_id == point_id)
     if alarm_level:
         query = query.where(AlarmShield.alarm_level == alarm_level)
@@ -581,12 +694,16 @@ async def get_alarm_shields(
 
 @router.post("/shields", response_model=AlarmShieldInfo, summary="创建告警屏蔽")
 async def create_alarm_shield(
-    data: AlarmShieldCreate, db: AsyncSession = Depends(get_db), current_user: User = Depends(require_operator)
+    data: AlarmShieldCreate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_operator),
+    site_context: SiteAccessContext = Depends(get_site_access_context),
 ):
     """
     创建告警屏蔽
     """
 
+    await _authorize_shield_point(db, data.point_id, site_context)
     shield = AlarmShield(**data.model_dump(), created_by=current_user.id)
     db.add(shield)
     await db.commit()
@@ -600,16 +717,17 @@ async def create_alarm_shield(
 
 
 @router.delete("/shields/{shield_id}", summary="删除告警屏蔽")
-async def delete_alarm_shield(shield_id: int, db: AsyncSession = Depends(get_db), _: User = Depends(require_operator)):
+async def delete_alarm_shield(
+    shield_id: int,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_operator),
+    site_context: SiteAccessContext = Depends(get_site_access_context),
+):
     """
     删除告警屏蔽
     """
 
-    result = await db.execute(select(AlarmShield).where(AlarmShield.id == shield_id))
-    shield = result.scalar_one_or_none()
-
-    if not shield:
-        raise HTTPException(status_code=404, detail="告警屏蔽不存在")
+    shield = await _authorized_alarm_shield(db, shield_id, site_context)
 
     await db.delete(shield)
     await db.commit()
@@ -621,14 +739,16 @@ async def delete_alarm_shield(shield_id: int, db: AsyncSession = Depends(get_db)
 
 
 @router.get("/{alarm_id}", response_model=AlarmInfo, summary="获取告警详情")
-async def get_alarm(alarm_id: int, db: AsyncSession = Depends(get_db), _: User = Depends(require_viewer)):
+async def get_alarm(
+    alarm_id: int,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_viewer),
+    site_context: SiteAccessContext = Depends(get_site_access_context),
+):
     """
     获取告警详情
     """
-    result = await db.execute(select(Alarm).where(Alarm.id == alarm_id))
-    alarm = result.scalar_one_or_none()
-    if not alarm:
-        raise HTTPException(status_code=404, detail="告警不存在")
+    alarm = await _authorized_alarm(db, alarm_id, site_context)
 
     alarm_info = AlarmInfo.model_validate(alarm)
     if alarm.point_id:
@@ -647,15 +767,13 @@ async def acknowledge_alarm(
     data: AlarmAcknowledge,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_operator),
+    site_context: SiteAccessContext = Depends(get_site_access_context),
 ):
     """
     确认告警
     """
-    result = await db.execute(select(Alarm).where(Alarm.id == alarm_id))
-    alarm = result.scalar_one_or_none()
-
-    if not alarm:
-        raise HTTPException(status_code=404, detail="告警不存在")
+    alarm = await _authorized_alarm(db, alarm_id, site_context)
+    site_id = await resolve_point_site_id(db, alarm.point_id) if alarm.point_id is not None else None
 
     if alarm.status != "active":
         raise HTTPException(status_code=400, detail="告警状态不允许确认")
@@ -677,7 +795,8 @@ async def acknowledge_alarm(
             "acknowledged_at": now.isoformat(),
             "ack_remark": data.remark,
             "action": "ack",
-        }
+        },
+        site_id=site_id,
     )
 
     return {"message": "告警已确认"}
@@ -689,15 +808,13 @@ async def resolve_alarm(
     data: AlarmResolve,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_operator),
+    site_context: SiteAccessContext = Depends(get_site_access_context),
 ):
     """
     解决告警
     """
-    result = await db.execute(select(Alarm).where(Alarm.id == alarm_id))
-    alarm = result.scalar_one_or_none()
-
-    if not alarm:
-        raise HTTPException(status_code=404, detail="告警不存在")
+    alarm = await _authorized_alarm(db, alarm_id, site_context)
+    site_id = await resolve_point_site_id(db, alarm.point_id) if alarm.point_id is not None else None
 
     if alarm.status == "resolved":
         raise HTTPException(status_code=400, detail="告警已解决")
@@ -730,7 +847,8 @@ async def resolve_alarm(
             "resolve_type": data.resolve_type or "manual",
             "duration_seconds": duration,
             "action": "resolve",
-        }
+        },
+        site_id=site_id,
     )
 
     return {"message": "告警已解决"}
@@ -742,15 +860,13 @@ async def process_alarm(
     data: AlarmProcess,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_operator),
+    site_context: SiteAccessContext = Depends(get_site_access_context),
 ):
     """
     记录告警处理过程（不改变状态）
     """
-    result = await db.execute(select(Alarm).where(Alarm.id == alarm_id))
-    alarm = result.scalar_one_or_none()
-
-    if not alarm:
-        raise HTTPException(status_code=404, detail="告警不存在")
+    alarm = await _authorized_alarm(db, alarm_id, site_context)
+    site_id = await resolve_point_site_id(db, alarm.point_id) if alarm.point_id is not None else None
 
     if alarm.status not in ("active", "acknowledged"):
         raise HTTPException(status_code=400, detail="告警状态不允许处理")
@@ -771,7 +887,8 @@ async def process_alarm(
             "processed_by": current_user.id,
             "processed_at": now.isoformat(),
             "action": "update",
-        }
+        },
+        site_id=site_id,
     )
 
     return {"message": "告警处理记录已保存"}

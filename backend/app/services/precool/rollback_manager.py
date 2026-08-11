@@ -23,6 +23,7 @@ from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.rollback import RollbackEvent, RollbackTriggerType
+from app.models.topology_config import CoolingZone
 
 logger = logging.getLogger(__name__)
 
@@ -348,6 +349,7 @@ class RollbackManager:
         }
 
         logger.error(f"🛡️ Zone {zone_id} 回退触发: {trigger_type.value} — {result['action']}")
+        site_id = await self._get_zone_site_id(session, zone_id)
 
         # WebSocket 推送
         try:
@@ -363,7 +365,8 @@ class RollbackManager:
                     "threshold": result.get("threshold"),
                     "rollback_action": result["action"],
                     "timestamp": datetime.now().isoformat(),
-                }
+                },
+                site_id=site_id,
             )
         except Exception as e:
             logger.warning(f"回退事件 WebSocket 推送失败: {e}")
@@ -428,6 +431,7 @@ class RollbackManager:
         state["recovery_start"] = None
 
         logger.info(f"🛡️ Zone {zone_id} 回退恢复: {trigger_type.value}")
+        site_id = await self._get_zone_site_id(session, zone_id)
 
         # WebSocket 推送恢复通知
         try:
@@ -440,12 +444,18 @@ class RollbackManager:
                     "zone_id": zone_id,
                     "trigger_type": trigger_type.value,
                     "timestamp": datetime.now().isoformat(),
-                }
+                },
+                site_id=site_id,
             )
         except Exception as e:
             logger.warning(f"恢复通知 WebSocket 推送失败: {e}")
 
     # ==================== 辅助方法 ====================
+
+    async def _get_zone_site_id(self, session: AsyncSession, zone_id: int) -> Optional[int]:
+        """通过持久化 CoolingZone 关系解析站点归属。"""
+        result = await session.execute(select(CoolingZone.site_id).where(CoolingZone.id == zone_id))
+        return result.scalar_one_or_none()
 
     async def _get_config_value(self, session: AsyncSession, key: str, default: float) -> float:
         """从 SystemConfig 读取单个配置值"""

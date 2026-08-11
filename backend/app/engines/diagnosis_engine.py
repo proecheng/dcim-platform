@@ -321,6 +321,7 @@ class DiagnosisEngine:
             push_status = await DiagnosisPushService.push_diagnosis_result(
                 session_id=session_id,
                 device_id=payload.get("device_id"),
+                site_id=payload.get("site_id"),
                 device_type=device_type,
                 engine_level="L1",
                 confidence=top_confidence,

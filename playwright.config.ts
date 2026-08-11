@@ -5,11 +5,11 @@ const isCI = !!process.env.CI
 export default defineConfig({
   testDir: './e2e',
   timeout: 60000,
-  retries: isCI ? 1 : 0,
+  retries: 0,
   use: {
     baseURL: 'http://127.0.0.1:3000',
     screenshot: 'only-on-failure',
-    trace: 'on-first-retry',
+    trace: 'retain-on-failure',
   },
   projects: [
     {

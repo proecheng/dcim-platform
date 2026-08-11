@@ -3,6 +3,7 @@
 """
 
 from datetime import datetime
+import logging
 from typing import Optional, List
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -14,8 +15,22 @@ from ...models.user import User, UserLoginHistory, UserSite
 from ...models.spatial import Site
 from ...schemas.user import UserCreate, UserUpdate, UserInfo, UserLoginHistoryResponse, UserSiteUpdate, UserSiteInfo
 from ...schemas.common import PageResponse
+from ...services.websocket import ws_manager
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
+
+
+async def _invalidate_user_after_commit(user_id: int) -> None:
+    try:
+        await ws_manager.invalidate_user(user_id)
+    except Exception as exc:
+        logger.error(
+            "WebSocket revocation failed: event=user_authorization_changed user_id=%s error=%s",
+            user_id,
+            exc,
+            extra={"security_event": "user_authorization_revocation_failed", "user_id": user_id},
+        )
 
 
 @router.get("", response_model=PageResponse[UserInfo], summary="获取用户列表")
@@ -133,6 +148,7 @@ async def update_user(
 
     await db.execute(update(User).where(User.id == user_id).values(**update_data))
     await db.commit()
+    await _invalidate_user_after_commit(user_id)
 
     # 重新查询
     result = await db.execute(select(User).where(User.id == user_id))
@@ -156,6 +172,7 @@ async def delete_user(user_id: int, db: AsyncSession = Depends(get_db), current_
 
     await db.execute(delete(User).where(User.id == user_id))
     await db.commit()
+    await _invalidate_user_after_commit(user_id)
 
     return {"message": "用户已删除"}
 
@@ -177,6 +194,8 @@ async def batch_delete_users(
 
     await db.execute(delete(User).where(User.id.in_(user_ids)))
     await db.commit()
+    for user_id in user_ids:
+        await _invalidate_user_after_commit(user_id)
 
     return {"message": f"已删除 {found} 个用户", "deleted_count": found}
 
@@ -198,6 +217,7 @@ async def toggle_user_status(
 
     await db.execute(update(User).where(User.id == user_id).values(is_active=is_active, updated_at=datetime.now()))
     await db.commit()
+    await _invalidate_user_after_commit(user_id)
 
     return {"message": f"用户已{'启用' if is_active else '禁用'}"}
 
@@ -223,6 +243,7 @@ async def reset_password(
         .values(password_hash=get_password_hash(new_password), updated_at=datetime.now())
     )
     await db.commit()
+    await _invalidate_user_after_commit(user_id)
 
     return {"message": "密码已重置"}
 
@@ -306,4 +327,5 @@ async def update_user_sites(
         db.add(UserSite(user_id=user_id, site_id=site_id))
 
     await db.commit()
+    await _invalidate_user_after_commit(user_id)
     return {"message": f"已为用户分配 {len(data.site_ids)} 个站点"}

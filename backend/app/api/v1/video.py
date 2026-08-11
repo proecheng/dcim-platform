@@ -10,10 +10,23 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
-from ..deps import get_db, require_admin, require_operator, require_viewer
+from ..deps import (
+    SiteAccessContext,
+    apply_camera_site_scope,
+    apply_point_site_scope,
+    authorized_camera_ids_query,
+    get_authorized_camera,
+    get_authorized_device,
+    get_db,
+    get_site_access_context,
+    require_admin,
+    require_operator,
+    require_viewer,
+)
 from ...models.user import User
 from ...models.alarm import Alarm
 from ...models.point import Point
+from ...models.video import Camera
 from ...schemas.video import (
     NVRCreate,
     NVRUpdate,
@@ -38,6 +51,14 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
+async def _get_authorized_alarm(db: AsyncSession, alarm_id: int, context: SiteAccessContext) -> Alarm:
+    query = apply_point_site_scope(select(Alarm).where(Alarm.id == alarm_id), Alarm.point_id, context)
+    alarm = (await db.execute(query)).scalar_one_or_none()
+    if alarm is None:
+        raise HTTPException(status_code=404, detail="告警不存在")
+    return alarm
+
+
 # ========== NVR 端点 ==========
 
 
@@ -58,7 +79,7 @@ async def list_nvrs(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_viewer),
+    _: User = Depends(require_admin),
 ):
     """获取 NVR 列表（分页）"""
     result = await video_service.list_nvrs(db, page, page_size)
@@ -78,7 +99,7 @@ async def list_nvrs(
 async def get_nvr(
     nvr_id: int,
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_viewer),
+    _: User = Depends(require_admin),
 ):
     """获取 NVR 详情"""
     nvr = await video_service.get_nvr(db, nvr_id)
@@ -128,13 +149,11 @@ async def get_cameras_by_alarm(
     alarm_id: int,
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_viewer),
+    context: SiteAccessContext = Depends(get_site_access_context),
 ):
     """根据告警 ID 查找关联摄像头（通过 Alarm→Point→device_id/area_code 关联链）"""
     # 查询告警关联的点位
-    alarm_result = await db.execute(select(Alarm).where(Alarm.id == alarm_id))
-    alarm = alarm_result.scalar_one_or_none()
-    if not alarm:
-        raise HTTPException(status_code=404, detail="告警不存在")
+    alarm = await _get_authorized_alarm(db, alarm_id, context)
 
     # 查询点位获取 device_id 和 area_code
     point_result = await db.execute(select(Point).where(Point.id == alarm.point_id))
@@ -145,10 +164,16 @@ async def get_cameras_by_alarm(
     cameras = []
     # 先按设备查找
     if point.device_id:
-        cameras = await video_service.get_cameras_by_device(db, point.device_id)
+        camera_query = apply_camera_site_scope(
+            select(Camera).where(Camera.device_id == point.device_id, Camera.is_enabled == True), Camera.id, context
+        )
+        cameras = list((await db.execute(camera_query.order_by(Camera.name))).scalars().all())
     # 再按区域查找
     if not cameras and point.area_code:
-        cameras = await video_service.get_cameras_by_area(db, point.area_code)
+        camera_query = apply_camera_site_scope(
+            select(Camera).where(Camera.area_code == point.area_code, Camera.is_enabled == True), Camera.id, context
+        )
+        cameras = list((await db.execute(camera_query.order_by(Camera.name))).scalars().all())
 
     return [CameraResponse.model_validate(c) for c in cameras]
 
@@ -158,9 +183,13 @@ async def get_cameras_by_area(
     area_code: str,
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_viewer),
+    context: SiteAccessContext = Depends(get_site_access_context),
 ):
     """按区域查询已启用的摄像头（联动查询用）"""
-    cameras = await video_service.get_cameras_by_area(db, area_code)
+    query = apply_camera_site_scope(
+        select(Camera).where(Camera.area_code == area_code, Camera.is_enabled == True), Camera.id, context
+    )
+    cameras = list((await db.execute(query.order_by(Camera.name))).scalars().all())
     return [CameraResponse.model_validate(c) for c in cameras]
 
 
@@ -169,9 +198,14 @@ async def get_cameras_by_device(
     device_id: int,
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_viewer),
+    context: SiteAccessContext = Depends(get_site_access_context),
 ):
     """按设备查询已启用的摄像头（联动查询用）"""
-    cameras = await video_service.get_cameras_by_device(db, device_id)
+    await get_authorized_device(db, device_id, context)
+    query = apply_camera_site_scope(
+        select(Camera).where(Camera.device_id == device_id, Camera.is_enabled == True), Camera.id, context
+    )
+    cameras = list((await db.execute(query.order_by(Camera.name))).scalars().all())
     return [CameraResponse.model_validate(c) for c in cameras]
 
 
@@ -196,6 +230,7 @@ async def list_cameras(
     page_size: int = Query(20, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_viewer),
+    context: SiteAccessContext = Depends(get_site_access_context),
 ):
     """获取摄像头列表（分页+筛选）"""
     result = await video_service.list_cameras(
@@ -205,6 +240,7 @@ async def list_cameras(
         status=status,
         page=page,
         page_size=page_size,
+        allowed_camera_ids=authorized_camera_ids_query(context),
     )
     items = []
     for camera in result["cameras"]:
@@ -227,8 +263,10 @@ async def get_camera(
     camera_id: int,
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_viewer),
+    context: SiteAccessContext = Depends(get_site_access_context),
 ):
     """获取摄像头详情（含预置位和NVR名称）"""
+    await get_authorized_camera(db, camera_id, context)
     detail = await video_service.get_camera(db, camera_id)
     if not detail:
         raise HTTPException(status_code=404, detail="摄像头不存在")
@@ -303,12 +341,11 @@ async def ptz_control(
     data: PTZControlRequest,
     db: AsyncSession = Depends(get_db),
     user: User = Depends(require_operator),
+    context: SiteAccessContext = Depends(get_site_access_context),
 ):
     """远程控制摄像头云台（模拟 ONVIF PTZ 命令）"""
     # 验证摄像头存在
-    cam = await video_service.get_camera(db, data.camera_id)
-    if not cam:
-        raise HTTPException(status_code=404, detail="摄像头不存在")
+    camera = await get_authorized_camera(db, data.camera_id, context)
     event = await video_service.ptz_control(
         db,
         data.camera_id,
@@ -317,7 +354,7 @@ async def ptz_control(
         user.username,
     )
     resp = VideoEventResponse.model_validate(event)
-    resp.camera_name = cam["camera"].name
+    resp.camera_name = camera.name
     return resp
 
 
@@ -326,11 +363,10 @@ async def call_preset(
     data: PresetCallRequest,
     db: AsyncSession = Depends(get_db),
     user: User = Depends(require_operator),
+    context: SiteAccessContext = Depends(get_site_access_context),
 ):
     """调用摄像头预置位（模拟 ONVIF 预置位调用）"""
-    cam = await video_service.get_camera(db, data.camera_id)
-    if not cam:
-        raise HTTPException(status_code=404, detail="摄像头不存在")
+    camera = await get_authorized_camera(db, data.camera_id, context)
     event = await video_service.call_preset(
         db,
         data.camera_id,
@@ -338,7 +374,7 @@ async def call_preset(
         user.username,
     )
     resp = VideoEventResponse.model_validate(event)
-    resp.camera_name = cam["camera"].name
+    resp.camera_name = camera.name
     return resp
 
 
@@ -347,11 +383,12 @@ async def start_recording(
     data: RecordingRequest,
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_operator),
+    context: SiteAccessContext = Depends(get_site_access_context),
 ):
     """触发摄像头开始录像（模拟 ONVIF 录像命令）"""
-    cam = await video_service.get_camera(db, data.camera_id)
-    if not cam:
-        raise HTTPException(status_code=404, detail="摄像头不存在")
+    camera = await get_authorized_camera(db, data.camera_id, context)
+    if data.alarm_id is not None:
+        await _get_authorized_alarm(db, data.alarm_id, context)
     event = await video_service.start_recording(
         db,
         data.camera_id,
@@ -360,7 +397,7 @@ async def start_recording(
         linkage_execution_id=data.linkage_execution_id,
     )
     resp = VideoEventResponse.model_validate(event)
-    resp.camera_name = cam["camera"].name
+    resp.camera_name = camera.name
     return resp
 
 
@@ -369,14 +406,13 @@ async def stop_recording(
     data: RecordingRequest,
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_operator),
+    context: SiteAccessContext = Depends(get_site_access_context),
 ):
     """停止摄像头录像（模拟 ONVIF 录像命令）"""
-    cam = await video_service.get_camera(db, data.camera_id)
-    if not cam:
-        raise HTTPException(status_code=404, detail="摄像头不存在")
+    camera = await get_authorized_camera(db, data.camera_id, context)
     event = await video_service.stop_recording(db, data.camera_id)
     resp = VideoEventResponse.model_validate(event)
-    resp.camera_name = cam["camera"].name
+    resp.camera_name = camera.name
     return resp
 
 
@@ -388,14 +424,18 @@ async def list_video_events(
     page_size: int = Query(20, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_viewer),
+    context: SiteAccessContext = Depends(get_site_access_context),
 ):
     """获取视频事件列表（分页+筛选）"""
+    if camera_id is not None:
+        await get_authorized_camera(db, camera_id, context)
     result = await video_service.list_video_events(
         db,
         camera_id=camera_id,
         event_type=event_type,
         page=page,
         page_size=page_size,
+        allowed_camera_ids=authorized_camera_ids_query(context),
     )
     items = []
     for event in result["items"]:
@@ -418,9 +458,11 @@ async def get_playback_info(
     alarm_id: int,
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_viewer),
+    context: SiteAccessContext = Depends(get_site_access_context),
 ):
     """获取告警回放信息（关联摄像头 + 时间定位 + 录像事件）"""
-    result = await video_service.get_playback_info(db, alarm_id)
+    await _get_authorized_alarm(db, alarm_id, context)
+    result = await video_service.get_playback_info(db, alarm_id, authorized_camera_ids_query(context))
     if not result:
         raise HTTPException(status_code=404, detail="告警不存在")
 
@@ -459,8 +501,10 @@ async def list_recording_segments(
     page_size: int = Query(20, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_viewer),
+    context: SiteAccessContext = Depends(get_site_access_context),
 ):
     """查询录像片段列表（按摄像头+时间范围）"""
+    await get_authorized_camera(db, camera_id, context)
     result = await video_service.list_recording_segments(
         db,
         camera_id,

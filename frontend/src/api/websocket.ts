@@ -17,9 +17,10 @@ interface WebSocketOptions {
   onError?: (error: Event) => void
 }
 
-interface SubscribeOptions {
+export interface WebSocketSubscribeOptions {
   channels?: string[]
   filters?: {
+    site_ids?: number[]
     point_ids?: number[]
     area_codes?: string[]
     alarm_levels?: string[]
@@ -35,6 +36,8 @@ export class WebSocketClient {
   private reconnectAttempts: number = 0
   private heartbeatTimer: number | null = null
   private reconnectTimer: number | null = null
+  private authenticated: boolean = false
+  private subscription: WebSocketSubscribeOptions | null = null
   private messageHandlers: Map<string, Set<MessageHandler>> = new Map()
   private isManualClose: boolean = false
   private hasConnected: boolean = false
@@ -63,9 +66,7 @@ export class WebSocketClient {
     this.isManualClose = false
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
     const host = window.location.host
-    const token = localStorage.getItem('token') || ''
-    const separator = this.url.includes('?') ? '&' : '?'
-    const wsUrl = `${protocol}//${host}${this.url}${token ? `${separator}token=${token}` : ''}`
+    const wsUrl = `${protocol}//${host}${this.url}`
 
     try {
       this.ws = new WebSocket(wsUrl)
@@ -84,16 +85,17 @@ export class WebSocketClient {
 
     this.ws.onopen = () => {
       if (import.meta.env.DEV) console.log('WebSocket 已连接:', this.url)
-      this.reconnectAttempts = 0
-      this.hasConnected = true
-      this.startHeartbeat()
-      degradationFlags.websocketDown = false
-      this.onOpenCallback?.()
+      this.authenticated = false
+      this.sendRaw({
+        action: 'authenticate',
+        token: localStorage.getItem('token') || '',
+      })
     }
 
     this.ws.onclose = () => {
       if (import.meta.env.DEV) console.log('WebSocket 已关闭:', this.url)
       this.stopHeartbeat()
+      this.authenticated = false
       // 只有曾经成功连接过再断开，才标记降级（避免首次连不上就显示 banner）
       if (this.hasConnected) {
         degradationFlags.websocketDown = true
@@ -125,6 +127,22 @@ export class WebSocketClient {
    */
   private handleMessage(message: any): void {
     const { type } = message
+
+    if (type === 'authenticated') {
+      if (this.authenticated) return
+      this.authenticated = true
+      this.reconnectAttempts = 0
+      this.hasConnected = true
+      degradationFlags.websocketDown = false
+      this.startHeartbeat()
+      this.sendSubscription()
+      this.onOpenCallback?.()
+      return
+    }
+
+    if (!this.authenticated) {
+      return
+    }
 
     // 心跳响应
     if (type === 'pong') {
@@ -192,20 +210,42 @@ export class WebSocketClient {
    * 发送消息
    */
   send(data: any): void {
-    if (this.ws?.readyState === WebSocket.OPEN) {
-      this.ws.send(JSON.stringify(data))
+    if (this.ws?.readyState === WebSocket.OPEN && this.authenticated) {
+      this.sendRaw(data)
     } else {
       console.warn('WebSocket 未连接，消息未发送:', data)
+    }
+  }
+
+  private sendRaw(data: any): void {
+    if (this.ws?.readyState === WebSocket.OPEN) {
+      this.ws.send(JSON.stringify(data))
     }
   }
 
   /**
    * 订阅消息
    */
-  subscribe(options: SubscribeOptions): void {
-    this.send({
+  subscribe(options: WebSocketSubscribeOptions): void {
+    this.subscription = {
+      channels: options.channels ? [...options.channels] : undefined,
+      filters: options.filters
+        ? {
+            site_ids: options.filters.site_ids ? [...options.filters.site_ids] : undefined,
+            point_ids: options.filters.point_ids ? [...options.filters.point_ids] : undefined,
+            area_codes: options.filters.area_codes ? [...options.filters.area_codes] : undefined,
+            alarm_levels: options.filters.alarm_levels ? [...options.filters.alarm_levels] : undefined,
+          }
+        : undefined,
+    }
+    this.sendSubscription()
+  }
+
+  private sendSubscription(): void {
+    if (!this.subscription || !this.authenticated) return
+    this.sendRaw({
       action: 'subscribe',
-      ...options
+      ...this.subscription,
     })
   }
 
@@ -213,10 +253,21 @@ export class WebSocketClient {
    * 取消订阅
    */
   unsubscribe(channels?: string[]): void {
-    this.send({
-      action: 'unsubscribe',
-      channels
-    })
+    if (!channels || !this.subscription?.channels) {
+      this.subscription = null
+    } else {
+      const remainingChannels = this.subscription.channels.filter(channel => !channels.includes(channel))
+      this.subscription = remainingChannels.length > 0
+        ? { ...this.subscription, channels: remainingChannels }
+        : null
+    }
+
+    if (this.authenticated) {
+      this.sendRaw({
+        action: 'unsubscribe',
+        channels,
+      })
+    }
   }
 
   /**
@@ -247,6 +298,8 @@ export class WebSocketClient {
    */
   close(): void {
     this.isManualClose = true
+    this.authenticated = false
+    this.subscription = null
     this.stopHeartbeat()
 
     if (this.reconnectTimer) {
@@ -264,7 +317,7 @@ export class WebSocketClient {
    * 获取连接状态
    */
   get isConnected(): boolean {
-    return this.ws?.readyState === WebSocket.OPEN
+    return this.ws?.readyState === WebSocket.OPEN && this.authenticated
   }
 
   /**

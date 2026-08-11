@@ -62,7 +62,7 @@ class AlarmNotifyHandler(ActionHandler):
                 "source": event.source,
                 "payload": event.payload,
             }
-            await ws_manager.broadcast_alarm(alarm_data)
+            await ws_manager.broadcast_alarm(alarm_data, site_id=event.payload.get("site_id"))
 
             duration = int((time.time() - start) * 1000)
             return ActionResult(success=True, status="success", duration_ms=duration)
@@ -237,7 +237,7 @@ class VideoPopupHandler(ActionHandler):
                 "device_id": device_id,
                 "source": event.source,
             }
-            await ws_manager.broadcast_alarm(popup_data)
+            await ws_manager.broadcast_alarm(popup_data, site_id=event.payload.get("site_id"))
 
             duration = int((_time.time() - start) * 1000)
             return ActionResult(success=True, status="success", duration_ms=duration)

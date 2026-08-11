@@ -9,7 +9,19 @@ from fastapi import APIRouter, Depends, HTTPException, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update
 
-from ..deps import get_db, require_viewer, require_operator
+from ..deps import (
+    SiteAccessContext,
+    apply_point_site_scope,
+    apply_site_scope,
+    get_authorized_point,
+    get_db,
+    get_site_access_context,
+    require_admin,
+    require_operator,
+    require_viewer,
+)
+from ...models.alarm import Alarm
+from ...models.device import Device
 from ...models.user import User
 from ...models.point import Point, PointRealtime
 from ...schemas.realtime import RealtimeData, RealtimeSummary, ControlCommand
@@ -20,7 +32,12 @@ router = APIRouter()
 
 
 @router.get("", summary="获取所有点位实时数据")
-async def get_all_realtime(response: Response, db: AsyncSession = Depends(get_db), _: User = Depends(require_viewer)):
+async def get_all_realtime(
+    response: Response,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_viewer),
+    site_context: SiteAccessContext = Depends(get_site_access_context),
+):
     """
     获取所有启用点位的实时数据（Redis 优先，DB 兜底）
     """
@@ -30,7 +47,9 @@ async def get_all_realtime(response: Response, db: AsyncSession = Depends(get_db
     if redis_service.is_available:
         try:
             # 查询所有启用点位的元数据
-            points_result = await db.execute(select(Point).where(Point.is_enabled == True))
+            points_result = await db.execute(
+                apply_point_site_scope(select(Point).where(Point.is_enabled == True), Point.id, site_context)
+            )
             points = points_result.scalars().all()
 
             if points:
@@ -108,6 +127,7 @@ async def get_all_realtime(response: Response, db: AsyncSession = Depends(get_db
         .join(PointRealtime, Point.id == PointRealtime.point_id)
         .where(Point.is_enabled == True)
     )
+    query = apply_point_site_scope(query, Point.id, site_context)
 
     result = await db.execute(query)
     rows = result.all()
@@ -141,7 +161,10 @@ async def get_all_realtime(response: Response, db: AsyncSession = Depends(get_db
 
 @router.get("/summary", response_model=RealtimeSummary, summary="获取实时数据汇总")
 async def get_realtime_summary(
-    response: Response, db: AsyncSession = Depends(get_db), _: User = Depends(require_viewer)
+    response: Response,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_viewer),
+    site_context: SiteAccessContext = Depends(get_site_access_context),
 ):
     """
     获取实时数据汇总信息
@@ -151,18 +174,26 @@ async def get_realtime_summary(
     degraded = False
 
     # 点位统计
-    total_result = await db.execute(select(func.count(Point.id)).where(Point.is_enabled == True))
+    total_result = await db.execute(
+        apply_point_site_scope(select(func.count(Point.id)).where(Point.is_enabled == True), Point.id, site_context)
+    )
     total_points = total_result.scalar()
 
     # 状态统计
     status_result = await db.execute(
-        select(PointRealtime.status, func.count(PointRealtime.point_id)).group_by(PointRealtime.status)
+        apply_point_site_scope(
+            select(PointRealtime.status, func.count(PointRealtime.point_id)), PointRealtime.point_id, site_context
+        ).group_by(PointRealtime.status)
     )
     status_counts = {row[0]: row[1] for row in status_result.all()}
 
     # 告警级别统计
     alarm_result = await db.execute(
-        select(PointRealtime.alarm_level, func.count(PointRealtime.point_id))
+        apply_point_site_scope(
+            select(PointRealtime.alarm_level, func.count(PointRealtime.point_id)),
+            PointRealtime.point_id,
+            site_context,
+        )
         .where(PointRealtime.alarm_level.isnot(None))
         .group_by(PointRealtime.alarm_level)
     )
@@ -175,7 +206,9 @@ async def get_realtime_summary(
     if redis_service.is_available:
         try:
             # 先查出 point_code -> point 映射
-            code_result = await db.execute(select(Point).where(Point.point_code.in_(key_point_codes)))
+            code_result = await db.execute(
+                apply_point_site_scope(select(Point).where(Point.point_code.in_(key_point_codes)), Point.id, site_context)
+            )
             code_points = {p.point_code: p for p in code_result.scalars().all()}
             redis_keys = [f"point:{code_points[c].id}:latest" for c in key_point_codes if c in code_points]
             redis_ids = [code_points[c] for c in key_point_codes if c in code_points]
@@ -202,9 +235,13 @@ async def get_realtime_summary(
                 if missing_codes:
                     for code in missing_codes:
                         point_result = await db.execute(
-                            select(Point, PointRealtime)
-                            .join(PointRealtime, Point.id == PointRealtime.point_id)
-                            .where(Point.point_code == code)
+                            apply_point_site_scope(
+                                select(Point, PointRealtime)
+                                .join(PointRealtime, Point.id == PointRealtime.point_id)
+                                .where(Point.point_code == code),
+                                Point.id,
+                                site_context,
+                            )
                         )
                         row = point_result.first()
                         if row:
@@ -226,9 +263,13 @@ async def get_realtime_summary(
     if not key_points:
         for code in key_point_codes:
             point_result = await db.execute(
-                select(Point, PointRealtime)
-                .join(PointRealtime, Point.id == PointRealtime.point_id)
-                .where(Point.point_code == code)
+                apply_point_site_scope(
+                    select(Point, PointRealtime)
+                    .join(PointRealtime, Point.id == PointRealtime.point_id)
+                    .where(Point.point_code == code),
+                    Point.id,
+                    site_context,
+                )
             )
             row = point_result.first()
             if row:
@@ -257,13 +298,15 @@ async def get_realtime_summary(
 
 
 @router.get("/dashboard", summary="获取仪表盘数据")
-async def get_dashboard_data(db: AsyncSession = Depends(get_db), _: User = Depends(require_viewer)):
+async def get_dashboard_data(
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_viewer),
+    site_context: SiteAccessContext = Depends(get_site_access_context),
+):
     """
     获取仪表盘显示所需的数据
     """
     from sqlalchemy import func
-    from ...models.alarm import Alarm
-
     # 概览卡片数据
     overview = {
         "temperature": None,
@@ -275,47 +318,68 @@ async def get_dashboard_data(db: AsyncSession = Depends(get_db), _: User = Depen
     }
 
     # 获取温度
-    temp_result = await db.execute(select(PointRealtime.value).join(Point).where(Point.point_code == "A1_TH_AI_001"))
+    temp_result = await db.execute(
+        apply_point_site_scope(
+            select(PointRealtime.value).join(Point).where(Point.point_code == "A1_TH_AI_001"), Point.id, site_context
+        )
+    )
     temp = temp_result.scalar()
     if temp:
         overview["temperature"] = round(temp, 1)
 
     # 获取湿度
-    hum_result = await db.execute(select(PointRealtime.value).join(Point).where(Point.point_code == "A1_TH_AI_002"))
+    hum_result = await db.execute(
+        apply_point_site_scope(
+            select(PointRealtime.value).join(Point).where(Point.point_code == "A1_TH_AI_002"), Point.id, site_context
+        )
+    )
     hum = hum_result.scalar()
     if hum:
         overview["humidity"] = round(hum, 1)
 
     # 获取功率
-    power_result = await db.execute(select(PointRealtime.value).join(Point).where(Point.point_code == "A1_PDU_AI_005"))
+    power_result = await db.execute(
+        apply_point_site_scope(
+            select(PointRealtime.value).join(Point).where(Point.point_code == "A1_PDU_AI_005"), Point.id, site_context
+        )
+    )
     power = power_result.scalar()
     if power:
         overview["power"] = round(power, 1)
 
     # 获取UPS负载
-    ups_result = await db.execute(select(PointRealtime.value).join(Point).where(Point.point_code == "A1_UPS_AI_003"))
+    ups_result = await db.execute(
+        apply_point_site_scope(
+            select(PointRealtime.value).join(Point).where(Point.point_code == "A1_UPS_AI_003"), Point.id, site_context
+        )
+    )
     ups = ups_result.scalar()
     if ups:
         overview["ups_load"] = round(ups, 1)
 
     # 空调运行数量（使用 Device.status 统计）
-    from ...models.device import Device
-
     ac_result = await db.execute(
-        select(func.count(Device.id)).where(
-            Device.device_type.in_(["AC", "PRECISION_AC_INDOOR", "PRECISION_AC_OUTDOOR"]), Device.status == "running"
+        apply_site_scope(
+            select(func.count(Device.id)).where(
+                Device.device_type.in_(["AC", "PRECISION_AC_INDOOR", "PRECISION_AC_OUTDOOR"]),
+                Device.status == "running",
+            ),
+            Device.site_id,
+            site_context,
         )
     )
     overview["ac_running"] = ac_result.scalar() or 0
 
     # 活动告警数量
-    alarm_result = await db.execute(select(func.count(Alarm.id)).where(Alarm.status == "active"))
+    alarm_result = await db.execute(
+        apply_point_site_scope(select(func.count(Alarm.id)).where(Alarm.status == "active"), Alarm.point_id, site_context)
+    )
     overview["alarm_count"] = alarm_result.scalar() or 0
 
     # 设备状态分布
-    from ...models.device import Device
-
-    device_status_result = await db.execute(select(Device.status, func.count(Device.id)).group_by(Device.status))
+    device_status_result = await db.execute(
+        apply_site_scope(select(Device.status, func.count(Device.id)), Device.site_id, site_context).group_by(Device.status)
+    )
     device_status = {row[0]: row[1] for row in device_status_result.all()}
 
     return {"overview": overview, "device_status": device_status, "updated_at": datetime.now().isoformat()}
@@ -325,7 +389,7 @@ async def get_dashboard_data(db: AsyncSession = Depends(get_db), _: User = Depen
 
 
 @router.get("/energy-dashboard", summary="获取能源仪表盘数据")
-async def get_energy_dashboard(db: AsyncSession = Depends(get_db), _: User = Depends(require_viewer)):
+async def get_energy_dashboard(db: AsyncSession = Depends(get_db), _: User = Depends(require_admin)):
     """
     获取V2.3增强版能源仪表盘数据
 
@@ -500,19 +564,23 @@ async def get_energy_dashboard(db: AsyncSession = Depends(get_db), _: User = Dep
 
 
 @router.get("/{point_id}", response_model=RealtimeData, summary="获取单个点位实时数据")
-async def get_point_realtime(point_id: int, db: AsyncSession = Depends(get_db), _: User = Depends(require_viewer)):
+async def get_point_realtime(
+    point_id: int,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_viewer),
+    site_context: SiteAccessContext = Depends(get_site_access_context),
+):
     """
     获取单个点位的实时数据
     """
-    result = await db.execute(
-        select(Point, PointRealtime).join(PointRealtime, Point.id == PointRealtime.point_id).where(Point.id == point_id)
-    )
+    point = await get_authorized_point(db, point_id, site_context)
+    result = await db.execute(select(PointRealtime).where(PointRealtime.point_id == point_id))
     row = result.first()
 
     if not row:
         raise HTTPException(status_code=404, detail="点位不存在")
 
-    point, realtime = row
+    realtime = row[0]
     return RealtimeData(
         point_id=point.id,
         point_code=point.point_code,
@@ -531,7 +599,12 @@ async def get_point_realtime(point_id: int, db: AsyncSession = Depends(get_db), 
 
 
 @router.get("/by-type/{point_type}", summary="按类型获取实时数据")
-async def get_realtime_by_type(point_type: str, db: AsyncSession = Depends(get_db), _: User = Depends(require_viewer)):
+async def get_realtime_by_type(
+    point_type: str,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_viewer),
+    site_context: SiteAccessContext = Depends(get_site_access_context),
+):
     """
     按点位类型获取实时数据
     """
@@ -543,6 +616,7 @@ async def get_realtime_by_type(point_type: str, db: AsyncSession = Depends(get_d
         .join(PointRealtime, Point.id == PointRealtime.point_id)
         .where(Point.is_enabled == True, Point.point_type == point_type)
     )
+    query = apply_point_site_scope(query, Point.id, site_context)
 
     result = await db.execute(query)
     rows = result.all()
@@ -568,7 +642,12 @@ async def get_realtime_by_type(point_type: str, db: AsyncSession = Depends(get_d
 
 
 @router.get("/by-area/{area_code}", summary="按区域获取实时数据")
-async def get_realtime_by_area(area_code: str, db: AsyncSession = Depends(get_db), _: User = Depends(require_viewer)):
+async def get_realtime_by_area(
+    area_code: str,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_viewer),
+    site_context: SiteAccessContext = Depends(get_site_access_context),
+):
     """
     按区域获取实时数据
     """
@@ -577,6 +656,7 @@ async def get_realtime_by_area(area_code: str, db: AsyncSession = Depends(get_db
         .join(PointRealtime, Point.id == PointRealtime.point_id)
         .where(Point.is_enabled == True, Point.area_code == area_code)
     )
+    query = apply_point_site_scope(query, Point.id, site_context)
 
     result = await db.execute(query)
     rows = result.all()
@@ -607,15 +687,12 @@ async def send_control_command(
     command: ControlCommand,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_operator),
+    site_context: SiteAccessContext = Depends(get_site_access_context),
 ):
     """
     向AO/DO点位下发控制指令
     """
-    result = await db.execute(select(Point).where(Point.id == point_id))
-    point = result.scalar_one_or_none()
-
-    if not point:
-        raise HTTPException(status_code=404, detail="点位不存在")
+    point = await get_authorized_point(db, point_id, site_context)
 
     if point.point_type not in ["AO", "DO"]:
         raise HTTPException(status_code=400, detail="该点位不支持控制操作")

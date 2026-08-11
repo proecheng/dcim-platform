@@ -9,7 +9,20 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 from pydantic import BaseModel, Field
 
-from ..deps import get_db, require_viewer, require_operator
+from ..deps import (
+    SiteAccessContext,
+    apply_work_order_approval_site_scope,
+    apply_work_order_site_scope,
+    get_authorized_alarm,
+    get_authorized_device,
+    get_authorized_point,
+    get_authorized_work_order,
+    get_authorized_work_order_approval,
+    get_db,
+    get_site_access_context,
+    require_operator,
+    require_viewer,
+)
 from ...models.user import User
 from ...models.operation import (
     WorkOrder,
@@ -162,11 +175,12 @@ async def get_work_orders(
     priority: Optional[WorkOrderPriority] = Query(None, description="优先级过滤"),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_viewer),
+    context: SiteAccessContext = Depends(get_site_access_context),
 ):
     """
     获取工单列表（分页）
     """
-    query = select(WorkOrder)
+    query = apply_work_order_site_scope(select(WorkOrder), WorkOrder.id, context)
 
     if status:
         query = query.where(WorkOrder.status == status)
@@ -182,11 +196,20 @@ async def get_work_orders(
 
 @router.post("/workorders", response_model=WorkOrderResponse, summary="创建工单")
 async def create_work_order(
-    data: WorkOrderCreate, db: AsyncSession = Depends(get_db), _: User = Depends(require_operator)
+    data: WorkOrderCreate,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_operator),
+    context: SiteAccessContext = Depends(get_site_access_context),
 ):
     """
     创建工单
     """
+    if data.device_id is None:
+        if context.site_ids is not None:
+            raise HTTPException(status_code=403, detail="工单必须关联授权设备")
+    else:
+        await get_authorized_device(db, data.device_id, context)
+
     order_no = await _generate_order_no(db, "WO")
     order = WorkOrder(order_no=order_no, **data.model_dump())
 
@@ -203,33 +226,40 @@ async def create_work_order(
 
 
 @router.get("/workorders/{id}", response_model=WorkOrderResponse, summary="获取工单详情")
-async def get_work_order(id: int, db: AsyncSession = Depends(get_db), _: User = Depends(require_viewer)):
+async def get_work_order(
+    id: int,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_viewer),
+    context: SiteAccessContext = Depends(get_site_access_context),
+):
     """
     根据ID获取工单详情
     """
-    result = await db.execute(select(WorkOrder).where(WorkOrder.id == id))
-    order = result.scalar_one_or_none()
-
-    if not order:
-        raise HTTPException(status_code=404, detail="工单不存在")
+    order = await get_authorized_work_order(db, id, context)
 
     return WorkOrderResponse.model_validate(order)
 
 
 @router.put("/workorders/{id}", response_model=WorkOrderResponse, summary="更新工单")
 async def update_work_order(
-    id: int, data: WorkOrderUpdate, db: AsyncSession = Depends(get_db), _: User = Depends(require_operator)
+    id: int,
+    data: WorkOrderUpdate,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_operator),
+    context: SiteAccessContext = Depends(get_site_access_context),
 ):
     """
     更新工单信息
     """
-    result = await db.execute(select(WorkOrder).where(WorkOrder.id == id))
-    order = result.scalar_one_or_none()
-
-    if not order:
-        raise HTTPException(status_code=404, detail="工单不存在")
+    order = await get_authorized_work_order(db, id, context)
 
     update_data = data.model_dump(exclude_unset=True)
+    if "device_id" in update_data:
+        if update_data["device_id"] is None:
+            if context.site_ids is not None:
+                raise HTTPException(status_code=403, detail="工单必须关联授权设备")
+        else:
+            await get_authorized_device(db, update_data["device_id"], context)
     for key, value in update_data.items():
         if value is not None:
             setattr(order, key, value)
@@ -241,15 +271,16 @@ async def update_work_order(
 
 
 @router.delete("/workorders/{id}", summary="删除工单")
-async def delete_work_order(id: int, db: AsyncSession = Depends(get_db), _: User = Depends(require_operator)):
+async def delete_work_order(
+    id: int,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_operator),
+    context: SiteAccessContext = Depends(get_site_access_context),
+):
     """
     删除工单
     """
-    result = await db.execute(select(WorkOrder).where(WorkOrder.id == id))
-    order = result.scalar_one_or_none()
-
-    if not order:
-        raise HTTPException(status_code=404, detail="工单不存在")
+    order = await get_authorized_work_order(db, id, context)
 
     await db.delete(order)
     await db.commit()
@@ -259,16 +290,16 @@ async def delete_work_order(id: int, db: AsyncSession = Depends(get_db), _: User
 
 @router.post("/workorders/{id}/assign", response_model=WorkOrderResponse, summary="派单")
 async def assign_work_order(
-    id: int, data: AssignRequest, db: AsyncSession = Depends(get_db), _: User = Depends(require_operator)
+    id: int,
+    data: AssignRequest,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_operator),
+    context: SiteAccessContext = Depends(get_site_access_context),
 ):
     """
     派单给指定处理人
     """
-    result = await db.execute(select(WorkOrder).where(WorkOrder.id == id))
-    order = result.scalar_one_or_none()
-
-    if not order:
-        raise HTTPException(status_code=404, detail="工单不存在")
+    order = await get_authorized_work_order(db, id, context)
 
     _check_transition(order.status, WorkOrderStatus.assigned)
 
@@ -288,15 +319,16 @@ async def assign_work_order(
 
 
 @router.post("/workorders/{id}/accept", response_model=WorkOrderResponse, summary="接单")
-async def accept_work_order(id: int, db: AsyncSession = Depends(get_db), _: User = Depends(require_operator)):
+async def accept_work_order(
+    id: int,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_operator),
+    context: SiteAccessContext = Depends(get_site_access_context),
+):
     """
     接单（处理人确认接受工单）
     """
-    result = await db.execute(select(WorkOrder).where(WorkOrder.id == id))
-    order = result.scalar_one_or_none()
-
-    if not order:
-        raise HTTPException(status_code=404, detail="工单不存在")
+    order = await get_authorized_work_order(db, id, context)
 
     _check_transition(order.status, WorkOrderStatus.accepted)
 
@@ -315,15 +347,16 @@ async def accept_work_order(id: int, db: AsyncSession = Depends(get_db), _: User
 
 
 @router.post("/workorders/{id}/start", response_model=WorkOrderResponse, summary="开始处理工单")
-async def start_work_order(id: int, db: AsyncSession = Depends(get_db), _: User = Depends(require_operator)):
+async def start_work_order(
+    id: int,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_operator),
+    context: SiteAccessContext = Depends(get_site_access_context),
+):
     """
     开始处理工单
     """
-    result = await db.execute(select(WorkOrder).where(WorkOrder.id == id))
-    order = result.scalar_one_or_none()
-
-    if not order:
-        raise HTTPException(status_code=404, detail="工单不存在")
+    order = await get_authorized_work_order(db, id, context)
 
     _check_transition(order.status, WorkOrderStatus.processing)
 
@@ -343,16 +376,16 @@ async def start_work_order(id: int, db: AsyncSession = Depends(get_db), _: User 
 
 @router.post("/workorders/{id}/complete", response_model=WorkOrderResponse, summary="完成工单")
 async def complete_work_order(
-    id: int, data: CompleteWorkOrderRequest, db: AsyncSession = Depends(get_db), _: User = Depends(require_operator)
+    id: int,
+    data: CompleteWorkOrderRequest,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_operator),
+    context: SiteAccessContext = Depends(get_site_access_context),
 ):
     """
     完成工单
     """
-    result = await db.execute(select(WorkOrder).where(WorkOrder.id == id))
-    order = result.scalar_one_or_none()
-
-    if not order:
-        raise HTTPException(status_code=404, detail="工单不存在")
+    order = await get_authorized_work_order(db, id, context)
 
     _check_transition(order.status, WorkOrderStatus.completed)
 
@@ -375,15 +408,16 @@ async def complete_work_order(
 
 
 @router.post("/workorders/{id}/close", response_model=WorkOrderResponse, summary="关闭工单")
-async def close_work_order(id: int, db: AsyncSession = Depends(get_db), _: User = Depends(require_operator)):
+async def close_work_order(
+    id: int,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_operator),
+    context: SiteAccessContext = Depends(get_site_access_context),
+):
     """
     关闭工单（完成后确认关闭）
     """
-    result = await db.execute(select(WorkOrder).where(WorkOrder.id == id))
-    order = result.scalar_one_or_none()
-
-    if not order:
-        raise HTTPException(status_code=404, detail="工单不存在")
+    order = await get_authorized_work_order(db, id, context)
 
     _check_transition(order.status, WorkOrderStatus.closed)
 
@@ -402,16 +436,17 @@ async def close_work_order(id: int, db: AsyncSession = Depends(get_db), _: User 
 
 
 @router.get("/workorders/{id}/logs", response_model=List[WorkOrderLogResponse], summary="获取工单日志")
-async def get_work_order_logs(id: int, db: AsyncSession = Depends(get_db), _: User = Depends(require_viewer)):
+async def get_work_order_logs(
+    id: int,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_viewer),
+    context: SiteAccessContext = Depends(get_site_access_context),
+):
     """
     获取工单日志
     """
     # 检查工单是否存在
-    result = await db.execute(select(WorkOrder).where(WorkOrder.id == id))
-    order = result.scalar_one_or_none()
-
-    if not order:
-        raise HTTPException(status_code=404, detail="工单不存在")
+    await get_authorized_work_order(db, id, context)
 
     result = await db.execute(
         select(WorkOrderLog).where(WorkOrderLog.order_id == id).order_by(WorkOrderLog.created_at.desc())
@@ -423,17 +458,17 @@ async def get_work_order_logs(id: int, db: AsyncSession = Depends(get_db), _: Us
 
 @router.post("/workorders/{id}/logs", response_model=WorkOrderLogResponse, summary="添加工单日志")
 async def add_work_order_log(
-    id: int, data: AddLogRequest, db: AsyncSession = Depends(get_db), _: User = Depends(require_operator)
+    id: int,
+    data: AddLogRequest,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_operator),
+    context: SiteAccessContext = Depends(get_site_access_context),
 ):
     """
     添加工单日志
     """
     # 检查工单是否存在
-    result = await db.execute(select(WorkOrder).where(WorkOrder.id == id))
-    order = result.scalar_one_or_none()
-
-    if not order:
-        raise HTTPException(status_code=404, detail="工单不存在")
+    await get_authorized_work_order(db, id, context)
 
     log = WorkOrderLog(order_id=id, action=data.action, content=data.content, operator=data.operator)
 
@@ -498,14 +533,14 @@ async def _check_approval_timeout(approval: WorkOrderApproval, db: AsyncSession)
 
 @router.post("/workorders/{id}/submit-approval", response_model=WorkOrderApprovalResponse, summary="提交工单审批")
 async def submit_work_order_approval(
-    id: int, data: WorkOrderApprovalCreate, db: AsyncSession = Depends(get_db), _: User = Depends(require_operator)
+    id: int,
+    data: WorkOrderApprovalCreate,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_operator),
+    context: SiteAccessContext = Depends(get_site_access_context),
 ):
     """提交工单审批（仅变更请求类型、已接单状态的工单可提交）"""
-    result = await db.execute(select(WorkOrder).where(WorkOrder.id == id))
-    order = result.scalar_one_or_none()
-
-    if not order:
-        raise HTTPException(status_code=404, detail="工单不存在")
+    order = await get_authorized_work_order(db, id, context)
 
     if order.order_type != WorkOrderType.change:
         raise HTTPException(status_code=400, detail="仅变更请求类型的工单需要审批")
@@ -550,19 +585,24 @@ async def get_work_order_approvals(
     order_id: Optional[int] = Query(None, description="工单ID过滤"),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_viewer),
+    context: SiteAccessContext = Depends(get_site_access_context),
 ):
     """获取工单审批列表（惰性检查超时）"""
     # 惰性检查超时
-    pending_result = await db.execute(
-        select(WorkOrderApproval).where(WorkOrderApproval.status == ApprovalStatus.pending)
+    pending_query = apply_work_order_approval_site_scope(
+        select(WorkOrderApproval).where(WorkOrderApproval.status == ApprovalStatus.pending),
+        WorkOrderApproval.id,
+        context,
     )
+    pending_result = await db.execute(pending_query)
     for appr in pending_result.scalars().all():
         await _check_approval_timeout(appr, db)
 
-    query = select(WorkOrderApproval)
+    query = apply_work_order_approval_site_scope(select(WorkOrderApproval), WorkOrderApproval.id, context)
     if status:
         query = query.where(WorkOrderApproval.status == status)
     if order_id is not None:
+        await get_authorized_work_order(db, order_id, context)
         query = query.where(WorkOrderApproval.order_id == order_id)
 
     query = query.order_by(WorkOrderApproval.created_at.desc()).offset(skip).limit(limit)
@@ -573,13 +613,14 @@ async def get_work_order_approvals(
 
 
 @router.get("/approvals/{id}", response_model=WorkOrderApprovalResponse, summary="获取审批详情")
-async def get_work_order_approval(id: int, db: AsyncSession = Depends(get_db), _: User = Depends(require_viewer)):
+async def get_work_order_approval(
+    id: int,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_viewer),
+    context: SiteAccessContext = Depends(get_site_access_context),
+):
     """获取工单审批详情"""
-    result = await db.execute(select(WorkOrderApproval).where(WorkOrderApproval.id == id))
-    approval = result.scalar_one_or_none()
-
-    if not approval:
-        raise HTTPException(status_code=404, detail="审批记录不存在")
+    approval = await get_authorized_work_order_approval(db, id, context)
 
     # 惰性检查超时
     await _check_approval_timeout(approval, db)
@@ -590,14 +631,14 @@ async def get_work_order_approval(id: int, db: AsyncSession = Depends(get_db), _
 
 @router.post("/approvals/{id}/approve", response_model=WorkOrderApprovalResponse, summary="批准审批")
 async def approve_work_order_approval(
-    id: int, data: ApproveRequest, db: AsyncSession = Depends(get_db), _: User = Depends(require_operator)
+    id: int,
+    data: ApproveRequest,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_operator),
+    context: SiteAccessContext = Depends(get_site_access_context),
 ):
     """批准工单审批，工单自动转为处理中"""
-    result = await db.execute(select(WorkOrderApproval).where(WorkOrderApproval.id == id))
-    approval = result.scalar_one_or_none()
-
-    if not approval:
-        raise HTTPException(status_code=404, detail="审批记录不存在")
+    approval = await get_authorized_work_order_approval(db, id, context)
 
     if approval.status != ApprovalStatus.pending:
         raise HTTPException(status_code=400, detail=f"审批状态为 {approval.status.value}，无法批准")
@@ -639,14 +680,14 @@ async def approve_work_order_approval(
 
 @router.post("/approvals/{id}/reject", response_model=WorkOrderApprovalResponse, summary="驳回审批")
 async def reject_work_order_approval(
-    id: int, data: RejectRequest, db: AsyncSession = Depends(get_db), _: User = Depends(require_operator)
+    id: int,
+    data: RejectRequest,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_operator),
+    context: SiteAccessContext = Depends(get_site_access_context),
 ):
     """驳回工单审批，工单保持已接单状态"""
-    result = await db.execute(select(WorkOrderApproval).where(WorkOrderApproval.id == id))
-    approval = result.scalar_one_or_none()
-
-    if not approval:
-        raise HTTPException(status_code=404, detail="审批记录不存在")
+    approval = await get_authorized_work_order_approval(db, id, context)
 
     if approval.status != ApprovalStatus.pending:
         raise HTTPException(status_code=400, detail=f"审批状态为 {approval.status.value}，无法驳回")
@@ -1004,9 +1045,22 @@ async def get_alarm_workorder_rules(
 
 @router.post("/alarm-rules/check", summary="检查告警并自动创建工单")
 async def check_alarm_create_workorder(
-    data: AlarmCheckRequest, db: AsyncSession = Depends(get_db), _: User = Depends(require_operator)
+    data: AlarmCheckRequest,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_operator),
+    context: SiteAccessContext = Depends(get_site_access_context),
 ):
     """根据告警信息匹配规则，自动创建工单"""
+    alarm = await get_authorized_alarm(db, data.alarm_id, context)
+    device_id = None
+    device_name = None
+    if alarm.point_id is not None:
+        point = await get_authorized_point(db, alarm.point_id, context)
+        device_id = point.device_id
+        if device_id is not None:
+            device = await get_authorized_device(db, device_id, context)
+            device_name = device.device_name
+
     query = select(AlarmWorkOrderRule).where(
         AlarmWorkOrderRule.is_enabled == True, AlarmWorkOrderRule.alarm_level == data.alarm_level
     )
@@ -1032,6 +1086,8 @@ async def check_alarm_create_workorder(
         order_type=rule.order_type,
         priority=rule.priority,
         alarm_id=data.alarm_id,
+        device_id=device_id,
+        device_name=device_name,
     )
     db.add(order)
     await db.commit()

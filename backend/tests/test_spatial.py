@@ -13,7 +13,10 @@ from app.models.spatial import Site, Floor, Room, Row, LayoutTemplate
 from app.models.asset import Cabinet
 from app.models.user import User
 from app.api.deps import (
+    SiteAccessContext,
+    enforce_inventory_authorization,
     get_db,
+    get_site_access_context,
     require_viewer,
     require_operator,
     get_current_user,
@@ -89,6 +92,8 @@ async def app(db_session, mock_user):
     _app.dependency_overrides[get_current_user] = lambda: mock_user
     _app.dependency_overrides[get_user_site_ids] = lambda: None
     _app.dependency_overrides[require_site_access] = lambda site_id: site_id
+    _app.dependency_overrides[enforce_inventory_authorization] = lambda: None
+    _app.dependency_overrides[get_site_access_context] = lambda: SiteAccessContext(1, "admin", "test-jti", None)
 
     yield _app
 

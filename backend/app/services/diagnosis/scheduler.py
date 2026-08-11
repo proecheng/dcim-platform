@@ -426,6 +426,7 @@ class DiagnosisScheduler:
                 push_status = await DiagnosisPushService.push_diagnosis_result(
                     session_id=session_id,
                     device_id=device_id,
+                    site_id=alarm_data.get("site_id"),
                     engine_level=inference_level,
                     confidence=confidence,
                     conclusion=result.get("conclusion"),
@@ -559,6 +560,7 @@ class DiagnosisScheduler:
                 msg_type="system_diagnosis_breaker",
                 data=data,
                 target_roles=["admin"],
+                global_message=True,
             )
         except Exception as e:
             logger.error(f"Failed to broadcast breaker state change: {e}")
@@ -597,6 +599,7 @@ class DiagnosisScheduler:
                                             "detected_at": datetime.now().isoformat(),
                                         },
                                         target_roles=["admin"],
+                                        global_message=True,
                                     )
                                 except Exception as ws_err:
                                     logger.error(f"Failed to broadcast anomaly alert: {ws_err}")
@@ -822,6 +825,7 @@ class DiagnosisScheduler:
                                         "generated_at": now.isoformat(),
                                     },
                                     target_roles=["admin"],
+                                    global_message=True,
                                 )
                             except Exception as ws_err:
                                 logger.error(f"Failed to broadcast report notification: {ws_err}")
@@ -860,6 +864,7 @@ class DiagnosisScheduler:
                                             "end_date": end_date.isoformat(),
                                         },
                                         target_roles=["admin"],
+                                        global_message=True,
                                     )
                                 except Exception as ws_err:
                                     logger.error(f"Failed to broadcast failure notification: {ws_err}")

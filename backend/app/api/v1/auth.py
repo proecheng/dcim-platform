@@ -4,6 +4,7 @@
 
 import time
 import uuid
+import logging
 from datetime import datetime, timedelta
 from typing import Optional
 from collections import defaultdict
@@ -19,9 +20,24 @@ from ...core.security import verify_password, get_password_hash
 from ...models.user import User, UserLoginHistory, UserSession, PasswordHistory
 from ...models.config import SystemConfig
 from ...schemas.user import Token, UserInfo, PasswordChange, PasswordPolicyConfig
+from ...services.websocket import ws_manager
 
 router = APIRouter()
 settings = get_settings()
+logger = logging.getLogger(__name__)
+
+
+async def _invalidate_jtis_after_commit(jtis: list[str]) -> None:
+    for jti in jtis:
+        try:
+            await ws_manager.invalidate_jti(jti)
+        except Exception as exc:
+            logger.error(
+                "WebSocket revocation failed: event=session_revoked jti_suffix=%s error=%s",
+                jti[-8:],
+                exc,
+                extra={"security_event": "session_revocation_failed", "jti_suffix": jti[-8:]},
+            )
 
 # 默认密码策略
 DEFAULT_PASSWORD_POLICY = {
@@ -160,12 +176,15 @@ async def login(request: Request, form_data: OAuth2PasswordRequestForm = Depends
         sessions_to_kick = active_sessions[: len(active_sessions) - MAX_SESSIONS + 1]
         for s in sessions_to_kick:
             s.is_active = False
+    else:
+        sessions_to_kick = []
 
     # 创建新会话记录
     session_record = UserSession(user_id=user.id, token_jti=jti)
     db.add(session_record)
 
     await db.commit()
+    await _invalidate_jtis_after_commit([session.token_jti for session in sessions_to_kick])
 
     # 检查密码是否过期
     password_warning = None
@@ -204,6 +223,7 @@ async def logout(
             # 失效当前会话
             await db.execute(update(UserSession).where(UserSession.token_jti == jti).values(is_active=False))
             await db.commit()
+            await _invalidate_jtis_after_commit([jti])
     except Exception:
         pass  # 即使失败也返回成功，避免泄露信息
 

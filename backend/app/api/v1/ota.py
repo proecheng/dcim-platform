@@ -5,7 +5,16 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, delete
 
-from ..deps import get_db, require_operator, require_admin
+from ..deps import (
+    SiteAccessContext,
+    apply_ota_task_site_scope,
+    get_authorized_gateways,
+    get_authorized_ota_task,
+    get_db,
+    get_site_access_context,
+    require_admin,
+    require_operator,
+)
 from ...models.user import User
 from ...models.gateway import FirmwarePackage, OtaTask, OtaTaskGateway
 from ...schemas.ota import (
@@ -48,7 +57,7 @@ async def create_firmware(
 async def list_firmware(
     is_active: Optional[bool] = Query(None),
     db: AsyncSession = Depends(get_db),
-    _user: User = Depends(require_operator),
+    _user: User = Depends(require_admin),
 ):
     query = select(FirmwarePackage)
     if is_active is not None:
@@ -92,7 +101,9 @@ async def create_task(
     data: OtaTaskCreate,
     db: AsyncSession = Depends(get_db),
     user: User = Depends(require_operator),
+    context: SiteAccessContext = Depends(get_site_access_context),
 ):
+    await get_authorized_gateways(db, data.gateway_ids, context)
     try:
         task = await ota_service.create_task(
             firmware_id=data.firmware_id,
@@ -116,8 +127,10 @@ async def list_tasks(
     page_size: int = Query(20, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
     _user: User = Depends(require_operator),
+    context: SiteAccessContext = Depends(get_site_access_context),
 ):
     query = select(OtaTask)
+    query = apply_ota_task_site_scope(query, OtaTask.id, context)
     if status:
         query = query.where(OtaTask.status == status)
 
@@ -142,11 +155,9 @@ async def get_task(
     task_id: str,
     db: AsyncSession = Depends(get_db),
     _user: User = Depends(require_operator),
+    context: SiteAccessContext = Depends(get_site_access_context),
 ):
-    result = await db.execute(select(OtaTask).where(OtaTask.task_id == task_id))
-    task = result.scalar_one_or_none()
-    if not task:
-        raise HTTPException(404, "任务不存在")
+    task = await get_authorized_ota_task(db, task_id, context)
 
     # 获取各网关状态
     gw_result = await db.execute(
@@ -166,9 +177,11 @@ async def start_task(
     task_id: str,
     db: AsyncSession = Depends(get_db),
     _user: User = Depends(require_operator),
+    context: SiteAccessContext = Depends(get_site_access_context),
 ):
     from ...mqtt import mqtt_service
 
+    await get_authorized_ota_task(db, task_id, context, require_resolvable_gateways=True)
     try:
         await ota_service.start_task(task_id, mqtt_service.publish, db)
         return {"detail": "任务已启动"}
@@ -183,9 +196,11 @@ async def cancel_task(
     task_id: str,
     db: AsyncSession = Depends(get_db),
     _user: User = Depends(require_operator),
+    context: SiteAccessContext = Depends(get_site_access_context),
 ):
     from ...mqtt import mqtt_service
 
+    await get_authorized_ota_task(db, task_id, context, require_resolvable_gateways=True)
     try:
         await ota_service.cancel_task(task_id, mqtt_service.publish, db)
         return {"detail": "任务已取消"}
@@ -198,7 +213,9 @@ async def pause_task(
     task_id: str,
     db: AsyncSession = Depends(get_db),
     _user: User = Depends(require_operator),
+    context: SiteAccessContext = Depends(get_site_access_context),
 ):
+    await get_authorized_ota_task(db, task_id, context, require_resolvable_gateways=True)
     try:
         await ota_service.pause_task(task_id, db)
         return {"detail": "任务已暂停"}
@@ -211,9 +228,11 @@ async def resume_task(
     task_id: str,
     db: AsyncSession = Depends(get_db),
     _user: User = Depends(require_operator),
+    context: SiteAccessContext = Depends(get_site_access_context),
 ):
     from ...mqtt import mqtt_service
 
+    await get_authorized_ota_task(db, task_id, context, require_resolvable_gateways=True)
     try:
         await ota_service.resume_task(task_id, mqtt_service.publish, db)
         return {"detail": "任务已恢复"}

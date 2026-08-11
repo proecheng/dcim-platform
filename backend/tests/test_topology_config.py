@@ -18,7 +18,15 @@ from app.models.topology_config import (
     CoolingZoneUnit,
 )
 from app.models.user import User
-from app.api.deps import get_db, require_viewer, require_operator, require_admin
+from app.api.deps import (
+    SiteAccessContext,
+    enforce_inventory_authorization,
+    get_db,
+    get_site_access_context,
+    require_admin,
+    require_operator,
+    require_viewer,
+)
 
 
 # ============================================================
@@ -100,10 +108,18 @@ async def app(db_session, mock_user):
     async def override_require_admin():
         return mock_user
 
+    async def override_site_context():
+        return SiteAccessContext(user_id=mock_user.id, role="admin", jti="unit-test", site_ids=None)
+
+    async def override_inventory_authorization():
+        return None
+
     _app.dependency_overrides[get_db] = override_get_db
     _app.dependency_overrides[require_viewer] = override_require_viewer
     _app.dependency_overrides[require_operator] = override_require_operator
     _app.dependency_overrides[require_admin] = override_require_admin
+    _app.dependency_overrides[get_site_access_context] = override_site_context
+    _app.dependency_overrides[enforce_inventory_authorization] = override_inventory_authorization
 
     yield _app
 

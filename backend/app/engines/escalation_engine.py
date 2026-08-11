@@ -6,6 +6,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update, func
 
 from ..models.alarm import Alarm, AlarmEscalation
+from ..models.device import Device
+from ..models.point import Point
 from ..services.websocket import ws_manager
 
 logger = logging.getLogger(__name__)
@@ -27,13 +29,14 @@ async def check_escalations(session: AsyncSession):
         cutoff_time = now - timedelta(minutes=rule.timeout_minutes)
         time_ref = func.coalesce(Alarm.last_escalated_at, Alarm.created_at)
         alarms_result = await session.execute(
-            select(Alarm).where(
-                Alarm.status == "active", Alarm.alarm_level == rule.source_level, time_ref <= cutoff_time
-            )
+            select(Alarm, Device.site_id)
+            .outerjoin(Point, Alarm.point_id == Point.id)
+            .outerjoin(Device, Point.device_id == Device.id)
+            .where(Alarm.status == "active", Alarm.alarm_level == rule.source_level, time_ref <= cutoff_time)
         )
-        alarms = alarms_result.scalars().all()
+        alarms = alarms_result.all()
 
-        for alarm in alarms:
+        for alarm, site_id in alarms:
             # 3. Build broadcast message from local vars BEFORE modifying ORM
             alarm_id = alarm.id
             source_level = rule.source_level
@@ -54,20 +57,23 @@ async def check_escalations(session: AsyncSession):
             )
 
             pending_broadcasts.append(
-                {
+                (
+                    {
                     "action": "escalate",
                     "id": alarm_id,
                     "alarm_level": target_level,
                     "previous_level": source_level,
                     "escalation_remark": remark,
-                }
+                    },
+                    site_id,
+                )
             )
 
     # 5. Commit FIRST, then broadcast
     if pending_broadcasts:
         await session.commit()
-        for payload in pending_broadcasts:
+        for payload, site_id in pending_broadcasts:
             try:
-                await ws_manager.broadcast_alarm(payload)
+                await ws_manager.broadcast_alarm(payload, site_id=site_id)
             except Exception as e:
                 logger.warning("升级广播失败: %s", e)

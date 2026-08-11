@@ -8,7 +8,17 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 
-from ..deps import get_db, require_viewer, require_operator, require_admin
+from ..deps import (
+    SiteAccessContext,
+    apply_site_scope,
+    get_authorized_cooling_unit,
+    get_authorized_device,
+    get_db,
+    get_site_access_context,
+    require_admin,
+    require_operator,
+    require_viewer,
+)
 from ...models.user import User
 from ...schemas.cooling import (
     CoolingUnitCreate,
@@ -33,20 +43,25 @@ router = APIRouter()
 
 
 @router.get("/overview", response_model=CoolingOverviewSummary, summary="制冷系统总览")
-async def get_cooling_overview(db: AsyncSession = Depends(get_db), _: User = Depends(require_viewer)):
+async def get_cooling_overview(
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_viewer),
+    context: SiteAccessContext = Depends(get_site_access_context),
+):
     """
     获取制冷系统总览统计
     """
     from ...models.device import Device
-    from ...models.cooling import CoolingGroup, ColdAisle
+    from ...models.cooling import CoolingGroup, CoolingUnit, ColdAisle
     from ...models.point import PointRealtime, Point
 
     # 空调统计
-    ac_result = await db.execute(
+    ac_query = (
         select(Device.status, func.count(Device.id))
         .where(Device.device_type.in_(["AC", "PRECISION_AC_INDOOR", "PRECISION_AC_OUTDOOR"]))
         .group_by(Device.status)
     )
+    ac_result = await db.execute(apply_site_scope(ac_query, Device.site_id, context))
     ac_stats = {row[0]: row[1] for row in ac_result.all()}
     ac_total = sum(ac_stats.values())
     ac_running = ac_stats.get("running", 0)
@@ -54,30 +69,43 @@ async def get_cooling_overview(db: AsyncSession = Depends(get_db), _: User = Dep
     ac_alarm = ac_stats.get("alarm", 0)
 
     # 平均送风/回风温度
-    supply_temp_result = await db.execute(
+    supply_temp_query = (
         select(PointRealtime.value)
         .join(Point, PointRealtime.point_id == Point.id)
+        .join(Device, Point.device_id == Device.id)
         .where(Point.point_code.like("%supply_temp%"))
     )
+    supply_temp_result = await db.execute(apply_site_scope(supply_temp_query, Device.site_id, context))
     supply_temps = [row[0] for row in supply_temp_result.all() if row[0] is not None]
     avg_supply_temp = sum(supply_temps) / len(supply_temps) if supply_temps else 0.0
 
-    return_temp_result = await db.execute(
+    return_temp_query = (
         select(PointRealtime.value)
         .join(Point, PointRealtime.point_id == Point.id)
+        .join(Device, Point.device_id == Device.id)
         .where(Point.point_code.like("%return_temp%"))
     )
+    return_temp_result = await db.execute(apply_site_scope(return_temp_query, Device.site_id, context))
     return_temps = [row[0] for row in return_temp_result.all() if row[0] is not None]
     avg_return_temp = sum(return_temps) / len(return_temps) if return_temps else 0.0
 
     # 冷通道统计
-    cold_aisle_count = await db.execute(select(func.count()).select_from(ColdAisle))
+    cold_aisle_query = select(func.count()).select_from(ColdAisle).join(Device, ColdAisle.device_id == Device.id)
+    cold_aisle_count = await db.execute(apply_site_scope(cold_aisle_query, Device.site_id, context))
     cold_aisle_total = cold_aisle_count.scalar()
 
     # 群控组统计
-    group_result = await db.execute(
-        select(CoolingGroup.group_mode, func.count(CoolingGroup.id)).group_by(CoolingGroup.group_mode)
-    )
+    if context.site_ids is None:
+        group_query = select(CoolingGroup.group_mode, func.count(CoolingGroup.id)).group_by(CoolingGroup.group_mode)
+    else:
+        group_query = (
+            select(CoolingGroup.group_mode, func.count(func.distinct(CoolingGroup.id)))
+            .join(CoolingUnit, CoolingUnit.group_id == CoolingGroup.id)
+            .join(Device, CoolingUnit.device_id == Device.id)
+            .where(Device.site_id.in_(context.site_ids))
+            .group_by(CoolingGroup.group_mode)
+        )
+    group_result = await db.execute(group_query)
     group_stats = {row[0]: row[1] for row in group_result.all()}
     group_total = sum(group_stats.values())
     group_linked = group_stats.get("linked", 0)
@@ -106,11 +134,12 @@ async def get_cooling_units(
     group_id: Optional[int] = Query(None, description="群控组ID"),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_viewer),
+    context: SiteAccessContext = Depends(get_site_access_context),
 ):
     """
     获取精密空调列表（分页、筛选）
     """
-    from ...models.cooling import CoolingUnit, CoolingGroup
+    from ...models.cooling import CoolingGroup, CoolingUnit
     from ...models.device import Device
 
     query = (
@@ -119,6 +148,7 @@ async def get_cooling_units(
         .outerjoin(CoolingGroup, CoolingUnit.group_id == CoolingGroup.id)
         .where(Device.device_type.in_(["AC", "PRECISION_AC_INDOOR", "PRECISION_AC_OUTDOOR"]))
     )
+    query = apply_site_scope(query, Device.site_id, context)
 
     if unit_type:
         query = query.where(CoolingUnit.unit_type == unit_type)
@@ -146,20 +176,27 @@ async def get_cooling_units(
 
 
 @router.get("/units/{unit_id}", response_model=CoolingUnitDetail, summary="获取空调详情")
-async def get_cooling_unit(unit_id: int, db: AsyncSession = Depends(get_db), _: User = Depends(require_viewer)):
+async def get_cooling_unit(
+    unit_id: int,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_viewer),
+    context: SiteAccessContext = Depends(get_site_access_context),
+):
     """
     获取精密空调详情（含关联设备信息和点位实时值）
     """
-    from ...models.cooling import CoolingUnit, CoolingGroup
+    from ...models.cooling import CoolingGroup, CoolingUnit
     from ...models.device import Device
     from ...models.point import Point, PointRealtime
 
-    result = await db.execute(
+    result_query = (
         select(CoolingUnit, Device, CoolingGroup)
         .join(Device, CoolingUnit.device_id == Device.id)
         .outerjoin(CoolingGroup, CoolingUnit.group_id == CoolingGroup.id)
         .where(CoolingUnit.id == unit_id)
     )
+    result_query = apply_site_scope(result_query, Device.site_id, context)
+    result = await db.execute(result_query)
     row = result.first()
     if not row:
         raise HTTPException(status_code=404, detail="空调不存在")
@@ -204,19 +241,24 @@ async def get_cooling_unit(unit_id: int, db: AsyncSession = Depends(get_db), _: 
 
 @router.post("/units", response_model=CoolingUnitInfo, summary="创建空调")
 async def create_cooling_unit(
-    data: CoolingUnitCreate, db: AsyncSession = Depends(get_db), _: User = Depends(require_operator)
+    data: CoolingUnitCreate,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_operator),
+    context: SiteAccessContext = Depends(get_site_access_context),
 ):
     """
     创建精密空调扩展记录
     """
     from ...models.cooling import CoolingUnit
-    from ...models.device import Device
+    from ...models.cooling import CoolingGroup
 
-    # 验证设备是否存在
-    device_result = await db.execute(select(Device).where(Device.id == data.device_id))
-    device = device_result.scalar_one_or_none()
-    if not device:
-        raise HTTPException(status_code=404, detail="设备不存在")
+    device = await get_authorized_device(db, data.device_id, context)
+    if data.group_id is not None:
+        if context.role != "admin":
+            raise HTTPException(status_code=403, detail="群控组为全局资源，仅管理员可管理")
+        group = (await db.execute(select(CoolingGroup).where(CoolingGroup.id == data.group_id))).scalar_one_or_none()
+        if group is None:
+            raise HTTPException(status_code=404, detail="群控组不存在")
 
     unit = CoolingUnit(**data.model_dump())
     db.add(unit)
@@ -233,20 +275,31 @@ async def create_cooling_unit(
 
 @router.put("/units/{unit_id}", response_model=CoolingUnitInfo, summary="更新空调")
 async def update_cooling_unit(
-    unit_id: int, data: CoolingUnitUpdate, db: AsyncSession = Depends(get_db), _: User = Depends(require_operator)
+    unit_id: int,
+    data: CoolingUnitUpdate,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_operator),
+    context: SiteAccessContext = Depends(get_site_access_context),
 ):
     """
     更新精密空调扩展记录
     """
-    from ...models.cooling import CoolingUnit, CoolingGroup
+    from ...models.cooling import CoolingGroup
     from ...models.device import Device
 
-    result = await db.execute(select(CoolingUnit).where(CoolingUnit.id == unit_id))
-    unit = result.scalar_one_or_none()
-    if not unit:
-        raise HTTPException(status_code=404, detail="空调不存在")
-
     update_data = data.model_dump(exclude_unset=True)
+    unit = await get_authorized_cooling_unit(db, unit_id, context)
+    if "device_id" in update_data:
+        await get_authorized_device(db, update_data["device_id"], context)
+    if "group_id" in update_data:
+        if context.role != "admin":
+            raise HTTPException(status_code=403, detail="群控组为全局资源，仅管理员可管理")
+        if update_data["group_id"] is not None:
+            group = (
+                await db.execute(select(CoolingGroup).where(CoolingGroup.id == update_data["group_id"]))
+            ).scalar_one_or_none()
+            if group is None:
+                raise HTTPException(status_code=404, detail="群控组不存在")
     for key, value in update_data.items():
         setattr(unit, key, value)
     unit.updated_at = datetime.now()
@@ -270,16 +323,16 @@ async def update_cooling_unit(
 
 
 @router.delete("/units/{unit_id}", summary="删除空调")
-async def delete_cooling_unit(unit_id: int, db: AsyncSession = Depends(get_db), _: User = Depends(require_admin)):
+async def delete_cooling_unit(
+    unit_id: int,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_admin),
+    context: SiteAccessContext = Depends(get_site_access_context),
+):
     """
     删除精密空调扩展记录
     """
-    from ...models.cooling import CoolingUnit
-
-    result = await db.execute(select(CoolingUnit).where(CoolingUnit.id == unit_id))
-    unit = result.scalar_one_or_none()
-    if not unit:
-        raise HTTPException(status_code=404, detail="空调不存在")
+    unit = await get_authorized_cooling_unit(db, unit_id, context)
 
     await db.delete(unit)
     await db.commit()
@@ -295,7 +348,7 @@ async def get_cooling_groups(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_viewer),
+    _: User = Depends(require_admin),
 ):
     """
     获取空调群控组列表
@@ -316,7 +369,7 @@ async def get_cooling_groups(
 
 
 @router.get("/groups/{group_id}", response_model=CoolingGroupInfo, summary="获取群控组详情")
-async def get_cooling_group(group_id: int, db: AsyncSession = Depends(get_db), _: User = Depends(require_viewer)):
+async def get_cooling_group(group_id: int, db: AsyncSession = Depends(get_db), _: User = Depends(require_admin)):
     """
     获取群控组详情
     """
@@ -332,7 +385,7 @@ async def get_cooling_group(group_id: int, db: AsyncSession = Depends(get_db), _
 
 @router.post("/groups", response_model=CoolingGroupInfo, summary="创建群控组")
 async def create_cooling_group(
-    data: CoolingGroupCreate, db: AsyncSession = Depends(get_db), _: User = Depends(require_operator)
+    data: CoolingGroupCreate, db: AsyncSession = Depends(get_db), _: User = Depends(require_admin)
 ):
     """
     创建空调群控组
@@ -349,7 +402,7 @@ async def create_cooling_group(
 
 @router.put("/groups/{group_id}", response_model=CoolingGroupInfo, summary="更新群控组")
 async def update_cooling_group(
-    group_id: int, data: CoolingGroupUpdate, db: AsyncSession = Depends(get_db), _: User = Depends(require_operator)
+    group_id: int, data: CoolingGroupUpdate, db: AsyncSession = Depends(get_db), _: User = Depends(require_admin)
 ):
     """
     更新空调群控组
@@ -404,6 +457,7 @@ async def get_cold_aisles(
     page_size: int = Query(20, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_viewer),
+    context: SiteAccessContext = Depends(get_site_access_context),
 ):
     """
     获取冷通道列表
@@ -412,6 +466,7 @@ async def get_cold_aisles(
     from ...models.device import Device
 
     query = select(ColdAisle, Device).join(Device, ColdAisle.device_id == Device.id)
+    query = apply_site_scope(query, Device.site_id, context)
 
     count_query = select(func.count()).select_from(query.subquery())
     total = (await db.execute(count_query)).scalar()
@@ -433,7 +488,12 @@ async def get_cold_aisles(
 
 
 @router.get("/cold-aisles/{aisle_id}", response_model=ColdAisleDetail, summary="获取冷通道详情")
-async def get_cold_aisle(aisle_id: int, db: AsyncSession = Depends(get_db), _: User = Depends(require_viewer)):
+async def get_cold_aisle(
+    aisle_id: int,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_viewer),
+    context: SiteAccessContext = Depends(get_site_access_context),
+):
     """
     获取冷通道详情（含关联设备信息和点位实时值）
     """
@@ -441,9 +501,11 @@ async def get_cold_aisle(aisle_id: int, db: AsyncSession = Depends(get_db), _: U
     from ...models.device import Device
     from ...models.point import Point, PointRealtime
 
-    result = await db.execute(
+    result_query = (
         select(ColdAisle, Device).join(Device, ColdAisle.device_id == Device.id).where(ColdAisle.id == aisle_id)
     )
+    result_query = apply_site_scope(result_query, Device.site_id, context)
+    result = await db.execute(result_query)
     row = result.first()
     if not row:
         raise HTTPException(status_code=404, detail="冷通道不存在")
@@ -487,19 +549,16 @@ async def get_cold_aisle(aisle_id: int, db: AsyncSession = Depends(get_db), _: U
 
 @router.post("/cold-aisles", response_model=ColdAisleInfo, summary="创建冷通道")
 async def create_cold_aisle(
-    data: ColdAisleCreate, db: AsyncSession = Depends(get_db), _: User = Depends(require_operator)
+    data: ColdAisleCreate,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_operator),
+    context: SiteAccessContext = Depends(get_site_access_context),
 ):
     """
     创建冷通道
     """
     from ...models.cooling import ColdAisle
-    from ...models.device import Device
-
-    # 验证设备是否存在
-    device_result = await db.execute(select(Device).where(Device.id == data.device_id))
-    device = device_result.scalar_one_or_none()
-    if not device:
-        raise HTTPException(status_code=404, detail="设备不存在")
+    device = await get_authorized_device(db, data.device_id, context)
 
     aisle = ColdAisle(**data.model_dump())
     db.add(aisle)
@@ -516,7 +575,11 @@ async def create_cold_aisle(
 
 @router.put("/cold-aisles/{aisle_id}", response_model=ColdAisleInfo, summary="更新冷通道")
 async def update_cold_aisle(
-    aisle_id: int, data: ColdAisleUpdate, db: AsyncSession = Depends(get_db), _: User = Depends(require_operator)
+    aisle_id: int,
+    data: ColdAisleUpdate,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_operator),
+    context: SiteAccessContext = Depends(get_site_access_context),
 ):
     """
     更新冷通道
@@ -524,12 +587,16 @@ async def update_cold_aisle(
     from ...models.cooling import ColdAisle
     from ...models.device import Device
 
-    result = await db.execute(select(ColdAisle).where(ColdAisle.id == aisle_id))
+    query = select(ColdAisle).join(Device, ColdAisle.device_id == Device.id).where(ColdAisle.id == aisle_id)
+    query = apply_site_scope(query, Device.site_id, context)
+    result = await db.execute(query)
     aisle = result.scalar_one_or_none()
     if not aisle:
         raise HTTPException(status_code=404, detail="冷通道不存在")
 
     update_data = data.model_dump(exclude_unset=True)
+    if "device_id" in update_data:
+        await get_authorized_device(db, update_data["device_id"], context)
     for key, value in update_data.items():
         setattr(aisle, key, value)
     aisle.updated_at = datetime.now()
@@ -550,13 +617,21 @@ async def update_cold_aisle(
 
 
 @router.delete("/cold-aisles/{aisle_id}", summary="删除冷通道")
-async def delete_cold_aisle(aisle_id: int, db: AsyncSession = Depends(get_db), _: User = Depends(require_admin)):
+async def delete_cold_aisle(
+    aisle_id: int,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_admin),
+    context: SiteAccessContext = Depends(get_site_access_context),
+):
     """
     删除冷通道
     """
     from ...models.cooling import ColdAisle
+    from ...models.device import Device
 
-    result = await db.execute(select(ColdAisle).where(ColdAisle.id == aisle_id))
+    query = select(ColdAisle).join(Device, ColdAisle.device_id == Device.id).where(ColdAisle.id == aisle_id)
+    query = apply_site_scope(query, Device.site_id, context)
+    result = await db.execute(query)
     aisle = result.scalar_one_or_none()
     if not aisle:
         raise HTTPException(status_code=404, detail="冷通道不存在")

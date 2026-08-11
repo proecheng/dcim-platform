@@ -8,11 +8,19 @@ import logging
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.database import get_db
-from app.api.deps import get_current_user, require_admin, require_operator
+from app.api.deps import (
+    SiteAccessContext,
+    apply_point_site_scope,
+    get_authorized_point,
+    get_current_user,
+    get_db,
+    get_site_access_context,
+    require_admin,
+    require_operator,
+)
 from app.models.diagnosis import SensorMetadata
 from app.models.user import User
 from app.schemas.diagnosis import (
@@ -33,12 +41,15 @@ async def create_sensor_metadata(
     data: SensorMetadataCreate,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_operator),
+    context: SiteAccessContext = Depends(get_site_access_context),
 ):
     """
     创建传感器元数据
 
     权限: admin/operator
     """
+
+    await get_authorized_point(db, data.point_id, context)
 
     # 检查点位是否已存在元数据
     result = await db.execute(select(SensorMetadata).where(SensorMetadata.point_id == data.point_id))
@@ -67,6 +78,7 @@ async def list_sensor_metadata(
     page_size: int = Query(20, ge=1, le=100, description="每页数量"),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    context: SiteAccessContext = Depends(get_site_access_context),
 ):
     """
     查询传感器元数据列表
@@ -74,17 +86,17 @@ async def list_sensor_metadata(
     权限: 所有登录用户
     """
     # 构建查询
-    query = select(SensorMetadata)
+    query = apply_point_site_scope(select(SensorMetadata), SensorMetadata.point_id, context)
 
     if point_id is not None:
+        await get_authorized_point(db, point_id, context)
         query = query.where(SensorMetadata.point_id == point_id)
     if accuracy_class is not None:
         query = query.where(SensorMetadata.accuracy_class == accuracy_class)
 
     # 获取总数
-    from sqlalchemy import func
-
     count_query = select(func.count()).select_from(SensorMetadata)
+    count_query = apply_point_site_scope(count_query, SensorMetadata.point_id, context)
     if point_id is not None:
         count_query = count_query.where(SensorMetadata.point_id == point_id)
     if accuracy_class is not None:
@@ -104,14 +116,22 @@ async def list_sensor_metadata(
 
 @router.get("/{metadata_id}", response_model=SensorMetadataResponse)
 async def get_sensor_metadata(
-    metadata_id: int, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)
+    metadata_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+    context: SiteAccessContext = Depends(get_site_access_context),
 ):
     """
     获取传感器元数据详情
 
     权限: 所有登录用户
     """
-    result = await db.execute(select(SensorMetadata).where(SensorMetadata.id == metadata_id))
+    query = apply_point_site_scope(
+        select(SensorMetadata).where(SensorMetadata.id == metadata_id),
+        SensorMetadata.point_id,
+        context,
+    )
+    result = await db.execute(query)
     metadata = result.scalar_one_or_none()
 
     if not metadata:
@@ -126,6 +146,7 @@ async def update_sensor_metadata(
     data: SensorMetadataUpdate,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_operator),
+    context: SiteAccessContext = Depends(get_site_access_context),
 ):
     """
     更新传感器元数据
@@ -133,7 +154,12 @@ async def update_sensor_metadata(
     权限: admin/operator
     """
 
-    result = await db.execute(select(SensorMetadata).where(SensorMetadata.id == metadata_id))
+    query = apply_point_site_scope(
+        select(SensorMetadata).where(SensorMetadata.id == metadata_id),
+        SensorMetadata.point_id,
+        context,
+    )
+    result = await db.execute(query)
     metadata = result.scalar_one_or_none()
 
     if not metadata:
@@ -159,6 +185,7 @@ async def delete_sensor_metadata(
     metadata_id: int,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_admin),
+    context: SiteAccessContext = Depends(get_site_access_context),
 ):
     """
     删除传感器元数据
@@ -166,7 +193,12 @@ async def delete_sensor_metadata(
     权限: admin
     """
 
-    result = await db.execute(select(SensorMetadata).where(SensorMetadata.id == metadata_id))
+    query = apply_point_site_scope(
+        select(SensorMetadata).where(SensorMetadata.id == metadata_id),
+        SensorMetadata.point_id,
+        context,
+    )
+    result = await db.execute(query)
     metadata = result.scalar_one_or_none()
 
     if not metadata:
@@ -184,13 +216,17 @@ async def delete_sensor_metadata(
 
 @router.get("/calibration-status/{point_id}", response_model=CalibrationStatusResponse)
 async def get_calibration_status(
-    point_id: int, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)
+    point_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+    context: SiteAccessContext = Depends(get_site_access_context),
 ):
     """
     查询传感器校准状态
 
     权限: 所有登录用户
     """
+    await get_authorized_point(db, point_id, context)
     status = await check_calibration_status(point_id, db)
     return status
 
@@ -198,7 +234,7 @@ async def get_calibration_status(
 @router.post("/check-expired-calibrations", status_code=200)
 async def trigger_expired_calibrations_check(
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_operator),
+    current_user: User = Depends(require_admin),
 ):
     """
     手动触发校准过期检查（创建维护告警）

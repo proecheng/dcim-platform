@@ -40,7 +40,7 @@ def _generate_diagnosis(deviation_sigma: float, cross_result: Optional[str]) -> 
     return f"该点位读数偏离历史均值 {sigma_str}σ，同区域无可比较传感器。建议现场校验。"
 
 
-async def run_drift_detection(db: AsyncSession) -> dict:
+async def run_drift_detection(db: AsyncSession, allowed_point_ids=None) -> dict:
     """
     执行漂移检测。返回检测统计。
     """
@@ -48,12 +48,13 @@ async def run_drift_detection(db: AsyncSession) -> dict:
     cutoff = now - timedelta(hours=HISTORY_WINDOW_HOURS)
 
     # Step 1: 获取所有启用的 AI 类型点位
-    point_result = await db.execute(
-        select(Point).where(
+    point_query = select(Point).where(
             Point.point_type.in_(["AI", "measurement"]),
             Point.is_enabled == True,  # noqa: E712
         )
-    )
+    if allowed_point_ids is not None:
+        point_query = point_query.where(Point.id.in_(allowed_point_ids))
+    point_result = await db.execute(point_query)
     points = point_result.scalars().all()
 
     total_checked = 0
@@ -126,7 +127,15 @@ async def run_drift_detection(db: AsyncSession) -> dict:
             continue
 
         # Step 6-7: 超过 3σ → 执行交叉验证
-        cross_result = await _cross_validate(db, point.id, point.area_code, point.device_type, mean_val, std_val)
+        cross_result = await _cross_validate(
+            db,
+            point.id,
+            point.area_code,
+            point.device_type,
+            mean_val,
+            std_val,
+            allowed_point_ids=allowed_point_ids,
+        )
 
         if cross_result == "fail":
             status = "confirmed"
@@ -193,6 +202,7 @@ async def _cross_validate(
     device_type: Optional[str],
     target_mean: float,
     target_std: float,
+    allowed_point_ids=None,
 ) -> str:
     """
     交叉验证：比较同区域同类型其他传感器的均值。
@@ -202,7 +212,7 @@ async def _cross_validate(
         return "skipped"
 
     # 查询同区域同类型的其他点位当前值
-    neighbor_result = await db.execute(
+    neighbor_query = (
         select(PointRealtime.value)
         .join(Point, Point.id == PointRealtime.point_id)
         .where(
@@ -213,6 +223,9 @@ async def _cross_validate(
             PointRealtime.value.isnot(None),
         )
     )
+    if allowed_point_ids is not None:
+        neighbor_query = neighbor_query.where(Point.id.in_(allowed_point_ids))
+    neighbor_result = await db.execute(neighbor_query)
     neighbor_values = [row[0] for row in neighbor_result.all() if row[0] is not None]
 
     if len(neighbor_values) < 2:

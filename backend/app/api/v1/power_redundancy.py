@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
-from ..deps import get_db, require_viewer, require_admin
+from ..deps import SiteAccessContext, apply_device_site_scope, get_db, get_site_access_context, require_admin, require_viewer
 from ...models.user import User
 from ...models.energy import PowerDevice
 from ...schemas.diagnosis import RedundancyConfigUpdate, RedundancyConfigResponse
@@ -19,9 +19,13 @@ async def get_device_redundancy(
     device_id: int,
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_viewer),
+    context: SiteAccessContext = Depends(get_site_access_context),
 ):
     """查询配电设备的冗余配置"""
-    result = await db.execute(select(PowerDevice).where(PowerDevice.id == device_id))
+    query = apply_device_site_scope(
+        select(PowerDevice).where(PowerDevice.id == device_id), PowerDevice.monitor_device_id, context
+    )
+    result = await db.execute(query)
     device = result.scalar_one_or_none()
 
     if not device:
@@ -43,9 +47,13 @@ async def update_device_redundancy(
     config: RedundancyConfigUpdate,
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_admin),
+    context: SiteAccessContext = Depends(get_site_access_context),
 ):
     """更新配电设备的冗余配置（仅管理员）"""
-    result = await db.execute(select(PowerDevice).where(PowerDevice.id == device_id))
+    query = apply_device_site_scope(
+        select(PowerDevice).where(PowerDevice.id == device_id), PowerDevice.monitor_device_id, context
+    )
+    result = await db.execute(query)
     device = result.scalar_one_or_none()
 
     if not device:

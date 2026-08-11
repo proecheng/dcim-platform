@@ -13,10 +13,35 @@ from fastapi import APIRouter, Body, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, and_
 
-from ..deps import get_db, require_admin, require_operator, require_viewer, require_diagnosis_advanced
+from ..deps import (
+    SiteAccessContext,
+    apply_cooling_zone_site_scope,
+    apply_device_site_scope,
+    apply_point_site_scope,
+    get_authorized_alarm,
+    get_authorized_cooling_zone,
+    get_authorized_device,
+    get_authorized_point,
+    get_db,
+    get_site_access_context,
+    require_admin,
+    require_diagnosis_advanced,
+    require_operator,
+    require_viewer,
+)
 from ...models.user import User
-from ...models.diagnosis import DiagnosisRule, DiagnosisResult, DiagnosisSession, DiagnosisAuditLog, BreakerProfile
+from ...models.diagnosis import (
+    BatterySOHRecord,
+    BreakerProfile,
+    CounterfactualAnalysis,
+    DiagnosisAnnotation,
+    DiagnosisAuditLog,
+    DiagnosisResult,
+    DiagnosisRule,
+    DiagnosisSession,
+)
 from ...models.fault_tree import FaultTree
+from ...models.topology_config import CoolingZone
 from ...schemas.diagnosis import (
     DiagnosisRuleCreate,
     DiagnosisRuleUpdate,
@@ -47,6 +72,51 @@ from pydantic import BaseModel, Field, field_validator
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+
+def _authorized_session_ids(context: SiteAccessContext):
+    return apply_device_site_scope(select(DiagnosisSession.id), DiagnosisSession.device_id, context)
+
+
+async def _get_authorized_session(
+    db: AsyncSession, session_id: int, context: SiteAccessContext
+) -> DiagnosisSession:
+    query = apply_device_site_scope(
+        select(DiagnosisSession).where(DiagnosisSession.id == session_id),
+        DiagnosisSession.device_id,
+        context,
+    )
+    session_obj = (await db.execute(query)).scalar_one_or_none()
+    if session_obj is None:
+        raise HTTPException(status_code=404, detail="诊断会话不存在")
+    return session_obj
+
+
+async def _get_authorized_result(
+    db: AsyncSession, result_id: int, context: SiteAccessContext
+) -> DiagnosisResult:
+    query = apply_device_site_scope(
+        select(DiagnosisResult).where(DiagnosisResult.id == result_id),
+        DiagnosisResult.device_id,
+        context,
+    )
+    result = (await db.execute(query)).scalar_one_or_none()
+    if result is None:
+        raise HTTPException(status_code=404, detail="诊断结果不存在")
+    return result
+
+
+async def _get_authorized_annotation(
+    db: AsyncSession, annotation_id: int, context: SiteAccessContext
+) -> DiagnosisAnnotation:
+    query = select(DiagnosisAnnotation).where(
+        DiagnosisAnnotation.id == annotation_id,
+        DiagnosisAnnotation.session_id.in_(_authorized_session_ids(context)),
+    )
+    annotation = (await db.execute(query)).scalar_one_or_none()
+    if annotation is None:
+        raise HTTPException(status_code=404, detail="标注不存在")
+    return annotation
 
 
 # ==================== 内联 Pydantic 模型 ====================
@@ -322,6 +392,7 @@ async def diagnosis_health(_: User = Depends(require_viewer)):
 async def list_sessions(
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_viewer),
+    context: SiteAccessContext = Depends(get_site_access_context),
     device_id: Optional[int] = Query(None, description="设备ID"),
     engine_level: Optional[str] = Query(None, description="推理级别: L1/L2/L3"),
     min_confidence: Optional[float] = Query(None, ge=0.0, le=1.0, description="最低置信度"),
@@ -331,8 +402,9 @@ async def list_sessions(
     page_size: int = Query(20, ge=1, le=100),
 ):
     """诊断会话列表（分页查询）"""
-    query = select(DiagnosisSession)
+    query = apply_device_site_scope(select(DiagnosisSession), DiagnosisSession.device_id, context)
     if device_id is not None:
+        await get_authorized_device(db, device_id, context)
         query = query.where(DiagnosisSession.device_id == device_id)
     if engine_level is not None:
         query = query.where(DiagnosisSession.engine_level == engine_level)
@@ -372,12 +444,10 @@ async def get_session_detail(
     session_id: int,
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_viewer),
+    context: SiteAccessContext = Depends(get_site_access_context),
 ):
     """诊断会话详情（含关联的诊断结果）"""
-    result = await db.execute(select(DiagnosisSession).where(DiagnosisSession.id == session_id))
-    session_obj = result.scalar_one_or_none()
-    if session_obj is None:
-        raise HTTPException(status_code=404, detail="诊断会话不存在")
+    session_obj = await _get_authorized_session(db, session_id, context)
 
     # 查询关联的诊断结果
     result_query = await db.execute(select(DiagnosisResult).where(DiagnosisResult.session_id == session_id))
@@ -394,12 +464,11 @@ async def get_session_audit_log(
     session_id: int,
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_admin),
+    context: SiteAccessContext = Depends(get_site_access_context),
 ):
     """诊断会话审计日志（需 admin 角色）"""
     # 验证会话存在
-    session_result = await db.execute(select(DiagnosisSession).where(DiagnosisSession.id == session_id))
-    if session_result.scalar_one_or_none() is None:
-        raise HTTPException(status_code=404, detail="诊断会话不存在")
+    await _get_authorized_session(db, session_id, context)
 
     result = await db.execute(
         select(DiagnosisAuditLog)
@@ -418,8 +487,10 @@ async def get_results_by_alarm(
     alarm_id: int,
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_viewer),
+    context: SiteAccessContext = Depends(get_site_access_context),
 ):
     """按告警ID查询诊断结果"""
+    await get_authorized_alarm(db, alarm_id, context)
     result = await db.execute(
         select(DiagnosisResult).where(DiagnosisResult.alarm_id == alarm_id).order_by(DiagnosisResult.created_at.desc())
     )
@@ -431,6 +502,7 @@ async def get_results_by_alarm(
 async def list_results(
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_viewer),
+    context: SiteAccessContext = Depends(get_site_access_context),
     device_type: Optional[str] = Query(None),
     zone: Optional[str] = Query(None),
     session_id: Optional[int] = Query(None, description="诊断会话ID"),
@@ -441,12 +513,13 @@ async def list_results(
     page_size: int = Query(20, ge=1, le=100),
 ):
     """诊断结果列表"""
-    query = select(DiagnosisResult)
+    query = apply_device_site_scope(select(DiagnosisResult), DiagnosisResult.device_id, context)
     if device_type is not None:
         query = query.where(DiagnosisResult.device_type == device_type)
     if zone is not None:
         query = query.where(DiagnosisResult.zone == zone)
     if session_id is not None:
+        await _get_authorized_session(db, session_id, context)
         query = query.where(DiagnosisResult.session_id == session_id)
     if min_confidence is not None:
         query = query.where(DiagnosisResult.confidence >= min_confidence)
@@ -484,12 +557,10 @@ async def get_result(
     result_id: int,
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_viewer),
+    context: SiteAccessContext = Depends(get_site_access_context),
 ):
     """诊断结果详情"""
-    result = await db.execute(select(DiagnosisResult).where(DiagnosisResult.id == result_id))
-    item = result.scalar_one_or_none()
-    if item is None:
-        raise HTTPException(status_code=404, detail="诊断结果不存在")
+    item = await _get_authorized_result(db, result_id, context)
     return DiagnosisResultResponse.model_validate(item)
 
 
@@ -498,8 +569,10 @@ async def manual_diagnose(
     alarm_id: int,
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_operator),
+    context: SiteAccessContext = Depends(get_site_access_context),
 ):
     """手动触发诊断"""
+    await get_authorized_alarm(db, alarm_id, context)
     payload = await diagnosis_engine.manual_diagnose(alarm_id)
     if payload is None:
         raise HTTPException(status_code=404, detail="告警不存在")
@@ -514,10 +587,12 @@ async def create_annotation(
     data: DiagnosisAnnotationCreate,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_operator),
+    context: SiteAccessContext = Depends(get_site_access_context),
 ):
     """创建诊断标注（operator+）"""
     from ...services.diagnosis.annotation_service import DiagnosisAnnotationService
 
+    await _get_authorized_session(db, data.session_id, context)
     try:
         annotation = await DiagnosisAnnotationService.create_annotation(
             db=db,
@@ -534,6 +609,7 @@ async def list_annotations(
     query: DiagnosisAnnotationListQuery = Depends(),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_operator),
+    context: SiteAccessContext = Depends(get_site_access_context),
 ):
     """获取标注列表（operator 只能查看自己的，admin 可查看所有）"""
     from ...services.diagnosis.annotation_service import DiagnosisAnnotationService
@@ -544,6 +620,7 @@ async def list_annotations(
             query=query,
             user_id=current_user.id,
             user_role=current_user.role,
+            allowed_session_ids=_authorized_session_ids(context),
         )
         return {
             "items": annotations,
@@ -560,10 +637,12 @@ async def delete_annotation(
     annotation_id: int,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_operator),
+    context: SiteAccessContext = Depends(get_site_access_context),
 ):
     """删除标注（operator 只能删除自己的，admin 可删除任何）"""
     from ...services.diagnosis.annotation_service import DiagnosisAnnotationService
 
+    await _get_authorized_annotation(db, annotation_id, context)
     try:
         await DiagnosisAnnotationService.delete_annotation(
             db=db,
@@ -599,37 +678,35 @@ async def get_all_latest_soh(
     limit: int = Query(100, ge=1, le=500, description="最大返回设备数"),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_viewer),
+    context: SiteAccessContext = Depends(get_site_access_context),
 ):
     """查询所有 UPS 设备最新 SOH（使用窗口函数优化）"""
-    from sqlalchemy import text
-
-    # 使用窗口函数获取每台设备最新的 SOH 记录
-    query = text("""
-        WITH ranked_soh AS (
-            SELECT
-                device_id,
-                soh_percent,
-                resistance_mohm,
-                cycle_count,
-                weights_version,
-                calculated_at,
-                ROW_NUMBER() OVER (PARTITION BY device_id ORDER BY calculated_at DESC) AS rn
-            FROM battery_soh_records
+    ranked_soh = select(
+        BatterySOHRecord.device_id.label("device_id"),
+        BatterySOHRecord.soh_percent.label("soh_percent"),
+        BatterySOHRecord.resistance_mohm.label("resistance_mohm"),
+        BatterySOHRecord.cycle_count.label("cycle_count"),
+        BatterySOHRecord.weights_version.label("weights_version"),
+        BatterySOHRecord.calculated_at.label("calculated_at"),
+        func.row_number()
+        .over(
+            partition_by=BatterySOHRecord.device_id,
+            order_by=BatterySOHRecord.calculated_at.desc(),
         )
-        SELECT
-            device_id,
-            soh_percent,
-            resistance_mohm,
-            cycle_count,
-            weights_version,
-            calculated_at
-        FROM ranked_soh
-        WHERE rn = 1
-        ORDER BY device_id
-        LIMIT :limit
-    """)
+        .label("rn"),
+    ).subquery()
+    query = select(
+        ranked_soh.c.device_id,
+        ranked_soh.c.soh_percent,
+        ranked_soh.c.resistance_mohm,
+        ranked_soh.c.cycle_count,
+        ranked_soh.c.weights_version,
+        ranked_soh.c.calculated_at,
+    ).where(ranked_soh.c.rn == 1)
+    query = apply_device_site_scope(query, ranked_soh.c.device_id, context)
+    query = query.order_by(ranked_soh.c.device_id).limit(limit)
 
-    result = await db.execute(query, {"limit": limit})
+    result = await db.execute(query)
     rows = result.fetchall()
 
     records = [
@@ -652,6 +729,7 @@ async def get_device_soh_history(
     device_id: int,
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_viewer),
+    context: SiteAccessContext = Depends(get_site_access_context),
     limit: int = Query(30, ge=1, le=100, description="返回记录数量"),
 ):
     """查询设备 SOH 历史记录（分页）"""
@@ -659,6 +737,7 @@ async def get_device_soh_history(
     from ...models.diagnosis import BatterySOHRecord
     from ...schemas.diagnosis import BatterySOHRecordResponse
 
+    await get_authorized_device(db, device_id, context)
     result = await db.execute(
         select(BatterySOHRecord)
         .where(BatterySOHRecord.device_id == device_id)
@@ -679,10 +758,12 @@ async def trigger_soh_calculation(
     device_id: int,
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_operator),
+    context: SiteAccessContext = Depends(get_site_access_context),
 ):
     """手动触发 SOH 计算（operator/admin）"""
     from ...services.diagnosis.battery_soh_service import calculate_soh
 
+    await get_authorized_device(db, device_id, context)
     soh = await calculate_soh(device_id)
 
     if soh is None:
@@ -872,16 +953,18 @@ async def get_trend_warnings(
     acknowledged: Optional[bool] = Query(None, description="是否已确认"),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_viewer),
+    context: SiteAccessContext = Depends(get_site_access_context),
 ):
     """查询趋势预警列表（分页）"""
     from ...models.diagnosis import TrendWarning
     from ...schemas.diagnosis import TrendWarningListResponse, TrendWarningResponse
 
     # 构建查询
-    query = select(TrendWarning)
+    query = apply_point_site_scope(select(TrendWarning), TrendWarning.point_id, context)
 
     # 应用过滤条件
     if point_id is not None:
+        await get_authorized_point(db, point_id, context)
         query = query.where(TrendWarning.point_id == point_id)
     if start_time:
         query = query.where(TrendWarning.detected_at >= start_time)
@@ -913,11 +996,17 @@ async def acknowledge_trend_warning(
     request: TrendWarningAcknowledge,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_operator),
+    context: SiteAccessContext = Depends(get_site_access_context),
 ):
     """确认趋势预警"""
     from ...models.diagnosis import TrendWarning
 
-    warning = await db.get(TrendWarning, warning_id)
+    query = apply_point_site_scope(
+        select(TrendWarning).where(TrendWarning.id == warning_id),
+        TrendWarning.point_id,
+        context,
+    )
+    warning = (await db.execute(query)).scalar_one_or_none()
     if not warning:
         raise HTTPException(status_code=404, detail="趋势预警不存在")
 
@@ -925,7 +1014,7 @@ async def acknowledge_trend_warning(
         raise HTTPException(status_code=400, detail="趋势预警已确认")
 
     warning.acknowledged = True
-    warning.acknowledged_by = current_user.username
+    warning.acknowledged_by = current_user.id
     warning.acknowledged_at = datetime.now(timezone.utc)
 
     await db.commit()
@@ -942,16 +1031,21 @@ async def get_sensor_fusion_records(
     end_time: Optional[datetime] = Query(None, description="结束时间"),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_viewer),
+    context: SiteAccessContext = Depends(get_site_access_context),
 ):
     """查询多传感器融合记录列表（分页）"""
     from ...models.diagnosis import SensorFusionRecord
     from ...schemas.diagnosis import SensorFusionRecordListResponse, SensorFusionRecordResponse
 
     # 构建查询
-    query = select(SensorFusionRecord)
+    authorized_zone_ids = apply_cooling_zone_site_scope(
+        select(CoolingZone.id), CoolingZone.site_id, context
+    )
+    query = select(SensorFusionRecord).where(SensorFusionRecord.zone_id.in_(authorized_zone_ids))
 
     # 应用过滤条件
     if zone_id is not None:
+        await get_authorized_cooling_zone(db, zone_id, context)
         query = query.where(SensorFusionRecord.zone_id == zone_id)
     if start_time:
         query = query.where(SensorFusionRecord.created_at >= start_time)
@@ -1067,17 +1161,13 @@ async def trigger_counterfactual_analysis(
     session_id: int,
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_operator),
+    context: SiteAccessContext = Depends(get_site_access_context),
     top_n: int = Query(5, ge=1, le=10, description="分析Top N证据"),
 ):
     """手动触发反事实分析（operator/admin）"""
     from ...services.diagnosis.counterfactual_service import analyze_counterfactual
 
-    # 检查会话是否存在
-    from ...models.diagnosis import DiagnosisSession
-
-    session_result = await db.execute(select(DiagnosisSession).where(DiagnosisSession.id == session_id))
-    if not session_result.scalar_one_or_none():
-        raise HTTPException(status_code=404, detail="诊断会话不存在")
+    await _get_authorized_session(db, session_id, context)
 
     # 触发分析
     analysis = await analyze_counterfactual(session_id, top_n, db)
@@ -1098,6 +1188,7 @@ async def get_counterfactual_analysis(
     session_id: int,
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_diagnosis_advanced),
+    context: SiteAccessContext = Depends(get_site_access_context),
 ):
     """
     获取反事实分析结果
@@ -1106,6 +1197,7 @@ async def get_counterfactual_analysis(
     """
     from ...services.diagnosis.counterfactual_service import get_counterfactual_analysis as get_analysis
 
+    await _get_authorized_session(db, session_id, context)
     analysis = await get_analysis(session_id, db)
 
     if not analysis:
@@ -1117,7 +1209,9 @@ async def get_counterfactual_analysis(
 @router.get("/counterfactual/{session_id}/progress")
 async def get_counterfactual_progress(
     session_id: int,
+    db: AsyncSession = Depends(get_db),
     _: User = Depends(require_diagnosis_advanced),
+    context: SiteAccessContext = Depends(get_site_access_context),
 ):
     """
     SSE 进度推送端点
@@ -1129,6 +1223,7 @@ async def get_counterfactual_progress(
     from fastapi.responses import StreamingResponse
     from ...services.diagnosis.counterfactual_service import stream_counterfactual_progress
 
+    await _get_authorized_session(db, session_id, context)
     return StreamingResponse(
         stream_counterfactual_progress(session_id),
         media_type="text/event-stream",
@@ -1144,6 +1239,7 @@ async def get_counterfactual_progress(
 async def list_counterfactual_analyses(
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_viewer),
+    context: SiteAccessContext = Depends(get_site_access_context),
     min_confidence: Optional[float] = Query(None, ge=0.0, le=1.0, description="最低原始置信度"),
     start_date: Optional[str] = Query(None, description="开始时间 ISO格式"),
     end_date: Optional[str] = Query(None, description="结束时间 ISO格式"),
@@ -1151,9 +1247,10 @@ async def list_counterfactual_analyses(
     page_size: int = Query(20, ge=1, le=100),
 ):
     """反事实分析列表（分页查询）"""
-    from ...models.diagnosis import CounterfactualAnalysis
-
-    query = select(CounterfactualAnalysis).where(CounterfactualAnalysis.deleted_at.is_(None))
+    query = select(CounterfactualAnalysis).where(
+        CounterfactualAnalysis.deleted_at.is_(None),
+        CounterfactualAnalysis.session_id.in_(_authorized_session_ids(context)),
+    )
 
     if min_confidence is not None:
         query = query.where(CounterfactualAnalysis.original_confidence >= min_confidence)
@@ -1192,10 +1289,12 @@ async def delete_counterfactual_analysis(
     session_id: int,
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_admin),
+    context: SiteAccessContext = Depends(get_site_access_context),
 ):
     """软删除反事实分析（仅 admin）"""
     from ...services.diagnosis.counterfactual_service import get_counterfactual_analysis as get_analysis
 
+    await _get_authorized_session(db, session_id, context)
     analysis = await get_analysis(session_id, db)
 
     if not analysis:
@@ -1566,6 +1665,7 @@ async def approve_time_window_adjustment(
                     "approved_by": current_user.username,
                 },
                 target_roles=["admin"],
+                global_message=True,
             )
         except Exception as ws_error:
             logger.error(f"发送 WebSocket 通知失败: {ws_error}", exc_info=True)
@@ -1661,6 +1761,7 @@ async def reject_time_window_adjustment(
                 "rejected_by": current_user.username,
             },
             target_roles=["admin"],
+            global_message=True,
         )
     except Exception as ws_error:
         logger.error(f"发送 WebSocket 通知失败: {ws_error}", exc_info=True)

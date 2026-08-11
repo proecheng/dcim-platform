@@ -505,6 +505,7 @@ async def _evaluate_alarms(
                         "point_id": alarm.point_id,
                         "point_code": meta["point_code"],
                         "point_name": meta["point_name"],
+                        "site_id": meta.get("site_id"),
                         "alarm_level": alarm.alarm_level,
                         "alarm_type": alarm.alarm_type,
                         "alarm_message": alarm.alarm_message,
@@ -512,7 +513,8 @@ async def _evaluate_alarms(
                         "threshold_value": alarm.threshold_value,
                         "status": "active",
                         "created_at": datetime.now().isoformat(),
-                    }
+                    },
+                    site_id=meta.get("site_id"),
                 )
             except Exception as e:
                 logger.warning("告警 WS 广播失败: %s", e)
@@ -542,6 +544,7 @@ async def _evaluate_alarms(
                         "threshold_type": triggered.threshold_type if triggered else "",
                         "device_type": meta.get("device_type") or "",
                         "zone": meta.get("area_code") or "default",
+                        "site_id": meta.get("site_id"),
                     },
                 )
                 await get_event_bus().publish("linkage", _evt)
@@ -563,6 +566,7 @@ async def _evaluate_alarms(
     if alarms_to_resolve:
         now = datetime.now()
         for alarm in alarms_to_resolve:
+            meta = _point_meta_cache.get(alarm.point_id, {})
             alarm.status = "resolved"
             alarm.resolve_type = "auto"
             alarm.resolved_at = now
@@ -576,10 +580,12 @@ async def _evaluate_alarms(
                         "alarm_no": alarm.alarm_no,
                         "point_id": alarm.point_id,
                         "alarm_level": alarm.alarm_level,
+                        "site_id": meta.get("site_id"),
                         "status": "resolved",
                         "resolve_type": "auto",
                         "resolved_at": now.isoformat(),
-                    }
+                    },
+                    site_id=meta.get("site_id"),
                 )
             except Exception:
                 pass
@@ -665,13 +671,14 @@ async def _broadcast_realtime(points: list[IngestPoint]) -> None:
             "point_code": meta.get("point_code", ""),
             "point_name": meta.get("point_name", ""),
             "point_type": meta.get("point_type", ""),
+            "site_id": meta.get("site_id"),
             "value": pt.value if meta.get("point_type") == "AI" else int(pt.value),
             "unit": meta.get("unit", ""),
             "status": pt.status,
             "source": pt.source,
             "timestamp": (pt.timestamp or datetime.now()).isoformat(),
         }
-        await ws_manager.broadcast_realtime(data)
+        await ws_manager.broadcast_realtime(data, site_id=meta.get("site_id"))
 
 
 async def _update_redis_cache(points: list[IngestPoint], now: datetime) -> None:

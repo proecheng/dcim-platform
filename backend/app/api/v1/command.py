@@ -10,7 +10,16 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, desc
 
-from ..deps import get_db, require_operator, require_admin, require_viewer
+from ..deps import (
+    SiteAccessContext,
+    apply_device_site_scope,
+    get_authorized_device,
+    get_db,
+    get_site_access_context,
+    require_admin,
+    require_operator,
+    require_viewer,
+)
 from ...models.user import User
 from ...models.command import CommandApproval, CommandAuditLog
 from ...schemas.command import (
@@ -28,6 +37,20 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
+async def _get_authorized_approval(
+    db: AsyncSession, approval_id: int, context: SiteAccessContext
+) -> CommandApproval:
+    query = apply_device_site_scope(
+        select(CommandApproval).where(CommandApproval.id == approval_id),
+        CommandApproval.target_device_id,
+        context,
+    )
+    approval = (await db.execute(query)).scalar_one_or_none()
+    if approval is None:
+        raise HTTPException(status_code=404, detail="审批工单不存在")
+    return approval
+
+
 # ==================== 命令提交 ====================
 
 
@@ -36,12 +59,14 @@ async def submit_command(
     data: CommandSubmitRequest,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_operator),
+    context: SiteAccessContext = Depends(get_site_access_context),
 ):
     """
     提交控制命令，系统根据风险等级自动判断确认流程：
     - 普通命令：直接执行
     - 关键命令：创建审批工单，等待审批
     """
+    await get_authorized_device(db, data.target_device_id, context)
     result = await command_service.submit_command(
         db=db,
         command_type=data.command_type,
@@ -65,6 +90,7 @@ async def list_approvals(
     page_size: int = Query(20, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_viewer),
+    context: SiteAccessContext = Depends(get_site_access_context),
 ):
     """获取审批工单列表（分页），查询前自动检查超时"""
     # 惰性超时检查
@@ -72,6 +98,8 @@ async def list_approvals(
 
     query = select(CommandApproval)
     count_query = select(func.count(CommandApproval.id))
+    query = apply_device_site_scope(query, CommandApproval.target_device_id, context)
+    count_query = apply_device_site_scope(count_query, CommandApproval.target_device_id, context)
 
     if status:
         query = query.where(CommandApproval.status == status)
@@ -103,12 +131,10 @@ async def get_approval(
     approval_id: int,
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_viewer),
+    context: SiteAccessContext = Depends(get_site_access_context),
 ):
     """获取审批工单详情"""
-    result = await db.execute(select(CommandApproval).where(CommandApproval.id == approval_id))
-    approval = result.scalar_one_or_none()
-    if not approval:
-        raise HTTPException(status_code=404, detail="审批工单不存在")
+    approval = await _get_authorized_approval(db, approval_id, context)
     return CommandApprovalResponse.model_validate(approval)
 
 
@@ -117,8 +143,10 @@ async def approve(
     approval_id: int,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_admin),
+    context: SiteAccessContext = Depends(get_site_access_context),
 ):
     """批准审批工单，命令将被执行"""
+    await _get_authorized_approval(db, approval_id, context)
     try:
         approval = await command_service.approve_command(
             db=db,
@@ -140,8 +168,10 @@ async def reject(
     data: ApprovalRejectRequest,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_admin),
+    context: SiteAccessContext = Depends(get_site_access_context),
 ):
     """驳回审批工单"""
+    await _get_authorized_approval(db, approval_id, context)
     try:
         approval = await command_service.reject_command(
             db=db,
@@ -170,10 +200,13 @@ async def list_audit_logs(
     page_size: int = Query(20, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_viewer),
+    context: SiteAccessContext = Depends(get_site_access_context),
 ):
     """获取命令审计日志列表（分页）"""
     query = select(CommandAuditLog)
     count_query = select(func.count(CommandAuditLog.id))
+    query = apply_device_site_scope(query, CommandAuditLog.target_device_id, context)
+    count_query = apply_device_site_scope(count_query, CommandAuditLog.target_device_id, context)
 
     if command_type:
         query = query.where(CommandAuditLog.command_type == command_type)

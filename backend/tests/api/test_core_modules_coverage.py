@@ -13,14 +13,55 @@ from app.models.history import PointHistory, PointHistoryArchive, PointChangeLog
 from app.models.device import Device
 from app.models.energy import PowerDevice
 from app.models.log import OperationLog, SystemLog, CommunicationLog
+from app.models.spatial import Site
+from app.models.user import UserSite
 
 
 # ======================== helpers ========================
 
 
+@pytest.fixture(autouse=True)
+async def core_module_site_access(async_db, operator_user, viewer_user):
+    """为核心模块覆盖测试建立真实站点归属和非管理员授权。"""
+    operator, _ = operator_user
+    viewer, _ = viewer_user
+    site = Site(site_code="CORE-COVERAGE", site_name="Core Coverage Site")
+    async_db.add(site)
+    await async_db.flush()
+    async_db.add_all(
+        [
+            UserSite(user_id=operator.id, site_id=site.id),
+            UserSite(user_id=viewer.id, site_id=site.id),
+        ]
+    )
+    await async_db.flush()
+    async_db.info["core_site_id"] = site.id
+
+
+async def _get_owned_device(db):
+    device_id = db.info.get("core_device_id")
+    if device_id is not None:
+        return await db.get(Device, device_id)
+
+    device = Device(
+        device_code="CORE-COVERAGE-DEVICE",
+        device_name="Core Coverage Device",
+        device_type="UPS",
+        area_code="A1",
+        site_id=db.info["core_site_id"],
+    )
+    db.add(device)
+    await db.flush()
+    db.info["core_device_id"] = device.id
+    return device
+
+
 async def _mk_point(
     db, code="PT-001", name="test-temp", ptype="AI", dtype="TH", area="A1", unit="C", enabled=True, **kw
 ):
+    device_id = kw.pop("device_id", None)
+    if device_id is None:
+        device_id = (await _get_owned_device(db)).id
     p = Point(
         point_code=code,
         point_name=name,
@@ -33,6 +74,7 @@ async def _mk_point(
         max_range=kw.pop("max_range", 100),
         precision=2,
         collect_interval=10,
+        device_id=device_id,
         **kw,
     )
     db.add(p)
@@ -55,7 +97,14 @@ async def _mk_history(db, pid, value=25.0, mins_ago=0):
 
 
 async def _mk_device(db, code="DEV-001", name="UPS-1", dtype="UPS", area="A1", status="online"):
-    d = Device(device_code=code, device_name=name, device_type=dtype, area_code=area, status=status)
+    d = Device(
+        device_code=code,
+        device_name=name,
+        device_type=dtype,
+        area_code=area,
+        status=status,
+        site_id=db.info["core_site_id"],
+    )
     db.add(d)
     await db.flush()
     return d
@@ -247,8 +296,8 @@ class TestPointGroups:
         assert r.status_code == 200
         assert r.json() == []
 
-    async def test_create_group(self, client, operator_user):
-        _, token = operator_user
+    async def test_create_group(self, client, admin_user):
+        _, token = admin_user
         r = await client.post(
             "/api/v1/points/groups",
             headers=auth_headers(token),
@@ -257,8 +306,8 @@ class TestPointGroups:
         assert r.status_code == 200
         assert r.json()["group_name"] == "TestGroup"
 
-    async def test_get_groups_after_create(self, client, operator_user):
-        _, token = operator_user
+    async def test_get_groups_after_create(self, client, admin_user):
+        _, token = admin_user
         await client.post(
             "/api/v1/points/groups", headers=auth_headers(token), json={"group_name": "G1", "group_type": "area"}
         )
@@ -286,16 +335,16 @@ class TestPointExport:
 
 @pytest.mark.asyncio
 class TestPointBatchImport:
-    async def test_import_csv(self, client, operator_user):
-        _, token = operator_user
+    async def test_import_csv(self, client, admin_user):
+        _, token = admin_user
         csv_content = "\u70b9\u4f4d\u7f16\u7801,\u70b9\u4f4d\u540d\u79f0,\u70b9\u4f4d\u7c7b\u578b,\u8bbe\u5907\u7c7b\u578b,\u533a\u57df,\u5355\u4f4d,\u91cf\u7a0b\u4e0b\u9650,\u91cf\u7a0b\u4e0a\u9650,\u7cbe\u5ea6,\u91c7\u96c6\u5468\u671f,\u542f\u7528\r\nIMP-001,imported-pt,AI,TH,A1,C,0,100,2,10,\u662f\r\n"
         files = {"file": ("test.csv", csv_content.encode("utf-8-sig"), "text/csv")}
         r = await client.post("/api/v1/points/batch-import", headers=auth_headers(token), files=files)
         assert r.status_code == 200
         assert r.json()["success_count"] >= 1
 
-    async def test_import_non_csv(self, client, operator_user):
-        _, token = operator_user
+    async def test_import_non_csv(self, client, admin_user):
+        _, token = admin_user
         files = {"file": ("test.txt", b"hello", "text/plain")}
         r = await client.post("/api/v1/points/batch-import", headers=auth_headers(token), files=files)
         assert r.status_code == 400
@@ -308,8 +357,9 @@ class TestPointCRUD:
         r = await client.get("/api/v1/points/99999", headers=auth_headers(token))
         assert r.status_code == 404
 
-    async def test_create_point(self, client, operator_user):
+    async def test_create_point(self, client, operator_user, async_db):
         _, token = operator_user
+        device = await _get_owned_device(async_db)
         r = await client.post(
             "/api/v1/points",
             headers=auth_headers(token),
@@ -319,6 +369,7 @@ class TestPointCRUD:
                 "point_type": "AI",
                 "device_type": "TH",
                 "area_code": "A1",
+                "device_id": device.id,
             },
         )
         assert r.status_code == 200
@@ -326,7 +377,7 @@ class TestPointCRUD:
 
     async def test_create_point_duplicate_code(self, client, operator_user, async_db):
         _, token = operator_user
-        await _mk_point(async_db, "DUP-001", "existing")
+        existing = await _mk_point(async_db, "DUP-001", "existing")
         r = await client.post(
             "/api/v1/points",
             headers=auth_headers(token),
@@ -336,6 +387,7 @@ class TestPointCRUD:
                 "point_type": "AI",
                 "device_type": "TH",
                 "area_code": "A1",
+                "device_id": existing.device_id,
             },
         )
         assert r.status_code == 400
@@ -571,9 +623,7 @@ class TestThresholdBatch:
                 "alarm_level": "major",
             },
         )
-        assert r.status_code == 200
-        assert r.json()["success_count"] == 1
-        assert r.json()["error_count"] == 1
+        assert r.status_code == 404
 
 
 @pytest.mark.asyncio
@@ -603,10 +653,7 @@ class TestThresholdCopy:
 class TestThresholdVersion:
     async def test_version_no_auth(self, client):
         r = await client.get("/api/v1/thresholds/version")
-        assert r.status_code == 200
-        data = r.json()
-        assert "version" in data
-        assert "updated_at" in data
+        assert r.status_code == 401
 
 
 @pytest.mark.asyncio
@@ -788,8 +835,8 @@ class TestHistoryTrend:
 
 @pytest.mark.asyncio
 class TestHistoryStatistics:
-    async def test_statistics_with_data(self, client, viewer_user, async_db):
-        _, token = viewer_user
+    async def test_statistics_with_data(self, client, admin_user, async_db):
+        _, token = admin_user
         p = await _mk_point(async_db, "HI-ST1", "stat-pt")
         await _mk_history(async_db, p.id, 20.0, mins_ago=10)
         await _mk_history(async_db, p.id, 30.0, mins_ago=5)
@@ -804,8 +851,8 @@ class TestHistoryStatistics:
         assert data["std_dev"] is not None
         assert data["change_rate"] is not None
 
-    async def test_statistics_no_data(self, client, viewer_user, async_db):
-        _, token = viewer_user
+    async def test_statistics_no_data(self, client, admin_user, async_db):
+        _, token = admin_user
         p = await _mk_point(async_db, "HI-ST2", "stat-empty")
         r = await client.get(f"/api/v1/history/{p.id}/statistics", headers=auth_headers(token))
         assert r.status_code == 200
@@ -822,15 +869,14 @@ class TestHistoryStatistics:
 @pytest.mark.asyncio
 class TestHistoryCompare:
     async def test_compare(self, client, viewer_user, async_db):
-        """Route shadowed by /{point_id} — 'compare' can't parse as int → 422."""
+        """已授权用户可比较同一授权范围内的多个点位。"""
         _, token = viewer_user
         p1 = await _mk_point(async_db, "HI-CM1", "cmp1")
         p2 = await _mk_point(async_db, "HI-CM2", "cmp2")
         await _mk_history(async_db, p1.id, 25.0, mins_ago=5)
         await _mk_history(async_db, p2.id, 30.0, mins_ago=5)
         r = await client.get(f"/api/v1/history/compare?point_ids={p1.id},{p2.id}", headers=auth_headers(token))
-        # Route shadowing: /{point_id} matches before /compare
-        assert r.status_code == 422
+        assert r.status_code == 200
 
 
 @pytest.mark.asyncio
@@ -858,26 +904,28 @@ class TestHistoryChanges:
 @pytest.mark.asyncio
 class TestHistoryExport:
     async def test_export_csv(self, client, operator_user, async_db):
-        """Route shadowed by /{point_id} — 'export' can't parse as int → 422."""
+        """已授权用户可导出站点范围内的 CSV 历史数据。"""
         _, token = operator_user
         p = await _mk_point(async_db, "HI-EX1", "export-hist")
         await _mk_history(async_db, p.id, 25.0, mins_ago=5)
         r = await client.get(f"/api/v1/history/export?point_id={p.id}&format=csv", headers=auth_headers(token))
-        assert r.status_code == 422
+        assert r.status_code == 200
+        assert "text/csv" in r.headers.get("content-type", "")
 
     async def test_export_json(self, client, operator_user, async_db):
-        """Route shadowed by /{point_id} — 'export' can't parse as int → 422."""
+        """已授权用户可导出站点范围内的 JSON 历史数据。"""
         _, token = operator_user
         p = await _mk_point(async_db, "HI-EX2", "export-json")
         await _mk_history(async_db, p.id, 25.0, mins_ago=5)
         r = await client.get(f"/api/v1/history/export?point_id={p.id}&format=json", headers=auth_headers(token))
-        assert r.status_code == 422
+        assert r.status_code == 200
+        assert "application/json" in r.headers.get("content-type", "")
 
     async def test_export_not_found(self, client, operator_user):
-        """Route shadowed by /{point_id} — 'export' can't parse as int → 422."""
+        """路由被 /{point_id} 遮蔽，严格对象授权统一返回 404。"""
         _, token = operator_user
         r = await client.get("/api/v1/history/export?point_id=99999&format=csv", headers=auth_headers(token))
-        assert r.status_code == 422
+        assert r.status_code == 404
 
 
 @pytest.mark.asyncio
@@ -908,8 +956,8 @@ class TestStatisticsOverview:
         assert "devices" in data
         assert "alarms" in data
 
-    async def test_overview_with_data(self, client, viewer_user, async_db):
-        _, token = viewer_user
+    async def test_overview_with_data(self, client, admin_user, async_db):
+        _, token = admin_user
         p = await _mk_point(async_db, "ST-O1", "stat-pt")
         await _mk_device(async_db, "ST-D1", "stat-dev", "UPS", "A1")
         await _mk_alarm(async_db, p.id, level="minor", status="active")

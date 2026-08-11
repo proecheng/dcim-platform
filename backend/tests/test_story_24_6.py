@@ -428,8 +428,8 @@ async def test_websocket_message_format():
     sent_messages = []
 
     # mock broadcast
-    async def mock_broadcast(message, channel):
-        sent_messages.append((message, channel))
+    async def mock_broadcast(message, channel, **kwargs):
+        sent_messages.append((message, channel, kwargs))
 
     manager.broadcast = mock_broadcast
 
@@ -443,15 +443,17 @@ async def test_websocket_message_format():
         msg_type="diagnosis_alert",
         data=push_data,
         target_roles=["operator", "admin"],
+        site_id=1,
     )
 
     assert len(sent_messages) == 1
-    msg, channel = sent_messages[0]
+    msg, channel, kwargs = sent_messages[0]
     assert channel == "alarms"
     assert msg["type"] == "diagnosis_alert"
     assert msg["target_roles"] == ["operator", "admin"]
     assert msg["data"]["session_id"] == 1
     assert msg["data"]["confidence"] == 92
+    assert kwargs["site_id"] == 1
 
 
 # ==================== 8.1 审计脱敏 - 敏感后缀字段测试（第二轮审查问题 2） ====================

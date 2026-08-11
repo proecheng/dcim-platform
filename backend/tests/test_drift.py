@@ -13,7 +13,15 @@ from app.models.drift import DriftDetectionResult
 from app.models.point import Point, PointRealtime
 from app.models.history import PointHistory
 from app.models.user import User
-from app.api.deps import get_db, require_admin, require_operator, require_viewer
+from app.api.deps import (
+    SiteAccessContext,
+    enforce_inventory_authorization,
+    get_db,
+    get_site_access_context,
+    require_admin,
+    require_operator,
+    require_viewer,
+)
 
 
 # ============================================================
@@ -78,10 +86,18 @@ async def app(db_session, mock_admin):
     async def override_require_viewer():
         return mock_admin
 
+    async def override_inventory_authorization():
+        return None
+
+    async def override_site_access_context():
+        return SiteAccessContext(user_id=mock_admin.id, role="admin", jti="test-jti", site_ids=None)
+
     _app.dependency_overrides[get_db] = override_get_db
     _app.dependency_overrides[require_admin] = override_require_admin
     _app.dependency_overrides[require_operator] = override_require_operator
     _app.dependency_overrides[require_viewer] = override_require_viewer
+    _app.dependency_overrides[enforce_inventory_authorization] = override_inventory_authorization
+    _app.dependency_overrides[get_site_access_context] = override_site_access_context
     yield _app
     _app.dependency_overrides.clear()
 

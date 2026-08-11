@@ -7,6 +7,15 @@ Story 29.4: 温度预测 API 端点
 import pytest
 from httpx import AsyncClient
 
+from app.models.topology_config import CoolingZone
+
+
+async def _create_zone(async_db, code: str = "TEST-PRECOOL") -> CoolingZone:
+    zone = CoolingZone(zone_code=code, zone_name="预冷测试区域")
+    async_db.add(zone)
+    await async_db.flush()
+    return zone
+
 
 # ==================== predict 端点 ====================
 
@@ -30,9 +39,7 @@ class TestPredict:
             json={"hours": 1.0},
             headers={"Authorization": f"Bearer {admin_token}"},
         )
-        data = response.json()
-        # zone 不存在 → 返回 404 或 503（取决于依赖检查）
-        assert data["code"] in (404, 500, 503)
+        assert response.status_code == 404
 
     @pytest.mark.asyncio
     async def test_predict_invalid_hours(self, client: AsyncClient, admin_token: str):
@@ -56,10 +63,17 @@ class TestPredict:
         assert response.status_code == 422
 
     @pytest.mark.asyncio
-    async def test_predict_default_hours(self, client: AsyncClient, admin_token: str):
+    async def test_predict_default_hours(self, client: AsyncClient, admin_token: str, async_db, monkeypatch):
         """默认 hours 参数"""
+        async def _insufficient_data(*_args, **_kwargs):
+            return {"error": "insufficient_data"}
+
+        monkeypatch.setattr(
+            "app.services.precool.thermal_model.ThermalModel.predict_temperature", _insufficient_data
+        )
+        zone = await _create_zone(async_db)
         response = await client.post(
-            "/api/v1/precool/zones/1/predict",
+            f"/api/v1/precool/zones/{zone.id}/predict",
             json={},
             headers={"Authorization": f"Bearer {admin_token}"},
         )
@@ -68,10 +82,17 @@ class TestPredict:
         assert "code" in data
 
     @pytest.mark.asyncio
-    async def test_predict_with_schedule(self, client: AsyncClient, admin_token: str):
+    async def test_predict_with_schedule(self, client: AsyncClient, admin_token: str, async_db, monkeypatch):
         """带制冷功率计划的预测"""
+        async def _insufficient_data(*_args, **_kwargs):
+            return {"error": "insufficient_data"}
+
+        monkeypatch.setattr(
+            "app.services.precool.thermal_model.ThermalModel.predict_temperature", _insufficient_data
+        )
+        zone = await _create_zone(async_db)
         response = await client.post(
-            "/api/v1/precool/zones/1/predict",
+            f"/api/v1/precool/zones/{zone.id}/predict",
             json={"hours": 0.5, "q_cool_schedule": [100.0] * 6},
             headers={"Authorization": f"Bearer {admin_token}"},
         )
@@ -79,10 +100,19 @@ class TestPredict:
         assert "code" in data
 
     @pytest.mark.asyncio
-    async def test_predict_schedule_length_mismatch(self, client: AsyncClient, admin_token: str):
+    async def test_predict_schedule_length_mismatch(
+        self, client: AsyncClient, admin_token: str, async_db, monkeypatch
+    ):
         """制冷功率计划长度不匹配"""
+        async def _invalid_schedule(*_args, **_kwargs):
+            return {"error": "invalid_q_cool_schedule"}
+
+        monkeypatch.setattr(
+            "app.services.precool.thermal_model.ThermalModel.predict_temperature", _invalid_schedule
+        )
+        zone = await _create_zone(async_db)
         response = await client.post(
-            "/api/v1/precool/zones/1/predict",
+            f"/api/v1/precool/zones/{zone.id}/predict",
             json={"hours": 1.0, "q_cool_schedule": [100.0] * 3},
             headers={"Authorization": f"Bearer {admin_token}"},
         )
@@ -103,10 +133,11 @@ class TestParameters:
         assert response.status_code == 401
 
     @pytest.mark.asyncio
-    async def test_parameters_empty_zone(self, client: AsyncClient, admin_token: str):
-        """查询不存在的 zone（返回空列表）"""
+    async def test_parameters_empty_zone(self, client: AsyncClient, admin_token: str, async_db):
+        """查询无参数的真实 zone（返回空列表）"""
+        zone = await _create_zone(async_db)
         response = await client.get(
-            "/api/v1/precool/zones/99999/parameters",
+            f"/api/v1/precool/zones/{zone.id}/parameters",
             headers={"Authorization": f"Bearer {admin_token}"},
         )
         data = response.json()
@@ -115,10 +146,11 @@ class TestParameters:
         assert data["data"]["total"] == 0
 
     @pytest.mark.asyncio
-    async def test_parameters_pagination(self, client: AsyncClient, admin_token: str):
+    async def test_parameters_pagination(self, client: AsyncClient, admin_token: str, async_db):
         """分页参数"""
+        zone = await _create_zone(async_db)
         response = await client.get(
-            "/api/v1/precool/zones/1/parameters?skip=0&limit=5",
+            f"/api/v1/precool/zones/{zone.id}/parameters?skip=0&limit=5",
             headers={"Authorization": f"Bearer {admin_token}"},
         )
         data = response.json()
@@ -148,10 +180,11 @@ class TestValidation:
         assert response.status_code == 401
 
     @pytest.mark.asyncio
-    async def test_validation_no_data(self, client: AsyncClient, admin_token: str):
+    async def test_validation_no_data(self, client: AsyncClient, admin_token: str, async_db):
         """无预测记录时返回 null"""
+        zone = await _create_zone(async_db)
         response = await client.get(
-            "/api/v1/precool/zones/99999/validation",
+            f"/api/v1/precool/zones/{zone.id}/validation",
             headers={"Authorization": f"Bearer {admin_token}"},
         )
         data = response.json()
@@ -164,15 +197,16 @@ class TestValidation:
         assert report["period_days"] == 7
 
     @pytest.mark.asyncio
-    async def test_validation_zone_id_in_response(self, client: AsyncClient, admin_token: str):
+    async def test_validation_zone_id_in_response(self, client: AsyncClient, admin_token: str, async_db):
         """响应包含 zone_id"""
+        zone = await _create_zone(async_db)
         response = await client.get(
-            "/api/v1/precool/zones/1/validation",
+            f"/api/v1/precool/zones/{zone.id}/validation",
             headers={"Authorization": f"Bearer {admin_token}"},
         )
         data = response.json()
         assert data["code"] == 200
-        assert data["data"]["zone_id"] == 1
+        assert data["data"]["zone_id"] == zone.id
 
 
 # ==================== dashboard 端点 ====================

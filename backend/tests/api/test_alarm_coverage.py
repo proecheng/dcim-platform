@@ -5,8 +5,13 @@
 from datetime import datetime, timedelta
 from unittest.mock import AsyncMock, patch
 
+from sqlalchemy import select
+
 from app.models.alarm import Alarm, AlarmRule, AlarmShield
+from app.models.device import Device
 from app.models.point import Point
+from app.models.spatial import Site
+from app.models.user import User, UserSite
 from tests.conftest import auth_headers
 
 
@@ -15,12 +20,28 @@ from tests.conftest import auth_headers
 
 async def _seed_points_and_alarms(async_db):
     """创建测试点位和告警数据，返回 (point, point2, alarms)"""
+    site = Site(site_code="ALARM-COVERAGE", site_name="告警覆盖率站点")
+    async_db.add(site)
+    await async_db.flush()
+    device = Device(
+        device_code="ALARM-COVERAGE",
+        device_name="告警覆盖率设备",
+        device_type="UPS",
+        area_code="A1",
+        site_id=site.id,
+    )
+    async_db.add(device)
+    await async_db.flush()
+    users = (await async_db.execute(select(User).where(User.role != "admin"))).scalars().all()
+    async_db.add_all([UserSite(user_id=user.id, site_id=site.id) for user in users])
+
     point = Point(
         point_code="TH-TEST-001",
         point_name="测试温度点位",
         point_type="AI",
         device_type="TH",
         area_code="A1",
+        device_id=device.id,
     )
     point2 = Point(
         point_code="UPS-TEST-001",
@@ -28,6 +49,7 @@ async def _seed_points_and_alarms(async_db):
         point_type="AI",
         device_type="UPS",
         area_code="B1",
+        device_id=device.id,
     )
     async_db.add_all([point, point2])
     await async_db.flush()
@@ -575,14 +597,7 @@ class TestAlarmShields:
     async def test_create_shield(self, client, operator_user, async_db):
         """POST /alarms/shields — 创建屏蔽"""
         _, token = operator_user
-        point = Point(
-            point_code="SH-TEST-001",
-            point_name="屏蔽测试点位",
-            point_type="AI",
-            device_type="TH",
-        )
-        async_db.add(point)
-        await async_db.flush()
+        point, _, _ = await _seed_points_and_alarms(async_db)
 
         now = datetime.now()
         resp = await client.post(
@@ -653,8 +668,10 @@ class TestAlarmShields:
     async def test_delete_shield(self, client, operator_user, async_db):
         """DELETE /alarms/shields/{id} — 删除屏蔽"""
         _, token = operator_user
+        point, _, _ = await _seed_points_and_alarms(async_db)
         now = datetime.now()
         shield = AlarmShield(
+            point_id=point.id,
             alarm_level="critical",
             start_time=now,
             end_time=now + timedelta(hours=1),
@@ -843,15 +860,15 @@ class TestBatchAckCoverageExtra:
 
     @patch("app.api.v1.alarm.ws_manager.broadcast_alarm", new_callable=AsyncMock)
     async def test_batch_ack_no_matching(self, mock_ws, client, operator_user, async_db):
-        """PUT /alarms/batch-acknowledge — 无匹配告警"""
+        """PUT /alarms/batch-acknowledge — 不存在的对象使整个批次失败"""
         _, token = operator_user
         resp = await client.put(
             "/api/v1/alarms/batch-acknowledge",
             json={"alarm_ids": [99998, 99999], "remark": "none"},
             headers=auth_headers(token),
         )
-        assert resp.status_code == 200
-        assert resp.json()["count"] == 0
+        assert resp.status_code == 404
+        mock_ws.assert_not_called()
 
 
 class TestAlarmRulesCoverageExtra:
@@ -1021,9 +1038,9 @@ class TestAlarmShieldsCoverageExtra:
         assert resp.status_code == 200
         assert resp.json()["total"] >= 1
 
-    async def test_create_shield_expired(self, client, operator_user, async_db):
+    async def test_create_shield_expired(self, client, admin_user, async_db):
         """POST /alarms/shields — 创建已过期屏蔽 (L616 expired 分支)"""
-        _, token = operator_user
+        _, token = admin_user
         now = datetime.now()
         resp = await client.post(
             "/api/v1/alarms/shields",
@@ -1038,9 +1055,9 @@ class TestAlarmShieldsCoverageExtra:
         assert resp.status_code == 200
         assert resp.json()["status"] == "expired"
 
-    async def test_create_shield_no_point(self, client, operator_user, async_db):
+    async def test_create_shield_no_point(self, client, admin_user, async_db):
         """POST /alarms/shields — 全局屏蔽（无点位）"""
-        _, token = operator_user
+        _, token = admin_user
         now = datetime.now()
         resp = await client.post(
             "/api/v1/alarms/shields",

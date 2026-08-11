@@ -11,7 +11,15 @@ from sqlalchemy import select, func, update, delete, and_
 import io
 import json
 
-from ..deps import get_db, require_viewer, require_operator
+from ..deps import (
+    SiteAccessContext,
+    apply_device_site_scope,
+    apply_site_scope,
+    get_db,
+    get_site_access_context,
+    require_operator,
+    require_viewer,
+)
 from ...models.user import User
 from ...models.report import ReportTemplate, ReportRecord, ReportSchedule
 from ...schemas.report import (
@@ -1115,7 +1123,11 @@ def _score_to_level(score: float) -> str:
 
 
 @router.post("/device-health/calculate", summary="计算设备健康度")
-async def calculate_device_health(db: AsyncSession = Depends(get_db), _: User = Depends(require_operator)):
+async def calculate_device_health(
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_operator),
+    context: SiteAccessContext = Depends(get_site_access_context),
+):
     """
     计算所有设备的健康度评分。
     算法：基础分100，紧急告警-15，重要告警-8，次要告警-3，逾期维保-20，近期维保+5。
@@ -1126,10 +1138,11 @@ async def calculate_device_health(db: AsyncSession = Depends(get_db), _: User = 
     from ...models.report import DeviceHealthScore
 
     # 清除旧数据
-    await db.execute(delete(DeviceHealthScore))
+    delete_query = apply_device_site_scope(delete(DeviceHealthScore), DeviceHealthScore.device_id, context)
+    await db.execute(delete_query)
 
     # 获取所有设备
-    devices_result = await db.execute(select(Device))
+    devices_result = await db.execute(apply_site_scope(select(Device), Device.site_id, context))
     devices = devices_result.scalars().all()
 
     now = datetime.now()
@@ -1197,11 +1210,13 @@ async def get_device_health_list(
     sort_order: str = Query("asc", description="排序方向: asc/desc"),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_viewer),
+    context: SiteAccessContext = Depends(get_site_access_context),
 ):
     """获取设备健康度列表，支持按健康度排序"""
     from ...models.report import DeviceHealthScore
 
     query = select(DeviceHealthScore)
+    query = apply_device_site_scope(query, DeviceHealthScore.device_id, context)
     if health_level:
         query = query.where(DeviceHealthScore.health_level == health_level)
 
@@ -1236,11 +1251,21 @@ async def get_device_health_list(
 
 
 @router.get("/device-health/{device_id}", summary="获取单个设备健康度")
-async def get_device_health(device_id: int, db: AsyncSession = Depends(get_db), _: User = Depends(require_viewer)):
+async def get_device_health(
+    device_id: int,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_viewer),
+    context: SiteAccessContext = Depends(get_site_access_context),
+):
     """获取单个设备的健康度评分"""
     from ...models.report import DeviceHealthScore
 
-    result = await db.execute(select(DeviceHealthScore).where(DeviceHealthScore.device_id == device_id))
+    query = apply_device_site_scope(
+        select(DeviceHealthScore).where(DeviceHealthScore.device_id == device_id),
+        DeviceHealthScore.device_id,
+        context,
+    )
+    result = await db.execute(query)
     health = result.scalar_one_or_none()
     if not health:
         raise HTTPException(status_code=404, detail="该设备无健康度数据，请先执行计算")

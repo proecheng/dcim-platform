@@ -15,6 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..core.database import async_session
 from ..models.linkage import (
+    LinkageExecution,
     LinkageRecovery,
     LinkageRecoveryLog,
 )
@@ -148,10 +149,17 @@ class RecoveryEngine:
         start_time = time.time()
 
         async with async_session() as session:
-            result = await session.execute(select(LinkageRecovery).where(LinkageRecovery.id == recovery_id))
-            recovery = result.scalar_one_or_none()
-            if recovery is None:
+            result = await session.execute(
+                select(LinkageRecovery, LinkageExecution.trigger_event)
+                .join(LinkageExecution, LinkageRecovery.execution_id == LinkageExecution.id)
+                .where(LinkageRecovery.id == recovery_id)
+            )
+            row = result.first()
+            if row is None:
                 return
+            recovery, trigger_event = row
+            event_payload = (trigger_event or {}).get("payload") or {}
+            site_id = event_payload.get("site_id")
 
             # 获取所有 pending 步骤
             logs_result = await session.execute(
@@ -203,7 +211,8 @@ class RecoveryEngine:
                     "recovery_id": recovery_id,
                     "status": status,
                     "duration_ms": elapsed_ms,
-                }
+                },
+                site_id=site_id,
             )
         except Exception as e:
             logger.warning("恢复引擎: WebSocket 广播失败: %s", e)

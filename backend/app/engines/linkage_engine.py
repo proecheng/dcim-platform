@@ -208,7 +208,8 @@ class LinkageEngine:
                     "status": status,
                     "event_type": event.event_type,
                     "is_test": event.is_test,
-                }
+                },
+                site_id=event.payload.get("site_id"),
             )
         except Exception as e:
             logger.warning("联动引擎: WebSocket 广播失败: %s", e)
@@ -227,7 +228,8 @@ class LinkageEngine:
                         "execution_id": execution_id,
                         "policy_name": policy_data["name"],
                         "event_id": event_id,
-                    }
+                    },
+                    site_id=event.payload.get("site_id"),
                 )
             except Exception as e:
                 logger.warning("联动引擎: 失败告警通知发送失败: %s", e)

@@ -11,7 +11,16 @@ from sqlalchemy import select, func, and_
 import csv
 import io
 
-from ..deps import get_db, require_viewer, require_operator, require_admin
+from ..deps import (
+    SiteAccessContext,
+    apply_point_site_scope,
+    get_authorized_point,
+    get_db,
+    get_site_access_context,
+    require_admin,
+    require_operator,
+    require_viewer,
+)
 from ...models.user import User
 from ...models.point import Point
 from ...models.history import PointHistory, PointHistoryArchive, PointChangeLog
@@ -31,16 +40,14 @@ async def get_point_history(
     page_size: int = Query(100, ge=1, le=1000),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_viewer),
+    site_context: SiteAccessContext = Depends(get_site_access_context),
 ):
     """
     获取点位历史数据（分页）
     返回格式: { items: [...], total, page, page_size }
     """
     # 检查点位
-    point_result = await db.execute(select(Point).where(Point.id == point_id))
-    point = point_result.scalar_one_or_none()
-    if not point:
-        raise HTTPException(status_code=404, detail="点位不存在")
+    await get_authorized_point(db, point_id, site_context)
 
     if not start_time:
         start_time = datetime.now() - timedelta(hours=24)
@@ -125,16 +132,14 @@ async def get_trend_data(
     duration: Optional[int] = Query(None, description="时长(分钟)，与start_time/end_time二选一"),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_viewer),
+    site_context: SiteAccessContext = Depends(get_site_access_context),
 ):
     """
     获取趋势数据（用于图表显示）
     返回格式: TrendData[] 数组
     """
     # 检查点位
-    point_result = await db.execute(select(Point).where(Point.id == point_id))
-    point = point_result.scalar_one_or_none()
-    if not point:
-        raise HTTPException(status_code=404, detail="点位不存在")
+    await get_authorized_point(db, point_id, site_context)
 
     # 确定时间范围
     if duration is not None:
@@ -177,15 +182,13 @@ async def get_history_statistics(
     end_time: Optional[datetime] = Query(None),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_viewer),
+    site_context: SiteAccessContext = Depends(get_site_access_context),
 ):
     """
     获取历史数据统计
     """
     # 检查点位
-    point_result = await db.execute(select(Point).where(Point.id == point_id))
-    point = point_result.scalar_one_or_none()
-    if not point:
-        raise HTTPException(status_code=404, detail="点位不存在")
+    point = await get_authorized_point(db, point_id, site_context)
 
     if not start_time:
         start_time = datetime.now() - timedelta(hours=24)
@@ -293,14 +296,25 @@ async def compare_points(
     end_time: Optional[datetime] = Query(None),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_viewer),
+    site_context: SiteAccessContext = Depends(get_site_access_context),
 ):
     """
     多个点位数据对比查询
     """
-    ids = [int(x.strip()) for x in point_ids.split(",") if x.strip()]
+    try:
+        ids = [int(x.strip()) for x in point_ids.split(",") if x.strip()]
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail="点位 ID 无效") from exc
 
     if len(ids) > 10:
         raise HTTPException(status_code=400, detail="最多支持10个点位对比")
+
+    requested_ids = set(ids)
+    point_query = apply_point_site_scope(select(Point).where(Point.id.in_(requested_ids)), Point.id, site_context)
+    points = (await db.execute(point_query)).scalars().all()
+    point_map = {point.id: point for point in points}
+    if set(point_map) != requested_ids:
+        raise HTTPException(status_code=404, detail="点位不存在")
 
     if not start_time:
         start_time = datetime.now() - timedelta(hours=24)
@@ -309,10 +323,7 @@ async def compare_points(
 
     result_data = {}
     for point_id in ids:
-        point_result = await db.execute(select(Point).where(Point.id == point_id))
-        point = point_result.scalar_one_or_none()
-        if not point:
-            continue
+        point = point_map[point_id]
 
         history_result = await db.execute(
             select(PointHistory)
@@ -345,14 +356,12 @@ async def get_change_log(
     page_size: int = Query(50, ge=1, le=200),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_viewer),
+    site_context: SiteAccessContext = Depends(get_site_access_context),
 ):
     """
     获取DI点位的变化记录
     """
-    point_result = await db.execute(select(Point).where(Point.id == point_id))
-    point = point_result.scalar_one_or_none()
-    if not point:
-        raise HTTPException(status_code=404, detail="点位不存在")
+    point = await get_authorized_point(db, point_id, site_context)
 
     if point.point_type != "DI":
         raise HTTPException(status_code=400, detail="该接口仅适用于DI点位")
@@ -406,14 +415,12 @@ async def export_history(
     format: str = Query("csv", description="导出格式: csv/json"),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_operator),
+    site_context: SiteAccessContext = Depends(get_site_access_context),
 ):
     """
     导出历史数据
     """
-    point_result = await db.execute(select(Point).where(Point.id == point_id))
-    point = point_result.scalar_one_or_none()
-    if not point:
-        raise HTTPException(status_code=404, detail="点位不存在")
+    point = await get_authorized_point(db, point_id, site_context)
 
     if not start_time:
         start_time = datetime.now() - timedelta(hours=24)
@@ -480,3 +487,7 @@ async def cleanup_history(
     await db.commit()
 
     return {"message": f"已清理 {deleted_count} 条历史数据", "cutoff_time": cutoff_time.isoformat()}
+
+
+# 静态路径和更具体的动态路径必须先匹配，避免被 /{point_id} 截获后返回 422。
+router.routes.sort(key=lambda route: (route.path.count("{"), -len(route.path)))

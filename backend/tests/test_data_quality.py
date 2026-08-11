@@ -10,15 +10,28 @@ from app.core.database import Base
 from app.engines.alarm_engine import AlarmEngine, ThresholdCache
 from app.models.point import Point, PointRealtime
 from app.models.user import User
-from app.api.deps import get_db, require_viewer
+from app.api.deps import (
+    SiteAccessContext,
+    enforce_inventory_authorization,
+    get_db,
+    get_site_access_context,
+    require_viewer,
+)
 
 
 # ==================== 告警引擎质量缓存单元测试 ====================
 
 
 @pytest.fixture
-def engine():
+def engine(monkeypatch):
     """创建测试用告警引擎"""
+    from app.services.diagnosis.dynamic_threshold_service import DynamicThresholdService
+
+    monkeypatch.setattr(
+        DynamicThresholdService,
+        "calculate_dynamic_threshold_sync",
+        lambda _point_id, static_threshold, _direction: (static_threshold, {"is_enabled": False}),
+    )
     e = AlarmEngine()
     e._loaded = True
     return e
@@ -135,7 +148,7 @@ def anyio_backend():
     return "asyncio"
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture
 async def api_engine():
     eng = create_async_engine("sqlite+aiosqlite:///:memory:")
     async with eng.begin() as conn:
@@ -144,7 +157,7 @@ async def api_engine():
     await eng.dispose()
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture
 def session_factory(api_engine):
     return async_sessionmaker(api_engine, class_=AsyncSession, expire_on_commit=False)
 
@@ -178,8 +191,16 @@ async def app(db_session, mock_user):
     async def override_require_viewer():
         return mock_user
 
+    async def override_inventory_authorization():
+        return None
+
+    async def override_site_access_context():
+        return SiteAccessContext(user_id=mock_user.id, role="admin", jti="data-quality-test-jti", site_ids=None)
+
     _app.dependency_overrides[get_db] = override_get_db
     _app.dependency_overrides[require_viewer] = override_require_viewer
+    _app.dependency_overrides[enforce_inventory_authorization] = override_inventory_authorization
+    _app.dependency_overrides[get_site_access_context] = override_site_access_context
 
     yield _app
 

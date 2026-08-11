@@ -216,10 +216,15 @@ async def list_cameras(
     status: Optional[str] = None,
     page: int = 1,
     page_size: int = 20,
+    allowed_camera_ids: Any = None,
 ) -> Dict[str, Any]:
     """摄像头列表（分页+筛选）"""
     query = select(Camera)
     count_query = select(func.count(Camera.id))
+
+    if allowed_camera_ids is not None:
+        query = query.where(Camera.id.in_(allowed_camera_ids))
+        count_query = count_query.where(Camera.id.in_(allowed_camera_ids))
 
     if nvr_id is not None:
         query = query.where(Camera.nvr_id == nvr_id)
@@ -315,10 +320,15 @@ async def list_video_events(
     event_type: Optional[str] = None,
     page: int = 1,
     page_size: int = 20,
+    allowed_camera_ids: Any = None,
 ) -> Dict[str, Any]:
     """视频事件列表（分页+筛选）"""
     query = select(VideoEvent)
     count_query = select(func.count(VideoEvent.id))
+
+    if allowed_camera_ids is not None:
+        query = query.where(VideoEvent.camera_id.in_(allowed_camera_ids))
+        count_query = count_query.where(VideoEvent.camera_id.in_(allowed_camera_ids))
 
     if camera_id is not None:
         query = query.where(VideoEvent.camera_id == camera_id)
@@ -418,7 +428,9 @@ async def stop_recording(db: AsyncSession, camera_id: int) -> VideoEvent:
 # ========== 回放服务 (Story 10-4) ==========
 
 
-async def get_playback_info(db: AsyncSession, alarm_id: int) -> Optional[Dict[str, Any]]:
+async def get_playback_info(
+    db: AsyncSession, alarm_id: int, allowed_camera_ids: Any = None
+) -> Optional[Dict[str, Any]]:
     """获取告警回放信息（摄像头 + 时间定位）"""
     # 查询告警
     alarm_result = await db.execute(select(Alarm).where(Alarm.id == alarm_id))
@@ -433,12 +445,22 @@ async def get_playback_info(db: AsyncSession, alarm_id: int) -> Optional[Dict[st
     # 查找关联摄像头: device_id 优先，area_code 兜底
     cameras: List[Camera] = []
     if point and point.device_id:
-        cameras = await get_cameras_by_device(db, point.device_id)
+        camera_query = select(Camera).where(
+            Camera.device_id == point.device_id, Camera.is_enabled == True
+        )
+        if allowed_camera_ids is not None:
+            camera_query = camera_query.where(Camera.id.in_(allowed_camera_ids))
+        cameras = list((await db.execute(camera_query.order_by(Camera.name))).scalars().all())
     if not cameras and point and point.area_code:
-        cameras = await get_cameras_by_area(db, point.area_code)
+        camera_query = select(Camera).where(
+            Camera.area_code == point.area_code, Camera.is_enabled == True
+        )
+        if allowed_camera_ids is not None:
+            camera_query = camera_query.where(Camera.id.in_(allowed_camera_ids))
+        cameras = list((await db.execute(camera_query.order_by(Camera.name))).scalars().all())
 
     # 查找该告警关联的录像事件
-    events_result = await db.execute(
+    events_query = (
         select(VideoEvent)
         .where(
             VideoEvent.alarm_id == alarm_id,
@@ -446,6 +468,9 @@ async def get_playback_info(db: AsyncSession, alarm_id: int) -> Optional[Dict[st
         )
         .order_by(VideoEvent.created_at)
     )
+    if allowed_camera_ids is not None:
+        events_query = events_query.where(VideoEvent.camera_id.in_(allowed_camera_ids))
+    events_result = await db.execute(events_query)
     recording_events = list(events_result.scalars().all())
 
     # 批量获取摄像头名称

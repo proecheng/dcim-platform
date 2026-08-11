@@ -8,7 +8,17 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, update, delete
 
-from ..deps import get_db, require_viewer, require_operator, require_admin, get_user_site_ids
+from ..deps import (
+    SiteAccessContext,
+    apply_site_scope,
+    get_db,
+    get_site_access_context,
+    get_user_site_ids,
+    require_admin,
+    require_context_site_access,
+    require_operator,
+    require_viewer,
+)
 from ...models.user import User
 from ...models.gateway import DataSource, DataSourceStatus
 from ...schemas.gateway import DataSourceCreate, DataSourceUpdate, DataSourceResponse, ConnectionTestRequest
@@ -35,17 +45,27 @@ KNOWN_PROTOCOL_TYPES = {
 }
 
 
+def _datasource_scope(query, context: SiteAccessContext):
+    return apply_site_scope(query, DataSource.site_id, context)
+
+
+async def _authorized_datasource(db: AsyncSession, datasource_id: int, context: SiteAccessContext) -> DataSource:
+    result = await db.execute(_datasource_scope(select(DataSource).where(DataSource.id == datasource_id), context))
+    datasource = result.scalar_one_or_none()
+    if datasource is None:
+        raise HTTPException(status_code=404, detail="数据源不存在")
+    return datasource
+
+
 @router.put("/{datasource_id}/write-permission", summary="切换数据源写入权限")
 async def toggle_write_permission(
     datasource_id: int,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_operator),
+    site_context: SiteAccessContext = Depends(get_site_access_context),
 ):
     # 查找数据源
-    result = await db.execute(select(DataSource).where(DataSource.id == datasource_id))
-    obj = result.scalar_one_or_none()
-    if not obj:
-        raise HTTPException(status_code=404, detail="数据源不存在")
+    obj = await _authorized_datasource(db, datasource_id, site_context)
 
     old_value = obj.write_enabled
     new_value = not old_value
@@ -131,7 +151,9 @@ async def create_datasource(
     data: DataSourceCreate,
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_operator),
+    site_context: SiteAccessContext = Depends(get_site_access_context),
 ):
+    require_context_site_access(data.site_id, site_context)
     # 校验协议类型
     if data.protocol_type not in KNOWN_PROTOCOL_TYPES:
         raise HTTPException(
@@ -291,11 +313,9 @@ async def get_datasource(
     datasource_id: int,
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_viewer),
+    site_context: SiteAccessContext = Depends(get_site_access_context),
 ):
-    result = await db.execute(select(DataSource).where(DataSource.id == datasource_id))
-    obj = result.scalar_one_or_none()
-    if not obj:
-        raise HTTPException(status_code=404, detail="数据源不存在")
+    obj = await _authorized_datasource(db, datasource_id, site_context)
     return DataSourceResponse.model_validate(obj)
 
 
@@ -305,11 +325,9 @@ async def update_datasource(
     data: DataSourceUpdate,
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_operator),
+    site_context: SiteAccessContext = Depends(get_site_access_context),
 ):
-    result = await db.execute(select(DataSource).where(DataSource.id == datasource_id))
-    obj = result.scalar_one_or_none()
-    if not obj:
-        raise HTTPException(status_code=404, detail="数据源不存在")
+    await _authorized_datasource(db, datasource_id, site_context)
 
     update_data = data.model_dump(exclude_unset=True)
     update_data["updated_at"] = datetime.now()
@@ -326,11 +344,9 @@ async def test_existing_connection(
     datasource_id: int,
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_operator),
+    site_context: SiteAccessContext = Depends(get_site_access_context),
 ):
-    result = await db.execute(select(DataSource).where(DataSource.id == datasource_id))
-    obj = result.scalar_one_or_none()
-    if not obj:
-        raise HTTPException(status_code=404, detail="数据源不存在")
+    obj = await _authorized_datasource(db, datasource_id, site_context)
 
     if obj.protocol_type not in _ADAPTER_REGISTRY:
         raise HTTPException(status_code=400, detail=f"不支持的协议类型: {obj.protocol_type}")
@@ -345,7 +361,9 @@ async def validate_points_excel(
     file: UploadFile = File(...),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_operator),
+    site_context: SiteAccessContext = Depends(get_site_access_context),
 ):
+    await _authorized_datasource(db, datasource_id, site_context)
     # 文件格式校验
     if not file.filename or not file.filename.endswith(".xlsx"):
         raise HTTPException(status_code=400, detail="仅支持 .xlsx 格式文件")
@@ -372,7 +390,9 @@ async def import_points_excel(
     file: UploadFile = File(...),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_operator),
+    site_context: SiteAccessContext = Depends(get_site_access_context),
 ):
+    await _authorized_datasource(db, datasource_id, site_context)
     if not file.filename or not file.filename.endswith(".xlsx"):
         raise HTTPException(status_code=400, detail="仅支持 .xlsx 格式文件")
 
@@ -397,11 +417,9 @@ async def delete_datasource(
     datasource_id: int,
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_admin),
+    site_context: SiteAccessContext = Depends(get_site_access_context),
 ):
-    result = await db.execute(select(DataSource).where(DataSource.id == datasource_id))
-    obj = result.scalar_one_or_none()
-    if not obj:
-        raise HTTPException(status_code=404, detail="数据源不存在")
+    await _authorized_datasource(db, datasource_id, site_context)
 
     await db.execute(delete(DataSource).where(DataSource.id == datasource_id))
     await db.commit()

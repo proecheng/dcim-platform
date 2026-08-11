@@ -18,6 +18,7 @@ from app.models.asset import (
     AssetInventoryItem,
 )
 from app.models.user import User
+from app.api.deps import SiteAccessContext
 from app.schemas.asset import AssetCreate, AssetUpdate
 from app.api.v1.asset import (
     create_asset,
@@ -79,6 +80,10 @@ async def user(db: AsyncSession):
     return u
 
 
+def _admin_context(user: User) -> SiteAccessContext:
+    return SiteAccessContext(user.id, "admin", "test-jti", None)
+
+
 # ============================================================
 # 测试
 # ============================================================
@@ -94,10 +99,11 @@ class TestAssetLifecycleWarranty:
             asset_name="生命周期测试服务器",
             asset_type=AssetType.server,
         )
-        result = await create_asset(data, db, user)
+        context = _admin_context(user)
+        result = await create_asset(data, db, user, context)
         asset_id = result.id
 
-        lifecycle = await get_asset_lifecycle(asset_id, db, user)
+        lifecycle = await get_asset_lifecycle(asset_id, db, user, context)
         actions = [r.action for r in lifecycle]
         assert "purchase" in actions
 
@@ -108,12 +114,13 @@ class TestAssetLifecycleWarranty:
             asset_name="报废测试服务器",
             asset_type=AssetType.server,
         )
-        result = await create_asset(data, db, user)
+        context = _admin_context(user)
+        result = await create_asset(data, db, user, context)
         asset_id = result.id
 
-        await update_asset(asset_id, AssetUpdate(status=AssetStatus.scrapped), db, user)
+        await update_asset(asset_id, AssetUpdate(status=AssetStatus.scrapped), db, user, context)
 
-        lifecycle = await get_asset_lifecycle(asset_id, db, user)
+        lifecycle = await get_asset_lifecycle(asset_id, db, user, context)
         actions = [r.action for r in lifecycle]
         assert "scrap" in actions
 
@@ -144,7 +151,8 @@ class TestAssetLifecycleWarranty:
             u_position=1,
             u_height=2,
         )
-        result = await create_asset(data, db, user)
+        context = _admin_context(user)
+        result = await create_asset(data, db, user, context)
         asset_id = result.id
 
         await update_asset(
@@ -152,9 +160,10 @@ class TestAssetLifecycleWarranty:
             AssetUpdate(cabinet_id=cab2.id, u_position=1),
             db,
             user,
+            context,
         )
 
-        lifecycle = await get_asset_lifecycle(asset_id, db, user)
+        lifecycle = await get_asset_lifecycle(asset_id, db, user, context)
         actions = [r.action for r in lifecycle]
         assert "move" in actions
 
@@ -174,7 +183,7 @@ class TestAssetLifecycleWarranty:
             db.add(asset)
         await db.commit()
 
-        resp = await get_warranty_alerts(db, user)
+        resp = await get_warranty_alerts(db, user, _admin_context(user))
         assert len(resp.within_30_days) == 1
         assert len(resp.within_60_days) == 1
         assert len(resp.within_90_days) == 1
@@ -193,7 +202,7 @@ class TestAssetLifecycleWarranty:
         db.add(asset)
         await db.commit()
 
-        resp = await get_warranty_alerts(db, user)
+        resp = await get_warranty_alerts(db, user, _admin_context(user))
         assert resp.total_count == 0
 
     async def test_warranty_alerts_excludes_expired(self, db: AsyncSession, user: User):
@@ -209,12 +218,12 @@ class TestAssetLifecycleWarranty:
         db.add(asset)
         await db.commit()
 
-        resp = await get_warranty_alerts(db, user)
+        resp = await get_warranty_alerts(db, user, _admin_context(user))
         assert resp.total_count == 0
 
     async def test_warranty_alerts_empty(self, db: AsyncSession, user: User):
         """无资产时保修预警应返回空"""
-        resp = await get_warranty_alerts(db, user)
+        resp = await get_warranty_alerts(db, user, _admin_context(user))
         assert resp.total_count == 0
         assert resp.within_30_days == []
         assert resp.within_60_days == []

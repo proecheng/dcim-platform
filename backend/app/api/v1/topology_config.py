@@ -12,7 +12,20 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, delete
 from sqlalchemy.exc import IntegrityError
 
-from ..deps import get_db, require_viewer, require_operator, require_admin
+from ..deps import (
+    SiteAccessContext,
+    apply_cabinet_site_scope,
+    apply_cooling_zone_site_scope,
+    apply_site_scope,
+    get_authorized_cabinet,
+    get_authorized_device,
+    get_authorized_room,
+    get_db,
+    get_site_access_context,
+    require_admin,
+    require_operator,
+    require_viewer,
+)
 from ...models.user import User
 from ...models.device import Device
 from ...models.asset import Cabinet, Asset
@@ -59,6 +72,72 @@ router = APIRouter()
 logger = logging.getLogger(__name__)
 
 
+def _apply_power_phase_scope(statement, context: SiteAccessContext):
+    """Require ownership of both ends of a cabinet-to-PDU mapping."""
+    if context.site_ids is None:
+        return statement
+    statement = apply_cabinet_site_scope(statement, PowerPhaseMapping.cabinet_id, context)
+    authorized_devices = select(Device.id).where(Device.site_id.in_(context.site_ids))
+    return statement.where(PowerPhaseMapping.pdu_device_id.in_(authorized_devices))
+
+
+async def _get_authorized_power_phase_mapping(
+    db: AsyncSession, mapping_id: int, context: SiteAccessContext
+) -> PowerPhaseMapping:
+    statement = _apply_power_phase_scope(
+        select(PowerPhaseMapping).where(PowerPhaseMapping.id == mapping_id), context
+    )
+    mapping = (await db.execute(statement)).scalar_one_or_none()
+    if mapping is None:
+        raise HTTPException(status_code=404, detail="映射不存在")
+    return mapping
+
+
+async def _load_authorized_cabinet_sites(
+    db: AsyncSession, cabinet_ids: list[int], context: SiteAccessContext
+) -> dict[int, int]:
+    unique_ids = set(cabinet_ids)
+    if not unique_ids:
+        return {}
+    statement = (
+        select(Cabinet.id, Floor.site_id)
+        .outerjoin(Row, Cabinet.row_id == Row.id)
+        .outerjoin(Room, Row.room_id == Room.id)
+        .outerjoin(Floor, Room.floor_id == Floor.id)
+        .where(Cabinet.id.in_(unique_ids))
+    )
+    statement = apply_site_scope(statement, Floor.site_id, context)
+    rows = (await db.execute(statement)).all()
+    result = {row[0]: row[1] for row in rows}
+    if set(result) != unique_ids:
+        raise HTTPException(status_code=404, detail="机柜不存在")
+    return result
+
+
+async def _load_authorized_cooling_unit_sites(
+    db: AsyncSession, unit_ids: list[int], context: SiteAccessContext
+) -> dict[int, int]:
+    unique_ids = set(unit_ids)
+    if not unique_ids:
+        return {}
+    statement = (
+        select(CoolingUnit.id, Device.site_id)
+        .join(Device, CoolingUnit.device_id == Device.id)
+        .where(CoolingUnit.id.in_(unique_ids))
+    )
+    statement = apply_site_scope(statement, Device.site_id, context)
+    rows = (await db.execute(statement)).all()
+    result = {row[0]: row[1] for row in rows}
+    if set(result) != unique_ids:
+        raise HTTPException(status_code=404, detail="空调不存在")
+    return result
+
+
+def _require_zone_relation_sites(zone_site_id: Optional[int], relation_sites: list[int]) -> None:
+    if zone_site_id is not None and any(site_id != zone_site_id for site_id in relation_sites):
+        raise HTTPException(status_code=400, detail="制冷区域关联对象必须属于同一站点")
+
+
 # ==================== 三相接线映射 ====================
 
 
@@ -67,11 +146,14 @@ async def list_power_phase_mappings(
     pdu_device_id: Optional[int] = Query(None, description="PDU设备ID过滤"),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_viewer),
+    context: SiteAccessContext = Depends(get_site_access_context),
 ):
     """获取三相接线映射列表"""
     stmt = select(PowerPhaseMapping)
     if pdu_device_id is not None:
+        await get_authorized_device(db, pdu_device_id, context)
         stmt = stmt.where(PowerPhaseMapping.pdu_device_id == pdu_device_id)
+    stmt = _apply_power_phase_scope(stmt, context)
     stmt = stmt.order_by(PowerPhaseMapping.id)
     result = await db.execute(stmt)
     mappings = result.scalars().all()
@@ -109,9 +191,13 @@ async def get_cabinet_power_phase(
     cabinet_id: int,
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_viewer),
+    context: SiteAccessContext = Depends(get_site_access_context),
 ):
     """获取机柜的三相接线"""
-    stmt = select(PowerPhaseMapping).where(PowerPhaseMapping.cabinet_id == cabinet_id)
+    await get_authorized_cabinet(db, cabinet_id, context)
+    stmt = _apply_power_phase_scope(
+        select(PowerPhaseMapping).where(PowerPhaseMapping.cabinet_id == cabinet_id), context
+    )
     result = await db.execute(stmt)
     mappings = result.scalars().all()
 
@@ -145,15 +231,17 @@ async def get_phase_balance(
     pdu_device_id: int,
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_viewer),
+    context: SiteAccessContext = Depends(get_site_access_context),
 ):
     """获取PDU三相不平衡度"""
     # 查询 PDU 设备名称
-    dev_result = await db.execute(select(Device).where(Device.id == pdu_device_id))
-    dev = dev_result.scalar_one_or_none()
-    pdu_name = dev.device_name if dev else None
+    dev = await get_authorized_device(db, pdu_device_id, context)
+    pdu_name = dev.device_name
 
     # 查询该 PDU 的所有映射
-    stmt = select(PowerPhaseMapping).where(PowerPhaseMapping.pdu_device_id == pdu_device_id)
+    stmt = _apply_power_phase_scope(
+        select(PowerPhaseMapping).where(PowerPhaseMapping.pdu_device_id == pdu_device_id), context
+    )
     result = await db.execute(stmt)
     mappings = result.scalars().all()
 
@@ -208,6 +296,7 @@ async def create_power_phase_mapping(
     data: PowerPhaseMappingCreate,
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_operator),
+    context: SiteAccessContext = Depends(get_site_access_context),
 ):
     """创建三相接线映射"""
     # 校验 phase
@@ -217,17 +306,11 @@ async def create_power_phase_mapping(
     if data.feed_type not in ("primary", "backup"):
         raise HTTPException(status_code=400, detail="馈电类型必须为 primary/backup")
     # 校验 PDU 设备类型
-    dev_result = await db.execute(select(Device).where(Device.id == data.pdu_device_id))
-    dev = dev_result.scalar_one_or_none()
-    if not dev:
-        raise HTTPException(status_code=404, detail="PDU设备不存在")
+    dev = await get_authorized_device(db, data.pdu_device_id, context)
     if dev.device_type != "PDU":
         raise HTTPException(status_code=400, detail="指定设备不是PDU类型")
     # 校验机柜
-    cab_result = await db.execute(select(Cabinet).where(Cabinet.id == data.cabinet_id))
-    cab = cab_result.scalar_one_or_none()
-    if not cab:
-        raise HTTPException(status_code=404, detail="机柜不存在")
+    cab = await get_authorized_cabinet(db, data.cabinet_id, context)
 
     mapping = PowerPhaseMapping(**data.model_dump())
     db.add(mapping)
@@ -262,12 +345,10 @@ async def update_power_phase_mapping(
     data: PowerPhaseMappingUpdate,
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_operator),
+    context: SiteAccessContext = Depends(get_site_access_context),
 ):
     """更新三相接线映射"""
-    result = await db.execute(select(PowerPhaseMapping).where(PowerPhaseMapping.id == mapping_id))
-    mapping = result.scalar_one_or_none()
-    if not mapping:
-        raise HTTPException(status_code=404, detail="映射不存在")
+    mapping = await _get_authorized_power_phase_mapping(db, mapping_id, context)
 
     update_data = data.model_dump(exclude_unset=True)
     if "phase" in update_data and update_data["phase"] not in ("A", "B", "C"):
@@ -315,12 +396,10 @@ async def delete_power_phase_mapping(
     mapping_id: int,
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_admin),
+    context: SiteAccessContext = Depends(get_site_access_context),
 ):
     """删除三相接线映射"""
-    result = await db.execute(select(PowerPhaseMapping).where(PowerPhaseMapping.id == mapping_id))
-    mapping = result.scalar_one_or_none()
-    if not mapping:
-        raise HTTPException(status_code=404, detail="映射不存在")
+    mapping = await _get_authorized_power_phase_mapping(db, mapping_id, context)
     await db.delete(mapping)
     await db.commit()
 
@@ -378,9 +457,13 @@ async def _build_zone_response(db: AsyncSession, zone: CoolingZone) -> CoolingZo
 async def list_cooling_zones(
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_viewer),
+    context: SiteAccessContext = Depends(get_site_access_context),
 ):
     """获取制冷区域列表"""
-    result = await db.execute(select(CoolingZone).order_by(CoolingZone.id))
+    statement = apply_cooling_zone_site_scope(
+        select(CoolingZone).order_by(CoolingZone.id), CoolingZone.site_id, context
+    )
+    result = await db.execute(statement)
     zones = result.scalars().all()
     return [await _build_zone_response(db, z) for z in zones]
 
@@ -390,9 +473,13 @@ async def get_cooling_zone(
     zone_id: int,
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_viewer),
+    context: SiteAccessContext = Depends(get_site_access_context),
 ):
     """获取制冷区域详情"""
-    result = await db.execute(select(CoolingZone).where(CoolingZone.id == zone_id))
+    statement = apply_cooling_zone_site_scope(
+        select(CoolingZone).where(CoolingZone.id == zone_id), CoolingZone.site_id, context
+    )
+    result = await db.execute(statement)
     zone = result.scalar_one_or_none()
     if not zone:
         raise HTTPException(status_code=404, detail="制冷区域不存在")
@@ -404,8 +491,20 @@ async def create_cooling_zone(
     data: CoolingZoneCreate,
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_operator),
+    context: SiteAccessContext = Depends(get_site_access_context),
 ):
     """创建制冷区域"""
+    if data.room_id is None:
+        if context.site_ids is not None:
+            raise HTTPException(status_code=403, detail="非管理员创建制冷区域时必须指定授权房间")
+        site_id = None
+    else:
+        _, site_id = await get_authorized_room(db, data.room_id, context)
+
+    cabinet_sites = await _load_authorized_cabinet_sites(db, data.cabinet_ids, context)
+    unit_sites = await _load_authorized_cooling_unit_sites(db, data.cooling_unit_ids, context)
+    _require_zone_relation_sites(site_id, [*cabinet_sites.values(), *unit_sites.values()])
+
     # 自动生成 zone_code: 查询最大序号 +1
     max_result = await db.execute(select(func.max(CoolingZone.zone_code)))
     max_code = max_result.scalar()
@@ -422,35 +521,22 @@ async def create_cooling_zone(
         zone_code=zone_code,
         zone_name=data.zone_name,
         room_id=data.room_id,
+        site_id=site_id,
         design_capacity_kw=data.design_capacity_kw,
         description=data.description,
     )
     db.add(zone)
     try:
+        await db.flush()
+        for cabinet_id in dict.fromkeys(data.cabinet_ids):
+            db.add(CoolingZoneCabinet(zone_id=zone.id, cabinet_id=cabinet_id))
+        for unit_id in dict.fromkeys(data.cooling_unit_ids):
+            db.add(CoolingZoneUnit(zone_id=zone.id, cooling_unit_id=unit_id))
         await db.commit()
     except IntegrityError:
         await db.rollback()
         raise HTTPException(status_code=409, detail="制冷区域编码冲突，请重试")
     await db.refresh(zone)
-
-    # 创建关联（校验 ID 存在性）
-    if data.cabinet_ids:
-        cab_result = await db.execute(select(Cabinet).where(Cabinet.id.in_(data.cabinet_ids)))
-        valid_cab_ids = {c.id for c in cab_result.scalars().all()}
-        invalid_cab_ids = set(data.cabinet_ids) - valid_cab_ids
-        if invalid_cab_ids:
-            raise HTTPException(status_code=400, detail=f"机柜 ID 不存在: {sorted(invalid_cab_ids)}")
-        for cab_id in data.cabinet_ids:
-            db.add(CoolingZoneCabinet(zone_id=zone.id, cabinet_id=cab_id))
-    if data.cooling_unit_ids:
-        unit_result = await db.execute(select(CoolingUnit).where(CoolingUnit.id.in_(data.cooling_unit_ids)))
-        valid_unit_ids = {u.id for u in unit_result.scalars().all()}
-        invalid_unit_ids = set(data.cooling_unit_ids) - valid_unit_ids
-        if invalid_unit_ids:
-            raise HTTPException(status_code=400, detail=f"空调 ID 不存在: {sorted(invalid_unit_ids)}")
-        for unit_id in data.cooling_unit_ids:
-            db.add(CoolingZoneUnit(zone_id=zone.id, cooling_unit_id=unit_id))
-    await db.commit()
 
     # 发布 Redis 更新通知
     await _publish_topology_update("create", zone.id, "cooling_zone")
@@ -464,30 +550,69 @@ async def update_cooling_zone(
     data: CoolingZoneUpdate,
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_operator),
+    context: SiteAccessContext = Depends(get_site_access_context),
 ):
     """更新制冷区域"""
-    result = await db.execute(select(CoolingZone).where(CoolingZone.id == zone_id))
+    statement = apply_cooling_zone_site_scope(
+        select(CoolingZone).where(CoolingZone.id == zone_id), CoolingZone.site_id, context
+    )
+    result = await db.execute(statement)
     zone = result.scalar_one_or_none()
     if not zone:
         raise HTTPException(status_code=404, detail="制冷区域不存在")
 
     update_data = data.model_dump(exclude_unset=True)
 
+    target_site_id = zone.site_id
+    if "room_id" in update_data:
+        if update_data["room_id"] is None:
+            if context.site_ids is not None:
+                raise HTTPException(status_code=403, detail="非管理员不能移除制冷区域站点归属")
+            target_site_id = None
+        else:
+            _, target_site_id = await get_authorized_room(db, update_data["room_id"], context)
+
+    if "cabinet_ids" in update_data and update_data["cabinet_ids"] is not None:
+        cabinet_ids = list(dict.fromkeys(update_data["cabinet_ids"]))
+    else:
+        cabinet_ids = list(
+            (
+                await db.execute(
+                    select(CoolingZoneCabinet.cabinet_id).where(CoolingZoneCabinet.zone_id == zone_id)
+                )
+            ).scalars().all()
+        )
+    if "cooling_unit_ids" in update_data and update_data["cooling_unit_ids"] is not None:
+        cooling_unit_ids = list(dict.fromkeys(update_data["cooling_unit_ids"]))
+    else:
+        cooling_unit_ids = list(
+            (
+                await db.execute(
+                    select(CoolingZoneUnit.cooling_unit_id).where(CoolingZoneUnit.zone_id == zone_id)
+                )
+            ).scalars().all()
+        )
+
+    cabinet_sites = await _load_authorized_cabinet_sites(db, cabinet_ids, context)
+    unit_sites = await _load_authorized_cooling_unit_sites(db, cooling_unit_ids, context)
+    _require_zone_relation_sites(target_site_id, [*cabinet_sites.values(), *unit_sites.values()])
+
     # 更新基本字段
     for k in ("zone_name", "room_id", "design_capacity_kw", "description"):
         if k in update_data:
             setattr(zone, k, update_data[k])
+    zone.site_id = target_site_id
 
     # 更新机柜关联：先删旧再插新
     if "cabinet_ids" in update_data and update_data["cabinet_ids"] is not None:
         await db.execute(delete(CoolingZoneCabinet).where(CoolingZoneCabinet.zone_id == zone_id))
-        for cab_id in update_data["cabinet_ids"]:
+        for cab_id in cabinet_ids:
             db.add(CoolingZoneCabinet(zone_id=zone_id, cabinet_id=cab_id))
 
     # 更新空调关联
     if "cooling_unit_ids" in update_data and update_data["cooling_unit_ids"] is not None:
         await db.execute(delete(CoolingZoneUnit).where(CoolingZoneUnit.zone_id == zone_id))
-        for unit_id in update_data["cooling_unit_ids"]:
+        for unit_id in cooling_unit_ids:
             db.add(CoolingZoneUnit(zone_id=zone_id, cooling_unit_id=unit_id))
 
     await db.commit()
@@ -504,9 +629,13 @@ async def delete_cooling_zone(
     zone_id: int,
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_admin),
+    context: SiteAccessContext = Depends(get_site_access_context),
 ):
     """删除制冷区域"""
-    result = await db.execute(select(CoolingZone).where(CoolingZone.id == zone_id))
+    statement = apply_cooling_zone_site_scope(
+        select(CoolingZone).where(CoolingZone.id == zone_id), CoolingZone.site_id, context
+    )
+    result = await db.execute(statement)
     zone = result.scalar_one_or_none()
     if not zone:
         raise HTTPException(status_code=404, detail="制冷区域不存在")
@@ -527,9 +656,13 @@ async def get_cooling_zone_capacity(
     zone_id: int,
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_viewer),
+    context: SiteAccessContext = Depends(get_site_access_context),
 ):
     """获取制冷区域容量使用"""
-    result = await db.execute(select(CoolingZone).where(CoolingZone.id == zone_id))
+    statement = apply_cooling_zone_site_scope(
+        select(CoolingZone).where(CoolingZone.id == zone_id), CoolingZone.site_id, context
+    )
+    result = await db.execute(statement)
     zone = result.scalar_one_or_none()
     if not zone:
         raise HTTPException(status_code=404, detail="制冷区域不存在")
@@ -564,12 +697,10 @@ async def get_cabinet_topology_summary(
     cabinet_id: int,
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_viewer),
+    context: SiteAccessContext = Depends(get_site_access_context),
 ):
     """获取机柜拓扑汇总（空间+配电+制冷）"""
-    cab_result = await db.execute(select(Cabinet).where(Cabinet.id == cabinet_id))
-    cab = cab_result.scalar_one_or_none()
-    if not cab:
-        raise HTTPException(status_code=404, detail="机柜不存在")
+    cab = await get_authorized_cabinet(db, cabinet_id, context)
 
     # 空间信息
     spatial = None
@@ -635,26 +766,32 @@ async def smart_site_selection(
     data: SmartSiteRequest,
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_viewer),
+    context: SiteAccessContext = Depends(get_site_access_context),
 ):
     """基于三合一拓扑的五维智能选址推荐 (FR65)"""
     weights = data.weights or SmartSiteWeights()
 
     # 1. 批量预加载所有数据
-    cab_result = await db.execute(select(Cabinet))
+    cabinet_statement = apply_cabinet_site_scope(select(Cabinet), Cabinet.id, context)
+    cab_result = await db.execute(cabinet_statement)
     cabinets = cab_result.scalars().all()
+    cabinet_ids = [cabinet.id for cabinet in cabinets]
     total_evaluated = len(cabinets)
 
     # used_u 聚合
     used_u_stmt = (
         select(Asset.cabinet_id, func.coalesce(func.sum(Asset.u_height), 0).label("used_u"))
-        .where(Asset.u_height.isnot(None))
+        .where(Asset.u_height.isnot(None), Asset.cabinet_id.in_(cabinet_ids))
         .group_by(Asset.cabinet_id)
     )
     used_u_result = await db.execute(used_u_stmt)
     used_u_map = {row.cabinet_id: int(row.used_u) for row in used_u_result}
 
     # PowerPhaseMapping
-    ppm_result = await db.execute(select(PowerPhaseMapping))
+    ppm_statement = _apply_power_phase_scope(
+        select(PowerPhaseMapping).where(PowerPhaseMapping.cabinet_id.in_(cabinet_ids)), context
+    )
+    ppm_result = await db.execute(ppm_statement)
     all_ppms = ppm_result.scalars().all()
     cab_ppm_map: dict[int, list] = {}
     pdu_ppm_map: dict[int, list] = {}
@@ -663,7 +800,13 @@ async def smart_site_selection(
         pdu_ppm_map.setdefault(ppm.pdu_device_id, []).append(ppm)
 
     # CoolingZoneCabinet + CoolingZone
-    czc_result = await db.execute(select(CoolingZoneCabinet))
+    czc_statement = (
+        select(CoolingZoneCabinet)
+        .join(CoolingZone, CoolingZoneCabinet.zone_id == CoolingZone.id)
+        .where(CoolingZoneCabinet.cabinet_id.in_(cabinet_ids))
+    )
+    czc_statement = apply_cooling_zone_site_scope(czc_statement, CoolingZone.site_id, context)
+    czc_result = await db.execute(czc_statement)
     all_czcs = czc_result.scalars().all()
     cab_zone_map: dict[int, list[int]] = {}
     zone_cab_map: dict[int, list[int]] = {}
@@ -671,7 +814,8 @@ async def smart_site_selection(
         cab_zone_map.setdefault(czc.cabinet_id, []).append(czc.zone_id)
         zone_cab_map.setdefault(czc.zone_id, []).append(czc.cabinet_id)
 
-    cz_result = await db.execute(select(CoolingZone))
+    zone_statement = apply_cooling_zone_site_scope(select(CoolingZone), CoolingZone.site_id, context)
+    cz_result = await db.execute(zone_statement)
     zone_map = {z.id: z for z in cz_result.scalars().all()}
 
     cab_power_map = {c.id: (c.max_power if c.max_power is not None else 0) for c in cabinets}
@@ -870,6 +1014,7 @@ async def fault_impact_analysis(
     data: FaultImpactRequest,
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_viewer),
+    context: SiteAccessContext = Depends(get_site_access_context),
 ):
     """故障影响分析 — 分析 PDU 或配电柜故障对下游机柜/资产/制冷/告警的影响"""
     if data.fault_source_type not in ("pdu", "panel"):
@@ -881,10 +1026,7 @@ async def fault_impact_analysis(
 
     # ---- PDU 故障 ----
     if data.fault_source_type == "pdu":
-        dev_result = await db.execute(select(Device).where(Device.id == data.fault_source_id))
-        dev = dev_result.scalar_one_or_none()
-        if not dev:
-            raise HTTPException(status_code=404, detail="PDU设备不存在")
+        dev = await get_authorized_device(db, data.fault_source_id, context)
         if dev.device_type != "PDU":
             raise HTTPException(status_code=400, detail="指定设备不是PDU类型")
         fault_source_name = dev.device_name
@@ -892,7 +1034,15 @@ async def fault_impact_analysis(
 
     # ---- 配电柜故障 ----
     elif data.fault_source_type == "panel":
-        panel_result = await db.execute(select(DistributionPanel).where(DistributionPanel.id == data.fault_source_id))
+        panel_statement = select(DistributionPanel).where(DistributionPanel.id == data.fault_source_id)
+        if context.site_ids is not None:
+            authorized_panel_ids = (
+                select(DistributionPanel.id)
+                .join(Device, DistributionPanel.device_id == Device.id)
+                .where(Device.site_id.in_(context.site_ids))
+            )
+            panel_statement = panel_statement.where(DistributionPanel.id.in_(authorized_panel_ids))
+        panel_result = await db.execute(panel_statement)
         panel = panel_result.scalar_one_or_none()
         if not panel:
             raise HTTPException(status_code=404, detail="配电柜不存在")
@@ -909,9 +1059,12 @@ async def fault_impact_analysis(
                 if pid in visited:
                     continue
                 visited.add(pid)
-                child_result = await db.execute(
-                    select(DistributionPanel.id).where(DistributionPanel.parent_panel_id == pid)
-                )
+                child_statement = select(DistributionPanel.id).where(DistributionPanel.parent_panel_id == pid)
+                if context.site_ids is not None:
+                    child_statement = child_statement.join(
+                        Device, DistributionPanel.device_id == Device.id
+                    ).where(Device.site_id.in_(context.site_ids))
+                child_result = await db.execute(child_statement)
                 for row in child_result.all():
                     if row[0] not in visited:
                         next_queue.append(row[0])
@@ -936,12 +1089,12 @@ async def fault_impact_analysis(
                 monitor_device_ids = {r[0] for r in pd_result.all()}
 
                 if monitor_device_ids:
-                    pdu_dev_result = await db.execute(
-                        select(Device.id).where(
+                    pdu_statement = select(Device.id).where(
                             Device.id.in_(monitor_device_ids),
                             Device.device_type == "PDU",
                         )
-                    )
+                    pdu_statement = apply_site_scope(pdu_statement, Device.site_id, context)
+                    pdu_dev_result = await db.execute(pdu_statement)
                     affected_pdu_device_ids = {r[0] for r in pdu_dev_result.all()}
 
     # ---- 受影响机柜 (通过 PowerPhaseMapping) ----
@@ -949,9 +1102,10 @@ async def fault_impact_analysis(
     affected_cabinet_ids: set[int] = set()
 
     if affected_pdu_device_ids:
-        ppm_result = await db.execute(
-            select(PowerPhaseMapping).where(PowerPhaseMapping.pdu_device_id.in_(affected_pdu_device_ids))
+        ppm_statement = _apply_power_phase_scope(
+            select(PowerPhaseMapping).where(PowerPhaseMapping.pdu_device_id.in_(affected_pdu_device_ids)), context
         )
+        ppm_result = await db.execute(ppm_statement)
         ppms = ppm_result.scalars().all()
 
         # 按 cabinet_id 分组
@@ -982,12 +1136,14 @@ async def fault_impact_analysis(
                 first_ppm = ppms_for_cab[0]
 
                 # 双路供电判断: 检查是否有另一路 (不同 feed_type) 且不在故障 PDU 列表中
-                other_feed_result = await db.execute(
+                other_feed_statement = _apply_power_phase_scope(
                     select(PowerPhaseMapping).where(
                         PowerPhaseMapping.cabinet_id == cab_id,
                         PowerPhaseMapping.pdu_device_id.notin_(affected_pdu_device_ids),
-                    )
+                    ),
+                    context,
                 )
+                other_feed_result = await db.execute(other_feed_statement)
                 has_other_feed = len(other_feed_result.scalars().all()) > 0
 
                 impact_level = "degraded" if has_other_feed else "power_loss"
@@ -1040,7 +1196,10 @@ async def fault_impact_analysis(
         zone_ids = [r[0] for r in czc_result.all()]
 
         for zone_id in zone_ids:
-            zone_result = await db.execute(select(CoolingZone).where(CoolingZone.id == zone_id))
+            zone_statement = apply_cooling_zone_site_scope(
+                select(CoolingZone).where(CoolingZone.id == zone_id), CoolingZone.site_id, context
+            )
+            zone_result = await db.execute(zone_statement)
             zone = zone_result.scalar_one_or_none()
             if not zone:
                 continue
@@ -1063,13 +1222,22 @@ async def fault_impact_analysis(
             data_source = "unknown"
 
             for cu_id in cu_ids:
-                cu_result = await db.execute(select(CoolingUnit).where(CoolingUnit.id == cu_id))
+                cu_statement = (
+                    select(CoolingUnit)
+                    .join(Device, CoolingUnit.device_id == Device.id)
+                    .where(CoolingUnit.id == cu_id)
+                )
+                cu_statement = apply_site_scope(cu_statement, Device.site_id, context)
+                cu_result = await db.execute(cu_statement)
                 cu = cu_result.scalar_one_or_none()
                 if not cu:
                     continue
 
                 # 获取空调设备名称
-                ac_dev_result = await db.execute(select(Device).where(Device.id == cu.device_id))
+                ac_device_statement = apply_site_scope(
+                    select(Device).where(Device.id == cu.device_id), Device.site_id, context
+                )
+                ac_dev_result = await db.execute(ac_device_statement)
                 ac_dev = ac_dev_result.scalar_one_or_none()
                 if ac_dev:
                     cooling_unit_names.append(ac_dev.device_name)
@@ -1128,6 +1296,14 @@ async def fault_impact_analysis(
                 all_affected_device_ids.add(r[0])
 
     if all_affected_device_ids:
+        if context.site_ids is not None:
+            authorized_devices_result = await db.execute(
+                select(Device.id).where(
+                    Device.id.in_(all_affected_device_ids),
+                    Device.site_id.in_(context.site_ids),
+                )
+            )
+            all_affected_device_ids = set(authorized_devices_result.scalars().all())
         point_result = await db.execute(select(Point.id).where(Point.device_id.in_(all_affected_device_ids)))
         point_ids = [r[0] for r in point_result.all()]
 

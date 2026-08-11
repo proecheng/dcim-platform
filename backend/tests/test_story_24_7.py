@@ -545,8 +545,8 @@ async def test_breaker_websocket_alert_format():
     manager = ConnectionManager()
     sent_messages = []
 
-    async def mock_broadcast(message, channel):
-        sent_messages.append((message, channel))
+    async def mock_broadcast(message, channel, **kwargs):
+        sent_messages.append((message, channel, kwargs))
 
     manager.broadcast = mock_broadcast
 
@@ -560,12 +560,14 @@ async def test_breaker_websocket_alert_format():
             "timestamp": "2026-03-06T12:00:00+00:00",
         },
         target_roles=["admin"],
+        global_message=True,
     )
 
     assert len(sent_messages) == 1
-    msg, channel = sent_messages[0]
+    msg, channel, kwargs = sent_messages[0]
     assert channel == "alarms"
     assert msg["type"] == "system_diagnosis_breaker"
     assert msg["target_roles"] == ["admin"]
     assert msg["data"]["state"] == "OPEN"
     assert msg["data"]["error_rate"] == 0.15
+    assert kwargs["global_message"] is True

@@ -26,6 +26,7 @@ class DiagnosisPushService:
         *,
         session_id: int,
         device_id: Optional[int] = None,
+        site_id: Optional[int] = None,
         device_type: Optional[str] = None,
         engine_level: str,
         confidence: float,
@@ -76,6 +77,7 @@ class DiagnosisPushService:
             push_data = {
                 "session_id": session_id,
                 "device_id": device_id,
+                "site_id": site_id,
                 "device_type": device_type,
                 "engine_level": engine_level,
                 "confidence": int(confidence * 100),  # 转百分比
@@ -88,6 +90,7 @@ class DiagnosisPushService:
                 msg_type=push_type,
                 data=push_data,
                 target_roles=["operator", "admin"],
+                site_id=site_id,
             )
 
             logger.info(
@@ -109,6 +112,7 @@ class DiagnosisPushService:
                 await DiagnosisPushService._enqueue_retry(
                     session_id=session_id,
                     device_id=device_id,
+                    site_id=site_id,
                     device_type=device_type,
                     engine_level=engine_level,
                     confidence=confidence,
@@ -126,6 +130,7 @@ class DiagnosisPushService:
         *,
         session_id: int,
         device_id: Optional[int],
+        site_id: Optional[int],
         device_type: Optional[str],
         engine_level: str,
         confidence: float,
@@ -139,6 +144,7 @@ class DiagnosisPushService:
         retry_data = {
             "session_id": session_id,
             "device_id": device_id,
+            "site_id": site_id,
             "device_type": device_type,
             "engine_level": engine_level,
             "confidence": confidence,
@@ -195,6 +201,7 @@ class DiagnosisPushService:
                 status = await DiagnosisPushService.push_diagnosis_result(
                     session_id=data["session_id"],
                     device_id=data.get("device_id"),
+                    site_id=data.get("site_id"),
                     device_type=data.get("device_type"),
                     engine_level=data["engine_level"],
                     confidence=data["confidence"],

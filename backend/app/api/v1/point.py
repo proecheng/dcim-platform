@@ -11,14 +11,44 @@ from sqlalchemy import select, func, update, delete
 import csv
 import io
 
-from ..deps import get_db, require_viewer, require_operator, require_admin
+from ..deps import (
+    SiteAccessContext,
+    apply_site_scope,
+    get_db,
+    get_site_access_context,
+    require_admin,
+    require_operator,
+    require_viewer,
+)
 from ...models.user import User
+from ...models.device import Device
 from ...models.point import Point, PointRealtime, PointGroup
 from ...models.energy import PowerDevice
 from ...schemas.point import PointCreate, PointUpdate, PointInfo, PointTypesSummary, PointGroupCreate, PointGroupInfo
 from ...schemas.common import PageResponse
 
 router = APIRouter()
+
+
+def _point_scope(query, context: SiteAccessContext):
+    query = query.outerjoin(Device, Point.device_id == Device.id)
+    return apply_site_scope(query, Device.site_id, context)
+
+
+async def _authorized_point(db: AsyncSession, point_id: int, context: SiteAccessContext) -> Point:
+    result = await db.execute(_point_scope(select(Point).where(Point.id == point_id), context))
+    point = result.scalar_one_or_none()
+    if point is None:
+        raise HTTPException(status_code=404, detail="点位不存在")
+    return point
+
+
+async def _authorized_target_device(db: AsyncSession, device_id: int, context: SiteAccessContext) -> Device:
+    result = await db.execute(apply_site_scope(select(Device).where(Device.id == device_id), Device.site_id, context))
+    device = result.scalar_one_or_none()
+    if device is None:
+        raise HTTPException(status_code=404, detail="设备不存在")
+    return device
 
 
 @router.get("", response_model=PageResponse[PointInfo], summary="获取点位列表")
@@ -33,12 +63,13 @@ async def get_points(
     energy_device_id: Optional[int] = Query(None, description="关联用能设备ID"),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_viewer),
+    site_context: SiteAccessContext = Depends(get_site_access_context),
 ):
     """
     获取点位列表（支持多条件筛选、分页）
     返回数据包含关联的用能设备名称
     """
-    query = select(Point)
+    query = _point_scope(select(Point), site_context)
 
     if keyword:
         query = query.where((Point.point_code.contains(keyword)) | (Point.point_name.contains(keyword)))
@@ -89,23 +120,33 @@ async def get_points(
 
 
 @router.get("/types-summary", response_model=PointTypesSummary, summary="获取点位类型统计")
-async def get_types_summary(db: AsyncSession = Depends(get_db), _: User = Depends(require_viewer)):
+async def get_types_summary(
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_viewer),
+    site_context: SiteAccessContext = Depends(get_site_access_context),
+):
     """
     获取点位按类型的统计信息
     """
     # 总数统计
-    total_result = await db.execute(select(func.count(Point.id)))
+    total_result = await db.execute(_point_scope(select(func.count(Point.id)), site_context))
     total = total_result.scalar()
 
-    enabled_result = await db.execute(select(func.count(Point.id)).where(Point.is_enabled == True))
+    enabled_result = await db.execute(
+        _point_scope(select(func.count(Point.id)).where(Point.is_enabled == True), site_context)
+    )
     enabled = enabled_result.scalar()
 
     # 按类型统计
-    type_result = await db.execute(select(Point.point_type, func.count(Point.id)).group_by(Point.point_type))
+    type_result = await db.execute(
+        _point_scope(select(Point.point_type, func.count(Point.id)), site_context).group_by(Point.point_type)
+    )
     type_counts = {row[0]: row[1] for row in type_result.all()}
 
     # 按设备类型统计
-    device_type_result = await db.execute(select(Point.device_type, func.count(Point.id)).group_by(Point.device_type))
+    device_type_result = await db.execute(
+        _point_scope(select(Point.device_type, func.count(Point.id)), site_context).group_by(Point.device_type)
+    )
     device_type_counts = {row[0]: row[1] for row in device_type_result.all()}
 
     return PointTypesSummary(
@@ -120,20 +161,33 @@ async def get_types_summary(db: AsyncSession = Depends(get_db), _: User = Depend
 
 
 @router.get("/groups", summary="获取点位分组")
-async def get_groups(db: AsyncSession = Depends(get_db), _: User = Depends(require_viewer)):
+async def get_groups(
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_viewer),
+    site_context: SiteAccessContext = Depends(get_site_access_context),
+):
     """
     获取点位分组列表
     """
+    if site_context.site_ids is not None:
+        return []
     result = await db.execute(select(PointGroup).order_by(PointGroup.sort_order))
     groups = result.scalars().all()
     return [PointGroupInfo.model_validate(g) for g in groups]
 
 
 @router.post("/groups", response_model=PointGroupInfo, summary="创建点位分组")
-async def create_group(data: PointGroupCreate, db: AsyncSession = Depends(get_db), _: User = Depends(require_operator)):
+async def create_group(
+    data: PointGroupCreate,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_operator),
+    site_context: SiteAccessContext = Depends(get_site_access_context),
+):
     """
     创建点位分组
     """
+    if site_context.site_ids is not None:
+        raise HTTPException(status_code=403, detail="未归属资源仅管理员可管理")
     group = PointGroup(**data.model_dump())
     db.add(group)
     await db.commit()
@@ -143,12 +197,15 @@ async def create_group(data: PointGroupCreate, db: AsyncSession = Depends(get_db
 
 @router.get("/export", summary="导出点位配置")
 async def export_points(
-    point_type: Optional[str] = Query(None), db: AsyncSession = Depends(get_db), _: User = Depends(require_operator)
+    point_type: Optional[str] = Query(None),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_operator),
+    site_context: SiteAccessContext = Depends(get_site_access_context),
 ):
     """
     导出点位配置为CSV文件
     """
-    query = select(Point)
+    query = _point_scope(select(Point), site_context)
     if point_type:
         query = query.where(Point.point_type == point_type)
 
@@ -200,11 +257,16 @@ async def export_points(
 
 @router.post("/batch-import", summary="批量导入点位")
 async def batch_import_points(
-    file: UploadFile = File(...), db: AsyncSession = Depends(get_db), _: User = Depends(require_operator)
+    file: UploadFile = File(...),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_operator),
+    site_context: SiteAccessContext = Depends(get_site_access_context),
 ):
     """
     从CSV文件批量导入点位
     """
+    if site_context.site_ids is not None:
+        raise HTTPException(status_code=403, detail="未归属资源仅管理员可导入")
     if not file.filename.endswith(".csv"):
         raise HTTPException(status_code=400, detail="请上传CSV文件")
 
@@ -248,22 +310,35 @@ async def batch_import_points(
 
 
 @router.get("/{point_id}", response_model=PointInfo, summary="获取点位详情")
-async def get_point(point_id: int, db: AsyncSession = Depends(get_db), _: User = Depends(require_viewer)):
+async def get_point(
+    point_id: int,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_viewer),
+    site_context: SiteAccessContext = Depends(get_site_access_context),
+):
     """
     获取点位详情
     """
-    result = await db.execute(select(Point).where(Point.id == point_id))
-    point = result.scalar_one_or_none()
-    if not point:
-        raise HTTPException(status_code=404, detail="点位不存在")
+    point = await _authorized_point(db, point_id, site_context)
     return PointInfo.model_validate(point)
 
 
 @router.post("", response_model=PointInfo, summary="创建点位")
-async def create_point(data: PointCreate, db: AsyncSession = Depends(get_db), _: User = Depends(require_operator)):
+async def create_point(
+    data: PointCreate,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_operator),
+    site_context: SiteAccessContext = Depends(get_site_access_context),
+):
     """
     创建新点位
     """
+    if data.device_id is None:
+        if site_context.site_ids is not None:
+            raise HTTPException(status_code=403, detail="未归属资源仅管理员可创建")
+    else:
+        await _authorized_target_device(db, data.device_id, site_context)
+
     # 检查点位编码唯一性
     result = await db.execute(select(Point).where(Point.point_code == data.point_code))
     if result.scalar_one_or_none():
@@ -284,17 +359,24 @@ async def create_point(data: PointCreate, db: AsyncSession = Depends(get_db), _:
 
 @router.put("/{point_id}", response_model=PointInfo, summary="更新点位")
 async def update_point(
-    point_id: int, data: PointUpdate, db: AsyncSession = Depends(get_db), _: User = Depends(require_operator)
+    point_id: int,
+    data: PointUpdate,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_operator),
+    site_context: SiteAccessContext = Depends(get_site_access_context),
 ):
     """
     更新点位信息
     """
-    result = await db.execute(select(Point).where(Point.id == point_id))
-    point = result.scalar_one_or_none()
-    if not point:
-        raise HTTPException(status_code=404, detail="点位不存在")
+    await _authorized_point(db, point_id, site_context)
 
     update_data = data.model_dump(exclude_unset=True)
+    if "device_id" in update_data:
+        if update_data["device_id"] is None:
+            if site_context.site_ids is not None:
+                raise HTTPException(status_code=403, detail="未归属资源仅管理员可管理")
+        else:
+            await _authorized_target_device(db, update_data["device_id"], site_context)
     update_data["updated_at"] = datetime.now()
 
     await db.execute(update(Point).where(Point.id == point_id).values(**update_data))
@@ -307,14 +389,16 @@ async def update_point(
 
 
 @router.delete("/{point_id}", summary="删除点位")
-async def delete_point(point_id: int, db: AsyncSession = Depends(get_db), _: User = Depends(require_admin)):
+async def delete_point(
+    point_id: int,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_admin),
+    site_context: SiteAccessContext = Depends(get_site_access_context),
+):
     """
     删除点位
     """
-    result = await db.execute(select(Point).where(Point.id == point_id))
-    point = result.scalar_one_or_none()
-    if not point:
-        raise HTTPException(status_code=404, detail="点位不存在")
+    await _authorized_point(db, point_id, site_context)
 
     # 删除关联的实时值
     await db.execute(delete(PointRealtime).where(PointRealtime.point_id == point_id))
@@ -326,13 +410,16 @@ async def delete_point(point_id: int, db: AsyncSession = Depends(get_db), _: Use
 
 
 @router.put("/{point_id}/enable", summary="启用点位")
-async def enable_point(point_id: int, db: AsyncSession = Depends(get_db), _: User = Depends(require_operator)):
+async def enable_point(
+    point_id: int,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_operator),
+    site_context: SiteAccessContext = Depends(get_site_access_context),
+):
     """
     启用点位
     """
-    result = await db.execute(select(Point).where(Point.id == point_id))
-    if not result.scalar_one_or_none():
-        raise HTTPException(status_code=404, detail="点位不存在")
+    await _authorized_point(db, point_id, site_context)
 
     await db.execute(update(Point).where(Point.id == point_id).values(is_enabled=True, updated_at=datetime.now()))
     await db.commit()
@@ -340,13 +427,16 @@ async def enable_point(point_id: int, db: AsyncSession = Depends(get_db), _: Use
 
 
 @router.put("/{point_id}/disable", summary="禁用点位")
-async def disable_point(point_id: int, db: AsyncSession = Depends(get_db), _: User = Depends(require_operator)):
+async def disable_point(
+    point_id: int,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_operator),
+    site_context: SiteAccessContext = Depends(get_site_access_context),
+):
     """
     禁用点位
     """
-    result = await db.execute(select(Point).where(Point.id == point_id))
-    if not result.scalar_one_or_none():
-        raise HTTPException(status_code=404, detail="点位不存在")
+    await _authorized_point(db, point_id, site_context)
 
     await db.execute(update(Point).where(Point.id == point_id).values(is_enabled=False, updated_at=datetime.now()))
     await db.commit()
@@ -359,6 +449,7 @@ async def link_point_to_device(
     energy_device_id: int = Query(..., description="用能设备ID"),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_operator),
+    site_context: SiteAccessContext = Depends(get_site_access_context),
 ):
     """
     将点位关联到用能设备
@@ -370,10 +461,7 @@ async def link_point_to_device(
     from ...services.point_device_matcher import PointDeviceMatcher
 
     # 验证点位存在
-    result = await db.execute(select(Point).where(Point.id == point_id))
-    point = result.scalar_one_or_none()
-    if not point:
-        raise HTTPException(status_code=404, detail="点位不存在")
+    point = await _authorized_point(db, point_id, site_context)
 
     # 验证设备存在
     result = await db.execute(select(PowerDevice).where(PowerDevice.id == energy_device_id))
@@ -405,7 +493,10 @@ async def link_point_to_device(
 
 @router.delete("/{point_id}/link-device", summary="取消点位与用能设备的关联")
 async def unlink_point_from_device(
-    point_id: int, db: AsyncSession = Depends(get_db), _: User = Depends(require_operator)
+    point_id: int,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_operator),
+    site_context: SiteAccessContext = Depends(get_site_access_context),
 ):
     """
     取消点位与用能设备的关联
@@ -414,10 +505,7 @@ async def unlink_point_from_device(
     2. 清除设备中指向该点位的字段
     """
     # 获取点位
-    result = await db.execute(select(Point).where(Point.id == point_id))
-    point = result.scalar_one_or_none()
-    if not point:
-        raise HTTPException(status_code=404, detail="点位不存在")
+    point = await _authorized_point(db, point_id, site_context)
 
     original_device_id = point.energy_device_id
 

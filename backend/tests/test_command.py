@@ -10,8 +10,17 @@ from sqlalchemy import select, delete
 from app.core.database import Base
 from app.models.command import CommandApproval, CommandAuditLog
 from app.models.config import SystemConfig
+from app.models.device import Device
 from app.models.user import User
-from app.api.deps import get_db, require_admin, require_operator, require_viewer
+from app.api.deps import (
+    SiteAccessContext,
+    enforce_inventory_authorization,
+    get_db,
+    get_site_access_context,
+    require_admin,
+    require_operator,
+    require_viewer,
+)
 
 
 # ============================================================
@@ -44,6 +53,25 @@ async def db_session(session_factory):
         await session.execute(delete(CommandAuditLog))
         await session.execute(delete(CommandApproval))
         await session.execute(delete(SystemConfig).where(SystemConfig.config_group == "command_risk"))
+        await session.execute(delete(Device))
+        session.add_all(
+            [
+                Device(
+                    id=1,
+                    device_code="CMD-AC-001",
+                    device_name="空调-A01",
+                    device_type="AC",
+                    area_code="A1",
+                ),
+                Device(
+                    id=2,
+                    device_code="CMD-PDU-002",
+                    device_name="配电柜-B01",
+                    device_type="PDU",
+                    area_code="B1",
+                ),
+            ]
+        )
         await session.commit()
         yield session
 
@@ -74,10 +102,18 @@ async def app(db_session, mock_admin):
     async def override_require_viewer():
         return mock_admin
 
+    async def override_inventory_authorization():
+        return None
+
+    async def override_site_access_context():
+        return SiteAccessContext(user_id=mock_admin.id, role="admin", jti="test-jti", site_ids=None)
+
     _app.dependency_overrides[get_db] = override_get_db
     _app.dependency_overrides[require_admin] = override_require_admin
     _app.dependency_overrides[require_operator] = override_require_operator
     _app.dependency_overrides[require_viewer] = override_require_viewer
+    _app.dependency_overrides[enforce_inventory_authorization] = override_inventory_authorization
+    _app.dependency_overrides[get_site_access_context] = override_site_access_context
     yield _app
     _app.dependency_overrides.clear()
 

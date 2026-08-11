@@ -3,12 +3,21 @@
 """
 
 from datetime import datetime
-from typing import Optional, List
+from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, update
 
-from ..deps import get_db, require_viewer, require_operator, require_admin, get_user_site_ids
+from ..deps import (
+    SiteAccessContext,
+    apply_site_scope,
+    get_db,
+    get_site_access_context,
+    require_admin,
+    require_context_site_access,
+    require_operator,
+    require_viewer,
+)
 from ...models.user import User
 from ...models.device import Device
 from ...models.point import Point, PointRealtime
@@ -22,6 +31,18 @@ from ...services.device_lifecycle import DeviceLifecycleService
 router = APIRouter()
 
 
+def _device_scope(query, context: SiteAccessContext):
+    return apply_site_scope(query, Device.site_id, context)
+
+
+async def _authorized_device(db: AsyncSession, device_id: int, context: SiteAccessContext) -> Device:
+    result = await db.execute(_device_scope(select(Device).where(Device.id == device_id), context))
+    device = result.scalar_one_or_none()
+    if device is None:
+        raise HTTPException(status_code=404, detail="设备不存在")
+    return device
+
+
 @router.get("", response_model=PageResponse[DeviceInfo], summary="获取设备列表")
 async def get_devices(
     page: int = Query(1, ge=1),
@@ -33,7 +54,7 @@ async def get_devices(
     site_id: Optional[int] = Query(None, description="站点ID"),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_viewer),
-    user_site_ids: Optional[List[int]] = Depends(get_user_site_ids),
+    site_context: SiteAccessContext = Depends(get_site_access_context),
 ):
     """
     获取设备列表（分页），按用户站点权限过滤
@@ -41,11 +62,11 @@ async def get_devices(
     query = select(Device)
 
     # 站点权限过滤（非 admin 用户仅可见授权站点设备）
-    if user_site_ids is not None:
-        query = query.where(Device.site_id.in_(user_site_ids))
+    query = _device_scope(query, site_context)
 
     # 手动站点筛选
     if site_id is not None:
+        require_context_site_access(site_id, site_context)
         query = query.where(Device.site_id == site_id)
 
     if keyword:
@@ -75,13 +96,16 @@ async def get_devices(
 
 
 @router.get("/tree", summary="获取设备树结构")
-async def get_device_tree(db: AsyncSession = Depends(get_db), _: User = Depends(require_viewer)):
+async def get_device_tree(
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_viewer),
+    site_context: SiteAccessContext = Depends(get_site_access_context),
+):
     """
     获取设备树结构（按区域-设备类型-设备）
     """
-    result = await db.execute(
-        select(Device).where(Device.is_enabled == True).order_by(Device.area_code, Device.device_type)
-    )
+    query = _device_scope(select(Device).where(Device.is_enabled == True), site_context)
+    result = await db.execute(query.order_by(Device.area_code, Device.device_type))
     devices = result.scalars().all()
 
     # 构建树结构
@@ -112,23 +136,33 @@ async def get_device_tree(db: AsyncSession = Depends(get_db), _: User = Depends(
 
 
 @router.get("/status-summary", response_model=DeviceStatusSummary, summary="获取设备状态汇总")
-async def get_status_summary(db: AsyncSession = Depends(get_db), _: User = Depends(require_viewer)):
+async def get_status_summary(
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_viewer),
+    site_context: SiteAccessContext = Depends(get_site_access_context),
+):
     """
     获取设备状态汇总统计
     """
     # 总数和启用数
-    total_result = await db.execute(select(func.count(Device.id)))
+    total_result = await db.execute(_device_scope(select(func.count(Device.id)), site_context))
     total = int(total_result.scalar() or 0)
 
-    enabled_result = await db.execute(select(func.count(Device.id)).where(Device.is_enabled == True))
+    enabled_result = await db.execute(
+        _device_scope(select(func.count(Device.id)).where(Device.is_enabled == True), site_context)
+    )
     enabled = int(enabled_result.scalar() or 0)
 
     # 按状态统计
-    status_result = await db.execute(select(Device.status, func.count(Device.id)).group_by(Device.status))
+    status_result = await db.execute(
+        _device_scope(select(Device.status, func.count(Device.id)), site_context).group_by(Device.status)
+    )
     status_counts = {row[0]: row[1] for row in status_result.all()}
 
     # 按类型统计
-    type_result = await db.execute(select(Device.device_type, func.count(Device.id)).group_by(Device.device_type))
+    type_result = await db.execute(
+        _device_scope(select(Device.device_type, func.count(Device.id)), site_context).group_by(Device.device_type)
+    )
     type_counts = {row[0]: row[1] for row in type_result.all()}
 
     return DeviceStatusSummary(
@@ -148,11 +182,12 @@ async def get_status_board(
     device_type: Optional[str] = Query(None, description="设备类型"),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_viewer),
+    site_context: SiteAccessContext = Depends(get_site_access_context),
 ):
     """
     获取设备状态看板 — 按区域和设备类型分组，Redis 判断在线状态
     """
-    query = select(Device).where(Device.is_enabled == True)
+    query = _device_scope(select(Device).where(Device.is_enabled == True), site_context)
     if area_code:
         query = query.where(Device.area_code == area_code)
     if device_type:
@@ -209,26 +244,30 @@ async def get_status_board(
 
 
 @router.get("/{device_id}", response_model=DeviceInfo, summary="获取设备详情")
-async def get_device(device_id: int, db: AsyncSession = Depends(get_db), _: User = Depends(require_viewer)):
+async def get_device(
+    device_id: int,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_viewer),
+    site_context: SiteAccessContext = Depends(get_site_access_context),
+):
     """
     获取设备详情
     """
-    result = await db.execute(select(Device).where(Device.id == device_id))
-    device = result.scalar_one_or_none()
-    if not device:
-        raise HTTPException(status_code=404, detail="设备不存在")
+    device = await _authorized_device(db, device_id, site_context)
     return DeviceInfo.model_validate(device)
 
 
 @router.get("/{device_id}/points", summary="获取设备下的点位")
-async def get_device_points(device_id: int, db: AsyncSession = Depends(get_db), _: User = Depends(require_viewer)):
+async def get_device_points(
+    device_id: int,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_viewer),
+    site_context: SiteAccessContext = Depends(get_site_access_context),
+):
     """
     获取设备关联的所有点位
     """
-    result = await db.execute(select(Device).where(Device.id == device_id))
-    device = result.scalar_one_or_none()
-    if not device:
-        raise HTTPException(status_code=404, detail="设备不存在")
+    device = await _authorized_device(db, device_id, site_context)
 
     points_result = await db.execute(select(Point).where(Point.device_id == device_id).order_by(Point.point_code))
     points = points_result.scalars().all()
@@ -240,15 +279,17 @@ async def get_device_points(device_id: int, db: AsyncSession = Depends(get_db), 
 
 
 @router.get("/{device_id}/detail", summary="获取设备详情（聚合）")
-async def get_device_detail(device_id: int, db: AsyncSession = Depends(get_db), _: User = Depends(require_viewer)):
+async def get_device_detail(
+    device_id: int,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_viewer),
+    site_context: SiteAccessContext = Depends(get_site_access_context),
+):
     """
     获取设备详情：基本信息 + 关联点位实时数据 + 当前活动告警
     """
     # 1. 设备基本信息
-    result = await db.execute(select(Device).where(Device.id == device_id))
-    device = result.scalar_one_or_none()
-    if not device:
-        raise HTTPException(status_code=404, detail="设备不存在")
+    device = await _authorized_device(db, device_id, site_context)
 
     # 2. 关联点位 + 实时数据
     points_result = await db.execute(
@@ -309,10 +350,17 @@ async def get_device_detail(device_id: int, db: AsyncSession = Depends(get_db), 
 
 
 @router.post("", response_model=DeviceInfo, summary="创建设备")
-async def create_device(data: DeviceCreate, db: AsyncSession = Depends(get_db), _: User = Depends(require_operator)):
+async def create_device(
+    data: DeviceCreate,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_operator),
+    site_context: SiteAccessContext = Depends(get_site_access_context),
+):
     """
     创建新设备
     """
+    require_context_site_access(data.site_id, site_context)
+
     # 检查设备编码唯一性
     result = await db.execute(select(Device).where(Device.device_code == data.device_code))
     if result.scalar_one_or_none():
@@ -338,17 +386,20 @@ async def create_device(data: DeviceCreate, db: AsyncSession = Depends(get_db), 
 
 @router.put("/{device_id}", response_model=DeviceInfo, summary="更新设备")
 async def update_device(
-    device_id: int, data: DeviceUpdate, db: AsyncSession = Depends(get_db), _: User = Depends(require_operator)
+    device_id: int,
+    data: DeviceUpdate,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_operator),
+    site_context: SiteAccessContext = Depends(get_site_access_context),
 ):
     """
     更新设备信息
     """
-    result = await db.execute(select(Device).where(Device.id == device_id))
-    device = result.scalar_one_or_none()
-    if not device:
-        raise HTTPException(status_code=404, detail="设备不存在")
+    await _authorized_device(db, device_id, site_context)
 
     update_data = data.model_dump(exclude_unset=True)
+    if "site_id" in update_data:
+        require_context_site_access(update_data["site_id"], site_context)
     update_data["updated_at"] = datetime.now()
 
     await db.execute(update(Device).where(Device.id == device_id).values(**update_data))
@@ -368,10 +419,16 @@ async def update_device(
 
 
 @router.get("/{device_id}/delete-impact", response_model=DeviceDeleteImpact, summary="删除影响分析")
-async def get_delete_impact(device_id: int, db: AsyncSession = Depends(get_db), _: User = Depends(require_viewer)):
+async def get_delete_impact(
+    device_id: int,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_viewer),
+    site_context: SiteAccessContext = Depends(get_site_access_context),
+):
     """
     分析删除设备将影响哪些关联数据
     """
+    await _authorized_device(db, device_id, site_context)
     lifecycle = DeviceLifecycleService(db)
     impact = await lifecycle.analyze_delete_impact(device_id)
     if impact is None:
@@ -385,14 +442,12 @@ async def delete_device(
     force: bool = Query(False, description="强制级联删除"),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_admin),
+    site_context: SiteAccessContext = Depends(get_site_access_context),
 ):
     """
     删除设备。无 force 参数时返回影响分析；force=true 时执行级联删除。
     """
-    result = await db.execute(select(Device).where(Device.id == device_id))
-    device = result.scalar_one_or_none()
-    if not device:
-        raise HTTPException(status_code=404, detail="设备不存在")
+    await _authorized_device(db, device_id, site_context)
 
     lifecycle = DeviceLifecycleService(db)
 

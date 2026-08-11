@@ -8,6 +8,16 @@ import pytest
 from unittest.mock import patch
 from httpx import AsyncClient
 
+from app.models.topology_config import CoolingZone
+
+
+@pytest.fixture
+async def rollback_zone(async_db):
+    zone = CoolingZone(zone_code="TEST-ROLLBACK", zone_name="回退测试区域")
+    async_db.add(zone)
+    await async_db.flush()
+    return zone
+
 
 # ==================== rollback-status 端点 ====================
 
@@ -21,28 +31,25 @@ class TestRollbackStatus:
         assert response.status_code == 401
 
     @pytest.mark.asyncio
-    async def test_status_normal(self, client: AsyncClient, admin_token: str):
+    async def test_status_normal(self, client: AsyncClient, admin_token: str, rollback_zone):
         """正常状态（无活跃回退）"""
         with patch(
             "app.api.v1.precool.rollback_manager"
         ) as mock_mgr:
             mock_mgr.get_zone_rollback_status.return_value = {
-                "zone_id": 1,
+                "zone_id": rollback_zone.id,
                 "has_active_rollback": False,
                 "active_triggers": [],
             }
 
             response = await client.get(
-                "/api/v1/precool/zones/1/rollback-status",
+                f"/api/v1/precool/zones/{rollback_zone.id}/rollback-status",
                 headers={"Authorization": f"Bearer {admin_token}"},
             )
             data = response.json()
-            # zone 可能不存在于测试数据库中，允许 404
-            if data["code"] == 200:
-                assert data["data"]["has_active_rollback"] is False
-                assert data["data"]["active_triggers"] == []
-            else:
-                assert data["code"] == 404
+            assert data["code"] == 200
+            assert data["data"]["has_active_rollback"] is False
+            assert data["data"]["active_triggers"] == []
 
     @pytest.mark.asyncio
     async def test_status_zone_not_found(self, client: AsyncClient, admin_token: str):
@@ -51,17 +58,16 @@ class TestRollbackStatus:
             "/api/v1/precool/zones/99999/rollback-status",
             headers={"Authorization": f"Bearer {admin_token}"},
         )
-        data = response.json()
-        assert data["code"] == 404
+        assert response.status_code == 404
 
     @pytest.mark.asyncio
-    async def test_status_with_active_rollback(self, client: AsyncClient, admin_token: str):
+    async def test_status_with_active_rollback(self, client: AsyncClient, admin_token: str, rollback_zone):
         """有活跃回退状态"""
         with patch(
             "app.api.v1.precool.rollback_manager"
         ) as mock_mgr:
             mock_mgr.get_zone_rollback_status.return_value = {
-                "zone_id": 1,
+                "zone_id": rollback_zone.id,
                 "has_active_rollback": True,
                 "active_triggers": [
                     {
@@ -74,14 +80,14 @@ class TestRollbackStatus:
             }
 
             response = await client.get(
-                "/api/v1/precool/zones/1/rollback-status",
+                f"/api/v1/precool/zones/{rollback_zone.id}/rollback-status",
                 headers={"Authorization": f"Bearer {admin_token}"},
             )
             data = response.json()
-            if data["code"] == 200:
-                assert data["data"]["has_active_rollback"] is True
-                assert len(data["data"]["active_triggers"]) == 1
-                assert data["data"]["active_triggers"][0]["trigger_type"] == "temp_over_limit"
+            assert data["code"] == 200
+            assert data["data"]["has_active_rollback"] is True
+            assert len(data["data"]["active_triggers"]) == 1
+            assert data["data"]["active_triggers"][0]["trigger_type"] == "temp_over_limit"
 
 
 # ==================== rollback-history 端点 ====================
@@ -102,21 +108,19 @@ class TestRollbackHistory:
             "/api/v1/precool/zones/99999/rollback-history",
             headers={"Authorization": f"Bearer {admin_token}"},
         )
-        data = response.json()
-        assert data["code"] == 404
+        assert response.status_code == 404
 
     @pytest.mark.asyncio
-    async def test_history_empty(self, client: AsyncClient, admin_token: str):
+    async def test_history_empty(self, client: AsyncClient, admin_token: str, rollback_zone):
         """无历史记录返回空列表"""
         response = await client.get(
-            "/api/v1/precool/zones/1/rollback-history",
+            f"/api/v1/precool/zones/{rollback_zone.id}/rollback-history",
             headers={"Authorization": f"Bearer {admin_token}"},
         )
         data = response.json()
-        # zone 可能不存在→404，或存在但无记录→200
-        if data["code"] == 200:
-            assert data["data"]["items"] == []
-            assert data["data"]["total"] == 0
+        assert data["code"] == 200
+        assert data["data"]["items"] == []
+        assert data["data"]["total"] == 0
 
     @pytest.mark.asyncio
     async def test_history_invalid_limit(self, client: AsyncClient, admin_token: str):
@@ -138,16 +142,16 @@ class TestRollbackHistory:
         assert response.status_code == 422
 
     @pytest.mark.asyncio
-    async def test_history_pagination_params(self, client: AsyncClient, admin_token: str):
+    async def test_history_pagination_params(self, client: AsyncClient, admin_token: str, rollback_zone):
         """分页参数生效"""
         response = await client.get(
-            "/api/v1/precool/zones/1/rollback-history?skip=0&limit=5",
+            f"/api/v1/precool/zones/{rollback_zone.id}/rollback-history?skip=0&limit=5",
             headers={"Authorization": f"Bearer {admin_token}"},
         )
         data = response.json()
-        if data["code"] == 200:
-            assert "items" in data["data"]
-            assert "total" in data["data"]
+        assert data["code"] == 200
+        assert "items" in data["data"]
+        assert "total" in data["data"]
 
 
 # ==================== rollback-overview 端点 ====================

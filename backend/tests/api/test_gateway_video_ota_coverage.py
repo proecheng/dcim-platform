@@ -490,8 +490,7 @@ class TestCameraByQueries:
     async def test_cameras_by_device_empty(self, client, admin_user):
         _, token = admin_user
         resp = await client.get(f"{VIDEO_PREFIX}/cameras/by-device/99999", headers=auth_headers(token))
-        assert resp.status_code == 200
-        assert resp.json() == []
+        assert resp.status_code == 404
 
     async def test_cameras_by_alarm_not_found(self, client, admin_user):
         _, token = admin_user
@@ -665,10 +664,7 @@ class TestPlayback:
             params={"camera_id": 99999},
             headers=auth_headers(token),
         )
-        assert resp.status_code == 200
-        data = resp.json()
-        assert data["total"] == 0
-        assert data["items"] == []
+        assert resp.status_code == 404
 
     async def test_recording_segments_no_auth(self, client):
         resp = await client.get(f"{VIDEO_PREFIX}/playback/segments", params={"camera_id": 1})
@@ -832,11 +828,12 @@ class TestOtaTaskCRUD:
 
     async def test_create_task_invalid_firmware(self, client, admin_user):
         _, token = admin_user
+        _, gw_id = await self._create_firmware_and_gateway(client, token)
         resp = await client.post(
             f"{OTA_PREFIX}/tasks",
             json={
                 "firmware_id": 99999,
-                "gateway_ids": [1],
+                "gateway_ids": [gw_id],
                 "strategy": "immediate",
             },
             headers=auth_headers(token),
@@ -884,28 +881,28 @@ class TestOtaTaskActions:
         resp = await client.post(
             f"{OTA_PREFIX}/tasks/nonexistent-id/start", headers=auth_headers(token)
         )
-        assert resp.status_code == 400
+        assert resp.status_code == 404
 
     async def test_cancel_task_not_found(self, client, admin_user):
         _, token = admin_user
         resp = await client.post(
             f"{OTA_PREFIX}/tasks/nonexistent-id/cancel", headers=auth_headers(token)
         )
-        assert resp.status_code == 400
+        assert resp.status_code == 404
 
     async def test_pause_task_not_found(self, client, admin_user):
         _, token = admin_user
         resp = await client.post(
             f"{OTA_PREFIX}/tasks/nonexistent-id/pause", headers=auth_headers(token)
         )
-        assert resp.status_code == 400
+        assert resp.status_code == 404
 
     async def test_resume_task_not_found(self, client, admin_user):
         _, token = admin_user
         resp = await client.post(
             f"{OTA_PREFIX}/tasks/nonexistent-id/resume", headers=auth_headers(token)
         )
-        assert resp.status_code == 400
+        assert resp.status_code == 404
 
     async def test_start_task_no_auth(self, client):
         resp = await client.post(f"{OTA_PREFIX}/tasks/some-id/start")

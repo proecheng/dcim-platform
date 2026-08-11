@@ -8,7 +8,32 @@ import pytest
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.models.device import Device
 from app.models.diagnosis import DiagnosisSession, DiagnosisAnnotation
+from app.models.spatial import Site
+from app.models.user import UserSite
+
+
+@pytest.fixture(autouse=True)
+async def authorized_diagnosis_device(async_db: AsyncSession, operator_user):
+    operator, _ = operator_user
+    site = Site(site_code="ANNOTATION-SITE", site_name="标注测试站点")
+    async_db.add(site)
+    await async_db.flush()
+    async_db.add_all(
+        [
+            UserSite(user_id=operator.id, site_id=site.id),
+            Device(
+                id=1,
+                device_code="ANNOTATION-DEVICE",
+                device_name="标注测试设备",
+                device_type="UPS",
+                area_code="A",
+                site_id=site.id,
+            ),
+        ]
+    )
+    await async_db.flush()
 
 
 @pytest.mark.asyncio
@@ -132,8 +157,8 @@ async def test_create_annotation_session_not_found(
         headers={"Authorization": f"Bearer {operator_token}"},
     )
 
-    assert response.status_code == 400
-    assert "not found" in response.json()["detail"]
+    assert response.status_code == 404
+    assert response.json()["detail"] == "诊断会话不存在"
 
 
 @pytest.mark.asyncio

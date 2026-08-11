@@ -10,7 +10,15 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, desc
 
-from ..deps import get_db, require_operator, require_viewer
+from ..deps import (
+    SiteAccessContext,
+    apply_point_site_scope,
+    authorized_point_ids_query,
+    get_db,
+    get_site_access_context,
+    require_operator,
+    require_viewer,
+)
 from ...models.user import User
 from ...models.drift import DriftDetectionResult
 from ...schemas.drift import (
@@ -29,9 +37,10 @@ router = APIRouter()
 async def trigger_detection(
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_operator),
+    context: SiteAccessContext = Depends(get_site_access_context),
 ):
     """触发一次漂移检测，扫描所有 AI 类型点位"""
-    result = await drift_detection.run_drift_detection(db)
+    result = await drift_detection.run_drift_detection(db, allowed_point_ids=authorized_point_ids_query(context))
     return DriftDetectResponse(
         message=f"检测完成: 检查 {result['total_checked']} 个点位",
         total_checked=result["total_checked"],
@@ -49,10 +58,13 @@ async def list_results(
     page_size: int = Query(20, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_viewer),
+    context: SiteAccessContext = Depends(get_site_access_context),
 ):
     """获取漂移检测结果列表（分页）"""
     query = select(DriftDetectionResult)
     count_query = select(func.count(DriftDetectionResult.id))
+    query = apply_point_site_scope(query, DriftDetectionResult.point_id, context)
+    count_query = apply_point_site_scope(count_query, DriftDetectionResult.point_id, context)
 
     if status:
         query = query.where(DriftDetectionResult.status == status)
@@ -81,13 +93,15 @@ async def list_results(
 async def get_summary(
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_viewer),
+    context: SiteAccessContext = Depends(get_site_access_context),
 ):
     """获取漂移检测统计概览"""
-    stats_result = await db.execute(
-        select(
+    stats_query = select(
             DriftDetectionResult.status,
             func.count(DriftDetectionResult.id),
         ).group_by(DriftDetectionResult.status)
+    stats_result = await db.execute(
+        apply_point_site_scope(stats_query, DriftDetectionResult.point_id, context)
     )
     counts = {row[0]: row[1] for row in stats_result.all()}
 
@@ -105,9 +119,15 @@ async def get_result(
     result_id: int,
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_viewer),
+    context: SiteAccessContext = Depends(get_site_access_context),
 ):
     """获取单条漂移检测结果详情"""
-    result = await db.execute(select(DriftDetectionResult).where(DriftDetectionResult.id == result_id))
+    query = apply_point_site_scope(
+        select(DriftDetectionResult).where(DriftDetectionResult.id == result_id),
+        DriftDetectionResult.point_id,
+        context,
+    )
+    result = await db.execute(query)
     record = result.scalar_one_or_none()
     if not record:
         raise HTTPException(status_code=404, detail="漂移检测记录不存在")
@@ -119,8 +139,16 @@ async def resolve_result(
     result_id: int,
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_operator),
+    context: SiteAccessContext = Depends(get_site_access_context),
 ):
     """手动解除漂移标记，恢复点位数据质量"""
+    authorized = apply_point_site_scope(
+        select(DriftDetectionResult.id).where(DriftDetectionResult.id == result_id),
+        DriftDetectionResult.point_id,
+        context,
+    )
+    if (await db.execute(authorized)).scalar_one_or_none() is None:
+        raise HTTPException(status_code=404, detail="漂移检测记录不存在")
     try:
         record = await drift_detection.resolve_drift(db, result_id)
     except ValueError as e:

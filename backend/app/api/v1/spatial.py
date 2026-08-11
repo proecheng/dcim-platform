@@ -18,7 +18,17 @@ import openpyxl
 # Excel 导入文件大小限制 (10MB)
 MAX_IMPORT_SIZE = 10 * 1024 * 1024
 
-from ..deps import get_db, require_operator, require_viewer, require_site_access, get_user_site_ids
+from ..deps import (
+    SiteAccessContext,
+    apply_site_scope,
+    get_db,
+    get_site_access_context,
+    get_user_site_ids,
+    require_context_site_access,
+    require_operator,
+    require_site_access,
+    require_viewer,
+)
 from ...models.user import User
 from ...models.spatial import Site, Floor, Room, Row, LayoutTemplate
 from ...models.asset import Cabinet
@@ -50,6 +60,67 @@ from ...schemas.spatial import (
 )
 
 router = APIRouter(prefix="/spatial", tags=["空间拓扑"])
+
+
+def _floor_scope(query, context: SiteAccessContext):
+    return apply_site_scope(query, Floor.site_id, context)
+
+
+async def _authorized_floor(db: AsyncSession, floor_id: int, context: SiteAccessContext) -> Floor:
+    result = await db.execute(_floor_scope(select(Floor).where(Floor.id == floor_id), context))
+    floor = result.scalar_one_or_none()
+    if floor is None:
+        raise HTTPException(status_code=404, detail="楼层不存在")
+    return floor
+
+
+def _room_scope(query, context: SiteAccessContext):
+    if context.site_ids is None:
+        return query
+    query = query.join(Floor, Room.floor_id == Floor.id)
+    return apply_site_scope(query, Floor.site_id, context)
+
+
+async def _authorized_room(db: AsyncSession, room_id: int, context: SiteAccessContext) -> Room:
+    result = await db.execute(_room_scope(select(Room).where(Room.id == room_id), context))
+    room = result.scalar_one_or_none()
+    if room is None:
+        raise HTTPException(status_code=404, detail="房间不存在")
+    return room
+
+
+def _row_scope(query, context: SiteAccessContext):
+    if context.site_ids is None:
+        return query
+    query = query.join(Room, Row.room_id == Room.id).join(Floor, Room.floor_id == Floor.id)
+    return apply_site_scope(query, Floor.site_id, context)
+
+
+async def _authorized_row(db: AsyncSession, row_id: int, context: SiteAccessContext) -> Row:
+    result = await db.execute(_row_scope(select(Row).where(Row.id == row_id), context))
+    row = result.scalar_one_or_none()
+    if row is None:
+        raise HTTPException(status_code=404, detail="行不存在")
+    return row
+
+
+def _cabinet_scope(query, context: SiteAccessContext):
+    if context.site_ids is None:
+        return query
+    query = (
+        query.join(Row, Cabinet.row_id == Row.id)
+        .join(Room, Row.room_id == Room.id)
+        .join(Floor, Room.floor_id == Floor.id)
+    )
+    return apply_site_scope(query, Floor.site_id, context)
+
+
+async def _authorized_cabinet(db: AsyncSession, cabinet_id: int, context: SiteAccessContext) -> Cabinet:
+    result = await db.execute(_cabinet_scope(select(Cabinet).where(Cabinet.id == cabinet_id), context))
+    cabinet = result.scalar_one_or_none()
+    if cabinet is None:
+        raise HTTPException(status_code=404, detail="机柜不存在")
+    return cabinet
 
 
 # ==================== 预置模板数据 ====================
@@ -399,9 +470,10 @@ async def list_floors(
     site_id: Optional[int] = Query(None, description="站点ID"),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_viewer),
+    site_context: SiteAccessContext = Depends(get_site_access_context),
 ):
     """获取楼层列表"""
-    stmt = select(Floor)
+    stmt = _floor_scope(select(Floor), site_context)
     if site_id is not None:
         stmt = stmt.where(Floor.site_id == site_id)
     stmt = stmt.order_by(Floor.sort_order, Floor.id)
@@ -414,8 +486,10 @@ async def create_floor(
     data: FloorCreate,
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_operator),
+    site_context: SiteAccessContext = Depends(get_site_access_context),
 ):
     """创建楼层"""
+    require_context_site_access(data.site_id, site_context)
     floor = Floor(**data.model_dump())
     db.add(floor)
     await db.commit()
@@ -429,13 +503,14 @@ async def update_floor(
     data: FloorUpdate,
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_operator),
+    site_context: SiteAccessContext = Depends(get_site_access_context),
 ):
     """更新楼层"""
-    result = await db.execute(select(Floor).where(Floor.id == floor_id))
-    floor = result.scalar_one_or_none()
-    if not floor:
-        raise HTTPException(status_code=404, detail="楼层不存在")
-    for k, v in data.model_dump(exclude_unset=True).items():
+    floor = await _authorized_floor(db, floor_id, site_context)
+    update_data = data.model_dump(exclude_unset=True)
+    if "site_id" in update_data:
+        require_context_site_access(update_data["site_id"], site_context)
+    for k, v in update_data.items():
         setattr(floor, k, v)
     floor.updated_at = datetime.now()
     await db.commit()
@@ -448,12 +523,10 @@ async def delete_floor(
     floor_id: int,
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_operator),
+    site_context: SiteAccessContext = Depends(get_site_access_context),
 ):
     """删除楼层"""
-    result = await db.execute(select(Floor).where(Floor.id == floor_id))
-    floor = result.scalar_one_or_none()
-    if not floor:
-        raise HTTPException(status_code=404, detail="楼层不存在")
+    floor = await _authorized_floor(db, floor_id, site_context)
     cnt = await db.execute(select(func.count(Room.id)).where(Room.floor_id == floor_id))
     if (cnt.scalar() or 0) > 0:
         raise HTTPException(status_code=400, detail="请先删除该楼层下的所有房间")
@@ -470,9 +543,10 @@ async def list_rooms(
     floor_id: Optional[int] = Query(None, description="楼层ID"),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_viewer),
+    site_context: SiteAccessContext = Depends(get_site_access_context),
 ):
     """获取房间列表"""
-    stmt = select(Room)
+    stmt = _room_scope(select(Room), site_context)
     if floor_id is not None:
         stmt = stmt.where(Room.floor_id == floor_id)
     stmt = stmt.order_by(Room.id)
@@ -485,10 +559,12 @@ async def create_room(
     data: RoomCreate,
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_operator),
+    site_context: SiteAccessContext = Depends(get_site_access_context),
 ):
     """创建房间"""
     if data.grid_cols > 50 or data.grid_rows > 50:
         raise HTTPException(status_code=400, detail="网格行列数不能超过50")
+    await _authorized_floor(db, data.floor_id, site_context)
     room = Room(**data.model_dump())
     db.add(room)
     await db.commit()
@@ -502,13 +578,13 @@ async def update_room(
     data: RoomUpdate,
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_operator),
+    site_context: SiteAccessContext = Depends(get_site_access_context),
 ):
     """更新房间"""
-    result = await db.execute(select(Room).where(Room.id == room_id))
-    room = result.scalar_one_or_none()
-    if not room:
-        raise HTTPException(status_code=404, detail="房间不存在")
+    room = await _authorized_room(db, room_id, site_context)
     update_data = data.model_dump(exclude_unset=True)
+    if "floor_id" in update_data:
+        await _authorized_floor(db, update_data["floor_id"], site_context)
     if "grid_cols" in update_data and update_data["grid_cols"] > 50:
         raise HTTPException(status_code=400, detail="网格列数不能超过50")
     if "grid_rows" in update_data and update_data["grid_rows"] > 50:
@@ -526,12 +602,10 @@ async def delete_room(
     room_id: int,
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_operator),
+    site_context: SiteAccessContext = Depends(get_site_access_context),
 ):
     """删除房间"""
-    result = await db.execute(select(Room).where(Room.id == room_id))
-    room = result.scalar_one_or_none()
-    if not room:
-        raise HTTPException(status_code=404, detail="房间不存在")
+    room = await _authorized_room(db, room_id, site_context)
     cnt = await db.execute(select(func.count(Row.id)).where(Row.room_id == room_id))
     if (cnt.scalar() or 0) > 0:
         raise HTTPException(status_code=400, detail="请先删除该房间下的所有行")
@@ -548,9 +622,10 @@ async def list_rows(
     room_id: Optional[int] = Query(None, description="房间ID"),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_viewer),
+    site_context: SiteAccessContext = Depends(get_site_access_context),
 ):
     """获取行列表"""
-    stmt = select(Row)
+    stmt = _row_scope(select(Row), site_context)
     if room_id is not None:
         stmt = stmt.where(Row.room_id == room_id)
     stmt = stmt.order_by(Row.sort_order, Row.id)
@@ -563,8 +638,10 @@ async def create_row(
     data: RowCreate,
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_operator),
+    site_context: SiteAccessContext = Depends(get_site_access_context),
 ):
     """创建行"""
+    await _authorized_room(db, data.room_id, site_context)
     row = Row(**data.model_dump())
     db.add(row)
     await db.commit()
@@ -578,13 +655,14 @@ async def update_row(
     data: RowUpdate,
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_operator),
+    site_context: SiteAccessContext = Depends(get_site_access_context),
 ):
     """更新行"""
-    result = await db.execute(select(Row).where(Row.id == row_id))
-    row = result.scalar_one_or_none()
-    if not row:
-        raise HTTPException(status_code=404, detail="行不存在")
-    for k, v in data.model_dump(exclude_unset=True).items():
+    row = await _authorized_row(db, row_id, site_context)
+    update_data = data.model_dump(exclude_unset=True)
+    if "room_id" in update_data:
+        await _authorized_room(db, update_data["room_id"], site_context)
+    for k, v in update_data.items():
         setattr(row, k, v)
     row.updated_at = datetime.now()
     await db.commit()
@@ -597,12 +675,10 @@ async def delete_row(
     row_id: int,
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_operator),
+    site_context: SiteAccessContext = Depends(get_site_access_context),
 ):
     """删除行"""
-    result = await db.execute(select(Row).where(Row.id == row_id))
-    row = result.scalar_one_or_none()
-    if not row:
-        raise HTTPException(status_code=404, detail="行不存在")
+    row = await _authorized_row(db, row_id, site_context)
     cnt = await db.execute(select(func.count(Cabinet.id)).where(Cabinet.row_id == row_id))
     if (cnt.scalar() or 0) > 0:
         raise HTTPException(status_code=400, detail="请先移除该行下的所有机柜")
@@ -618,6 +694,7 @@ async def delete_row(
 async def get_spatial_tree(
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_viewer),
+    site_context: SiteAccessContext = Depends(get_site_access_context),
 ):
     """获取完整空间拓扑树"""
     stmt = (
@@ -625,6 +702,7 @@ async def get_spatial_tree(
         .options(selectinload(Site.floors).selectinload(Floor.rooms).selectinload(Room.rows).selectinload(Row.cabinets))
         .order_by(Site.id)
     )
+    stmt = apply_site_scope(stmt, Site.id, site_context)
     result = await db.execute(stmt)
     return result.scalars().unique().all()
 
@@ -638,15 +716,15 @@ async def update_cabinet_position(
     data: CabinetPositionUpdate,
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_operator),
+    site_context: SiteAccessContext = Depends(get_site_access_context),
 ):
     """更新机柜空间位置"""
-    result = await db.execute(select(Cabinet).where(Cabinet.id == cabinet_id))
-    cabinet = result.scalar_one_or_none()
-    if not cabinet:
-        raise HTTPException(status_code=404, detail="机柜不存在")
+    cabinet = await _authorized_cabinet(db, cabinet_id, site_context)
 
     # H1: 网格边界校验
     target_row_id = data.row_id if data.row_id is not None else cabinet.row_id
+    if data.row_id is not None:
+        await _authorized_row(db, data.row_id, site_context)
     if target_row_id and (data.grid_x is not None or data.grid_y is not None):
         row_result = await db.execute(select(Row).where(Row.id == target_row_id))
         row_obj = row_result.scalar_one_or_none()

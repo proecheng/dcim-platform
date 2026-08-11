@@ -57,6 +57,7 @@ async def check_communication_status(session: AsyncSession):
                     {
                         "type": "data_quality_changed",
                         "datasource_id": ds.id,
+                        "site_id": ds.site_id,
                         "quality": 2,
                         "affected_point_ids": point_ids,
                         "affected_count": len(point_ids),
@@ -82,6 +83,7 @@ async def check_communication_status(session: AsyncSession):
                                 "alarm_level": alarm.alarm_level,
                                 "alarm_type": alarm.alarm_type,
                                 "alarm_message": alarm.alarm_message,
+                                "site_id": ds.site_id,
                                 "status": "active",
                             }
                         )
@@ -97,6 +99,7 @@ async def check_communication_status(session: AsyncSession):
                         {
                             "action": "resolve",
                             "source": f"datasource:{ds.id}",
+                            "site_id": ds.site_id,
                             "status": "resolved",
                         }
                     )
@@ -108,6 +111,7 @@ async def check_communication_status(session: AsyncSession):
                 {
                     "type": "data_quality_changed",
                     "datasource_id": ds.id,
+                    "site_id": ds.site_id,
                     "quality": 0,
                     "affected_point_ids": point_ids,
                     "affected_count": len(point_ids),
@@ -121,12 +125,12 @@ async def check_communication_status(session: AsyncSession):
     # commit 成功后发送 WebSocket 广播
     for payload in pending_broadcasts:
         try:
-            await ws_manager.broadcast_system(payload)
+            await ws_manager.broadcast_system(payload, site_id=payload.get("site_id"))
         except Exception:
             pass
     for msg in pending_alarm_broadcasts:
         try:
-            await ws_manager.broadcast_alarm(msg)
+            await ws_manager.broadcast_alarm(msg, site_id=msg.get("site_id"))
         except Exception:
             pass
 

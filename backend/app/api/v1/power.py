@@ -8,7 +8,17 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, update, delete, or_
 
-from ..deps import get_db, require_viewer, require_operator, require_admin
+from ..deps import (
+    SiteAccessContext,
+    apply_device_site_scope,
+    apply_site_scope,
+    get_authorized_device,
+    get_db,
+    get_site_access_context,
+    require_admin,
+    require_operator,
+    require_viewer,
+)
 from ...models.user import User
 from ...models.device import Device
 from ...models.point import Point, PointRealtime
@@ -28,6 +38,35 @@ from ...schemas.common import PageResponse
 router = APIRouter()
 
 
+def _scope_ups_query(query, context: SiteAccessContext):
+    """通过 UPSDevice -> Device -> Site 约束查询。"""
+    return apply_device_site_scope(query, UPSDevice.device_id, context)
+
+
+def _scope_battery_query(query, context: SiteAccessContext):
+    """通过 BatteryGroup -> UPSDevice -> Device -> Site 约束查询。"""
+    if context.site_ids is None:
+        return query
+    authorized_ups_ids = _scope_ups_query(select(UPSDevice.id), context)
+    return query.where(BatteryGroup.ups_device_id.in_(authorized_ups_ids))
+
+
+async def _get_authorized_ups(db: AsyncSession, ups_id: int, context: SiteAccessContext) -> UPSDevice:
+    query = _scope_ups_query(select(UPSDevice).where(UPSDevice.id == ups_id), context)
+    ups = (await db.execute(query)).scalar_one_or_none()
+    if ups is None:
+        raise HTTPException(status_code=404, detail="UPS设备不存在")
+    return ups
+
+
+async def _get_authorized_battery(db: AsyncSession, bg_id: int, context: SiteAccessContext) -> BatteryGroup:
+    query = _scope_battery_query(select(BatteryGroup).where(BatteryGroup.id == bg_id), context)
+    battery = (await db.execute(query)).scalar_one_or_none()
+    if battery is None:
+        raise HTTPException(status_code=404, detail="电池组不存在")
+    return battery
+
+
 # ==================== 供配电总览 ====================
 
 
@@ -35,73 +74,99 @@ router = APIRouter()
 async def get_power_overview(
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_viewer),
+    context: SiteAccessContext = Depends(get_site_access_context),
 ):
     """获取供配电系统总览统计"""
     # UPS统计 — 基于 UPSDevice 扩展表（与 UPS 监控页一致）
-    ups_total_r = await db.execute(select(func.count(UPSDevice.id)))
+    ups_total_q = _scope_ups_query(select(func.count(UPSDevice.id)), context)
+    ups_total_r = await db.execute(ups_total_q)
     ups_total = ups_total_r.scalar() or 0
 
-    ups_online_r = await db.execute(
+    ups_online_q = (
         select(func.count(UPSDevice.id))
         .select_from(UPSDevice.__table__.join(Device.__table__, Device.id == UPSDevice.device_id))
         .where(Device.status == "online")
     )
+    ups_online_r = await db.execute(apply_site_scope(ups_online_q, Device.site_id, context))
     ups_online = ups_online_r.scalar() or 0
 
-    ups_offline_r = await db.execute(
+    ups_offline_q = (
         select(func.count(UPSDevice.id))
         .select_from(UPSDevice.__table__.join(Device.__table__, Device.id == UPSDevice.device_id))
         .where(Device.status == "offline")
     )
+    ups_offline_r = await db.execute(apply_site_scope(ups_offline_q, Device.site_id, context))
     ups_offline = ups_offline_r.scalar() or 0
 
-    ups_alarm_r = await db.execute(
+    ups_alarm_q = (
         select(func.count(UPSDevice.id))
         .select_from(UPSDevice.__table__.join(Device.__table__, Device.id == UPSDevice.device_id))
         .where(Device.status == "alarm")
     )
+    ups_alarm_r = await db.execute(apply_site_scope(ups_alarm_q, Device.site_id, context))
     ups_alarm = ups_alarm_r.scalar() or 0
 
     # 电池组统计
-    battery_total_r = await db.execute(select(func.count(BatteryGroup.id)))
+    battery_total_q = _scope_battery_query(select(func.count(BatteryGroup.id)), context)
+    battery_total_r = await db.execute(battery_total_q)
     battery_total = battery_total_r.scalar() or 0
 
     # 电池SOH/SOC — 从关联点位实时值获取
     battery_avg_soh = 0.0
     battery_lowest_soc = 0.0
 
-    soh_r = await db.execute(
+    soh_q = (
         select(func.avg(PointRealtime.value))
-        .select_from(PointRealtime.__table__.join(Point.__table__, PointRealtime.point_id == Point.id))
+        .select_from(
+            PointRealtime.__table__
+            .join(Point.__table__, PointRealtime.point_id == Point.id)
+            .join(Device.__table__, Point.device_id == Device.id)
+        )
         .where(Point.point_code.like("%_soh"))
     )
+    soh_r = await db.execute(apply_site_scope(soh_q, Device.site_id, context))
     soh_val = soh_r.scalar()
     if soh_val is not None:
         battery_avg_soh = round(float(soh_val), 1)
 
-    soc_r = await db.execute(
+    soc_q = (
         select(func.min(PointRealtime.value))
-        .select_from(PointRealtime.__table__.join(Point.__table__, PointRealtime.point_id == Point.id))
+        .select_from(
+            PointRealtime.__table__
+            .join(Point.__table__, PointRealtime.point_id == Point.id)
+            .join(Device.__table__, Point.device_id == Device.id)
+        )
         .where(Point.point_code.like("%_soc"))
     )
+    soc_r = await db.execute(apply_site_scope(soc_q, Device.site_id, context))
     soc_val = soc_r.scalar()
     if soc_val is not None:
         battery_lowest_soc = round(float(soc_val), 1)
 
     # 配电柜 / PDU 统计
-    cabinet_total_r = await db.execute(select(func.count(Device.id)).where(Device.device_type == "CABINET"))
+    cabinet_total_q = apply_site_scope(
+        select(func.count(Device.id)).where(Device.device_type == "CABINET"), Device.site_id, context
+    )
+    cabinet_total_r = await db.execute(cabinet_total_q)
     cabinet_total = cabinet_total_r.scalar() or 0
 
-    pdu_total_r = await db.execute(select(func.count(Device.id)).where(Device.device_type == "PDU"))
+    pdu_total_q = apply_site_scope(
+        select(func.count(Device.id)).where(Device.device_type == "PDU"), Device.site_id, context
+    )
+    pdu_total_r = await db.execute(pdu_total_q)
     pdu_total = pdu_total_r.scalar() or 0
 
     # 总负载 / 平均负载率 — 从UPS负载率点位获取
-    load_r = await db.execute(
+    load_q = (
         select(
             func.sum(PointRealtime.value),
             func.avg(PointRealtime.value),
         )
-        .select_from(PointRealtime.__table__.join(Point.__table__, PointRealtime.point_id == Point.id))
+        .select_from(
+            PointRealtime.__table__
+            .join(Point.__table__, PointRealtime.point_id == Point.id)
+            .join(Device.__table__, Point.device_id == Device.id)
+        )
         .where(
             or_(
                 Point.point_code.like("%_load_rate"),
@@ -110,6 +175,7 @@ async def get_power_overview(
             )
         )
     )
+    load_r = await db.execute(apply_site_scope(load_q, Device.site_id, context))
     load_row = load_r.first()
     total_load_kw = 0.0
     avg_load_rate = 0.0
@@ -117,9 +183,13 @@ async def get_power_overview(
         avg_load_rate = round(float(load_row[1]), 1)
 
     # total_load_kw 从 total_power 点位获取
-    power_r = await db.execute(
+    power_q = (
         select(func.sum(PointRealtime.value))
-        .select_from(PointRealtime.__table__.join(Point.__table__, PointRealtime.point_id == Point.id))
+        .select_from(
+            PointRealtime.__table__
+            .join(Point.__table__, PointRealtime.point_id == Point.id)
+            .join(Device.__table__, Point.device_id == Device.id)
+        )
         .where(
             or_(
                 Point.point_code.like("%_total_power"),
@@ -127,6 +197,7 @@ async def get_power_overview(
             )
         )
     )
+    power_r = await db.execute(apply_site_scope(power_q, Device.site_id, context))
     power_val = power_r.scalar()
     if power_val is not None:
         total_load_kw = round(float(power_val), 1)
@@ -156,17 +227,19 @@ async def list_ups_devices(
     ups_type: Optional[str] = Query(None, description="UPS类型"),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_viewer),
+    context: SiteAccessContext = Depends(get_site_access_context),
 ):
     """获取UPS设备列表（分页），关联 Device 表返回编码/名称/状态"""
     query = select(UPSDevice, Device).outerjoin(Device, Device.id == UPSDevice.device_id)
+    query = _scope_ups_query(query, context)
     if ups_type:
         query = query.where(UPSDevice.ups_type == ups_type)
 
-    count_q = select(func.count()).select_from(
-        select(UPSDevice.id).where(UPSDevice.ups_type == ups_type).subquery()
-        if ups_type
-        else select(UPSDevice.id).subquery()
-    )
+    count_source = select(UPSDevice.id)
+    if ups_type:
+        count_source = count_source.where(UPSDevice.ups_type == ups_type)
+    count_source = _scope_ups_query(count_source, context)
+    count_q = select(func.count()).select_from(count_source.subquery())
     total = (await db.execute(count_q)).scalar() or 0
 
     query = query.order_by(UPSDevice.id)
@@ -207,12 +280,10 @@ async def get_ups_device(
     ups_id: int,
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_viewer),
+    context: SiteAccessContext = Depends(get_site_access_context),
 ):
     """获取UPS设备详情，含关联点位实时值"""
-    result = await db.execute(select(UPSDevice).where(UPSDevice.id == ups_id))
-    ups = result.scalar_one_or_none()
-    if not ups:
-        raise HTTPException(status_code=404, detail="UPS设备不存在")
+    ups = await _get_authorized_ups(db, ups_id, context)
 
     # 获取关联Device
     dev_r = await db.execute(select(Device).where(Device.id == ups.device_id))
@@ -256,13 +327,11 @@ async def create_ups_device(
     data: UPSDeviceCreate,
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_operator),
+    context: SiteAccessContext = Depends(get_site_access_context),
 ):
     """创建UPS设备扩展记录"""
     # 校验device_id存在且类型为UPS
-    dev_r = await db.execute(select(Device).where(Device.id == data.device_id))
-    device = dev_r.scalar_one_or_none()
-    if not device:
-        raise HTTPException(status_code=400, detail="关联设备不存在")
+    await get_authorized_device(db, data.device_id, context)
 
     # 检查是否已有UPS扩展记录
     exist_r = await db.execute(select(UPSDevice).where(UPSDevice.device_id == data.device_id))
@@ -282,11 +351,10 @@ async def update_ups_device(
     data: UPSDeviceUpdate,
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_operator),
+    context: SiteAccessContext = Depends(get_site_access_context),
 ):
     """更新UPS设备扩展记录"""
-    result = await db.execute(select(UPSDevice).where(UPSDevice.id == ups_id))
-    if not result.scalar_one_or_none():
-        raise HTTPException(status_code=404, detail="UPS设备不存在")
+    await _get_authorized_ups(db, ups_id, context)
 
     update_data = data.model_dump(exclude_unset=True)
     update_data["updated_at"] = datetime.now()
@@ -302,11 +370,10 @@ async def delete_ups_device(
     ups_id: int,
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_admin),
+    context: SiteAccessContext = Depends(get_site_access_context),
 ):
     """删除UPS设备扩展记录"""
-    result = await db.execute(select(UPSDevice).where(UPSDevice.id == ups_id))
-    if not result.scalar_one_or_none():
-        raise HTTPException(status_code=404, detail="UPS设备不存在")
+    await _get_authorized_ups(db, ups_id, context)
 
     # 先删除关联电池组
     await db.execute(delete(BatteryGroup).where(BatteryGroup.ups_device_id == ups_id))
@@ -326,13 +393,16 @@ async def list_battery_groups(
     battery_type: Optional[str] = Query(None, description="电池类型"),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_viewer),
+    context: SiteAccessContext = Depends(get_site_access_context),
 ):
     """获取电池组列表（分页）"""
     query = select(BatteryGroup)
     if ups_device_id is not None:
+        await _get_authorized_ups(db, ups_device_id, context)
         query = query.where(BatteryGroup.ups_device_id == ups_device_id)
     if battery_type:
         query = query.where(BatteryGroup.battery_type == battery_type)
+    query = _scope_battery_query(query, context)
 
     count_q = select(func.count()).select_from(query.subquery())
     total = (await db.execute(count_q)).scalar() or 0
@@ -355,12 +425,10 @@ async def get_battery_group(
     bg_id: int,
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_viewer),
+    context: SiteAccessContext = Depends(get_site_access_context),
 ):
     """获取电池组详情，含关联点位实时值"""
-    result = await db.execute(select(BatteryGroup).where(BatteryGroup.id == bg_id))
-    bg = result.scalar_one_or_none()
-    if not bg:
-        raise HTTPException(status_code=404, detail="电池组不存在")
+    bg = await _get_authorized_battery(db, bg_id, context)
 
     # 获取关联UPS的device_id，再查点位
     ups_r = await db.execute(select(UPSDevice).where(UPSDevice.id == bg.ups_device_id))
@@ -403,12 +471,11 @@ async def create_battery_group(
     data: BatteryGroupCreate,
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_operator),
+    context: SiteAccessContext = Depends(get_site_access_context),
 ):
     """创建电池组"""
     # 校验UPS设备存在
-    ups_r = await db.execute(select(UPSDevice).where(UPSDevice.id == data.ups_device_id))
-    if not ups_r.scalar_one_or_none():
-        raise HTTPException(status_code=400, detail="关联UPS设备不存在")
+    await _get_authorized_ups(db, data.ups_device_id, context)
 
     bg = BatteryGroup(**data.model_dump())
     db.add(bg)
@@ -423,11 +490,10 @@ async def update_battery_group(
     data: BatteryGroupUpdate,
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_operator),
+    context: SiteAccessContext = Depends(get_site_access_context),
 ):
     """更新电池组"""
-    result = await db.execute(select(BatteryGroup).where(BatteryGroup.id == bg_id))
-    if not result.scalar_one_or_none():
-        raise HTTPException(status_code=404, detail="电池组不存在")
+    await _get_authorized_battery(db, bg_id, context)
 
     update_data = data.model_dump(exclude_unset=True)
     update_data["updated_at"] = datetime.now()
@@ -443,11 +509,10 @@ async def delete_battery_group(
     bg_id: int,
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_admin),
+    context: SiteAccessContext = Depends(get_site_access_context),
 ):
     """删除电池组"""
-    result = await db.execute(select(BatteryGroup).where(BatteryGroup.id == bg_id))
-    if not result.scalar_one_or_none():
-        raise HTTPException(status_code=404, detail="电池组不存在")
+    await _get_authorized_battery(db, bg_id, context)
 
     await db.execute(delete(BatteryGroup).where(BatteryGroup.id == bg_id))
     await db.commit()
@@ -463,9 +528,11 @@ async def list_cabinets(
     page_size: int = Query(20, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_viewer),
+    context: SiteAccessContext = Depends(get_site_access_context),
 ):
     """获取配电柜列表（device_type=CABINET），含聚合点位数据"""
     query = select(Device).where(Device.device_type == "CABINET")
+    query = apply_site_scope(query, Device.site_id, context)
 
     count_q = select(func.count()).select_from(query.subquery())
     total = (await db.execute(count_q)).scalar() or 0
@@ -504,9 +571,12 @@ async def get_cabinet_branches(
     device_id: int,
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_viewer),
+    context: SiteAccessContext = Depends(get_site_access_context),
 ):
     """获取配电柜的支路/回路信息（从 distribution_circuits 表查询）"""
     from ...models.energy import DistributionPanel, DistributionCircuit
+
+    dev = await get_authorized_device(db, device_id, context)
 
     # 通过 device_id 找到对应的 DistributionPanel
     panel_r = await db.execute(select(DistributionPanel).where(DistributionPanel.device_id == device_id))
@@ -514,13 +584,8 @@ async def get_cabinet_branches(
 
     if not panel:
         # 也尝试通过 device_code 匹配
-        dev_r = await db.execute(select(Device).where(Device.id == device_id))
-        dev = dev_r.scalar_one_or_none()
-        if dev:
-            panel_r2 = await db.execute(
-                select(DistributionPanel).where(DistributionPanel.panel_code == dev.device_code)
-            )
-            panel = panel_r2.scalar_one_or_none()
+        panel_r2 = await db.execute(select(DistributionPanel).where(DistributionPanel.panel_code == dev.device_code))
+        panel = panel_r2.scalar_one_or_none()
 
     if not panel:
         return {"branches": [], "panel_id": None}
@@ -562,9 +627,11 @@ async def list_pdus(
     page_size: int = Query(20, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_viewer),
+    context: SiteAccessContext = Depends(get_site_access_context),
 ):
     """获取PDU列表（device_type=PDU），含聚合点位数据"""
     query = select(Device).where(Device.device_type == "PDU")
+    query = apply_site_scope(query, Device.site_id, context)
 
     count_q = select(func.count()).select_from(query.subquery())
     total = (await db.execute(count_q)).scalar() or 0

@@ -6,7 +6,17 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, update, delete
 
-from ..deps import get_db, require_viewer, require_operator, require_admin, get_user_site_ids
+from ..deps import (
+    SiteAccessContext,
+    apply_site_scope,
+    get_db,
+    get_site_access_context,
+    get_user_site_ids,
+    require_admin,
+    require_context_site_access,
+    require_operator,
+    require_viewer,
+)
 from ...models.user import User
 from ...models.gateway import Gateway, DataSource, DataSourcePoint, GatewayEvent, ConfigPushRecord
 from ...schemas.gateway import (
@@ -23,6 +33,18 @@ from ...schemas.gateway import (
 from ...schemas.common import PageResponse
 
 router = APIRouter()
+
+
+def _gateway_scope(query, context: SiteAccessContext):
+    return apply_site_scope(query, Gateway.site_id, context)
+
+
+async def _authorized_gateway(db: AsyncSession, gateway_id: int, context: SiteAccessContext) -> Gateway:
+    result = await db.execute(_gateway_scope(select(Gateway).where(Gateway.id == gateway_id), context))
+    gateway = result.scalar_one_or_none()
+    if gateway is None:
+        raise HTTPException(status_code=404, detail="网关不存在")
+    return gateway
 
 
 @router.get("", response_model=PageResponse[GatewayResponse], summary="获取网关列表")
@@ -74,7 +96,9 @@ async def create_gateway(
     data: GatewayCreate,
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_operator),
+    site_context: SiteAccessContext = Depends(get_site_access_context),
 ):
+    require_context_site_access(data.site_id, site_context)
     # 检查 gateway_id 唯一性
     result = await db.execute(select(Gateway).where(Gateway.gateway_id == data.gateway_id))
     if result.scalar_one_or_none():
@@ -114,11 +138,9 @@ async def get_gateway(
     gateway_id: int,
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_viewer),
+    site_context: SiteAccessContext = Depends(get_site_access_context),
 ):
-    result = await db.execute(select(Gateway).where(Gateway.id == gateway_id))
-    obj = result.scalar_one_or_none()
-    if not obj:
-        raise HTTPException(status_code=404, detail="网关不存在")
+    obj = await _authorized_gateway(db, gateway_id, site_context)
 
     # 查询关联数据源数量
     ds_count_result = await db.execute(
@@ -151,12 +173,10 @@ async def gateway_events(
     event_type: Optional[str] = Query(None, description="事件类型筛选"),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_viewer),
+    site_context: SiteAccessContext = Depends(get_site_access_context),
 ):
     # 先查 Gateway 获取 gateway_id 字符串
-    gw_result = await db.execute(select(Gateway).where(Gateway.id == gateway_id))
-    gw = gw_result.scalar_one_or_none()
-    if not gw:
-        raise HTTPException(status_code=404, detail="网关不存在")
+    gw = await _authorized_gateway(db, gateway_id, site_context)
 
     query = select(GatewayEvent).where(GatewayEvent.gateway_id == gw.gateway_id)
     if event_type:
@@ -183,12 +203,11 @@ async def push_config(
     gateway_id: int,
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_operator),
+    site_context: SiteAccessContext = Depends(get_site_access_context),
 ):
     """构建并下发采集配置到指定网关"""
     # 验证网关存在
-    gw_result = await db.execute(select(Gateway).where(Gateway.id == gateway_id))
-    if not gw_result.scalar_one_or_none():
-        raise HTTPException(status_code=404, detail="网关不存在")
+    await _authorized_gateway(db, gateway_id, site_context)
 
     from ...mqtt import mqtt_service
     from ...services.config_push import push_config_to_gateway
@@ -217,12 +236,10 @@ async def config_history(
     page_size: int = Query(20, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_viewer),
+    site_context: SiteAccessContext = Depends(get_site_access_context),
 ):
     """查询网关配置下发历史"""
-    gw_result = await db.execute(select(Gateway).where(Gateway.id == gateway_id))
-    gw = gw_result.scalar_one_or_none()
-    if not gw:
-        raise HTTPException(status_code=404, detail="网关不存在")
+    gw = await _authorized_gateway(db, gateway_id, site_context)
 
     query = select(ConfigPushRecord).where(ConfigPushRecord.gateway_id == gw.gateway_id)
 
@@ -248,11 +265,9 @@ async def update_gateway(
     data: GatewayUpdate,
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_operator),
+    site_context: SiteAccessContext = Depends(get_site_access_context),
 ):
-    result = await db.execute(select(Gateway).where(Gateway.id == gateway_id))
-    obj = result.scalar_one_or_none()
-    if not obj:
-        raise HTTPException(status_code=404, detail="网关不存在")
+    await _authorized_gateway(db, gateway_id, site_context)
 
     update_data = data.model_dump(exclude_unset=True)
     update_data["updated_at"] = datetime.now()
@@ -271,15 +286,13 @@ async def assign_gateway_site(
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_admin),
     user_site_ids: Optional[list[int]] = Depends(get_user_site_ids),
+    site_context: SiteAccessContext = Depends(get_site_access_context),
 ):
     """将网关分配到指定站点（仅管理员）"""
     from ...models.spatial import Site
 
     # 验证网关存在
-    result = await db.execute(select(Gateway).where(Gateway.id == gateway_id))
-    obj = result.scalar_one_or_none()
-    if not obj:
-        raise HTTPException(status_code=404, detail="网关不存在")
+    await _authorized_gateway(db, gateway_id, site_context)
 
     # 验证目标站点存在
     site_result = await db.execute(select(Site).where(Site.id == data.site_id))
@@ -289,6 +302,7 @@ async def assign_gateway_site(
     # 验证用户有目标站点的访问权限
     if user_site_ids is not None and data.site_id not in user_site_ids:
         raise HTTPException(status_code=403, detail="无目标站点访问权限")
+    require_context_site_access(data.site_id, site_context)
 
     await db.execute(
         update(Gateway).where(Gateway.id == gateway_id).values(site_id=data.site_id, updated_at=datetime.now())
@@ -305,11 +319,9 @@ async def delete_gateway(
     gateway_id: int,
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_admin),
+    site_context: SiteAccessContext = Depends(get_site_access_context),
 ):
-    result = await db.execute(select(Gateway).where(Gateway.id == gateway_id))
-    obj = result.scalar_one_or_none()
-    if not obj:
-        raise HTTPException(status_code=404, detail="网关不存在")
+    await _authorized_gateway(db, gateway_id, site_context)
 
     await db.execute(delete(Gateway).where(Gateway.id == gateway_id))
     await db.commit()

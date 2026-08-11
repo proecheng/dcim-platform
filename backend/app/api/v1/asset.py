@@ -8,11 +8,23 @@ from io import BytesIO
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, and_, or_
+from sqlalchemy.orm import selectinload
 from starlette.responses import StreamingResponse
 from pydantic import BaseModel as PydanticBaseModel
 import openpyxl
 
-from ..deps import get_db, require_viewer, require_operator
+from ..deps import (
+    SiteAccessContext,
+    apply_asset_site_scope,
+    apply_cabinet_site_scope,
+    get_authorized_asset,
+    get_authorized_cabinet,
+    get_authorized_row,
+    get_db,
+    get_site_access_context,
+    require_operator,
+    require_viewer,
+)
 from ...models.user import User
 from ...models.asset import (
     Asset,
@@ -160,11 +172,12 @@ async def get_cabinets(
     limit: int = Query(100, ge=1, le=1000, description="返回记录数"),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_viewer),
+    context: SiteAccessContext = Depends(get_site_access_context),
 ):
     """
     获取机柜列表（分页）
     """
-    query = select(Cabinet).offset(skip).limit(limit)
+    query = apply_cabinet_site_scope(select(Cabinet), Cabinet.id, context).offset(skip).limit(limit)
     result = await db.execute(query)
     cabinets = result.scalars().all()
 
@@ -186,15 +199,16 @@ async def get_cabinets(
 
 
 @router.get("/cabinets/{cabinet_id}", response_model=CabinetResponse, summary="获取机柜详情")
-async def get_cabinet(cabinet_id: int, db: AsyncSession = Depends(get_db), _: User = Depends(require_viewer)):
+async def get_cabinet(
+    cabinet_id: int,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_viewer),
+    context: SiteAccessContext = Depends(get_site_access_context),
+):
     """
     根据ID获取机柜详情
     """
-    result = await db.execute(select(Cabinet).where(Cabinet.id == cabinet_id))
-    cabinet = result.scalar_one_or_none()
-
-    if not cabinet:
-        raise HTTPException(status_code=404, detail="机柜不存在")
+    cabinet = await get_authorized_cabinet(db, cabinet_id, context)
 
     # 计算已使用U数
     used_u_result = await db.execute(
@@ -211,16 +225,15 @@ async def get_cabinet(cabinet_id: int, db: AsyncSession = Depends(get_db), _: Us
 
 @router.get("/cabinets/{cabinet_id}/usage", summary="获取机柜U位使用情况")
 async def get_cabinet_usage(
-    cabinet_id: int, db: AsyncSession = Depends(get_db), _: User = Depends(require_viewer)
+    cabinet_id: int,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_viewer),
+    context: SiteAccessContext = Depends(get_site_access_context),
 ) -> Dict[str, Any]:
     """
     获取机柜U位使用情况，包含U位映射表
     """
-    result = await db.execute(select(Cabinet).where(Cabinet.id == cabinet_id))
-    cabinet = result.scalar_one_or_none()
-
-    if not cabinet:
-        raise HTTPException(status_code=404, detail="机柜不存在")
+    cabinet = await get_authorized_cabinet(db, cabinet_id, context)
 
     total_u = cabinet.total_u or 42
 
@@ -290,21 +303,16 @@ async def move_asset_in_cabinet(
     data: MoveAssetRequest,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_operator),
+    context: SiteAccessContext = Depends(get_site_access_context),
 ):
     """在同一机柜内移动资产到新的U位位置"""
     # 1. 校验机柜存在
-    cab_result = await db.execute(select(Cabinet).where(Cabinet.id == cabinet_id))
-    cabinet = cab_result.scalar_one_or_none()
-    if not cabinet:
-        raise HTTPException(status_code=404, detail="机柜不存在")
+    cabinet = await get_authorized_cabinet(db, cabinet_id, context)
 
     total_u = cabinet.total_u or 42
 
     # 2. 校验资产存在且属于该机柜
-    asset_result = await db.execute(select(Asset).where(Asset.id == data.asset_id))
-    asset = asset_result.scalar_one_or_none()
-    if not asset:
-        raise HTTPException(status_code=404, detail="资产不存在")
+    asset = await get_authorized_asset(db, data.asset_id, context)
     if asset.cabinet_id != cabinet_id:
         raise HTTPException(status_code=400, detail="资产不属于该机柜")
 
@@ -341,11 +349,16 @@ async def move_asset_in_cabinet(
     await db.commit()
 
     # 7. 返回更新后的 usage 数据
-    return await get_cabinet_usage(cabinet_id, db, current_user)
+    return await get_cabinet_usage(cabinet_id, db, current_user, context)
 
 
 @router.post("/cabinets", response_model=CabinetResponse, summary="创建机柜")
-async def create_cabinet(data: CabinetCreate, db: AsyncSession = Depends(get_db), _: User = Depends(require_operator)):
+async def create_cabinet(
+    data: CabinetCreate,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_operator),
+    context: SiteAccessContext = Depends(get_site_access_context),
+):
     """
     创建新机柜
     """
@@ -353,6 +366,12 @@ async def create_cabinet(data: CabinetCreate, db: AsyncSession = Depends(get_db)
     existing = await db.execute(select(Cabinet).where(Cabinet.cabinet_code == data.cabinet_code))
     if existing.scalar_one_or_none():
         raise HTTPException(status_code=400, detail="机柜编码已存在")
+
+    if data.row_id is None:
+        if context.site_ids is not None:
+            raise HTTPException(status_code=403, detail="机柜必须关联授权空间")
+    else:
+        await get_authorized_row(db, data.row_id, context)
 
     cabinet = Cabinet(**data.model_dump())
     db.add(cabinet)
@@ -368,19 +387,25 @@ async def create_cabinet(data: CabinetCreate, db: AsyncSession = Depends(get_db)
 
 @router.put("/cabinets/{cabinet_id}", response_model=CabinetResponse, summary="更新机柜")
 async def update_cabinet(
-    cabinet_id: int, data: CabinetUpdate, db: AsyncSession = Depends(get_db), _: User = Depends(require_operator)
+    cabinet_id: int,
+    data: CabinetUpdate,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_operator),
+    context: SiteAccessContext = Depends(get_site_access_context),
 ):
     """
     更新机柜信息
     """
-    result = await db.execute(select(Cabinet).where(Cabinet.id == cabinet_id))
-    cabinet = result.scalar_one_or_none()
-
-    if not cabinet:
-        raise HTTPException(status_code=404, detail="机柜不存在")
+    cabinet = await get_authorized_cabinet(db, cabinet_id, context)
 
     # 如果更新编码，检查是否已存在
     update_data = data.model_dump(exclude_unset=True)
+    if "row_id" in update_data:
+        if update_data["row_id"] is None:
+            if context.site_ids is not None:
+                raise HTTPException(status_code=403, detail="机柜必须关联授权空间")
+        else:
+            await get_authorized_row(db, update_data["row_id"], context)
     if "cabinet_code" in update_data and update_data["cabinet_code"] != cabinet.cabinet_code:
         existing = await db.execute(select(Cabinet).where(Cabinet.cabinet_code == update_data["cabinet_code"]))
         if existing.scalar_one_or_none():
@@ -408,15 +433,16 @@ async def update_cabinet(
 
 
 @router.delete("/cabinets/{cabinet_id}", summary="删除机柜")
-async def delete_cabinet(cabinet_id: int, db: AsyncSession = Depends(get_db), _: User = Depends(require_operator)):
+async def delete_cabinet(
+    cabinet_id: int,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_operator),
+    context: SiteAccessContext = Depends(get_site_access_context),
+):
     """
     删除机柜（如果有关联资产则不允许删除）
     """
-    result = await db.execute(select(Cabinet).where(Cabinet.id == cabinet_id))
-    cabinet = result.scalar_one_or_none()
-
-    if not cabinet:
-        raise HTTPException(status_code=404, detail="机柜不存在")
+    cabinet = await get_authorized_cabinet(db, cabinet_id, context)
 
     # 检查是否有关联资产
     asset_count_result = await db.execute(select(func.count(Asset.id)).where(Asset.cabinet_id == cabinet_id))
@@ -444,11 +470,12 @@ async def get_assets(
     keyword: Optional[str] = Query(None, description="关键词(资产编码、名称、品牌、型号)"),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_viewer),
+    context: SiteAccessContext = Depends(get_site_access_context),
 ):
     """
     获取资产列表（多条件筛选、分页）
     """
-    query = select(Asset)
+    query = apply_asset_site_scope(select(Asset), Asset.id, context)
 
     conditions = []
     if asset_type:
@@ -456,6 +483,7 @@ async def get_assets(
     if status:
         conditions.append(Asset.status == status)
     if cabinet_id:
+        await get_authorized_cabinet(db, cabinet_id, context)
         conditions.append(Asset.cabinet_id == cabinet_id)
     if keyword:
         keyword_filter = or_(
@@ -498,6 +526,7 @@ async def import_assets(
     mode: str = Query("preview", description="模式: preview(预校验) / confirm(确认导入)"),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_operator),
+    context: SiteAccessContext = Depends(get_site_access_context),
 ):
     """批量导入资产（预校验 / 确认导入）"""
     # 读取 Excel
@@ -528,7 +557,8 @@ async def import_assets(
     existing_codes = {r[0] for r in existing_codes_result.all()}
 
     # 预加载所有机柜 code -> id 映射
-    cabinet_result = await db.execute(select(Cabinet))
+    cabinet_query = apply_cabinet_site_scope(select(Cabinet), Cabinet.id, context)
+    cabinet_result = await db.execute(cabinet_query)
     cabinets = cabinet_result.scalars().all()
     cabinet_map = {c.cabinet_code: c for c in cabinets}
 
@@ -705,6 +735,7 @@ async def export_assets(
     template: bool = Query(False, description="是否只下载空模板"),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_viewer),
+    context: SiteAccessContext = Depends(get_site_access_context),
 ):
     """导出资产列表为 Excel，template=true 时只返回表头"""
     wb = openpyxl.Workbook()
@@ -716,7 +747,7 @@ async def export_assets(
     ws.append(headers)
 
     if not template:
-        query = select(Asset)
+        query = apply_asset_site_scope(select(Asset), Asset.id, context)
 
         conditions = []
         if asset_type:
@@ -724,6 +755,7 @@ async def export_assets(
         if status:
             conditions.append(Asset.status == status)
         if cabinet_id:
+            await get_authorized_cabinet(db, cabinet_id, context)
             conditions.append(Asset.cabinet_id == cabinet_id)
         if keyword:
             keyword_filter = or_(
@@ -742,7 +774,8 @@ async def export_assets(
         assets = result.scalars().all()
 
         # 预加载机柜映射
-        cab_result = await db.execute(select(Cabinet))
+        cabinet_query = apply_cabinet_site_scope(select(Cabinet), Cabinet.id, context)
+        cab_result = await db.execute(cabinet_query)
         cab_map = {c.id: c.cabinet_code for c in cab_result.scalars().all()}
 
         # 资产类型反向映射
@@ -789,15 +822,16 @@ async def export_assets(
 
 
 @router.get("/assets/{asset_id}", response_model=AssetResponse, summary="获取资产详情")
-async def get_asset(asset_id: int, db: AsyncSession = Depends(get_db), _: User = Depends(require_viewer)):
+async def get_asset(
+    asset_id: int,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_viewer),
+    context: SiteAccessContext = Depends(get_site_access_context),
+):
     """
     根据ID获取资产详情
     """
-    result = await db.execute(select(Asset).where(Asset.id == asset_id))
-    asset = result.scalar_one_or_none()
-
-    if not asset:
-        raise HTTPException(status_code=404, detail="资产不存在")
+    asset = await get_authorized_asset(db, asset_id, context)
 
     asset_data = AssetResponse.model_validate(asset)
 
@@ -816,7 +850,10 @@ async def get_asset(asset_id: int, db: AsyncSession = Depends(get_db), _: User =
 
 @router.post("/assets", response_model=AssetResponse, summary="创建资产")
 async def create_asset(
-    data: AssetCreate, db: AsyncSession = Depends(get_db), current_user: User = Depends(require_operator)
+    data: AssetCreate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_operator),
+    context: SiteAccessContext = Depends(get_site_access_context),
 ):
     """
     创建新资产
@@ -829,11 +866,10 @@ async def create_asset(
     # 如果指定了机柜，检查机柜是否存在
     cabinet_name = None
     if data.cabinet_id:
-        cabinet_result = await db.execute(select(Cabinet).where(Cabinet.id == data.cabinet_id))
-        cabinet = cabinet_result.scalar_one_or_none()
-        if not cabinet:
-            raise HTTPException(status_code=400, detail="指定的机柜不存在")
+        cabinet = await get_authorized_cabinet(db, data.cabinet_id, context)
         cabinet_name = cabinet.cabinet_name
+    elif context.site_ids is not None:
+        raise HTTPException(status_code=403, detail="资产必须关联授权机柜")
 
     # U 位冲突校验
     if data.cabinet_id and data.u_position and data.u_height:
@@ -872,18 +908,24 @@ async def create_asset(
 
 @router.put("/assets/{asset_id}", response_model=AssetResponse, summary="更新资产")
 async def update_asset(
-    asset_id: int, data: AssetUpdate, db: AsyncSession = Depends(get_db), current_user: User = Depends(require_operator)
+    asset_id: int,
+    data: AssetUpdate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_operator),
+    context: SiteAccessContext = Depends(get_site_access_context),
 ):
     """
     更新资产信息
     """
-    result = await db.execute(select(Asset).where(Asset.id == asset_id))
-    asset = result.scalar_one_or_none()
-
-    if not asset:
-        raise HTTPException(status_code=404, detail="资产不存在")
+    asset = await get_authorized_asset(db, asset_id, context)
 
     update_data = data.model_dump(exclude_unset=True)
+    if "cabinet_id" in update_data:
+        if update_data["cabinet_id"] is None:
+            if context.site_ids is not None:
+                raise HTTPException(status_code=403, detail="资产必须关联授权机柜")
+        else:
+            await get_authorized_cabinet(db, update_data["cabinet_id"], context)
 
     # 如果更新编码，检查是否已存在
     if "asset_code" in update_data and update_data["asset_code"] != asset.asset_code:
@@ -1001,15 +1043,16 @@ async def update_asset(
 
 
 @router.delete("/assets/{asset_id}", summary="删除资产")
-async def delete_asset(asset_id: int, db: AsyncSession = Depends(get_db), _: User = Depends(require_operator)):
+async def delete_asset(
+    asset_id: int,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_operator),
+    context: SiteAccessContext = Depends(get_site_access_context),
+):
     """
     删除资产及其关联记录
     """
-    result = await db.execute(select(Asset).where(Asset.id == asset_id))
-    asset = result.scalar_one_or_none()
-
-    if not asset:
-        raise HTTPException(status_code=404, detail="资产不存在")
+    asset = await get_authorized_asset(db, asset_id, context)
 
     # 删除关联的生命周期记录
     await db.execute(select(AssetLifecycle).where(AssetLifecycle.asset_id == asset_id))
@@ -1028,14 +1071,17 @@ async def delete_asset(asset_id: int, db: AsyncSession = Depends(get_db), _: Use
 
 
 @router.get("/assets/{asset_id}/lifecycle", response_model=List[LifecycleResponse], summary="获取资产生命周期记录")
-async def get_asset_lifecycle(asset_id: int, db: AsyncSession = Depends(get_db), _: User = Depends(require_viewer)):
+async def get_asset_lifecycle(
+    asset_id: int,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_viewer),
+    context: SiteAccessContext = Depends(get_site_access_context),
+):
     """
     获取指定资产的生命周期记录
     """
     # 检查资产是否存在
-    asset_result = await db.execute(select(Asset).where(Asset.id == asset_id))
-    if not asset_result.scalar_one_or_none():
-        raise HTTPException(status_code=404, detail="资产不存在")
+    await get_authorized_asset(db, asset_id, context)
 
     result = await db.execute(
         select(AssetLifecycle).where(AssetLifecycle.asset_id == asset_id).order_by(AssetLifecycle.action_date.desc())
@@ -1050,17 +1096,16 @@ async def get_asset_lifecycle(asset_id: int, db: AsyncSession = Depends(get_db),
 
 @router.post("/maintenance", response_model=MaintenanceResponse, summary="创建维护记录")
 async def create_maintenance(
-    data: MaintenanceCreate, db: AsyncSession = Depends(get_db), current_user: User = Depends(require_operator)
+    data: MaintenanceCreate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_operator),
+    context: SiteAccessContext = Depends(get_site_access_context),
 ):
     """
     创建维护记录并更新资产状态
     """
     # 检查资产是否存在
-    asset_result = await db.execute(select(Asset).where(Asset.id == data.asset_id))
-    asset = asset_result.scalar_one_or_none()
-
-    if not asset:
-        raise HTTPException(status_code=404, detail="资产不存在")
+    asset = await get_authorized_asset(db, data.asset_id, context)
 
     # 创建维护记录
     record = MaintenanceRecord(**data.model_dump())
@@ -1095,11 +1140,17 @@ async def complete_maintenance(
     result: Optional[str] = Query(None, description="维护结果"),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_operator),
+    context: SiteAccessContext = Depends(get_site_access_context),
 ):
     """
     完成维护并恢复资产状态
     """
-    record_result = await db.execute(select(MaintenanceRecord).where(MaintenanceRecord.id == record_id))
+    record_query = apply_asset_site_scope(
+        select(MaintenanceRecord).where(MaintenanceRecord.id == record_id),
+        MaintenanceRecord.asset_id,
+        context,
+    )
+    record_result = await db.execute(record_query)
     record = record_result.scalar_one_or_none()
 
     if not record:
@@ -1144,13 +1195,15 @@ async def get_maintenance_records(
     asset_id: Optional[int] = Query(None, description="资产ID"),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_viewer),
+    context: SiteAccessContext = Depends(get_site_access_context),
 ):
     """
     获取维护记录列表（可按资产ID筛选）
     """
-    query = select(MaintenanceRecord)
+    query = apply_asset_site_scope(select(MaintenanceRecord), MaintenanceRecord.asset_id, context)
 
     if asset_id:
+        await get_authorized_asset(db, asset_id, context)
         query = query.where(MaintenanceRecord.asset_id == asset_id)
 
     query = query.order_by(MaintenanceRecord.start_time.desc()).offset(skip).limit(limit)
@@ -1205,7 +1258,7 @@ async def create_inventory(
 
     # 更新统计信息
     await _update_inventory_stats(db, inventory.id)
-    await db.refresh(inventory)
+    await db.refresh(inventory, ["items"])
 
     return InventoryResponse.model_validate(inventory)
 
@@ -1220,7 +1273,13 @@ async def get_inventory_list(
     """
     获取资产盘点列表
     """
-    query = select(AssetInventory).order_by(AssetInventory.created_at.desc()).offset(skip).limit(limit)
+    query = (
+        select(AssetInventory)
+        .options(selectinload(AssetInventory.items))
+        .order_by(AssetInventory.created_at.desc())
+        .offset(skip)
+        .limit(limit)
+    )
 
     result = await db.execute(query)
     inventories = result.scalars().all()
@@ -1278,42 +1337,62 @@ async def update_inventory_item(
 
 
 @router.get("/statistics", response_model=AssetStatistics, summary="获取资产统计信息")
-async def get_statistics(db: AsyncSession = Depends(get_db), _: User = Depends(require_viewer)):
+async def get_statistics(
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_viewer),
+    context: SiteAccessContext = Depends(get_site_access_context),
+):
     """
     获取资产统计信息
     """
     # 资产总数
-    total_result = await db.execute(select(func.count(Asset.id)))
+    total_query = apply_asset_site_scope(select(func.count(Asset.id)), Asset.id, context)
+    total_result = await db.execute(total_query)
     total_count = total_result.scalar() or 0
 
     # 按状态统计
-    status_result = await db.execute(select(Asset.status, func.count(Asset.id)).group_by(Asset.status))
+    status_query = apply_asset_site_scope(
+        select(Asset.status, func.count(Asset.id)).group_by(Asset.status), Asset.id, context
+    )
+    status_result = await db.execute(status_query)
     by_status = {status.value if status else "unknown": count for status, count in status_result.all()}
 
     # 按类型统计
-    type_result = await db.execute(select(Asset.asset_type, func.count(Asset.id)).group_by(Asset.asset_type))
+    type_query = apply_asset_site_scope(
+        select(Asset.asset_type, func.count(Asset.id)).group_by(Asset.asset_type), Asset.id, context
+    )
+    type_result = await db.execute(type_query)
     by_type = {asset_type.value if asset_type else "unknown": count for asset_type, count in type_result.all()}
 
     # 按部门统计
-    dept_result = await db.execute(
-        select(Asset.department, func.count(Asset.id)).where(Asset.department.isnot(None)).group_by(Asset.department)
+    department_query = apply_asset_site_scope(
+        select(Asset.department, func.count(Asset.id))
+        .where(Asset.department.isnot(None))
+        .group_by(Asset.department),
+        Asset.id,
+        context,
     )
+    dept_result = await db.execute(department_query)
     by_department = {dept or "未分配": count for dept, count in dept_result.all()}
 
     # 资产总价值
-    value_result = await db.execute(select(func.sum(Asset.purchase_price)))
+    value_query = apply_asset_site_scope(select(func.sum(Asset.purchase_price)), Asset.id, context)
+    value_result = await db.execute(value_query)
     total_value = value_result.scalar() or 0
 
     # 保修即将到期数量（30天内）
     expiring_date = date.today() + timedelta(days=30)
-    expiring_result = await db.execute(
+    expiring_query = apply_asset_site_scope(
         select(func.count(Asset.id)).where(
             Asset.warranty_end.isnot(None),
             Asset.warranty_end <= expiring_date,
             Asset.warranty_end >= date.today(),
             Asset.status != AssetStatus.scrapped,
-        )
+        ),
+        Asset.id,
+        context,
     )
+    expiring_result = await db.execute(expiring_query)
     warranty_expiring_count = expiring_result.scalar() or 0
 
     return AssetStatistics(
@@ -1327,10 +1406,14 @@ async def get_statistics(db: AsyncSession = Depends(get_db), _: User = Depends(r
 
 
 @router.get("/warranty-alerts", response_model=WarrantyAlertResponse, summary="获取保修预警汇总")
-async def get_warranty_alerts(db: AsyncSession = Depends(get_db), _: User = Depends(require_viewer)):
+async def get_warranty_alerts(
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_viewer),
+    context: SiteAccessContext = Depends(get_site_access_context),
+):
     """返回 30/60/90 天三个阈值的过保预警资产列表"""
     today = date.today()
-    result = await db.execute(
+    query = apply_asset_site_scope(
         select(Asset)
         .where(
             Asset.warranty_end.isnot(None),
@@ -1338,8 +1421,11 @@ async def get_warranty_alerts(db: AsyncSession = Depends(get_db), _: User = Depe
             Asset.warranty_end <= today + timedelta(days=90),
             Asset.status != AssetStatus.scrapped,
         )
-        .order_by(Asset.warranty_end.asc())
+        .order_by(Asset.warranty_end.asc()),
+        Asset.id,
+        context,
     )
+    result = await db.execute(query)
     assets = result.scalars().all()
 
     alerts_30, alerts_60, alerts_90 = [], [], []
@@ -1374,13 +1460,14 @@ async def get_warranty_expiring_assets(
     days: int = Query(30, ge=1, le=365, description="天数范围"),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_viewer),
+    context: SiteAccessContext = Depends(get_site_access_context),
 ):
     """
     获取保修即将到期的资产
     """
     expiring_date = date.today() + timedelta(days=days)
 
-    result = await db.execute(
+    query = apply_asset_site_scope(
         select(Asset)
         .where(
             Asset.warranty_end.isnot(None),
@@ -1388,8 +1475,11 @@ async def get_warranty_expiring_assets(
             Asset.warranty_end >= date.today(),
             Asset.status != AssetStatus.scrapped,
         )
-        .order_by(Asset.warranty_end.asc())
+        .order_by(Asset.warranty_end.asc()),
+        Asset.id,
+        context,
     )
+    result = await db.execute(query)
     assets = result.scalars().all()
 
     asset_list = []

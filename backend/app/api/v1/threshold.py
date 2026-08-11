@@ -8,7 +8,15 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, update, delete
 
-from ..deps import get_db, require_viewer, require_operator
+from ..deps import (
+    SiteAccessContext,
+    apply_point_site_scope,
+    get_authorized_point,
+    get_db,
+    get_site_access_context,
+    require_operator,
+    require_viewer,
+)
 from ...models.user import User
 from ...models.alarm import AlarmThreshold
 from ...models.point import Point
@@ -35,6 +43,34 @@ def _increment_version():
 router = APIRouter()
 
 
+def _threshold_scope(query, context: SiteAccessContext):
+    return apply_point_site_scope(query, AlarmThreshold.point_id, context)
+
+
+async def _authorized_threshold(
+    db: AsyncSession, threshold_id: int, context: SiteAccessContext
+) -> AlarmThreshold:
+    result = await db.execute(_threshold_scope(select(AlarmThreshold).where(AlarmThreshold.id == threshold_id), context))
+    threshold = result.scalar_one_or_none()
+    if threshold is None:
+        raise HTTPException(status_code=404, detail="阈值配置不存在")
+    return threshold
+
+
+async def _authorized_points(
+    db: AsyncSession, point_ids: List[int], context: SiteAccessContext
+) -> dict[int, Point]:
+    requested_ids = set(point_ids)
+    if not requested_ids:
+        return {}
+    query = apply_point_site_scope(select(Point).where(Point.id.in_(requested_ids)), Point.id, context)
+    points = (await db.execute(query)).scalars().all()
+    point_map = {point.id: point for point in points}
+    if set(point_map) != requested_ids:
+        raise HTTPException(status_code=404, detail="点位不存在")
+    return point_map
+
+
 @router.get("", response_model=PageResponse[ThresholdInfo], summary="获取阈值配置列表")
 async def get_thresholds(
     page: int = Query(1, ge=1),
@@ -45,13 +81,15 @@ async def get_thresholds(
     device_type: Optional[str] = Query(None, description="设备类型"),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_viewer),
+    site_context: SiteAccessContext = Depends(get_site_access_context),
 ):
     """
     获取阈值配置列表
     """
-    query = select(AlarmThreshold)
+    query = _threshold_scope(select(AlarmThreshold), site_context)
 
     if point_id:
+        await get_authorized_point(db, point_id, site_context)
         query = query.where(AlarmThreshold.point_id == point_id)
     if threshold_type:
         query = query.where(AlarmThreshold.threshold_type == threshold_type)
@@ -84,10 +122,16 @@ async def get_thresholds(
 
 
 @router.get("/point/{point_id}", summary="获取点位阈值配置")
-async def get_point_thresholds(point_id: int, db: AsyncSession = Depends(get_db), _: User = Depends(require_viewer)):
+async def get_point_thresholds(
+    point_id: int,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_viewer),
+    site_context: SiteAccessContext = Depends(get_site_access_context),
+):
     """
     获取指定点位的所有阈值配置
     """
+    await get_authorized_point(db, point_id, site_context)
     result = await db.execute(
         select(AlarmThreshold).where(AlarmThreshold.point_id == point_id).order_by(AlarmThreshold.priority.desc())
     )
@@ -98,16 +142,16 @@ async def get_point_thresholds(point_id: int, db: AsyncSession = Depends(get_db)
 
 @router.post("", response_model=ThresholdInfo, summary="创建阈值配置")
 async def create_threshold(
-    data: ThresholdCreate, db: AsyncSession = Depends(get_db), _: User = Depends(require_operator)
+    data: ThresholdCreate,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_operator),
+    site_context: SiteAccessContext = Depends(get_site_access_context),
 ):
     """
     创建阈值配置
     """
     # 检查点位是否存在
-    point_result = await db.execute(select(Point).where(Point.id == data.point_id))
-    point = point_result.scalar_one_or_none()
-    if not point:
-        raise HTTPException(status_code=404, detail="点位不存在")
+    point = await get_authorized_point(db, data.point_id, site_context)
 
     threshold = AlarmThreshold(**data.model_dump())
     db.add(threshold)
@@ -124,25 +168,19 @@ async def create_threshold(
 
 @router.post("/batch", summary="批量配置阈值")
 async def batch_create_thresholds(
-    data: ThresholdBatchCreate, db: AsyncSession = Depends(get_db), _: User = Depends(require_operator)
+    data: ThresholdBatchCreate,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_operator),
+    site_context: SiteAccessContext = Depends(get_site_access_context),
 ):
     """
     为多个点位批量创建相同的阈值配置
     """
-    success_count = 0
-    error_list = []
-
+    point_map = await _authorized_points(db, data.point_ids, site_context)
     for point_id in data.point_ids:
-        # 检查点位是否存在
-        point_result = await db.execute(select(Point).where(Point.id == point_id))
-        point = point_result.scalar_one_or_none()
-
-        if not point:
-            error_list.append(f"点位 {point_id} 不存在")
-            continue
-
-        try:
-            threshold = AlarmThreshold(
+        point = point_map[point_id]
+        db.add(
+            AlarmThreshold(
                 point_id=point_id,
                 threshold_type=data.threshold_type,
                 threshold_value=data.threshold_value,
@@ -152,15 +190,12 @@ async def batch_create_thresholds(
                 dead_band=data.dead_band,
                 is_enabled=True,
             )
-            db.add(threshold)
-            success_count += 1
-        except Exception as e:
-            error_list.append(f"点位 {point_id}: {str(e)}")
+        )
 
     await db.commit()
     _increment_version()
 
-    return {"success_count": success_count, "error_count": len(error_list), "errors": error_list}
+    return {"success_count": len(data.point_ids), "error_count": 0, "errors": []}
 
 
 @router.post("/copy", summary="复制阈值配置到其他点位")
@@ -169,12 +204,16 @@ async def copy_thresholds(
     target_point_ids: List[int],
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_operator),
+    site_context: SiteAccessContext = Depends(get_site_access_context),
 ):
     """
     将一个点位的阈值配置复制到其他点位
     """
     # 获取源点位的阈值配置
-    source_result = await db.execute(select(AlarmThreshold).where(AlarmThreshold.point_id == source_point_id))
+    await _authorized_points(db, [source_point_id, *target_point_ids], site_context)
+    source_result = await db.execute(
+        _threshold_scope(select(AlarmThreshold).where(AlarmThreshold.point_id == source_point_id), site_context)
+    )
     source_thresholds = source_result.scalars().all()
 
     if not source_thresholds:
@@ -183,11 +222,6 @@ async def copy_thresholds(
     success_count = 0
     for target_id in target_point_ids:
         if target_id == source_point_id:
-            continue
-
-        # 检查目标点位是否存在
-        point_result = await db.execute(select(Point).where(Point.id == target_id))
-        if not point_result.scalar_one_or_none():
             continue
 
         # 删除目标点位现有阈值
@@ -278,12 +312,10 @@ async def set_four_level_thresholds(
     data: FourLevelThresholdCreate,
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_operator),
+    site_context: SiteAccessContext = Depends(get_site_access_context),
 ):
     """为指定点位一次性配置4级告警阈值（高高限/高限/低限/低低限）"""
-    point_result = await db.execute(select(Point).where(Point.id == point_id))
-    point = point_result.scalar_one_or_none()
-    if not point:
-        raise HTTPException(status_code=404, detail="点位不存在")
+    point = await get_authorized_point(db, point_id, site_context)
 
     await _upsert_four_level(db, point, data)
     await db.commit()
@@ -297,11 +329,16 @@ async def set_four_level_thresholds(
 
 @router.post("/batch-by-device-type", summary="按设备类型批量配置阈值")
 async def batch_set_by_device_type(
-    data: BatchByDeviceTypeCreate, db: AsyncSession = Depends(get_db), _: User = Depends(require_operator)
+    data: BatchByDeviceTypeCreate,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_operator),
+    site_context: SiteAccessContext = Depends(get_site_access_context),
 ):
     """为指定设备类型下所有AI点位批量配置4级阈值"""
     points_result = await db.execute(
-        select(Point).where(Point.device_type == data.device_type, Point.point_type == "AI")
+        apply_point_site_scope(
+            select(Point).where(Point.device_type == data.device_type, Point.point_type == "AI"), Point.id, site_context
+        )
     )
     points = points_result.scalars().all()
 
@@ -338,15 +375,16 @@ async def batch_set_by_device_type(
 
 @router.put("/{threshold_id}", response_model=ThresholdInfo, summary="更新阈值配置")
 async def update_threshold(
-    threshold_id: int, data: ThresholdUpdate, db: AsyncSession = Depends(get_db), _: User = Depends(require_operator)
+    threshold_id: int,
+    data: ThresholdUpdate,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_operator),
+    site_context: SiteAccessContext = Depends(get_site_access_context),
 ):
     """
     更新阈值配置
     """
-    result = await db.execute(select(AlarmThreshold).where(AlarmThreshold.id == threshold_id))
-    threshold = result.scalar_one_or_none()
-    if not threshold:
-        raise HTTPException(status_code=404, detail="阈值配置不存在")
+    await _authorized_threshold(db, threshold_id, site_context)
 
     update_data = data.model_dump(exclude_unset=True)
     update_data["updated_at"] = datetime.now()
@@ -362,13 +400,16 @@ async def update_threshold(
 
 
 @router.delete("/{threshold_id}", summary="删除阈值配置")
-async def delete_threshold(threshold_id: int, db: AsyncSession = Depends(get_db), _: User = Depends(require_operator)):
+async def delete_threshold(
+    threshold_id: int,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_operator),
+    site_context: SiteAccessContext = Depends(get_site_access_context),
+):
     """
     删除阈值配置
     """
-    result = await db.execute(select(AlarmThreshold).where(AlarmThreshold.id == threshold_id))
-    if not result.scalar_one_or_none():
-        raise HTTPException(status_code=404, detail="阈值配置不存在")
+    await _authorized_threshold(db, threshold_id, site_context)
 
     await db.execute(delete(AlarmThreshold).where(AlarmThreshold.id == threshold_id))
     await db.commit()

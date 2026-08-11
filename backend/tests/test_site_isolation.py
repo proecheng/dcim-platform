@@ -11,7 +11,15 @@ from app.models.user import User, UserSite
 from app.models.device import Device
 from app.models.spatial import Site
 from app.core.security import get_password_hash
-from app.api.deps import get_db, require_admin, require_operator, require_viewer, get_user_site_ids
+from app.api.deps import (
+    SiteAccessContext,
+    enforce_inventory_authorization,
+    get_db,
+    get_site_access_context,
+    require_admin,
+    require_operator,
+    require_viewer,
+)
 
 
 # ============================================================
@@ -75,15 +83,18 @@ async def app(db_session, mock_admin):
     async def override_require_viewer():
         return mock_admin
 
-    # admin 默认不过滤站点
-    async def override_get_user_site_ids():
+    async def override_policy_gate():
         return None
+
+    async def override_site_context():
+        return SiteAccessContext(mock_admin.id, "admin", "test-jti", None)
 
     _app.dependency_overrides[get_db] = override_get_db
     _app.dependency_overrides[require_admin] = override_require_admin
     _app.dependency_overrides[require_operator] = override_require_operator
     _app.dependency_overrides[require_viewer] = override_require_viewer
-    _app.dependency_overrides[get_user_site_ids] = override_get_user_site_ids
+    _app.dependency_overrides[enforce_inventory_authorization] = override_policy_gate
+    _app.dependency_overrides[get_site_access_context] = override_site_context
     yield _app
     _app.dependency_overrides.clear()
 
@@ -228,10 +239,10 @@ async def test_device_site_filter_operator(client, app, seed_sites, db_session):
     await db_session.commit()
 
     # 模拟 operator 只有 site_a 权限
-    async def override_site_ids():
-        return [site_a.id]
+    async def override_site_context():
+        return SiteAccessContext(99999, "operator", "test-jti", frozenset({site_a.id}))
 
-    app.dependency_overrides[get_user_site_ids] = override_site_ids
+    app.dependency_overrides[get_site_access_context] = override_site_context
 
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as c:
@@ -242,10 +253,10 @@ async def test_device_site_filter_operator(client, app, seed_sites, db_session):
         assert data["items"][0]["device_code"] == "DEV-A2"
 
     # 恢复 admin 模式
-    async def override_admin_site_ids():
-        return None
+    async def override_admin_site_context():
+        return SiteAccessContext(99999, "admin", "test-jti", None)
 
-    app.dependency_overrides[get_user_site_ids] = override_admin_site_ids
+    app.dependency_overrides[get_site_access_context] = override_admin_site_context
 
 
 @pytest.mark.anyio

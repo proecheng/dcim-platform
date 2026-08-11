@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from pydantic import BaseModel, ConfigDict
 
-from ..deps import get_db, get_current_user
+from ..deps import get_db, require_admin
 from ...models import FloorMap
 from ...models.user import User
 from ...schemas.common import ResponseModel
@@ -48,7 +48,7 @@ class FloorMapResponse(BaseModel):
 
 
 @router.get("/floors", response_model=ResponseModel[FloorListResponse], summary="获取楼层列表")
-async def get_floors(db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
+async def get_floors(db: AsyncSession = Depends(get_db), current_user: User = Depends(require_admin)):
     """获取所有楼层及其可用的图类型"""
     result = await db.execute(
         select(FloorMap.floor_code, FloorMap.floor_name, FloorMap.map_type).order_by(
@@ -91,7 +91,7 @@ async def get_floors(db: AsyncSession = Depends(get_db), current_user: User = De
 
 @router.get("/{floor_code}/{map_type}", response_model=ResponseModel[FloorMapResponse], summary="获取楼层图")
 async def get_floor_map(
-    floor_code: str, map_type: str, db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)
+    floor_code: str, map_type: str, db: AsyncSession = Depends(get_db), current_user: User = Depends(require_admin)
 ):
     """获取指定楼层的2D或3D图数据"""
     if map_type not in ["2d", "3d"]:
@@ -110,7 +110,7 @@ async def get_floor_map(
 
 @router.get("/default", response_model=ResponseModel[FloorMapResponse], summary="获取默认楼层图")
 async def get_default_floor_map(
-    map_type: str = "3d", db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)
+    map_type: str = "3d", db: AsyncSession = Depends(get_db), current_user: User = Depends(require_admin)
 ):
     """获取默认显示的楼层图"""
     # 先找标记为默认的

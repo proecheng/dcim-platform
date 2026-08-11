@@ -361,7 +361,7 @@ class TestPowerUPS:
         _, token = admin_user
         payload = {"device_id": 99999, "ups_type": "standalone"}
         resp = await client.post("/api/v1/power/ups", json=payload, headers=auth_headers(token))
-        assert resp.status_code == 400
+        assert resp.status_code == 404
 
     async def test_get_ups_detail(self, client, admin_user, async_db):
         _, token = admin_user
@@ -421,7 +421,7 @@ class TestPowerBatteries:
         _, token = admin_user
         payload = {"ups_device_id": 99999, "group_name": "BG-X"}
         resp = await client.post("/api/v1/power/batteries", json=payload, headers=auth_headers(token))
-        assert resp.status_code == 400
+        assert resp.status_code == 404
 
     async def test_get_battery_detail(self, client, admin_user, async_db):
         _, token = admin_user

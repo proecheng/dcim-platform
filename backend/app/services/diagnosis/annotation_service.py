@@ -82,6 +82,7 @@ class DiagnosisAnnotationService:
         query: DiagnosisAnnotationListQuery,
         user_id: Optional[int] = None,
         user_role: Optional[str] = None,
+        allowed_session_ids=None,
     ) -> Tuple[List[DiagnosisAnnotationResponse], int]:
         """
         获取标注列表（分页）
@@ -103,6 +104,9 @@ class DiagnosisAnnotationService:
 
         if query.annotation:
             conditions.append(DiagnosisAnnotation.annotation == query.annotation)
+
+        if allowed_session_ids is not None:
+            conditions.append(DiagnosisAnnotation.session_id.in_(allowed_session_ids))
 
         # RBAC 权限过滤
         if user_role == "operator" and user_id:

@@ -140,6 +140,7 @@ async def _probe_gateway(gw_ds: DataSource, db: AsyncSession) -> list[dict]:
                     {
                         "action": "resolve",
                         "source": f"datasource:{gw_ds.id}",
+                        "site_id": gw_ds.site_id,
                         "status": "resolved",
                     }
                 )
@@ -153,6 +154,7 @@ async def _probe_gateway(gw_ds: DataSource, db: AsyncSession) -> list[dict]:
                         "action": "resolve_batch",
                         "count": batch_count,
                         "source": f"gateway:{gw_ds.id}:children",
+                        "site_id": gw_ds.site_id,
                     }
                 )
     else:
@@ -210,6 +212,7 @@ async def _probe_gateway(gw_ds: DataSource, db: AsyncSession) -> list[dict]:
                         "alarm_level": alarm.alarm_level,
                         "alarm_type": alarm.alarm_type,
                         "alarm_message": alarm.alarm_message,
+                        "site_id": gw_ds.site_id,
                         "status": "active",
                     }
                 )
@@ -251,7 +254,7 @@ async def check_mstp_gateway_health(db: AsyncSession) -> None:
 
             for msg in pending_broadcasts:
                 try:
-                    await ws_manager.broadcast_alarm(msg)
+                    await ws_manager.broadcast_alarm(msg, site_id=msg.get("site_id"))
                 except Exception:
                     pass
         except ImportError:

@@ -4,9 +4,9 @@
 Story 32.3: 测试手动校准、校准历史、部署阶段查询和切换端点。
 """
 
-import pytest
-from datetime import datetime
 from unittest.mock import AsyncMock, patch, MagicMock
+
+import pytest
 
 from tests.conftest import auth_headers
 
@@ -157,9 +157,8 @@ class TestTriggerCalibration:
             "/api/v1/precool/zones/99999/calibrate",
             headers=auth_headers(token),
         )
-        data = resp.json()
-        assert data["code"] == 404
-        assert "不存在" in data["message"]
+        assert resp.status_code == 404
+        assert "不存在" in resp.json()["detail"]
 
     async def test_calibrate_scipy_not_installed(self, client, admin_user, sample_zone):
         """scipy 未安装返回 503"""
@@ -270,8 +269,7 @@ class TestCalibrationHistory:
             "/api/v1/precool/zones/99999/calibration-history",
             headers=auth_headers(token),
         )
-        data = resp.json()
-        assert data["code"] == 404
+        assert resp.status_code == 404
 
 
 # ==================== GET /deployment-phase 测试 ====================

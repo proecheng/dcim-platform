@@ -3,21 +3,19 @@
 Story 26.1: 反事实分析
 """
 
+from unittest.mock import AsyncMock, patch
+
 import pytest
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
 
 from app.models.diagnosis import (
-    DiagnosisSession,
     DiagnosisResult,
-    CounterfactualAnalysis,
+    DiagnosisSession,
 )
 from app.services.diagnosis.counterfactual_service import analyze_counterfactual
-from tests.conftest import redis_required
 
 
-@redis_required
 @pytest.mark.asyncio
 async def test_counterfactual_analysis_workflow_3_evidences(
     client: AsyncClient,
@@ -95,7 +93,29 @@ async def test_counterfactual_analysis_workflow_3_evidences(
     await async_db.refresh(result)
 
     # 3. 执行反事实分析
-    analysis = await analyze_counterfactual(session.id, top_n=3, db=async_db)
+    with (
+        patch(
+            "app.services.diagnosis.counterfactual_service._acquire_redis_lock",
+            new_callable=AsyncMock,
+            return_value="test-lock",
+        ),
+        patch(
+            "app.services.diagnosis.counterfactual_service._release_redis_lock",
+            new_callable=AsyncMock,
+            return_value=True,
+        ),
+        patch(
+            "app.services.diagnosis.counterfactual_service.get_config",
+            new_callable=AsyncMock,
+            side_effect=lambda _key, default: default,
+        ),
+        patch(
+            "app.services.diagnosis.counterfactual_service._get_config_version",
+            new_callable=AsyncMock,
+            return_value="1.0.0",
+        ),
+    ):
+        analysis = await analyze_counterfactual(session.id, top_n=3, db=async_db)
 
     assert analysis is not None
     assert analysis.session_id == session.id
@@ -147,4 +167,3 @@ async def test_counterfactual_analysis_not_found(
 
     assert response.status_code == 404
     assert "不存在" in response.json()["detail"]
-

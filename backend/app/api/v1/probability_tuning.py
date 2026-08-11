@@ -251,6 +251,7 @@ async def approve_adjustment(
             "approved_by": current_user.username,
         },
         target_roles=["admin"],
+        global_message=True,
     )
 
     return {"message": "审批成功", "version_id": version.id}
@@ -318,6 +319,7 @@ async def reject_adjustment(
             "approved_by": current_user.username,
         },
         target_roles=["admin"],
+        global_message=True,
     )
 
     return {"message": "已拒绝"}
