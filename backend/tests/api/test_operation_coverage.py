@@ -4,6 +4,7 @@ operation.py — 工单/巡检/知识库/告警规则/审批/统计
 """
 
 import pytest
+from app.models.alarm import Alarm
 from tests.conftest import auth_headers
 
 BASE = "/api/v1/operation"
@@ -79,6 +80,18 @@ async def _create_alarm_rule(client, token, **overrides):
     resp = await client.post(f"{BASE}/alarm-rules", json=payload, headers=auth_headers(token))
     assert resp.status_code == 200
     return resp.json()
+
+
+async def _create_alarm(async_db, alarm_no, alarm_level, alarm_message):
+    """创建告警检查所需的真实告警记录"""
+    alarm = Alarm(
+        alarm_no=alarm_no,
+        alarm_level=alarm_level,
+        alarm_message=alarm_message,
+    )
+    async_db.add(alarm)
+    await async_db.flush()
+    return alarm
 
 
 # ==================== 工单管理 ====================
@@ -773,14 +786,15 @@ class TestAlarmRules:
         )
         assert resp.status_code == 404
 
-    async def test_check_alarm_matched(self, client, admin_user):
+    async def test_check_alarm_matched(self, client, admin_user, async_db):
         """告警匹配规则后自动创建工单"""
         _, token = admin_user
         await _create_alarm_rule(client, token, alarm_level="critical")
+        alarm = await _create_alarm(async_db, "OP-CHECK-001", "critical", "温度超过阈值")
         resp = await client.post(
             f"{BASE}/alarm-rules/check",
             json={
-                "alarm_id": 1,
+                "alarm_id": alarm.id,
                 "alarm_level": "critical",
                 "alarm_message": "温度超过阈值",
             },
@@ -791,13 +805,14 @@ class TestAlarmRules:
         assert data["matched"] is True
         assert data["work_order"] is not None
 
-    async def test_check_alarm_no_match(self, client, admin_user):
+    async def test_check_alarm_no_match(self, client, admin_user, async_db):
         """无匹配规则时不创建工单"""
         _, token = admin_user
+        alarm = await _create_alarm(async_db, "OP-CHECK-002", "info", "信息告警")
         resp = await client.post(
             f"{BASE}/alarm-rules/check",
             json={
-                "alarm_id": 2,
+                "alarm_id": alarm.id,
                 "alarm_level": "info",
                 "alarm_message": "信息告警",
             },
@@ -806,16 +821,17 @@ class TestAlarmRules:
         assert resp.status_code == 200
         assert resp.json()["matched"] is False
 
-    async def test_check_alarm_auto_assign(self, client, admin_user):
+    async def test_check_alarm_auto_assign(self, client, admin_user, async_db):
         """规则设置了 assignee 时自动派单"""
         _, token = admin_user
         await _create_alarm_rule(
             client, token, alarm_level="critical", assignee="值班员"
         )
+        alarm = await _create_alarm(async_db, "OP-CHECK-003", "critical", "UPS 故障")
         resp = await client.post(
             f"{BASE}/alarm-rules/check",
             json={
-                "alarm_id": 3,
+                "alarm_id": alarm.id,
                 "alarm_level": "critical",
                 "alarm_message": "UPS 故障",
             },

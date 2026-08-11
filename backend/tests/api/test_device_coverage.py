@@ -7,6 +7,8 @@ from unittest.mock import patch
 from app.models.device import Device
 from app.models.point import Point, PointRealtime
 from app.models.alarm import Alarm
+from app.models.spatial import Site
+from app.models.user import UserSite
 from tests.conftest import auth_headers
 
 
@@ -52,6 +54,16 @@ async def _seed_devices(async_db):
     async_db.add_all(devices)
     await async_db.flush()
     return devices
+
+
+async def _grant_operator_site(async_db, operator, site_code):
+    """创建站点并授予操作员访问权限"""
+    site = Site(site_code=site_code, site_name=f"{site_code} 测试站点")
+    async_db.add(site)
+    await async_db.flush()
+    async_db.add(UserSite(user_id=operator.id, site_id=site.id))
+    await async_db.flush()
+    return site
 
 
 # ============== 设备列表 ==============
@@ -328,7 +340,8 @@ class TestDeviceCRUD:
 
     async def test_create_device(self, client, operator_user, async_db):
         """POST /devices — 创建设备"""
-        _, token = operator_user
+        operator, token = operator_user
+        site = await _grant_operator_site(async_db, operator, "DEVICE-CREATE-SITE")
         resp = await client.post(
             "/api/v1/devices",
             json={
@@ -337,6 +350,7 @@ class TestDeviceCRUD:
                 "device_type": "UPS",
                 "area_code": "A1",
                 "manufacturer": "测试厂商",
+                "site_id": site.id,
             },
             headers=auth_headers(token),
         )
@@ -347,12 +361,14 @@ class TestDeviceCRUD:
 
     async def test_create_device_duplicate_code(self, client, operator_user, async_db):
         """POST /devices — 重复编码"""
-        _, token = operator_user
+        operator, token = operator_user
+        site = await _grant_operator_site(async_db, operator, "DEVICE-DUPLICATE-SITE")
         device = Device(
             device_code="DUP-DEV-001",
             device_name="已存在设备",
             device_type="AC",
             area_code="A1",
+            site_id=site.id,
         )
         async_db.add(device)
         await async_db.flush()
@@ -364,6 +380,7 @@ class TestDeviceCRUD:
                 "device_name": "重复设备",
                 "device_type": "AC",
                 "area_code": "A1",
+                "site_id": site.id,
             },
             headers=auth_headers(token),
         )
@@ -371,12 +388,14 @@ class TestDeviceCRUD:
 
     async def test_update_device(self, client, operator_user, async_db):
         """PUT /devices/{id} — 更新设备"""
-        _, token = operator_user
+        operator, token = operator_user
+        site = await _grant_operator_site(async_db, operator, "DEVICE-UPDATE-SITE")
         device = Device(
             device_code="UPD-DEV-001",
             device_name="待更新设备",
             device_type="TH",
             area_code="B1",
+            site_id=site.id,
         )
         async_db.add(device)
         await async_db.flush()
@@ -692,7 +711,8 @@ class TestDeviceCRUDCoverageExtra:
 
     async def test_create_device_full(self, client, operator_user, async_db):
         """POST /devices — 完整参数创建"""
-        _, token = operator_user
+        operator, token = operator_user
+        site = await _grant_operator_site(async_db, operator, "DEVICE-FULL-SITE")
         resp = await client.post(
             "/api/v1/devices",
             json={
@@ -702,6 +722,7 @@ class TestDeviceCRUDCoverageExtra:
                 "area_code": "C1",
                 "manufacturer": "厂商A",
                 "status": "offline",
+                "site_id": site.id,
             },
             headers=auth_headers(token),
         )
@@ -712,12 +733,14 @@ class TestDeviceCRUDCoverageExtra:
 
     async def test_update_device_multiple_fields(self, client, operator_user, async_db):
         """PUT /devices/{id} — 更新多个字段"""
-        _, token = operator_user
+        operator, token = operator_user
+        site = await _grant_operator_site(async_db, operator, "DEVICE-MULTI-SITE")
         device = Device(
             device_code="UPD-MULTI-001",
             device_name="多字段更新",
             device_type="AC",
             area_code="A1",
+            site_id=site.id,
         )
         async_db.add(device)
         await async_db.flush()

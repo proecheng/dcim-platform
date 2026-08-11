@@ -1,5 +1,7 @@
 """节能机会自动检测服务测试 — Story 6-3"""
 
+import uuid
+
 import pytest
 
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
@@ -7,6 +9,7 @@ from sqlalchemy import delete, select
 
 from app.core.database import Base
 from app.models.energy import EnergyOpportunity
+from app.models.user import User, UserSession
 from app.services.opportunity_detector import (
     OpportunityDetector,
     CATEGORY_TO_INT,
@@ -14,6 +17,7 @@ from app.services.opportunity_detector import (
 )
 from app.services.opportunity_engine import OpportunityCategory
 from app.services.analysis_plugins.base import PluginPriority
+from tests.conftest import _create_test_token, auth_headers
 
 
 @pytest.fixture(scope="module")
@@ -33,6 +37,24 @@ async def api_engine():
 @pytest.fixture(scope="module")
 def session_factory(api_engine):
     return async_sessionmaker(api_engine, class_=AsyncSession, expire_on_commit=False)
+
+
+@pytest.fixture(scope="module")
+async def admin_token(session_factory):
+    async with session_factory() as session:
+        admin = User(
+            username="opportunity_detector_admin",
+            password_hash="test-only",
+            real_name="机会检测管理员",
+            role="admin",
+            is_active=True,
+        )
+        session.add(admin)
+        await session.flush()
+        jti = uuid.uuid4().hex
+        session.add(UserSession(user_id=admin.id, token_jti=jti, is_active=True))
+        await session.commit()
+        return _create_test_token(admin.username, jti)
 
 
 @pytest.fixture
@@ -196,12 +218,11 @@ class TestDetectAPI:
     """测试 /detect API 端点"""
 
     @pytest.mark.anyio
-    async def test_trigger_detection_api(self, db_session, session_factory):
+    async def test_trigger_detection_api(self, db_session, session_factory, admin_token):
         """POST /v1/opportunities/detect 应返回 200"""
         from httpx import AsyncClient, ASGITransport
         from app.main import app
         from app.api.deps import get_db, get_current_user
-        from app.models.user import User
 
         # 覆盖依赖
         async def override_get_db():
@@ -218,7 +239,11 @@ class TestDetectAPI:
 
         try:
             transport = ASGITransport(app=app)
-            async with AsyncClient(transport=transport, base_url="http://test") as client:
+            async with AsyncClient(
+                transport=transport,
+                base_url="http://test",
+                headers=auth_headers(admin_token),
+            ) as client:
                 resp = await client.post(
                     "/api/v1/opportunities/detect",
                     params={"days": 30},

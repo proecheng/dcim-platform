@@ -1,14 +1,17 @@
 """效果追踪服务测试 — Story 6-4"""
 
-import pytest
+import uuid
 from datetime import datetime, date, timedelta
 
+import pytest
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from sqlalchemy import delete, select
 
 from app.core.database import Base
 from app.models.energy import EnergyOpportunity, ExecutionPlan, ExecutionTask, ExecutionResult, EnergyDaily
+from app.models.user import User, UserSession
 from app.services.effect_tracker import EffectTracker
+from tests.conftest import _create_test_token, auth_headers
 
 
 # ==================== Fixtures ====================
@@ -31,6 +34,24 @@ async def api_engine():
 @pytest.fixture(scope="module")
 def session_factory(api_engine):
     return async_sessionmaker(api_engine, class_=AsyncSession, expire_on_commit=False)
+
+
+@pytest.fixture(scope="module")
+async def admin_token(session_factory):
+    async with session_factory() as session:
+        admin = User(
+            username="effect_tracker_admin",
+            password_hash="test-only",
+            real_name="效果追踪管理员",
+            role="admin",
+            is_active=True,
+        )
+        session.add(admin)
+        await session.flush()
+        jti = uuid.uuid4().hex
+        session.add(UserSession(user_id=admin.id, token_jti=jti, is_active=True))
+        await session.commit()
+        return _create_test_token(admin.username, jti)
 
 
 @pytest.fixture
@@ -352,12 +373,11 @@ class TestRunTrackingEmpty:
 
 class TestExecuteOpportunityFallback:
     @pytest.mark.anyio
-    async def test_execute_opportunity_with_analysis_data(self, db_session, session_factory):
+    async def test_execute_opportunity_with_analysis_data(self, db_session, session_factory, admin_token):
         """无 measures 但有 analysis_data 的机会应从 analysis_data 生成任务"""
         from httpx import AsyncClient, ASGITransport
         from app.main import app
         from app.api.deps import get_db, get_current_user
-        from app.models.user import User
 
         # 创建机会（无 measures，有 analysis_data）
         opp = EnergyOpportunity(
@@ -406,7 +426,11 @@ class TestExecuteOpportunityFallback:
 
         try:
             transport = ASGITransport(app=app)
-            async with AsyncClient(transport=transport, base_url="http://test") as client:
+            async with AsyncClient(
+                transport=transport,
+                base_url="http://test",
+                headers=auth_headers(admin_token),
+            ) as client:
                 resp = await client.post(f"/api/v1/opportunities/{opp_id}/execute")
                 assert resp.status_code == 200
                 body = resp.json()
@@ -415,12 +439,11 @@ class TestExecuteOpportunityFallback:
             app.dependency_overrides.clear()
 
     @pytest.mark.anyio
-    async def test_execute_opportunity_with_measures_regression(self, db_session, session_factory):
+    async def test_execute_opportunity_with_measures_regression(self, db_session, session_factory, admin_token):
         """有 measures 的机会应从 measures 生成任务（回归测试）"""
         from httpx import AsyncClient, ASGITransport
         from app.main import app
         from app.api.deps import get_db, get_current_user
-        from app.models.user import User
         from app.models.energy import OpportunityMeasure
 
         # 创建机会 + measures
@@ -466,7 +489,11 @@ class TestExecuteOpportunityFallback:
 
         try:
             transport = ASGITransport(app=app)
-            async with AsyncClient(transport=transport, base_url="http://test") as client:
+            async with AsyncClient(
+                transport=transport,
+                base_url="http://test",
+                headers=auth_headers(admin_token),
+            ) as client:
                 resp = await client.post(f"/api/v1/opportunities/{opp_id}/execute")
                 assert resp.status_code == 200
                 body = resp.json()

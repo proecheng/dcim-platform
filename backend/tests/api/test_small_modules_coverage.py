@@ -17,6 +17,14 @@ from app.models.energy import (
 )
 
 
+@pytest.fixture
+async def admin_client(client, admin_user):
+    """返回带管理员活动会话认证头的测试客户端"""
+    _, token = admin_user
+    client.headers.update(auth_headers(token))
+    return client
+
+
 # ==================== Pricing Tests ====================
 
 
@@ -153,78 +161,95 @@ class TestPricingPeakValleySpread:
 
 @pytest.mark.asyncio
 class TestVPPAnalysis:
-    async def test_full_analysis(self, client):
+    async def test_full_analysis(self, client, admin_user):
+        _, token = admin_user
         payload = {
             "months": ["2025-01", "2025-03"],
             "start_date": "2025-10-01",
             "end_date": "2025-10-30",
         }
-        resp = await client.post("/api/v1/vpp/analysis", json=payload)
+        resp = await client.post("/api/v1/vpp/analysis", json=payload, headers=auth_headers(token))
         assert resp.status_code == 200
         data = resp.json()
         assert data["code"] == 0
 
-    async def test_analysis_invalid_body(self, client):
-        resp = await client.post("/api/v1/vpp/analysis", json={})
+    async def test_analysis_invalid_body(self, client, admin_user):
+        _, token = admin_user
+        resp = await client.post("/api/v1/vpp/analysis", json={}, headers=auth_headers(token))
         assert resp.status_code == 422
 
 
 @pytest.mark.asyncio
 class TestVPPLoadMetrics:
-    async def test_load_metrics(self, client):
-        resp = await client.get("/api/v1/vpp/load-metrics?start_date=2025-10-01&end_date=2025-10-30")
+    async def test_load_metrics(self, client, admin_user):
+        _, token = admin_user
+        resp = await client.get(
+            "/api/v1/vpp/load-metrics?start_date=2025-10-01&end_date=2025-10-30",
+            headers=auth_headers(token),
+        )
         assert resp.status_code == 200
         assert resp.json()["code"] == 0
 
-    async def test_load_metrics_missing_params(self, client):
-        resp = await client.get("/api/v1/vpp/load-metrics")
+    async def test_load_metrics_missing_params(self, client, admin_user):
+        _, token = admin_user
+        resp = await client.get("/api/v1/vpp/load-metrics", headers=auth_headers(token))
         assert resp.status_code == 422
 
 
 @pytest.mark.asyncio
 class TestVPPCostStructure:
-    async def test_cost_structure(self, client):
-        resp = await client.get("/api/v1/vpp/cost-structure/2025-01")
+    async def test_cost_structure(self, client, admin_user):
+        _, token = admin_user
+        resp = await client.get("/api/v1/vpp/cost-structure/2025-01", headers=auth_headers(token))
         assert resp.status_code == 200
         assert resp.json()["code"] == 0
 
 
 @pytest.mark.asyncio
 class TestVPPTransferPotential:
-    async def test_transfer_potential(self, client):
-        resp = await client.get("/api/v1/vpp/transfer-potential")
+    async def test_transfer_potential(self, client, admin_user):
+        _, token = admin_user
+        resp = await client.get("/api/v1/vpp/transfer-potential", headers=auth_headers(token))
         assert resp.status_code == 200
         assert resp.json()["code"] == 0
 
 
 @pytest.mark.asyncio
 class TestVPPRevenue:
-    async def test_vpp_revenue(self, client):
-        resp = await client.get("/api/v1/vpp/vpp-revenue?adjustable_capacity=4500.0")
+    async def test_vpp_revenue(self, client, admin_user):
+        _, token = admin_user
+        resp = await client.get(
+            "/api/v1/vpp/vpp-revenue?adjustable_capacity=4500.0",
+            headers=auth_headers(token),
+        )
         assert resp.status_code == 200
         assert resp.json()["code"] == 0
 
-    async def test_vpp_revenue_missing_param(self, client):
-        resp = await client.get("/api/v1/vpp/vpp-revenue")
+    async def test_vpp_revenue_missing_param(self, client, admin_user):
+        _, token = admin_user
+        resp = await client.get("/api/v1/vpp/vpp-revenue", headers=auth_headers(token))
         assert resp.status_code == 422
 
 
 @pytest.mark.asyncio
 class TestVPPROI:
-    async def test_roi(self, client):
-        resp = await client.get("/api/v1/vpp/roi?annual_benefit=5000000.0")
+    async def test_roi(self, client, admin_user):
+        _, token = admin_user
+        resp = await client.get("/api/v1/vpp/roi?annual_benefit=5000000.0", headers=auth_headers(token))
         assert resp.status_code == 200
         assert resp.json()["code"] == 0
 
-    async def test_roi_missing_param(self, client):
-        resp = await client.get("/api/v1/vpp/roi")
+    async def test_roi_missing_param(self, client, admin_user):
+        _, token = admin_user
+        resp = await client.get("/api/v1/vpp/roi", headers=auth_headers(token))
         assert resp.status_code == 422
 
 
 @pytest.mark.asyncio
 class TestVPPFormulaReference:
-    async def test_formula_reference(self, client):
-        resp = await client.get("/api/v1/vpp/formula-reference")
+    async def test_formula_reference(self, client, admin_user):
+        _, token = admin_user
+        resp = await client.get("/api/v1/vpp/formula-reference", headers=auth_headers(token))
         assert resp.status_code == 200
         data = resp.json()
         assert data["code"] == 0
@@ -431,24 +456,24 @@ async def _create_regulation_config(db, device_id, reg_type="temperature"):
 
 @pytest.mark.asyncio
 class TestRegulationConfigs:
-    async def test_get_configs_empty(self, client):
-        resp = await client.get("/api/v1/regulation/configs")
+    async def test_get_configs_empty(self, admin_client):
+        resp = await admin_client.get("/api/v1/regulation/configs")
         assert resp.status_code == 200
         assert resp.json() == []
 
-    async def test_get_configs_with_data(self, client, async_db):
+    async def test_get_configs_with_data(self, admin_client, async_db):
         dev = await _create_power_device(async_db)
         await _create_regulation_config(async_db, dev.id)
         await async_db.commit()
-        resp = await client.get("/api/v1/regulation/configs")
+        resp = await admin_client.get("/api/v1/regulation/configs")
         assert resp.status_code == 200
         assert len(resp.json()) >= 1
 
-    async def test_get_configs_auto_generates_missing_adjustable_device(self, client, async_db):
+    async def test_get_configs_auto_generates_missing_adjustable_device(self, admin_client, async_db):
         dev = await _create_power_device(async_db, "DEV004", "自动补齐空调")
         await async_db.commit()
 
-        resp = await client.get("/api/v1/regulation/configs")
+        resp = await admin_client.get("/api/v1/regulation/configs")
 
         assert resp.status_code == 200
         generated = next(item for item in resp.json() if item["device_id"] == dev.id)
@@ -457,39 +482,39 @@ class TestRegulationConfigs:
         assert generated["max_value"] == 28.0
         assert generated["current_value"] == 23.0
 
-    async def test_get_configs_filter_device(self, client, async_db):
+    async def test_get_configs_filter_device(self, admin_client, async_db):
         dev = await _create_power_device(async_db, "DEV002", "设备2")
         await _create_regulation_config(async_db, dev.id)
         await async_db.commit()
-        resp = await client.get(f"/api/v1/regulation/configs?device_id={dev.id}")
+        resp = await admin_client.get(f"/api/v1/regulation/configs?device_id={dev.id}")
         assert resp.status_code == 200
 
-    async def test_get_configs_filter_type(self, client, async_db):
+    async def test_get_configs_filter_type(self, admin_client, async_db):
         dev = await _create_power_device(async_db, "DEV003", "设备3")
         await _create_regulation_config(async_db, dev.id, "brightness")
         await async_db.commit()
-        resp = await client.get("/api/v1/regulation/configs?regulation_type=brightness")
+        resp = await admin_client.get("/api/v1/regulation/configs?regulation_type=brightness")
         assert resp.status_code == 200
 
-    async def test_get_configs_disabled(self, client, async_db):
-        resp = await client.get("/api/v1/regulation/configs?is_enabled=false")
+    async def test_get_configs_disabled(self, admin_client, async_db):
+        resp = await admin_client.get("/api/v1/regulation/configs?is_enabled=false")
         assert resp.status_code == 200
 
 
 @pytest.mark.asyncio
 class TestRegulationConfigCRUD:
-    async def test_get_config_by_id(self, client, async_db):
+    async def test_get_config_by_id(self, admin_client, async_db):
         dev = await _create_power_device(async_db, "DEV010", "设备10")
         cfg = await _create_regulation_config(async_db, dev.id)
         await async_db.commit()
-        resp = await client.get(f"/api/v1/regulation/configs/{cfg.id}")
+        resp = await admin_client.get(f"/api/v1/regulation/configs/{cfg.id}")
         assert resp.status_code == 200
 
-    async def test_get_config_not_found(self, client):
-        resp = await client.get("/api/v1/regulation/configs/99999")
+    async def test_get_config_not_found(self, admin_client):
+        resp = await admin_client.get("/api/v1/regulation/configs/99999")
         assert resp.status_code == 404
 
-    async def test_create_config(self, client, async_db):
+    async def test_create_config(self, admin_client, async_db):
         dev = await _create_power_device(async_db, "DEV020", "设备20")
         await async_db.commit()
         payload = {
@@ -507,50 +532,50 @@ class TestRegulationConfigCRUD:
             "comfort_impact": "medium",
             "performance_impact": "low",
         }
-        resp = await client.post("/api/v1/regulation/configs", json=payload)
+        resp = await admin_client.post("/api/v1/regulation/configs", json=payload)
         assert resp.status_code == 200
 
-    async def test_update_config(self, client, async_db):
+    async def test_update_config(self, admin_client, async_db):
         dev = await _create_power_device(async_db, "DEV030", "设备30")
         cfg = await _create_regulation_config(async_db, dev.id)
         await async_db.commit()
-        resp = await client.put(
+        resp = await admin_client.put(
             f"/api/v1/regulation/configs/{cfg.id}",
             json={"min_value": 20.0, "max_value": 30.0},
         )
         assert resp.status_code == 200
 
-    async def test_update_config_not_found(self, client):
-        resp = await client.put("/api/v1/regulation/configs/99999", json={"min_value": 20.0})
+    async def test_update_config_not_found(self, admin_client):
+        resp = await admin_client.put("/api/v1/regulation/configs/99999", json={"min_value": 20.0})
         assert resp.status_code == 404
 
-    async def test_delete_config(self, client, async_db):
+    async def test_delete_config(self, admin_client, async_db):
         dev = await _create_power_device(async_db, "DEV040", "设备40")
         cfg = await _create_regulation_config(async_db, dev.id)
         await async_db.commit()
-        resp = await client.delete(f"/api/v1/regulation/configs/{cfg.id}")
+        resp = await admin_client.delete(f"/api/v1/regulation/configs/{cfg.id}")
         assert resp.status_code == 200
         assert resp.json()["message"] == "删除成功"
 
-    async def test_delete_config_not_found(self, client):
-        resp = await client.delete("/api/v1/regulation/configs/99999")
+    async def test_delete_config_not_found(self, admin_client):
+        resp = await admin_client.delete("/api/v1/regulation/configs/99999")
         assert resp.status_code == 404
 
 
 @pytest.mark.asyncio
 class TestRegulationSimulate:
-    async def test_simulate(self, client, async_db):
+    async def test_simulate(self, admin_client, async_db):
         dev = await _create_power_device(async_db, "DEV050", "设备50")
         cfg = await _create_regulation_config(async_db, dev.id)
         await async_db.commit()
-        resp = await client.post(
+        resp = await admin_client.post(
             "/api/v1/regulation/simulate",
             json={"config_id": cfg.id, "target_value": 27.0},
         )
         assert resp.status_code == 200
 
-    async def test_simulate_not_found(self, client):
-        resp = await client.post(
+    async def test_simulate_not_found(self, admin_client):
+        resp = await admin_client.post(
             "/api/v1/regulation/simulate",
             json={"config_id": 99999, "target_value": 27.0},
         )
@@ -559,18 +584,18 @@ class TestRegulationSimulate:
 
 @pytest.mark.asyncio
 class TestRegulationApply:
-    async def test_apply(self, client, async_db):
+    async def test_apply(self, admin_client, async_db):
         dev = await _create_power_device(async_db, "DEV060", "设备60")
         cfg = await _create_regulation_config(async_db, dev.id)
         await async_db.commit()
-        resp = await client.post(
+        resp = await admin_client.post(
             "/api/v1/regulation/apply",
             json={"config_id": cfg.id, "target_value": 27.0, "reason": "manual", "remark": "test"},
         )
         assert resp.status_code == 200
 
-    async def test_apply_not_found(self, client):
-        resp = await client.post(
+    async def test_apply_not_found(self, admin_client):
+        resp = await admin_client.post(
             "/api/v1/regulation/apply",
             json={"config_id": 99999, "target_value": 27.0, "reason": "manual"},
         )
@@ -579,24 +604,24 @@ class TestRegulationApply:
 
 @pytest.mark.asyncio
 class TestRegulationHistory:
-    async def test_get_history_empty(self, client):
-        resp = await client.get("/api/v1/regulation/history")
+    async def test_get_history_empty(self, admin_client):
+        resp = await admin_client.get("/api/v1/regulation/history")
         assert resp.status_code == 200
         assert resp.json() == []
 
-    async def test_get_history_with_filters(self, client):
-        resp = await client.get("/api/v1/regulation/history?device_id=1&config_id=1&limit=10")
+    async def test_get_history_with_filters(self, admin_client):
+        resp = await admin_client.get("/api/v1/regulation/history?device_id=1&config_id=1&limit=10")
         assert resp.status_code == 200
 
 
 @pytest.mark.asyncio
 class TestRegulationRecommendations:
-    async def test_recommendations_no_params(self, client):
-        resp = await client.get("/api/v1/regulation/recommendations")
+    async def test_recommendations_no_params(self, admin_client):
+        resp = await admin_client.get("/api/v1/regulation/recommendations")
         assert resp.status_code == 200
 
-    async def test_recommendations_with_params(self, client):
-        resp = await client.get("/api/v1/regulation/recommendations?current_demand=1000&declared_demand=1200")
+    async def test_recommendations_with_params(self, admin_client):
+        resp = await admin_client.get("/api/v1/regulation/recommendations?current_demand=1000&declared_demand=1200")
         assert resp.status_code == 200
 
 

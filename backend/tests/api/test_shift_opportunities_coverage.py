@@ -16,7 +16,7 @@ shift.py / opportunities.py
 """
 
 import pytest
-from datetime import date, time
+from datetime import date
 
 from tests.conftest import auth_headers
 
@@ -773,28 +773,28 @@ class TestShiftRBAC:
         )
         assert resp.status_code == 403
 
-    async def test_viewer_can_list_plans(self, client, viewer_user):
+    async def test_viewer_cannot_list_plans(self, client, viewer_user):
         _, token = viewer_user
         resp = await client.get(
             f"{SHIFT}/plans", headers=auth_headers(token)
         )
-        assert resp.status_code == 200
+        assert resp.status_code == 403
 
-    async def test_viewer_can_view_dashboard(self, client, viewer_user):
+    async def test_viewer_cannot_view_dashboard(self, client, viewer_user):
         _, token = viewer_user
         resp = await client.get(
             f"{SHIFT}/dashboard/overview", headers=auth_headers(token)
         )
-        assert resp.status_code == 200
+        assert resp.status_code == 403
 
-    async def test_operator_can_create_plan(self, client, operator_user):
+    async def test_operator_cannot_create_plan(self, client, operator_user):
         _, token = operator_user
         resp = await client.post(
             f"{SHIFT}/plans",
             json=_plan_payload(),
             headers=auth_headers(token),
         )
-        assert resp.status_code == 201
+        assert resp.status_code == 403
 
 
 # ===========================================================================
@@ -1107,17 +1107,17 @@ class TestOpportunitiesRBAC:
         resp = await client.post(f"{OPP}/1/execute")
         assert resp.status_code == 401
 
-    async def test_viewer_can_list(self, client, viewer_user):
+    async def test_viewer_cannot_list(self, client, viewer_user):
         _, token = viewer_user
         resp = await client.get(f"{OPP}", headers=auth_headers(token))
-        assert resp.status_code == 200
+        assert resp.status_code == 403
 
-    async def test_viewer_can_view_dashboard(self, client, viewer_user):
+    async def test_viewer_cannot_view_dashboard(self, client, viewer_user):
         _, token = viewer_user
         resp = await client.get(
             f"{OPP}/dashboard", headers=auth_headers(token)
         )
-        assert resp.status_code == 200
+        assert resp.status_code == 403
 
     async def test_viewer_cannot_create(self, client, viewer_user):
         """create 需要 admin 角色"""

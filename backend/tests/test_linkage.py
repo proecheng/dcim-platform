@@ -1,5 +1,8 @@
 """联动引擎 API 测试 — Story 9-1"""
 
+import uuid
+from unittest.mock import AsyncMock, patch
+
 import pytest
 
 from httpx import AsyncClient, ASGITransport
@@ -8,8 +11,9 @@ from sqlalchemy import delete
 
 from app.core.database import Base
 from app.models.linkage import LinkagePolicy, LinkageAction, LinkageExecution, LinkageLog
-from app.models.user import User
+from app.models.user import User, UserSession
 from app.api.deps import get_db, require_admin, require_operator, require_viewer
+from tests.conftest import _create_test_token, auth_headers
 
 
 # ============================================================
@@ -34,6 +38,24 @@ async def engine():
 @pytest.fixture(scope="module")
 def session_factory(engine):
     return async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+
+
+@pytest.fixture(scope="module")
+async def admin_token(session_factory):
+    async with session_factory() as session:
+        admin = User(
+            username="linkage_admin",
+            password_hash="test-only",
+            real_name="联动策略管理员",
+            role="admin",
+            is_active=True,
+        )
+        session.add(admin)
+        await session.flush()
+        jti = uuid.uuid4().hex
+        session.add(UserSession(user_id=admin.id, token_jti=jti, is_active=True))
+        await session.commit()
+        return _create_test_token(admin.username, jti)
 
 
 @pytest.fixture
@@ -87,14 +109,23 @@ async def app(db_session, mock_admin, mock_viewer):
     _app.dependency_overrides[require_admin] = override_require_admin
     _app.dependency_overrides[require_operator] = override_require_operator
     _app.dependency_overrides[require_viewer] = override_require_viewer
-    yield _app
+    with patch(
+        "app.api.v1.linkage.linkage_engine.reload_policies",
+        new_callable=AsyncMock,
+        return_value=0,
+    ):
+        yield _app
     _app.dependency_overrides.clear()
 
 
 @pytest.fixture
-async def client(app):
+async def client(app, admin_token):
     transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://test") as c:
+    async with AsyncClient(
+        transport=transport,
+        base_url="http://test",
+        headers=auth_headers(admin_token),
+    ) as c:
         yield c
 
 

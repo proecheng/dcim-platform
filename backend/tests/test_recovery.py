@@ -1,8 +1,9 @@
 """联动恢复引擎 API 测试 — Story 9-4"""
 
-import pytest
+import uuid
 from unittest.mock import patch, AsyncMock
 
+import pytest
 from httpx import AsyncClient, ASGITransport
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from sqlalchemy import select, delete
@@ -16,9 +17,10 @@ from app.models.linkage import (
     LinkageRecovery,
     LinkageRecoveryLog,
 )
-from app.models.user import User
+from app.models.user import User, UserSession
 from app.api.deps import get_db, require_admin, require_operator, require_viewer
 from app.engines.recovery_engine import RecoveryEngine, RECOVERY_COMMAND_MAP, RECOVERY_ORDER
+from tests.conftest import _create_test_token, auth_headers
 
 
 # ============================================================
@@ -43,6 +45,24 @@ async def engine():
 @pytest.fixture(scope="module")
 def session_factory(engine):
     return async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+
+
+@pytest.fixture(scope="module")
+async def admin_token(session_factory):
+    async with session_factory() as session:
+        admin = User(
+            username="recovery_admin",
+            password_hash="test-only",
+            real_name="联动恢复管理员",
+            role="admin",
+            is_active=True,
+        )
+        session.add(admin)
+        await session.flush()
+        jti = uuid.uuid4().hex
+        session.add(UserSession(user_id=admin.id, token_jti=jti, is_active=True))
+        await session.commit()
+        return _create_test_token(admin.username, jti)
 
 
 @pytest.fixture
@@ -104,9 +124,13 @@ async def app(db_session, mock_admin, mock_viewer):
 
 
 @pytest.fixture
-async def client(app):
+async def client(app, admin_token):
     transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://test") as c:
+    async with AsyncClient(
+        transport=transport,
+        base_url="http://test",
+        headers=auth_headers(admin_token),
+    ) as c:
         yield c
 
 

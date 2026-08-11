@@ -1,5 +1,7 @@
 """用户管理 API 测试 (Story 13-1)"""
 
+import uuid
+
 import pytest
 
 from httpx import AsyncClient, ASGITransport
@@ -7,8 +9,9 @@ from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sess
 from sqlalchemy import delete
 
 from app.core.database import Base
-from app.models.user import User
+from app.models.user import User, UserSession
 from app.api.deps import get_db, require_admin, require_operator, require_viewer
+from tests.conftest import _create_test_token, auth_headers
 
 
 # ============================================================
@@ -38,9 +41,27 @@ def session_factory(engine):
 @pytest.fixture
 async def db_session(session_factory):
     async with session_factory() as session:
+        await session.execute(delete(UserSession))
         await session.execute(delete(User))
         await session.commit()
         yield session
+
+
+@pytest.fixture
+async def admin_token(db_session):
+    admin = User(
+        username="user_management_admin",
+        password_hash="test-only",
+        real_name="用户管理管理员",
+        role="admin",
+        is_active=True,
+    )
+    db_session.add(admin)
+    await db_session.flush()
+    jti = uuid.uuid4().hex
+    db_session.add(UserSession(user_id=admin.id, token_jti=jti, is_active=True))
+    await db_session.commit()
+    return _create_test_token(admin.username, jti)
 
 
 @pytest.fixture
@@ -78,9 +99,13 @@ async def app(db_session, mock_admin):
 
 
 @pytest.fixture
-async def client(app):
+async def client(app, admin_token):
     transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://test") as c:
+    async with AsyncClient(
+        transport=transport,
+        base_url="http://test",
+        headers=auth_headers(admin_token),
+    ) as c:
         yield c
 
 

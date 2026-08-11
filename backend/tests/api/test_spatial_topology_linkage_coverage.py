@@ -14,17 +14,13 @@ from app.models.device import Device
 from app.models.topology_config import (
     PowerPhaseMapping,
     CoolingZone,
-    CoolingZoneCabinet,
-    CoolingZoneUnit,
 )
 from app.models.cooling import CoolingUnit
 from app.models.linkage import (
     LinkagePolicy,
-    LinkageAction,
     LinkageExecution,
     LinkageLog,
     LinkageRecovery,
-    LinkageRecoveryLog,
 )
 
 
@@ -758,14 +754,13 @@ class TestPowerPhaseMapping:
         assert resp.status_code == 200
         assert len(resp.json()) >= 1
 
-    async def test_get_cabinet_power_phase_empty(self, client, admin_user):
+    async def test_get_cabinet_power_phase_not_found(self, client, admin_user):
         _, token = admin_user
         resp = await client.get(
             "/api/v1/topology-config/power-phase/cabinet/99999",
             headers=auth_headers(token),
         )
-        assert resp.status_code == 200
-        assert resp.json() == []
+        assert resp.status_code == 404
 
     async def test_update_power_phase_mapping(self, client, admin_user, async_db):
         _, token = admin_user

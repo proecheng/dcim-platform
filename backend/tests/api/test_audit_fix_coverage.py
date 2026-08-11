@@ -13,8 +13,7 @@
 """
 
 import pytest
-import json
-from datetime import datetime, timedelta, timezone
+from datetime import datetime
 from httpx import AsyncClient
 from sqlalchemy import select
 
@@ -298,13 +297,39 @@ class TestRBACDependencyInjection:
 
     @pytest.mark.asyncio
     async def test_sensor_metadata_operator_can_update(
-        self, client: AsyncClient, operator_token: str, async_db
+        self, client: AsyncClient, operator_user, async_db
     ):
         """operator 可以更新传感器元数据 (require_operator)"""
+        from app.models.device import Device
         from app.models.diagnosis import SensorMetadata
+        from app.models.point import Point
+        from app.models.spatial import Site
+        from app.models.user import UserSite
+
+        operator, operator_token = operator_user
+        site = Site(site_code="AUDIT-SENSOR-SITE", site_name="审计传感器测试站点")
+        async_db.add(site)
+        await async_db.flush()
+        device = Device(
+            device_code="AUDIT-SENSOR-DEVICE",
+            device_name="审计传感器测试设备",
+            device_type="UPS",
+            area_code="A",
+            site_id=site.id,
+        )
+        async_db.add(device)
+        await async_db.flush()
+        point = Point(
+            point_code="AUDIT-SENSOR-POINT",
+            point_name="审计传感器测试点位",
+            point_type="AI",
+            device_id=device.id,
+        )
+        async_db.add_all([UserSite(user_id=operator.id, site_id=site.id), point])
+        await async_db.flush()
 
         meta = SensorMetadata(
-            point_id=9004, accuracy_class=0.5, calibration_interval_days=365
+            point_id=point.id, accuracy_class=0.5, calibration_interval_days=365
         )
         async_db.add(meta)
         await async_db.flush()
@@ -335,15 +360,15 @@ class TestRBACDependencyInjection:
         assert response.status_code == 200
 
     @pytest.mark.asyncio
-    async def test_probability_adjustments_viewer_can_list(
+    async def test_probability_adjustments_viewer_cannot_list(
         self, client: AsyncClient, viewer_token: str
     ):
-        """viewer 可以查看概率调参列表 (require_viewer)"""
+        """viewer 不能查看全局概率调参配置"""
         response = await client.get(
             "/api/v1/diagnosis/probability-tuning/adjustments",
             headers={"Authorization": f"Bearer {viewer_token}"},
         )
-        assert response.status_code == 200
+        assert response.status_code == 403
 
     @pytest.mark.asyncio
     async def test_probability_adjustments_no_auth(

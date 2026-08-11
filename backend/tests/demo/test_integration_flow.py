@@ -9,6 +9,7 @@ from app.demo.service import DemoDataService
 from app.models.history import PointHistory
 from app.models.point import Point, PointRealtime
 from app.services import ingest_pipeline
+from tests.conftest import auth_headers
 
 
 class _SessionCtx:
@@ -25,7 +26,7 @@ class _SessionCtx:
         return False
 
 
-async def test_demo_flow_load_generate_unload_with_api(async_db, client, monkeypatch):
+async def test_demo_flow_load_generate_unload_with_api(async_db, client, monkeypatch, admin_token):
     svc = DemoDataService()
 
     async def _noop(*_args, **_kwargs):
@@ -101,7 +102,7 @@ async def test_demo_flow_load_generate_unload_with_api(async_db, client, monkeyp
     assert load_result["success"] is True
 
     # 使用 AsyncClient 验证 API 可见状态
-    status_resp = await client.get("/api/v1/demo/status")
+    status_resp = await client.get("/api/v1/demo/status", headers=auth_headers(admin_token))
     assert status_resp.status_code == 200
     status_data = status_resp.json()["data"]
     assert status_data["point_count"] == 3
@@ -111,7 +112,7 @@ async def test_demo_flow_load_generate_unload_with_api(async_db, client, monkeyp
     history_count_after_generate = await async_db.scalar(select(func.count(PointHistory.id)))
     assert history_count_after_generate >= 1
 
-    unload_resp = await client.post("/api/v1/demo/unload")
+    unload_resp = await client.post("/api/v1/demo/unload", headers=auth_headers(admin_token))
     assert unload_resp.status_code == 200
     unload_data = unload_resp.json()
     assert unload_data["success"] is True

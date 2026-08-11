@@ -1,9 +1,10 @@
 """告警升级规则与引擎测试 — Story 5-5"""
 
-import pytest
+import uuid
 from datetime import datetime, timedelta
 from unittest.mock import AsyncMock, patch
 
+import pytest
 from httpx import AsyncClient, ASGITransport
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from sqlalchemy import delete, select
@@ -11,9 +12,10 @@ from sqlalchemy import delete, select
 from app.core.database import Base
 from app.models.alarm import Alarm, AlarmEscalation
 from app.models.point import Point
-from app.models.user import User
+from app.models.user import User, UserSession
 from app.api.deps import get_db, require_viewer, require_operator
 from app.engines.escalation_engine import check_escalations
+from tests.conftest import _create_test_token, auth_headers
 
 
 # ==================== fixtures ====================
@@ -36,6 +38,24 @@ async def engine():
 @pytest.fixture(scope="module")
 def session_factory(engine):
     return async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+
+
+@pytest.fixture(scope="module")
+async def admin_token(session_factory):
+    async with session_factory() as session:
+        admin = User(
+            username="escalation_admin",
+            password_hash="test-only",
+            real_name="告警升级管理员",
+            role="admin",
+            is_active=True,
+        )
+        session.add(admin)
+        await session.flush()
+        jti = uuid.uuid4().hex
+        session.add(UserSession(user_id=admin.id, token_jti=jti, is_active=True))
+        await session.commit()
+        return _create_test_token(admin.username, jti)
 
 
 @pytest.fixture
@@ -81,9 +101,13 @@ async def app(db_session, mock_user):
 
 
 @pytest.fixture
-async def client(app):
+async def client(app, admin_token):
     transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://test") as c:
+    async with AsyncClient(
+        transport=transport,
+        base_url="http://test",
+        headers=auth_headers(admin_token),
+    ) as c:
         yield c
 
 

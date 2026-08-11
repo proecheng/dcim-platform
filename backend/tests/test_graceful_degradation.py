@@ -6,8 +6,12 @@ from httpx import AsyncClient, ASGITransport
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.core.database import Base
-from app.models.user import User
+from app.models.user import User, UserSession
 from app.core.security import get_password_hash
+from tests.conftest import _create_test_token
+
+
+TEST_JTI = "graceful-degradation-session"
 
 
 @pytest_asyncio.fixture
@@ -38,6 +42,8 @@ async def test_user(db_session: AsyncSession):
         is_active=True,
     )
     db_session.add(user)
+    await db_session.flush()
+    db_session.add(UserSession(user_id=user.id, token_jti=TEST_JTI, is_active=True))
     await db_session.commit()
     await db_session.refresh(user)
     return user
@@ -45,11 +51,7 @@ async def test_user(db_session: AsyncSession):
 
 def _make_token(username: str = "testadmin") -> str:
     """生成测试 JWT"""
-    from app.core.config import get_settings
-    from jose import jwt
-
-    settings = get_settings()
-    return jwt.encode({"sub": username}, settings.secret_key, algorithm=settings.algorithm)
+    return _create_test_token(username, TEST_JTI)
 
 
 @pytest_asyncio.fixture

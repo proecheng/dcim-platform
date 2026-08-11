@@ -11,9 +11,12 @@ from unittest.mock import AsyncMock, patch
 VPP_API_KEY = "dcim-vpp-default-key-change-me"
 
 
-def vpp_headers():
-    """VPP API Key 请求头"""
-    return {"X-VPP-API-Key": VPP_API_KEY}
+def vpp_headers(token, api_key=VPP_API_KEY):
+    """VPP API Key 与活动会话请求头"""
+    return {
+        "Authorization": f"Bearer {token}",
+        "X-VPP-API-Key": api_key,
+    }
 
 
 def _make_dispatch_result(status="accepted", **kwargs):
@@ -45,27 +48,28 @@ VALID_REQUEST = {
 class TestVppDispatchAPI:
     """POST /vpp/dispatch API 测试"""
 
-    async def test_missing_api_key_returns_401(self, client):
+    async def test_missing_api_key_returns_401(self, client, admin_token):
         """缺少 API Key 返回 401"""
         resp = await client.post(
             "/api/v1/precool/vpp/dispatch",
             json=VALID_REQUEST,
+            headers={"Authorization": f"Bearer {admin_token}"},
         )
         body = resp.json()
         assert body["code"] == 401
         assert "认证失败" in body["message"]
 
-    async def test_invalid_api_key_returns_401(self, client):
+    async def test_invalid_api_key_returns_401(self, client, admin_token):
         """无效 API Key 返回 401"""
         resp = await client.post(
             "/api/v1/precool/vpp/dispatch",
             json=VALID_REQUEST,
-            headers={"X-VPP-API-Key": "wrong-key"},
+            headers=vpp_headers(admin_token, api_key="wrong-key"),
         )
         body = resp.json()
         assert body["code"] == 401
 
-    async def test_not_phase_4_returns_403(self, client):
+    async def test_not_phase_4_returns_403(self, client, admin_token):
         """非阶段 4 返回 403"""
         with patch(
             "app.services.precool.deployment_phase.deployment_phase_service.get_current_phase",
@@ -75,13 +79,13 @@ class TestVppDispatchAPI:
             resp = await client.post(
                 "/api/v1/precool/vpp/dispatch",
                 json=VALID_REQUEST,
-                headers=vpp_headers(),
+                headers=vpp_headers(admin_token),
             )
         body = resp.json()
         assert body["code"] == 403
         assert "阶段 4" in body["message"]
 
-    async def test_invalid_command_type_returns_400(self, client):
+    async def test_invalid_command_type_returns_400(self, client, admin_token):
         """无效 command_type 返回 400"""
         with patch(
             "app.services.precool.deployment_phase.deployment_phase_service.get_current_phase",
@@ -95,13 +99,13 @@ class TestVppDispatchAPI:
                     "target_power_kw": 10,
                     "duration_minutes": 30,
                 },
-                headers=vpp_headers(),
+                headers=vpp_headers(admin_token),
             )
         body = resp.json()
         assert body["code"] == 400
         assert "command_type" in body["message"]
 
-    async def test_missing_field_returns_400(self, client):
+    async def test_missing_field_returns_400(self, client, admin_token):
         """缺少必填字段返回 400"""
         with patch(
             "app.services.precool.deployment_phase.deployment_phase_service.get_current_phase",
@@ -111,12 +115,12 @@ class TestVppDispatchAPI:
             resp = await client.post(
                 "/api/v1/precool/vpp/dispatch",
                 json={"command_type": "down_adjust", "duration_minutes": 30},
-                headers=vpp_headers(),
+                headers=vpp_headers(admin_token),
             )
         body = resp.json()
         assert body["code"] == 400
 
-    async def test_rate_limit_exceeded_returns_429(self, client):
+    async def test_rate_limit_exceeded_returns_429(self, client, admin_token):
         """超出速率限制返回 429"""
         with patch(
             "app.services.precool.deployment_phase.deployment_phase_service.get_current_phase",
@@ -131,13 +135,13 @@ class TestVppDispatchAPI:
                 resp = await client.post(
                     "/api/v1/precool/vpp/dispatch",
                     json=VALID_REQUEST,
-                    headers=vpp_headers(),
+                    headers=vpp_headers(admin_token),
                 )
         body = resp.json()
         assert body["code"] == 429
         assert "速率限制" in body["message"]
 
-    async def test_accepted_dispatch(self, client):
+    async def test_accepted_dispatch(self, client, admin_token):
         """正常指令被接受"""
         with patch(
             "app.services.precool.deployment_phase.deployment_phase_service.get_current_phase",
@@ -157,14 +161,14 @@ class TestVppDispatchAPI:
                     resp = await client.post(
                         "/api/v1/precool/vpp/dispatch",
                         json=VALID_REQUEST,
-                        headers=vpp_headers(),
+                        headers=vpp_headers(admin_token),
                     )
         body = resp.json()
         assert body["code"] == 200
         assert body["data"]["status"] == "accepted"
         assert body["data"]["accepted_power_kw"] == 30.0
 
-    async def test_rejected_dispatch(self, client):
+    async def test_rejected_dispatch(self, client, admin_token):
         """超过容量的指令被拒绝"""
         with patch(
             "app.services.precool.deployment_phase.deployment_phase_service.get_current_phase",
@@ -188,14 +192,14 @@ class TestVppDispatchAPI:
                     resp = await client.post(
                         "/api/v1/precool/vpp/dispatch",
                         json=VALID_REQUEST,
-                        headers=vpp_headers(),
+                        headers=vpp_headers(admin_token),
                     )
         body = resp.json()
         assert body["code"] == 200
         assert body["data"]["status"] == "rejected"
         assert body["data"]["max_adjustable_kw"] == 50.0
 
-    async def test_service_exception_returns_500(self, client):
+    async def test_service_exception_returns_500(self, client, admin_token):
         """服务异常返回 500"""
         with patch(
             "app.services.precool.deployment_phase.deployment_phase_service.get_current_phase",
@@ -215,7 +219,7 @@ class TestVppDispatchAPI:
                     resp = await client.post(
                         "/api/v1/precool/vpp/dispatch",
                         json=VALID_REQUEST,
-                        headers=vpp_headers(),
+                        headers=vpp_headers(admin_token),
                     )
         body = resp.json()
         assert body["code"] == 500

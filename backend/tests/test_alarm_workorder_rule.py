@@ -1,15 +1,18 @@
 """告警-工单规则 API 测试 — 告警自动生成工单"""
 
-import pytest
+import uuid
 
+import pytest
 from httpx import AsyncClient, ASGITransport
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from sqlalchemy import delete
 
 from app.core.database import Base
+from app.models.alarm import Alarm
 from app.models.operation import AlarmWorkOrderRule, WorkOrder, WorkOrderLog
-from app.models.user import User
+from app.models.user import User, UserSession
 from app.api.deps import get_db, require_admin, require_operator, require_viewer
+from tests.conftest import _create_test_token, auth_headers
 
 
 # ============================================================
@@ -36,12 +39,42 @@ def session_factory(engine):
     return async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
 
+@pytest.fixture(scope="module")
+async def admin_token(session_factory):
+    async with session_factory() as session:
+        admin = User(
+            username="alarm_rule_admin",
+            password_hash="test-only",
+            real_name="告警规则管理员",
+            role="admin",
+            is_active=True,
+        )
+        session.add(admin)
+        await session.flush()
+        jti = uuid.uuid4().hex
+        session.add(UserSession(user_id=admin.id, token_jti=jti, is_active=True))
+        await session.commit()
+        return _create_test_token(admin.username, jti)
+
+
 @pytest.fixture
 async def db_session(session_factory):
     async with session_factory() as session:
         await session.execute(delete(WorkOrderLog))
         await session.execute(delete(WorkOrder))
         await session.execute(delete(AlarmWorkOrderRule))
+        await session.execute(delete(Alarm))
+        session.add_all(
+            [
+                Alarm(
+                    id=alarm_id,
+                    alarm_no=f"ALM-RULE-{alarm_id}",
+                    alarm_level=alarm_level,
+                    alarm_message="告警规则测试",
+                )
+                for alarm_id, alarm_level in ((1, "critical"), (2, "minor"), (3, "critical"), (42, "critical"))
+            ]
+        )
         await session.commit()
         yield session
 
@@ -81,9 +114,13 @@ async def app(db_session, mock_admin):
 
 
 @pytest.fixture
-async def client(app):
+async def client(app, admin_token):
     transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://test") as c:
+    async with AsyncClient(
+        transport=transport,
+        base_url="http://test",
+        headers=auth_headers(admin_token),
+    ) as c:
         yield c
 
 

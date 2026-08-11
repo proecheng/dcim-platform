@@ -5,7 +5,7 @@ Story 26.4: 时间窗口自适应
 
 import pytest
 import json
-from datetime import datetime, timedelta
+import uuid
 from httpx import AsyncClient, ASGITransport
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from sqlalchemy import select, delete
@@ -15,8 +15,9 @@ from app.models.diagnosis import TimeWindowAdjustmentLog, DiagnosisResult, Diagn
 from app.models.config import SystemConfig
 from app.models.alarm import Alarm
 from app.models.device import Device
-from app.models.user import User
+from app.models.user import User, UserSession
 from app.api.deps import get_db, require_admin, require_operator, require_viewer
+from tests.conftest import _create_test_token, auth_headers
 
 
 # ============================================================
@@ -52,6 +53,7 @@ async def db_session(session_factory):
         await session.execute(delete(Alarm))
         await session.execute(delete(Device))
         await session.execute(delete(SystemConfig))
+        await session.execute(delete(UserSession))
         await session.execute(delete(User))
         await session.commit()
         yield session
@@ -102,9 +104,10 @@ async def app(db_session, mock_admin, mock_viewer):
 
 
 @pytest.fixture
-async def client(app):
+async def client(app, setup_test_data):
+    headers = auth_headers(setup_test_data["token"])
     transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://test") as ac:
+    async with AsyncClient(transport=transport, base_url="http://test", headers=headers) as ac:
         yield ac
 
 
@@ -132,9 +135,12 @@ async def setup_test_data(db_session):
     )
     db_session.add(admin)
 
+    jti = uuid.uuid4().hex
+    db_session.add(UserSession(user_id=admin.id, token_jti=jti, is_active=True))
+
     await db_session.commit()
 
-    return {"config": config, "admin": admin}
+    return {"config": config, "admin": admin, "token": _create_test_token(admin.username, jti)}
 
 
 # ============================================================
@@ -412,4 +418,3 @@ async def test_reject_without_reason(client, db_session, setup_test_data):
     )
     # 空理由应被拒绝（Pydantic 验证：reason 为必填字段）
     assert response.status_code in (400, 422)
-
