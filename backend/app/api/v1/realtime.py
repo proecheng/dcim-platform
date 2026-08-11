@@ -207,7 +207,9 @@ async def get_realtime_summary(
         try:
             # 先查出 point_code -> point 映射
             code_result = await db.execute(
-                apply_point_site_scope(select(Point).where(Point.point_code.in_(key_point_codes)), Point.id, site_context)
+                apply_point_site_scope(
+                    select(Point).where(Point.point_code.in_(key_point_codes)), Point.id, site_context
+                )
             )
             code_points = {p.point_code: p for p in code_result.scalars().all()}
             redis_keys = [f"point:{code_points[c].id}:latest" for c in key_point_codes if c in code_points]
@@ -307,6 +309,7 @@ async def get_dashboard_data(
     获取仪表盘显示所需的数据
     """
     from sqlalchemy import func
+
     # 概览卡片数据
     overview = {
         "temperature": None,
@@ -372,13 +375,17 @@ async def get_dashboard_data(
 
     # 活动告警数量
     alarm_result = await db.execute(
-        apply_point_site_scope(select(func.count(Alarm.id)).where(Alarm.status == "active"), Alarm.point_id, site_context)
+        apply_point_site_scope(
+            select(func.count(Alarm.id)).where(Alarm.status == "active"), Alarm.point_id, site_context
+        )
     )
     overview["alarm_count"] = alarm_result.scalar() or 0
 
     # 设备状态分布
     device_status_result = await db.execute(
-        apply_site_scope(select(Device.status, func.count(Device.id)), Device.site_id, site_context).group_by(Device.status)
+        apply_site_scope(select(Device.status, func.count(Device.id)), Device.site_id, site_context).group_by(
+            Device.status
+        )
     )
     device_status = {row[0]: row[1] for row in device_status_result.all()}
 

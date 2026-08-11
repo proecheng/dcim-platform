@@ -247,8 +247,7 @@ class _ProducerVisitor(ast.NodeVisitor):
                     "call": func.attr,
                     "channel": PRODUCER_METHOD_CHANNELS[func.attr],
                     "has_site_id": "site_id" in keywords,
-                    "global_message_is_true": isinstance(global_message, ast.Constant)
-                    and global_message.value is True,
+                    "global_message_is_true": isinstance(global_message, ast.Constant) and global_message.value is True,
                 }
             )
         self.generic_visit(node)
@@ -438,9 +437,7 @@ def _action_for_method(method: str, operation: str) -> str:
         return "read"
     if "login" in operation or "refresh" in operation:
         return "authenticate"
-    return {"POST": "create", "PUT": "update", "PATCH": "update", "DELETE": "delete"}.get(
-        method, "execute"
-    )
+    return {"POST": "create", "PUT": "update", "PATCH": "update", "DELETE": "delete"}.get(method, "execute")
 
 
 def _resource_for_path(path: str) -> str:

@@ -85,9 +85,7 @@ async def _authorize_shield_point(db: AsyncSession, point_id: Optional[int], con
     require_context_site_access(site_id, context, hide_existence=True)
 
 
-async def _authorized_alarm_shield(
-    db: AsyncSession, shield_id: int, context: SiteAccessContext
-) -> AlarmShield:
+async def _authorized_alarm_shield(db: AsyncSession, shield_id: int, context: SiteAccessContext) -> AlarmShield:
     result = await db.execute(_alarm_shield_scope(select(AlarmShield).where(AlarmShield.id == shield_id), context))
     shield = result.scalar_one_or_none()
     if shield is None:
@@ -267,9 +265,7 @@ async def get_alarm_statistics(
 
     # 按状态统计
     status_result = await db.execute(
-        _alarm_scope(select(Alarm.status, func.count(Alarm.id)), site_context)
-        .where(base_filter)
-        .group_by(Alarm.status)
+        _alarm_scope(select(Alarm.status, func.count(Alarm.id)), site_context).where(base_filter).group_by(Alarm.status)
     )
     by_status = {row[0]: row[1] for row in status_result.all()}
 
@@ -446,8 +442,10 @@ async def batch_acknowledge(
     批量确认告警
     """
     authorized_ids = (
-        await db.execute(_alarm_scope(select(Alarm.id).where(Alarm.id.in_(data.alarm_ids)), site_context))
-    ).scalars().all()
+        (await db.execute(_alarm_scope(select(Alarm.id).where(Alarm.id.in_(data.alarm_ids)), site_context)))
+        .scalars()
+        .all()
+    )
     if set(authorized_ids) != set(data.alarm_ids):
         raise HTTPException(status_code=404, detail="告警不存在")
     site_rows = (

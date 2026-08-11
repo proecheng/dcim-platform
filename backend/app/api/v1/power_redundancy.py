@@ -6,7 +6,14 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
-from ..deps import SiteAccessContext, apply_device_site_scope, get_db, get_site_access_context, require_admin, require_viewer
+from ..deps import (
+    SiteAccessContext,
+    apply_device_site_scope,
+    get_db,
+    get_site_access_context,
+    require_admin,
+    require_viewer,
+)
 from ...models.user import User
 from ...models.energy import PowerDevice
 from ...schemas.diagnosis import RedundancyConfigUpdate, RedundancyConfigResponse

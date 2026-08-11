@@ -27,9 +27,7 @@ async def get_data_quality_status(
         PointRealtime.quality,
         func.count(PointRealtime.point_id),
     ).group_by(PointRealtime.quality)
-    stats_result = await db.execute(
-        apply_point_site_scope(stats_query, PointRealtime.point_id, context)
-    )
+    stats_result = await db.execute(apply_point_site_scope(stats_query, PointRealtime.point_id, context))
     counts = {row[0] or 0: row[1] for row in stats_result.all()}
 
     total = sum(counts.values())
@@ -53,9 +51,7 @@ async def get_data_quality_status(
             .join(Point, Point.id == PointRealtime.point_id)
             .where(PointRealtime.quality == 2)
         )
-        detail_result = await db.execute(
-            apply_point_site_scope(detail_query, PointRealtime.point_id, context)
-        )
+        detail_result = await db.execute(apply_point_site_scope(detail_query, PointRealtime.point_id, context))
         for row in detail_result.all():
             q = row[4] or 0
             unreliable_points.append(

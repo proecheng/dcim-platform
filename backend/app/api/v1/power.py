@@ -118,9 +118,9 @@ async def get_power_overview(
     soh_q = (
         select(func.avg(PointRealtime.value))
         .select_from(
-            PointRealtime.__table__
-            .join(Point.__table__, PointRealtime.point_id == Point.id)
-            .join(Device.__table__, Point.device_id == Device.id)
+            PointRealtime.__table__.join(Point.__table__, PointRealtime.point_id == Point.id).join(
+                Device.__table__, Point.device_id == Device.id
+            )
         )
         .where(Point.point_code.like("%_soh"))
     )
@@ -132,9 +132,9 @@ async def get_power_overview(
     soc_q = (
         select(func.min(PointRealtime.value))
         .select_from(
-            PointRealtime.__table__
-            .join(Point.__table__, PointRealtime.point_id == Point.id)
-            .join(Device.__table__, Point.device_id == Device.id)
+            PointRealtime.__table__.join(Point.__table__, PointRealtime.point_id == Point.id).join(
+                Device.__table__, Point.device_id == Device.id
+            )
         )
         .where(Point.point_code.like("%_soc"))
     )
@@ -163,9 +163,9 @@ async def get_power_overview(
             func.avg(PointRealtime.value),
         )
         .select_from(
-            PointRealtime.__table__
-            .join(Point.__table__, PointRealtime.point_id == Point.id)
-            .join(Device.__table__, Point.device_id == Device.id)
+            PointRealtime.__table__.join(Point.__table__, PointRealtime.point_id == Point.id).join(
+                Device.__table__, Point.device_id == Device.id
+            )
         )
         .where(
             or_(
@@ -186,9 +186,9 @@ async def get_power_overview(
     power_q = (
         select(func.sum(PointRealtime.value))
         .select_from(
-            PointRealtime.__table__
-            .join(Point.__table__, PointRealtime.point_id == Point.id)
-            .join(Device.__table__, Point.device_id == Device.id)
+            PointRealtime.__table__.join(Point.__table__, PointRealtime.point_id == Point.id).join(
+                Device.__table__, Point.device_id == Device.id
+            )
         )
         .where(
             or_(

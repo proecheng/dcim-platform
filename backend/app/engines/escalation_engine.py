@@ -59,11 +59,11 @@ async def check_escalations(session: AsyncSession):
             pending_broadcasts.append(
                 (
                     {
-                    "action": "escalate",
-                    "id": alarm_id,
-                    "alarm_level": target_level,
-                    "previous_level": source_level,
-                    "escalation_remark": remark,
+                        "action": "escalate",
+                        "id": alarm_id,
+                        "alarm_level": target_level,
+                        "previous_level": source_level,
+                        "escalation_remark": remark,
                     },
                     site_id,
                 )

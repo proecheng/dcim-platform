@@ -78,9 +78,7 @@ def _authorized_session_ids(context: SiteAccessContext):
     return apply_device_site_scope(select(DiagnosisSession.id), DiagnosisSession.device_id, context)
 
 
-async def _get_authorized_session(
-    db: AsyncSession, session_id: int, context: SiteAccessContext
-) -> DiagnosisSession:
+async def _get_authorized_session(db: AsyncSession, session_id: int, context: SiteAccessContext) -> DiagnosisSession:
     query = apply_device_site_scope(
         select(DiagnosisSession).where(DiagnosisSession.id == session_id),
         DiagnosisSession.device_id,
@@ -92,9 +90,7 @@ async def _get_authorized_session(
     return session_obj
 
 
-async def _get_authorized_result(
-    db: AsyncSession, result_id: int, context: SiteAccessContext
-) -> DiagnosisResult:
+async def _get_authorized_result(db: AsyncSession, result_id: int, context: SiteAccessContext) -> DiagnosisResult:
     query = apply_device_site_scope(
         select(DiagnosisResult).where(DiagnosisResult.id == result_id),
         DiagnosisResult.device_id,
@@ -1038,9 +1034,7 @@ async def get_sensor_fusion_records(
     from ...schemas.diagnosis import SensorFusionRecordListResponse, SensorFusionRecordResponse
 
     # 构建查询
-    authorized_zone_ids = apply_cooling_zone_site_scope(
-        select(CoolingZone.id), CoolingZone.site_id, context
-    )
+    authorized_zone_ids = apply_cooling_zone_site_scope(select(CoolingZone.id), CoolingZone.site_id, context)
     query = select(SensorFusionRecord).where(SensorFusionRecord.zone_id.in_(authorized_zone_ids))
 
     # 应用过滤条件

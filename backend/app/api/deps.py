@@ -270,9 +270,7 @@ def authorized_work_order_ids_query(context: SiteAccessContext) -> Any:
     if context.site_ids is None:
         return None
     return (
-        select(WorkOrder.id)
-        .join(Device, WorkOrder.device_id == Device.id)
-        .where(Device.site_id.in_(context.site_ids))
+        select(WorkOrder.id).join(Device, WorkOrder.device_id == Device.id).where(Device.site_id.in_(context.site_ids))
     )
 
 
@@ -284,9 +282,7 @@ def apply_work_order_site_scope(statement: Any, order_id_column: Any, context: S
     return statement.where(order_id_column.in_(authorized_ids))
 
 
-def apply_work_order_approval_site_scope(
-    statement: Any, approval_id_column: Any, context: SiteAccessContext
-) -> Any:
+def apply_work_order_approval_site_scope(statement: Any, approval_id_column: Any, context: SiteAccessContext) -> Any:
     """通过 WorkOrderApproval -> WorkOrder -> Device -> Site 约束审批查询。"""
     if context.site_ids is None:
         return statement
@@ -352,9 +348,7 @@ def apply_camera_site_scope(statement: Any, camera_id_column: Any, context: Site
     return statement.where(camera_id_column.in_(authorized_ids))
 
 
-def authorized_ota_task_ids_query(
-    context: SiteAccessContext, *, require_resolvable_gateways: bool = False
-) -> Any:
+def authorized_ota_task_ids_query(context: SiteAccessContext, *, require_resolvable_gateways: bool = False) -> Any:
     """返回全部目标网关均可解析且落在授权站点内的 OTA 任务 ID 查询。"""
     if context.site_ids is None and not require_resolvable_gateways:
         return None
@@ -387,9 +381,7 @@ def apply_ota_task_site_scope(
     require_resolvable_gateways: bool = False,
 ) -> Any:
     """通过 OtaTaskGateway -> Gateway 的完整目标集合约束 OTA 任务查询。"""
-    authorized_ids = authorized_ota_task_ids_query(
-        context, require_resolvable_gateways=require_resolvable_gateways
-    )
+    authorized_ids = authorized_ota_task_ids_query(context, require_resolvable_gateways=require_resolvable_gateways)
     if authorized_ids is None:
         return statement
     return statement.where(task_id_column.in_(authorized_ids))
@@ -473,10 +465,7 @@ async def get_authorized_asset(db: AsyncSession, asset_id: int, context: SiteAcc
 async def get_authorized_row(db: AsyncSession, row_id: int, context: SiteAccessContext) -> Row:
     """通过 Row -> Room -> Floor -> Site 读取授权机柜行。"""
     query = (
-        select(Row)
-        .join(Room, Row.room_id == Room.id)
-        .join(Floor, Room.floor_id == Floor.id)
-        .where(Row.id == row_id)
+        select(Row).join(Room, Row.room_id == Room.id).join(Floor, Room.floor_id == Floor.id).where(Row.id == row_id)
     )
     query = apply_site_scope(query, Floor.site_id, context)
     row = (await db.execute(query)).scalar_one_or_none()
@@ -485,13 +474,9 @@ async def get_authorized_row(db: AsyncSession, row_id: int, context: SiteAccessC
     return row
 
 
-async def get_authorized_work_order(
-    db: AsyncSession, order_id: int, context: SiteAccessContext
-) -> WorkOrder:
+async def get_authorized_work_order(db: AsyncSession, order_id: int, context: SiteAccessContext) -> WorkOrder:
     """按设备站点读取工单，统一隐藏站外、未归属和不存在对象。"""
-    query = apply_work_order_site_scope(
-        select(WorkOrder).where(WorkOrder.id == order_id), WorkOrder.id, context
-    )
+    query = apply_work_order_site_scope(select(WorkOrder).where(WorkOrder.id == order_id), WorkOrder.id, context)
     order = (await db.execute(query)).scalar_one_or_none()
     if order is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="工单不存在")
@@ -524,11 +509,7 @@ async def get_authorized_alarm(db: AsyncSession, alarm_id: int, context: SiteAcc
 
 async def get_authorized_room(db: AsyncSession, room_id: int, context: SiteAccessContext) -> tuple[Room, int]:
     """Read a room and its trusted site owner in one scoped query."""
-    query = (
-        select(Room, Floor.site_id)
-        .join(Floor, Room.floor_id == Floor.id)
-        .where(Room.id == room_id)
-    )
+    query = select(Room, Floor.site_id).join(Floor, Room.floor_id == Floor.id).where(Room.id == room_id)
     query = apply_site_scope(query, Floor.site_id, context)
     row = (await db.execute(query)).first()
     if row is None:
@@ -536,22 +517,16 @@ async def get_authorized_room(db: AsyncSession, room_id: int, context: SiteAcces
     return row[0], row[1]
 
 
-async def get_authorized_cooling_unit(
-    db: AsyncSession, unit_id: int, context: SiteAccessContext
-) -> CoolingUnit:
+async def get_authorized_cooling_unit(db: AsyncSession, unit_id: int, context: SiteAccessContext) -> CoolingUnit:
     """Read a cooling unit through its trusted device site owner."""
-    query = apply_cooling_unit_site_scope(
-        select(CoolingUnit).where(CoolingUnit.id == unit_id), CoolingUnit.id, context
-    )
+    query = apply_cooling_unit_site_scope(select(CoolingUnit).where(CoolingUnit.id == unit_id), CoolingUnit.id, context)
     unit = (await db.execute(query)).scalar_one_or_none()
     if unit is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="空调不存在")
     return unit
 
 
-async def get_authorized_cooling_zone(
-    db: AsyncSession, zone_id: int, context: SiteAccessContext
-) -> CoolingZone:
+async def get_authorized_cooling_zone(db: AsyncSession, zone_id: int, context: SiteAccessContext) -> CoolingZone:
     """Read a cooling zone by its persisted site owner."""
     query = apply_cooling_zone_site_scope(
         select(CoolingZone).where(CoolingZone.id == zone_id), CoolingZone.site_id, context
@@ -689,8 +664,6 @@ async def get_user_site_ids(
     return sorted(context.site_ids)
 
 
-async def require_site_access(
-    site_id: int, context: SiteAccessContext = Depends(get_site_access_context)
-) -> int:
+async def require_site_access(site_id: int, context: SiteAccessContext = Depends(get_site_access_context)) -> int:
     """验证用户对指定站点的访问权限。admin 不限制，其他角色检查 UserSite 关联。"""
     return require_context_site_access(site_id, context)

@@ -42,9 +42,7 @@ logger = logging.getLogger(__name__)
 settings = get_settings()
 
 
-async def verify_websocket_token(
-    token: str, channel: str, *, db=None
-) -> WebSocketAuthorizationContext | None:
+async def verify_websocket_token(token: str, channel: str, *, db=None) -> WebSocketAuthorizationContext | None:
     """返回严格活动会话授权上下文，不向连接池暴露原始令牌。"""
     if not isinstance(token, str) or not token:
         return None

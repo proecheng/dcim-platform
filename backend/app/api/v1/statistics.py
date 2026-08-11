@@ -68,9 +68,7 @@ async def get_overview(
 
     # 今日告警
     today_start = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
-    alarm_today_query = _scope_alarm_query(
-        select(func.count(Alarm.id)).where(Alarm.created_at >= today_start), context
-    )
+    alarm_today_query = _scope_alarm_query(select(func.count(Alarm.id)).where(Alarm.created_at >= today_start), context)
     alarm_today = (await db.execute(alarm_today_query)).scalar()
 
     # 实时数据状态

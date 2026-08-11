@@ -47,19 +47,17 @@ def _threshold_scope(query, context: SiteAccessContext):
     return apply_point_site_scope(query, AlarmThreshold.point_id, context)
 
 
-async def _authorized_threshold(
-    db: AsyncSession, threshold_id: int, context: SiteAccessContext
-) -> AlarmThreshold:
-    result = await db.execute(_threshold_scope(select(AlarmThreshold).where(AlarmThreshold.id == threshold_id), context))
+async def _authorized_threshold(db: AsyncSession, threshold_id: int, context: SiteAccessContext) -> AlarmThreshold:
+    result = await db.execute(
+        _threshold_scope(select(AlarmThreshold).where(AlarmThreshold.id == threshold_id), context)
+    )
     threshold = result.scalar_one_or_none()
     if threshold is None:
         raise HTTPException(status_code=404, detail="阈值配置不存在")
     return threshold
 
 
-async def _authorized_points(
-    db: AsyncSession, point_ids: List[int], context: SiteAccessContext
-) -> dict[int, Point]:
+async def _authorized_points(db: AsyncSession, point_ids: List[int], context: SiteAccessContext) -> dict[int, Point]:
     requested_ids = set(point_ids)
     if not requested_ids:
         return {}

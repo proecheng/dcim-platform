@@ -84,9 +84,7 @@ def _apply_power_phase_scope(statement, context: SiteAccessContext):
 async def _get_authorized_power_phase_mapping(
     db: AsyncSession, mapping_id: int, context: SiteAccessContext
 ) -> PowerPhaseMapping:
-    statement = _apply_power_phase_scope(
-        select(PowerPhaseMapping).where(PowerPhaseMapping.id == mapping_id), context
-    )
+    statement = _apply_power_phase_scope(select(PowerPhaseMapping).where(PowerPhaseMapping.id == mapping_id), context)
     mapping = (await db.execute(statement)).scalar_one_or_none()
     if mapping is None:
         raise HTTPException(status_code=404, detail="映射不存在")
@@ -576,21 +574,17 @@ async def update_cooling_zone(
         cabinet_ids = list(dict.fromkeys(update_data["cabinet_ids"]))
     else:
         cabinet_ids = list(
-            (
-                await db.execute(
-                    select(CoolingZoneCabinet.cabinet_id).where(CoolingZoneCabinet.zone_id == zone_id)
-                )
-            ).scalars().all()
+            (await db.execute(select(CoolingZoneCabinet.cabinet_id).where(CoolingZoneCabinet.zone_id == zone_id)))
+            .scalars()
+            .all()
         )
     if "cooling_unit_ids" in update_data and update_data["cooling_unit_ids"] is not None:
         cooling_unit_ids = list(dict.fromkeys(update_data["cooling_unit_ids"]))
     else:
         cooling_unit_ids = list(
-            (
-                await db.execute(
-                    select(CoolingZoneUnit.cooling_unit_id).where(CoolingZoneUnit.zone_id == zone_id)
-                )
-            ).scalars().all()
+            (await db.execute(select(CoolingZoneUnit.cooling_unit_id).where(CoolingZoneUnit.zone_id == zone_id)))
+            .scalars()
+            .all()
         )
 
     cabinet_sites = await _load_authorized_cabinet_sites(db, cabinet_ids, context)
@@ -1061,9 +1055,9 @@ async def fault_impact_analysis(
                 visited.add(pid)
                 child_statement = select(DistributionPanel.id).where(DistributionPanel.parent_panel_id == pid)
                 if context.site_ids is not None:
-                    child_statement = child_statement.join(
-                        Device, DistributionPanel.device_id == Device.id
-                    ).where(Device.site_id.in_(context.site_ids))
+                    child_statement = child_statement.join(Device, DistributionPanel.device_id == Device.id).where(
+                        Device.site_id.in_(context.site_ids)
+                    )
                 child_result = await db.execute(child_statement)
                 for row in child_result.all():
                     if row[0] not in visited:
@@ -1090,9 +1084,9 @@ async def fault_impact_analysis(
 
                 if monitor_device_ids:
                     pdu_statement = select(Device.id).where(
-                            Device.id.in_(monitor_device_ids),
-                            Device.device_type == "PDU",
-                        )
+                        Device.id.in_(monitor_device_ids),
+                        Device.device_type == "PDU",
+                    )
                     pdu_statement = apply_site_scope(pdu_statement, Device.site_id, context)
                     pdu_dev_result = await db.execute(pdu_statement)
                     affected_pdu_device_ids = {r[0] for r in pdu_dev_result.all()}
@@ -1223,9 +1217,7 @@ async def fault_impact_analysis(
 
             for cu_id in cu_ids:
                 cu_statement = (
-                    select(CoolingUnit)
-                    .join(Device, CoolingUnit.device_id == Device.id)
-                    .where(CoolingUnit.id == cu_id)
+                    select(CoolingUnit).join(Device, CoolingUnit.device_id == Device.id).where(CoolingUnit.id == cu_id)
                 )
                 cu_statement = apply_site_scope(cu_statement, Device.site_id, context)
                 cu_result = await db.execute(cu_statement)

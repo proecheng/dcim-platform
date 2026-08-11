@@ -58,8 +58,8 @@ prometheus-client>=0.16.0
 # Deep learning (optional) — 见 requirements-ml.txt
 # pip install -r requirements-ml.txt
 
-# HTTP client (联动引擎 Webhook)
-httpx>=0.25.0
+# HTTP client (联动引擎 Webhook，兼容 Starlette 0.35 TestClient)
+httpx>=0.25.0,<0.28.0
 
 # YAML 配置 (消防策略)
 PyYAML>=6.0

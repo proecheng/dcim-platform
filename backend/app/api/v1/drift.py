@@ -97,12 +97,10 @@ async def get_summary(
 ):
     """获取漂移检测统计概览"""
     stats_query = select(
-            DriftDetectionResult.status,
-            func.count(DriftDetectionResult.id),
-        ).group_by(DriftDetectionResult.status)
-    stats_result = await db.execute(
-        apply_point_site_scope(stats_query, DriftDetectionResult.point_id, context)
-    )
+        DriftDetectionResult.status,
+        func.count(DriftDetectionResult.id),
+    ).group_by(DriftDetectionResult.status)
+    stats_result = await db.execute(apply_point_site_scope(stats_query, DriftDetectionResult.point_id, context))
     counts = {row[0]: row[1] for row in stats_result.all()}
 
     return DriftDetectionSummary(

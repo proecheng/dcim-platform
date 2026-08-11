@@ -558,6 +558,7 @@ async def create_cold_aisle(
     创建冷通道
     """
     from ...models.cooling import ColdAisle
+
     device = await get_authorized_device(db, data.device_id, context)
 
     aisle = ColdAisle(**data.model_dump())

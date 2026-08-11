@@ -95,7 +95,9 @@ class ConnectionManager:
     def start_heartbeat(self) -> None:
         if self._heartbeat_task is None or self._heartbeat_task.done():
             self._heartbeat_task = asyncio.create_task(self._heartbeat_loop())
-            logger.info("WebSocket heartbeat started (interval=%ds, timeout=%ds)", HEARTBEAT_INTERVAL, HEARTBEAT_TIMEOUT)
+            logger.info(
+                "WebSocket heartbeat started (interval=%ds, timeout=%ds)", HEARTBEAT_INTERVAL, HEARTBEAT_TIMEOUT
+            )
 
     def stop_heartbeat(self) -> None:
         if self._heartbeat_task and not self._heartbeat_task.done():
@@ -140,8 +142,7 @@ class ConnectionManager:
             context
             for connections in self.active_connections.values()
             for context in list(connections)
-            if (isinstance(user, str) and context.username == user)
-            or (type(user) is int and context.user_id == user)
+            if (isinstance(user, str) and context.username == user) or (type(user) is int and context.user_id == user)
         ]
         contexts = await self._revalidate_contexts(contexts, force=True)
         return await self._send_snapshot(contexts, message)
@@ -275,7 +276,9 @@ class ConnectionManager:
                 await context.websocket.send_json(message)
                 sent += 1
             except Exception as exc:
-                logger.warning("WebSocket send failed: channel=%s user_id=%s error=%s", context.channel, context.user_id, exc)
+                logger.warning(
+                    "WebSocket send failed: channel=%s user_id=%s error=%s", context.channel, context.user_id, exc
+                )
                 dead.append(context)
         await self._close_contexts(dead, 1000, "send failed")
         return sent
@@ -335,11 +338,7 @@ class ConnectionManager:
         candidates = [context for context in contexts if context.is_authorized and self._is_registered(context)]
         if force and not self._revalidate_before_send:
             return candidates
-        due = [
-            context
-            for context in candidates
-            if force or now - context.last_validated >= AUTH_REVALIDATE_INTERVAL
-        ]
+        due = [context for context in candidates if force or now - context.last_validated >= AUTH_REVALIDATE_INTERVAL]
         if not due:
             return candidates
         jtis = {context.jti for context in due}

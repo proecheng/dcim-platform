@@ -42,9 +42,7 @@ def _authorized_device_ids(context: SiteAccessContext):
     return apply_site_scope(select(Device.id), Device.site_id, context)
 
 
-async def _get_authorized_advice(
-    db: AsyncSession, advice_id: int, context: SiteAccessContext
-) -> MaintenanceAdvice:
+async def _get_authorized_advice(db: AsyncSession, advice_id: int, context: SiteAccessContext) -> MaintenanceAdvice:
     statement = select(MaintenanceAdvice).where(
         MaintenanceAdvice.id == advice_id,
         MaintenanceAdvice.device_id.in_(_authorized_device_ids(context)),

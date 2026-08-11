@@ -49,9 +49,9 @@ async def run_drift_detection(db: AsyncSession, allowed_point_ids=None) -> dict:
 
     # Step 1: 获取所有启用的 AI 类型点位
     point_query = select(Point).where(
-            Point.point_type.in_(["AI", "measurement"]),
-            Point.is_enabled == True,  # noqa: E712
-        )
+        Point.point_type.in_(["AI", "measurement"]),
+        Point.is_enabled == True,  # noqa: E712
+    )
     if allowed_point_ids is not None:
         point_query = point_query.where(Point.id.in_(allowed_point_ids))
     point_result = await db.execute(point_query)

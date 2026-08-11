@@ -398,6 +398,8 @@ GPT-5 Codex
 - Task 7 green: Reused the original session plus `/auth/refresh`, then passed 197 backend matrix/regression tests and 12 zero-retry Playwright executions.
 - Task 8 red: Evidence generation exposed oversized Docker contexts, unreachable default package CDNs, backend settings loading from the wrong working directory, and Windows `.cmd` tool-version discovery failures.
 - Task 8 green: Built both local evidence images, generated the complete raw artifact set, and passed Schema, path, size, hash, inventory-drift, and test-result validation for 12 manifest artifacts while keeping approvals pending and the production gate blocked.
+- PR CI red: The remote backend job rejected 22 Story application files at the pinned Ruff 0.15.2 format gate; a clean CI environment also resolved unbounded httpx to 0.28.1, which is incompatible with Starlette 0.35.1 `TestClient`.
+- PR CI green: Formatted the 22 Story application files with Ruff 0.15.2, constrained httpx to `<0.28.0`, and passed Ruff check/format, Python compile, and all 197 authorization regression tests in the CI-compatible environment.
 
 ### Implementation Plan
 
@@ -413,11 +415,13 @@ GPT-5 Codex
 - Task 6: Moved authentication to the first WebSocket frame, delayed connected/subscription state until authentication succeeds, restored subscriptions after every reauthentication, and made selected-site filters narrowing-only with `null` omitting `site_ids`.
 - Task 7: Completed fail-closed inventory mutations for HTTP/WS/channel/producer drift and added a live double-site matrix for list/detail/mutation/stream, guessed IDs, logout revocation, and role downgrade without fixed waits or retries.
 - Task 8.1-8.3: Published the auditable evidence package with real local image IDs, sanitized environment/tool fingerprints, exact commands, raw pytest/Playwright/Vitest results, AC mappings, and validated SHA-256 references. Charlie/Dana approval remains pending, so Task 8.4 and the production gate remain blocked.
+- PR CI follow-up: Aligned Story application formatting with the repository-pinned Ruff version and bounded httpx to the Starlette-compatible test client range without changing authorization behavior.
 
 ### File List
 
 - `backend/.dockerignore`
 - `backend/Dockerfile`
+- `backend/requirements.txt`
 - `backend/authz_inventory.yaml`
 - `backend/app/core/authorization.py`
 - `backend/app/main.py`
@@ -531,3 +535,4 @@ GPT-5 Codex
 ## Change Log
 
 - 2026-08-11: Completed automatable evidence publication and validation for Task 8.1-8.3; Task 8.4 remains pending Charlie/Dana approval and the production gate remains `BLOCKED`.
+- 2026-08-11: Resolved PR CI format and Starlette/httpx compatibility gates; 197 authorization regression tests pass in the pinned CI toolchain.

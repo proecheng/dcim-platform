@@ -37,9 +37,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-async def _get_authorized_approval(
-    db: AsyncSession, approval_id: int, context: SiteAccessContext
-) -> CommandApproval:
+async def _get_authorized_approval(db: AsyncSession, approval_id: int, context: SiteAccessContext) -> CommandApproval:
     query = apply_device_site_scope(
         select(CommandApproval).where(CommandApproval.id == approval_id),
         CommandApproval.target_device_id,

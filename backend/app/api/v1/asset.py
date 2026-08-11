@@ -1366,9 +1366,7 @@ async def get_statistics(
 
     # 按部门统计
     department_query = apply_asset_site_scope(
-        select(Asset.department, func.count(Asset.id))
-        .where(Asset.department.isnot(None))
-        .group_by(Asset.department),
+        select(Asset.department, func.count(Asset.id)).where(Asset.department.isnot(None)).group_by(Asset.department),
         Asset.id,
         context,
     )

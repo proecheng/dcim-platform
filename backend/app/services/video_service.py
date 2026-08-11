@@ -445,16 +445,12 @@ async def get_playback_info(
     # 查找关联摄像头: device_id 优先，area_code 兜底
     cameras: List[Camera] = []
     if point and point.device_id:
-        camera_query = select(Camera).where(
-            Camera.device_id == point.device_id, Camera.is_enabled == True
-        )
+        camera_query = select(Camera).where(Camera.device_id == point.device_id, Camera.is_enabled == True)
         if allowed_camera_ids is not None:
             camera_query = camera_query.where(Camera.id.in_(allowed_camera_ids))
         cameras = list((await db.execute(camera_query.order_by(Camera.name))).scalars().all())
     if not cameras and point and point.area_code:
-        camera_query = select(Camera).where(
-            Camera.area_code == point.area_code, Camera.is_enabled == True
-        )
+        camera_query = select(Camera).where(Camera.area_code == point.area_code, Camera.is_enabled == True)
         if allowed_camera_ids is not None:
             camera_query = camera_query.where(Camera.id.in_(allowed_camera_ids))
         cameras = list((await db.execute(camera_query.order_by(Camera.name))).scalars().all())

@@ -39,6 +39,7 @@ async def _invalidate_jtis_after_commit(jtis: list[str]) -> None:
                 extra={"security_event": "session_revocation_failed", "jti_suffix": jti[-8:]},
             )
 
+
 # 默认密码策略
 DEFAULT_PASSWORD_POLICY = {
     "min_length": 8,
