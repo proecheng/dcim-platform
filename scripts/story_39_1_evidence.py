@@ -91,7 +91,7 @@ def _split_null_output(command: list[str]) -> list[str]:
 
 def _is_story_source(path: str) -> bool:
     if path.startswith("backend/"):
-        return not path.startswith(("backend/reports/", "backend/.pytest_cache/"))
+        return path != "backend/coverage.xml" and not path.startswith(("backend/reports/", "backend/.pytest_cache/"))
     return path in {
         "frontend/src/api/websocket.ts",
         "frontend/src/composables/useWebSocket.ts",

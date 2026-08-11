@@ -405,6 +405,7 @@ GPT-5 Codex
 - Linux CI follow-up red: Run `31468739097` reached 2,865 passing backend tests before `test_fault_impact_pdu_basic` returned `401`; its test client still bypassed the role dependency without presenting the active-JTI identity now required by the global policy gate.
 - Linux CI follow-up green: Replaced the remaining fault-impact and gateway-monitor API dependency bypasses with real admin users, active `UserSession` rows, JTI-bearing JWTs, and authenticated clients. The two focused files passed 17 tests, and the CI-aligned root tail from `test_fault_impact.py` passed 548 tests with 5 skips; Ruff and diff checks passed.
 - Evidence command follow-up: Added both repaired CI regression files to the raw JUnit and Ruff command contract and aligned the recorded Docker commands with the required `--provenance=false` builds before minting a replacement RC.
+- Evidence scope preflight: Excluded generated `backend/coverage.xml` and `backend/reports/` from the backend image context and excluded the coverage XML from Story source-dirty detection, preserving user artifacts without contaminating the RC or source snapshot.
 
 ### Implementation Plan
 
@@ -424,6 +425,7 @@ GPT-5 Codex
 - Broad regression follow-up: Repaired 24 legacy backend tests to exercise the strict active-session and site-ownership contract without weakening production authorization. Removed the linkage test's application-database side effect so split pytest runs exit cleanly; all regression partitions and quality gates passed, while the production gate remains blocked pending independent Charlie/Dana approval.
 - Linux CI follow-up: Repaired the final two API fixtures that still bypassed strict identity dependencies. Both now authenticate through real active JTI sessions; the focused and post-failure CI tail regressions pass without changing production authorization. Task 8.4 and the production gate remain blocked pending independent Charlie/Dana approval.
 - Evidence command follow-up: Bound the repaired CI regressions into the generated raw test artifact and made the manifest's image build commands match the provenance-disabled RC procedure.
+- Evidence scope preflight: Hardened Docker and source-snapshot exclusions for generated coverage/report outputs so replacement RC evidence binds only implementation sources.
 
 ### File List
 
@@ -568,6 +570,7 @@ GPT-5 Codex
 
 ## Change Log
 
+- 2026-08-11: Excluded generated coverage and report outputs from the backend RC context and Story source-dirty calculation.
 - 2026-08-11: Added the repaired CI regression files to the evidence command contract and corrected recorded RC build commands before issuing the replacement evidence package.
 - 2026-08-11: Replaced the final fault-impact and gateway-monitor API auth bypasses with real active-JTI clients; 17 focused and 548 CI-tail tests passed, while Task 8.4 remains pending and `BLOCKED`.
 - 2026-08-11: Completed automatable evidence publication and validation for Task 8.1-8.3; Task 8.4 remains pending Charlie/Dana approval and the production gate remains `BLOCKED`.

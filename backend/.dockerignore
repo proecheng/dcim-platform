@@ -18,5 +18,7 @@ docs/
 *.md
 .pytest_cache/
 .coverage
+coverage.xml
 htmlcov/
+reports/
 alembic/versions/__pycache__/
