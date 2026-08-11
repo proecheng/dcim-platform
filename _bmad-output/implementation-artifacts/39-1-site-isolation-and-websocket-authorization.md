@@ -404,6 +404,7 @@ GPT-5 Codex
 - Broad backend regression green: Updated all 24 tests to use real users, active JTI sessions, trusted site ownership, and current role policies; isolated the linkage policy reload in its test fixture. Split regressions passed 503 API tests, 136 root tests with 4 skips, 26 maintenance-advisor tests, 296 remaining service tests, and 99 tail tests. Ruff, application format, compile, and changed-file diff checks passed. The monolithic Windows coverage command exceeded the 30-minute outer runner limit without triggering `--maxfail=1`, so no full-suite summary was claimed.
 - Linux CI follow-up red: Run `31468739097` reached 2,865 passing backend tests before `test_fault_impact_pdu_basic` returned `401`; its test client still bypassed the role dependency without presenting the active-JTI identity now required by the global policy gate.
 - Linux CI follow-up green: Replaced the remaining fault-impact and gateway-monitor API dependency bypasses with real admin users, active `UserSession` rows, JTI-bearing JWTs, and authenticated clients. The two focused files passed 17 tests, and the CI-aligned root tail from `test_fault_impact.py` passed 548 tests with 5 skips; Ruff and diff checks passed.
+- Evidence command follow-up: Added both repaired CI regression files to the raw JUnit and Ruff command contract and aligned the recorded Docker commands with the required `--provenance=false` builds before minting a replacement RC.
 
 ### Implementation Plan
 
@@ -422,6 +423,7 @@ GPT-5 Codex
 - PR CI follow-up: Aligned Story application formatting with the repository-pinned Ruff version and bounded httpx to the Starlette-compatible test client range without changing authorization behavior.
 - Broad regression follow-up: Repaired 24 legacy backend tests to exercise the strict active-session and site-ownership contract without weakening production authorization. Removed the linkage test's application-database side effect so split pytest runs exit cleanly; all regression partitions and quality gates passed, while the production gate remains blocked pending independent Charlie/Dana approval.
 - Linux CI follow-up: Repaired the final two API fixtures that still bypassed strict identity dependencies. Both now authenticate through real active JTI sessions; the focused and post-failure CI tail regressions pass without changing production authorization. Task 8.4 and the production gate remain blocked pending independent Charlie/Dana approval.
+- Evidence command follow-up: Bound the repaired CI regressions into the generated raw test artifact and made the manifest's image build commands match the provenance-disabled RC procedure.
 
 ### File List
 
@@ -566,6 +568,7 @@ GPT-5 Codex
 
 ## Change Log
 
+- 2026-08-11: Added the repaired CI regression files to the evidence command contract and corrected recorded RC build commands before issuing the replacement evidence package.
 - 2026-08-11: Replaced the final fault-impact and gateway-monitor API auth bypasses with real active-JTI clients; 17 focused and 548 CI-tail tests passed, while Task 8.4 remains pending and `BLOCKED`.
 - 2026-08-11: Completed automatable evidence publication and validation for Task 8.1-8.3; Task 8.4 remains pending Charlie/Dana approval and the production gate remains `BLOCKED`.
 - 2026-08-11: Resolved PR CI format and Starlette/httpx compatibility gates; 197 authorization regression tests pass in the pinned CI toolchain.

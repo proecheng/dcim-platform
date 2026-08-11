@@ -470,7 +470,7 @@ def generate(args: argparse.Namespace) -> None:
         {
             "id": "PYTEST-AUTHZ",
             "cwd": "backend",
-            "command": "pytest -q tests/test_authorization_inventory.py tests/test_story_39_1.py tests/test_websocket_authorization.py tests/test_auth_session.py tests/test_site_isolation.py tests/test_site_management.py tests/test_device_detail.py tests/test_point_data.py tests/test_alarm_api.py tests/test_story_24_6.py tests/test_story_24_7.py --junitxml=../_bmad-output/test-artifacts/epic-39/39.1/pytest-authz.xml",
+            "command": "pytest -q tests/test_authorization_inventory.py tests/test_story_39_1.py tests/test_websocket_authorization.py tests/test_auth_session.py tests/test_site_isolation.py tests/test_site_management.py tests/test_device_detail.py tests/test_point_data.py tests/test_alarm_api.py tests/test_story_24_6.py tests/test_story_24_7.py tests/test_fault_impact.py tests/test_gateway_monitor.py --junitxml=../_bmad-output/test-artifacts/epic-39/39.1/pytest-authz.xml",
             "result": "PASS" if not test_metrics["pytest"]["failures"] and not test_metrics["pytest"]["errors"] else "FAIL",
         },
         {
@@ -500,19 +500,19 @@ def generate(args: argparse.Namespace) -> None:
         {
             "id": "BACKEND-RUFF",
             "cwd": "backend",
-            "command": "ruff check app tests/test_authorization_inventory.py tests/test_story_39_1.py tests/test_websocket_authorization.py",
+            "command": "ruff check app tests/test_authorization_inventory.py tests/test_story_39_1.py tests/test_websocket_authorization.py tests/test_fault_impact.py tests/test_gateway_monitor.py",
             "result": "PASS",
         },
         {
             "id": "BACKEND-IMAGE",
             "cwd": ".",
-            "command": f"docker build -t {args.backend_image} backend",
+            "command": f"docker build --provenance=false -t {args.backend_image} backend",
             "result": "PASS" if images["backend"]["status"] == "BUILT" else "FAIL",
         },
         {
             "id": "FRONTEND-IMAGE",
             "cwd": ".",
-            "command": f"docker build -t {args.frontend_image} frontend",
+            "command": f"docker build --provenance=false -t {args.frontend_image} frontend",
             "result": "PASS" if images["frontend"]["status"] == "BUILT" else "FAIL",
         },
     ]
