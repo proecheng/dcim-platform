@@ -4,7 +4,7 @@ baseline_commit: a9b872155f8554136f456e6d15116e721270761c
 
 # Story 39.1: 站点隔离与 WebSocket 服务端授权
 
-Status: review
+Status: done
 
 ## Story
 
@@ -393,7 +393,7 @@ npm run typecheck
 
 ## Story Completion Status
 
-- **状态:** review
+- **状态:** done
 - **创建日期:** 2026-08-10
 - **说明:** 已完成代码面、测试面、Git 历史和 NFR 对抗性分析；开发所需授权边界、默认拒绝规则、回归约束和证据契约已明确。
 
@@ -440,6 +440,7 @@ GPT-5 Codex
 - Evidence audit 3B green: Bound JUnit, Playwright, and Vitest to a maximum 12-hour execution window and required test files with executed cases; rebuilt inventory/OpenAPI/producer and HTTP/WS matrix evidence from current runtime/JUnit; recomputed manifest metrics and environment; enforced the repository-owned bidirectional AC artifact map. Governance tests passed 35/35, the trusted backend set passed 257/257, the frontend set passed 38/38, and typecheck, ESLint, Ruff 0.15.2 check/format, and diff checks passed.
 - Evidence audit 3B stale-package check: The existing formal package remains intentionally unrefreshed. Validation rejects its stale repository Schema first, and direct report binding rejects its 2026-08-11 Playwright report against the 2026-08-12 manifest window; `evidence-validation.json` remained byte-for-byte unchanged.
 - Story closeout preflight: All tasks and 20 review findings are complete; the trusted backend set passed 257/257, governance passed 35/35, the focused frontend set passed 38/38, and TypeScript, ESLint, Ruff 0.15.2, Python compile, and diff checks passed before the final full regression gate.
+- Final PR CI: Run `31619320609` passed the frontend checks in 3m13s, the complete backend regression in 31m9s, and the critical E2E gate in 3m7s. The E2E gate retained the existing authentication/detail coverage and isolated the Story 39.1 authorization matrix behind a backend restart so the production login limiter remained unchanged.
 
 ### Implementation Plan
 
@@ -468,6 +469,7 @@ GPT-5 Codex
 - Frontend regression verification: Build, typecheck, full lint, and all 1,706 Vitest cases passed; local Windows workers were bounded to four after the default fan-out hit an import-time timeout, without changing product code or the CI command.
 - Batch 2 review follow-up: Bound WebSocket connections to JWT expiry, preserved approved global messages under site subscriptions, restricted E2E targets to loopback origins, restored natural login navigation assertions, and made preview loopback-only with a strict port. The focused backend review set passed 215 tests; frontend typecheck/build and six live authentication E2E checks passed.
 - Story closeout: Completed all code-review follow-ups, isolated the Story 39.1 commit boundary from unrelated workspace changes, and moved the implementation to review pending SHA-bound RC and formal evidence refresh.
+- Final CI closeout: Passed all PR checks after splitting the critical E2E selection into two single-worker phases with an isolated in-memory login-rate window; moved Story 39.1 to done for final-SHA RC and evidence generation while Epic 39 production remains blocked.
 
 ### File List
 
@@ -622,6 +624,7 @@ GPT-5 Codex
 
 ## Change Log
 
+- 2026-08-13: Passed the complete PR CI on run `31619320609`, isolated cumulative E2E login-rate state without weakening production controls, and marked Story 39.1 done for final-SHA RC and formal evidence generation.
 - 2026-08-12: Completed all review follow-ups and prepared the Story 39.1 implementation for a clean SHA-bound RC and formal evidence refresh.
 - 2026-08-12: Closed the third-batch evidence/CI/supply-chain review findings with raw-result-derived gates, trusted repository binding, image changeset attestations, Story 39.1 CI E2E coverage, official-default package sources, and a Linux-generated transitive hash lock.
 - 2026-08-12: Replaced the inapplicable Charlie/Dana virtual-role approval gate with the user-approved `single-maintainer` evidence governance model; Story completion remains evidence-driven and Epic 39 production approval remains separate.
