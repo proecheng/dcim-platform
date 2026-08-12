@@ -462,7 +462,7 @@ development_status:
 
   # Epic 39: 生产就绪与安全闭环
   epic-39: in-progress
-  39-1-site-isolation-and-websocket-authorization: in-progress
+  39-1-site-isolation-and-websocket-authorization: review
   39-2-command-xss-and-production-credential-hardening: backlog
   39-3-postgresql-disaster-recovery-and-failover: backlog
   39-4-real-gateway-and-field-uat: backlog

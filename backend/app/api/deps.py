@@ -39,6 +39,7 @@ class AuthenticatedUserContext:
 
     user: User
     jti: str
+    expires_at: float
 
 
 @dataclass(frozen=True)
@@ -73,7 +74,14 @@ async def authenticate_access_token(token: Optional[str], db: AsyncSession) -> A
         payload = jwt.decode(token, settings.secret_key, algorithms=[settings.algorithm])
         username: str = payload.get("sub")
         jti: str = payload.get("jti")
-        if not isinstance(username, str) or not username or not isinstance(jti, str) or not jti:
+        expires_at = payload.get("exp")
+        if (
+            not isinstance(username, str)
+            or not username
+            or not isinstance(jti, str)
+            or not jti
+            or type(expires_at) not in {int, float}
+        ):
             raise credentials_exception
     except JWTError:
         # JWT 签名验证失败 — 记录安全告警
@@ -112,7 +120,7 @@ async def authenticate_access_token(token: Optional[str], db: AsyncSession) -> A
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    return AuthenticatedUserContext(user=user, jti=jti)
+    return AuthenticatedUserContext(user=user, jti=jti, expires_at=float(expires_at))
 
 
 async def get_authenticated_user_context(

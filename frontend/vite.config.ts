@@ -53,7 +53,8 @@ export default defineConfig({
   },
   preview: {
     port: 3000,
-    host: '0.0.0.0',
+    strictPort: true,
+    host: '127.0.0.1',
     allowedHosts: ['powerlab.cn', 'localhost', '127.0.0.1'],
     proxy
   }

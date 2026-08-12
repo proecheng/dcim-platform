@@ -64,6 +64,9 @@ httpx>=0.25.0,<0.28.0
 # YAML 配置 (消防策略)
 PyYAML>=6.0
 
+# Evidence validation
+jsonschema>=4.23,<5.0
+
 # Testing
 pytest>=7.4.0
 pytest-asyncio>=0.23.0

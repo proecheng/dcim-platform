@@ -4,7 +4,7 @@ baseline_commit: a9b872155f8554136f456e6d15116e721270761c
 
 # Story 39.1: 站点隔离与 WebSocket 服务端授权
 
-Status: in-progress
+Status: review
 
 ## Story
 
@@ -153,6 +153,29 @@ so that 跨站点用户无法通过 API、猜测 ID 或 WebSocket 获得未授�
   - [x] 8.2 创建 `manifest.yaml`，记录 Git SHA、前后端镜像摘要、环境指纹、工具版本、精确命令、UTC 时间、原始产物、指标、AC 映射、限制和责任人
   - [x] 8.3 对清单引用文件执行存在性与哈希校验；截图和文字摘要只能作为补充
   - [x] 8.4 记录 `single-maintainer` 治理，由 `proecheng` 依据完整机器证据作出 Story 结论；不要求虚拟角色签名，任何缺失、失败或跨站点残余风险仍使 Story 门禁 `BLOCKED`
+
+### Review Findings
+
+- [x] [Review][Patch] Shift 清单把合法 viewer/operator 能力错误收紧为 admin-only，回归测试随后把成功断言改成 `403` [backend/tests/api/test_shift_opportunities_coverage.py:776]
+- [x] [Review][Patch] Opportunities 清单与路由 `require_viewer` 契约冲突，回归测试错误接受 viewer 列表和仪表盘被拒绝 [backend/tests/api/test_shift_opportunities_coverage.py:1110]
+- [x] [Review][Patch] Probability adjustments 清单与路由 `require_viewer` 契约冲突，回归测试错误接受 viewer 读取被拒绝 [backend/tests/api/test_audit_fix_coverage.py:363]
+- [x] [Review][Patch] 已建立的 WebSocket 连接未绑定 JWT 到期时间，令牌过期后仍可持续接收数据 [backend/app/services/websocket.py:31]
+- [x] [Review][Patch] 站点订阅过滤错误屏蔽已批准的全局消息 [backend/app/services/websocket.py:255]
+- [x] [Review][Patch] 任意 `E2E_BASE_URL` 会接收默认管理员凭据，缺少远程目标显式授权和专用凭据门禁 [playwright.config.ts:4]
+- [x] [Review][Patch] 登录 setup 主动导航到 Dashboard，掩盖应用自然跳转回归 [e2e/auth.setup.ts:35]
+- [x] [Review][Patch] Preview 默认监听所有网卡并代理回环后端，扩大本地后端暴露面 [frontend/vite.config.ts:56]
+- [x] [Review][Patch] Preview 未启用严格端口，端口占用时可能测试 3000 上的旧进程 [frontend/vite.config.ts:54]
+- [x] [Review][Patch] E2E baseURL 与认证响应匹配缺少 origin/路径边界校验 [e2e/auth.setup.ts:18]
+- [x] [Review][Patch] 证据生成器未从完整原始结果推导门禁，矩阵外 pytest 失败、硬编码静态检查 PASS 或旧镜像 tag 都可能使 Story 假绿 [scripts/story_39_1_evidence.py:444]
+- [x] [Review][Patch] 空矩阵、Playwright 全跳过和 Vitest 零用例/待定用例仍会被接受为 PASS [scripts/story_39_1_evidence.py:263]
+- [x] [Review][Patch] 验证器信任证据包自带 Schema 和自报源码清单，未重新绑定当前 HEAD、完整 Story 文件集合与受信任 Schema [scripts/story_39_1_evidence.py:632]
+- [x] [Review][Patch] 生产仓库摘要只校验字符串格式，未证明摘要属于当前镜像 tag 和 changeset [scripts/story_39_1_evidence.py:315]
+- [x] [Review][Patch] PR 关键 E2E 未运行 Story 39.1 双站点与 WebSocket 授权矩阵 [.github/workflows/ci.yml:191]
+- [x] [Review][Patch] Docker 默认使用第三方 APT/PyPI 镜像且 Python 依赖未锁传递哈希，扩大供应链与不可重复构建风险 [backend/Dockerfile:6]
+- [x] [Review][Patch] 原始测试报告未绑定本次执行窗口与必需测试集合，旧或缺项的 Playwright、Vitest、JUnit 报告可被重放到新 changeset；现有证据已出现 8 月 11 日报告配 8 月 12 日 manifest [scripts/story_39_1_evidence.py:603]
+- [x] [Review][Patch] 验证器信任可自报的授权清单差异及 HTTP/WebSocket 派生矩阵，没有从当前运行时清单和原始 JUnit cases 重新生成并逐字段比对 [scripts/story_39_1_evidence.py:654]
+- [x] [Review][Patch] manifest.metrics 与环境指纹未和原始报告、当前环境及派生产物交叉核对，任意指标或环境声明可在重算 manifest 哈希后通过 [scripts/story_39_1_evidence.py:698]
+- [x] [Review][Patch] AC evidence 仅按字符串通过 Schema，验证器未确认引用属于 manifest 产物、产物声明覆盖对应 AC，或每个必需证据均被实际引用 [scripts/story_39_1_evidence.py:721]
 
 ## Dev Notes
 
@@ -370,7 +393,7 @@ npm run typecheck
 
 ## Story Completion Status
 
-- **状态:** ready-for-dev
+- **状态:** review
 - **创建日期:** 2026-08-10
 - **说明:** 已完成代码面、测试面、Git 历史和 NFR 对抗性分析；开发所需授权边界、默认拒绝规则、回归约束和证据契约已明确。
 
@@ -413,6 +436,10 @@ GPT-5 Codex
 - Evidence snapshot scope follow-up: Added the CI workflow, Vite preview configuration, and authenticated browser setup to Story source hashing so replacement evidence covers the complete critical-E2E fix.
 - Critical E2E preview green: With `CI=1` and `E2E_BASE_URL=http://127.0.0.1:3001`, the exact CI selection passed all 14 zero-retry tests in 29.6 seconds, including both lazy invalid-detail routes; the isolated preview was then stopped and port 3001 released.
 - Frontend regression follow-up: The default Windows worker fan-out twice exhausted the pre-existing 5-second limit while importing the first `useAlarm` test; that file passed 11/11 in isolation, and the unchanged full suite passed 1,706/1,706 with four bounded local workers. The CI command remains unchanged because the Linux frontend job already passed with its default scheduling.
+- Evidence audit 3B red: Nine new governance paths showed that old or incomplete raw reports, self-reported runtime/matrix derivatives, forged metrics/environment declarations, and broken AC evidence graphs were not independently rejected.
+- Evidence audit 3B green: Bound JUnit, Playwright, and Vitest to a maximum 12-hour execution window and required test files with executed cases; rebuilt inventory/OpenAPI/producer and HTTP/WS matrix evidence from current runtime/JUnit; recomputed manifest metrics and environment; enforced the repository-owned bidirectional AC artifact map. Governance tests passed 35/35, the trusted backend set passed 257/257, the frontend set passed 38/38, and typecheck, ESLint, Ruff 0.15.2 check/format, and diff checks passed.
+- Evidence audit 3B stale-package check: The existing formal package remains intentionally unrefreshed. Validation rejects its stale repository Schema first, and direct report binding rejects its 2026-08-11 Playwright report against the 2026-08-12 manifest window; `evidence-validation.json` remained byte-for-byte unchanged.
+- Story closeout preflight: All tasks and 20 review findings are complete; the trusted backend set passed 257/257, governance passed 35/35, the focused frontend set passed 38/38, and TypeScript, ESLint, Ruff 0.15.2, Python compile, and diff checks passed before the final full regression gate.
 
 ### Implementation Plan
 
@@ -436,8 +463,11 @@ GPT-5 Codex
 - Critical E2E follow-up: Hardened admin setup against cold Vite dependency-optimization reloads while still requiring successful server authentication and active-session validation before saving browser state.
 - Critical E2E server follow-up: Moved the gate from cold `vite dev` to built `vite preview` with the same API/WS proxy contract, eliminating route-level optimizer reloads for all critical pages.
 - Evidence snapshot scope follow-up: Bound the CI workflow, preview proxy configuration, and authentication setup into the source snapshot used by the replacement RC evidence.
+- Evidence audit 3B: Removed remaining self-reported evidence trust by sharing repository-owned required-test/artifact contracts between generation and validation, recomputing stable derivatives and metrics, and rejecting stale execution windows, environment drift, and incomplete or coordinated AC-map tampering.
 - Critical E2E verification: Passed the complete CI browser selection against an isolated production preview with 14/14 tests and zero retries, then removed the temporary preview process without affecting the existing development services.
 - Frontend regression verification: Build, typecheck, full lint, and all 1,706 Vitest cases passed; local Windows workers were bounded to four after the default fan-out hit an import-time timeout, without changing product code or the CI command.
+- Batch 2 review follow-up: Bound WebSocket connections to JWT expiry, preserved approved global messages under site subscriptions, restricted E2E targets to loopback origins, restored natural login navigation assertions, and made preview loopback-only with a strict port. The focused backend review set passed 215 tests; frontend typecheck/build and six live authentication E2E checks passed.
+- Story closeout: Completed all code-review follow-ups, isolated the Story 39.1 commit boundary from unrelated workspace changes, and moved the implementation to review pending SHA-bound RC and formal evidence refresh.
 
 ### File List
 
@@ -565,6 +595,11 @@ GPT-5 Codex
 - `e2e/auth.setup.ts`
 - `playwright.config.ts`
 - `.github/workflows/ci.yml`
+- `backend/Dockerfile`
+- `backend/requirements.txt`
+- `backend/requirements.lock`
+- `backend/tests/test_story_39_1_evidence_governance.py`
+- `frontend/Dockerfile`
 - `frontend/vite.config.ts`
 - `scripts/story_39_1_evidence.py`
 - `scripts/story_39_1_manifest.schema.json`
@@ -582,9 +617,13 @@ GPT-5 Codex
 - `_bmad-output/test-artifacts/epic-39/39.1/manifest.schema.json`
 - `_bmad-output/test-artifacts/epic-39/39.1/manifest.yaml`
 - `_bmad-output/test-artifacts/epic-39/39.1/evidence-validation.json`
+- `_bmad-output/implementation-artifacts/39-1-site-isolation-and-websocket-authorization.md`
+- `_bmad-output/implementation-artifacts/sprint-status.yaml`
 
 ## Change Log
 
+- 2026-08-12: Completed all review follow-ups and prepared the Story 39.1 implementation for a clean SHA-bound RC and formal evidence refresh.
+- 2026-08-12: Closed the third-batch evidence/CI/supply-chain review findings with raw-result-derived gates, trusted repository binding, image changeset attestations, Story 39.1 CI E2E coverage, official-default package sources, and a Linux-generated transitive hash lock.
 - 2026-08-12: Replaced the inapplicable Charlie/Dana virtual-role approval gate with the user-approved `single-maintainer` evidence governance model; Story completion remains evidence-driven and Epic 39 production approval remains separate.
 - 2026-08-11: Verified the complete 14-test critical E2E gate against an isolated production preview with zero retries.
 - 2026-08-11: Expanded Story source hashing to cover every file in the critical E2E preview fix before replacement RC evidence generation.

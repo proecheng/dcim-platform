@@ -29,10 +29,10 @@ jobs:
         with:
           python-version: '3.11'
           cache: 'pip'
-          cache-dependency-path: backend/requirements.txt
+          cache-dependency-path: backend/requirements.lock
 
       - name: 安装依赖
-        run: pip install -r requirements.txt
+        run: pip install --require-hashes -r requirements.lock
 
       - name: Ruff 代码检查
         run: ruff check app/
@@ -152,7 +152,7 @@ jobs:
 
       - name: 安装后端依赖
         working-directory: backend
-        run: pip install -r requirements.txt
+        run: pip install --require-hashes -r requirements.lock
 
       - name: 安装前端依赖
         working-directory: frontend
@@ -189,7 +189,7 @@ jobs:
           exit 1
 
       - name: 运行关键 E2E
-        run: npx playwright test e2e/auth.spec.ts e2e/authorization-matrix.spec.ts e2e/invalid-detail-pages.spec.ts --project=chromium
+        run: npx playwright test e2e/auth.spec.ts e2e/authorization-matrix.spec.ts e2e/site-isolation-websocket-authorization.spec.ts e2e/invalid-detail-pages.spec.ts --project=chromium
 
       - name: 上传 E2E 诊断日志
         if: failure()

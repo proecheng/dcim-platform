@@ -1,6 +1,9 @@
 # 前端 Dockerfile — 多阶段构建
 FROM node:18-alpine AS build
 
+ARG VCS_REF=unknown
+ARG STORY_SOURCE_SNAPSHOT=unknown
+
 WORKDIR /app
 
 # 安装依赖
@@ -13,6 +16,11 @@ RUN npm run build
 
 # 生产阶段 — Nginx
 FROM nginx:alpine
+
+ARG VCS_REF=unknown
+ARG STORY_SOURCE_SNAPSHOT=unknown
+LABEL org.opencontainers.image.revision="${VCS_REF}" \
+      io.dcim.story-39-1.source-snapshot-sha256="${STORY_SOURCE_SNAPSHOT}"
 
 # 复制构建产物
 COPY --from=build /app/dist /usr/share/nginx/html

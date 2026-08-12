@@ -36,6 +36,7 @@ class ConnectionContext:
     role: str
     allowed_site_ids: Optional[frozenset[int]]
     channel: str
+    expires_at: float
     username: Optional[str] = None
     subscriptions: dict[str, frozenset[Any]] = field(default_factory=dict)
     last_validated: float = field(default_factory=time.monotonic)
@@ -52,6 +53,7 @@ class WebSocketAuthorizationContext:
     allowed_site_ids: Optional[frozenset[int]]
     channel: str
     username: str
+    expires_at: float
 
 
 class ConnectionManager:
@@ -253,7 +255,7 @@ class ConnectionManager:
         if not global_message and context.allowed_site_ids is not None and site_id not in context.allowed_site_ids:
             return False
         requested_sites = context.subscriptions.get("site_ids")
-        if requested_sites is not None and site_id not in requested_sites:
+        if not global_message and requested_sites is not None and site_id not in requested_sites:
             return False
         data = message.get("data") if isinstance(message.get("data"), dict) else message
         for filter_name, data_name in (
@@ -268,9 +270,13 @@ class ConnectionManager:
 
     async def _send_snapshot(self, contexts: list[ConnectionContext], message: dict) -> int:
         dead: list[ConnectionContext] = []
+        expired: list[ConnectionContext] = []
         sent = 0
         for context in list(contexts):
             if not context.is_authorized or not self._is_registered(context):
+                continue
+            if time.time() >= context.expires_at:
+                expired.append(context)
                 continue
             try:
                 await context.websocket.send_json(message)
@@ -280,6 +286,7 @@ class ConnectionManager:
                     "WebSocket send failed: channel=%s user_id=%s error=%s", context.channel, context.user_id, exc
                 )
                 dead.append(context)
+        await self._close_contexts(expired, 4001, "Unauthorized")
         await self._close_contexts(dead, 1000, "send failed")
         return sent
 
@@ -336,6 +343,10 @@ class ConnectionManager:
     ) -> list[ConnectionContext]:
         now = time.monotonic()
         candidates = [context for context in contexts if context.is_authorized and self._is_registered(context)]
+        expired = [context for context in candidates if time.time() >= context.expires_at]
+        if expired:
+            await self._close_contexts(expired, 4001, "Unauthorized")
+            candidates = [context for context in candidates if context not in expired]
         if force and not self._revalidate_before_send:
             return candidates
         due = [context for context in candidates if force or now - context.last_validated >= AUTH_REVALIDATE_INTERVAL]

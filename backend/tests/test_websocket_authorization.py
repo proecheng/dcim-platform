@@ -46,7 +46,16 @@ class FailingWebSocket(FakeWebSocket):
         raise RuntimeError("socket closed")
 
 
-def _context(websocket, *, user_id, jti, role="viewer", sites=frozenset({1}), channel="realtime"):
+def _context(
+    websocket,
+    *,
+    user_id,
+    jti,
+    role="viewer",
+    sites=frozenset({1}),
+    channel="realtime",
+    expires_at=None,
+):
     return ConnectionContext(
         websocket=websocket,
         user_id=user_id,
@@ -54,6 +63,7 @@ def _context(websocket, *, user_id, jti, role="viewer", sites=frozenset({1}), ch
         role=role,
         allowed_site_ids=sites,
         channel=channel,
+        expires_at=expires_at or time.time() + 3600,
     )
 
 
@@ -63,7 +73,9 @@ async def test_site_broadcast_only_reaches_authorized_connections():
     socket_a, socket_b, socket_admin = FakeWebSocket(), FakeWebSocket(), FakeWebSocket()
     await manager.connect(_context(socket_a, user_id=1, jti="a", sites=frozenset({10})), already_accepted=True)
     await manager.connect(_context(socket_b, user_id=2, jti="b", sites=frozenset({20})), already_accepted=True)
-    await manager.connect(_context(socket_admin, user_id=3, jti="admin", role="admin", sites=None), already_accepted=True)
+    await manager.connect(
+        _context(socket_admin, user_id=3, jti="admin", role="admin", sites=None), already_accepted=True
+    )
 
     sent = await manager.broadcast_realtime({"point_id": 7, "value": 42}, site_id=10)
 
@@ -89,7 +101,9 @@ async def test_site_broadcast_without_trusted_site_is_rejected():
 async def test_role_filter_is_enforced_by_server():
     manager = ConnectionManager(revalidate_before_send=False)
     viewer, operator = FakeWebSocket(), FakeWebSocket()
-    await manager.connect(_context(viewer, user_id=1, jti="viewer", role="viewer", channel="alarms"), already_accepted=True)
+    await manager.connect(
+        _context(viewer, user_id=1, jti="viewer", role="viewer", channel="alarms"), already_accepted=True
+    )
     await manager.connect(
         _context(operator, user_id=2, jti="operator", role="operator", channel="alarms"), already_accepted=True
     )
@@ -142,6 +156,31 @@ async def test_subscription_filters_point_area_alarm_level_and_site():
     assert await manager.broadcast_alarm({**matching, "alarm_level": "major"}, site_id=10) == 0
     assert await manager.broadcast_alarm(matching, site_id=20) == 0
     assert len(socket.sent) == 1
+
+
+@pytest.mark.asyncio
+async def test_site_subscription_does_not_hide_approved_global_message():
+    manager = ConnectionManager(revalidate_before_send=False)
+    socket = FakeWebSocket()
+    context = _context(socket, user_id=1, jti="a", sites=frozenset({10}), channel="system")
+    await manager.connect(context, already_accepted=True)
+    manager.update_subscription(context, {"action": "subscribe", "filters": {"site_ids": [10]}})
+
+    assert await manager.broadcast_system({"status": "maintenance"}, global_message=True) == 1
+    assert socket.sent == [{"type": "system", "data": {"status": "maintenance"}}]
+
+
+@pytest.mark.asyncio
+async def test_expired_token_context_is_closed_before_business_send():
+    manager = ConnectionManager(revalidate_before_send=False)
+    socket = FakeWebSocket()
+    context = _context(socket, user_id=1, jti="expired", expires_at=time.time() - 1)
+    await manager.connect(context, already_accepted=True)
+
+    assert await manager.broadcast_realtime({"point_id": 7}, site_id=1) == 0
+    assert socket.sent == []
+    assert socket.closed == [(4001, "Unauthorized")]
+    assert manager.total_connections == 0
 
 
 @pytest.mark.parametrize(
@@ -237,6 +276,7 @@ async def test_websocket_token_returns_full_active_session_context(async_db, ope
     assert context.role == "operator"
     assert context.allowed_site_ids == frozenset()
     assert context.channel == "realtime"
+    assert context.expires_at > time.time()
 
 
 def test_websocket_routes_do_not_accept_token_query_parameter():
@@ -254,6 +294,7 @@ def _authorization(channel: str = "realtime") -> WebSocketAuthorizationContext:
         allowed_site_ids=frozenset({10}),
         channel=channel,
         username="viewer",
+        expires_at=time.time() + 3600,
     )
 
 
@@ -358,6 +399,7 @@ async def test_logout_commit_invalidates_current_jti(client, async_db, operator_
         role=user.role,
         allowed_site_ids=frozenset(),
         channel="realtime",
+        expires_at=authorization.expires_at,
         username=user.username,
     )
     await ws_manager.connect(context, already_accepted=True)
@@ -387,6 +429,7 @@ async def test_site_replacement_commit_invalidates_target_user(client, async_db,
         role=target.role,
         allowed_site_ids=frozenset(),
         channel="realtime",
+        expires_at=authorization.expires_at,
         username=target.username,
     )
     await ws_manager.connect(context, already_accepted=True)
@@ -422,6 +465,7 @@ async def test_broadcast_revalidation_blocks_revoked_session(async_db, operator_
         role=user.role,
         allowed_site_ids=frozenset(),
         channel="realtime",
+        expires_at=authorization.expires_at,
         username=user.username,
     )
     await manager.connect(context, already_accepted=True)
@@ -451,6 +495,7 @@ async def test_concurrent_session_eviction_invalidates_old_connection(client, as
         role=user.role,
         allowed_site_ids=frozenset(),
         channel="realtime",
+        expires_at=authorization.expires_at,
         username=user.username,
     )
     await ws_manager.connect(context, already_accepted=True)
@@ -485,6 +530,7 @@ async def test_user_authorization_mutations_invalidate_connections(
         role=target.role,
         allowed_site_ids=frozenset(),
         channel="realtime",
+        expires_at=authorization.expires_at,
         username=target.username,
     )
     await ws_manager.connect(context, already_accepted=True)

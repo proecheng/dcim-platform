@@ -51,6 +51,43 @@ def test_candidate_builder_preserves_reviewed_http_classifications(inventory):
         }, item["key"]
 
 
+@pytest.mark.parametrize(
+    ("key", "expected_roles"),
+    [
+        (
+            "GET /api/v1/energy/shift/plans::get_plans",
+            ["admin", "operator", "viewer"],
+        ),
+        (
+            "POST /api/v1/energy/shift/plans::create_plan",
+            ["admin", "operator"],
+        ),
+        (
+            "POST /api/v1/energy/shift/analysis/feasibility::analyze_feasibility",
+            ["admin", "operator", "viewer"],
+        ),
+        (
+            "GET /api/v1/opportunities::list_opportunities",
+            ["admin", "operator", "viewer"],
+        ),
+        (
+            "POST /api/v1/opportunities/{opportunity_id}/simulate::simulate_opportunity",
+            ["admin", "operator", "viewer"],
+        ),
+        (
+            "GET /api/v1/diagnosis/probability-tuning/adjustments::list_adjustments",
+            ["admin", "operator", "viewer"],
+        ),
+    ],
+)
+def test_candidate_builder_preserves_inclusive_global_roles(key, expected_roles):
+    candidate = build_authorization_inventory(app)
+    policies = {item["key"]: item for item in candidate["http"]}
+
+    assert policies[key]["access"] == "GLOBAL"
+    assert policies[key]["roles"] == expected_roles
+
+
 def test_missing_runtime_route_is_rejected(inventory):
     mutated = deepcopy(inventory)
     mutated["http"].pop()

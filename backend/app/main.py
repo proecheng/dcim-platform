@@ -57,6 +57,7 @@ async def verify_websocket_token(token: str, channel: str, *, db=None) -> WebSoc
             allowed_site_ids=site_context.site_ids,
             channel=channel,
             username=identity.user.username,
+            expires_at=identity.expires_at,
         )
 
     try:
@@ -1480,6 +1481,7 @@ async def _serve_authorized_websocket(websocket: WebSocket, channel: str) -> Non
             role=authorization.role,
             allowed_site_ids=authorization.allowed_site_ids,
             channel=authorization.channel,
+            expires_at=authorization.expires_at,
             username=authorization.username,
         )
         await ws_manager.connect(context, already_accepted=True)

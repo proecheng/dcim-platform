@@ -28,9 +28,11 @@ OPP = "/api/v1/opportunities"
 # DB 辅助 — 直接在数据库中创建测试记录，绕过 API 层 model_validate 的懒加载问题
 # ---------------------------------------------------------------------------
 
+
 async def _create_energy_opportunity_in_db(async_db, **overrides):
     """直接在数据库中创建 EnergyOpportunity 记录"""
     from app.models.energy import EnergyOpportunity
+
     defaults = {
         "category": 1,
         "title": "测试节能机会",
@@ -50,6 +52,7 @@ async def _create_energy_opportunity_in_db(async_db, **overrides):
 # ---------------------------------------------------------------------------
 # 辅助工厂
 # ---------------------------------------------------------------------------
+
 
 def _plan_payload(**overrides):
     """构建最小合法的 ShiftPlanCreate body"""
@@ -125,28 +128,20 @@ class TestShiftPlans:
 
     async def test_get_plan_detail(self, client, admin_user):
         _, token = admin_user
-        create = await client.post(
-            f"{SHIFT}/plans", json=_plan_payload(), headers=auth_headers(token)
-        )
+        create = await client.post(f"{SHIFT}/plans", json=_plan_payload(), headers=auth_headers(token))
         plan_id = create.json()["id"]
-        resp = await client.get(
-            f"{SHIFT}/plans/{plan_id}", headers=auth_headers(token)
-        )
+        resp = await client.get(f"{SHIFT}/plans/{plan_id}", headers=auth_headers(token))
         assert resp.status_code == 200
         assert resp.json()["id"] == plan_id
 
     async def test_get_plan_not_found(self, client, admin_user):
         _, token = admin_user
-        resp = await client.get(
-            f"{SHIFT}/plans/99999", headers=auth_headers(token)
-        )
+        resp = await client.get(f"{SHIFT}/plans/99999", headers=auth_headers(token))
         assert resp.status_code == 404
 
     async def test_update_plan(self, client, admin_user):
         _, token = admin_user
-        create = await client.post(
-            f"{SHIFT}/plans", json=_plan_payload(), headers=auth_headers(token)
-        )
+        create = await client.post(f"{SHIFT}/plans", json=_plan_payload(), headers=auth_headers(token))
         plan_id = create.json()["id"]
         resp = await client.put(
             f"{SHIFT}/plans/{plan_id}",
@@ -167,20 +162,14 @@ class TestShiftPlans:
 
     async def test_delete_plan(self, client, admin_user):
         _, token = admin_user
-        create = await client.post(
-            f"{SHIFT}/plans", json=_plan_payload(), headers=auth_headers(token)
-        )
+        create = await client.post(f"{SHIFT}/plans", json=_plan_payload(), headers=auth_headers(token))
         plan_id = create.json()["id"]
-        resp = await client.delete(
-            f"{SHIFT}/plans/{plan_id}", headers=auth_headers(token)
-        )
+        resp = await client.delete(f"{SHIFT}/plans/{plan_id}", headers=auth_headers(token))
         assert resp.status_code == 204
 
     async def test_delete_plan_not_found(self, client, admin_user):
         _, token = admin_user
-        resp = await client.delete(
-            f"{SHIFT}/plans/99999", headers=auth_headers(token)
-        )
+        resp = await client.delete(f"{SHIFT}/plans/99999", headers=auth_headers(token))
         assert resp.status_code == 404
 
     async def test_list_plans_with_filters(self, client, admin_user):
@@ -204,29 +193,21 @@ class TestShiftPlanWorkflow:
 
     async def test_submit_plan(self, client, admin_user):
         _, token = admin_user
-        create = await client.post(
-            f"{SHIFT}/plans", json=_plan_payload(), headers=auth_headers(token)
-        )
+        create = await client.post(f"{SHIFT}/plans", json=_plan_payload(), headers=auth_headers(token))
         plan_id = create.json()["id"]
-        resp = await client.post(
-            f"{SHIFT}/plans/{plan_id}/submit", headers=auth_headers(token)
-        )
+        resp = await client.post(f"{SHIFT}/plans/{plan_id}/submit", headers=auth_headers(token))
         # 可能 200（成功）或 404（状态不允许）
         assert resp.status_code in (200, 404)
 
     async def test_submit_plan_not_found(self, client, admin_user):
         _, token = admin_user
-        resp = await client.post(
-            f"{SHIFT}/plans/99999/submit", headers=auth_headers(token)
-        )
+        resp = await client.post(f"{SHIFT}/plans/99999/submit", headers=auth_headers(token))
         assert resp.status_code == 404
 
     async def test_approve_plan_wrong_status(self, client, admin_user):
         """草稿状态的计划不能直接审批 — 返回 400"""
         _, token = admin_user
-        create = await client.post(
-            f"{SHIFT}/plans", json=_plan_payload(), headers=auth_headers(token)
-        )
+        create = await client.post(f"{SHIFT}/plans", json=_plan_payload(), headers=auth_headers(token))
         plan_id = create.json()["id"]
         resp = await client.post(
             f"{SHIFT}/plans/{plan_id}/approve",
@@ -247,20 +228,14 @@ class TestShiftPlanWorkflow:
     async def test_execute_plan_wrong_status(self, client, admin_user):
         """草稿状态的计划不能直接执行 — 返回 400"""
         _, token = admin_user
-        create = await client.post(
-            f"{SHIFT}/plans", json=_plan_payload(), headers=auth_headers(token)
-        )
+        create = await client.post(f"{SHIFT}/plans", json=_plan_payload(), headers=auth_headers(token))
         plan_id = create.json()["id"]
-        resp = await client.post(
-            f"{SHIFT}/plans/{plan_id}/execute", headers=auth_headers(token)
-        )
+        resp = await client.post(f"{SHIFT}/plans/{plan_id}/execute", headers=auth_headers(token))
         assert resp.status_code == 400
 
     async def test_execute_plan_not_found(self, client, admin_user):
         _, token = admin_user
-        resp = await client.post(
-            f"{SHIFT}/plans/99999/execute", headers=auth_headers(token)
-        )
+        resp = await client.post(f"{SHIFT}/plans/99999/execute", headers=auth_headers(token))
         assert resp.status_code == 404
 
 
@@ -275,9 +250,7 @@ class TestShiftOpportunities:
 
     async def test_list_opportunities_empty(self, client, admin_user):
         _, token = admin_user
-        resp = await client.get(
-            f"{SHIFT}/opportunities", headers=auth_headers(token)
-        )
+        resp = await client.get(f"{SHIFT}/opportunities", headers=auth_headers(token))
         assert resp.status_code == 200
 
     async def test_list_opportunities_with_filters(self, client, admin_user):
@@ -291,9 +264,7 @@ class TestShiftOpportunities:
 
     async def test_get_opportunity_not_found(self, client, admin_user):
         _, token = admin_user
-        resp = await client.get(
-            f"{SHIFT}/opportunities/99999", headers=auth_headers(token)
-        )
+        resp = await client.get(f"{SHIFT}/opportunities/99999", headers=auth_headers(token))
         assert resp.status_code == 404
 
     async def test_analyze_opportunities(self, client, admin_user):
@@ -383,17 +354,13 @@ class TestShiftDevices:
 
     async def test_shiftable_devices_empty(self, client, admin_user):
         _, token = admin_user
-        resp = await client.get(
-            f"{SHIFT}/devices/shiftable", headers=auth_headers(token)
-        )
+        resp = await client.get(f"{SHIFT}/devices/shiftable", headers=auth_headers(token))
         assert resp.status_code == 200
         assert isinstance(resp.json(), list)
 
     async def test_device_potential_not_implemented(self, client, admin_user):
         _, token = admin_user
-        resp = await client.get(
-            f"{SHIFT}/devices/1/potential", headers=auth_headers(token)
-        )
+        resp = await client.get(f"{SHIFT}/devices/1/potential", headers=auth_headers(token))
         # 端点返回 501 Not Implemented
         assert resp.status_code == 501
 
@@ -409,27 +376,21 @@ class TestShiftDashboard:
 
     async def test_dashboard_overview(self, client, admin_user):
         _, token = admin_user
-        resp = await client.get(
-            f"{SHIFT}/dashboard/overview", headers=auth_headers(token)
-        )
+        resp = await client.get(f"{SHIFT}/dashboard/overview", headers=auth_headers(token))
         assert resp.status_code == 200
         body = resp.json()
         assert "total_plans" in body
 
     async def test_dashboard_realtime(self, client, admin_user):
         _, token = admin_user
-        resp = await client.get(
-            f"{SHIFT}/dashboard/realtime", headers=auth_headers(token)
-        )
+        resp = await client.get(f"{SHIFT}/dashboard/realtime", headers=auth_headers(token))
         assert resp.status_code == 200
         body = resp.json()
         assert "current_shift_power" in body
 
     async def test_dashboard_trends(self, client, admin_user):
         _, token = admin_user
-        resp = await client.get(
-            f"{SHIFT}/dashboard/trends", headers=auth_headers(token)
-        )
+        resp = await client.get(f"{SHIFT}/dashboard/trends", headers=auth_headers(token))
         assert resp.status_code == 200
         assert isinstance(resp.json(), list)
 
@@ -454,9 +415,7 @@ class TestShiftStatistics:
 
     async def test_statistics_summary(self, client, admin_user):
         _, token = admin_user
-        resp = await client.get(
-            f"{SHIFT}/statistics/summary", headers=auth_headers(token)
-        )
+        resp = await client.get(f"{SHIFT}/statistics/summary", headers=auth_headers(token))
         assert resp.status_code == 200
         body = resp.json()
         assert "total_plans" in body
@@ -482,9 +441,7 @@ class TestShiftCooling:
 
     async def test_get_cooling_config(self, client, admin_user):
         _, token = admin_user
-        resp = await client.get(
-            f"{SHIFT}/cooling/config", headers=auth_headers(token)
-        )
+        resp = await client.get(f"{SHIFT}/cooling/config", headers=auth_headers(token))
         assert resp.status_code == 200
 
     async def test_update_cooling_config(self, client, admin_user):
@@ -503,16 +460,12 @@ class TestShiftCooling:
 
     async def test_get_cooling_status(self, client, admin_user):
         _, token = admin_user
-        resp = await client.get(
-            f"{SHIFT}/cooling/status", headers=auth_headers(token)
-        )
+        resp = await client.get(f"{SHIFT}/cooling/status", headers=auth_headers(token))
         assert resp.status_code == 200
 
     async def test_get_cooling_history(self, client, admin_user):
         _, token = admin_user
-        resp = await client.get(
-            f"{SHIFT}/cooling/history", headers=auth_headers(token)
-        )
+        resp = await client.get(f"{SHIFT}/cooling/history", headers=auth_headers(token))
         assert resp.status_code == 200
 
     async def test_get_cooling_history_with_params(self, client, admin_user):
@@ -604,9 +557,7 @@ class TestShiftConstraints:
 
     async def test_list_constraints(self, client, admin_user):
         _, token = admin_user
-        resp = await client.get(
-            f"{SHIFT}/constraints", headers=auth_headers(token)
-        )
+        resp = await client.get(f"{SHIFT}/constraints", headers=auth_headers(token))
         assert resp.status_code == 200
 
     async def test_create_constraint(self, client, admin_user):
@@ -692,9 +643,7 @@ class TestShiftNoAuth:
         assert resp.status_code == 401
 
     async def test_analysis_no_auth(self, client):
-        resp = await client.post(
-            f"{SHIFT}/analysis/feasibility", json=_feasibility_payload()
-        )
+        resp = await client.post(f"{SHIFT}/analysis/feasibility", json=_feasibility_payload())
         assert resp.status_code == 401
 
     async def test_devices_no_auth(self, client):
@@ -738,16 +687,12 @@ class TestShiftRBAC:
 
     async def test_viewer_cannot_delete_plan(self, client, viewer_user):
         _, token = viewer_user
-        resp = await client.delete(
-            f"{SHIFT}/plans/1", headers=auth_headers(token)
-        )
+        resp = await client.delete(f"{SHIFT}/plans/1", headers=auth_headers(token))
         assert resp.status_code == 403
 
     async def test_viewer_cannot_submit_plan(self, client, viewer_user):
         _, token = viewer_user
-        resp = await client.post(
-            f"{SHIFT}/plans/1/submit", headers=auth_headers(token)
-        )
+        resp = await client.post(f"{SHIFT}/plans/1/submit", headers=auth_headers(token))
         assert resp.status_code == 403
 
     async def test_viewer_cannot_approve_plan(self, client, viewer_user):
@@ -761,40 +706,32 @@ class TestShiftRBAC:
 
     async def test_viewer_cannot_execute_plan(self, client, viewer_user):
         _, token = viewer_user
-        resp = await client.post(
-            f"{SHIFT}/plans/1/execute", headers=auth_headers(token)
-        )
+        resp = await client.post(f"{SHIFT}/plans/1/execute", headers=auth_headers(token))
         assert resp.status_code == 403
 
     async def test_viewer_cannot_analyze_opportunities(self, client, viewer_user):
         _, token = viewer_user
-        resp = await client.post(
-            f"{SHIFT}/opportunities/analyze", headers=auth_headers(token)
-        )
+        resp = await client.post(f"{SHIFT}/opportunities/analyze", headers=auth_headers(token))
         assert resp.status_code == 403
 
-    async def test_viewer_cannot_list_plans(self, client, viewer_user):
+    async def test_viewer_can_list_plans(self, client, viewer_user):
         _, token = viewer_user
-        resp = await client.get(
-            f"{SHIFT}/plans", headers=auth_headers(token)
-        )
-        assert resp.status_code == 403
+        resp = await client.get(f"{SHIFT}/plans", headers=auth_headers(token))
+        assert resp.status_code == 200
 
-    async def test_viewer_cannot_view_dashboard(self, client, viewer_user):
+    async def test_viewer_can_view_dashboard(self, client, viewer_user):
         _, token = viewer_user
-        resp = await client.get(
-            f"{SHIFT}/dashboard/overview", headers=auth_headers(token)
-        )
-        assert resp.status_code == 403
+        resp = await client.get(f"{SHIFT}/dashboard/overview", headers=auth_headers(token))
+        assert resp.status_code == 200
 
-    async def test_operator_cannot_create_plan(self, client, operator_user):
+    async def test_operator_can_create_plan(self, client, operator_user):
         _, token = operator_user
         resp = await client.post(
             f"{SHIFT}/plans",
             json=_plan_payload(),
             headers=auth_headers(token),
         )
-        assert resp.status_code == 403
+        assert resp.status_code == 201
 
 
 # ===========================================================================
@@ -808,9 +745,7 @@ class TestOpportunitiesDashboard:
 
     async def test_dashboard(self, client, admin_user):
         _, token = admin_user
-        resp = await client.get(
-            f"{OPP}/dashboard", headers=auth_headers(token)
-        )
+        resp = await client.get(f"{OPP}/dashboard", headers=auth_headers(token))
         assert resp.status_code == 200
         body = resp.json()
         assert "summary_cards" in body
@@ -829,9 +764,7 @@ class TestOpportunitiesDetect:
         """注: 检测器内部 EnergyDaily.date 属性不存在，会抛出 DataLoadError"""
         _, token = admin_user
         try:
-            resp = await client.post(
-                f"{OPP}/detect", headers=auth_headers(token)
-            )
+            resp = await client.post(f"{OPP}/detect", headers=auth_headers(token))
             assert resp.status_code in (200, 500)
         except Exception:
             # 内部 DataLoadError 可能未被完全捕获
@@ -856,17 +789,13 @@ class TestOpportunitiesDetect:
     async def test_detect_viewer_forbidden(self, client, viewer_user):
         """detect 需要 admin 角色"""
         _, token = viewer_user
-        resp = await client.post(
-            f"{OPP}/detect", headers=auth_headers(token)
-        )
+        resp = await client.post(f"{OPP}/detect", headers=auth_headers(token))
         assert resp.status_code == 403
 
     async def test_detect_operator_forbidden(self, client, operator_user):
         """detect 需要 admin 角色"""
         _, token = operator_user
-        resp = await client.post(
-            f"{OPP}/detect", headers=auth_headers(token)
-        )
+        resp = await client.post(f"{OPP}/detect", headers=auth_headers(token))
         assert resp.status_code == 403
 
 
@@ -913,16 +842,12 @@ class TestOpportunitiesCRUD:
     async def test_get_detail(self, client, admin_user, async_db):
         _, token = admin_user
         opp = await _create_energy_opportunity_in_db(async_db)
-        resp = await client.get(
-            f"{OPP}/{opp.id}/detail", headers=auth_headers(token)
-        )
+        resp = await client.get(f"{OPP}/{opp.id}/detail", headers=auth_headers(token))
         assert resp.status_code == 200
 
     async def test_get_detail_not_found(self, client, admin_user):
         _, token = admin_user
-        resp = await client.get(
-            f"{OPP}/99999/detail", headers=auth_headers(token)
-        )
+        resp = await client.get(f"{OPP}/99999/detail", headers=auth_headers(token))
         assert resp.status_code == 404
 
     async def test_update_opportunity(self, client, admin_user, async_db):
@@ -947,25 +872,19 @@ class TestOpportunitiesCRUD:
     async def test_delete_opportunity(self, client, admin_user, async_db):
         _, token = admin_user
         opp = await _create_energy_opportunity_in_db(async_db)
-        resp = await client.delete(
-            f"{OPP}/{opp.id}", headers=auth_headers(token)
-        )
+        resp = await client.delete(f"{OPP}/{opp.id}", headers=auth_headers(token))
         assert resp.status_code == 200
 
     async def test_delete_not_found(self, client, admin_user):
         _, token = admin_user
-        resp = await client.delete(
-            f"{OPP}/99999", headers=auth_headers(token)
-        )
+        resp = await client.delete(f"{OPP}/99999", headers=auth_headers(token))
         assert resp.status_code == 404
 
     async def test_delete_non_discovered_forbidden(self, client, admin_user, async_db):
         """只能删除 discovered 状态的机会"""
         _, token = admin_user
         opp = await _create_energy_opportunity_in_db(async_db, status="executing")
-        resp = await client.delete(
-            f"{OPP}/{opp.id}", headers=auth_headers(token)
-        )
+        resp = await client.delete(f"{OPP}/{opp.id}", headers=auth_headers(token))
         assert resp.status_code == 400
 
 
@@ -1016,17 +935,13 @@ class TestOpportunitiesDevices:
 
     async def test_devices_not_found(self, client, admin_user):
         _, token = admin_user
-        resp = await client.get(
-            f"{OPP}/99999/devices", headers=auth_headers(token)
-        )
+        resp = await client.get(f"{OPP}/99999/devices", headers=auth_headers(token))
         assert resp.status_code == 404
 
     async def test_get_devices(self, client, admin_user, async_db):
         _, token = admin_user
         opp = await _create_energy_opportunity_in_db(async_db)
-        resp = await client.get(
-            f"{OPP}/{opp.id}/devices", headers=auth_headers(token)
-        )
+        resp = await client.get(f"{OPP}/{opp.id}/devices", headers=auth_headers(token))
         assert resp.status_code == 200
         body = resp.json()
         assert "available_devices" in body
@@ -1062,17 +977,13 @@ class TestOpportunitiesExecute:
 
     async def test_execute_not_found(self, client, admin_user):
         _, token = admin_user
-        resp = await client.post(
-            f"{OPP}/99999/execute", headers=auth_headers(token)
-        )
+        resp = await client.post(f"{OPP}/99999/execute", headers=auth_headers(token))
         assert resp.status_code == 404
 
     async def test_execute_opportunity(self, client, admin_user, async_db):
         _, token = admin_user
         opp = await _create_energy_opportunity_in_db(async_db)
-        resp = await client.post(
-            f"{OPP}/{opp.id}/execute", headers=auth_headers(token)
-        )
+        resp = await client.post(f"{OPP}/{opp.id}/execute", headers=auth_headers(token))
         assert resp.status_code == 200
         body = resp.json()
         assert "plan_id" in body
@@ -1081,9 +992,7 @@ class TestOpportunitiesExecute:
         """已执行的机会不能再次执行"""
         _, token = admin_user
         opp = await _create_energy_opportunity_in_db(async_db, status="completed")
-        resp = await client.post(
-            f"{OPP}/{opp.id}/execute", headers=auth_headers(token)
-        )
+        resp = await client.post(f"{OPP}/{opp.id}/execute", headers=auth_headers(token))
         assert resp.status_code == 400
 
 
@@ -1107,17 +1016,15 @@ class TestOpportunitiesRBAC:
         resp = await client.post(f"{OPP}/1/execute")
         assert resp.status_code == 401
 
-    async def test_viewer_cannot_list(self, client, viewer_user):
+    async def test_viewer_can_list(self, client, viewer_user):
         _, token = viewer_user
         resp = await client.get(f"{OPP}", headers=auth_headers(token))
-        assert resp.status_code == 403
+        assert resp.status_code == 200
 
-    async def test_viewer_cannot_view_dashboard(self, client, viewer_user):
+    async def test_viewer_can_view_dashboard(self, client, viewer_user):
         _, token = viewer_user
-        resp = await client.get(
-            f"{OPP}/dashboard", headers=auth_headers(token)
-        )
-        assert resp.status_code == 403
+        resp = await client.get(f"{OPP}/dashboard", headers=auth_headers(token))
+        assert resp.status_code == 200
 
     async def test_viewer_cannot_create(self, client, viewer_user):
         """create 需要 admin 角色"""
@@ -1132,9 +1039,7 @@ class TestOpportunitiesRBAC:
     async def test_viewer_cannot_execute(self, client, viewer_user):
         """execute 需要 admin 角色"""
         _, token = viewer_user
-        resp = await client.post(
-            f"{OPP}/1/execute", headers=auth_headers(token)
-        )
+        resp = await client.post(f"{OPP}/1/execute", headers=auth_headers(token))
         assert resp.status_code == 403
 
     async def test_operator_cannot_create(self, client, operator_user):
@@ -1150,7 +1055,5 @@ class TestOpportunitiesRBAC:
     async def test_operator_cannot_delete(self, client, operator_user):
         """delete 需要 admin 角色"""
         _, token = operator_user
-        resp = await client.delete(
-            f"{OPP}/1", headers=auth_headers(token)
-        )
+        resp = await client.delete(f"{OPP}/1", headers=auth_headers(token))
         assert resp.status_code == 403

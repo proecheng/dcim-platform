@@ -409,6 +409,8 @@ http:
   access: GLOBAL
   roles:
   - admin
+  - operator
+  - viewer
   action: delete
   resource: energy
   resolver: null
@@ -422,6 +424,7 @@ http:
   access: GLOBAL
   roles:
   - admin
+  - operator
   action: delete
   resource: energy
   resolver: null
@@ -2545,6 +2548,8 @@ http:
   access: GLOBAL
   roles:
   - admin
+  - operator
+  - viewer
   action: read
   resource: diagnosis
   resolver: null
@@ -3522,6 +3527,8 @@ http:
   access: GLOBAL
   roles:
   - admin
+  - operator
+  - viewer
   action: read
   resource: energy
   resolver: null
@@ -3535,6 +3542,8 @@ http:
   access: GLOBAL
   roles:
   - admin
+  - operator
+  - viewer
   action: read
   resource: energy
   resolver: null
@@ -3548,6 +3557,8 @@ http:
   access: GLOBAL
   roles:
   - admin
+  - operator
+  - viewer
   action: read
   resource: energy
   resolver: null
@@ -3561,6 +3572,8 @@ http:
   access: GLOBAL
   roles:
   - admin
+  - operator
+  - viewer
   action: read
   resource: energy
   resolver: null
@@ -3574,6 +3587,8 @@ http:
   access: GLOBAL
   roles:
   - admin
+  - operator
+  - viewer
   action: read
   resource: energy
   resolver: null
@@ -3587,6 +3602,8 @@ http:
   access: GLOBAL
   roles:
   - admin
+  - operator
+  - viewer
   action: read
   resource: energy
   resolver: null
@@ -3600,6 +3617,8 @@ http:
   access: GLOBAL
   roles:
   - admin
+  - operator
+  - viewer
   action: read
   resource: energy
   resolver: null
@@ -3613,6 +3632,8 @@ http:
   access: GLOBAL
   roles:
   - admin
+  - operator
+  - viewer
   action: read
   resource: energy
   resolver: null
@@ -3626,6 +3647,8 @@ http:
   access: GLOBAL
   roles:
   - admin
+  - operator
+  - viewer
   action: read
   resource: energy
   resolver: null
@@ -3639,6 +3662,8 @@ http:
   access: GLOBAL
   roles:
   - admin
+  - operator
+  - viewer
   action: read
   resource: energy
   resolver: null
@@ -3652,6 +3677,8 @@ http:
   access: GLOBAL
   roles:
   - admin
+  - operator
+  - viewer
   action: read
   resource: energy
   resolver: null
@@ -3665,6 +3692,8 @@ http:
   access: GLOBAL
   roles:
   - admin
+  - operator
+  - viewer
   action: read
   resource: energy
   resolver: null
@@ -3678,6 +3707,8 @@ http:
   access: GLOBAL
   roles:
   - admin
+  - operator
+  - viewer
   action: read
   resource: energy
   resolver: null
@@ -3691,6 +3722,8 @@ http:
   access: GLOBAL
   roles:
   - admin
+  - operator
+  - viewer
   action: read
   resource: energy
   resolver: null
@@ -3704,6 +3737,8 @@ http:
   access: GLOBAL
   roles:
   - admin
+  - operator
+  - viewer
   action: read
   resource: energy
   resolver: null
@@ -3717,6 +3752,8 @@ http:
   access: GLOBAL
   roles:
   - admin
+  - operator
+  - viewer
   action: read
   resource: energy
   resolver: null
@@ -3730,6 +3767,8 @@ http:
   access: GLOBAL
   roles:
   - admin
+  - operator
+  - viewer
   action: read
   resource: energy
   resolver: null
@@ -3743,6 +3782,8 @@ http:
   access: GLOBAL
   roles:
   - admin
+  - operator
+  - viewer
   action: read
   resource: energy
   resolver: null
@@ -4848,6 +4889,8 @@ http:
   access: GLOBAL
   roles:
   - admin
+  - operator
+  - viewer
   action: read
   resource: opportunities
   resolver: null
@@ -4861,6 +4904,8 @@ http:
   access: GLOBAL
   roles:
   - admin
+  - operator
+  - viewer
   action: read
   resource: opportunities
   resolver: null
@@ -4874,6 +4919,8 @@ http:
   access: GLOBAL
   roles:
   - admin
+  - operator
+  - viewer
   action: read
   resource: opportunities
   resolver: null
@@ -4887,6 +4934,8 @@ http:
   access: GLOBAL
   roles:
   - admin
+  - operator
+  - viewer
   action: read
   resource: opportunities
   resolver: null
@@ -8384,6 +8433,8 @@ http:
   access: GLOBAL
   roles:
   - admin
+  - operator
+  - viewer
   action: create
   resource: energy
   resolver: null
@@ -8397,6 +8448,8 @@ http:
   access: GLOBAL
   roles:
   - admin
+  - operator
+  - viewer
   action: create
   resource: energy
   resolver: null
@@ -8410,6 +8463,8 @@ http:
   access: GLOBAL
   roles:
   - admin
+  - operator
+  - viewer
   action: create
   resource: energy
   resolver: null
@@ -8423,6 +8478,8 @@ http:
   access: GLOBAL
   roles:
   - admin
+  - operator
+  - viewer
   action: create
   resource: energy
   resolver: null
@@ -8436,6 +8493,8 @@ http:
   access: GLOBAL
   roles:
   - admin
+  - operator
+  - viewer
   action: create
   resource: energy
   resolver: null
@@ -8449,6 +8508,7 @@ http:
   access: GLOBAL
   roles:
   - admin
+  - operator
   action: create
   resource: energy
   resolver: null
@@ -8462,6 +8522,7 @@ http:
   access: GLOBAL
   roles:
   - admin
+  - operator
   action: create
   resource: energy
   resolver: null
@@ -8475,6 +8536,7 @@ http:
   access: GLOBAL
   roles:
   - admin
+  - operator
   action: create
   resource: energy
   resolver: null
@@ -8488,6 +8550,7 @@ http:
   access: GLOBAL
   roles:
   - admin
+  - operator
   action: create
   resource: energy
   resolver: null
@@ -8501,6 +8564,7 @@ http:
   access: GLOBAL
   roles:
   - admin
+  - operator
   action: create
   resource: energy
   resolver: null
@@ -8514,6 +8578,7 @@ http:
   access: GLOBAL
   roles:
   - admin
+  - operator
   action: create
   resource: energy
   resolver: null
@@ -8527,6 +8592,8 @@ http:
   access: GLOBAL
   roles:
   - admin
+  - operator
+  - viewer
   action: create
   resource: energy
   resolver: null
@@ -9118,6 +9185,8 @@ http:
   access: GLOBAL
   roles:
   - admin
+  - operator
+  - viewer
   action: create
   resource: opportunities
   resolver: null
@@ -9131,6 +9200,8 @@ http:
   access: GLOBAL
   roles:
   - admin
+  - operator
+  - viewer
   action: create
   resource: opportunities
   resolver: null
@@ -10941,6 +11012,8 @@ http:
   access: GLOBAL
   roles:
   - admin
+  - operator
+  - viewer
   action: update
   resource: energy
   resolver: null
@@ -10954,6 +11027,8 @@ http:
   access: GLOBAL
   roles:
   - admin
+  - operator
+  - viewer
   action: update
   resource: energy
   resolver: null
@@ -10967,6 +11042,7 @@ http:
   access: GLOBAL
   roles:
   - admin
+  - operator
   action: update
   resource: energy
   resolver: null

@@ -79,6 +79,29 @@ GLOBAL_ADMIN_PATHS = {
     "/api/v1/diagnosis/trend-config",
 }
 
+GLOBAL_INCLUSIVE_PREFIXES = ("/api/v1/energy/shift",)
+
+GLOBAL_OPERATOR_PATHS = {
+    "/api/v1/energy/shift/opportunities/analyze",
+    "/api/v1/energy/shift/opportunities/{opp_id}/convert",
+    "/api/v1/energy/shift/plans",
+    "/api/v1/energy/shift/plans/{plan_id}",
+    "/api/v1/energy/shift/plans/{plan_id}/approve",
+    "/api/v1/energy/shift/plans/{plan_id}/execute",
+    "/api/v1/energy/shift/plans/{plan_id}/submit",
+}
+
+GLOBAL_VIEWER_READ_PREFIXES = ("/api/v1/opportunities",)
+
+GLOBAL_VIEWER_READ_PATHS = {
+    "/api/v1/diagnosis/probability-tuning/adjustments",
+}
+
+GLOBAL_VIEWER_PATHS = {
+    "/api/v1/opportunities/{opportunity_id}/select-devices",
+    "/api/v1/opportunities/{opportunity_id}/simulate",
+}
+
 SITE_PATH_RESOLVER_PREFIXES = (
     ("/api/v1/diagnosis/analyze", "alarm.point.device.site_id"),
     ("/api/v1/diagnosis/battery-soh", "device.site_id"),
@@ -464,6 +487,21 @@ def _mixed_http_policy(method: str, path: str) -> tuple[str, list[str], str | No
         if method in {"GET", "HEAD"}:
             return "GLOBAL", ["admin", "operator", "viewer"], None
         return "GLOBAL", ["admin"], None
+    if any(_path_is_or_under(path, prefix) for prefix in GLOBAL_INCLUSIVE_PREFIXES):
+        roles = (
+            ["admin", "operator"]
+            if normalized in GLOBAL_OPERATOR_PATHS and method not in {"GET", "HEAD"}
+            else ["admin", "operator", "viewer"]
+        )
+        return "GLOBAL", roles, None
+    if normalized in GLOBAL_VIEWER_PATHS or (
+        method in {"GET", "HEAD"}
+        and (
+            normalized in GLOBAL_VIEWER_READ_PATHS
+            or any(_path_is_or_under(path, prefix) for prefix in GLOBAL_VIEWER_READ_PREFIXES)
+        )
+    ):
+        return "GLOBAL", ["admin", "operator", "viewer"], None
     if normalized in GLOBAL_ADMIN_PATHS:
         return "GLOBAL", ["admin"], None
 
@@ -577,7 +615,11 @@ def build_authorization_inventory(app: Any) -> dict[str, Any]:
         user_targeted = producer["channel"] == "direct"
         producers.append(
             {
-                **producer,
+                "key": producer["key"],
+                "source": producer["source"],
+                "owner": producer["owner"],
+                "call": producer["call"],
+                "channel": producer["channel"],
                 "scope": "USER" if user_targeted else "SITE",
                 "resolver": None if user_targeted else "site.id",
                 "tests": ["AUTHZ-INVENTORY-WS-PRODUCER-01"],
@@ -597,8 +639,25 @@ def build_authorization_inventory(app: Any) -> dict[str, Any]:
 
 
 def write_authorization_inventory(app: Any, path: Path | str = DEFAULT_INVENTORY_PATH) -> Path:
-    """Write a deterministic candidate inventory for explicit code review."""
+    """Write a deterministic inventory without discarding reviewed classifications."""
     path = Path(path)
     data = build_authorization_inventory(app)
+    if path.exists():
+        reviewed = load_authorization_inventory(path)
+        reviewed_http = {item["key"]: item for item in reviewed["http"]}
+        for item in data["http"]:
+            previous = reviewed_http.get(item["key"])
+            if previous:
+                item["action"] = previous["action"]
+                item["tests"] = previous["tests"]
+
+        reviewed_producers = {item["key"]: item for item in reviewed["websocket"]["producers"]}
+        for item in data["websocket"]["producers"]:
+            previous = reviewed_producers.get(item["key"])
+            if previous:
+                item["scope"] = previous["scope"]
+                item["resolver"] = previous["resolver"]
+                item["tests"] = previous["tests"]
+
     path.write_text(yaml.safe_dump(data, allow_unicode=True, sort_keys=False, width=120), encoding="utf-8")
     return path

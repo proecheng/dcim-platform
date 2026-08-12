@@ -202,7 +202,17 @@
     "image": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["tag", "status", "digest", "repo_digests", "production_registry_digest"],
+      "required": [
+        "tag",
+        "status",
+        "digest",
+        "repo_digests",
+        "production_registry_digest",
+        "git_sha_label",
+        "source_snapshot_label",
+        "attestation_status",
+        "registry_digest_status"
+      ],
       "properties": {
         "tag": { "type": "string", "minLength": 1 },
         "status": { "enum": ["BUILT", "NOT_BUILT", "FAILED"] },
@@ -218,7 +228,21 @@
             { "type": "null" },
             { "type": "string", "pattern": "^[^@\\s]+@sha256:[0-9a-f]{64}$" }
           ]
-        }
+        },
+        "git_sha_label": {
+          "anyOf": [
+            { "type": "null" },
+            { "$ref": "#/$defs/gitSha" }
+          ]
+        },
+        "source_snapshot_label": {
+          "anyOf": [
+            { "type": "null" },
+            { "$ref": "#/$defs/sha256Hex" }
+          ]
+        },
+        "attestation_status": { "enum": ["PASS", "FAILED"] },
+        "registry_digest_status": { "enum": ["PASS", "FAILED", "NOT_PROVIDED"] }
       },
       "allOf": [
         {

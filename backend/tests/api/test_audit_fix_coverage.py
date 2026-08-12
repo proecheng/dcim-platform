@@ -29,9 +29,7 @@ class TestPydanticModelValidation:
     """测试 Pydantic 模型替换 dict Body 后的验证行为"""
 
     @pytest.mark.asyncio
-    async def test_reject_time_window_whitespace_reason(
-        self, client: AsyncClient, admin_token: str, async_db
-    ):
+    async def test_reject_time_window_whitespace_reason(self, client: AsyncClient, admin_token: str, async_db):
         """strip_whitespace=True: 全空白 reason 应被拒绝"""
         # 创建待审批记录
         from app.models.diagnosis import TimeWindowAdjustmentLog
@@ -59,9 +57,7 @@ class TestPydanticModelValidation:
         assert response.status_code == 422
 
     @pytest.mark.asyncio
-    async def test_reject_time_window_valid_reason(
-        self, client: AsyncClient, admin_token: str, async_db
-    ):
+    async def test_reject_time_window_valid_reason(self, client: AsyncClient, admin_token: str, async_db):
         """正常 reason 应通过验证"""
         from app.models.diagnosis import TimeWindowAdjustmentLog
 
@@ -87,9 +83,7 @@ class TestPydanticModelValidation:
         assert response.status_code == 200
 
     @pytest.mark.asyncio
-    async def test_hmac_key_rotate_short_key(
-        self, client: AsyncClient, admin_token: str
-    ):
+    async def test_hmac_key_rotate_short_key(self, client: AsyncClient, admin_token: str):
         """HMACKeyRotateRequest: key < 32 字符应被拒绝"""
         response = await client.post(
             "/api/v1/diagnosis/hmac-key/rotate",
@@ -99,9 +93,7 @@ class TestPydanticModelValidation:
         assert response.status_code == 422
 
     @pytest.mark.asyncio
-    async def test_hmac_key_rotate_missing_key(
-        self, client: AsyncClient, admin_token: str
-    ):
+    async def test_hmac_key_rotate_missing_key(self, client: AsyncClient, admin_token: str):
         """HMACKeyRotateRequest: 缺少 new_key 字段应 422"""
         response = await client.post(
             "/api/v1/diagnosis/hmac-key/rotate",
@@ -111,9 +103,7 @@ class TestPydanticModelValidation:
         assert response.status_code == 422
 
     @pytest.mark.asyncio
-    async def test_approve_time_window_optional_reason(
-        self, client: AsyncClient, admin_token: str, async_db
-    ):
+    async def test_approve_time_window_optional_reason(self, client: AsyncClient, admin_token: str, async_db):
         """TimeWindowApproveRequest: reason 可选，空 body 应通过"""
         from app.models.diagnosis import TimeWindowAdjustmentLog
         from app.models.config import SystemConfig
@@ -158,9 +148,7 @@ class TestPaginationBoundary:
     """测试分页参数 le=100 上限"""
 
     @pytest.mark.asyncio
-    async def test_ab_tests_page_size_exceeds_limit(
-        self, client: AsyncClient, admin_token: str
-    ):
+    async def test_ab_tests_page_size_exceeds_limit(self, client: AsyncClient, admin_token: str):
         """A/B 测试列表: page_size > 100 应被拒绝"""
         response = await client.get(
             "/api/v1/diagnosis/ab-tests?page_size=101",
@@ -169,9 +157,7 @@ class TestPaginationBoundary:
         assert response.status_code == 422
 
     @pytest.mark.asyncio
-    async def test_ab_tests_page_size_at_limit(
-        self, client: AsyncClient, admin_token: str
-    ):
+    async def test_ab_tests_page_size_at_limit(self, client: AsyncClient, admin_token: str):
         """A/B 测试列表: page_size=100 应通过"""
         response = await client.get(
             "/api/v1/diagnosis/ab-tests?page_size=100",
@@ -180,9 +166,7 @@ class TestPaginationBoundary:
         assert response.status_code == 200
 
     @pytest.mark.asyncio
-    async def test_ab_tests_page_zero(
-        self, client: AsyncClient, admin_token: str
-    ):
+    async def test_ab_tests_page_zero(self, client: AsyncClient, admin_token: str):
         """A/B 测试列表: page=0 应被拒绝 (ge=1)"""
         response = await client.get(
             "/api/v1/diagnosis/ab-tests?page=0",
@@ -191,9 +175,7 @@ class TestPaginationBoundary:
         assert response.status_code == 422
 
     @pytest.mark.asyncio
-    async def test_fault_tree_versions_page_size_exceeds_limit(
-        self, client: AsyncClient, admin_token: str, async_db
-    ):
+    async def test_fault_tree_versions_page_size_exceeds_limit(self, client: AsyncClient, admin_token: str, async_db):
         """故障树版本列表: page_size > 100 应被拒绝"""
         # 创建一个故障树
         from app.models.fault_tree import FaultTree
@@ -209,9 +191,7 @@ class TestPaginationBoundary:
         assert response.status_code == 422
 
     @pytest.mark.asyncio
-    async def test_battery_soh_limit_exceeds_max(
-        self, client: AsyncClient, admin_token: str
-    ):
+    async def test_battery_soh_limit_exceeds_max(self, client: AsyncClient, admin_token: str):
         """battery-soh/latest: limit > 500 应被拒绝"""
         response = await client.get(
             "/api/v1/diagnosis/battery-soh/latest?limit=501",
@@ -220,9 +200,7 @@ class TestPaginationBoundary:
         assert response.status_code == 422
 
     @pytest.mark.asyncio
-    async def test_battery_soh_limit_at_max(
-        self, client: AsyncClient, admin_token: str
-    ):
+    async def test_battery_soh_limit_at_max(self, client: AsyncClient, admin_token: str):
         """battery-soh/latest: limit=500 应通过"""
         response = await client.get(
             "/api/v1/diagnosis/battery-soh/latest?limit=500",
@@ -240,9 +218,7 @@ class TestRBACDependencyInjection:
     """测试 RBAC 依赖注入替换后的权限行为"""
 
     @pytest.mark.asyncio
-    async def test_sensor_metadata_viewer_cannot_create(
-        self, client: AsyncClient, viewer_token: str
-    ):
+    async def test_sensor_metadata_viewer_cannot_create(self, client: AsyncClient, viewer_token: str):
         """viewer 不能创建传感器元数据 (require_operator)"""
         response = await client.post(
             "/api/v1/diagnosis/sensor-metadata/",
@@ -262,9 +238,7 @@ class TestRBACDependencyInjection:
         """viewer 不能删除传感器元数据 (require_admin)"""
         from app.models.diagnosis import SensorMetadata
 
-        meta = SensorMetadata(
-            point_id=9002, accuracy_class=0.5, calibration_interval_days=365
-        )
+        meta = SensorMetadata(point_id=9002, accuracy_class=0.5, calibration_interval_days=365)
         async_db.add(meta)
         await async_db.flush()
         await async_db.refresh(meta)
@@ -276,15 +250,11 @@ class TestRBACDependencyInjection:
         assert response.status_code == 403
 
     @pytest.mark.asyncio
-    async def test_sensor_metadata_operator_cannot_delete(
-        self, client: AsyncClient, operator_token: str, async_db
-    ):
+    async def test_sensor_metadata_operator_cannot_delete(self, client: AsyncClient, operator_token: str, async_db):
         """operator 不能删除传感器元数据 (require_admin)"""
         from app.models.diagnosis import SensorMetadata
 
-        meta = SensorMetadata(
-            point_id=9003, accuracy_class=0.5, calibration_interval_days=365
-        )
+        meta = SensorMetadata(point_id=9003, accuracy_class=0.5, calibration_interval_days=365)
         async_db.add(meta)
         await async_db.flush()
         await async_db.refresh(meta)
@@ -296,9 +266,7 @@ class TestRBACDependencyInjection:
         assert response.status_code == 403
 
     @pytest.mark.asyncio
-    async def test_sensor_metadata_operator_can_update(
-        self, client: AsyncClient, operator_user, async_db
-    ):
+    async def test_sensor_metadata_operator_can_update(self, client: AsyncClient, operator_user, async_db):
         """operator 可以更新传感器元数据 (require_operator)"""
         from app.models.device import Device
         from app.models.diagnosis import SensorMetadata
@@ -328,9 +296,7 @@ class TestRBACDependencyInjection:
         async_db.add_all([UserSite(user_id=operator.id, site_id=site.id), point])
         await async_db.flush()
 
-        meta = SensorMetadata(
-            point_id=point.id, accuracy_class=0.5, calibration_interval_days=365
-        )
+        meta = SensorMetadata(point_id=point.id, accuracy_class=0.5, calibration_interval_days=365)
         async_db.add(meta)
         await async_db.flush()
         await async_db.refresh(meta)
@@ -343,9 +309,7 @@ class TestRBACDependencyInjection:
         assert response.status_code == 200
 
     @pytest.mark.asyncio
-    async def test_fault_tree_versions_viewer_can_list(
-        self, client: AsyncClient, viewer_token: str, async_db
-    ):
+    async def test_fault_tree_versions_viewer_can_list(self, client: AsyncClient, viewer_token: str, async_db):
         """viewer 可以查看故障树版本列表 (require_viewer)"""
         from app.models.fault_tree import FaultTree
 
@@ -360,20 +324,16 @@ class TestRBACDependencyInjection:
         assert response.status_code == 200
 
     @pytest.mark.asyncio
-    async def test_probability_adjustments_viewer_cannot_list(
-        self, client: AsyncClient, viewer_token: str
-    ):
-        """viewer 不能查看全局概率调参配置"""
+    async def test_probability_adjustments_viewer_can_list(self, client: AsyncClient, viewer_token: str):
+        """viewer 可以查看全局概率调参配置"""
         response = await client.get(
             "/api/v1/diagnosis/probability-tuning/adjustments",
             headers={"Authorization": f"Bearer {viewer_token}"},
         )
-        assert response.status_code == 403
+        assert response.status_code == 200
 
     @pytest.mark.asyncio
-    async def test_probability_adjustments_no_auth(
-        self, client: AsyncClient
-    ):
+    async def test_probability_adjustments_no_auth(self, client: AsyncClient):
         """无认证不能查看概率调参列表"""
         response = await client.get(
             "/api/v1/diagnosis/probability-tuning/adjustments",
@@ -390,9 +350,7 @@ class TestAuditLog:
     """测试审计日志 OperationLog 写入"""
 
     @pytest.mark.asyncio
-    async def test_ab_test_create_writes_audit_log(
-        self, client: AsyncClient, admin_token: str, async_db
-    ):
+    async def test_ab_test_create_writes_audit_log(self, client: AsyncClient, admin_token: str, async_db):
         """创建 A/B 测试应写入审计日志"""
         from app.models.fault_tree import FaultTree, FaultTreeVersion
 
@@ -435,11 +393,7 @@ class TestAuditLog:
 
         if response.status_code == 201:
             # 验证审计日志
-            result = await async_db.execute(
-                select(OperationLog).where(
-                    OperationLog.action == "create_ab_test"
-                )
-            )
+            result = await async_db.execute(select(OperationLog).where(OperationLog.action == "create_ab_test"))
             logs = result.scalars().all()
             assert len(logs) >= 1
             assert logs[-1].module == "ab_testing"
@@ -454,9 +408,7 @@ class TestMethodChange:
     """测试 GET→POST 方法变更"""
 
     @pytest.mark.asyncio
-    async def test_reload_rules_get_not_200(
-        self, client: AsyncClient, admin_token: str
-    ):
+    async def test_reload_rules_get_not_200(self, client: AsyncClient, admin_token: str):
         """GET /rules/reload 不应返回 200（已改为 POST）"""
         response = await client.get(
             "/api/v1/diagnosis/rules/reload",
@@ -466,9 +418,7 @@ class TestMethodChange:
         assert response.status_code != 200
 
     @pytest.mark.asyncio
-    async def test_reload_rules_post_works(
-        self, client: AsyncClient, admin_token: str
-    ):
+    async def test_reload_rules_post_works(self, client: AsyncClient, admin_token: str):
         """POST /rules/reload 应正常工作"""
         response = await client.post(
             "/api/v1/diagnosis/rules/reload",
@@ -487,9 +437,7 @@ class TestBoundaryFixes:
     """测试边界条件修复"""
 
     @pytest.mark.asyncio
-    async def test_export_format_invalid(
-        self, client: AsyncClient, admin_token: str
-    ):
+    async def test_export_format_invalid(self, client: AsyncClient, admin_token: str):
         """Literal['pdf']: 非 pdf 格式应返回 422"""
         response = await client.get(
             "/api/v1/diagnosis/reports/misdiagnosis/export?period=2025-01&format=csv",
@@ -498,9 +446,7 @@ class TestBoundaryFixes:
         assert response.status_code == 422
 
     @pytest.mark.asyncio
-    async def test_export_format_pdf_valid(
-        self, client: AsyncClient, admin_token: str
-    ):
+    async def test_export_format_pdf_valid(self, client: AsyncClient, admin_token: str):
         """Literal['pdf']: pdf 格式应通过验证"""
         response = await client.get(
             "/api/v1/diagnosis/reports/misdiagnosis/export?period=2025-01&format=pdf",
@@ -510,9 +456,7 @@ class TestBoundaryFixes:
         assert response.status_code != 422
 
     @pytest.mark.asyncio
-    async def test_sensor_check_expired_returns_200(
-        self, client: AsyncClient, admin_token: str
-    ):
+    async def test_sensor_check_expired_returns_200(self, client: AsyncClient, admin_token: str):
         """check-expired-calibrations 应返回 200（不是 202）"""
         response = await client.post(
             "/api/v1/diagnosis/sensor-metadata/check-expired-calibrations",
@@ -522,9 +466,7 @@ class TestBoundaryFixes:
         assert "已完成" in response.json()["message"]
 
     @pytest.mark.asyncio
-    async def test_misdiagnosis_end_date_boundary(
-        self, client: AsyncClient, admin_token: str, async_db
-    ):
+    async def test_misdiagnosis_end_date_boundary(self, client: AsyncClient, admin_token: str, async_db):
         """end_date 边界: 使用 < 而非 <=，避免多包含次日零时"""
         from app.models.report import ReportRecord
 
@@ -564,9 +506,7 @@ class TestGenericErrorMessages:
     """测试错误消息不泄露内部异常详情"""
 
     @pytest.mark.asyncio
-    async def test_probability_approve_error_generic(
-        self, client: AsyncClient, admin_token: str
-    ):
+    async def test_probability_approve_error_generic(self, client: AsyncClient, admin_token: str):
         """概率调参审批不存在记录时应返回通用消息"""
         response = await client.post(
             "/api/v1/diagnosis/probability-tuning/adjustments/99999/approve",
@@ -580,9 +520,7 @@ class TestGenericErrorMessages:
         assert "NoneType" not in detail
 
     @pytest.mark.asyncio
-    async def test_time_window_approve_nonexistent_generic(
-        self, client: AsyncClient, admin_token: str
-    ):
+    async def test_time_window_approve_nonexistent_generic(self, client: AsyncClient, admin_token: str):
         """时间窗口审批不存在记录应返回通用消息"""
         response = await client.post(
             "/api/v1/diagnosis/time-window-tuning/adjustments/99999/approve",
@@ -594,9 +532,7 @@ class TestGenericErrorMessages:
         assert "Traceback" not in detail
 
     @pytest.mark.asyncio
-    async def test_time_window_reject_nonexistent_generic(
-        self, client: AsyncClient, admin_token: str
-    ):
+    async def test_time_window_reject_nonexistent_generic(self, client: AsyncClient, admin_token: str):
         """时间窗口拒绝不存在记录应返回通用消息"""
         response = await client.post(
             "/api/v1/diagnosis/time-window-tuning/adjustments/99999/reject",
