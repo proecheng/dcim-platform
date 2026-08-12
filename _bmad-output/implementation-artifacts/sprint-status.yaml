@@ -57,9 +57,10 @@
 # P3: Epic 33 (VPP虚拟电厂集成) — Phase 3
 # P0: Epic 37 (协议模板与设备级制冷柔性一体化) — V4.4 基线补记
 # P0: Epic 38 (发布候选版流程与质量门禁) — V4.4 发布收口
+# P0: Epic 39 (生产就绪与安全闭环) — V4.4.1 生产批准前置
 
 generated: 2026-03-11
-last_updated: 2026-08-09
+last_updated: 2026-08-12
 project: admin
 project_key: NOKEY
 tracking_system: file-system
@@ -453,3 +454,24 @@ development_status:
   38-3-ci-regression-gate-restoration: done
   38-4-cd-images-and-release-candidate-evidence: done
   epic-38-retrospective: done  # 2026-08-09
+
+  # ============================================================
+  # V4.4.1 生产就绪与安全闭环 (Epic 39)
+  # 新增于 2026-08-10，依据已批准 sprint-change-proposal-2026-08-10.md
+  # ============================================================
+
+  # Epic 39: 生产就绪与安全闭环
+  epic-39: in-progress
+  39-1-site-isolation-and-websocket-authorization: in-progress
+  39-2-command-xss-and-production-credential-hardening: backlog
+  39-3-postgresql-disaster-recovery-and-failover: backlog
+  39-4-real-gateway-and-field-uat: backlog
+  39-5-vulnerability-and-supply-chain-gate: backlog
+  39-6-production-performance-and-capacity: backlog
+  39-7-slo-observability-and-burn-in: backlog
+  39-8-core-coverage-and-e2e-determinism: backlog
+  39-9-production-crypto-audit-and-key-custody: backlog
+  39-10-multi-instance-state-and-data-capacity: backlog
+  39-11-database-and-axios-contract-debt: backlog
+  39-12-ota-deployment-smoke-and-auto-rollback: backlog
+  epic-39-retrospective: optional

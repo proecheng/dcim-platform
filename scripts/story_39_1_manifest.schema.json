@@ -19,11 +19,12 @@
     "exceptions",
     "decisions",
     "ownership",
-    "approvals",
-    "production_gate"
+    "governance",
+    "story_gate",
+    "epic_production_gate"
   ],
   "properties": {
-    "schema_version": { "const": 1 },
+    "schema_version": { "const": 2 },
     "story": {
       "type": "object",
       "additionalProperties": false,
@@ -140,30 +141,56 @@
     "ownership": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["implementation_owner", "security_owner", "qa_owner"],
+      "required": ["maintainer"],
       "properties": {
-        "implementation_owner": { "const": "Amelia" },
-        "security_owner": { "const": "Charlie" },
-        "qa_owner": { "const": "Dana" }
+        "maintainer": { "const": "proecheng" }
       }
     },
-    "approvals": {
+    "governance": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["security", "qa"],
+      "required": [
+        "mode",
+        "maintainer",
+        "independent_approval_required",
+        "decision",
+        "decided_at_utc",
+        "basis"
+      ],
       "properties": {
-        "security": { "$ref": "#/$defs/approval" },
-        "qa": { "$ref": "#/$defs/approval" }
+        "mode": { "const": "single-maintainer" },
+        "maintainer": { "const": "proecheng" },
+        "independent_approval_required": { "const": false },
+        "decision": { "enum": ["VERIFIED", "BLOCKED"] },
+        "decided_at_utc": { "type": "string", "format": "date-time" },
+        "basis": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1 }
+        }
       }
     },
-    "production_gate": {
+    "story_gate": {
       "type": "object",
       "additionalProperties": false,
       "required": ["status", "blockers"],
       "properties": {
-        "status": { "enum": ["BLOCKED", "CONDITIONAL REVIEW", "APPROVED"] },
+        "status": { "enum": ["PASS", "BLOCKED"] },
         "blockers": {
           "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "epic_production_gate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "blockers"],
+      "properties": {
+        "status": { "const": "BLOCKED" },
+        "blockers": {
+          "type": "array",
+          "minItems": 1,
           "items": { "type": "string", "minLength": 1 }
         }
       }
@@ -232,18 +259,6 @@
           "minItems": 1,
           "items": { "type": "string", "minLength": 1 }
         }
-      }
-    },
-    "approval": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["name", "role", "status", "signed_at_utc", "signature"],
-      "properties": {
-        "name": { "type": "string", "minLength": 1 },
-        "role": { "type": "string", "minLength": 1 },
-        "status": { "enum": ["PENDING", "APPROVED", "REJECTED"] },
-        "signed_at_utc": { "type": ["string", "null"], "format": "date-time" },
-        "signature": { "type": ["string", "null"] }
       }
     }
   }

@@ -1,6 +1,6 @@
 ---
-stepsCompleted: [requirements-inventory, epic-design, story-creation, coverage-map, phase2-supplement, tcl-precool-supplement, v4.4-release-closure]
-inputDocuments: [_bmad-output/planning-artifacts/prd.md, _bmad-output/planning-artifacts/architecture.md, _bmad-output/planning-artifacts/sprint-change-proposal-2026-08-08.md, docs/空调可转移功率算法调研与改进方案.md]
+stepsCompleted: [requirements-inventory, epic-design, story-creation, coverage-map, phase2-supplement, tcl-precool-supplement, v4.4-release-closure, v4.4.1-production-readiness]
+inputDocuments: [_bmad-output/planning-artifacts/prd.md, _bmad-output/planning-artifacts/architecture.md, _bmad-output/planning-artifacts/sprint-change-proposal-2026-08-08.md, _bmad-output/planning-artifacts/sprint-change-proposal-2026-08-10.md, _bmad-output/planning-artifacts/sprint-change-proposal-2026-08-12.md, docs/空调可转移功率算法调研与改进方案.md]
 tcl_supplement_date: 2026-03-10
 tcl_supplement_epics: [29, 30, 31, 32, 33]
 workflowType: epics-and-stories
@@ -9,19 +9,21 @@ user_name: proecheng
 date: 2026-02-21
 phase2_supplement_date: 2026-02-21
 phase2_supplement_epics: [18, 19, 20, 21, 22, 23]
+production_readiness_supplement_date: 2026-08-10
+production_readiness_epic: 39
 ---
 
 # DCIM 算力中心智能监控系统 - Epics & Stories
 
 **Author:** proecheng
 **Date:** 2026-02-15
-**Status:** 完整版 - 基于 PRD 2026-02-15 + Architecture 2026-02-15 全面重建
+**Status:** 完整版 - V4.4.1 生产就绪与安全闭环基线于 2026-08-10 获批
 
 ---
 
 ## 概述
 
-本文档将 PRD 中功能需求 FR1-FR99、补充需求和非功能需求按业务域组织为 38 个 Epic，每个 Epic 包含可独立验证的用户故事。所有故事按 PRD 分阶段计划标注阶段归属。Epic 24-26 为智能诊断系统，Epic 27-28 为数据链路与 Demo 解耦，Epic 29-33 为预冷 TCL 模型，Epic 34-36 为 V4.3 客户 RFP 能力，Epic 37 为协议模板与设备级制冷柔性一体化，Epic 38 为 V4.4 发布候选版流程与质量门禁。
+本文档将 PRD 中功能需求 FR1-FR99、补充需求和非功能需求按业务域组织为 39 个 Epic，每个 Epic 包含可独立验证的用户故事。所有故事按 PRD 分阶段计划标注阶段归属。Epic 24-26 为智能诊断系统，Epic 27-28 为数据链路与 Demo 解耦，Epic 29-33 为预冷 TCL 模型，Epic 34-36 为 V4.3 客户 RFP 能力，Epic 37 为协议模板与设备级制冷柔性一体化，Epic 38 为 V4.4 发布候选版流程与质量门禁，Epic 39 为 V4.4.1 生产就绪与安全闭环。
 
 ### Epic 总览
 
@@ -65,6 +67,7 @@ phase2_supplement_epics: [18, 19, 20, 21, 22, 23]
 | **36** | **预测性维护扩展** | **V4.3 P0** | **FR-PM01~PM06** | **5** |
 | **37** | **协议模板与设备级制冷柔性一体化** | **V4.4 基线补记** | **FR-PT01~PT04, FR-CF01~CF04** | **4** |
 | **38** | **发布候选版流程与质量门禁** | **V4.4 发布收口** | **FR-WF01~WF02, NFR-RC01~RC04** | **4** |
+| **39** | **生产就绪与安全闭环** | **V4.4.1 生产批准前置** | **NFR-PR01~PR08** | **12** |
 
 ### Epic 依赖关系
 
@@ -90,6 +93,7 @@ Epic 29 --> Epic 32 (校准依赖热模型)
 Epic 32 与 Epic 31 可并行
 Epic 3,29-33 --> Epic 37 --> Epic 38
 Epic 14 --> Epic 38 (发布门禁依赖质量与测试基础)
+Epic 13,15,16,27,28,37,38 --> Epic 39 (生产就绪依赖身份、协议、站点、数据链路、隔离和可追溯软件 RC)
 ```
 
 ### 阶段规划
@@ -102,6 +106,7 @@ Epic 14 --> Epic 38 (发布门禁依赖质量与测试基础)
 | Phase 2b 月9-10 | 专业扩展 | **25**, 16, **31**, **32** |
 | Phase 3 月11-12+ | 高级+灰度 | **26**, **33** |
 | V4.4 基线与发布收口 | 2026-07~08 | **37**, **38** |
+| V4.4.1 生产就绪与安全闭环 | 2026-08 起，条件性 6-9 周 | **39** |
 
 ---
 
@@ -5533,12 +5538,13 @@ except ImportError:
 
 ---
 
-## V4.4 基线与发布收口 Epic 总览
+## V4.4 与 V4.4.1 基线、发布收口及生产就绪 Epic 总览
 
 | # | Epic | FR/NFR 覆盖 | 故事数 | 依赖 |
 |---|------|-------------|--------|------|
 | 37 | 协议模板与设备级制冷柔性一体化 | FR-PT01~PT04, FR-CF01~CF04 | 4 | Epic 3, 29-33 |
 | 38 | 发布候选版流程与质量门禁 | FR-WF01~WF02, NFR-RC01~RC04 | 4 | Epic 14, 37 |
+| 39 | 生产就绪与安全闭环 | NFR-PR01~PR08 | 12 | Epic 13, 15, 16, 27, 28, 37, 38 |
 
 ---
 
@@ -5716,4 +5722,283 @@ So that 软件候选版本可追溯且不会被误认为已完成现场生产验
 
 ---
 
-*文档更新 - 共 38 个 Epic, 184+ 个 Stories, 覆盖 FR1-FR99 全部功能需求 + FR34-1~42 智能诊断子需求 + FR-TCL-1~23 预冷 TCL 模型 + FR-N01~N07 多渠道通知引擎 + FR-BN01~BN04 BACnet MS/TP 设备接入 + FR-PM01~PM06 预测性维护扩展 + FR-PT01~PT04 协议模板 + FR-CF01~CF04 设备级制冷柔性 + FR-WF01~WF02 业务流程契约 + NFR-RC01~RC04 发布质量门禁。V4.4 新增 Epic 37-38（8 Stories），依据 2026-08-08 Sprint Change Proposal 完成基线补记与发布收口。*
+## Epic 39: 生产就绪与安全闭环
+
+**阶段:** V4.4.1 生产批准前置（2026-08 起，条件性 6-9 周）
+
+**优先级:** P0；在生产批准或无关功能扩展前完成
+
+**目标:** 将可追溯的 V4.4 软件发布候选版转化为可进入生产决策的版本，关闭全部 CRITICAL/HIGH NFR 行动并形成可审计的目标环境证据，不扩展产品功能范围。
+
+**NFR 覆盖:** NFR-PR01~PR08
+
+**架构参考:** Architecture Section 26.1~26.9
+
+**前置基线:** Epic 38 保持 `done`。Epic 39 不重开已完成 Epic，也不得把软件 RC 完成解释为生产批准。
+
+### Epic 39 决策前置
+
+以下决策必须由唯一维护者 `proecheng` 记录到对应 Story 文件和 Architecture Section 26，未完成时相关 Story 不得进入 `ready-for-dev`：
+
+| ID | 决策 | 阻断 Story |
+|----|------|------------|
+| D39-01 | RTO、RPO、备份保留、恢复与故障切换范围 | 39.3 |
+| D39-02 | 漏洞阻断级别、可利用性、扫描覆盖与例外到期规则 | 39.5 |
+| D39-03 | 证据窗口、错误率、资源告警、MTTR 与连续运行次数 | 39.7 |
+| D39-04 | 独立/组合负载、生产资源预算与通过计算方法 | 39.6 |
+| D39-05 | 单实例或多实例生产拓扑及其状态/恢复边界 | 39.10 |
+| D39-06 | 现场设备/协议/固件矩阵、样本、写安全与 UAT 参与方 | 39.4 |
+| D39-07 | 网关 OTA 是否纳入本次发布及其目标矩阵 | 39.12 |
+| D39-08 | 例外权限、不可豁免控制、补偿措施与到期/复审流程 | 任一例外 |
+
+### Epic 39 统一证据契约
+
+每个 Story 必须在 `_bmad-output/test-artifacts/epic-39/<story-id>/manifest.yaml` 发布机器可读证据清单，包含 Story ID、Git SHA、后端/前端镜像摘要、变更集、目标环境和脱敏拓扑指纹、工具版本、精确命令/配置、UTC 时间、操作人、原始产物、计算指标、验收标准映射、限制与例外及唯一维护者的具名结论。当前项目不要求 BMAD 虚拟角色或独立代码审批人签署；截图或文字摘要不能替代原始机器可读证据。
+
+### Story 39.1: 站点隔离与 WebSocket 服务端授权（C1）
+
+As a 安全负责人,
+I want 所有对象访问与实时流都执行完整的服务端站点和会话授权,
+So that 跨站点用户无法通过 API、猜测 ID 或 WebSocket 获得未授权数据。
+
+**实施与证据责任:** `proecheng`（唯一维护者；无需独立证据审批）
+
+**Acceptance Criteria:**
+
+- 生成完整的 API 对象查询/修改及 WebSocket 频道清单，每项标明角色、站点、会话控制和自动化测试；未分类路由直接使清单门禁失败
+- 所有对象读写在返回或写入前校验用户允许站点范围
+- WebSocket 连接绑定用户 ID、活动 JTI、角色和允许站点，广播过滤完全在服务端执行
+- 跨站点列表/详情/修改/流、猜测 ID、角色降级和已撤销会话阻断测试全部通过
+
+**NFR/行动追溯:** NFR-PR01, C1
+
+### Story 39.2: 命令、XSS 与生产凭据加固（C2）
+
+As a 安全负责人,
+I want 命令审批、不可信内容和生产凭据在默认情况下保持安全,
+So that 未分类命令、自审批、存储型脚本和默认凭据不能进入生产路径。
+
+**实施与证据责任:** `proecheng`（唯一维护者；无需独立证据审批）
+
+**Acceptance Criteria:**
+
+- 未知命令默认拒绝，只有完成显式分类后才允许执行
+- 受保护命令的请求人与审批人必须不同，自审批和绕过尝试被拒绝并审计
+- `marked()` 输出在进入 `v-html` 前完成白名单净化，持久化恶意 Markdown 测试通过
+- 生产启动拒绝全部默认、占位或已知开发凭据
+- 已部署代理使用显式来源允许列表，不组合通配来源和凭据，并通过 CORS、CSP 与安全响应头检查
+
+**NFR/行动追溯:** NFR-PR02, C2
+
+### Story 39.3: PostgreSQL 灾难恢复与站点故障切换（C3）
+
+As a 运维负责人,
+I want PostgreSQL 备份、恢复、回滚和故障切换满足已批准目标,
+So that 生产数据故障可以在可测量的时间和数据损失边界内恢复。
+
+**依赖:** Story 39.7；D39-01 在开发前完成
+
+**实施与证据责任:** `proecheng`（唯一维护者；无需独立证据审批）
+
+**Acceptance Criteria:**
+
+- 唯一维护者在开发开始前记录数值 RTO、RPO、备份保留、恢复和故障切换范围
+- 自动每日 PostgreSQL 备份生成加密、完整性校验通过的制品，并对异常产生运维告警
+- 恢复、迁移回滚、应用回滚和站点/数据库故障切换均在批准阈值内完成并提供一致性证据
+
+**NFR/行动追溯:** NFR-PR05, C3
+
+### Story 39.4: 真实网关集成与现场 UAT（C4）
+
+As a 项目负责人,
+I want 在已批准的真实设备范围上完成协议联调、写安全和现场验收,
+So that 生产候选版本的设备兼容性和现场行为得到具名验证。
+
+**依赖:** Stories 39.3, 39.6, 39.9, 39.12；D39-06 在开发前完成
+
+**实施与证据责任:** `proecheng`（唯一维护者；现场 UAT 参与方仍需记录实际结果）
+
+**Acceptance Criteria:**
+
+- D39-06 明确设备、协议、固件矩阵、代表性抽样规则、排除项和 UAT 参与方
+- 每个范围内样本通过连接、点位映射/单位、只读优先、写安全和故障隔离测试
+- 72 小时离线缓存/回放证明顺序、去重、完整性和恢复能力
+- 现场集成与用户验收绑定精确发布镜像摘要并记录参与方和结果
+
+**NFR/行动追溯:** NFR-PR05, C4
+
+### Story 39.5: 漏洞治理与供应链门禁（H1）
+
+As a 安全负责人,
+I want 完整盘点依赖、镜像和代码扫描风险并执行阻断策略,
+So that 未分类或超出批准阈值的供应链风险无法进入生产候选版本。
+
+**决策前置:** D39-02；任何例外同时满足 D39-08
+
+**实施与证据责任:** `proecheng`（唯一维护者；无需独立证据审批）
+
+**Acceptance Criteria:**
+
+- 当前 28 个 Python 发现均按严重度、可利用性、修复/补偿、责任人、到期日和例外到期日完成分类
+- 完整 CycloneDX/SPDX SBOM 覆盖后端、前端和镜像
+- Python、npm、镜像、SAST 和密钥扫描发布机器可读制品，并按 D39-02/D39-08 阻断；不得保留未分类发现
+
+**NFR/行动追溯:** NFR-PR03, H1
+
+### Story 39.6: 生产等效性能与容量（H2）
+
+As a QA 负责人,
+I want 精确发布镜像在生产等效环境中通过独立和批准的组合负载,
+So that 性能结论基于可复现环境和实测资源饱和数据。
+
+**依赖:** Stories 39.7, 39.10；D39-04 在开发前完成
+
+**实施与证据责任:** `proecheng`（唯一维护者；无需独立证据审批）
+
+**Acceptance Criteria:**
+
+- 环境清单记录 PostgreSQL/Redis/MQTT 版本、网络、计算/存储限制、数据集、发布 SHA 和镜像摘要
+- 精确镜像分别执行 10,000 点、5,000 msg/s、50 并发用户、API/报表/浏览器延迟和 WebSocket 交付测试，并执行一个 D39-04 批准的代表性组合负载；未经批准不得假定所有最大值同时发生
+- 保留 API/报表/浏览器/WebSocket P50/P95/P99、错误、丢失/重复、队列、数据库、CPU 和内存原始指标
+- 所有现有 PRD 性能阈值均通过；残余关注按门禁矩阵处理，不得把失败阈值静默改为 `PASS`
+
+**NFR/行动追溯:** NFR-PR04, H2
+
+### Story 39.7: SLO 可观测性、MTTR 与连续运行（H3）
+
+As a 运维负责人,
+I want 生产关键指标、告警和恢复流程在预生产窗口内可验证,
+So that 发布决定基于真实可观测性，同时不虚构年度 SLO 已经得到证明。
+
+**决策前置:** D39-03
+
+**实施与证据责任:** `proecheng`（唯一维护者；无需独立证据审批）
+
+**Acceptance Criteria:**
+
+- 在开发前由唯一维护者记录测量窗口、错误率阈值、资源告警、MTTR 方法和连续运行次数
+- 健康/就绪、RED 指标、依赖状态、日志、可用性、错误预算、MTTR、备份年龄和网关积压均可观测并告警
+- 批准的预生产窗口证明稳定运行、告警可操作、事件可恢复且关键 E2E 无重试连续通过，但不宣称证明年度 SLO
+- 上线后测量计划为 `>=99.5%` 年度可用性 SLO 指定责任人，并定义违约对发布决定和后续工作的影响
+
+**NFR/行动追溯:** NFR-PR05, H3
+
+### Story 39.8: 核心覆盖率与 E2E 确定性（H4）
+
+As a QA 负责人,
+I want 核心模块覆盖率、类型检查和关键 E2E 成为确定性阻断门禁,
+So that 随机等待、重试和未覆盖核心逻辑不能掩盖发布风险。
+
+**实施与证据责任:** `proecheng`（唯一维护者；无需独立证据审批）
+
+**Acceptance Criteria:**
+
+- 采集、告警和联动模块分别在阻断 CI 规则下达到 `>=80%` 覆盖率
+- 后端 Pyright 和前端类型检查在 CI 中通过并保留报告
+- 消除认证设置不稳定问题，关键 E2E 不依赖重试通过
+- 门禁 E2E 不含任意固定等待；已识别的 105 处等待全部登记，每处替换为状态/事件断言，或明确隔离为非门禁手工/诊断等待并记录责任人和移除日期
+- 保留 JUnit/HTML/trace 制品，连续运行报告区分首次通过与重试行为
+
+**NFR/行动追溯:** NFR-PR06, H4
+
+### Story 39.9: 生产 TLS、加密、审计与密钥保管（H5）
+
+As a 运维负责人,
+I want 传输、静态数据、审计和签名密钥具备可验证的生产控制,
+So that 敏感数据和审计证据不会依赖未经证明的配置声明。
+
+**实施与证据责任:** `proecheng`（唯一维护者；无需独立证据审批）
+
+**Acceptance Criteria:**
+
+- 目标 TLS 和安全响应头通过扫描并满足批准基线
+- PostgreSQL 数据卷和备份制品具有已验证的静态加密
+- 审计保留配置强制至少 180 天，普通管理员修改/删除被拒绝；通过加速生命周期和防篡改测试验证，无需等待 180 个自然日
+- JWT/HMAC 密钥使用受管保管、具名责任、轮换和已测试的平滑切换
+
+**NFR/行动追溯:** NFR-PR02, NFR-PR03, H5
+
+### Story 39.10: 多实例状态模型与数据增长容量（H6）
+
+As a 架构师,
+I want 先确定受支持生产拓扑，再验证其状态、恢复和容量边界,
+So that 系统不会在未定义共享状态的情况下声称支持多实例，也不会隐藏单实例限制。
+
+**决策前置:** D39-05
+
+**实施与证据责任:** `proecheng`（唯一维护者；无需独立证据审批）
+
+**Acceptance Criteria:**
+
+- D39-05 通过 ADR 选择受支持生产拓扑及其可用性/恢复边界
+- 架构为 API、MQTT、WebSocket、调度器和 Worker 指定状态与幂等所有权
+- 如选择多实例，多副本测试证明扇出、会话、故障切换和防重复工作；如选择单实例，测试容量、重启恢复并记录明确的非 HA 限制
+- PostgreSQL/Redis 保留、索引、连接池、存储、归档和饱和决策使用实测数据
+
+**NFR/行动追溯:** NFR-PR07, H6
+
+### Story 39.11: 数据库与 Axios 契约债务（H7）
+
+As a 开发负责人,
+I want 数据库迁移、并发约束和前端响应类型与真实运行行为一致,
+So that 生产迁移、并发告警和 API 消费不会依赖隐式假设或类型绕过。
+
+**实施与证据责任:** `proecheng`（唯一维护者；无需独立证据审批）
+
+**Acceptance Criteria:**
+
+- PostgreSQL `alarm_type` 迁移完成向前与向后验证
+- 活动告警并发唯一性由数据库约束并在竞争条件下测试
+- 前端 API 响应类型与 Axios 拦截器实际解包行为一致，受影响路径不存在未关闭的 `as any` 例外
+
+**NFR/行动追溯:** NFR-PR06, H7
+
+### Story 39.12: OTA、部署冒烟与自动回滚（H8）
+
+As a 运维负责人,
+I want 应用部署具备强制健康回滚，并根据批准范围验证网关 OTA,
+So that 应用和固件失败都回到已验证版本，同时不让无关 OTA 范围阻断应用发布。
+
+**决策前置:** D39-07
+
+**实施与证据责任:** `proecheng`（唯一维护者；无需独立证据审批）
+
+**Acceptance Criteria:**
+
+- D39-07 将强制应用部署回滚与条件性网关 OTA 范围分离
+- 如 OTA 在范围内，每个必需硬件/固件类别的 A/B 故障注入均返回上一分区并记录事件；否则 D39-07 决定必须标明供 Story 39.4 使用的认证网关基线
+- 部署验证迁移版本、健康/就绪、登录、授权、关键读写和 WebSocket 冒烟用例
+- 迁移、健康或冒烟失败自动停止提升，回滚至已验证镜像摘要并保留审计证据
+
+**NFR/行动追溯:** NFR-PR07, H8
+
+### Epic 39 Story 依赖关系
+
+```text
+39.1 + 39.2 + 39.5 + 39.9 + 39.11  （安全与数据契约基线，可并行）
+39.7 -> 39.3
+39.7 + 39.10 -> 39.6
+39.8                                      （可并行）
+39.3 + 39.6 + 39.9 + 39.12 -> 39.4
+全部 Story -> NFR 重新评估 -> 生产门禁决定
+```
+
+### Epic 39 完成规则
+
+Epic 39 完成要求 12 份 Story 证据清单全部有效，并重新执行 NFR 评估。`APPROVED` 必须满足四个 NFR 域全部 `PASS`、无未关闭 CRITICAL/HIGH 行动、八个证据缺口全部关闭、`blockers=false` 且现场 UAT 已完成并留痕。任一 `FAIL`、未关闭阻断项、缺失清单或未经记录的例外均保持 `BLOCKED`；`CONDITIONAL REVIEW` 不构成自动生产批准。
+
+### Epic 39 后续 MEDIUM 登记
+
+| ID | 后续项 | 责任人 | 目标 |
+|----|--------|--------|------|
+| M1 | 零停机发布策略与 N-1 Schema 验证 | proecheng | 下一发布规划周期 |
+| M2 | 跨浏览器矩阵与 WCAG 2.1 AA 推进 | proecheng | 下一产品里程碑 |
+| M3 | 长期数据保留、分区、归档和容量复审触发器 | proecheng | 首个批准容量触发点前 |
+| M4 | JUnit/HTML/trace 自动发布与周期性测试质量评审 | proecheng | 必要时纳入 39.8，否则下一里程碑 |
+| M5 | 全路由 OpenAPI 审计与静态质量/债务趋势 | proecheng | 必要时纳入 39.8/39.11，否则下一里程碑 |
+
+任何使 NFR 域保持 `CONCERNS` 的 MEDIUM 项，都必须在 `CONDITIONAL REVIEW` 决定中记录责任人、到期日、补偿控制和证据计划。
+
+---
+
+*文档更新 - 共 39 个 Epic, 196+ 个 Stories, 覆盖 FR1-FR99 全部功能需求 + FR34-1~42 智能诊断子需求 + FR-TCL-1~23 预冷 TCL 模型 + FR-N01~N07 多渠道通知引擎 + FR-BN01~BN04 BACnet MS/TP 设备接入 + FR-PM01~PM06 预测性维护扩展 + FR-PT01~PT04 协议模板 + FR-CF01~CF04 设备级制冷柔性 + FR-WF01~WF02 业务流程契约 + NFR-RC01~RC04 发布质量门禁 + NFR-PR01~PR08 生产就绪门禁。V4.4 新增 Epic 37-38（8 Stories），V4.4.1 新增 Epic 39（12 Stories），依据 2026-08-10 已批准 Sprint Change Proposal 建立生产就绪与安全闭环基线。*

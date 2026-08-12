@@ -1,6 +1,6 @@
 ---
-stepsCompleted: [tech-stack, architecture-pattern, data-architecture, api-design, deployment, protocol-adapters, linkage-engine, video-integration, physical-topology, nfr-support, demo-module, ingest-pipeline, architecture-update, device-binding, intelligent-diagnosis, tcl-precool-model, notification-engine, predictive-maintenance, bacnet-mstp, protocol-template-cooling-flexibility, release-gates]
-inputDocuments: [_bmad-output/planning-artifacts/prd.md, _bmad-output/planning-artifacts/product-brief.md, docs/project-knowledge/project-context.md, docs/project-knowledge/backend-architecture.md, docs/project-knowledge/frontend-architecture.md, docs/project-knowledge/integration-architecture.md]
+stepsCompleted: [tech-stack, architecture-pattern, data-architecture, api-design, deployment, protocol-adapters, linkage-engine, video-integration, physical-topology, nfr-support, demo-module, ingest-pipeline, architecture-update, device-binding, intelligent-diagnosis, tcl-precool-model, notification-engine, predictive-maintenance, bacnet-mstp, protocol-template-cooling-flexibility, release-gates, production-readiness-security-closure]
+inputDocuments: [_bmad-output/planning-artifacts/prd.md, _bmad-output/planning-artifacts/product-brief.md, _bmad-output/planning-artifacts/sprint-change-proposal-2026-08-12.md, docs/project-knowledge/project-context.md, docs/project-knowledge/backend-architecture.md, docs/project-knowledge/frontend-architecture.md, docs/project-knowledge/integration-architecture.md]
 workflowType: 'architecture'
 project_name: 'DCIM'
 user_name: 'proecheng'
@@ -11,7 +11,7 @@ date: '2026-03-01'
 
 **Author:** proecheng
 **Date:** 2026-02-15
-**Status:** 完整版（V4.4.0 更新，新增协议模板/设备级制冷柔性/发布质量门禁 2026-08-08；V4.3.0 多渠道通知/预测性维护/BACnet MS/TP 架构 2026-03-18；V4.2.0 预冷 TCL 模型架构 2026-03-10；V4.0.0 智能诊断系统架构 2026-03-05；V3.2.0 演示系统模块化、统一数据管线、设备双向绑定 2026-03-01）
+**Status:** 完整版（V4.4.1 更新，新增生产就绪与安全闭环架构 2026-08-10；V4.4.0 协议模板/设备级制冷柔性/发布质量门禁 2026-08-08；V4.3.0 多渠道通知/预测性维护/BACnet MS/TP 架构 2026-03-18；V4.2.0 预冷 TCL 模型架构 2026-03-10；V4.0.0 智能诊断系统架构 2026-03-05；V3.2.0 演示系统模块化、统一数据管线、设备双向绑定 2026-03-01）
 
 ---
 
@@ -3029,9 +3029,106 @@ ghcr.io/<repository>/frontend:latest
 
 软件 RC 报告必须引用 CI/CD 运行 URL 和提交 SHA，并单独列出未覆盖的真实设备联调、生产密钥、安全处置、迁移演练和现场 UAT。
 
+## 26. 生产就绪与安全闭环架构（V4.4.1 新增）
+
+本章定义软件 RC 之后、生产批准之前的强制控制边界。所有 Epic 39 证据必须绑定同一 Git SHA、后端/前端镜像摘要和目标环境指纹；软件 RC、Story 验收与生产批准是三个独立决定，任何一个决定都不能替代后续门禁。
+
+### 26.1 身份、对象与实时流授权边界
+
+- 所有对象查询、详情、修改和删除路径必须在返回或写入前完成角色与站点范围校验。对象级授权清单必须覆盖全部 API 路由和后台调用，未分类路径不得默认开放。
+- WebSocket 连接上下文必须包含用户 ID、活动 JTI、角色和允许站点集合。连接建立与会话失效检查由服务端执行，广播和订阅过滤不得依赖前端隐藏或客户端过滤。
+- 跨站点列表、详情、变更、流、猜测 ID、角色降级和已撤销会话均纳入阻断性负向测试。
+
+### 26.2 命令与不可信内容边界
+
+- 命令使用显式白名单 Schema 与风险分类；未知类型、缺失分类或无法解析的参数一律默认拒绝。
+- 受保护命令必须分离请求人与审批人，禁止自审批；所有拒绝、绕过尝试和审批结果进入不可抵赖审计记录。
+- Markdown/HTML 等存储内容在进入 `v-html` 或等效渲染边界前执行白名单净化，并用持久化恶意载荷回归测试验证。
+- 生产代理与后端共享明确的来源允许列表，不得将通配来源与凭据组合；部署后校验 CORS、CSP 和安全响应头。
+
+### 26.3 密钥、加密、审计与供应链边界
+
+- 生产启动必须拒绝默认、占位或已知开发凭据。密钥由受管密钥存储注入，记录保管责任、轮换周期和可验证的轮换/回退流程。
+- 目标环境验证 TLS、PostgreSQL 数据卷和备份制品的静态加密。审计数据至少保留 180 天，普通管理员不得修改或删除，并通过加速生命周期及防篡改测试验证策略。
+- 后端、前端和最终镜像必须生成 CycloneDX 或 SPDX SBOM；Python、npm、镜像、SAST 和密钥扫描发布机器可读结果，并按 D39-02/D39-08 阻断或登记限期例外。
+
+### 26.4 PostgreSQL 恢复架构
+
+- 自动备份调度器每天生成加密且经过完整性校验的 PostgreSQL 制品，并对备份过期、失败和校验失败产生告警。
+- 恢复演练在隔离环境执行，覆盖数据恢复、向前/向后迁移、应用回滚和站点/数据库故障切换，不得以开发 SQLite 结果替代生产 PostgreSQL 证据。
+- RTO、RPO、保留周期、恢复范围和故障切换范围由 D39-01 批准；原始时间线和一致性校验结果进入 Story 39.3 证据清单。
+
+### 26.5 可观测性、SLO 与预生产证据
+
+- 健康/就绪、RED 指标、依赖状态、队列/积压、WebSocket、备份年龄、错误率、资源饱和度和网关积压必须可观测并绑定责任人和告警规则。
+- D39-03 决定预生产证据窗口、错误率阈值、资源告警、MTTR 计算方法和连续运行次数。预生产浸泡只证明发布就绪，不得宣称已证明年度可用性。
+- 上线后由独立运行计划持续测量 `>=99.5%` 年度可用性 SLO，定义错误预算、违约处理和后续工作归属。
+
+### 26.6 受支持拓扑与容量模型
+
+- D39-05 必须先以 ADR 选择受支持的单实例或多实例生产拓扑，并明确可用性、恢复和非 HA 边界。
+- 架构必须为 API、MQTT 采集、WebSocket、调度器和 Worker 指定状态、幂等、锁和重复工作所有权。多实例方案必须验证共享状态、扇出、会话和故障切换；单实例方案必须验证容量、重启恢复并签署非 HA 限制。
+- PostgreSQL/Redis 连接池、索引、保留、归档、存储和增长预算必须以 D39-04 的实测饱和数据为依据，不得用未验证的理论最大值替代。
+
+### 26.7 应用部署与条件性 OTA 回滚
+
+- 应用部署前检查迁移版本和兼容性，部署后执行健康/就绪、登录、授权、关键读写和 WebSocket 冒烟测试。
+- 迁移、健康或冒烟失败必须停止提升，并自动回滚到经过验证的镜像摘要；回滚原因、目标摘要和结果写入审计证据。
+- 网关 OTA 仅在 D39-07 将固件纳入本次发布范围时执行。范围内每个目标硬件/固件类别都必须进行 A/B 故障注入并恢复至上一分区；范围外则以签署的认证网关基线供 Story 39.4 使用。
+
+### 26.8 生产证据包
+
+每个 Story 必须在 `_bmad-output/test-artifacts/epic-39/<story-id>/manifest.yaml` 发布机器可读清单，至少包含：
+
+- Story ID、Git SHA、后端/前端镜像摘要和变更集标识；
+- 目标环境 ID、脱敏配置/拓扑指纹、工具版本、精确命令或测试配置；
+- UTC 开始/结束时间、操作人、原始产物路径、计算指标、结果和验收标准映射；
+- 已知限制、例外及到期日、关联决策记录和责任人。当前单维护者项目由 `proecheng` 依据机器可读证据记录 Story 结论，不要求 BMAD 虚拟角色或独立代码审批人签署。
+
+截图或文字摘要只能作为补充，不能替代原始机器可读证据。Epic 39 完成时，12 份清单、现场 UAT、更新后的 NFR 报告和最终门禁决定共同构成生产证据包。
+
+### 26.9 决策与例外治理
+
+| ID | 必须完成并留痕的决定 | 决策记录人 | 阻断范围 |
+|----|----------------------|------------|----------|
+| D39-01 | 数值 RTO、RPO、备份保留、恢复范围和故障切换范围 | `proecheng`（唯一维护者） | Story 39.3 |
+| D39-02 | 漏洞阻断级别、可利用性处理、扫描覆盖和例外到期规则 | `proecheng`（唯一维护者） | Story 39.5 |
+| D39-03 | 发布证据窗口、错误率阈值、资源告警、MTTR 方法和连续运行次数 | `proecheng`（唯一维护者） | Story 39.7 |
+| D39-04 | 独立/组合负载、生产资源预算和通过/失败计算方法 | `proecheng`（唯一维护者） | Story 39.6 |
+| D39-05 | 单实例恢复边界或多实例共享状态/扇出的受支持拓扑 | `proecheng`（唯一维护者） | Story 39.10 |
+| D39-06 | 现场设备/协议/固件矩阵、样本覆盖、写安全范围和 UAT 参与方 | `proecheng`（唯一维护者） | Story 39.4 |
+| D39-07 | 本次发布是否包含网关 OTA；如包含，确定目标硬件/固件矩阵和回滚证据 | `proecheng`（唯一维护者） | Story 39.12 |
+| D39-08 | 例外权限、不可豁免控制、补偿措施和到期/复审流程 | `proecheng`（唯一维护者） | 任一例外 |
+
+相关决定未记录到 Story 文件和本章前，Story 不得进入 `ready-for-dev`。
+
+| 门禁结果 | 确定性条件 | 允许结果 |
+|----------|------------|----------|
+| `BLOCKED` | 任一 NFR 域为 `FAIL`；任一 CRITICAL/HIGH 行动或证据缺口未关闭；必需决定/证据缺失；或例外未授权/已过期 | 禁止生产批准 |
+| `CONDITIONAL REVIEW` | 无 `FAIL`、无未关闭 CRITICAL/HIGH 行动、无证据缺口，但一个或多个域仍为 `CONCERNS` | 不自动批准；唯一维护者具名记录风险、补偿控制和到期日 |
+| `APPROVED` | 性能、安全、可靠性和可维护性全部 `PASS`，`blockers=false`，全部 Story 证据清单有效且现场 UAT 已完成 | 可进入生产发布门禁 |
+
+以下控制不可豁免：跨站点或 WebSocket 越权、命令默认放行或自审批、未净化存储内容执行、生产默认/占位凭据、生产 PostgreSQL 无法在批准目标内恢复，以及范围内设备缺少写安全或现场 UAT。其他 HIGH 残余风险只能按 D39-08 登记具名补偿控制和固定到期日，且到期日不得晚于下一次发布门禁。单维护者治理只取消项目交付中的虚拟角色审批，不取消应用运行时职责分离或外部现场验收。
+
 ---
 
 ## 附录: 架构变更日志
+
+### V4.4.1 (2026-08-10)
+
+**重大变更**:
+
+1. 新增对象与 WebSocket 服务端授权、命令默认拒绝、审批职责分离和不可信内容净化边界
+2. 新增生产密钥、加密、审计保留、SBOM 和阻断性供应链扫描架构
+3. 新增 PostgreSQL 自动备份、恢复、迁移回滚和故障切换证据边界
+4. 新增预生产 SLO/可观测性、受支持拓扑、容量和应用自动回滚架构
+5. 建立统一 Story 证据清单、D39-01~D39-08 决策登记和确定性生产门禁矩阵
+
+**PRD 对应关系**:
+
+- Section 26.1-26.3 -> NFR-PR01~PR03, NFR-PR06
+- Section 26.4-26.7 -> NFR-PR04~PR07
+- Section 26.8-26.9 -> NFR-PR08
 
 ### V4.4.0 (2026-08-08)
 

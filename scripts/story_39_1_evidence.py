@@ -22,6 +22,7 @@ from typing import Any
 
 import jsonschema
 import yaml
+from story_39_1_governance import validate_governance
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -103,7 +104,9 @@ def _is_story_source(path: str) -> bool:
         "e2e/site-isolation-websocket-authorization.spec.ts",
         "playwright.config.ts",
         "scripts/story_39_1_evidence.py",
+        "scripts/story_39_1_governance.py",
         "scripts/story_39_1_manifest.schema.json",
+        "backend/tests/test_story_39_1_evidence_governance.py",
         "_bmad-output/implementation-artifacts/39-1-site-isolation-and-websocket-authorization.md",
     }
 
@@ -423,7 +426,7 @@ def generate(args: argparse.Namespace) -> None:
     registry_digests_available = all(
         image["production_registry_digest"] for image in images.values()
     )
-    limitations = ["Charlie and Dana have not independently signed this evidence package."]
+    limitations = []
     if source["working_tree_dirty"]:
         limitations.append(
             "Story-scoped implementation files remain in a dirty working tree and are bound by source-file-hashes.json."
@@ -438,16 +441,16 @@ def generate(args: argparse.Namespace) -> None:
         ]
     )
 
-    production_blockers = [
-        "Charlie security approval is missing.",
-        "Dana QA approval is missing.",
-    ]
+    story_blockers = []
     if not registry_digests_available:
-        production_blockers.append(
+        story_blockers.append(
             "Production registry image digests are not available from the local evidence environment."
         )
     if source["working_tree_dirty"]:
-        production_blockers.append("The implementation changeset is not committed.")
+        story_blockers.append("The implementation changeset is not committed.")
+
+    story_status = "BLOCKED" if story_blockers else "PASS"
+    governance_decision = "BLOCKED" if story_blockers else "VERIFIED"
 
     artifact_specs = {
         "authorization-inventory.yaml": ("Reviewed authorization policy inventory", ["AC1", "AC2", "AC3"]),
@@ -473,7 +476,7 @@ def generate(args: argparse.Namespace) -> None:
         {
             "id": "PYTEST-AUTHZ",
             "cwd": "backend",
-            "command": "pytest -q tests/test_authorization_inventory.py tests/test_story_39_1.py tests/test_websocket_authorization.py tests/test_auth_session.py tests/test_site_isolation.py tests/test_site_management.py tests/test_device_detail.py tests/test_point_data.py tests/test_alarm_api.py tests/test_story_24_6.py tests/test_story_24_7.py tests/test_fault_impact.py tests/test_gateway_monitor.py --junitxml=../_bmad-output/test-artifacts/epic-39/39.1/pytest-authz.xml",
+            "command": "pytest -q tests/test_authorization_inventory.py tests/test_story_39_1.py tests/test_story_39_1_evidence_governance.py tests/test_websocket_authorization.py tests/test_auth_session.py tests/test_site_isolation.py tests/test_site_management.py tests/test_device_detail.py tests/test_point_data.py tests/test_alarm_api.py tests/test_story_24_6.py tests/test_story_24_7.py tests/test_fault_impact.py tests/test_gateway_monitor.py --junitxml=../_bmad-output/test-artifacts/epic-39/39.1/pytest-authz.xml",
             "result": "PASS" if not test_metrics["pytest"]["failures"] and not test_metrics["pytest"]["errors"] else "FAIL",
         },
         {
@@ -521,7 +524,7 @@ def generate(args: argparse.Namespace) -> None:
     ]
 
     manifest = {
-        "schema_version": 1,
+        "schema_version": 2,
         "story": {
             "id": "39.1",
             "key": "39-1-site-isolation-and-websocket-authorization",
@@ -583,7 +586,7 @@ def generate(args: argparse.Namespace) -> None:
                 "evidence": [evidence["websocket-authz-matrix-results.json"], evidence["pytest-authz.xml"], evidence["playwright-authz-results.json"]],
             },
             "AC5": {
-                "result": "BLOCKED",
+                "result": story_status,
                 "evidence": [evidence["http-authz-matrix-results.json"], evidence["websocket-authz-matrix-results.json"], evidence["manifest.schema.json"]],
             },
         },
@@ -592,31 +595,32 @@ def generate(args: argparse.Namespace) -> None:
         "decisions": [
             "No D39-08 exception is applied; cross-site and WebSocket authorization controls are non-waivable.",
             "Cross-instance fan-out remains outside Story 39.1 and is owned by Story 39.10.",
+            "The project uses single-maintainer evidence governance; virtual BMAD role signatures are not required.",
         ],
         "ownership": {
-            "implementation_owner": "Amelia",
-            "security_owner": "Charlie",
-            "qa_owner": "Dana",
+            "maintainer": "proecheng",
         },
-        "approvals": {
-            "security": {
-                "name": "Charlie",
-                "role": "Security evidence approver",
-                "status": "PENDING",
-                "signed_at_utc": None,
-                "signature": None,
-            },
-            "qa": {
-                "name": "Dana",
-                "role": "QA evidence approver",
-                "status": "PENDING",
-                "signed_at_utc": None,
-                "signature": None,
-            },
+        "governance": {
+            "mode": "single-maintainer",
+            "maintainer": "proecheng",
+            "independent_approval_required": False,
+            "decision": governance_decision,
+            "decided_at_utc": _utc_now(),
+            "basis": [
+                "All Story 39.1 acceptance criteria are evaluated from machine-readable evidence.",
+                "The manifest, artifact paths, SHA-256 hashes, source snapshot, and automated results pass validation.",
+            ],
         },
-        "production_gate": {
+        "story_gate": {
+            "status": story_status,
+            "blockers": story_blockers,
+        },
+        "epic_production_gate": {
             "status": "BLOCKED",
-            "blockers": production_blockers,
+            "blockers": [
+                "Epic 39 Stories 39.2 through 39.12 and the refreshed NFR assessment are not complete.",
+                "Production-equivalent environment validation and field UAT remain outside Story 39.1.",
+            ],
         },
     }
     (output_dir / "manifest.yaml").write_text(
@@ -699,10 +703,12 @@ def validate(args: argparse.Namespace) -> None:
     if playwright["unexpected"] or playwright["flaky"] or not vitest["success"] or vitest["failed"]:
         raise SystemExit("Playwright 或 Vitest 原始结果未通过")
 
-    approvals = manifest["approvals"]
-    pending = [key for key, value in approvals.items() if value["status"] != "APPROVED"]
-    if pending and manifest["production_gate"]["status"] != "BLOCKED":
-        raise SystemExit("审批缺失时生产门禁必须为 BLOCKED")
+    try:
+        validate_governance(manifest)
+    except ValueError as exc:
+        raise SystemExit(str(exc)) from exc
+    governance = manifest["governance"]
+    story_gate = manifest["story_gate"]
 
     report = {
         "validated_at_utc": _utc_now(),
@@ -713,12 +719,19 @@ def validate(args: argparse.Namespace) -> None:
         "source_files": "PASS",
         "source_file_count": len(source_checks),
         "automated_evidence": "PASS",
-        "pending_approvals": pending,
-        "production_gate": manifest["production_gate"]["status"],
+        "governance_mode": governance["mode"],
+        "independent_approval_required": governance["independent_approval_required"],
+        "story_gate": story_gate["status"],
+        "epic_production_gate": manifest["epic_production_gate"]["status"],
         "result": "PASS",
     }
     _write_json(output_dir / "evidence-validation.json", report)
-    print(json.dumps({"result": "PASS", "artifact_count": len(checks), "production_gate": "BLOCKED"}))
+    print(json.dumps({
+        "result": "PASS",
+        "artifact_count": len(checks),
+        "story_gate": story_gate["status"],
+        "epic_production_gate": manifest["epic_production_gate"]["status"],
+    }))
 
 
 def main() -> None:

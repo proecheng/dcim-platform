@@ -1,11 +1,11 @@
 ---
-stepsCompleted: ['step-01-init', 'step-02-discovery', 'step-03-success', 'step-04-journeys', 'step-05-domain', 'step-06-innovation', 'step-07-project-type', 'step-08-scoping', 'step-09-functional', 'step-10-nonfunctional', 'step-11-polish', 'step-12-complete', 'step-13-v3.1-supplement', 'step-intelligent-diagnosis-upgrade', 'step-diagnosis-deep-review-r1', 'step-diagnosis-adversarial-review-r2', 'step-v4.3-p0-rfp-requirements', 'step-v4.4-release-closure']
+stepsCompleted: ['step-01-init', 'step-02-discovery', 'step-03-success', 'step-04-journeys', 'step-05-domain', 'step-06-innovation', 'step-07-project-type', 'step-08-scoping', 'step-09-functional', 'step-10-nonfunctional', 'step-11-polish', 'step-12-complete', 'step-13-v3.1-supplement', 'step-intelligent-diagnosis-upgrade', 'step-diagnosis-deep-review-r1', 'step-diagnosis-adversarial-review-r2', 'step-v4.3-p0-rfp-requirements', 'step-v4.4-release-closure', 'step-v4.4.1-production-readiness']
 classification:
   projectType: 'IoT Platform + Web App'
   domain: '数据中心动力环境综合管理（供配电系统、制冷系统、环境监控系统、安防与消防系统、智能基础设施、能效与运维管理）'
   complexity: 'high'
   projectContext: 'brownfield'
-inputDocuments: ['_bmad-output/planning-artifacts/product-brief.md', 'docs/project-knowledge/project-context.md', 'docs/project-knowledge/project-overview.md', '2026.01.20北京盈泽-- 某项目技术方案 (1).md', '动环监测信息内容说明表（华为）.xlsx', '共济DCIM v3r3 标准方案技术建议书v1.1.md', 'JITON-DCIM数据中心基础设施管理平台（PPT）.md', 'shoonis微模块综合监控系统解决方案-V1.1.md', '机房动力环境监控的组成及必要性-郭小平.md']
+inputDocuments: ['_bmad-output/planning-artifacts/product-brief.md', '_bmad-output/planning-artifacts/sprint-change-proposal-2026-08-10.md', '_bmad-output/planning-artifacts/sprint-change-proposal-2026-08-12.md', 'docs/project-knowledge/project-context.md', 'docs/project-knowledge/project-overview.md', '2026.01.20北京盈泽-- 某项目技术方案 (1).md', '动环监测信息内容说明表（华为）.xlsx', '共济DCIM v3r3 标准方案技术建议书v1.1.md', 'JITON-DCIM数据中心基础设施管理平台（PPT）.md', 'shoonis微模块综合监控系统解决方案-V1.1.md', '机房动力环境监控的组成及必要性-郭小平.md']
 workflowType: 'prd'
 documentCounts:
   briefs: 1
@@ -1305,6 +1305,29 @@ DCIM 算力中心智能监控系统是一个 IoT Platform + Web App 混合型产
 | NFR-RC04 | 可追溯发布 | CD 仅在同一 SHA 的 CI 成功后执行，后端与前端镜像同时构建并推送 `sha-*` 与 `latest` 标签；RC 报告记录 CI/CD URL、提交 SHA、自动化范围和未完成的现场验收项 | GitHub Actions CD Job + RC 验证报告 |
 
 > 自动化软件 RC 通过不等同于生产验收。真实 Modbus/SNMP 设备联调、生产密钥与网络配置、安全扫描处置、数据库迁移演练和用户现场验收仍需在部署阶段单独签署。
+
+### V4.4.1 生产就绪门禁
+
+| ID | 门禁 | 必须达到的结果 | 证据 |
+|----|------|----------------|------|
+| NFR-PR01 | 授权与会话隔离 | 每个对象和实时流都在服务端强制校验角色、站点范围和活动会话；跨站点负向测试全部通过 | API/WebSocket 安全测试报告 |
+| NFR-PR02 | 命令与内容安全 | 未知命令默认拒绝，请求人不得自行审批，存储内容渲染前完成白名单净化，生产环境拒绝默认或占位凭据 | 安全负向测试与启动校验报告 |
+| NFR-PR03 | 供应链治理 | 后端、前端和镜像均生成完整机器可读 SBOM；依赖、前端、镜像、SAST 和密钥扫描无未分类发现；阻断阈值和限期例外按 D39-02/D39-08 执行，不可豁免项不得例外 | SBOM、扫描产物和例外登记 |
+| NFR-PR04 | 生产等效性能 | 精确发布镜像在 PostgreSQL、Redis、MQTT 生产等效环境中分别满足现有 API、浏览器、WebSocket、点位、消息吞吐和并发阈值，并通过 D39-04 批准的组合负载及资源预算 | 环境清单、负载配置、原始结果和容量报告 |
+| NFR-PR05 | 可靠性与恢复 | 预生产浸泡测试在 D39-03 证据窗口内证明监控与恢复就绪；上线后持续度量年度可用性 `>=99.5%`；自动 PostgreSQL 备份、恢复、迁移回滚和故障切换满足 D39-01；范围内网关通过 72 小时回放 | 浸泡/SLO 计划、灾备演练、网关与 UAT 签署 |
+| NFR-PR06 | 可维护性门禁 | 采集、告警和联动核心模块分别达到 `>=80%` 覆盖率；后端 Pyright 与前端类型检查通过；门禁 E2E 不依赖任意固定等待或重试；所有剩余硬等待均已登记、替换或明确隔离 | 覆盖率、类型检查、测试评审和连续运行产物 |
+| NFR-PR07 | 部署与扩展 | D39-05 明确受支持的单实例或多实例拓扑及其状态/恢复边界；应用部署回滚为必选项；仅当 D39-07 将网关固件纳入发布范围时要求 OTA 回滚 | ADR、拓扑测试、应用回滚和条件性 OTA 证据 |
+| NFR-PR08 | 生产决策 | 按生产门禁判定矩阵执行；单维护者项目由 `proecheng` 依据可审计机器证据记录决定，不要求 BMAD 虚拟角色或独立代码审批人签名；`APPROVED` 仍要求四个 NFR 域全部 `PASS`、无未关闭 CRITICAL/HIGH 行动、八个证据缺口全部关闭、`blockers=false`、Story 证据清单有效且现场 UAT 已完成 | 具名门禁决定记录和更新后的 NFR 报告 |
+
+生产门禁采用以下确定性判定：
+
+| 门禁结果 | 判定条件 | 允许结果 |
+|----------|----------|----------|
+| `BLOCKED` | 任一 NFR 域为 `FAIL`；任一 CRITICAL/HIGH 行动或证据缺口未关闭；必需决策/证据缺失；或例外未经授权、已经过期 | 禁止生产批准 |
+| `CONDITIONAL REVIEW` | 无 `FAIL`、无未关闭 CRITICAL/HIGH 行动、无证据缺口，但一个或多个域仍为 `CONCERNS` | 不得自动批准；唯一维护者必须具名记录残余风险、补偿控制和到期日 |
+| `APPROVED` | 性能、安全、可靠性和可维护性全部 `PASS`，`blockers=false`，全部 Story 证据清单校验通过且现场 UAT 已完成 | 可进入生产发布门禁 |
+
+Epic 39 的不可豁免项包括：跨站点或 WebSocket 越权、命令默认放行或自审批、未净化存储内容执行、生产默认/占位凭据、生产 PostgreSQL 无法在批准目标内恢复，以及范围内设备缺少写安全或现场 UAT。D39-01~D39-08 中涉及的数值阈值、拓扑、设备范围和例外权限必须在相关 Story 进入 `ready-for-dev` 前由唯一维护者 `proecheng` 记录。这里取消的是项目交付证据的虚拟角色审批，不影响应用运行时的关键命令职责分离和现场用户验收。
 
 ### 附录：硬件基础设施清单
 
