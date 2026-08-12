@@ -166,7 +166,9 @@ jobs:
 
       - name: 启动后端
         working-directory: backend
-        run: nohup python -m uvicorn app.main:app --host 127.0.0.1 --port 8080 > ../backend-ci.log 2>&1 &
+        run: |
+          nohup python -m uvicorn app.main:app --host 127.0.0.1 --port 8080 > ../backend-ci.log 2>&1 &
+          echo $! > ../backend-ci.pid
 
       - name: 启动前端
         working-directory: frontend
@@ -188,8 +190,37 @@ jobs:
           cat frontend-ci.log || true
           exit 1
 
-      - name: 运行关键 E2E
-        run: npx playwright test e2e/auth.spec.ts e2e/authorization-matrix.spec.ts e2e/site-isolation-websocket-authorization.spec.ts e2e/invalid-detail-pages.spec.ts --project=chromium --workers=1
+      - name: 运行认证与详情基线 E2E
+        run: npx playwright test e2e/auth.spec.ts e2e/invalid-detail-pages.spec.ts --project=chromium --workers=1
+
+      - name: 重启后端以隔离 Story 39.1 E2E
+        working-directory: backend
+        run: |
+          backend_pid="$(cat ../backend-ci.pid)"
+          kill "$backend_pid"
+          for i in {1..30}; do
+            if ! kill -0 "$backend_pid" 2>/dev/null; then
+              break
+            fi
+            sleep 1
+          done
+          if kill -0 "$backend_pid" 2>/dev/null; then
+            echo "后端进程未按时退出: $backend_pid"
+            exit 1
+          fi
+          nohup python -m uvicorn app.main:app --host 127.0.0.1 --port 8080 >> ../backend-ci.log 2>&1 &
+          echo $! > ../backend-ci.pid
+          for i in {1..60}; do
+            if curl -fsS http://127.0.0.1:8080/api/health >/dev/null; then
+              exit 0
+            fi
+            sleep 2
+          done
+          cat ../backend-ci.log || true
+          exit 1
+
+      - name: 运行 Story 39.1 授权 E2E
+        run: npx playwright test e2e/authorization-matrix.spec.ts e2e/site-isolation-websocket-authorization.spec.ts --project=chromium --workers=1
 
       - name: 上传 E2E 诊断日志
         if: failure()
