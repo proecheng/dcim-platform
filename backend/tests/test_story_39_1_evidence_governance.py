@@ -273,6 +273,7 @@ def test_ci_runs_story_39_1_site_and_websocket_e2e():
     workflow = (ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
 
     assert "e2e/site-isolation-websocket-authorization.spec.ts" in workflow
+    assert "--workers=1" in workflow
 
 
 def test_backend_docker_build_uses_official_defaults_and_hash_lock():

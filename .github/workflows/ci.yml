@@ -189,7 +189,7 @@ jobs:
           exit 1
 
       - name: 运行关键 E2E
-        run: npx playwright test e2e/auth.spec.ts e2e/authorization-matrix.spec.ts e2e/site-isolation-websocket-authorization.spec.ts e2e/invalid-detail-pages.spec.ts --project=chromium
+        run: npx playwright test e2e/auth.spec.ts e2e/authorization-matrix.spec.ts e2e/site-isolation-websocket-authorization.spec.ts e2e/invalid-detail-pages.spec.ts --project=chromium --workers=1
 
       - name: 上传 E2E 诊断日志
         if: failure()
