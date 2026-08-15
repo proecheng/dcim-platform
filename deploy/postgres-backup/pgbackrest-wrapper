@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+cipher_file=${PGBACKREST_REPO1_CIPHER_PASS_FILE:?PGBACKREST_REPO1_CIPHER_PASS_FILE is required}
+/usr/local/bin/validate-secrets.sh "$cipher_file" pgbackrest_cipher_pass 32
+
+export PGBACKREST_REPO1_CIPHER_PASS
+PGBACKREST_REPO1_CIPHER_PASS=$(<"$cipher_file")
+unset PGBACKREST_REPO1_CIPHER_PASS_FILE
+
+if [[ -n "${POSTGRES_USER:-}" ]]; then
+    export PGBACKREST_PG1_USER=$POSTGRES_USER
+fi
+
+exec pgbackrest "$@"

@@ -3,7 +3,10 @@ version: '3.8'
 services:
   # ─── PostgreSQL + TimescaleDB ───────────────────────────────
   postgres:
-    image: timescale/timescaledb:latest-pg16
+    image: dcim-postgres:16.15-ts2.29.1-pgb2.59.0
+    build:
+      context: .
+      dockerfile: deploy/postgres-backup/Dockerfile
     container_name: dcim-postgres
     restart: unless-stopped
     environment:
@@ -14,6 +17,7 @@ services:
       - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       - postgres-data:/var/lib/postgresql/data
+    command: ["postgres", "-c", "shared_preload_libraries=timescaledb"]
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-dcim} -d ${POSTGRES_DB:-dcim}"]
       interval: 10s

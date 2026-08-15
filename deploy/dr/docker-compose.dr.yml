@@ -1,0 +1,231 @@
+name: dcim-story-39-3-dr
+
+x-postgres-image: &postgres-image "${DCIM_POSTGRES_IMAGE:?DCIM_POSTGRES_IMAGE must be an immutable @sha256 reference}"
+
+services:
+  postgres-primary:
+    image: *postgres-image
+    hostname: postgres-primary
+    environment:
+      POSTGRES_DB: "${POSTGRES_DB:-dcim}"
+      POSTGRES_USER: "${POSTGRES_USER:-dcim}"
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+      POSTGRES_INITDB_ARGS: "--data-checksums --auth-host=scram-sha-256"
+      REPLICATION_PASSWORD_FILE: /run/secrets/replication_password
+      PGBACKREST_REPO1_CIPHER_PASS_FILE: /run/secrets/pgbackrest_cipher_pass
+      FENCE_TOKEN_FILE: /run/secrets/fence_token
+    command: ["postgres", "-c", "config_file=/etc/postgresql/postgresql-primary.conf"]
+    secrets:
+      - postgres_password
+      - replication_password
+      - pgbackrest_cipher_pass
+      - fence_token
+    volumes:
+      - postgres-primary-data:/var/lib/postgresql/data
+      - pgbackrest-repository:/var/lib/pgbackrest
+      - postgres-socket:/var/run/postgresql
+    networks:
+      primary-site:
+      replication-transit:
+      database-client:
+        aliases:
+          - postgres-writer
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-dcim} -d ${POSTGRES_DB:-dcim}"]
+      interval: 5s
+      timeout: 3s
+      retries: 24
+      start_period: 20s
+    labels:
+      com.dcim.story: "39.3"
+      com.dcim.dr.role: primary
+
+  postgres-standby:
+    image: *postgres-image
+    hostname: postgres-standby
+    entrypoint: ["/usr/local/bin/standby-entrypoint.sh"]
+    environment:
+      PGDATA: /var/lib/postgresql/data
+      REPLICATION_PASSWORD_FILE: /run/secrets/replication_password
+      PGBACKREST_REPO1_CIPHER_PASS_FILE: /run/secrets/pgbackrest_cipher_pass
+      FENCE_TOKEN_FILE: /run/secrets/fence_token
+    secrets:
+      - replication_password
+      - pgbackrest_cipher_pass
+      - fence_token
+    volumes:
+      - postgres-standby-data:/var/lib/postgresql/data
+      - pgbackrest-repository:/var/lib/pgbackrest
+    networks:
+      - standby-site
+      - replication-transit
+    depends_on:
+      postgres-primary:
+        condition: service_healthy
+    labels:
+      com.dcim.story: "39.3"
+      com.dcim.dr.role: standby
+
+  backup-scheduler:
+    image: *postgres-image
+    profiles: ["backup"]
+    environment:
+      POSTGRES_DB: "${POSTGRES_DB:-dcim}"
+      POSTGRES_USER: "${POSTGRES_USER:-dcim}"
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+      PGBACKREST_REPO1_CIPHER_PASS_FILE: /run/secrets/pgbackrest_cipher_pass
+      BACKUP_FULL_WEEKDAY: "${BACKUP_FULL_WEEKDAY:-0}"
+      BACKUP_DAILY_HOUR: "${BACKUP_DAILY_HOUR:-2}"
+      BACKUP_INCREMENTAL_HOURS: "${BACKUP_INCREMENTAL_HOURS:-8,14,20}"
+    command: ["/usr/local/bin/backup-scheduler.sh"]
+    secrets:
+      - postgres_password
+      - pgbackrest_cipher_pass
+    volumes:
+      - postgres-primary-data:/var/lib/postgresql/data:ro
+      - pgbackrest-repository:/var/lib/pgbackrest
+      - postgres-socket:/var/run/postgresql
+      - dr-status:/var/lib/dcim-dr-status
+    networks:
+      - primary-site
+    depends_on:
+      postgres-primary:
+        condition: service_healthy
+    restart: "on-failure:3"
+    user: postgres
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/backup-healthcheck.sh"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    labels:
+      com.dcim.story: "39.3"
+      com.dcim.dr.role: backup-scheduler
+
+  postgres-restore:
+    image: *postgres-image
+    profiles: ["restore"]
+    entrypoint: ["/usr/local/bin/restore-entrypoint.sh"]
+    environment:
+      PGDATA: /var/lib/postgresql/data
+      POSTGRES_DB: "${POSTGRES_DB:-dcim}"
+      POSTGRES_USER: "${POSTGRES_USER:-dcim}"
+      PGBACKREST_REPO1_CIPHER_PASS_FILE: /run/secrets/pgbackrest_cipher_pass
+      RESTORE_ISOLATION_ID: dcim-story-39-3-restore
+      RESTORE_TARGET_TYPE: "${RESTORE_TARGET_TYPE:-latest}"
+      RESTORE_TARGET_VALUE: "${RESTORE_TARGET_VALUE:-}"
+      EXPECTED_POSTGRES_MAJOR: "${EXPECTED_POSTGRES_MAJOR:-16}"
+    secrets:
+      - pgbackrest_cipher_pass
+    volumes:
+      - postgres-restore-data:/var/lib/postgresql/data
+      - pgbackrest-repository:/var/lib/pgbackrest:ro
+      - restore-socket:/var/run/postgresql
+      - dr-status:/var/lib/dcim-dr-status
+    networks:
+      - restore-isolated
+    restart: "no"
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/restore-healthcheck.sh"]
+      interval: 5s
+      timeout: 3s
+      retries: 120
+      start_period: 10s
+    labels:
+      com.dcim.story: "39.3"
+      com.dcim.dr.role: restore
+
+  restore-validator:
+    image: *postgres-image
+    profiles: ["restore"]
+    environment:
+      POSTGRES_DB: "${POSTGRES_DB:-dcim}"
+      POSTGRES_USER: "${POSTGRES_USER:-dcim}"
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+      PGBACKREST_REPO1_CIPHER_PASS_FILE: /run/secrets/pgbackrest_cipher_pass
+      EXPECTED_ALEMBIC_HEAD: "${EXPECTED_ALEMBIC_HEAD:-20260707_0100}"
+    command: ["/usr/local/bin/restore-validate.sh"]
+    user: postgres
+    secrets:
+      - postgres_password
+      - pgbackrest_cipher_pass
+    volumes:
+      - pgbackrest-repository:/var/lib/pgbackrest:ro
+      - restore-socket:/var/run/postgresql
+      - dr-status:/var/lib/dcim-dr-status
+    networks:
+      - restore-isolated
+    depends_on:
+      postgres-restore:
+        condition: service_healthy
+    restart: "no"
+    labels:
+      com.dcim.story: "39.3"
+      com.dcim.dr.role: restore-validator
+
+secrets:
+  postgres_password:
+    file: "${POSTGRES_PASSWORD_FILE:?POSTGRES_PASSWORD_FILE is required}"
+  replication_password:
+    file: "${REPLICATION_PASSWORD_FILE:?REPLICATION_PASSWORD_FILE is required}"
+  pgbackrest_cipher_pass:
+    file: "${PGBACKREST_CIPHER_PASS_FILE:?PGBACKREST_CIPHER_PASS_FILE is required}"
+  fence_token:
+    file: "${FENCE_TOKEN_FILE:?FENCE_TOKEN_FILE is required}"
+
+volumes:
+  postgres-primary-data:
+    labels:
+      com.dcim.story: "39.3"
+      com.dcim.dr.role: primary-data
+  postgres-standby-data:
+    labels:
+      com.dcim.story: "39.3"
+      com.dcim.dr.role: standby-data
+  postgres-restore-data:
+    labels:
+      com.dcim.story: "39.3"
+      com.dcim.dr.role: restore-data
+  postgres-socket:
+    labels:
+      com.dcim.story: "39.3"
+      com.dcim.dr.role: postgres-socket
+  dr-status:
+    labels:
+      com.dcim.story: "39.3"
+      com.dcim.dr.role: backup-status
+  restore-socket:
+    labels:
+      com.dcim.story: "39.3"
+      com.dcim.dr.role: restore-socket
+  pgbackrest-repository:
+    external: true
+    name: "${PGBACKREST_REPOSITORY_VOLUME:?PGBACKREST_REPOSITORY_VOLUME is required}"
+
+networks:
+  primary-site:
+    internal: true
+    labels:
+      com.dcim.story: "39.3"
+      com.dcim.dr.site: primary
+  standby-site:
+    internal: true
+    labels:
+      com.dcim.story: "39.3"
+      com.dcim.dr.site: standby
+  replication-transit:
+    internal: true
+    labels:
+      com.dcim.story: "39.3"
+      com.dcim.dr.role: replication-transit
+  database-client:
+    internal: true
+    labels:
+      com.dcim.story: "39.3"
+      com.dcim.dr.role: stable-endpoint
+  restore-isolated:
+    internal: true
+    labels:
+      com.dcim.story: "39.3"
+      com.dcim.dr.role: restore-isolated

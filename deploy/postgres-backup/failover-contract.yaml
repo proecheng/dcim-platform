@@ -1,0 +1,46 @@
+schema_version: 1
+
+stable_endpoint:
+  hostname: "postgres-writer"
+  port: 5432
+  probe_table: "story_39_3_failover_probe"
+  consecutive_successes_required: 3
+
+scenarios:
+  planned_switchover:
+    rpo_seconds_max: 0
+    rto_seconds_max: 900
+    replay_catchup_required: true
+    fence_before_promotion: true
+  unexpected_primary_failure:
+    rpo_seconds_max: 60
+    rto_seconds_max: 1800
+    fence_before_promotion: true
+  site_restore:
+    rpo_seconds_max: 300
+    rto_seconds_max: 14400
+    isolated_restore_required: true
+
+rto_formula:
+  start: "trusted fault injection or recovery decision monotonic timestamp"
+  stop: "third consecutive stable-endpoint readiness and critical-write success"
+
+rpo_formula:
+  missing_commit_count: "count of client-acknowledged probe sequences absent after recovery"
+  latest_missing_commit_age_seconds: "recovery UTC minus the newest missing acknowledged commit UTC"
+
+fencing:
+  container_stopped_required: true
+  stable_endpoint_disconnected_required: true
+  health_failure_alone_is_sufficient: false
+
+old_primary_rejoin:
+  allowed_methods:
+    - "pg_rewind"
+    - "full_rebuild"
+  untreated_old_primary_allowed: false
+
+evidence_classification:
+  same_host: "mechanism-only"
+  independent_failure_domain_required: true
+  same_host_may_claim_formal_pass: false

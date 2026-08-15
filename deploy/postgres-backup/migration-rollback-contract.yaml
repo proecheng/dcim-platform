@@ -1,0 +1,65 @@
+schema_version: 1
+
+release_migration:
+  revision: "20260707_0100"
+  down_revision: "20260322_0200"
+  migration_file: "backend/alembic/versions/20260707_0100_power_device_flexibility_fields.py"
+  classification: "conditionally_reversible"
+  write_freeze_required: true
+  named_restore_point_required: true
+  downgrade_sequence:
+    - "20260322_0200"
+    - "20260707_0100"
+  reversibility_invariant:
+    id: "new_flexibility_columns_are_empty"
+    expected: 0
+    sql: >-
+      SELECT count(*) FROM power_devices
+      WHERE load_subtype IS NOT NULL
+         OR controllable_params IS NOT NULL
+         OR thermal_storage_config IS NOT NULL
+         OR flexibility_factor IS NOT NULL
+  fallback: "pitr"
+
+irreversible_boundaries:
+  - revision: "a001_full_schema"
+    migration_file: "backend/alembic/versions/a001_full_schema.py"
+    recovery: "pitr"
+    reason: "PostgreSQL full-schema creation has an empty downgrade and cannot prove object or data restoration."
+  - revision: "a002_timescaledb_hypertable"
+    migration_file: "backend/alembic/versions/a002_timescaledb_hypertable.py"
+    recovery: "pitr"
+    reason: "The hypertable conversion is irreversible; downgrade only removes TimescaleDB policies."
+
+application_compatibility:
+  previous_image_required: true
+  current_image_required: true
+  immutable_digest_required: true
+  previous_source_revision: "4dfac2df0d80141bd8044f8ccf9ed26de3cd6933"
+  current_source_revision: "436a8e778037bf6fcf9140b757e9584e669ad33b"
+  previous_image_schema: "20260322_0200"
+  current_image_schema: "20260707_0100"
+  release_model_fields:
+    - "load_subtype"
+    - "controllable_params"
+    - "thermal_storage_config"
+    - "flexibility_factor"
+  required_secret_files:
+    - "FAULT_TREE_HMAC_KEY"
+  probes:
+    - "image_schema_inventory"
+    - "application_import"
+    - "orm_read"
+    - "temporary_write"
+
+failure_conditions:
+  - "write_freeze_missing"
+  - "active_application_connections"
+  - "alembic_not_at_head"
+  - "timescaledb_objects_missing"
+  - "migration_invariant_changed"
+  - "migration_command_failed"
+  - "application_secret_missing"
+  - "application_image_provenance_mismatch"
+  - "previous_app_incompatible"
+  - "current_app_incompatible"

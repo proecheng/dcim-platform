@@ -1,0 +1,25 @@
+ARG DCIM_POSTGRES_RUNTIME_BASE=dcim-postgres:16.15-ts2.29.1-pgb2.59.0@sha256:e6ca69c005bfba5b30dbb91c58a181874e2c833e0a311ad3998f32d4b497f3e4
+ARG DCIM_POSTGRES_RUNTIME_BASE_DIGEST=sha256:e6ca69c005bfba5b30dbb91c58a181874e2c833e0a311ad3998f32d4b497f3e4
+
+FROM ${DCIM_POSTGRES_RUNTIME_BASE}
+
+USER root
+
+ARG DCIM_POSTGRES_RUNTIME_BASE
+ARG DCIM_POSTGRES_RUNTIME_BASE_DIGEST
+
+LABEL io.dcim.story-39-3.schema-gate="188-tables" \
+      io.dcim.story-39-3.runtime-base.reference="${DCIM_POSTGRES_RUNTIME_BASE}" \
+      io.dcim.story-39-3.runtime-base.digest="${DCIM_POSTGRES_RUNTIME_BASE_DIGEST}"
+
+COPY deploy/postgres-backup/restore-validate.sh /usr/local/bin/restore-validate.sh
+COPY deploy/postgres-backup/standby-entrypoint.sh /usr/local/bin/standby-entrypoint.sh
+COPY deploy/postgres-backup/expected-schema-tables.txt /usr/local/share/dcim-dr/expected-schema-tables.txt
+COPY deploy/postgres-backup/init-primary.sh /docker-entrypoint-initdb.d/20-dcim-replication.sh
+
+RUN chmod 0755 /usr/local/bin/restore-validate.sh \
+    && chmod 0755 /usr/local/bin/standby-entrypoint.sh \
+    && chmod 0755 /docker-entrypoint-initdb.d/20-dcim-replication.sh \
+    && bash -n /usr/local/bin/restore-validate.sh \
+    && bash -n /usr/local/bin/standby-entrypoint.sh \
+    && bash -n /docker-entrypoint-initdb.d/20-dcim-replication.sh

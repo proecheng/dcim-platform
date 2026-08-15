@@ -60,7 +60,7 @@
 # P0: Epic 39 (生产就绪与安全闭环) — V4.4.1 生产批准前置
 
 generated: 2026-03-11
-last_updated: 2026-08-12
+last_updated: 2026-08-14
 project: admin
 project_key: NOKEY
 tracking_system: file-system
@@ -464,7 +464,7 @@ development_status:
   epic-39: in-progress
   39-1-site-isolation-and-websocket-authorization: done
   39-2-command-xss-and-production-credential-hardening: backlog
-  39-3-postgresql-disaster-recovery-and-failover: backlog
+  39-3-postgresql-disaster-recovery-and-failover: in-progress
   39-4-real-gateway-and-field-uat: backlog
   39-5-vulnerability-and-supply-chain-gate: backlog
   39-6-production-performance-and-capacity: backlog
