@@ -90,9 +90,13 @@ def calculate_rpo(
             raise ValueError(f"duplicate acknowledged sequence: {sequence}")
         commits[sequence] = parse_utc(str(item["committed_at"]))
 
-    missing_sequences = sorted(set(commits) - {int(item) for item in recovered_sequences})
+    missing_sequences = sorted(
+        set(commits) - {int(item) for item in recovered_sequences}
+    )
     if missing_sequences:
         newest_missing = max(commits[sequence] for sequence in missing_sequences)
+        if newest_missing > recovered_time:
+            raise ValueError("recovered UTC time precedes a missing commit")
         missing_age = max(0.0, (recovered_time - newest_missing).total_seconds())
     else:
         missing_age = 0.0
@@ -213,16 +217,22 @@ def load_secret_file(path: Path, code: str, name: str) -> str:
     return value
 
 
-def inspect_json(runner: CommandRunner, object_type: str, name: str, template: str) -> Any:
+def inspect_json(
+    runner: CommandRunner, object_type: str, name: str, template: str
+) -> Any:
     output = runner.run(
         f"inspect_{object_type}_{name}",
         ["docker", object_type, "inspect", name, "--format", template],
         failure_code="isolation_target_missing",
     )
-    return parse_json_output(output, "isolation_label_invalid", f"{object_type} inspection")
+    return parse_json_output(
+        output, "isolation_label_invalid", f"{object_type} inspection"
+    )
 
 
-def inspect_labels(runner: CommandRunner, object_type: str, name: str) -> dict[str, str]:
+def inspect_labels(
+    runner: CommandRunner, object_type: str, name: str
+) -> dict[str, str]:
     labels = inspect_json(runner, object_type, name, "{{json .Labels}}")
     if not isinstance(labels, dict):
         raise DrillError("isolation_label_invalid", f"{object_type} labels are missing")
@@ -250,7 +260,9 @@ def require_labels(
     }
     for key, value in expected.items():
         if labels.get(key) != value:
-            raise DrillError("isolation_label_invalid", f"{key} does not match the drill contract")
+            raise DrillError(
+                "isolation_label_invalid", f"{key} does not match the drill contract"
+            )
 
 
 def container_running(runner: CommandRunner, container: str) -> bool:
@@ -266,7 +278,11 @@ def network_container_names(runner: CommandRunner, network: str) -> set[str]:
     payload = inspect_json(runner, "network", network, "{{json .Containers}}")
     if not isinstance(payload, dict):
         return set()
-    return {str(item.get("Name")) for item in payload.values() if isinstance(item, dict) and item.get("Name")}
+    return {
+        str(item.get("Name"))
+        for item in payload.values()
+        if isinstance(item, dict) and item.get("Name")
+    }
 
 
 def validate_isolation(
@@ -280,7 +296,9 @@ def validate_isolation(
     primary_site_network: str,
 ) -> None:
     if PROJECT_PATTERN.fullmatch(project) is None:
-        raise DrillError("isolation_project_invalid", "project name is outside Story 39.3")
+        raise DrillError(
+            "isolation_project_invalid", "project name is outside Story 39.3"
+        )
 
     require_labels(
         inspect_container_labels(runner, primary),
@@ -313,11 +331,16 @@ def validate_isolation(
         role_value="primary",
     )
     if not container_running(runner, primary) or not container_running(runner, standby):
-        raise DrillError("topology_not_ready", "primary and standby must both be running")
+        raise DrillError(
+            "topology_not_ready", "primary and standby must both be running"
+        )
 
     endpoint_members = network_container_names(runner, stable_network)
     if primary not in endpoint_members or standby in endpoint_members:
-        raise DrillError("stable_endpoint_invalid", "postgres-writer must initially resolve only to primary")
+        raise DrillError(
+            "stable_endpoint_invalid",
+            "postgres-writer must initially resolve only to primary",
+        )
 
 
 def psql_container(
@@ -361,9 +384,14 @@ def load_primary_runtime(runner: CommandRunner, primary: str) -> dict[str, Any]:
     )
     mounts = inspect_json(runner, "container", primary, "{{json .Mounts}}")
     if not isinstance(mounts, list):
-        raise DrillError("primary_runtime_invalid", "primary runtime inspection is incomplete")
+        raise DrillError(
+            "primary_runtime_invalid", "primary runtime inspection is incomplete"
+        )
     if IMAGE_PATTERN.fullmatch(image) is None:
-        raise DrillError("mutable_postgres_image", "PostgreSQL image must use an immutable @sha256 reference")
+        raise DrillError(
+            "mutable_postgres_image",
+            "PostgreSQL image must use an immutable @sha256 reference",
+        )
     return {"image": image, "mounts": mounts}
 
 
@@ -371,7 +399,9 @@ def mount_by_destination(runtime: dict[str, Any], destination: str) -> dict[str,
     for mount in runtime["mounts"]:
         if isinstance(mount, dict) and mount.get("Destination") == destination:
             return mount
-    raise DrillError("primary_runtime_invalid", f"required mount {destination} is missing")
+    raise DrillError(
+        "primary_runtime_invalid", f"required mount {destination} is missing"
+    )
 
 
 def create_probe_client(
@@ -383,34 +413,48 @@ def create_probe_client(
 ) -> str:
     password_mount = mount_by_destination(runtime, "/run/secrets/postgres_password")
     if password_mount.get("Type") != "bind" or not password_mount.get("Source"):
-        raise DrillError("postgres_password_missing", "PostgreSQL password secret mount is invalid")
+        raise DrillError(
+            "postgres_password_missing", "PostgreSQL password secret mount is invalid"
+        )
 
     name = f"{project}-failover-probe-{uuid.uuid4().hex[:10]}"
-    runner.run(
-        "create_failover_probe_client",
-        [
-            "docker",
-            "run",
-            "--detach",
-            "--name",
-            name,
-            "--network",
-            stable_network,
-            "--label",
-            "com.dcim.story=39.3",
-            "--label",
-            f"com.docker.compose.project={project}",
-            "--label",
-            "com.dcim.dr.role=failover-probe",
-            "--mount",
-            f"type=bind,src={password_mount['Source']},dst=/run/secrets/postgres_password,readonly",
-            "--entrypoint",
-            "sleep",
-            str(runtime["image"]),
-            "infinity",
-        ],
-        failure_code="probe_client_create_failed",
-    )
+    try:
+        runner.run(
+            "create_failover_probe_client",
+            [
+                "docker",
+                "run",
+                "--detach",
+                "--name",
+                name,
+                "--network",
+                stable_network,
+                "--label",
+                "com.dcim.story=39.3",
+                "--label",
+                f"com.docker.compose.project={project}",
+                "--label",
+                "com.dcim.dr.role=failover-probe",
+                "--mount",
+                f"type=bind,src={password_mount['Source']},dst=/run/secrets/postgres_password,readonly",
+                "--entrypoint",
+                "sleep",
+                str(runtime["image"]),
+                "infinity",
+            ],
+            failure_code="probe_client_create_failed",
+        )
+    except DrillError:
+        removed, _ = runner.try_run(
+            "remove_failed_failover_probe_client",
+            ["docker", "rm", "--force", name],
+        )
+        if not removed:
+            raise DrillError(
+                "probe_client_cleanup_failed",
+                "failed to remove the probe container after startup failure",
+            )
+        raise
     return name
 
 
@@ -470,31 +514,49 @@ class ProbeWriter:
         self.attempts: list[dict[str, Any]] = []
         self._sequence = 0
         self._stop = threading.Event()
-        self._paused = threading.Event()
-        self._active = threading.Event()
         self._condition = threading.Condition()
-        self._thread = threading.Thread(target=self._run, name="story-39-3-write-probe", daemon=True)
+        self._pause_requested = False
+        self._paused_acknowledged = False
+        self._active = False
+        self._command_timeout = max(5.0, self.interval_seconds * 4)
+        self._thread = threading.Thread(
+            target=self._run, name="story-39-3-write-probe", daemon=True
+        )
 
     def start(self) -> None:
         self._thread.start()
 
     def stop(self) -> None:
-        self._stop.set()
-        self._paused.clear()
+        with self._condition:
+            self._stop.set()
+            self._pause_requested = False
+            self._condition.notify_all()
         if self._thread.is_alive():
-            self._thread.join(timeout=10)
+            self._thread.join(timeout=self._command_timeout + 2.0)
+        if self._thread.is_alive():
+            raise DrillError(
+                "write_probe_stop_timeout", "write probe did not stop cleanly"
+            )
 
     def pause_and_wait(self, timeout: float) -> None:
-        self._paused.set()
         deadline = time.monotonic() + timeout
-        while self._active.is_set():
-            if time.monotonic() >= deadline:
-                raise DrillError("write_probe_pause_timeout", "write probe did not pause")
-            self._stop.wait(0.05)
+        with self._condition:
+            self._pause_requested = True
+            self._condition.notify_all()
+            while self._active or not self._paused_acknowledged:
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    raise DrillError(
+                        "write_probe_pause_timeout", "write probe did not pause"
+                    )
+                self._condition.wait(min(remaining, 0.1))
         self.timeline.record("continuous_write_probe_paused")
 
     def resume(self) -> None:
-        self._paused.clear()
+        with self._condition:
+            self._pause_requested = False
+            self._paused_acknowledged = False
+            self._condition.notify_all()
         self.timeline.record("continuous_write_probe_resumed")
 
     def wait_for_acknowledged(self, count: int, timeout: float) -> None:
@@ -503,7 +565,10 @@ class ProbeWriter:
             while len(self.acknowledged) < count:
                 remaining = deadline - time.monotonic()
                 if remaining <= 0:
-                    raise DrillError("write_probe_not_ready", "continuous write probe did not warm up")
+                    raise DrillError(
+                        "write_probe_not_ready",
+                        "continuous write probe did not warm up",
+                    )
                 self._condition.wait(min(remaining, 1.0))
 
     def wait_for_consecutive_successes(
@@ -532,17 +597,25 @@ class ProbeWriter:
                     return completed_at
                 remaining = deadline - time.monotonic()
                 if remaining <= 0:
-                    raise DrillError("stable_endpoint_not_ready", "stable endpoint did not recover in time")
+                    raise DrillError(
+                        "stable_endpoint_not_ready",
+                        "stable endpoint did not recover in time",
+                    )
                 self._condition.wait(min(remaining, 1.0))
 
     def _run(self) -> None:
         while not self._stop.is_set():
-            if self._paused.is_set():
-                self._stop.wait(0.05)
-                continue
-            self._active.set()
-            self._sequence += 1
-            sequence = self._sequence
+            with self._condition:
+                while self._pause_requested and not self._stop.is_set():
+                    self._paused_acknowledged = True
+                    self._condition.notify_all()
+                    self._condition.wait()
+                self._paused_acknowledged = False
+                if self._stop.is_set():
+                    break
+                self._active = True
+                self._sequence += 1
+                sequence = self._sequence
             sql = (
                 f"INSERT INTO {PROBE_TABLE}(run_id, sequence, committed_at) "
                 f"VALUES ('{self.run_id}', {sequence}, clock_timestamp()) "
@@ -555,8 +628,10 @@ class ProbeWriter:
             try:
                 success, output = self.runner.try_run(
                     f"continuous_write_probe_{sequence}",
-                    probe_psql_argv(self.probe_client, self.database, self.database_user, sql),
-                    timeout=max(5.0, self.interval_seconds * 4),
+                    probe_psql_argv(
+                        self.probe_client, self.database, self.database_user, sql
+                    ),
+                    timeout=self._command_timeout,
                 )
                 monotonic_at = time.monotonic()
                 attempt = {
@@ -567,7 +642,9 @@ class ProbeWriter:
                 }
                 if success:
                     try:
-                        payload = parse_json_output(output, "write_probe_invalid", "write probe")
+                        payload = parse_json_output(
+                            output, "write_probe_invalid", "write probe"
+                        )
                     except DrillError:
                         success = False
                         attempt["success"] = False
@@ -577,16 +654,25 @@ class ProbeWriter:
                             "committed_at": str(payload["committed_at"]),
                             "writer_identity": str(payload.get("writer_identity", "")),
                         }
-                        self.acknowledged.append(acknowledged)
                         self.timeline.record("write_acknowledged", sequence=sequence)
                 if not success:
-                    self.timeline.record("write_unavailable", status="expected-during-failover", sequence=sequence)
+                    self.timeline.record(
+                        "write_unavailable",
+                        status="expected-during-failover",
+                        sequence=sequence,
+                    )
                 with self._condition:
+                    if success:
+                        self.acknowledged.append(acknowledged)
                     self.attempts.append(attempt)
                     self._condition.notify_all()
             finally:
-                self._active.clear()
-            self._stop.wait(self.interval_seconds)
+                with self._condition:
+                    self._active = False
+                    self._condition.notify_all()
+            with self._condition:
+                if not self._stop.is_set():
+                    self._condition.wait(self.interval_seconds)
 
 
 def lsn_to_int(value: str) -> int:
@@ -625,7 +711,9 @@ def wait_for_replay_catchup(
             "SELECT COALESCE(pg_last_wal_replay_lsn()::text, '0/0');",
         ).splitlines()[-1]
         if lsn_to_int(standby_lsn) >= lsn_to_int(primary_lsn):
-            timeline.record("replay_lsn_caught_up", primary_lsn=primary_lsn, standby_lsn=standby_lsn)
+            timeline.record(
+                "replay_lsn_caught_up", primary_lsn=primary_lsn, standby_lsn=standby_lsn
+            )
             return {"primary_lsn": primary_lsn, "standby_lsn": standby_lsn}
         time.sleep(poll_interval)
     raise DrillError("replay_lsn_timeout", "standby replay LSN did not catch up")
@@ -635,7 +723,10 @@ def verify_fence(runner: CommandRunner, *, primary: str, stable_network: str) ->
     if container_running(runner, primary):
         raise DrillError("primary_not_fenced", "old primary container is still running")
     if primary in network_container_names(runner, stable_network):
-        raise DrillError("primary_not_fenced", "old primary remains attached to the stable endpoint network")
+        raise DrillError(
+            "primary_not_fenced",
+            "old primary remains attached to the stable endpoint network",
+        )
 
 
 def fence_primary(
@@ -665,7 +756,9 @@ def fence_primary(
         ["docker", "network", "disconnect", "--force", stable_network, primary],
     )
     if not disconnected and primary in network_container_names(runner, stable_network):
-        raise DrillError("primary_fence_failed", "old primary could not be disconnected")
+        raise DrillError(
+            "primary_fence_failed", "old primary could not be disconnected"
+        )
     verify_fence(runner, primary=primary, stable_network=stable_network)
     timeline.record(
         "primary_fenced",
@@ -734,12 +827,25 @@ def switch_writer_alias(
         )
     runner.run(
         "connect_promoted_writer_alias",
-        ["docker", "network", "connect", "--alias", STABLE_ENDPOINT, stable_network, standby],
+        [
+            "docker",
+            "network",
+            "connect",
+            "--alias",
+            STABLE_ENDPOINT,
+            stable_network,
+            standby,
+        ],
         failure_code="endpoint_switch_failed",
     )
     if standby not in network_container_names(runner, stable_network):
-        raise DrillError("endpoint_switch_failed", "promoted standby is not on the stable endpoint network")
-    return timeline.record("stable_endpoint_switched", hostname=STABLE_ENDPOINT, target=standby)
+        raise DrillError(
+            "endpoint_switch_failed",
+            "promoted standby is not on the stable endpoint network",
+        )
+    return timeline.record(
+        "stable_endpoint_switched", hostname=STABLE_ENDPOINT, target=standby
+    )
 
 
 def recovered_probe_state(
@@ -764,7 +870,9 @@ def recovered_probe_state(
     )
     payload = parse_json_output(output, "recovered_probe_invalid", "recovered probe")
     if payload["row_count"] != payload["distinct_count"]:
-        raise DrillError("duplicate_recovered_commit", "recovered probe contains duplicate sequences")
+        raise DrillError(
+            "duplicate_recovered_commit", "recovered probe contains duplicate sequences"
+        )
     sequences = {int(item) for item in payload["sequences"]}
     return sequences, payload
 
@@ -855,12 +963,18 @@ def refuse_untreated_old_primary(
 
 def volume_name(mount: dict[str, Any], destination: str) -> str:
     if mount.get("Type") != "volume" or not mount.get("Name"):
-        raise DrillError("primary_runtime_invalid", f"{destination} must use a named volume")
+        raise DrillError(
+            "primary_runtime_invalid", f"{destination} must use a named volume"
+        )
     return str(mount["Name"])
 
 
 def bind_mount_argument(mount: dict[str, Any]) -> str:
-    if mount.get("Type") != "bind" or not mount.get("Source") or not mount.get("Destination"):
+    if (
+        mount.get("Type") != "bind"
+        or not mount.get("Source")
+        or not mount.get("Destination")
+    ):
         raise DrillError("primary_runtime_invalid", "secret bind mount is invalid")
     suffix = ",readonly" if not mount.get("RW", False) else ""
     return f"type=bind,src={mount['Source']},dst={mount['Destination']}{suffix}"
@@ -886,12 +1000,17 @@ def full_rebuild_old_primary(
     poll_interval: float,
 ) -> dict[str, Any]:
     if not allow_full_rebuild:
-        raise DrillError("full_rebuild_not_authorized", "old primary full rebuild requires explicit authorization")
+        raise DrillError(
+            "full_rebuild_not_authorized",
+            "old primary full rebuild requires explicit authorization",
+        )
     verify_fence(runner, primary=primary, stable_network=stable_network)
 
     data_mount = mount_by_destination(runtime, "/var/lib/postgresql/data")
     repository_mount = mount_by_destination(runtime, "/var/lib/pgbackrest")
-    replication_secret = mount_by_destination(runtime, "/run/secrets/replication_password")
+    replication_secret = mount_by_destination(
+        runtime, "/run/secrets/replication_password"
+    )
     cipher_secret = mount_by_destination(runtime, "/run/secrets/pgbackrest_cipher_pass")
     data_volume = volume_name(data_mount, "/var/lib/postgresql/data")
     repository_volume = volume_name(repository_mount, "/var/lib/pgbackrest")
@@ -986,7 +1105,15 @@ def full_rebuild_old_primary(
     )
     runner.run(
         "connect_rebuilt_old_primary_site",
-        ["docker", "network", "connect", "--alias", "postgres-primary", primary_site_network, primary],
+        [
+            "docker",
+            "network",
+            "connect",
+            "--alias",
+            "postgres-primary",
+            primary_site_network,
+            primary,
+        ],
         failure_code="full_rebuild_failed",
     )
 
@@ -1030,7 +1157,9 @@ def full_rebuild_old_primary(
                 break
         time.sleep(poll_interval)
     if not replay_lsn:
-        raise DrillError("full_rebuild_failed", "rebuilt old primary did not catch up as a standby")
+        raise DrillError(
+            "full_rebuild_failed", "rebuilt old primary did not catch up as a standby"
+        )
     probe_count = int(
         psql_container(
             runner,
@@ -1079,10 +1208,15 @@ def classify_evidence(
         return {
             "class": SAME_HOST_EVIDENCE_CLASS,
             "formal_pass_allowed": False,
-            "independent_failure_domain_required": bool(evidence_contract["independent_failure_domain_required"]),
+            "independent_failure_domain_required": bool(
+                evidence_contract["independent_failure_domain_required"]
+            ),
         }
     if attestation is None:
-        raise DrillError("failure_domain_attestation_missing", "independent evidence requires an attestation")
+        raise DrillError(
+            "failure_domain_attestation_missing",
+            "independent evidence requires an attestation",
+        )
     raise DrillError(
         "independent_failure_domain_unsupported",
         "a local attestation cannot prove independent failure domains; use externally collected evidence",
@@ -1122,7 +1256,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--fault-tree-hmac-key-env", default=FAULT_TREE_HMAC_KEY)
     parser.add_argument("--contract", type=Path, default=DEFAULT_CONTRACT)
     parser.add_argument("--output-dir", type=Path, required=True)
-    parser.add_argument("--failure-domain", choices=("same-host", "independent"), default="same-host")
+    parser.add_argument(
+        "--failure-domain", choices=("same-host", "independent"), default="same-host"
+    )
     parser.add_argument("--failure-domain-attestation", type=Path)
     parser.add_argument("--probe-interval-seconds", type=float, default=1.0)
     parser.add_argument("--warmup-commits", type=int, default=3)
@@ -1141,22 +1277,43 @@ def execute(
     try:
         contract = yaml.safe_load(args.contract.read_text(encoding="utf-8"))
     except (OSError, UnicodeDecodeError, yaml.YAMLError) as exc:
-        raise DrillError("failover_contract_invalid", "cannot read failover contract") from exc
+        raise DrillError(
+            "failover_contract_invalid", "cannot read failover contract"
+        ) from exc
     if not isinstance(contract, dict) or contract.get("schema_version") != 1:
-        raise DrillError("failover_contract_invalid", "failover contract schema is invalid")
+        raise DrillError(
+            "failover_contract_invalid", "failover contract schema is invalid"
+        )
 
     primary = args.primary_container or f"{args.project}-postgres-primary-1"
     standby = args.standby_container or f"{args.project}-postgres-standby-1"
     stable_network = args.stable_network or f"{args.project}_database-client"
-    replication_network = args.replication_network or f"{args.project}_replication-transit"
+    replication_network = (
+        args.replication_network or f"{args.project}_replication-transit"
+    )
     primary_site_network = args.primary_site_network or f"{args.project}_primary-site"
     for name in (args.database, args.database_user):
         if IDENTIFIER_PATTERN.fullmatch(name) is None:
-            raise DrillError("database_identifier_invalid", "database identifiers must be simple PostgreSQL names")
+            raise DrillError(
+                "database_identifier_invalid",
+                "database identifiers must be simple PostgreSQL names",
+            )
     if args.probe_interval_seconds <= 0 or args.poll_interval_seconds <= 0:
-        raise DrillError("interval_invalid", "probe and poll intervals must be positive")
+        raise DrillError(
+            "interval_invalid", "probe and poll intervals must be positive"
+        )
     if args.warmup_commits < 1 or args.operation_timeout_seconds <= 0:
         raise DrillError("timeout_invalid", "warmup count and timeout must be positive")
+    if args.scenario == "site_restore":
+        raise DrillError(
+            "site_restore_requires_external_runner",
+            "site restore requires an isolated pgBackRest restore workflow",
+        )
+    if not args.allow_full_rebuild:
+        raise DrillError(
+            "full_rebuild_not_authorized",
+            "old primary full rebuild must be authorized before failover starts",
+        )
 
     validate_isolation(
         runner,
@@ -1195,7 +1352,9 @@ def execute(
         )
         runner.run(
             "initialize_failover_probe",
-            probe_psql_argv(probe_client, args.database, args.database_user, create_table_sql),
+            probe_psql_argv(
+                probe_client, args.database, args.database_user, create_table_sql
+            ),
             failure_code="stable_endpoint_not_ready",
         )
         initial_role = runner.run(
@@ -1209,7 +1368,9 @@ def execute(
             failure_code="stable_endpoint_not_ready",
         )
         if initial_role != "f":
-            raise DrillError("stable_endpoint_invalid", "postgres-writer does not target the primary")
+            raise DrillError(
+                "stable_endpoint_invalid", "postgres-writer does not target the primary"
+            )
 
         writer = ProbeWriter(
             runner=runner,
@@ -1221,13 +1382,17 @@ def execute(
             interval_seconds=args.probe_interval_seconds,
         )
         writer.start()
-        writer.wait_for_acknowledged(args.warmup_commits, args.operation_timeout_seconds)
-        timeline.record("continuous_write_probe_ready", acknowledged=len(writer.acknowledged))
+        writer.wait_for_acknowledged(
+            args.warmup_commits, args.operation_timeout_seconds
+        )
+        timeline.record(
+            "continuous_write_probe_ready", acknowledged=len(writer.acknowledged)
+        )
 
         replay: dict[str, str] | None = None
         if args.scenario == "planned_switchover":
-            writer.pause_and_wait(args.operation_timeout_seconds)
             rto_started = timeline.record("planned_switchover_decision")
+            writer.pause_and_wait(args.operation_timeout_seconds)
             replay = wait_for_replay_catchup(
                 runner,
                 timeline,
@@ -1240,8 +1405,6 @@ def execute(
             )
         elif args.scenario == "unexpected_primary_failure":
             rto_started = timeline.record("unexpected_primary_failure_injected")
-        else:
-            rto_started = timeline.record("site_restore_decision")
 
         abrupt_failure = args.scenario != "planned_switchover"
         fence_primary(
@@ -1267,7 +1430,9 @@ def execute(
             standby=standby,
         )
         writer.resume()
-        required_successes = int(contract["stable_endpoint"]["consecutive_successes_required"])
+        required_successes = int(
+            contract["stable_endpoint"]["consecutive_successes_required"]
+        )
         writer.wait_for_consecutive_successes(
             after_monotonic=endpoint_switched_at,
             required=required_successes,
@@ -1328,14 +1493,18 @@ def execute(
 
         objective = contract["scenarios"][args.scenario]
         rto_ok = rto_seconds <= float(objective["rto_seconds_max"])
-        rpo_ok = rpo["latest_missing_commit_age_seconds"] <= float(objective["rpo_seconds_max"]) and (
+        rpo_ok = rpo["latest_missing_commit_age_seconds"] <= float(
+            objective["rpo_seconds_max"]
+        ) and (
             args.scenario != "planned_switchover" or rpo["missing_commit_count"] == 0
         )
         scenario_pass = rto_ok and rpo_ok
         result.update(
             {
                 "run_id": run_id,
-                "status": "pass" if evidence["formal_pass_allowed"] else "mechanism-pass",
+                "status": "pass"
+                if evidence["formal_pass_allowed"]
+                else "mechanism-pass",
                 "failure_code": None,
                 "formal_pass": bool(evidence["formal_pass_allowed"] and scenario_pass),
                 "scenario_objective_met": scenario_pass,
@@ -1354,12 +1523,25 @@ def execute(
         )
         if not scenario_pass:
             result["status"] = "failed"
-            raise DrillError("recovery_objective_not_met", "scenario RTO or RPO objective was not met")
+            raise DrillError(
+                "recovery_objective_not_met",
+                "scenario RTO or RPO objective was not met",
+            )
     finally:
-        if writer is not None:
-            writer.stop()
-            result.setdefault("acknowledged_commit_count", len(writer.acknowledged))
-        runner.try_run("remove_failover_probe_client", ["docker", "rm", "--force", probe_client])
+        try:
+            if writer is not None:
+                writer.stop()
+                result.setdefault("acknowledged_commit_count", len(writer.acknowledged))
+        finally:
+            removed, _ = runner.try_run(
+                "remove_failover_probe_client",
+                ["docker", "rm", "--force", probe_client],
+            )
+            if not removed:
+                raise DrillError(
+                    "probe_client_cleanup_failed",
+                    "failed to remove the password-bearing probe container",
+                )
 
 
 def main() -> int:

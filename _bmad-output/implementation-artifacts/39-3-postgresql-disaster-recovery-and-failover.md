@@ -145,6 +145,28 @@ RTO 从受信 UTC 故障注入/恢复决定时间开始，到应用连续通过 
 - [x] [Review][Patch] 目录锁在容器被强杀后会永久残留，后续所有备份均返回并发冲突，缺少可自动回收的进程锁 [`deploy/postgres-backup/backup-job.sh:92`]
 - [x] [Review][Patch] 调度器重启时 stanza 成功会覆盖之前的失败 `last-run.json`，健康检查恢复绿色并隐藏最近一次备份失败 [`deploy/postgres-backup/backup-scheduler.sh:98`; `deploy/postgres-backup/backup-healthcheck.sh:27`]
 
+- [x] [Review][Patch] 迁移写冻结没有真实闸门 [`scripts/story_39_3_migration_drill.py:430-522`] — 已决定采用数据库级写入 fence：撤销/隔离应用连接并由独立运维凭据执行迁移，持续验证无业务写入；当前代码只校验可伪造的 token 格式并瞬时统计连接。
+- [x] [Review][Patch] 空库引导通过 `create_all` 后直接 stamp 多个 Alembic revision [`scripts/story_39_3_schema_bootstrap.py:564-615`] — 已决定改用从已验证构建数据库生成、校验并绑定哈希的 canonical PostgreSQL schema 制品，再执行明确审计的后续迁移和完整 catalog 校验；当前实现会跳过函数、约束、索引和数据副作用。
+
+- [x] [Review][Patch] Alembic 迁移 URL 未绑定已验证的 restore 容器 [`scripts/story_39_3_migration_drill.py:437-439`; `:592-644`] — `--database-url-file` 可指向同网络另一数据库，前后 `docker exec` 检查的目标与实际 downgrade/upgrade 目标不一致，可能误改错误数据库。
+- [x] [Review][Patch] schema bootstrap 的数据库 host 未绑定已验证 primary 容器 [`scripts/story_39_3_schema_bootstrap.py:525`; `:559-570`] — 可覆盖为网络内其他 PostgreSQL，创建完成后才在原容器校验，错误目标会先被写入完整 schema。
+- [x] [Review][Patch] `site_restore` 场景实际只执行现有 standby promotion [`scripts/story_39_3_failover_drill.py:1241-1255`] — 没有独立恢复卷、pgBackRest restore 或整站恢复校验，却可以生成站点恢复 RTO/RPO 结果；应在实现真实恢复前拒绝该场景或改为独立恢复流程。
+- [x] [Review][Patch] full rebuild 授权在故障切换和应用恢复之后才检查 [`scripts/story_39_3_failover_drill.py:1308-1322`; `:869-882`] — 默认运行会先完成切换再以 `full_rebuild_not_authorized` 失败，留下已切换但未重建的拓扑；授权门禁必须前置到任何变更之前。
+- [x] [Review][Patch] 命名 restore point 未等待 WAL 归档可恢复 [`scripts/story_39_3_migration_drill.py:583-603`] — 仅执行 `CHECKPOINT`/`pg_create_restore_point` 后立即降级，没有 `pg_switch_wal`、归档状态和隔离 PITR 验证，声明的回退点可能不存在于仓库。
+- [x] [Review][Patch] 迁移演练未按 D39-01 重算 RTO/RPO 就写入 `status: pass` [`scripts/story_39_3_migration_drill.py:712-724`] — 成功的功能探针不能证明 60 分钟 RTO 或 RPO 0，缺失时间线和已确认提交的重算门禁。
+- [x] [Review][Patch] TimescaleDB 检查只匹配任意同名 job，未绑定 `public.point_history` 或前后参数 [`scripts/story_39_3_migration_drill.py:535-551`; `:655-671`; `scripts/story_39_3_schema_bootstrap.py:478-501`] — 其他 schema/表的策略可使目标 hypertable 缺失或配置漂移仍被判定通过。
+- [x] [Review][Patch] 迁移前后数据指纹只覆盖 `power_devices` 的 id、device_code 和行数 [`scripts/story_39_3_migration_drill.py:569-579`; `:696-706`] — 其他表、列、约束、索引、序列或 TimescaleDB 配置变化不会被发现，错误回滚仍可通过。
+- [x] [Review][Patch] 旧/新应用 schema 探针通过源码子串判断字段存在 [`scripts/story_39_3_migration_drill.py:355-367`] — 注释或无关文本包含字段名即可满足检查，不代表实际 SQLAlchemy mapper/数据库 DDL 兼容。
+- [x] [Review][Patch] 应用兼容性写探针只创建 TEMP 表 [`scripts/story_39_3_migration_drill.py:320-351`] — 没有对代表性业务表执行可回滚读写，真实字段、权限、触发器或约束不兼容仍可能被漏检。
+- [x] [Review][Patch] 计划切换在探针暂停完成后才启动 RTO 计时 [`scripts/story_39_3_failover_drill.py:1228-1231`] — 停写握手及其耗时被排除在 D39-01 的恢复窗口之外，计划切换结果会系统性低估。
+- [x] [Review][Patch] 写探针暂停握手和停止回收存在竞态 [`scripts/story_39_3_failover_drill.py:481-485`; `:1228-1231`] — worker 可在主线程观察到 inactive 后继续提交；`join(10)` 超过命令超时时仍可遗留后台线程，RPO 快照与后续提交会交叉。
+- [x] [Review][Patch] 探针容器创建/删除失败会泄露带密码挂载的容器 [`scripts/story_39_3_failover_drill.py:389-414`; `:1358-1362`] — 创建后启动失败或 finally 删除失败被忽略，结果仍可通过并留下凭据挂载。
+- [x] [Review][Patch] RPO 对未来时间戳直接钳制为零 [`scripts/story_39_3_failover_drill.py:94-96`] — 主机与数据库时钟偏斜时，实际缺失提交可能被错误计算为满足 RPO；应检测时钟倒置并失败关闭。
+- [x] [Review][Patch] 空库判定只看 public 普通表且排除 `alembic_version` [`scripts/story_39_3_schema_bootstrap.py:400-416`] — 视图、序列、其他 schema、扩展对象或残留 revision 可污染数据库而仍进入 bootstrap。
+- [x] [Review][Patch] schema 验证只比较表名清单和数量 [`scripts/story_39_3_schema_bootstrap.py:294-296`; `:401-428`] — 列类型、约束、索引、默认值和序列错误不会被发现，错误发布 schema 仍可标记成功。
+- [x] [Review][Patch] Docker CLI 超时只终止本地进程，未回收已启动的 migration/bootstrap 容器 [`scripts/story_39_3_migration_drill.py:87-116`; `scripts/story_39_3_schema_bootstrap.py:153-181`] — `docker run` 容器可能继续后台修改数据库，脚本却已报错并允许后续流程继续。
+- [x] [Review][Patch] downgrade 或 schema/Alembic 后续步骤失败后没有隔离、回滚或可重试状态 [`scripts/story_39_3_migration_drill.py:617-628`; `scripts/story_39_3_schema_bootstrap.py:564-615`] — 数据库可能停留在半成品/降级 revision，下次演练被非空门禁拒绝且无法安全恢复。
+
 - [x] Task 1: 固化版本、恢复拓扑和安全配置 (AC: #1, #2, #5)
   - [x] 1.1 将 TimescaleDB/PG16 和 pgBackRest 固定到已验证版本与镜像摘要，记录升级/漂移规则
   - [x] 1.2 在独立 DR Compose/profile 中定义主库、温备、加密仓库和隔离恢复目标，不破坏默认一键开发启动
@@ -347,6 +369,7 @@ GPT-5 Codex
 - 2026-08-15 TASK 5 RUNTIME: 五个全新同机 Compose 项目均使用独立卷和显式 `10.253.50.0/24`–`10.253.73.0/24` 网络；最终计划切换 RTO 25.437 秒、RPO 0、26/26 提交恢复，意外 `SIGKILL` RTO 24.047 秒、整站机制 `SIGKILL` RTO 23.937 秒，后二者均 RPO 0 且 26/26 提交恢复。三类场景均先 fence 后 promotion、稳定端点和固定应用镜像读写通过，旧主被拒绝直接上线并全量重建为 replay LSN 追平的 standby。
 - 2026-08-15 TASK 5 QUALITY: Story 39.3 全部专项 39 passed；Ruff、DR Compose、镜像内 Shell 语法和 `git diff --check` 通过。完整后端回归单次 20 分钟和首个 55 文件分片 10 分钟均因命令时限退出且没有可用汇总，未计为通过；Task 3 已验证的完整基线仍为 4047 passed、9 skipped。Task 5 原始 JSON 与全部新容器、卷、网络保留，未清理旧证据资源。
 - 2026-08-15 TASK 5.4 PREFLIGHT: `default` 与 `desktop-linux` Docker context 均解析到本机 `docker-desktop` daemon ID `7fd954cc-90bb-4647-a9f3-a82b05630b37` 和同一 `/var/lib/docker`；未配置 `ssh://` context、SSH 远端主机、独立存储或第二站点参数。正式独立故障域演练因缺少第二执行目标而未启动，不能以 WSL、同机 context、本地声明或同机 VM 替代；5.4、Task 5 和 Story 状态保持打开。
+- 2026-08-15 REVIEW PATCHES FINAL: 第二批 15 项审查补丁全部关闭；failover、migration 和 canonical schema 专项共 30 passed，Ruff、Python 编译和 `git diff --check` 通过。canonical dump 在第三个全新空卷真实恢复为 188 表、Alembic `20260707_0100`、TimescaleDB hypertable 与两项策略，dump SHA256=`906be133fc73f6a60f7a6922505be0b2135f5521a30b4121e10b03d125b5dc0c`，恢复后 catalog SHA256=`d456da32ff71f488be31ffd1730171cb24b4228ad58f16daf8dc4aea81753842`。
 
 ### Implementation Plan
 
@@ -385,6 +408,7 @@ GPT-5 Codex
 - Task 5.3 完成：未经处理旧主重新上线被明确拒绝；在唯一项目/卷标签校验与显式授权后执行 full rebuild，重建节点以 standby 回归并通过 replay LSN 与完整探针集门禁。
 - Task 5.4 部分完成：同机演练明确记录为 `mechanism-only` / `mechanism-pass` 且 `formal_pass=false`；因当前没有真实独立故障域，正式站点证据仍未完成，不勾选 5.4 或 Task 5。
 - 第一批代码审查修复完成：默认 Compose 的 DR 初始化改为显式启用，正式 DR 镜像强制组装 `@sha256` 引用，空仓库保留检查正常等待首备，备份互斥改为崩溃可回收的 `flock`，调度器初始化不再覆盖最近失败状态。
+- 第二批代码审查修复完成：迁移写冻结改为数据库原生角色 fence 和独立迁移凭据，迁移 URL 绑定 restore socket，restore point 等待归档并绑定外部 PITR 证据；完整 catalog/data/TimescaleDB 指纹、真实业务 DML、RTO/RPO 和失败后 head 恢复均失败关闭。failover 补齐前置授权、真实暂停握手、探针容器回收和时钟倒置拒绝；空库引导改为哈希绑定 canonical dump 与完整 catalog 校验，并通过全新空卷真实恢复。
 
 ### File List
 
@@ -407,6 +431,8 @@ GPT-5 Codex
 - `deploy/postgres-backup/backup-job.sh`
 - `deploy/postgres-backup/backup-scheduler.sh`
 - `deploy/postgres-backup/init-primary.sh`
+- `deploy/postgres-backup/canonical-schema.dump`
+- `deploy/postgres-backup/canonical-schema-manifest.json`
 - `deploy/postgres-backup/expected-schema-tables.txt`
 - `deploy/postgres-backup/failover-contract.yaml`
 - `deploy/postgres-backup/migration-rollback-contract.yaml`
@@ -439,3 +465,4 @@ GPT-5 Codex
 - 2026-08-15: 完成 Task 4，绑定当前/上一应用镜像 digest、source revision 和 schema inventory；可逆 downgrade/upgrade、七类失败关闭及独立不可逆命名 PITR 通过，为 39.12 固化“上一应用可启动、当前应用必须等待 schema roll-forward”的数据库回滚条件。
 - 2026-08-15: 完成 Task 5.1–5.3，新增受控 failover/failback 编排、稳定端点、持续写入和固定应用探针；计划/意外/整站机制演练及旧主全量重建通过。5.4 因缺少真实独立故障域继续打开，Story 保持 `in-progress`。
 - 2026-08-15: 完成第一批代码审查修复，关闭默认栈初始化、镜像摘要、空仓库启动、崩溃残留锁和失败状态覆盖五项缺陷；Story 39.3 专项增至 41 passed，状态保持 `in-progress`。
+- 2026-08-15: 完成第二批 15 项代码审查修复，数据库原生写冻结、容器/URL 隔离、WAL/PITR 证据、完整指纹、RTO/RPO、failover 竞态与 canonical schema 恢复均通过专项和真实空卷验证；20 项审查意见全部关闭，Story 因 5.4/39.7 前置仍保持 `in-progress`。

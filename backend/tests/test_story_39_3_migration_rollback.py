@@ -1,6 +1,7 @@
 """Story 39.3 迁移与应用回滚契约测试。"""
 
 import importlib.util
+import json
 from pathlib import Path
 import sys
 
@@ -90,9 +91,9 @@ def test_migration_drill_requires_freeze_restore_point_and_immutable_images():
         "restore-socket",
         "pg_create_restore_point",
         "new_flexibility_columns_are_empty",
-        "alembic current",
-        "alembic downgrade",
-        "alembic upgrade",
+        "alembic_current",
+        "alembic_downgrade",
+        "alembic_upgrade",
         "migration_invariant_changed",
         "alembic_not_at_head",
         "timescaledb_objects_missing",
@@ -104,8 +105,8 @@ def test_migration_drill_requires_freeze_restore_point_and_immutable_images():
     ):
         assert required in drill
 
-    assert drill.index("pg_create_restore_point") < drill.index("alembic downgrade")
-    assert drill.index("new_flexibility_columns_are_empty") < drill.index("alembic downgrade")
+    assert drill.index("pg_create_restore_point") < drill.index("alembic_downgrade")
+    assert drill.index("new_flexibility_columns_are_empty") < drill.index("alembic_downgrade")
     assert "shell=True" not in drill
 
 
@@ -151,12 +152,16 @@ def test_migration_drill_uses_explicit_database_role_for_psql(monkeypatch, tmp_p
             "restore-socket-volume",
             "--database-url-file",
             str(tmp_path / "database-url"),
+            "--migration-database-url-file",
+            str(tmp_path / "migration-database-url"),
             "--write-freeze-token-file",
             str(tmp_path / "freeze-token"),
             "--fault-tree-hmac-key-file",
             str(tmp_path / "fault-tree-hmac-key"),
             "--output-dir",
             str(tmp_path),
+            "--pitr-evidence-file",
+            str(tmp_path / "pitr-evidence.json"),
         ],
     )
 
@@ -185,13 +190,17 @@ def test_run_app_injects_secret_by_environment_name_only():
 
     class RecordingRunner:
         def __init__(self):
-            self.argv = None
+            self.calls = []
             self.env = None
 
         def run(self, _step, argv, **kwargs):
-            self.argv = argv
-            self.env = kwargs["env"]
+            self.calls.append(argv)
+            if "env" in kwargs:
+                self.env = kwargs["env"]
             return "ok"
+
+        def try_run(self, _step, _argv, **_kwargs):
+            return True, ""
 
     runner = RecordingRunner()
     secret = "a" * 64
@@ -208,14 +217,15 @@ def test_run_app_injects_secret_by_environment_name_only():
         failure_code="probe_failed",
     )
 
-    assert runner.argv is not None
+    assert runner.calls
     assert runner.env is not None
     assert runner.env["FAULT_TREE_HMAC_KEY"] == secret
-    assert runner.argv.count("--env") == 2
-    assert "DATABASE_URL" in runner.argv
-    assert "FAULT_TREE_HMAC_KEY" in runner.argv
-    assert "type=volume,src=restore-socket-volume,dst=/var/run/postgresql,readonly" in runner.argv
-    assert secret not in runner.argv
+    create_argv = runner.calls[0]
+    assert create_argv.count("--env") == 2
+    assert "DATABASE_URL" in create_argv
+    assert "FAULT_TREE_HMAC_KEY" in create_argv
+    assert "type=volume,src=restore-socket-volume,dst=/var/run/postgresql,readonly" in create_argv
+    assert secret not in create_argv
 
 
 def test_named_secret_can_be_loaded_from_dotenv_without_exposing_other_values(tmp_path):
@@ -236,3 +246,115 @@ def test_named_secret_can_be_loaded_from_dotenv_without_exposing_other_values(tm
         )
         == secret
     )
+
+
+def test_database_urls_are_bound_to_validated_restore_socket():
+    drill = _load_drill_module()
+    application_url = "postgresql+asyncpg://dcim:secret@/dcim?host=%2Fvar%2Frun%2Fpostgresql"
+
+    assert (
+        drill.validate_socket_database_url(
+            application_url,
+            expected_database="dcim",
+            expected_user="dcim",
+            name="application database URL",
+        )
+        == application_url
+    )
+    with pytest.raises(drill.DrillError) as tcp_error:
+        drill.validate_socket_database_url(
+            "postgresql+asyncpg://dcim:secret@postgres-restore:5432/dcim",
+            expected_database="dcim",
+            expected_user="dcim",
+            name="application database URL",
+        )
+    assert tcp_error.value.code == "database_url_target_invalid"
+
+    with pytest.raises(drill.DrillError) as role_error:
+        drill.validate_socket_database_url(
+            application_url,
+            expected_database="dcim",
+            expected_user="postgres",
+            name="migration database URL",
+        )
+    assert role_error.value.code == "database_url_target_invalid"
+
+
+def test_database_native_fence_disables_login_and_terminates_sessions():
+    drill = _load_drill_module()
+
+    class RecordingRunner:
+        def __init__(self):
+            self.commands = []
+
+        def run(self, step, argv, **_kwargs):
+            self.commands.append((step, argv))
+            return "0" if step == "verify_application_sessions_fenced" else ""
+
+    runner = RecordingRunner()
+    drill.set_application_login(
+        runner,
+        "postgres-restore",
+        "dcim",
+        "postgres",
+        "dcim",
+        False,
+    )
+
+    sql = [argv[argv.index("--command") + 1] for _, argv in runner.commands]
+    assert 'ALTER ROLE "dcim" NOLOGIN' in sql[0]
+    assert "pg_terminate_backend" in sql[1]
+    assert "pg_stat_activity" in sql[2]
+
+
+def test_application_and_schema_probes_use_runtime_metadata_and_business_dml():
+    drill = _load_drill_module()
+
+    assert "Base.metadata.tables" in drill.APP_IMAGE_SCHEMA_PROBE
+    assert "ScriptDirectory" in drill.APP_IMAGE_SCHEMA_PROBE
+    assert "models.glob" not in drill.APP_IMAGE_SCHEMA_PROBE
+    assert "update(PowerDevice)" in drill.APP_PROBE
+    assert "transaction.rollback" in drill.APP_PROBE
+    assert "TEMP TABLE" not in drill.APP_PROBE
+    assert "information_schema.columns" in drill.DATABASE_FINGERPRINT_PROBE
+    assert "pg_get_constraintdef" in drill.DATABASE_FINGERPRINT_PROBE
+
+
+def test_pitr_evidence_is_bound_to_restore_point_and_fingerprints(tmp_path):
+    drill = _load_drill_module()
+    database_fingerprint = {"alembic_revision": "head", "catalog": {}, "data": {}}
+    timescaledb_fingerprint = {"hypertables": [{}], "jobs": [{}, {}]}
+    evidence = tmp_path / "pitr-evidence.json"
+    evidence.write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "status": "pass",
+                "isolated_restore": True,
+                "restore_target_type": "name",
+                "restore_target_value": "story_39_3_test",
+                "restore_lsn": "0/123",
+                "alembic_head": "head",
+                "repository_check": "pass",
+                "pg_amcheck": "pass",
+                "rpo_missing_commit_count": 0,
+                "rto_seconds": 30,
+                "database_fingerprint": database_fingerprint,
+                "timescaledb_fingerprint": timescaledb_fingerprint,
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    payload = drill.wait_for_pitr_evidence(
+        evidence,
+        restore_point="story_39_3_test",
+        restore_lsn="0/123",
+        expected_head="head",
+        expected_database_fingerprint=database_fingerprint,
+        expected_timescaledb_fingerprint=timescaledb_fingerprint,
+        created_after=evidence.stat().st_mtime - 1,
+        timeout=1,
+        poll_interval=0.01,
+    )
+    assert payload["status"] == "pass"

@@ -12,8 +12,10 @@ import subprocess
 import sys
 import tempfile
 import time
+import uuid
 from datetime import datetime, timezone
 from typing import Any
+from urllib.parse import parse_qs, unquote, urlsplit
 
 import yaml
 
@@ -34,6 +36,9 @@ CURRENT_APP_IMAGE = "CURRENT_APP_IMAGE"
 PREVIOUS_APP_IMAGE = "PREVIOUS_APP_IMAGE"
 FAULT_TREE_HMAC_KEY = "FAULT_TREE_HMAC_KEY"
 ENVIRONMENT_NAME_PATTERN = re.compile(r"^[A-Z][A-Z0-9_]*$")
+IDENTIFIER_PATTERN = re.compile(r"^[a-z_][a-z0-9_]{0,62}$")
+POSTGRES_SOCKET_DIR = "/var/run/postgresql"
+MIGRATION_RTO_SECONDS_MAX = 3600.0
 
 
 class DrillError(RuntimeError):
@@ -72,6 +77,15 @@ def load_secret_file(
                     value = value[1:-1]
                 break
     return require_value(value, code, name)
+
+
+def parse_json_output(output: str, code: str, name: str) -> Any:
+    for line in reversed(output.splitlines()):
+        try:
+            return json.loads(line)
+        except json.JSONDecodeError:
+            continue
+    raise DrillError(code, f"{name} did not return valid JSON")
 
 
 class CommandRunner:
@@ -126,6 +140,19 @@ class CommandRunner:
             raise DrillError(failure_code, f"{step} exited with {completed.returncode}")
         return stdout
 
+    def try_run(
+        self,
+        step: str,
+        argv: list[str],
+        *,
+        env: dict[str, str] | None = None,
+        timeout: int = 60,
+    ) -> tuple[bool, str]:
+        try:
+            return True, self.run(step, argv, env=env, timeout=timeout)
+        except DrillError:
+            return False, ""
+
 
 def inspect_labels(
     runner: CommandRunner, object_type: str, name: str
@@ -170,6 +197,11 @@ def validate_isolation(
             "isolation_label_invalid", "restore container labels are invalid"
         ) from exc
 
+    if not isinstance(container_labels, dict):
+        raise DrillError(
+            "isolation_label_invalid", "restore container labels are missing"
+        )
+
     network_labels = inspect_labels(runner, "network", network)
     volume_labels = inspect_labels(runner, "volume", socket_volume)
     expected = {
@@ -191,6 +223,69 @@ def validate_isolation(
         raise DrillError("isolation_label_invalid", "network is not restore-isolated")
     if volume_labels.get("com.dcim.dr.role") != "restore-socket":
         raise DrillError("isolation_label_invalid", "volume is not a restore-socket")
+
+    runtime_output = runner.run(
+        "inspect_restore_runtime",
+        [
+            "docker",
+            "inspect",
+            container,
+            "--format",
+            "{{json .State.Running}}|{{json .Mounts}}|{{json .NetworkSettings.Networks}}",
+        ],
+        failure_code="isolation_target_missing",
+    )
+    try:
+        running_json, mounts_json, networks_json = runtime_output.split("|", 2)
+        running = json.loads(running_json)
+        mounts = json.loads(mounts_json)
+        networks = json.loads(networks_json)
+    except (ValueError, json.JSONDecodeError) as exc:
+        raise DrillError(
+            "isolation_runtime_invalid", "restore runtime inspection is invalid"
+        ) from exc
+    socket_attached = isinstance(mounts, list) and any(
+        isinstance(mount, dict)
+        and mount.get("Type") == "volume"
+        and mount.get("Name") == socket_volume
+        and mount.get("Destination") == POSTGRES_SOCKET_DIR
+        for mount in mounts
+    )
+    if running is not True or not socket_attached:
+        raise DrillError(
+            "isolation_runtime_invalid",
+            "restore container is not running with the validated socket volume",
+        )
+    if not isinstance(networks, dict) or network not in networks:
+        raise DrillError(
+            "isolation_runtime_invalid",
+            "restore container is not attached to the validated network",
+        )
+    members_output = runner.run(
+        "inspect_restore_network_members",
+        ["docker", "network", "inspect", network, "--format", "{{json .Containers}}"],
+        failure_code="isolation_target_missing",
+    )
+    try:
+        members = json.loads(members_output)
+    except json.JSONDecodeError as exc:
+        raise DrillError(
+            "isolation_runtime_invalid", "restore network membership is invalid"
+        ) from exc
+    if not isinstance(members, dict):
+        raise DrillError(
+            "isolation_runtime_invalid", "restore network membership is missing"
+        )
+    member_names = {
+        str(member.get("Name"))
+        for member in members.values()
+        if isinstance(member, dict) and member.get("Name")
+    }
+    if member_names != {container}:
+        raise DrillError(
+            "isolation_runtime_invalid",
+            "restore network must contain only the validated database before migration",
+        )
 
 
 def validate_image(
@@ -233,6 +328,40 @@ def validate_image(
         )
 
 
+def validate_socket_database_url(
+    value: str,
+    *,
+    expected_database: str,
+    expected_user: str,
+    name: str,
+) -> str:
+    """Only accept credentials that connect through the validated restore socket."""
+
+    parsed = urlsplit(value)
+    if parsed.scheme not in {"postgresql", "postgresql+asyncpg"}:
+        raise DrillError("database_url_invalid", f"{name} must use PostgreSQL")
+    if parsed.hostname not in (None, "") or parsed.port is not None:
+        raise DrillError(
+            "database_url_target_invalid",
+            f"{name} must not contain a TCP host or port",
+        )
+    database = unquote(parsed.path.lstrip("/"))
+    if database != expected_database or unquote(parsed.username or "") != expected_user:
+        raise DrillError(
+            "database_url_target_invalid",
+            f"{name} database or role does not match the validated target",
+        )
+    socket_values = parse_qs(parsed.query).get("host", [])
+    if socket_values != [POSTGRES_SOCKET_DIR]:
+        raise DrillError(
+            "database_url_target_invalid",
+            f"{name} must use {POSTGRES_SOCKET_DIR}",
+        )
+    if not parsed.password:
+        raise DrillError("database_url_invalid", f"{name} has no password")
+    return value
+
+
 def psql(
     runner: CommandRunner,
     container: str,
@@ -266,6 +395,269 @@ def psql(
     )
 
 
+def quote_identifier(value: str) -> str:
+    if IDENTIFIER_PATTERN.fullmatch(value) is None:
+        raise DrillError(
+            "database_identifier_invalid",
+            "database identifiers must be simple PostgreSQL names",
+        )
+    return f'"{value}"'
+
+
+def role_can_login(
+    runner: CommandRunner,
+    container: str,
+    database: str,
+    migration_user: str,
+    application_user: str,
+) -> bool:
+    role = quote_identifier(application_user)
+    value = psql(
+        runner,
+        container,
+        database,
+        migration_user,
+        "read_application_role_login",
+        f"SELECT rolcanlogin::text FROM pg_roles WHERE rolname = '{application_user}';",
+    )
+    if value not in {"t", "f"}:
+        raise DrillError(
+            "application_role_missing", f"application role {role} does not exist"
+        )
+    return value == "t"
+
+
+def set_application_login(
+    runner: CommandRunner,
+    container: str,
+    database: str,
+    migration_user: str,
+    application_user: str,
+    enabled: bool,
+) -> None:
+    role = quote_identifier(application_user)
+    action = "LOGIN" if enabled else "NOLOGIN"
+    psql(
+        runner,
+        container,
+        database,
+        migration_user,
+        "enable_application_role" if enabled else "fence_application_role",
+        f"ALTER ROLE {role} {action};",
+    )
+    if not enabled:
+        psql(
+            runner,
+            container,
+            database,
+            migration_user,
+            "terminate_application_sessions",
+            "SELECT pg_terminate_backend(pid) FROM pg_stat_activity "
+            f"WHERE usename = '{application_user}' AND pid <> pg_backend_pid();",
+        )
+        active = psql(
+            runner,
+            container,
+            database,
+            migration_user,
+            "verify_application_sessions_fenced",
+            "SELECT count(*)::text FROM pg_stat_activity "
+            f"WHERE usename = '{application_user}' AND pid <> pg_backend_pid();",
+        )
+        if active != "0":
+            raise DrillError(
+                "write_freeze_failed",
+                "application sessions remained after database fence",
+            )
+
+
+def capture_timescaledb_fingerprint(
+    runner: CommandRunner,
+    container: str,
+    database: str,
+    migration_user: str,
+    step: str,
+) -> dict[str, Any]:
+    output = psql(
+        runner,
+        container,
+        database,
+        migration_user,
+        step,
+        "SELECT json_build_object("
+        "'hypertables', COALESCE((SELECT json_agg(json_build_object("
+        "'schema', hypertable_schema, 'name', hypertable_name, "
+        "'compression', compression_enabled) ORDER BY hypertable_name) "
+        "FROM timescaledb_information.hypertables "
+        "WHERE hypertable_schema = 'public' AND hypertable_name = 'point_history'), '[]'::json), "
+        "'jobs', COALESCE((SELECT json_agg(json_build_object("
+        "'proc_name', proc_name, 'schedule_interval', schedule_interval, "
+        "'config', config) ORDER BY proc_name) "
+        "FROM timescaledb_information.jobs "
+        "WHERE hypertable_schema = 'public' AND hypertable_name = 'point_history' "
+        "AND proc_name IN ('policy_compression', 'policy_retention')), '[]'::json)"
+        ")::text;",
+    )
+    payload = parse_json_output(output, "timescaledb_fingerprint_invalid", step)
+    if not isinstance(payload, dict):
+        raise DrillError(
+            "timescaledb_fingerprint_invalid",
+            "TimescaleDB fingerprint is not an object",
+        )
+    hypertables = payload.get("hypertables")
+    jobs = payload.get("jobs")
+    if (
+        not isinstance(hypertables, list)
+        or len(hypertables) != 1
+        or not isinstance(jobs, list)
+        or len(jobs) != 2
+    ):
+        raise DrillError(
+            "timescaledb_objects_missing",
+            "point_history hypertable and both policies are required",
+        )
+    return payload
+
+
+def capture_database_fingerprint(
+    runner: CommandRunner,
+    *,
+    step: str,
+    image: str,
+    network: str,
+    socket_volume: str,
+    database_url: str,
+    fault_tree_hmac_key: str,
+) -> dict[str, Any]:
+    output = run_app(
+        runner,
+        step=step,
+        image=image,
+        network=network,
+        socket_volume=socket_volume,
+        database_url=database_url,
+        runtime_environment={FAULT_TREE_HMAC_KEY: fault_tree_hmac_key},
+        entrypoint="python",
+        arguments=["-c", DATABASE_FINGERPRINT_PROBE],
+        failure_code="database_fingerprint_failed",
+        timeout=900,
+    )
+    payload = parse_json_output(output, "database_fingerprint_invalid", step)
+    if not isinstance(payload, dict) or not isinstance(payload.get("data"), dict):
+        raise DrillError(
+            "database_fingerprint_invalid", "database fingerprint is not an object"
+        )
+    return payload
+
+
+def create_archived_restore_point(
+    runner: CommandRunner,
+    *,
+    container: str,
+    database: str,
+    migration_user: str,
+    restore_point: str,
+    timeout: float,
+    poll_interval: float,
+) -> dict[str, str]:
+    output = psql(
+        runner,
+        container,
+        database,
+        migration_user,
+        "create_archived_restore_point",
+        f"CHECKPOINT; SELECT pg_create_restore_point('{restore_point}'); "
+        "SELECT pg_walfile_name(pg_switch_wal());",
+    )
+    lines = [line.strip() for line in output.splitlines() if line.strip()]
+    if len(lines) < 2:
+        raise DrillError(
+            "restore_point_invalid", "restore point command returned incomplete output"
+        )
+    restore_lsn, wal_segment = lines[-2:]
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        archived = psql(
+            runner,
+            container,
+            database,
+            migration_user,
+            "poll_restore_point_archive",
+            "SELECT CASE WHEN COALESCE(last_archived_wal, '') >= "
+            f"'{wal_segment}' THEN '1' ELSE '0' END FROM pg_stat_archiver;",
+        )
+        if archived == "1":
+            return {"restore_lsn": restore_lsn, "wal_segment": wal_segment}
+        time.sleep(poll_interval)
+    raise DrillError(
+        "restore_point_not_archived", "restore point WAL was not archived in time"
+    )
+
+
+def wait_for_pitr_evidence(
+    path: Path,
+    *,
+    restore_point: str,
+    restore_lsn: str,
+    expected_head: str,
+    expected_database_fingerprint: dict[str, Any],
+    expected_timescaledb_fingerprint: dict[str, Any],
+    created_after: float,
+    timeout: float,
+    poll_interval: float,
+) -> dict[str, Any]:
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        try:
+            stat = path.stat()
+            payload = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+            time.sleep(poll_interval)
+            continue
+        if stat.st_mtime < created_after:
+            raise DrillError("pitr_evidence_stale", "PITR evidence predates this drill")
+        expected = {
+            "schema_version": 1,
+            "status": "pass",
+            "isolated_restore": True,
+            "restore_target_type": "name",
+            "restore_target_value": restore_point,
+            "restore_lsn": restore_lsn,
+            "alembic_head": expected_head,
+            "repository_check": "pass",
+            "pg_amcheck": "pass",
+            "rpo_missing_commit_count": 0,
+        }
+        if not isinstance(payload, dict) or any(
+            payload.get(key) != value for key, value in expected.items()
+        ):
+            raise DrillError(
+                "pitr_evidence_invalid",
+                "PITR evidence does not match this restore point",
+            )
+        if payload.get("database_fingerprint") != expected_database_fingerprint:
+            raise DrillError(
+                "pitr_evidence_invalid", "PITR database fingerprint does not match"
+            )
+        if payload.get("timescaledb_fingerprint") != expected_timescaledb_fingerprint:
+            raise DrillError(
+                "pitr_evidence_invalid", "PITR TimescaleDB fingerprint does not match"
+            )
+        rto_seconds = payload.get("rto_seconds")
+        if (
+            not isinstance(rto_seconds, (int, float))
+            or not 0 <= float(rto_seconds) <= MIGRATION_RTO_SECONDS_MAX
+        ):
+            raise DrillError(
+                "pitr_recovery_objective_not_met",
+                "PITR evidence exceeds the migration RTO",
+            )
+        return payload
+    raise DrillError(
+        "pitr_evidence_timeout", "isolated PITR evidence was not produced in time"
+    )
+
+
 def run_app(
     runner: CommandRunner,
     *,
@@ -294,12 +686,17 @@ def run_app(
     environment_arguments: list[str] = []
     for name in sorted(container_environment):
         environment_arguments.extend(["--env", name])
-    return runner.run(
-        step,
+    normalized_step = re.sub(r"[^a-z0-9]+", "-", step.lower()).strip("-")[:32]
+    container_name = (
+        f"dcim-story-39-3-migration-{normalized_step}-{uuid.uuid4().hex[:8]}"
+    )
+    runner.run(
+        f"create_{step}",
         [
             "docker",
-            "run",
-            "--rm",
+            "create",
+            "--name",
+            container_name,
             "--network",
             network,
             "--mount",
@@ -315,15 +712,32 @@ def run_app(
             *arguments,
         ],
         env=environment,
-        timeout=timeout,
+        timeout=60,
         failure_code=failure_code,
     )
+    try:
+        return runner.run(
+            step,
+            ["docker", "start", "--attach", container_name],
+            timeout=timeout,
+            failure_code=failure_code,
+        )
+    finally:
+        removed, _ = runner.try_run(
+            f"remove_{step}",
+            ["docker", "rm", "--force", container_name],
+        )
+        if not removed:
+            raise DrillError(
+                "migration_container_cleanup_failed",
+                f"could not remove migration container for {step}",
+            )
 
 
 APP_PROBE = """
 import asyncio
 import os
-from sqlalchemy import select, text
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import create_async_engine
 import app.main
 from app.models.energy import PowerDevice
@@ -331,13 +745,22 @@ from app.models.energy import PowerDevice
 async def main():
     engine = create_async_engine(os.environ["DATABASE_URL"])
     try:
-        async with engine.begin() as connection:
-            await connection.execute(select(PowerDevice).limit(1))
-            await connection.execute(text("CREATE TEMP TABLE story_39_3_app_probe(value integer NOT NULL)"))
-            await connection.execute(text("INSERT INTO story_39_3_app_probe(value) VALUES (1)"))
-            value = (await connection.execute(text("SELECT value FROM story_39_3_app_probe"))).scalar_one()
-            if value != 1:
-                raise RuntimeError("write probe mismatch")
+        async with engine.connect() as connection:
+            transaction = await connection.begin()
+            try:
+                device_id = (await connection.execute(select(PowerDevice.id).limit(1))).scalar_one_or_none()
+                if device_id is None:
+                    raise RuntimeError("representative power device is missing")
+                updated = await connection.execute(
+                    update(PowerDevice)
+                    .where(PowerDevice.id == device_id)
+                    .values(device_code=PowerDevice.device_code)
+                    .returning(PowerDevice.id)
+                )
+                if updated.scalar_one() != device_id:
+                    raise RuntimeError("business write probe mismatch")
+            finally:
+                await transaction.rollback()
     finally:
         await engine.dispose()
 
@@ -348,18 +771,18 @@ asyncio.run(main())
 APP_IMAGE_SCHEMA_PROBE = """
 import json
 import os
-from pathlib import Path
+from alembic.config import Config
+from alembic.script import ScriptDirectory
+from app.core.database import Base
+import app.models
 
 revision = os.environ["EXPECTED_RELEASE_REVISION"]
 schema = os.environ["EXPECTED_IMAGE_SCHEMA"]
 fields = [item for item in os.environ["EXPECTED_MODEL_FIELDS"].split(",") if item]
-versions = Path("/app/alembic/versions")
-models = Path("/app/app/models")
-revision_present = any(path.name.startswith(revision + "_") for path in versions.glob("*.py"))
-model_source = "".join(
-    path.read_text(encoding="utf-8", errors="ignore") for path in models.glob("*.py")
-)
-present_fields = sorted(field for field in fields if field in model_source)
+script = ScriptDirectory.from_config(Config("/app/alembic.ini"))
+revision_present = script.get_revision(revision) is not None
+power_devices = Base.metadata.tables["power_devices"]
+present_fields = sorted(field for field in fields if field in power_devices.c)
 
 if schema == "previous":
     valid = not revision_present and not present_fields
@@ -371,6 +794,88 @@ else:
 if not valid:
     raise RuntimeError("application image schema inventory mismatch")
 print(json.dumps({"schema": schema, "revision_present": revision_present, "fields": present_fields}))
+""".strip()
+
+
+DATABASE_FINGERPRINT_PROBE = """
+import asyncio
+import json
+import os
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import create_async_engine
+
+CATALOG_SQL = '''
+SELECT jsonb_build_object(
+  'columns', COALESCE((
+    SELECT jsonb_agg(to_jsonb(c) ORDER BY c.table_name, c.ordinal_position)
+    FROM (
+      SELECT table_name, ordinal_position, column_name, data_type, udt_name,
+             is_nullable, column_default, is_identity
+      FROM information_schema.columns
+      WHERE table_schema = 'public'
+    ) c
+  ), '[]'::jsonb),
+  'constraints', COALESCE((
+    SELECT jsonb_agg(to_jsonb(c) ORDER BY c.table_name, c.name)
+    FROM (
+      SELECT cls.relname AS table_name, con.conname AS name,
+             pg_get_constraintdef(con.oid, true) AS definition
+      FROM pg_constraint con
+      JOIN pg_class cls ON cls.oid = con.conrelid
+      JOIN pg_namespace nsp ON nsp.oid = cls.relnamespace
+      WHERE nsp.nspname = 'public'
+    ) c
+  ), '[]'::jsonb),
+  'indexes', COALESCE((
+    SELECT jsonb_agg(to_jsonb(i) ORDER BY i.tablename, i.indexname)
+    FROM (
+      SELECT tablename, indexname, indexdef
+      FROM pg_indexes WHERE schemaname = 'public'
+    ) i
+  ), '[]'::jsonb),
+  'sequences', COALESCE((
+    SELECT jsonb_agg(to_jsonb(s) ORDER BY s.sequencename)
+    FROM (
+      SELECT sequencename, data_type, start_value, min_value, max_value,
+             increment_by, cycle
+      FROM pg_sequences WHERE schemaname = 'public'
+    ) s
+  ), '[]'::jsonb)
+)::text;
+'''
+
+async def main():
+    engine = create_async_engine(os.environ["DATABASE_URL"])
+    try:
+        async with engine.connect() as connection:
+            table_names = [
+                row[0]
+                for row in (
+                    await connection.execute(
+                        text("SELECT tablename FROM pg_tables WHERE schemaname='public' "
+                             "AND tablename <> 'alembic_version' ORDER BY tablename")
+                    )
+                ).all()
+            ]
+            data = {}
+            for table_name in table_names:
+                quoted = connection.dialect.identifier_preparer.quote(table_name)
+                query = text(
+                    f"SELECT count(*)::bigint, "
+                    f"md5(COALESCE(string_agg(to_jsonb(t)::text, E'\\n' "
+                    f"ORDER BY to_jsonb(t)::text), '')) FROM {quoted} AS t"
+                )
+                count, digest = (await connection.execute(query)).one()
+                data[table_name] = {"count": int(count), "digest": digest}
+            catalog = json.loads((await connection.execute(text(CATALOG_SQL))).scalar_one())
+            revision = (
+                await connection.execute(text("SELECT version_num FROM alembic_version"))
+            ).scalar_one()
+            print(json.dumps({"alembic_revision": revision, "catalog": catalog, "data": data}, sort_keys=True))
+    finally:
+        await engine.dispose()
+
+asyncio.run(main())
 """.strip()
 
 
@@ -395,7 +900,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--socket-volume", required=True)
     parser.add_argument("--database", default="dcim")
     parser.add_argument("--database-user", default="dcim")
+    parser.add_argument("--migration-database-user", default="postgres")
     parser.add_argument("--database-url-file", type=Path, required=True)
+    parser.add_argument("--migration-database-url-file", type=Path, required=True)
     parser.add_argument("--write-freeze-token-file", type=Path, required=True)
     parser.add_argument("--fault-tree-hmac-key-file", type=Path, required=True)
     parser.add_argument("--restore-point", default=os.getenv(MIGRATION_RESTORE_POINT))
@@ -403,13 +910,26 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--previous-app-image", default=os.getenv(PREVIOUS_APP_IMAGE))
     parser.add_argument("--contract", type=Path, default=DEFAULT_CONTRACT)
     parser.add_argument("--output-dir", type=Path, required=True)
+    parser.add_argument("--archive-timeout-seconds", type=float, default=300.0)
+    parser.add_argument("--poll-interval-seconds", type=float, default=1.0)
+    parser.add_argument("--pitr-evidence-file", type=Path, required=True)
+    parser.add_argument("--pitr-evidence-timeout-seconds", type=float, default=3600.0)
     return parser.parse_args()
 
 
 def execute(
     args: argparse.Namespace, runner: CommandRunner, result: dict[str, Any]
 ) -> None:
-    contract = yaml.safe_load(args.contract.read_text(encoding="utf-8"))
+    try:
+        contract = yaml.safe_load(args.contract.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, yaml.YAMLError) as exc:
+        raise DrillError(
+            "migration_contract_invalid", "cannot read migration contract"
+        ) from exc
+    if not isinstance(contract, dict) or contract.get("schema_version") != 1:
+        raise DrillError(
+            "migration_contract_invalid", "migration contract schema is invalid"
+        )
     release = contract["release_migration"]
     compatibility = contract["application_compatibility"]
     head = str(release["revision"])
@@ -437,6 +957,11 @@ def execute(
     database_url = load_secret_file(
         args.database_url_file, "database_url_missing", "database URL"
     )
+    migration_database_url = load_secret_file(
+        args.migration_database_url_file,
+        "migration_database_url_missing",
+        "migration database URL",
+    )
     fault_tree_hmac_key = load_secret_file(
         args.fault_tree_hmac_key_file,
         "application_secret_missing",
@@ -450,6 +975,44 @@ def execute(
     database_user = require_value(
         args.database_user, "database_user_missing", "database user"
     )
+    migration_database_user = require_value(
+        args.migration_database_user,
+        "migration_database_user_missing",
+        "migration database user",
+    )
+    if database_user == migration_database_user:
+        raise DrillError(
+            "migration_role_invalid",
+            "application and migration roles must be different",
+        )
+    if (
+        IDENTIFIER_PATTERN.fullmatch(database_user) is None
+        or IDENTIFIER_PATTERN.fullmatch(migration_database_user) is None
+    ):
+        raise DrillError(
+            "database_identifier_invalid",
+            "database roles must be simple PostgreSQL names",
+        )
+    database_url = validate_socket_database_url(
+        database_url,
+        expected_database=args.database,
+        expected_user=database_user,
+        name="application database URL",
+    )
+    migration_database_url = validate_socket_database_url(
+        migration_database_url,
+        expected_database=args.database,
+        expected_user=migration_database_user,
+        name="migration database URL",
+    )
+    if (
+        args.archive_timeout_seconds <= 0
+        or args.poll_interval_seconds <= 0
+        or args.pitr_evidence_timeout_seconds <= 0
+    ):
+        raise DrillError(
+            "timeout_invalid", "archive, poll, and PITR timeouts must be positive"
+        )
     app_environment = {FAULT_TREE_HMAC_KEY: fault_tree_hmac_key}
 
     validate_isolation(
@@ -502,227 +1065,358 @@ def execute(
         arguments=["-c", APP_IMAGE_SCHEMA_PROBE],
         failure_code="current_app_incompatible",
     )
-
-    active_connections = int(
-        psql(
-            runner,
-            args.postgres_container,
-            args.database,
-            database_user,
-            "verify_write_freeze",
-            "SELECT count(*) FROM pg_stat_activity "
-            "WHERE datname = current_database() AND pid <> pg_backend_pid() "
-            "AND backend_type = 'client backend';",
-        )
-    )
-    if active_connections != 0:
-        raise DrillError(
-            "active_application_connections",
-            "database still has application connections",
-        )
-
-    actual_head = psql(
+    if not role_can_login(
         runner,
         args.postgres_container,
         args.database,
+        migration_database_user,
         database_user,
-        "alembic current",
-        "SELECT version_num FROM alembic_version;",
-    )
-    if actual_head != head:
-        raise DrillError("alembic_not_at_head", f"expected {head}, got {actual_head}")
-
-    timescale_ok = psql(
-        runner,
-        args.postgres_container,
-        args.database,
-        database_user,
-        "verify_timescaledb_objects",
-        "SELECT CASE WHEN "
-        "EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'timescaledb') AND "
-        "EXISTS (SELECT 1 FROM timescaledb_information.hypertables WHERE hypertable_name = 'point_history') AND "
-        "EXISTS (SELECT 1 FROM timescaledb_information.jobs WHERE proc_name = 'policy_compression') AND "
-        "EXISTS (SELECT 1 FROM timescaledb_information.jobs WHERE proc_name = 'policy_retention') "
-        "THEN 1 ELSE 0 END;",
-    )
-    if timescale_ok != "1":
-        raise DrillError(
-            "timescaledb_objects_missing", "required TimescaleDB objects are missing"
-        )
-
-    invariant_count = int(
-        psql(
-            runner,
-            args.postgres_container,
-            args.database,
-            database_user,
-            "new_flexibility_columns_are_empty",
-            str(invariant["sql"]),
-        )
-    )
-    if invariant_count != int(invariant["expected"]):
-        raise DrillError(
-            "migration_invariant_changed",
-            "release migration contains non-reversible data",
-        )
-
-    fingerprint_sql = (
-        "SELECT json_build_object("
-        "'power_device_count', count(*), "
-        "'power_device_digest', md5(COALESCE(string_agg(id::text || ':' || device_code, ',' ORDER BY id), ''))"
-        ")::text FROM power_devices;"
-    )
-    before_fingerprint = psql(
-        runner,
-        args.postgres_container,
-        args.database,
-        database_user,
-        "capture_pre_migration_invariants",
-        fingerprint_sql,
-    )
-    restore_lsn = psql(
-        runner,
-        args.postgres_container,
-        args.database,
-        database_user,
-        "pg_create_restore_point",
-        f"CHECKPOINT; SELECT pg_create_restore_point('{restore_point}');",
-    ).splitlines()[-1]
-
-    run_app(
-        runner,
-        step="alembic downgrade",
-        image=current_image,
-        network=args.network,
-        socket_volume=args.socket_volume,
-        database_url=database_url,
-        runtime_environment=app_environment,
-        entrypoint="alembic",
-        arguments=["-c", "/app/alembic.ini", "downgrade", down_revision],
-        failure_code="migration_command_failed",
-    )
-    downgraded_revision = psql(
-        runner,
-        args.postgres_container,
-        args.database,
-        database_user,
-        "verify_downgraded_revision",
-        "SELECT version_num FROM alembic_version;",
-    )
-    if downgraded_revision != down_revision:
-        raise DrillError(
-            "migration_command_failed", "downgrade did not reach the approved revision"
-        )
-
-    run_app(
-        runner,
-        step="previous_app_readiness_and_write_probe",
-        image=previous_image,
-        network=args.network,
-        socket_volume=args.socket_volume,
-        database_url=database_url,
-        runtime_environment=app_environment,
-        entrypoint="python",
-        arguments=["-c", APP_PROBE],
-        failure_code="previous_app_incompatible",
-    )
-
-    run_app(
-        runner,
-        step="alembic upgrade",
-        image=current_image,
-        network=args.network,
-        socket_volume=args.socket_volume,
-        database_url=database_url,
-        runtime_environment=app_environment,
-        entrypoint="alembic",
-        arguments=["-c", "/app/alembic.ini", "upgrade", head],
-        failure_code="migration_command_failed",
-    )
-    final_head = psql(
-        runner,
-        args.postgres_container,
-        args.database,
-        database_user,
-        "verify_final_head",
-        "SELECT version_num FROM alembic_version;",
-    )
-    if final_head != head:
-        raise DrillError(
-            "alembic_not_at_head", "upgrade did not restore the release head"
-        )
-
-    final_timescale = psql(
-        runner,
-        args.postgres_container,
-        args.database,
-        database_user,
-        "verify_final_timescaledb_objects",
-        "SELECT CASE WHEN "
-        "EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'timescaledb') AND "
-        "EXISTS (SELECT 1 FROM timescaledb_information.hypertables WHERE hypertable_name = 'point_history') AND "
-        "EXISTS (SELECT 1 FROM timescaledb_information.jobs WHERE proc_name = 'policy_compression') AND "
-        "EXISTS (SELECT 1 FROM timescaledb_information.jobs WHERE proc_name = 'policy_retention') "
-        "THEN 1 ELSE 0 END;",
-    )
-    if final_timescale != "1":
-        raise DrillError(
-            "timescaledb_objects_missing", "TimescaleDB objects changed during rollback"
-        )
-
-    final_invariant = int(
-        psql(
-            runner,
-            args.postgres_container,
-            args.database,
-            database_user,
-            "verify_final_migration_invariant",
-            str(invariant["sql"]),
-        )
-    )
-    final_fingerprint = psql(
-        runner,
-        args.postgres_container,
-        args.database,
-        database_user,
-        "capture_final_invariants",
-        fingerprint_sql,
-    )
-    if (
-        final_invariant != int(invariant["expected"])
-        or final_fingerprint != before_fingerprint
     ):
         raise DrillError(
-            "migration_invariant_changed", "database invariants changed during rollback"
+            "application_role_missing",
+            "application role must be login-capable before the drill",
         )
 
-    run_app(
-        runner,
-        step="current_app_readiness_and_write_probe",
-        image=current_image,
-        network=args.network,
-        socket_volume=args.socket_volume,
-        database_url=database_url,
-        runtime_environment=app_environment,
-        entrypoint="python",
-        arguments=["-c", APP_PROBE],
-        failure_code="current_app_incompatible",
-    )
+    role_fenced = False
+    migration_started = False
+    before_database_fingerprint: dict[str, Any] | None = None
+    before_timescaledb_fingerprint: dict[str, Any] | None = None
+    restore_info: dict[str, str] | None = None
+    pitr_evidence_started = time.time()
+    rto_started = time.monotonic()
+    result["rto_started_at_utc"] = utc_now()
 
-    result.update(
-        {
-            "status": "pass",
-            "failure_code": None,
-            "release_revision": head,
-            "downgraded_revision": down_revision,
-            "restore_point": restore_point,
-            "restore_lsn": restore_lsn,
-            "current_app_image": current_image,
-            "previous_app_image": previous_image,
-            "before_fingerprint": json.loads(before_fingerprint),
-            "after_fingerprint": json.loads(final_fingerprint),
-        }
-    )
+    def run_application_probe_under_fence(
+        *, step: str, image: str, failure_code: str
+    ) -> None:
+        nonlocal role_fenced
+        set_application_login(
+            runner,
+            args.postgres_container,
+            args.database,
+            migration_database_user,
+            database_user,
+            True,
+        )
+        role_fenced = False
+        try:
+            run_app(
+                runner,
+                step=step,
+                image=image,
+                network=args.network,
+                socket_volume=args.socket_volume,
+                database_url=database_url,
+                runtime_environment=app_environment,
+                entrypoint="python",
+                arguments=["-c", APP_PROBE],
+                failure_code=failure_code,
+            )
+        finally:
+            set_application_login(
+                runner,
+                args.postgres_container,
+                args.database,
+                migration_database_user,
+                database_user,
+                False,
+            )
+            role_fenced = True
+
+    try:
+        try:
+            set_application_login(
+                runner,
+                args.postgres_container,
+                args.database,
+                migration_database_user,
+                database_user,
+                False,
+            )
+        except Exception:
+            result["quarantined"] = True
+            raise
+        role_fenced = True
+
+        actual_head = psql(
+            runner,
+            args.postgres_container,
+            args.database,
+            migration_database_user,
+            "alembic_current",
+            "SELECT version_num FROM alembic_version;",
+        )
+        if actual_head != head:
+            raise DrillError(
+                "alembic_not_at_head", f"expected {head}, got {actual_head}"
+            )
+
+        before_timescaledb_fingerprint = capture_timescaledb_fingerprint(
+            runner,
+            args.postgres_container,
+            args.database,
+            migration_database_user,
+            "capture_pre_migration_timescaledb",
+        )
+        invariant_count = int(
+            psql(
+                runner,
+                args.postgres_container,
+                args.database,
+                migration_database_user,
+                "new_flexibility_columns_are_empty",
+                str(invariant["sql"]),
+            )
+        )
+        if invariant_count != int(invariant["expected"]):
+            raise DrillError(
+                "migration_invariant_changed",
+                "release migration contains non-reversible data",
+            )
+        before_database_fingerprint = capture_database_fingerprint(
+            runner,
+            step="capture_pre_migration_database",
+            image=current_image,
+            network=args.network,
+            socket_volume=args.socket_volume,
+            database_url=migration_database_url,
+            fault_tree_hmac_key=fault_tree_hmac_key,
+        )
+        pitr_evidence_started = time.time()
+        restore_info = create_archived_restore_point(
+            runner,
+            container=args.postgres_container,
+            database=args.database,
+            migration_user=migration_database_user,
+            restore_point=restore_point,
+            timeout=args.archive_timeout_seconds,
+            poll_interval=args.poll_interval_seconds,
+        )
+        migration_started = True
+
+        run_app(
+            runner,
+            step="alembic_downgrade",
+            image=current_image,
+            network=args.network,
+            socket_volume=args.socket_volume,
+            database_url=migration_database_url,
+            runtime_environment=app_environment,
+            entrypoint="alembic",
+            arguments=["-c", "/app/alembic.ini", "downgrade", down_revision],
+            failure_code="migration_command_failed",
+        )
+        downgraded_revision = psql(
+            runner,
+            args.postgres_container,
+            args.database,
+            migration_database_user,
+            "verify_downgraded_revision",
+            "SELECT version_num FROM alembic_version;",
+        )
+        if downgraded_revision != down_revision:
+            raise DrillError(
+                "migration_command_failed",
+                "downgrade did not reach the approved revision",
+            )
+
+        run_application_probe_under_fence(
+            step="previous_app_readiness_and_write_probe",
+            image=previous_image,
+            failure_code="previous_app_incompatible",
+        )
+        run_app(
+            runner,
+            step="alembic_upgrade",
+            image=current_image,
+            network=args.network,
+            socket_volume=args.socket_volume,
+            database_url=migration_database_url,
+            runtime_environment=app_environment,
+            entrypoint="alembic",
+            arguments=["-c", "/app/alembic.ini", "upgrade", head],
+            failure_code="migration_command_failed",
+        )
+        final_head = psql(
+            runner,
+            args.postgres_container,
+            args.database,
+            migration_database_user,
+            "verify_final_head",
+            "SELECT version_num FROM alembic_version;",
+        )
+        if final_head != head:
+            raise DrillError(
+                "alembic_not_at_head", "upgrade did not restore the release head"
+            )
+
+        final_timescaledb_fingerprint = capture_timescaledb_fingerprint(
+            runner,
+            args.postgres_container,
+            args.database,
+            migration_database_user,
+            "capture_final_timescaledb",
+        )
+        final_invariant = int(
+            psql(
+                runner,
+                args.postgres_container,
+                args.database,
+                migration_database_user,
+                "verify_final_migration_invariant",
+                str(invariant["sql"]),
+            )
+        )
+        final_database_fingerprint = capture_database_fingerprint(
+            runner,
+            step="capture_final_database",
+            image=current_image,
+            network=args.network,
+            socket_volume=args.socket_volume,
+            database_url=migration_database_url,
+            fault_tree_hmac_key=fault_tree_hmac_key,
+        )
+        if (
+            final_invariant != int(invariant["expected"])
+            or final_database_fingerprint != before_database_fingerprint
+            or final_timescaledb_fingerprint != before_timescaledb_fingerprint
+        ):
+            raise DrillError(
+                "migration_invariant_changed",
+                "database catalog, data, or TimescaleDB state changed during rollback",
+            )
+
+        run_application_probe_under_fence(
+            step="current_app_readiness_and_write_probe",
+            image=current_image,
+            failure_code="current_app_incompatible",
+        )
+        recovery_completed = time.monotonic()
+        rto_seconds = round(recovery_completed - rto_started, 6)
+        if rto_seconds > MIGRATION_RTO_SECONDS_MAX:
+            raise DrillError(
+                "migration_rto_objective_not_met",
+                "migration rollback exceeded the 60 minute RTO",
+            )
+        pitr_evidence = wait_for_pitr_evidence(
+            args.pitr_evidence_file,
+            restore_point=restore_point,
+            restore_lsn=str(restore_info["restore_lsn"]),
+            expected_head=head,
+            expected_database_fingerprint=before_database_fingerprint,
+            expected_timescaledb_fingerprint=before_timescaledb_fingerprint,
+            created_after=pitr_evidence_started,
+            timeout=args.pitr_evidence_timeout_seconds,
+            poll_interval=args.poll_interval_seconds,
+        )
+        set_application_login(
+            runner,
+            args.postgres_container,
+            args.database,
+            migration_database_user,
+            database_user,
+            True,
+        )
+        role_fenced = False
+        result.update(
+            {
+                "status": "pass",
+                "failure_code": None,
+                "release_revision": head,
+                "downgraded_revision": down_revision,
+                "restore_point": restore_point,
+                **restore_info,
+                "current_app_image": current_image,
+                "previous_app_image": previous_image,
+                "before_fingerprint": before_database_fingerprint,
+                "after_fingerprint": final_database_fingerprint,
+                "before_timescaledb_fingerprint": before_timescaledb_fingerprint,
+                "after_timescaledb_fingerprint": final_timescaledb_fingerprint,
+                "rto_seconds": rto_seconds,
+                "rto_seconds_max": MIGRATION_RTO_SECONDS_MAX,
+                "rpo_missing_commit_count": 0,
+                "rpo_seconds": 0,
+                "pitr_evidence": pitr_evidence,
+                "write_freeze": "database-role-fence",
+            }
+        )
+    except Exception:
+        if migration_started:
+            try:
+                current_revision = psql(
+                    runner,
+                    args.postgres_container,
+                    args.database,
+                    migration_database_user,
+                    "inspect_recovery_revision",
+                    "SELECT version_num FROM alembic_version;",
+                )
+                if current_revision != head:
+                    run_app(
+                        runner,
+                        step="automatic_recovery_upgrade",
+                        image=current_image,
+                        network=args.network,
+                        socket_volume=args.socket_volume,
+                        database_url=migration_database_url,
+                        runtime_environment=app_environment,
+                        entrypoint="alembic",
+                        arguments=["-c", "/app/alembic.ini", "upgrade", head],
+                        failure_code="automatic_recovery_failed",
+                    )
+                recovered_fingerprint = capture_database_fingerprint(
+                    runner,
+                    step="verify_automatic_recovery",
+                    image=current_image,
+                    network=args.network,
+                    socket_volume=args.socket_volume,
+                    database_url=migration_database_url,
+                    fault_tree_hmac_key=fault_tree_hmac_key,
+                )
+                if recovered_fingerprint != before_database_fingerprint:
+                    raise DrillError(
+                        "automatic_recovery_failed",
+                        "automatic recovery fingerprint mismatch",
+                    )
+                result["automatic_recovery"] = "head_verified"
+                set_application_login(
+                    runner,
+                    args.postgres_container,
+                    args.database,
+                    migration_database_user,
+                    database_user,
+                    True,
+                )
+                role_fenced = False
+            except Exception as recovery_error:
+                result["quarantined"] = True
+                result["automatic_recovery_error"] = type(recovery_error).__name__
+                try:
+                    set_application_login(
+                        runner,
+                        args.postgres_container,
+                        args.database,
+                        migration_database_user,
+                        database_user,
+                        False,
+                    )
+                    role_fenced = True
+                except Exception:
+                    result["quarantined"] = True
+        elif role_fenced:
+            try:
+                set_application_login(
+                    runner,
+                    args.postgres_container,
+                    args.database,
+                    migration_database_user,
+                    database_user,
+                    True,
+                )
+                role_fenced = False
+            except Exception:
+                result["quarantined"] = True
+        raise
 
 
 def main() -> int:

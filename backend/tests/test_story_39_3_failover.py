@@ -2,6 +2,9 @@
 
 import importlib.util
 from pathlib import Path
+import threading
+import time
+from types import SimpleNamespace
 
 import pytest
 import yaml
@@ -120,6 +123,124 @@ def test_rpo_calculation_counts_missing_acknowledged_commits_and_age():
     assert result["missing_commit_count"] == 1
     assert result["missing_sequences"] == [2]
     assert result["latest_missing_commit_age_seconds"] == 4.0
+
+
+def test_rpo_calculation_rejects_clock_reversal():
+    drill = _load_drill_module()
+
+    with pytest.raises(ValueError, match="precedes"):
+        drill.calculate_rpo(
+            acknowledged=[{"sequence": 1, "committed_at": "2026-08-15T00:00:06Z"}],
+            recovered_sequences=set(),
+            recovered_at="2026-08-15T00:00:05Z",
+        )
+
+
+def test_destructive_failover_preconditions_run_before_docker(tmp_path):
+    drill = _load_drill_module()
+    contract = tmp_path / "failover-contract.yaml"
+    contract.write_text("schema_version: 1\n", encoding="utf-8")
+
+    def args_for(scenario, allow_full_rebuild):
+        return SimpleNamespace(
+            contract=contract,
+            project="dcim-story-39-3-full",
+            scenario=scenario,
+            primary_container=None,
+            standby_container=None,
+            stable_network=None,
+            replication_network=None,
+            primary_site_network=None,
+            database="dcim",
+            database_user="dcim",
+            probe_interval_seconds=1.0,
+            poll_interval_seconds=1.0,
+            warmup_commits=3,
+            operation_timeout_seconds=30.0,
+            allow_full_rebuild=allow_full_rebuild,
+        )
+
+    class NoDockerRunner:
+        def run(self, *_args, **_kwargs):
+            raise AssertionError("Docker must not run before destructive preflight")
+
+    with pytest.raises(drill.DrillError) as site_error:
+        drill.execute(
+            args_for("site_restore", True),
+            NoDockerRunner(),
+            drill.Timeline(),
+            {},
+        )
+    assert site_error.value.code == "site_restore_requires_external_runner"
+
+    with pytest.raises(drill.DrillError) as rebuild_error:
+        drill.execute(
+            args_for("planned_switchover", False),
+            NoDockerRunner(),
+            drill.Timeline(),
+            {},
+        )
+    assert rebuild_error.value.code == "full_rebuild_not_authorized"
+
+
+def test_probe_pause_waits_for_inflight_write_and_blocks_new_writes():
+    drill = _load_drill_module()
+
+    class BlockingRunner:
+        def __init__(self):
+            self.calls = 0
+            self.started = threading.Event()
+            self.release = threading.Event()
+
+        def try_run(self, *_args, **_kwargs):
+            self.calls += 1
+            sequence = self.calls
+            self.started.set()
+            assert self.release.wait(2)
+            return (
+                True,
+                '{"sequence":%d,"committed_at":"2026-08-15T00:00:00Z"}' % sequence,
+            )
+
+    runner = BlockingRunner()
+    writer = drill.ProbeWriter(
+        runner=runner,
+        timeline=drill.Timeline(),
+        probe_client="probe",
+        database="dcim",
+        database_user="dcim",
+        run_id="story39_3_test",
+        interval_seconds=0.01,
+    )
+    writer.start()
+    assert runner.started.wait(1)
+
+    pause_error = []
+
+    def pause():
+        try:
+            writer.pause_and_wait(2)
+        except Exception as exc:  # pragma: no cover - assertion reports the exception
+            pause_error.append(exc)
+
+    pause_thread = threading.Thread(target=pause)
+    pause_thread.start()
+    time.sleep(0.05)
+    assert pause_thread.is_alive()
+    runner.release.set()
+    pause_thread.join(1)
+    assert not pause_error
+    assert not pause_thread.is_alive()
+    paused_calls = runner.calls
+    time.sleep(0.05)
+    assert runner.calls == paused_calls
+
+    writer.resume()
+    deadline = time.monotonic() + 1
+    while runner.calls == paused_calls and time.monotonic() < deadline:
+        time.sleep(0.01)
+    writer.stop()
+    assert runner.calls > paused_calls
 
 
 def test_same_host_cannot_claim_formal_or_spoof_independent_evidence(tmp_path):
