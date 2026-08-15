@@ -95,8 +95,8 @@ run_retention_if_ready() {
 }
 
 write_heartbeat
-/usr/local/bin/backup-job.sh "stanza"
-/usr/local/bin/backup-job.sh "status"
+BACKUP_PRESERVE_FAILED_LAST_RUN=true /usr/local/bin/backup-job.sh "stanza"
+BACKUP_PRESERVE_FAILED_LAST_RUN=true /usr/local/bin/backup-job.sh "status"
 run_retention_if_ready
 
 while true; do

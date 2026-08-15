@@ -11,6 +11,10 @@ BASE_IMAGE = (
     "@sha256:60f4761b9035e0b8d5218f701a8c3382f641bf12b1604822574cf5be3baeb537"
 )
 VERSIONED_IMAGE = "dcim-postgres:16.15-ts2.29.1-pgb2.59.0"
+DR_IMAGE_REFERENCE = (
+    "${DCIM_POSTGRES_IMAGE_REPOSITORY:?DCIM_POSTGRES_IMAGE_REPOSITORY is required}"
+    "@sha256:${DCIM_POSTGRES_IMAGE_DIGEST:?DCIM_POSTGRES_IMAGE_DIGEST is required}"
+)
 SCHEMA_GATE_BASE = (
     "dcim-postgres:16.15-ts2.29.1-pgb2.59.0@sha256:e6ca69c005bfba5b30dbb91c58a181874e2c833e0a311ad3998f32d4b497f3e4"
 )
@@ -103,8 +107,10 @@ def test_dr_compose_separates_roles_networks_and_volumes():
 
     for name in required:
         image = services[name]["image"]
-        assert image.startswith("${DCIM_POSTGRES_IMAGE:?")
+        assert image == DR_IMAGE_REFERENCE
         assert "latest" not in image.lower()
+
+    assert services["postgres-primary"]["environment"]["DCIM_DR_INIT_ENABLED"] == "true"
 
     primary_volumes = "\n".join(services["postgres-primary"]["volumes"])
     standby_volumes = "\n".join(services["postgres-standby"]["volumes"])
@@ -176,6 +182,23 @@ def test_dr_credentials_are_secret_files_and_fail_closed():
     assert "PGBACKREST_PG1_USER" in wrapper
     assert "POSTGRES_USER" in wrapper
     assert "unset PGBACKREST_REPO1_CIPHER_PASS_FILE" in wrapper
+
+
+def test_dr_initialization_is_opt_in_for_the_default_compose_stack():
+    init_script = _text("deploy/postgres-backup/init-primary.sh")
+    opt_in_guard = init_script.index("dr_init_enabled=${DCIM_DR_INIT_ENABLED:-false}")
+    disabled_exit = init_script.index("false)\n        exit 0")
+    secret_requirement = init_script.index("REPLICATION_PASSWORD_FILE is required")
+
+    assert opt_in_guard < disabled_exit < secret_requirement
+
+    dr = _yaml("deploy/dr/docker-compose.dr.yml")
+    assert dr["services"]["postgres-primary"]["environment"]["DCIM_DR_INIT_ENABLED"] == "true"
+
+    env_example = _text(".env.example")
+    assert "DCIM_POSTGRES_IMAGE_REPOSITORY=" in env_example
+    assert "DCIM_POSTGRES_IMAGE_DIGEST=" in env_example
+    assert "DCIM_POSTGRES_IMAGE=" not in env_example
 
 
 def test_promotion_contract_requires_fencing_and_safe_rejoin():

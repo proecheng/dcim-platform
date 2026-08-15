@@ -102,6 +102,9 @@ parse_snapshot() {
     )
 
     if [[ -z "$latest_backup" ]]; then
+        if [[ "$mode" == "ready" ]]; then
+            return 1
+        fi
         echo "empty_backup_chain" >&2
         return 2
     fi
@@ -122,7 +125,14 @@ if [[ "$mode" == "ready" ]]; then
     ready_snapshot=$(mktemp "$status_dir/.pgbackrest-ready.XXXXXX")
     trap 'rm -f "$ready_snapshot"' EXIT
     /usr/local/bin/pgbackrest-wrapper --stanza="$stanza" info --output=json >"$ready_snapshot"
-    parse_snapshot "$ready_snapshot"
+    parse_exit=0
+    parse_snapshot "$ready_snapshot" || parse_exit=$?
+    if [[ $parse_exit -eq 1 ]]; then
+        exit 1
+    fi
+    if [[ $parse_exit -ne 0 ]]; then
+        exit "$parse_exit"
+    fi
     if [[ $retention_full_count -lt $minimum_full_count || $retention_window_full_count -lt $minimum_full_count ]]; then
         exit 1
     fi

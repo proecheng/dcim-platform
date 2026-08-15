@@ -1,8 +1,9 @@
 # PostgreSQL 16 灾备拓扑
 
 该 Compose 只提供可重复的 PostgreSQL/TimescaleDB/pgBackRest 机制环境。正式镜像必须由
-`deploy/postgres-backup/Dockerfile` 构建并发布，`DCIM_POSTGRES_IMAGE` 必须填写包含
-`@sha256` 的不可变引用；标签或本地 image ID 不能用于正式证据。
+`deploy/postgres-backup/Dockerfile` 构建并发布，`DCIM_POSTGRES_IMAGE_REPOSITORY` 填写带版本标签的仓库引用，
+`DCIM_POSTGRES_IMAGE_DIGEST` 填写不含 `sha256:` 前缀的 64 位 manifest digest。Compose 会将两者固定组合为
+`<repository>@sha256:<digest>`；标签或本地 image ID 不能用于正式证据。
 
 ## 故障域
 

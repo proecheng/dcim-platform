@@ -15,12 +15,22 @@ esac
 
 stanza=${PGBACKREST_STANZA:-dcim}
 status_dir=${BACKUP_STATUS_DIR:-/var/lib/dcim-dr-status}
-lock_dir="$status_dir/backup-operation.lock"
+lock_file="$status_dir/backup-operation.lock"
 run_id="$(date -u +%Y%m%dT%H%M%S%N)-$$"
 current_step=initializing
 failure_code=""
 lock_acquired=0
 completed=0
+preserve_failed_last_run=${BACKUP_PRESERVE_FAILED_LAST_RUN:-false}
+
+case "$preserve_failed_last_run" in
+    true|false)
+        ;;
+    *)
+        echo "BACKUP_PRESERVE_FAILED_LAST_RUN must be true or false" >&2
+        exit 64
+        ;;
+esac
 
 mkdir -p "$status_dir" "$status_dir/runs" "$status_dir/success"
 
@@ -38,10 +48,13 @@ write_state() {
         "$run_id" "$operation" "$state" "$current_step" "$exit_code" "$code" "$finished_at" >"$run_tmp"
     mv -f "$run_tmp" "$status_dir/runs/${run_id}.json"
 
-    state_tmp=$(mktemp "$status_dir/.last-run.XXXXXX")
-    printf '{"run_id":"%s","operation":"%s","status":"%s","step":"%s","exit_code":%s,"failure_code":"%s","finished_at_utc":"%s"}\n' \
-        "$run_id" "$operation" "$state" "$current_step" "$exit_code" "$code" "$finished_at" >"$state_tmp"
-    mv -f "$state_tmp" "$status_dir/last-run.json"
+    if [[ "$state" != "success" || "$preserve_failed_last_run" != "true" || ! -f "$status_dir/last-run.json" ]] \
+        || ! grep -q '"status":"failed"' "$status_dir/last-run.json"; then
+        state_tmp=$(mktemp "$status_dir/.last-run.XXXXXX")
+        printf '{"run_id":"%s","operation":"%s","status":"%s","step":"%s","exit_code":%s,"failure_code":"%s","finished_at_utc":"%s"}\n' \
+            "$run_id" "$operation" "$state" "$current_step" "$exit_code" "$code" "$finished_at" >"$state_tmp"
+        mv -f "$state_tmp" "$status_dir/last-run.json"
+    fi
 }
 
 write_success_marker() {
@@ -63,8 +76,7 @@ cleanup() {
         write_state "failed" "$exit_code" "$failure_code" || true
     fi
     if [[ $lock_acquired -eq 1 ]]; then
-        rm -f "$lock_dir/owner"
-        rmdir "$lock_dir" 2>/dev/null || true
+        flock -u 9 || true
     fi
     exit "$exit_code"
 }
@@ -89,7 +101,8 @@ verify_repository() {
     ! grep -Eq '^[[:space:]]*status:[[:space:]]+error[[:space:]]*$' "$status_dir/pgbackrest-verify.txt"
 }
 
-if ! mkdir "$lock_dir"; then
+exec 9>>"$lock_file"
+if ! flock -n 9; then
     current_step=lock
     failure_code=concurrent_operation
     write_state "failed" 75 "$failure_code"
@@ -97,7 +110,7 @@ if ! mkdir "$lock_dir"; then
     exit 75
 fi
 lock_acquired=1
-printf '%s\n' "$run_id" >"$lock_dir/owner"
+touch "$lock_file"
 trap cleanup EXIT
 
 case "$operation" in

@@ -137,6 +137,14 @@ RTO 从受信 UTC 故障注入/恢复决定时间开始，到应用连续通过 
 
 ## Tasks / Subtasks
 
+### Review Findings
+
+- [x] [Review][Patch] 默认 Compose 的 DR 初始化脚本缺少启用门禁，新数据卷会因未提供复制与仓库 secret 而初始化失败 [`docker-compose.yml:6`; `deploy/postgres-backup/Dockerfile:144`; `deploy/postgres-backup/init-primary.sh:4`]
+- [x] [Review][Patch] DR Compose 仅要求镜像变量非空，未验证不可变 `@sha256` 引用，正式节点仍可使用漂移标签 [`deploy/dr/docker-compose.dr.yml:3`]
+- [x] [Review][Patch] 空仓库首次启动时 retention ready 返回错误并终止调度器，导致首个备份永远不会执行 [`deploy/postgres-backup/retention-guard.sh:105`; `deploy/postgres-backup/backup-scheduler.sh:100`]
+- [x] [Review][Patch] 目录锁在容器被强杀后会永久残留，后续所有备份均返回并发冲突，缺少可自动回收的进程锁 [`deploy/postgres-backup/backup-job.sh:92`]
+- [x] [Review][Patch] 调度器重启时 stanza 成功会覆盖之前的失败 `last-run.json`，健康检查恢复绿色并隐藏最近一次备份失败 [`deploy/postgres-backup/backup-scheduler.sh:98`; `deploy/postgres-backup/backup-healthcheck.sh:27`]
+
 - [x] Task 1: 固化版本、恢复拓扑和安全配置 (AC: #1, #2, #5)
   - [x] 1.1 将 TimescaleDB/PG16 和 pgBackRest 固定到已验证版本与镜像摘要，记录升级/漂移规则
   - [x] 1.2 在独立 DR Compose/profile 中定义主库、温备、加密仓库和隔离恢复目标，不破坏默认一键开发启动
@@ -376,6 +384,7 @@ GPT-5 Codex
 - Task 5.2 完成：所有场景均在 promotion 前验证容器停止与客户端网络断开，提升后切换 `postgres-writer`，连续数据库写入及固定应用镜像 ORM/事务探针通过。
 - Task 5.3 完成：未经处理旧主重新上线被明确拒绝；在唯一项目/卷标签校验与显式授权后执行 full rebuild，重建节点以 standby 回归并通过 replay LSN 与完整探针集门禁。
 - Task 5.4 部分完成：同机演练明确记录为 `mechanism-only` / `mechanism-pass` 且 `formal_pass=false`；因当前没有真实独立故障域，正式站点证据仍未完成，不勾选 5.4 或 Task 5。
+- 第一批代码审查修复完成：默认 Compose 的 DR 初始化改为显式启用，正式 DR 镜像强制组装 `@sha256` 引用，空仓库保留检查正常等待首备，备份互斥改为崩溃可回收的 `flock`，调度器初始化不再覆盖最近失败状态。
 
 ### File List
 
@@ -429,3 +438,4 @@ GPT-5 Codex
 - 2026-08-15: 完成 Task 3，修复首次归档前 stanza 初始化并加入受约束的 188 表 schema bootstrap；四种 PITR、六类失败关闭、TimescaleDB/应用兼容探针及完整后端回归通过，Story 保持 `in-progress` 并进入 Task 4。
 - 2026-08-15: 完成 Task 4，绑定当前/上一应用镜像 digest、source revision 和 schema inventory；可逆 downgrade/upgrade、七类失败关闭及独立不可逆命名 PITR 通过，为 39.12 固化“上一应用可启动、当前应用必须等待 schema roll-forward”的数据库回滚条件。
 - 2026-08-15: 完成 Task 5.1–5.3，新增受控 failover/failback 编排、稳定端点、持续写入和固定应用探针；计划/意外/整站机制演练及旧主全量重建通过。5.4 因缺少真实独立故障域继续打开，Story 保持 `in-progress`。
+- 2026-08-15: 完成第一批代码审查修复，关闭默认栈初始化、镜像摘要、空仓库启动、崩溃残留锁和失败状态覆盖五项缺陷；Story 39.3 专项增至 41 passed，状态保持 `in-progress`。

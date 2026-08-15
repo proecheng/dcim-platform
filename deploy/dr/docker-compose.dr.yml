@@ -1,6 +1,6 @@
 name: dcim-story-39-3-dr
 
-x-postgres-image: &postgres-image "${DCIM_POSTGRES_IMAGE:?DCIM_POSTGRES_IMAGE must be an immutable @sha256 reference}"
+x-postgres-image: &postgres-image "${DCIM_POSTGRES_IMAGE_REPOSITORY:?DCIM_POSTGRES_IMAGE_REPOSITORY is required}@sha256:${DCIM_POSTGRES_IMAGE_DIGEST:?DCIM_POSTGRES_IMAGE_DIGEST is required}"
 
 services:
   postgres-primary:
@@ -11,6 +11,7 @@ services:
       POSTGRES_USER: "${POSTGRES_USER:-dcim}"
       POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
       POSTGRES_INITDB_ARGS: "--data-checksums --auth-host=scram-sha-256"
+      DCIM_DR_INIT_ENABLED: "true"
       REPLICATION_PASSWORD_FILE: /run/secrets/replication_password
       PGBACKREST_REPO1_CIPHER_PASS_FILE: /run/secrets/pgbackrest_cipher_pass
       FENCE_TOKEN_FILE: /run/secrets/fence_token

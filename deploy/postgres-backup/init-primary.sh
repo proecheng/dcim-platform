@@ -1,6 +1,19 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+dr_init_enabled=${DCIM_DR_INIT_ENABLED:-false}
+case "$dr_init_enabled" in
+    true)
+        ;;
+    false)
+        exit 0
+        ;;
+    *)
+        echo "DCIM_DR_INIT_ENABLED must be true or false" >&2
+        exit 64
+        ;;
+esac
+
 replication_secret=${REPLICATION_PASSWORD_FILE:?REPLICATION_PASSWORD_FILE is required}
 /usr/local/bin/validate-secrets.sh "$replication_secret" replication_password 32
 replication_password=$(<"$replication_secret")

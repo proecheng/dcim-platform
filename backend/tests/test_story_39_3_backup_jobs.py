@@ -46,12 +46,14 @@ def test_backup_job_uses_atomic_lock_validation_and_markers():
 
     assert 'case "$operation" in' in job
     assert "stanza|full|diff|incr|check|verify|expire|status" in job
-    assert 'mkdir "$lock_dir"' in job
+    assert 'exec 9>>"$lock_file"' in job
+    assert "flock -n 9" in job
+    assert 'mkdir "$lock_dir"' not in job
     assert "concurrent_operation" in job
     assert "exit 75" in job
     assert 'mktemp "$status_dir/.last-run.XXXXXX"' in job
     assert 'mv -f "$state_tmp" "$status_dir/last-run.json"' in job
-    assert 'success/${run_id}.json' in job
+    assert "success/${run_id}.json" in job
     assert "stanza-create" in job
     assert 'run_step "repository_check"' in job
     assert 'run_step "repository_verify"' in job
@@ -60,6 +62,26 @@ def test_backup_job_uses_atomic_lock_validation_and_markers():
     assert "status:[[:space:]]+error" in job
     assert 'run_step "backup_${operation}"' in job
     assert 'run_step "expire"' in job
+
+    dockerfile = _text("deploy/postgres-backup/Dockerfile")
+    assert "util-linux" in dockerfile
+
+
+def test_scheduler_bootstrap_preserves_failure_and_empty_repository_is_not_fatal():
+    scheduler = _text("deploy/postgres-backup/backup-scheduler.sh")
+    assert 'BACKUP_PRESERVE_FAILED_LAST_RUN=true /usr/local/bin/backup-job.sh "stanza"' in scheduler
+    assert 'BACKUP_PRESERVE_FAILED_LAST_RUN=true /usr/local/bin/backup-job.sh "status"' in scheduler
+
+    job = _text("deploy/postgres-backup/backup-job.sh")
+    assert "preserve_failed_last_run=${BACKUP_PRESERVE_FAILED_LAST_RUN:-false}" in job
+    assert 'grep -q \'"status":"failed"\'' in job
+
+    guard = _text("deploy/postgres-backup/retention-guard.sh")
+    empty_chain = guard.index('if [[ -z "$latest_backup" ]]')
+    ready_skip = guard.index('if [[ "$mode" == "ready" ]]', empty_chain)
+    nonfatal_return = guard.index("return 1", ready_skip)
+    fatal_error = guard.index('echo "empty_backup_chain"', nonfatal_return)
+    assert empty_chain < ready_skip < nonfatal_return < fatal_error
 
 
 def test_retention_is_time_bounded_and_latest_chain_is_guarded():

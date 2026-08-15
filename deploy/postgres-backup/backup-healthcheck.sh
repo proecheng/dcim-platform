@@ -3,7 +3,7 @@ set -euo pipefail
 
 status_dir=${BACKUP_STATUS_DIR:-/var/lib/dcim-dr-status}
 heartbeat="$status_dir/scheduler-heartbeat"
-lock_dir="$status_dir/backup-operation.lock"
+lock_file="$status_dir/backup-operation.lock"
 heartbeat_max_age=${BACKUP_HEARTBEAT_MAX_AGE_SECONDS:-180}
 active_max_age=${BACKUP_ACTIVE_MAX_AGE_SECONDS:-14400}
 now_epoch=$(date -u +%s)
@@ -16,9 +16,13 @@ file_age() {
     printf '%s\n' "$((now_epoch - modified))"
 }
 
-if [[ -d "$lock_dir" ]]; then
-    [[ $(file_age "$lock_dir") -le $active_max_age ]]
-    exit 0
+if [[ -f "$lock_file" ]]; then
+    exec 9>>"$lock_file"
+    if ! flock -n 9; then
+        [[ $(file_age "$lock_file") -le $active_max_age ]]
+        exit 0
+    fi
+    flock -u 9
 fi
 
 [[ -f "$heartbeat" ]]

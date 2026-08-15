@@ -105,6 +105,7 @@ RUN set -eux; \
         libxml2 \
         libyaml-0-2 \
         libzstd1 \
+        util-linux \
     && rm -rf /var/lib/apt/lists/* \
     && mkdir -p \
         /etc/pgbackrest \
