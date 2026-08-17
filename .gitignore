@@ -50,12 +50,17 @@ Thumbs.db
 
 # 测试
 .coverage
+coverage.xml
 htmlcov/
 .pytest_cache/
+test-results/
+backend/reports/
+backend/backend/
 
 # 临时文件
 *.tmp
 *.temp
+*.bak_*
 .cache/
 tmp/
 tmpclaude-*
@@ -73,6 +78,7 @@ _build_*.py
 
 # Claude / AI 工具相关
 .claude/
+.codex/
 .gemini/
 .opencode/
 .sisyphus/

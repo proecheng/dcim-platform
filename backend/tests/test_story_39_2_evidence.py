@@ -219,6 +219,38 @@ def test_source_binding_requires_complete_current_file_set(monkeypatch, tmp_path
         EVIDENCE.validate_source_binding(tmp_path)
 
 
+@pytest.mark.parametrize(
+    ("changed_paths", "error"),
+    [
+        ({"evidence/manifest.yaml", "evidence/evidence-validation.json"}, None),
+        ({"evidence/manifest.yaml", "backend/app/main.py"}, "非证据源码提交"),
+    ],
+)
+def test_source_binding_allows_only_evidence_commit_tail(monkeypatch, tmp_path, changed_paths, error):
+    output_dir = tmp_path / "evidence"
+    output_dir.mkdir()
+    recorded = {
+        "git_sha": "c" * 40,
+        "baseline_commit": EVIDENCE.BASELINE_COMMIT,
+        "working_tree_dirty": False,
+        "source_snapshot_sha256": EVIDENCE.sha256_json([]),
+        "file_count": 0,
+        "files": [],
+    }
+    (output_dir / "source-file-hashes.json").write_text(json.dumps(recorded), encoding="utf-8")
+    monkeypatch.setattr(EVIDENCE, "ROOT", tmp_path)
+    monkeypatch.setattr(EVIDENCE, "current_source_files", lambda _output_dir: [])
+    monkeypatch.setattr(EVIDENCE, "git_head", lambda: "d" * 40)
+    monkeypatch.setattr(EVIDENCE, "git_is_ancestor", lambda _ancestor, _head: True)
+    monkeypatch.setattr(EVIDENCE, "null_git_paths", lambda _command: changed_paths)
+
+    if error:
+        with pytest.raises(SystemExit, match=error):
+            EVIDENCE.validate_source_binding(output_dir)
+    else:
+        assert EVIDENCE.validate_source_binding(output_dir) == recorded
+
+
 def test_manifest_changeset_must_match_recomputed_source_snapshot():
     snapshot = {
         "git_sha": "c" * 40,
