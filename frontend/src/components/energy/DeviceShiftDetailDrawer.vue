@@ -430,18 +430,19 @@ function _buildChart() {
   const option: echarts.EChartsOption = {
     tooltip: {
       trigger: 'axis',
+      renderMode: 'richText',
       formatter: (params: any) => {
         if (!Array.isArray(params) || params.length === 0) return ''
         const hour = params[0].axisValue
         const point = data[params[0].dataIndex]
         const periodLabel = PERIOD_LABELS[point.period_type] || point.period_type
-        let html = `<b>${hour}</b> (${periodLabel})<br/>`
+        let text = `${hour} (${periodLabel})\n`
         params.forEach((p: any) => {
           if (p.seriesName && p.value !== undefined) {
-            html += `${p.marker}${p.seriesName}: ${p.value.toFixed(2)} kW<br/>`
+            text += `${p.seriesName}: ${p.value.toFixed(2)} kW\n`
           }
         })
-        return html
+        return text
       }
     },
     legend: {
@@ -543,16 +544,17 @@ function buildTrendChart() {
   const option: echarts.EChartsOption = {
     tooltip: {
       trigger: 'axis',
+      renderMode: 'richText',
       formatter: (params: any) => {
         if (!Array.isArray(params) || params.length === 0) return ''
         const _date = params[0].axisValue
         const point = data[params[0].dataIndex]
-        let html = `<b>${point.date}</b><br/>`
-        html += `平均功率: ${point.avg_power.toFixed(2)} kW<br/>`
-        html += `最大功率: ${point.max_power.toFixed(2)} kW<br/>`
-        html += `最小功率: ${point.min_power.toFixed(2)} kW<br/>`
-        html += `总能耗: ${point.energy.toFixed(2)} kWh`
-        return html
+        let text = `${point.date}\n`
+        text += `平均功率: ${point.avg_power.toFixed(2)} kW\n`
+        text += `最大功率: ${point.max_power.toFixed(2)} kW\n`
+        text += `最小功率: ${point.min_power.toFixed(2)} kW\n`
+        text += `总能耗: ${point.energy.toFixed(2)} kWh`
+        return text
       }
     },
     legend: {

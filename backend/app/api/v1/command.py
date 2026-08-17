@@ -31,6 +31,7 @@ from ...schemas.command import (
     RiskConfigUpdateRequest,
 )
 from ...services import command_service
+from ...services.command_registry import CommandPolicyError
 
 logger = logging.getLogger(__name__)
 
@@ -64,16 +65,19 @@ async def submit_command(
     - 普通命令：直接执行
     - 关键命令：创建审批工单，等待审批
     """
-    await get_authorized_device(db, data.target_device_id, context)
-    result = await command_service.submit_command(
-        db=db,
-        command_type=data.command_type,
-        target_device_id=data.target_device_id,
-        target_device_name=data.target_device_name,
-        command_content=data.command_content,
-        operator_id=current_user.id,
-        operator_name=current_user.username,
-    )
+    authorized_device = await get_authorized_device(db, data.target_device_id, context)
+    try:
+        result = await command_service.submit_command(
+            db=db,
+            command_type=data.command_type,
+            target_device_id=data.target_device_id,
+            target_device_name=authorized_device.device_name,
+            command_content=data.command_content,
+            operator_id=current_user.id,
+            operator_name=current_user.username,
+        )
+    except CommandPolicyError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
     return CommandSubmitResponse(**result)
 
 

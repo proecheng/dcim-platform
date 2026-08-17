@@ -4,7 +4,8 @@
   "description": "Reverse proxy for DCIM system",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "test": "node --test server.test.js"
   },
   "dependencies": {
     "express": "^4.18.2",

@@ -209,6 +209,7 @@ import {
   type ProbabilityAdjustment
 } from '@/api/modules/probability-tuning'
 import { getFaultTrees } from '@/api/modules/diagnosis'
+import { WebSocketClient } from '@/api/websocket'
 import { useUserStore } from '@/stores/user'
 
 interface FaultTree {
@@ -228,7 +229,7 @@ const currentRow = ref<ProbabilityAdjustment | null>(null)
 
 // WebSocket 和轮询相关
 const userStore = useUserStore()
-let wsConnection: WebSocket | null = null
+let wsConnection: WebSocketClient | null = null
 let pollingTimer: number | null = null
 const POLLING_INTERVAL = 30000 // 30 秒轮询一次
 
@@ -441,40 +442,18 @@ const initWebSocket = () => {
       return
     }
 
-    const wsUrl = import.meta.env.VITE_WS_URL || 'ws://localhost:8080/ws'
-    const url = `${wsUrl}/system?token=${token}`
-
-    wsConnection = new WebSocket(url)
-
-    wsConnection.onopen = () => {
-      console.log('WebSocket 连接成功（概率调参）')
+    const handleAdjustmentUpdate = () => {
+      ElMessage.info('有新的调参建议或状态更新')
+      fetchAdjustments()
     }
-
-    wsConnection.onmessage = (event) => {
-      try {
-        const data = JSON.parse(event.data)
-
-        // 监听概率调参相关消息
-        if (data.type === 'probability_tuning_approval' ||
-            data.type === 'probability_adjustment_updated') {
-          console.log('收到概率调参更新通知，刷新列表')
-          ElMessage.info('有新的调参建议或状态更新')
-          fetchAdjustments()
-        }
-      } catch (error) {
-        console.error('解析 WebSocket 消息失败:', error)
-      }
-    }
-
-    wsConnection.onerror = (error) => {
-      console.error('WebSocket 连接错误:', error)
-    }
-
-    wsConnection.onclose = () => {
-      console.log('WebSocket 连接关闭')
-      // 连接关闭后，启动轮询作为降级方案
-      startPolling()
-    }
+    wsConnection = new WebSocketClient({
+      url: '/ws/system',
+      onOpen: stopPolling,
+      onClose: startPolling,
+    })
+    wsConnection.on('probability_tuning_approval', handleAdjustmentUpdate)
+    wsConnection.on('probability_adjustment_updated', handleAdjustmentUpdate)
+    wsConnection.connect()
   } catch (error) {
     console.error('初始化 WebSocket 失败:', error)
     // WebSocket 失败，启动轮询

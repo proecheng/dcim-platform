@@ -8,6 +8,7 @@ import ExportButton from './ExportButton.vue'
 import StatusTag from './StatusTag.vue'
 import ConfirmDialog from './ConfirmDialog.vue'
 import DegradationBanner from './DegradationBanner.vue'
+import SafeRichText from './SafeRichText.vue'
 
 export {
   DataTable,
@@ -16,7 +17,8 @@ export {
   ExportButton,
   StatusTag,
   ConfirmDialog,
-  DegradationBanner
+  DegradationBanner,
+  SafeRichText
 }
 
 export default {
@@ -26,5 +28,6 @@ export default {
   ExportButton,
   StatusTag,
   ConfirmDialog,
-  DegradationBanner
+  DegradationBanner,
+  SafeRichText
 }

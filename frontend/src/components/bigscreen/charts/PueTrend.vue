@@ -41,11 +41,11 @@ const chartOption = computed<EChartsOption>(() => {
     },
     tooltip: {
       trigger: 'axis',
+      renderMode: 'richText',
       formatter: (params: unknown) => {
         const p = params as { name: string; value: number }[]
         if (p && p[0]) {
-          const color = getPueColor(p[0].value)
-          return `${p[0].name}<br/>PUE: <span style="color:${color};font-weight:bold">${p[0].value.toFixed(2)}</span>`
+          return `${p[0].name}\nPUE: ${p[0].value.toFixed(2)}`
         }
         return ''
       }

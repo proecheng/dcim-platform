@@ -48,8 +48,7 @@
         </el-form-item>
       </el-form>
 
-      <div class="login-footer">
-        <!-- TODO: 正式发布前移除此默认账户提示 -->
+      <div v-if="showDevelopmentCredentials" class="login-footer">
         <p>开发环境默认账户: admin / admin123</p>
       </div>
     </div>
@@ -68,6 +67,7 @@ const userStore = useUserStore()
 
 const formRef = ref()
 const loading = ref(false)
+const showDevelopmentCredentials = import.meta.env.DEV
 
 const form = reactive({
   username: '',

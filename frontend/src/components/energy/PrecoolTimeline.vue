@@ -76,6 +76,7 @@ function renderChart() {
   const option: any = {
     tooltip: {
       trigger: 'item',
+      renderMode: 'richText',
       formatter: (params: any) => {
         const s = params.data?.schedule as ScheduleListItem | undefined
         if (!s) return ''
@@ -83,11 +84,11 @@ function renderChart() {
         const endH = timeToHour(s.precool_end_time).toFixed(1)
         const savings = s.planned_savings_kwh != null ? `${s.planned_savings_kwh.toFixed(1)} kWh` : '-'
         const actual = s.actual_savings_kwh != null ? `${s.actual_savings_kwh.toFixed(1)} kWh` : '-'
-        return `<strong>预冷计划 #${s.id}</strong><br/>
-          时段: ${startH}h - ${endH}h<br/>
-          目标温度: ${s.target_temp}°C<br/>
-          状态: ${STATUS_LABELS[s.status] || s.status}<br/>
-          计划节省: ${savings}<br/>
+        return `预冷计划 #${s.id}\n
+          时段: ${startH}h - ${endH}h\n
+          目标温度: ${s.target_temp}°C\n
+          状态: ${STATUS_LABELS[s.status] || s.status}\n
+          计划节省: ${savings}\n
           实际节省: ${actual}`
       },
     },

@@ -56,7 +56,8 @@ const getOption = (): EChartsOption => {
     } : undefined,
     tooltip: props.showTooltip ? {
       trigger: 'item',
-      formatter: '{a} <br/>{b}: {c} ({d}%)'
+      renderMode: 'richText',
+      formatter: '{a}\n{b}: {c} ({d}%)'
     } : undefined,
     legend: props.showLegend ? {
       orient: 'vertical',

@@ -444,14 +444,13 @@ async function confirmDelete(row: BatteryItem) {
     '此操作将同时影响以下数据：',
     '1) 电池组页面中的该电池组记录',
     '2) UPS详情页中该电池组相关信息'
-  ].join('<br/>')
+  ].join('\n')
 
   try {
     await ElMessageBox.confirm(message, '删除确认', {
       type: 'warning',
       confirmButtonText: '确定删除',
-      cancelButtonText: '取消',
-      dangerouslyUseHTMLString: true
+      cancelButtonText: '取消'
     })
 
     saving.value = true

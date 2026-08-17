@@ -14,6 +14,8 @@ sys.path.insert(0, _root)
 
 def _load_module(name: str, filepath: str) -> types.ModuleType:
     """直接加载 .py 文件为模块，绕过 __init__.py"""
+    if name in sys.modules:
+        return sys.modules[name]
     spec = importlib.util.spec_from_file_location(name, filepath)
     mod = importlib.util.module_from_spec(spec)
     sys.modules[name] = mod
@@ -357,7 +359,7 @@ class TestMqttServiceTopicMatching:
     @pytest.fixture(autouse=True)
     def _load_mqtt_service(self):
         """直接加载 MqttService 的 _topic_matches 方法，避免触发完整 app 导入"""
-        _mqtt_client_path = os.path.join(_root, "backend", "app", "mqtt", "client.py")
+        _mqtt_client_path = os.path.join(_root, "app", "mqtt", "client.py")
         # 只需要测试静态方法 _topic_matches，直接从源码提取
         import ast
 

@@ -17,6 +17,7 @@ from app.models.asset import (
     AssetInventoryItem,
 )
 from app.models.user import User
+from app.api.deps import SiteAccessContext
 from app.api.v1.asset import get_cabinet_usage, move_asset_in_cabinet, MoveAssetRequest
 
 
@@ -105,15 +106,22 @@ async def sample_user(db: AsyncSession):
     return user
 
 
+@pytest.fixture
+def site_context(sample_user):
+    return SiteAccessContext(user_id=sample_user.id, role="admin", jti="test", site_ids=None)
+
+
 # ============================================================
 # 测试
 # ============================================================
 
 
 class TestGetCabinetUsage:
-    async def test_get_cabinet_usage_returns_assets(self, db: AsyncSession, sample_cabinet, sample_asset, sample_user):
+    async def test_get_cabinet_usage_returns_assets(
+        self, db: AsyncSession, sample_cabinet, sample_asset, sample_user, site_context
+    ):
         """get_cabinet_usage 应返回 assets 数组，包含完整字段"""
-        result = await get_cabinet_usage(sample_cabinet.id, db, sample_user)
+        result = await get_cabinet_usage(sample_cabinet.id, db, sample_user, site_context)
 
         assert "assets" in result
         assets = result["assets"]
@@ -132,10 +140,10 @@ class TestGetCabinetUsage:
 
 
 class TestMoveAsset:
-    async def test_move_asset_success(self, db: AsyncSession, sample_cabinet, sample_asset, sample_user):
+    async def test_move_asset_success(self, db: AsyncSession, sample_cabinet, sample_asset, sample_user, site_context):
         """移动资产到 U10，验证位置更新和生命周期记录"""
         req = MoveAssetRequest(asset_id=sample_asset.id, new_u_position=10)
-        result = await move_asset_in_cabinet(sample_cabinet.id, req, db, sample_user)
+        result = await move_asset_in_cabinet(sample_cabinet.id, req, db, sample_user, site_context)
 
         # 验证返回的 usage 数据
         assert result["cabinet_id"] == sample_cabinet.id
@@ -157,7 +165,7 @@ class TestMoveAsset:
         assert lc.to_location == "U10"
         assert lc.remark == "U位拖拽移动"
 
-    async def test_move_asset_conflict(self, db: AsyncSession, sample_cabinet, sample_asset, sample_user):
+    async def test_move_asset_conflict(self, db: AsyncSession, sample_cabinet, sample_asset, sample_user, site_context):
         """移动到已被占用的 U 位应返回 400"""
         from fastapi import HTTPException
 
@@ -178,21 +186,25 @@ class TestMoveAsset:
         # 尝试移动 sample_asset（u_height=4）到 U10
         req = MoveAssetRequest(asset_id=sample_asset.id, new_u_position=10)
         with pytest.raises(HTTPException) as exc_info:
-            await move_asset_in_cabinet(sample_cabinet.id, req, db, sample_user)
+            await move_asset_in_cabinet(sample_cabinet.id, req, db, sample_user, site_context)
         assert exc_info.value.status_code == 400
 
-    async def test_move_asset_out_of_range(self, db: AsyncSession, sample_cabinet, sample_asset, sample_user):
+    async def test_move_asset_out_of_range(
+        self, db: AsyncSession, sample_cabinet, sample_asset, sample_user, site_context
+    ):
         """移动到超出机柜范围的 U 位应返回 400"""
         from fastapi import HTTPException
 
         # sample_asset u_height=4, U40+4-1=U43 > 42
         req = MoveAssetRequest(asset_id=sample_asset.id, new_u_position=40)
         with pytest.raises(HTTPException) as exc_info:
-            await move_asset_in_cabinet(sample_cabinet.id, req, db, sample_user)
+            await move_asset_in_cabinet(sample_cabinet.id, req, db, sample_user, site_context)
         assert exc_info.value.status_code == 400
         assert "U位超出机柜范围" in exc_info.value.detail
 
-    async def test_move_asset_wrong_cabinet(self, db: AsyncSession, sample_cabinet, sample_asset, sample_user):
+    async def test_move_asset_wrong_cabinet(
+        self, db: AsyncSession, sample_cabinet, sample_asset, sample_user, site_context
+    ):
         """用错误的 cabinet_id 移动应返回 400"""
         from fastapi import HTTPException
 
@@ -210,6 +222,6 @@ class TestMoveAsset:
         # sample_asset 属于 sample_cabinet，用 cab2.id 调用
         req = MoveAssetRequest(asset_id=sample_asset.id, new_u_position=5)
         with pytest.raises(HTTPException) as exc_info:
-            await move_asset_in_cabinet(cab2.id, req, db, sample_user)
+            await move_asset_in_cabinet(cab2.id, req, db, sample_user, site_context)
         assert exc_info.value.status_code == 400
         assert "资产不属于该机柜" in exc_info.value.detail

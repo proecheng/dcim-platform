@@ -7,7 +7,15 @@ from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.core.database import Base
-from app.api.deps import get_db, require_viewer
+from app.api.deps import (
+    AuthenticatedUserContext,
+    SiteAccessContext,
+    enforce_inventory_authorization,
+    get_authenticated_user_context,
+    get_db,
+    get_site_access_context,
+    require_viewer,
+)
 from app.models.device import Device
 from app.models.user import User
 from app.main import app
@@ -46,7 +54,12 @@ async def async_db():
 async def client(async_db):
     """创建测试 HTTP 客户端（跳过认证）"""
     mock_user = User(id=1, username="test_admin", role="admin", is_active=True, password_hash="x")
+    identity = AuthenticatedUserContext(user=mock_user, jti="test-jti", expires_at=4102444800.0)
+    site_context = SiteAccessContext(user_id=1, role="admin", jti="test-jti", site_ids=None)
     app.dependency_overrides[require_viewer] = lambda: mock_user
+    app.dependency_overrides[enforce_inventory_authorization] = lambda: None
+    app.dependency_overrides[get_authenticated_user_context] = lambda: identity
+    app.dependency_overrides[get_site_access_context] = lambda: site_context
 
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:

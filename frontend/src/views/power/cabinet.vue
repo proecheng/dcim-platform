@@ -441,14 +441,13 @@ async function confirmDelete(row: CabinetItem) {
     '1) 配电拓扑页中的该配电柜节点',
     '2) 配电柜监控页中的该配电柜记录',
     '3) 该配电柜下级回路/设备/点位（如存在）'
-  ].join('<br/>')
+  ].join('\n')
 
   try {
     await ElMessageBox.confirm(message, '删除确认', {
       type: 'warning',
       confirmButtonText: '确定删除',
-      cancelButtonText: '取消',
-      dangerouslyUseHTMLString: true
+      cancelButtonText: '取消'
     })
 
     saving.value = true

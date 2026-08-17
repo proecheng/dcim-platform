@@ -403,13 +403,14 @@ function renderCurve(data: any[], demandTarget: number) {
   const option: echarts.EChartsOption = {
     tooltip: {
       trigger: 'axis',
+      renderMode: 'richText',
       formatter: (params: any) => {
         const p = params[0]
         const point = data[p.dataIndex]
         const alertText = getAlertText(point.alert_level)
-        return `${point.full_timestamp}<br/>
-                功率: ${point.power} kW<br/>
-                利用率: ${point.utilization}%<br/>
+        return `${point.full_timestamp}\n
+                功率: ${point.power} kW\n
+                利用率: ${point.utilization}%\n
                 状态: ${alertText}`
       }
     },
@@ -517,6 +518,7 @@ function renderPie() {
   const option: echarts.EChartsOption = {
     tooltip: {
       trigger: 'item',
+      renderMode: 'richText',
       formatter: '{b}: {c} kWh ({d}%)'
     },
     legend: {

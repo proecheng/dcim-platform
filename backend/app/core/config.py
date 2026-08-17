@@ -3,7 +3,11 @@
 """
 
 import secrets
-from urllib.parse import urlparse
+import ipaddress
+import re
+import socket
+from enum import Enum
+from urllib.parse import unquote, urlparse
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import Field, field_validator
 from functools import lru_cache
@@ -15,13 +19,101 @@ def generate_secret_key() -> str:
     return secrets.token_urlsafe(64)
 
 
+class AppEnvironment(str, Enum):
+    DEVELOPMENT = "development"
+    TEST = "test"
+    PRODUCTION = "production"
+
+
+class ProductionConfigurationError(RuntimeError):
+    """Raised before startup side effects when production settings are unsafe."""
+
+
+def parse_cors_origins(raw_origins: str) -> list[str]:
+    origins: list[str] = []
+    for raw_origin in raw_origins.split(","):
+        origin = raw_origin.strip()
+        if not origin:
+            continue
+        if origin in {"*", "null"}:
+            raise ValueError("wildcard and null origins are not allowed")
+        parsed = urlparse(origin)
+        if (
+            parsed.scheme not in {"http", "https"}
+            or not parsed.netloc
+            or parsed.username is not None
+            or parsed.password is not None
+            or parsed.path
+            or parsed.params
+            or parsed.query
+            or parsed.fragment
+        ):
+            raise ValueError("origin must be an absolute HTTP(S) origin without path, credentials, query, or fragment")
+        try:
+            hostname = parsed.hostname or ""
+            if ":" in hostname:
+                canonical_host = f"[{hostname.lower()}]"
+            else:
+                canonical_host = hostname.encode("idna").decode("ascii").lower()
+            port = parsed.port
+        except (UnicodeError, ValueError) as exc:
+            raise ValueError("origin contains an invalid host or port") from exc
+        default_port = (parsed.scheme == "http" and port == 80) or (parsed.scheme == "https" and port == 443)
+        canonical = f"{parsed.scheme}://{canonical_host}"
+        if port is not None and not default_port:
+            canonical += f":{port}"
+        if canonical != origin:
+            raise ValueError("origin must use its canonical serialization")
+        origins.append(origin)
+    if not origins:
+        raise ValueError("at least one origin is required")
+    return origins
+
+
+def _is_loopback_origin(origin: str) -> bool:
+    hostname = urlparse(origin).hostname
+    if hostname is None or hostname.lower() == "localhost":
+        return True
+    hostname = hostname.strip("[]")
+    try:
+        return ipaddress.ip_address(hostname).is_loopback
+    except ValueError:
+        if re.fullmatch(r"[0-9.]+", hostname):
+            try:
+                return ipaddress.ip_address(socket.inet_aton(hostname)).is_loopback
+            except OSError:
+                pass
+        return False
+
+
+def _contains_unsafe_marker(value: str) -> bool:
+    normalized = value.strip().lower()
+    markers = (
+        "change-this",
+        "change_me",
+        "change-me",
+        "default",
+        "placeholder",
+        "example",
+        "required-",
+        "admin123",
+    )
+    return not normalized or any(marker in normalized for marker in markers)
+
+
+def _is_weak_password(value: str, minimum_length: int = 12) -> bool:
+    return len(value) < minimum_length or _contains_unsafe_marker(value)
+
+
 class Settings(BaseSettings):
     """应用配置"""
 
     # 应用信息
     app_name: str = "算力中心智能监控系统"
     app_version: str = "3.0.0"
+    app_env: AppEnvironment = AppEnvironment.DEVELOPMENT
     debug: bool = True  # 开发阶段默认开启，正式发布前改为 False
+    sql_echo: bool = False
 
     # 服务器配置
     host: str = "0.0.0.0"
@@ -71,6 +163,7 @@ class Settings(BaseSettings):
 
     # 模拟模式配置（已废弃，保留向后兼容）
     simulation_interval: int = 60  # 模拟数据生成间隔(秒)
+    simulation_batch_size: int = Field(default=300, ge=1, le=5000)
 
     # 授权配置
     license_key: str = "DEMO-0000-0000-0000"
@@ -156,3 +249,65 @@ class Settings(BaseSettings):
 def get_settings() -> Settings:
     """获取配置单例"""
     return Settings()
+
+
+def validate_production_settings(settings: Settings) -> None:
+    if settings.app_env != AppEnvironment.PRODUCTION:
+        return
+
+    errors: list[str] = []
+
+    def reject(field: str, reason: str) -> None:
+        errors.append(f"{field}: {reason}")
+
+    if settings.debug:
+        reject("DEBUG", "production requires false")
+    if "secret_key" not in settings.model_fields_set:
+        reject("SECRET_KEY", "must be explicitly injected")
+    elif len(settings.secret_key) < 48 or _contains_unsafe_marker(settings.secret_key):
+        reject("SECRET_KEY", "must be a stable non-placeholder secret of at least 48 characters")
+
+    database = urlparse(settings.database_url)
+    if database.scheme != "postgresql+asyncpg":
+        reject("DATABASE_URL", "production requires PostgreSQL with the asyncpg driver")
+    database_password = unquote(database.password or "")
+    if _is_weak_password(database_password) or database_password == "dcim_password":
+        reject("DATABASE_URL", "database password is missing or unsafe")
+
+    try:
+        origins = parse_cors_origins(settings.cors_origins)
+    except ValueError:
+        reject("CORS_ORIGINS", "contains an invalid origin")
+    else:
+        if any(_is_loopback_origin(origin) for origin in origins):
+            reject("CORS_ORIGINS", "production origins cannot use localhost or loopback addresses")
+
+    if settings.seed_enabled and (
+        len(settings.default_admin_password) < 12 or _contains_unsafe_marker(settings.default_admin_password)
+    ):
+        reject("DEFAULT_ADMIN_PASSWORD", "production seed requires an explicit strong password")
+    if settings.demo_enabled:
+        reject("DEMO_ENABLED", "production demo mode is not allowed")
+    if settings.simulation_enabled:
+        reject("SIMULATION_ENABLED", "production simulation mode is not allowed")
+    if _contains_unsafe_marker(settings.VPP_API_KEY) or len(settings.VPP_API_KEY) < 32:
+        reject("VPP_API_KEY", "must be a non-placeholder secret of at least 32 characters")
+    if _contains_unsafe_marker(settings.license_key) or settings.license_key.startswith("DEMO-"):
+        reject("LICENSE_KEY", "must be a non-demo production license")
+    if _contains_unsafe_marker(settings.fault_tree_hmac_key) or len(settings.fault_tree_hmac_key) < 32:
+        reject("FAULT_TREE_HMAC_KEY", "must be a non-placeholder secret of at least 32 characters")
+    if _contains_unsafe_marker(settings.gateway_secret_key) or len(settings.gateway_secret_key) < 32:
+        reject("GATEWAY_SECRET_KEY", "must be a non-placeholder secret of at least 32 characters")
+    if settings.redis_enabled:
+        redis = urlparse(settings.effective_redis_url)
+        redis_password = unquote(redis.password or "")
+        if redis.scheme not in {"redis", "rediss"} or not redis.hostname or _is_weak_password(redis_password):
+            reject("REDIS_URL", "must include a non-placeholder password when Redis is enabled")
+    if settings.mqtt_enabled:
+        if not settings.mqtt_username.strip():
+            reject("MQTT_USERNAME", "required when MQTT is enabled")
+        if _is_weak_password(settings.mqtt_password):
+            reject("MQTT_PASSWORD", "required and must not be a placeholder when MQTT is enabled")
+
+    if errors:
+        raise ProductionConfigurationError("Unsafe production configuration: " + "; ".join(errors))

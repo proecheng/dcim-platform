@@ -10,9 +10,16 @@
 import pytest
 from tests.conftest import auth_headers
 
+import app.services.ocr_service as ocr_service
+
 # 测试用文件魔数前缀
 JPEG_HEADER = b"\xff\xd8\xff\xe0" + b"\x00" * 100
 PNG_HEADER = b"\x89PNG\r\n\x1a\n" + b"\x00" * 100
+
+
+@pytest.fixture(autouse=True)
+def force_mock_ocr(monkeypatch):
+    monkeypatch.setattr(ocr_service, "_paddle_available", False)
 
 
 class TestOcrBillEndpoint:

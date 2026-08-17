@@ -1341,18 +1341,17 @@ const handleDeleteNode = async (data: any) => {
   const childCount = countChildren(data)
   let message = `确定要删除 ${getNodeTypeName(data.type)} "${data.label}" 吗？`
   if (isPduNode(data)) {
-    message += '<br/><br/>此操作将同时影响：<br/>1) 配电拓扑页中的该PDU节点<br/>2) 机柜PDU监控页中的该PDU记录<br/>3) 该PDU下级点位（如存在）'
+    message += '\n\n此操作将同时影响：\n1) 配电拓扑页中的该PDU节点\n2) 机柜PDU监控页中的该PDU记录\n3) 该PDU下级点位（如存在）'
   }
   if (childCount > 0) {
-    message += `<br/><br/><span style="color: var(--el-color-warning);">⚠️ 该节点下有 <strong>${childCount}</strong> 个子节点，将一并删除！</span>`
+    message += `\n\n该节点下有 ${childCount} 个子节点，将一并删除！`
   }
 
   try {
     await ElMessageBox.confirm(message, '删除确认', {
       type: 'warning',
       confirmButtonText: '确定删除',
-      cancelButtonText: '取消',
-      dangerouslyUseHTMLString: true
+      cancelButtonText: '取消'
     })
 
     saving.value = true

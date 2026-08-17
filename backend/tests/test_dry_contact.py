@@ -317,6 +317,13 @@ class TestDryContactMonitor:
 class TestSchedulerDryContact:
     """调度器干接点集成"""
 
+    @pytest.fixture(autouse=True)
+    def _restore_adapter_registry(self):
+        original = ADAPTER_REGISTRY.copy()
+        yield
+        ADAPTER_REGISTRY.clear()
+        ADAPTER_REGISTRY.update(original)
+
     def _register_mock_adapter(self, read_values: list[dict[str, PointValue]] | None = None):
         """注册 mock 适配器，可自定义返回值序列"""
         ADAPTER_REGISTRY.clear()

@@ -40,9 +40,10 @@ const chartOption = computed<EChartsOption>(() => {
   return {
     tooltip: {
       trigger: 'item',
+      renderMode: 'richText',
       formatter: (params: unknown) => {
         const p = params as { name: string; value: number; percent: number }
-        return `${p.name}<br/>功率: ${p.value} ${props.unit}<br/>占比: ${p.percent.toFixed(1)}%`
+        return `${p.name}\n功率: ${p.value} ${props.unit}\n占比: ${p.percent.toFixed(1)}%`
       }
     },
     legend: {

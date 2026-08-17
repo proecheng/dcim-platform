@@ -76,12 +76,13 @@ const getOption = (): EChartsOption => {
     } : undefined,
     tooltip: {
       trigger: 'axis',
+      renderMode: 'richText',
       formatter: (params: any) => {
         const point = params[0]
         if (point) {
           const time = dayjs(point.axisValue).format('HH:mm:ss')
           const value = point.value[1]
-          return `${time}<br/>${point.seriesName}: ${value}${props.unit || ''}`
+          return `${time}\n${point.seriesName}: ${value}${props.unit || ''}`
         }
         return ''
       }

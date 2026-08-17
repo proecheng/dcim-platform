@@ -8,7 +8,19 @@ from sqlalchemy import select
 
 from app.core.database import Base
 from app.main import app
-from app.api.deps import get_db, require_viewer, require_operator, require_admin, get_current_user, get_user_site_ids
+from app.api.deps import (
+    AuthenticatedUserContext,
+    SiteAccessContext,
+    enforce_inventory_authorization,
+    get_authenticated_user_context,
+    get_current_user,
+    get_db,
+    get_site_access_context,
+    get_user_site_ids,
+    require_admin,
+    require_operator,
+    require_viewer,
+)
 from app.models.gateway import DataSource, DataSourcePoint
 from app.models.point import Point, PointRealtime
 from app.models.user import User
@@ -29,6 +41,8 @@ async def setup_db():
             yield session
 
     mock_user = User(id=1, username="test_admin", role="admin", is_active=True)
+    identity = AuthenticatedUserContext(user=mock_user, jti="test-jti", expires_at=4102444800.0)
+    site_context = SiteAccessContext(user_id=1, role="admin", jti="test-jti", site_ids=None)
 
     app.dependency_overrides[get_db] = override_get_db
     app.dependency_overrides[require_viewer] = lambda: mock_user
@@ -36,6 +50,9 @@ async def setup_db():
     app.dependency_overrides[require_admin] = lambda: mock_user
     app.dependency_overrides[get_current_user] = lambda: mock_user
     app.dependency_overrides[get_user_site_ids] = lambda: None
+    app.dependency_overrides[enforce_inventory_authorization] = lambda: None
+    app.dependency_overrides[get_authenticated_user_context] = lambda: identity
+    app.dependency_overrides[get_site_access_context] = lambda: site_context
 
     yield _session_factory
 

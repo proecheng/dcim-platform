@@ -10,10 +10,9 @@ from fastapi import Depends, FastAPI, HTTPException, WebSocket, WebSocketDisconn
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import select, text
 
-from .core.config import get_settings
+from .core.config import get_settings, parse_cors_origins, validate_production_settings
 from .core.authorization import validate_authorization_inventory
 from .core.database import init_db, async_session
-from .core.security import get_password_hash
 from .models import User
 from .api.v1 import api_router
 from .api.deps import authenticate_access_token, build_site_access_context, enforce_inventory_authorization
@@ -70,22 +69,8 @@ async def verify_websocket_token(token: str, channel: str, *, db=None) -> WebSoc
 
 
 async def init_default_data():
-    """初始化默认数据"""
+    """初始化不包含用户凭据的兼容数据。"""
     async with async_session() as session:
-        # 创建默认管理员账户
-        result = await session.execute(select(User).where(User.username == "admin"))
-        if not result.scalar_one_or_none():
-            admin = User(
-                username="admin",
-                password_hash=get_password_hash("admin123"),
-                real_name="系统管理员",
-                email="admin@dcim.local",
-                role="admin",
-            )
-            session.add(admin)
-            await session.commit()
-            print("创建默认管理员账户: admin / admin123")
-
         # 初始化角色权限
         from .models import RolePermission
 
@@ -226,7 +211,8 @@ async def init_default_configs():
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # 清单漂移时，在启动任何工作线程或监听器之前失败。
+    # 配置和清单漂移时，在数据库或任何监听器之前失败。
+    validate_production_settings(settings)
     validate_authorization_inventory(app)
 
     """应用生命周期管理 - Story 28.2: 分层启动"""
@@ -1305,7 +1291,7 @@ app = FastAPI(
 )
 
 # CORS 配置 - 只允许配置的前端地址
-cors_origins = [origin.strip() for origin in settings.cors_origins.split(",") if origin.strip()]
+cors_origins = parse_cors_origins(settings.cors_origins)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=cors_origins,

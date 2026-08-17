@@ -24,10 +24,11 @@
             <el-icon :size="28"><Grid /></el-icon>
           </div>
           <div class="stat-info">
-            <div class="stat-value">{{ statistics.space?.usage_rate?.toFixed(1) || 0 }}%</div>
+            <div class="stat-value">{{ formatUsageRate(statistics.space?.usage_rate, statistics.space?.total_u_positions) }}</div>
             <div class="stat-label">空间容量</div>
             <div class="stat-detail">{{ statistics.space?.used_u_positions || 0 }}/{{ statistics.space?.total_u_positions || 0 }} U</div>
             <el-progress
+              v-if="hasCapacityBase(statistics.space?.total_u_positions)"
               :percentage="statistics.space?.usage_rate || 0"
               :stroke-width="6"
               :show-text="false"
@@ -42,10 +43,11 @@
             <el-icon :size="28"><Lightning /></el-icon>
           </div>
           <div class="stat-info">
-            <div class="stat-value">{{ statistics.power?.usage_rate?.toFixed(1) || 0 }}%</div>
+            <div class="stat-value">{{ formatUsageRate(statistics.power?.usage_rate, statistics.power?.total_capacity_kw) }}</div>
             <div class="stat-label">电力容量</div>
-            <div class="stat-detail">{{ statistics.power?.used_capacity_kw || 0 }}/{{ statistics.power?.total_capacity_kw || 0 }} kW</div>
+            <div class="stat-detail">{{ formatCapacity(statistics.power?.used_capacity_kw) }}/{{ formatCapacity(statistics.power?.total_capacity_kw) }} kW</div>
             <el-progress
+              v-if="hasCapacityBase(statistics.power?.total_capacity_kw)"
               :percentage="statistics.power?.usage_rate || 0"
               :stroke-width="6"
               :show-text="false"
@@ -60,10 +62,11 @@
             <el-icon :size="28"><Odometer /></el-icon>
           </div>
           <div class="stat-info">
-            <div class="stat-value">{{ statistics.cooling?.usage_rate?.toFixed(1) || 0 }}%</div>
+            <div class="stat-value">{{ formatUsageRate(statistics.cooling?.usage_rate, statistics.cooling?.total_cooling_kw) }}</div>
             <div class="stat-label">制冷容量</div>
-            <div class="stat-detail">{{ statistics.cooling?.used_cooling_kw || 0 }}/{{ statistics.cooling?.total_cooling_kw || 0 }} kW</div>
+            <div class="stat-detail">{{ formatCapacity(statistics.cooling?.used_cooling_kw) }}/{{ formatCapacity(statistics.cooling?.total_cooling_kw) }} kW</div>
             <el-progress
+              v-if="hasCapacityBase(statistics.cooling?.total_cooling_kw)"
               :percentage="statistics.cooling?.usage_rate || 0"
               :stroke-width="6"
               :show-text="false"
@@ -78,10 +81,11 @@
             <el-icon :size="28"><Box /></el-icon>
           </div>
           <div class="stat-info">
-            <div class="stat-value">{{ statistics.weight?.usage_rate?.toFixed(1) || 0 }}%</div>
+            <div class="stat-value">{{ formatUsageRate(statistics.weight?.usage_rate, statistics.weight?.total_weight_kg) }}</div>
             <div class="stat-label">承重容量</div>
-            <div class="stat-detail">{{ statistics.weight?.used_weight_kg || 0 }}/{{ statistics.weight?.total_weight_kg || 0 }} kg</div>
+            <div class="stat-detail">{{ formatCapacity(statistics.weight?.used_weight_kg) }}/{{ formatCapacity(statistics.weight?.total_weight_kg) }} kg</div>
             <el-progress
+              v-if="hasCapacityBase(statistics.weight?.total_weight_kg)"
               :percentage="statistics.weight?.usage_rate || 0"
               :stroke-width="6"
               :show-text="false"
@@ -112,17 +116,19 @@
               <template #default="{ row }">
                 <div class="usage-cell">
                   <el-progress
+                    v-if="hasCapacityBase(row.total_u_positions)"
                     :percentage="row.usage_rate"
                     :stroke-width="8"
                     :color="getProgressColor(row.usage_rate)"
                   />
+                  <span v-else class="data-insufficient">--</span>
                 </div>
               </template>
             </el-table-column>
             <el-table-column prop="status" label="状态" width="100">
               <template #default="{ row }">
-                <el-tag :type="getStatusType(row.status)" size="small">
-                  {{ getStatusLabel(row.status) }}
+                <el-tag :type="hasCapacityBase(row.total_u_positions) ? getStatusType(row.status) : 'info'" size="small">
+                  {{ hasCapacityBase(row.total_u_positions) ? getStatusLabel(row.status) : '数据不足' }}
                 </el-tag>
               </template>
             </el-table-column>
@@ -161,17 +167,19 @@
               <template #default="{ row }">
                 <div class="usage-cell">
                   <el-progress
+                    v-if="hasCapacityBase(row.total_capacity_kw)"
                     :percentage="row.usage_rate"
                     :stroke-width="8"
                     :color="getProgressColor(row.usage_rate)"
                   />
+                  <span v-else class="data-insufficient">--</span>
                 </div>
               </template>
             </el-table-column>
             <el-table-column prop="status" label="状态" width="100">
               <template #default="{ row }">
-                <el-tag :type="getStatusType(row.status)" size="small">
-                  {{ getStatusLabel(row.status) }}
+                <el-tag :type="hasCapacityBase(row.total_capacity_kw) ? getStatusType(row.status) : 'info'" size="small">
+                  {{ hasCapacityBase(row.total_capacity_kw) ? getStatusLabel(row.status) : '数据不足' }}
                 </el-tag>
               </template>
             </el-table-column>
@@ -206,17 +214,19 @@
               <template #default="{ row }">
                 <div class="usage-cell">
                   <el-progress
+                    v-if="hasCapacityBase(row.total_cooling_kw)"
                     :percentage="row.usage_rate"
                     :stroke-width="8"
                     :color="getProgressColor(row.usage_rate)"
                   />
+                  <span v-else class="data-insufficient">--</span>
                 </div>
               </template>
             </el-table-column>
             <el-table-column prop="status" label="状态" width="100">
               <template #default="{ row }">
-                <el-tag :type="getStatusType(row.status)" size="small">
-                  {{ getStatusLabel(row.status) }}
+                <el-tag :type="hasCapacityBase(row.total_cooling_kw) ? getStatusType(row.status) : 'info'" size="small">
+                  {{ hasCapacityBase(row.total_cooling_kw) ? getStatusLabel(row.status) : '数据不足' }}
                 </el-tag>
               </template>
             </el-table-column>
@@ -245,13 +255,16 @@
             <el-table-column label="使用率" width="180">
               <template #default="{ row }">
                 <div class="usage-cell">
-                  <el-progress :percentage="row.usage_rate" :stroke-width="8" :color="getProgressColor(row.usage_rate)" />
+                  <el-progress v-if="hasCapacityBase(row.total_weight_kg)" :percentage="row.usage_rate" :stroke-width="8" :color="getProgressColor(row.usage_rate)" />
+                  <span v-else class="data-insufficient">--</span>
                 </div>
               </template>
             </el-table-column>
             <el-table-column prop="status" label="状态" width="100">
               <template #default="{ row }">
-                <el-tag :type="getStatusType(row.status)" size="small">{{ getStatusLabel(row.status) }}</el-tag>
+                <el-tag :type="hasCapacityBase(row.total_weight_kg) ? getStatusType(row.status) : 'info'" size="small">
+                  {{ hasCapacityBase(row.total_weight_kg) ? getStatusLabel(row.status) : '数据不足' }}
+                </el-tag>
               </template>
             </el-table-column>
             <el-table-column label="操作" width="150" fixed="right">
@@ -1691,14 +1704,15 @@ function renderForecastChart(data: typeof forecastData.value) {
   const option: echarts.EChartsOption = {
     tooltip: {
       trigger: 'axis',
+      renderMode: 'richText',
       formatter: (params: any) => {
-        let result = params[0]?.axisValue + '<br/>'
+        let result = `${params[0]?.axisValue}\n`
         params.forEach((p: any) => {
           if (p.seriesName !== '置信下界') {
-            result += `${p.marker}${p.seriesName}: ${p.value?.toFixed?.(1) ?? '-'}%<br/>`
+            result += `${p.seriesName}: ${p.value?.toFixed?.(1) ?? '-'}%\n`
           }
         })
-        result += '<span style="color:#999;font-size:11px;">预测仅供参考</span>'
+        result += '预测仅供参考'
         return result
       }
     },
@@ -1779,6 +1793,22 @@ function getProgressColor(percentage: number | undefined): string {
   if (p >= 90) return '#f56c6c'
   if (p >= 70) return '#e6a23c'
   return '#67c23a'
+}
+
+function formatCapacity(value: number | undefined): string {
+  const capacity = Number(value)
+  return Number.isFinite(capacity)
+    ? capacity.toLocaleString('zh-CN', { maximumFractionDigits: 2 })
+    : '0'
+}
+
+function hasCapacityBase(total: number | null | undefined): boolean {
+  return Number.isFinite(Number(total)) && Number(total) > 0
+}
+
+function formatUsageRate(rate: number | null | undefined, total: number | null | undefined): string {
+  if (!hasCapacityBase(total) || !Number.isFinite(Number(rate))) return '--'
+  return `${Number(rate).toFixed(1)}%`
 }
 </script>
 

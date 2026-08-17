@@ -27,8 +27,8 @@
           <div class="stat-item">
             <div class="label">优化状态</div>
             <div class="value">
-              <el-tag :type="result.optimization?.status === 'success' ? 'success' : 'danger'">
-                {{ result.optimization?.status === 'success' ? '优化成功' : '优化失败' }}
+              <el-tag :type="optimizationStatus.type">
+                {{ optimizationStatus.text }}
               </el-tag>
             </div>
           </div>
@@ -39,7 +39,7 @@
           <div class="stat-item">
             <div class="label">预计最大需量</div>
             <div class="value highlight">{{ result.optimization?.max_demand?.toFixed(1) || 0 }} kW</div>
-            <div class="sub-text">目标: {{ result.optimization?.demand_target?.toFixed(1) || 0 }} kW</div>
+            <div class="sub-text">目标: {{ formatNumber(result.optimization?.demand_target, 1) }} kW</div>
           </div>
         </el-card>
       </el-col>
@@ -58,14 +58,24 @@
         <el-card shadow="hover" class="summary-card success">
           <div class="stat-item">
             <div class="label">预计节省</div>
-            <div class="value success-text">¥ {{ result.optimization?.expected_saving?.toFixed(2) || 0 }}</div>
+            <div class="value success-text">¥ {{ formatNumber(result.optimization?.expected_saving, 2) }}</div>
             <div class="sub-text">
-              节省率: {{ result.optimization?.saving_ratio?.toFixed(1) || 0 }}%
+              {{ result.optimization?.data_sufficient ? '节省率' : '情景节省率' }}:
+              {{ formatNumber(result.optimization?.saving_ratio, 1) }}%
             </div>
           </div>
         </el-card>
       </el-col>
     </el-row>
+
+    <el-alert
+      v-if="result?.optimization?.warning"
+      :title="result.optimization.warning"
+      type="warning"
+      :closable="false"
+      show-icon
+      class="data-warning"
+    />
 
     <!-- 图表区域 -->
     <el-row :gutter="20" class="chart-row">
@@ -169,6 +179,18 @@ const storageActive = computed(() => {
   return result.value?.optimization?.storage_schedule?.some(s => s.charge_power > 0 || s.discharge_power > 0)
 })
 
+const optimizationStatus = computed(() => {
+  const optimization = result.value?.optimization
+  if (!optimization) return { text: '暂无结果', type: 'info' as const }
+  if (optimization.status !== 'success') return { text: '优化失败', type: 'danger' as const }
+  if (!optimization.data_sufficient) return { text: '情景模拟', type: 'warning' as const }
+  return { text: '优化成功', type: 'success' as const }
+})
+
+function formatNumber(value: number | null | undefined, precision: number) {
+  return value == null || !Number.isFinite(value) ? '--' : value.toFixed(precision)
+}
+
 onMounted(async () => {
   await loadSchedule()
 })
@@ -207,7 +229,8 @@ async function runOptimization() {
     }
     const res = await runDayAheadOptimization(params)
     if (res.data) {
-      ElMessage.success(`优化完成，预计节省 ¥${res.data.expected_saving?.toFixed(2) || 0}`)
+      const prefix = res.data.data_sufficient ? '优化完成' : '情景模拟完成'
+      ElMessage.success(`${prefix}，预计节省 ¥${formatNumber(res.data.expected_saving, 2)}`)
       await loadSchedule()
     }
   } catch (e) {
@@ -243,13 +266,14 @@ function renderForecastChart() {
   const option: echarts.EChartsOption = {
     tooltip: {
       trigger: 'axis',
+      renderMode: 'richText',
       formatter: (params: any) => {
         const p = params[0]
         const idx = p.dataIndex
         const point = forecast.forecasts[idx]
-        return `${point.time}<br/>
-                预测功率: ${point.predicted_power.toFixed(1)} kW<br/>
-                时段: ${getPeriodName(point.period)}<br/>
+        return `${point.time}\n
+                预测功率: ${point.predicted_power.toFixed(1)} kW\n
+                时段: ${getPeriodName(point.period)}\n
                 区间: [${point.lower_bound.toFixed(1)}, ${point.upper_bound.toFixed(1)}]`
       }
     },
@@ -477,11 +501,12 @@ function renderGanttChart() {
 
   const option: echarts.EChartsOption = {
     tooltip: {
+      renderMode: 'richText',
       formatter: (params: any) => {
         const d = params.data
-        return `${categories[d.value[0]]}<br/>
-                时段: ${Math.floor(d.value[1] / 4)}:${(d.value[1] % 4) * 15}0 - ${Math.floor(d.value[2] / 4)}:${(d.value[2] % 4) * 15}0<br/>
-                动作: ${d.name}<br/>
+        return `${categories[d.value[0]]}\n
+                时段: ${Math.floor(d.value[1] / 4)}:${(d.value[1] % 4) * 15}0 - ${Math.floor(d.value[2] / 4)}:${(d.value[2] % 4) * 15}0\n
+                动作: ${d.name}\n
                 功率: ${d.value[3]} kW`
       }
     },
@@ -522,7 +547,9 @@ function renderGanttChart() {
               width: end[0] - start[0],
               height: height
             },
-            style: api.style()
+            style: {
+              fill: params.data?.itemStyle?.color || '#1890ff'
+            }
           }
         },
         encode: {
@@ -603,6 +630,7 @@ function renderPeriodChart() {
   const option: echarts.EChartsOption = {
     tooltip: {
       trigger: 'item',
+      renderMode: 'richText',
       formatter: '{b}: {c} kWh ({d}%)'
     },
     legend: {
@@ -643,6 +671,10 @@ function renderPeriodChart() {
 <style scoped lang="scss">
 .schedule-dashboard {
   padding: 20px;
+
+  .data-warning {
+    margin-bottom: 20px;
+  }
 
   .header-bar {
     display: flex;

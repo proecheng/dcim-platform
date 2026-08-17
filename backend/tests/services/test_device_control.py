@@ -19,6 +19,7 @@ from app.services.device_control_service import (
     ControlInterface,
     DeviceControlService,
 )
+from app.services.command_registry import authorize_command
 from app.models.energy import PowerDevice, LoadRegulationConfig
 
 
@@ -146,8 +147,8 @@ class TestValidateControlPermission:
         assert result["is_allowed"] is True
 
     @pytest.mark.asyncio
-    async def test_force_ignores_range(self, async_db):
-        """force=True 忽略范围限制"""
+    async def test_force_cannot_bypass_range(self, async_db):
+        """force=True 仍须遵守设备安全范围"""
         device = PowerDevice(
             device_code="DEV-004",
             device_name="强制空调",
@@ -172,8 +173,8 @@ class TestValidateControlPermission:
 
         svc = DeviceControlService(async_db)
         result = await svc.validate_control_permission(device.id, "temperature", 35.0, force=True)
-        assert result["is_allowed"] is True
-        assert len(result["warnings"]) > 0
+        assert result["is_allowed"] is False
+        assert any("大于最大值" in reason for reason in result["reasons"])
 
 
 class TestGetControlStatus:
@@ -227,7 +228,22 @@ class TestControlDeviceRegulation:
     async def test_device_not_found(self, async_db):
         """设备不存在时返回失败"""
         svc = DeviceControlService(async_db)
-        action = await svc.control_device_regulation(99999, "temperature", 25.0)
+        authorization = authorize_command(
+            "device_regulation",
+            {
+                "device_id": 99999,
+                "regulation_type": "temperature",
+                "target_value": 25.0,
+                "force": False,
+            },
+            entrypoint="execution_service",
+        )
+        action = await svc.control_device_regulation(
+            99999,
+            "temperature",
+            25.0,
+            command_authorization=authorization,
+        )
         assert action.result == ControlResult.FAILED
         assert "不存在" in action.message
 
@@ -259,7 +275,22 @@ class TestControlDeviceRegulation:
         await async_db.flush()
 
         svc = DeviceControlService(async_db)
-        action = await svc.control_device_regulation(device.id, "temperature", 26.0)
+        authorization = authorize_command(
+            "device_regulation",
+            {
+                "device_id": device.id,
+                "regulation_type": "temperature",
+                "target_value": 26.0,
+                "force": False,
+            },
+            entrypoint="execution_service",
+        )
+        action = await svc.control_device_regulation(
+            device.id,
+            "temperature",
+            26.0,
+            command_authorization=authorization,
+        )
         assert action.result == ControlResult.SIMULATED
         assert "模拟" in action.message
 

@@ -22,6 +22,9 @@ DEFAULT_PRICING_NAME = "默认五级分时电价"
 
 async def run_minimal_seed():
     """执行最小化种子（幂等，分阶段提交）"""
+    if not settings.seed_enabled:
+        raise RuntimeError("SEED_ENABLED must be true to run the minimal seed")
+
     logger.info("开始执行最小化种子...")
 
     # 阶段 1: 创建默认管理员用户（独立事务）
@@ -85,7 +88,7 @@ async def _create_default_admin_user():
         session.add(user)
         await session.commit()
         logger.info("✓ 创建默认管理员用户: admin")
-        logger.warning(f"⚠️  默认密码: {settings.default_admin_password} - 生产环境请立即修改！")
+        logger.warning("默认管理员用户已创建；请按凭据管理流程保存其密码")
 
 
 async def _create_default_site(session: AsyncSession) -> Site:

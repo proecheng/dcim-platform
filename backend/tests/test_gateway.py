@@ -118,11 +118,13 @@ class TestAdapterRegistry:
 
     def setup_method(self):
         """每个测试前清空注册表"""
+        self._original_registry = ADAPTER_REGISTRY.copy()
         ADAPTER_REGISTRY.clear()
 
     def teardown_method(self):
-        """每个测试后清空注册表"""
+        """每个测试后恢复注册表"""
         ADAPTER_REGISTRY.clear()
+        ADAPTER_REGISTRY.update(self._original_registry)
 
     def test_register_adapter_decorator(self):
         """装饰器注册适配器"""
@@ -226,6 +228,13 @@ class TestAdapterRegistry:
 
 class TestCollectionScheduler:
     """测试采集调度器"""
+
+    @pytest.fixture(autouse=True)
+    def _restore_adapter_registry(self):
+        original = ADAPTER_REGISTRY.copy()
+        yield
+        ADAPTER_REGISTRY.clear()
+        ADAPTER_REGISTRY.update(original)
 
     def _make_config(self, ds_id="ds-1", interval=1):
         return DataSourceConfig(

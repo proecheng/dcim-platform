@@ -11,6 +11,8 @@
 import pytest
 from datetime import date
 
+import app.services.ocr_service as ocr_service
+
 from app.services.ocr_service import (
     _get_mock_result,
     _detect_provider,
@@ -23,6 +25,11 @@ from app.services.ocr_service import (
 JPEG_HEADER = b"\xff\xd8\xff\xe0" + b"\x00" * 100
 PNG_HEADER = b"\x89PNG\r\n\x1a\n" + b"\x00" * 100
 PDF_HEADER = b"%PDF-1.4" + b"\x00" * 100
+
+
+@pytest.fixture(autouse=True)
+def force_mock_ocr(monkeypatch):
+    monkeypatch.setattr(ocr_service, "_paddle_available", False)
 
 
 class TestGetMockResult:

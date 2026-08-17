@@ -15,6 +15,7 @@
 
 import pytest
 
+from app.services.command_registry import CommandPolicyError
 from app.services.execution_service import ExecutionService
 from app.models.energy import ExecutionPlan, ExecutionTask, EnergyOpportunity
 
@@ -63,9 +64,10 @@ class TestGetRegulationType:
         svc = ExecutionService(None)
         assert svc._get_regulation_type("load_adjust") == "load"
 
-    def test_unknown_defaults_to_temperature(self):
+    def test_unknown_task_type_is_rejected(self):
         svc = ExecutionService(None)
-        assert svc._get_regulation_type("unknown_type") == "temperature"
+        with pytest.raises(CommandPolicyError, match="未知自动任务类型"):
+            svc._get_regulation_type("unknown_type")
 
 
 class TestGetStatusText:

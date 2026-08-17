@@ -435,13 +435,12 @@ async function confirmDelete(row: UPSItem) {
     `确定删除UPS设备「${row.device_name}」吗？`,
     '',
     '此操作将同时删除关联的电池组和点位数据。'
-  ].join('<br/>')
+  ].join('\n')
   try {
     await ElMessageBox.confirm(message, '删除确认', {
       type: 'warning',
       confirmButtonText: '确定删除',
-      cancelButtonText: '取消',
-      dangerouslyUseHTMLString: true
+      cancelButtonText: '取消'
     })
     saving.value = true
     await deleteUPS(row.id)

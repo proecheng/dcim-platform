@@ -14,6 +14,7 @@ from sqlalchemy.orm import selectinload
 
 from ..models.energy import ExecutionPlan, ExecutionTask, ExecutionResult, EnergyOpportunity, EnergyDaily
 from .device_control_service import DeviceControlService, ControlResult
+from .command_registry import CommandPolicyError, authorize_command
 
 logger = logging.getLogger(__name__)
 
@@ -150,41 +151,67 @@ class ExecutionService:
         if task.status == "completed":
             return {"success": False, "error": "任务已完成"}
 
-        # 更新任务状态
+        # 在写入任务状态或触发任何设备副作用前，完整解析并授权整批控制参数。
+        try:
+            params = task.parameters or {}
+            if not isinstance(params, dict):
+                raise CommandPolicyError("任务参数必须是对象")
+
+            target_state = params.get("target_state", {})
+            selected_devices = params.get("selected_devices", [])
+            if not isinstance(target_state, dict):
+                raise CommandPolicyError("target_state 必须是对象")
+            if not isinstance(selected_devices, list) or not selected_devices:
+                raise CommandPolicyError("selected_devices 必须是非空数组")
+
+            reg_type = self._get_regulation_type(task.task_type)
+            target_value = target_state.get("value") if "value" in target_state else target_state.get(reg_type)
+            if target_value is None:
+                raise CommandPolicyError(f"target_state 缺少 {reg_type} 目标值")
+
+            prepared_controls = []
+            for selected_device in selected_devices:
+                device_id = selected_device.get("device_id") if isinstance(selected_device, dict) else selected_device
+                authorization = authorize_command(
+                    "device_regulation",
+                    {
+                        "device_id": device_id,
+                        "regulation_type": reg_type,
+                        "target_value": target_value,
+                        "force": force,
+                    },
+                    entrypoint="execution_service",
+                )
+                prepared_controls.append(authorization)
+        except (CommandPolicyError, TypeError, ValueError) as exc:
+            return {"success": False, "error": f"自动任务参数无效: {exc}"}
+
         task.status = "executing"
         await self.db.commit()
-
-        # 解析参数执行控制
-        params = task.parameters or {}
-        target_state = params.get("target_state", {})
-        selected_devices = params.get("selected_devices", [])
 
         control_results = []
         all_success = True
 
         # 为每个设备执行控制
-        if isinstance(selected_devices, list) and selected_devices:
-            for device_id in selected_devices:
-                if isinstance(device_id, dict):
-                    device_id = device_id.get("device_id", device_id)
+        for authorization in prepared_controls:
+            authorized = authorization.parameters
+            action = await self.device_control.control_device_regulation(
+                device_id=authorized["device_id"],
+                regulation_type=authorized["regulation_type"],
+                target_value=authorized["target_value"],
+                force=authorized["force"],
+                command_authorization=authorization,
+            )
+            control_results.append(
+                {
+                    "device_id": authorized["device_id"],
+                    "result": action.result.value,
+                    "message": action.message,
+                }
+            )
 
-                # 根据任务类型确定调节参数
-                reg_type = self._get_regulation_type(task.task_type)
-                target_value = target_state.get("value") or target_state.get(reg_type)
-
-                if target_value is not None:
-                    action = await self.device_control.control_device_regulation(
-                        device_id=int(device_id),
-                        regulation_type=reg_type,
-                        target_value=float(target_value),
-                        force=force,
-                    )
-                    control_results.append(
-                        {"device_id": device_id, "result": action.result.value, "message": action.message}
-                    )
-
-                    if action.result not in [ControlResult.SUCCESS, ControlResult.SIMULATED]:
-                        all_success = False
+            if action.result != ControlResult.SUCCESS:
+                all_success = False
 
         # 更新任务结果
         task.executed_at = datetime.now()
@@ -194,7 +221,7 @@ class ExecutionService:
             task.status = "completed"
         else:
             task.status = "failed"
-            task.error_message = "部分设备控制失败"
+            task.error_message = "部分设备未完成真实控制或闭环确认"
 
         await self.db.commit()
 
@@ -622,7 +649,10 @@ class ExecutionService:
             "load_adjust": "load",
             "device_control": "temperature",  # 默认
         }
-        return mapping.get(task_type, "temperature")
+        try:
+            return mapping[task_type]
+        except KeyError as exc:
+            raise CommandPolicyError(f"未知自动任务类型: {task_type!r}") from exc
 
     def _get_status_text(self, status: str) -> str:
         """获取状态文本"""

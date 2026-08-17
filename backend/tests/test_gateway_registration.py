@@ -3,6 +3,7 @@
 from datetime import datetime, timedelta
 from unittest.mock import patch, MagicMock
 
+import pytest
 import pytest_asyncio
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
@@ -43,6 +44,29 @@ async def db_session():
 
 class TestStatusReporter:
     """StatusReporter 单元测试"""
+
+    def test_production_rejects_missing_gateway_secret(self, monkeypatch):
+        monkeypatch.setenv("APP_ENV", "production")
+        monkeypatch.delenv("GATEWAY_SECRET_KEY", raising=False)
+
+        with pytest.raises(ValueError, match="GATEWAY_SECRET_KEY"):
+            StatusReporter(gateway_id="gw-production")
+
+    def test_production_rejects_placeholder_gateway_secret(self, monkeypatch):
+        monkeypatch.setenv("APP_ENV", "production")
+
+        with pytest.raises(ValueError, match="GATEWAY_SECRET_KEY"):
+            StatusReporter(
+                gateway_id="gw-production",
+                secret_key="default-secret-key-change-in-production",
+            )
+
+    @pytest.mark.parametrize("secret", ["x", "<required-gateway-secret>", "change_me_in_production"])
+    def test_production_rejects_weak_gateway_secret(self, monkeypatch, secret):
+        monkeypatch.setenv("APP_ENV", " production ")
+
+        with pytest.raises(ValueError, match="GATEWAY_SECRET_KEY"):
+            StatusReporter(gateway_id="gw-production", secret_key=secret)
 
     @patch("gateway.status_reporter._HAS_PSUTIL", True)
     @patch("gateway.status_reporter.psutil", create=True)

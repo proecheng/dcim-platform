@@ -289,9 +289,10 @@ function updateChart() {
   const option: echarts.EChartsOption = {
     tooltip: {
       trigger: 'axis',
+      renderMode: 'richText',
       formatter: (params: any) => {
         const data = params[0]
-        return `${data.axisValue}<br/>数值: ${data.value?.toFixed(2)} ${currentPoint.value?.unit || ''}`
+        return `${data.axisValue}\n数值: ${data.value?.toFixed(2)} ${currentPoint.value?.unit || ''}`
       }
     },
     grid: {

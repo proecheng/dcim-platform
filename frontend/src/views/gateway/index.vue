@@ -749,12 +749,13 @@ function renderEventChart(gatewayId: number, events: GatewayEvent[]) {
   const option: echarts.EChartsOption = {
     tooltip: {
       trigger: 'axis',
+      renderMode: 'richText',
       formatter: (params: unknown) => {
         const p = (params as Array<{ dataIndex: number }>)[0]
         const evt = sorted[p.dataIndex]
-        let tip = `<b>${times[p.dataIndex]}</b><br/>`
-        tip += `类型: ${evt.event_type === 'status_change' ? '状态变更' : '资源告警'}<br/>`
-        if (evt.old_status) tip += `${evt.old_status} → ${evt.new_status}<br/>`
+        let tip = `${times[p.dataIndex]}\n`
+        tip += `类型: ${evt.event_type === 'status_change' ? '状态变更' : '资源告警'}\n`
+        if (evt.old_status) tip += `${evt.old_status} → ${evt.new_status}\n`
         return tip
       },
     },

@@ -469,16 +469,9 @@ async function loadPUETrend() {
 
 async function loadDashboard() {
   try {
-    console.log('[monitor.vue] Loading dashboard data...')
     const res = await getEnergyDashboard()
-    console.log('[monitor.vue] getEnergyDashboard response:', res)
-    if (res.code === 0 && res.data) {
-      dashboard.value = res.data
-      console.log('[monitor.vue] dashboard.value updated:', dashboard.value)
-    } else {
-      console.warn('[monitor.vue] API returned no data or error code')
-      dashboard.value = {}
-    }
+    const data = (res as any)?.data ?? res
+    dashboard.value = data && typeof data === 'object' ? data : {}
     updateDemandChart()
   } catch (e) {
     console.error('加载仪表盘数据失败', e)
@@ -730,12 +723,13 @@ function updatePUETrendChart() {
   const option: echarts.EChartsOption = {
     tooltip: {
       trigger: 'axis',
+      renderMode: 'richText',
       backgroundColor: 'rgba(26, 42, 74, 0.95)',
       borderColor: 'rgba(0, 212, 255, 0.3)',
       textStyle: { color: 'rgba(255, 255, 255, 0.85)' },
       formatter: (params: any) => {
         const d = params[0]
-        return `${d.axisValue}<br/>PUE: ${d.value?.toFixed(2)}`
+        return `${d.axisValue}\nPUE: ${d.value?.toFixed(2)}`
       }
     },
     grid: {

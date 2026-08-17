@@ -3,11 +3,11 @@
     <el-tabs v-model="activeTab" type="border-card">
       <!-- V4.0: 优化总览 - 为初学者设计 -->
       <el-tab-pane label="优化总览" name="overview">
-        <OptimizationOverview :activeTab="activeTab" @update:activeTab="activeTab = $event" />
+        <OptimizationOverview :key="overviewRefreshKey" :activeTab="activeTab" @update:activeTab="activeTab = $event" />
       </el-tab-pane>
 
       <!-- V4.0: 需量分析 - 合并需量曲线+需量配置分析 -->
-      <el-tab-pane label="需量分析" name="demand">
+      <el-tab-pane label="需量分析" name="demand" lazy>
         <div class="tab-header">
           <el-select
             v-model="selectedMeterPointId"
@@ -155,14 +155,14 @@
               </el-statistic>
             </el-col>
             <el-col :span="6">
-              <el-statistic title="潜在节省(元/月)" :value="demandResult.total_potential_saving" :precision="2" />
+              <el-statistic title="潜在节省(元/年)" :value="demandResult.total_potential_saving" :precision="2" />
             </el-col>
           </el-row>
           <el-table :data="demandResult?.items || []" stripe class="analysis-table" style="margin-top: 16px;">
             <el-table-column prop="meter_name" label="计量点" min-width="120" />
             <el-table-column prop="declared_demand" label="申报需量(kW)" width="110" />
-            <el-table-column prop="max_demand_12m" label="12月最大(kW)" width="120" />
-            <el-table-column prop="avg_demand_12m" label="12月平均(kW)" width="120" />
+            <el-table-column prop="max_demand_12m" label="历史最大(kW)" width="120" />
+            <el-table-column prop="avg_demand_12m" label="历史平均(kW)" width="120" />
             <el-table-column prop="utilization_rate" label="利用率" width="100">
               <template #default="{ row }">
                 <!-- [V2.10-FIX] 修复：utilization_rate 已经是百分比，不需要再乘100；超过100%时显示实际值 -->
@@ -177,19 +177,20 @@
             <el-table-column prop="optimal_demand" label="建议需量(kW)" width="120" />
             <el-table-column label="状态" width="100">
               <template #default="{ row }">
-                <el-tag v-if="row.is_over_declared" type="warning">申报过高</el-tag>
+                <el-tag v-if="!row.data_sufficient" type="info">数据不足</el-tag>
+                <el-tag v-else-if="row.is_over_declared" type="warning">申报过高</el-tag>
                 <el-tag v-else-if="row.is_under_declared" type="danger">申报不足</el-tag>
                 <el-tag v-else type="success">合理</el-tag>
               </template>
             </el-table-column>
-            <el-table-column prop="potential_saving" label="潜在节省(元)" width="110" />
+            <el-table-column prop="potential_saving" label="年节省(元)" width="110" />
             <el-table-column prop="recommendation" label="建议" min-width="200" show-overflow-tooltip />
           </el-table>
         </el-card>
       </el-tab-pane>
 
       <!-- 负荷转移分析 -->
-      <el-tab-pane label="负荷转移" name="shift">
+      <el-tab-pane label="负荷转移" name="shift" lazy>
         <div class="tab-header">
           <el-button type="primary" @click="loadShiftAnalysis" :loading="loading.shift">
             <el-icon><Refresh /></el-icon>刷新分析
@@ -247,7 +248,7 @@
       </el-tab-pane>
 
       <!-- 设备运行优化 -->
-      <el-tab-pane label="设备运行优化" name="device">
+      <el-tab-pane label="设备运行优化" name="device" lazy>
         <div class="tab-header">
           <el-button type="primary" @click="loadDeviceOptimization" :loading="loading.device">
             <el-icon><Refresh /></el-icon>刷新分析
@@ -260,115 +261,110 @@
             <el-statistic title="可优化设备" :value="deviceOptimization.optimizableCount || 0" />
           </el-col>
           <el-col :span="6">
-            <el-statistic title="总节能潜力(kWh/月)" :value="deviceOptimization.totalSavingKwh || 0" :precision="0" />
+            <el-statistic title="总节能潜力(kWh/年)" :value="deviceOptimization.totalSavingKwh || 0" :precision="0" />
           </el-col>
           <el-col :span="6">
-            <el-statistic title="总节省潜力(元/月)" :value="deviceOptimization.totalSavingCost || 0" :precision="0" />
+            <el-statistic title="总节省潜力(元/年)" :value="deviceOptimization.totalSavingCost || 0" :precision="0" />
           </el-col>
           <el-col :span="6">
-            <el-statistic title="平均效率提升" :value="deviceOptimization.avgEfficiencyGain || 0" suffix="%" :precision="1" />
+            <el-statistic title="平均置信度" :value="deviceOptimization.avgConfidence || 0" suffix="%" :precision="1" />
           </el-col>
         </el-row>
+
+        <el-alert
+          v-if="deviceOptimization.suggestions.length === 0"
+          type="info"
+          :closable="false"
+          title="真实设备数据未触发优化建议，未使用模拟结果"
+          style="margin-bottom: 16px;"
+        />
 
         <!-- 设备优化建议列表 -->
         <el-card shadow="hover" style="margin-top: 20px;">
           <template #header>设备运行优化建议</template>
           <el-table :data="deviceOptimization.suggestions || []" stripe>
-            <el-table-column prop="device_name" label="设备名称" min-width="120" />
-            <el-table-column prop="device_type" label="设备类型" width="100" />
-            <el-table-column prop="current_efficiency" label="当前效率" width="100">
+            <el-table-column prop="title" label="建议" min-width="150" />
+            <el-table-column prop="related_devices_text" label="关联设备" min-width="150" show-overflow-tooltip />
+            <el-table-column prop="priority" label="优先级" width="90">
               <template #default="{ row }">
-                <el-progress :percentage="row.current_efficiency || 0" :stroke-width="10" />
+                <el-tag :type="getAnalysisPriorityType(row.priority)" size="small">
+                  {{ getAnalysisPriorityText(row.priority) }}
+                </el-tag>
               </template>
             </el-table-column>
-            <el-table-column prop="target_efficiency" label="目标效率" width="100">
+            <el-table-column prop="confidence" label="置信度" width="120">
               <template #default="{ row }">
-                <span class="highlight">{{ row.target_efficiency || 0 }}%</span>
+                <el-progress :percentage="row.confidence || 0" :stroke-width="10" />
               </template>
             </el-table-column>
-            <el-table-column prop="saving_kwh" label="节能(kWh/月)" width="120" />
-            <el-table-column prop="saving_cost" label="节省(元/月)" width="110" />
-            <el-table-column prop="recommendation" label="优化建议" min-width="200" show-overflow-tooltip />
-            <el-table-column label="操作" width="100" fixed="right">
+            <el-table-column prop="saving_kwh" label="节能(kWh/年)" width="125" />
+            <el-table-column prop="saving_cost" label="节省(元/年)" width="115" />
+            <el-table-column prop="description" label="算法结论" min-width="220" show-overflow-tooltip />
+            <el-table-column label="操作" width="130" fixed="right">
               <template #default="{ row }">
-                <el-button type="primary" size="small" @click="executeDeviceOptimization(row)">
-                  执行
+                <el-button type="primary" size="small" @click="addDeviceOpportunity(row)" :loading="row.adding">
+                  加入节能中心
                 </el-button>
               </template>
             </el-table-column>
           </el-table>
         </el-card>
 
-        <!-- 空调/UPS/照明专项优化 -->
+        <!-- 算法来源与闭环说明 -->
         <el-row :gutter="20" style="margin-top: 20px;">
           <el-col :span="8">
             <el-card shadow="hover" class="device-category-card">
-              <template #header>
-                <div class="category-header">
-                  <el-icon :size="24" color="#409eff"><Sunny /></el-icon>
-                  <span>空调系统优化</span>
-                </div>
-              </template>
+              <template #header>算法来源</template>
               <div class="category-stats">
                 <div class="stat-item">
-                  <span class="label">当前PUE贡献</span>
-                  <span class="value">{{ deviceOptimization.hvac?.pueContribution || 0 }}%</span>
+                  <span class="label">插件</span>
+                  <span class="value">设备效率分析</span>
                 </div>
                 <div class="stat-item">
-                  <span class="label">节能潜力</span>
-                  <span class="value highlight">{{ deviceOptimization.hvac?.savingPotential || 0 }} kWh</span>
+                  <span class="label">插件ID</span>
+                  <span class="value">equipment_efficiency</span>
                 </div>
                 <div class="stat-item">
-                  <span class="label">建议设定温度</span>
-                  <span class="value">{{ deviceOptimization.hvac?.recommendedTemp || 25 }}°C</span>
+                  <span class="label">数据来源</span>
+                  <span class="value">设备与功率实测数据</span>
                 </div>
               </div>
             </el-card>
           </el-col>
           <el-col :span="8">
             <el-card shadow="hover" class="device-category-card">
-              <template #header>
-                <div class="category-header">
-                  <el-icon :size="24" color="#52c41a"><Lightning /></el-icon>
-                  <span>UPS系统优化</span>
-                </div>
-              </template>
+              <template #header>算法口径</template>
               <div class="category-stats">
                 <div class="stat-item">
-                  <span class="label">当前负载率</span>
-                  <span class="value">{{ deviceOptimization.ups?.loadRate || 0 }}%</span>
+                  <span class="label">分析窗口</span>
+                  <span class="value">30 天</span>
                 </div>
                 <div class="stat-item">
-                  <span class="label">最佳负载率</span>
-                  <span class="value highlight">40-70%</span>
+                  <span class="label">收益单位</span>
+                  <span class="value highlight">kWh/年、元/年</span>
                 </div>
                 <div class="stat-item">
-                  <span class="label">节能建议</span>
-                  <span class="value">{{ deviceOptimization.ups?.recommendation || '运行正常' }}</span>
+                  <span class="label">无结果策略</span>
+                  <span class="value">显示 0，不生成模拟值</span>
                 </div>
               </div>
             </el-card>
           </el-col>
           <el-col :span="8">
             <el-card shadow="hover" class="device-category-card">
-              <template #header>
-                <div class="category-header">
-                  <el-icon :size="24" color="#faad14"><Sunrise /></el-icon>
-                  <span>照明系统优化</span>
-                </div>
-              </template>
+              <template #header>闭环路径</template>
               <div class="category-stats">
                 <div class="stat-item">
-                  <span class="label">当前功耗</span>
-                  <span class="value">{{ deviceOptimization.lighting?.currentPower || 0 }} kW</span>
+                  <span class="label">1</span>
+                  <span class="value">算法识别建议</span>
                 </div>
                 <div class="stat-item">
-                  <span class="label">节能潜力</span>
-                  <span class="value highlight">{{ deviceOptimization.lighting?.savingPotential || 0 }}%</span>
+                  <span class="label">2</span>
+                  <span class="value highlight">加入并审核节能机会</span>
                 </div>
                 <div class="stat-item">
-                  <span class="label">建议措施</span>
-                  <span class="value">{{ deviceOptimization.lighting?.recommendation || '分区控制' }}</span>
+                  <span class="label">3</span>
+                  <span class="value">执行计划与效果追踪</span>
                 </div>
               </div>
             </el-card>
@@ -377,7 +373,7 @@
       </el-tab-pane>
 
       <!-- VPP需求响应 -->
-      <el-tab-pane label="VPP需求响应" name="vpp">
+      <el-tab-pane label="VPP需求响应" name="vpp" lazy>
         <div class="tab-header">
           <el-button type="primary" @click="loadVPPStatus" :loading="loading.vpp">
             <el-icon><Refresh /></el-icon>刷新状态
@@ -390,18 +386,26 @@
         <!-- VPP状态概览 -->
         <el-row :gutter="20" class="summary-row">
           <el-col :span="6">
-            <el-statistic title="可调节容量(kW)" :value="vppStatus.adjustableCapacity || 0" :precision="0" />
+            <el-statistic title="向下可调容量(kW)" :value="vppStatus.adjustableCapacity || 0" :precision="0" />
           </el-col>
           <el-col :span="6">
-            <el-statistic title="响应成功率" :value="vppStatus.responseSuccessRate || 0" suffix="%" :precision="1" />
+            <el-statistic title="指令接受率" :value="vppStatus.responseSuccessRate || 0" suffix="%" :precision="1" />
           </el-col>
           <el-col :span="6">
-            <el-statistic title="累计收益(元)" :value="vppStatus.totalEarnings || 0" :precision="0" />
+            <el-statistic title="累计估算收益(元)" :value="vppStatus.totalEarnings || 0" :precision="0" />
           </el-col>
           <el-col :span="6">
             <el-statistic title="本月响应次数" :value="vppStatus.monthlyResponseCount || 0" />
           </el-col>
         </el-row>
+
+        <el-alert
+          v-if="vppStatus.availabilityMessage"
+          type="warning"
+          :closable="false"
+          :title="vppStatus.availabilityMessage"
+          style="margin-bottom: 16px;"
+        />
 
         <!-- 当前响应状态 -->
         <el-card shadow="hover" style="margin-top: 20px;">
@@ -409,7 +413,7 @@
             <div class="card-header">
               <span>需求响应状态</span>
               <el-tag :type="vppStatus.isActive ? 'success' : 'info'" size="large">
-                {{ vppStatus.isActive ? '响应中' : '待命' }}
+                {{ vppStatus.availabilityMessage ? '未接入' : (vppStatus.isActive ? '响应中' : '待命') }}
               </el-tag>
             </div>
           </template>
@@ -417,7 +421,7 @@
             <el-row :gutter="20">
               <el-col :span="12">
                 <div class="status-section">
-                  <h4>当前响应信息</h4>
+                  <h4>最近接受的指令</h4>
                   <el-descriptions :column="1" border>
                     <el-descriptions-item label="响应类型">
                       {{ vppStatus.currentResponse?.type || '无' }}
@@ -431,7 +435,7 @@
                     <el-descriptions-item label="目标削减">
                       {{ vppStatus.currentResponse?.targetReduction || 0 }} kW
                     </el-descriptions-item>
-                    <el-descriptions-item label="实际削减">
+                    <el-descriptions-item label="接受功率">
                       {{ vppStatus.currentResponse?.actualReduction || 0 }} kW
                     </el-descriptions-item>
                   </el-descriptions>
@@ -467,16 +471,16 @@
             <el-table-column prop="duration" label="持续时间" width="100" />
             <el-table-column prop="targetReduction" label="目标削减(kW)" width="120" />
             <el-table-column prop="actualReduction" label="实际削减(kW)" width="120" />
-            <el-table-column prop="completionRate" label="完成率" width="100">
+            <el-table-column prop="completionRate" label="接受率" width="100">
               <template #default="{ row }">
                 <el-progress :percentage="row.completionRate || 0" :stroke-width="10" />
               </template>
             </el-table-column>
             <el-table-column prop="earnings" label="收益(元)" width="100" />
-            <el-table-column prop="status" label="状态" width="80">
+            <el-table-column prop="status" label="状态" width="100">
               <template #default="{ row }">
-                <el-tag :type="row.status === 'completed' ? 'success' : 'danger'" size="small">
-                  {{ row.status === 'completed' ? '完成' : '失败' }}
+                <el-tag :type="getVppStatusType(row.status)" size="small">
+                  {{ getVppStatusText(row.status) }}
                 </el-tag>
               </template>
             </el-table-column>
@@ -485,13 +489,13 @@
       </el-tab-pane>
 
       <!-- V4.0: 调度与报告 - 合并负荷调度和优化报告 -->
-      <el-tab-pane label="调度与报告" name="schedule">
+      <el-tab-pane label="调度与报告" name="schedule" lazy>
         <!-- 使用子Tab切换调度和报告 -->
         <el-tabs v-model="scheduleSubTab" type="card" class="sub-tabs">
           <el-tab-pane label="负荷调度" name="dispatch">
             <ScheduleDashboard />
           </el-tab-pane>
-          <el-tab-pane label="优化报告" name="report">
+          <el-tab-pane label="优化报告" name="report" lazy>
             <OptimizationReport />
           </el-tab-pane>
         </el-tabs>
@@ -503,7 +507,7 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, watch, computed, nextTick } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import { Refresh, Sunny, Sunrise, DataAnalysis } from '@element-plus/icons-vue'
+import { Refresh, DataAnalysis } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import * as echarts from 'echarts'
 import {
@@ -514,6 +518,8 @@ import {
   getDemandOptimizationPlan,
   getDemandAggregatedCurve,
   getMeterPoints,
+  runSingleAnalysis,
+  type AnalysisSuggestion,
   type DemandConfigAnalysisResult,
   type DeviceShiftAnalysisResult,
   type Demand15MinDataPoint,
@@ -522,6 +528,12 @@ import {
   type DemandAggregatedCurveResponse,
   type MeterPoint
 } from '@/api/modules/energy'
+import {
+  getVppCapacity,
+  getVppDispatches,
+  getVppStatistics,
+  type VppDispatch
+} from '@/api/modules/precool'
 import { getLoadPeriodDistribution, type LoadPeriodData, type HourlyLoadPoint } from '@/api/modules/demand'
 import { createOpportunity, getExecutionPlanDetail, type EnergyOpportunity, type OpportunityCategory } from '@/api/modules/opportunities'
 import LoadPeriodChart from '@/components/demand/LoadPeriodChart.vue'
@@ -534,9 +546,11 @@ const router = useRouter()
 const route = useRoute()
 
 const activeTab = ref('overview')
+const overviewRefreshKey = ref(0)
 const scheduleSubTab = ref('dispatch')
 const demandChartRef = ref<HTMLElement>()
 let demandChart: echarts.ECharts | null = null
+let demandChartRetryTimer: number | null = null
 
 // 计量点选择
 const meterPoints = ref<MeterPoint[]>([])
@@ -569,20 +583,24 @@ const analysisDaysOptions = [
 ]
 
 // 设备运行优化数据
+interface DeviceOptimizationSuggestion extends AnalysisSuggestion {
+  related_devices_text: string
+  saving_kwh: number
+  saving_cost: number
+  adding: boolean
+}
+
 const deviceOptimization = ref<{
   optimizableCount: number
   totalSavingKwh: number
   totalSavingCost: number
-  avgEfficiencyGain: number
-  suggestions: any[]
-  hvac?: { pueContribution: number; savingPotential: number; recommendedTemp: number }
-  ups?: { loadRate: number; recommendation: string }
-  lighting?: { currentPower: number; savingPotential: number; recommendation: string }
+  avgConfidence: number
+  suggestions: DeviceOptimizationSuggestion[]
 }>({
   optimizableCount: 0,
   totalSavingKwh: 0,
   totalSavingCost: 0,
-  avgEfficiencyGain: 0,
+  avgConfidence: 0,
   suggestions: []
 })
 
@@ -593,6 +611,7 @@ const vppStatus = ref<{
   totalEarnings: number
   monthlyResponseCount: number
   isActive: boolean
+  availabilityMessage: string
   currentResponse?: {
     type: string
     startTime: string
@@ -608,6 +627,7 @@ const vppStatus = ref<{
   totalEarnings: 0,
   monthlyResponseCount: 0,
   isActive: false,
+  availabilityMessage: '',
   adjustableResources: [],
   historyRecords: []
 })
@@ -782,22 +802,10 @@ const handleCreateShiftOpportunity = async (data: {
     console.error('[analysis.vue] ❌ Exception in handleCreateShiftOpportunity:', e)
     console.error('[analysis.vue] Error stack:', e.stack)
 
-    // 开发环境：即使API失败也提示成功并跳转，方便前端测试
-    if (import.meta.env.DEV) {
-      console.warn('[analysis.vue] DEV mode: Showing success despite error for testing')
-      ElMessage.warning({
-        message: '开发模式：跳过API错误，直接跳转到节能中心',
-        duration: 2000
-      })
-      setTimeout(() => {
-        router.push('/energy/center')
-      }, 1000)
-    } else {
-      ElMessage.error({
-        message: `创建节能机会失败: ${e.message || '网络错误，请稍后重试'}`,
-        duration: 3000
-      })
-    }
+    ElMessage.error({
+      message: `创建节能机会失败: ${e.message || '网络错误，请稍后重试'}`,
+      duration: 3000
+    })
   } finally {
     console.log('[analysis.vue] ========== CREATE OPPORTUNITY ENDED ==========')
   }
@@ -811,71 +819,176 @@ const shiftableDevices = computed(() =>
 const loadDeviceOptimization = async () => {
   loading.value.device = true
   try {
-    // 模拟数据 - 实际应调用后端API
+    const res = await runSingleAnalysis('equipment_efficiency', {
+      days: 30,
+      save_results: false
+    })
+    const suggestions = (res.data?.suggestions || []).map((item): DeviceOptimizationSuggestion => ({
+      ...item,
+      related_devices_text: item.related_devices?.join('、') || '设备整体',
+      saving_kwh: Number(item.estimated_saving || 0),
+      saving_cost: Number(item.estimated_cost_saving || 0),
+      adding: false
+    }))
+
     deviceOptimization.value = {
-      optimizableCount: 12,
-      totalSavingKwh: 8500,
-      totalSavingCost: 6800,
-      avgEfficiencyGain: 15.5,
-      suggestions: [
-        { device_name: '精密空调-1', device_type: '空调', current_efficiency: 75, target_efficiency: 90, saving_kwh: 2000, saving_cost: 1600, recommendation: '调整设定温度至25°C，优化送风模式' },
-        { device_name: '精密空调-2', device_type: '空调', current_efficiency: 72, target_efficiency: 88, saving_kwh: 1800, saving_cost: 1440, recommendation: '清洗滤网，检查制冷剂' },
-        { device_name: 'UPS-A', device_type: 'UPS', current_efficiency: 85, target_efficiency: 92, saving_kwh: 1200, saving_cost: 960, recommendation: '优化负载分配，提高负载率' },
-        { device_name: '照明系统-机房', device_type: '照明', current_efficiency: 60, target_efficiency: 85, saving_kwh: 800, saving_cost: 640, recommendation: '更换LED灯具，启用分区控制' }
-      ],
-      hvac: { pueContribution: 35, savingPotential: 3800, recommendedTemp: 25 },
-      ups: { loadRate: 45, recommendation: '可适当增加负载' },
-      lighting: { currentPower: 15, savingPotential: 30, recommendation: '分区控制+传感器' }
+      optimizableCount: new Set(suggestions.flatMap(item => item.related_devices || [])).size,
+      totalSavingKwh: suggestions.reduce((sum, item) => sum + item.saving_kwh, 0),
+      totalSavingCost: suggestions.reduce((sum, item) => sum + item.saving_cost, 0),
+      avgConfidence: suggestions.length
+        ? suggestions.reduce((sum, item) => sum + Number(item.confidence || 0), 0) / suggestions.length
+        : 0,
+      suggestions
     }
   } catch (e) {
     console.error('加载设备优化数据失败', e)
+    deviceOptimization.value = {
+      optimizableCount: 0,
+      totalSavingKwh: 0,
+      totalSavingCost: 0,
+      avgConfidence: 0,
+      suggestions: []
+    }
   } finally {
     loading.value.device = false
   }
 }
 
-// 执行设备优化
-const executeDeviceOptimization = (row: any) => {
-  router.push({
-    path: '/energy/execution',
-    query: {
-      type: 'device_optimization',
-      device_name: row.device_name
-    }
-  })
+const getAnalysisPriorityText = (priority: string) => {
+  const normalized = priority.toLowerCase()
+  return ({ critical: '紧急', high: '高', medium: '中', low: '低' } as Record<string, string>)[normalized] || priority
+}
+
+const getAnalysisPriorityType = (priority: string) => {
+  const normalized = priority.toLowerCase()
+  return normalized === 'critical' || normalized === 'high'
+    ? 'danger'
+    : normalized === 'medium' ? 'warning' : 'info'
+}
+
+const addDeviceOpportunity = async (row: DeviceOptimizationSuggestion) => {
+  row.adding = true
+  try {
+    const normalizedPriority = row.priority.toLowerCase()
+    await createOpportunity({
+      category: 2,
+      title: row.title,
+      description: row.description,
+      priority: normalizedPriority === 'critical' || normalizedPriority === 'high'
+        ? 'high'
+        : normalizedPriority === 'low' ? 'low' : 'medium',
+      status: 'discovered',
+      potential_saving: row.saving_cost,
+      confidence: Math.min(Math.max(Number(row.confidence || 0) / 100, 0), 1),
+      source_plugin: 'equipment_efficiency',
+      analysis_data: {
+        detail: row.detail,
+        description: row.description,
+        estimated_saving_kwh: row.saving_kwh,
+        implementation_difficulty: row.implementation_difficulty,
+        payback_period: row.payback_period,
+        related_devices: row.related_devices
+      }
+    })
+    ElMessage.success('已加入节能中心，可继续审核并生成执行计划')
+    overviewRefreshKey.value += 1
+    activeTab.value = 'overview'
+  } catch (e) {
+    console.error('创建设备优化机会失败', e)
+  } finally {
+    row.adding = false
+  }
 }
 
 // 加载VPP状态
 const loadVPPStatus = async () => {
   loading.value.vpp = true
   try {
-    // 模拟数据 - 实际应调用后端API
+    const [capacityRes, dispatchRes, statisticsRes] = await Promise.all([
+      getVppCapacity(),
+      getVppDispatches({ page: 1, page_size: 20 }),
+      getVppStatistics()
+    ])
+    const capacity = capacityRes.code === 200 ? capacityRes.data : null
+    const dispatches = dispatchRes.code === 200 ? (dispatchRes.data?.items || []) : []
+    const statistics = statisticsRes.code === 200 ? statisticsRes.data : null
+    const latestAccepted = dispatches.find(item => item.status === 'accepted')
+
     vppStatus.value = {
-      adjustableCapacity: 500,
-      responseSuccessRate: 92.5,
-      totalEarnings: 125000,
-      monthlyResponseCount: 8,
+      adjustableCapacity: Number(capacity?.down_adjustable_kw || 0),
+      responseSuccessRate: Number(statistics?.all_time.response_success_rate || 0),
+      totalEarnings: Number(statistics?.all_time.estimated_savings_yuan || 0),
+      monthlyResponseCount: Number(statistics?.monthly.count || 0),
       isActive: false,
-      currentResponse: undefined,
-      adjustableResources: [
-        { name: '空调负荷群', type: '柔性', capacity: 200, status: 'ready' },
-        { name: 'UPS负荷', type: '可中断', capacity: 150, status: 'ready' },
-        { name: '照明负荷', type: '柔性', capacity: 50, status: 'ready' },
-        { name: '储能系统', type: '储能', capacity: 100, status: 'busy' }
-      ],
-      historyRecords: [
-        { date: '2026-01-25', type: '削峰', duration: '2小时', targetReduction: 300, actualReduction: 285, completionRate: 95, earnings: 8500, status: 'completed' },
-        { date: '2026-01-20', type: '削峰', duration: '3小时', targetReduction: 400, actualReduction: 380, completionRate: 95, earnings: 11400, status: 'completed' },
-        { date: '2026-01-15', type: '填谷', duration: '4小时', targetReduction: 200, actualReduction: 200, completionRate: 100, earnings: 4000, status: 'completed' },
-        { date: '2026-01-10', type: '削峰', duration: '2小时', targetReduction: 350, actualReduction: 280, completionRate: 80, earnings: 5600, status: 'completed' }
-      ]
+      availabilityMessage: capacityRes.code === 403
+        ? capacityRes.message
+        : capacityRes.code !== 200 ? `VPP 容量服务异常：${capacityRes.message}` : '',
+      currentResponse: latestAccepted ? mapCurrentVppResponse(latestAccepted) : undefined,
+      adjustableResources: (capacity?.zones || []).map(zone => ({
+        name: zone.zone_name,
+        type: '制冷区域',
+        capacity: zone.down_adjustable_kw,
+        status: zone.down_adjustable_kw > 0 ? 'ready' : 'unavailable'
+      })),
+      historyRecords: dispatches.map(mapVppHistoryRecord)
     }
   } catch (e) {
     console.error('加载VPP状态失败', e)
+    vppStatus.value = {
+      adjustableCapacity: 0,
+      responseSuccessRate: 0,
+      totalEarnings: 0,
+      monthlyResponseCount: 0,
+      isActive: false,
+      availabilityMessage: 'VPP 服务不可用，未使用模拟数据',
+      adjustableResources: [],
+      historyRecords: []
+    }
   } finally {
     loading.value.vpp = false
   }
 }
+
+const getVppTypeText = (commandType: VppDispatch['command_type']) =>
+  commandType === 'down_adjust' ? '削峰' : '填谷'
+
+const mapCurrentVppResponse = (dispatch: VppDispatch) => {
+  const start = dispatch.created_at ? new Date(dispatch.created_at) : null
+  const end = start ? new Date(start.getTime() + dispatch.duration_minutes * 60_000) : null
+  return {
+    type: getVppTypeText(dispatch.command_type),
+    startTime: start?.toLocaleString() || '-',
+    endTime: end?.toLocaleString() || '-',
+    targetReduction: Number(dispatch.target_power_kw || 0),
+    actualReduction: Number(dispatch.accepted_power_kw || 0)
+  }
+}
+
+const mapVppHistoryRecord = (dispatch: VppDispatch) => {
+  const acceptedPower = Number(dispatch.accepted_power_kw || 0)
+  const targetPower = Number(dispatch.target_power_kw || 0)
+  return {
+    date: dispatch.created_at?.slice(0, 10) || '-',
+    type: getVppTypeText(dispatch.command_type),
+    duration: `${dispatch.duration_minutes}分钟`,
+    targetReduction: targetPower,
+    actualReduction: acceptedPower,
+    completionRate: targetPower > 0 ? Math.min(acceptedPower / targetPower * 100, 100) : 0,
+    earnings: dispatch.status === 'accepted'
+      ? acceptedPower * dispatch.duration_minutes / 60 * 0.5
+      : 0,
+    status: dispatch.status
+  }
+}
+
+const getVppStatusText = (status: VppDispatch['status']) => ({
+  received: '已接收',
+  accepted: '已接受',
+  rejected: '已拒绝'
+})[status]
+
+const getVppStatusType = (status: VppDispatch['status']) =>
+  status === 'accepted' ? 'success' : status === 'rejected' ? 'danger' : 'warning'
 
 // 跳转到VPP方案分析
 const goToVPPAnalysis = () => {
@@ -1007,12 +1120,20 @@ async function loadMeterPoints() {
 }
 
 onUnmounted(() => {
+  if (demandChartRetryTimer !== null) window.clearTimeout(demandChartRetryTimer)
   demandChart?.dispose()
 })
 
 function initChart() {
   console.log('[analysis.vue] initChart called, demandChartRef.value:', demandChartRef.value)
   if (demandChartRef.value) {
+    const existingChart = echarts.getInstanceByDom(demandChartRef.value)
+    if (existingChart) {
+      demandChart = existingChart
+      demandChart.resize()
+      return
+    }
+
     // 检查容器尺寸
     const rect = demandChartRef.value.getBoundingClientRect()
     console.log('[analysis.vue] Chart container size:', rect.width, 'x', rect.height)
@@ -1020,15 +1141,17 @@ function initChart() {
     if (rect.width === 0 || rect.height === 0) {
       console.warn('[analysis.vue] Chart container has zero size, will retry after delay')
       // 延迟重试初始化
-      setTimeout(() => {
-        if (demandChartRef.value && !demandChart) {
+      if (demandChartRetryTimer !== null) window.clearTimeout(demandChartRetryTimer)
+      demandChartRetryTimer = window.setTimeout(() => {
+        demandChartRetryTimer = null
+        if (activeTab.value === 'demand' && demandChartRef.value && !demandChart) {
           const retryRect = demandChartRef.value.getBoundingClientRect()
           console.log('[analysis.vue] Retry init, container size:', retryRect.width, 'x', retryRect.height)
-          demandChart = echarts.init(demandChartRef.value)
-          demandChart.resize()
-          // 如果有数据，重新渲染
-          if (aggregatedCurveData.value) {
-            updateAggregatedDemandChart()
+          if (retryRect.width > 0 && retryRect.height > 0) {
+            initChart()
+            if (aggregatedCurveData.value) {
+              updateAggregatedDemandChart()
+            }
           }
         }
       }, 300)
@@ -1155,19 +1278,20 @@ function updateAggregatedDemandChart() {
   const option: echarts.EChartsOption = {
     tooltip: {
       trigger: 'axis',
+      renderMode: 'richText',
       formatter: (params: any) => {
         if (!Array.isArray(params) || params.length === 0) return ''
         const idx = params[0].dataIndex
         const point = points[idx]
-        let html = `<b>${point.time}</b><br/>`
-        html += `平均需量: ${point.avg_demand.toFixed(1)} kW<br/>`
-        html += `最大需量: ${point.max_demand.toFixed(1)} kW<br/>`
-        html += `最小需量: ${point.min_demand.toFixed(1)} kW<br/>`
+        let text = `${point.time}\n`
+        text += `平均需量: ${point.avg_demand.toFixed(1)} kW\n`
+        text += `最大需量: ${point.max_demand.toFixed(1)} kW\n`
+        text += `最小需量: ${point.min_demand.toFixed(1)} kW\n`
         if (point.over_declared_ratio > 0) {
-          html += `<span style="color:#f56c6c">超申报比例: ${point.over_declared_ratio.toFixed(1)}%</span><br/>`
+          text += `超申报比例: ${point.over_declared_ratio.toFixed(1)}%\n`
         }
-        html += `数据点数: ${point.data_count}`
-        return html
+        text += `数据点数: ${point.data_count}`
+        return text
       }
     },
     legend: {
@@ -1289,9 +1413,10 @@ function updateDemandChart() {
   const option: echarts.EChartsOption = {
     tooltip: {
       trigger: 'axis',
+      renderMode: 'richText',
       formatter: (params: any) => {
         const d = params[0]
-        return `${d.axisValue}<br/>需量: ${d.value?.toFixed(1)} kW<br/>利用率: ${((d.value / declaredDemand) * 100).toFixed(1)}%`
+        return `${d.axisValue}\n需量: ${d.value?.toFixed(1)} kW\n利用率: ${((d.value / declaredDemand) * 100).toFixed(1)}%`
       }
     },
     legend: {

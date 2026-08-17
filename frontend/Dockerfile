@@ -19,8 +19,10 @@ FROM nginx:alpine
 
 ARG VCS_REF=unknown
 ARG STORY_SOURCE_SNAPSHOT=unknown
+ARG STORY_39_2_SOURCE_SNAPSHOT=unknown
 LABEL org.opencontainers.image.revision="${VCS_REF}" \
-      io.dcim.story-39-1.source-snapshot-sha256="${STORY_SOURCE_SNAPSHOT}"
+      io.dcim.story-39-1.source-snapshot-sha256="${STORY_SOURCE_SNAPSHOT}" \
+      io.dcim.story-39-2.source-snapshot-sha256="${STORY_39_2_SOURCE_SNAPSHOT}"
 
 # 复制构建产物
 COPY --from=build /app/dist /usr/share/nginx/html

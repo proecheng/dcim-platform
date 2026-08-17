@@ -11,6 +11,15 @@ from typing import Any, Callable, Coroutine, Optional
 
 logger = logging.getLogger(__name__)
 
+_DEVELOPMENT_GATEWAY_SECRET = "default-secret-key-change-in-production"
+
+
+def _is_unsafe_gateway_secret(value: Optional[str]) -> bool:
+    normalized = (value or "").strip().lower()
+    markers = ("change-this", "change_me", "change-me", "default", "placeholder", "required-")
+    return len(normalized) < 32 or any(marker in normalized for marker in markers)
+
+
 # psutil 可选依赖
 try:
     import psutil
@@ -40,7 +49,12 @@ class StatusReporter:
         self._version = version
         self._capabilities = capabilities or []
         self._interval = interval
-        self._secret_key = secret_key or os.getenv("GATEWAY_SECRET_KEY", "default-secret-key-change-in-production")
+        configured_secret = secret_key or os.getenv("GATEWAY_SECRET_KEY")
+        if os.getenv("APP_ENV", "development").strip().lower() == "production" and _is_unsafe_gateway_secret(
+            configured_secret
+        ):
+            raise ValueError("GATEWAY_SECRET_KEY must be explicitly configured for production")
+        self._secret_key = configured_secret or _DEVELOPMENT_GATEWAY_SECRET
         self._task: Optional[asyncio.Task] = None
         self._running = False
 

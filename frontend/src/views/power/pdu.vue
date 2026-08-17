@@ -544,14 +544,13 @@ async function confirmDelete(row: PDUItem) {
     '1) 配电拓扑页中的该PDU节点',
     '2) 机柜PDU监控页中的该PDU记录',
     '3) 该PDU相关联的下级点位（如存在）'
-  ].join('<br/>')
+  ].join('\n')
 
   try {
     await ElMessageBox.confirm(message, '删除确认', {
       type: 'warning',
       confirmButtonText: '确定删除',
-      cancelButtonText: '取消',
-      dangerouslyUseHTMLString: true
+      cancelButtonText: '取消'
     })
 
     saving.value = true

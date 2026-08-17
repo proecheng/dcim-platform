@@ -17,10 +17,13 @@ export function createLabelRenderer(container: HTMLElement): CSS2DRenderer {
 export function createPowerLabel(power: number, name: string): CSS2DObject {
   const div = document.createElement('div')
   div.className = 'power-label'
-  div.innerHTML = `
-    <div class="label-name">${name}</div>
-    <div class="label-value">${power.toFixed(1)} kW</div>
-  `
+  const nameElement = document.createElement('div')
+  nameElement.className = 'label-name'
+  nameElement.textContent = name
+  const valueElement = document.createElement('div')
+  valueElement.className = 'label-value'
+  valueElement.textContent = `${power.toFixed(1)} kW`
+  div.append(nameElement, valueElement)
   div.style.cssText = `
     background: rgba(0, 20, 40, 0.85);
     border: 1px solid rgba(0, 136, 255, 0.5);
@@ -48,7 +51,10 @@ export function createTemperatureLabel(temp: number): CSS2DObject {
   else if (temp > 26) color = '#ffcc00' // 偏热
   else if (temp < 18) color = '#0066ff' // 过冷
 
-  div.innerHTML = `<span style="color: ${color}">${temp.toFixed(1)}°C</span>`
+  const valueElement = document.createElement('span')
+  valueElement.style.color = color
+  valueElement.textContent = `${temp.toFixed(1)}°C`
+  div.appendChild(valueElement)
   div.style.cssText = `
     background: rgba(0, 0, 0, 0.7);
     border-radius: 3px;
@@ -67,7 +73,8 @@ export function createTemperatureLabel(temp: number): CSS2DObject {
 export function updateLabelContent(label: CSS2DObject, content: string): void {
   const div = label.element as HTMLDivElement
   if (div) {
-    div.innerHTML = content
+    div.replaceChildren()
+    div.textContent = content
   }
 }
 

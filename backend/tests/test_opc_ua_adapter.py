@@ -16,6 +16,8 @@ sys.path.insert(0, _root)
 
 def _load_module(name: str, filepath: str) -> types.ModuleType:
     """直接加载 .py 文件为模块，绕过 __init__.py"""
+    if name in sys.modules:
+        return sys.modules[name]
     spec = importlib.util.spec_from_file_location(name, filepath)
     mod = importlib.util.module_from_spec(spec)
     sys.modules[name] = mod

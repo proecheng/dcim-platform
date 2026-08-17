@@ -215,6 +215,7 @@ function renderChart() {
       },
       tooltip: {
         trigger: 'axis',
+        renderMode: 'richText',
         formatter: (params: any) => {
           const point = params[0]
           const period = periods[point.dataIndex]
@@ -225,7 +226,7 @@ function renderChart() {
             valley: '谷时',
             deep_valley: '深谷'
           }
-          return `${point.axisValue}时<br/>负荷: ${point.value} kW<br/>时段: ${periodName[period] || period}`
+          return `${point.axisValue}时\n负荷: ${point.value} kW\n时段: ${periodName[period] || period}`
         }
       },
       xAxis: {

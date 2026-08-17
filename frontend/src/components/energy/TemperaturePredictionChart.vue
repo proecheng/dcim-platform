@@ -103,14 +103,15 @@ const renderChart = (data: PredictResponse) => {
   const option: EChartsOption = {
     tooltip: {
       trigger: 'axis',
+      renderMode: 'richText',
       formatter: (params: any) => {
         if (!Array.isArray(params) || params.length === 0) return ''
-        let html = `<strong>${params[0].axisValue}</strong><br/>`
+        let text = `${params[0].axisValue}\n`
         for (const p of params) {
           if (p.seriesName === '误差下界' || p.seriesName === '误差带') continue
-          html += `${p.marker} ${p.seriesName}: ${p.value}°C<br/>`
+          text += `${p.seriesName}: ${p.value}°C\n`
         }
-        return html
+        return text
       }
     },
     legend: {

@@ -404,12 +404,13 @@ function renderTimeline() {
 
   chartInstance.setOption({
     tooltip: {
+      renderMode: 'richText',
       formatter: (params: Record<string, unknown>) => {
         const val = (params as { value: [number, number, number, string] }).value
         const start = new Date(val[1]).toLocaleString('zh-CN')
         const end = new Date(val[2]).toLocaleString('zh-CN')
         const scope = scopeLabel(val[3] as ShieldScope)
-        return `${(params as { name: string }).name}<br/>范围: ${scope}<br/>${start} ~ ${end}`
+        return `${(params as { name: string }).name}\n范围: ${scope}\n${start} ~ ${end}`
       }
     },
     grid: { left: 160, right: 40, top: 10, bottom: 30 },

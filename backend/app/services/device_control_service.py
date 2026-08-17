@@ -14,6 +14,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_
 
 from ..models.energy import PowerDevice, LoadRegulationConfig, DeviceShiftConfig
+from .command_registry import (
+    CommandAuthorization,
+    CommandPolicyError,
+    authorize_command,
+    verify_device_regulation_authorization,
+)
 
 
 class ControlResult(str, Enum):
@@ -83,6 +89,7 @@ class DeviceControlService:
         target_value: float,
         scheduled_time: Optional[datetime] = None,
         force: bool = False,
+        command_authorization: Optional[CommandAuthorization] = None,
     ) -> ControlAction:
         """
         控制设备调节
@@ -92,11 +99,33 @@ class DeviceControlService:
             regulation_type: 调节类型 (temperature/brightness/load)
             target_value: 目标值
             scheduled_time: 计划执行时间（None表示立即执行）
-            force: 是否强制执行（忽略部分约束）
+            force: 是否强制执行（不绕过安全约束）
 
         Returns:
             ControlAction: 控制结果
         """
+        try:
+            verify_device_regulation_authorization(
+                command_authorization,
+                device_id=device_id,
+                regulation_type=regulation_type,
+                target_value=target_value,
+                force=force,
+            )
+        except (CommandPolicyError, ValueError) as exc:
+            return ControlAction(
+                device_id=device_id,
+                device_name="Unknown",
+                action_type=regulation_type,
+                current_value=0,
+                target_value=target_value,
+                unit="",
+                interface=ControlInterface.MANUAL,
+                result=ControlResult.FAILED,
+                message=str(exc),
+                executed_at=datetime.now(),
+            )
+
         # 1. 获取设备和调节配置
         device = await self._get_device(device_id)
         if not device:
@@ -175,8 +204,8 @@ class DeviceControlService:
 
         await self.log_control_action(action)
 
-        # 6. 更新配置中的当前值（模拟执行）
-        if result in [ControlResult.SUCCESS, ControlResult.SIMULATED]:
+        # 6. 只有真实控制成功才更新当前值；模拟结果不能冒充设备反馈。
+        if result == ControlResult.SUCCESS:
             reg_config.current_value = target_value
             await self.db.commit()
 
@@ -226,11 +255,6 @@ class DeviceControlService:
         if shift_config and shift_config.is_critical:
             if not force:
                 warnings.append("此设备为关键负荷，调节需谨慎")
-
-        # 如果force=True，忽略非致命错误
-        if force and reasons:
-            warnings.extend([f"[已忽略] {r}" for r in reasons])
-            reasons = []
 
         return {"is_allowed": len(reasons) == 0, "reasons": reasons, "warnings": warnings}
 
@@ -332,14 +356,29 @@ class DeviceControlService:
         Returns:
             控制结果列表
         """
-        results = []
+        prepared_controls = []
         for ctrl in controls:
+            authorization = authorize_command(
+                "device_regulation",
+                {
+                    "device_id": ctrl["device_id"],
+                    "regulation_type": ctrl["regulation_type"],
+                    "target_value": ctrl["target_value"],
+                    "force": ctrl.get("force", False),
+                },
+                entrypoint="device_control_batch",
+            )
+            prepared_controls.append((ctrl, authorization))
+
+        results = []
+        for ctrl, authorization in prepared_controls:
             action = await self.control_device_regulation(
                 device_id=ctrl["device_id"],
                 regulation_type=ctrl["regulation_type"],
                 target_value=ctrl["target_value"],
                 scheduled_time=ctrl.get("scheduled_time"),
                 force=ctrl.get("force", False),
+                command_authorization=authorization,
             )
             results.append(action)
         return results

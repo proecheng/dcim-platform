@@ -1,5 +1,6 @@
 """控制命令分级确认 API 测试 — Story 9-6"""
 
+import asyncio
 import pytest
 from datetime import datetime, timedelta
 
@@ -21,6 +22,7 @@ from app.api.deps import (
     require_operator,
     require_viewer,
 )
+from app.services import command_service
 
 
 # ============================================================
@@ -79,7 +81,7 @@ async def db_session(session_factory):
 @pytest.fixture
 def mock_admin():
     user = User()
-    user.id = 1
+    user.id = 2
     user.username = "test_admin"
     user.role = "admin"
     user.is_active = True
@@ -87,7 +89,17 @@ def mock_admin():
 
 
 @pytest.fixture
-async def app(db_session, mock_admin):
+def mock_operator():
+    user = User()
+    user.id = 1
+    user.username = "test_operator"
+    user.role = "operator"
+    user.is_active = True
+    return user
+
+
+@pytest.fixture
+async def app(db_session, mock_admin, mock_operator):
     from app.main import app as _app
 
     async def override_get_db():
@@ -97,7 +109,7 @@ async def app(db_session, mock_admin):
         return mock_admin
 
     async def override_require_operator():
-        return mock_admin
+        return mock_operator
 
     async def override_require_viewer():
         return mock_admin
@@ -172,6 +184,18 @@ async def test_submit_normal_command(client):
     assert data["status"] == "executed"
     assert data["audit_log_id"] is not None
     assert data.get("approval_id") is None
+
+
+@pytest.mark.anyio
+async def test_submit_uses_server_side_device_name_in_audit(client, db_session):
+    payload = {**NORMAL_CMD, "target_device_name": "伪造设备名称"}
+
+    response = await client.post(f"{BASE_URL}/submit", json=payload)
+
+    assert response.status_code == 200
+    audit_id = response.json()["audit_log_id"]
+    audit = (await db_session.execute(select(CommandAuditLog).where(CommandAuditLog.id == audit_id))).scalar_one()
+    assert audit.target_device_name == "空调-A01"
 
 
 @pytest.mark.anyio
@@ -266,6 +290,38 @@ async def test_approve_command(client):
 
 
 @pytest.mark.anyio
+async def test_self_approval_is_rejected_and_audited(client, db_session, app, mock_operator):
+    submit_data = await _submit_critical(client)
+    approval_id = submit_data["approval_id"]
+
+    async def override_require_admin():
+        return mock_operator
+
+    app.dependency_overrides[require_admin] = override_require_admin
+    response = await client.post(f"{BASE_URL}/approvals/{approval_id}/approve")
+
+    assert response.status_code == 400
+    assert "请求人不能审批" in response.json()["detail"]
+    approval = (await db_session.execute(select(CommandApproval).where(CommandApproval.id == approval_id))).scalar_one()
+    assert approval.status == "pending"
+    audit_events = (
+        (
+            await db_session.execute(
+                select(CommandAuditLog).where(
+                    CommandAuditLog.approval_id == approval_id,
+                    CommandAuditLog.result == "rejected",
+                )
+            )
+        )
+        .scalars()
+        .all()
+    )
+    assert len(audit_events) == 1
+    assert audit_events[0].operator_id == mock_operator.id
+    assert "自审批" in audit_events[0].result_message
+
+
+@pytest.mark.anyio
 async def test_approve_nonexistent(client):
     """批准不存在的审批工单，返回 404"""
     resp = await client.post(f"{BASE_URL}/approvals/99999/approve")
@@ -281,6 +337,88 @@ async def test_approve_already_approved(client):
     await client.post(f"{BASE_URL}/approvals/{approval_id}/approve")
     resp = await client.post(f"{BASE_URL}/approvals/{approval_id}/approve")
     assert resp.status_code == 400
+
+
+@pytest.mark.anyio
+async def test_approval_audit_is_append_only(client, db_session):
+    submit_data = await _submit_critical(client)
+    approval_id = submit_data["approval_id"]
+
+    await client.post(f"{BASE_URL}/approvals/{approval_id}/approve")
+
+    events = (
+        (
+            await db_session.execute(
+                select(CommandAuditLog).where(CommandAuditLog.approval_id == approval_id).order_by(CommandAuditLog.id)
+            )
+        )
+        .scalars()
+        .all()
+    )
+    assert [event.result for event in events] == ["pending", "success"]
+    assert events[0].result_message == "已提交审批，等待审批人确认"
+
+
+@pytest.mark.anyio
+async def test_concurrent_approval_has_exactly_one_success(tmp_path):
+    database_path = tmp_path / "command-concurrency.db"
+    concurrent_engine = create_async_engine(f"sqlite+aiosqlite:///{database_path}")
+    concurrent_sessions = async_sessionmaker(concurrent_engine, class_=AsyncSession, expire_on_commit=False)
+    async with concurrent_engine.begin() as connection:
+        await connection.run_sync(Base.metadata.create_all)
+    async with concurrent_sessions() as setup_session:
+        approval = CommandApproval(
+            command_type="power_off",
+            risk_level="critical",
+            target_device_id=2,
+            target_device_name="配电柜-B01",
+            command_content={"circuit": "B-01"},
+            requester_id=1,
+            requester_name="requester",
+            status="pending",
+            expired_at=datetime.now() + timedelta(minutes=30),
+        )
+        setup_session.add(approval)
+        await setup_session.commit()
+        approval_id = approval.id
+
+    async def approve(approver_id: int):
+        async with concurrent_sessions() as session:
+            try:
+                result = await command_service.approve_command(
+                    session,
+                    approval_id,
+                    approver_id=approver_id,
+                    approver_name=f"approver-{approver_id}",
+                )
+                return "success" if result is not None else "missing"
+            except ValueError:
+                return "rejected"
+
+    try:
+        outcomes = await asyncio.gather(approve(2), approve(3))
+
+        assert sorted(outcomes) == ["rejected", "success"]
+        async with concurrent_sessions() as session:
+            final_approval = (
+                await session.execute(select(CommandApproval).where(CommandApproval.id == approval_id))
+            ).scalar_one()
+            assert final_approval.status == "approved"
+            success_events = (
+                (
+                    await session.execute(
+                        select(CommandAuditLog).where(
+                            CommandAuditLog.approval_id == approval_id,
+                            CommandAuditLog.result == "success",
+                        )
+                    )
+                )
+                .scalars()
+                .all()
+            )
+            assert len(success_events) == 1
+    finally:
+        await concurrent_engine.dispose()
 
 
 # ============================================================
@@ -343,6 +481,33 @@ async def test_approval_timeout(client, db_session):
     assert approval_id in timeout_ids
 
 
+@pytest.mark.anyio
+async def test_reject_expired_approval_records_timeout(client, db_session):
+    submit_data = await _submit_critical(client)
+    approval_id = submit_data["approval_id"]
+    approval = (await db_session.execute(select(CommandApproval).where(CommandApproval.id == approval_id))).scalar_one()
+    approval.expired_at = datetime.now() - timedelta(minutes=1)
+    await db_session.commit()
+
+    response = await client.post(
+        f"{BASE_URL}/approvals/{approval_id}/reject",
+        json={"reason": "too late"},
+    )
+
+    assert response.status_code == 400
+    await db_session.refresh(approval)
+    assert approval.status == "timeout"
+    timeout_event = (
+        await db_session.execute(
+            select(CommandAuditLog).where(
+                CommandAuditLog.approval_id == approval_id,
+                CommandAuditLog.result == "timeout",
+            )
+        )
+    ).scalar_one()
+    assert timeout_event.operator_name == "test_admin"
+
+
 # ============================================================
 # Tests — GET /audit-logs
 # ============================================================
@@ -382,6 +547,43 @@ async def test_get_risk_configs(client):
     assert "ac_temp_set" in types
 
 
+@pytest.mark.anyio
+async def test_get_risk_configs_ignores_unknown_invalid_and_downgraded_legacy_rows(client, db_session):
+    from app.models.config import SystemConfig
+
+    db_session.add_all(
+        [
+            SystemConfig(
+                config_group="command_risk",
+                config_key="future_unclassified_command",
+                config_value="normal",
+                value_type="string",
+            ),
+            SystemConfig(
+                config_group="command_risk",
+                config_key="power_off",
+                config_value="normal",
+                value_type="string",
+            ),
+            SystemConfig(
+                config_group="command_risk",
+                config_key="ac_temp_set",
+                config_value="extreme",
+                value_type="string",
+            ),
+        ]
+    )
+    await db_session.commit()
+
+    response = await client.get(f"{BASE_URL}/risk-configs")
+
+    assert response.status_code == 200
+    config_map = {item["command_type"]: item["risk_level"] for item in response.json()}
+    assert "future_unclassified_command" not in config_map
+    assert config_map["power_off"] == "critical"
+    assert config_map["ac_temp_set"] == "normal"
+
+
 # ============================================================
 # Tests — PUT /risk-configs
 # ============================================================
@@ -389,24 +591,38 @@ async def test_get_risk_configs(client):
 
 @pytest.mark.anyio
 async def test_update_risk_configs(client):
-    """更新风险配置，验证变更生效"""
+    """普通命令可升级，关键命令不可降级。"""
     update_payload = {
         "configs": [
             {"command_type": "ac_temp_set", "risk_level": "critical", "description": "调整空调温度（升级为关键）"},
-            {"command_type": "power_off", "risk_level": "normal", "description": "切断电源（降级为普通）"},
         ]
     }
     resp = await client.put(f"{BASE_URL}/risk-configs", json=update_payload)
     assert resp.status_code == 200
     data = resp.json()
-    assert data["updated"] == 2
+    assert data["updated"] == 1
 
     # 验证配置已变更
     resp2 = await client.get(f"{BASE_URL}/risk-configs")
     configs = resp2.json()
     config_map = {c["command_type"]: c["risk_level"] for c in configs}
     assert config_map["ac_temp_set"] == "critical"
-    assert config_map["power_off"] == "normal"
+    assert config_map["power_off"] == "critical"
+
+
+@pytest.mark.anyio
+async def test_update_risk_configs_rejects_critical_downgrade(client):
+    response = await client.put(
+        f"{BASE_URL}/risk-configs",
+        json={
+            "configs": [
+                {"command_type": "power_off", "risk_level": "normal", "description": "unsafe downgrade"},
+            ]
+        },
+    )
+
+    assert response.status_code == 400
+    assert "最低风险等级" in response.json()["detail"]
 
 
 @pytest.mark.anyio

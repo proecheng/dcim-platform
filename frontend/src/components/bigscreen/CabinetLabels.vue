@@ -36,8 +36,7 @@ function createLabel(cabinetId: string, name: string, power: number, position: T
 
 // 更新标签内容 - 紧凑型设计，使用安全的DOM操作防止XSS
 function updateLabelDiv(div: HTMLDivElement, _name: string, power: number) {
-  // 清空现有内容
-  div.innerHTML = ''
+  div.replaceChildren()
 
   // 使用DOM API安全创建内容，防止XSS
   const powerDiv = document.createElement('div')

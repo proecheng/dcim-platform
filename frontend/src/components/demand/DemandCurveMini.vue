@@ -105,9 +105,10 @@ function renderChart() {
     },
     tooltip: {
       trigger: 'axis',
+      renderMode: 'richText',
       formatter: (params: any) => {
         const point = params[0]
-        return `${point.axisValue}<br/>最大需量: ${point.value} kW`
+        return `${point.axisValue}\n最大需量: ${point.value} kW`
       }
     },
     xAxis: {

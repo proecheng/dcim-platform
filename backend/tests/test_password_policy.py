@@ -11,7 +11,16 @@ from app.core.database import Base
 from app.models.user import User, PasswordHistory
 from app.models.config import SystemConfig
 from app.core.security import get_password_hash
-from app.api.deps import get_db, get_current_user, require_admin
+from app.api.deps import (
+    AuthenticatedUserContext,
+    SiteAccessContext,
+    enforce_inventory_authorization,
+    get_authenticated_user_context,
+    get_current_user,
+    get_db,
+    get_site_access_context,
+    require_admin,
+)
 from app.api.v1.auth import login_limiter
 from app.schemas.user import validate_password_complexity
 
@@ -75,9 +84,15 @@ async def app(db_session, mock_admin):
     async def override_require_admin():
         return mock_admin
 
+    identity = AuthenticatedUserContext(user=mock_admin, jti="test-jti", expires_at=4102444800.0)
+    site_context = SiteAccessContext(user_id=mock_admin.id, role="admin", jti="test-jti", site_ids=None)
+
     _app.dependency_overrides[get_db] = override_get_db
     _app.dependency_overrides[get_current_user] = override_get_current_user
     _app.dependency_overrides[require_admin] = override_require_admin
+    _app.dependency_overrides[enforce_inventory_authorization] = lambda: None
+    _app.dependency_overrides[get_authenticated_user_context] = lambda: identity
+    _app.dependency_overrides[get_site_access_context] = lambda: site_context
     login_limiter.attempts.clear()
     yield _app
     _app.dependency_overrides.clear()

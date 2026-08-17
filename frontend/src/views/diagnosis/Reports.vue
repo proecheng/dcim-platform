@@ -40,10 +40,9 @@
         <el-table-column prop="report_period" label="报告周期" width="120" />
         <el-table-column label="准确率" width="100">
           <template #default="{ row }">
-            <span v-if="row.summary?.accuracy_rate !== null">
-              {{ (row.summary.accuracy_rate * 100).toFixed(1) }}%
+            <span :class="{ 'text-muted': formatPercent(row.summary?.accuracy_rate) === 'N/A' }">
+              {{ formatPercent(row.summary?.accuracy_rate) }}
             </span>
-            <span v-else class="text-muted">N/A</span>
           </template>
         </el-table-column>
         <el-table-column label="误报次数" width="100">
@@ -58,7 +57,9 @@
         </el-table-column>
         <el-table-column label="标注覆盖率" width="120">
           <template #default="{ row }">
-            {{ (row.summary?.annotation_coverage * 100).toFixed(1) }}%
+            <span :class="{ 'text-muted': formatPercent(row.summary?.annotation_coverage) === 'N/A' }">
+              {{ formatPercent(row.summary?.annotation_coverage) }}
+            </span>
           </template>
         </el-table-column>
         <el-table-column prop="generated_at" label="生成时间" width="180">
@@ -113,7 +114,7 @@
           </el-descriptions>
         </div>
         <div class="report-content">
-          <div v-html="renderedContent" />
+          <SafeRichText :markdown="currentReport.content" />
         </div>
       </div>
       <template #footer>
@@ -156,7 +157,7 @@
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus } from '@element-plus/icons-vue'
-import { marked } from 'marked'
+import { SafeRichText } from '@/components/common'
 import {
   getMisdiagnosisReports,
   getMisdiagnosisReport,
@@ -184,7 +185,6 @@ const reportList = ref<SystemReport[]>([])
 // 报告详情
 const detailVisible = ref(false)
 const currentReport = ref<SystemReport | null>(null)
-const renderedContent = ref('')
 
 // 生成报告
 const generateVisible = ref(false)
@@ -233,9 +233,8 @@ const handleReset = () => {
 // 查看报告
 const handleView = async (report: SystemReport) => {
   try {
-    const detail = await getMisdiagnosisReport(report.id)
+    const detail = await getMisdiagnosisReport(report.report_period)
     currentReport.value = detail
-    renderedContent.value = marked(detail.content) as string
     detailVisible.value = true
   } catch (error: any) {
     ElMessage.error(error.message || '加载报告详情失败')
@@ -245,7 +244,7 @@ const handleView = async (report: SystemReport) => {
 // 导出PDF
 const handleExport = async (report: SystemReport) => {
   try {
-    const blob = await exportMisdiagnosisReport(report.id)
+    const blob = await exportMisdiagnosisReport(report.report_period)
     const url = window.URL.createObjectURL(blob)
     const link = document.createElement('a')
     link.href = url
@@ -325,6 +324,12 @@ const formatDateTime = (dateStr: string) => {
     minute: '2-digit',
     second: '2-digit'
   })
+}
+
+const formatPercent = (value: unknown) => {
+  return typeof value === 'number' && Number.isFinite(value)
+    ? `${(value * 100).toFixed(1)}%`
+    : 'N/A'
 }
 
 onMounted(() => {

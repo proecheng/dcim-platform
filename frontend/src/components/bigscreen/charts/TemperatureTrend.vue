@@ -34,10 +34,11 @@ const chartOption = computed<EChartsOption>(() => {
     },
     tooltip: {
       trigger: 'axis',
+      renderMode: 'richText',
       formatter: (params: unknown) => {
         const p = params as { name: string; value: number }[]
         if (p && p[0]) {
-          return `${p[0].name}<br/>温度: ${p[0].value}${props.unit}`
+          return `${p[0].name}\n温度: ${p[0].value}${props.unit}`
         }
         return ''
       }
