@@ -528,8 +528,7 @@ class TestShiftReports:
         _, token = admin_user
         resp = await client.post(
             f"{SHIFT}/reports/export",
-            params={"format": "excel"},
-            json={"report_type": "monthly", "year": 2025, "month": 6},
+            params={"report_type": "monthly", "year": 2025, "month": 6, "format": "excel"},
             headers=auth_headers(token),
         )
         # 可能 200 或 500（导出依赖外部库）
@@ -539,8 +538,7 @@ class TestShiftReports:
         _, token = admin_user
         resp = await client.post(
             f"{SHIFT}/reports/export",
-            params={"format": "docx"},
-            json={"report_type": "monthly"},
+            params={"report_type": "monthly", "year": 2025, "month": 6, "format": "docx"},
             headers=auth_headers(token),
         )
         assert resp.status_code == 422
