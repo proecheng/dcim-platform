@@ -396,8 +396,40 @@ class ConnectionManager:
         await self._close_contexts(revoked, 4001, "Unauthorized")
         return [context for context in candidates if context not in revoked and context.is_authorized]
 
-    async def broadcast_realtime(self, point_data: dict, *, site_id: Optional[int] = None) -> int:
-        return await self.broadcast({"type": "realtime", "data": point_data}, "realtime", site_id=site_id)
+    async def broadcast_realtime(self, point_data: dict | list[dict], *, site_id: Optional[int] = None) -> int:
+        if isinstance(point_data, dict):
+            return await self.broadcast({"type": "realtime", "data": point_data}, "realtime", site_id=site_id)
+
+        if (
+            not isinstance(point_data, list)
+            or not point_data
+            or any(not isinstance(item, dict) for item in point_data)
+            or type(site_id) is not int
+            or site_id <= 0
+        ):
+            logger.warning("Rejected malformed realtime batch broadcast: site_id=%s", site_id)
+            return 0
+
+        contexts = await self._revalidate_contexts(list(self.active_connections["realtime"]), force=True)
+        sent = 0
+        for context in contexts:
+            filtered_data = [
+                item
+                for item in point_data
+                if self._can_receive(
+                    context,
+                    {"data": item},
+                    site_id=site_id,
+                    global_message=False,
+                    target_roles=frozenset(),
+                )
+            ]
+            if filtered_data:
+                sent += await self._send_snapshot(
+                    [context],
+                    {"type": "realtime_batch", "data": filtered_data},
+                )
+        return sent
 
     async def broadcast_alarm(
         self, alarm_data: dict, *, site_id: Optional[int] = None, global_message: bool = False

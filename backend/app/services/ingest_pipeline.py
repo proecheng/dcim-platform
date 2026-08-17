@@ -664,8 +664,12 @@ async def _evaluate_alarms(
 
 async def _broadcast_realtime(points: list[IngestPoint]) -> None:
     """批量 WebSocket 广播实时数据"""
+    batches: dict[int, list[dict]] = {}
     for pt in points:
         meta = _point_meta_cache.get(pt.point_id, {})
+        site_id = meta.get("site_id")
+        if site_id is None:
+            continue
         data = {
             "point_id": pt.point_id,
             "point_code": meta.get("point_code", ""),
@@ -678,7 +682,10 @@ async def _broadcast_realtime(points: list[IngestPoint]) -> None:
             "source": pt.source,
             "timestamp": (pt.timestamp or datetime.now()).isoformat(),
         }
-        await ws_manager.broadcast_realtime(data, site_id=meta.get("site_id"))
+        batches.setdefault(site_id, []).append(data)
+
+    for site_id, data_list in batches.items():
+        await ws_manager.broadcast_realtime(data_list, site_id=site_id)
 
 
 async def _update_redis_cache(points: list[IngestPoint], now: datetime) -> None:

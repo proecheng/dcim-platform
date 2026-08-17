@@ -17,6 +17,11 @@ export type WebSocketChannel = 'alarms' | 'realtime' | 'system' | 'linkage'
 // 连接池：每个通道一个 WebSocketClient 实例
 const clients = new Map<WebSocketChannel, WebSocketClient>()
 
+type MessageHandler = (data: any) => void
+
+// 处理器独立于连接保存，站点切换重连后可以自动恢复。
+const handlers = new Map<WebSocketChannel, Map<string, Set<MessageHandler>>>()
+
 // Story 27.6: 订阅记录，disconnect 不丢失
 const subscriptions = new Map<WebSocketChannel, WebSocketSubscribeOptions>()
 
@@ -52,6 +57,44 @@ function withSiteScope(
   }
 }
 
+function attachHandlers(channel: WebSocketChannel, client: WebSocketClient): void {
+  const channelHandlers = handlers.get(channel)
+  if (!channelHandlers) return
+
+  for (const [type, typeHandlers] of channelHandlers) {
+    for (const handler of typeHandlers) {
+      client.on(type, handler)
+    }
+  }
+}
+
+function createClient(
+  channel: WebSocketChannel,
+  siteId: number | null = getCurrentSiteId(),
+): WebSocketClient {
+  const client = new WebSocketClient({
+    url: `/ws/${channel}`,
+    heartbeatInterval: 30000,
+    reconnectInterval: 3000,
+    maxReconnectAttempts: 10,
+  })
+
+  clients.set(channel, client)
+  attachHandlers(channel, client)
+
+  const options = subscriptions.get(channel)
+  if (options) {
+    client.subscribe(withSiteScope(options, siteId))
+  }
+
+  client.connect()
+  return client
+}
+
+function ensureClient(channel: WebSocketChannel): WebSocketClient {
+  return clients.get(channel) || createClient(channel)
+}
+
 // 辅助函数：获取客户端或警告
 function getClientOrWarn(channel: WebSocketChannel): WebSocketClient | null {
   const client = clients.get(channel)
@@ -67,20 +110,7 @@ const manager = {
    * 连接指定通道（如果已连接则复用）
    */
   connect(channel: WebSocketChannel): void {
-    const existing = clients.get(channel)
-    if (existing) {
-      return
-    }
-
-    const client = new WebSocketClient({
-      url: `/ws/${channel}`,
-      heartbeatInterval: 30000,
-      reconnectInterval: 3000,
-      maxReconnectAttempts: 10,
-    })
-
-    client.connect()
-    clients.set(channel, client)
+    ensureClient(channel)
   },
 
   /**
@@ -107,9 +137,26 @@ const manager = {
    * 注册消息处理器
    */
   on(channel: WebSocketChannel, type: string, handler: (data: any) => void): void {
-    const client = getClientOrWarn(channel)
-    if (client) {
-      client.on(type, handler)
+    let channelHandlers = handlers.get(channel)
+    if (!channelHandlers) {
+      channelHandlers = new Map()
+      handlers.set(channel, channelHandlers)
+    }
+
+    let typeHandlers = channelHandlers.get(type)
+    if (!typeHandlers) {
+      typeHandlers = new Set()
+      channelHandlers.set(type, typeHandlers)
+    }
+
+    const isNewHandler = !typeHandlers.has(handler)
+    typeHandlers.add(handler)
+
+    const existing = clients.get(channel)
+    if (existing) {
+      if (isNewHandler) existing.on(type, handler)
+    } else {
+      ensureClient(channel)
     }
   },
 
@@ -117,6 +164,15 @@ const manager = {
    * 移除消息处理器
    */
   off(channel: WebSocketChannel, type: string, handler?: (data: any) => void): void {
+    const channelHandlers = handlers.get(channel)
+    if (handler) {
+      channelHandlers?.get(type)?.delete(handler)
+      if (channelHandlers?.get(type)?.size === 0) channelHandlers.delete(type)
+    } else {
+      channelHandlers?.delete(type)
+    }
+    if (channelHandlers?.size === 0) handlers.delete(channel)
+
     const client = clients.get(channel)
     if (client) {
       client.off(type, handler)
@@ -130,9 +186,11 @@ const manager = {
     // 仅记录业务过滤器，站点范围始终由当前站点选择重新生成
     const baseOptions = withoutSiteScope(options)
     subscriptions.set(channel, baseOptions)
-    const client = getClientOrWarn(channel)
-    if (client) {
-      client.subscribe(withSiteScope(baseOptions, getCurrentSiteId()))
+    const existing = clients.get(channel)
+    if (existing) {
+      existing.subscribe(withSiteScope(baseOptions, getCurrentSiteId()))
+    } else {
+      createClient(channel)
     }
   },
 
@@ -165,18 +223,7 @@ const manager = {
 
     // 2. 重新连接所有通道
     for (const channel of channelsToReconnect) {
-      const options = subscriptions.get(channel)
-      const client = new WebSocketClient({
-        url: `/ws/${channel}`,
-        heartbeatInterval: 30000,
-        reconnectInterval: 3000,
-        maxReconnectAttempts: 10,
-      })
-      if (options) {
-        client.subscribe(withSiteScope(options, siteId))
-      }
-      client.connect()
-      clients.set(channel, client)
+      createClient(channel, siteId)
     }
   },
 }

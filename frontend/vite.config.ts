@@ -16,7 +16,7 @@ const proxy = {
   }
 }
 
-export default defineConfig({
+export default defineConfig(({ command }) => ({
   plugins: [
     vue(),
     AutoImport({
@@ -26,7 +26,7 @@ export default defineConfig({
     }),
     Components({
       resolvers: [ElementPlusResolver()],
-      dts: 'src/components.d.ts'
+      dts: command === 'serve' ? 'src/components.d.ts' : false
     })
   ],
   resolve: {
@@ -58,4 +58,4 @@ export default defineConfig({
     allowedHosts: ['powerlab.cn', 'localhost', '127.0.0.1'],
     proxy
   }
-})
+}))

@@ -49,6 +49,14 @@
 
     <!-- 分析结果展示 -->
     <template v-if="analysisResult">
+      <el-alert
+        v-if="!analysisResult.data_sufficient"
+        type="warning"
+        :closable="false"
+        title="分析数据不足，未知指标显示为 --"
+        :description="analysisResult.warnings.join('；')"
+        style="margin-bottom: 20px"
+      />
       <!-- 用电规模指标 -->
       <el-card class="metric-card">
         <template #header>
@@ -229,8 +237,9 @@
           <el-col :span="8">
             <div class="summary-item">
               <el-statistic
+                v-if="analysisResult.summary?.annual_total_benefit?.value != null"
                 title="年总收益"
-                :value="analysisResult.summary?.annual_total_benefit?.value || 0"
+                :value="analysisResult.summary.annual_total_benefit.value"
                 suffix="元/年"
               >
                 <template #prefix>
@@ -245,8 +254,9 @@
           <el-col :span="8">
             <div class="summary-item">
               <el-statistic
+                v-if="analysisResult.investment_return?.payback_period?.value != null"
                 title="投资回收期"
-                :value="analysisResult.investment_return?.payback_period?.value || 0"
+                :value="analysisResult.investment_return.payback_period.value"
                 :precision="2"
                 suffix="年"
               >
@@ -254,13 +264,18 @@
                   <el-icon><Clock /></el-icon>
                 </template>
               </el-statistic>
+              <div v-else class="summary-unavailable">
+                <span>投资回收期</span>
+                <strong>--</strong>
+              </div>
             </div>
           </el-col>
           <el-col :span="8">
             <div class="summary-item">
               <el-statistic
+                v-if="analysisResult.investment_return?.roi?.value != null"
                 title="投资收益率"
-                :value="analysisResult.investment_return?.roi?.value || 0"
+                :value="analysisResult.investment_return.roi.value"
                 :precision="2"
                 suffix="%"
               >
@@ -268,6 +283,10 @@
                   <el-icon><Odometer /></el-icon>
                 </template>
               </el-statistic>
+              <div v-else class="summary-unavailable">
+                <span>投资收益率</span>
+                <strong>--</strong>
+              </div>
             </div>
           </el-col>
         </el-row>
@@ -308,15 +327,23 @@ import { vppApi, type AnalysisResponse } from '@/api/modules/vpp'
 import MetricDisplay from '@/components/MetricDisplay.vue'
 
 const loading = ref(false)
-const analysisMonths = ref(['2025-01', '2025-03', '2025-06', '2025-08', '2025-10'])
-const dateRange = ref<[string, string]>(['2025-10-01', '2025-10-30'])
+const today = new Date()
+const formatMonth = (date: Date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
+const formatDate = (date: Date) => `${formatMonth(date)}-${String(date.getDate()).padStart(2, '0')}`
+const recentMonths = Array.from({ length: 12 }, (_, index) => {
+  const date = new Date(today.getFullYear(), today.getMonth() - 11 + index, 1)
+  return formatMonth(date)
+})
+
+const analysisMonths = ref(recentMonths.slice(-6))
+const dateRange = ref<[string, string]>([
+  formatDate(new Date(today.getFullYear(), today.getMonth(), 1)),
+  formatDate(today)
+])
 const analysisResult = ref<AnalysisResponse | null>(null)
 
 // 可选月份列表
-const availableMonths = ref([
-  '2025-01', '2025-02', '2025-03', '2025-04', '2025-05', '2025-06',
-  '2025-07', '2025-08', '2025-09', '2025-10', '2025-11', '2025-12'
-])
+const availableMonths = ref(recentMonths)
 
 /**
  * 运行分析

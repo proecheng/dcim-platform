@@ -106,7 +106,7 @@
         </div>
 
         <!-- 嵌套条件组 -->
-        <ConditionGroupEditor
+        <CompoundConditionGroup
           v-else
           :group="child"
           :point-options="pointOptions"

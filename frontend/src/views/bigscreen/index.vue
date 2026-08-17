@@ -72,6 +72,7 @@
 
       <!-- 左侧环境面板 -->
       <LeftPanel
+        class="left-panel"
         v-if="store.modeConfig.showAllPanels && store.panelStates.leftPanel?.visible !== false"
         @locateAlarm="handleLocateAlarm"
         @viewAllAlarms="handleViewAllAlarms"
@@ -80,6 +81,7 @@
 
       <!-- 右侧能耗面板 -->
       <RightPanel
+        class="right-panel"
         v-if="store.modeConfig.showAllPanels && store.panelStates.rightPanel?.visible !== false"
         @navigate="handleNavigate"
       />
@@ -180,7 +182,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, watch, type ShallowRef } from 'vue'
+import { ref, shallowRef, computed, onMounted, onUnmounted, watch, type ShallowRef } from 'vue'
 import { ArrowDown, FullScreen, Bell, Loading, VideoPlay, VideoPause, Back } from '@element-plus/icons-vue'
 import * as THREE from 'three'
 import type { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
@@ -270,6 +272,9 @@ const modeLabels: Record<SceneMode, string> = {
 
 // Raycaster (点击检测)
 const containerRef = ref<HTMLElement | null>(null)
+const raycasterCameraRef = shallowRef<THREE.PerspectiveCamera | null>(null)
+const raycasterSceneRef = shallowRef<THREE.Scene | null>(null)
+useRaycaster(containerRef, raycasterCameraRef, raycasterSceneRef)
 
 // 相机动画
 let cameraAnimation: ReturnType<typeof useCameraAnimation> | null = null
@@ -349,6 +354,8 @@ async function onSceneReady() {
     const canvas = sceneComponent.renderer?.domElement
     if (canvas?.parentElement) {
       containerRef.value = canvas.parentElement
+      raycasterCameraRef.value = sceneComponent.camera
+      raycasterSceneRef.value = sceneComponent.scene
     }
 
     // 数据现在由 useBigscreenData 自动获取真实API数据
@@ -360,21 +367,18 @@ async function onSceneReady() {
   }
 }
 
-// 初始化 Raycaster（场景就绪后）
-watch(isSceneReady, (ready) => {
-  if (ready && containerRef.value && threeSceneRef.value) {
-    useRaycaster(
-      containerRef,
-      threeSceneRef.value.camera as unknown as ShallowRef<THREE.PerspectiveCamera | null>,
-      threeSceneRef.value.scene as unknown as ShallowRef<THREE.Scene | null>
-    )
-  }
-})
-
 // 监听模式变化，调整刷新频率
 watch(() => store.mode, () => {
   const interval = store.modeConfig.refreshInterval
   bigscreenData.setRefreshInterval(interval)
+})
+
+watch(viewMode, (mode) => {
+  if (mode === '2d') {
+    containerRef.value = null
+    raycasterCameraRef.value = null
+    raycasterSceneRef.value = null
+  }
 })
 
 // 切换模式

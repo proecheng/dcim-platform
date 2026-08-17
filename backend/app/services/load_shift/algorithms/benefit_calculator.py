@@ -3,8 +3,10 @@ Benefit Calculator - Calculate cost and energy savings for shift plans
 效益计算器 - 计算转移计划的成本和节能效益
 """
 
-from typing import Dict, Any, List, Optional
-from sqlalchemy import select
+from typing import Dict, Any, List
+from datetime import date
+
+from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.energy import PowerDevice, ElectricityPricing
@@ -95,27 +97,34 @@ class BenefitCalculator:
         result = await self.db.execute(select(PowerDevice).where(PowerDevice.id.in_(device_ids)))
         return result.scalars().all()
 
-    async def _load_pricing(self) -> Optional[ElectricityPricing]:
-        """
-        Load electricity pricing - 加载电价配置
-
-        Returns:
-            Latest active pricing or None
-        """
+    async def _load_pricing(self) -> Dict[ShiftPeriodType, float]:
+        """Load the latest active price for each time-of-use period."""
+        today = date.today()
         result = await self.db.execute(
             select(ElectricityPricing)
-            .where(ElectricityPricing.is_enabled == True)
-            .order_by(ElectricityPricing.effective_date.desc())
-            .limit(1)
+            .where(
+                ElectricityPricing.is_enabled == True,
+                ElectricityPricing.effective_date <= today,
+                or_(ElectricityPricing.expire_date.is_(None), ElectricityPricing.expire_date >= today),
+            )
+            .order_by(ElectricityPricing.effective_date.desc(), ElectricityPricing.id.desc())
         )
-        return result.scalar_one_or_none()
+
+        prices: Dict[ShiftPeriodType, float] = {}
+        for record in result.scalars().all():
+            try:
+                period = ShiftPeriodType(record.period_type)
+            except ValueError:
+                continue
+            prices.setdefault(period, float(record.price))
+        return prices
 
     async def _calculate_cost_saving(
         self,
         from_period: ShiftPeriodType,
         to_period: ShiftPeriodType,
         energy_kwh: float,
-        pricing: Optional[ElectricityPricing],
+        pricing: Dict[ShiftPeriodType, float],
     ) -> float:
         """
         Calculate cost saving - 计算成本节省
@@ -148,26 +157,26 @@ class BenefitCalculator:
 
         return max(0, cost_saving)  # Ensure non-negative
 
-    def _get_price_from_pricing(self, period: ShiftPeriodType, pricing: ElectricityPricing) -> float:
+    def _get_price_from_pricing(self, period: ShiftPeriodType, pricing: Dict[ShiftPeriodType, float]) -> float:
         """
         Get price for period from pricing - 从电价配置获取时段价格
 
         Args:
             period: Shift period type
-            pricing: Electricity pricing
+            pricing: Prices keyed by time-of-use period
 
         Returns:
             Price in yuan/kWh
         """
-        period_map = {
-            ShiftPeriodType.SHARP: pricing.sharp_price,
-            ShiftPeriodType.PEAK: pricing.peak_price,
-            ShiftPeriodType.FLAT: pricing.flat_price,
-            ShiftPeriodType.VALLEY: pricing.valley_price,
+        default_prices = {
+            ShiftPeriodType.SHARP: 1.2,
+            ShiftPeriodType.PEAK: 1.0,
+            ShiftPeriodType.FLAT: 0.6,
+            ShiftPeriodType.VALLEY: 0.3,
         }
-        return period_map.get(period, pricing.flat_price or 0.6)
+        return pricing.get(period, default_prices.get(period, 0.6))
 
-    async def _get_period_price(self, period: ShiftPeriodType, pricing: Optional[ElectricityPricing]) -> float:
+    async def _get_period_price(self, period: ShiftPeriodType, pricing: Dict[ShiftPeriodType, float]) -> float:
         """
         Get period price - 获取时段价格
 

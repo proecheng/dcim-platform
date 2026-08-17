@@ -314,4 +314,8 @@ def generate_demo_forecast(target_date: Optional[datetime] = None) -> Dict:
         target_date = datetime.now() + timedelta(days=1)
 
     forecaster = LoadForecaster(base_load=350.0, peak_load=850.0)
-    return forecaster.forecast_day(target_date, noise_level=0.03)
+    forecast = forecaster.forecast_day(target_date, noise_level=0.0)
+    forecast["data_source"] = "demo_scenario"
+    forecast["data_sufficient"] = False
+    forecast["warning"] = "当前未接入可用于日前预测的真实历史负荷，以下结果为确定性情景模拟"
+    return forecast

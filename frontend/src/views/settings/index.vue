@@ -245,7 +245,12 @@
             <el-descriptions-item label="授权类型">标准版</el-descriptions-item>
             <el-descriptions-item label="最大点位数">{{ licenseInfo.max_points }}</el-descriptions-item>
             <el-descriptions-item label="已用点位">{{ licenseInfo.used_points }}</el-descriptions-item>
-            <el-descriptions-item label="剩余点位">{{ licenseInfo.max_points - licenseInfo.used_points }}</el-descriptions-item>
+            <el-descriptions-item label="剩余点位">
+              {{ remainingPoints }}
+              <el-tag v-if="excessPoints > 0" type="danger" size="small" style="margin-left: 8px;">
+                已超额 {{ excessPoints }}
+              </el-tag>
+            </el-descriptions-item>
             <el-descriptions-item label="授权状态">
               <el-tag type="success">有效</el-tag>
             </el-descriptions-item>
@@ -629,6 +634,8 @@ const licenseInfo = reactive({
   max_points: 100,
   used_points: 0
 })
+const remainingPoints = computed(() => Math.max(0, licenseInfo.max_points - licenseInfo.used_points))
+const excessPoints = computed(() => Math.max(0, licenseInfo.used_points - licenseInfo.max_points))
 
 const systemInfo = reactive({
   app_name: '算力中心智能监控系统',

@@ -41,8 +41,8 @@ const chartOption = computed<EChartsOption>(() => {
       {
         name: props.title,
         type: 'gauge',
-        center: ['50%', '60%'],
-        radius: '90%',
+        center: ['50%', '52%'],
+        radius: '78%',
         startAngle: 200,
         endAngle: -20,
         min: props.min,
@@ -54,12 +54,12 @@ const chartOption = computed<EChartsOption>(() => {
         progress: {
           show: true,
           roundCap: true,
-          width: 12
+          width: 9
         },
         pointer: {
           show: props.showPointer,
-          length: '60%',
-          width: 4,
+          length: '55%',
+          width: 3,
           itemStyle: {
             color: '#ffffff'
           }
@@ -67,7 +67,7 @@ const chartOption = computed<EChartsOption>(() => {
         axisLine: {
           roundCap: true,
           lineStyle: {
-            width: 12,
+            width: 9,
             color: [
               [props.thresholds.warning / props.max, 'rgba(0, 204, 255, 0.2)'],
               [props.thresholds.danger / props.max, 'rgba(255, 170, 0, 0.2)'],
@@ -83,7 +83,7 @@ const chartOption = computed<EChartsOption>(() => {
         },
         axisLabel: {
           show: true,
-          distance: 20,
+          distance: 10,
           color: '#8899aa',
           fontSize: 10,
           formatter: (value: number) => {
@@ -95,16 +95,16 @@ const chartOption = computed<EChartsOption>(() => {
         },
         title: {
           show: true,
-          offsetCenter: [0, '75%'],
-          fontSize: 12,
+          offsetCenter: [0, '72%'],
+          fontSize: 11,
           color: '#8899aa'
         },
         detail: {
           valueAnimation: true,
-          fontSize: 24,
+          fontSize: 19,
           fontWeight: 'bold',
-          offsetCenter: [0, '30%'],
-          formatter: `{value}${props.unit}`,
+          offsetCenter: [0, '22%'],
+          formatter: (value: number) => `${Number(value).toFixed(1)}${props.unit}`,
           color: color
         },
         data: [

@@ -1,6 +1,6 @@
 """MaintenanceAdvisor — Story 36.3
 
-维护建议引擎：健康度≤40时生成建议，≥60时自动关闭，支持确认转工单和拒绝。
+维护建议引擎：健康度<60时生成建议，≥60时自动关闭，支持确认转工单和拒绝。
 """
 
 import logging
@@ -41,7 +41,7 @@ URGENCY_PRIORITY_MAP = {
 
 
 def _calc_urgency(score: float) -> str:
-    """评分→紧急度映射（仅 score≤40 时调用）"""
+    """评分→紧急度映射（仅 score<60 时调用）"""
     if score < 20:
         return "high"
     return "medium"
@@ -81,7 +81,7 @@ class MaintenanceAdvisor:
         degradation_result: DegradationResult,
         plugin_key: str = "hvac",
     ) -> MaintenanceAdvice | None:
-        """健康度≤40 时生成/更新维护建议（幂等）
+        """健康度<60 时生成/更新维护建议（幂等）
 
         Args:
             device: Device 对象
@@ -90,9 +90,9 @@ class MaintenanceAdvisor:
             plugin_key: 设备类型插件标识
 
         Returns:
-            MaintenanceAdvice 对象，或 None（评分 > 40）
+            MaintenanceAdvice 对象，或 None（评分 >= 60）
         """
-        if health_score > 40:
+        if health_score >= 60:
             return None
 
         urgency = _calc_urgency(health_score)

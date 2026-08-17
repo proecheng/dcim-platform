@@ -4,7 +4,7 @@ Energy/History/Demand/Power/Cooling API coverage tests
 
 from datetime import datetime, timedelta, date
 
-from app.models.energy import PowerDevice
+from app.models.energy import EnergyDaily, EnergyMonthly, PowerDevice
 from app.models.point import Point
 from app.models.device import Device
 from app.models.history import PointHistory
@@ -207,6 +207,67 @@ class TestEnergyStatistics:
             headers=auth_headers(token),
         )
         assert resp.status_code == 200
+
+    async def test_energy_trend_aggregates_devices_per_period(self, client, admin_user, async_db):
+        _, token = admin_user
+        first = await _seed_power_device(async_db, code="PD-TREND-001", name="Trend Device 1")
+        second = await _seed_power_device(async_db, code="PD-TREND-002", name="Trend Device 2")
+        stat_date = date(2099, 1, 15)
+        async_db.add_all(
+            [
+                EnergyDaily(
+                    device_id=first.id,
+                    stat_date=stat_date,
+                    total_energy=100,
+                    energy_cost=80,
+                    avg_power=20,
+                ),
+                EnergyDaily(
+                    device_id=second.id,
+                    stat_date=stat_date,
+                    total_energy=200,
+                    energy_cost=160,
+                    avg_power=40,
+                ),
+                EnergyMonthly(
+                    device_id=first.id,
+                    stat_year=2099,
+                    stat_month=1,
+                    total_energy=1000,
+                    energy_cost=800,
+                    avg_power=25,
+                ),
+                EnergyMonthly(
+                    device_id=second.id,
+                    stat_year=2099,
+                    stat_month=1,
+                    total_energy=2000,
+                    energy_cost=1600,
+                    avg_power=45,
+                ),
+            ]
+        )
+        await async_db.flush()
+
+        daily_resp = await client.get(
+            "/api/v1/energy/statistics/trend",
+            params={"start_date": str(stat_date), "end_date": str(stat_date), "granularity": "daily"},
+            headers=auth_headers(token),
+        )
+        monthly_resp = await client.get(
+            "/api/v1/energy/statistics/trend",
+            params={"start_date": "2099-01-01", "end_date": "2099-12-31", "granularity": "monthly"},
+            headers=auth_headers(token),
+        )
+
+        assert daily_resp.status_code == 200
+        assert daily_resp.json()["data"]["data"] == [
+            {"time_label": "2099-01-15", "energy": 300.0, "cost": 240.0, "power": 30.0}
+        ]
+        assert monthly_resp.status_code == 200
+        assert monthly_resp.json()["data"]["data"] == [
+            {"time_label": "2099-01", "energy": 3000.0, "cost": 2400.0, "power": 35.0}
+        ]
 
     async def test_get_energy_comparison(self, client, admin_user, async_db):
         _, token = admin_user

@@ -342,8 +342,8 @@ async function doRecalculate() {
       calculationResult.steps = data.calculation_steps || []
       calculationResult.pricing_used = data.pricing_used
 
-      // 通知父组件
-      emit('paramsChanged', { ...paramForm }, data.effects)
+      // 仅在用户确实偏离默认值时标记调整；恢复默认值时清除旧结果。
+      emit('paramsChanged', { ...paramForm }, hasChanges.value ? data.effects : null)
     }
   } catch (e) {
     console.error('重算失败', e)

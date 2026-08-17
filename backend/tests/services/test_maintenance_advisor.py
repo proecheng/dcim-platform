@@ -353,16 +353,16 @@ async def test_api_viewer_cannot_confirm(client, async_db, viewer_token):
 # ==================== 6.9 健康度恢复后不再生成建议 ====================
 
 @pytest.mark.asyncio
-async def test_no_advice_when_score_above_40(async_db):
-    """健康度>40 时 evaluate 返回 None"""
+async def test_no_advice_when_score_at_least_60(async_db):
+    """健康度>=60 时 evaluate 返回 None"""
     device = await _make_device(async_db, "AC", "N01")
     dr = DegradationResult(
-        device_id=device.id, score=50.0, confidence=0.8,
+        device_id=device.id, score=60.0, confidence=0.8,
         available_points=3, total_points=5, data_sufficiency="full",
     )
 
     advisor = MaintenanceAdvisor(async_db)
-    result = await advisor.evaluate(device, health_score=50.0, degradation_result=dr)
+    result = await advisor.evaluate(device, health_score=60.0, degradation_result=dr)
 
     assert result is None
 
@@ -383,13 +383,13 @@ async def test_calculate_all_integrates_advisor(async_db):
     count = await calculator.calculate_all_health_scores()
     assert count >= 1
 
-    # 检查是否生成了建议（取决于实际评分是否≤40）
+    # 检查是否生成了建议（取决于实际评分是否<60）
     result = await async_db.execute(
         select(DeviceHealthScore).where(DeviceHealthScore.device_id == device.id)
     )
     health_record = result.scalar_one()
 
-    if health_record.score <= 40:
+    if health_record.score < 60:
         advices = await async_db.execute(
             select(MaintenanceAdvice).where(
                 MaintenanceAdvice.device_id == device.id,
@@ -430,32 +430,32 @@ async def test_reject_non_pending_raises_error(async_db):
 # ==================== 6.12 边界测试 ====================
 
 @pytest.mark.asyncio
-async def test_score_40_boundary_triggers_advice(async_db):
-    """score=40 边界值应触发建议（≤40）"""
+async def test_score_59_boundary_triggers_advice(async_db):
+    """score=59 边界值应触发建议（<60）"""
     device = await _make_device(async_db, "AC", "BD01")
     dr = DegradationResult(
-        device_id=device.id, score=40.0, confidence=0.8,
+        device_id=device.id, score=59.0, confidence=0.8,
         available_points=3, total_points=5, data_sufficiency="full",
     )
 
     advisor = MaintenanceAdvisor(async_db)
-    advice = await advisor.evaluate(device, health_score=40.0, degradation_result=dr)
+    advice = await advisor.evaluate(device, health_score=59.0, degradation_result=dr)
 
     assert advice is not None
     assert advice.urgency == "medium"
 
 
 @pytest.mark.asyncio
-async def test_score_41_no_advice(async_db):
-    """score=41 不触发建议（>40）"""
+async def test_score_60_no_advice(async_db):
+    """score=60 不触发建议（>=60）"""
     device = await _make_device(async_db, "AC", "BD02")
     dr = DegradationResult(
-        device_id=device.id, score=41.0, confidence=0.8,
+        device_id=device.id, score=60.0, confidence=0.8,
         available_points=3, total_points=5, data_sufficiency="full",
     )
 
     advisor = MaintenanceAdvisor(async_db)
-    advice = await advisor.evaluate(device, health_score=41.0, degradation_result=dr)
+    advice = await advisor.evaluate(device, health_score=60.0, degradation_result=dr)
     assert advice is None
 
 

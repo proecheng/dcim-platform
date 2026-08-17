@@ -72,7 +72,7 @@
       <el-col :span="6">
         <el-card shadow="hover" class="stat-card">
           <div class="stat-content">
-            <div class="stat-value">{{ (overview.success_rate * 100)?.toFixed(1) || 0 }}%</div>
+            <div class="stat-value">{{ successRate.toFixed(1) }}%</div>
             <div class="stat-label">成功率</div>
           </div>
         </el-card>
@@ -103,8 +103,8 @@
           <div class="realtime-status">
             <div class="status-item">
               <span class="label">执行状态</span>
-              <el-tag :type="realtime.execution_status === 'idle' ? 'info' : 'success'">
-                {{ realtime.execution_status === 'idle' ? '空闲' : '执行中' }}
+              <el-tag :type="isExecuting ? 'success' : 'info'">
+                {{ isExecuting ? '执行中' : '空闲' }}
               </el-tag>
             </div>
             <div class="status-item">
@@ -131,7 +131,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted, onUnmounted } from 'vue'
+import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import * as echarts from 'echarts'
 import { getDashboardOverview, getRealtimeData, getTrends } from '@/api/modules/shift'
@@ -142,6 +142,11 @@ const router = useRouter()
 const overview = reactive<any>({})
 const realtime = reactive<any>({})
 const trendDays = ref(7)
+const successRate = computed(() => {
+  const rate = Number(overview.success_rate)
+  return Number.isFinite(rate) ? rate * 100 : 0
+})
+const isExecuting = computed(() => ['executing', 'in_progress', 'running'].includes(realtime.execution_status))
 const trendChartRef = ref<HTMLElement>()
 let trendChart: echarts.ECharts | null = null
 let refreshTimer: any = null
@@ -149,7 +154,7 @@ let refreshTimer: any = null
 const loadOverview = async () => {
   try {
     const res = await getDashboardOverview()
-    Object.assign(overview, res.data || {})
+    Object.assign(overview, (res as any)?.data ?? res ?? {})
   } catch (error: any) {
     ElMessage.error(error.message || '加载概览数据失败')
   }
@@ -158,7 +163,7 @@ const loadOverview = async () => {
 const loadRealtime = async () => {
   try {
     const res = await getRealtimeData()
-    Object.assign(realtime, res.data || {})
+    Object.assign(realtime, (res as any)?.data ?? res ?? {})
   } catch (error: any) {
     console.error('加载实时数据失败', error)
   }
@@ -167,7 +172,7 @@ const loadRealtime = async () => {
 const loadTrends = async () => {
   try {
     const res = await getTrends(trendDays.value)
-    const trends = res.data || []
+    const trends = Array.isArray(res) ? res : (res as any)?.data ?? []
     renderTrendChart(trends)
   } catch (error: any) {
     ElMessage.error(error.message || '加载趋势数据失败')

@@ -827,8 +827,11 @@ async def smart_site_selection(
         if available_u < data.required_u:
             return None
         # 承重硬性筛选
-        if data.required_weight_kg is not None and cab.max_weight is not None:
-            if cab.max_weight < data.required_weight_kg:
+        if data.required_weight_kg is not None:
+            if cab.max_weight is None or cab.max_weight < data.required_weight_kg:
+                return None
+        if data.required_power_kw is not None and data.required_power_kw > 0:
+            if cab.max_power is None or cab.max_power < data.required_power_kw:
                 return None
 
         dimensions = []

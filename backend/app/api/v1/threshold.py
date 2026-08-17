@@ -104,11 +104,17 @@ async def get_thresholds(
     result = await db.execute(query)
     thresholds = result.scalars().all()
 
-    # 附加点位信息
+    # 批量附加点位信息，避免每条阈值单独查询产生 N+1 请求。
+    point_ids = {threshold.point_id for threshold in thresholds}
+    points = []
+    if point_ids:
+        point_result = await db.execute(select(Point).where(Point.id.in_(point_ids)))
+        points = point_result.scalars().all()
+    point_map = {point.id: point for point in points}
+
     threshold_list = []
     for threshold in thresholds:
-        point_result = await db.execute(select(Point).where(Point.id == threshold.point_id))
-        point = point_result.scalar_one_or_none()
+        point = point_map.get(threshold.point_id)
         info = ThresholdInfo.model_validate(threshold)
         if point:
             info.point_code = point.point_code

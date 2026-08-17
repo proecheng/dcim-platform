@@ -70,7 +70,7 @@ export const useBigscreenStore = defineStore('bigscreen', () => {
     leftPanel: { x: 20, y: 60, collapsed: false, visible: true },
     rightPanel: { x: -300, y: 60, collapsed: false, visible: true },
     deviceDetail: { x: -320, y: 60, collapsed: false, visible: true },
-    floorSelector: { x: 20, y: 120, collapsed: false, visible: true },
+    floorSelector: { x: 320, y: 72, collapsed: false, visible: true },
     bottomBar: { x: 0, y: 0, collapsed: false, visible: true }
   })
 
@@ -221,6 +221,9 @@ export const useBigscreenStore = defineStore('bigscreen', () => {
       const saved = localStorage.getItem('bigscreen-panel-states')
       if (saved) {
         const parsed = JSON.parse(saved)
+        if (parsed.floorSelector?.x === 20 && parsed.floorSelector?.y === 120) {
+          parsed.floorSelector = { ...parsed.floorSelector, x: 320, y: 72 }
+        }
         Object.keys(parsed).forEach(key => {
           if (panelStates.value[key]) {
             panelStates.value[key] = { ...panelStates.value[key], ...parsed[key] }
@@ -237,7 +240,7 @@ export const useBigscreenStore = defineStore('bigscreen', () => {
       leftPanel: { x: 20, y: 60, collapsed: false, visible: true },
       rightPanel: { x: -300, y: 60, collapsed: false, visible: true },
       deviceDetail: { x: -320, y: 60, collapsed: false, visible: true },
-      floorSelector: { x: 20, y: 120, collapsed: false, visible: true },
+      floorSelector: { x: 320, y: 72, collapsed: false, visible: true },
       bottomBar: { x: 0, y: 0, collapsed: false, visible: true }
     }
     savePanelStates()

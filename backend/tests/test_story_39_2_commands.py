@@ -59,7 +59,7 @@ def test_device_control_callers_are_explicitly_inventoried():
         ):
             callers.add(source_file.relative_to(services_root).as_posix())
 
-    assert callers == {"device_control_service.py", "execution_service.py"}
+    assert callers == {"device_control_service.py", "execution_service.py", "load_regulation.py"}
 
 
 @pytest.mark.asyncio

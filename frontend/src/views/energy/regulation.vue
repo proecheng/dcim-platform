@@ -21,7 +21,7 @@
       <el-col :span="6">
         <el-card shadow="hover" class="stat-card">
           <div class="stat-content">
-            <div class="stat-value warning">{{ totalPowerSaving.toFixed(1) }}</div>
+            <div class="stat-value warning">{{ totalPowerSaving === null ? '--' : totalPowerSaving.toFixed(1) }}</div>
             <div class="stat-label">潜在节能 (kW)</div>
           </div>
         </el-card>
@@ -71,7 +71,7 @@
             <el-table-column label="调节" width="200">
               <template #default="{ row }">
                 <el-slider
-                  v-model="row.current_value"
+                  v-model="draftTargets[row.id]"
                   :min="row.min_value"
                   :max="row.max_value"
                   :step="row.step_size"
@@ -132,7 +132,8 @@
                 </span>
               </div>
               <div class="rec-saving">
-                预计节省: <strong>{{ rec.power_saving.toFixed(1) }} kW</strong>
+                预计节省:
+                <strong>{{ rec.power_saving == null ? '--' : `${rec.power_saving.toFixed(1)} kW` }}</strong>
               </div>
               <div class="rec-reason">{{ rec.reason }}</div>
             </div>
@@ -164,16 +165,16 @@
         </el-table-column>
         <el-table-column label="功率变化" width="120">
           <template #default="{ row }">
-            <span :class="row.power_saved > 0 ? 'text-success' : ''">
-              {{ row.power_saved > 0 ? '-' : '' }}{{ row.power_saved?.toFixed(1) }} kW
+            <span :class="(row.power_saved ?? 0) > 0 ? 'text-success' : ''">
+              {{ row.power_saved === undefined || row.power_saved === null ? '--' : `-${row.power_saved.toFixed(1)} kW` }}
             </span>
           </template>
         </el-table-column>
         <el-table-column prop="trigger_reason" label="原因" width="100" />
         <el-table-column prop="status" label="状态" width="80">
           <template #default="{ row }">
-            <el-tag :type="row.status === 'completed' ? 'success' : 'info'" size="small">
-              {{ row.status === 'completed' ? '已完成' : row.status }}
+            <el-tag :type="historyStatusMap[row.status]?.type || 'info'" size="small">
+              {{ historyStatusMap[row.status]?.text || row.status }}
             </el-tag>
           </template>
         </el-table-column>
@@ -202,18 +203,29 @@
         </div>
         <div class="result-item">
           <span class="label">当前功率:</span>
-          <span class="value">{{ simulateResult.current_power?.toFixed(2) }} kW</span>
+          <span class="value">{{ formatPower(simulateResult.current_power) }}</span>
         </div>
         <div class="result-item">
           <span class="label">预计功率:</span>
-          <span class="value">{{ simulateResult.estimated_power?.toFixed(2) }} kW</span>
+          <span class="value">{{ formatPower(simulateResult.estimated_power) }}</span>
         </div>
         <div class="result-item highlight">
           <span class="label">功率变化:</span>
-          <span class="value" :class="simulateResult.power_change < 0 ? 'text-success' : 'text-danger'">
-            {{ simulateResult.power_change?.toFixed(2) }} kW
+          <span class="value" :class="(simulateResult.power_change ?? 0) < 0 ? 'text-success' : 'text-danger'">
+            {{ formatPower(simulateResult.power_change) }}
           </span>
         </div>
+        <div class="result-item">
+          <span class="label">计算依据:</span>
+          <span class="value">{{ simulateResult.calculation_method || '--' }}</span>
+        </div>
+        <el-alert
+          v-if="simulateResult.warning"
+          :title="simulateResult.warning"
+          type="warning"
+          :closable="false"
+          show-icon
+        />
         <div class="result-item">
           <span class="label">舒适度影响:</span>
           <span class="value">{{ impactTextMap[simulateResult.comfort_impact] || '无' }}</span>
@@ -225,7 +237,7 @@
       </div>
       <template #footer>
         <el-button @click="simulateDialogVisible = false">取消</el-button>
-        <el-button type="primary" @click="applySimulateResult">应用调节</el-button>
+        <el-button type="primary" @click="applySimulateResult">提交调节</el-button>
       </template>
     </el-dialog>
 
@@ -304,6 +316,7 @@ const devices = ref<PowerDevice[]>([])
 const simulateDialogVisible = ref(false)
 const simulateResult = ref<RegulationSimulateResponse | null>(null)
 const currentSimulateConfig = ref<LoadRegulationConfig | null>(null)
+const draftTargets = ref<Record<number, number>>({})
 
 const createDialogVisible = ref(false)
 const createForm = ref({
@@ -339,8 +352,19 @@ const impactTextMap: Record<string, string> = {
   high: '较大'
 }
 
+const historyStatusMap: Record<string, { text: string; type: TagType }> = {
+  completed: { text: '已完成', type: 'success' },
+  pending: { text: '待人工', type: 'warning' },
+  simulated: { text: '仅模拟', type: 'info' },
+  failed: { text: '失败', type: 'danger' },
+  reverted: { text: '已恢复', type: 'info' }
+}
+
 const totalPowerSaving = computed(() => {
-  return recommendations.value.reduce((sum, r) => sum + r.power_saving, 0)
+  const quantified = recommendations.value.filter((item) => item.power_saving != null)
+  return quantified.length > 0
+    ? quantified.reduce((sum, item) => sum + (item.power_saving ?? 0), 0)
+    : null
 })
 
 const historyCount = computed(() => history.value.length)
@@ -350,6 +374,10 @@ function unwrapResponse<T>(response: T | { data?: T } | undefined): T | undefine
     return (response as { data?: T }).data
   }
   return response as T | undefined
+}
+
+function formatPower(value?: number | null) {
+  return value === undefined || value === null ? '--' : `${value.toFixed(2)} kW`
 }
 
 onMounted(async () => {
@@ -374,6 +402,12 @@ async function loadConfigs() {
   try {
     const res = await getRegulationConfigs()
     configs.value = unwrapResponse<LoadRegulationConfig[]>(res) || []
+    draftTargets.value = Object.fromEntries(
+      configs.value.map((config) => [
+        config.id,
+        config.current_value ?? config.default_value ?? config.min_value
+      ])
+    )
   } catch (e) {
     console.error('加载配置失败', e)
   }
@@ -415,7 +449,7 @@ async function simulateConfig(config: LoadRegulationConfig, targetValue?: number
   try {
     const res = await simulateRegulation({
       config_id: config.id,
-      target_value: targetValue ?? config.current_value ?? config.default_value ?? config.min_value
+      target_value: targetValue ?? draftTargets.value[config.id] ?? config.current_value ?? config.default_value ?? config.min_value
     })
     simulateResult.value = unwrapResponse<RegulationSimulateResponse>(res) || null
     currentSimulateConfig.value = config
@@ -429,12 +463,19 @@ async function applySimulateResult() {
   if (!simulateResult.value || !currentSimulateConfig.value) return
 
   try {
-    await applyRegulation({
+    const response = await applyRegulation({
       config_id: simulateResult.value.config_id,
       target_value: simulateResult.value.target_value,
       reason: 'manual'
     })
-    ElMessage.success('调节已应用')
+    const result = unwrapResponse<RegulationHistory>(response)
+    if (result?.status === 'completed') {
+      ElMessage.success('调节已完成并确认')
+    } else if (result?.status === 'simulated') {
+      ElMessage.warning('仅完成模拟，设备当前值未更新')
+    } else {
+      ElMessage.warning('调节已提交，等待人工执行和反馈确认')
+    }
     simulateDialogVisible.value = false
     await loadAllData()
   } catch {
@@ -448,12 +489,19 @@ async function applyRecommendation(rec: RegulationRecommendation) {
       `确定要将 ${rec.device_name} 的${typeTextMap[rec.regulation_type]}从 ${rec.current_value} 调整为 ${rec.recommended_value} 吗？`,
       '确认调节'
     )
-    await applyRegulation({
+    const response = await applyRegulation({
       config_id: rec.config_id,
       target_value: rec.recommended_value,
       reason: 'recommendation'
     })
-    ElMessage.success('调节已应用')
+    const result = unwrapResponse<RegulationHistory>(response)
+    if (result?.status === 'completed') {
+      ElMessage.success('调节已完成并确认')
+    } else if (result?.status === 'simulated') {
+      ElMessage.warning('仅完成模拟，设备当前值未更新')
+    } else {
+      ElMessage.warning('调节已提交，等待人工执行和反馈确认')
+    }
     await loadAllData()
   } catch (e) {
     if (e !== 'cancel') {

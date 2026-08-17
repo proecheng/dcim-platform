@@ -80,15 +80,19 @@
       <el-table :data="execution.device_executions" border>
         <el-table-column type="index" label="#" width="60" />
         <el-table-column prop="device_name" label="设备名称" min-width="180" />
-        <el-table-column prop="shift_action" label="转移动作" width="120" />
-        <el-table-column prop="target_power" label="目标功率 (kW)" width="140" align="right">
+        <el-table-column label="转移动作" width="120">
           <template #default="{ row }">
-            {{ row.target_power?.toFixed(1) || 0 }}
+            {{ row.shift_action || row.action || '-' }}
           </template>
         </el-table-column>
-        <el-table-column prop="actual_power" label="实际功率 (kW)" width="140" align="right">
+        <el-table-column label="执行前功率 (kW)" width="140" align="right">
           <template #default="{ row }">
-            {{ row.actual_power?.toFixed(1) || 0 }}
+            {{ formatPower(row.power_before ?? row.target_power) }}
+          </template>
+        </el-table-column>
+        <el-table-column label="执行后功率 (kW)" width="140" align="right">
+          <template #default="{ row }">
+            {{ formatPower(row.power_after ?? row.actual_power) }}
           </template>
         </el-table-column>
         <el-table-column prop="status" label="执行状态" width="120">
@@ -96,7 +100,11 @@
             <el-tag :type="getDeviceStatusType(row.status)">{{ getDeviceStatusLabel(row.status) }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="start_time" label="开始时间" width="160" />
+        <el-table-column label="开始时间" width="160">
+          <template #default="{ row }">
+            {{ row.start_time || row.executed_at || '-' }}
+          </template>
+        </el-table-column>
         <el-table-column prop="end_time" label="结束时间" width="160" />
         <el-table-column prop="error_message" label="错误信息" min-width="200" />
       </el-table>
@@ -108,34 +116,34 @@
       </template>
       <el-descriptions :column="3" border>
         <el-descriptions-item label="联动前制冷功率">
-          {{ execution.cooling_linkage.before_power?.toFixed(1) || 0 }} kW
+          {{ getCoolingValue(execution.cooling_linkage, 'before_power', 'cooling_power_before', 1) }} kW
         </el-descriptions-item>
         <el-descriptions-item label="联动后制冷功率">
-          {{ execution.cooling_linkage.after_power?.toFixed(1) || 0 }} kW
+          {{ getCoolingValue(execution.cooling_linkage, 'after_power', 'cooling_power_after', 1) }} kW
         </el-descriptions-item>
         <el-descriptions-item label="制冷功率变化">
           {{ getCoolingPowerChange(execution.cooling_linkage) }} kW
         </el-descriptions-item>
         <el-descriptions-item label="联动前COP">
-          {{ execution.cooling_linkage.before_cop?.toFixed(2) || 0 }}
+          {{ getCoolingValue(execution.cooling_linkage, 'before_cop', 'cooling_efficiency_before', 2) }}
         </el-descriptions-item>
         <el-descriptions-item label="联动后COP">
-          {{ execution.cooling_linkage.after_cop?.toFixed(2) || 0 }}
+          {{ getCoolingValue(execution.cooling_linkage, 'after_cop', 'cooling_efficiency_after', 2) }}
         </el-descriptions-item>
         <el-descriptions-item label="COP变化">
           {{ getCOPChange(execution.cooling_linkage) }}
         </el-descriptions-item>
         <el-descriptions-item label="联动前供水温度">
-          {{ execution.cooling_linkage.before_supply_temp?.toFixed(1) || 0 }} °C
+          {{ getCoolingValue(execution.cooling_linkage, 'before_supply_temp', 'supply_temp_before', 1) }} °C
         </el-descriptions-item>
         <el-descriptions-item label="联动后供水温度">
-          {{ execution.cooling_linkage.after_supply_temp?.toFixed(1) || 0 }} °C
+          {{ getCoolingValue(execution.cooling_linkage, 'after_supply_temp', 'supply_temp_after', 1) }} °C
         </el-descriptions-item>
         <el-descriptions-item label="联动前回水温度">
-          {{ execution.cooling_linkage.before_return_temp?.toFixed(1) || 0 }} °C
+          {{ getCoolingValue(execution.cooling_linkage, 'before_return_temp', 'return_temp_before', 1) }} °C
         </el-descriptions-item>
         <el-descriptions-item label="联动后回水温度">
-          {{ execution.cooling_linkage.after_return_temp?.toFixed(1) || 0 }} °C
+          {{ getCoolingValue(execution.cooling_linkage, 'after_return_temp', 'return_temp_after', 1) }} °C
         </el-descriptions-item>
       </el-descriptions>
     </el-card>
@@ -207,10 +215,12 @@ type TagType = 'primary' | 'success' | 'info' | 'warning' | 'danger'
 const getStatusType = (status: string): TagType => {
   const map: Record<string, TagType> = {
     pending: 'info',
+    executing: 'warning',
     running: 'warning',
     completed: 'success',
     failed: 'danger',
-    cancelled: 'info'
+    cancelled: 'info',
+    reverted: 'warning'
   }
   return map[status] || 'info'
 }
@@ -218,10 +228,12 @@ const getStatusType = (status: string): TagType => {
 const getStatusLabel = (status: string) => {
   const map: Record<string, string> = {
     pending: '待执行',
+    executing: '执行中',
     running: '执行中',
     completed: '已完成',
     failed: '执行失败',
-    cancelled: '已取消'
+    cancelled: '已取消',
+    reverted: '已回滚'
   }
   return map[status] || status
 }
@@ -229,6 +241,7 @@ const getStatusLabel = (status: string) => {
 const getDeviceStatusType = (status: string): TagType => {
   const map: Record<string, TagType> = {
     pending: 'info',
+    executing: 'warning',
     running: 'warning',
     completed: 'success',
     failed: 'danger'
@@ -239,6 +252,7 @@ const getDeviceStatusType = (status: string): TagType => {
 const getDeviceStatusLabel = (status: string) => {
   const map: Record<string, string> = {
     pending: '待执行',
+    executing: '执行中',
     running: '执行中',
     completed: '已完成',
     failed: '失败'
@@ -260,13 +274,25 @@ const getCompletionRate = (exec: Partial<ShiftExecution>) => {
 }
 
 const getCoolingPowerChange = (linkage: any) => {
-  const change = (linkage.after_power || 0) - (linkage.before_power || 0)
+  const after = linkage.after_power ?? linkage.cooling_power_after ?? 0
+  const before = linkage.before_power ?? linkage.cooling_power_before ?? 0
+  const change = after - before
   return change > 0 ? `+${change.toFixed(1)}` : change.toFixed(1)
 }
 
 const getCOPChange = (linkage: any) => {
-  const change = (linkage.after_cop || 0) - (linkage.before_cop || 0)
+  const after = linkage.after_cop ?? linkage.cooling_efficiency_after ?? 0
+  const before = linkage.before_cop ?? linkage.cooling_efficiency_before ?? 0
+  const change = after - before
   return change > 0 ? `+${change.toFixed(2)}` : change.toFixed(2)
+}
+
+const formatPower = (value: unknown) =>
+  typeof value === 'number' && Number.isFinite(value) ? value.toFixed(1) : '-'
+
+const getCoolingValue = (linkage: any, primaryKey: string, fallbackKey: string, precision: number) => {
+  const value = linkage?.[primaryKey] ?? linkage?.[fallbackKey]
+  return typeof value === 'number' && Number.isFinite(value) ? value.toFixed(precision) : '-'
 }
 
 const goToPlan = (planId: number) => {

@@ -70,6 +70,15 @@ export function getDashboard(params?: {
   return request.get<DashboardResponse>('/v1/predictive-maintenance/dashboard', { params })
 }
 
+export function recalculateHealthScores() {
+  return request.post<{
+    total_devices: number
+    calculated_at: string
+    summary: Record<string, number>
+    algorithm: string
+  }>('/v1/reports/device-health/calculate', undefined, { timeout: 60000 })
+}
+
 export function getDeviceDetail(deviceId: number) {
   return request.get<DeviceDetailResponse>(`/v1/predictive-maintenance/devices/${deviceId}/detail`)
 }

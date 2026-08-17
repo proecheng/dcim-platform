@@ -42,7 +42,8 @@
           </el-select>
         </el-form-item>
         <el-form-item>
-          <el-button :icon="Refresh" @click="loadDashboard">刷新</el-button>
+          <el-button :icon="Refresh" @click="loadDashboard">刷新结果</el-button>
+          <el-button type="primary" :loading="recalculating" @click="handleRecalculate">重新评估</el-button>
         </el-form-item>
       </el-form>
     </el-card>
@@ -226,6 +227,7 @@ import { Refresh } from '@element-plus/icons-vue'
 import {
   getDashboard,
   getDeviceDetail,
+  recalculateHealthScores,
   confirmAdvice,
   rejectAdvice,
 } from '@/api/modules/predictiveMaintenance'
@@ -259,6 +261,7 @@ const rejectingAdvice = ref<MaintenanceAdviceInfo | null>(null)
 // 操作状态
 const confirmingId = ref<number | null>(null)
 const rejectingId = ref<number | null>(null)
+const recalculating = ref(false)
 
 async function loadDashboard() {
   loading.value = true
@@ -271,6 +274,27 @@ async function loadDashboard() {
     console.error('加载仪表盘失败', e)
   } finally {
     loading.value = false
+  }
+}
+
+async function handleRecalculate() {
+  try {
+    await ElMessageBox.confirm(
+      '将使用劣化趋势、近30天告警和维保记录重新计算健康度，并同步维护建议。是否继续？',
+      '重新评估设备健康度',
+      { confirmButtonText: '开始评估', cancelButtonText: '取消', type: 'warning' }
+    )
+    recalculating.value = true
+    const result = await recalculateHealthScores()
+    await loadDashboard()
+    ElMessage.success(`评估完成：已计算 ${result.total_devices} 台设备`)
+  } catch (error: any) {
+    if (error !== 'cancel') {
+      console.error('重新评估失败', error)
+      ElMessage.error('重新评估失败')
+    }
+  } finally {
+    recalculating.value = false
   }
 }
 

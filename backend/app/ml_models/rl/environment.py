@@ -104,6 +104,17 @@ class EnergySavingEnv:
         self._state = self._build_state()
         return self._state
 
+    def sync_context(self, state: Dict[str, Any]) -> None:
+        """Synchronize internal transition context with an externally supplied state."""
+        self._step_count = 0
+        self._cumulative_saving = float(state.get("cumulative_saving", 0))
+
+        current_rate = float(state.get("achievement_rate", 0.9))
+        history = [float(value) for value in state.get("achievement_history", [])]
+        if len(history) < self.state_space.history_dim:
+            history = [current_rate] * (self.state_space.history_dim - len(history)) + history
+        self._achievement_history = history[-self.state_space.history_dim :]
+
     def _build_state(self) -> np.ndarray:
         """构建状态向量"""
         # 负荷数据 (模拟)

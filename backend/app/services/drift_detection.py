@@ -40,6 +40,11 @@ def _generate_diagnosis(deviation_sigma: float, cross_result: Optional[str]) -> 
     return f"该点位读数偏离历史均值 {sigma_str}σ，同区域无可比较传感器。建议现场校验。"
 
 
+def _generate_resolved_diagnosis(deviation_sigma: float, automatic: bool) -> str:
+    action = "自动解除漂移标记" if automatic else "已由人工解除漂移标记"
+    return f"当前偏差已降至 {deviation_sigma:.1f}σ，{action}。建议继续观察点位稳定性。"
+
+
 async def run_drift_detection(db: AsyncSession, allowed_point_ids=None) -> dict:
     """
     执行漂移检测。返回检测统计。
@@ -56,6 +61,15 @@ async def run_drift_detection(db: AsyncSession, allowed_point_ids=None) -> dict:
         point_query = point_query.where(Point.id.in_(allowed_point_ids))
     point_result = await db.execute(point_query)
     points = point_result.scalars().all()
+
+    resolved_query = select(DriftDetectionResult).where(DriftDetectionResult.status == "resolved")
+    if allowed_point_ids is not None:
+        resolved_query = resolved_query.where(DriftDetectionResult.point_id.in_(allowed_point_ids))
+    resolved_result = await db.execute(resolved_query)
+    for record in resolved_result.scalars().all():
+        if record.cross_validation_result is not None or "持续偏离" in record.diagnosis:
+            record.cross_validation_result = None
+            record.diagnosis = _generate_resolved_diagnosis(record.deviation_sigma, automatic=True)
 
     total_checked = 0
     skipped = 0
@@ -117,6 +131,8 @@ async def run_drift_detection(db: AsyncSession, allowed_point_ids=None) -> dict:
                 existing.resolved_at = now
                 existing.current_value = current_val
                 existing.deviation_sigma = deviation
+                existing.cross_validation_result = None
+                existing.diagnosis = _generate_resolved_diagnosis(deviation, automatic=True)
                 # 恢复 PointRealtime.quality
                 realtime.quality = 0
                 auto_resolved += 1
@@ -257,6 +273,8 @@ async def resolve_drift(db: AsyncSession, result_id: int) -> Optional[DriftDetec
 
     record.status = "resolved"
     record.resolved_at = datetime.now()
+    record.cross_validation_result = None
+    record.diagnosis = _generate_resolved_diagnosis(record.deviation_sigma, automatic=False)
 
     # 恢复 PointRealtime.quality
     await db.execute(update(PointRealtime).where(PointRealtime.point_id == record.point_id).values(quality=0))

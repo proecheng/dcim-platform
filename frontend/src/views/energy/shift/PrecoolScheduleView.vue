@@ -132,6 +132,7 @@
 </template>
 
 <script setup lang="ts">
+import { useRouter } from 'vue-router'
 import { Plus, Refresh, VideoPause } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import echarts from '@/utils/echarts'
@@ -145,6 +146,8 @@ import {
   getPrecoolConfig,
 } from '@/api/modules/precool'
 import type { ScheduleListItem, ScheduleDetail, PrecoolConfig, DashboardZone } from '@/api/modules/precool'
+
+const router = useRouter()
 
 // ========== 状态 ==========
 const zoneList = ref<DashboardZone[]>([])
@@ -274,9 +277,23 @@ async function handleCreate() {
   if (!selectedZoneId.value) return
   creating.value = true
   try {
-    await createSchedule(selectedZoneId.value, { schedule_date: scheduleDateStr.value })
+    const response = await createSchedule(selectedZoneId.value, { schedule_date: scheduleDateStr.value })
+    const payload = response as any
+    if (payload?.code && payload.code !== 200) {
+      const errorCode = payload?.data?.error
+      if (errorCode === 'precool_disabled') {
+        await ElMessageBox.confirm(
+          `${payload.message}，是否前往制冷联动配置启用预冷？`,
+          '预冷未启用',
+          { confirmButtonText: '前往配置', cancelButtonText: '取消', type: 'warning' }
+        )
+        await router.push('/energy/shift/cooling-config')
+        return
+      }
+      throw new Error(payload.message || '生成失败')
+    }
     ElMessage.success('预冷计划生成成功')
-    fetchSchedules()
+    await fetchSchedules()
   } catch (err: any) {
     const msg = err?.response?.data?.message || err?.message || '生成失败'
     ElMessage.error(msg)

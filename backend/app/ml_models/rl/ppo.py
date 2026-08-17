@@ -195,7 +195,7 @@ class PPOAgent:
         # 多轮更新
         for _ in range(self.update_epochs):
             # 评估当前策略下的动作
-            log_probs, entropy, values = self.network.evaluate_action(
+            log_probs, values, entropy = self.network.evaluate_action(
                 batch["states"], batch["continuous_actions"], batch["discrete_actions"]
             )
 
@@ -229,7 +229,9 @@ class PPOAgent:
         return {"policy_loss": total_policy_loss / n, "value_loss": total_value_loss / n, "entropy": total_entropy / n}
 
     @torch.no_grad()
-    def select_action(self, state: np.ndarray, explore: bool = True) -> Tuple[Dict[str, float], float, float]:
+    def select_action(
+        self, state: np.ndarray, explore: bool = True
+    ) -> Tuple[Dict[str, float], np.ndarray, float, float]:
         """
         选择动作
 
@@ -238,23 +240,13 @@ class PPOAgent:
             explore: 是否进行探索
 
         Returns:
-            (actions_dict, log_prob, value)
+            (actions_dict, raw_continuous_action, log_prob, value)
         """
         state_tensor = torch.FloatTensor(state).unsqueeze(0).to(self.device)
 
-        actions, log_probs = self.network.get_action(state_tensor, deterministic=not explore)
-        value = self.network.get_value(state_tensor)
+        actions, log_prob, value, raw_continuous = self.network.get_action(state_tensor, deterministic=not explore)
 
-        actions_dict = {
-            "priority_weight": actions["priority_weight"].item(),
-            "safety_coeff": actions["safety_coeff"].item(),
-            "temperature": actions["temperature"].item(),
-            "target_period": actions["target_period"].item(),
-        }
-
-        total_log_prob = log_probs["continuous"].item() + log_probs["discrete"].item()
-
-        return actions_dict, total_log_prob, value.item()
+        return actions, raw_continuous.squeeze(0).cpu().numpy(), log_prob.item(), value.item()
 
 
 # 需要import F

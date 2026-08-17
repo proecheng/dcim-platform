@@ -19,14 +19,6 @@ from ..models.capacity import (
     CapacityHistory,
     CapacityType,
 )
-from ..models.capacity import (
-    SpaceCapacity,
-    PowerCapacity,
-    CoolingCapacity,
-    WeightCapacity,
-    CapacityHistory,
-    CapacityType,
-)
 
 logger = logging.getLogger(__name__)
 
@@ -39,6 +31,7 @@ class DataSimulator:
         self.task = None
         # 点位当前值缓存（用于模拟连续变化）
         self.value_cache: Dict[int, float] = {}
+        self._point_offset = 0
 
     def generate_ai_value(self, point: Point, current_value: float = None) -> float:
         """生成模拟量输入值 - 增强版（支持设备特定逻辑）"""
@@ -111,11 +104,22 @@ class DataSimulator:
     async def run_collection_cycle(self):
         """执行一次采集周期 — 生成模拟值并通过统一管道入库"""
         from ..services.ingest_pipeline import IngestPoint, process_payload
+        from ..core.config import get_settings
 
         async with async_session() as session:
             # 获取所有启用的点位
-            result = await session.execute(select(Point).where(Point.is_enabled == True))
-            points = result.scalars().all()
+            result = await session.execute(select(Point).where(Point.is_enabled == True).order_by(Point.id))
+            all_points = result.scalars().all()
+
+            batch_size = get_settings().simulation_batch_size
+            if len(all_points) > batch_size:
+                start = self._point_offset if self._point_offset < len(all_points) else 0
+                end = min(start + batch_size, len(all_points))
+                points = all_points[start:end]
+                self._point_offset = 0 if end >= len(all_points) else end
+            else:
+                points = all_points
+                self._point_offset = 0
 
             # 预取 AO/DO 点位实时值，避免逐点查询导致 N+1
             ao_do_ids = [point.id for point in points if point.point_type in ["AO", "DO"]]

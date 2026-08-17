@@ -76,7 +76,7 @@ const initChart = () => {
 }
 
 const updateChart = () => {
-  if (!chartInstance.value) return
+  if (!chartInstance.value || chartInstance.value.isDisposed()) return
 
   chartInstance.value.setOption({
     series: [{
@@ -94,15 +94,22 @@ const updateChart = () => {
   })
 }
 
+const resizeChart = () => {
+  if (!chartInstance.value || chartInstance.value.isDisposed()) return
+  chartInstance.value.resize()
+}
+
 watch([peakRatioValue, flatRatioValue, valleyRatioValue], updateChart)
 
 onMounted(() => {
   initChart()
-  window.addEventListener('resize', () => chartInstance.value?.resize())
+  window.addEventListener('resize', resizeChart)
 })
 
 onUnmounted(() => {
+  window.removeEventListener('resize', resizeChart)
   chartInstance.value?.dispose()
+  chartInstance.value = undefined
 })
 </script>
 

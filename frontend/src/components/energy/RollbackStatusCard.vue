@@ -33,8 +33,12 @@
       </el-descriptions>
     </div>
 
-    <div v-else style="color: #67c23a; text-align: center; padding: 10px">
-      所有约束检查通过，系统运行正常
+    <div v-else-if="headroom !== null" style="color: #67c23a; text-align: center; padding: 10px">
+      当前未触发回退保护，温度裕度 {{ headroom.toFixed(1) }}°C
+    </div>
+
+    <div v-else style="color: #E6A23C; text-align: center; padding: 10px">
+      未触发回退事件，但缺少实时温度裕度，无法确认全部约束
     </div>
   </el-card>
 </template>
@@ -67,12 +71,14 @@ const wsManager = useWebSocketManager()
 
 const statusTagType = computed(() => {
   if (status.value?.has_active_rollback) return 'danger'
+  if (props.headroom === null) return 'warning'
   if (props.headroom !== null && props.headroom <= 3) return 'warning'
   return 'success'
 })
 
 const statusText = computed(() => {
   if (status.value?.has_active_rollback) return '回退中'
+  if (props.headroom === null) return '数据不足'
   if (props.headroom !== null && props.headroom <= 3) return '接近约束'
   return '正常'
 })

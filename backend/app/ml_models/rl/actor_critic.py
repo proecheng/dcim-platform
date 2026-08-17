@@ -101,7 +101,7 @@ class ActorCriticNetwork(nn.Module):
 
     def get_action(
         self, state: torch.Tensor, deterministic: bool = False
-    ) -> Tuple[Dict[str, float], torch.Tensor, torch.Tensor]:
+    ) -> Tuple[Dict[str, float], torch.Tensor, torch.Tensor, torch.Tensor]:
         """
         获取动作
 
@@ -113,6 +113,7 @@ class ActorCriticNetwork(nn.Module):
             actions: 动作字典
             log_prob: 动作的对数概率
             value: 状态价值
+            raw_continuous_actions: 未缩放的连续动作，用于 PPO 训练
         """
         continuous_mean, continuous_std, discrete_logits, value = self.forward(state)
 
@@ -147,13 +148,13 @@ class ActorCriticNetwork(nn.Module):
 
         # 构建动作字典
         actions = {
-            "priority": float(priority[0].item()),
+            "priority_weight": float(priority[0].item()),
             "safety_coeff": float(safety_coeff[0].item()),
             "temperature": float(temperature[0].item()),
             "target_period": int(target_period[0].item()),
         }
 
-        return actions, total_log_prob, value.squeeze(-1)
+        return actions, total_log_prob, value.squeeze(-1), continuous_actions
 
     def evaluate_action(
         self, state: torch.Tensor, actions: torch.Tensor, target_periods: torch.Tensor

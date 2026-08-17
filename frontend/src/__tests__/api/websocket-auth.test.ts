@@ -245,4 +245,33 @@ describe('WebSocket manager site-scoped subscriptions', () => {
     manager.disconnect('alarms')
     siteEvents.clear()
   })
+
+  it('connects when handlers subscribe before an explicit connect and restores them after reconnect', async () => {
+    vi.resetModules()
+    const { siteEvents } = await import('@/utils/siteEvents')
+    siteEvents.clear()
+    const { useWebSocketManager } = await import('@/composables/useWebSocketManager')
+    const manager = useWebSocketManager()
+    const handler = vi.fn()
+
+    manager.on('realtime', 'realtime', handler)
+    manager.subscribe('realtime', { channels: ['realtime'] })
+
+    expect(MockWebSocket.instances).toHaveLength(1)
+    const initialSocket = MockWebSocket.instances[0]
+    initialSocket.open()
+    initialSocket.receive({ type: 'authenticated' })
+    initialSocket.receive({ type: 'realtime', data: { point_id: 1 } })
+    expect(handler).toHaveBeenCalledTimes(1)
+
+    siteEvents.emit(7)
+    const reconnectedSocket = MockWebSocket.instances[1]
+    reconnectedSocket.open()
+    reconnectedSocket.receive({ type: 'authenticated' })
+    reconnectedSocket.receive({ type: 'realtime', data: { point_id: 2 } })
+    expect(handler).toHaveBeenCalledTimes(2)
+
+    manager.disconnect('realtime')
+    siteEvents.clear()
+  })
 })

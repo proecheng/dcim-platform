@@ -1,8 +1,8 @@
 <template>
   <div class="constraint-check-result">
     <el-alert
-      :title="result.is_valid ? '约束检查通过' : '约束检查未通过'"
-      :type="result.is_valid ? 'success' : 'error'"
+      :title="summaryTitle"
+      :type="summaryPassed ? 'success' : 'error'"
       :closable="false"
       style="margin-bottom: 16px"
     />
@@ -36,7 +36,7 @@
         v-for="(violation, index) in result.violated_constraints"
         :key="index"
         :title="violation.constraint_name || '约束违反'"
-        :description="violation.description"
+        :description="violation.message || violation.description"
         type="error"
         :closable="false"
         style="margin-bottom: 8px"
@@ -85,9 +85,22 @@
 </template>
 
 <script setup lang="ts">
-defineProps<{
+import { computed } from 'vue'
+
+const props = defineProps<{
   result: any
 }>()
+
+const isFeasibilityResult = computed(() => props.result.is_feasible !== undefined)
+const summaryPassed = computed(() =>
+  isFeasibilityResult.value ? props.result.is_feasible : props.result.is_valid
+)
+const summaryTitle = computed(() => {
+  if (isFeasibilityResult.value) {
+    return summaryPassed.value ? '可行性分析通过' : '可行性分析未通过'
+  }
+  return summaryPassed.value ? '约束检查通过' : '约束检查未通过'
+})
 </script>
 
 <style scoped lang="scss">

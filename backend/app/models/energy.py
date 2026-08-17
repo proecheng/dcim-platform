@@ -1071,7 +1071,9 @@ class RLModelState(Base):
     total_steps = Column(Integer, default=0, comment="总训练步数")
     total_episodes = Column(Integer, default=0, comment="总训练回合")
     exploration_rate = Column(Numeric(5, 4), default=0.3, comment="当前探索率")
-    exploration_phase = Column(String(20), default="initial", comment="探索阶段: initial/stable/fluctuating/decaying")
+    exploration_phase = Column(
+        String(20), default="initial", comment="探索阶段: initial/stable/fluctuating/decaying/manual"
+    )
 
     # 性能统计
     avg_reward = Column(Numeric(10, 4), comment="平均奖励")

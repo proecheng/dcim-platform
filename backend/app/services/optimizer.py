@@ -187,11 +187,11 @@ class MILPOptimizer:
         Returns:
             优化结果字典
         """
-        if not PULP_AVAILABLE:
-            return self._optimize_heuristic(base_load, demand_target)
-
         if demand_target is None:
             demand_target = self.pricing.declared_demand
+
+        if not PULP_AVAILABLE:
+            return self._optimize_heuristic(base_load, demand_target)
 
         try:
             return self._optimize_milp(base_load, demand_target)
@@ -631,6 +631,14 @@ def run_day_ahead_optimization(
 
     # 提取基础负荷
     base_load = [f["predicted_power"] for f in forecast_data.get("forecasts", [])]
+    if not base_load:
+        return {
+            "status": "insufficient_data",
+            "message": "负荷预测为空，无法执行日前优化",
+            "data_sufficient": False,
+            "data_source": forecast_data.get("data_source", "unknown"),
+            "warning": "缺少96点负荷预测数据",
+        }
     if len(base_load) != 96:
         # 如果数据点不是96个，进行插值或截断
         if len(base_load) < 96:
@@ -650,5 +658,8 @@ def run_day_ahead_optimization(
     # 添加预测信息
     result["forecast_date"] = forecast_data.get("date")
     result["base_load_summary"] = forecast_data.get("statistics", {})
+    result["data_source"] = forecast_data.get("data_source", "unknown")
+    result["data_sufficient"] = bool(forecast_data.get("data_sufficient", False))
+    result["warning"] = forecast_data.get("warning")
 
     return result

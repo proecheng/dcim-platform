@@ -143,8 +143,8 @@ const maxGauge = ref(100)
 
 // 统计数据
 const statistics = ref({
-  daily: { count: 0, total_power_kw: 0, estimated_savings_yuan: 0 },
-  monthly: { count: 0, total_power_kw: 0, estimated_savings_yuan: 0 },
+  daily: { count: 0, total_power_kw: 0, total_energy_kwh: 0, estimated_savings_yuan: 0 },
+  monthly: { count: 0, total_power_kw: 0, total_energy_kwh: 0, estimated_savings_yuan: 0 },
 })
 
 // 指令列表
@@ -182,9 +182,9 @@ const statCards = computed(() => [
     suffix: '次',
   },
   {
-    label: '今日调控总量',
-    value: statistics.value.daily.total_power_kw,
-    suffix: 'kW',
+    label: '今日调控电量',
+    value: statistics.value.daily.total_energy_kwh,
+    suffix: 'kWh',
   },
   {
     label: '本月参与次数',
@@ -232,8 +232,8 @@ function formatTime(iso: string) {
 async function fetchCapacity() {
   try {
     const res = await getVppCapacity()
-    if (res.data?.code === 200 && res.data.data) {
-      const data = res.data.data
+    if (res.code === 200 && res.data) {
+      const data = res.data
       downCapacity.value = Math.round(data.down_adjustable_kw * 10) / 10
       upCapacity.value = Math.round(data.up_adjustable_kw * 10) / 10
       downThermalKw.value = Math.round((data.down_adjustable_thermal_kw || 0) * 10) / 10
@@ -256,8 +256,8 @@ async function fetchCapacity() {
 async function fetchStatistics() {
   try {
     const res = await getVppStatistics()
-    if (res.data?.code === 200 && res.data.data) {
-      statistics.value = res.data.data
+    if (res.code === 200 && res.data) {
+      statistics.value = res.data
     }
   } catch {
     // 静默处理
@@ -272,9 +272,9 @@ async function fetchDispatches(page?: number) {
       page: currentPage.value,
       page_size: pageSize,
     })
-    if (res.data?.code === 200 && res.data.data) {
-      dispatches.value = res.data.data.items || []
-      totalDispatches.value = res.data.data.total || 0
+    if (res.code === 200 && res.data) {
+      dispatches.value = res.data.items || []
+      totalDispatches.value = res.data.total || 0
     }
   } catch {
     // 静默处理

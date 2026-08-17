@@ -1,5 +1,6 @@
 """演示数据生成引擎测试。"""
 
+from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
 from sqlalchemy import select
@@ -105,3 +106,35 @@ async def test_run_collection_cycle_builds_ingest_payload(async_db, monkeypatch)
     # 数据库点位仍存在，避免 run_collection_cycle 误改结构性数据
     db_points = (await async_db.execute(select(Point.id))).scalars().all()
     assert set(db_points) == {ai_point.id, di_point.id, ao_point.id}
+
+
+async def test_run_collection_cycle_rotates_large_point_sets(async_db, monkeypatch):
+    points = [await _add_point(async_db, f"BATCH_AI_{index:03d}", f"批次点位{index}", "AI") for index in range(5)]
+    await async_db.commit()
+
+    class _SessionCtx:
+        def __call__(self):
+            return self
+
+        async def __aenter__(self):
+            return async_db
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+    captured_batches = []
+
+    async def _capture(payload, session=None):
+        captured_batches.append([point.point_id for point in payload])
+
+    monkeypatch.setattr("app.demo.engine.async_session", _SessionCtx())
+    monkeypatch.setattr("app.services.ingest_pipeline.process_payload", AsyncMock(side_effect=_capture))
+    monkeypatch.setattr("app.core.config.get_settings", lambda: SimpleNamespace(simulation_batch_size=2))
+
+    simulator = DataSimulator()
+    await simulator.run_collection_cycle()
+    await simulator.run_collection_cycle()
+    await simulator.run_collection_cycle()
+
+    assert [len(batch) for batch in captured_batches] == [2, 2, 1]
+    assert {point_id for batch in captured_batches for point_id in batch} == {point.id for point in points}

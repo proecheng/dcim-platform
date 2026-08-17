@@ -95,6 +95,27 @@ async def test_process_payload_empty_returns_zero(async_db):
     assert result.errors == []
 
 
+async def test_broadcast_realtime_skips_points_without_site(monkeypatch):
+    broadcast = AsyncMock(return_value=1)
+    monkeypatch.setattr(ingest_pipeline.ws_manager, "broadcast_realtime", broadcast)
+    monkeypatch.setattr(
+        ingest_pipeline,
+        "_point_meta_cache",
+        {
+            1: {"point_code": "NO_SITE", "point_type": "AI", "site_id": None},
+            2: {"point_code": "SITE_1", "point_type": "AI", "site_id": 1},
+        },
+    )
+
+    await ingest_pipeline._broadcast_realtime(
+        [IngestPoint(point_id=1, value=10), IngestPoint(point_id=2, value=20)]
+    )
+
+    broadcast.assert_awaited_once()
+    assert broadcast.await_args.kwargs["site_id"] == 1
+    assert [item["point_id"] for item in broadcast.await_args.args[0]] == [2]
+
+
 async def test_process_payload_300_points_performance(async_db, monkeypatch):
     ingest_pipeline.invalidate_point_cache()
     await _stub_side_effects(monkeypatch)

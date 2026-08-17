@@ -877,6 +877,7 @@ class DemandConfigAnalysisItem(BaseModel):
     potential_saving: float = Field(..., description="调整后节省 元/年")
     over_demand_risk: float = Field(..., description="超需量风险概率 %")
     recommendation: str = Field(..., description="配置建议")
+    data_sufficient: bool = Field(..., description="是否有足够真实数据支持分析")
 
 
 class DemandConfigAnalysisResult(BaseModel):
@@ -1202,6 +1203,7 @@ class LoadRegulationConfigResponse(LoadRegulationConfigBase):
     device_name: Optional[str] = None
     device_type: Optional[str] = None
     rated_power: Optional[float] = None
+    power_point_id: Optional[int] = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -1222,9 +1224,13 @@ class RegulationSimulateResponse(BaseModel):
     regulation_type: str
     current_value: float
     target_value: float
-    current_power: float = Field(..., description="当前功率 kW")
-    estimated_power: float = Field(..., description="预估功率 kW")
-    power_change: float = Field(..., description="功率变化 kW")
+    current_power: Optional[float] = Field(None, description="当前功率 kW")
+    estimated_power: Optional[float] = Field(None, description="预估功率 kW")
+    power_change: Optional[float] = Field(None, description="功率变化 kW")
+    data_sufficient: bool = Field(..., description="是否具备可量化模拟所需数据")
+    data_source: Optional[str] = Field(None, description="当前功率数据来源")
+    calculation_method: Optional[str] = Field(None, description="功率变化计算方法")
+    warning: Optional[str] = Field(None, description="数据不足或模拟限制说明")
     comfort_impact: str
     performance_impact: str
 
@@ -1268,7 +1274,9 @@ class RegulationRecommendation(BaseModel):
     regulation_type: str
     current_value: float
     recommended_value: float
-    power_saving: float = Field(..., description="节省功率 kW")
+    power_saving: Optional[float] = Field(None, description="节省功率 kW")
+    data_sufficient: bool = Field(..., description="是否具备可量化建议所需数据")
+    data_source: Optional[str] = Field(None, description="建议使用的数据来源")
     reason: str = Field(..., description="建议原因")
     priority: str = Field(..., description="优先级")
 

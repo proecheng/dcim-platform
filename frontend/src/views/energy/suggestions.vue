@@ -56,6 +56,8 @@
       </el-col>
     </el-row>
 
+    <RLOptimizationPanel :proposals="suggestions" />
+
     <el-row :gutter="20">
       <!-- 建议统计 -->
       <el-col :span="8">
@@ -184,7 +186,7 @@
       <el-form :model="completeForm" label-width="100px">
         <el-form-item label="实际节能">
           <el-input-number v-model="completeForm.actual_saving" :min="0" style="width: 100%;" />
-          <span style="margin-left: 8px;">kWh/月</span>
+          <span style="margin-left: 8px;">kWh</span>
         </el-form-item>
         <el-form-item label="备注">
           <el-input v-model="completeForm.remark" type="textarea" :rows="2" placeholder="可选备注" />
@@ -241,6 +243,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { Lightning, Money, Finished, TrendCharts, Refresh, Setting } from '@element-plus/icons-vue'
 import * as echarts from 'echarts'
 import SuggestionDetailDrawer from '@/components/energy/SuggestionDetailDrawer.vue'
+import RLOptimizationPanel from '@/components/energy/RLOptimizationPanel.vue'
 import {
   getSuggestions, getSavingPotential, acceptSuggestion, rejectSuggestion, completeSuggestion,
   getSuggestionTemplates, triggerSuggestionAnalysis, getSuggestionsSummary,

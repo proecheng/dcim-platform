@@ -298,6 +298,9 @@ class FeedbackLearner:
 
     def _generate_recommendations(self, metrics: LearningMetrics, execution_data: Dict) -> List[str]:
         """生成改进建议"""
+        if execution_data.get("total_schedules", 0) == 0 and metrics.total_records == 0:
+            return ["暂无真实调度执行和预测反馈数据，暂不能评估成功率、需量利用率或节省达成率"]
+
         recommendations = []
 
         # 预测准确性建议

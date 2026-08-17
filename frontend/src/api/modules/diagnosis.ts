@@ -333,8 +333,10 @@ export function getMisdiagnosisReports(params?: PageParams & {
 /**
  * 获取误诊报告详情
  */
-export function getMisdiagnosisReport(reportId: number): Promise<SystemReport> {
-  return request.get(`/v1/diagnosis/reports/misdiagnosis/${reportId}`)
+export function getMisdiagnosisReport(reportPeriod: string): Promise<SystemReport> {
+  return request.get('/v1/diagnosis/reports/misdiagnosis', {
+    params: { period: reportPeriod }
+  })
 }
 
 /**
@@ -352,8 +354,9 @@ export function generateMisdiagnosisReport(period: string): Promise<{
 /**
  * 导出误诊报告为 PDF
  */
-export function exportMisdiagnosisReport(reportId: number): Promise<Blob> {
-  return request.get(`/v1/diagnosis/reports/misdiagnosis/${reportId}/export`, {
+export function exportMisdiagnosisReport(reportPeriod: string): Promise<Blob> {
+  return request.get('/v1/diagnosis/reports/misdiagnosis/export', {
+    params: { period: reportPeriod },
     responseType: 'blob'
   })
 }
@@ -457,4 +460,3 @@ export function getFaultTrees(params?: {
 }): Promise<FaultTree[]> {
   return request.get('/v1/diagnosis/fault-trees', { params })
 }
-

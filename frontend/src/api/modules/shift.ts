@@ -312,5 +312,8 @@ export function getShiftReport(params: any) {
   return request.get(`/v1/energy/shift/reports/${params.report_type}`, { params })
 }
 export function exportShiftReport(data: any) {
-  return request.post('/v1/energy/shift/reports/export', data.report_data, { params: { format: data.format } })
+  return request.post<Blob>('/v1/energy/shift/reports/export', undefined, {
+    params: data,
+    responseType: 'blob'
+  })
 }

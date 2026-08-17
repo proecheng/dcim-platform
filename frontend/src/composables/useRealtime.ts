@@ -64,12 +64,15 @@ export function useRealtime(options: UseRealtimeOptions = {}) {
   const handleRealtimeMessage = (message: any) => {
     if (message.type === 'realtime' && message.data) {
       store.updatePoint(message.data as RealtimeData)
+    } else if (message.type === 'realtime_batch' && Array.isArray(message.data)) {
+      store.updatePoints(message.data as RealtimeData[])
     }
   }
 
-  // 订阅实时数据（MainLayout 已预连接，这里只注册处理器）
+  // 注册单点与批量处理器，并按需建立实时数据连接。
   const subscribeRealtime = () => {
     wsManager.on('realtime', 'realtime', handleRealtimeMessage)
+    wsManager.on('realtime', 'realtime_batch', handleRealtimeMessage)
     wsManager.subscribe('realtime', {
       channels: ['realtime'],
       filters: pointIds ? { point_ids: pointIds } : undefined
@@ -92,6 +95,7 @@ export function useRealtime(options: UseRealtimeOptions = {}) {
   onUnmounted(() => {
     stopPolling()
     wsManager.off('realtime', 'realtime', handleRealtimeMessage)
+    wsManager.off('realtime', 'realtime_batch', handleRealtimeMessage)
   })
 
   return {

@@ -123,6 +123,8 @@ class PowerFactorPlugin(AnalysisPlugin):
 
             # 补偿设备投资估算 (约 50-100 元/kVar)
             investment = q_compensation * 75
+            payback_months = investment / total_benefit * 12 if total_benefit > 0 else None
+            payback_display = f"{payback_months:.1f} 个月" if payback_months is not None else "无法估算（当前收益为 0）"
 
             priority = (
                 PluginPriority.CRITICAL
@@ -167,7 +169,7 @@ class PowerFactorPlugin(AnalysisPlugin):
 ### 投资回报分析
 - 设备投资: ¥{investment:.0f}
 - 年节省电费: ¥{total_benefit:.0f}
-- 投资回报期: {investment / total_benefit * 12:.1f} 个月
+- 投资回报期: {payback_display}
 
 ### 功率因数低的设备
 {chr(10).join([f"- {p.device_name}: PF={p.power_factor:.3f}" for p in sorted(context.power_data, key=lambda x: x.power_factor)[:5]])}
@@ -176,7 +178,7 @@ class PowerFactorPlugin(AnalysisPlugin):
                     estimated_cost_saving=total_benefit,
                     implementation_difficulty=3,
                     priority=priority,
-                    payback_period=investment / (total_benefit / 12) if total_benefit > 0 else None,
+                    payback_period=payback_months,
                     related_devices=[
                         p.device_name for p in sorted(context.power_data, key=lambda x: x.power_factor)[:5]
                     ],

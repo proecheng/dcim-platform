@@ -177,6 +177,7 @@
       </template>
 
       <el-table :data="detailData" stripe border v-loading="loading">
+        <el-table-column prop="device_id" label="设备ID" width="90" />
         <el-table-column
           :prop="filters.period === 'daily' ? 'stat_date' : 'stat_month'"
           :label="filters.period === 'daily' ? '日期' : '月份'"
@@ -290,21 +291,27 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
+  window.removeEventListener('resize', handleResize)
   trendChart?.dispose()
   pieChart?.dispose()
   costChart?.dispose()
+  trendChart = null
+  pieChart = null
+  costChart = null
 })
+
+function handleResize() {
+  if (trendChart && !trendChart.isDisposed()) trendChart.resize()
+  if (pieChart && !pieChart.isDisposed()) pieChart.resize()
+  if (costChart && !costChart.isDisposed()) costChart.resize()
+}
 
 function initCharts() {
   if (trendChartRef.value) trendChart = echarts.init(trendChartRef.value)
   if (pieChartRef.value) pieChart = echarts.init(pieChartRef.value)
   if (costChartRef.value) costChart = echarts.init(costChartRef.value)
 
-  window.addEventListener('resize', () => {
-    trendChart?.resize()
-    pieChart?.resize()
-    costChart?.resize()
-  })
+  window.addEventListener('resize', handleResize)
 }
 
 function handlePeriodChange() {

@@ -47,6 +47,7 @@ export interface PowerDeviceUpdate {
   device_name?: string
   device_type?: string
   rated_power?: number
+  power_point_id?: number
   rated_voltage?: number
   rated_current?: number
   phase_type?: string
@@ -472,12 +473,18 @@ export function getSuggestion(suggestionId: number) {
 
 /** 接受建议 */
 export function acceptSuggestion(suggestionId: number, data?: { remark?: string }) {
-  return request.put<ResponseModel<EnergySuggestion>>(`/v1/energy/suggestions/${suggestionId}/accept`, data)
+  return request.post<ResponseModel<{ proposal_id: number; status: string; selected_measure_ids: number[] }>>(
+    `/v1/proposals/${suggestionId}/accept-all`,
+    data
+  )
 }
 
 /** 拒绝建议 */
 export function rejectSuggestion(suggestionId: number, data: { remark: string }) {
-  return request.put<ResponseModel<EnergySuggestion>>(`/v1/energy/suggestions/${suggestionId}/reject`, data)
+  return request.post<ResponseModel<{ proposal_id: number; status: string }>>(
+    `/v1/proposals/${suggestionId}/reject`,
+    data
+  )
 }
 
 /** 完成建议 */
@@ -485,7 +492,10 @@ export function completeSuggestion(suggestionId: number, data?: {
   actual_saving?: number
   remark?: string
 }) {
-  return request.put<ResponseModel<EnergySuggestion>>(`/v1/energy/suggestions/${suggestionId}/complete`, data)
+  return request.post<ResponseModel<{ proposal_id: number; status: string }>>(
+    `/v1/proposals/${suggestionId}/complete`,
+    data
+  )
 }
 
 /** 获取节能潜力 */
@@ -936,6 +946,7 @@ export interface DemandConfigAnalysisItem {
   potential_saving: number
   over_demand_risk: number
   recommendation: string
+  data_sufficient: boolean
 }
 
 export interface DemandConfigAnalysisResult {
@@ -1155,9 +1166,13 @@ export interface RegulationSimulateResponse {
   regulation_type: string
   current_value: number
   target_value: number
-  current_power: number
-  estimated_power: number
-  power_change: number
+  current_power?: number | null
+  estimated_power?: number | null
+  power_change?: number | null
+  data_sufficient: boolean
+  data_source?: string
+  calculation_method?: string
+  warning?: string
   comfort_impact?: string
   performance_impact?: string
 }
@@ -1173,10 +1188,10 @@ export interface RegulationHistory {
   new_value: number
   power_before?: number
   power_after?: number
-  power_saved?: number
+  power_saved?: number | null
   trigger_reason: string
   status: string
-  executed_at?: string
+  executed_at?: string | null
   created_at: string
 }
 
@@ -1188,7 +1203,9 @@ export interface RegulationRecommendation {
   regulation_type: string
   current_value: number
   recommended_value: number
-  power_saving: number
+  power_saving?: number | null
+  data_sufficient: boolean
+  data_source?: string
   reason: string
   priority: string
 }
@@ -1306,6 +1323,7 @@ export interface DemandOptimizationPlanResponse {
   meter_point_id: number
   meter_name: string
   current_declared: number
+  data_sufficient: boolean
   statistics: {
     max_demand: number
     avg_demand: number
@@ -1377,6 +1395,7 @@ export interface DemandAggregatedCurveResponse {
     over_declared_count: number
     over_declared_ratio: number
     total_data_points: number
+    data_sufficient: boolean
   }
   aggregated_points: DemandAggregatedPoint[]
 }

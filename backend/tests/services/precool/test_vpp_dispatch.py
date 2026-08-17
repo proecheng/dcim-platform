@@ -469,6 +469,7 @@ class TestGetStatistics:
         empty_row = MagicMock()
         empty_row.count = 0
         empty_row.total_power = None
+        empty_row.total_energy = None
 
         daily_result = MagicMock()
         daily_result.first.return_value = empty_row
@@ -476,8 +477,15 @@ class TestGetStatistics:
         monthly_result = MagicMock()
         monthly_result.first.return_value = empty_row
 
+        all_time_row = MagicMock()
+        all_time_row.total_count = 0
+        all_time_row.accepted_count = 0
+        all_time_row.total_energy = None
+        all_time_result = MagicMock()
+        all_time_result.first.return_value = all_time_row
+
         mock_session.execute = AsyncMock(
-            side_effect=[daily_result, monthly_result]
+            side_effect=[daily_result, monthly_result, all_time_result]
         )
 
         with patch(
@@ -491,7 +499,9 @@ class TestGetStatistics:
 
         assert result["daily"]["count"] == 0
         assert result["daily"]["total_power_kw"] == 0
+        assert result["daily"]["total_energy_kwh"] == 0
         assert result["monthly"]["estimated_savings_yuan"] == 0
+        assert result["all_time"]["response_success_rate"] == 0
 
     @pytest.mark.asyncio
     async def test_statistics_with_data(self):
@@ -502,10 +512,12 @@ class TestGetStatistics:
         daily_row = MagicMock()
         daily_row.count = 3
         daily_row.total_power = 90.0
+        daily_row.total_energy = 135.0
 
         monthly_row = MagicMock()
         monthly_row.count = 25
         monthly_row.total_power = 750.0
+        monthly_row.total_energy = 1125.0
 
         daily_result = MagicMock()
         daily_result.first.return_value = daily_row
@@ -513,8 +525,15 @@ class TestGetStatistics:
         monthly_result = MagicMock()
         monthly_result.first.return_value = monthly_row
 
+        all_time_row = MagicMock()
+        all_time_row.total_count = 10
+        all_time_row.accepted_count = 8
+        all_time_row.total_energy = 1500.0
+        all_time_result = MagicMock()
+        all_time_result.first.return_value = all_time_row
+
         mock_session.execute = AsyncMock(
-            side_effect=[daily_result, monthly_result]
+            side_effect=[daily_result, monthly_result, all_time_result]
         )
 
         with patch(
@@ -528,7 +547,11 @@ class TestGetStatistics:
 
         assert result["daily"]["count"] == 3
         assert result["daily"]["total_power_kw"] == 90.0
-        assert result["daily"]["estimated_savings_yuan"] == 45.0
+        assert result["daily"]["total_energy_kwh"] == 135.0
+        assert result["daily"]["estimated_savings_yuan"] == 67.5
         assert result["monthly"]["count"] == 25
         assert result["monthly"]["total_power_kw"] == 750.0
-        assert result["monthly"]["estimated_savings_yuan"] == 375.0
+        assert result["monthly"]["total_energy_kwh"] == 1125.0
+        assert result["monthly"]["estimated_savings_yuan"] == 562.5
+        assert result["all_time"]["response_success_rate"] == 80.0
+        assert result["all_time"]["estimated_savings_yuan"] == 750.0

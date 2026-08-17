@@ -23,7 +23,7 @@ export interface SpaceCapacity {
   warning_threshold: number
   critical_threshold: number
   status: CapacityStatus
-  usage_rate: number
+  usage_rate: number | null
   created_at: string
   updated_at: string
 }
@@ -56,7 +56,7 @@ export interface PowerCapacity {
   warning_threshold: number
   critical_threshold: number
   status: CapacityStatus
-  usage_rate: number
+  usage_rate: number | null
   created_at: string
   updated_at: string
 }
@@ -90,7 +90,7 @@ export interface CoolingCapacity {
   warning_threshold: number
   critical_threshold: number
   status: CapacityStatus
-  usage_rate: number
+  usage_rate: number | null
   created_at: string
   updated_at: string
 }
@@ -120,7 +120,7 @@ export interface WeightCapacity {
   warning_threshold: number
   critical_threshold: number
   status: CapacityStatus
-  usage_rate: number
+  usage_rate: number | null
   created_at: string
   updated_at: string
 }

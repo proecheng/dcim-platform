@@ -2,6 +2,7 @@ import axios, { AxiosRequestConfig } from 'axios'
 import { ElMessage } from 'element-plus'
 import router from '@/router'
 import { degradationFlags } from '@/stores/degradation'
+import { PUBLIC_AUTH_UNAVAILABLE_EVENT } from '@/utils/authEvents'
 
 // API基础URL - 始终使用相对路径，通过代理访问后端
 // 开发环境: Vite 代理转发到 localhost:8080
@@ -106,6 +107,8 @@ instance.interceptors.response.use(
               ;(window as any).__authExpiredShown = false
             }, 3000)
           }
+        } else {
+          window.dispatchEvent(new Event(PUBLIC_AUTH_UNAVAILABLE_EVENT))
         }
       } else if (!silentError && status === 403) {
         ElMessage.error('没有权限执行此操作')

@@ -231,14 +231,21 @@ async def test_smart_site_space_scoring(client, seed_cabinets, seed_assets):
 async def test_smart_site_power_scoring(client, seed_cabinets):
     resp = await client.post(URL, json={"required_u": 1, "required_power_kw": 8.0})
     data = resp.json()
+    assert {candidate["cabinet_id"] for candidate in data["candidates"]} == {1, 3}
     for c in data["candidates"]:
         power_dim = next(d for d in c["dimensions"] if d["dimension"] == "电力容量")
-        if c["cabinet_id"] == 4:
-            assert power_dim["data_available"] is False
-            assert power_dim["score"] == 50.0
-        elif c["cabinet_id"] == 3:
+        if c["cabinet_id"] == 3:
             assert power_dim["data_available"] is True
             assert power_dim["score"] == 100.0
+
+
+@pytest.mark.anyio
+async def test_smart_site_power_requirement_excludes_unknown_and_insufficient_capacity(client, seed_cabinets):
+    resp = await client.post(URL, json={"required_u": 1, "required_power_kw": 21.0})
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["qualified_count"] == 0
+    assert data["candidates"] == []
 
 
 @pytest.mark.anyio
@@ -307,6 +314,14 @@ async def test_smart_site_no_candidates(client, seed_cabinets):
     data = resp.json()
     assert data["qualified_count"] == 0
     assert len(data["candidates"]) == 0
+
+
+@pytest.mark.anyio
+async def test_smart_site_weight_requirement_excludes_unknown_capacity(client, seed_cabinets):
+    resp = await client.post(URL, json={"required_u": 1, "required_weight_kg": 400})
+    assert resp.status_code == 200
+    data = resp.json()
+    assert {candidate["cabinet_id"] for candidate in data["candidates"]} == {1, 3}
 
 
 @pytest.mark.anyio

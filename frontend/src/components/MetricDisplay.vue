@@ -41,7 +41,7 @@
 import { InfoFilled } from '@element-plus/icons-vue'
 
 interface MetricValue {
-  value: number
+  value: number | null
   unit?: string
   formula?: string
   data_source?: any
@@ -54,7 +54,7 @@ defineProps<{
   metric: MetricValue | null | undefined
 }>()
 
-const formatValue = (value: number): string => {
+const formatValue = (value: number | null): string => {
   if (value === null || value === undefined || isNaN(value)) {
     return '--'
   }

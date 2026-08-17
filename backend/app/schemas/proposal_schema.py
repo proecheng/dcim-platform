@@ -283,4 +283,4 @@ class RLExplorationRateUpdateRequest(BaseModel):
     """探索率更新请求"""
 
     exploration_rate: float = Field(..., description="新探索率", ge=0.0, le=1.0)
-    phase: Optional[str] = Field(None, description="阶段: initial/stable/fluctuating/decaying")
+    phase: Optional[str] = Field(None, description="阶段: initial/stable/fluctuating/decaying/manual")

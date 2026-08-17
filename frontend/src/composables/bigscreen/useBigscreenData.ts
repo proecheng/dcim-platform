@@ -5,6 +5,7 @@ import { useAlarmStore } from '@/stores/alarm'
 import { useRealtimeStore } from '@/stores/realtime'
 import { useEnergyStore } from '@/stores/energy'
 import type { DeviceRealtimeData } from '@/types/bigscreen'
+import { PUBLIC_AUTH_UNAVAILABLE_EVENT } from '@/utils/authEvents'
 
 export interface DataFetchOptions {
   refreshInterval?: number
@@ -22,6 +23,7 @@ export function useBigscreenData(options: DataFetchOptions = {}) {
 
   let refreshTimer: number | null = null
   let currentInterval = refreshInterval
+  let authUnavailable = false
 
   // Story 27.7 AC4: 移除 fetchEnvironmentData，environment 现在是 BigscreenStore 的 getter
   // 从 RealtimeStore 自动派生，无需手动更新
@@ -90,6 +92,8 @@ export function useBigscreenData(options: DataFetchOptions = {}) {
 
   // 刷新所有数据
   async function refreshAllData() {
+    if (authUnavailable) return
+
     isLoading.value = true
     error.value = null
 
@@ -111,7 +115,7 @@ export function useBigscreenData(options: DataFetchOptions = {}) {
 
   // 开始定时刷新
   function startRefresh() {
-    if (refreshTimer) return
+    if (refreshTimer || authUnavailable) return
 
     refreshTimer = window.setInterval(() => {
       if (enableRealtime) {
@@ -137,7 +141,13 @@ export function useBigscreenData(options: DataFetchOptions = {}) {
     }
   }
 
+  function handlePublicAuthUnavailable() {
+    authUnavailable = true
+    stopRefresh()
+  }
+
   onMounted(() => {
+    window.addEventListener(PUBLIC_AUTH_UNAVAILABLE_EVENT, handlePublicAuthUnavailable)
     refreshAllData()
     if (enableRealtime) {
       startRefresh()
@@ -146,6 +156,7 @@ export function useBigscreenData(options: DataFetchOptions = {}) {
 
   onUnmounted(() => {
     stopRefresh()
+    window.removeEventListener(PUBLIC_AUTH_UNAVAILABLE_EVENT, handlePublicAuthUnavailable)
   })
 
   return {

@@ -1,5 +1,5 @@
 // frontend/src/composables/bigscreen/useRaycaster.ts
-import { shallowRef, onMounted, onUnmounted, type Ref, type ShallowRef } from 'vue'
+import { shallowRef, watch, onUnmounted, type Ref, type ShallowRef } from 'vue'
 import * as THREE from 'three'
 import { useBigscreenStore } from '@/stores/bigscreen'
 
@@ -186,18 +186,25 @@ export function useRaycaster(
     }
   }
 
-  onMounted(() => {
-    if (containerRef.value) {
-      containerRef.value.addEventListener('mousemove', handleMouseMove)
-      containerRef.value.addEventListener('click', handleClick)
-    }
-  })
+  function attachListeners(container: HTMLElement | null) {
+    if (!container) return
+    container.addEventListener('mousemove', handleMouseMove)
+    container.addEventListener('click', handleClick)
+  }
+
+  function detachListeners(container: HTMLElement | null) {
+    if (!container) return
+    container.removeEventListener('mousemove', handleMouseMove)
+    container.removeEventListener('click', handleClick)
+  }
+
+  watch(containerRef, (container, previousContainer) => {
+    detachListeners(previousContainer)
+    attachListeners(container)
+  }, { immediate: true, flush: 'post' })
 
   onUnmounted(() => {
-    if (containerRef.value) {
-      containerRef.value.removeEventListener('mousemove', handleMouseMove)
-      containerRef.value.removeEventListener('click', handleClick)
-    }
+    detachListeners(containerRef.value)
   })
 
   return {

@@ -89,6 +89,7 @@
           <el-menu-item index="/energy/monitor">用电监控</el-menu-item>
           <el-menu-item index="/energy/statistics">能耗统计</el-menu-item>
           <el-menu-item index="/energy/analysis">节能分析</el-menu-item>
+          <el-menu-item index="/energy/suggestions">智能建议</el-menu-item>
           <el-menu-item index="/energy/regulation">负荷调节</el-menu-item>
           <el-menu-item index="/energy/execution">执行管理</el-menu-item>
           <el-menu-item index="/energy/report">能效报告</el-menu-item>
@@ -324,10 +325,9 @@ onMounted(async () => {
   // 初始化应用设置（包含 localStorage 迁移逻辑）
   appStore.initFromStorage()
 
-  // 初始化 WebSocket 管理器，预连接常用通道
+  // useRealtime() 负责实时通道订阅；这里只确保告警通道全局可用。
   const wsManager = useWebSocketManager()
   wsManager.connect('alarms')
-  wsManager.connect('realtime')
 
   // 获取用户信息
   if (userStore.token && !userStore.userInfo) {

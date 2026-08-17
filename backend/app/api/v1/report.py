@@ -1128,78 +1128,38 @@ async def calculate_device_health(
     _: User = Depends(require_operator),
     context: SiteAccessContext = Depends(get_site_access_context),
 ):
-    """
-    计算所有设备的健康度评分。
-    算法：基础分100，紧急告警-15，重要告警-8，次要告警-3，逾期维保-20，近期维保+5。
-    """
+    """使用预测性维护正式算法重新评估授权站点内的设备健康度。"""
     from ...models.device import Device
-    from ...models.alarm import Alarm
-    from ...models.point import Point
     from ...models.report import DeviceHealthScore
+    from ...services.predictive_maintenance.config import DEVICE_TYPE_MAP
+    from ...services.predictive_maintenance.health_calculator import DeviceHealthScoreCalculator
 
-    # 清除旧数据
-    delete_query = apply_device_site_scope(delete(DeviceHealthScore), DeviceHealthScore.device_id, context)
-    await db.execute(delete_query)
-
-    # 获取所有设备
-    devices_result = await db.execute(apply_site_scope(select(Device), Device.site_id, context))
-    devices = devices_result.scalars().all()
-
-    now = datetime.now()
-    thirty_days_ago = now - timedelta(days=30)
-    scores = []
-
-    for device in devices:
-        score = 100.0
-
-        # 近30天告警统计（通过 Point 关联设备）
-        alarm_result = await db.execute(
-            select(Alarm.alarm_level, func.count(Alarm.id))
-            .join(Point, Alarm.point_id == Point.id)
-            .where(and_(Point.device_id == device.id, Alarm.created_at >= thirty_days_ago))
-            .group_by(Alarm.alarm_level)
+    device_ids_result = await db.execute(
+        apply_site_scope(
+            select(Device.id).where(Device.device_type.in_(DEVICE_TYPE_MAP.keys())),
+            Device.site_id,
+            context,
         )
-        alarm_counts = {row[0]: row[1] for row in alarm_result.all()}
-        total_alarms = sum(alarm_counts.values())
-
-        score -= alarm_counts.get("critical", 0) * 15
-        score -= alarm_counts.get("major", 0) * 8
-        score -= alarm_counts.get("minor", 0) * 3
-
-        # Clamp
-        score = max(0, min(100, score))
-        health_level = _score_to_level(score)
-
-        health = DeviceHealthScore(
-            device_id=device.id,
-            device_name=device.device_name,
-            device_type=device.device_type,
-            score=round(score, 1),
-            health_level=health_level,
-            alarm_count=total_alarms,
-            calculated_at=now,
-        )
-        db.add(health)
-        scores.append(
-            {
-                "device_id": device.id,
-                "device_name": device.device_name,
-                "score": round(score, 1),
-                "health_level": health_level,
-            }
-        )
-
+    )
+    device_ids = list(device_ids_result.scalars().all())
+    calculator = DeviceHealthScoreCalculator(db)
+    total_devices = await calculator.calculate_all_health_scores(device_ids=device_ids)
     await db.commit()
 
+    scores_result = await db.execute(
+        select(DeviceHealthScore.health_level, func.count())
+        .where(DeviceHealthScore.device_id.in_(device_ids))
+        .group_by(DeviceHealthScore.health_level)
+    )
+    summary = {"健康": 0, "关注": 0, "预警": 0, "危险": 0}
+    summary.update({level: count for level, count in scores_result.all()})
+    now = datetime.now()
+
     return {
-        "total_devices": len(scores),
+        "total_devices": total_devices,
         "calculated_at": now.isoformat(),
-        "summary": {
-            "健康": sum(1 for s in scores if s["health_level"] == "健康"),
-            "关注": sum(1 for s in scores if s["health_level"] == "关注"),
-            "预警": sum(1 for s in scores if s["health_level"] == "预警"),
-            "危险": sum(1 for s in scores if s["health_level"] == "危险"),
-        },
+        "summary": summary,
+        "algorithm": "predictive_maintenance_three_factor",
     }
 
 

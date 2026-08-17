@@ -52,15 +52,19 @@
       <el-table :data="deviceStatus" border v-loading="loading">
         <el-table-column type="index" label="#" width="60" />
         <el-table-column prop="device_name" label="设备名称" min-width="180" />
-        <el-table-column prop="shift_action" label="转移动作" width="120" />
-        <el-table-column prop="target_power" label="目标功率 (kW)" width="140" align="right">
+        <el-table-column label="转移动作" width="120">
           <template #default="{ row }">
-            {{ row.target_power?.toFixed(1) || 0 }}
+            {{ row.shift_action || row.action || '-' }}
           </template>
         </el-table-column>
-        <el-table-column prop="current_power" label="当前功率 (kW)" width="140" align="right">
+        <el-table-column label="执行前功率 (kW)" width="140" align="right">
           <template #default="{ row }">
-            {{ row.current_power?.toFixed(1) || 0 }}
+            {{ formatPower(row.power_before ?? row.target_power) }}
+          </template>
+        </el-table-column>
+        <el-table-column label="当前功率 (kW)" width="140" align="right">
+          <template #default="{ row }">
+            {{ formatPower(row.current_power ?? row.power_after ?? row.actual_power) }}
           </template>
         </el-table-column>
         <el-table-column prop="status" label="执行状态" width="120">
@@ -264,6 +268,7 @@ type TagType = 'primary' | 'success' | 'info' | 'warning' | 'danger'
 const getDeviceStatusType = (status: string): TagType => {
   const map: Record<string, TagType> = {
     pending: 'info',
+    executing: 'warning',
     running: 'warning',
     completed: 'success',
     failed: 'danger'
@@ -274,12 +279,16 @@ const getDeviceStatusType = (status: string): TagType => {
 const getDeviceStatusLabel = (status: string) => {
   const map: Record<string, string> = {
     pending: '待执行',
+    executing: '执行中',
     running: '执行中',
     completed: '已完成',
     failed: '失败'
   }
   return map[status] || status
 }
+
+const formatPower = (value: unknown) =>
+  typeof value === 'number' && Number.isFinite(value) ? value.toFixed(1) : '-'
 
 onMounted(async () => {
   await fetchDetail()

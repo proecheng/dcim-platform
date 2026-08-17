@@ -178,18 +178,40 @@ class CoolingLinkageService:
         Returns:
             状态字典
         """
-        # TODO: 从实时数据获取制冷系统状态
-        # 这里返回模拟数据
+        records_result = await db.execute(
+            select(CoolingLinkageRecord).order_by(desc(CoolingLinkageRecord.timestamp)).limit(200)
+        )
+        records = records_result.scalars().all()
+        latest = records[0] if records else None
+        if latest is None:
+            return {
+                "total_cooling_power": None,
+                "current_cop": None,
+                "supply_temp": None,
+                "return_temp": None,
+                "linkage_active": False,
+                "last_adjust_time": None,
+                "adjust_count": 0,
+                "total_energy_saving": None,
+                "total_cost_saving": None,
+                "data_sufficient": False,
+                "data_source": None,
+                "warning": "暂无制冷联动执行记录，无法确认当前状态或累计节能收益",
+            }
+
         return {
-            "total_cooling_power": 850.5,
-            "current_cop": 3.2,
-            "supply_temp": 9.5,
-            "return_temp": 16.2,
-            "linkage_active": True,
-            "last_adjust_time": datetime.now().isoformat(),
-            "adjust_count": 12,
-            "total_energy_saving": 1250.0,
-            "total_cost_saving": 875.0,
+            "total_cooling_power": float(latest.after_power) if latest.after_power is not None else None,
+            "current_cop": float(latest.cop_after) if latest.cop_after is not None else None,
+            "supply_temp": float(latest.supply_temp_after) if latest.supply_temp_after is not None else None,
+            "return_temp": float(latest.return_temp_after) if latest.return_temp_after is not None else None,
+            "linkage_active": False,
+            "last_adjust_time": latest.timestamp.isoformat() if latest.timestamp else None,
+            "adjust_count": len(records),
+            "total_energy_saving": None,
+            "total_cost_saving": None,
+            "data_sufficient": True,
+            "data_source": "cooling_linkage_records",
+            "warning": "联动记录未包含持续时长与电价，暂不能计算累计节能量和成本收益",
         }
 
     @staticmethod

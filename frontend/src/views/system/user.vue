@@ -186,6 +186,47 @@
           </el-table>
           <el-empty v-if="!contactLoading && contactList.length === 0" description="暂无联系方式" :image-size="60" />
         </el-tab-pane>
+        <el-tab-pane label="站点权限" name="sites">
+          <el-alert
+            v-if="form.role === 'admin'"
+            title="管理员默认拥有全部站点权限，无需单独分配"
+            type="info"
+            :closable="false"
+            show-icon
+          />
+          <div v-else v-loading="sitePermissionLoading" class="site-permission-panel">
+            <div class="site-permission-toolbar">
+              <span>已选择 {{ selectedSiteIds.length }} / {{ availableSites.length }} 个站点</span>
+              <div>
+                <el-button size="small" @click="selectAllSites">全选</el-button>
+                <el-button size="small" @click="selectedSiteIds = []">清空</el-button>
+              </div>
+            </div>
+            <el-checkbox-group v-model="selectedSiteIds" class="site-checkbox-group">
+              <el-checkbox
+                v-for="site in availableSites"
+                :key="site.id"
+                :value="site.id"
+                border
+              >
+                <span class="site-checkbox-label">
+                  <span>{{ site.site_name }}</span>
+                  <small>{{ site.site_code }}</small>
+                </span>
+              </el-checkbox>
+            </el-checkbox-group>
+            <el-empty
+              v-if="!sitePermissionLoading && availableSites.length === 0"
+              description="暂无可分配站点"
+              :image-size="60"
+            />
+            <div class="site-permission-actions">
+              <el-button type="primary" :loading="sitePermissionSaving" @click="saveSitePermissions">
+                保存站点权限
+              </el-button>
+            </div>
+          </div>
+        </el-tab-pane>
       </el-tabs>
       <!-- 新增用户时不显示 Tab，直接显示表单 -->
       <el-form v-if="!isEdit" ref="formRef" :model="form" :rules="formRules" label-width="80px">
@@ -295,9 +336,13 @@ import {
   deleteUser,
   toggleUserStatus,
   resetPassword,
-  batchDeleteUsers
+  batchDeleteUsers,
+  getUserSites,
+  updateUserSites
 } from '@/api/modules/user'
 import type { UserInfo, UserCreateParams, UserUpdateParams } from '@/api/modules/user'
+import { getSites } from '@/api/modules/spatial'
+import type { Site } from '@/api/modules/spatial'
 import {
   getUserContacts,
   createContact as apiCreateContact,
@@ -306,6 +351,7 @@ import {
   importFromProfile,
 } from '@/api/modules/notification'
 import type { ContactItem, ContactForm } from '@/api/modules/notification'
+import { isValidOptionalEmail, isValidOptionalPhone } from '@/utils/userValidation'
 
 type FormInstance = InstanceType<typeof import('element-plus')['ElForm']>
 
@@ -387,9 +433,27 @@ const form = reactive({
   department: ''
 })
 
+function validateOptionalEmail(_rule: unknown, value: string, callback: (error?: Error) => void) {
+  if (!isValidOptionalEmail(value)) {
+    callback(new Error('请输入正确的邮箱地址'))
+    return
+  }
+  callback()
+}
+
+function validateOptionalPhone(_rule: unknown, value: string, callback: (error?: Error) => void) {
+  if (!isValidOptionalPhone(value)) {
+    callback(new Error('请输入正确的手机号'))
+    return
+  }
+  callback()
+}
+
 const formRules = computed(() => ({
   username: [{ required: true, message: '请输入用户名', trigger: 'blur' }],
   password: isEdit.value ? [] : [{ required: true, message: '请输入密码', trigger: 'blur' }],
+  email: [{ validator: validateOptionalEmail, trigger: ['blur', 'change'] }],
+  phone: [{ validator: validateOptionalPhone, trigger: ['blur', 'change'] }],
   role: [{ required: true, message: '请选择角色', trigger: 'change' }]
 }))
 
@@ -487,6 +551,8 @@ function handleEdit(row: UserInfo) {
   editingId.value = row.id
   dialogTab.value = 'basic'
   contactList.value = []
+  availableSites.value = []
+  selectedSiteIds.value = []
   Object.assign(form, {
     username: row.username,
     password: '',
@@ -509,11 +575,13 @@ async function handleSubmit() {
 
   submitting.value = true
   try {
+    const email = form.email.trim() || undefined
+    const phone = form.phone.trim() || undefined
     if (isEdit.value && editingId.value) {
       const payload: UserUpdateParams = {
         real_name: form.real_name || undefined,
-        email: form.email || undefined,
-        phone: form.phone || undefined,
+        email,
+        phone,
         role: form.role || undefined,
         department: form.department || undefined
       }
@@ -524,8 +592,8 @@ async function handleSubmit() {
         username: form.username,
         password: form.password,
         real_name: form.real_name || undefined,
-        email: form.email || undefined,
-        phone: form.phone || undefined,
+        email,
+        phone,
         role: form.role || undefined,
         department: form.department || undefined
       }
@@ -629,6 +697,10 @@ const dialogTab = ref('basic')
 const contactChannelCn: Record<string, string> = { sms: '短信', email: '邮件', im: '即时通讯', voice: '语音' }
 const contactLoading = ref(false)
 const contactList = ref<ContactItem[]>([])
+const sitePermissionLoading = ref(false)
+const sitePermissionSaving = ref(false)
+const availableSites = ref<Site[]>([])
+const selectedSiteIds = ref<number[]>([])
 
 // 联系方式对话框
 const contactDialogVisible = ref(false)
@@ -663,8 +735,45 @@ async function loadContacts() {
 watch(dialogTab, (tab) => {
   if (tab === 'contacts' && contactList.value.length === 0) {
     loadContacts()
+  } else if (tab === 'sites' && form.role !== 'admin' && availableSites.value.length === 0) {
+    loadSitePermissions()
   }
 })
+
+async function loadSitePermissions() {
+  if (!editingId.value) return
+  sitePermissionLoading.value = true
+  try {
+    const [sitesResult, assignedSites] = await Promise.all([
+      getSites(),
+      getUserSites(editingId.value)
+    ])
+    const sites = (sitesResult as unknown as { data?: Site[] }).data ?? sitesResult
+    availableSites.value = Array.isArray(sites) ? sites : []
+    selectedSiteIds.value = assignedSites.map(site => site.site_id)
+  } catch (e) {
+    showApiError(e, '加载站点权限失败')
+  } finally {
+    sitePermissionLoading.value = false
+  }
+}
+
+function selectAllSites() {
+  selectedSiteIds.value = availableSites.value.map(site => site.id)
+}
+
+async function saveSitePermissions() {
+  if (!editingId.value) return
+  sitePermissionSaving.value = true
+  try {
+    const result = await updateUserSites(editingId.value, selectedSiteIds.value)
+    ElMessage.success(result.message || '站点权限已保存')
+  } catch (e) {
+    showApiError(e, '保存站点权限失败')
+  } finally {
+    sitePermissionSaving.value = false
+  }
+}
 
 function handleCreateContact() {
   contactIsEdit.value = false
@@ -817,6 +926,47 @@ async function handleImportContacts() {
     display: flex;
     gap: 8px;
     margin-bottom: 12px;
+  }
+
+  .site-permission-panel {
+    min-height: 180px;
+  }
+
+  .site-permission-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 16px;
+    color: var(--text-secondary);
+  }
+
+  .site-checkbox-group {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+
+    :deep(.el-checkbox) {
+      width: 100%;
+      height: auto;
+      min-height: 48px;
+      margin: 0;
+    }
+  }
+
+  .site-checkbox-label {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+
+    small {
+      color: var(--text-secondary);
+    }
+  }
+
+  .site-permission-actions {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 20px;
   }
 
   :deep(.el-form-item__label) {

@@ -654,8 +654,9 @@ function goToOriginalConfig() {
     case 'vpp_response':
       // VPP需求响应
       router.push({
-        path: '/vpp/response',
+        path: '/energy/analysis',
         query: {
+          tab: 'vpp',
           plan_id: planId,
           restore: 'true'
         }
@@ -665,8 +666,9 @@ function goToOriginalConfig() {
     case 'dispatch_scheduler':
       // 日前调度优化
       router.push({
-        path: '/optimization/schedule',
+        path: '/energy/analysis',
         query: {
+          tab: 'schedule',
           plan_id: planId,
           restore: 'true'
         }

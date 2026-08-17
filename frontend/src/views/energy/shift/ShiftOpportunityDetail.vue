@@ -24,9 +24,9 @@
           {{ opportunity.analysis_date }}
         </el-descriptions-item>
         <el-descriptions-item label="转移方向">
-          <el-tag>{{ opportunity.recommended_shift_from }}</el-tag>
+          <el-tag>{{ getPeriodLabel(opportunity.recommended_shift_from) }}</el-tag>
           <el-icon style="margin: 0 8px"><Right /></el-icon>
-          <el-tag type="success">{{ opportunity.recommended_shift_to }}</el-tag>
+          <el-tag type="success">{{ getPeriodLabel(opportunity.recommended_shift_to) }}</el-tag>
         </el-descriptions-item>
         <el-descriptions-item label="推荐功率">
           <span class="highlight-value">{{ opportunity.recommended_shift_power?.toFixed(1) }} kW</span>
@@ -83,13 +83,13 @@
       <h3>分析数据</h3>
       <el-descriptions :column="3" border>
         <el-descriptions-item label="电价差">
-          {{ opportunity.analysis_data?.price_diff?.toFixed(2) }} 元/kWh
+          {{ formatMetric(opportunity.analysis_data?.price_diff, '元/kWh', 2) }}
         </el-descriptions-item>
         <el-descriptions-item label="回溯天数">
-          {{ opportunity.analysis_data?.lookback_days }} 天
+          {{ formatMetric(opportunity.analysis_data?.lookback_days, '天') }}
         </el-descriptions-item>
         <el-descriptions-item label="推荐设备数">
-          {{ opportunity.analysis_data?.device_count }} 台
+          {{ formatMetric(opportunity.analysis_data?.device_count, '台') }}
         </el-descriptions-item>
       </el-descriptions>
 
@@ -98,7 +98,7 @@
           type="primary"
           size="large"
           @click="handleConvert"
-          :disabled="opportunity.status !== 'pending'"
+          :disabled="!canConvert(opportunity.status)"
         >
           转换为转移计划
         </el-button>
@@ -229,7 +229,9 @@ const getPriorityLabel = (priority: string) => {
 
 const getStatusType = (status: string): TagType => {
   const map: Record<string, TagType> = {
-    pending: 'info',
+    discovered: 'info',
+    reviewed: 'primary',
+    accepted: 'success',
     converted: 'success',
     rejected: 'danger',
     expired: 'info'
@@ -239,13 +241,32 @@ const getStatusType = (status: string): TagType => {
 
 const getStatusLabel = (status: string) => {
   const map: Record<string, string> = {
-    pending: '待处理',
+    discovered: '待处理',
+    reviewed: '已查看',
+    accepted: '已接受',
     converted: '已转换',
     rejected: '已拒绝',
     expired: '已过期'
   }
   return map[status] || status
 }
+
+const periodLabels: Record<string, string> = {
+  peak: '尖峰',
+  sharp: '高峰',
+  flat: '平段',
+  valley: '谷段'
+}
+
+const getPeriodLabel = (period?: string | null) => periodLabels[period || ''] || period || '--'
+
+const formatMetric = (value: unknown, unit: string, precision?: number) => {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return '--'
+  const rendered = precision === undefined ? String(value) : value.toFixed(precision)
+  return `${rendered} ${unit}`
+}
+
+const canConvert = (status: string) => ['discovered', 'reviewed', 'accepted'].includes(status)
 </script>
 
 <style scoped lang="scss">

@@ -9,7 +9,9 @@
     <el-row :gutter="20" style="margin-top: 20px">
       <el-col :span="6">
         <el-card shadow="hover">
-          <el-statistic title="制冷总功率" :value="status.total_cooling_power || 0" suffix="kW" :precision="1" />
+          <el-statistic title="制冷总功率" :value="status.total_cooling_power" :suffix="status.total_cooling_power == null ? '' : 'kW'" :precision="1">
+            <template #prefix><span v-if="status.total_cooling_power == null">--</span></template>
+          </el-statistic>
           <div style="margin-top: 10px; font-size: 12px; color: #909399">
             目标: {{ config.max_cooling_power || 0 }} kW
           </div>
@@ -17,7 +19,9 @@
       </el-col>
       <el-col :span="6">
         <el-card shadow="hover">
-          <el-statistic title="当前 COP" :value="status.current_cop || 0" :precision="2" />
+          <el-statistic title="当前 COP" :value="status.current_cop" :precision="2">
+            <template #prefix><span v-if="status.current_cop == null">--</span></template>
+          </el-statistic>
           <div style="margin-top: 10px; font-size: 12px" :style="{ color: getCOPColor(status.current_cop) }">
             目标: {{ config.target_cop || 0 }} ({{ getCOPStatus(status.current_cop) }})
           </div>
@@ -25,7 +29,9 @@
       </el-col>
       <el-col :span="6">
         <el-card shadow="hover">
-          <el-statistic title="供水温度" :value="status.supply_temp || 0" suffix="°C" :precision="1" />
+          <el-statistic title="供水温度" :value="status.supply_temp" :suffix="status.supply_temp == null ? '' : '°C'" :precision="1">
+            <template #prefix><span v-if="status.supply_temp == null">--</span></template>
+          </el-statistic>
           <div style="margin-top: 10px; font-size: 12px" :style="{ color: getTempColor(status.supply_temp, 'supply') }">
             目标: {{ config.target_supply_temp || 0 }}°C
           </div>
@@ -33,13 +39,24 @@
       </el-col>
       <el-col :span="6">
         <el-card shadow="hover">
-          <el-statistic title="回水温度" :value="status.return_temp || 0" suffix="°C" :precision="1" />
+          <el-statistic title="回水温度" :value="status.return_temp" :suffix="status.return_temp == null ? '' : '°C'" :precision="1">
+            <template #prefix><span v-if="status.return_temp == null">--</span></template>
+          </el-statistic>
           <div style="margin-top: 10px; font-size: 12px" :style="{ color: getTempColor(status.return_temp, 'return') }">
             目标: {{ config.target_return_temp || 0 }}°C
           </div>
         </el-card>
       </el-col>
     </el-row>
+
+    <el-alert
+      v-if="status.warning"
+      :title="status.warning"
+      type="warning"
+      :closable="false"
+      show-icon
+      style="margin-top: 20px"
+    />
 
     <!-- 回退保护状态与事件记录 -->
     <el-row :gutter="20" style="margin-top: 20px" v-if="selectedZoneId">
@@ -105,10 +122,10 @@
               {{ status.adjust_count || 0 }} 次
             </el-descriptions-item>
             <el-descriptions-item label="累计节能">
-              {{ status.total_energy_saving?.toFixed(0) || 0 }} kWh
+              {{ formatMetric(status.total_energy_saving, 'kWh') }}
             </el-descriptions-item>
             <el-descriptions-item label="累计成本节省">
-              {{ status.total_cost_saving?.toFixed(0) || 0 }} 元
+              {{ formatMetric(status.total_cost_saving, '元') }}
             </el-descriptions-item>
           </el-descriptions>
         </el-card>
@@ -212,6 +229,9 @@ const currentZoneHeadroom = computed(() => {
   return zone?.headroom ?? null
 })
 
+const formatMetric = (value: number | null | undefined, unit: string) =>
+  value == null ? '--' : `${value.toFixed(0)} ${unit}`
+
 const onZoneChange = (val: number) => {
   selectedZoneId.value = val
 }
@@ -310,7 +330,7 @@ const updateCharts = (data: any) => {
   if (powerChartInstance.value) {
     const powerData = powerChartInstance.value.getOption().series[0].data || []
     const targetData = powerChartInstance.value.getOption().series[1].data || []
-    powerData.push([now, data.total_cooling_power || 0])
+    if (data.total_cooling_power != null) powerData.push([now, data.total_cooling_power])
     targetData.push([now, config.value.max_cooling_power || 0])
     if (powerData.length > 100) powerData.shift()
     if (targetData.length > 100) targetData.shift()
@@ -320,7 +340,7 @@ const updateCharts = (data: any) => {
   if (copChartInstance.value) {
     const copData = copChartInstance.value.getOption().series[0].data || []
     const targetCopData = copChartInstance.value.getOption().series[1].data || []
-    copData.push([now, data.current_cop || 0])
+    if (data.current_cop != null) copData.push([now, data.current_cop])
     targetCopData.push([now, config.value.target_cop || 0])
     if (copData.length > 100) copData.shift()
     if (targetCopData.length > 100) targetCopData.shift()
@@ -330,8 +350,8 @@ const updateCharts = (data: any) => {
   if (tempChartInstance.value) {
     const supplyData = tempChartInstance.value.getOption().series[0].data || []
     const returnData = tempChartInstance.value.getOption().series[1].data || []
-    supplyData.push([now, data.supply_temp || 0])
-    returnData.push([now, data.return_temp || 0])
+    if (data.supply_temp != null) supplyData.push([now, data.supply_temp])
+    if (data.return_temp != null) returnData.push([now, data.return_temp])
     if (supplyData.length > 100) supplyData.shift()
     if (returnData.length > 100) returnData.shift()
     tempChartInstance.value.setOption({ series: [{ data: supplyData }, { data: returnData }] })

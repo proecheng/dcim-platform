@@ -86,6 +86,41 @@ async def test_site_broadcast_only_reaches_authorized_connections():
 
 
 @pytest.mark.asyncio
+async def test_realtime_batch_preserves_site_and_point_filters():
+    manager = ConnectionManager(revalidate_before_send=False)
+    filtered_socket, other_site_socket, admin_socket = FakeWebSocket(), FakeWebSocket(), FakeWebSocket()
+    filtered_context = _context(filtered_socket, user_id=1, jti="filtered", sites=frozenset({10}))
+    manager.update_subscription(
+        filtered_context,
+        {"action": "subscribe", "filters": {"site_ids": [10], "point_ids": [7]}},
+    )
+    await manager.connect(filtered_context, already_accepted=True)
+    await manager.connect(
+        _context(other_site_socket, user_id=2, jti="other", sites=frozenset({20})), already_accepted=True
+    )
+    await manager.connect(
+        _context(admin_socket, user_id=3, jti="admin-batch", role="admin", sites=None), already_accepted=True
+    )
+
+    sent = await manager.broadcast_realtime(
+        [{"point_id": 7, "value": 42}, {"point_id": 8, "value": 84}],
+        site_id=10,
+    )
+
+    assert sent == 2
+    assert filtered_socket.sent == [
+        {"type": "realtime_batch", "data": [{"point_id": 7, "value": 42}]}
+    ]
+    assert other_site_socket.sent == []
+    assert admin_socket.sent == [
+        {
+            "type": "realtime_batch",
+            "data": [{"point_id": 7, "value": 42}, {"point_id": 8, "value": 84}],
+        }
+    ]
+
+
+@pytest.mark.asyncio
 async def test_site_broadcast_without_trusted_site_is_rejected():
     manager = ConnectionManager(revalidate_before_send=False)
     socket = FakeWebSocket()

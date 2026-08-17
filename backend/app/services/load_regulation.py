@@ -3,13 +3,16 @@
 实现温度、亮度、运行模式等负荷调节功能
 """
 
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import List, Optional
 from sqlalchemy import select, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..models.energy import LoadRegulationConfig, RegulationHistory, PowerDevice
+from ..models.point import PointRealtime
 from .device_config_generator import DeviceConfigAutoGenerator
+from .device_control_service import ControlResult, DeviceControlService
+from .command_registry import authorize_command
 from ..schemas.energy import (
     LoadRegulationConfigCreate,
     LoadRegulationConfigUpdate,
@@ -22,6 +25,9 @@ from ..schemas.energy import (
 
 class LoadRegulationService:
     """负荷调节服务"""
+
+    REALTIME_MAX_AGE = timedelta(minutes=5)
+    NON_MEASURED_SOURCES = {"demo", "demo_backfill", "simulated", "unknown"}
 
     # 调节类型配置
     REGULATION_TYPES = {
@@ -119,6 +125,7 @@ class LoadRegulationService:
                 "device_name": device.device_name,
                 "device_type": device.device_type,
                 "rated_power": device.rated_power,
+                "power_point_id": device.power_point_id,
             }
             configs.append(LoadRegulationConfigResponse(**config_dict))
 
@@ -162,6 +169,126 @@ class LoadRegulationService:
             device_name=device.device_name,
             device_type=device.device_type,
             rated_power=device.rated_power,
+            power_point_id=device.power_point_id,
+        )
+
+    @staticmethod
+    def _current_value(config: LoadRegulationConfigResponse) -> float:
+        for value in (config.current_value, config.default_value, config.min_value):
+            if value is not None:
+                return float(value)
+        return 0.0
+
+    @staticmethod
+    def _interpolate_curve(curve: Optional[List[dict]], value: float) -> Optional[float]:
+        points: List[tuple[float, float]] = []
+        for item in curve or []:
+            if not isinstance(item, dict) or item.get("value") is None:
+                continue
+            metric = item.get("power_ratio")
+            if metric is None:
+                metric = item.get("power")
+            if metric is not None:
+                points.append((float(item["value"]), float(metric)))
+        points.sort(key=lambda item: item[0])
+        if not points or value < points[0][0] or value > points[-1][0]:
+            return None
+        for point_value, metric in points:
+            if abs(value - point_value) < 1e-9:
+                return metric
+        for (left_value, left_metric), (right_value, right_metric) in zip(points, points[1:]):
+            if left_value <= value <= right_value:
+                ratio = (value - left_value) / (right_value - left_value)
+                return left_metric + (right_metric - left_metric) * ratio
+        return None
+
+    @staticmethod
+    def _validate_target(config: LoadRegulationConfigResponse, target_value: float) -> None:
+        if target_value < config.min_value or target_value > config.max_value:
+            raise ValueError(f"目标值必须在 {config.min_value} 至 {config.max_value}{config.unit or ''} 范围内")
+        if config.step_size > 0:
+            steps = (target_value - config.min_value) / config.step_size
+            if abs(steps - round(steps)) > 1e-6:
+                raise ValueError(f"目标值必须按 {config.step_size}{config.unit or ''} 步长设置")
+
+    async def _get_current_power(self, power_point_id: Optional[int]) -> tuple[Optional[float], Optional[str], str]:
+        if not power_point_id:
+            return None, None, "设备未关联实时功率点位"
+        realtime = await self.db.get(PointRealtime, power_point_id)
+        if realtime is None or realtime.value is None:
+            return None, None, "实时功率点位暂无读数"
+        source = (realtime.source or "unknown").lower()
+        if source in self.NON_MEASURED_SOURCES:
+            return None, source, f"功率点位来源为 {source}，不能作为真实节能量依据"
+        if realtime.quality != 0 or realtime.status not in {None, "normal"}:
+            return None, source, "实时功率读数质量异常或设备离线"
+        if realtime.updated_at is None:
+            return None, source, "实时功率读数缺少更新时间"
+        now = datetime.now(realtime.updated_at.tzinfo) if realtime.updated_at.tzinfo else datetime.now()
+        if now - realtime.updated_at > self.REALTIME_MAX_AGE:
+            return None, source, "实时功率读数已超过5分钟，不能用于当前调节模拟"
+        current_power = float(realtime.value)
+        if current_power < 0:
+            return None, source, "实时功率读数不能为负数"
+        return current_power, source, ""
+
+    def _estimate_power(
+        self,
+        config: LoadRegulationConfigResponse,
+        current_value: float,
+        target_value: float,
+        current_power: float,
+    ) -> tuple[Optional[float], Optional[str]]:
+        current_curve_value = self._interpolate_curve(config.power_curve, current_value)
+        target_curve_value = self._interpolate_curve(config.power_curve, target_value)
+        if current_curve_value is not None and target_curve_value is not None and current_curve_value > 0:
+            return max(0.0, current_power * target_curve_value / current_curve_value), "实时功率×功率曲线插值"
+
+        if config.power_factor is None:
+            return None, None
+        value_change = target_value - current_value
+        power_factor = float(config.power_factor)
+        if abs(power_factor) <= 1:
+            power_change = current_power * power_factor * value_change
+            method = "实时功率×比例系数"
+        else:
+            power_change = power_factor * value_change
+            method = "实时功率+kW单位变化系数"
+        return max(0.0, current_power + power_change), method
+
+    async def _build_simulation(
+        self, config: LoadRegulationConfigResponse, target_value: float
+    ) -> RegulationSimulateResponse:
+        self._validate_target(config, target_value)
+        current_value = self._current_value(config)
+        current_power, source, warning = await self._get_current_power(config.power_point_id)
+        estimated_power: Optional[float] = None
+        calculation_method: Optional[str] = None
+        if current_power is not None:
+            estimated_power, calculation_method = self._estimate_power(
+                config, current_value, target_value, current_power
+            )
+            if estimated_power is None:
+                warning = "缺少覆盖当前值与目标值的功率曲线或有效功率系数"
+
+        data_sufficient = current_power is not None and estimated_power is not None
+        power_change = estimated_power - current_power if data_sufficient else None
+        return RegulationSimulateResponse(
+            config_id=config.id,
+            device_id=config.device_id,
+            device_name=config.device_name or "Unknown",
+            regulation_type=config.regulation_type,
+            current_value=current_value,
+            target_value=target_value,
+            current_power=round(current_power, 3) if current_power is not None else None,
+            estimated_power=round(estimated_power, 3) if estimated_power is not None else None,
+            power_change=round(power_change, 3) if power_change is not None else None,
+            data_sufficient=data_sufficient,
+            data_source=source,
+            calculation_method=calculation_method,
+            warning=warning or None,
+            comfort_impact=config.comfort_impact,
+            performance_impact=config.performance_impact,
         )
 
     async def create_config(self, data: LoadRegulationConfigCreate) -> LoadRegulationConfig:
@@ -185,11 +312,11 @@ class LoadRegulationService:
             regulation_type=data.regulation_type,
             min_value=data.min_value,
             max_value=data.max_value,
-            current_value=data.current_value or data.default_value,
+            current_value=data.current_value if data.current_value is not None else data.default_value,
             default_value=data.default_value,
             step_size=data.step_size,
             unit=data.unit or type_config.get("unit"),
-            power_factor=data.power_factor or type_config.get("power_factor"),
+            power_factor=data.power_factor if data.power_factor is not None else type_config.get("power_factor"),
             base_power=data.base_power,
             priority=data.priority,
             comfort_impact=data.comfort_impact or type_config.get("comfort_impact", "low"),
@@ -237,40 +364,7 @@ class LoadRegulationService:
         config_resp = await self.get_config_by_id(config_id)
         if not config_resp:
             return None
-
-        # 计算功率变化
-        current_value = config_resp.current_value or config_resp.default_value or config_resp.min_value
-        base_power = config_resp.base_power or config_resp.rated_power or 10.0
-        power_factor = config_resp.power_factor or 0.05
-
-        # 根据调节类型计算功率
-        value_change = target_value - current_value
-        if config_resp.regulation_type == "temperature":
-            # 温度升高，功率降低
-            power_change = base_power * power_factor * value_change
-        elif config_resp.regulation_type == "brightness":
-            # 亮度降低，功率降低
-            power_change = base_power * (value_change / 100)
-        else:
-            # 其他类型
-            power_change = base_power * power_factor * value_change
-
-        current_power = base_power
-        estimated_power = max(0, current_power + power_change)
-
-        return RegulationSimulateResponse(
-            config_id=config_id,
-            device_id=config_resp.device_id,
-            device_name=config_resp.device_name or "Unknown",
-            regulation_type=config_resp.regulation_type,
-            current_value=current_value,
-            target_value=target_value,
-            current_power=current_power,
-            estimated_power=estimated_power,
-            power_change=power_change,
-            comfort_impact=config_resp.comfort_impact,
-            performance_impact=config_resp.performance_impact,
-        )
+        return await self._build_simulation(config_resp, target_value)
 
     async def apply_regulation(
         self,
@@ -293,10 +387,41 @@ class LoadRegulationService:
 
         config, device = row
 
-        # 模拟计算功率变化
+        config_resp = await self.get_config_by_id(config_id)
+        if config_resp is None:
+            return None
+        self._validate_target(config_resp, target_value)
+
+        # 估算功率变化并通过统一设备控制入口提交，不能直接把数据库写入当执行成功。
         sim_result = await self.simulate_regulation(config_id, target_value)
         if not sim_result:
             return None
+
+        authorization = authorize_command(
+            "device_regulation",
+            {
+                "device_id": config.device_id,
+                "regulation_type": config.regulation_type,
+                "target_value": target_value,
+                "force": False,
+            },
+            entrypoint="load_regulation",
+        )
+        action = await DeviceControlService(self.db).control_device_regulation(
+            device_id=config.device_id,
+            regulation_type=config.regulation_type,
+            target_value=target_value,
+            command_authorization=authorization,
+        )
+        status_map = {
+            ControlResult.SUCCESS: "completed",
+            ControlResult.PENDING: "pending",
+            ControlResult.SIMULATED: "simulated",
+            ControlResult.PARTIAL: "failed",
+            ControlResult.FAILED: "failed",
+        }
+        status = status_map[action.result]
+        details = "; ".join(part for part in (remark, action.message) if part)
 
         # 创建历史记录
         history = RegulationHistory(
@@ -307,18 +432,18 @@ class LoadRegulationService:
             new_value=target_value,
             power_before=sim_result.current_power,
             power_after=sim_result.estimated_power,
-            power_saved=abs(sim_result.power_change) if sim_result.power_change < 0 else 0,
+            power_saved=(
+                abs(sim_result.power_change)
+                if status == "completed" and sim_result.power_change is not None and sim_result.power_change < 0
+                else None
+            ),
             trigger_reason=reason,
-            trigger_detail=remark,
-            status="completed",
-            executed_at=datetime.now(),
+            trigger_detail=details or None,
+            status=status,
+            executed_at=datetime.now() if status in {"completed", "simulated"} else None,
             operator_id=operator_id,
         )
         self.db.add(history)
-
-        # 更新配置当前值
-        config.current_value = target_value
-        config.updated_at = datetime.now()
 
         await self.db.commit()
         await self.db.refresh(history)
@@ -386,10 +511,14 @@ class LoadRegulationService:
             # 根据当前需量情况生成建议
             if config.regulation_type == "temperature":
                 # 温度调节建议
-                current = config.current_value or 24
+                current = self._current_value(config)
                 if current < 26:
                     recommended = min(config.max_value, current + 2)
-                    power_saving = (config.base_power or 10) * 0.12
+                    simulation = await self._build_simulation(config, recommended)
+                    power_saving = max(0.0, -simulation.power_change) if simulation.power_change is not None else None
+                    saving_text = (
+                        f"可节省约{power_saving:.1f}kW" if power_saving is not None else "节能量待实时功率接入后评估"
+                    )
                     recommendations.append(
                         RegulationRecommendation(
                             config_id=config.id,
@@ -399,17 +528,23 @@ class LoadRegulationService:
                             current_value=current,
                             recommended_value=recommended,
                             power_saving=power_saving,
-                            reason=f"将温度从{current}℃调高至{recommended}℃可节省约{power_saving:.1f}kW",
+                            data_sufficient=simulation.data_sufficient,
+                            data_source=simulation.data_source,
+                            reason=f"将温度从{current}℃调高至{recommended}℃，{saving_text}",
                             priority="medium",
                         )
                     )
 
             elif config.regulation_type == "brightness":
                 # 亮度调节建议
-                current = config.current_value or 100
+                current = self._current_value(config)
                 if current > 70:
                     recommended = 70
-                    power_saving = (config.base_power or 5) * 0.3
+                    simulation = await self._build_simulation(config, recommended)
+                    power_saving = max(0.0, -simulation.power_change) if simulation.power_change is not None else None
+                    saving_text = (
+                        f"可节省约{power_saving:.1f}kW" if power_saving is not None else "节能量待实时功率接入后评估"
+                    )
                     recommendations.append(
                         RegulationRecommendation(
                             config_id=config.id,
@@ -419,11 +554,13 @@ class LoadRegulationService:
                             current_value=current,
                             recommended_value=recommended,
                             power_saving=power_saving,
-                            reason=f"将亮度从{current}%降至{recommended}%可节省约{power_saving:.1f}kW",
+                            data_sufficient=simulation.data_sufficient,
+                            data_source=simulation.data_source,
+                            reason=f"将亮度从{current}%降至{recommended}%，{saving_text}",
                             priority="low",
                         )
                     )
 
         # 按节省功率排序
-        recommendations.sort(key=lambda x: x.power_saving, reverse=True)
+        recommendations.sort(key=lambda item: item.power_saving if item.power_saving is not None else -1, reverse=True)
         return recommendations

@@ -10,7 +10,7 @@ import uuid
 from datetime import datetime
 from typing import Optional
 
-from sqlalchemy import select
+from sqlalchemy import case, select
 from sqlalchemy.sql import func
 
 from ...core.database import async_session
@@ -199,6 +199,7 @@ class VppDispatchService:
                 select(
                     func.count().label("count"),
                     func.sum(VppDispatch.accepted_power_kw).label("total_power"),
+                    func.sum(VppDispatch.accepted_power_kw * VppDispatch.duration_minutes / 60.0).label("total_energy"),
                 ).where(
                     VppDispatch.status == "accepted",
                     VppDispatch.created_at >= today_start,
@@ -211,6 +212,7 @@ class VppDispatchService:
                 select(
                     func.count().label("count"),
                     func.sum(VppDispatch.accepted_power_kw).label("total_power"),
+                    func.sum(VppDispatch.accepted_power_kw * VppDispatch.duration_minutes / 60.0).label("total_energy"),
                 ).where(
                     VppDispatch.status == "accepted",
                     VppDispatch.created_at >= month_start,
@@ -218,23 +220,54 @@ class VppDispatchService:
             )
             monthly = monthly_result.first()
 
+            all_time_result = await session.execute(
+                select(
+                    func.count().label("total_count"),
+                    func.sum(case((VppDispatch.status == "accepted", 1), else_=0)).label("accepted_count"),
+                    func.sum(
+                        case(
+                            (
+                                VppDispatch.status == "accepted",
+                                VppDispatch.accepted_power_kw * VppDispatch.duration_minutes / 60.0,
+                            ),
+                            else_=0.0,
+                        )
+                    ).label("total_energy"),
+                )
+            )
+            all_time = all_time_result.first()
+
             # 峰谷价差估算节省电费（0.5 元/kWh）
             PRICE_DIFF = 0.5
-            daily_count = daily.count if daily else 0
+            daily_count = int(daily.count or 0) if daily else 0
             daily_power = float(daily.total_power or 0)
-            monthly_count = monthly.count if monthly else 0
+            daily_energy = float(daily.total_energy or 0)
+            monthly_count = int(monthly.count or 0) if monthly else 0
             monthly_power = float(monthly.total_power or 0)
+            monthly_energy = float(monthly.total_energy or 0)
+            total_count = int(all_time.total_count or 0) if all_time else 0
+            accepted_count = int(all_time.accepted_count or 0) if all_time else 0
+            all_time_energy = float(all_time.total_energy or 0) if all_time else 0
 
             return {
                 "daily": {
                     "count": daily_count,
                     "total_power_kw": round(daily_power, 1),
-                    "estimated_savings_yuan": round(daily_power * PRICE_DIFF, 2),
+                    "total_energy_kwh": round(daily_energy, 1),
+                    "estimated_savings_yuan": round(daily_energy * PRICE_DIFF, 2),
                 },
                 "monthly": {
                     "count": monthly_count,
                     "total_power_kw": round(monthly_power, 1),
-                    "estimated_savings_yuan": round(monthly_power * PRICE_DIFF, 2),
+                    "total_energy_kwh": round(monthly_energy, 1),
+                    "estimated_savings_yuan": round(monthly_energy * PRICE_DIFF, 2),
+                },
+                "all_time": {
+                    "count": total_count,
+                    "accepted_count": accepted_count,
+                    "response_success_rate": round(accepted_count / total_count * 100, 1) if total_count else 0.0,
+                    "total_energy_kwh": round(all_time_energy, 1),
+                    "estimated_savings_yuan": round(all_time_energy * PRICE_DIFF, 2),
                 },
             }
 

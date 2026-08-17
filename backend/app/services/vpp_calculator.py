@@ -9,7 +9,7 @@ This service implements all VPP calculation methods with:
 - Comprehensive docstrings
 """
 
-from typing import List, Dict
+from typing import Dict, List, Optional
 from datetime import date
 import statistics
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -46,7 +46,7 @@ class VPPCalculator:
         bill = result.scalar_one_or_none()
         if not bill:
             return {
-                "value": 0,
+                "value": None,
                 "unit": "元/kWh",
                 "formula": "total_cost / total_consumption",
                 "data_source": {"error": "无数据", "month": month},
@@ -79,7 +79,7 @@ class VPPCalculator:
 
         if len(consumptions) < 2:
             return {
-                "value": 0,
+                "value": None,
                 "unit": "%",
                 "formula": "(max - min) / avg * 100",
                 "data_source": {"error": "数据不足", "months_count": len(consumptions)},
@@ -119,7 +119,7 @@ class VPPCalculator:
         bill = result.scalar_one_or_none()
         if not bill:
             return {
-                "value": 0,
+                "value": None,
                 "unit": "%",
                 "formula": "peak_consumption / total_consumption * 100",
                 "data_source": {"error": "无数据", "month": month},
@@ -153,7 +153,7 @@ class VPPCalculator:
         bill = result.scalar_one_or_none()
         if not bill:
             return {
-                "value": 0,
+                "value": None,
                 "unit": "%",
                 "formula": "valley_consumption / total_consumption * 100",
                 "data_source": {"error": "无数据", "month": month},
@@ -330,9 +330,9 @@ class VPPCalculator:
         price_result = await self.db.execute(select(ElectricityPrice))
         prices = {p.period_type.value: p.price for p in price_result.scalars().all()}
 
-        peak_price = prices.get("peak", 0.85)  # 默认值
-        valley_price = prices.get("valley", 0.35)  # 默认值
-        price_spread = peak_price - valley_price
+        peak_price = prices.get("peak")
+        valley_price = prices.get("valley")
+        price_spread = peak_price - valley_price if peak_price is not None and valley_price is not None else None
 
         # 获取配置参数
         config_result = await self.db.execute(select(VPPConfig).where(VPPConfig.config_key == "daily_shift_hours"))
@@ -340,7 +340,9 @@ class VPPCalculator:
         daily_shift_hours = config.config_value if config else 4  # 默认4小时
 
         # D3. 计算年收益潜力
-        annual_benefit = transferable_load * daily_shift_hours * 365 * price_spread
+        annual_benefit = (
+            transferable_load * daily_shift_hours * 365 * price_spread if price_spread is not None else None
+        )
 
         return {
             "transferable_load": {
@@ -350,23 +352,27 @@ class VPPCalculator:
                 "description": "可转移负荷量",
             },
             "price_spread": {
-                "value": round(price_spread, 4),
+                "value": round(price_spread, 4) if price_spread is not None else None,
                 "unit": "元/kWh",
                 "formula": "peak_price - valley_price",
                 "data_source": {"peak_price": peak_price, "valley_price": valley_price},
             },
             "annual_transfer_benefit": {
-                "value": round(annual_benefit, 2),
+                "value": round(annual_benefit, 2) if annual_benefit is not None else None,
                 "unit": "元/年",
                 "formula": "transferable_load * daily_shift_hours * 365 * price_spread",
                 "parameters": {"daily_shift_hours": daily_shift_hours},
             },
-            "data_source": {"adjustable_loads_count": len(loads), "price_table": "electricity_prices"},
+            "data_source": {
+                "adjustable_loads_count": len(loads),
+                "price_table": "electricity_prices",
+                "price_data_sufficient": price_spread is not None,
+            },
         }
 
     # ==================== E. 需量优化指标 ====================
 
-    async def calc_demand_optimization(self, P_max: float) -> Dict:
+    async def calc_demand_optimization(self, P_max: Optional[float]) -> Dict:
         """E1-E2. 计算需量优化潜力
 
         包括:
@@ -390,26 +396,26 @@ class VPPCalculator:
         target_ratio = configs.get("target_demand_ratio", 0.9)  # 默认削减10%
         demand_price = configs.get("demand_price", 40)  # 默认40元/kW/月
 
-        target_demand = P_max * target_ratio
-        peak_reduction = P_max - target_demand
-        annual_benefit = peak_reduction * demand_price * 12
+        target_demand = P_max * target_ratio if P_max is not None else None
+        peak_reduction = P_max - target_demand if P_max is not None and target_demand is not None else None
+        annual_benefit = peak_reduction * demand_price * 12 if peak_reduction is not None else None
 
         return {
             "peak_reduction_potential": {
-                "value": round(peak_reduction, 2),
+                "value": round(peak_reduction, 2) if peak_reduction is not None else None,
                 "unit": "kW",
                 "formula": "P_max - target_demand",
                 "description": "削峰空间",
             },
             "demand_optimization_benefit": {
-                "value": round(annual_benefit, 2),
+                "value": round(annual_benefit, 2) if annual_benefit is not None else None,
                 "unit": "元/年",
                 "formula": "peak_reduction * demand_price * 12",
                 "description": "需量优化年收益",
             },
             "parameters": {
                 "P_max": P_max,
-                "target_demand": round(target_demand, 2),
+                "target_demand": round(target_demand, 2) if target_demand is not None else None,
                 "target_ratio": target_ratio,
                 "demand_price": demand_price,
             },
@@ -417,7 +423,7 @@ class VPPCalculator:
 
     # ==================== F. 虚拟电厂收益指标 ====================
 
-    async def calc_vpp_revenue(self, adjustable_capacity: float) -> Dict:
+    async def calc_vpp_revenue(self, adjustable_capacity: Optional[float]) -> Dict:
         """F1-F4. 计算VPP各类收益
 
         包括:
@@ -441,24 +447,36 @@ class VPPCalculator:
         # F1. 需求响应收益
         response_count = configs.get("response_count", 20)  # 年响应次数
         response_price = configs.get("response_price", 4)  # 响应补贴 元/kW
-        demand_response_revenue = adjustable_capacity * response_count * response_price
+        demand_response_revenue = (
+            adjustable_capacity * response_count * response_price if adjustable_capacity is not None else None
+        )
 
         # F2. 辅助服务收益
         service_hours = configs.get("service_hours", 200)  # 年服务小时数
         service_price = configs.get("service_price", 0.75)  # 服务价格 元/kW·h
-        ancillary_service_revenue = adjustable_capacity * service_hours * service_price
+        ancillary_service_revenue = (
+            adjustable_capacity * service_hours * service_price if adjustable_capacity is not None else None
+        )
 
         # F3. 现货市场套利
         arbitrage_hours = configs.get("arbitrage_hours", 500)  # 年套利小时数
         price_spread_spot = configs.get("price_spread_spot", 0.3)  # 现货价差
-        spot_arbitrage_revenue = adjustable_capacity * arbitrage_hours * price_spread_spot
+        spot_arbitrage_revenue = (
+            adjustable_capacity * arbitrage_hours * price_spread_spot if adjustable_capacity is not None else None
+        )
 
         # F4. VPP总收益
-        total_vpp_revenue = demand_response_revenue + ancillary_service_revenue + spot_arbitrage_revenue
+        total_vpp_revenue = (
+            demand_response_revenue + ancillary_service_revenue + spot_arbitrage_revenue
+            if demand_response_revenue is not None
+            and ancillary_service_revenue is not None
+            and spot_arbitrage_revenue is not None
+            else None
+        )
 
         return {
             "demand_response_revenue": {
-                "value": round(demand_response_revenue, 2),
+                "value": round(demand_response_revenue, 2) if demand_response_revenue is not None else None,
                 "unit": "元/年",
                 "formula": "adjustable_capacity * response_count * response_price",
                 "parameters": {
@@ -468,19 +486,19 @@ class VPPCalculator:
                 },
             },
             "ancillary_service_revenue": {
-                "value": round(ancillary_service_revenue, 2),
+                "value": round(ancillary_service_revenue, 2) if ancillary_service_revenue is not None else None,
                 "unit": "元/年",
                 "formula": "adjustable_capacity * service_hours * service_price",
                 "parameters": {"service_hours": service_hours, "service_price": service_price},
             },
             "spot_arbitrage_revenue": {
-                "value": round(spot_arbitrage_revenue, 2),
+                "value": round(spot_arbitrage_revenue, 2) if spot_arbitrage_revenue is not None else None,
                 "unit": "元/年",
                 "formula": "adjustable_capacity * arbitrage_hours * price_spread_spot",
                 "parameters": {"arbitrage_hours": arbitrage_hours, "price_spread_spot": price_spread_spot},
             },
             "total_vpp_revenue": {
-                "value": round(total_vpp_revenue, 2),
+                "value": round(total_vpp_revenue, 2) if total_vpp_revenue is not None else None,
                 "unit": "元/年",
                 "formula": "demand_response + ancillary_service + spot_arbitrage",
             },
@@ -488,7 +506,7 @@ class VPPCalculator:
 
     # ==================== G. 投资回报指标 ====================
 
-    async def calc_roi(self, annual_benefit: float) -> Dict:
+    async def calc_roi(self, annual_benefit: Optional[float]) -> Dict:
         """G1-G4. 计算投资回报指标
 
         包括:
@@ -514,18 +532,28 @@ class VPPCalculator:
         )
         configs = {c.config_key: c.config_value for c in config_result.scalars().all()}
 
-        monitoring_cost = configs.get("monitoring_system_cost", 500000)
-        control_cost = configs.get("control_system_cost", 800000)
-        platform_cost = configs.get("platform_cost", 200000)
-        other_cost = configs.get("other_cost", 100000)
+        investment_keys = ["monitoring_system_cost", "control_system_cost", "platform_cost", "other_cost"]
+        investment_configured = all(key in configs for key in investment_keys)
+        monitoring_cost = configs.get("monitoring_system_cost")
+        control_cost = configs.get("control_system_cost")
+        platform_cost = configs.get("platform_cost")
+        other_cost = configs.get("other_cost")
 
-        total_investment = monitoring_cost + control_cost + platform_cost + other_cost
-        payback_period = total_investment / annual_benefit if annual_benefit > 0 else float("inf")
-        roi = annual_benefit / total_investment * 100 if total_investment > 0 else 0
+        total_investment = sum(configs[key] for key in investment_keys) if investment_configured else None
+        payback_period = (
+            total_investment / annual_benefit
+            if total_investment is not None and annual_benefit is not None and annual_benefit > 0
+            else None
+        )
+        roi = (
+            annual_benefit / total_investment * 100
+            if total_investment is not None and total_investment > 0 and annual_benefit is not None
+            else None
+        )
 
         return {
             "total_investment": {
-                "value": round(total_investment, 2),
+                "value": round(total_investment, 2) if total_investment is not None else None,
                 "unit": "元",
                 "formula": "monitoring + control + platform + other",
                 "breakdown": {
@@ -535,13 +563,20 @@ class VPPCalculator:
                     "other": other_cost,
                 },
             },
-            "annual_total_benefit": {"value": round(annual_benefit, 2), "unit": "元/年"},
+            "annual_total_benefit": {
+                "value": round(annual_benefit, 2) if annual_benefit is not None else None,
+                "unit": "元/年",
+            },
             "payback_period": {
-                "value": round(payback_period, 2) if payback_period != float("inf") else 0,
+                "value": round(payback_period, 2) if payback_period is not None else None,
                 "unit": "年",
                 "formula": "total_investment / annual_benefit",
             },
-            "roi": {"value": round(roi, 2), "unit": "%", "formula": "annual_benefit / total_investment * 100"},
+            "roi": {
+                "value": round(roi, 2) if roi is not None else None,
+                "unit": "%",
+                "formula": "annual_benefit / total_investment * 100",
+            },
         }
 
     # ==================== H. 综合分析报告 ====================
@@ -561,11 +596,11 @@ class VPPCalculator:
         """
         # 获取负荷指标
         load_metrics = await self.calc_load_metrics(start_date, end_date)
-        P_max = load_metrics.get("P_max", {}).get("value", 0)
+        P_max = load_metrics.get("P_max", {}).get("value")
 
         # 获取峰谷转移潜力
         transfer = await self.calc_transfer_potential()
-        transferable_load = transfer.get("transferable_load", {}).get("value", 0)
+        transferable_load = transfer.get("transferable_load", {}).get("value")
 
         # 获取需量优化
         demand_opt = await self.calc_demand_optimization(P_max)
@@ -574,10 +609,11 @@ class VPPCalculator:
         vpp_revenue = await self.calc_vpp_revenue(transferable_load)
 
         # 计算年总收益
-        annual_transfer_benefit = transfer.get("annual_transfer_benefit", {}).get("value", 0)
-        demand_benefit = demand_opt.get("demand_optimization_benefit", {}).get("value", 0)
-        total_vpp = vpp_revenue.get("total_vpp_revenue", {}).get("value", 0)
-        annual_total_benefit = annual_transfer_benefit + demand_benefit + total_vpp
+        annual_transfer_benefit = transfer.get("annual_transfer_benefit", {}).get("value")
+        demand_benefit = demand_opt.get("demand_optimization_benefit", {}).get("value")
+        total_vpp = vpp_revenue.get("total_vpp_revenue", {}).get("value")
+        benefit_parts = [annual_transfer_benefit, demand_benefit, total_vpp]
+        annual_total_benefit = sum(benefit_parts) if all(value is not None for value in benefit_parts) else None
 
         # 计算ROI
         roi = await self.calc_roi(annual_total_benefit)
@@ -585,7 +621,21 @@ class VPPCalculator:
         # 电费结构 (使用最近月份)
         cost_structure = await self.calc_cost_structure(months[-1]) if months else {}
 
+        warnings = []
+        if "error" in load_metrics:
+            warnings.append("所选日期范围无负荷曲线")
+        if transfer.get("data_source", {}).get("adjustable_loads_count", 0) == 0:
+            warnings.append("未配置可调节负荷资源")
+        if not transfer.get("data_source", {}).get("price_data_sufficient", False):
+            warnings.append("缺少峰、谷电价配置")
+        if "error" in cost_structure:
+            warnings.append("所选月份无电费结构数据")
+        if roi.get("total_investment", {}).get("value") is None:
+            warnings.append("VPP 投资配置不完整")
+
         return {
+            "data_sufficient": not warnings,
+            "warnings": warnings,
             "analysis_period": {"months": months, "load_data_range": f"{start_date} to {end_date}"},
             "electricity_usage": {
                 "average_price": await self.calc_average_price(months[-1]) if months else {},
@@ -601,7 +651,7 @@ class VPPCalculator:
             "investment_return": roi,
             "summary": {
                 "annual_total_benefit": {
-                    "value": round(annual_total_benefit, 2),
+                    "value": round(annual_total_benefit, 2) if annual_total_benefit is not None else None,
                     "unit": "元/年",
                     "formula": "transfer_benefit + demand_benefit + vpp_revenue",
                     "breakdown": {

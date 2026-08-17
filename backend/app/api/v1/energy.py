@@ -29,6 +29,7 @@ from ...models.energy import (
     PowerCurveData,
     DemandHistory,
     DeviceShiftConfig,
+    EnergySavingProposal,
 )
 from ...schemas.common import ResponseModel
 from ...services.pue_calculator import calculate_realtime_pue
@@ -875,44 +876,53 @@ async def get_energy_trend(
     total_cost = 0.0
 
     if granularity == "daily":
-        query = select(EnergyDaily).where(EnergyDaily.stat_date >= start_date, EnergyDaily.stat_date <= end_date)
+        query = select(
+            EnergyDaily.stat_date,
+            func.sum(EnergyDaily.total_energy),
+            func.sum(EnergyDaily.energy_cost),
+            func.avg(EnergyDaily.avg_power),
+        ).where(EnergyDaily.stat_date >= start_date, EnergyDaily.stat_date <= end_date)
         if device_id:
             query = query.where(EnergyDaily.device_id == device_id)
-        query = query.order_by(EnergyDaily.stat_date)
+        query = query.group_by(EnergyDaily.stat_date).order_by(EnergyDaily.stat_date)
         result = await db.execute(query)
-        records = result.scalars().all()
-        for r in records:
-            energy = r.total_energy or 0
-            cost = r.energy_cost or 0
+        for stat_date, energy_value, cost_value, power_value in result.all():
+            energy = energy_value or 0
+            cost = cost_value or 0
             total_energy += energy
             total_cost += cost
             data_list.append(
                 EnergyTrendItem(
-                    time_label=r.stat_date.strftime("%Y-%m-%d"),
+                    time_label=stat_date.strftime("%Y-%m-%d"),
                     energy=round(energy, 2),
                     cost=round(cost, 2),
-                    power=round(r.avg_power or 0, 2),
+                    power=round(power_value or 0, 2),
                 )
             )
 
     elif granularity == "monthly":
-        query = select(EnergyMonthly).where(EnergyMonthly.stat_year == start_date.year)
+        query = select(
+            EnergyMonthly.stat_year,
+            EnergyMonthly.stat_month,
+            func.sum(EnergyMonthly.total_energy),
+            func.sum(EnergyMonthly.energy_cost),
+            func.avg(EnergyMonthly.avg_power),
+        ).where(EnergyMonthly.stat_year == start_date.year)
         if device_id:
             query = query.where(EnergyMonthly.device_id == device_id)
-        query = query.order_by(EnergyMonthly.stat_month)
+        query = query.group_by(EnergyMonthly.stat_year, EnergyMonthly.stat_month).order_by(EnergyMonthly.stat_month)
         result = await db.execute(query)
-        records = result.scalars().all()
-        for r in records:
-            energy = r.total_energy or 0
-            cost = r.energy_cost or 0
+        for stat_year, stat_month, energy_value, cost_value, power_value in result.all():
+            energy = energy_value or 0
+            cost = cost_value or 0
             total_energy += energy
             total_cost += cost
             data_list.append(
                 EnergyTrendItem(
-                    time_label=f"{r.stat_year}-{r.stat_month:02d}",
+                    time_label=f"{stat_year}-{stat_month:02d}",
                     energy=round(energy, 2),
                     cost=round(cost, 2),
-                    power=round(r.avg_power or 0, 2),
+                    power=round(power_value or 0, 2),
                 )
             )
 
@@ -1646,10 +1656,10 @@ async def recalculate_suggestion(
         source_period: str = Field(..., description="转出时段（sharp/peak/normal）")
         target_period: str = Field(..., description="转入时段（valley/deep_valley/normal）")
 
-    # 验证建议是否存在
-    result = await db.execute(select(EnergySuggestion).where(EnergySuggestion.id == suggestion_id))
-    suggestion = result.scalar_one_or_none()
-    if not suggestion:
+    # 兼容旧建议表和新版节能方案表。重算只依赖用户参数、实时电价和设备配置。
+    suggestion_result = await db.execute(select(EnergySuggestion.id).where(EnergySuggestion.id == suggestion_id))
+    proposal_result = await db.execute(select(EnergySavingProposal.id).where(EnergySavingProposal.id == suggestion_id))
+    if suggestion_result.scalar_one_or_none() is None and proposal_result.scalar_one_or_none() is None:
         raise HTTPException(status_code=404, detail="建议不存在")
 
     # 重新计算
@@ -2883,6 +2893,7 @@ async def analyze_demand_config(db: AsyncSession = Depends(get_db), current_user
         )
         history = history_result.scalars().all()
 
+        data_sufficient = False
         if history:
             # 优先使用 DemandHistory 数据
             max_demands = [h.max_demand for h in history if h.max_demand]
@@ -2896,6 +2907,7 @@ async def analyze_demand_config(db: AsyncSession = Depends(get_db), current_user
                 demand_95th = sorted_demands[min(idx_95, len(sorted_demands) - 1)]
             else:
                 demand_95th = max_demand_12m * 0.95
+            data_sufficient = bool(max_demands)
         else:
             # [V2.10-FIX] 尝试从 Demand15MinData 获取数据 (与 optimization-plan 端点相同数据源)
             end_date = datetime.now()
@@ -2918,23 +2930,22 @@ async def analyze_demand_config(db: AsyncSession = Depends(get_db), current_user
                 sorted_demands = sorted(demands)
                 idx_95 = int(len(sorted_demands) * 0.95)
                 demand_95th = sorted_demands[min(idx_95, len(sorted_demands) - 1)]
+                data_sufficient = True
             else:
-                # 无实际数据时使用确定性模拟数据
-                # 基于计量点ID生成确定性的模拟数据
-                seed_factor = (meter.id % 10 + 1) / 10  # 0.1-1.0 基于ID
-                base_ratio = 0.75 + seed_factor * 0.2  # 0.77-0.95 利用率范围
-                max_demand_12m = declared * base_ratio
-                avg_demand_12m = max_demand_12m * 0.72
-                demand_95th = max_demand_12m * 0.94
+                max_demand_12m = 0
+                avg_demand_12m = 0
+                demand_95th = 0
 
         utilization = max_demand_12m / declared if declared > 0 else 0
 
         # 使用统一阈值判断配置状态 (low=80%, high=105%)
-        is_over_declared = utilization < _thresholds.low_utilization  # 利用率低于80%视为申报过高
-        is_under_declared = utilization > _thresholds.high_utilization  # 利用率超过105%视为申报过低
+        is_over_declared = data_sufficient and utilization < _thresholds.low_utilization
+        is_under_declared = data_sufficient and utilization > _thresholds.high_utilization
 
         # [V2.10-FIX] 根据不同情况计算最优需量
-        if is_under_declared:
+        if not data_sufficient:
+            optimal_demand = declared
+        elif is_under_declared:
             # 申报不足时：基于最大需量 + 更大安全裕度计算建议需量
             optimal_demand = _math.ceil(max_demand_12m * (1 + _thresholds.safety_margin * 1.5) / 5) * 5
         else:
@@ -2951,14 +2962,18 @@ async def analyze_demand_config(db: AsyncSession = Depends(get_db), current_user
             penalty = over_amount * _demand_price * 2 * 3  # 假设一年超3次
             saving = penalty - (optimal_demand - declared) * _demand_price * 12
             under_declared_count += 1
-        else:
+        elif data_sufficient:
             saving = 0
             optimal_count += 1
+        else:
+            saving = 0
 
         total_saving += max(saving, 0)
 
         # 生成建议
-        if is_over_declared:
+        if not data_sufficient:
+            recommendation = "数据不足，无法评估需量配置"
+        elif is_over_declared:
             recommendation = f"建议将申报需量从 {declared:.0f}kW 下调至 {optimal_demand:.0f}kW，可节省需量费用"
         elif is_under_declared:
             recommendation = f"建议将申报需量从 {declared:.0f}kW 上调至 {optimal_demand:.0f}kW，避免超需量罚款"
@@ -2966,7 +2981,9 @@ async def analyze_demand_config(db: AsyncSession = Depends(get_db), current_user
             recommendation = "当前需量配置合理，无需调整"
 
         # 计算超需量风险概率
-        over_risk = min(100, max(0, (max_demand_12m / declared - 0.9) * 100 * 5)) if declared > 0 else 0
+        over_risk = (
+            min(100, max(0, (max_demand_12m / declared - 0.9) * 100 * 5)) if data_sufficient and declared > 0 else 0
+        )
 
         analysis_items.append(
             DemandConfigAnalysisItem(
@@ -2983,6 +3000,7 @@ async def analyze_demand_config(db: AsyncSession = Depends(get_db), current_user
                 potential_saving=round(max(saving, 0), 2),
                 over_demand_risk=round(over_risk, 1),
                 recommendation=recommendation,
+                data_sufficient=data_sufficient,
             )
         )
 
@@ -3344,11 +3362,9 @@ async def get_demand_aggregated_curve(
             total_points_count += len(slot_demands)
             all_demands.extend(slot_demands)
         else:
-            # 无数据时使用模拟值（基于典型数据中心负荷曲线）
-            base_factor = 0.6 + 0.3 * abs(((hour - 14) / 10))  # 14点最高
-            avg_demand = declared_demand * base_factor
-            max_demand = avg_demand * 1.1
-            min_demand = avg_demand * 0.9
+            avg_demand = 0
+            max_demand = 0
+            min_demand = 0
             over_count = 0
 
         aggregated_points.append(
@@ -3393,6 +3409,7 @@ async def get_demand_aggregated_curve(
                 "over_declared_count": total_over_declared,
                 "over_declared_ratio": round(over_declared_ratio, 2),
                 "total_data_points": total_points_count,
+                "data_sufficient": bool(all_demands),
             },
             "aggregated_points": aggregated_points,
         }
@@ -3529,14 +3546,11 @@ async def get_demand_optimization_plan(
     )
     demands = [r[0] for r in result.all()]
 
-    # [V2.10-FIX] 无实际数据时使用确定性模拟数据
+    data_sufficient = len(demands) >= 10
     if not demands or len(demands) < 10:
-        # 使用与 analyze_demand_config 相同的确定性算法
-        seed_factor = (meter_point_id % 10 + 1) / 10  # 0.1-1.0 基于ID
-        base_ratio = 0.75 + seed_factor * 0.2  # 0.77-0.95 利用率范围
-        max_demand = declared_demand * base_ratio
-        avg_demand = max_demand * 0.72
-        p95_demand = max_demand * 0.94
+        max_demand = 0
+        avg_demand = 0
+        p95_demand = 0
     else:
         # 使用实际数据
         max_demand = max(demands)
@@ -3558,7 +3572,17 @@ async def get_demand_optimization_plan(
     # 使用统一阈值: low_utilization=80%, high_utilization=105%
     utilization_decimal = utilization / 100  # 转为小数
 
-    if utilization_decimal < _thresholds.low_utilization:  # < 80%
+    if not data_sufficient:
+        recommendations.append(
+            {
+                "type": "insufficient_data",
+                "title": "需量数据不足",
+                "description": "最近30天有效15分钟需量数据少于10条，无法生成可靠优化方案",
+                "action": "请先检查计量点采集链路并补齐数据",
+                "saving": "暂不估算",
+            }
+        )
+    elif utilization_decimal < _thresholds.low_utilization:  # < 80%
         # 申报过高
         import math as _math
 
@@ -3618,6 +3642,7 @@ async def get_demand_optimization_plan(
             "meter_point_id": meter_point_id,
             "meter_name": meter.meter_name,
             "current_declared": declared_demand,
+            "data_sufficient": data_sufficient,
             "statistics": {
                 "max_demand": round(max_demand, 2),
                 "avg_demand": round(avg_demand, 2),

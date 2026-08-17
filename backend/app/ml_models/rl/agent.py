@@ -64,6 +64,7 @@ class AdaptiveOptimizer:
 
         # 探索率调度 (S5f)
         self._exploration_rate = self.rl_config.initial_exploration_rate
+        self._exploration_phase = "initial"
         self._step_count = 0
         self._recent_achievements = []
         self._is_trained = False
@@ -95,7 +96,7 @@ class AdaptiveOptimizer:
         explore = np.random.random() < self._exploration_rate
 
         # 选择动作
-        actions, log_prob, value = self.ppo.select_action(state, explore=explore)
+        actions, _raw_continuous, log_prob, value = self.ppo.select_action(state, explore=explore)
 
         # 转换为调整建议 (S5e)
         adjustments = self._translate_action(actions)
@@ -162,11 +163,16 @@ class AdaptiveOptimizer:
         self._step_count += 1
 
         # 构建状态
-        state = self.env.reset() if current_state is None else self._build_state_vector(current_state)
+        if current_state is None:
+            state = self.env.reset()
+        else:
+            self.env.sync_context(current_state)
+            state = self._build_state_vector(current_state)
+        self.env.set_expected_saving(expected_saving)
 
         # 选择动作
         explore = np.random.random() < self._exploration_rate
-        actions, log_prob, value = self.ppo.select_action(state, explore=explore)
+        actions, raw_continuous, log_prob, value = self.ppo.select_action(state, explore=explore)
 
         # 计算奖励
         achievement_rate = actual_saving / expected_saving if expected_saving > 0 else 1.0
@@ -180,9 +186,8 @@ class AdaptiveOptimizer:
         next_state, _, _, _ = self.env.step(actions)
 
         # 存储经验
-        continuous_actions = np.array([actions["priority_weight"], actions["safety_coeff"], actions["temperature"]])
         self.ppo.buffer.store(
-            state, continuous_actions, int(actions["target_period"]), reward, next_state, False, log_prob, value
+            state, raw_continuous, int(actions["target_period"]), reward, next_state, False, log_prob, value
         )
 
         # 记录达成率
@@ -215,8 +220,12 @@ class AdaptiveOptimizer:
         - 稳定阶段（连续100步达成率 > 90%）: epsilon = 0.1
         - 波动阶段（连续3次 < 80%）: epsilon = 0.2
         """
+        if self._exploration_phase == "manual":
+            return
+
         if self._step_count < 1000:
             self._exploration_rate = 0.3
+            self._exploration_phase = "initial"
             return
 
         recent = (
@@ -226,12 +235,15 @@ class AdaptiveOptimizer:
         if len(recent) >= 100 and all(r > 0.9 for r in recent):
             # 稳定阶段
             self._exploration_rate = 0.1
+            self._exploration_phase = "stable"
         elif len(recent) >= 3 and all(r < 0.8 for r in recent[-3:]):
             # 波动阶段
             self._exploration_rate = 0.2
+            self._exploration_phase = "fluctuating"
         else:
             # 默认逐步衰减
             self._exploration_rate = max(0.1, 0.3 * (0.999 ** (self._step_count - 1000)))
+            self._exploration_phase = "decaying"
 
     def _build_state_vector(self, state_dict: Dict[str, Any]) -> np.ndarray:
         """将状态字典转换为向量"""

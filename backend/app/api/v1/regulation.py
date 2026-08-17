@@ -81,7 +81,10 @@ async def delete_regulation_config(config_id: int, db: AsyncSession = Depends(ge
 async def simulate_regulation(data: RegulationSimulateRequest, db: AsyncSession = Depends(get_db)):
     """模拟调节效果"""
     service = LoadRegulationService(db)
-    result = await service.simulate_regulation(data.config_id, data.target_value)
+    try:
+        result = await service.simulate_regulation(data.config_id, data.target_value)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
     if not result:
         raise HTTPException(status_code=404, detail="配置不存在")
     return result
@@ -91,7 +94,10 @@ async def simulate_regulation(data: RegulationSimulateRequest, db: AsyncSession 
 async def apply_regulation(data: RegulationApplyRequest, db: AsyncSession = Depends(get_db)):
     """应用调节方案"""
     service = LoadRegulationService(db)
-    result = await service.apply_regulation(data.config_id, data.target_value, data.reason, remark=data.remark)
+    try:
+        result = await service.apply_regulation(data.config_id, data.target_value, data.reason, remark=data.remark)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
     if not result:
         raise HTTPException(status_code=404, detail="配置不存在")
     return result

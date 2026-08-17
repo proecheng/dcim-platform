@@ -121,6 +121,7 @@ const routes: RouteRecordRaw[] = [
           { path: 'monitor', name: 'EnergyMonitor', component: () => import('@/views/energy/monitor.vue'), meta: { title: '用电监控', icon: 'Odometer' } },
           { path: 'statistics', name: 'EnergyStatistics', component: () => import('@/views/energy/statistics.vue'), meta: { title: '能耗统计', icon: 'TrendCharts' } },
           { path: 'analysis', name: 'EnergyAnalysis', component: () => import('@/views/energy/analysis.vue'), meta: { title: '节能分析', icon: 'Opportunity' } },
+          { path: 'suggestions', name: 'EnergySuggestions', component: () => import('@/views/energy/suggestions.vue'), meta: { title: '智能建议', icon: 'MagicStick' } },
           { path: 'regulation', name: 'EnergyRegulation', component: () => import('@/views/energy/regulation.vue'), meta: { title: '负荷调节', icon: 'Operation' } },
           { path: 'execution', name: 'EnergyExecution', component: () => import('@/views/energy/execution.vue'), meta: { title: '执行管理', icon: 'VideoPlay' } },
           { path: 'report', name: 'EnergyReport', component: () => import('@/views/energy/report.vue'), meta: { title: '能效报告', icon: 'Document' } },

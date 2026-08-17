@@ -3,10 +3,10 @@
     <!-- 报表类型切换 -->
     <el-card shadow="hover" class="type-card">
       <el-radio-group v-model="reportType" @change="handleTypeChange">
-        <el-radio-button label="daily">日报</el-radio-button>
-        <el-radio-button label="weekly">周报</el-radio-button>
-        <el-radio-button label="monthly">月报</el-radio-button>
-        <el-radio-button label="custom">自定义报表</el-radio-button>
+        <el-radio-button value="daily">日报</el-radio-button>
+        <el-radio-button value="weekly">周报</el-radio-button>
+        <el-radio-button value="monthly">月报</el-radio-button>
+        <el-radio-button value="custom">自定义报表</el-radio-button>
       </el-radio-group>
     </el-card>
 

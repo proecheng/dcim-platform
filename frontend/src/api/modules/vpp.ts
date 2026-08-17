@@ -10,7 +10,7 @@ export interface AnalysisRequest {
 }
 
 export interface MetricValue {
-  value: number
+  value: number | null
   unit: string
   formula: string
   data_source?: any
@@ -21,6 +21,8 @@ export interface MetricValue {
 }
 
 export interface AnalysisResponse {
+  data_sufficient: boolean
+  warnings: string[]
   analysis_period: {
     months: string[]
     load_data_range: string

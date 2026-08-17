@@ -5,12 +5,12 @@
         <span>负荷转移前后对比</span>
         <div class="header-controls">
           <el-radio-group v-model="dataRange" size="small" @change="handleRangeChange">
-            <el-radio-button label="1day">1天</el-radio-button>
-            <el-radio-button label="7day">7天平均</el-radio-button>
+            <el-radio-button value="1day">1天</el-radio-button>
+            <el-radio-button value="7day">7天平均</el-radio-button>
           </el-radio-group>
           <el-radio-group v-model="timeGranularity" size="small" style="margin-left: 12px;">
-            <el-radio-button label="1h">1小时</el-radio-button>
-            <el-radio-button label="15min">15分钟</el-radio-button>
+            <el-radio-button value="1h">1小时</el-radio-button>
+            <el-radio-button value="15min">15分钟</el-radio-button>
           </el-radio-group>
         </div>
       </div>

@@ -40,15 +40,19 @@ export function useEntranceAnimation(options: EntranceAnimationOptions = {}) {
       }
     })
 
+    const target = (selector: string) => document.querySelector(selector)
+
     // 阶段1: 背景层淡入 (0-0.5s)
-    timeline.from('.bigscreen-container', {
+    const container = target('.bigscreen-container')
+    if (container) timeline.from(container, {
       opacity: 0,
       duration: 0.5,
       ease: 'power1.inOut'
     })
 
     // 阶段2: 3D场景淡入并缩放 (0.3-1.1s)
-    timeline.from('.three-scene-container', {
+    const scene = target('.three-scene-container')
+    if (scene) timeline.from(scene, {
       opacity: 0,
       scale: 0.9,
       duration: 0.8,
@@ -56,7 +60,8 @@ export function useEntranceAnimation(options: EntranceAnimationOptions = {}) {
     }, 0.3)
 
     // 阶段3: 顶部栏从上滑入 (0.5-1.0s)
-    timeline.from('.top-bar', {
+    const topBar = target('.top-bar')
+    if (topBar) timeline.from(topBar, {
       y: -80,
       opacity: 0,
       duration: 0.5,
@@ -64,7 +69,8 @@ export function useEntranceAnimation(options: EntranceAnimationOptions = {}) {
     }, 0.5)
 
     // 阶段4: 左侧面板从左滑入 (0.8-1.2s)
-    timeline.from('.left-panel', {
+    const leftPanel = target('.left-panel')
+    if (leftPanel) timeline.from(leftPanel, {
       x: -300,
       opacity: 0,
       duration: 0.4,
@@ -72,7 +78,8 @@ export function useEntranceAnimation(options: EntranceAnimationOptions = {}) {
     }, 0.8)
 
     // 阶段5: 右侧面板从右滑入 (0.8-1.2s)
-    timeline.from('.right-panel', {
+    const rightPanel = target('.right-panel')
+    if (rightPanel) timeline.from(rightPanel, {
       x: 300,
       opacity: 0,
       duration: 0.4,
@@ -80,7 +87,8 @@ export function useEntranceAnimation(options: EntranceAnimationOptions = {}) {
     }, 0.8)
 
     // 阶段6: 底部栏从下滑入 (1.0-1.3s)
-    timeline.from('.bottom-bar', {
+    const bottomBar = target('.bottom-bar')
+    if (bottomBar) timeline.from(bottomBar, {
       y: 80,
       opacity: 0,
       duration: 0.3,
@@ -88,12 +96,15 @@ export function useEntranceAnimation(options: EntranceAnimationOptions = {}) {
     }, 1.0)
 
     // 阶段7: 设备详情面板淡入 (1.1-1.4s)
-    timeline.from('.device-detail-panel', {
-      opacity: 0,
-      scale: 0.95,
-      duration: 0.3,
-      ease
-    }, 1.1)
+    const deviceDetailPanel = target('.device-detail-panel')
+    if (deviceDetailPanel) {
+      timeline.from(deviceDetailPanel, {
+        opacity: 0,
+        scale: 0.95,
+        duration: 0.3,
+        ease
+      }, 1.1)
+    }
 
     return timeline
   }
@@ -182,7 +193,7 @@ export function useEntranceAnimation(options: EntranceAnimationOptions = {}) {
     stopAll()
 
     // 重置所有元素到最终状态
-    gsap.set([
+    const targets = [
       '.bigscreen-container',
       '.three-scene-container',
       '.top-bar',
@@ -190,9 +201,11 @@ export function useEntranceAnimation(options: EntranceAnimationOptions = {}) {
       '.right-panel',
       '.bottom-bar',
       '.device-detail-panel'
-    ], {
-      clearProps: 'all'
-    })
+    ].map(selector => document.querySelector(selector)).filter((element): element is Element => element !== null)
+
+    if (targets.length > 0) {
+      gsap.set(targets, { clearProps: 'all' })
+    }
 
     isComplete.value = true
   }

@@ -2,10 +2,10 @@
   <div class="floor-selector">
     <div class="floor-tabs">
       <el-radio-group v-model="currentFloor" size="small">
-        <el-radio-button label="B1">B1 制冷机房</el-radio-button>
-        <el-radio-button label="F1">F1 机房区A</el-radio-button>
-        <el-radio-button label="F2">F2 机房区B</el-radio-button>
-        <el-radio-button label="F3">F3 办公监控</el-radio-button>
+        <el-radio-button value="B1">B1 制冷机房</el-radio-button>
+        <el-radio-button value="F1">F1 机房区A</el-radio-button>
+        <el-radio-button value="F2">F2 机房区B</el-radio-button>
+        <el-radio-button value="F3">F3 办公监控</el-radio-button>
       </el-radio-group>
     </div>
 

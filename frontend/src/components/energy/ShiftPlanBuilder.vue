@@ -46,8 +46,8 @@
           <div class="strategy-select">
             <span class="strategy-label">优化策略:</span>
             <el-radio-group v-model="optimizationStrategy" size="small">
-              <el-radio-button label="max_benefit">效益最大化</el-radio-button>
-              <el-radio-button label="min_cost">成本最小化</el-radio-button>
+              <el-radio-button value="max_benefit">效益最大化</el-radio-button>
+              <el-radio-button value="min_cost">成本最小化</el-radio-button>
             </el-radio-group>
           </div>
           <el-button

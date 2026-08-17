@@ -50,7 +50,7 @@ export interface DriftDetectResponse {
  * 触发漂移检测
  */
 export function triggerDriftDetection(): Promise<DriftDetectResponse> {
-  return request.post('/v1/drift/detect')
+  return request.post('/v1/drift/detect', undefined, { timeout: 60000 })
 }
 
 /**

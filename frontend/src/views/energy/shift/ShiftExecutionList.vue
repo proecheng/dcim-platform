@@ -4,11 +4,12 @@
       <el-form :inline="true" :model="filterForm">
         <el-form-item label="执行状态">
           <el-select v-model="filterForm.status" placeholder="全部状态" clearable style="width: 150px">
-            <el-option label="未开始" value="not_started" />
-            <el-option label="进行中" value="in_progress" />
+            <el-option label="待执行" value="pending" />
+            <el-option label="执行中" value="executing" />
             <el-option label="已完成" value="completed" />
             <el-option label="失败" value="failed" />
             <el-option label="已取消" value="cancelled" />
+            <el-option label="已回滚" value="reverted" />
           </el-select>
         </el-form-item>
         <el-form-item label="日期范围">
@@ -169,22 +170,30 @@ type TagType = 'primary' | 'success' | 'info' | 'warning' | 'danger'
 
 const getStatusType = (status: string): TagType => {
   const map: Record<string, TagType> = {
+    pending: 'info',
+    executing: 'warning',
     not_started: 'info',
     in_progress: 'warning',
+    running: 'warning',
     completed: 'success',
     failed: 'danger',
-    cancelled: 'info'
+    cancelled: 'info',
+    reverted: 'warning'
   }
   return map[status] || 'info'
 }
 
 const getStatusLabel = (status: string) => {
   const map: Record<string, string> = {
-    not_started: '未开始',
-    in_progress: '进行中',
+    pending: '待执行',
+    executing: '执行中',
+    not_started: '待执行',
+    in_progress: '执行中',
+    running: '执行中',
     completed: '已完成',
     failed: '失败',
-    cancelled: '已取消'
+    cancelled: '已取消',
+    reverted: '已回滚'
   }
   return map[status] || status
 }

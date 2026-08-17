@@ -213,6 +213,8 @@ const statCards = computed(() => [
 
 // ── 设备选择 ──
 const selectedDevice = ref<DoorDevice | null>(null)
+const dateRange = ref<[string, string] | null>(null)
+const filterEventType = ref<AccessEventType | ''>('')
 
 // 默认选中第一个设备
 watch(doorDevices, (devices) => {
@@ -227,9 +229,6 @@ function handleDeviceClick(device: DoorDevice) {
 }
 
 // ── 时间线筛选 ──
-const dateRange = ref<[string, string] | null>(null)
-const filterEventType = ref<AccessEventType | ''>('')
-
 const filteredEvents = computed(() => {
   if (!filterEventType.value) return accessEvents.value
   return accessEvents.value.filter(e => e.eventType === filterEventType.value)

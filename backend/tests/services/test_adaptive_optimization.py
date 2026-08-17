@@ -17,7 +17,7 @@ from unittest.mock import MagicMock
 from decimal import Decimal
 
 from app.services.adaptive_optimization_service import AdaptiveOptimizationService
-from app.models.energy import EnergySavingProposal
+from app.models.energy import EnergySavingProposal, RLModelState, RLTrainingLog
 
 
 class TestBuildStateFromProposal:
@@ -148,6 +148,54 @@ class TestGetModelInfo:
         assert info["is_trained"] is False
         assert info["total_steps"] == 0
 
+    @pytest.mark.asyncio
+    async def test_model_info_restores_persisted_shared_state(self, async_db, monkeypatch):
+        state = RLModelState(
+            model_name="adaptive_optimizer",
+            is_trained=True,
+            total_steps=12,
+            exploration_rate=Decimal("0.18"),
+            exploration_phase="manual",
+            recent_achievements=[0.81, 0.92],
+        )
+        async_db.add(state)
+        async_db.add(
+            RLTrainingLog(
+                actual_saving=Decimal("80"),
+                expected_saving=Decimal("100"),
+                reward=Decimal("0.8"),
+                achievement_rate=Decimal("0.8"),
+                exploration_rate=Decimal("0.18"),
+                step_count=20,
+            )
+        )
+        await async_db.commit()
+
+        fake_env = MagicMock()
+        fake_env.get_state_dim.return_value = 51
+        fake_env.get_action_spec.return_value = {"continuous": {}, "discrete": {}}
+        fake_optimizer = MagicMock()
+        fake_optimizer._exploration_rate = 0.3
+        fake_optimizer._step_count = 0
+        fake_optimizer._is_trained = False
+        fake_optimizer.is_trained = False
+        fake_optimizer.env = fake_env
+        del fake_optimizer._persistent_state_loaded
+        monkeypatch.setattr(AdaptiveOptimizationService, "_shared_optimizer", fake_optimizer)
+
+        svc = AdaptiveOptimizationService(async_db)
+        info = await svc.get_model_info()
+
+        assert svc._get_optimizer() is fake_optimizer
+        assert fake_optimizer._exploration_rate == pytest.approx(0.18)
+        assert fake_optimizer._step_count == 20
+        assert fake_optimizer._is_trained is True
+        assert fake_optimizer._exploration_phase == "manual"
+        assert fake_optimizer._recent_achievements == [0.81, 0.92]
+        assert info["exploration_rate"] == pytest.approx(0.18)
+        assert info["exploration_phase"] == "manual"
+        assert info["total_steps"] == 20
+
 
 class TestGetOptimizationHistory:
     """优化历史测试"""
@@ -183,6 +231,26 @@ class TestUpdateExplorationRate:
         svc._get_optimizer = lambda: None
         result = await svc.update_exploration_rate(0.1)
         assert result["success"] is False
+
+    @pytest.mark.asyncio
+    async def test_manual_rate_and_phase_are_persisted(self, async_db):
+        svc = AdaptiveOptimizationService(async_db)
+        optimizer = MagicMock()
+        optimizer._persistent_state_loaded = True
+        optimizer._exploration_rate = 0.3
+        optimizer._exploration_phase = "initial"
+        optimizer._step_count = 4
+        optimizer._recent_achievements = [0.8]
+        optimizer.is_trained = False
+        svc._get_optimizer = lambda: optimizer
+
+        result = await svc.update_exploration_rate(0.27, phase="manual")
+
+        assert result["new_rate"] == pytest.approx(0.27)
+        assert optimizer._exploration_phase == "manual"
+        state = await svc._get_or_create_model_state()
+        assert float(state.exploration_rate) == pytest.approx(0.27)
+        assert state.exploration_phase == "manual"
 
 
 class TestSaveCheckpoint:

@@ -298,17 +298,79 @@ export function getCalibrationHistory(
 
 // ==================== VPP 监控 (Story 33.3) ====================
 
+export interface VppZoneCapacity {
+  zone_id: number
+  zone_name: string
+  down_adjustable_kw: number
+  up_adjustable_kw: number
+  down_adjustable_thermal_kw: number
+  up_adjustable_thermal_kw: number
+  T_current: number | null
+  headroom_down: number
+  headroom_up: number
+  cop: number
+}
+
+export interface VppCapacity {
+  down_adjustable_kw: number
+  up_adjustable_kw: number
+  down_adjustable_thermal_kw: number
+  up_adjustable_thermal_kw: number
+  T_current: number | null
+  headroom_down: number
+  headroom_up: number
+  response_window_hours: number
+  zones: VppZoneCapacity[]
+  cached_at: string | null
+}
+
+export interface VppDispatch {
+  dispatch_id: string
+  command_type: 'down_adjust' | 'up_adjust'
+  target_power_kw: number
+  duration_minutes: number
+  status: 'received' | 'accepted' | 'rejected'
+  reject_reason?: string | null
+  max_adjustable_kw?: number | null
+  accepted_power_kw?: number | null
+  aborted_schedule_id?: number | null
+  created_at?: string | null
+}
+
+export interface VppStatisticsPeriod {
+  count: number
+  total_power_kw: number
+  total_energy_kwh: number
+  estimated_savings_yuan: number
+}
+
+export interface VppStatistics {
+  daily: VppStatisticsPeriod
+  monthly: VppStatisticsPeriod
+  all_time: {
+    count: number
+    accepted_count: number
+    response_success_rate: number
+    total_energy_kwh: number
+    estimated_savings_yuan: number
+  }
+}
+
 /** 查询 VPP 可调容量 */
 export function getVppCapacity() {
-  return request.get<{ code: number; message: string; data: any }>('/v1/precool/vpp/capacity')
+  return request.get<{ code: number; message: string; data: VppCapacity | null }>('/v1/precool/vpp/capacity')
 }
 
 /** 查询 VPP 调控指令列表 */
 export function getVppDispatches(params?: { page?: number; page_size?: number; status?: string }) {
-  return request.get<{ code: number; message: string; data: any }>('/v1/precool/vpp/dispatches', { params })
+  return request.get<{
+    code: number
+    message: string
+    data: { total: number; page: number; page_size: number; items: VppDispatch[] } | null
+  }>('/v1/precool/vpp/dispatches', { params })
 }
 
 /** 查询 VPP 需求响应统计 */
 export function getVppStatistics() {
-  return request.get<{ code: number; message: string; data: any }>('/v1/precool/vpp/statistics')
+  return request.get<{ code: number; message: string; data: VppStatistics | null }>('/v1/precool/vpp/statistics')
 }

@@ -418,8 +418,9 @@ async def test_device_health_list_after_calculate(client, db_session):
     item = next((i for i in items if i["device_id"] == device.id), None)
     assert item is not None
     assert item["device_name"] == "测试设备A"
-    assert item["score"] == 100.0
-    assert item["health_level"] == "健康"
+    assert item["score"] == 75.0
+    assert item["health_level"] == "关注"
+    assert calc_resp.json()["algorithm"] == "predictive_maintenance_three_factor"
 
 
 @pytest.mark.anyio
@@ -440,7 +441,7 @@ async def test_device_health_filter_level(client, db_session):
 
     await client.post(HEALTH_CALC_URL)
 
-    # 筛选"健康"等级（无告警设备得分100，属于"健康"）
+    # 无历史点位/维保数据时正式算法给出有限置信度的关注结果，不伪装健康
     resp = await client.get(HEALTH_LIST_URL, params={"health_level": "健康"})
     assert resp.status_code == 200
     items = resp.json()

@@ -283,7 +283,7 @@
           <el-form :inline="true" class="filter-form">
             <el-form-item label="点位">
               <el-select v-model="shieldFilters.point_id" placeholder="全部（含全局）" clearable filterable>
-                <el-option label="全局屏蔽" :value="null" />
+                <el-option label="全局屏蔽" :value="0" />
                 <el-option
                   v-for="point in pointOptions"
                   :key="point.id"

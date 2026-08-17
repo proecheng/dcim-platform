@@ -3,35 +3,44 @@
     <div class="toolbar-title">节点工具</div>
 
     <div class="toolbar-items">
-      <div
+      <button
+        type="button"
         class="toolbar-item"
         draggable="true"
         @dragstart="handleDragStart('AND')"
-        title="AND 门节点"
+        @dragend="handleDragEnd"
+        @click="handleClick('AND')"
+        title="添加 AND 门节点"
       >
         <div class="node-icon and-gate">AND</div>
         <div class="node-label">AND 门</div>
-      </div>
+      </button>
 
-      <div
+      <button
+        type="button"
         class="toolbar-item"
         draggable="true"
         @dragstart="handleDragStart('OR')"
-        title="OR 门节点"
+        @dragend="handleDragEnd"
+        @click="handleClick('OR')"
+        title="添加 OR 门节点"
       >
         <div class="node-icon or-gate">OR</div>
         <div class="node-label">OR 门</div>
-      </div>
+      </button>
 
-      <div
+      <button
+        type="button"
         class="toolbar-item"
         draggable="true"
         @dragstart="handleDragStart('leaf')"
-        title="叶节点"
+        @dragend="handleDragEnd"
+        @click="handleClick('leaf')"
+        title="添加叶节点"
       >
         <div class="node-icon leaf-node">叶</div>
         <div class="node-label">叶节点</div>
-      </div>
+      </button>
     </div>
 
     <div class="toolbar-divider"></div>
@@ -53,9 +62,21 @@ const emit = defineEmits<{
   (e: 'fit-view'): void
 }>()
 
+let suppressNextClick = false
+
 function handleDragStart(nodeType: string) {
-  // 将节点类型存储到 dataTransfer 中
-  // 实际的拖拽处理在 FaultTreeCanvas 组件中
+  suppressNextClick = true
+  emit('add-node', nodeType)
+}
+
+function handleDragEnd() {
+  window.setTimeout(() => {
+    suppressNextClick = false
+  }, 0)
+}
+
+function handleClick(nodeType: string) {
+  if (suppressNextClick) return
   emit('add-node', nodeType)
 }
 </script>
@@ -88,8 +109,16 @@ function handleDragStart(nodeType: string) {
       padding: 12px;
       border: 1px solid #dcdfe6;
       border-radius: 4px;
-      cursor: move;
+      width: 100%;
+      background: #fff;
+      font-family: inherit;
+      text-align: left;
+      cursor: grab;
       transition: all 0.3s;
+
+      &:active {
+        cursor: grabbing;
+      }
 
       &:hover {
         border-color: #409eff;

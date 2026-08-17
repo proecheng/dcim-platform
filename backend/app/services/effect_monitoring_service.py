@@ -15,6 +15,7 @@ from decimal import Decimal
 from typing import Dict, Any, Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, and_
+from sqlalchemy.orm import selectinload
 
 from app.models.energy import (
     EnergySavingProposal,
@@ -294,7 +295,11 @@ class EffectMonitoringService:
             period_start = period_end - timedelta(days=1)
 
         # 获取方案
-        stmt = select(EnergySavingProposal).where(EnergySavingProposal.id == proposal_id)
+        stmt = (
+            select(EnergySavingProposal)
+            .options(selectinload(EnergySavingProposal.measures))
+            .where(EnergySavingProposal.id == proposal_id)
+        )
         result = await self.db.execute(stmt)
         proposal = result.scalar_one_or_none()
 

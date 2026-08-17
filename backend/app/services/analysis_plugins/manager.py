@@ -273,11 +273,13 @@ class PluginManager:
             devices = result.scalars().all()
 
             for device in devices:
+                if device.avg_load_rate is None:
+                    continue
                 rated_power = device.rated_power or 0
                 pf = device.power_factor or 0.95
                 rated_voltage = device.rated_voltage or 380
-                load_rate = device.avg_load_rate or 0
-                active_power = rated_power * (load_rate / 100) if load_rate else rated_power
+                load_rate = device.avg_load_rate
+                active_power = rated_power * (load_rate / 100)
                 apparent_power = active_power / pf if pf > 0 else active_power
                 reactive_power = (apparent_power**2 - active_power**2) ** 0.5 if apparent_power > active_power else 0
                 current = (active_power * 1000 / (rated_voltage * 1.732)) if rated_voltage > 0 else 0

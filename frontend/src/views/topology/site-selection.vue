@@ -125,7 +125,10 @@
           </el-table-column>
         </el-table>
 
-        <el-empty v-else-if="!loading" description="输入需求参数后点击「推荐选址」" />
+        <el-empty
+          v-else-if="!loading"
+          :description="result ? '没有满足空间、功率和承重硬约束的机柜' : '输入需求参数后点击「推荐选址」'"
+        />
       </div>
 
       <!-- 维度评分详情 -->
@@ -255,8 +258,8 @@ async function handleSearch() {
   try {
     const res = await getSmartSiteSelection({
       required_u: form.required_u,
-      required_power_kw: form.required_power_kw || undefined,
-      required_weight_kg: form.required_weight_kg || undefined,
+      required_power_kw: form.required_power_kw ?? undefined,
+      required_weight_kg: form.required_weight_kg ?? undefined,
       limit: 20,
       weights: { ...weights }
     })

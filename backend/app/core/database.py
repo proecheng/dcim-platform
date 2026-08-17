@@ -16,7 +16,7 @@ def _build_engine_kwargs() -> dict:
     """根据数据库类型构建引擎参数"""
     url = settings.database_url
     kwargs: dict = {
-        "echo": settings.debug,
+        "echo": settings.sql_echo,
         "future": True,
     }
     if url.startswith("postgresql") or url.startswith("postgres"):

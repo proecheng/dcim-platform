@@ -65,7 +65,7 @@ const store = useBigscreenStore()
 const panelRef = ref()
 
 // 从store获取面板状态
-const panelState = computed(() => store.panelStates.floorSelector || { x: 20, y: 120, collapsed: false })
+const panelState = computed(() => store.panelStates.floorSelector || { x: 320, y: 72, collapsed: false })
 
 const floors = ref<FloorInfo[]>([])
 const currentFloor = ref(props.modelValue || 'F1')

@@ -311,7 +311,9 @@ async function handleAccept() {
   if (!props.suggestion?.id) return
 
   // 获取调整后的参数
-  const adjustedParams = paramAdjustmentRef.value?.getParams()
+  const adjustedParams = adjustedEffects.value
+    ? paramAdjustmentRef.value?.getParams()
+    : undefined
 
   await ElMessageBox.confirm(
     adjustedEffects.value

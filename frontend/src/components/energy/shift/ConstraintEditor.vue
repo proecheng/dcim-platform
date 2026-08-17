@@ -197,9 +197,9 @@
 
       <el-form-item label="约束优先级">
         <el-radio-group v-model="constraint.priority">
-          <el-radio label="high">高</el-radio>
-          <el-radio label="medium">中</el-radio>
-          <el-radio label="low">低</el-radio>
+          <el-radio value="high">高</el-radio>
+          <el-radio value="medium">中</el-radio>
+          <el-radio value="low">低</el-radio>
         </el-radio-group>
       </el-form-item>
 

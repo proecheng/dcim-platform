@@ -402,8 +402,8 @@ function editCabinet(row: Cabinet) {
     cabinet_code: row.cabinet_code,
     cabinet_name: row.cabinet_name,
     location: row.location,
-    row_number: row.row_number,
-    column_number: row.column_number,
+    row_number: Number(row.row_number) || 1,
+    column_number: Number(row.column_number) || 1,
     total_u: row.total_u,
     max_power: row.max_power,
     max_weight: row.max_weight

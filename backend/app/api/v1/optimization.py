@@ -20,6 +20,37 @@ from ...services.optimizer import (
 router = APIRouter()
 
 
+async def _save_day_ahead_bundle(db: AsyncSession, date: str, forecast: dict, optimization: dict) -> None:
+    import json
+    from ...models.config import SystemConfig
+
+    schedule_key = f"schedule_{date}"
+    bundle = {
+        "date": date,
+        "forecast": forecast,
+        "optimization": optimization,
+        "status": "saved",
+    }
+    schedule_result = await db.execute(select(SystemConfig).where(SystemConfig.config_key == schedule_key))
+    existing = schedule_result.scalar_one_or_none()
+    serialized = json.dumps(bundle, ensure_ascii=False, default=str)
+    if existing:
+        existing.config_value = serialized
+        existing.config_group = "day_ahead_schedule"
+        existing.value_type = "json"
+    else:
+        db.add(
+            SystemConfig(
+                config_group="day_ahead_schedule",
+                config_key=schedule_key,
+                config_value=serialized,
+                value_type="json",
+                description=f"{date} 日前调度计划",
+            )
+        )
+    await db.commit()
+
+
 # ==================== Pydantic 模型 ====================
 
 
@@ -157,15 +188,21 @@ async def run_optimization(
 
     device_result = await db.execute(select(PowerDevice).where(PowerDevice.is_enabled == True))
     power_devices = device_result.scalars().all()
-    devices = [
-        {
-            "id": d.id,
-            "name": d.device_name,
-            "type": d.device_type,
-            "rated_power": d.rated_power,
-        }
-        for d in power_devices
-    ]
+    devices = []
+    skipped_device_count = 0
+    for device in power_devices:
+        raw_type = (device.device_type or "").lower()
+        if raw_type not in {"shiftable", "curtailable", "modulating", "generation", "storage", "rigid"}:
+            skipped_device_count += 1
+            continue
+        devices.append(
+            {
+                "id": device.id,
+                "name": device.device_name,
+                "device_type": raw_type,
+                "rated_power": device.rated_power or 0,
+            }
+        )
 
     # 5. 执行优化
     result = run_day_ahead_optimization(
@@ -175,27 +212,16 @@ async def run_optimization(
         devices=devices,
         demand_target=request.demand_target,
     )
+    result["dispatchable_device_count"] = len(devices)
+    result["skipped_unmapped_device_count"] = skipped_device_count
+    if skipped_device_count and not devices:
+        existing_warning = result.get("warning")
+        device_warning = f"{skipped_device_count}台设备未配置可调度类型，本次仅模拟储能调度"
+        result["warning"] = "; ".join(part for part in (existing_warning, device_warning) if part)
 
-    # 6. 保存调度计划到数据库
-    import json as _json
-    from ...models.config import SystemConfig
-
-    schedule_key = f"schedule_{request.target_date}"
-    schedule_result = await db.execute(select(SystemConfig).where(SystemConfig.config_key == schedule_key))
-    existing = schedule_result.scalar_one_or_none()
-    if existing:
-        existing.config_value = _json.dumps(result, ensure_ascii=False, default=str)
-    else:
-        db.add(
-            SystemConfig(
-                config_group="day_ahead_schedule",
-                config_key=schedule_key,
-                config_value=_json.dumps(result, ensure_ascii=False, default=str),
-                value_type="json",
-                description=f"{request.target_date} 日前调度计划",
-            )
-        )
-    await db.commit()
+    # 6. 保存同一批预测和优化结果，后续 GET 必须读取这个版本，避免随机重算断开闭环。
+    resolved_date = date_obj.strftime("%Y-%m-%d")
+    await _save_day_ahead_bundle(db, resolved_date, forecast_data, result)
 
     return {"code": 0, "message": "success", "data": result}
 
@@ -212,10 +238,27 @@ async def get_schedule(date: str, db: AsyncSession = Depends(get_db), current_us
     except ValueError:
         raise HTTPException(status_code=400, detail="日期格式错误")
 
-    # NOTE: 当前返回实时计算结果，后续版本从数据库查询已保存的调度计划
-    # 暂时返回实时计算的结果
+    import json
+    from ...models.config import SystemConfig
 
-    # 生成预测和优化
+    schedule_key = f"schedule_{date}"
+    saved_result = await db.execute(
+        select(SystemConfig).where(
+            SystemConfig.config_group == "day_ahead_schedule",
+            SystemConfig.config_key == schedule_key,
+        )
+    )
+    saved = saved_result.scalar_one_or_none()
+    if saved:
+        try:
+            payload = json.loads(saved.config_value)
+        except (TypeError, json.JSONDecodeError):
+            payload = None
+        if isinstance(payload, dict) and {"forecast", "optimization"}.issubset(payload):
+            payload["status"] = "saved"
+            return {"code": 0, "message": "success", "data": payload}
+
+    # 无完整已保存方案时生成确定性情景模拟，明确标注数据来源。
     forecast_data = generate_demo_forecast(date_obj)
 
     pricing_config = {
@@ -257,7 +300,7 @@ async def get_schedule(date: str, db: AsyncSession = Depends(get_db), current_us
             "date": date,
             "forecast": forecast_data,
             "optimization": result,
-            "status": "generated",  # 'saved' or 'generated'
+            "status": "generated",
         },
     }
 

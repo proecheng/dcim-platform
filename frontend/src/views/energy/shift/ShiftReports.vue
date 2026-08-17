@@ -51,12 +51,12 @@
     <el-row :gutter="20" style="margin-top: 20px" v-if="reportData">
       <el-col :span="6">
         <el-card shadow="hover">
-          <el-statistic title="总成本节省" :value="reportData.total_cost_saving || 0" suffix="元" :precision="0" />
+          <el-statistic title="总成本节省" :value="reportData.total_cost_saving || 0" suffix="元" :precision="2" />
         </el-card>
       </el-col>
       <el-col :span="6">
         <el-card shadow="hover">
-          <el-statistic title="总节能量" :value="reportData.total_energy_saving || 0" suffix="kWh" :precision="0" />
+          <el-statistic title="总节能量" :value="reportData.total_energy_saving || 0" suffix="kWh" :precision="2" />
         </el-card>
       </el-col>
       <el-col :span="6">
@@ -65,27 +65,40 @@
         </el-card>
       </el-col>
       <el-col :span="6">
-        <el-card shadow="hover">
-          <el-statistic title="成功率" :value="reportData.success_rate || 0" suffix="%" :precision="1" />
+        <el-card shadow="hover" class="success-rate-card">
+          <el-statistic v-if="reportData.success_rate !== null" title="成功率" :value="reportData.success_rate" suffix="%" :precision="1" />
+          <div v-else class="empty-stat">
+            <div class="empty-stat-title">成功率</div>
+            <div class="empty-stat-value">--</div>
+          </div>
         </el-card>
       </el-col>
     </el-row>
 
-    <el-card shadow="hover" style="margin-top: 20px" v-if="reportData">
+    <el-alert
+      v-if="reportData?.warning"
+      :title="reportData.warning"
+      type="warning"
+      :closable="false"
+      show-icon
+      style="margin-top: 20px"
+    />
+
+    <el-card shadow="hover" style="margin-top: 20px" v-if="reportData?.details.length">
       <template #header>
         <span>成本节省趋势</span>
       </template>
       <div ref="costChartRef" style="width: 100%; height: 400px"></div>
     </el-card>
 
-    <el-card shadow="hover" style="margin-top: 20px" v-if="reportData">
+    <el-card shadow="hover" style="margin-top: 20px" v-if="reportData?.details.length">
       <template #header>
         <span>节能量趋势</span>
       </template>
       <div ref="energyChartRef" style="width: 100%; height: 400px"></div>
     </el-card>
 
-    <el-card shadow="hover" style="margin-top: 20px" v-if="reportData">
+    <el-card shadow="hover" style="margin-top: 20px" v-if="reportData?.details.length">
       <template #header>
         <span>执行统计</span>
       </template>
@@ -103,7 +116,7 @@
       <template #header>
         <span>详细数据</span>
       </template>
-      <el-table :data="reportData.details" border>
+      <el-table v-if="reportData.details.length" :data="reportData.details" border>
         <el-table-column type="index" label="#" width="60" />
         <el-table-column prop="date" label="日期" width="120" />
         <el-table-column prop="execution_count" label="执行次数" width="100" align="right" />
@@ -116,28 +129,30 @@
         </el-table-column>
         <el-table-column prop="cost_saving" label="成本节省 (元)" width="140" align="right">
           <template #default="{ row }">
-            {{ row.cost_saving?.toFixed(0) || 0 }}
+            {{ row.cost_saving?.toFixed(2) || '0.00' }}
           </template>
         </el-table-column>
         <el-table-column prop="energy_saving" label="节能量 (kWh)" width="140" align="right">
           <template #default="{ row }">
-            {{ row.energy_saving?.toFixed(0) || 0 }}
+            {{ row.energy_saving?.toFixed(2) || '0.00' }}
           </template>
         </el-table-column>
         <el-table-column prop="success_rate" label="成功率" width="100" align="right">
           <template #default="{ row }">
-            {{ row.success_rate?.toFixed(1) || 0 }}%
+            {{ row.success_rate === null ? '--' : `${row.success_rate.toFixed(1)}%` }}
           </template>
         </el-table-column>
       </el-table>
+      <el-empty v-else description="所选周期暂无负荷转移执行记录" />
     </el-card>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, nextTick, onMounted, onUnmounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import * as echarts from 'echarts'
+import { exportShiftReport, getShiftReport } from '@/api/modules/shift'
 
 interface QueryForm {
   report_type: string
@@ -149,7 +164,9 @@ interface ReportData {
   total_cost_saving: number
   total_energy_saving: number
   execution_count: number
-  success_rate: number
+  success_rate: number | null
+  data_sufficient: boolean
+  warning: string | null
   details: Array<any>
   trend_data: Array<any>
   execution_stats: any
@@ -173,76 +190,19 @@ const executionPieInstance = ref<echarts.ECharts>()
 const periodPieInstance = ref<echarts.ECharts>()
 
 const handleTypeChange = () => {
+  disposeCharts()
   reportData.value = null
 }
 
 const handleQuery = async () => {
   loading.value = true
   try {
-    // TODO: 调用 API 获取报表数据
-    // const res = await getShiftReport(queryForm.value)
-    // reportData.value = res.data
-    
-    // 模拟数据
-    const days = queryForm.value.report_type === 'monthly' ? 30 : 12
-    const details = []
-    const trendData = []
-    
-    for (let i = 1; i <= days; i++) {
-      const date = queryForm.value.report_type === 'monthly' 
-        ? `${queryForm.value.month}-${String(i).padStart(2, '0')}`
-        : `${queryForm.value.year}-${String(i).padStart(2, '0')}`
-      
-      const executionCount = Math.floor(Math.random() * 5) + 1
-      const successCount = Math.floor(executionCount * (0.8 + Math.random() * 0.2))
-      const failedCount = executionCount - successCount
-      const costSaving = Math.random() * 500 + 200
-      const energySaving = Math.random() * 800 + 400
-      
-      details.push({
-        date,
-        execution_count: executionCount,
-        success_count: successCount,
-        failed_count: failedCount,
-        total_shift_power: Math.random() * 200 + 100,
-        cost_saving: costSaving,
-        energy_saving: energySaving,
-        success_rate: (successCount / executionCount) * 100
-      })
-      
-      trendData.push({
-        date,
-        cost_saving: costSaving,
-        energy_saving: energySaving
-      })
-    }
-    
-    const totalCostSaving = details.reduce((sum, item) => sum + item.cost_saving, 0)
-    const totalEnergySaving = details.reduce((sum, item) => sum + item.energy_saving, 0)
-    const totalExecutions = details.reduce((sum, item) => sum + item.execution_count, 0)
-    const totalSuccess = details.reduce((sum, item) => sum + item.success_count, 0)
-    
-    reportData.value = {
-      total_cost_saving: totalCostSaving,
-      total_energy_saving: totalEnergySaving,
-      execution_count: totalExecutions,
-      success_rate: (totalSuccess / totalExecutions) * 100,
-      details,
-      trend_data: trendData,
-      execution_stats: {
-        success: totalSuccess,
-        failed: totalExecutions - totalSuccess
-      },
-      period_stats: {
-        peak_to_valley: Math.floor(totalExecutions * 0.6),
-        valley_to_peak: Math.floor(totalExecutions * 0.3),
-        peak_to_flat: Math.floor(totalExecutions * 0.1)
-      }
-    }
-    
-    setTimeout(() => {
-      initCharts()
-    }, 100)
+    const params = getReportParams()
+    const response = await getShiftReport(params) as any
+    disposeCharts()
+    reportData.value = response.data ?? response
+    await nextTick()
+    if (reportData.value?.details.length) initCharts()
   } catch (error: any) {
     ElMessage.error(error.message || '查询失败')
   } finally {
@@ -251,6 +211,7 @@ const handleQuery = async () => {
 }
 
 const handleReset = () => {
+  disposeCharts()
   queryForm.value = {
     report_type: 'monthly',
     month: new Date().toISOString().slice(0, 7),
@@ -261,14 +222,25 @@ const handleReset = () => {
 
 const handleExport = async (format: 'excel' | 'pdf') => {
   try {
-    // TODO: 调用 API 导出报表
-    // const res = await exportShiftReport({ ...queryForm.value, format })
-    // window.open(res.data.download_url)
-    
-    ElMessage.success(`正在导出 ${format.toUpperCase()} 格式报表...`)
+    const blob = await exportShiftReport({ ...getReportParams(), format })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `shift-report-${queryForm.value.report_type}-${queryForm.value.report_type === 'monthly' ? queryForm.value.month : queryForm.value.year}.${format === 'excel' ? 'xlsx' : 'pdf'}`
+    link.click()
+    URL.revokeObjectURL(url)
+    ElMessage.success(`${format.toUpperCase()} 报表已导出`)
   } catch (error: any) {
     ElMessage.error(error.message || '导出失败')
   }
+}
+
+const getReportParams = () => {
+  if (queryForm.value.report_type === 'monthly') {
+    const [year, month] = queryForm.value.month.split('-').map(Number)
+    return { report_type: 'monthly', year, month }
+  }
+  return { report_type: 'yearly', year: Number(queryForm.value.year) }
 }
 
 const initCharts = () => {
@@ -352,7 +324,8 @@ const initCharts = () => {
         data: [
           { value: reportData.value.period_stats.peak_to_valley, name: '峰转谷' },
           { value: reportData.value.period_stats.valley_to_peak, name: '谷转峰' },
-          { value: reportData.value.period_stats.peak_to_flat, name: '峰转平' }
+          { value: reportData.value.period_stats.peak_to_flat, name: '峰转平' },
+          { value: reportData.value.period_stats.other || 0, name: '其他' }
         ],
         emphasis: {
           itemStyle: {
@@ -366,20 +339,44 @@ const initCharts = () => {
   }
 }
 
+const disposeCharts = () => {
+  costChartInstance.value?.dispose()
+  energyChartInstance.value?.dispose()
+  executionPieInstance.value?.dispose()
+  periodPieInstance.value?.dispose()
+  costChartInstance.value = undefined
+  energyChartInstance.value = undefined
+  executionPieInstance.value = undefined
+  periodPieInstance.value = undefined
+}
+
 onMounted(() => {
   handleQuery()
 })
 
 onUnmounted(() => {
-  if (costChartInstance.value) costChartInstance.value.dispose()
-  if (energyChartInstance.value) energyChartInstance.value.dispose()
-  if (executionPieInstance.value) executionPieInstance.value.dispose()
-  if (periodPieInstance.value) periodPieInstance.value.dispose()
+  disposeCharts()
 })
 </script>
 
 <style scoped lang="scss">
 .shift-reports {
   padding: 20px;
+
+  .success-rate-card {
+    height: 100%;
+  }
+
+  .empty-stat-title {
+    color: var(--el-text-color-regular);
+    font-size: 14px;
+    line-height: 22px;
+  }
+
+  .empty-stat-value {
+    margin-top: 6px;
+    font-size: 28px;
+    line-height: 38px;
+  }
 }
 </style>

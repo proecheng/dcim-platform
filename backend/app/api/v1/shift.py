@@ -5,6 +5,7 @@ Load Shift API - 负荷转移 API
 from typing import List, Optional, Dict, Any
 from datetime import date, time, datetime
 from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 
@@ -954,10 +955,13 @@ async def get_shift_report(
     return {"data": report_data}
 
 
-@router.post("/reports/export", response_model=Dict[str, Any])
+@router.post("/reports/export")
 async def export_shift_report(
-    report_data: Dict[str, Any],
+    report_type: str = Query(..., pattern="^(monthly|yearly)$"),
+    year: int = Query(..., ge=2020, le=2100),
+    month: Optional[int] = Query(None, ge=1, le=12),
     format: str = Query(..., pattern="^(excel|pdf)$"),
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     """
@@ -966,12 +970,28 @@ async def export_shift_report(
     """
     from app.services.load_shift.shift_report_service import ShiftReportService
 
-    if format == "excel":
-        file_path = await ShiftReportService.export_report_excel(report_data)
+    if report_type == "monthly":
+        if month is None:
+            raise HTTPException(status_code=400, detail="Month is required for monthly report")
+        report_data = await ShiftReportService.generate_monthly_report(db, year, month)
     else:
-        file_path = await ShiftReportService.export_report_pdf(report_data)
+        report_data = await ShiftReportService.generate_yearly_report(db, year)
 
-    return {"data": {"download_url": file_path}}
+    if format == "excel":
+        stream = ShiftReportService.export_report_excel(report_data)
+        media_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        extension = "xlsx"
+    else:
+        stream = ShiftReportService.export_report_pdf(report_data)
+        media_type = "application/pdf"
+        extension = "pdf"
+
+    period = f"{year}-{month:02d}" if month is not None and report_type == "monthly" else str(year)
+    return StreamingResponse(
+        stream,
+        media_type=media_type,
+        headers={"Content-Disposition": f'attachment; filename="shift-report-{period}.{extension}"'},
+    )
 
 
 # ========== 约束管理端点 ==========

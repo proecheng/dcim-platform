@@ -359,7 +359,7 @@ async function handleExecuteOpportunity(item: any) {
   }
 }
 
-function gotoCenter() { router.push('/energy/analysis') }
+function gotoCenter() { router.push('/energy/suggestions') }
 function goToExecution(item: EnergySuggestion) {
   router.push({
     path: '/energy/execution',

@@ -218,7 +218,10 @@ const canPreview = () => {
 }
 
 const runConstraintPreview = async () => {
-  if (!canPreview()) return
+  if (!canPreview()) {
+    ElMessage.warning('请先填写转移日期、时段和目标功率')
+    return
+  }
   previewLoading.value = true
   try {
     const res = await checkConstraints({
@@ -228,7 +231,7 @@ const runConstraintPreview = async () => {
       target_shift_power: form.target_shift_power,
       selected_devices: form.selected_devices,
     })
-    constraintPreview.value = res?.data || null
+    constraintPreview.value = res || null
   } catch (error: any) {
     constraintPreview.value = null
     ElMessage.warning(error.message || '约束预检失败')
@@ -302,7 +305,7 @@ const handleAnalyze = async () => {
       target_shift_power: form.target_shift_power,
       selected_devices: form.selected_devices,
     })
-    analysisResult.value = res.data
+    analysisResult.value = res
     analysisResultVisible.value = true
   } catch (error: any) {
     ElMessage.error(error.message || '分析失败')

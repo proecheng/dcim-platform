@@ -84,7 +84,7 @@
           <el-col :span="8">
             <el-statistic
               title="预计月节省"
-              :value="(suggestion.potential_cost_saving || 0) / 12"
+              :value="suggestion.potential_cost_saving || 0"
               :precision="0"
             >
               <template #suffix>元</template>
@@ -93,7 +93,7 @@
           <el-col :span="8">
             <el-statistic
               title="预计年节省"
-              :value="(suggestion.potential_cost_saving || 0) / 10000"
+              :value="((suggestion.potential_cost_saving || 0) * 12) / 10000"
               :precision="2"
             >
               <template #suffix>万元</template>

@@ -163,7 +163,7 @@ class DeviceHealthScoreCalculator:
 
         return score, health_level, score_factors
 
-    async def calculate_all_health_scores(self) -> int:
+    async def calculate_all_health_scores(self, device_ids: list[int] | None = None) -> int:
         """全量设备批量计算健康度评分
 
         Returns:
@@ -171,7 +171,10 @@ class DeviceHealthScoreCalculator:
         """
         # 1. 查询所有支持的设备
         supported_types = list(DEVICE_TYPE_MAP.keys())
-        result = await self.db.execute(select(Device).where(Device.device_type.in_(supported_types)))
+        query = select(Device).where(Device.device_type.in_(supported_types))
+        if device_ids is not None:
+            query = query.where(Device.id.in_(device_ids))
+        result = await self.db.execute(query)
         devices = result.scalars().all()
         if not devices:
             return 0
@@ -237,7 +240,7 @@ class DeviceHealthScoreCalculator:
                     degradation_score=dr.score,
                 )
 
-                if score <= 40:
+                if score < 60:
                     logger.warning(
                         "设备健康度预警: device_id=%d, name=%s, score=%.1f, level=%s",
                         device.id,
@@ -247,8 +250,6 @@ class DeviceHealthScoreCalculator:
                     )
                     await advisor.evaluate(device, score, dr, plugin_key)
                 elif score >= 60:
-                    # 设计意图：41-59 分（"关注"/"预警"区间）不触发也不关闭建议
-                    # pending 建议在此区间保持，等待人工判断或恢复到≥60 自动关闭
                     auto_close_ids.append(device.id)
 
                 count += 1

@@ -49,6 +49,12 @@ export interface LoginHistory {
   fail_reason?: string
 }
 
+export interface UserSiteInfo {
+  site_id: number
+  site_code: string
+  site_name: string
+}
+
 /**
  * 获取用户列表
  */
@@ -114,4 +120,14 @@ export function getLoginHistory(id: number, params?: PageParams): Promise<PageRe
  */
 export function batchDeleteUsers(userIds: number[]): Promise<{ message: string; deleted_count: number }> {
   return request.post('/v1/users/batch-delete', userIds)
+}
+
+/** 获取用户可访问的站点 */
+export function getUserSites(userId: number): Promise<UserSiteInfo[]> {
+  return request.get(`/v1/users/${userId}/sites`)
+}
+
+/** 全量更新用户可访问的站点 */
+export function updateUserSites(userId: number, siteIds: number[]): Promise<{ message: string }> {
+  return request.put(`/v1/users/${userId}/sites`, { site_ids: siteIds })
 }

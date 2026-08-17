@@ -46,6 +46,11 @@ export interface ForecastResult {
   forecasts: ForecastPoint[]
   statistics: ForecastStatistics
   period_summary: Record<string, PeriodSummary>
+  data_source?: string
+  data_sufficient?: boolean
+  warning?: string
+  dispatchable_device_count?: number
+  skipped_unmapped_device_count?: number
 }
 
 /** 成本分解 */
@@ -103,6 +108,9 @@ export interface OptimizationResult {
   saving_ratio: number
   forecast_date?: string
   base_load_summary?: ForecastStatistics
+  data_source?: string
+  data_sufficient?: boolean
+  warning?: string
 }
 
 /** 日前调度完整结果 */

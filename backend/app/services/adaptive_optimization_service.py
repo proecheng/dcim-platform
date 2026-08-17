@@ -15,6 +15,7 @@ from decimal import Decimal
 from typing import Dict, Any, Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, desc
+from sqlalchemy.orm import selectinload
 
 from app.models.energy import EnergySavingProposal, RLOptimizationHistory, RLTrainingLog, RLModelState
 
@@ -32,6 +33,8 @@ class AdaptiveOptimizationService:
     4. 管理模型状态和探索率
     """
 
+    _shared_optimizer = None
+
     def __init__(self, db: AsyncSession):
         self.db = db
         self._optimizer = None
@@ -40,15 +43,53 @@ class AdaptiveOptimizationService:
     def _get_optimizer(self):
         """延迟加载 AdaptiveOptimizer"""
         if self._optimizer is None:
-            try:
-                from app.ml_models.rl.agent import AdaptiveOptimizer
-                from app.ml_models.config import MLConfig
+            if AdaptiveOptimizationService._shared_optimizer is None:
+                try:
+                    from app.ml_models.rl.agent import AdaptiveOptimizer
+                    from app.ml_models.config import MLConfig
 
-                self._optimizer = AdaptiveOptimizer(MLConfig())
-                logger.info("AdaptiveOptimizer 初始化成功")
-            except Exception as e:
-                logger.warning(f"AdaptiveOptimizer 初始化失败: {e}")
+                    AdaptiveOptimizationService._shared_optimizer = AdaptiveOptimizer(MLConfig())
+                    logger.info("AdaptiveOptimizer 初始化成功")
+                except Exception as e:
+                    logger.warning(f"AdaptiveOptimizer 初始化失败: {e}")
+            self._optimizer = AdaptiveOptimizationService._shared_optimizer
         return self._optimizer
+
+    async def _ensure_optimizer_state_loaded(self, optimizer) -> None:
+        """Restore persisted runtime state once for the shared optimizer."""
+        if getattr(optimizer, "_persistent_state_loaded", False):
+            return
+
+        stmt = (
+            select(RLModelState)
+            .where(RLModelState.model_name == "adaptive_optimizer")
+            .order_by(desc(RLModelState.updated_at))
+            .limit(1)
+        )
+        result = await self.db.execute(stmt)
+        model_state = result.scalar_one_or_none()
+        training_stats_result = await self.db.execute(
+            select(
+                func.count(RLTrainingLog.id).label("log_count"),
+                func.max(RLTrainingLog.step_count).label("max_step"),
+            )
+        )
+        training_stats = training_stats_result.first()
+        persisted_step = int(model_state.total_steps or 0) if model_state else 0
+        log_count = int(training_stats.log_count or 0) if training_stats else 0
+        max_log_step = int(training_stats.max_step or 0) if training_stats else 0
+
+        if model_state:
+            if model_state.exploration_rate is not None:
+                optimizer._exploration_rate = float(model_state.exploration_rate)
+            if model_state.exploration_phase:
+                optimizer._exploration_phase = model_state.exploration_phase
+            optimizer._recent_achievements = [float(value) for value in (model_state.recent_achievements or [])]
+            optimizer._is_trained = bool(model_state.is_trained)
+
+        optimizer._step_count = max(optimizer._step_count, persisted_step, log_count, max_log_step)
+
+        optimizer._persistent_state_loaded = True
 
     def _get_ml_service(self):
         """延迟加载 MLEnergySavingService"""
@@ -78,9 +119,14 @@ class AdaptiveOptimizationService:
         optimizer = self._get_optimizer()
         if optimizer is None:
             return {"success": False, "error": "RL 优化器不可用"}
+        await self._ensure_optimizer_state_loaded(optimizer)
 
         # 验证方案存在
-        stmt = select(EnergySavingProposal).where(EnergySavingProposal.id == proposal_id)
+        stmt = (
+            select(EnergySavingProposal)
+            .options(selectinload(EnergySavingProposal.measures))
+            .where(EnergySavingProposal.id == proposal_id)
+        )
         result = await self.db.execute(stmt)
         proposal = result.scalar_one_or_none()
         if not proposal:
@@ -156,6 +202,7 @@ class AdaptiveOptimizationService:
         optimizer = self._get_optimizer()
         if optimizer is None:
             return {"success": False, "error": "RL 优化器不可用"}
+        await self._ensure_optimizer_state_loaded(optimizer)
 
         try:
             result = optimizer.train_step(
@@ -250,12 +297,15 @@ class AdaptiveOptimizationService:
         """获取 RL 模型信息"""
         optimizer = self._get_optimizer()
         is_available = optimizer is not None
+        if optimizer is not None:
+            await self._ensure_optimizer_state_loaded(optimizer)
 
         # 从数据库获取持久化状态
         stmt = (
             select(RLModelState)
             .where(RLModelState.model_name == "adaptive_optimizer")
             .order_by(desc(RLModelState.updated_at))
+            .limit(1)
         )
         result = await self.db.execute(stmt)
         model_state = result.scalar_one_or_none()
@@ -283,15 +333,7 @@ class AdaptiveOptimizationService:
             info["state_dim"] = optimizer.env.get_state_dim()
             info["action_spec"] = optimizer.env.get_action_spec()
 
-            # 确定探索阶段
-            if optimizer._step_count < 1000:
-                info["exploration_phase"] = "initial"
-            elif optimizer._exploration_rate <= 0.1:
-                info["exploration_phase"] = "stable"
-            elif optimizer._exploration_rate >= 0.2:
-                info["exploration_phase"] = "fluctuating"
-            else:
-                info["exploration_phase"] = "decaying"
+            info["exploration_phase"] = getattr(optimizer, "_exploration_phase", "initial")
 
         if model_state:
             info["avg_reward"] = float(model_state.avg_reward) if model_state.avg_reward else None
@@ -367,9 +409,12 @@ class AdaptiveOptimizationService:
         optimizer = self._get_optimizer()
         if optimizer is None:
             return {"success": False, "error": "RL 优化器不可用"}
+        await self._ensure_optimizer_state_loaded(optimizer)
 
         old_rate = optimizer._exploration_rate
+        resolved_phase = phase or "manual"
         optimizer._exploration_rate = exploration_rate
+        optimizer._exploration_phase = resolved_phase
 
         # 更新数据库
         await self._update_model_state(
@@ -385,7 +430,7 @@ class AdaptiveOptimizationService:
             "success": True,
             "old_rate": old_rate,
             "new_rate": exploration_rate,
-            "phase": phase or "manual",
+            "phase": resolved_phase,
         }
 
     async def save_checkpoint(self) -> Dict[str, Any]:
@@ -393,6 +438,7 @@ class AdaptiveOptimizationService:
         optimizer = self._get_optimizer()
         if optimizer is None:
             return {"success": False, "error": "RL 优化器不可用"}
+        await self._ensure_optimizer_state_loaded(optimizer)
 
         try:
             optimizer._save_checkpoint()
@@ -460,15 +506,7 @@ class AdaptiveOptimizationService:
             str(round(result.get("exploration_rate", optimizer._exploration_rate), 4))
         )
 
-        # 确定探索阶段
-        if optimizer._step_count < 1000:
-            model_state.exploration_phase = "initial"
-        elif optimizer._exploration_rate <= 0.1:
-            model_state.exploration_phase = "stable"
-        elif optimizer._exploration_rate >= 0.2:
-            model_state.exploration_phase = "fluctuating"
-        else:
-            model_state.exploration_phase = "decaying"
+        model_state.exploration_phase = getattr(optimizer, "_exploration_phase", "initial")
 
         # 更新统计
         achievements = optimizer._recent_achievements
@@ -484,7 +522,12 @@ class AdaptiveOptimizationService:
 
     async def _get_or_create_model_state(self) -> RLModelState:
         """获取或创建模型状态记录"""
-        stmt = select(RLModelState).where(RLModelState.model_name == "adaptive_optimizer")
+        stmt = (
+            select(RLModelState)
+            .where(RLModelState.model_name == "adaptive_optimizer")
+            .order_by(desc(RLModelState.updated_at))
+            .limit(1)
+        )
         result = await self.db.execute(stmt)
         model_state = result.scalar_one_or_none()
 

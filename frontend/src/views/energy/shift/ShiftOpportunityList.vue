@@ -4,10 +4,11 @@
       <el-form :inline="true" :model="filterForm">
         <el-form-item label="状态">
           <el-select v-model="filterForm.status" placeholder="全部状态" clearable style="width: 150px">
-            <el-option label="待处理" value="pending" />
+            <el-option label="待处理" value="discovered" />
+            <el-option label="已查看" value="reviewed" />
+            <el-option label="已接受" value="accepted" />
             <el-option label="已转换" value="converted" />
             <el-option label="已拒绝" value="rejected" />
-            <el-option label="已过期" value="expired" />
           </el-select>
         </el-form-item>
         <el-form-item label="优先级">
@@ -34,7 +35,7 @@
         <el-table-column prop="opportunity_name" label="机会名称" min-width="200" />
         <el-table-column label="转移方向" width="150">
           <template #default="{ row }">
-            {{ row.recommended_shift_from }} → {{ row.recommended_shift_to }}
+            {{ getPeriodLabel(row.recommended_shift_from) }} → {{ getPeriodLabel(row.recommended_shift_to) }}
           </template>
         </el-table-column>
         <el-table-column prop="recommended_shift_power" label="推荐功率(kW)" width="120" align="right">
@@ -78,7 +79,7 @@
               link
               type="success"
               @click="handleConvert(row)"
-              :disabled="row.status !== 'pending'"
+              :disabled="!canConvert(row.status)"
             >
               转为计划
             </el-button>
@@ -274,7 +275,9 @@ const getPriorityLabel = (priority: string) => {
 
 const getStatusType = (status: string): TagType => {
   const map: Record<string, TagType> = {
-    pending: 'info',
+    discovered: 'info',
+    reviewed: 'primary',
+    accepted: 'success',
     converted: 'success',
     rejected: 'danger',
     expired: 'info'
@@ -284,13 +287,26 @@ const getStatusType = (status: string): TagType => {
 
 const getStatusLabel = (status: string) => {
   const map: Record<string, string> = {
-    pending: '待处理',
+    discovered: '待处理',
+    reviewed: '已查看',
+    accepted: '已接受',
     converted: '已转换',
     rejected: '已拒绝',
     expired: '已过期'
   }
   return map[status] || status
 }
+
+const periodLabels: Record<string, string> = {
+  peak: '尖峰',
+  sharp: '高峰',
+  flat: '平段',
+  valley: '谷段'
+}
+
+const getPeriodLabel = (period?: string | null) => periodLabels[period || ''] || period || '--'
+
+const canConvert = (status: string) => ['discovered', 'reviewed', 'accepted'].includes(status)
 </script>
 
 <style scoped lang="scss">

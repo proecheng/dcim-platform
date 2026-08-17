@@ -55,6 +55,10 @@ class EquipmentEfficiencyPlugin(AnalysisPlugin):
             },
         )
 
+    def validate_context(self, context: AnalysisContext) -> bool:
+        """设备效率分析只依赖设备运行观测，不要求能耗日表覆盖。"""
+        return bool(context.device_data or context.power_data)
+
     async def analyze(self, context: AnalysisContext) -> List[SuggestionResult]:
         """执行设备效率分析"""
         results = []
@@ -92,6 +96,8 @@ class EquipmentEfficiencyPlugin(AnalysisPlugin):
                     found = True
                     break
             if not found:
+                if d.current_power <= 0:
+                    continue
                 load_rate = d.current_power / d.rated_power if d.rated_power > 0 else 0
                 devices_with_load.append(
                     {
@@ -295,10 +301,9 @@ class EquipmentEfficiencyPlugin(AnalysisPlugin):
             )
 
         # 分析4: 设备整体健康度评估
-        if devices_with_load:
-            avg_load_rate = statistics.mean(
-                [d.get("load_rate", 0) for d in devices_with_load if d.get("load_rate", 0) > 0]
-            )
+        if devices_with_load and any(d.get("load_rate", 0) > 0 for d in devices_with_load):
+            positive_load_rates = [d.get("load_rate", 0) for d in devices_with_load if d.get("load_rate", 0) > 0]
+            avg_load_rate = statistics.mean(positive_load_rates) if positive_load_rates else 0.0
             optimal_devices = [d for d in devices_with_load if optimal_min <= d.get("load_rate", 0) <= optimal_max]
             optimal_ratio = len(optimal_devices) / len(devices_with_load)
 
