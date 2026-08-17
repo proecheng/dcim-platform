@@ -9,8 +9,12 @@ import sys
 from unittest.mock import AsyncMock
 
 import pytest
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import async_sessionmaker
 
 from app.core.config import ProductionConfigurationError, Settings, parse_cors_origins, validate_production_settings
+from app.core.security import verify_password
+from app.models import User
 from app.seeds import minimal_seed
 
 
@@ -120,6 +124,31 @@ async def test_seed_runner_rejects_direct_call_when_disabled(monkeypatch):
         await minimal_seed.run_minimal_seed()
 
     create_admin.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_seed_creates_login_capable_admin_idempotently(monkeypatch, async_engine):
+    password = "Ci-E2E-Admin-39.2!"
+    settings = Settings(
+        _env_file=None,
+        seed_enabled=True,
+        default_admin_password=password,
+        fault_tree_hmac_key="x" * 32,
+    )
+    session_factory = async_sessionmaker(async_engine, expire_on_commit=False)
+    monkeypatch.setattr(minimal_seed, "settings", settings)
+    monkeypatch.setattr(minimal_seed, "async_session", session_factory)
+
+    await minimal_seed._create_default_admin_user()
+    await minimal_seed._create_default_admin_user()
+
+    async with session_factory() as session:
+        users = (await session.execute(select(User).where(User.username == "admin"))).scalars().all()
+
+    assert len(users) == 1
+    assert users[0].role == "admin"
+    assert users[0].is_active is True
+    assert verify_password(password, users[0].password_hash)
 
 
 def test_production_validation_precedes_database_and_background_side_effects():

@@ -81,7 +81,7 @@ async def _create_default_admin_user():
 
         user = User(
             username="admin",
-            hashed_password=get_password_hash(settings.default_admin_password),
+            password_hash=get_password_hash(settings.default_admin_password),
             role="admin",
             is_active=True,
         )

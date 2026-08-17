@@ -133,6 +133,9 @@ jobs:
     env:
       DATABASE_URL: sqlite+aiosqlite:///./e2e-ci.db
       FAULT_TREE_HMAC_KEY: ci-e2e-fault-tree-hmac-key-at-least-32-characters
+      SEED_ENABLED: "true"
+      DEFAULT_ADMIN_PASSWORD: Ci-E2E-Admin-39.2!
+      E2E_ADMIN_PASSWORD: Ci-E2E-Admin-39.2!
       REDIS_ENABLED: "false"
       DEMO_ENABLED: "false"
       SIMULATION_ENABLED: "false"

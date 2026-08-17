@@ -6,7 +6,7 @@ import { test, expect } from '@playwright/test'
  */
 
 const ADMIN_USER = 'admin'
-const ADMIN_PASS = 'admin123'
+const ADMIN_PASS = process.env.E2E_ADMIN_PASSWORD || 'admin123'
 
 test.describe('认证流程测试', () => {
   // 覆盖 storageState，使用空白认证状态
