@@ -1,0 +1,53 @@
+{
+  "generated_at_utc": "2026-08-17T04:51:47.957338Z",
+  "results": [
+    {
+      "id": "BACKEND-RUFF",
+      "cwd": "backend",
+      "command": "ruff check app gateway tests/test_story_39_2_commands.py tests/test_command.py tests/services/test_device_control.py tests/services/test_execution_service.py tests/test_gateway_registration.py tests/test_story_39_2_production_config.py tests/test_story_39_2_cors.py tests/test_story_39_2_evidence.py",
+      "exit_code": 0,
+      "result": "PASS",
+      "output": "All checks passed!"
+    },
+    {
+      "id": "BACKEND-RUFF-FORMAT",
+      "cwd": "backend",
+      "command": "ruff format --check app gateway tests/test_story_39_2_commands.py tests/test_command.py tests/services/test_device_control.py tests/services/test_execution_service.py tests/test_gateway_registration.py tests/test_story_39_2_production_config.py tests/test_story_39_2_cors.py tests/test_story_39_2_evidence.py",
+      "exit_code": 0,
+      "result": "PASS",
+      "output": "416 files already formatted"
+    },
+    {
+      "id": "BACKEND-COMPILE",
+      "cwd": "backend",
+      "command": "D:\\mytest1\\backend\\.venv\\Scripts\\python.exe -m compileall -q app gateway",
+      "exit_code": 0,
+      "result": "PASS",
+      "output": ""
+    },
+    {
+      "id": "FRONTEND-TYPECHECK",
+      "cwd": "frontend",
+      "command": "npm run typecheck",
+      "exit_code": 0,
+      "result": "PASS",
+      "output": "> dcim-frontend@1.0.0 typecheck\n> vue-tsc --noEmit"
+    },
+    {
+      "id": "FRONTEND-ESLINT",
+      "cwd": "frontend",
+      "command": "npm run lint",
+      "exit_code": 0,
+      "result": "PASS",
+      "output": "> dcim-frontend@1.0.0 lint\n> eslint src/ --ignore-pattern \"src/**/*.d.ts\" --max-warnings=0"
+    },
+    {
+      "id": "EVIDENCE-RUFF",
+      "cwd": ".",
+      "command": "ruff check scripts/story_39_2_evidence.py scripts/story_39_2_governance.py backend/tests/test_story_39_2_evidence.py",
+      "exit_code": 0,
+      "result": "PASS",
+      "output": "All checks passed!"
+    }
+  ]
+}

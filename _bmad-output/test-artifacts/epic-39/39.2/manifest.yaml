@@ -1,0 +1,307 @@
+schema_version: 1
+story:
+  id: '39.2'
+  key: 39-2-command-xss-and-production-credential-hardening
+  title: Command, XSS, and production credential hardening
+changeset:
+  git_sha: d7401a08bf2a17add1a453928585e49201dd88fa
+  baseline_commit: 436a8e778037bf6fcf9140b757e9584e669ad33b
+  working_tree_dirty: true
+  changeset_id: d7401a08bf2a17add1a453928585e49201dd88fa+a763e2edf7a097b512f1c3e2b7f45424cc83dad3e3d10567c75204aaad9bfce4
+  source_snapshot_sha256: a763e2edf7a097b512f1c3e2b7f45424cc83dad3e3d10567c75204aaad9bfce4
+  source_file_count: 222
+environment:
+  id: local-windows-docker-desktop-story-39-2
+  kind: local integration evidence
+  fingerprint_sha256: 4633f194609177a7896d100237257bdf0d9f1bfdcb668dd73bf926f809b7838a
+  topology: local tests plus isolated Docker Nginx artifact and browser
+  production_equivalent: false
+tools:
+  python: Python 3.11.9
+  pytest: pytest 9.0.2
+  ruff: ruff 0.15.12
+  node: v24.12.0
+  npm: 11.6.2
+  playwright: Version 1.58.2
+  docker: Docker version 29.4.0, build 9d7ad9f
+  git: git version 2.52.0.windows.1
+  jsonschema: 4.26.0
+execution:
+  started_at_utc: '2026-08-17T04:47:47.395637Z'
+  ended_at_utc: '2026-08-17T04:52:33.421477Z'
+  operator: proecheng (Codex-assisted)
+  commands:
+  - id: PYTEST-SECURITY
+    cwd: backend
+    command: D:\mytest1\backend\.venv\Scripts\python.exe -m pytest tests/test_story_39_2_commands.py
+      tests/test_command.py tests/services/test_device_control.py tests/services/test_execution_service.py
+      tests/test_gateway_registration.py tests/test_story_39_2_production_config.py
+      tests/test_story_39_2_cors.py tests/test_story_39_2_evidence.py -q --junitxml=D:\mytest1\_bmad-output\test-artifacts\epic-39\39.2\pytest-security.xml
+    result: PASS
+  - id: VITEST-XSS
+    cwd: frontend
+    command: npx vitest --run src/__tests__/api/websocket-auth.test.ts src/components/common/SafeRichText.test.ts
+      src/security/html.test.ts src/security/html-sink-policy.test.ts src/utils/three/labelRenderer.test.ts
+      src/views/diagnosis/Reports.test.ts --reporter=json --outputFile=D:\mytest1\_bmad-output\test-artifacts\epic-39\39.2\vitest-xss-results.json
+    result: PASS
+  - id: PROXY-SECURITY
+    cwd: proxy
+    command: npm test
+    result: PASS
+  - id: BACKEND-CORS-RUNTIME
+    cwd: backend
+    command: D:\mytest1\backend\.venv\Scripts\python.exe -m uvicorn app.main:app --host
+      127.0.0.1 --port 51025 --lifespan off --log-level warning
+    result: PASS
+  - id: FRONTEND-IMAGE
+    cwd: .
+    command: docker build --provenance=false --build-arg VCS_REF=d7401a08bf2a17add1a453928585e49201dd88fa
+      --build-arg STORY_39_2_SOURCE_SNAPSHOT=a763e2edf7a097b512f1c3e2b7f45424cc83dad3e3d10567c75204aaad9bfce4
+      -t dcim-story-39-2-frontend:evidence frontend
+    result: PASS
+  - id: NGINX-BROWSER
+    cwd: .
+    command: npx playwright test --config=e2e/story-39-2.playwright.config.ts --reporter=json
+    result: PASS
+  - id: BACKEND-RUFF
+    cwd: backend
+    command: ruff check app gateway tests/test_story_39_2_commands.py tests/test_command.py
+      tests/services/test_device_control.py tests/services/test_execution_service.py
+      tests/test_gateway_registration.py tests/test_story_39_2_production_config.py
+      tests/test_story_39_2_cors.py tests/test_story_39_2_evidence.py
+    result: PASS
+  - id: BACKEND-RUFF-FORMAT
+    cwd: backend
+    command: ruff format --check app gateway tests/test_story_39_2_commands.py tests/test_command.py
+      tests/services/test_device_control.py tests/services/test_execution_service.py
+      tests/test_gateway_registration.py tests/test_story_39_2_production_config.py
+      tests/test_story_39_2_cors.py tests/test_story_39_2_evidence.py
+    result: PASS
+  - id: BACKEND-COMPILE
+    cwd: backend
+    command: D:\mytest1\backend\.venv\Scripts\python.exe -m compileall -q app gateway
+    result: PASS
+  - id: FRONTEND-TYPECHECK
+    cwd: frontend
+    command: npm run typecheck
+    result: PASS
+  - id: FRONTEND-ESLINT
+    cwd: frontend
+    command: npm run lint
+    result: PASS
+  - id: EVIDENCE-RUFF
+    cwd: .
+    command: ruff check scripts/story_39_2_evidence.py scripts/story_39_2_governance.py
+      backend/tests/test_story_39_2_evidence.py
+    result: PASS
+artifacts:
+- path: _bmad-output/test-artifacts/epic-39/39.2/command-registry-snapshot.json
+  sha256: dfd165dab2be9958a80bd760073407ad6908b61100c06977dcf32143611f0ade
+  size_bytes: 5472
+  media_type: application/json
+  purpose: Runtime command registry and entrypoint drift snapshot
+  acceptance_criteria:
+  - AC1
+  - AC2
+- path: _bmad-output/test-artifacts/epic-39/39.2/pytest-security.xml
+  sha256: 2c25c22a5b19e12afb9689c8419e31fc990d28b5cb562c712aec11ba607c706d
+  size_bytes: 20685
+  media_type: application/xml
+  purpose: Raw backend command, approval, production config, and CORS tests
+  acceptance_criteria:
+  - AC1
+  - AC2
+  - AC4
+  - AC5
+  - AC6
+- path: _bmad-output/test-artifacts/epic-39/39.2/vitest-xss-results.json
+  sha256: b9aa1579f7ef4bac57e3b39051b27ed3687f433f045bb1de0a7f640b263dca97
+  size_bytes: 10621
+  media_type: application/json
+  purpose: Raw frontend sanitizer and HTML sink tests
+  acceptance_criteria:
+  - AC3
+  - AC6
+- path: _bmad-output/test-artifacts/epic-39/39.2/proxy-security-results.json
+  sha256: 46dee1b6302046d5f64539aea126d44f81f7b0f0e69ee07660e7ae905adf0195
+  size_bytes: 1531
+  media_type: application/json
+  purpose: Raw Node proxy CORS and security-header tests
+  acceptance_criteria:
+  - AC5
+  - AC6
+- path: _bmad-output/test-artifacts/epic-39/39.2/backend-cors-runtime-results.json
+  sha256: 0eb46f0eb4bd416296130282b630d1213f1234c8b13460ae3fe0c146ee7fa8a7
+  size_bytes: 1069
+  media_type: application/json
+  purpose: Live Uvicorn CORS response matrix
+  acceptance_criteria:
+  - AC5
+  - AC6
+- path: _bmad-output/test-artifacts/epic-39/39.2/nginx-security-results.json
+  sha256: ad183b4117c2e33570a0606d1c198ff22c761b335afdeefd6f604b520eff536d
+  size_bytes: 3948
+  media_type: application/json
+  purpose: Actual Nginx artifact response matrix
+  acceptance_criteria:
+  - AC5
+  - AC6
+- path: _bmad-output/test-artifacts/epic-39/39.2/nginx-browser-results.json
+  sha256: 64e09556ad8b484ad65c15ec5da5603a12af9a6fb4a9126811fe232a8de1a9f7
+  size_bytes: 2586
+  media_type: application/json
+  purpose: Actual browser load under enforced Nginx CSP
+  acceptance_criteria:
+  - AC3
+  - AC5
+  - AC6
+- path: _bmad-output/test-artifacts/epic-39/39.2/quality-command-results.json
+  sha256: b7c10d3a86043f9b3e6769133c586c9b5acd9659c4d4af377125ac22c3029387
+  size_bytes: 2086
+  media_type: application/json
+  purpose: Static analysis, type checking, and compilation results
+  acceptance_criteria:
+  - AC6
+- path: _bmad-output/test-artifacts/epic-39/39.2/environment-fingerprint.json
+  sha256: e8c125992ddc86c81bbba516cb2d614d4882679cca6a8c7ff990072ce6549988
+  size_bytes: 470
+  media_type: application/json
+  purpose: Sanitized execution environment fingerprint
+  acceptance_criteria:
+  - AC6
+- path: _bmad-output/test-artifacts/epic-39/39.2/source-file-hashes.json
+  sha256: f8154d2cc5441e8a2d98c05e2e6b44fe32bcc604d085f2d90dab5eded5fd888b
+  size_bytes: 42001
+  media_type: application/json
+  purpose: Story implementation source snapshot
+  acceptance_criteria:
+  - AC1
+  - AC2
+  - AC3
+  - AC4
+  - AC5
+  - AC6
+- path: _bmad-output/test-artifacts/epic-39/39.2/manifest.schema.json
+  sha256: a186a36d6a1980eba4f5dbed69f2f364c6928faf40d5e7b379d2402f940f9b9a
+  size_bytes: 6620
+  media_type: application/json
+  purpose: Evidence manifest JSON Schema
+  acceptance_criteria:
+  - AC6
+metrics:
+  command_registry:
+    commands: 7
+    entrypoints: 9
+    validation: PASS
+  pytest:
+    tests: 154
+    failures: 0
+    errors: 0
+    skipped: 0
+  vitest:
+    test_files: 13
+    tests: 30
+    passed: 30
+    failed: 0
+    pending: 0
+    success: true
+  proxy:
+    tests: 5
+    passed: 5
+    failed: 0
+  backend_cors:
+    cases: 3
+    result: PASS
+  nginx:
+    cases: 5
+    result: PASS
+  playwright:
+    expected: 1
+    unexpected: 0
+    skipped: 0
+    flaky: 0
+    duration_ms: 3552.0179999999996
+  quality:
+    commands: 6
+    passed: 6
+  frontend_image:
+    tag: dcim-story-39-2-frontend:evidence
+    id: sha256:4521c8c9d5c3a159823e43b33723b040739eff54bff12682b41b8a65c072cd68
+    git_sha_label: d7401a08bf2a17add1a453928585e49201dd88fa
+    source_snapshot_label: a763e2edf7a097b512f1c3e2b7f45424cc83dad3e3d10567c75204aaad9bfce4
+acceptance_criteria:
+  AC1:
+    result: PASS
+    evidence:
+    - _bmad-output/test-artifacts/epic-39/39.2/command-registry-snapshot.json
+    - _bmad-output/test-artifacts/epic-39/39.2/pytest-security.xml
+    - _bmad-output/test-artifacts/epic-39/39.2/source-file-hashes.json
+  AC2:
+    result: PASS
+    evidence:
+    - _bmad-output/test-artifacts/epic-39/39.2/command-registry-snapshot.json
+    - _bmad-output/test-artifacts/epic-39/39.2/pytest-security.xml
+    - _bmad-output/test-artifacts/epic-39/39.2/source-file-hashes.json
+  AC3:
+    result: PASS
+    evidence:
+    - _bmad-output/test-artifacts/epic-39/39.2/vitest-xss-results.json
+    - _bmad-output/test-artifacts/epic-39/39.2/nginx-browser-results.json
+    - _bmad-output/test-artifacts/epic-39/39.2/source-file-hashes.json
+  AC4:
+    result: PASS
+    evidence:
+    - _bmad-output/test-artifacts/epic-39/39.2/pytest-security.xml
+    - _bmad-output/test-artifacts/epic-39/39.2/source-file-hashes.json
+  AC5:
+    result: PASS
+    evidence:
+    - _bmad-output/test-artifacts/epic-39/39.2/pytest-security.xml
+    - _bmad-output/test-artifacts/epic-39/39.2/proxy-security-results.json
+    - _bmad-output/test-artifacts/epic-39/39.2/backend-cors-runtime-results.json
+    - _bmad-output/test-artifacts/epic-39/39.2/nginx-security-results.json
+    - _bmad-output/test-artifacts/epic-39/39.2/nginx-browser-results.json
+    - _bmad-output/test-artifacts/epic-39/39.2/source-file-hashes.json
+  AC6:
+    result: PASS
+    evidence:
+    - _bmad-output/test-artifacts/epic-39/39.2/pytest-security.xml
+    - _bmad-output/test-artifacts/epic-39/39.2/vitest-xss-results.json
+    - _bmad-output/test-artifacts/epic-39/39.2/proxy-security-results.json
+    - _bmad-output/test-artifacts/epic-39/39.2/backend-cors-runtime-results.json
+    - _bmad-output/test-artifacts/epic-39/39.2/nginx-security-results.json
+    - _bmad-output/test-artifacts/epic-39/39.2/nginx-browser-results.json
+    - _bmad-output/test-artifacts/epic-39/39.2/quality-command-results.json
+    - _bmad-output/test-artifacts/epic-39/39.2/environment-fingerprint.json
+    - _bmad-output/test-artifacts/epic-39/39.2/source-file-hashes.json
+    - _bmad-output/test-artifacts/epic-39/39.2/manifest.schema.json
+limitations:
+- Validation used a local Docker Desktop topology with a stub API upstream; it is
+  not a production deployment.
+- Production credential custody, rotation, TLS, and encryption at rest remain in Story
+  39.9.
+exceptions: []
+decisions:
+- Unknown commands and protected-command self-approval are non-waivable.
+- Story 39.2 completion does not authorize production deployment or unblock Epic 39.
+ownership:
+  maintainer: proecheng
+governance:
+  mode: single-maintainer
+  maintainer: proecheng
+  independent_approval_required: false
+  decision: VERIFIED
+  decided_at_utc: '2026-08-17T04:52:33.421477Z'
+  basis:
+  - All Story 39.2 acceptance criteria are evaluated from machine-readable evidence.
+  - The manifest, artifact hashes, runtime registry, source snapshot, tests, and actual
+    Nginx responses pass validation.
+story_gate:
+  status: PASS
+  blockers: []
+epic_production_gate:
+  status: BLOCKED
+  blockers:
+  - Epic 39 Stories 39.3 through 39.12 and the refreshed NFR assessment are incomplete.
+  - Production-equivalent deployment, field UAT, and operational approval remain outside
+    Story 39.2.

@@ -1,0 +1,19 @@
+{
+  "validated_at_utc": "2026-08-17T04:55:09.685731Z",
+  "validator": "scripts/story_39_2_evidence.py",
+  "trusted_schema_sha256": "a186a36d6a1980eba4f5dbed69f2f364c6928faf40d5e7b379d2402f940f9b9a",
+  "manifest_sha256": "f71610d10c108bc302d9563e56ca2d9b33b7f16a27b27c176e8a9073168011da",
+  "source_snapshot_sha256": "a763e2edf7a097b512f1c3e2b7f45424cc83dad3e3d10567c75204aaad9bfce4",
+  "artifact_count": 11,
+  "acceptance_criteria": {
+    "AC1": "PASS",
+    "AC2": "PASS",
+    "AC3": "PASS",
+    "AC4": "PASS",
+    "AC5": "PASS",
+    "AC6": "PASS"
+  },
+  "story_gate": "PASS",
+  "epic_production_gate": "BLOCKED",
+  "result": "PASS"
+}

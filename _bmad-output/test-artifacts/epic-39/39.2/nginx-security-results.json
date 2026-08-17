@@ -1,0 +1,78 @@
+{
+  "generated_at_utc": "2026-08-17T04:51:38.261206Z",
+  "image": {
+    "tag": "dcim-story-39-2-frontend:evidence",
+    "id": "sha256:4521c8c9d5c3a159823e43b33723b040739eff54bff12682b41b8a65c072cd68",
+    "git_sha_label": "d7401a08bf2a17add1a453928585e49201dd88fa",
+    "source_snapshot_label": "a763e2edf7a097b512f1c3e2b7f45424cc83dad3e3d10567c75204aaad9bfce4"
+  },
+  "asset_path": "/assets/index-o7lw856m.js",
+  "cases": {
+    "root": {
+      "status": 200,
+      "headers": {
+        "content-security-policy": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' ws: wss:; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'",
+        "x-content-type-options": "nosniff",
+        "x-frame-options": "DENY",
+        "referrer-policy": "strict-origin-when-cross-origin",
+        "permissions-policy": "camera=(), microphone=(), geolocation=(), payment=(), usb=()",
+        "cache-control": "",
+        "content-type": "text/html"
+      },
+      "security_headers": "PASS"
+    },
+    "asset": {
+      "status": 200,
+      "headers": {
+        "content-security-policy": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' ws: wss:; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'",
+        "x-content-type-options": "nosniff",
+        "x-frame-options": "DENY",
+        "referrer-policy": "strict-origin-when-cross-origin",
+        "permissions-policy": "camera=(), microphone=(), geolocation=(), payment=(), usb=()",
+        "cache-control": "public, immutable",
+        "content-type": "application/javascript"
+      },
+      "security_headers": "PASS"
+    },
+    "spa_fallback": {
+      "status": 200,
+      "headers": {
+        "content-security-policy": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' ws: wss:; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'",
+        "x-content-type-options": "nosniff",
+        "x-frame-options": "DENY",
+        "referrer-policy": "strict-origin-when-cross-origin",
+        "permissions-policy": "camera=(), microphone=(), geolocation=(), payment=(), usb=()",
+        "cache-control": "",
+        "content-type": "text/html"
+      },
+      "security_headers": "PASS"
+    },
+    "api_error": {
+      "status": 404,
+      "headers": {
+        "content-security-policy": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' ws: wss:; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'",
+        "x-content-type-options": "nosniff",
+        "x-frame-options": "DENY",
+        "referrer-policy": "strict-origin-when-cross-origin",
+        "permissions-policy": "camera=(), microphone=(), geolocation=(), payment=(), usb=()",
+        "cache-control": "",
+        "content-type": "text/html"
+      },
+      "security_headers": "PASS"
+    },
+    "static_404": {
+      "status": 404,
+      "headers": {
+        "content-security-policy": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' ws: wss:; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'",
+        "x-content-type-options": "nosniff",
+        "x-frame-options": "DENY",
+        "referrer-policy": "strict-origin-when-cross-origin",
+        "permissions-policy": "camera=(), microphone=(), geolocation=(), payment=(), usb=()",
+        "cache-control": "",
+        "content-type": "text/html"
+      },
+      "security_headers": "PASS"
+    }
+  },
+  "result": "PASS"
+}

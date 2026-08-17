@@ -1,0 +1,1121 @@
+{
+  "generated_at_utc": "2026-08-17T04:47:48.191298Z",
+  "scope": "Story 39.2 implementation, tests, deployment configuration, and evidence tooling",
+  "git_sha": "d7401a08bf2a17add1a453928585e49201dd88fa",
+  "baseline_commit": "436a8e778037bf6fcf9140b757e9584e669ad33b",
+  "working_tree_dirty": true,
+  "source_snapshot_sha256": "a763e2edf7a097b512f1c3e2b7f45424cc83dad3e3d10567c75204aaad9bfce4",
+  "file_count": 222,
+  "files": [
+    {
+      "path": ".env.example",
+      "size_bytes": 3979,
+      "sha256": "a498080caa665ec3ba330eac5e4d0c21166c6ca2286a7c4a5062835e032abf15"
+    },
+    {
+      "path": "backend/.env.example",
+      "size_bytes": 4125,
+      "sha256": "3d5a7c86f839f0928e0145d8b0185f377ca7eb0cef009cc4a359bdddbe9ba8ae"
+    },
+    {
+      "path": "backend/app/api/v1/command.py",
+      "size_bytes": 9785,
+      "sha256": "0ad0c731534a971aae929635bf838256831c2d1fad86410fd19dcdb7e1a09722"
+    },
+    {
+      "path": "backend/app/api/v1/energy.py",
+      "size_bytes": 159727,
+      "sha256": "6017925a055a4207e6163af19f6b374c838c77d17c14ca01ca60c9888d499868"
+    },
+    {
+      "path": "backend/app/api/v1/optimization.py",
+      "size_bytes": 24022,
+      "sha256": "acff2d3a58105e295e8ac69efbbc0579ece73be61dbfbc71f177641b25fba49c"
+    },
+    {
+      "path": "backend/app/api/v1/proposal.py",
+      "size_bytes": 60794,
+      "sha256": "fb51ee38ce4f6ad7079d4c0b210b101463a389d82e217b06d39bc98b34673cb7"
+    },
+    {
+      "path": "backend/app/api/v1/regulation.py",
+      "size_bytes": 4750,
+      "sha256": "b6143f1b14c44fc51fb1c7b42b3a69311e77087b176232073b8dff44c998ca42"
+    },
+    {
+      "path": "backend/app/api/v1/report.py",
+      "size_bytes": 45409,
+      "sha256": "1708dca69f787baadc88df68cce2c29c248fdbaa253f443fd8818e8c6058da8d"
+    },
+    {
+      "path": "backend/app/api/v1/shift.py",
+      "size_bytes": 35375,
+      "sha256": "ceedfee4dc3e31854181e6d4ba7ba0d06fdee56cf6ddc3247062087dfb045e5a"
+    },
+    {
+      "path": "backend/app/api/v1/threshold.py",
+      "size_bytes": 14699,
+      "sha256": "ad1e1dcdd70ee0553833e3c2f810a2a1b13907896412e4aee8ff9bc6eae6263b"
+    },
+    {
+      "path": "backend/app/api/v1/topology_config.py",
+      "size_bytes": 55121,
+      "sha256": "9f02af4e419dcfa4becf46502f66cc2a1be79d0f418dcc7a87cb7dbe392d9604"
+    },
+    {
+      "path": "backend/app/core/config.py",
+      "size_bytes": 12180,
+      "sha256": "9d9166a63676ac1be20c951677a1cba65a23fa2a83dc5f675a6205f848f07afe"
+    },
+    {
+      "path": "backend/app/core/database.py",
+      "size_bytes": 5365,
+      "sha256": "f8a354878e8383db312387dcdbd815d07d0efb7ab095582784e6f9e151b79179"
+    },
+    {
+      "path": "backend/app/demo/engine.py",
+      "size_bytes": 10720,
+      "sha256": "150bbb67fff16b7426898303e064489a5d263ff71ec7676ace2f759227cc7fa7"
+    },
+    {
+      "path": "backend/app/main.py",
+      "size_bytes": 62085,
+      "sha256": "ac868e1366e9ba91b876339dc470c49389284c438c318fd1fb4f4b46bd134a64"
+    },
+    {
+      "path": "backend/app/ml_models/rl/actor_critic.py",
+      "size_bytes": 8030,
+      "sha256": "6c18139b135fe6c8029ddf13147894a0f57cfacf4b9b22b6a20f3f6868f65f2d"
+    },
+    {
+      "path": "backend/app/ml_models/rl/agent.py",
+      "size_bytes": 10859,
+      "sha256": "db644c3b7782468c4279fbc23181b2836e1ccbc78f67e1b14424f1480133f9bf"
+    },
+    {
+      "path": "backend/app/ml_models/rl/environment.py",
+      "size_bytes": 8020,
+      "sha256": "6e5c0a251f36b3664b2482d6dcce1dd384c3bd041e71e58b991961ebd6ebe789"
+    },
+    {
+      "path": "backend/app/ml_models/rl/ppo.py",
+      "size_bytes": 8176,
+      "sha256": "d7d96e4278775f9155f0011910f3b759b0e368b2c74dfed4cd83361ff3e19d13"
+    },
+    {
+      "path": "backend/app/models/energy.py",
+      "size_bytes": 68918,
+      "sha256": "7016cecaa3bfe3a1da7ffd818b2ecdead3495c860c968513d56aefe584e74a93"
+    },
+    {
+      "path": "backend/app/schemas/energy.py",
+      "size_bytes": 76532,
+      "sha256": "fe74d909e8fe0a9505dcca4277877c9ecfeeebaa5b8a7f4128c95b84078f2f4f"
+    },
+    {
+      "path": "backend/app/schemas/proposal_schema.py",
+      "size_bytes": 11492,
+      "sha256": "cf955725f0fdd11e358aaf9283fe0d76ebf3326186491fd45a43c2d85613094a"
+    },
+    {
+      "path": "backend/app/seeds/minimal_seed.py",
+      "size_bytes": 8432,
+      "sha256": "30839aec475a0e87f85b2d5aef77ebcd959253d4dc1baacaefba109f47de1a21"
+    },
+    {
+      "path": "backend/app/services/adaptive_optimization_service.py",
+      "size_bytes": 21520,
+      "sha256": "7b4201deca258f6eaace35dbbf260c99a3476681c97cfa6a1522ff4910ba5ed3"
+    },
+    {
+      "path": "backend/app/services/analysis_plugins/equipment_efficiency.py",
+      "size_bytes": 14037,
+      "sha256": "c8c15a4c60caad4965a24bcea3bcdb52b47c8176525a600e8039bf305f9b89e3"
+    },
+    {
+      "path": "backend/app/services/analysis_plugins/manager.py",
+      "size_bytes": 21381,
+      "sha256": "d1d8f0c5bee7040359b5d6202ab6afc1cd06bb2ec2c44da542792da0d1b0ebc0"
+    },
+    {
+      "path": "backend/app/services/analysis_plugins/power_factor.py",
+      "size_bytes": 9221,
+      "sha256": "0a396a3f19a43027cc036dc76f92c3a6be9f37dadd828e7f246d4490ee8e8a78"
+    },
+    {
+      "path": "backend/app/services/command_registry.py",
+      "size_bytes": 5206,
+      "sha256": "ed7d88368c4d79884cec77869ebdd0620938632e8ae4f3151e6a908ca153e898"
+    },
+    {
+      "path": "backend/app/services/command_service.py",
+      "size_bytes": 18220,
+      "sha256": "f7a684733da30ef67eb77e0a297253503b835aed3f0ed401c9727e8e0169fb35"
+    },
+    {
+      "path": "backend/app/services/device_control_service.py",
+      "size_bytes": 17063,
+      "sha256": "3e843ae50b33e0f379112220e152d73c85954b286ab344867acf31ee06354538"
+    },
+    {
+      "path": "backend/app/services/drift_detection.py",
+      "size_bytes": 10050,
+      "sha256": "7711026c114b62db71c75d0da0d6ce48494ee722c5f1be6adb2e3b952259de86"
+    },
+    {
+      "path": "backend/app/services/effect_monitoring_service.py",
+      "size_bytes": 17304,
+      "sha256": "a60b602f0fe3c978b15903776a5bd4aabf0ca8a85636ccccc175716911735049"
+    },
+    {
+      "path": "backend/app/services/execution_service.py",
+      "size_bytes": 27384,
+      "sha256": "77e785c9470ce6670799ac09b3185a25b1dfae47f6f6c67a2d5a9cc0a676180a"
+    },
+    {
+      "path": "backend/app/services/feedback_learning.py",
+      "size_bytes": 12560,
+      "sha256": "4637f0fb70660232a0ad295f992878126d5a12737228f7f4efb730ec4bd95900"
+    },
+    {
+      "path": "backend/app/services/forecasting.py",
+      "size_bytes": 10409,
+      "sha256": "12c8db6963c090243e6c54e3174d1af4dbb90c6efb23bf69f66f951cc454ac50"
+    },
+    {
+      "path": "backend/app/services/ingest_pipeline.py",
+      "size_bytes": 27420,
+      "sha256": "7c6a2cd127cf85231767097f3838a30f4e7c4e4ad2617ceb46c37630eefc7df3"
+    },
+    {
+      "path": "backend/app/services/load_regulation.py",
+      "size_bytes": 24165,
+      "sha256": "f6c05e993f31b8de7eadaf2348258fa72f79b61ce1bf843fcccd19660140bf8e"
+    },
+    {
+      "path": "backend/app/services/load_shift/algorithms/benefit_calculator.py",
+      "size_bytes": 11916,
+      "sha256": "4ef84bb821f7237793c9d762b736c4a7beddbb21784eeb6885a3a7af60004594"
+    },
+    {
+      "path": "backend/app/services/load_shift/cooling_linkage_service.py",
+      "size_bytes": 13608,
+      "sha256": "fd38fa0da973e58c4ea0517a3f4d9000a40e7bcedd5d380d6615e92c6e3a14e5"
+    },
+    {
+      "path": "backend/app/services/load_shift/shift_report_service.py",
+      "size_bytes": 15364,
+      "sha256": "e072e56666b4a8efc9630e734febb94b53d2878b733a4a80b3e51442fb4096bf"
+    },
+    {
+      "path": "backend/app/services/optimizer.py",
+      "size_bytes": 24246,
+      "sha256": "3bb54d8654d70a684b92f8f1f341410b15bde7fa9e553f79d465fd3c2e18c66e"
+    },
+    {
+      "path": "backend/app/services/precool/vpp_dispatch.py",
+      "size_bytes": 11832,
+      "sha256": "1172dfa42259f670fb504630703e4e45f2b843e36c43090f679ebda9d648b9e3"
+    },
+    {
+      "path": "backend/app/services/predictive_maintenance/advisor.py",
+      "size_bytes": 9094,
+      "sha256": "4509d5813aecb327b35989f1fdfd839f08c7500165e3e58a08cd47c65b2b690b"
+    },
+    {
+      "path": "backend/app/services/predictive_maintenance/health_calculator.py",
+      "size_bytes": 12494,
+      "sha256": "658d9391308620e3cc1c7821f4af2c4a1156f2703cfa00cfd427d9a58b7a36b9"
+    },
+    {
+      "path": "backend/app/services/vpp_calculator.py",
+      "size_bytes": 26202,
+      "sha256": "4f807269fcbe24b1b43407a59008d2557f03993c840591867014f4bf16a23f82"
+    },
+    {
+      "path": "backend/app/services/websocket.py",
+      "size_bytes": 21276,
+      "sha256": "1d0d4d7a562d67e63302d4c4d684b291bf5370c96b32e60fe424b55886eb40b9"
+    },
+    {
+      "path": "backend/authz_inventory.yaml",
+      "size_bytes": 298765,
+      "sha256": "9543e8d3c360606747178018f683e78ac548739f61df351388a94b13db931ee6"
+    },
+    {
+      "path": "backend/gateway/status_reporter.py",
+      "size_bytes": 4704,
+      "sha256": "660db49add35f77e9f85425ff62515bbf813bc305a44016fac3503b6b75efc20"
+    },
+    {
+      "path": "backend/tests/api/test_demand_algorithm_data_sufficiency.py",
+      "size_bytes": 1972,
+      "sha256": "57dd113fad16df228024a4bcdf70cc9f51562a268541c10fcd04ccfc7e88563b"
+    },
+    {
+      "path": "backend/tests/api/test_energy_history_demand_power_cooling_coverage.py",
+      "size_bytes": 26804,
+      "sha256": "162469400da1a656615465d1360d0f85074ba4919b04a27ca0fd24757072caf6"
+    },
+    {
+      "path": "backend/tests/api/test_energy_ocr.py",
+      "size_bytes": 3725,
+      "sha256": "fa1330c06fdf9c58391ef9eff9678c10fafd33e4ef5f73270cab6d02e182a31a"
+    },
+    {
+      "path": "backend/tests/api/test_energy_suggestion_recalculate.py",
+      "size_bytes": 1062,
+      "sha256": "4012c4dd66310ac781cf254abcf53ec3b1e053692823aae4246fdf4cefa39b44"
+    },
+    {
+      "path": "backend/tests/api/test_proposal_algorithm_awaits.py",
+      "size_bytes": 10894,
+      "sha256": "f92e753a77f1892b653b1f8ad0f5485789614829db1f86d6658a9595da3e3933"
+    },
+    {
+      "path": "backend/tests/api/test_proposal_shift_effects.py",
+      "size_bytes": 781,
+      "sha256": "fb02f326013dcf01af23a6b85d42509cf0fe276a21c6fc61f995ef29eea44237"
+    },
+    {
+      "path": "backend/tests/demo/test_engine.py",
+      "size_bytes": 4905,
+      "sha256": "6f57e8600713cc39de00393183a0a342572e97d8949ae280b55b998dc3b6c1d1"
+    },
+    {
+      "path": "backend/tests/demo/test_ingest_pipeline.py",
+      "size_bytes": 5347,
+      "sha256": "da3b68a68a076177f48cde325d223c84562d77db8a70947f75c3e93c6ff2b520"
+    },
+    {
+      "path": "backend/tests/services/precool/test_vpp_dispatch.py",
+      "size_bytes": 19548,
+      "sha256": "996e30d8c7defaa00408139fb230c2a2448174c645ae23de68d86839ffdad3ef"
+    },
+    {
+      "path": "backend/tests/services/test_adaptive_optimization.py",
+      "size_bytes": 9697,
+      "sha256": "6c2562de500960fb58532b86b0195a3fa9cf7eb5faf5507316964c6e35fc47ce"
+    },
+    {
+      "path": "backend/tests/services/test_analysis_plugin_edge_cases.py",
+      "size_bytes": 1675,
+      "sha256": "e4cf59e09b5f26ce511c70e66f2b28153fa3b900f2fc1283dcbdf9bc606092a7"
+    },
+    {
+      "path": "backend/tests/services/test_cooling_linkage_data_sufficiency.py",
+      "size_bytes": 567,
+      "sha256": "57d602fbbddc8f01b003328a5261a97d2eacdfe7b08e39640b6ed3d254bb3be1"
+    },
+    {
+      "path": "backend/tests/services/test_day_ahead_optimization_integrity.py",
+      "size_bytes": 1815,
+      "sha256": "1ee89ce8d2bca7661516ec52654f0aeac1a19689bad9fbf07c5fcbedee779a5a"
+    },
+    {
+      "path": "backend/tests/services/test_device_control.py",
+      "size_bytes": 9720,
+      "sha256": "9a68700aa2ab35f423bbb7a84fb6265cd38dcec3072f61b56a4d1b33bf284004"
+    },
+    {
+      "path": "backend/tests/services/test_drift_detection_consistency.py",
+      "size_bytes": 540,
+      "sha256": "45fba8b8f66a298ce18eab7bef988d22a9bf9ff3145d65c127d42fa5bc243b9c"
+    },
+    {
+      "path": "backend/tests/services/test_execution_service.py",
+      "size_bytes": 9061,
+      "sha256": "11d567b8206b1882de98813d71eff8b8c57d5f4cb8f575ac37dcd8bec3fc3580"
+    },
+    {
+      "path": "backend/tests/services/test_load_regulation_algorithm.py",
+      "size_bytes": 5049,
+      "sha256": "e788187aee55b34b4681ba76b4a4a44f2aa96b84577d838cee4ee643ff7cc45b"
+    },
+    {
+      "path": "backend/tests/services/test_load_shift_benefit_calculator.py",
+      "size_bytes": 1172,
+      "sha256": "f665eb70b1316c1e7456702122b24b0991475ed9896c7bbf2221838f4dd0836f"
+    },
+    {
+      "path": "backend/tests/services/test_maintenance_advisor.py",
+      "size_bytes": 23364,
+      "sha256": "7b073099f0d601f994fd113bf1890e8dd63af4068570632561b36d71fdbfb9b3"
+    },
+    {
+      "path": "backend/tests/services/test_ocr_service.py",
+      "size_bytes": 7779,
+      "sha256": "dbd23f3a85110e7e029e136751751ecf65b9fe69447e62b300b1d078838be29b"
+    },
+    {
+      "path": "backend/tests/services/test_rl_algorithm_execution.py",
+      "size_bytes": 2659,
+      "sha256": "098de4f8bfa7621cfafbe446d05c10e41eb985a34d7cc83565a4bb4c51cb1fb1"
+    },
+    {
+      "path": "backend/tests/services/test_shift_report_integrity.py",
+      "size_bytes": 2357,
+      "sha256": "22063f079d8a37a22c5d357bd91e8fc4a6c2923ef46e855a0eb1ea3606ea68fd"
+    },
+    {
+      "path": "backend/tests/services/test_vpp_calculator_data_sufficiency.py",
+      "size_bytes": 3123,
+      "sha256": "74a394cd8a52a3484e110f3ebdc7a4e431a0c0ffae6df0e3a94c757e6be0b7b9"
+    },
+    {
+      "path": "backend/tests/test_bacnet_ip_adapter.py",
+      "size_bytes": 28699,
+      "sha256": "7a95b625771d6bab1bf1a70dc4ed51623efb2cc45e8eeca1d144def8a595a6c5"
+    },
+    {
+      "path": "backend/tests/test_cabinet_usage.py",
+      "size_bytes": 7418,
+      "sha256": "a54bfe6f38b5a5366acc0457b88755bc063b4b1394c10018820e07fbe951b5ba"
+    },
+    {
+      "path": "backend/tests/test_command.py",
+      "size_bytes": 21042,
+      "sha256": "cb283db3577a6948ac1e51fd96cde1597f0194f0d6c58bca6ea6c963ef6bd368"
+    },
+    {
+      "path": "backend/tests/test_communication_monitor.py",
+      "size_bytes": 7371,
+      "sha256": "e4a9f3bd5fd144b1041dc7fb680e994cecdb07ccec8c65b9edc67acab10f3aec"
+    },
+    {
+      "path": "backend/tests/test_config_push.py",
+      "size_bytes": 13980,
+      "sha256": "841e9630d38d59a5edf4917c77c12edc4a65a049bc76a50d16cb002feaf623c1"
+    },
+    {
+      "path": "backend/tests/test_connection_test.py",
+      "size_bytes": 19520,
+      "sha256": "565b2ed35acca615a2851c41213cac34015e82bd3c045786494932c348c48c62"
+    },
+    {
+      "path": "backend/tests/test_device_status_board.py",
+      "size_bytes": 7004,
+      "sha256": "ef44cf2d831811831d7493c7bf347e0b1b760349d3c179ba7c4471d701fe6488"
+    },
+    {
+      "path": "backend/tests/test_dry_contact.py",
+      "size_bytes": 18225,
+      "sha256": "be6181b94ba10b16666b32f0588945be77ff65728e900fac9294ff8954d7e027"
+    },
+    {
+      "path": "backend/tests/test_gateway.py",
+      "size_bytes": 25814,
+      "sha256": "f3f1b15faf101f502e6becc3ebc9109e561ceca7246fe95ae1f0028a99bcef90"
+    },
+    {
+      "path": "backend/tests/test_gateway_api.py",
+      "size_bytes": 8838,
+      "sha256": "904e67c2195c7c7c2ba07aee71de7e0e366dcd5591337d2cd41b29f53b1573f8"
+    },
+    {
+      "path": "backend/tests/test_gateway_registration.py",
+      "size_bytes": 10840,
+      "sha256": "d67cb614f96e51c05026d2cb80aec76624de3010a12cd2b4408c71aa7667676a"
+    },
+    {
+      "path": "backend/tests/test_http_rest_adapter.py",
+      "size_bytes": 23887,
+      "sha256": "07ec9e42fc715b482c86c10f64751d8a345e4b4046ec0cb41c39c775282d5685"
+    },
+    {
+      "path": "backend/tests/test_mqtt_adapter.py",
+      "size_bytes": 15218,
+      "sha256": "17dae3c238959bed85cba97062b15b34b1358622ac623c5c3a497e041c83b20e"
+    },
+    {
+      "path": "backend/tests/test_opc_ua_adapter.py",
+      "size_bytes": 27808,
+      "sha256": "c714f5e3387538b3193d2caff8178bb38662815531a60a95f8cdeda2bdd765d5"
+    },
+    {
+      "path": "backend/tests/test_password_policy.py",
+      "size_bytes": 8602,
+      "sha256": "0776e3f3096343ab614446ba97c67f3a0420a35f586a93b80eddd83d2338395f"
+    },
+    {
+      "path": "backend/tests/test_point_import.py",
+      "size_bytes": 12021,
+      "sha256": "d923d78012276f445cd2d826882ebadec9a34bf27e1cee54ca9cda6c2129cedf"
+    },
+    {
+      "path": "backend/tests/test_report_auto.py",
+      "size_bytes": 15728,
+      "sha256": "effdcae3a49a85a28eb0d9d5a6f188619d8402f2ce8f160af42b4cff4fac3080"
+    },
+    {
+      "path": "backend/tests/test_smart_site_selection.py",
+      "size_bytes": 10681,
+      "sha256": "c7c8e98c0fa8c8eb23af75c42cd93f5a65b18fb8199785c8173c3e7941b9cb75"
+    },
+    {
+      "path": "backend/tests/test_story_39_2_commands.py",
+      "size_bytes": 5852,
+      "sha256": "278790466015ca2cd65c01acac66fe6137e32fbf4dc7682429edbcb81494202a"
+    },
+    {
+      "path": "backend/tests/test_story_39_2_cors.py",
+      "size_bytes": 1466,
+      "sha256": "2339867762966ea3611abfbe6113db4cb1bbc5775fb44a9fb86c91ae4b9aa2f9"
+    },
+    {
+      "path": "backend/tests/test_story_39_2_evidence.py",
+      "size_bytes": 12382,
+      "sha256": "fa6b57a4e24878a6972f815c3f7de406d0f72d1c4183876cc6206f0c2de060d7"
+    },
+    {
+      "path": "backend/tests/test_story_39_2_production_config.py",
+      "size_bytes": 8131,
+      "sha256": "54bcd66f03f0be4b8f18214ef69e1f500be078fca73992375b23b3177f441eae"
+    },
+    {
+      "path": "backend/tests/test_story_39_3_backup_jobs.py",
+      "size_bytes": 6197,
+      "sha256": "3a8bd813b61c60e8b8b11f602a15ff5c38cb05cf3e404a0c822805b80c5c5e0d"
+    },
+    {
+      "path": "backend/tests/test_story_39_3_dr_config.py",
+      "size_bytes": 9320,
+      "sha256": "4313d67b063e23fa408d83274209492e8b13cf3d0f9e07e2469a4a69bc3ed1f8"
+    },
+    {
+      "path": "backend/tests/test_story_39_3_failover.py",
+      "size_bytes": 8842,
+      "sha256": "85e7e2ea331a972f6ff6dde6a45db4f274dba6b2f02047abb6d2056b913b39a6"
+    },
+    {
+      "path": "backend/tests/test_story_39_3_migration_rollback.py",
+      "size_bytes": 12644,
+      "sha256": "89ccec922665f8edc6ea2986e26128828f470d59bc0edf8eff9b5f95846e0a09"
+    },
+    {
+      "path": "backend/tests/test_story_39_3_restore_jobs.py",
+      "size_bytes": 8088,
+      "sha256": "71dfc6caeb4ad5cd41856519f4e916181eef9e9cb961ce0cb1ad23ae971c0f93"
+    },
+    {
+      "path": "backend/tests/test_story_39_3_schema_bootstrap.py",
+      "size_bytes": 7988,
+      "sha256": "6e26aa02eaafc3de58ec16aadf6a4c5169d9de61206b213afcdf7856a00cf478"
+    },
+    {
+      "path": "backend/tests/test_websocket_authorization.py",
+      "size_bytes": 21660,
+      "sha256": "db577f752047340692666a9efc7ef1df4a10f47dc920df84ff16c717246f73a9"
+    },
+    {
+      "path": "deploy/nginx/dcim.conf",
+      "size_bytes": 4059,
+      "sha256": "4902cf8a5e883dd3cd382c41502139528ef39ef5a1a3ac6bffeea1c21d974c97"
+    },
+    {
+      "path": "docker-compose.yml",
+      "size_bytes": 5240,
+      "sha256": "9908e9915882c62f199e05bb9e865616659c04e7b615168c19dc41dd48eb6332"
+    },
+    {
+      "path": "e2e/story-39-2-nginx-security.spec.ts",
+      "size_bytes": 1136,
+      "sha256": "f57b3e79c3b8fc6b632118b15eac7542bf72b4763be881893f10fd6d4f80ec06"
+    },
+    {
+      "path": "e2e/story-39-2.playwright.config.ts",
+      "size_bytes": 260,
+      "sha256": "2b422c78c6d32a72ec4ec25129d7890d682f67a9305b617445edfabc2e820210"
+    },
+    {
+      "path": "frontend/Dockerfile",
+      "size_bytes": 912,
+      "sha256": "bf4486c5fef7c2ec4bab2688bb6f4ca64b087ac32c3732ae6fcf5b04e65f4c93"
+    },
+    {
+      "path": "frontend/nginx.conf",
+      "size_bytes": 2511,
+      "sha256": "75791f822a549f942a7d64f1981b262d0f1eefb738629092b8993f3058e2c14b"
+    },
+    {
+      "path": "frontend/package-lock.json",
+      "size_bytes": 237123,
+      "sha256": "4bdd3536f73b041063fddeb230ece2724ca0176c42c646a86e0883525b243cc0"
+    },
+    {
+      "path": "frontend/package.json",
+      "size_bytes": 1638,
+      "sha256": "1d0e644d797e9c8126792cb8bed2307188935fd67232e86b43b42cdd37d6aeb1"
+    },
+    {
+      "path": "frontend/src/__tests__/api/websocket-auth.test.ts",
+      "size_bytes": 8784,
+      "sha256": "886cfa5f60113a36e928accf99affbfc40f3eac97db0a4b40baabaf04a6fe309"
+    },
+    {
+      "path": "frontend/src/__tests__/utils/userValidation.test.ts",
+      "size_bytes": 839,
+      "sha256": "89dc6e4cc56862d863eb80537f88e37549028644dc8ac79f3b9383f0c69fe03c"
+    },
+    {
+      "path": "frontend/src/api/modules/capacity.ts",
+      "size_bytes": 13357,
+      "sha256": "30374d0725c384aae4ec72ed134ced4499226285d247425fbdbe218f64ac837f"
+    },
+    {
+      "path": "frontend/src/api/modules/diagnosis.ts",
+      "size_bytes": 11002,
+      "sha256": "58ae55684d93aa05b405f968c78325d727259430f6dd7ff77576485a112716de"
+    },
+    {
+      "path": "frontend/src/api/modules/drift.ts",
+      "size_bytes": 2043,
+      "sha256": "bd4715c6a5ebe18eb224206cc29b146a4af3215c88c4131402bb3f2132d5d849"
+    },
+    {
+      "path": "frontend/src/api/modules/energy.ts",
+      "size_bytes": 67583,
+      "sha256": "cefc4fe05d116c97f47b879cc081c50a8e96823b0dc00fad1b0ab4eef6a83b16"
+    },
+    {
+      "path": "frontend/src/api/modules/optimization.ts",
+      "size_bytes": 7276,
+      "sha256": "52ed6d5d2769a30a9cab1cab14afb4a98f06ac747ef8782728b527c45eff3d2f"
+    },
+    {
+      "path": "frontend/src/api/modules/precool.ts",
+      "size_bytes": 10106,
+      "sha256": "5a27ff8de8af5b21deaaa224e7e91f8720452349941f715c77aaf7cae731815a"
+    },
+    {
+      "path": "frontend/src/api/modules/predictiveMaintenance.ts",
+      "size_bytes": 2867,
+      "sha256": "246977d0969f2489eda4a457885e1e9f798b3d5506d13cd039cd2a63e127e4f8"
+    },
+    {
+      "path": "frontend/src/api/modules/proposal.ts",
+      "size_bytes": 3167,
+      "sha256": "437f01d49977e5fb05ff5717280931946e74dd2a664de3b0decfa6b857e95e35"
+    },
+    {
+      "path": "frontend/src/api/modules/shift.ts",
+      "size_bytes": 9096,
+      "sha256": "dceb054f207a112001f8e17410874469f13c376b35dbd1fac960e5ea32cb3926"
+    },
+    {
+      "path": "frontend/src/api/modules/user.ts",
+      "size_bytes": 2942,
+      "sha256": "e56e56a7b4050e7b55701951b5e5c1dd6104ab5da09764ef854f58e3b9b2958b"
+    },
+    {
+      "path": "frontend/src/api/modules/vpp.ts",
+      "size_bytes": 3175,
+      "sha256": "d60b56734847b21683a60e322f56de28bebb68500d20a358148163840d176e1f"
+    },
+    {
+      "path": "frontend/src/components.d.ts",
+      "size_bytes": 12797,
+      "sha256": "c365293fd859be049b3addf5e0b14d5ae78d83ae4ff48d8fa37cba89a0c4fef6"
+    },
+    {
+      "path": "frontend/src/components/MetricDisplay.vue",
+      "size_bytes": 3870,
+      "sha256": "1daf0e6cace8fcc8d6a954fdfa2b41978be5dc8472140abae3939d387de7e476"
+    },
+    {
+      "path": "frontend/src/components/bigscreen/CabinetLabels.vue",
+      "size_bytes": 4328,
+      "sha256": "a3dee2aea87f0c2e390f568542285edbdf6178ec2b08264c09f47705df6d58d5"
+    },
+    {
+      "path": "frontend/src/components/bigscreen/FloorSelector.vue",
+      "size_bytes": 6446,
+      "sha256": "b26fe6ac40bae9f85b94a16c3887ff86d7256c5a7c4b2a3f700bd0ec2af5fd27"
+    },
+    {
+      "path": "frontend/src/components/bigscreen/charts/GaugeChart.vue",
+      "size_bytes": 2828,
+      "sha256": "dd0498054a07f5d14f502f79f5ace4b0a3a9c35db5fb502979317c835cda023e"
+    },
+    {
+      "path": "frontend/src/components/bigscreen/charts/PowerDistribution.vue",
+      "size_bytes": 3068,
+      "sha256": "d514290de9271703aa5b18e89e27f2034e19eb8307274c2c321a8611f5bd9036"
+    },
+    {
+      "path": "frontend/src/components/bigscreen/charts/PueTrend.vue",
+      "size_bytes": 3488,
+      "sha256": "4e2b7896e4d7d65645ab3ddb8e39af5fd3d880dbe03caa8b46d7d8a2a7107ee8"
+    },
+    {
+      "path": "frontend/src/components/bigscreen/charts/TemperatureTrend.vue",
+      "size_bytes": 3294,
+      "sha256": "b5b2de464a9a757137fc3fcfebe98f5142c6f874eea2c0e62a30e9deb44db150"
+    },
+    {
+      "path": "frontend/src/components/charts/PieChart.vue",
+      "size_bytes": 3190,
+      "sha256": "b000aee6f4ed85caf9c88d51d34c56cb22481cb84137ae3f3460653dbb25b521"
+    },
+    {
+      "path": "frontend/src/components/charts/RealtimeChart.vue",
+      "size_bytes": 4776,
+      "sha256": "e40570988929cb004ba5dffe05a2309f1a9af1e13a39adecf4d43c464f5f1033"
+    },
+    {
+      "path": "frontend/src/components/common/SafeRichText.test.ts",
+      "size_bytes": 1937,
+      "sha256": "8b5787e5b49bcd8ef8f1e266d24fc31c24231d1f2bc4a1b3616938260a9c7da2"
+    },
+    {
+      "path": "frontend/src/components/common/SafeRichText.vue",
+      "size_bytes": 324,
+      "sha256": "1546bbe27652269e9eb93eae49e10777fa41ed114c7b5bf47eba1cbaeaafb5bb"
+    },
+    {
+      "path": "frontend/src/components/common/index.ts",
+      "size_bytes": 688,
+      "sha256": "2f42888838c5f7a1148941642f797ea448aca19db6f217c1f1f6b5ad9354cd16"
+    },
+    {
+      "path": "frontend/src/components/demand/DemandCurveMini.vue",
+      "size_bytes": 6674,
+      "sha256": "f82e788dffae568854c6b9efe7db0170109569722b5f79142b03dff29316234a"
+    },
+    {
+      "path": "frontend/src/components/demand/LoadPeriodChart.vue",
+      "size_bytes": 10284,
+      "sha256": "ee5e066a6ff3ee79ab49ac5ba04723c2b8c6b79912e7499f32f61322d8032a39"
+    },
+    {
+      "path": "frontend/src/components/diagnosis/NodeToolbar.test.ts",
+      "size_bytes": 1333,
+      "sha256": "4f2585bd2ac56fc55230f409c042041ba7a07ca52bbf7f0c15724faaac724b5c"
+    },
+    {
+      "path": "frontend/src/components/diagnosis/NodeToolbar.vue",
+      "size_bytes": 3562,
+      "sha256": "67d8a1d7bbe8085aa59ba89405e61eb22e18e992eb9ca3cd19e2eb806836f005"
+    },
+    {
+      "path": "frontend/src/components/energy/CostCard.vue",
+      "size_bytes": 5194,
+      "sha256": "754cb86987138c9994e35e334dab4eb83b5ec74325d16cd127429f6e21cf771a"
+    },
+    {
+      "path": "frontend/src/components/energy/DemandDashboard.vue",
+      "size_bytes": 19492,
+      "sha256": "07b77e003c0b49376a19e0e3d149e1e8d0f6654e5cce26de2ce46c9ad9beb813"
+    },
+    {
+      "path": "frontend/src/components/energy/DeviceShiftDetailDrawer.vue",
+      "size_bytes": 28728,
+      "sha256": "a72d24d9131a6007dbe46b7d8664903067ac014f2701c5cc71203e80114be6bc"
+    },
+    {
+      "path": "frontend/src/components/energy/LoadComparisonChart.vue",
+      "size_bytes": 19807,
+      "sha256": "460bed367d7bbe281c52729907c472d91fec8f0f70c5c4dc9735b5bc0842743a"
+    },
+    {
+      "path": "frontend/src/components/energy/OptimizationOverview.vue",
+      "size_bytes": 16675,
+      "sha256": "45461a835da06d5009ef757732383601b5b06884a548726db0e09404c17d4a6f"
+    },
+    {
+      "path": "frontend/src/components/energy/ParameterAdjustment.vue",
+      "size_bytes": 15609,
+      "sha256": "3c9c23eff80de7ada58c21caba99145c2f2c7862141e18f7eced1c037237d30f"
+    },
+    {
+      "path": "frontend/src/components/energy/PrecoolTimeline.vue",
+      "size_bytes": 5673,
+      "sha256": "8aaab9eac10899ab609e8965bf55626fcd6879aa07f5c97df304e06c33f34f3d"
+    },
+    {
+      "path": "frontend/src/components/energy/RLOptimizationPanel.vue",
+      "size_bytes": 15370,
+      "sha256": "e1e8d0076478f2aaabdd554936c815e21f33302d5f8c8c7789012b798107818d"
+    },
+    {
+      "path": "frontend/src/components/energy/RollbackStatusCard.vue",
+      "size_bytes": 4116,
+      "sha256": "c9426aaa5b278fc7c7f0114c2a83cfe5a8613fc6ccea302dfc4f26aae90fc06f"
+    },
+    {
+      "path": "frontend/src/components/energy/ScheduleDashboard.vue",
+      "size_bytes": 21442,
+      "sha256": "8f914181fd16ba3d5601e2d1acf34c2e7fdb961907439dec23d16c450b90f9f9"
+    },
+    {
+      "path": "frontend/src/components/energy/ShiftPlanBuilder.vue",
+      "size_bytes": 35073,
+      "sha256": "d45d03363e787bc5080bce0f221b72dbc7a2cc9031f9d1acb96a0433a4c02367"
+    },
+    {
+      "path": "frontend/src/components/energy/SuggestionDetailDrawer.vue",
+      "size_bytes": 13812,
+      "sha256": "0589a2eb9fbd531c596d9efd3f9ef8cab99332dfa8f8b4163114d203143aa593"
+    },
+    {
+      "path": "frontend/src/components/energy/SuggestionOverview.vue",
+      "size_bytes": 8556,
+      "sha256": "9dca72a2281f484b2e86851fdade078e311b8a441dbfadbb2aef10e8d6c4da5f"
+    },
+    {
+      "path": "frontend/src/components/energy/TemperaturePredictionChart.vue",
+      "size_bytes": 7524,
+      "sha256": "06ff1377560f664f1f607ce3d0f73c36071c4653c4b4ce63e7d79bc6ed0dc152"
+    },
+    {
+      "path": "frontend/src/components/energy/shift/ConstraintEditor.vue",
+      "size_bytes": 17420,
+      "sha256": "cb3e036807fd7865d6b320d9b0d682992536bd63fa7fc96533ad4073f8a97779"
+    },
+    {
+      "path": "frontend/src/components/floor-layouts/FloorLayoutSelector.vue",
+      "size_bytes": 1209,
+      "sha256": "1ca87f82c78caaf784eb32d509ad89e475798707d5a056beb577214b80634128"
+    },
+    {
+      "path": "frontend/src/composables/bigscreen/useBigscreenData.ts",
+      "size_bytes": 5279,
+      "sha256": "f90b5ce846a22e554d2487adc42e75c8b8d133d639eb9032aa1d173aaa0d3587"
+    },
+    {
+      "path": "frontend/src/composables/bigscreen/useEntranceAnimation.ts",
+      "size_bytes": 5933,
+      "sha256": "fce21a838757fef142d0f4e16b667f454760c8faf445340759cc72f11b134844"
+    },
+    {
+      "path": "frontend/src/composables/bigscreen/useRaycaster.ts",
+      "size_bytes": 6341,
+      "sha256": "7bb5e1521e3e6f5fbad12383ba33d817268fccb10f7011f39d3c8eb60b72ee29"
+    },
+    {
+      "path": "frontend/src/composables/useRealtime.ts",
+      "size_bytes": 3227,
+      "sha256": "7d8ea0c10e9271c404c8041fb80a09752b8d94e6b1597ea0fb424e57cc7c0b2f"
+    },
+    {
+      "path": "frontend/src/composables/useWebSocketManager.ts",
+      "size_bytes": 6801,
+      "sha256": "f5c0afb10d1f5095f4f784ae7f70c2208c41772c48393e4689d9a6d062e5f09a"
+    },
+    {
+      "path": "frontend/src/layouts/MainLayout.vue",
+      "size_bytes": 17916,
+      "sha256": "dd9e73c731b8e2998079f7227d4fd71bfaafb7667b631dbe2cb1e3abc949c088"
+    },
+    {
+      "path": "frontend/src/router/index.ts",
+      "size_bytes": 22916,
+      "sha256": "b97261cafb3bdb683a9a3605637a03146c2b3ebc9ef29cb1231cde7508b70432"
+    },
+    {
+      "path": "frontend/src/security/html-sink-policy.test.ts",
+      "size_bytes": 2804,
+      "sha256": "4b5380b34669c2c3fbe9a1cbae8df41576fc4179b52071fb04a30c8b1ea85886"
+    },
+    {
+      "path": "frontend/src/security/html.test.ts",
+      "size_bytes": 2433,
+      "sha256": "e952a270608f06cc129fe3cb4327cbdbdc4dd667e71402c20369af2e33a5e7b4"
+    },
+    {
+      "path": "frontend/src/security/html.ts",
+      "size_bytes": 1894,
+      "sha256": "901dd67ec6bc0ad0a72910206dee1f9f2824325f5f9ad4ad5b741ed2492dc239"
+    },
+    {
+      "path": "frontend/src/stores/bigscreen.ts",
+      "size_bytes": 8262,
+      "sha256": "6972ba97561f3cb7ab3af9b3ec6fb1cb2de88f79d19f77dc69802ca9769e7b3e"
+    },
+    {
+      "path": "frontend/src/styles/index.scss",
+      "size_bytes": 9397,
+      "sha256": "2f1a67c388be457b50a0d37f4bbf95599ce058a7212f009f3c775b46676fd20d"
+    },
+    {
+      "path": "frontend/src/utils/authEvents.ts",
+      "size_bytes": 76,
+      "sha256": "bee69f2baa07f749a255c198cc3034766ed93f1ff49cf1f38a7610b9b1d9ede3"
+    },
+    {
+      "path": "frontend/src/utils/request.ts",
+      "size_bytes": 4946,
+      "sha256": "93283597fc94e25e9fa1f628a0f56133be109889dc64003c9da22be8cb147dbc"
+    },
+    {
+      "path": "frontend/src/utils/three/labelRenderer.test.ts",
+      "size_bytes": 725,
+      "sha256": "094cf71cc7a813e7b28167e75d1d7e6499c3130340d59be04222bfa7d6609d3c"
+    },
+    {
+      "path": "frontend/src/utils/three/labelRenderer.ts",
+      "size_bytes": 2735,
+      "sha256": "1accc1ef1c8de3c654e62044d5af73e14215664b004037b23264b1e2a6ac8356"
+    },
+    {
+      "path": "frontend/src/utils/userValidation.ts",
+      "size_bytes": 423,
+      "sha256": "263f1c4354dbcb818bf112d4086de7a8519af22dd8a1bd77cfbbe521b5301aa7"
+    },
+    {
+      "path": "frontend/src/views/alarm/CompoundConditionGroup.vue",
+      "size_bytes": 8084,
+      "sha256": "2f970366488d883a39d2161f8e58d6380ef68c7a159cfaf2df1e4752c984d45a"
+    },
+    {
+      "path": "frontend/src/views/alarm/index.vue",
+      "size_bytes": 62885,
+      "sha256": "919607d2418a05c636ac7798dd6bfb99db270f5d1710eb0cb87307a4bec06946"
+    },
+    {
+      "path": "frontend/src/views/alarm/shield.vue",
+      "size_bytes": 26502,
+      "sha256": "f47105518067eb606614fd8632db27b06595abbe3dd673d0d340a343072655c8"
+    },
+    {
+      "path": "frontend/src/views/asset/cabinet.vue",
+      "size_bytes": 23724,
+      "sha256": "24ff8b29412c1fb8bfe34a1bf9e54e56a4b2fba983d7e2623a552275eff73431"
+    },
+    {
+      "path": "frontend/src/views/bigscreen/index.vue",
+      "size_bytes": 22742,
+      "sha256": "4177e5b8c54d5a821bf4f0107732451504819f2149884cf398aae388e655b226"
+    },
+    {
+      "path": "frontend/src/views/capacity/index.vue",
+      "size_bytes": 70467,
+      "sha256": "ddee3462cdbffd76e3379c1edb6083241e4bc70dbeec16ecb11ed2aea6e9fa37"
+    },
+    {
+      "path": "frontend/src/views/diagnosis/ProbabilityTuning.vue",
+      "size_bytes": 16125,
+      "sha256": "018f743df409fb3e4b1626b5b8ccc6413874ae1370d681361ae4f843ab6ab7fb"
+    },
+    {
+      "path": "frontend/src/views/diagnosis/Reports.test.ts",
+      "size_bytes": 2977,
+      "sha256": "c7a596abda34c00900e1b7149531790f4c670bcdc6271095a3b6307f3d4a3315"
+    },
+    {
+      "path": "frontend/src/views/diagnosis/Reports.vue",
+      "size_bytes": 11381,
+      "sha256": "8289da7ddb028536fa9e89a7a18acd9bf99f56e3b8262782b0da1c2e40183eaf"
+    },
+    {
+      "path": "frontend/src/views/diagnosis/TimeWindowTuning.vue",
+      "size_bytes": 14545,
+      "sha256": "c51a822ebcc5153314d0df178bddd9c674c41e13511532c1efadc47671c2cb8f"
+    },
+    {
+      "path": "frontend/src/views/energy/analysis.vue",
+      "size_bytes": 60904,
+      "sha256": "e26760912788e53ef51e19e4c3668c219dfd518fe62190f269be6e1b6660326c"
+    },
+    {
+      "path": "frontend/src/views/energy/execution.vue",
+      "size_bytes": 29406,
+      "sha256": "89ca453ecab45a29051941deceb571253659fa097a05bad25790a14f4b5041b0"
+    },
+    {
+      "path": "frontend/src/views/energy/monitor.vue",
+      "size_bytes": 29317,
+      "sha256": "82953acb027a4da5f588e332a7e18a0d7414ea73fa8f21b20354ca39f801abdc"
+    },
+    {
+      "path": "frontend/src/views/energy/regulation.vue",
+      "size_bytes": 25083,
+      "sha256": "93625ab240c43628a83b2d9d954cac7974df9652ba22d83ad27c6508309b635f"
+    },
+    {
+      "path": "frontend/src/views/energy/shift/CoolingLinkageMonitor.vue",
+      "size_bytes": 16926,
+      "sha256": "f0e9f0c09de3a8f07ab1c9b6044c777cbfb4dfbf6caa52923daa2525daecbefd"
+    },
+    {
+      "path": "frontend/src/views/energy/shift/PrecoolScheduleView.vue",
+      "size_bytes": 16210,
+      "sha256": "3f70c02312698855458205460a5b9e5d8200bd256e431c4e997644b1290987e1"
+    },
+    {
+      "path": "frontend/src/views/energy/shift/ShiftDashboard.vue",
+      "size_bytes": 9661,
+      "sha256": "23b06d13be0c10ec1585e28eb9173332a7137a143c6a68555166fe7f391bcb41"
+    },
+    {
+      "path": "frontend/src/views/energy/shift/ShiftExecutionDetail.vue",
+      "size_bytes": 12459,
+      "sha256": "20aaeca14145cded143ac7cb73fbd0e80b15e279d99ee49899148d21a751689e"
+    },
+    {
+      "path": "frontend/src/views/energy/shift/ShiftExecutionList.vue",
+      "size_bytes": 6372,
+      "sha256": "56c7a5faf67e6bbbd1cff2b6c687b827318480513ad0d14558bd0021959e7faf"
+    },
+    {
+      "path": "frontend/src/views/energy/shift/ShiftExecutionMonitor.vue",
+      "size_bytes": 9356,
+      "sha256": "b28c0ff964bf36f602c46132dd28be4a9ac17074e03e6ee1928cb568cc1145ba"
+    },
+    {
+      "path": "frontend/src/views/energy/shift/ShiftOpportunityDetail.vue",
+      "size_bytes": 9142,
+      "sha256": "df6aa066ef7be845b636e3e13f188e6578edced5a61e2fd00a9a4469700cc011"
+    },
+    {
+      "path": "frontend/src/views/energy/shift/ShiftOpportunityList.vue",
+      "size_bytes": 9798,
+      "sha256": "5c3864625b49ca31f1db8339e7a47bcda061ca62a750ff81a260bed0a1239acc"
+    },
+    {
+      "path": "frontend/src/views/energy/shift/ShiftPlanCreate.vue",
+      "size_bytes": 11747,
+      "sha256": "23c44125cf3d86201dfcc4b9719e0dc9061d4cd0139c9cefa63a97b91b42211b"
+    },
+    {
+      "path": "frontend/src/views/energy/shift/ShiftReports.vue",
+      "size_bytes": 12385,
+      "sha256": "2f77ce14da4db33c96c74cf856ec6c8f01209347a03729fa86c407a8d7dc3932"
+    },
+    {
+      "path": "frontend/src/views/energy/shift/VppMonitorView.vue",
+      "size_bytes": 9145,
+      "sha256": "7af8a437ea4715296633032d62b1681e849222ee0cb5076ce128cf7a615e6fb4"
+    },
+    {
+      "path": "frontend/src/views/energy/shift/components/ConstraintCheckResult.vue",
+      "size_bytes": 4188,
+      "sha256": "f19858a3fdd706a5e4c56886ccb28a1fdc5fb3b02244cc5ea5a3a3f0f7773a75"
+    },
+    {
+      "path": "frontend/src/views/energy/statistics.vue",
+      "size_bytes": 23121,
+      "sha256": "b495fdb8369b7440b01964a4db42e8d5feda09d8f9061e8247bb303bd038333d"
+    },
+    {
+      "path": "frontend/src/views/energy/suggestions.vue",
+      "size_bytes": 22404,
+      "sha256": "b56d6bf86eca8f47385ccdef62ba4df6fb1833a887b70791c51415b2db1761ed"
+    },
+    {
+      "path": "frontend/src/views/energy/topology.vue",
+      "size_bytes": 80713,
+      "sha256": "9f3ce9db11d73c566ebb848f328e51bf17f1ac12d0ed65b0d20d1d8d79eb40ba"
+    },
+    {
+      "path": "frontend/src/views/gateway/index.vue",
+      "size_bytes": 48802,
+      "sha256": "5f6a43ca02217bee34b4f4f3e643ae97a2a7b721bb932edf51575727c9ad1f01"
+    },
+    {
+      "path": "frontend/src/views/history/index.vue",
+      "size_bytes": 13556,
+      "sha256": "76dbf2c0abd2abb1e13b5d60a4498c90e9c1837dfbd78baa6270aa82ce3d5a2d"
+    },
+    {
+      "path": "frontend/src/views/login/index.vue",
+      "size_bytes": 4583,
+      "sha256": "cb81cdf453dd152070b315d5aa0e4601c569a9313541def3da83abad84bf0dc4"
+    },
+    {
+      "path": "frontend/src/views/operation/predictive.vue",
+      "size_bytes": 18362,
+      "sha256": "c27580ef289d3976668565fce5fb116df8a0655b82edee195975290b89265039"
+    },
+    {
+      "path": "frontend/src/views/power/battery.vue",
+      "size_bytes": 17770,
+      "sha256": "357fbf70fb42225a1e0b64bc7c2d50e066767b7592e7a6d84de8e3e79aa5fb34"
+    },
+    {
+      "path": "frontend/src/views/power/cabinet.vue",
+      "size_bytes": 18919,
+      "sha256": "ebafce80818ee92cc280098e877020b265bdd2101255bb7f65aea1a6538c9214"
+    },
+    {
+      "path": "frontend/src/views/power/pdu.vue",
+      "size_bytes": 19870,
+      "sha256": "1c656977320a5024cf00c5b8f9bb480b0131ef7ea08dff3b79a49fecb13217a6"
+    },
+    {
+      "path": "frontend/src/views/power/ups.vue",
+      "size_bytes": 18462,
+      "sha256": "942bede14453515573bcc40c523c2246d907d72ab32cf74fceac4ebed8d7e363"
+    },
+    {
+      "path": "frontend/src/views/report/index.vue",
+      "size_bytes": 22082,
+      "sha256": "e4b9e947c07831498be483b1b25c88fe9386d9c375164eaecb0c5c1af0b3f5eb"
+    },
+    {
+      "path": "frontend/src/views/security/access-control.vue",
+      "size_bytes": 16293,
+      "sha256": "c3a7d7d6bc230592a3320095882f95f0aa61af5e84fb0f7e9b329c19ac3f690d"
+    },
+    {
+      "path": "frontend/src/views/settings/index.vue",
+      "size_bytes": 42389,
+      "sha256": "cf800a31fb34dcd796db706ac7a47c87b18561c490458a3cc0bd635b98970b59"
+    },
+    {
+      "path": "frontend/src/views/system/user.vue",
+      "size_bytes": 31097,
+      "sha256": "ec4e52f464073e547d8fed09e5a505f4bf88e515c2ff44d20dc81d436b87cd78"
+    },
+    {
+      "path": "frontend/src/views/topology/site-selection.vue",
+      "size_bytes": 14336,
+      "sha256": "fdb1e7ad3eaff8db5a4dd6d126a66eac46ffbb8e7f447646d373af9369d4eb31"
+    },
+    {
+      "path": "frontend/src/views/vpp/VPPAnalysis.vue",
+      "size_bytes": 17186,
+      "sha256": "88e91d9bc4415a121d81599f37d908514e2e08af2a61cf0bb1d47a76c815a85a"
+    },
+    {
+      "path": "frontend/vite.config.ts",
+      "size_bytes": 1410,
+      "sha256": "1d21b2082062b3d508c021f298f82a7ff77c0565746b9b7d5ae9e66ac6d0f01a"
+    },
+    {
+      "path": "proxy/package.json",
+      "size_bytes": 325,
+      "sha256": "0c189229fdfb4dd497bb218b2c55c589fad3cdff9c912b20145d06f6b1bef131"
+    },
+    {
+      "path": "proxy/server-temp.js",
+      "size_bytes": 94,
+      "sha256": "0fe1ec7fec1d1b41285b49bca28a048bd9f3804243ea216841dfd826c0c400e9"
+    },
+    {
+      "path": "proxy/server.js",
+      "size_bytes": 6439,
+      "sha256": "215fd9b3c812ac5f39ec7435d15d35f2020199c969cb8ccca399fe479f6e79de"
+    },
+    {
+      "path": "proxy/server.test.js",
+      "size_bytes": 5498,
+      "sha256": "f141701537b4dabef0ad544c8b684719bd4ce272b646929cdcba10999175a716"
+    },
+    {
+      "path": "scripts/story_39_2_evidence.py",
+      "size_bytes": 55604,
+      "sha256": "fc6a9a2d7f9706d5d6889ec993286a25c2d55d197ed751ce32caae2a8d2f7cdc"
+    },
+    {
+      "path": "scripts/story_39_2_governance.py",
+      "size_bytes": 1338,
+      "sha256": "5364af907f2eb13c940d8536458e91406a7d3aaf3948eef6a20c675c5143d764"
+    },
+    {
+      "path": "scripts/story_39_2_manifest.schema.json",
+      "size_bytes": 6620,
+      "sha256": "a186a36d6a1980eba4f5dbed69f2f364c6928faf40d5e7b379d2402f940f9b9a"
+    }
+  ]
+}

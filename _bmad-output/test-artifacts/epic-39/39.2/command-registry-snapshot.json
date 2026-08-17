@@ -1,0 +1,227 @@
+{
+  "registry": {
+    "ac_temp_set": {
+      "parameter_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "temperature": {
+            "maximum": 32.0,
+            "minimum": 16.0,
+            "title": "Temperature",
+            "type": "number"
+          }
+        },
+        "required": [
+          "temperature"
+        ],
+        "title": "AcTempSetParameters",
+        "type": "object"
+      },
+      "minimum_risk": "normal",
+      "requires_approval": false,
+      "description": "调整空调温度",
+      "entrypoints": [
+        "command_api"
+      ],
+      "test_ids": [
+        "CMD-AC-TEMP-01"
+      ]
+    },
+    "device_decommission": {
+      "parameter_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "reason": {
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "reason"
+        ],
+        "title": "DeviceDecommissionParameters",
+        "type": "object"
+      },
+      "minimum_risk": "critical",
+      "requires_approval": true,
+      "description": "设备下架断电",
+      "entrypoints": [
+        "command_api"
+      ],
+      "test_ids": [
+        "CMD-DECOMMISSION-01"
+      ]
+    },
+    "device_regulation": {
+      "parameter_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "device_id": {
+            "exclusiveMinimum": 0,
+            "title": "Device Id",
+            "type": "integer"
+          },
+          "regulation_type": {
+            "enum": [
+              "temperature",
+              "brightness",
+              "mode",
+              "load"
+            ],
+            "title": "Regulation Type",
+            "type": "string"
+          },
+          "target_value": {
+            "title": "Target Value",
+            "type": "number"
+          },
+          "force": {
+            "default": false,
+            "title": "Force",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "device_id",
+          "regulation_type",
+          "target_value"
+        ],
+        "title": "DeviceRegulationParameters",
+        "type": "object"
+      },
+      "minimum_risk": "normal",
+      "requires_approval": false,
+      "description": "执行节能计划设备调节",
+      "entrypoints": [
+        "device_control_batch",
+        "execution_service",
+        "load_regulation"
+      ],
+      "test_ids": [
+        "CMD-REGULATION-01"
+      ]
+    },
+    "door_access": {
+      "parameter_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "action": {
+            "enum": [
+              "open",
+              "close",
+              "lock",
+              "unlock"
+            ],
+            "title": "Action",
+            "type": "string"
+          }
+        },
+        "required": [
+          "action"
+        ],
+        "title": "DoorAccessParameters",
+        "type": "object"
+      },
+      "minimum_risk": "normal",
+      "requires_approval": false,
+      "description": "门禁开关",
+      "entrypoints": [
+        "command_api"
+      ],
+      "test_ids": [
+        "CMD-DOOR-01"
+      ]
+    },
+    "light_switch": {
+      "parameter_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "enabled"
+        ],
+        "title": "LightSwitchParameters",
+        "type": "object"
+      },
+      "minimum_risk": "normal",
+      "requires_approval": false,
+      "description": "开关照明",
+      "entrypoints": [
+        "command_api"
+      ],
+      "test_ids": [
+        "CMD-LIGHT-01"
+      ]
+    },
+    "power_off": {
+      "parameter_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "circuit": {
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Circuit",
+            "type": "string"
+          }
+        },
+        "required": [
+          "circuit"
+        ],
+        "title": "PowerOffParameters",
+        "type": "object"
+      },
+      "minimum_risk": "critical",
+      "requires_approval": true,
+      "description": "切断回路电源",
+      "entrypoints": [
+        "command_api"
+      ],
+      "test_ids": [
+        "CMD-POWER-OFF-01"
+      ]
+    },
+    "ups_switch": {
+      "parameter_schema": {
+        "additionalProperties": false,
+        "properties": {
+          "mode": {
+            "enum": [
+              "inverter",
+              "bypass",
+              "off"
+            ],
+            "title": "Mode",
+            "type": "string"
+          }
+        },
+        "required": [
+          "mode"
+        ],
+        "title": "UpsSwitchParameters",
+        "type": "object"
+      },
+      "minimum_risk": "critical",
+      "requires_approval": true,
+      "description": "UPS 切换",
+      "entrypoints": [
+        "command_api"
+      ],
+      "test_ids": [
+        "CMD-UPS-01"
+      ]
+    }
+  },
+  "device_regulation_callers": [
+    "device_control_service.py",
+    "execution_service.py",
+    "load_regulation.py"
+  ],
+  "validation": "PASS",
+  "errors": []
+}

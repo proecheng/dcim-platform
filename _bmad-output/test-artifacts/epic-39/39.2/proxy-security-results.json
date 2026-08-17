@@ -1,0 +1,13 @@
+{
+  "started_at_utc": "2026-08-17T04:49:01.837275Z",
+  "ended_at_utc": "2026-08-17T04:49:03.239062Z",
+  "command": "npm test",
+  "exit_code": 0,
+  "result": "PASS",
+  "metrics": {
+    "tests": 5,
+    "passed": 5,
+    "failed": 0
+  },
+  "output": "> dcim-proxy@1.0.0 test\n> node --test server.test.js\n\n[HPM] Proxy created: /  -> http://127.0.0.1:1\n[HPM] Proxy created: /  -> http://127.0.0.1:1\n[HPM] Proxy created: /  -> http://127.0.0.1:1\n[2026-08-17T04:49:03.054Z] GET /health\n▶ proxy security boundary\n  ✔ allows configured credentialed origins and emits security headers (78.5068ms)\n  ✔ allows configured preflight without using wildcard ACAO (9.2292ms)\n[2026-08-17T04:49:03.094Z] GET /health\n[HPM] Proxy created: /  -> http://localhost:31993\n[HPM] Proxy created: /  -> http://localhost:31993\n[HPM] Proxy created: /  -> http://localhost:31993\nDCIM proxy listening on http://127.0.0.1:31992, backend=http://localhost:31993\n  ✔ rejects unconfigured preflight and withholds ACAO from simple requests (11.4667ms)\n✔ proxy security boundary (151.8603ms)\n▶ proxy origin parser\n  ✔ rejects wildcards, null, paths, credentials, and production loopback (2.0606ms)\n✔ proxy origin parser (2.5094ms)\n▶ proxy WebSocket origin boundary\n  ✔ rejects unconfigured WebSocket origins before proxying upstream (42.0626ms)\n✔ proxy WebSocket origin boundary (42.4876ms)\nℹ tests 5\nℹ suites 3\nℹ pass 5\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 581.1043"
+}

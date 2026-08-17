@@ -1,0 +1,14 @@
+{
+  "generated_at_utc": "2026-08-17T04:52:33.267392Z",
+  "fingerprint_sha256": "4633f194609177a7896d100237257bdf0d9f1bfdcb668dd73bf926f809b7838a",
+  "values": {
+    "os": "Windows-10-10.0.26200-SP0",
+    "python": "3.11.9",
+    "node": "v24.12.0",
+    "npm": "11.6.2",
+    "docker": "29.4.0",
+    "git": "git version 2.52.0.windows.1",
+    "topology": "local tests plus isolated Docker Nginx artifact and browser",
+    "production_equivalent": false
+  }
+}
