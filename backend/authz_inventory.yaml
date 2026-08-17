@@ -9644,10 +9644,36 @@ http:
   active_session: true
   tests:
   - AUTHZ-INVENTORY-HTTP-01
+- key: POST /api/v1/proposals/{proposal_id}/accept-all::accept_all_proposal_measures
+  method: POST
+  path: /api/v1/proposals/{proposal_id}/accept-all
+  operation: accept_all_proposal_measures
+  access: GLOBAL
+  roles:
+  - admin
+  action: create
+  resource: proposals
+  resolver: null
+  active_session: true
+  tests:
+  - AUTHZ-INVENTORY-HTTP-01
 - key: POST /api/v1/proposals/{proposal_id}/accept::accept_proposal
   method: POST
   path: /api/v1/proposals/{proposal_id}/accept
   operation: accept_proposal
+  access: GLOBAL
+  roles:
+  - admin
+  action: create
+  resource: proposals
+  resolver: null
+  active_session: true
+  tests:
+  - AUTHZ-INVENTORY-HTTP-01
+- key: POST /api/v1/proposals/{proposal_id}/complete::complete_proposal
+  method: POST
+  path: /api/v1/proposals/{proposal_id}/complete
+  operation: complete_proposal
   access: GLOBAL
   roles:
   - admin
@@ -9700,6 +9726,19 @@ http:
   method: POST
   path: /api/v1/proposals/{proposal_id}/monitoring/stop
   operation: stop_monitoring
+  access: GLOBAL
+  roles:
+  - admin
+  action: create
+  resource: proposals
+  resolver: null
+  active_session: true
+  tests:
+  - AUTHZ-INVENTORY-HTTP-01
+- key: POST /api/v1/proposals/{proposal_id}/reject::reject_proposal
+  method: POST
+  path: /api/v1/proposals/{proposal_id}/reject
+  operation: reject_proposal
   access: GLOBAL
   roles:
   - admin
