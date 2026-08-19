@@ -22,6 +22,13 @@ The branch containing deployment tooling may advance beyond the candidate
 SHA. Do not rebuild the application images from that branch. The candidate
 identity is the table above.
 
+For repeated deployment to multiple Windows, Linux, or macOS Docker hosts,
+use `story-39-7-fleet-deployment.md` and
+`scripts/story_39_7_deploy.py`. The fleet controller applies the image and
+health checks in Sections 3-5 concurrently through Docker contexts. This
+document remains the detailed procedure and evidence boundary for the real
+pre-production target.
+
 ## Recommended topology
 
 Use a dedicated Linux VM or physical host with:

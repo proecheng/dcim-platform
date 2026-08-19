@@ -1,0 +1,120 @@
+version: 1
+
+# Run at most three deployments at once. Increase only after registry, network,
+# database, and control-host capacity have been measured.
+concurrency: 3
+report_directory: ../../_bmad-output/test-artifacts/epic-39/39.7/fleet-reports
+
+defaults:
+  compose_file: docker-compose.story-39-7-preprod.yml
+  platform: linux/amd64
+  e2e:
+    headed: true
+    specs:
+      - e2e/auth.spec.ts
+      - e2e/invalid-detail-pages.spec.ts
+      - e2e/authorization-matrix.spec.ts
+      - e2e/site-isolation-websocket-authorization.spec.ts
+
+targets:
+  # Docker Desktop must be switched to Linux containers. This target is also
+  # the control host, so Playwright can use the published loopback port.
+  - name: workstation
+    docker_context: desktop-linux
+    env_file: ../../../dcim-fleet-secrets/workstation.env
+    project_name: dcim-story-39-7-workstation
+    e2e:
+      mode: local
+      local_port: 3000
+
+  # Remote Docker contexts use SSH. Playwright remains on the control host and
+  # reaches each remote loopback listener through a unique SSH tunnel.
+  - name: qa-linux-01
+    docker_context: qa-linux-01
+    env_file: ../../../dcim-fleet-secrets/qa-linux-01.env
+    project_name: dcim-story-39-7-qa-01
+    e2e:
+      mode: ssh-tunnel
+      ssh_target: deploy@qa-linux-01.example.invalid
+      local_port: 13001
+      remote_port: 3000
+
+  - name: qa-linux-02
+    docker_context: qa-linux-02
+    env_file: ../../../dcim-fleet-secrets/qa-linux-02.env
+    project_name: dcim-story-39-7-qa-02
+    e2e:
+      mode: ssh-tunnel
+      ssh_target: deploy@qa-linux-02.example.invalid
+      local_port: 13002
+      remote_port: 3000
+
+  - name: qa-linux-03
+    docker_context: qa-linux-03
+    env_file: ../../../dcim-fleet-secrets/qa-linux-03.env
+    project_name: dcim-story-39-7-qa-03
+    e2e:
+      mode: ssh-tunnel
+      ssh_target: deploy@qa-linux-03.example.invalid
+      local_port: 13003
+      remote_port: 3000
+
+  - name: qa-linux-04
+    docker_context: qa-linux-04
+    env_file: ../../../dcim-fleet-secrets/qa-linux-04.env
+    project_name: dcim-story-39-7-qa-04
+    e2e:
+      mode: ssh-tunnel
+      ssh_target: deploy@qa-linux-04.example.invalid
+      local_port: 13004
+      remote_port: 3000
+
+  - name: qa-linux-05
+    docker_context: qa-linux-05
+    env_file: ../../../dcim-fleet-secrets/qa-linux-05.env
+    project_name: dcim-story-39-7-qa-05
+    e2e:
+      mode: ssh-tunnel
+      ssh_target: deploy@qa-linux-05.example.invalid
+      local_port: 13005
+      remote_port: 3000
+
+  - name: qa-linux-06
+    docker_context: qa-linux-06
+    env_file: ../../../dcim-fleet-secrets/qa-linux-06.env
+    project_name: dcim-story-39-7-qa-06
+    e2e:
+      mode: ssh-tunnel
+      ssh_target: deploy@qa-linux-06.example.invalid
+      local_port: 13006
+      remote_port: 3000
+
+  - name: qa-linux-07
+    docker_context: qa-linux-07
+    env_file: ../../../dcim-fleet-secrets/qa-linux-07.env
+    project_name: dcim-story-39-7-qa-07
+    e2e:
+      mode: ssh-tunnel
+      ssh_target: deploy@qa-linux-07.example.invalid
+      local_port: 13007
+      remote_port: 3000
+
+  - name: qa-linux-08
+    docker_context: qa-linux-08
+    env_file: ../../../dcim-fleet-secrets/qa-linux-08.env
+    project_name: dcim-story-39-7-qa-08
+    e2e:
+      mode: ssh-tunnel
+      ssh_target: deploy@qa-linux-08.example.invalid
+      local_port: 13008
+      remote_port: 3000
+
+  - name: preproduction
+    docker_context: preproduction
+    env_file: ../../../dcim-fleet-secrets/preproduction.env
+    project_name: dcim-story-39-7-preproduction
+    e2e:
+      mode: ssh-tunnel
+      ssh_target: deploy@preproduction.example.invalid
+      local_port: 13009
+      remote_port: 3000

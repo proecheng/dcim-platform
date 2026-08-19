@@ -105,6 +105,7 @@ docs/ref/
 .playwright-mcp/
 e2e/test-results/
 e2e/.auth/
+_bmad-output/test-artifacts/epic-39/39.7/fleet-reports/
 
 # 生成的临时文件
 openapi*.json

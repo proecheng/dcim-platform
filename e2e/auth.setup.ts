@@ -3,7 +3,7 @@ import path from 'path'
 
 const ADMIN_USER = process.env.E2E_ADMIN_USER || 'admin'
 const ADMIN_PASS = process.env.E2E_ADMIN_PASSWORD || 'admin123'
-const authFile = path.join(__dirname, '.auth', 'admin.json')
+const authFile = process.env.E2E_AUTH_FILE || path.join(__dirname, '.auth', 'admin.json')
 
 function matchesResponse(responseURL: string, origin: string, pathname: string): boolean {
   const url = new URL(responseURL)

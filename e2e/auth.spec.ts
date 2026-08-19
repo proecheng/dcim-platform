@@ -5,7 +5,7 @@ import { test, expect } from '@playwright/test'
  * 使用独立 browser context（不注入 storageState），独立测试登录逻辑
  */
 
-const ADMIN_USER = 'admin'
+const ADMIN_USER = process.env.E2E_ADMIN_USER || 'admin'
 const ADMIN_PASS = process.env.E2E_ADMIN_PASSWORD || 'admin123'
 
 test.describe('认证流程测试', () => {

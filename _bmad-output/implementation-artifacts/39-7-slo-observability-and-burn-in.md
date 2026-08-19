@@ -208,6 +208,7 @@ GPT-5
 - Compose dependency, gateway, backup, resource, and RED inputs in one read-only service; evaluate alert state with an injected monotonic/UTC clock and process-local lifecycle explicitly labeled.
 - Keep release evidence authoritative in an independent CLI validator that recomputes availability, error budget, MTTR, continuity, provenance, and first-pass E2E rules from raw records.
 - Deploy the fixed candidate through a standalone no-build Compose definition that joins the Story 39.3 database network and status volume; freeze image, service-config, process, and host identity before starting the real window.
+- Drive repeated deployments from one versioned YAML inventory and bounded parallel Docker-context workers; verify immutable images, external resources, runtime health, and first-attempt Playwright results per target while keeping secrets out of reports.
 
 ### Completion Notes List
 
@@ -224,10 +225,12 @@ GPT-5
 - Independent validation rejects the baseline with the expected non-zero exit code only because the manifest is `BLOCKED`, the window and availability samples have not started, critical-E2E placeholders remain, and the resolved incident drill is absent; no provenance binding error was reported.
 - Published the fixed backend and frontend candidates to GHCR under `story-39-7-ba11774` without moving `latest`; GHCR and Buildx independently report the original immutable digests and OCI revision `ba1177448958c90e7ab979a3666f8719208c2f8f`.
 - Added a standalone pre-production Compose definition, host-only environment template, and operational deployment plan that prohibit builds and automatic pulls, require immutable dependencies, and connect the application to Story 39.3 external database/status resources; all 68 Story tests, 7 preparation/deployment guard tests, Ruff, and Compose configuration validation pass.
+- Added a cross-platform fleet controller with `plan`, `preflight`, `deploy`, `verify`, `test`, and `status` actions, a ten-target Docker-context inventory, bounded failure-isolated concurrency, SSH loopback tunnels for headed Playwright, per-target temporary authentication/results isolation, and sanitized JSON reports. Configurable E2E usernames now work in the critical auth flow; 83 Story tests, Ruff, and the 19-test Playwright collection pass. The local Linux/amd64 engine has no Story 39.3 external network or status volume, so no pre-production window was started.
 - Task 5.4 remains open: no genuine immutable-image 72-hour pre-production window or 12 spaced first-pass E2E runs have occurred, so this Story remains `in-progress`.
 
 ### File List
 
+- `.gitignore`
 - `_bmad-output/implementation-artifacts/39-7-slo-observability-and-burn-in.md`
 - `_bmad-output/implementation-artifacts/sprint-status.yaml`
 - `_bmad-output/planning-artifacts/architecture.md`
@@ -250,6 +253,7 @@ GPT-5
 - `backend/tests/test_story_39_7_sli.py`
 - `backend/tests/test_story_39_7_evidence.py`
 - `backend/tests/test_story_39_7_prepare.py`
+- `backend/tests/test_story_39_7_deploy.py`
 - `backend/app/core/redis_lock.py`
 - `backend/tests/test_gateway_registration.py`
 - `backend/tests/test_redis_lock.py`
@@ -257,9 +261,15 @@ GPT-5
 - `deploy/observability/docker-compose.story-39-7-preprod.yml`
 - `deploy/observability/story-39-7-preprod.env.example`
 - `deploy/observability/story-39-7-preproduction-deployment.md`
+- `deploy/observability/story-39-7-fleet-deployment.md`
+- `deploy/observability/story-39-7-targets.example.yaml`
 - `docker-compose.yml`
+- `e2e/auth.setup.ts`
+- `e2e/auth.spec.ts`
+- `playwright.config.ts`
 - `scripts/story_39_7_evidence.py`
 - `scripts/story_39_7_prepare.py`
+- `scripts/story_39_7_deploy.py`
 - `_bmad-output/test-artifacts/epic-39/39.7/manifest.yaml`
 - `_bmad-output/test-artifacts/epic-39/39.7/manifest.schema.json`
 - `_bmad-output/test-artifacts/epic-39/39.7/local-validation.json`
@@ -283,3 +293,4 @@ GPT-5
 - 2026-08-19: Cleared full backend regression after fixing a test-isolation MQTT settings assertion and hardening Redis lock client reuse across event loops; targeted Ruff and diff checks passed on touched files.
 - 2026-08-19: Prepared the Node 22 fixed-image candidate and trusted local `BLOCKED` baseline, fixed Windows BuildKit output decoding, and recorded immutable SHA/digest/environment provenance; the genuine 72-hour gate remains open.
 - 2026-08-19: Published the fixed application images to GHCR and added the no-build pre-production deployment package; Story remains in progress until a real target, collector, scheduled E2E runs, and incident drill complete the external gate.
+- 2026-08-19: Added inventory-driven cross-platform fleet deployment, runtime verification, SSH-tunneled headed E2E execution, failure-isolated parallel reports, and configurable critical-test usernames; the Story remains blocked pending the genuine 72-hour window.

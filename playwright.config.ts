@@ -16,6 +16,8 @@ if (!loopbackHosts.has(parsedBaseURL.hostname)) {
 }
 
 const baseURL = parsedBaseURL.origin
+const authFile = process.env.E2E_AUTH_FILE || './e2e/.auth/admin.json'
+const outputDir = process.env.E2E_OUTPUT_DIR || './e2e/test-results'
 
 export default defineConfig({
   testDir: './e2e',
@@ -37,11 +39,11 @@ export default defineConfig({
         browserName: 'chromium',
         headless: isCI,
         launchOptions: isCI ? {} : { slowMo: 300 },
-        storageState: './e2e/.auth/admin.json',
+        storageState: authFile,
       },
       dependencies: ['setup'],
       testIgnore: /auth\.setup\.ts/,
     },
   ],
-  outputDir: './e2e/test-results',
+  outputDir,
 })
