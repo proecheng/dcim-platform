@@ -1,0 +1,63 @@
+schema_version: 1
+story_id: '39.7'
+status: pending
+gate_result: BLOCKED
+owner: proecheng
+decision_id: D39-03
+annual_slo_proven: false
+provenance:
+  git_sha: PENDING
+  backend_image: PENDING
+  frontend_image: PENDING
+  environment_fingerprint: PENDING
+window:
+  started_at_utc: null
+  ended_at_utc: null
+artifacts:
+  availability_samples:
+    path: availability_samples.json
+    sha256: PENDING
+  provenance_samples:
+    path: provenance_samples.json
+    sha256: PENDING
+  e2e_runs:
+    path: e2e_runs.json
+    sha256: PENDING
+  incidents:
+    path: incidents.json
+    sha256: PENDING
+  alerts:
+    path: alerts.json
+    sha256: PENDING
+  maintenance_windows:
+    path: maintenance_windows.json
+    sha256: PENDING
+  source_hashes:
+    path: source_hashes.json
+    sha256: PENDING
+  backend_image_manifest:
+    path: backend_image_manifest.json
+    sha256: PENDING
+  frontend_image_manifest:
+    path: frontend_image_manifest.json
+    sha256: PENDING
+  environment:
+    path: environment.json
+    sha256: PENDING
+commands:
+  - 'PENDING: run the fixed-image pre-production collector and critical E2E command'
+tool_versions:
+  collector: PENDING
+  e2e: PENDING
+ac_mapping:
+  AC1: [source_hashes]
+  AC2: [availability_samples, provenance_samples]
+  AC3: [alerts]
+  AC4: [availability_samples, incidents, maintenance_windows]
+  AC5: [provenance_samples, e2e_runs, incidents, alerts, source_hashes, backend_image_manifest, frontend_image_manifest, environment]
+  AC6: [availability_samples, provenance_samples, e2e_runs]
+  AC7: [source_hashes, environment]
+known_limits:
+  - The genuine fixed-image 72-hour pre-production window has not run.
+  - No annual availability SLO is proven by local implementation tests.
+  - Story 39.7 and dependent Epic 39 gates remain blocked pending external evidence.

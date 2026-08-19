@@ -75,6 +75,8 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
+      args:
+        VCS_REF: ${VCS_REF:?VCS_REF is required}
     container_name: dcim-backend
     restart: unless-stopped
     environment:
@@ -113,6 +115,11 @@ services:
       COLLECT_INTERVAL: ${COLLECT_INTERVAL:-10}
       DATA_RETENTION_DAYS: ${DATA_RETENTION_DAYS:-30}
       MAX_POINTS: ${MAX_POINTS:-100}
+      BACKUP_STATUS_DIR: /var/lib/dcim-dr-status
+      OBSERVABILITY_STATE_PATH: /var/lib/dcim-observability/state.json
+    volumes:
+      - dr-status:/var/lib/dcim-dr-status:ro
+      - observability-state:/var/lib/dcim-observability
     ports:
       - "${BACKEND_PORT:-8080}:8080"
     depends_on:
@@ -130,6 +137,8 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      args:
+        VCS_REF: ${VCS_REF:?VCS_REF is required}
     container_name: dcim-nginx
     restart: unless-stopped
     ports:
@@ -147,6 +156,11 @@ volumes:
     name: dcim-redis-data
   emqx-data:
     name: dcim-emqx-data
+  dr-status:
+    external: true
+    name: ${DCIM_DR_STATUS_VOLUME:-dcim-story-39-3-dr_dr-status}
+  observability-state:
+    name: dcim-observability-state
 
 networks:
   dcim-network:

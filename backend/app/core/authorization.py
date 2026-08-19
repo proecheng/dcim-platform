@@ -75,6 +75,7 @@ GLOBAL_ADMIN_PATHS = {
     "/api/v1/diagnosis/fault-trees",
     "/api/v1/diagnosis/health",
     "/api/v1/diagnosis/sensor-metadata/check-expired-calibrations",
+    "/api/v1/system/observability",
     "/api/v1/diagnosis/training-audit",
     "/api/v1/diagnosis/trend-config",
 }

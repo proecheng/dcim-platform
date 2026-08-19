@@ -5,16 +5,22 @@ Redis 分布式锁实现
 """
 
 import asyncio
+import logging
 import time
 import uuid
 from contextlib import asynccontextmanager
 from typing import Optional
 
 from redis import asyncio as aioredis
+from redis.exceptions import RedisError
 
 from app.core.config import get_settings
 
+logger = logging.getLogger(__name__)
 settings = get_settings()
+
+
+_RECOVERABLE_REDIS_ERRORS = (RedisError, RuntimeError, OSError, AttributeError)
 
 
 class RedisLock:
@@ -44,12 +50,15 @@ class RedisLock:
 
         while time.time() - start_time < timeout:
             # SET NX EX：如果不存在则设置，并设置过期时间
-            acquired = await self.redis.set(
-                lock_key,
-                lock_value,
-                nx=True,  # 只在键不存在时设置
-                ex=timeout,  # 过期时间
-            )
+            try:
+                acquired = await self.redis.set(
+                    lock_key,
+                    lock_value,
+                    nx=True,  # 只在键不存在时设置
+                    ex=timeout,  # 过期时间
+                )
+            except _RECOVERABLE_REDIS_ERRORS as exc:
+                raise RedisError(f"Redis lock unavailable for {key}: {exc}") from exc
 
             if acquired:
                 break
@@ -71,27 +80,51 @@ class RedisLock:
                 return 0
             end
             """
-            await self.redis.eval(lua_script, 1, lock_key, lock_value)
+            try:
+                await self.redis.eval(lua_script, 1, lock_key, lock_value)
+            except _RECOVERABLE_REDIS_ERRORS as exc:
+                logger.warning("Redis lock release failed key=%s: %s", key, exc)
 
 
 # 全局 Redis 客户端实例（可选）
 _redis_client: Optional[aioredis.Redis] = None
+_redis_client_loop: Optional[asyncio.AbstractEventLoop] = None
+
+
+async def _safe_close_redis_client(client: aioredis.Redis) -> None:
+    try:
+        await client.aclose()
+    except AttributeError:
+        try:
+            await client.close()
+        except _RECOVERABLE_REDIS_ERRORS as exc:
+            logger.warning("Redis client close failed: %s", exc)
+    except _RECOVERABLE_REDIS_ERRORS as exc:
+        logger.warning("Redis client close failed: %s", exc)
 
 
 async def get_redis_client() -> aioredis.Redis:
     """获取 Redis 客户端实例"""
-    global _redis_client
+    global _redis_client, _redis_client_loop
+
+    current_loop = asyncio.get_running_loop()
+    if _redis_client is not None and _redis_client_loop is not current_loop:
+        await _safe_close_redis_client(_redis_client)
+        _redis_client = None
+        _redis_client_loop = None
 
     if _redis_client is None:
         _redis_client = await aioredis.from_url(settings.effective_redis_url, encoding="utf-8", decode_responses=True)
+        _redis_client_loop = current_loop
 
     return _redis_client
 
 
 async def close_redis_client():
     """关闭 Redis 客户端"""
-    global _redis_client
+    global _redis_client, _redis_client_loop
 
     if _redis_client is not None:
-        await _redis_client.close()
+        await _safe_close_redis_client(_redis_client)
         _redis_client = None
+        _redis_client_loop = None

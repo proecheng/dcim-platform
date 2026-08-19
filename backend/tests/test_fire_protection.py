@@ -4,7 +4,7 @@ Story 9-2
 """
 
 import uuid
-from unittest.mock import patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 from httpx import AsyncClient, ASGITransport
@@ -373,18 +373,12 @@ async def test_fire_protection_status(client):
 @pytest.mark.anyio
 async def test_fire_protection_reload(client, db_session):
     """测试 reload 端点"""
-    from app.engines import linkage_engine as le_module
+    from app.engines.linkage_engine import linkage_engine
 
-    # patch linkage_engine.reload_policies 避免它内部调用 async_session
-    class _FakeCtx:
-        async def __aenter__(self):
-            return db_session
-
-        async def __aexit__(self, *args):
-            pass
-
-    with patch.object(le_module, "async_session", return_value=_FakeCtx()):
+    with patch.object(linkage_engine, "reload_policies", new_callable=AsyncMock, return_value=0) as reload_mock:
         resp = await client.post("/api/v1/linkage/fire-protection/reload")
+
+    reload_mock.assert_awaited_once_with(db_session)
 
     assert resp.status_code == 200
     data = resp.json()

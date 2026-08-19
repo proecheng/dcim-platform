@@ -19,6 +19,7 @@ from .api.deps import authenticate_access_token, build_site_access_context, enfo
 from .services.websocket import ConnectionContext, WebSocketAuthorizationContext, ws_manager
 from .demo.lifecycle import startup as demo_startup, shutdown as demo_shutdown
 from .core.redis import redis_service
+from .services.observability import run_observability_monitor
 from .engines.alarm_engine import alarm_engine
 from .engines.linkage_engine import linkage_engine
 from .engines.event_bus import get_event_bus
@@ -1225,6 +1226,7 @@ async def lifespan(app: FastAPI):
             await asyncio.sleep(10)
 
     rollback_task = asyncio.create_task(_rollback_monitor_loop())
+    observability_task = asyncio.create_task(run_observability_monitor(async_session))
     print("回退保护监控已启动，每10秒检查一次")
 
     print("API文档: http://localhost:8000/docs")
@@ -1265,6 +1267,7 @@ async def lifespan(app: FastAPI):
     soh_calculation_task.cancel()
     channel_escalation_task.cancel()  # Story 34.5
     rollback_task.cancel()  # Story 30.2
+    observability_task.cancel()
 
     # 停止校准检查定时任务
     if scheduler:
@@ -1366,13 +1369,17 @@ async def readiness():
 
     # Redis 检查
     try:
-        if redis_service.is_available:
+        if not settings.redis_enabled:
+            checks["redis"] = "disabled"
+        elif redis_service.is_available:
             await redis_service._pool.ping()
             checks["redis"] = "ok"
         else:
-            checks["redis"] = "disabled"
+            checks["redis"] = "fail"
+            ready = False
     except Exception:
         checks["redis"] = "fail"
+        ready = False
 
     # WebSocket 检查
     checks["websocket"] = {

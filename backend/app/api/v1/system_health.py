@@ -17,9 +17,19 @@ from ...models.config import SystemConfig
 from ...core.redis import redis_service
 from ...core.config import get_settings
 from ...services.websocket import ws_manager
+from ...services.observability import observability_monitor
+from ...mqtt import mqtt_service
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
+
+
+@router.get("/observability", summary="SLO 可观测性快照")
+async def get_observability_snapshot(
+    _: User = Depends(require_admin),
+):
+    """返回只读的 RED、依赖、资源、备份和网关告警快照。"""
+    return await observability_monitor.get_snapshot()
 
 
 @router.get("/health", summary="系统健康状态")
@@ -55,7 +65,7 @@ async def get_system_health(
     # MQTT 状态
     mqtt_status = "not_configured"
     if getattr(settings, "mqtt_enabled", False):
-        mqtt_status = "unknown"
+        mqtt_status = "connected" if mqtt_service.is_connected else "disconnected"
 
     # 存储使用率
     storage_info = {}

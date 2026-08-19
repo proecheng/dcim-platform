@@ -8,9 +8,10 @@ import logging
 import time
 import uuid
 from datetime import datetime
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from ..core.database import async_session
@@ -29,52 +30,57 @@ class LinkageEngine:
         self._policy_cache: Dict[int, dict] = {}
         self._handler_registry: ActionHandlerRegistry = default_registry()
 
-    async def load_policies(self) -> int:
+    async def load_policies(self, session: Optional[AsyncSession] = None) -> int:
         """从数据库加载所有启用的策略到内存缓存"""
-        async with async_session() as session:
-            result = await session.execute(
-                select(LinkagePolicy)
-                .where(LinkagePolicy.is_enabled == True)  # noqa: E712
-                .options(selectinload(LinkagePolicy.actions))
-            )
-            policies = result.scalars().all()
+        if session is None:
+            async with async_session() as managed_session:
+                return await self._load_policies(managed_session)
+        return await self._load_policies(session)
 
-            # 构建新缓存（copy-on-write）— 存储纯 dict，避免 detached ORM 对象
-            new_cache: Dict[int, dict] = {}
-            for p in policies:
-                actions_data = []
-                if hasattr(p, "actions") and p.actions is not None:
-                    sorted_actions = sorted(p.actions, key=lambda a: a.sort_order if a.sort_order is not None else 0)
-                    actions_data = [
-                        {
-                            "id": a.id,
-                            "action_type": a.action_type,
-                            "action_config": a.action_config,
-                            "sort_order": a.sort_order,
-                            "timeout_seconds": a.timeout_seconds,
-                            "retry_count": a.retry_count,
-                        }
-                        for a in sorted_actions
-                    ]
-                new_cache[p.id] = {
-                    "id": p.id,
-                    "name": p.name,
-                    "trigger_type": p.trigger_type,
-                    "trigger_condition": p.trigger_condition,
-                    "priority": p.priority,
-                    "is_system": p.is_system,
-                    "actions": actions_data,
-                }
+    async def _load_policies(self, session: AsyncSession) -> int:
+        result = await session.execute(
+            select(LinkagePolicy)
+            .where(LinkagePolicy.is_enabled == True)  # noqa: E712
+            .options(selectinload(LinkagePolicy.actions))
+        )
+        policies = result.scalars().all()
 
-            # 原子替换
-            self._policy_cache = new_cache
-            logger.info("联动引擎: 已加载 %d 条策略", len(new_cache))
-            return len(new_cache)
+        # 构建新缓存（copy-on-write）— 存储纯 dict，避免 detached ORM 对象
+        new_cache: Dict[int, dict] = {}
+        for p in policies:
+            actions_data = []
+            if hasattr(p, "actions") and p.actions is not None:
+                sorted_actions = sorted(p.actions, key=lambda a: a.sort_order if a.sort_order is not None else 0)
+                actions_data = [
+                    {
+                        "id": a.id,
+                        "action_type": a.action_type,
+                        "action_config": a.action_config,
+                        "sort_order": a.sort_order,
+                        "timeout_seconds": a.timeout_seconds,
+                        "retry_count": a.retry_count,
+                    }
+                    for a in sorted_actions
+                ]
+            new_cache[p.id] = {
+                "id": p.id,
+                "name": p.name,
+                "trigger_type": p.trigger_type,
+                "trigger_condition": p.trigger_condition,
+                "priority": p.priority,
+                "is_system": p.is_system,
+                "actions": actions_data,
+            }
 
-    async def reload_policies(self) -> int:
+        # 原子替换
+        self._policy_cache = new_cache
+        logger.info("联动引擎: 已加载 %d 条策略", len(new_cache))
+        return len(new_cache)
+
+    async def reload_policies(self, session: Optional[AsyncSession] = None) -> int:
         """重新加载策略缓存（公开接口）"""
         try:
-            return await self.load_policies()
+            return await self.load_policies(session)
         except Exception as e:
             logger.warning("联动引擎: 重新加载策略失败: %s", e)
             return len(self._policy_cache)

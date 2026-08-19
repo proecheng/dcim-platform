@@ -179,6 +179,35 @@ BASE_URL = "/api/v1/linkage"
 
 
 @pytest.mark.anyio
+async def test_load_policies_reuses_provided_session(db_session):
+    """显式传入会话时不得再创建全局数据库连接"""
+    from app.engines import linkage_engine as linkage_engine_module
+    from app.engines.linkage_engine import linkage_engine
+
+    with patch.object(
+        linkage_engine_module,
+        "async_session",
+        side_effect=AssertionError("不应创建全局数据库会话"),
+    ):
+        count = await linkage_engine.load_policies(db_session)
+
+    assert count == 0
+
+
+@pytest.mark.anyio
+async def test_application_engine_connection_does_not_block_pytest_exit():
+    """全局引擎连接由测试会话统一回收，不得遗留 aiosqlite 工作线程"""
+    from sqlalchemy import text
+
+    from app.core.database import async_session as application_async_session
+
+    async with application_async_session() as session:
+        value = (await session.execute(text("SELECT 1"))).scalar_one()
+
+    assert value == 1
+
+
+@pytest.mark.anyio
 async def test_create_policy(client):
     """创建联动策略"""
     resp = await client.post(

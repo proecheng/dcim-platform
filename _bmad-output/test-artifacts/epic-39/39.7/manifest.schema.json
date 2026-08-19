@@ -1,0 +1,140 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "story-39-7-manifest.schema.json",
+  "type": "object",
+  "required": ["schema_version", "story_id", "status", "gate_result", "owner", "decision_id", "annual_slo_proven", "provenance", "window", "artifacts", "commands", "tool_versions", "ac_mapping", "known_limits"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "story_id": {"const": "39.7"},
+    "status": {"enum": ["pending", "blocked", "pass"]},
+    "gate_result": {"enum": ["BLOCKED", "PASS"]},
+    "owner": {"const": "proecheng"},
+    "decision_id": {"const": "D39-03"},
+    "annual_slo_proven": {"const": false},
+    "provenance": {
+      "type": "object",
+      "required": ["git_sha", "backend_image", "frontend_image", "environment_fingerprint"],
+      "properties": {
+        "git_sha": {"anyOf": [{"type": "string", "pattern": "^[0-9a-f]{40}$"}, {"const": "PENDING"}]},
+        "backend_image": {"anyOf": [{"type": "string", "pattern": "^.+@sha256:[0-9a-f]{64}$"}, {"const": "PENDING"}]},
+        "frontend_image": {"anyOf": [{"type": "string", "pattern": "^.+@sha256:[0-9a-f]{64}$"}, {"const": "PENDING"}]},
+        "environment_fingerprint": {"anyOf": [{"type": "string", "pattern": "^[0-9a-f]{64}$"}, {"const": "PENDING"}]}
+      },
+      "additionalProperties": false
+    },
+    "window": {
+      "type": "object",
+      "required": ["started_at_utc", "ended_at_utc"],
+      "properties": {
+        "started_at_utc": {"type": ["string", "null"], "format": "date-time"},
+        "ended_at_utc": {"type": ["string", "null"], "format": "date-time"}
+      },
+      "additionalProperties": false
+    },
+    "artifacts": {
+      "type": "object",
+      "required": ["availability_samples", "provenance_samples", "e2e_runs", "incidents", "alerts", "maintenance_windows", "source_hashes", "backend_image_manifest", "frontend_image_manifest", "environment"],
+      "properties": {
+        "availability_samples": {"$ref": "#/$defs/artifact"},
+        "provenance_samples": {"$ref": "#/$defs/artifact"},
+        "e2e_runs": {"$ref": "#/$defs/artifact"},
+        "incidents": {"$ref": "#/$defs/artifact"},
+        "alerts": {"$ref": "#/$defs/artifact"},
+        "maintenance_windows": {"$ref": "#/$defs/artifact"},
+        "source_hashes": {"$ref": "#/$defs/artifact"},
+        "backend_image_manifest": {"$ref": "#/$defs/artifact"},
+        "frontend_image_manifest": {"$ref": "#/$defs/artifact"},
+        "environment": {"$ref": "#/$defs/artifact"}
+      },
+      "additionalProperties": false
+    },
+    "commands": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}},
+    "tool_versions": {"type": "object", "minProperties": 1, "additionalProperties": {"type": "string", "minLength": 1}},
+    "ac_mapping": {
+      "type": "object",
+      "required": ["AC1", "AC2", "AC3", "AC4", "AC5", "AC6", "AC7"],
+      "properties": {
+        "AC1": {"$ref": "#/$defs/mapping"}, "AC2": {"$ref": "#/$defs/mapping"},
+        "AC3": {"$ref": "#/$defs/mapping"}, "AC4": {"$ref": "#/$defs/mapping"},
+        "AC5": {"$ref": "#/$defs/mapping"}, "AC6": {"$ref": "#/$defs/mapping"},
+        "AC7": {"$ref": "#/$defs/mapping"}
+      },
+      "additionalProperties": false
+    },
+    "known_limits": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}}
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"status": {"const": "pass"}}},
+      "then": {
+        "properties": {
+          "gate_result": {"const": "PASS"},
+          "provenance": {"$ref": "#/$defs/complete_provenance"},
+          "window": {"$ref": "#/$defs/complete_window"},
+          "artifacts": {"$ref": "#/$defs/complete_artifacts"},
+          "commands": {"items": {"not": {"pattern": "^PENDING(?:\\b|:)"}}},
+          "tool_versions": {"additionalProperties": {"not": {"const": "PENDING"}}}
+        }
+      }
+    },
+    {"if": {"properties": {"status": {"enum": ["pending", "blocked"]}}}, "then": {"properties": {"gate_result": {"const": "BLOCKED"}}}},
+    {"if": {"properties": {"gate_result": {"const": "PASS"}}}, "then": {"properties": {"status": {"const": "pass"}}}}
+  ],
+  "$defs": {
+    "artifact": {
+      "type": "object",
+      "required": ["path", "sha256"],
+      "properties": {
+        "path": {"type": "string", "minLength": 1},
+        "sha256": {"anyOf": [{"type": "string", "pattern": "^[0-9a-f]{64}$"}, {"const": "PENDING"}]}
+      },
+      "additionalProperties": false
+    },
+    "complete_artifact": {
+      "type": "object",
+      "required": ["path", "sha256"],
+      "properties": {
+        "path": {"type": "string", "minLength": 1},
+        "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+      },
+      "additionalProperties": false
+    },
+    "complete_artifacts": {
+      "type": "object",
+      "properties": {
+        "availability_samples": {"$ref": "#/$defs/complete_artifact"},
+        "provenance_samples": {"$ref": "#/$defs/complete_artifact"},
+        "e2e_runs": {"$ref": "#/$defs/complete_artifact"},
+        "incidents": {"$ref": "#/$defs/complete_artifact"},
+        "alerts": {"$ref": "#/$defs/complete_artifact"},
+        "maintenance_windows": {"$ref": "#/$defs/complete_artifact"},
+        "source_hashes": {"$ref": "#/$defs/complete_artifact"},
+        "backend_image_manifest": {"$ref": "#/$defs/complete_artifact"},
+        "frontend_image_manifest": {"$ref": "#/$defs/complete_artifact"},
+        "environment": {"$ref": "#/$defs/complete_artifact"}
+      }
+    },
+    "complete_provenance": {
+      "type": "object",
+      "required": ["git_sha", "backend_image", "frontend_image", "environment_fingerprint"],
+      "properties": {
+        "git_sha": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+        "backend_image": {"type": "string", "pattern": "^.+@sha256:[0-9a-f]{64}$"},
+        "frontend_image": {"type": "string", "pattern": "^.+@sha256:[0-9a-f]{64}$"},
+        "environment_fingerprint": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+      },
+      "additionalProperties": false
+    },
+    "complete_window": {
+      "type": "object",
+      "required": ["started_at_utc", "ended_at_utc"],
+      "properties": {
+        "started_at_utc": {"type": "string", "format": "date-time"},
+        "ended_at_utc": {"type": "string", "format": "date-time"}
+      },
+      "additionalProperties": false
+    },
+    "mapping": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "minLength": 1}}
+  },
+  "additionalProperties": false
+}

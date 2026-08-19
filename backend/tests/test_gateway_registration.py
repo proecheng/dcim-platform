@@ -287,11 +287,12 @@ class TestMqttService:
 class TestMqttSettings:
     """MQTT 配置默认值测试"""
 
-    def test_mqtt_settings_defaults(self):
+    def test_mqtt_settings_defaults(self, monkeypatch):
         """Settings 包含 MQTT 默认配置"""
         from app.core.config import Settings
 
-        s = Settings()
+        monkeypatch.delenv("MQTT_ENABLED", raising=False)
+        s = Settings(_env_file=None, fault_tree_hmac_key="test-hmac-key-at-least-32-chars-long")
         assert s.mqtt_enabled is True
         assert s.mqtt_host == "localhost"
         assert s.mqtt_port == 1883

@@ -6396,6 +6396,19 @@ http:
   active_session: true
   tests:
   - AUTHZ-INVENTORY-HTTP-01
+- key: GET /api/v1/system/observability::get_observability_snapshot
+  method: GET
+  path: /api/v1/system/observability
+  operation: get_observability_snapshot
+  access: GLOBAL
+  roles:
+  - admin
+  action: read
+  resource: system
+  resolver: null
+  active_session: true
+  tests:
+  - AUTHZ-INVENTORY-HTTP-01
 - key: GET /api/v1/test-simple::test_simple
   method: GET
   path: /api/v1/test-simple

@@ -14,8 +14,15 @@ from .metrics import metrics_collector
 
 logger = logging.getLogger(__name__)
 
-# 不记录指标的路径
-_SKIP_PATHS = {"/api/health", "/api/readiness"}
+# 不记录指标的探针和抓取路径
+_SKIP_PATHS = {
+    "/api/health",
+    "/api/readiness",
+    "/api/metrics",
+    "/api/metrics/prometheus",
+    "/api/v1/system/health",
+    "/api/v1/system/observability",
+}
 
 
 class MetricsMiddleware(BaseHTTPMiddleware):
@@ -27,9 +34,28 @@ class MetricsMiddleware(BaseHTTPMiddleware):
             return await call_next(request)
 
         start = time.perf_counter()
-        response = await call_next(request)
-        duration_ms = (time.perf_counter() - start) * 1000
+        try:
+            response = await call_next(request)
+        except Exception:
+            duration_ms = (time.perf_counter() - start) * 1000
+            await metrics_collector.record_request(
+                method=request.method,
+                path=path,
+                status_code=500,
+                duration_ms=round(duration_ms, 2),
+            )
+            logger.exception(
+                "Unhandled request exception",
+                extra={
+                    "request_method": request.method,
+                    "request_path": path,
+                    "status_code": 500,
+                    "duration_ms": round(duration_ms, 2),
+                },
+            )
+            raise
 
+        duration_ms = (time.perf_counter() - start) * 1000
         await metrics_collector.record_request(
             method=request.method,
             path=path,

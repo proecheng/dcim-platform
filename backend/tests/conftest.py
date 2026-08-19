@@ -44,12 +44,19 @@ redis_required = pytest.mark.skipif(not redis_available, reason="Redis not avail
 if not os.getenv("FAULT_TREE_HMAC_KEY"):
     os.environ["FAULT_TREE_HMAC_KEY"] = "test-hmac-key-at-least-32-chars-long-for-testing-only"
 
-from app.core.database import Base, get_db
+from app.core.database import Base, engine as application_engine, get_db
 from app.core.security import get_password_hash
 from app.core.config import get_settings
 
 # 确保所有模型在 create_all 之前被导入
 import app.models  # noqa: F401
+
+
+@pytest.fixture(scope="session", autouse=True)
+async def application_engine_lifecycle():
+    """测试会话结束后回收应用全局引擎持有的连接线程"""
+    yield
+    await application_engine.dispose()
 
 
 

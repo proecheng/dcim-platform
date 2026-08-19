@@ -23,6 +23,7 @@ class MqttService:
         self._task: Optional[asyncio.Task] = None
         self._heartbeat_task: Optional[asyncio.Task] = None
         self._running = False
+        self._connected = False
         self._client = None
         # 动态订阅: topic_pattern → handler
         self._dynamic_subscriptions: dict[str, MessageHandler] = {}
@@ -43,6 +44,8 @@ class MqttService:
     async def stop(self) -> None:
         """停止 MQTT 客户端"""
         self._running = False
+        self._connected = False
+        self._client = None
         for task in [self._task, self._heartbeat_task]:
             if task:
                 task.cancel()
@@ -94,6 +97,7 @@ class MqttService:
                 ) as client:
                     logger.info("MQTT 已连接: %s:%d", settings.mqtt_host, settings.mqtt_port)
                     self._client = client
+                    self._connected = True
                     retry_delay = 1.0  # 重置退避
 
                     # 订阅网关状态 topic
@@ -121,16 +125,27 @@ class MqttService:
                         await self._handle_message(message)
 
             except asyncio.CancelledError:
+                self._connected = False
+                self._client = None
                 raise
             except ImportError:
+                self._connected = False
                 self._client = None
                 logger.error("aiomqtt 未安装，MQTT 功能不可用")
                 return
             except Exception as e:
+                self._connected = False
                 self._client = None
                 logger.warning("MQTT 连接失败: %s (%.1fs 后重试)", e, retry_delay)
                 await asyncio.sleep(retry_delay)
                 retry_delay = min(retry_delay * 2, 60.0)
+            finally:
+                self._connected = False
+                self._client = None
+
+    @property
+    def is_connected(self) -> bool:
+        return self._running and self._connected and self._client is not None
 
     async def _handle_message(self, message) -> None:  # type: ignore[no-untyped-def]
         """处理收到的 MQTT 消息"""

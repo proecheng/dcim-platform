@@ -55,7 +55,7 @@ async def reload_fire_protection(
     from ...services.fire_protection import reload as fp_reload
 
     count = await fp_reload(db)
-    await linkage_engine.reload_policies()
+    await linkage_engine.reload_policies(db)
     return {"message": f"消防策略重载完成，共 {count} 条", "count": count}
 
 
@@ -213,7 +213,7 @@ async def create_policy(
         db.add(action)
 
     await db.commit()
-    await linkage_engine.reload_policies()
+    await linkage_engine.reload_policies(db)
 
     return {"id": policy.id, "message": "策略创建成功"}
 
@@ -265,7 +265,7 @@ async def update_policy(
             db.add(action)
 
     await db.commit()
-    await linkage_engine.reload_policies()
+    await linkage_engine.reload_policies(db)
 
     return {"message": "策略更新成功"}
 
@@ -289,7 +289,7 @@ async def delete_policy(
     await db.execute(delete(LinkageAction).where(LinkageAction.policy_id == policy_id))
     await db.delete(policy)
     await db.commit()
-    await linkage_engine.reload_policies()
+    await linkage_engine.reload_policies(db)
 
     return {"message": "策略删除成功"}
 
@@ -308,7 +308,7 @@ async def toggle_policy(
 
     policy.is_enabled = not policy.is_enabled
     await db.commit()
-    await linkage_engine.reload_policies()
+    await linkage_engine.reload_policies(db)
 
     return {"is_enabled": policy.is_enabled, "message": "状态切换成功"}
 

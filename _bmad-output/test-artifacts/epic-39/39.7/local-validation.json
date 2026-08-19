@@ -1,0 +1,68 @@
+{
+  "schema_version": 1,
+  "story_id": "39.7",
+  "evidence_class": "local-implementation-only",
+  "captured_at_utc": "2026-08-18T11:06:03Z",
+  "git_baseline": "2959f0210001958b49a522ef3fcc895981124384",
+  "annual_slo_proven": false,
+  "preproduction_window_proven": false,
+  "story_gate_result": "BLOCKED",
+  "results": {
+    "story_and_related_tests": {
+      "status": "passed",
+      "passed": 61,
+      "command": "python -m pytest -q backend/tests/test_story_39_7_metrics.py backend/tests/test_story_39_7_observability.py backend/tests/test_story_39_7_sli.py backend/tests/test_story_39_7_evidence.py"
+    },
+    "ruff": {
+      "status": "passed",
+      "command": "python -m ruff check backend/app/contracts backend/app/services/observability.py backend/app/services/slo_evidence.py backend/app/middleware/metrics.py backend/app/middleware/metrics_middleware.py backend/app/api/v1/system_health.py backend/app/core/authorization.py backend/app/mqtt/client.py backend/app/main.py backend/tests/test_story_39_7_metrics.py backend/tests/test_story_39_7_observability.py backend/tests/test_story_39_7_sli.py backend/tests/test_story_39_7_evidence.py scripts/story_39_7_evidence.py"
+    },
+    "manifest_schema": {
+      "status": "passed",
+      "pending_manifest_valid": true,
+      "false_pass_and_status_gate_contradictions_rejected": true
+    },
+    "compose_config": {
+      "status": "passed",
+      "backend_and_frontend_vcs_ref": "2959f0210001958b49a522ef3fcc895981124384",
+      "missing_vcs_ref_rejected": true
+    },
+    "pending_evidence_negative_gate": {
+      "status": "passed",
+      "expected_exit_code": 1,
+      "actual_exit_code": 1,
+      "reason_verified": "manifest is pending or blocked",
+      "runtime_secret_injection_required": false
+    },
+    "git_diff_check": {
+      "status": "passed"
+    },
+    "backend_regression": {
+      "status": "incomplete",
+      "collected": 4188,
+      "failed": null,
+      "standard_attempt": {
+        "command": "python -m pytest -q backend/tests --tb=short",
+        "elapsed_minutes_before_termination": 61.1,
+        "result": "pytest process stopped making CPU progress and produced no final summary"
+      },
+      "diagnostic_wrapper_attempt": {
+        "command": "pytest.main(['-q', 'backend/tests', '--tb=short']) with the original return code preserved",
+        "elapsed_minutes_before_termination": 79.3,
+        "result": "pytest.main did not return and produced no final summary"
+      },
+      "isolated_diagnostics": {
+        "passed": 95,
+        "breakdown": "83 spatial/topology tests, 8 time-window tuning tests, and 4 fire-protection tests",
+        "finding": "The four fire-protection assertions passed in 12.83 seconds, after which a non-daemon aiosqlite _connection_worker_thread remained blocked on its queue and prevented normal process exit."
+      },
+      "reason": "The configured complete backend suite cannot be claimed as PASS until the unrelated global SQLite test lifecycle leak is corrected and one standard invocation exits with a final summary."
+    }
+  },
+  "known_limits": [
+    "The genuine fixed-image 72-hour pre-production window has not run.",
+    "Twelve spaced first-pass critical E2E runs have not been collected.",
+    "The local validation does not prove the annual 99.5% availability SLO.",
+    "The complete 4,188-test backend suite did not produce a final summary because of an unrelated global aiosqlite test-lifecycle leak."
+  ]
+}

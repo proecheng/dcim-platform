@@ -1,0 +1,79 @@
+schema_version: 1
+decision_id: D39-03
+owner: proecheng
+recorded_at: '2026-08-18'
+evidence_window:
+  minimum_duration_seconds: 259200
+  critical_e2e_runs: 12
+  minimum_e2e_spacing_seconds: 18000
+  maximum_monitoring_gap_seconds: 300
+  first_attempt_required: true
+  retries_allowed_for_gate: 0
+  minimum_resolved_critical_incidents: 1
+thresholds:
+  http_error_rate_5m:
+    warning_percent: 0.5
+    critical_percent: 1.0
+    recovery_evaluations: 3
+  resources:
+    warning_percent: 80.0
+    critical_percent: 90.0
+    recovery_below_percent: 75.0
+    sustain_seconds: 300
+    recovery_evaluations: 3
+  backup_age:
+    warning_seconds: 93600
+    critical_seconds: 129600
+  gateway_backlog:
+    warning_consecutive_failures: 3
+    critical_heartbeat_age_seconds: 300
+  availability:
+    annual_slo_percent: 99.5
+    annual_error_budget_minutes: 2628
+    short_window_proves_annual_slo: false
+mttr:
+  starts_at: critical_alert_fired_at
+  recovery_requires:
+    readiness_passed: true
+    critical_e2e_passed: true
+    consecutive_evaluations: 3
+required_artifacts:
+  - availability_samples
+  - provenance_samples
+  - e2e_runs
+  - incidents
+  - alerts
+  - maintenance_windows
+  - source_hashes
+  - backend_image_manifest
+  - frontend_image_manifest
+  - environment
+required_source_paths:
+  - backend/app/main.py
+  - backend/app/middleware/metrics.py
+  - backend/app/middleware/metrics_middleware.py
+  - backend/app/contracts/__init__.py
+  - backend/app/contracts/observability.py
+  - backend/app/contracts/slo_evidence.py
+  - backend/app/services/observability.py
+  - backend/app/services/slo_evidence.py
+  - backend/app/api/v1/system_health.py
+  - backend/authz_inventory.yaml
+  - scripts/story_39_7_evidence.py
+  - deploy/observability/story-39-7-contract.yaml
+required_acceptance_criteria:
+  - AC1
+  - AC2
+  - AC3
+  - AC4
+  - AC5
+  - AC6
+  - AC7
+required_ac_artifacts:
+  AC1: [source_hashes]
+  AC2: [availability_samples, provenance_samples]
+  AC3: [alerts]
+  AC4: [availability_samples, incidents, maintenance_windows]
+  AC5: [provenance_samples, e2e_runs, incidents, alerts, source_hashes, backend_image_manifest, frontend_image_manifest, environment]
+  AC6: [availability_samples, provenance_samples, e2e_runs]
+  AC7: [source_hashes, environment]
