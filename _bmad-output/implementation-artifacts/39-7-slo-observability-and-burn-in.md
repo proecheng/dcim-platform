@@ -207,6 +207,7 @@ GPT-5
 - Extend the existing collector with bounded cumulative samples plus a clock-injected rolling window; retain current top-level metric fields and correct percentiles with nearest-rank calculation.
 - Compose dependency, gateway, backup, resource, and RED inputs in one read-only service; evaluate alert state with an injected monotonic/UTC clock and process-local lifecycle explicitly labeled.
 - Keep release evidence authoritative in an independent CLI validator that recomputes availability, error budget, MTTR, continuity, provenance, and first-pass E2E rules from raw records.
+- Deploy the fixed candidate through a standalone no-build Compose definition that joins the Story 39.3 database network and status volume; freeze image, service-config, process, and host identity before starting the real window.
 
 ### Completion Notes List
 
@@ -221,6 +222,8 @@ GPT-5
 - Fixed-image baseline prepared from candidate `ba1177448958c90e7ab979a3666f8719208c2f8f` using backend image `dcim-backend@sha256:2024d5d0e953153674a769307dbfccb840cbe47596e3277a8efbb09b17b626fc`, frontend image `dcim-frontend@sha256:28f85db1baf1f039614c2e1ea4b4a4a1fc610bfda3c30ce239f7b018f6ee0032`, and environment fingerprint `1e112779666dad5dab8cd69e2298bda847f556eda34ec01c7baedc844e5ab0db`.
 - Upgraded the frontend candidate build stage to Node 22 and hardened the preparation tool for UTF-8 BuildKit output on Windows; 6 preparation-tool tests and the frontend production build pass.
 - Independent validation rejects the baseline with the expected non-zero exit code only because the manifest is `BLOCKED`, the window and availability samples have not started, critical-E2E placeholders remain, and the resolved incident drill is absent; no provenance binding error was reported.
+- Published the fixed backend and frontend candidates to GHCR under `story-39-7-ba11774` without moving `latest`; GHCR and Buildx independently report the original immutable digests and OCI revision `ba1177448958c90e7ab979a3666f8719208c2f8f`.
+- Added a standalone pre-production Compose definition, host-only environment template, and operational deployment plan that prohibit builds and automatic pulls, require immutable dependencies, and connect the application to Story 39.3 external database/status resources; all 68 Story tests, 7 preparation/deployment guard tests, Ruff, and Compose configuration validation pass.
 - Task 5.4 remains open: no genuine immutable-image 72-hour pre-production window or 12 spaced first-pass E2E runs have occurred, so this Story remains `in-progress`.
 
 ### File List
@@ -251,6 +254,9 @@ GPT-5
 - `backend/tests/test_gateway_registration.py`
 - `backend/tests/test_redis_lock.py`
 - `deploy/observability/story-39-7-contract.yaml`
+- `deploy/observability/docker-compose.story-39-7-preprod.yml`
+- `deploy/observability/story-39-7-preprod.env.example`
+- `deploy/observability/story-39-7-preproduction-deployment.md`
 - `docker-compose.yml`
 - `scripts/story_39_7_evidence.py`
 - `scripts/story_39_7_prepare.py`
@@ -276,3 +282,4 @@ GPT-5
 - 2026-08-18: Implemented RED/health observability, persistent alert evaluation, SLI/MTTR recomputation, trusted burn-in evidence validation, lifecycle-aware manifest schema, immutable image provenance, and local blocked-gate evidence; Story remains in progress pending complete regression and genuine 72-hour burn-in.
 - 2026-08-19: Cleared full backend regression after fixing a test-isolation MQTT settings assertion and hardening Redis lock client reuse across event loops; targeted Ruff and diff checks passed on touched files.
 - 2026-08-19: Prepared the Node 22 fixed-image candidate and trusted local `BLOCKED` baseline, fixed Windows BuildKit output decoding, and recorded immutable SHA/digest/environment provenance; the genuine 72-hour gate remains open.
+- 2026-08-19: Published the fixed application images to GHCR and added the no-build pre-production deployment package; Story remains in progress until a real target, collector, scheduled E2E runs, and incident drill complete the external gate.

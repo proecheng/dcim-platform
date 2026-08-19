@@ -6,6 +6,7 @@ import tarfile
 from pathlib import Path
 
 import pytest
+import yaml
 
 from scripts.story_39_7_prepare import (
     EvidencePreparationError,
@@ -99,3 +100,18 @@ def test_run_decodes_tool_output_as_utf8(monkeypatch):
     assert _run(["docker", "version"]) == "build \N{check mark}"
     assert captured["encoding"] == "utf-8"
     assert captured["errors"] == "replace"
+
+
+def test_preproduction_compose_cannot_rebuild_or_replace_candidate_images():
+    repository = Path(__file__).resolve().parents[2]
+    compose_path = repository / "deploy" / "observability" / "docker-compose.story-39-7-preprod.yml"
+    compose = yaml.safe_load(compose_path.read_text(encoding="utf-8"))
+    services = compose["services"]
+
+    assert all("build" not in service for service in services.values())
+    assert services["backend"]["image"] == "${DCIM_BACKEND_IMAGE:?DCIM_BACKEND_IMAGE is required}"
+    assert services["nginx"]["image"] == "${DCIM_FRONTEND_IMAGE:?DCIM_FRONTEND_IMAGE is required}"
+    assert all(service["pull_policy"] == "never" for service in services.values())
+    assert "dr-database-client" in services["backend"]["networks"]
+    assert compose["networks"]["dr-database-client"]["external"] is True
+    assert compose["volumes"]["dr-status"]["external"] is True

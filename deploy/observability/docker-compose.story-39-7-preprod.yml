@@ -1,0 +1,119 @@
+name: dcim-story-39-7-preprod
+
+services:
+  redis:
+    image: "${DCIM_REDIS_IMAGE:?DCIM_REDIS_IMAGE is required}"
+    pull_policy: never
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes", "--requirepass", "${REDIS_PASSWORD:?REDIS_PASSWORD is required}"]
+    environment:
+      REDIS_PASSWORD: "${REDIS_PASSWORD:?REDIS_PASSWORD is required}"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a \"$$REDIS_PASSWORD\" ping | grep PONG"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - dcim-network
+
+  emqx:
+    image: "${DCIM_EMQX_IMAGE:?DCIM_EMQX_IMAGE is required}"
+    pull_policy: never
+    restart: unless-stopped
+    environment:
+      EMQX_NAME: dcim-emqx
+      EMQX_HOST: 0.0.0.0
+    volumes:
+      - emqx-data:/opt/emqx/data
+    healthcheck:
+      test: ["CMD", "emqx", "ping"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    networks:
+      - dcim-network
+
+  backend:
+    image: "${DCIM_BACKEND_IMAGE:?DCIM_BACKEND_IMAGE is required}"
+    pull_policy: never
+    restart: unless-stopped
+    environment:
+      APP_NAME: "${APP_NAME:-DCIM Preproduction}"
+      APP_VERSION: "3.0.0"
+      APP_ENV: production
+      DEBUG: "false"
+      DATABASE_URL: "${DATABASE_URL:?DATABASE_URL is required}"
+      TIMESCALEDB_ENABLED: "${TIMESCALEDB_ENABLED:-true}"
+      SECRET_KEY: "${SECRET_KEY:?SECRET_KEY is required}"
+      ALGORITHM: "${ALGORITHM:-HS256}"
+      ACCESS_TOKEN_EXPIRE_MINUTES: "${ACCESS_TOKEN_EXPIRE_MINUTES:-30}"
+      REFRESH_TOKEN_EXPIRE_DAYS: "${REFRESH_TOKEN_EXPIRE_DAYS:-7}"
+      CORS_ORIGINS: "${CORS_ORIGINS:?CORS_ORIGINS is required}"
+      REDIS_ENABLED: "true"
+      REDIS_URL: "${REDIS_URL:?REDIS_URL is required}"
+      MQTT_ENABLED: "true"
+      MQTT_HOST: emqx
+      MQTT_PORT: "1883"
+      MQTT_USERNAME: "${MQTT_USERNAME:?MQTT_USERNAME is required}"
+      MQTT_PASSWORD: "${MQTT_PASSWORD:?MQTT_PASSWORD is required}"
+      GATEWAY_SECRET_KEY: "${GATEWAY_SECRET_KEY:?GATEWAY_SECRET_KEY is required}"
+      VPP_API_KEY: "${VPP_API_KEY:?VPP_API_KEY is required}"
+      LICENSE_KEY: "${LICENSE_KEY:?LICENSE_KEY is required}"
+      FAULT_TREE_HMAC_KEY: "${FAULT_TREE_HMAC_KEY:?FAULT_TREE_HMAC_KEY is required}"
+      SEED_ENABLED: "false"
+      DEMO_ENABLED: "false"
+      SIMULATION_ENABLED: "false"
+      COLLECT_INTERVAL: "${COLLECT_INTERVAL:-10}"
+      DATA_RETENTION_DAYS: "${DATA_RETENTION_DAYS:-30}"
+      MAX_POINTS: "${MAX_POINTS:-100}"
+      BACKUP_STATUS_DIR: /var/lib/dcim-dr-status
+      OBSERVABILITY_STATE_PATH: /var/lib/dcim-observability/state.json
+    volumes:
+      - dr-status:/var/lib/dcim-dr-status:ro
+      - observability-state:/var/lib/dcim-observability
+    depends_on:
+      redis:
+        condition: service_healthy
+      emqx:
+        condition: service_healthy
+    networks:
+      - dcim-network
+      - dr-database-client
+    labels:
+      com.dcim.story: "39.7"
+      com.dcim.candidate.git-sha: "${CANDIDATE_GIT_SHA:?CANDIDATE_GIT_SHA is required}"
+      com.dcim.candidate.expected-image-id: "${DCIM_BACKEND_EXPECTED_ID:?DCIM_BACKEND_EXPECTED_ID is required}"
+
+  nginx:
+    image: "${DCIM_FRONTEND_IMAGE:?DCIM_FRONTEND_IMAGE is required}"
+    pull_policy: never
+    restart: unless-stopped
+    ports:
+      - "${PREPROD_BIND_ADDRESS:-127.0.0.1}:${NGINX_PORT:-3000}:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - dcim-network
+    labels:
+      com.dcim.story: "39.7"
+      com.dcim.candidate.git-sha: "${CANDIDATE_GIT_SHA:?CANDIDATE_GIT_SHA is required}"
+      com.dcim.candidate.expected-image-id: "${DCIM_FRONTEND_EXPECTED_ID:?DCIM_FRONTEND_EXPECTED_ID is required}"
+
+volumes:
+  redis-data:
+  emqx-data:
+  observability-state:
+  dr-status:
+    external: true
+    name: "${DCIM_DR_STATUS_VOLUME:-dcim-story-39-3-dr_dr-status}"
+
+networks:
+  dcim-network:
+    driver: bridge
+  dr-database-client:
+    external: true
+    name: "${DCIM_DR_DATABASE_NETWORK:-dcim-story-39-3-dr_database-client}"
