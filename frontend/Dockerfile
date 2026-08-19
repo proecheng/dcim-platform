@@ -1,5 +1,5 @@
 # 前端 Dockerfile — 多阶段构建
-FROM node:18-alpine AS build
+FROM node:22-alpine AS build
 
 ARG VCS_REF=unknown
 ARG STORY_SOURCE_SNAPSHOT=unknown
