@@ -112,6 +112,7 @@ def test_repository_example_inventory_contains_ten_unique_targets():
     assert len(inventory.targets) == 10
     assert len({target.e2e.local_port for target in inventory.targets}) == 10
     assert inventory.concurrency == 3
+    assert {target.e2e.browser_channel for target in inventory.targets} == {"msedge"}
 
 
 def test_critical_auth_spec_uses_configured_e2e_username():
@@ -129,6 +130,7 @@ def test_playwright_artifacts_can_be_isolated_per_fleet_target():
     assert "process.env.E2E_AUTH_FILE" in auth_setup
     assert "process.env.E2E_AUTH_FILE" in playwright_config
     assert "process.env.E2E_OUTPUT_DIR" in playwright_config
+    assert "process.env.E2E_BROWSER_CHANNEL" in playwright_config
 
 
 @pytest.mark.parametrize(
@@ -426,7 +428,12 @@ def test_e2e_uses_target_specific_temporary_auth_and_output_paths(tmp_path, monk
                     "docker_context": "browser-a",
                     "env_file": str(env_path),
                     "project_name": "dcim-browser-a",
-                    "e2e": {"mode": "local", "local_port": 13001, "headed": True},
+                    "e2e": {
+                        "mode": "local",
+                        "local_port": 13001,
+                        "headed": True,
+                        "browser_channel": "msedge",
+                    },
                 }
             ],
         )
@@ -449,4 +456,5 @@ def test_e2e_uses_target_specific_temporary_auth_and_output_paths(tmp_path, monk
     assert checks[0]["name"] == "critical_e2e"
     assert runner.environment["E2E_AUTH_FILE"] != str(Path("e2e/.auth/admin.json"))
     assert "dcim-e2e-browser-a-" in runner.environment["E2E_AUTH_FILE"]
+    assert runner.environment["E2E_BROWSER_CHANNEL"] == "msedge"
     assert not Path(runner.environment["E2E_AUTH_FILE"]).parent.exists()

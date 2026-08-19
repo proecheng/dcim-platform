@@ -18,6 +18,16 @@ if (!loopbackHosts.has(parsedBaseURL.hostname)) {
 const baseURL = parsedBaseURL.origin
 const authFile = process.env.E2E_AUTH_FILE || './e2e/.auth/admin.json'
 const outputDir = process.env.E2E_OUTPUT_DIR || './e2e/test-results'
+const browserChannel = process.env.E2E_BROWSER_CHANNEL as
+  | 'chrome'
+  | 'chrome-beta'
+  | 'chrome-dev'
+  | 'chrome-canary'
+  | 'msedge'
+  | 'msedge-beta'
+  | 'msedge-dev'
+  | 'msedge-canary'
+  | undefined
 
 export default defineConfig({
   testDir: './e2e',
@@ -37,6 +47,7 @@ export default defineConfig({
       name: 'chromium',
       use: {
         browserName: 'chromium',
+        channel: browserChannel,
         headless: isCI,
         launchOptions: isCI ? {} : { slowMo: 300 },
         storageState: authFile,

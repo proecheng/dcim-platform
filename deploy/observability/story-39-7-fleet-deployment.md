@@ -52,7 +52,9 @@ Install or verify:
 - Python 3.11 and PyYAML 6.0.3.
 - Docker CLI with Docker Compose v2.
 - Node.js 22 and repository dependencies installed with `npm ci`.
-- Playwright Chromium installed with `npx playwright install chromium`.
+- Microsoft Edge installed on a Windows control computer for the example's
+  `browser_channel: msedge`, or Playwright Chromium installed with
+  `npx playwright install chromium` when no channel is configured.
 - OpenSSH client and key-based access to remote targets.
 
 Confirm the Python dependency without exposing configuration:
@@ -180,9 +182,10 @@ loopback listener. This satisfies the repository's loopback-only Playwright
 policy without exposing the pre-production HTTP port.
 
 Every concurrent SSH target needs a unique `local_port`. The example reserves
-`13001` through `13009`. `headed: true` opens visible Playwright Chromium
-windows on the control computer. Set it to `false` for a non-interactive CI
-runner.
+`13001` through `13009`. `headed: true` opens visible external Microsoft Edge
+windows on the control computer because the example sets `browser_channel:
+msedge`. Remove `browser_channel` to use bundled Playwright Chromium, or set
+`headed: false` for a non-interactive CI runner.
 
 Concurrent targets use separate temporary authentication-state and trace
 directories. Those directories are deleted after each run so bearer tokens do

@@ -10,6 +10,7 @@ defaults:
   platform: linux/amd64
   e2e:
     headed: true
+    browser_channel: msedge
     specs:
       - e2e/auth.spec.ts
       - e2e/invalid-detail-pages.spec.ts

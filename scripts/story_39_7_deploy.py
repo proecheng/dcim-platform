@@ -34,6 +34,16 @@ PLACEHOLDER_RE = re.compile(
 )
 SUPPORTED_PLATFORM = "linux/amd64"
 SUPPORTED_ACTIONS = {"plan", "preflight", "deploy", "verify", "test", "status"}
+SUPPORTED_BROWSER_CHANNELS = {
+    "chrome",
+    "chrome-beta",
+    "chrome-dev",
+    "chrome-canary",
+    "msedge",
+    "msedge-beta",
+    "msedge-dev",
+    "msedge-canary",
+}
 APPLICATION_IMAGE_KEYS = {
     "backend": ("DCIM_BACKEND_IMAGE", "DCIM_BACKEND_EXPECTED_ID"),
     "frontend": ("DCIM_FRONTEND_IMAGE", "DCIM_FRONTEND_EXPECTED_ID"),
@@ -95,6 +105,7 @@ class E2EConfig:
     local_port: int | None = None
     remote_port: int | None = None
     headed: bool = False
+    browser_channel: str | None = None
     specs: tuple[str, ...] = DEFAULT_E2E_SPECS
 
 
@@ -189,6 +200,14 @@ def _build_e2e(raw: Mapping[str, Any], target_name: str) -> E2EConfig:
         raise DeploymentError(
             f"target {target_name} e2e.specs must be a non-empty list of paths"
         )
+    browser_channel = raw.get("browser_channel")
+    if (
+        browser_channel is not None
+        and browser_channel not in SUPPORTED_BROWSER_CHANNELS
+    ):
+        raise DeploymentError(
+            f"target {target_name} has unsupported e2e.browser_channel: {browser_channel!r}"
+        )
     if mode == "ssh-tunnel":
         if not isinstance(ssh_target, str) or not ssh_target.strip():
             raise DeploymentError(
@@ -209,6 +228,7 @@ def _build_e2e(raw: Mapping[str, Any], target_name: str) -> E2EConfig:
         local_port=local_port,
         remote_port=remote_port,
         headed=bool(raw.get("headed", False)),
+        browser_channel=browser_channel,
         specs=tuple(specs_raw),
     )
 
@@ -609,6 +629,7 @@ class FleetController:
                 "status": "passed",
                 "mode": target.e2e.mode,
                 "headed": target.e2e.headed,
+                "browser_channel": target.e2e.browser_channel or "bundled-chromium",
             },
         ]
 
@@ -942,6 +963,8 @@ class FleetController:
                     "PLAYWRIGHT_JSON_OUTPUT_FILE": str(artifact),
                 }
             )
+            if target.e2e.browser_channel:
+                process_env["E2E_BROWSER_CHANNEL"] = target.e2e.browser_channel
             if (
                 not process_env["E2E_ADMIN_USER"]
                 or not process_env["E2E_ADMIN_PASSWORD"]
@@ -973,6 +996,7 @@ class FleetController:
                 "name": "critical_e2e",
                 "status": "passed",
                 "headed": target.e2e.headed,
+                "browser_channel": target.e2e.browser_channel or "bundled-chromium",
                 "retries": 0,
                 "artifact": str(artifact),
             }
