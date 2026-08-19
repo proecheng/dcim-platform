@@ -34,13 +34,16 @@ def _run(
     cwd: Path = ROOT,
     text: bool = True,
 ) -> str | bytes:
+    output_options: dict[str, Any] = {"text": text}
+    if text:
+        output_options.update(encoding="utf-8", errors="replace")
     result = subprocess.run(
         list(command),
         cwd=cwd,
         check=False,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
-        text=text,
+        **output_options,
     )
     if result.returncode != 0:
         stderr = result.stderr.strip() if text else result.stderr.decode(errors="replace").strip()

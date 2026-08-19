@@ -1,6 +1,7 @@
 import hashlib
 import io
 import json
+import subprocess
 import tarfile
 from pathlib import Path
 
@@ -8,6 +9,7 @@ import pytest
 
 from scripts.story_39_7_prepare import (
     EvidencePreparationError,
+    _run,
     buildx_command,
     extract_oci_manifest,
 )
@@ -83,3 +85,17 @@ def test_frontend_candidate_uses_supported_node_build_image():
     dockerfile = (Path(__file__).resolve().parents[2] / "frontend" / "Dockerfile").read_text(encoding="utf-8")
 
     assert "FROM node:22-alpine AS build" in dockerfile
+
+
+def test_run_decodes_tool_output_as_utf8(monkeypatch):
+    captured: dict[str, object] = {}
+
+    def fake_run(command, **kwargs):
+        captured.update(kwargs)
+        return subprocess.CompletedProcess(command, 0, stdout="build \N{check mark}", stderr="")
+
+    monkeypatch.setattr("scripts.story_39_7_prepare.subprocess.run", fake_run)
+
+    assert _run(["docker", "version"]) == "build \N{check mark}"
+    assert captured["encoding"] == "utf-8"
+    assert captured["errors"] == "replace"
