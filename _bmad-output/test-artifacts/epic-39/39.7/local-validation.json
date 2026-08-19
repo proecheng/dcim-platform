@@ -1,68 +1,82 @@
 {
   "schema_version": 1,
   "story_id": "39.7",
-  "evidence_class": "local-implementation-only",
-  "captured_at_utc": "2026-08-18T11:06:03Z",
-  "git_baseline": "2959f0210001958b49a522ef3fcc895981124384",
+  "evidence_class": "local-fixed-image-baseline",
+  "captured_at_utc": "2026-08-19T08:48:38Z",
+  "git_baseline": "ba1177448958c90e7ab979a3666f8719208c2f8f",
+  "provenance": {
+    "backend_image": "dcim-backend@sha256:2024d5d0e953153674a769307dbfccb840cbe47596e3277a8efbb09b17b626fc",
+    "frontend_image": "dcim-frontend@sha256:28f85db1baf1f039614c2e1ea4b4a4a1fc610bfda3c30ce239f7b018f6ee0032",
+    "environment_fingerprint": "1e112779666dad5dab8cd69e2298bda847f556eda34ec01c7baedc844e5ab0db",
+    "provider": "local-docker-desktop"
+  },
   "annual_slo_proven": false,
   "preproduction_window_proven": false,
   "story_gate_result": "BLOCKED",
   "results": {
     "story_and_related_tests": {
       "status": "passed",
-      "passed": 61,
-      "command": "python -m pytest -q backend/tests/test_story_39_7_metrics.py backend/tests/test_story_39_7_observability.py backend/tests/test_story_39_7_sli.py backend/tests/test_story_39_7_evidence.py"
+      "passed": 67,
+      "command": "python -m pytest -q tests/test_story_39_7_evidence.py tests/test_story_39_7_metrics.py tests/test_story_39_7_observability.py tests/test_story_39_7_prepare.py tests/test_story_39_7_sli.py"
+    },
+    "prepare_tool_tests": {
+      "status": "passed",
+      "passed": 6,
+      "coverage": "OCI and Docker v2 manifest verification, revision drift, BuildKit SHA binding, Node 22 build baseline, and UTF-8 tool-output decoding"
     },
     "ruff": {
       "status": "passed",
-      "command": "python -m ruff check backend/app/contracts backend/app/services/observability.py backend/app/services/slo_evidence.py backend/app/middleware/metrics.py backend/app/middleware/metrics_middleware.py backend/app/api/v1/system_health.py backend/app/core/authorization.py backend/app/mqtt/client.py backend/app/main.py backend/tests/test_story_39_7_metrics.py backend/tests/test_story_39_7_observability.py backend/tests/test_story_39_7_sli.py backend/tests/test_story_39_7_evidence.py scripts/story_39_7_evidence.py"
+      "command": "python -m ruff check backend/app/contracts backend/app/services/observability.py backend/app/services/slo_evidence.py backend/app/middleware/metrics.py backend/app/middleware/metrics_middleware.py backend/app/api/v1/system_health.py backend/app/core/authorization.py backend/app/mqtt/client.py backend/app/main.py backend/tests/test_story_39_7_metrics.py backend/tests/test_story_39_7_observability.py backend/tests/test_story_39_7_sli.py backend/tests/test_story_39_7_evidence.py backend/tests/test_story_39_7_prepare.py scripts/story_39_7_evidence.py scripts/story_39_7_prepare.py"
     },
-    "manifest_schema": {
+    "frontend_build": {
       "status": "passed",
-      "pending_manifest_valid": true,
-      "false_pass_and_status_gate_contradictions_rejected": true
+      "command": "npm run build",
+      "docker_build_image": "node:22-alpine",
+      "warnings": "Existing Sass deprecations, component naming conflict, and chunk-size warnings remain non-fatal."
     },
-    "compose_config": {
+    "fixed_image_build": {
       "status": "passed",
-      "backend_and_frontend_vcs_ref": "2959f0210001958b49a522ef3fcc895981124384",
-      "missing_vcs_ref_rejected": true
+      "command": "python scripts/story_39_7_prepare.py --git-sha ba1177448958c90e7ab979a3666f8719208c2f8f --provider local-docker-desktop",
+      "manifest_bytes_match_image_digests": true,
+      "revision_annotations_match_git_sha": true
     },
-    "pending_evidence_negative_gate": {
-      "status": "passed",
+    "independent_baseline_validation": {
+      "status": "passed-negative-gate",
       "expected_exit_code": 1,
       "actual_exit_code": 1,
-      "reason_verified": "manifest is pending or blocked",
-      "runtime_secret_injection_required": false
+      "valid": false,
+      "provenance_errors": false,
+      "blocking_reasons": [
+        "manifest is pending or blocked",
+        "burn-in command and critical-E2E tool placeholders remain",
+        "window has not started",
+        "availability samples have not been collected",
+        "a resolved critical incident drill has not been recorded"
+      ]
+    },
+    "backend_regression": {
+      "status": "passed-by-partition",
+      "passed": 4187,
+      "skipped": 9,
+      "partitioned_runs": {
+        "all_except_device_template_file": "4165 passed, 9 skipped",
+        "device_template_file": "22 passed"
+      },
+      "single_process_attempt": {
+        "status": "inconclusive",
+        "finding": "The all-in-one process stopped during asynchronous fixture teardown near 9% and hit the 60-second no-progress timeout; the affected device-template file passed separately."
+      },
+      "interpretation": "Partitioned execution covered the complete backend test corpus without a business assertion failure; the remaining risk is process-lifecycle/resource accumulation in the all-in-one pytest invocation."
     },
     "git_diff_check": {
       "status": "passed"
-    },
-    "backend_regression": {
-      "status": "incomplete",
-      "collected": 4188,
-      "failed": null,
-      "standard_attempt": {
-        "command": "python -m pytest -q backend/tests --tb=short",
-        "elapsed_minutes_before_termination": 61.1,
-        "result": "pytest process stopped making CPU progress and produced no final summary"
-      },
-      "diagnostic_wrapper_attempt": {
-        "command": "pytest.main(['-q', 'backend/tests', '--tb=short']) with the original return code preserved",
-        "elapsed_minutes_before_termination": 79.3,
-        "result": "pytest.main did not return and produced no final summary"
-      },
-      "isolated_diagnostics": {
-        "passed": 95,
-        "breakdown": "83 spatial/topology tests, 8 time-window tuning tests, and 4 fire-protection tests",
-        "finding": "The four fire-protection assertions passed in 12.83 seconds, after which a non-daemon aiosqlite _connection_worker_thread remained blocked on its queue and prevented normal process exit."
-      },
-      "reason": "The configured complete backend suite cannot be claimed as PASS until the unrelated global SQLite test lifecycle leak is corrected and one standard invocation exits with a final summary."
     }
   },
   "known_limits": [
     "The genuine fixed-image 72-hour pre-production window has not run.",
     "Twelve spaced first-pass critical E2E runs have not been collected.",
-    "The local validation does not prove the annual 99.5% availability SLO.",
-    "The complete 4,188-test backend suite did not produce a final summary because of an unrelated global aiosqlite test-lifecycle leak."
+    "A resolved critical incident drill has not been recorded.",
+    "This local validation does not prove the annual 99.5% availability SLO or production readiness.",
+    "The all-in-one backend pytest process still has a teardown/resource-accumulation risk even though the complete corpus passes by partition."
   ]
 }

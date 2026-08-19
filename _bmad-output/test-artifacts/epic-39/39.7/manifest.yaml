@@ -1,63 +1,91 @@
 schema_version: 1
 story_id: '39.7'
-status: pending
+status: blocked
 gate_result: BLOCKED
 owner: proecheng
 decision_id: D39-03
 annual_slo_proven: false
 provenance:
-  git_sha: PENDING
-  backend_image: PENDING
-  frontend_image: PENDING
-  environment_fingerprint: PENDING
+  git_sha: ba1177448958c90e7ab979a3666f8719208c2f8f
+  backend_image: dcim-backend@sha256:2024d5d0e953153674a769307dbfccb840cbe47596e3277a8efbb09b17b626fc
+  frontend_image: dcim-frontend@sha256:28f85db1baf1f039614c2e1ea4b4a4a1fc610bfda3c30ce239f7b018f6ee0032
+  environment_fingerprint: 1e112779666dad5dab8cd69e2298bda847f556eda34ec01c7baedc844e5ab0db
 window:
   started_at_utc: null
   ended_at_utc: null
 artifacts:
   availability_samples:
     path: availability_samples.json
-    sha256: PENDING
+    sha256: 4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945
   provenance_samples:
     path: provenance_samples.json
-    sha256: PENDING
+    sha256: 4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945
   e2e_runs:
     path: e2e_runs.json
-    sha256: PENDING
+    sha256: 4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945
   incidents:
     path: incidents.json
-    sha256: PENDING
+    sha256: 4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945
   alerts:
     path: alerts.json
-    sha256: PENDING
+    sha256: 4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945
   maintenance_windows:
     path: maintenance_windows.json
-    sha256: PENDING
+    sha256: 4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945
   source_hashes:
     path: source_hashes.json
-    sha256: PENDING
+    sha256: 2adb346ac8955084f8c8723cd0a1cd1751a3a2145715c83d8914c518217f216a
   backend_image_manifest:
     path: backend_image_manifest.json
-    sha256: PENDING
+    sha256: 2024d5d0e953153674a769307dbfccb840cbe47596e3277a8efbb09b17b626fc
   frontend_image_manifest:
     path: frontend_image_manifest.json
-    sha256: PENDING
+    sha256: 28f85db1baf1f039614c2e1ea4b4a4a1fc610bfda3c30ce239f7b018f6ee0032
   environment:
     path: environment.json
-    sha256: PENDING
+    sha256: 1e112779666dad5dab8cd69e2298bda847f556eda34ec01c7baedc844e5ab0db
 commands:
-  - 'PENDING: run the fixed-image pre-production collector and critical E2E command'
+- docker buildx build --provenance=false --platform linux/amd64 --annotation manifest:org.opencontainers.image.revision=ba1177448958c90e7ab979a3666f8719208c2f8f
+  --build-arg VCS_REF=ba1177448958c90e7ab979a3666f8719208c2f8f --tag dcim-backend:story-39-7-ba11774
+  --load backend
+- docker buildx build --provenance=false --platform linux/amd64 --annotation manifest:org.opencontainers.image.revision=ba1177448958c90e7ab979a3666f8719208c2f8f
+  --build-arg VCS_REF=ba1177448958c90e7ab979a3666f8719208c2f8f --tag dcim-frontend:story-39-7-ba11774
+  --load frontend
+- 'PENDING: deploy the fixed images and start the 72-hour collector plus critical
+  E2E schedule'
 tool_versions:
-  collector: PENDING
-  e2e: PENDING
+  prepare_script: '1'
+  docker_server: 29.4.0
+  critical_e2e: PENDING
 ac_mapping:
-  AC1: [source_hashes]
-  AC2: [availability_samples, provenance_samples]
-  AC3: [alerts]
-  AC4: [availability_samples, incidents, maintenance_windows]
-  AC5: [provenance_samples, e2e_runs, incidents, alerts, source_hashes, backend_image_manifest, frontend_image_manifest, environment]
-  AC6: [availability_samples, provenance_samples, e2e_runs]
-  AC7: [source_hashes, environment]
+  AC1:
+  - source_hashes
+  AC2:
+  - availability_samples
+  - provenance_samples
+  AC3:
+  - alerts
+  AC4:
+  - availability_samples
+  - incidents
+  - maintenance_windows
+  AC5:
+  - provenance_samples
+  - e2e_runs
+  - incidents
+  - alerts
+  - source_hashes
+  - backend_image_manifest
+  - frontend_image_manifest
+  - environment
+  AC6:
+  - availability_samples
+  - provenance_samples
+  - e2e_runs
+  AC7:
+  - source_hashes
+  - environment
 known_limits:
-  - The genuine fixed-image 72-hour pre-production window has not run.
-  - No annual availability SLO is proven by local implementation tests.
-  - Story 39.7 and dependent Epic 39 gates remain blocked pending external evidence.
+- This is a local fixed-image baseline, not a completed pre-production burn-in window.
+- The 72-hour window and 12 spaced first-pass critical E2E runs have not occurred.
+- No annual availability SLO or production-readiness PASS is claimed.

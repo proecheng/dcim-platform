@@ -1,0 +1,1 @@
+{"backend_image":"dcim-backend@sha256:2024d5d0e953153674a769307dbfccb840cbe47596e3277a8efbb09b17b626fc","environment_fingerprint":"1e112779666dad5dab8cd69e2298bda847f556eda34ec01c7baedc844e5ab0db","frontend_image":"dcim-frontend@sha256:28f85db1baf1f039614c2e1ea4b4a4a1fc610bfda3c30ce239f7b018f6ee0032","git_sha":"ba1177448958c90e7ab979a3666f8719208c2f8f"}

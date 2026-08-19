@@ -1,0 +1,38 @@
+{
+  "annual_slo_proven": false,
+  "derived": {
+    "availability": {
+      "annual_error_budget_minutes": 2628,
+      "annual_slo_proven": false,
+      "bad_minutes": 0,
+      "eligible_minutes": 0,
+      "error_budget_consumed_percent": 0.0,
+      "excluded_minutes": 0,
+      "good_minutes": 0,
+      "missing_minutes": 0,
+      "observed_availability_percent": 0.0,
+      "provisional_annual_budget_remaining_minutes": 2628.0,
+      "slo_target_percent": 99.5,
+      "total_minutes": 0,
+      "window_error_budget_minutes": 0.0
+    },
+    "mttr": {
+      "incident_count": 0,
+      "incidents": [],
+      "mean_mttr_seconds": null,
+      "resolved_incidents": 0,
+      "unresolved_incidents": 0
+    }
+  },
+  "errors": [
+    "manifest is pending or blocked: status='blocked', gate='BLOCKED'",
+    "manifest commands contain a placeholder",
+    "manifest tool_versions contain a placeholder",
+    "window.started_at_utc must be a UTC timestamp",
+    "observed availability is below the 99.5% release threshold",
+    "at least one resolved critical incident drill is required"
+  ],
+  "schema_version": 1,
+  "story_id": "39.7",
+  "valid": false
+}

@@ -216,8 +216,11 @@ GPT-5
 - Task 2 complete: added the authorized read-only observability snapshot, D39-03 alert lifecycle, Story 39.3 backup-status fail-closed parsing, gateway backlog/resource aggregation, real MQTT state, and Redis readiness failure handling; 30 related regression tests and Ruff pass.
 - Task 3 complete: added independent availability/error-budget and MTTR recomputation; missing telemetry remains bad time, only pre-approved maintenance is excluded, and recovery requires three consecutive readiness plus critical-E2E passes; 5 focused tests and Ruff pass.
 - Task 4 complete: published the D39-03 YAML contract, lifecycle-aware pending `BLOCKED` manifest/schema, pure contract layer, and independently runnable fail-closed validator for provenance, hashes, continuity, retries, E2E spacing, alerts, incidents, source hashes, AC mapping, and false annual claims; the CLI needs no application runtime secret.
-- Task 5.1/5.3 complete: 61 Story tests, Ruff, schema contradictions, Compose `VCS_REF` positive/negative checks, pending-evidence non-zero gate, and `git diff --check` pass; local evidence explicitly records `annual_slo_proven: false` and `BLOCKED`.
-- Task 5.2 complete: full backend regression now passes (`4183 passed, 9 skipped`) after fixing an env-isolated MQTT settings test and making the Redis lock helper loop-aware / fail-closed for stale clients; targeted Ruff and `git diff --check` passed on the touched files.
+- Task 5.1/5.3 complete: 67 Story tests, Ruff, schema contradictions, Compose `VCS_REF` positive/negative checks, pending-evidence non-zero gate, and `git diff --check` pass; local evidence explicitly records `annual_slo_proven: false` and `BLOCKED`.
+- Task 5.2 complete by partition: the complete backend corpus passes (`4187 passed, 9 skipped`), including the device-template file separately (`22 passed`); the all-in-one pytest process still has an asynchronous teardown/resource-accumulation risk near 9%, with no business assertion failure in partitioned coverage.
+- Fixed-image baseline prepared from candidate `ba1177448958c90e7ab979a3666f8719208c2f8f` using backend image `dcim-backend@sha256:2024d5d0e953153674a769307dbfccb840cbe47596e3277a8efbb09b17b626fc`, frontend image `dcim-frontend@sha256:28f85db1baf1f039614c2e1ea4b4a4a1fc610bfda3c30ce239f7b018f6ee0032`, and environment fingerprint `1e112779666dad5dab8cd69e2298bda847f556eda34ec01c7baedc844e5ab0db`.
+- Upgraded the frontend candidate build stage to Node 22 and hardened the preparation tool for UTF-8 BuildKit output on Windows; 6 preparation-tool tests and the frontend production build pass.
+- Independent validation rejects the baseline with the expected non-zero exit code only because the manifest is `BLOCKED`, the window and availability samples have not started, critical-E2E placeholders remain, and the resolved incident drill is absent; no provenance binding error was reported.
 - Task 5.4 remains open: no genuine immutable-image 72-hour pre-production window or 12 spaced first-pass E2E runs have occurred, so this Story remains `in-progress`.
 
 ### File List
@@ -226,6 +229,7 @@ GPT-5
 - `_bmad-output/implementation-artifacts/sprint-status.yaml`
 - `_bmad-output/planning-artifacts/architecture.md`
 - `backend/Dockerfile`
+- `frontend/Dockerfile`
 - `backend/app/contracts/__init__.py`
 - `backend/app/contracts/observability.py`
 - `backend/app/contracts/slo_evidence.py`
@@ -242,18 +246,33 @@ GPT-5
 - `backend/tests/test_story_39_7_observability.py`
 - `backend/tests/test_story_39_7_sli.py`
 - `backend/tests/test_story_39_7_evidence.py`
+- `backend/tests/test_story_39_7_prepare.py`
 - `backend/app/core/redis_lock.py`
 - `backend/tests/test_gateway_registration.py`
 - `backend/tests/test_redis_lock.py`
 - `deploy/observability/story-39-7-contract.yaml`
 - `docker-compose.yml`
 - `scripts/story_39_7_evidence.py`
+- `scripts/story_39_7_prepare.py`
 - `_bmad-output/test-artifacts/epic-39/39.7/manifest.yaml`
 - `_bmad-output/test-artifacts/epic-39/39.7/manifest.schema.json`
 - `_bmad-output/test-artifacts/epic-39/39.7/local-validation.json`
+- `_bmad-output/test-artifacts/epic-39/39.7/alerts.json`
+- `_bmad-output/test-artifacts/epic-39/39.7/availability_samples.json`
+- `_bmad-output/test-artifacts/epic-39/39.7/backend_image_manifest.json`
+- `_bmad-output/test-artifacts/epic-39/39.7/baseline-validation.json`
+- `_bmad-output/test-artifacts/epic-39/39.7/e2e_runs.json`
+- `_bmad-output/test-artifacts/epic-39/39.7/environment.json`
+- `_bmad-output/test-artifacts/epic-39/39.7/frontend_image_manifest.json`
+- `_bmad-output/test-artifacts/epic-39/39.7/incidents.json`
+- `_bmad-output/test-artifacts/epic-39/39.7/maintenance_windows.json`
+- `_bmad-output/test-artifacts/epic-39/39.7/provenance_samples.json`
+- `_bmad-output/test-artifacts/epic-39/39.7/source_hashes.json`
+- `_bmad-output/test-artifacts/epic-39/39.7/trusted-provenance.json`
 
 ## Change Log
 
 - 2026-08-18: Created Story 39.7 and recorded D39-03 numeric observability, SLO, MTTR, and burn-in decisions.
 - 2026-08-18: Implemented RED/health observability, persistent alert evaluation, SLI/MTTR recomputation, trusted burn-in evidence validation, lifecycle-aware manifest schema, immutable image provenance, and local blocked-gate evidence; Story remains in progress pending complete regression and genuine 72-hour burn-in.
 - 2026-08-19: Cleared full backend regression after fixing a test-isolation MQTT settings assertion and hardening Redis lock client reuse across event loops; targeted Ruff and diff checks passed on touched files.
+- 2026-08-19: Prepared the Node 22 fixed-image candidate and trusted local `BLOCKED` baseline, fixed Windows BuildKit output decoding, and recorded immutable SHA/digest/environment provenance; the genuine 72-hour gate remains open.

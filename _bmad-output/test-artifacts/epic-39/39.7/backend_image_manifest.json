@@ -1,0 +1,59 @@
+{
+  "schemaVersion": 2,
+  "mediaType": "application/vnd.docker.distribution.manifest.v2+json",
+  "config": {
+    "mediaType": "application/vnd.docker.container.image.v1+json",
+    "digest": "sha256:a89b71d8fbf44719d08200500553c7bd8c85ddedb99251318e6b397713658b39",
+    "size": 9048
+  },
+  "layers": [
+    {
+      "mediaType": "application/vnd.docker.image.rootfs.diff.tar.gzip",
+      "digest": "sha256:062e450697faa5f02a3a74eba9864ee4d79bc9cfbd65769fc6cdff2c05c6a053",
+      "size": 29780905
+    },
+    {
+      "mediaType": "application/vnd.docker.image.rootfs.diff.tar.gzip",
+      "digest": "sha256:9775d166087aba0afe5ba9a88859c04c08090e82ae218742d09fec9119e0335d",
+      "size": 1293282
+    },
+    {
+      "mediaType": "application/vnd.docker.image.rootfs.diff.tar.gzip",
+      "digest": "sha256:6b265b8eae4a26a263eb55546aa430c1eef37032a7cd86393d98c6b779f28319",
+      "size": 14418685
+    },
+    {
+      "mediaType": "application/vnd.docker.image.rootfs.diff.tar.gzip",
+      "digest": "sha256:c89b9f64c028c19ba92e195d7589d914b9cd1fc69f3c3dfeb931e93876ac2064",
+      "size": 248
+    },
+    {
+      "mediaType": "application/vnd.docker.image.rootfs.diff.tar.gzip",
+      "digest": "sha256:5062374cf516741a0303c6f4a3cce3fc4e69ac03e6b42703ed1844b80a7e4274",
+      "size": 93
+    },
+    {
+      "mediaType": "application/vnd.docker.image.rootfs.diff.tar.gzip",
+      "digest": "sha256:d37badf66a08cc46ab7cd46e1bf0c2a18cfbcc247c8c0b1deb0facd70ab5f934",
+      "size": 9476747
+    },
+    {
+      "mediaType": "application/vnd.docker.image.rootfs.diff.tar.gzip",
+      "digest": "sha256:d0d6f193daab7279caccc0d17f69e318bdd374326ac2d3021992cc35857c527f",
+      "size": 68157
+    },
+    {
+      "mediaType": "application/vnd.docker.image.rootfs.diff.tar.gzip",
+      "digest": "sha256:06f6f479ea58b08778c330eccbed9f779cbff60c97ef10551493be829fcc57ad",
+      "size": 171061902
+    },
+    {
+      "mediaType": "application/vnd.docker.image.rootfs.diff.tar.gzip",
+      "digest": "sha256:2fe8c85adf81c4e408e04bc1ffab7d60e17caa67df6482e11172fe34cc042e02",
+      "size": 4188034
+    }
+  ],
+  "annotations": {
+    "org.opencontainers.image.revision": "ba1177448958c90e7ab979a3666f8719208c2f8f"
+  }
+}
