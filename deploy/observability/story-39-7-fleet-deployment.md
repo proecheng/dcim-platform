@@ -41,9 +41,9 @@ so the control computer may run Windows 10/11, Linux, or macOS.
 | Native Windows containers | No | Candidate images are Linux images |
 | ARM64 / Apple Silicon engine | No for this fixed candidate | Publish and validate a separate multi-architecture candidate first |
 
-Every managed target must already have the Story 39.3 database network and
-DR status volume described in
-`deploy/observability/story-39-7-preproduction-deployment.md`.
+The `bootstrap` action can create the Story 39.3 database, DR status volume,
+first verified full backup, and Story 39.7 application on an empty target.
+The older `deploy` action remains available when Story 39.3 already exists.
 
 ## One-time control-computer setup
 
@@ -56,6 +56,9 @@ Install or verify:
   `browser_channel: msedge`, or Playwright Chromium installed with
   `npx playwright install chromium` when no channel is configured.
 - OpenSSH client and key-based access to remote targets.
+- A GHCR login on the control computer that can pull the private immutable
+  application and PostgreSQL packages. Image pulls are sent through each
+  Docker context before remote Compose starts with `--pull never`.
 
 Confirm the Python dependency without exposing configuration:
 
@@ -126,6 +129,132 @@ Use distinct credentials for pre-production. Passwords inside URLs must be
 percent-encoded. The control script validates presence and consistency but
 never writes environment values to its reports.
 
+Each target also declares a `dr` block. `secret_directory` must be outside the
+checkout. Missing DR secret files are generated with exclusive creation;
+existing files are validated and are never overwritten. For SSH targets every
+Compose, generated DR environment, and secret file is copied to a same-directory
+`.incoming-*` path. The remote account verifies owner and SHA-256, applies mode
+`0600`, and atomically renames it. Existing secrets must also match byte-for-byte;
+they are never replaced. A shell trap and controller cleanup cover command
+failure, SCP interruption, and control-process interrupts. On Windows the
+controller applies and reads back a single-current-SID protected DACL before it
+reads each target environment file and whenever it creates secret or state files.
+
+`state_directory` is also outside the checkout. Back it up with the control
+computer configuration: it is the sanitized source of truth for rollback.
+Restrict it to deployment operators even though it contains no secret values.
+The controller applies the same current-account-only Windows ACL to this
+directory and its state files.
+
+## Zero-to-one lifecycle
+
+On a new empty Docker host, one command performs the complete first deployment:
+
+```bash
+python scripts/story_39_7_deploy.py bootstrap \
+  --inventory deploy/observability/story-39-7-targets.yaml \
+  --target qa-linux-01
+```
+
+`bootstrap` fails closed if it finds existing Compose resources, an existing
+pgBackRest repository volume, or an existing lifecycle state. It then:
+
+1. validates Linux/amd64, Compose, inventory paths, the canonical manifest, and
+   confirms that the target is empty;
+2. writes a sanitized `bootstrap_pending` / `prepared` checkpoint before the
+   first persistent lifecycle change;
+3. creates or reuses protected secret files without replacing them;
+4. pulls the exact canonical PostgreSQL, final PostgreSQL, schema application,
+   and Story 39.7 application images;
+5. starts the canonical primary and restores the approved 188-table schema;
+6. explicitly transitions the primary to the final DR runtime;
+7. starts the standby and backup scheduler, then runs `stanza`, `full`, `check`,
+   `verify`, and `status`;
+8. deploys Story 39.7, verifies health/readiness, and runs headed Edge E2E when
+   the target enables E2E;
+9. promotes the checkpoint to a verified state snapshot for upgrade and rollback.
+
+The controller checkpoints `canonical_running`, `schema_verified`,
+`runtime_started`, and `dr_verified` as those phases finish. If any phase is
+interrupted, fix the cause and run the identical `bootstrap` command again. It
+resumes from the last completed phase; a completed schema report is reused and
+an application/E2E retry after `dr_verified` does not recreate the database,
+restart schema bootstrap, create another first full backup, or delete a volume.
+Schema report reuse requires exact project, container, network, database,
+approved image, artifact, catalog, table inventory, and Alembic identities. A
+post-schema resume also requires the original Docker daemon and primary-volume
+fingerprint, then re-queries and hashes the full live catalog through a one-off
+approved backend container before continuing.
+
+The lifecycle journal contains immutable image references but no passwords,
+tokens, URLs, rendered Compose, configuration values, or generated DR secrets.
+Its HMAC-SHA256 key and digest-addressed Compose/configuration snapshots live in
+the protected repository-external `secret_directory`; any signature, snapshot,
+Docker daemon, primary volume, repository volume, live catalog, stanza, or
+initial-full-backup mismatch fails closed. Every lifecycle change invalidates any
+formal 72-hour observation window and retains `release_gate: BLOCKED`.
+
+For a later application release, update that target's external environment
+file to the new immutable references and run:
+
+```bash
+python scripts/story_39_7_deploy.py upgrade \
+  --inventory deploy/observability/story-39-7-targets.yaml \
+  --target qa-linux-01 \
+  --schema-compatible
+```
+
+`--schema-compatible` is an explicit operator assertion in addition to an
+automated contract gate. The controller compares the candidate backend with
+the approved schema application image across table names, columns, types, Enum
+members, nullability, primary/foreign keys, constraints, indexes, Alembic heads,
+and the hash of every migration file. The controller refuses any difference and any
+database runtime change. Schema-changing releases must use the migration and
+restore-point workflow first. Upgrade writes a pending journal before changing
+containers and records the previous verified release only after verification.
+
+To restore the previous immutable application release without deleting any
+database, Redis, EMQX, backup, or status volume:
+
+```bash
+python scripts/story_39_7_deploy.py rollback \
+  --inventory deploy/observability/story-39-7-targets.yaml \
+  --target qa-linux-01 \
+  --schema-compatible
+```
+
+Rollback also works after a failed pending upgrade, even when candidate release
+fields in the current environment file are malformed. It restores the verified
+immutable release fields and non-sensitive application configuration snapshot,
+while requiring the current secret values to remain available. It uses the saved
+Compose snapshot and requires all rollback images by local digest, so a registry
+outage does not turn rollback into an image pull. The lifecycle code never runs
+`docker compose down -v` and never removes a data volume.
+
+Lifecycle operations take an exclusive local file lock and reserve a uniquely
+named, running `--rm` container on the target Docker daemon. The lock carries
+owner, action, and UTC expiry labels. The controller refreshes its heartbeat every
+60 seconds; after 30 minutes without a successful heartbeat the container exits,
+so a crashed controller cannot leave a permanent lock. Upgrade and rollback fail
+unless the approved DR runtime image already exists on the target; lock
+acquisition never pulls it from a registry. This serializes separate control
+processes even when they use different local state directories. Immediately
+before lifecycle execution, context endpoints and Docker daemon IDs are resolved;
+aliases to the same engine cannot reuse application projects, DR projects, or
+pgBackRest repository volumes. Remote directories are also unique per SSH host.
+
+If a legacy or abnormal stopped lock remains, first confirm no lifecycle process
+is active, inspect its labels and state, and remove only that exact container:
+
+```bash
+docker --context qa-linux-01 container inspect dcim-lifecycle-lock-<daemon-id-hash>
+docker --context qa-linux-01 container rm dcim-lifecycle-lock-<daemon-id-hash>
+```
+
+The controller automatically removes a stopped lock only when it has the DCIM
+lock label and its parseable lease expiry is in the past. It never removes a
+running lock or an unlabelled same-name container.
+
 ## Deployment workflow
 
 Use the same command on Windows PowerShell, Linux, and macOS:
@@ -151,12 +280,15 @@ Actions are deliberately separate:
 
 | Action | Effect |
 | --- | --- |
+| `bootstrap` | Empty host to Story 39.3 canonical schema, final DR runtime, first full backup, Story 39.7 application, verification, optional headed E2E, and state snapshot; resumes from the last completed bootstrap phase |
 | `plan` | Validate inventory, env placeholders, immutable digests, and test topology without contacting Docker |
 | `preflight` | Require Linux/amd64, Compose, Story 39.3 network and volume, and valid Compose interpolation |
 | `deploy` | Pull exact digests, verify image IDs and OCI revision, start with `--no-build --pull never`, then run health checks |
+| `upgrade` | Require verified state and `--schema-compatible`, journal the candidate, deploy exact digests, verify, and retain the previous release |
+| `rollback` | Require `--schema-compatible`, restore the previous verified immutable references, preserve all volumes, and verify |
 | `verify` | Re-check candidate images, service health, backend health, Nginx proxy health, and readiness |
 | `test` | Run `verify`, then execute the first-attempt critical Playwright suite with zero retries |
-| `status` | Return a sanitized snapshot of Compose service state |
+| `status` | Independently return sanitized application, signed lifecycle journal, and DR service state; the journal remains readable with Docker offline, while missing/exited/unhealthy services produce `partial` and a non-zero exit |
 
 Run one or more selected targets while diagnosing a failure:
 
@@ -203,10 +335,22 @@ contain candidate identity, image references, configuration hashes, service
 state, and check outcomes. They contain neither rendered Compose YAML nor
 environment values. Known secret values and URL credentials are redacted from
 command errors.
+Lifecycle failures preserve completed checks in the action report and record a
+redacted failure stage in the pending journal.
 
 The controller isolates targets. If target 4 fails, targets 1-3 and 5-10 keep
 running. The process exits non-zero when any selected target fails. Correct
-the target and rerun only that name; `docker compose up` is idempotent.
+the target and rerun only that name. A `status` result can be `partial`; inspect
+all three independent checks instead of treating a missing application as a
+missing database or journal.
+
+For post-deployment diagnosis, run `status`, then `verify`, then `test` for the
+affected target. Fix source code in the repository, build and publish a new
+immutable candidate, update the external target environment file, and use
+`upgrade`. Do not edit running containers: those changes cannot be audited or
+rolled back from the lifecycle state. A failed bootstrap preserves its data,
+phase checkpoint, and evidence; rerun `bootstrap` to resume. Inspect the JSON
+report before any operator-reviewed cleanup.
 
 Reports always include:
 

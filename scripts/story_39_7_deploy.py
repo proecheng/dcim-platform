@@ -11,6 +11,7 @@ import socket
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from contextlib import contextmanager
@@ -33,7 +34,18 @@ PLACEHOLDER_RE = re.compile(
     r"<[^>]+>|\b(?:change[-_ ]?me|replace[-_ ]?me|todo)\b", re.IGNORECASE
 )
 SUPPORTED_PLATFORM = "linux/amd64"
-SUPPORTED_ACTIONS = {"plan", "preflight", "deploy", "verify", "test", "status"}
+SUPPORTED_ACTIONS = {
+    "bootstrap",
+    "deploy",
+    "plan",
+    "preflight",
+    "rollback",
+    "status",
+    "test",
+    "upgrade",
+    "verify",
+}
+LIFECYCLE_ACTIONS = {"bootstrap", "upgrade", "rollback"}
 SUPPORTED_BROWSER_CHANNELS = {
     "chrome",
     "chrome-beta",
@@ -91,6 +103,8 @@ DEFAULT_E2E_SPECS = (
     "e2e/authorization-matrix.spec.ts",
     "e2e/site-isolation-websocket-authorization.spec.ts",
 )
+_PROTECTED_ENVIRONMENT_PATHS: set[Path] = set()
+_PROTECTED_ENVIRONMENT_PATHS_LOCK = threading.Lock()
 
 
 class DeploymentError(RuntimeError):
@@ -110,6 +124,22 @@ class E2EConfig:
 
 
 @dataclass(frozen=True)
+class DRConfig:
+    mode: str
+    compose_file: Path
+    project_name: str
+    secret_directory: Path
+    canonical_runtime_image: str
+    final_runtime_image: str
+    schema_application_image: str
+    repository_volume: str
+    ssh_target: str | None = None
+    ssh_args: tuple[str, ...] = ()
+    scp_args: tuple[str, ...] = ()
+    remote_directory: str | None = None
+
+
+@dataclass(frozen=True)
 class Target:
     name: str
     docker_context: str
@@ -118,6 +148,7 @@ class Target:
     project_name: str
     platform: str = SUPPORTED_PLATFORM
     e2e: E2EConfig = field(default_factory=E2EConfig)
+    dr: DRConfig | None = None
 
 
 @dataclass(frozen=True)
@@ -125,6 +156,7 @@ class Inventory:
     targets: tuple[Target, ...]
     concurrency: int
     report_directory: Path
+    state_directory: Path
 
 
 @dataclass(frozen=True)
@@ -233,6 +265,94 @@ def _build_e2e(raw: Mapping[str, Any], target_name: str) -> E2EConfig:
     )
 
 
+def _string_list(value: Any, field_name: str) -> tuple[str, ...]:
+    if not isinstance(value, list) or not all(
+        isinstance(item, str) and item for item in value
+    ):
+        raise DeploymentError(f"{field_name} must be a list of strings")
+    return tuple(value)
+
+
+def _immutable_image(value: Any, field_name: str) -> str:
+    if not isinstance(value, str) or IMAGE_DIGEST_RE.fullmatch(value) is None:
+        raise DeploymentError(f"{field_name} must use an immutable digest reference")
+    return value
+
+
+def _build_dr(
+    raw: Mapping[str, Any], target_name: str, inventory_directory: Path
+) -> DRConfig | None:
+    if not raw:
+        return None
+    mode = raw.get("mode")
+    if mode not in {"local", "ssh"}:
+        raise DeploymentError(f"target {target_name} dr.mode must be local or ssh")
+    project_name = raw.get("project_name")
+    repository_volume = raw.get("repository_volume")
+    if not isinstance(project_name, str) or not NAME_RE.fullmatch(project_name):
+        raise DeploymentError(f"target {target_name} requires a valid dr.project_name")
+    if not isinstance(repository_volume, str) or not NAME_RE.fullmatch(
+        repository_volume
+    ):
+        raise DeploymentError(
+            f"target {target_name} requires a valid dr.repository_volume"
+        )
+    ssh_args = _string_list(
+        raw.get("ssh_args", []), f"target {target_name} dr.ssh_args"
+    )
+    scp_args = _string_list(
+        raw.get("scp_args", []), f"target {target_name} dr.scp_args"
+    )
+    ssh_target = raw.get("ssh_target")
+    remote_directory = raw.get("remote_directory")
+    if mode == "ssh":
+        if (
+            not isinstance(ssh_target, str)
+            or not ssh_target.strip()
+            or ssh_target.startswith("-")
+        ):
+            raise DeploymentError(f"target {target_name} ssh DR requires ssh_target")
+        if (
+            not isinstance(remote_directory, str)
+            or not re.fullmatch(r"/[A-Za-z0-9._/-]+", remote_directory)
+            or ".." in Path(remote_directory).parts
+        ):
+            raise DeploymentError(
+                f"target {target_name} ssh DR requires a safe absolute remote_directory"
+            )
+    return DRConfig(
+        mode=mode,
+        compose_file=_resolve_path(
+            raw.get("compose_file"),
+            inventory_directory,
+            f"target {target_name} dr.compose_file",
+        ),
+        project_name=project_name,
+        secret_directory=_resolve_path(
+            raw.get("secret_directory"),
+            inventory_directory,
+            f"target {target_name} dr.secret_directory",
+        ),
+        canonical_runtime_image=_immutable_image(
+            raw.get("canonical_runtime_image"),
+            f"target {target_name} dr.canonical_runtime_image",
+        ),
+        final_runtime_image=_immutable_image(
+            raw.get("final_runtime_image"),
+            f"target {target_name} dr.final_runtime_image",
+        ),
+        schema_application_image=_immutable_image(
+            raw.get("schema_application_image"),
+            f"target {target_name} dr.schema_application_image",
+        ),
+        repository_volume=repository_volume,
+        ssh_target=ssh_target,
+        ssh_args=ssh_args,
+        scp_args=scp_args,
+        remote_directory=remote_directory,
+    )
+
+
 def load_inventory(path: Path | str) -> Inventory:
     inventory_path = Path(path).expanduser().resolve()
     try:
@@ -253,8 +373,14 @@ def load_inventory(path: Path | str) -> Inventory:
         inventory_path.parent,
         "report_directory",
     )
+    state_directory = _resolve_path(
+        root.get("state_directory", str(report_directory / "state")),
+        inventory_path.parent,
+        "state_directory",
+    )
     defaults = dict(_mapping(root.get("defaults", {}), "defaults"))
     defaults_e2e = dict(_mapping(defaults.pop("e2e", {}), "defaults.e2e"))
+    defaults_dr = dict(_mapping(defaults.pop("dr", {}), "defaults.dr"))
     targets_raw = root.get("targets")
     if not isinstance(targets_raw, list) or not targets_raw:
         raise DeploymentError("inventory targets must be a non-empty list")
@@ -264,8 +390,10 @@ def load_inventory(path: Path | str) -> Inventory:
         target_raw = dict(defaults)
         item_mapping = dict(_mapping(item, f"targets[{index}]"))
         item_e2e = dict(_mapping(item_mapping.pop("e2e", {}), f"targets[{index}].e2e"))
+        item_dr = dict(_mapping(item_mapping.pop("dr", {}), f"targets[{index}].dr"))
         target_raw.update(item_mapping)
         e2e_raw = {**defaults_e2e, **item_e2e}
+        dr_raw = {**defaults_dr, **item_dr}
         name = target_raw.get("name")
         context = target_raw.get("docker_context")
         project_name = target_raw.get("project_name")
@@ -299,6 +427,7 @@ def load_inventory(path: Path | str) -> Inventory:
                 project_name=project_name,
                 platform=platform,
                 e2e=_build_e2e(e2e_raw, name),
+                dr=_build_dr(dr_raw, name, inventory_path.parent),
             )
         )
 
@@ -308,6 +437,36 @@ def load_inventory(path: Path | str) -> Inventory:
     projects = [(target.docker_context, target.project_name) for target in targets]
     if len(projects) != len(set(projects)):
         raise DeploymentError("project_name must be unique within each Docker context")
+    dr_projects = [
+        (target.docker_context, target.dr.project_name)
+        for target in targets
+        if target.dr is not None
+    ]
+    if len(dr_projects) != len(set(dr_projects)):
+        raise DeploymentError(
+            "dr.project_name must be unique within each Docker context"
+        )
+    all_projects = [*projects, *dr_projects]
+    if len(all_projects) != len(set(all_projects)):
+        raise DeploymentError(
+            "application and DR project names must not overlap within a Docker context"
+        )
+    dr_volumes = [
+        (target.docker_context, target.dr.repository_volume)
+        for target in targets
+        if target.dr is not None
+    ]
+    if len(dr_volumes) != len(set(dr_volumes)):
+        raise DeploymentError(
+            "dr.repository_volume must be unique within each Docker context"
+        )
+    remote_dr_roots = [
+        (target.dr.ssh_target, target.dr.remote_directory)
+        for target in targets
+        if target.dr is not None and target.dr.mode == "ssh"
+    ]
+    if len(remote_dr_roots) != len(set(remote_dr_roots)):
+        raise DeploymentError("remote DR directories must be unique per SSH host")
     tunnel_ports = [
         target.e2e.local_port
         for target in targets
@@ -315,15 +474,109 @@ def load_inventory(path: Path | str) -> Inventory:
     ]
     if len(tunnel_ports) != len(set(tunnel_ports)):
         raise DeploymentError("ssh-tunnel local tunnel ports must be unique")
+    for target in targets:
+        if (
+            target.dr is not None
+            and target.dr.mode == "ssh"
+            and target.e2e.mode == "ssh-tunnel"
+            and target.dr.ssh_target != target.e2e.ssh_target
+        ):
+            raise DeploymentError(
+                f"target {target.name} DR and E2E SSH destinations must match"
+            )
     return Inventory(
         targets=tuple(targets),
         concurrency=concurrency,
         report_directory=report_directory,
+        state_directory=state_directory,
     )
+
+
+def _protect_environment_file(path: Path) -> None:
+    try:
+        metadata = path.lstat()
+    except OSError as exc:
+        raise DeploymentError(
+            f"cannot inspect target environment file: {path}"
+        ) from exc
+    if path.is_symlink() or not path.is_file():
+        raise DeploymentError("target environment file must be a regular file")
+    if os.name != "nt":
+        if metadata.st_uid != os.geteuid() or metadata.st_mode & 0o077:
+            raise DeploymentError(
+                "target environment file must be owner-only (mode 0600)"
+            )
+        return
+    resolved = path.resolve()
+    with _PROTECTED_ENVIRONMENT_PATHS_LOCK:
+        if resolved in _PROTECTED_ENVIRONMENT_PATHS:
+            return
+        script = r"""
+$ErrorActionPreference = 'Stop'
+$identity = [System.Security.Principal.WindowsIdentity]::GetCurrent()
+$sid = $identity.User
+if ($null -eq $sid) { throw 'current token has no SID' }
+$acl = [System.Security.AccessControl.FileSecurity]::new()
+$acl.SetAccessRuleProtection($true, $false)
+$acl.SetOwner($sid)
+$rule = [System.Security.AccessControl.FileSystemAccessRule]::new(
+  $sid,
+  [System.Security.AccessControl.FileSystemRights]::FullControl,
+  [System.Security.AccessControl.InheritanceFlags]::None,
+  [System.Security.AccessControl.PropagationFlags]::None,
+  [System.Security.AccessControl.AccessControlType]::Allow
+)
+$acl.AddAccessRule($rule) | Out-Null
+[System.IO.File]::SetAccessControl($env:DCIM_ENV_ACL_PATH, $acl)
+$actual = [System.IO.File]::GetAccessControl($env:DCIM_ENV_ACL_PATH)
+$rules = @($actual.GetAccessRules($true, $true, [System.Security.Principal.SecurityIdentifier]))
+$full = [System.Security.AccessControl.FileSystemRights]::FullControl
+if (-not $actual.AreAccessRulesProtected -or $rules.Count -ne 1 -or
+    $rules[0].IdentityReference.Value -ne $sid.Value -or
+    $rules[0].AccessControlType -ne [System.Security.AccessControl.AccessControlType]::Allow -or
+    (($rules[0].FileSystemRights -band $full) -ne $full)) {
+  throw 'restricted DACL verification failed'
+}
+""".strip()
+        environment = dict(os.environ)
+        environment["DCIM_ENV_ACL_PATH"] = str(resolved)
+        try:
+            completed = subprocess.run(
+                [
+                    "powershell.exe",
+                    "-NoLogo",
+                    "-NoProfile",
+                    "-NonInteractive",
+                    "-Command",
+                    script,
+                ],
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                env=environment,
+                shell=False,
+                timeout=30,
+            )
+        except (OSError, subprocess.TimeoutExpired) as exc:
+            raise DeploymentError(
+                "cannot restrict Windows ACL for target environment file"
+            ) from exc
+        if completed.returncode != 0:
+            detail = (
+                completed.stderr.strip().splitlines()[-1]
+                if completed.stderr.strip()
+                else "unknown error"
+            )
+            raise DeploymentError(
+                f"cannot restrict Windows ACL for target environment file: {detail}"
+            )
+        _PROTECTED_ENVIRONMENT_PATHS.add(resolved)
 
 
 def parse_environment(path: Path | str) -> dict[str, str]:
     env_path = Path(path)
+    _protect_environment_file(env_path)
     try:
         lines = env_path.read_text(encoding="utf-8-sig").splitlines()
     except OSError as exc:
@@ -495,10 +748,15 @@ def _parse_json_output(output: str, description: str) -> Any:
 
 class FleetController:
     def __init__(
-        self, inventory: Inventory, *, runner: CommandRunner | Any | None = None
+        self,
+        inventory: Inventory,
+        *,
+        runner: CommandRunner | Any | None = None,
+        schema_compatible: bool = False,
     ):
         self.inventory = inventory
         self.runner = runner or CommandRunner()
+        self.schema_compatible = schema_compatible
 
     def execute(
         self, action: str, target_names: Sequence[str] | None = None
@@ -506,6 +764,8 @@ class FleetController:
         if action not in SUPPORTED_ACTIONS:
             raise DeploymentError(f"unsupported action: {action}")
         targets = self._select_targets(target_names)
+        if action in LIFECYCLE_ACTIONS:
+            self._validate_runtime_resource_uniqueness(targets)
         started = _utc_now()
         results_by_name: dict[str, dict[str, Any]] = {}
         with ThreadPoolExecutor(
@@ -558,14 +818,80 @@ class FleetController:
             raise DeploymentError(f"unknown inventory targets: {', '.join(unknown)}")
         return [by_name[name] for name in requested]
 
+    def _runtime_engine_identity(self, target: Target) -> tuple[str, str]:
+        endpoint_output = self.runner.run(
+            [
+                "docker",
+                "context",
+                "inspect",
+                target.docker_context,
+                "--format",
+                "{{json .Endpoints.docker.Host}}",
+            ]
+        ).stdout.strip()
+        daemon_output = self.runner.run(
+            build_docker_command(target, "info", "--format", "{{json .ID}}")
+        ).stdout.strip()
+        endpoint = _parse_json_output(endpoint_output, "Docker context endpoint")
+        daemon_id = _parse_json_output(daemon_output, "Docker daemon identity")
+        if (
+            not isinstance(endpoint, str)
+            or not endpoint
+            or not isinstance(daemon_id, str)
+            or not daemon_id
+        ):
+            raise DeploymentError("Docker engine identity is invalid")
+        return endpoint, daemon_id
+
+    def _validate_runtime_resource_uniqueness(self, targets: Sequence[Target]) -> None:
+        resolved = [
+            (target, *self._runtime_engine_identity(target)) for target in targets
+        ]
+        for index, (left, left_endpoint, left_daemon) in enumerate(resolved):
+            for right, right_endpoint, right_daemon in resolved[index + 1 :]:
+                if left_endpoint != right_endpoint and left_daemon != right_daemon:
+                    continue
+                left_projects = {left.project_name}
+                right_projects = {right.project_name}
+                if left.dr is not None:
+                    left_projects.add(left.dr.project_name)
+                if right.dr is not None:
+                    right_projects.add(right.dr.project_name)
+                overlap = sorted(left_projects & right_projects)
+                if overlap:
+                    raise DeploymentError(
+                        "targets "
+                        f"{left.name} and {right.name} resolve to the same Docker engine "
+                        f"and reuse project {overlap[0]}"
+                    )
+                if (
+                    left.dr is not None
+                    and right.dr is not None
+                    and left.dr.repository_volume == right.dr.repository_volume
+                ):
+                    raise DeploymentError(
+                        "targets "
+                        f"{left.name} and {right.name} resolve to the same Docker engine "
+                        f"and reuse repository volume {left.dr.repository_volume}"
+                    )
+
     def _execute_target(self, action: str, target: Target) -> dict[str, Any]:
         started = time.monotonic()
         started_at = _utc_text()
         secrets: list[str] = []
+        checks: list[dict[str, Any]] = []
+        lifecycle_manager = None
         try:
-            values = parse_environment(target.env_file)
+            if action == "status":
+                try:
+                    values = parse_environment(target.env_file)
+                except DeploymentError:
+                    values = {}
+            else:
+                values = parse_environment(target.env_file)
             secrets = _secret_values(values)
-            validate_environment(values)
+            if action not in {"rollback", "status"}:
+                validate_environment(values)
             if action == "plan":
                 checks = self._plan(target, values)
             elif action == "preflight":
@@ -576,12 +902,30 @@ class FleetController:
                 checks = self._verify(target, values, secrets)
             elif action == "test":
                 checks = self._test(target, values, secrets)
+            elif action in LIFECYCLE_ACTIONS:
+                from scripts.story_39_7_lifecycle import LifecycleManager
+
+                lifecycle_manager = LifecycleManager(self)
+                checks = lifecycle_manager.execute(action, target, values, secrets)
             else:
                 checks = self._status(target, values, secrets)
-            status = "passed"
+            status = (
+                "partial"
+                if action == "status"
+                and any(check.get("status") == "failed" for check in checks)
+                else "passed"
+            )
             error = None
         except Exception as exc:
-            checks = []
+            if lifecycle_manager is not None:
+                checks.extend(lifecycle_manager.last_checks)
+            checks.append(
+                {
+                    "name": "action_failure",
+                    "status": "failed",
+                    "error": redact_text(str(exc), secrets),
+                }
+            )
             status = "failed"
             error = redact_text(str(exc), secrets)
         result: dict[str, Any] = {
@@ -601,7 +945,7 @@ class FleetController:
         return result
 
     def _plan(self, target: Target, values: Mapping[str, str]) -> list[dict[str, Any]]:
-        return [
+        checks = [
             {"name": "inventory", "status": "passed"},
             {
                 "name": "environment",
@@ -632,9 +976,27 @@ class FleetController:
                 "browser_channel": target.e2e.browser_channel or "bundled-chromium",
             },
         ]
+        if target.dr is not None:
+            checks.append(
+                {
+                    "name": "dr_lifecycle",
+                    "status": "passed",
+                    "mode": target.dr.mode,
+                    "project_name": target.dr.project_name,
+                    "canonical_runtime_image": target.dr.canonical_runtime_image,
+                    "final_runtime_image": target.dr.final_runtime_image,
+                    "schema_application_image": target.dr.schema_application_image,
+                    "state_directory": str(self.inventory.state_directory),
+                }
+            )
+        return checks
 
     def _preflight(
-        self, target: Target, values: Mapping[str, str], secrets: Sequence[str]
+        self,
+        target: Target,
+        values: Mapping[str, str],
+        secrets: Sequence[str],
+        compose_environment: Mapping[str, str] | None = None,
     ) -> list[dict[str, Any]]:
         if not target.compose_file.is_file():
             raise DeploymentError(f"compose file does not exist: {target.compose_file}")
@@ -675,7 +1037,9 @@ class FleetController:
             secrets=secrets,
         )
         self.runner.run(
-            build_compose_command(target, "config", "--quiet"), secrets=secrets
+            build_compose_command(target, "config", "--quiet"),
+            env=compose_environment,
+            secrets=secrets,
         )
         return [
             {
@@ -749,25 +1113,57 @@ class FleetController:
         return checks
 
     def _deploy(
-        self, target: Target, values: Mapping[str, str], secrets: Sequence[str]
+        self,
+        target: Target,
+        values: Mapping[str, str],
+        secrets: Sequence[str],
+        *,
+        pull_images: bool = True,
     ) -> list[dict[str, Any]]:
-        checks = self._preflight(target, values, secrets)
-        for key in IMAGE_KEYS:
-            self.runner.run(
-                build_docker_command(target, "pull", values[key]),
-                secrets=secrets,
-                timeout=1800,
-            )
+        compose_environment = dict(os.environ)
+        compose_environment.update(values)
+        checks = self._preflight(
+            target, values, secrets, compose_environment=compose_environment
+        )
+        if pull_images:
+            for key in IMAGE_KEYS:
+                self.runner.run(
+                    build_docker_command(target, "pull", values[key]),
+                    secrets=secrets,
+                    timeout=1800,
+                )
+        else:
+            for key in IMAGE_KEYS:
+                output = self.runner.run(
+                    build_docker_command(
+                        target,
+                        "image",
+                        "inspect",
+                        values[key],
+                        "--format",
+                        "{{json .Id}}",
+                    ),
+                    secrets=secrets,
+                ).stdout.strip()
+                image_id = _parse_json_output(output, f"local {key} image")
+                if (
+                    not isinstance(image_id, str)
+                    or IMAGE_ID_RE.fullmatch(image_id) is None
+                ):
+                    raise DeploymentError(f"local {key} image is unavailable")
         checks.append(
             {
-                "name": "image_pull",
+                "name": "image_pull" if pull_images else "local_images",
                 "status": "passed",
                 "references": [values[key] for key in IMAGE_KEYS],
+                "registry_contacted": pull_images,
             }
         )
         checks.extend(self._verify_images(target, values, secrets))
         images = self.runner.run(
-            build_compose_command(target, "config", "--images"), secrets=secrets
+            build_compose_command(target, "config", "--images"),
+            env=compose_environment,
+            secrets=secrets,
         ).stdout.splitlines()
         configured_images = sorted(line.strip() for line in images if line.strip())
         expected_images = sorted(values[key] for key in IMAGE_KEYS)
@@ -776,10 +1172,13 @@ class FleetController:
                 "rendered Compose images do not match the immutable inventory"
             )
         hashes = self.runner.run(
-            build_compose_command(target, "config", "--hash", "*"), secrets=secrets
+            build_compose_command(target, "config", "--hash", "*"),
+            env=compose_environment,
+            secrets=secrets,
         ).stdout.splitlines()
         self.runner.run(
             build_compose_command(target, "up", "-d", "--no-build", "--pull", "never"),
+            env=compose_environment,
             secrets=secrets,
             timeout=1800,
         )
@@ -795,22 +1194,39 @@ class FleetController:
                 "pull_during_startup": False,
             }
         )
-        checks.extend(self._verify_runtime(target, secrets))
+        checks.extend(
+            self._verify_runtime(
+                target, secrets, compose_environment=compose_environment
+            )
+        )
         return checks
 
     def _verify(
         self, target: Target, values: Mapping[str, str], secrets: Sequence[str]
     ) -> list[dict[str, Any]]:
-        checks = self._preflight(target, values, secrets)
+        compose_environment = dict(os.environ)
+        compose_environment.update(values)
+        checks = self._preflight(
+            target, values, secrets, compose_environment=compose_environment
+        )
         checks.extend(self._verify_images(target, values, secrets))
-        checks.extend(self._verify_runtime(target, secrets))
+        checks.extend(
+            self._verify_runtime(
+                target, secrets, compose_environment=compose_environment
+            )
+        )
         return checks
 
     def _compose_ps(
-        self, target: Target, secrets: Sequence[str]
+        self,
+        target: Target,
+        secrets: Sequence[str],
+        compose_environment: Mapping[str, str] | None = None,
     ) -> list[Mapping[str, Any]]:
         output = self.runner.run(
-            build_compose_command(target, "ps", "--format", "json"), secrets=secrets
+            build_compose_command(target, "ps", "--format", "json"),
+            env=compose_environment,
+            secrets=secrets,
         ).stdout.strip()
         if not output:
             raise DeploymentError("Compose returned no service status")
@@ -827,9 +1243,14 @@ class FleetController:
         return items
 
     def _verify_runtime(
-        self, target: Target, secrets: Sequence[str]
+        self,
+        target: Target,
+        secrets: Sequence[str],
+        compose_environment: Mapping[str, str] | None = None,
     ) -> list[dict[str, Any]]:
-        items = self._compose_ps(target, secrets)
+        items = self._compose_ps(
+            target, secrets, compose_environment=compose_environment
+        )
         by_service = {str(item.get("Service")): item for item in items}
         required = {"redis", "emqx", "backend", "nginx"}
         missing = sorted(required - set(by_service))
@@ -853,6 +1274,7 @@ class FleetController:
             ["curl", "-fsS", "http://127.0.0.1:8080/api/health"],
             "backend health",
             secrets,
+            compose_environment,
         )
         proxy_health = self._json_probe(
             target,
@@ -860,6 +1282,7 @@ class FleetController:
             ["wget", "-qO-", "http://127.0.0.1/api/health"],
             "proxy health",
             secrets,
+            compose_environment,
         )
         proxy_readiness = self._json_probe(
             target,
@@ -867,6 +1290,7 @@ class FleetController:
             ["wget", "-qO-", "http://127.0.0.1/api/readiness"],
             "proxy readiness",
             secrets,
+            compose_environment,
         )
         return [
             {"name": "services", "status": "passed", "services": service_status},
@@ -894,9 +1318,11 @@ class FleetController:
         probe_command: Sequence[str],
         description: str,
         secrets: Sequence[str],
+        compose_environment: Mapping[str, str] | None = None,
     ) -> Mapping[str, Any]:
         output = self.runner.run(
             build_compose_command(target, "exec", "-T", service, *probe_command),
+            env=compose_environment,
             secrets=secrets,
         ).stdout.strip()
         payload = _parse_json_output(output, description)
@@ -910,18 +1336,57 @@ class FleetController:
     def _status(
         self, target: Target, _values: Mapping[str, str], secrets: Sequence[str]
     ) -> list[dict[str, Any]]:
-        items = self._compose_ps(target, secrets)
-        services = []
-        for item in items:
-            services.append(
+        checks: list[dict[str, Any]] = []
+        try:
+            items = self._compose_ps(target, secrets)
+            by_service = {str(item.get("Service")): item for item in items}
+            required = {"redis", "emqx", "backend", "nginx"}
+            missing = sorted(required - set(by_service))
+            if missing:
+                raise DeploymentError(
+                    f"Compose services are missing: {', '.join(missing)}"
+                )
+            for name in sorted(required):
+                state = str(by_service[name].get("State", "")).lower()
+                health = str(by_service[name].get("Health", "")).lower()
+                if state != "running":
+                    raise DeploymentError(f"service {name} is not running")
+                if health and health != "healthy":
+                    raise DeploymentError(f"service {name} is not healthy")
+            services = [
                 {
                     "service": item.get("Service"),
                     "state": item.get("State"),
                     "health": item.get("Health"),
                     "image": item.get("Image"),
                 }
+                for item in items
+            ]
+            checks.append(
+                {"name": "compose_status", "status": "passed", "services": services}
             )
-        return [{"name": "compose_status", "status": "passed", "services": services}]
+        except Exception as exc:
+            checks.append(
+                {
+                    "name": "compose_status",
+                    "status": "failed",
+                    "error": redact_text(str(exc), secrets),
+                }
+            )
+        if target.dr is not None:
+            from scripts.story_39_7_lifecycle import LifecycleManager
+
+            try:
+                checks.extend(LifecycleManager(self).status(target, secrets))
+            except Exception as exc:
+                checks.append(
+                    {
+                        "name": "lifecycle_status",
+                        "status": "failed",
+                        "error": redact_text(str(exc), secrets),
+                    }
+                )
+        return checks
 
     def _test(
         self, target: Target, values: Mapping[str, str], secrets: Sequence[str]
@@ -1095,6 +1560,11 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--concurrency", type=int, help="override inventory concurrency (1-32)"
     )
+    parser.add_argument(
+        "--schema-compatible",
+        action="store_true",
+        help="assert that upgrade or rollback keeps the existing database schema compatible",
+    )
     return parser
 
 
@@ -1106,7 +1576,9 @@ def main(argv: Sequence[str] | None = None) -> int:
             if not 1 <= args.concurrency <= 32:
                 raise DeploymentError("--concurrency must be between 1 and 32")
             inventory = replace(inventory, concurrency=args.concurrency)
-        report = FleetController(inventory).execute(args.action, args.targets)
+        report = FleetController(
+            inventory, schema_compatible=args.schema_compatible
+        ).execute(args.action, args.targets)
     except DeploymentError as exc:
         print(
             json.dumps(

@@ -106,6 +106,9 @@ docs/ref/
 e2e/test-results/
 e2e/.auth/
 _bmad-output/test-artifacts/epic-39/39.7/fleet-reports/
+deploy/observability/story-39-7-targets.yaml
+deploy/dr/story-39-3-*.env
+.dcim-story-39-7-rollback-*.yml
 
 # 生成的临时文件
 openapi*.json

@@ -5,6 +5,36 @@
 `DCIM_POSTGRES_IMAGE_DIGEST` 填写不含 `sha256:` 前缀的 64 位 manifest digest。Compose 会将两者固定组合为
 `<repository>@sha256:<digest>`；标签或本地 image ID 不能用于正式证据。
 
+## 自动首次部署
+
+推荐通过 `scripts/story_39_7_deploy.py bootstrap` 使用本 Compose，而不是手工逐项启动。控制器会先以
+`canonical-schema-manifest.json` 指定的规范运行时启动主库并恢复 188 张表，再显式切换到最终 DR
+运行时，随后启动备库和备份调度器，依次执行 stanza 创建、首次 full、check、verify 和 status。
+控制器会在首次持久化变更前写入 `bootstrap_pending/prepared`，并在规范主库、schema、最终 DR
+运行时和首次全量备份依次完成后更新阶段检查点。任一阶段失败，修复原因后原样重跑 `bootstrap`
+即可从最后完成阶段继续；`dr_verified` 后只复核现有 DR/备份并重试应用，不会重建数据库或再次执行
+首次 full。
+
+DR 密钥目录必须位于仓库外。缺失文件采用排他创建；已存在文件只校验、不覆盖。SSH 目标的 Compose、
+非敏感环境文件和密钥都先上传到同目录 `.incoming-*` 文件，复核所有者和 SHA-256、收紧为 0600 后
+原子改名；中断会精确清理该临时文件。密钥已存在时还必须内容一致，绝不覆盖。字段合同见
+`story-39-3.env.example`，完整清单与命令见 `deploy/observability/story-39-7-fleet-deployment.md`。
+
+自动升级和回滚只允许在显式 `--schema-compatible` 下切换应用不可变镜像；数据库运行时发生变化时
+控制器会失败关闭，必须先执行迁移与 restore point 流程。自动化不会执行 `down -v`，也不会删除
+主库、备库、pgBackRest、Redis、EMQX 或状态卷。
+此外，候选后端必须与批准的建库后端具有完全一致的 SQLAlchemy schema 合同、Alembic heads 和迁移
+文件哈希；Enum 的完整成员列表也属于合同，仅有“表数量相同”不会通过。生命周期操作同时使用控制机
+文件锁和目标 Docker daemon 锁容器，避免两个控制进程并发改写同一数据库和 journal。控制器每 60 秒
+刷新锁容器心跳；心跳连续丢失 30 分钟时容器退出。升级和回滚只使用目标上已有的已批准 DR 运行时
+镜像获取锁，不会为了获取锁访问镜像仓库；回滚的应用和 schema 镜像也只按本地 digest 复核。
+
+`schema_verified` 检查点同时记录 Docker daemon ID，以及主库卷和 pgBackRest 仓库卷的名称、创建时间
+和完整标签。恢复执行前会逐项复核卷指纹，并使用已批准的后端镜像从数据库网络重新查询完整 catalog；
+卷被替换、daemon 被替换或 catalog 漂移都会失败关闭。`dr_verified` 还绑定健康的 `dcim` stanza 和首次
+full backup label，并要求 `last-run.json` 同时满足 `status=success`、`step=complete`、`exit_code=0`。
+已存在的 schema 报告只有在项目、容器、网络、数据库、运行时、应用镜像及所有批准哈希完全一致时才会复用。
+
 ## 故障域
 
 - `postgres-primary-data`、`postgres-standby-data` 和 `postgres-restore-data` 互不复用。

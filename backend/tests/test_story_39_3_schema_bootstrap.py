@@ -3,6 +3,7 @@
 import importlib.util
 import json
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -131,6 +132,44 @@ def test_schema_bootstrap_rejects_isolation_label_mismatch():
     assert exc_info.value.code == "isolation_label_invalid"
 
 
+def test_application_metadata_probe_passes_secret_only_through_environment():
+    bootstrap = _load_bootstrap_module()
+
+    class Runner:
+        def __init__(self):
+            self.calls = []
+
+        def run(self, step, argv, **kwargs):
+            self.calls.append((step, argv, kwargs))
+            if step == "validate_application_metadata":
+                return json.dumps(
+                    {
+                        "table_count": bootstrap.EXPECTED_TABLE_COUNT,
+                        "schema_sha256": bootstrap.EXPECTED_SCHEMA_SHA256,
+                    }
+                )
+            return ""
+
+        def try_run(self, step, argv, **kwargs):
+            self.calls.append((step, argv, kwargs))
+            return True, ""
+
+    runner = Runner()
+    image = "example.invalid/backend@sha256:" + ("a" * 64)
+
+    bootstrap.validate_application_metadata(
+        runner,
+        image,
+        bootstrap.EXPECTED_SCHEMA_SHA256,
+    )
+
+    _step, create_command, options = runner.calls[0]
+    secret = options["env"]["FAULT_TREE_HMAC_KEY"]
+    assert create_command[create_command.index("--env") + 1] == "FAULT_TREE_HMAC_KEY"
+    assert secret not in create_command
+    assert len(secret) == 64
+
+
 def test_canonical_manifest_binds_dump_hash_and_release_provenance(tmp_path):
     bootstrap = _load_bootstrap_module()
     dump = tmp_path / "canonical-schema.dump"
@@ -224,3 +263,67 @@ def test_canonical_artifact_cleanup_uses_root_for_sticky_tmp(tmp_path):
             bootstrap.CANONICAL_CONTAINER_PATH,
         ],
     )
+
+
+def test_success_report_binds_project_database_container_network_and_images(tmp_path, monkeypatch):
+    bootstrap = _load_bootstrap_module()
+    application_image = "example.invalid/backend@sha256:" + ("a" * 64)
+    runtime_image = "example.invalid/postgres@sha256:" + ("b" * 64)
+    expected_tables = [f"table_{index}" for index in range(bootstrap.EXPECTED_TABLE_COUNT)]
+    table_hash = "c" * 64
+    catalog_hash = "d" * 64
+    password_file = tmp_path / "postgres_password"
+    password_file.write_text("database-secret\n", encoding="utf-8")
+    args = SimpleNamespace(
+        project="dcim-story-39-3-report",
+        postgres_container="primary-container-id",
+        network="dcim-story-39-3-report_database-client",
+        application_image=application_image,
+        postgres_password_file=password_file,
+        database="dcim",
+        database_user="dcim",
+        canonical_dump=tmp_path / "canonical-schema.dump",
+        canonical_manifest=tmp_path / "canonical-schema-manifest.json",
+        schema_file=tmp_path / "expected-schema-tables.txt",
+        expected_schema_sha256=table_hash,
+    )
+    monkeypatch.setattr(
+        bootstrap,
+        "load_expected_schema",
+        lambda *_args: (expected_tables, table_hash),
+    )
+    monkeypatch.setattr(bootstrap, "validate_application_image", lambda *_args: application_image)
+    monkeypatch.setattr(
+        bootstrap,
+        "load_canonical_manifest",
+        lambda *_args: {
+            "runtime_image": runtime_image,
+            "artifact_sha256": "e" * 64,
+        },
+    )
+    monkeypatch.setattr(bootstrap, "validate_isolation", lambda *_args: runtime_image)
+    monkeypatch.setattr(bootstrap, "validate_application_metadata", lambda *_args: None)
+    monkeypatch.setattr(bootstrap, "query_database_occupancy", lambda *_args: 0)
+    monkeypatch.setattr(bootstrap, "restore_canonical_schema", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(bootstrap, "query_release_tables", lambda *_args: expected_tables)
+    monkeypatch.setattr(
+        bootstrap,
+        "query_catalog",
+        lambda *_args: {
+            "alembic_head": bootstrap.RELEASE_HEAD,
+            "timescaledb": {"hypertables": [{}], "jobs": [{}, {}]},
+        },
+    )
+    monkeypatch.setattr(bootstrap, "validate_catalog", lambda *_args: catalog_hash)
+    result = {}
+
+    bootstrap.execute(args, object(), result)
+
+    assert result["project"] == args.project
+    assert result["postgres_container"] == args.postgres_container
+    assert result["network"] == args.network
+    assert result["database"] == args.database
+    assert result["database_user"] == args.database_user
+    assert result["application_image"] == application_image
+    assert result["runtime_image"] == runtime_image
+    assert result["catalog_sha256"] == catalog_hash

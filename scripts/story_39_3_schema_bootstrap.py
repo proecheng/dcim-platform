@@ -613,6 +613,9 @@ def validate_application_metadata(
         "print(json.dumps({'table_count':len(names),'schema_sha256':digest},sort_keys=True))"
     )
     name = f"dcim-story-39-3-schema-metadata-{uuid.uuid4().hex[:10]}"
+    probe_secret = f"{uuid.uuid4().hex}{uuid.uuid4().hex}"
+    process_environment = dict(os.environ)
+    process_environment["FAULT_TREE_HMAC_KEY"] = probe_secret
     runner.run(
         "create_application_metadata_probe",
         [
@@ -629,11 +632,12 @@ def validate_application_metadata(
             "--entrypoint",
             "python",
             "--env",
-            f"FAULT_TREE_HMAC_KEY={uuid.uuid4().hex}{uuid.uuid4().hex}",
+            "FAULT_TREE_HMAC_KEY",
             image,
             "-c",
             probe,
         ],
+        env=process_environment,
         timeout=60,
         failure_code="application_metadata_probe_failed",
     )
@@ -821,6 +825,11 @@ def execute(
         {
             "status": "pass",
             "failure_code": None,
+            "project": args.project,
+            "postgres_container": args.postgres_container,
+            "network": args.network,
+            "database": args.database,
+            "database_user": args.database_user,
             "application_image": application_image,
             "runtime_image": runtime_image,
             "canonical_artifact_sha256": manifest["artifact_sha256"],

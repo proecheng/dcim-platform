@@ -4,6 +4,7 @@ version: 1
 # database, and control-host capacity have been measured.
 concurrency: 3
 report_directory: ../../_bmad-output/test-artifacts/epic-39/39.7/fleet-reports
+state_directory: ../../../dcim-fleet-state
 
 defaults:
   compose_file: docker-compose.story-39-7-preprod.yml
@@ -16,6 +17,13 @@ defaults:
       - e2e/invalid-detail-pages.spec.ts
       - e2e/authorization-matrix.spec.ts
       - e2e/site-isolation-websocket-authorization.spec.ts
+  dr:
+    compose_file: ../dr/docker-compose.dr.yml
+    project_name: dcim-story-39-3-dr
+    canonical_runtime_image: ghcr.io/proecheng/dcim-platform/postgres:16.15-ts2.29.1-pgb2.59.0-runtime@sha256:e6ca69c005bfba5b30dbb91c58a181874e2c833e0a311ad3998f32d4b497f3e4
+    final_runtime_image: ghcr.io/proecheng/dcim-platform/postgres:16.15-ts2.29.1-pgb2.59.0-schema-gate-v1@sha256:ad57905638f480f574c1955bf433e5414ddf8158a4a5f76ad2ee7d5e683e0f76
+    schema_application_image: ghcr.io/proecheng/dcim-platform/backend@sha256:58bb47905f93872fb4be2817c22d600f10fa60432dcd20f59405a7e149f22bcd
+    repository_volume: dcim-story-39-3-dr-pgbackrest
 
 targets:
   # Docker Desktop must be switched to Linux containers. This target is also
@@ -24,6 +32,9 @@ targets:
     docker_context: desktop-linux
     env_file: ../../../dcim-fleet-secrets/workstation.env
     project_name: dcim-story-39-7-workstation
+    dr:
+      mode: local
+      secret_directory: ../../../dcim-fleet-secrets/workstation/dr
     e2e:
       mode: local
       local_port: 3000
@@ -34,6 +45,11 @@ targets:
     docker_context: qa-linux-01
     env_file: ../../../dcim-fleet-secrets/qa-linux-01.env
     project_name: dcim-story-39-7-qa-01
+    dr:
+      mode: ssh
+      ssh_target: deploy@qa-linux-01.example.invalid
+      remote_directory: /opt/dcim/story-39-3
+      secret_directory: ../../../dcim-fleet-secrets/qa-linux-01/dr
     e2e:
       mode: ssh-tunnel
       ssh_target: deploy@qa-linux-01.example.invalid
@@ -44,6 +60,11 @@ targets:
     docker_context: qa-linux-02
     env_file: ../../../dcim-fleet-secrets/qa-linux-02.env
     project_name: dcim-story-39-7-qa-02
+    dr:
+      mode: ssh
+      ssh_target: deploy@qa-linux-02.example.invalid
+      remote_directory: /opt/dcim/story-39-3
+      secret_directory: ../../../dcim-fleet-secrets/qa-linux-02/dr
     e2e:
       mode: ssh-tunnel
       ssh_target: deploy@qa-linux-02.example.invalid
@@ -54,6 +75,11 @@ targets:
     docker_context: qa-linux-03
     env_file: ../../../dcim-fleet-secrets/qa-linux-03.env
     project_name: dcim-story-39-7-qa-03
+    dr:
+      mode: ssh
+      ssh_target: deploy@qa-linux-03.example.invalid
+      remote_directory: /opt/dcim/story-39-3
+      secret_directory: ../../../dcim-fleet-secrets/qa-linux-03/dr
     e2e:
       mode: ssh-tunnel
       ssh_target: deploy@qa-linux-03.example.invalid
@@ -64,6 +90,11 @@ targets:
     docker_context: qa-linux-04
     env_file: ../../../dcim-fleet-secrets/qa-linux-04.env
     project_name: dcim-story-39-7-qa-04
+    dr:
+      mode: ssh
+      ssh_target: deploy@qa-linux-04.example.invalid
+      remote_directory: /opt/dcim/story-39-3
+      secret_directory: ../../../dcim-fleet-secrets/qa-linux-04/dr
     e2e:
       mode: ssh-tunnel
       ssh_target: deploy@qa-linux-04.example.invalid
@@ -74,6 +105,11 @@ targets:
     docker_context: qa-linux-05
     env_file: ../../../dcim-fleet-secrets/qa-linux-05.env
     project_name: dcim-story-39-7-qa-05
+    dr:
+      mode: ssh
+      ssh_target: deploy@qa-linux-05.example.invalid
+      remote_directory: /opt/dcim/story-39-3
+      secret_directory: ../../../dcim-fleet-secrets/qa-linux-05/dr
     e2e:
       mode: ssh-tunnel
       ssh_target: deploy@qa-linux-05.example.invalid
@@ -84,6 +120,11 @@ targets:
     docker_context: qa-linux-06
     env_file: ../../../dcim-fleet-secrets/qa-linux-06.env
     project_name: dcim-story-39-7-qa-06
+    dr:
+      mode: ssh
+      ssh_target: deploy@qa-linux-06.example.invalid
+      remote_directory: /opt/dcim/story-39-3
+      secret_directory: ../../../dcim-fleet-secrets/qa-linux-06/dr
     e2e:
       mode: ssh-tunnel
       ssh_target: deploy@qa-linux-06.example.invalid
@@ -94,6 +135,11 @@ targets:
     docker_context: qa-linux-07
     env_file: ../../../dcim-fleet-secrets/qa-linux-07.env
     project_name: dcim-story-39-7-qa-07
+    dr:
+      mode: ssh
+      ssh_target: deploy@qa-linux-07.example.invalid
+      remote_directory: /opt/dcim/story-39-3
+      secret_directory: ../../../dcim-fleet-secrets/qa-linux-07/dr
     e2e:
       mode: ssh-tunnel
       ssh_target: deploy@qa-linux-07.example.invalid
@@ -104,6 +150,11 @@ targets:
     docker_context: qa-linux-08
     env_file: ../../../dcim-fleet-secrets/qa-linux-08.env
     project_name: dcim-story-39-7-qa-08
+    dr:
+      mode: ssh
+      ssh_target: deploy@qa-linux-08.example.invalid
+      remote_directory: /opt/dcim/story-39-3
+      secret_directory: ../../../dcim-fleet-secrets/qa-linux-08/dr
     e2e:
       mode: ssh-tunnel
       ssh_target: deploy@qa-linux-08.example.invalid
@@ -114,6 +165,11 @@ targets:
     docker_context: preproduction
     env_file: ../../../dcim-fleet-secrets/preproduction.env
     project_name: dcim-story-39-7-preproduction
+    dr:
+      mode: ssh
+      ssh_target: deploy@preproduction.example.invalid
+      remote_directory: /opt/dcim/story-39-3
+      secret_directory: ../../../dcim-fleet-secrets/preproduction/dr
     e2e:
       mode: ssh-tunnel
       ssh_target: deploy@preproduction.example.invalid

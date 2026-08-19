@@ -12,9 +12,9 @@ pgbackrest:
   source_commit: "f84c8357d49ea9452cd606531e9c4c322c41bc2e"
   source_sha256: "faaf8faa14a6392279654ee216a493fcd07b0c513af4b55fe34faec062cb8875"
 release_image:
-  tag: "dcim-postgres:16.15-ts2.29.1-pgb2.59.0"
+  tag: "ghcr.io/proecheng/dcim-platform/postgres:16.15-ts2.29.1-pgb2.59.0-schema-gate-v1"
   require_digest: true
-  accepted_reference: "<registry>/dcim-postgres:16.15-ts2.29.1-pgb2.59.0@sha256:<verified-manifest-digest>"
+  accepted_reference: "ghcr.io/proecheng/dcim-platform/postgres:16.15-ts2.29.1-pgb2.59.0-schema-gate-v1@sha256:ad57905638f480f574c1955bf433e5414ddf8158a4a5f76ad2ee7d5e683e0f76"
 upgrade_policy:
   allow_floating_tags: false
   rebuild_on_component_change: true

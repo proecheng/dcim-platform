@@ -13,7 +13,7 @@
     "timescaledb_jobs": 2
   },
   "postgres_version": "16.15",
-  "runtime_image": "dcim-postgres:16.15-ts2.29.1-pgb2.59.0@sha256:e6ca69c005bfba5b30dbb91c58a181874e2c833e0a311ad3998f32d4b497f3e4",
+  "runtime_image": "ghcr.io/proecheng/dcim-platform/postgres:16.15-ts2.29.1-pgb2.59.0-runtime@sha256:e6ca69c005bfba5b30dbb91c58a181874e2c833e0a311ad3998f32d4b497f3e4",
   "schema_version": 1,
   "source_revision": "436a8e778037bf6fcf9140b757e9584e669ad33b",
   "table_count": 188,
