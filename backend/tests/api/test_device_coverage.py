@@ -5,6 +5,7 @@
 from unittest.mock import patch
 
 from app.models.device import Device
+from app.models.energy import PowerDevice
 from app.models.point import Point, PointRealtime
 from app.models.alarm import Alarm
 from app.models.spatial import Site
@@ -470,6 +471,38 @@ class TestDeviceCRUD:
         data = resp.json()
         # 影响分析应包含点位相关信息
         assert "impacts" in data or "device_name" in data
+
+    async def test_force_delete_unlinks_power_device_before_deleting_monitor(self, client, admin_user, async_db):
+        """PostgreSQL 约束要求先持久化能源设备的解除关联。"""
+        _, token = admin_user
+        device = Device(
+            device_code="DEL-DEV-POWER-001",
+            device_name="有关联拓扑设备",
+            device_type="PDU",
+            area_code="A1",
+        )
+        async_db.add(device)
+        await async_db.flush()
+        power_device = PowerDevice(
+            device_code="DEL-POWER-001",
+            device_name="保留的能源拓扑设备",
+            device_type="PDU",
+            monitor_device_id=device.id,
+            rated_power=22.0,
+            is_enabled=True,
+        )
+        async_db.add(power_device)
+        await async_db.flush()
+
+        resp = await client.delete(
+            f"/api/v1/devices/{device.id}?force=true",
+            headers=auth_headers(token),
+        )
+
+        assert resp.status_code == 200
+        await async_db.refresh(power_device)
+        assert power_device.monitor_device_id is None
+        assert power_device.is_enabled is False
 
     async def test_delete_device_not_found(self, client, admin_user, async_db):
         """DELETE /devices/99999 — 不存在"""

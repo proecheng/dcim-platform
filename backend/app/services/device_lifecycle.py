@@ -363,6 +363,10 @@ class DeviceLifecycleService:
             pd.updated_at = datetime.now()
         deleted["power_devices_unlinked"] = len(pds)
 
+        # The application session disables autoflush. Persist FK unlinking before
+        # deleting the monitored device so PostgreSQL sees the updated references.
+        await self.db.flush()
+
         # 13. 软关联警告（不删除，仅记录）
         from ..models.operation import WorkOrder
         from ..models.command import CommandApproval
