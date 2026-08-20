@@ -30,9 +30,9 @@ IDENTIFIER_PATTERN = re.compile(r"^[a-z_][a-z0-9_]{0,62}$")
 TABLE_PATTERN = re.compile(r"^[a-z][a-z0-9_]*$")
 RELEASE_HEAD = "20260707_0100"
 SOURCE_REVISION = "436a8e778037bf6fcf9140b757e9584e669ad33b"
-EXPECTED_TABLE_COUNT = 188
+EXPECTED_TABLE_COUNT = 189
 EXPECTED_SCHEMA_SHA256 = (
-    "81cdd3d0d4d3a4ad5edc128981e383bcfff5f37bc1b9d30f491c1598fc1be6b3"
+    "0df268cf4fa358af46f127c716d5d6f40ccbe3c4d7017a8f5f68e33bc7dc6e25"
 )
 CANONICAL_CONTAINER_PATH = "/tmp/dcim-story-39-3-canonical-schema.dump"
 
@@ -193,7 +193,7 @@ def load_expected_schema(path: Path, expected_hash: str) -> tuple[list[str], str
     if len(names) != EXPECTED_TABLE_COUNT or len(set(names)) != EXPECTED_TABLE_COUNT:
         raise BootstrapError(
             "schema_manifest_invalid",
-            "expected schema manifest must contain 188 unique tables",
+            f"expected schema manifest must contain {EXPECTED_TABLE_COUNT} unique tables",
         )
     if any(TABLE_PATTERN.fullmatch(name) is None for name in names):
         raise BootstrapError(
@@ -279,9 +279,13 @@ def validate_isolation_labels(
         raise BootstrapError(
             "isolation_label_invalid", "container is not a Story 39.3 primary"
         )
-    if network_labels.get("com.dcim.dr.site") != "primary":
+    if not (
+        network_labels.get("com.dcim.dr.site") == "primary"
+        or network_labels.get("com.dcim.dr.role") == "stable-endpoint"
+    ):
         raise BootstrapError(
-            "isolation_label_invalid", "network is not the primary site"
+            "isolation_label_invalid",
+            "network is neither the primary site nor the stable endpoint",
         )
 
 
@@ -607,7 +611,7 @@ def validate_application_metadata(
 ) -> None:
     probe = (
         "import json; from hashlib import sha256; "
-        "from app.core.database import Base; import app.models; "
+        "from app.core.database import Base; import app.api.v1; import app.models; "
         "names=sorted(t.name for t in Base.metadata.sorted_tables if t.schema in (None,'public')); "
         "digest=sha256((chr(10).join(names)+chr(10)).encode()).hexdigest(); "
         "print(json.dumps({'table_count':len(names),'schema_sha256':digest},sort_keys=True))"

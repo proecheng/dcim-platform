@@ -166,7 +166,7 @@ pgBackRest repository volume, or an existing lifecycle state. It then:
 3. creates or reuses protected secret files without replacing them;
 4. pulls the exact canonical PostgreSQL, final PostgreSQL, schema application,
    and Story 39.7 application images;
-5. starts the canonical primary and restores the approved 188-table schema;
+5. starts the canonical primary and restores the approved 189-table schema;
 6. explicitly transitions the primary to the final DR runtime;
 7. starts the standby and backup scheduler, then runs `stanza`, `full`, `check`,
    `verify`, and `status`;

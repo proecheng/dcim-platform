@@ -25,6 +25,8 @@ import yaml
 
 
 ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 GIT_SHA_RE = re.compile(r"^[0-9a-f]{40}$")
 IMAGE_DIGEST_RE = re.compile(r"^\S+@sha256:([0-9a-f]{64})$")
 IMAGE_ID_RE = re.compile(r"^sha256:([0-9a-f]{64})$")
@@ -895,7 +897,12 @@ class FleetController:
             if action == "plan":
                 checks = self._plan(target, values)
             elif action == "preflight":
-                checks = self._preflight(target, values, secrets)
+                checks = self._preflight(
+                    target,
+                    values,
+                    secrets,
+                    allow_bootstrap_external_missing=target.dr is not None,
+                )
             elif action == "deploy":
                 checks = self._deploy(target, values, secrets)
             elif action == "verify":
@@ -997,6 +1004,7 @@ class FleetController:
         values: Mapping[str, str],
         secrets: Sequence[str],
         compose_environment: Mapping[str, str] | None = None,
+        allow_bootstrap_external_missing: bool = False,
     ) -> list[dict[str, Any]]:
         if not target.compose_file.is_file():
             raise DeploymentError(f"compose file does not exist: {target.compose_file}")
@@ -1024,24 +1032,55 @@ class FleetController:
         compose_version = self.runner.run(
             build_docker_command(target, "compose", "version"), secrets=secrets
         ).stdout.strip()
-        self.runner.run(
-            build_docker_command(
-                target, "network", "inspect", values["DCIM_DR_DATABASE_NETWORK"]
-            ),
-            secrets=secrets,
-        )
-        self.runner.run(
-            build_docker_command(
-                target, "volume", "inspect", values["DCIM_DR_STATUS_VOLUME"]
-            ),
-            secrets=secrets,
-        )
+        external_resources_available = True
+        try:
+            self.runner.run(
+                build_docker_command(
+                    target, "network", "inspect", values["DCIM_DR_DATABASE_NETWORK"]
+                ),
+                secrets=secrets,
+            )
+            self.runner.run(
+                build_docker_command(
+                    target, "volume", "inspect", values["DCIM_DR_STATUS_VOLUME"]
+                ),
+                secrets=secrets,
+            )
+        except DeploymentError:
+            if not allow_bootstrap_external_missing:
+                raise
+            external_resources_available = False
+            state_path = self.inventory.state_directory / f"{target.name}.json"
+            if state_path.exists():
+                raise
+            for project in (
+                target.project_name,
+                target.dr.project_name if target.dr else "",
+            ):
+                if not project:
+                    continue
+                for kind in ("container", "network", "volume"):
+                    command = [kind, "ls"]
+                    if kind == "container":
+                        command.append("--all")
+                    command.extend(
+                        [
+                            "--filter",
+                            f"label=com.docker.compose.project={project}",
+                            "--format",
+                            "{{.ID}}",
+                        ]
+                    )
+                    if self.runner.run(
+                        build_docker_command(target, *command)
+                    ).stdout.strip():
+                        raise
         self.runner.run(
             build_compose_command(target, "config", "--quiet"),
             env=compose_environment,
             secrets=secrets,
         )
-        return [
+        checks = [
             {
                 "name": "docker_engine",
                 "status": "passed",
@@ -1052,17 +1091,33 @@ class FleetController:
             {"name": "docker_compose", "status": "passed", "version": compose_version},
             {"name": "environment", "status": "passed"},
             {"name": "compose_config", "status": "passed"},
-            {
-                "name": "story_39_3_network",
-                "status": "passed",
-                "name_value": values["DCIM_DR_DATABASE_NETWORK"],
-            },
-            {
-                "name": "story_39_3_status_volume",
-                "status": "passed",
-                "name_value": values["DCIM_DR_STATUS_VOLUME"],
-            },
         ]
+        if external_resources_available:
+            checks.extend(
+                [
+                    {
+                        "name": "story_39_3_network",
+                        "status": "passed",
+                        "name_value": values["DCIM_DR_DATABASE_NETWORK"],
+                    },
+                    {
+                        "name": "story_39_3_status_volume",
+                        "status": "passed",
+                        "name_value": values["DCIM_DR_STATUS_VOLUME"],
+                    },
+                ]
+            )
+        else:
+            checks.append(
+                {
+                    "name": "story_39_3_external_resources",
+                    "status": "deferred",
+                    "reason": "clean bootstrap target will create the DR network and status volume",
+                    "network": values["DCIM_DR_DATABASE_NETWORK"],
+                    "volume": values["DCIM_DR_STATUS_VOLUME"],
+                }
+            )
+        return checks
 
     def _verify_images(
         self, target: Target, values: Mapping[str, str], secrets: Sequence[str]
@@ -1177,7 +1232,17 @@ class FleetController:
             secrets=secrets,
         ).stdout.splitlines()
         self.runner.run(
-            build_compose_command(target, "up", "-d", "--no-build", "--pull", "never"),
+            build_compose_command(
+                target,
+                "up",
+                "-d",
+                "--no-build",
+                "--pull",
+                "never",
+                "--wait",
+                "--wait-timeout",
+                "600",
+            ),
             env=compose_environment,
             secrets=secrets,
             timeout=1800,

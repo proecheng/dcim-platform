@@ -78,6 +78,18 @@ class TestRateLimiter:
         remaining = limiter.get_remaining_time("key3")
         assert remaining >= 0
 
+    def test_login_rate_limit_is_scoped_to_account_and_client(self):
+        from app.api.v1.auth import RateLimiter, _login_rate_limit_key
+
+        limiter = RateLimiter(max_attempts=1, window_seconds=60)
+        first_account = _login_rate_limit_key("10.0.0.5", "Admin")
+        same_account = _login_rate_limit_key("10.0.0.5", " admin ")
+        second_account = _login_rate_limit_key("10.0.0.5", "operator")
+
+        assert limiter.is_allowed(first_account) is True
+        assert limiter.is_allowed(same_account) is False
+        assert limiter.is_allowed(second_account) is True
+
 
 class TestLoginRateLimitBranch:
     """登录端点的速率限制分支（覆盖行 97-103）"""

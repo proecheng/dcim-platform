@@ -147,6 +147,7 @@ rl_model_states
 rl_optimization_history
 rl_training_logs
 role_permissions
+rollback_events
 rooms
 rows
 scheme_pricing_relations

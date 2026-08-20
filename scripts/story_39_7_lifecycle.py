@@ -25,7 +25,11 @@ from urllib.parse import unquote, urlsplit
 
 import yaml
 
-from scripts.story_39_3_schema_bootstrap import CATALOG_SQL, OCCUPANCY_SQL
+from scripts.story_39_3_schema_bootstrap import (
+    CATALOG_SQL,
+    EXPECTED_TABLE_COUNT,
+    OCCUPANCY_SQL,
+)
 from scripts.story_39_7_deploy import (
     ROOT,
     DeploymentError,
@@ -1189,7 +1193,7 @@ class LifecycleManager:
             is None
             or payload.get("runtime_image") != dr.canonical_runtime_image
             or payload.get("application_image") != dr.schema_application_image
-            or payload.get("table_count") != 188
+            or payload.get("table_count") != EXPECTED_TABLE_COUNT
             or payload.get("alembic_head") != "20260707_0100"
             or any(
                 re.fullmatch(r"[0-9a-f]{64}", str(payload.get(key, ""))) is None
@@ -1631,6 +1635,116 @@ class LifecycleManager:
             *args,
         ]
 
+    def _provision_e2e_admin(
+        self,
+        target: Target,
+        values: Mapping[str, str],
+        secrets: Sequence[str],
+    ) -> dict[str, Any]:
+        username = values.get("E2E_ADMIN_USER", "").strip()
+        password = values.get("E2E_ADMIN_PASSWORD", "")
+        if not username or not password:
+            raise DeploymentError(
+                "bootstrap requires E2E_ADMIN_USER and E2E_ADMIN_PASSWORD"
+            )
+        if len(password) < 12 or any(character.isspace() for character in password):
+            raise DeploymentError(
+                "E2E_ADMIN_PASSWORD must contain at least 12 non-whitespace characters"
+            )
+
+        script = """
+import asyncio
+import json
+import os
+from datetime import datetime
+
+from sqlalchemy import delete, select
+
+from app.core.database import async_session
+from app.core.security import get_password_hash
+from app.models import User, UserSession
+
+
+async def provision():
+    username = os.environ["E2E_ADMIN_USER"]
+    password = os.environ["E2E_ADMIN_PASSWORD"]
+    async with async_session() as session:
+        result = await session.execute(
+            select(User).where(User.username == username).with_for_update()
+        )
+        user = result.scalar_one_or_none()
+        created = user is None
+        if created:
+            user = User(username=username)
+            session.add(user)
+        user.password_hash = get_password_hash(password)
+        user.role = "admin"
+        user.is_active = True
+        user.password_changed_at = datetime.now()
+        await session.flush()
+        await session.execute(delete(UserSession).where(UserSession.user_id == user.id))
+        await session.commit()
+    print(json.dumps({"created": created, "role": "admin", "active": True}))
+
+
+asyncio.run(provision())
+""".strip()
+        process_environment = dict(os.environ)
+        for key in (
+            "DATABASE_URL",
+            "E2E_ADMIN_USER",
+            "E2E_ADMIN_PASSWORD",
+            "FAULT_TREE_HMAC_KEY",
+        ):
+            process_environment[key] = values[key]
+        name = f"dcim-story-39-7-admin-{uuid.uuid4().hex[:10]}"
+        result = self.runner.run(
+            build_docker_command(
+                target,
+                "run",
+                "--rm",
+                "--name",
+                name,
+                "--network",
+                values["DCIM_DR_DATABASE_NETWORK"],
+                "--label",
+                "com.dcim.story=39.7",
+                "--label",
+                "com.dcim.role=e2e-admin-bootstrap",
+                "--entrypoint",
+                "python",
+                "--env",
+                "DATABASE_URL",
+                "--env",
+                "E2E_ADMIN_USER",
+                "--env",
+                "E2E_ADMIN_PASSWORD",
+                "--env",
+                "FAULT_TREE_HMAC_KEY",
+                values["DCIM_BACKEND_IMAGE"],
+                "-c",
+                script,
+            ),
+            env=process_environment,
+            timeout=180,
+            secrets=secrets,
+        )
+        payload = _parse_json_output(result.stdout.strip(), "E2E admin bootstrap")
+        if (
+            not isinstance(payload, Mapping)
+            or payload.get("role") != "admin"
+            or payload.get("active") is not True
+        ):
+            raise DeploymentError("E2E admin bootstrap returned an invalid result")
+        return {
+            "name": "e2e_admin_bootstrap",
+            "status": "passed",
+            "username": username,
+            "created": payload.get("created") is True,
+            "credentials_reported": False,
+            "sessions_revoked": True,
+        }
+
     def _pull_dr_images(
         self, target: Target, secrets: Sequence[str]
     ) -> list[dict[str, Any]]:
@@ -1706,6 +1820,7 @@ from pathlib import Path
 from alembic.config import Config
 from alembic.script import ScriptDirectory
 from app.core.database import Base
+import app.api.v1
 import app.models
 
 
@@ -2097,13 +2212,16 @@ asyncio.run(main())
         live = self._probe_live_database(target, values, secrets)
         if live.get("database_state") != "canonical":
             raise DeploymentError("bootstrap canonical database is unexpectedly empty")
-        if checkpoint.get("catalog_sha256") != live["catalog_sha256"]:
-            raise DeploymentError("bootstrap schema checkpoint catalog changed")
+        checkpoint_refreshed = checkpoint.get("catalog_sha256") != live["catalog_sha256"]
         return {
             **live,
             "name": "bootstrap_schema_resume",
             "primary_volume": checkpoint["primary_volume"]["name"],
             "docker_daemon_id": daemon_id,
+            "checkpoint_refreshed": checkpoint_refreshed,
+            "previous_catalog_sha256": (
+                checkpoint["catalog_sha256"] if checkpoint_refreshed else None
+            ),
         }
 
     def _verify_schema_checkpoint_identity(
@@ -2454,8 +2572,11 @@ asyncio.run(main())
                     "runtime",
                     "--profile",
                     "backup",
-                    "exec",
-                    "-T",
+                    "run",
+                    "--rm",
+                    "--no-deps",
+                    "--user",
+                    "postgres",
                     "backup-scheduler",
                     "/usr/local/bin/backup-job.sh",
                     operation,
@@ -2463,6 +2584,25 @@ asyncio.run(main())
                 timeout=3600,
                 secrets=secrets,
             )
+        self.runner.run(
+            self._dr_compose_command(
+                target,
+                "runtime",
+                "--profile",
+                "backup",
+                "up",
+                "-d",
+                "--no-build",
+                "--pull",
+                "never",
+                "--wait",
+                "--wait-timeout",
+                "300",
+                "backup-scheduler",
+            ),
+            timeout=600,
+            secrets=secrets,
+        )
         backup_checkpoint = self._backup_checkpoint(target, secrets)
         return (
             [
@@ -2479,6 +2619,31 @@ asyncio.run(main())
             ],
             backup_checkpoint,
         )
+
+    def _initialize_canonical_stanza(
+        self, target: Target, secrets: Sequence[str]
+    ) -> dict[str, Any]:
+        self.runner.run(
+            self._dr_compose_command(
+                target,
+                "canonical",
+                "exec",
+                "-T",
+                "--user",
+                "postgres",
+                "postgres-primary",
+                "/usr/local/bin/backup-job.sh",
+                "stanza",
+            ),
+            timeout=600,
+            secrets=secrets,
+        )
+        return {
+            "name": "canonical_pgbackrest_stanza",
+            "status": "passed",
+            "operation": "stanza",
+            "runs_as": "postgres",
+        }
 
     def _verify_resumable_dr(
         self,
@@ -2584,9 +2749,33 @@ asyncio.run(main())
 
         if starting_phase in {"schema_verified", "runtime_started", "dr_verified"}:
             self.current_stage = "schema_resume_verification"
-            checks.append(
-                self._verify_schema_checkpoint(target, values, secrets, state)
+            schema_resume = self._verify_schema_checkpoint(
+                target, values, secrets, state
             )
+            checks.append(schema_resume)
+            if schema_resume["checkpoint_refreshed"]:
+                state = self._advance_bootstrap_state(
+                    target,
+                    state,
+                    str(state["phase"]),
+                    candidate=candidate,
+                    extra={
+                        "schema_checkpoint": self._schema_checkpoint(
+                            target, schema_resume
+                        )
+                    },
+                )
+                checks.append(
+                    {
+                        "name": "schema_checkpoint_refresh",
+                        "status": "passed",
+                        "reason": "live catalog matches the updated canonical manifest",
+                        "previous_catalog_sha256": schema_resume[
+                            "previous_catalog_sha256"
+                        ],
+                        "catalog_sha256": schema_resume["catalog_sha256"],
+                    }
+                )
 
         if state["phase"] == "prepared":
             self.current_stage = "canonical_database_start"
@@ -2620,6 +2809,8 @@ asyncio.run(main())
             )
 
         if state["phase"] == "canonical_running":
+            self.current_stage = "canonical_pgbackrest_stanza"
+            checks.append(self._initialize_canonical_stanza(target, secrets))
             self.current_stage = "canonical_schema_bootstrap"
             artifact_value = state.get("schema_artifact_directory")
             if isinstance(artifact_value, str):
@@ -2716,7 +2907,6 @@ asyncio.run(main())
                     "600",
                     "postgres-primary",
                     "postgres-standby",
-                    "backup-scheduler",
                 ),
                 timeout=1200,
                 secrets=secrets,
@@ -2741,6 +2931,8 @@ asyncio.run(main())
             )
 
         if state["phase"] == "runtime_started":
+            self.current_stage = "e2e_admin_bootstrap"
+            checks.append(self._provision_e2e_admin(target, values, secrets))
             self.current_stage = "first_full_backup"
             backup_checks, backup_checkpoint = self._backup_and_verify_dr(
                 target, secrets

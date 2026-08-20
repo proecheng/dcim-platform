@@ -2,7 +2,7 @@ import { test, expect, type APIRequestContext } from '@playwright/test'
 import fs from 'fs'
 import path from 'path'
 
-const authFile = path.join(__dirname, '.auth', 'admin.json')
+const authFile = process.env.E2E_AUTH_FILE || path.join(__dirname, '.auth', 'admin.json')
 
 type TestUser = {
   id: number

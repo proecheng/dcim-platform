@@ -8,7 +8,7 @@
 ## 自动首次部署
 
 推荐通过 `scripts/story_39_7_deploy.py bootstrap` 使用本 Compose，而不是手工逐项启动。控制器会先以
-`canonical-schema-manifest.json` 指定的规范运行时启动主库并恢复 188 张表，再显式切换到最终 DR
+`canonical-schema-manifest.json` 指定的规范运行时启动主库并恢复 189 张表，再显式切换到最终 DR
 运行时，随后启动备库和备份调度器，依次执行 stanza 创建、首次 full、check、verify 和 status。
 控制器会在首次持久化变更前写入 `bootstrap_pending/prepared`，并在规范主库、schema、最终 DR
 运行时和首次全量备份依次完成后更新阶段检查点。任一阶段失败，修复原因后原样重跑 `bootstrap`

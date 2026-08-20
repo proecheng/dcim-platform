@@ -2,6 +2,7 @@
 认证 API - v1
 """
 
+import hashlib
 import time
 import uuid
 import logging
@@ -89,6 +90,12 @@ class RateLimiter:
 login_limiter = RateLimiter(max_attempts=5, window_seconds=60)
 
 
+def _login_rate_limit_key(client_ip: str, username: str) -> str:
+    """Keep login throttling isolated per account without retaining raw usernames."""
+    material = f"{client_ip}\0{username.strip().casefold()}".encode("utf-8")
+    return hashlib.sha256(material).hexdigest()
+
+
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> tuple[str, str]:
     """创建访问令牌，返回 (token, jti)"""
     to_encode = data.copy()
@@ -108,8 +115,9 @@ async def login(request: Request, form_data: OAuth2PasswordRequestForm = Depends
     client_ip = request.client.host if request.client else "unknown"
 
     # 检查速率限制
-    if not login_limiter.is_allowed(client_ip):
-        remaining = login_limiter.get_remaining_time(client_ip)
+    rate_limit_key = _login_rate_limit_key(client_ip, form_data.username)
+    if not login_limiter.is_allowed(rate_limit_key):
+        remaining = login_limiter.get_remaining_time(rate_limit_key)
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             detail=f"登录尝试过于频繁，请在{remaining}秒后重试",

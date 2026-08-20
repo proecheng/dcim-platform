@@ -176,7 +176,7 @@ def test_restore_validator_requires_the_complete_release_schema():
         for line in _text("deploy/postgres-backup/expected-schema-tables.txt").splitlines()
         if line.strip() and not line.startswith("#")
     }
-    assert len(tables) == 188
+    assert len(tables) == 189
     for required in (
         "users",
         "alarms",
@@ -185,6 +185,7 @@ def test_restore_validator_requires_the_complete_release_schema():
         "point_history",
         "linkage_policies",
         "maintenance_advices",
+        "rollback_events",
         "training_data_audits",
     ):
         assert required in tables

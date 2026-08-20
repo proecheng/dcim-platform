@@ -2,13 +2,13 @@
   "alembic_head": "20260707_0100",
   "application_image": "ghcr.io/proecheng/dcim-platform/backend@sha256:58bb47905f93872fb4be2817c22d600f10fa60432dcd20f59405a7e149f22bcd",
   "artifact": "canonical-schema.dump",
-  "artifact_sha256": "906be133fc73f6a60f7a6922505be0b2135f5521a30b4121e10b03d125b5dc0c",
-  "catalog_sha256": "d456da32ff71f488be31ffd1730171cb24b4228ad58f16daf8dc4aea81753842",
+  "artifact_sha256": "2bdcc61d5fa5b86bd840e17d38cb65a810b9994c0c7063a71784dc8f4e5337ff",
+  "catalog_sha256": "0fbfce3030dbd358547cc26690e434200e6d9c7a9a69b5a9672e030f8866d3a3",
   "catalog_summary": {
-    "columns": 2324,
-    "constraints": 445,
-    "indexes": 344,
-    "sequences": 186,
+    "columns": 2334,
+    "constraints": 447,
+    "indexes": 345,
+    "sequences": 187,
     "timescaledb_hypertables": 1,
     "timescaledb_jobs": 2
   },
@@ -16,7 +16,7 @@
   "runtime_image": "ghcr.io/proecheng/dcim-platform/postgres:16.15-ts2.29.1-pgb2.59.0-runtime@sha256:e6ca69c005bfba5b30dbb91c58a181874e2c833e0a311ad3998f32d4b497f3e4",
   "schema_version": 1,
   "source_revision": "436a8e778037bf6fcf9140b757e9584e669ad33b",
-  "table_count": 188,
-  "table_names_sha256": "81cdd3d0d4d3a4ad5edc128981e383bcfff5f37bc1b9d30f491c1598fc1be6b3",
+  "table_count": 189,
+  "table_names_sha256": "0df268cf4fa358af46f127c716d5d6f40ccbe3c4d7017a8f5f68e33bc7dc6e25",
   "timescaledb_version": "2.29.1"
 }

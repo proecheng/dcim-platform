@@ -137,6 +137,7 @@ from .thermal import ThermalParameter, TemperaturePredictionLog, PrecoolSchedule
 from .user_notification_contact import UserNotificationContact
 from .notification_record import NotificationRecord
 from .notification_policy import NotificationPolicy
+from .rollback import RollbackEvent, RollbackTriggerType
 
 __all__ = [
     # 枚举
@@ -152,6 +153,8 @@ __all__ = [
     "UserNotificationContact",
     "NotificationRecord",
     "NotificationPolicy",
+    "RollbackEvent",
+    "RollbackTriggerType",
     # 设备
     "Device",
     # 点位

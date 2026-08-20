@@ -9,7 +9,7 @@ import pytest
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-EXPECTED_SCHEMA_SHA256 = "81cdd3d0d4d3a4ad5edc128981e383bcfff5f37bc1b9d30f491c1598fc1be6b3"
+EXPECTED_SCHEMA_SHA256 = "0df268cf4fa358af46f127c716d5d6f40ccbe3c4d7017a8f5f68e33bc7dc6e25"
 
 
 def _text(path: str) -> str:
@@ -132,6 +132,26 @@ def test_schema_bootstrap_rejects_isolation_label_mismatch():
     assert exc_info.value.code == "isolation_label_invalid"
 
 
+def test_schema_bootstrap_accepts_story_39_3_stable_endpoint_network():
+    bootstrap = _load_bootstrap_module()
+    labels = {
+        "com.dcim.story": "39.3",
+        "com.docker.compose.project": "dcim-story-39-3-full",
+        "com.dcim.dr.role": "primary",
+    }
+    network_labels = {
+        "com.dcim.story": "39.3",
+        "com.docker.compose.project": "dcim-story-39-3-full",
+        "com.dcim.dr.role": "stable-endpoint",
+    }
+
+    bootstrap.validate_isolation_labels(
+        "dcim-story-39-3-full",
+        labels,
+        network_labels,
+    )
+
+
 def test_application_metadata_probe_passes_secret_only_through_environment():
     bootstrap = _load_bootstrap_module()
 
@@ -168,6 +188,30 @@ def test_application_metadata_probe_passes_secret_only_through_environment():
     assert create_command[create_command.index("--env") + 1] == "FAULT_TREE_HMAC_KEY"
     assert secret not in create_command
     assert len(secret) == 64
+    assert "import app.api.v1" in create_command[-1]
+
+
+def test_registered_application_models_match_the_canonical_inventory():
+    bootstrap = _load_bootstrap_module()
+    expected = {
+        line.strip()
+        for line in _text("deploy/postgres-backup/expected-schema-tables.txt").splitlines()
+        if line.strip() and not line.startswith("#")
+    }
+
+    from app.core.database import Base
+    import app.api.v1  # noqa: F401
+    import app.models  # noqa: F401
+
+    actual = {
+        table.name
+        for table in Base.metadata.sorted_tables
+        if table.schema in (None, "public")
+    }
+    assert "rollback_events" in actual
+    assert actual == expected
+    assert len(actual) == bootstrap.EXPECTED_TABLE_COUNT
+    assert bootstrap.normalized_schema_hash(sorted(actual)) == EXPECTED_SCHEMA_SHA256
 
 
 def test_canonical_manifest_binds_dump_hash_and_release_provenance(tmp_path):

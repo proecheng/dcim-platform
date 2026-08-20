@@ -440,7 +440,20 @@ def test_deploy_pulls_fixed_images_starts_without_build_and_verifies_runtime(tmp
         values["DCIM_REDIS_IMAGE"],
         values["DCIM_EMQX_IMAGE"],
     }
-    assert any(command[-5:] == ["up", "-d", "--no-build", "--pull", "never"] for command in runner.commands)
+    assert any(
+        command[-8:]
+        == [
+            "up",
+            "-d",
+            "--no-build",
+            "--pull",
+            "never",
+            "--wait",
+            "--wait-timeout",
+            "600",
+        ]
+        for command in runner.commands
+    )
     assert report["annual_slo_proven"] is False
     assert report["release_gate"] == "BLOCKED"
 
@@ -512,6 +525,15 @@ def test_e2e_uses_target_specific_temporary_auth_and_output_paths(tmp_path, monk
     assert "dcim-e2e-browser-a-" in runner.environment["E2E_AUTH_FILE"]
     assert runner.environment["E2E_BROWSER_CHANNEL"] == "msedge"
     assert not Path(runner.environment["E2E_AUTH_FILE"]).parent.exists()
+
+
+def test_e2e_specs_use_the_controller_auth_file():
+    for path in (
+        deploy_module.ROOT / "e2e/authorization-matrix.spec.ts",
+        deploy_module.ROOT / "e2e/site-isolation-websocket-authorization.spec.ts",
+    ):
+        source = path.read_text(encoding="utf-8")
+        assert "process.env.E2E_AUTH_FILE" in source
 
 
 def _lifecycle_dr_config(tmp_path: Path) -> DRConfig:
@@ -730,6 +752,12 @@ class _LifecycleRunner:
         self.commands.append(command)
         self.call_options.append(kwargs)
         joined = " ".join(command)
+        if "com.dcim.role=e2e-admin-bootstrap" in command:
+            return CommandResult(
+                stdout=json.dumps({"created": True, "role": "admin", "active": True}),
+                stderr="",
+                returncode=0,
+            )
         if " container run " in f" {joined} " and "com.dcim.lifecycle.lock=true" in command:
             self.lock_labels = {
                 value.split("=", 1)[0]: value.split("=", 1)[1]
@@ -864,8 +892,8 @@ class _LifecycleRunner:
             return CommandResult(
                 stdout=json.dumps(
                     {
-                        "table_count": 188,
-                        "table_names_sha256": "81cdd3d0d4d3a4ad5edc128981e383bcfff5f37bc1b9d30f491c1598fc1be6b3",
+                        "table_count": 189,
+                        "table_names_sha256": "0df268cf4fa358af46f127c716d5d6f40ccbe3c4d7017a8f5f68e33bc7dc6e25",
                         "schema_contract_sha256": "a" * 64,
                         "migration_sha256": "b" * 64,
                         "alembic_heads": ["20260707_0100"],
@@ -967,12 +995,51 @@ def test_bootstrap_runs_two_stage_database_backup_and_writes_sanitized_state(tmp
     )
     schema = next(index for index, command in enumerate(commands) if "story_39_3_schema_bootstrap.py" in command)
     runtime_up = next(index for index, command in enumerate(commands) if "runtime.env" in command and " up " in command)
-    assert canonical_up < schema < runtime_up
+    assert "backup-scheduler" not in runner.commands[runtime_up]
+    admin_bootstrap = next(
+        index for index, command in enumerate(runner.commands) if "com.dcim.role=e2e-admin-bootstrap" in command
+    )
+    first_backup = next(
+        index
+        for index, command in enumerate(runner.commands)
+        if "/usr/local/bin/backup-job.sh" in command and command[-1] == "full"
+    )
+    assert canonical_up < schema < runtime_up < admin_bootstrap < first_backup
     schema_command = runner.commands[schema]
     assert schema_command[schema_command.index("--database") + 1] == "dcim"
     assert schema_command[schema_command.index("--database-user") + 1] == "dcim"
     backup_operations = [command[-1] for command in runner.commands if "/usr/local/bin/backup-job.sh" in command]
-    assert backup_operations == ["stanza", "full", "check", "verify", "status"]
+    assert backup_operations == [
+        "stanza",
+        "stanza",
+        "full",
+        "check",
+        "verify",
+        "status",
+    ]
+    runtime_backup_commands = [
+        command
+        for command in runner.commands
+        if "/usr/local/bin/backup-job.sh" in command and any("runtime.env" in argument for argument in command)
+    ]
+    assert all("run" in command and "--rm" in command for command in runtime_backup_commands)
+    scheduler_up = next(
+        index
+        for index, command in enumerate(runner.commands)
+        if "backup-scheduler" in command and "up" in command and any("runtime.env" in argument for argument in command)
+    )
+    assert first_backup < scheduler_up
+    canonical_stanza = next(
+        index
+        for index, command in enumerate(runner.commands)
+        if any("canonical.env" in argument for argument in command) and "/usr/local/bin/backup-job.sh" in command
+    )
+    assert canonical_up < canonical_stanza < schema < runtime_up
+    assert runner.commands[canonical_stanza][-5:-2] == [
+        "--user",
+        "postgres",
+        "postgres-primary",
+    ]
     assert not any(" down " in f" {' '.join(command)} " or "-v" in command for command in runner.commands)
     metadata_commands = [
         command for command in runner.commands if "create" in command and "com.dcim.role=schema-metadata" in command
@@ -985,6 +1052,13 @@ def test_bootstrap_runs_two_stage_database_backup_and_writes_sanitized_state(tmp
         if "create" in command and "com.dcim.role=schema-metadata" in command
     ]
     assert all(options["env"]["FAULT_TREE_HMAC_KEY"] for options in metadata_calls)
+    admin_command = runner.commands[admin_bootstrap]
+    admin_options = runner.call_options[admin_bootstrap]
+    assert values["E2E_ADMIN_PASSWORD"] not in admin_command
+    assert admin_options["env"]["E2E_ADMIN_PASSWORD"] == values["E2E_ADMIN_PASSWORD"]
+    assert "E2E_ADMIN_PASSWORD" in admin_command
+    admin_script = admin_command[-1]
+    assert admin_script.index("user.password_hash =") < admin_script.index("await session.flush()")
     state_text = (inventory.state_directory / "lifecycle.json").read_text(encoding="utf-8")
     assert values["SECRET_KEY"] not in state_text
     assert "database-secret" not in state_text
@@ -1413,6 +1487,27 @@ def test_schema_resume_rejects_live_catalog_drift(tmp_path):
 
     with pytest.raises(DeploymentError, match="live canonical catalog differs"):
         manager._verify_schema_checkpoint(target, values, [], state)
+
+
+def test_schema_resume_refreshes_stale_checkpoint_only_for_approved_live_catalog(tmp_path):
+    inventory, values, _env_path = _lifecycle_inventory(tmp_path)
+    target = inventory.targets[0]
+    runner = _LifecycleRunner()
+    runner.database_empty = False
+    manager = LifecycleManager(FleetController(inventory, runner=runner))
+    manifest = json.loads(lifecycle_module.CANONICAL_MANIFEST.read_text(encoding="utf-8"))
+    state = manager._bootstrap_pending_state(
+        target, manager._release(target, values), "dr_verified"
+    )
+    state["schema_checkpoint"] = manager._schema_checkpoint(
+        target, {"catalog_sha256": "e" * 64}
+    )
+
+    result = manager._verify_schema_checkpoint(target, values, [], state)
+
+    assert result["checkpoint_refreshed"] is True
+    assert result["previous_catalog_sha256"] == "e" * 64
+    assert result["catalog_sha256"] == manifest["catalog_sha256"]
 
 
 def test_reused_schema_report_is_bound_to_project_database_images_and_hashes(tmp_path):
