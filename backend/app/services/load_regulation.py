@@ -412,6 +412,7 @@ class LoadRegulationService:
             regulation_type=config.regulation_type,
             target_value=target_value,
             command_authorization=authorization,
+            regulation_config_id=config.id,
         )
         status_map = {
             ControlResult.SUCCESS: "completed",

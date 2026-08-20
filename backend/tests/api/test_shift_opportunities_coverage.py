@@ -273,8 +273,8 @@ class TestShiftOpportunities:
             f"{SHIFT}/opportunities/analyze",
             headers=auth_headers(token),
         )
-        # 可能 200（分析完成）或 500（无可分析数据但不影响覆盖率）
-        assert resp.status_code in (200, 500)
+        assert resp.status_code == 200
+        assert "opportunities_found" in resp.json()
 
     async def test_convert_opportunity_not_found(self, client, admin_user):
         _, token = admin_user

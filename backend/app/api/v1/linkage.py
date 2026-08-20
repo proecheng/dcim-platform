@@ -5,7 +5,7 @@ Story 9-1: 联动引擎核心框架
 
 import asyncio
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional, List
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -41,6 +41,13 @@ from ...services.timeline_report import generate_timeline, generate_timeline_exc
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+
+def _parse_db_datetime(value: str) -> datetime:
+    parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    if parsed.tzinfo is not None:
+        parsed = parsed.astimezone(timezone.utc).replace(tzinfo=None)
+    return parsed
 
 
 # ==================== 消防策略管理（静态路由必须在参数化路由之前）====================
@@ -365,13 +372,13 @@ async def list_executions(
         stmt = stmt.where(LinkageExecution.status == status)
     if start_time is not None:
         try:
-            st = datetime.fromisoformat(start_time)
+            st = _parse_db_datetime(start_time)
             stmt = stmt.where(LinkageExecution.started_at >= st)
         except ValueError:
             pass
     if end_time is not None:
         try:
-            et = datetime.fromisoformat(end_time)
+            et = _parse_db_datetime(end_time)
             stmt = stmt.where(LinkageExecution.started_at <= et)
         except ValueError:
             pass

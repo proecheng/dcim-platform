@@ -90,6 +90,7 @@ class DeviceControlService:
         scheduled_time: Optional[datetime] = None,
         force: bool = False,
         command_authorization: Optional[CommandAuthorization] = None,
+        regulation_config_id: Optional[int] = None,
     ) -> ControlAction:
         """
         控制设备调节
@@ -100,6 +101,7 @@ class DeviceControlService:
             target_value: 目标值
             scheduled_time: 计划执行时间（None表示立即执行）
             force: 是否强制执行（不绕过安全约束）
+            regulation_config_id: 调用方已选择的调节配置 ID
 
         Returns:
             ControlAction: 控制结果
@@ -142,7 +144,7 @@ class DeviceControlService:
                 executed_at=datetime.now(),
             )
 
-        reg_config = await self._get_regulation_config(device_id, regulation_type)
+        reg_config = await self._get_regulation_config(device_id, regulation_type, regulation_config_id)
         if not reg_config:
             return ControlAction(
                 device_id=device_id,
@@ -158,7 +160,13 @@ class DeviceControlService:
             )
 
         # 2. 验证控制权限和约束
-        validation = await self.validate_control_permission(device_id, regulation_type, target_value, force)
+        validation = await self.validate_control_permission(
+            device_id,
+            regulation_type,
+            target_value,
+            force,
+            regulation_config_id=regulation_config_id,
+        )
         if not validation["is_allowed"]:
             return ControlAction(
                 device_id=device_id,
@@ -212,7 +220,12 @@ class DeviceControlService:
         return action
 
     async def validate_control_permission(
-        self, device_id: int, regulation_type: str, target_value: float, force: bool = False
+        self,
+        device_id: int,
+        regulation_type: str,
+        target_value: float,
+        force: bool = False,
+        regulation_config_id: Optional[int] = None,
     ) -> Dict[str, Any]:
         """
         验证控制权限和约束
@@ -228,7 +241,7 @@ class DeviceControlService:
         warnings = []
 
         # 获取配置
-        reg_config = await self._get_regulation_config(device_id, regulation_type)
+        reg_config = await self._get_regulation_config(device_id, regulation_type, regulation_config_id)
         if not reg_config:
             return {"is_allowed": False, "reasons": ["未找到调节配置"], "warnings": []}
 
@@ -390,14 +403,28 @@ class DeviceControlService:
         result = await self.db.execute(select(PowerDevice).where(PowerDevice.id == device_id))
         return result.scalar_one_or_none()
 
-    async def _get_regulation_config(self, device_id: int, regulation_type: str) -> Optional[LoadRegulationConfig]:
+    async def _get_regulation_config(
+        self,
+        device_id: int,
+        regulation_type: str,
+        config_id: Optional[int] = None,
+    ) -> Optional[LoadRegulationConfig]:
         """获取调节配置"""
+        conditions = [
+            LoadRegulationConfig.device_id == device_id,
+            LoadRegulationConfig.regulation_type == regulation_type,
+        ]
+        if config_id is not None:
+            conditions.append(LoadRegulationConfig.id == config_id)
         result = await self.db.execute(
-            select(LoadRegulationConfig).where(
-                and_(
-                    LoadRegulationConfig.device_id == device_id, LoadRegulationConfig.regulation_type == regulation_type
-                )
+            select(LoadRegulationConfig)
+            .where(and_(*conditions))
+            .order_by(
+                LoadRegulationConfig.is_enabled.desc(),
+                LoadRegulationConfig.updated_at.desc(),
+                LoadRegulationConfig.id.desc(),
             )
+            .limit(1)
         )
         return result.scalar_one_or_none()
 

@@ -1345,10 +1345,11 @@ class TestLinkageExecutions:
         policy = await _mk_policy(async_db, name="时间过滤策略")
         await _mk_execution(async_db, policy.id)
         resp = await client.get(
-            "/api/v1/linkage/executions?start_time=2020-01-01T00:00:00&end_time=2030-01-01T00:00:00",
+            "/api/v1/linkage/executions?start_time=2020-01-01T00:00:00Z&end_time=2030-01-01T08:00:00%2B08:00",
             headers=auth_headers(token),
         )
         assert resp.status_code == 200
+        assert resp.json()["total"] == 1
 
     async def test_list_recoverable_executions(self, client, admin_user, async_db):
         _, token = admin_user

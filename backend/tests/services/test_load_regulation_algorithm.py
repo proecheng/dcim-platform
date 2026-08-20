@@ -138,6 +138,33 @@ async def test_apply_pending_does_not_update_current_value_or_claim_saving(async
 
 
 @pytest.mark.asyncio
+async def test_apply_uses_requested_config_when_device_type_has_duplicates(async_db):
+    device, config = await _create_config(async_db, point_source="mqtt")
+    duplicate = LoadRegulationConfig(
+        device_id=device.id,
+        regulation_type=config.regulation_type,
+        min_value=20.0,
+        max_value=24.0,
+        current_value=22.0,
+        default_value=22.0,
+        step_size=0.5,
+        unit="°C",
+        power_factor=-1.0,
+        base_power=50.0,
+        is_enabled=True,
+        is_auto=False,
+    )
+    async_db.add(duplicate)
+    await async_db.commit()
+
+    result = await LoadRegulationService(async_db).apply_regulation(config.id, 26.0)
+
+    assert result is not None
+    assert result.config_id == config.id
+    assert result.status == "pending"
+
+
+@pytest.mark.asyncio
 async def test_simulation_validates_range_and_step(async_db):
     _, config = await _create_config(async_db, point_source="mqtt")
     service = LoadRegulationService(async_db)

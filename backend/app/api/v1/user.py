@@ -6,6 +6,7 @@ from datetime import datetime
 import logging
 from typing import Optional, List
 from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, update, delete
 
@@ -30,6 +31,17 @@ async def _invalidate_user_after_commit(user_id: int) -> None:
             user_id,
             exc,
             extra={"security_event": "user_authorization_revocation_failed", "user_id": user_id},
+        )
+
+
+async def _ensure_user_history_allows_delete(db: AsyncSession, user_ids: List[int]) -> None:
+    history_count = await db.scalar(
+        select(func.count(UserLoginHistory.id)).where(UserLoginHistory.user_id.in_(user_ids))
+    )
+    if history_count:
+        raise HTTPException(
+            status_code=409,
+            detail="用户存在登录审计记录，不能删除；请改为禁用用户",
         )
 
 
@@ -170,8 +182,16 @@ async def delete_user(user_id: int, db: AsyncSession = Depends(get_db), current_
     if not user:
         raise HTTPException(status_code=404, detail="用户不存在")
 
-    await db.execute(delete(User).where(User.id == user_id))
-    await db.commit()
+    await _ensure_user_history_allows_delete(db, [user_id])
+    try:
+        await db.execute(delete(User).where(User.id == user_id))
+        await db.commit()
+    except IntegrityError as exc:
+        await db.rollback()
+        raise HTTPException(
+            status_code=409,
+            detail="用户已关联业务或审计数据，不能删除；请改为禁用用户",
+        ) from exc
     await _invalidate_user_after_commit(user_id)
 
     return {"message": "用户已删除"}
@@ -192,8 +212,16 @@ async def batch_delete_users(
     if found == 0:
         raise HTTPException(status_code=404, detail="未找到要删除的用户")
 
-    await db.execute(delete(User).where(User.id.in_(user_ids)))
-    await db.commit()
+    await _ensure_user_history_allows_delete(db, user_ids)
+    try:
+        await db.execute(delete(User).where(User.id.in_(user_ids)))
+        await db.commit()
+    except IntegrityError as exc:
+        await db.rollback()
+        raise HTTPException(
+            status_code=409,
+            detail="部分用户已关联业务或审计数据，不能删除；请改为禁用用户",
+        ) from exc
     for user_id in user_ids:
         await _invalidate_user_after_commit(user_id)
 

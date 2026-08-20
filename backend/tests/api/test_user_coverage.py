@@ -330,6 +330,25 @@ class TestDeleteUser:
         resp = await client.delete(f"{USERS_URL}/99999", headers=auth_headers(token))
         assert resp.status_code == 404
 
+    async def test_delete_user_with_login_history_returns_conflict(self, client, admin_user, async_db):
+        """保留登录审计历史，并提示管理员禁用用户"""
+        _, token = admin_user
+        user = User(
+            username="audited_delete_target",
+            password_hash=get_password_hash("Test@1234"),
+            role="viewer",
+            is_active=True,
+        )
+        async_db.add(user)
+        await async_db.flush()
+        async_db.add(UserLoginHistory(user_id=user.id, status="success"))
+        await async_db.flush()
+
+        resp = await client.delete(f"{USERS_URL}/{user.id}", headers=auth_headers(token))
+
+        assert resp.status_code == 409
+        assert "禁用用户" in resp.json()["detail"]
+
 
 class TestToggleUserStatus:
     """启用/禁用用户端点（覆盖行 221-247）"""
