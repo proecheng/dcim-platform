@@ -32,6 +32,8 @@ type IssueRecord = {
 }
 
 const FRONTEND_URL = process.env.FRONTEND_URL ?? 'http://127.0.0.1:3000'
+const E2E_ADMIN_USER = process.env.E2E_ADMIN_USER ?? 'admin'
+const E2E_ADMIN_PASSWORD = process.env.E2E_ADMIN_PASSWORD ?? 'admin123'
 const VISIBLE_MS = Number(process.env.VISIBLE_MS ?? 5500)
 const ACTION_MS = Number(process.env.ACTION_MS ?? 5500)
 const MAX_BUTTONS_PER_PAGE = Number(process.env.MAX_BUTTONS_PER_PAGE ?? 120)
@@ -130,6 +132,8 @@ const routes: RouteSpec[] = [
 const routeSlice = routes.slice(ROUTE_START - 1, ROUTE_END > 0 ? ROUTE_END : routes.length)
 
 const sessionEndingButtonText = /退出登录|登出|注销|返回登录/
+const excludedWalkthroughButtonText = /打开数字孪生大屏/
+const destructiveActionText = /删除|清空|移除|注销/
 const confirmButtonText = /确定|确认|确认删除|删除|保存|提交|应用|完成|启用|禁用|下发|执行/
 const closeButtonText = /取消|关闭|返回/
 const expectedBusinessHttpConsoleText = /Failed to load resource: the server responded with a status of (400|409) /
@@ -318,8 +322,8 @@ async function loginVisible(page: Page) {
   const username = page.locator('input').first()
   const password = page.locator('input[type="password"]').first()
   if (await username.isVisible().catch(() => false)) {
-    await username.fill('admin')
-    await password.fill('admin123')
+    await username.fill(E2E_ADMIN_USER)
+    await password.fill(E2E_ADMIN_PASSWORD)
     await page.locator('button').filter({ hasText: '登' }).first().click()
     await page.waitForURL('**/dashboard', { timeout: 30000 }).catch(async () => {
       await page.goto('/dashboard', { waitUntil: 'domcontentloaded' })
@@ -333,8 +337,8 @@ async function ensureAuthenticated(page: Page) {
   const response = await page.request
     .post(`${FRONTEND_URL}/api/v1/auth/login`, {
       form: {
-        username: 'admin',
-        password: 'admin123',
+        username: E2E_ADMIN_USER,
+        password: E2E_ADMIN_PASSWORD,
       },
     })
     .catch(() => null)
@@ -437,6 +441,18 @@ async function clickAllVisibleButtons(page: Page, route: RouteSpec, actions: Act
         label,
         status: 'skipped',
         detail: '跳过会中断后续巡检会话的按钮',
+      })
+      continue
+    }
+
+    if (excludedWalkthroughButtonText.test(label)) {
+      actions.push({
+        route: route.path,
+        title: route.title,
+        type: '按钮',
+        label,
+        status: 'skipped',
+        detail: '按本轮测试要求跳过数字孪生界面',
       })
       continue
     }
@@ -591,6 +607,14 @@ async function exerciseTransientUi(page: Page, route: RouteSpec, actions: Action
   const popConfirm = page.locator('.el-popconfirm:visible').last()
   if (await popConfirm.isVisible().catch(() => false)) {
     await page.waitForTimeout(ACTION_MS)
+    const popConfirmText = await popConfirm.innerText().catch(() => '')
+    if (destructiveActionText.test(popConfirmText)) {
+      const cancel = popConfirm.getByRole('button', { name: closeButtonText }).first()
+      if (await cancel.isVisible().catch(() => false)) {
+        await clickAndRecord(page, cancel, route, actions, '确认气泡', '跳过破坏性操作')
+      }
+      return
+    }
     const confirm = popConfirm.getByRole('button', { name: confirmButtonText }).last()
     if (await confirm.isVisible().catch(() => false)) {
       await clickAndRecord(page, confirm, route, actions, '确认气泡', '确认')
@@ -601,6 +625,14 @@ async function exerciseTransientUi(page: Page, route: RouteSpec, actions: Action
   const messageBox = page.locator('.el-message-box:visible').last()
   if (await messageBox.isVisible().catch(() => false)) {
     await page.waitForTimeout(ACTION_MS)
+    const messageBoxText = await messageBox.innerText().catch(() => '')
+    if (destructiveActionText.test(messageBoxText)) {
+      const cancel = messageBox.getByRole('button', { name: closeButtonText }).first()
+      if (await cancel.isVisible().catch(() => false)) {
+        await clickAndRecord(page, cancel, route, actions, '确认弹窗', '跳过破坏性操作')
+      }
+      return
+    }
     const confirm = messageBox.getByRole('button', { name: confirmButtonText }).last()
     if (await confirm.isVisible().catch(() => false)) {
       await clickAndRecord(page, confirm, route, actions, '确认弹窗', '确认')
@@ -616,6 +648,14 @@ async function exerciseTransientUi(page: Page, route: RouteSpec, actions: Action
   const dialog = page.locator('.el-dialog:visible, .el-drawer:visible, [role="dialog"]:visible').last()
   if (await dialog.isVisible().catch(() => false)) {
     await editDialogFields(dialog, page, route, actions)
+    const dialogText = await dialog.innerText().catch(() => '')
+    if (destructiveActionText.test(dialogText)) {
+      const cancel = dialog.getByRole('button', { name: closeButtonText }).first()
+      if (await cancel.isVisible().catch(() => false)) {
+        await clickAndRecord(page, cancel, route, actions, '弹窗/抽屉提交', '跳过破坏性操作')
+      }
+      return
+    }
     const confirm = dialog.getByRole('button', { name: confirmButtonText }).last()
     if (await confirm.isVisible().catch(() => false) && (await confirm.isEnabled().catch(() => false))) {
       await clickAndRecord(page, confirm, route, actions, '弹窗/抽屉提交', await buttonLabel(confirm))

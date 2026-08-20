@@ -1,7 +1,7 @@
 """告警 API 测试 — Story 5.3"""
 
 import pytest
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from unittest.mock import AsyncMock, patch
 
 from httpx import AsyncClient, ASGITransport
@@ -354,3 +354,26 @@ class TestAlarmStatistics:
         assert resp.status_code == 200
         data = resp.json()
         assert isinstance(data["by_device_type"], dict)
+
+    async def test_timezone_aware_filters_work_with_legacy_naive_columns(self, client, seed_data):
+        """ISO-8601 UTC filters from the frontend must not cause asyncpg type errors."""
+        now = datetime.now(timezone.utc)
+        params = {
+            "start_time": (now - timedelta(days=1)).isoformat(),
+            "end_time": (now + timedelta(days=1)).isoformat(),
+            "device_type": "TH",
+            "page": 1,
+            "page_size": 20,
+        }
+
+        list_response = await client.get("/api/v1/alarms", params=params)
+        assert list_response.status_code == 200
+        assert list_response.json()["total"] == 3
+
+        statistics_response = await client.get("/api/v1/alarms/statistics", params=params)
+        assert statistics_response.status_code == 200
+        assert statistics_response.json()["total"] == 3
+
+        export_response = await client.get("/api/v1/alarms/export", params=params)
+        assert export_response.status_code == 200
+        assert export_response.headers["content-type"].startswith("text/csv")

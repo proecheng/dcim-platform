@@ -3,7 +3,7 @@
 """
 
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
@@ -45,6 +45,13 @@ from ...services.websocket import ws_manager
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+
+def _db_datetime(value: Optional[datetime]) -> Optional[datetime]:
+    """Normalize API datetimes to the UTC-naive values used by legacy alarm columns."""
+    if value is None or value.tzinfo is None:
+        return value
+    return value.astimezone(timezone.utc).replace(tzinfo=None)
 
 
 def _alarm_scope(query, context: SiteAccessContext):
@@ -112,6 +119,8 @@ async def get_alarms(
     """
     获取告警列表（多条件筛选、分页）
     """
+    db_start_time = _db_datetime(start_time)
+    db_end_time = _db_datetime(end_time)
     query = _alarm_scope(select(Alarm), site_context)
 
     if status:
@@ -124,10 +133,10 @@ async def get_alarms(
         if site_context.site_ids is None:
             query = query.join(Point, Alarm.point_id == Point.id, isouter=True)
         query = query.where(Point.device_type == device_type, Alarm.point_id.isnot(None))
-    if start_time:
-        query = query.where(Alarm.created_at >= start_time)
-    if end_time:
-        query = query.where(Alarm.created_at <= end_time)
+    if db_start_time:
+        query = query.where(Alarm.created_at >= db_start_time)
+    if db_end_time:
+        query = query.where(Alarm.created_at <= db_end_time)
     if keyword:
         query = query.where(Alarm.alarm_message.contains(keyword))
     if data_source:
@@ -235,13 +244,15 @@ async def get_alarm_statistics(
     """
     获取告警统计信息（支持按设备类型和告警级别筛选）
     """
-    if not start_time:
-        start_time = datetime.now() - timedelta(days=7)
-    if not end_time:
-        end_time = datetime.now()
+    db_start_time = _db_datetime(start_time)
+    db_end_time = _db_datetime(end_time)
+    if not db_start_time:
+        db_start_time = datetime.now() - timedelta(days=7)
+    if not db_end_time:
+        db_end_time = datetime.now()
 
     # 构建基础条件
-    conditions = [Alarm.created_at >= start_time, Alarm.created_at <= end_time]
+    conditions = [Alarm.created_at >= db_start_time, Alarm.created_at <= db_end_time]
     if alarm_level:
         conditions.append(Alarm.alarm_level == alarm_level)
     if device_type:
@@ -292,8 +303,8 @@ async def get_alarm_statistics(
         by_status=by_status,
         by_device_type=by_device_type,
         avg_duration_seconds=int(avg_duration),
-        start_time=start_time,
-        end_time=end_time,
+        start_time=db_start_time,
+        end_time=db_end_time,
     )
 
 
@@ -392,12 +403,14 @@ async def export_alarms(
     """
     导出告警记录为CSV
     """
+    db_start_time = _db_datetime(start_time)
+    db_end_time = _db_datetime(end_time)
     query = _alarm_scope(select(Alarm), site_context)
 
-    if start_time:
-        query = query.where(Alarm.created_at >= start_time)
-    if end_time:
-        query = query.where(Alarm.created_at <= end_time)
+    if db_start_time:
+        query = query.where(Alarm.created_at >= db_start_time)
+    if db_end_time:
+        query = query.where(Alarm.created_at <= db_end_time)
     if status:
         query = query.where(Alarm.status == status)
 
