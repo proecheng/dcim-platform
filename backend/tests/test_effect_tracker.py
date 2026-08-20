@@ -6,6 +6,7 @@ from datetime import datetime, date, timedelta
 import pytest
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from sqlalchemy import delete, select
+from sqlalchemy.dialects import postgresql
 
 from app.core.database import Base
 from app.models.energy import EnergyOpportunity, ExecutionPlan, ExecutionTask, ExecutionResult, EnergyDaily
@@ -110,6 +111,31 @@ def _create_plan(db, opportunity_id, **kwargs):
 
 class TestFindPlansNeedingTracking:
     @pytest.mark.anyio
+    async def test_postgres_cutoff_is_bound_as_date(self):
+        """The PostgreSQL DATE comparison must not bind the cutoff as VARCHAR."""
+
+        captured = {}
+
+        class CaptureSession:
+            async def execute(self, statement):
+                captured["statement"] = statement
+
+                class Result:
+                    def scalars(self):
+                        return self
+
+                    def all(self):
+                        return []
+
+                return Result()
+
+        tracker = EffectTracker(CaptureSession())
+        await tracker._find_plans_needing_tracking()
+        compiled = captured["statement"].compile(dialect=postgresql.dialect())
+
+        assert any(isinstance(value, date) for value in compiled.params.values())
+
+    @pytest.mark.anyio
     async def test_find_plans_needing_tracking(self, db_session):
         """已完成计划(completed_at 10天前, 无 ExecutionResult) 应被找到"""
         opp = _create_opportunity(db_session)
@@ -155,6 +181,37 @@ class TestFindPlansNeedingTracking:
 
 
 class TestEnergyComparisonEffect:
+    @pytest.mark.anyio
+    async def test_postgres_energy_ranges_are_bound_as_dates(self):
+        """Both comparison windows must bind PostgreSQL DATE values."""
+
+        captured = []
+
+        class CaptureSession:
+            async def execute(self, statement):
+                captured.append(statement)
+
+                class Result:
+                    def all(self):
+                        return []
+
+                return Result()
+
+        tracker = EffectTracker(CaptureSession())
+        tracking_start = date.today() - timedelta(days=10)
+        await tracker._calculate_energy_comparison_effect(
+            device_ids=[],
+            tracking_start=tracking_start,
+            tracking_end=tracking_start + timedelta(days=7),
+            tracking_days=7,
+        )
+
+        assert len(captured) == 2
+        for statement in captured:
+            params = statement.compile(dialect=postgresql.dialect()).params.values()
+            assert all(not isinstance(value, str) for value in params)
+            assert any(isinstance(value, date) for value in params)
+
     @pytest.mark.anyio
     async def test_calculate_energy_comparison_effect(self, db_session):
         """创建 EnergyDaily 记录，验证能耗对比计算"""
@@ -241,6 +298,32 @@ class TestLoadShiftEffect:
 
 
 class TestMarkCompletedTracking:
+    @pytest.mark.anyio
+    async def test_postgres_tracking_end_is_bound_as_date(self):
+        """Tracking completion must compare DATE to DATE on PostgreSQL."""
+
+        captured = {}
+
+        class CaptureSession:
+            async def execute(self, statement):
+                captured["statement"] = statement
+
+                class Result:
+                    def scalars(self):
+                        return self
+
+                    def all(self):
+                        return []
+
+                return Result()
+
+        tracker = EffectTracker(CaptureSession())
+        assert await tracker._mark_completed_tracking() == 0
+        params = captured["statement"].compile(dialect=postgresql.dialect()).params.values()
+
+        assert date.today() in params
+        assert date.today().isoformat() not in params
+
     @pytest.mark.anyio
     async def test_mark_completed_tracking(self, db_session):
         """tracking_end 在过去的 tracking 记录应被标记为 completed"""

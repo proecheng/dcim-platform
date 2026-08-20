@@ -134,9 +134,11 @@ const routeSlice = routes.slice(ROUTE_START - 1, ROUTE_END > 0 ? ROUTE_END : rou
 const sessionEndingButtonText = /退出登录|登出|注销|返回登录/
 const excludedWalkthroughButtonText = /打开数字孪生大屏/
 const destructiveActionText = /删除|清空|移除|注销/
-const confirmButtonText = /确定|确认|确认删除|删除|保存|提交|应用|完成|启用|禁用|下发|执行/
+const confirmButtonText = /确定|确认|确认删除|删除|保存|提交|应用|完成|启用|禁用|下发|执行|开始分析|触发分析/
 const closeButtonText = /取消|关闭|返回/
 const expectedBusinessHttpConsoleText = /Failed to load resource: the server responded with a status of (400|409) /
+
+let activeReport: { startedAt: Date; routes: RouteRecord[]; issues: IssueRecord[] } | null = null
 
 test.describe.configure({ mode: 'serial' })
 test.use({
@@ -157,6 +159,7 @@ test('manual headed walkthrough of every routed page and safe functions', async 
   const startedAt = new Date()
   const routeRecords: RouteRecord[] = []
   const issues: IssueRecord[] = []
+  activeReport = { startedAt, routes: routeRecords, issues }
   let currentRoute = '启动'
 
   page.on('console', (message) => {
@@ -489,6 +492,7 @@ async function clickSafely(
     await locator.scrollIntoViewIfNeeded({ timeout: 2500 }).catch(() => {})
     await locator.click({ timeout: 3500, noWaitAfter: true })
     actions.push({ route: route.path, title: route.title, type, label, status: 'clicked' })
+    await writeActiveReport()
     await page.waitForTimeout(ACTION_MS)
     if (options.exerciseAfterClick !== false) {
       await exerciseTransientUi(page, route, actions)
@@ -505,6 +509,7 @@ async function clickSafely(
       status: 'skipped',
       detail: error instanceof Error ? error.message.slice(0, 260) : String(error).slice(0, 260),
     })
+    await writeActiveReport()
   }
 }
 
@@ -543,7 +548,7 @@ async function editEditableControls(page: Page, route: RouteSpec, actions: Actio
       await editable.scrollIntoViewIfNeeded({ timeout: 2500 }).catch(() => {})
       const tagName = ((await editable.evaluate((el) => el.tagName).catch(() => '')) as string).toLowerCase()
       const inputType = ((await editable.getAttribute('type').catch(() => '')) ?? '').toLowerCase()
-      const value = testValueFor(label, inputType, tagName, index)
+      const value = await valueForEditable(editable, label, inputType, tagName, index)
 
       if (tagName === 'textarea' || tagName === 'input') {
         console.log(`[manual-visible-walkthrough] edit: ${route.title} ${label}`)
@@ -556,6 +561,7 @@ async function editEditableControls(page: Page, route: RouteSpec, actions: Actio
       }
 
       actions.push({ route: route.path, title: route.title, type, label, status: 'clicked' })
+      await writeActiveReport()
       await page.waitForTimeout(ACTION_MS)
     } catch (error) {
       actions.push({
@@ -566,6 +572,7 @@ async function editEditableControls(page: Page, route: RouteSpec, actions: Actio
         status: 'skipped',
         detail: error instanceof Error ? error.message.slice(0, 260) : String(error).slice(0, 260),
       })
+      await writeActiveReport()
     }
   }
 
@@ -686,7 +693,7 @@ async function editDialogFields(dialog: Locator, page: Page, route: RouteSpec, a
       await editable.scrollIntoViewIfNeeded({ timeout: 2500 }).catch(() => {})
       const tagName = ((await editable.evaluate((el) => el.tagName).catch(() => '')) as string).toLowerCase()
       const inputType = ((await editable.getAttribute('type').catch(() => '')) ?? '').toLowerCase()
-      const value = testValueFor(label, inputType, tagName, index)
+      const value = await valueForEditable(editable, label, inputType, tagName, index)
       if (tagName === 'textarea' || tagName === 'input') {
         await editable.fill(value, { timeout: 3500 })
       } else {
@@ -695,6 +702,7 @@ async function editDialogFields(dialog: Locator, page: Page, route: RouteSpec, a
         await page.keyboard.type(value, { delay: 30 }).catch(() => {})
       }
       actions.push({ route: route.path, title: route.title, type: '弹窗/抽屉可编辑内容', label, status: 'clicked' })
+      await writeActiveReport()
       await page.waitForTimeout(ACTION_MS)
     } catch (error) {
       actions.push({
@@ -705,6 +713,7 @@ async function editDialogFields(dialog: Locator, page: Page, route: RouteSpec, a
         status: 'skipped',
         detail: error instanceof Error ? error.message.slice(0, 260) : String(error).slice(0, 260),
       })
+      await writeActiveReport()
     }
   }
 }
@@ -721,6 +730,7 @@ async function clickAndRecord(
     await locator.scrollIntoViewIfNeeded({ timeout: 2500 }).catch(() => {})
     await locator.click({ timeout: 3500, noWaitAfter: true })
     actions.push({ route: route.path, title: route.title, type, label: label || type, status: 'clicked' })
+    await writeActiveReport()
     await page.waitForTimeout(ACTION_MS)
   } catch (error) {
     actions.push({
@@ -731,6 +741,7 @@ async function clickAndRecord(
       status: 'skipped',
       detail: error instanceof Error ? error.message.slice(0, 260) : String(error).slice(0, 260),
     })
+    await writeActiveReport()
   }
 }
 
@@ -841,12 +852,30 @@ async function isEditable(locator: Locator) {
   return !['button', 'submit', 'reset', 'file', 'checkbox', 'radio'].includes(inputType)
 }
 
+async function valueForEditable(locator: Locator, label: string, inputType: string, tagName: string, index: number) {
+  if (inputType === 'number') {
+    const min = parseOptionalNumber(await locator.getAttribute('min').catch(() => null))
+    const max = parseOptionalNumber(await locator.getAttribute('max').catch(() => null))
+    const step = parseOptionalNumber(await locator.getAttribute('step').catch(() => null))
+    const floor = Number.isFinite(min) ? min : 1
+    const ceiling = Number.isFinite(max) ? max : floor + 8
+    const increment = Number.isFinite(step) && step > 0 ? step : 1
+    const candidate = Math.min(ceiling, Math.max(floor, floor + increment))
+    return String(Number.isInteger(candidate) ? candidate : candidate.toFixed(3))
+  }
+  return testValueFor(label, inputType, tagName, index)
+}
+
+function parseOptionalNumber(value: string | null) {
+  if (value === null || value.trim() === '') {
+    return Number.NaN
+  }
+  return Number(value)
+}
+
 function testValueFor(label: string, inputType: string, tagName: string, index: number) {
   if (/页|page/i.test(label)) {
     return '1'
-  }
-  if (inputType === 'number') {
-    return String((index % 9) + 1)
   }
   if (inputType === 'email' || /邮箱|email/i.test(label)) {
     return `walkthrough-${RUN_ID}-${index}@example.com`
@@ -901,6 +930,18 @@ function dedupeIssues(issues: IssueRecord[]) {
     deduped.push(issue)
   }
   return deduped
+}
+
+async function writeActiveReport() {
+  if (!activeReport) {
+    return
+  }
+  await writeReport({
+    startedAt: activeReport.startedAt,
+    endedAt: new Date(),
+    routes: activeReport.routes,
+    issues: dedupeIssues(activeReport.issues),
+  })
 }
 
 async function writeReport(summary: {

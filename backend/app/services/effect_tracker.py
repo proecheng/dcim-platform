@@ -48,7 +48,9 @@ class EffectTracker:
 
     async def _find_plans_needing_tracking(self) -> List:
         """查找需要追踪的计划: status='completed', completed_at 距今 >= 7天, 无 ExecutionResult"""
-        seven_days_ago = (date.today() - timedelta(days=7)).isoformat()
+        # Keep the cutoff as a Python date. PostgreSQL's ``date(timestamp)``
+        # expression returns DATE and rejects a VARCHAR comparison.
+        seven_days_ago = date.today() - timedelta(days=7)
         result = await self.db.execute(
             select(ExecutionPlan)
             .outerjoin(ExecutionResult)
@@ -119,12 +121,12 @@ class EffectTracker:
 
         # 构建查询条件
         before_conditions = [
-            EnergyDaily.stat_date >= before_start.isoformat(),
-            EnergyDaily.stat_date <= before_end.isoformat(),
+            EnergyDaily.stat_date >= before_start,
+            EnergyDaily.stat_date <= before_end,
         ]
         after_conditions = [
-            EnergyDaily.stat_date >= tracking_start.isoformat(),
-            EnergyDaily.stat_date <= tracking_end.isoformat(),
+            EnergyDaily.stat_date >= tracking_start,
+            EnergyDaily.stat_date <= tracking_end,
         ]
 
         # 设备过滤 (H3)
@@ -253,10 +255,10 @@ class EffectTracker:
 
     async def _mark_completed_tracking(self) -> int:
         """标记追踪期结束的记录为 completed"""
-        today_str = date.today().isoformat()
+        today = date.today()
         result = await self.db.execute(
             select(ExecutionResult).where(
-                and_(ExecutionResult.status == "tracking", ExecutionResult.tracking_end <= today_str)
+                and_(ExecutionResult.status == "tracking", ExecutionResult.tracking_end <= today)
             )
         )
         records = result.scalars().all()
