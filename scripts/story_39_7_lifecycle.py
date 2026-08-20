@@ -39,6 +39,7 @@ from scripts.story_39_7_deploy import (
     Target,
     _parse_json_output,
     build_docker_command,
+    is_local_image_reference,
     redact_text,
     validate_environment,
 )
@@ -1791,7 +1792,7 @@ asyncio.run(provision())
         manifest = self._load_manifest(target.dr)
         candidate_image = values["DCIM_BACKEND_IMAGE"]
         for image in {candidate_image, target.dr.schema_application_image}:
-            if pull_images:
+            if pull_images and not is_local_image_reference(image):
                 self.runner.run(
                     build_docker_command(target, "pull", image),
                     timeout=1800,

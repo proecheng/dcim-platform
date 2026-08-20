@@ -18,6 +18,7 @@ from scripts.story_39_7_deploy import (
     Target,
     build_compose_command,
     build_docker_command,
+    is_local_image_reference,
     load_inventory,
     parse_environment,
     redact_text,
@@ -129,6 +130,12 @@ def test_repository_example_inventory_contains_ten_unique_targets():
     assert all(
         target.dr and target.dr.canonical_runtime_image.startswith("ghcr.io/proecheng/") for target in inventory.targets
     )
+
+
+def test_local_immutable_image_references_are_not_pulled_from_registry():
+    assert is_local_image_reference("localhost/dcim/backend@sha256:" + "a" * 64)
+    assert is_local_image_reference("localhost:5000/dcim/backend@sha256:" + "b" * 64)
+    assert not is_local_image_reference("ghcr.io/proecheng/dcim-platform/backend@sha256:" + "c" * 64)
 
 
 def test_critical_auth_spec_uses_configured_e2e_username():

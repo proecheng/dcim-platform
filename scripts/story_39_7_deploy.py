@@ -58,6 +58,12 @@ SUPPORTED_BROWSER_CHANNELS = {
     "msedge-dev",
     "msedge-canary",
 }
+
+
+def is_local_image_reference(reference: str) -> bool:
+    """Return whether an immutable image reference is expected to exist locally."""
+    host = reference.split("/", 1)[0].split("@", 1)[0]
+    return host == "localhost" or host.startswith("localhost:") or host in {"127.0.0.1", "[::1]"}
 APPLICATION_IMAGE_KEYS = {
     "backend": ("DCIM_BACKEND_IMAGE", "DCIM_BACKEND_EXPECTED_ID"),
     "frontend": ("DCIM_FRONTEND_IMAGE", "DCIM_FRONTEND_EXPECTED_ID"),
@@ -1180,8 +1186,12 @@ class FleetController:
         checks = self._preflight(
             target, values, secrets, compose_environment=compose_environment
         )
+        local_references = []
         if pull_images:
             for key in IMAGE_KEYS:
+                if is_local_image_reference(values[key]):
+                    local_references.append(values[key])
+                    continue
                 self.runner.run(
                     build_docker_command(target, "pull", values[key]),
                     secrets=secrets,
@@ -1206,12 +1216,15 @@ class FleetController:
                     or IMAGE_ID_RE.fullmatch(image_id) is None
                 ):
                     raise DeploymentError(f"local {key} image is unavailable")
+                if values[key] not in local_references:
+                    local_references.append(values[key])
         checks.append(
             {
-                "name": "image_pull" if pull_images else "local_images",
+                "name": "image_pull" if pull_images and not local_references else "local_images",
                 "status": "passed",
                 "references": [values[key] for key in IMAGE_KEYS],
-                "registry_contacted": pull_images,
+                "registry_contacted": pull_images and len(local_references) < len(IMAGE_KEYS),
+                "local_references": sorted(local_references),
             }
         )
         checks.extend(self._verify_images(target, values, secrets))
