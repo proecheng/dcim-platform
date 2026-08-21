@@ -29,7 +29,7 @@ from ..deps import (
     require_site_access,
     require_viewer,
 )
-from ...models.user import User
+from ...models.user import User, UserSite
 from ...models.spatial import Site, Floor, Room, Row, LayoutTemplate
 from ...models.asset import Cabinet
 from ...models.gateway import Gateway, DataSource, MqttAclRule
@@ -394,6 +394,10 @@ async def delete_site(
     ds_cnt = await db.execute(select(func.count(DataSource.id)).where(DataSource.site_id == site_id))
     ds_count = ds_cnt.scalar() or 0
 
+    # 用户站点授权同样持有外键；必须先解除授权，避免提交时返回 500。
+    user_site_cnt = await db.execute(select(func.count(UserSite.id)).where(UserSite.site_id == site_id))
+    user_site_count = user_site_cnt.scalar() or 0
+
     deps = []
     if floor_count > 0:
         deps.append(f"楼层({floor_count})")
@@ -403,6 +407,8 @@ async def delete_site(
         deps.append(f"设备({dev_count})")
     if ds_count > 0:
         deps.append(f"数据源({ds_count})")
+    if user_site_count > 0:
+        deps.append(f"用户授权({user_site_count})")
 
     if deps:
         raise HTTPException(status_code=400, detail=f"请先删除该站点下的关联数据: {', '.join(deps)}")

@@ -36,6 +36,7 @@ const E2E_ADMIN_USER = process.env.E2E_ADMIN_USER ?? 'admin'
 const E2E_ADMIN_PASSWORD = process.env.E2E_ADMIN_PASSWORD ?? 'admin123'
 const VISIBLE_MS = Number(process.env.VISIBLE_MS ?? 5500)
 const ACTION_MS = Number(process.env.ACTION_MS ?? 5500)
+const CONTROL_TIMEOUT_MS = Number(process.env.CONTROL_TIMEOUT_MS ?? 5000)
 const MAX_BUTTONS_PER_PAGE = Number(process.env.MAX_BUTTONS_PER_PAGE ?? 120)
 const MAX_EDITABLES_PER_PAGE = Number(process.env.MAX_EDITABLES_PER_PAGE ?? 80)
 const MAX_TOGGLES_PER_PAGE = Number(process.env.MAX_TOGGLES_PER_PAGE ?? 80)
@@ -152,6 +153,7 @@ test.use({
 
 test('manual headed walkthrough of every routed page and safe functions', async ({ page }) => {
   test.setTimeout(60 * 60 * 1000)
+  page.setDefaultTimeout(CONTROL_TIMEOUT_MS)
 
   fs.mkdirSync(ARTIFACT_DIR, { recursive: true })
   clearPreviousSummary()
@@ -652,7 +654,7 @@ async function exerciseTransientUi(page: Page, route: RouteSpec, actions: Action
     return
   }
 
-  const dialog = page.locator('.el-dialog:visible, .el-drawer:visible, [role="dialog"]:visible').last()
+  const dialog = page.locator('.el-dialog:visible, .el-drawer:visible').last()
   if (await dialog.isVisible().catch(() => false)) {
     await editDialogFields(dialog, page, route, actions)
     const dialogText = await dialog.innerText().catch(() => '')
@@ -694,6 +696,7 @@ async function editDialogFields(dialog: Locator, page: Page, route: RouteSpec, a
       const tagName = ((await editable.evaluate((el) => el.tagName).catch(() => '')) as string).toLowerCase()
       const inputType = ((await editable.getAttribute('type').catch(() => '')) ?? '').toLowerCase()
       const value = await valueForEditable(editable, label, inputType, tagName, index)
+      console.log(`[manual-visible-walkthrough] dialog edit: ${route.title} ${label}`)
       if (tagName === 'textarea' || tagName === 'input') {
         await editable.fill(value, { timeout: 3500 })
       } else {
@@ -727,6 +730,7 @@ async function clickAndRecord(
   label: string,
 ) {
   try {
+    console.log(`[manual-visible-walkthrough] action: ${route.title} ${type} ${label || type}`)
     await locator.scrollIntoViewIfNeeded({ timeout: 2500 }).catch(() => {})
     await locator.click({ timeout: 3500, noWaitAfter: true })
     actions.push({ route: route.path, title: route.title, type, label: label || type, status: 'clicked' })
@@ -748,7 +752,7 @@ async function clickAndRecord(
 async function closeTransientUi(page: Page, beforeUrl: string, actions: ActionRecord[], route: RouteSpec) {
   await settle(page)
 
-  const dialog = page.locator('.el-dialog:visible, .el-drawer:visible, [role="dialog"]:visible').last()
+  const dialog = page.locator('.el-dialog:visible, .el-drawer:visible').last()
   if ((await dialog.count().catch(() => 0)) > 0) {
     await page.waitForTimeout(900)
     const cancelButton = dialog.getByRole('button', { name: /取消|关闭|返回/ }).first()
@@ -831,6 +835,14 @@ async function editableLabel(locator: Locator, index: number) {
   if (placeholder) {
     return placeholder
   }
+  const formLabel = normalize(
+    (await locator
+      .evaluate((element) => element.closest('.el-form-item')?.querySelector('.el-form-item__label')?.textContent ?? '')
+      .catch(() => '')) as string,
+  )
+  if (formLabel) {
+    return formLabel
+  }
   const name = normalize((await locator.getAttribute('name', { timeout: 300 }).catch(() => '')) ?? '')
   if (name) {
     return name
@@ -840,11 +852,11 @@ async function editableLabel(locator: Locator, index: number) {
 }
 
 async function isEditable(locator: Locator) {
-  const disabled = await locator.isDisabled().catch(() => true)
+  const disabled = await locator.isDisabled({ timeout: CONTROL_TIMEOUT_MS }).catch(() => true)
   if (disabled) {
     return false
   }
-  const readonly = await locator.getAttribute('readonly').catch(() => null)
+  const readonly = await locator.getAttribute('readonly', { timeout: CONTROL_TIMEOUT_MS }).catch(() => null)
   if (readonly !== null) {
     return false
   }
@@ -853,9 +865,19 @@ async function isEditable(locator: Locator) {
 }
 
 async function valueForEditable(locator: Locator, label: string, inputType: string, tagName: string, index: number) {
-  if (inputType === 'number') {
-    const min = parseOptionalNumber(await locator.getAttribute('min').catch(() => null))
-    const max = parseOptionalNumber(await locator.getAttribute('max').catch(() => null))
+  if (/日期|date/i.test(label)) {
+    return new Date().toISOString().slice(0, 10)
+  }
+  const role = (await locator.getAttribute('role', { timeout: CONTROL_TIMEOUT_MS }).catch(() => null)) ?? ''
+  if (inputType === 'number' || role === 'spinbutton' || /天数|数量|时长|阈值/.test(label)) {
+    const min = parseOptionalNumber(
+      (await locator.getAttribute('min').catch(() => null)) ??
+        (await locator.getAttribute('aria-valuemin').catch(() => null)),
+    )
+    const max = parseOptionalNumber(
+      (await locator.getAttribute('max').catch(() => null)) ??
+        (await locator.getAttribute('aria-valuemax').catch(() => null)),
+    )
     const step = parseOptionalNumber(await locator.getAttribute('step').catch(() => null))
     const floor = Number.isFinite(min) ? min : 1
     const ceiling = Number.isFinite(max) ? max : floor + 8

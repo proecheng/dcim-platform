@@ -13,6 +13,7 @@ Story 16-1: 站点管理测试
 import pytest
 from httpx import AsyncClient
 
+from app.models.user import UserSite
 from tests.conftest import auth_headers
 
 
@@ -270,6 +271,19 @@ class TestSiteDelete:
         resp = await client.delete(f"/api/v1/spatial/sites/{site['id']}", headers=auth_headers(token))
         assert resp.status_code == 400
         assert "数据源" in resp.json()["detail"]
+
+    @pytest.mark.asyncio
+    async def test_delete_site_with_user_assignment_blocked(self, client, admin_user, async_db):
+        """删除仍分配给用户的站点时返回业务错误，而不是数据库外键 500。"""
+        user, token = admin_user
+        site = await create_site(client, token)
+        async_db.add(UserSite(user_id=user.id, site_id=site["id"]))
+        await async_db.commit()
+
+        resp = await client.delete(f"/api/v1/spatial/sites/{site['id']}", headers=auth_headers(token))
+
+        assert resp.status_code == 400
+        assert "用户授权" in resp.json()["detail"]
 
     @pytest.mark.asyncio
     async def test_delete_nonexistent_site(self, client, admin_user):
