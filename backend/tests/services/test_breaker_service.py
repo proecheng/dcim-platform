@@ -3,12 +3,12 @@
 """
 import pytest
 from datetime import datetime, timedelta
+from unittest.mock import patch
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.services.diagnosis.breaker_service import (
     interpolate_trip_time,
     check_breaker_action,
-    BREAKER_CURVES
 )
 from app.models.alarm import Alarm
 from app.models.energy import PowerDevice
@@ -179,7 +179,9 @@ async def test_check_breaker_action_too_slow(async_db: AsyncSession):
     await async_db.commit()
     await async_db.refresh(alarm)
 
-    result = await check_breaker_action(alarm, async_db)
+    with patch("app.services.diagnosis.breaker_service.datetime") as mocked_datetime:
+        mocked_datetime.now.return_value = alarm.created_at + timedelta(seconds=0.15)
+        result = await check_breaker_action(alarm, async_db)
 
     assert result.action_type == "动作过慢，断路器老化"
     assert result.confidence == 0.8

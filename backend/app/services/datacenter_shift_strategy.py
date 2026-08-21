@@ -753,13 +753,15 @@ async def _get_thm_config(session: AsyncSession) -> Dict[str, float]:
 
     for key, default_value in defaults.items():
         try:
-            result = (await session.execute(select(SystemConfig).where(SystemConfig.key == key))).scalar_one_or_none()
+            result = (
+                await session.execute(select(SystemConfig).where(SystemConfig.config_key == key))
+            ).scalar_one_or_none()
 
             if result is None:
                 logger.warning(f"Config {key} not found, using default {default_value}")
                 config[key] = default_value
             else:
-                value = float(result.value)
+                value = float(result.config_value)
 
                 # 范围校验
                 if key == "thm_safety_factor":
@@ -807,7 +809,7 @@ async def _get_zone_supply_temperature(zone_id: int, session: AsyncSession) -> f
     query = (
         select(CoolingUnit, Point)
         .join(CoolingZoneUnit, CoolingZoneUnit.cooling_unit_id == CoolingUnit.id)
-        .join(Point, Point.device_code == CoolingUnit.device_code)
+        .join(Point, Point.device_id == CoolingUnit.device_id)
         .where(CoolingZoneUnit.zone_id == zone_id)
         .where(Point.point_code.like("%_supply_temp"))
     )
