@@ -46,6 +46,14 @@ class FailingWebSocket(FakeWebSocket):
         raise RuntimeError("socket closed")
 
 
+class DisconnectBeforeAuthWebSocket(FakeWebSocket):
+    async def receive_json(self):
+        raise WebSocketDisconnect(code=1000)
+
+    async def close(self, code=1000, reason=""):
+        raise AssertionError("a disconnected client must not be closed again")
+
+
 def _context(
     websocket,
     *,
@@ -346,6 +354,15 @@ def test_websocket_route_authenticates_before_processing_messages(monkeypatch):
         assert websocket.receive_json() == {"type": "authenticated"}
         websocket.send_json({"action": "ping"})
         assert websocket.receive_json() == {"type": "pong"}
+
+
+@pytest.mark.asyncio
+async def test_websocket_disconnect_before_auth_does_not_send_second_close():
+    socket = DisconnectBeforeAuthWebSocket()
+
+    await main_module._serve_authorized_websocket(socket, "realtime")
+
+    assert socket.accepted is True
 
 
 @pytest.mark.parametrize(

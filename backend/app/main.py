@@ -1445,14 +1445,26 @@ async def get_app_metrics():
 WS_AUTH_TIMEOUT_SECONDS = 5
 
 
+async def _close_unauthorized_websocket(websocket: WebSocket) -> None:
+    try:
+        await websocket.close(code=4001, reason="Unauthorized")
+    except WebSocketDisconnect:
+        return
+    except RuntimeError as exc:
+        if "Unexpected ASGI message 'websocket.close'" not in str(exc):
+            raise
+
+
 async def _serve_authorized_websocket(websocket: WebSocket, channel: str) -> None:
     await websocket.accept()
     context = None
     try:
         try:
             auth_frame = await asyncio.wait_for(websocket.receive_json(), timeout=WS_AUTH_TIMEOUT_SECONDS)
+        except WebSocketDisconnect:
+            return
         except Exception:
-            await websocket.close(code=4001, reason="Unauthorized")
+            await _close_unauthorized_websocket(websocket)
             return
         if (
             not isinstance(auth_frame, dict)
@@ -1460,12 +1472,12 @@ async def _serve_authorized_websocket(websocket: WebSocket, channel: str) -> Non
             or auth_frame.get("action") != "authenticate"
             or not isinstance(auth_frame.get("token"), str)
         ):
-            await websocket.close(code=4001, reason="Unauthorized")
+            await _close_unauthorized_websocket(websocket)
             return
 
         authorization = await verify_websocket_token(auth_frame["token"], channel)
         if authorization is None:
-            await websocket.close(code=4001, reason="Unauthorized")
+            await _close_unauthorized_websocket(websocket)
             return
         context = ConnectionContext(
             websocket=websocket,
@@ -1485,7 +1497,7 @@ async def _serve_authorized_websocket(websocket: WebSocket, channel: str) -> Non
                 message = await websocket.receive_json()
                 await ws_manager.handle_client_message(context, message)
             except ValueError:
-                await websocket.close(code=4001, reason="Unauthorized")
+                await _close_unauthorized_websocket(websocket)
                 return
     except WebSocketDisconnect:
         pass

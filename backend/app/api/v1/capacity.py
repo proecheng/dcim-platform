@@ -5,7 +5,7 @@
 import re
 import numpy as np
 from typing import Optional, List, Dict, Any
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from collections import defaultdict
 from fastapi import APIRouter, Depends, HTTPException, Query, Body
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -956,6 +956,13 @@ async def delete_capacity_plan(id: int, db: AsyncSession = Depends(get_db), _: U
 _VALID_CAP_TYPES = ("space", "power", "cooling", "weight")
 
 
+def _to_utc_naive(value: datetime) -> datetime:
+    """Match aware API timestamps to the database's UTC-naive DateTime columns."""
+    if value.tzinfo is None:
+        return value
+    return value.astimezone(timezone.utc).replace(tzinfo=None)
+
+
 def _auto_interval(start: datetime, end: datetime) -> str:
     """根据时间跨度自动选择聚合粒度"""
     span = (end - start).days
@@ -996,8 +1003,10 @@ async def get_capacity_trend(
 
     now = datetime.now()
     try:
-        end_dt = datetime.fromisoformat(end_time) if end_time else now
-        start_dt = datetime.fromisoformat(start_time) if start_time else end_dt - timedelta(days=30)
+        end_dt = _to_utc_naive(datetime.fromisoformat(end_time)) if end_time else now
+        start_dt = (
+            _to_utc_naive(datetime.fromisoformat(start_time)) if start_time else end_dt - timedelta(days=30)
+        )
     except (ValueError, TypeError):
         raise HTTPException(status_code=400, detail="无效的时间格式，请使用 ISO 8601 格式")
 

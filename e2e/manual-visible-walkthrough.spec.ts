@@ -135,7 +135,7 @@ const routeSlice = routes.slice(ROUTE_START - 1, ROUTE_END > 0 ? ROUTE_END : rou
 const sessionEndingButtonText = /退出登录|登出|注销|返回登录/
 const excludedWalkthroughButtonText = /打开数字孪生大屏/
 const destructiveActionText = /删除|清空|移除|注销/
-const confirmButtonText = /确定|确认|确认删除|删除|保存|提交|应用|完成|启用|禁用|下发|执行|开始分析|触发分析/
+const confirmButtonText = /确定|确认|确认删除|删除|保存|提交|应用|完成|启用|禁用|下发|执行|开始分析|触发分析|继续|生成|评估/
 const closeButtonText = /取消|关闭|返回/
 const expectedBusinessHttpConsoleText = /Failed to load resource: the server responded with a status of (400|409) /
 
@@ -382,11 +382,21 @@ async function clickTabs(page: Page, route: RouteSpec, actions: ActionRecord[]) 
     }
     seen.add(label)
     await clickSafely(page, tab, route, actions, '标签页', label)
+
+    const activePane = pageScope(page).locator('.el-tab-pane:visible').last()
+    if (await activePane.isVisible().catch(() => false)) {
+      await editEditableControls(page, route, actions, `页签“${label}”可编辑内容`, activePane)
+      await clickSelectLikeControls(page, route, actions, activePane)
+      await clickPagination(page, route, actions, activePane)
+      await clickAllVisibleButtons(page, route, actions, activePane)
+    }
   }
 }
 
-async function clickSelectLikeControls(page: Page, route: RouteSpec, actions: ActionRecord[]) {
-  const controls = pageScope(page).locator('.el-select:visible, .el-date-editor:visible, .el-dropdown:visible')
+async function clickSelectLikeControls(page: Page, route: RouteSpec, actions: ActionRecord[], scope?: Locator) {
+  const controls = (scope ?? pageScope(page)).locator(
+    '.el-select:visible, .el-date-editor:visible, .el-dropdown:visible',
+  )
   const total = await controls.count().catch(() => 0)
   for (let index = 0; index < total; index += 1) {
     const control = controls.nth(index)
@@ -410,8 +420,8 @@ async function clickSelectLikeControls(page: Page, route: RouteSpec, actions: Ac
   }
 }
 
-async function clickPagination(page: Page, route: RouteSpec, actions: ActionRecord[]) {
-  const pagers = pageScope(page).locator('.el-pagination button:not([disabled]):visible')
+async function clickPagination(page: Page, route: RouteSpec, actions: ActionRecord[], scope?: Locator) {
+  const pagers = (scope ?? pageScope(page)).locator('.el-pagination button:not([disabled]):visible')
   const total = await pagers.count().catch(() => 0)
   for (let index = 0; index < Math.min(total, 2); index += 1) {
     await clickSafely(page, pagers.nth(index), route, actions, '分页', `分页按钮${index + 1}`, {
@@ -420,11 +430,12 @@ async function clickPagination(page: Page, route: RouteSpec, actions: ActionReco
   }
 }
 
-async function clickAllVisibleButtons(page: Page, route: RouteSpec, actions: ActionRecord[]) {
+async function clickAllVisibleButtons(page: Page, route: RouteSpec, actions: ActionRecord[], scope?: Locator) {
   const seen = new Set<string>()
+  const root = scope ?? pageScope(page)
 
   for (let index = 0; index < MAX_BUTTONS_PER_PAGE; index += 1) {
-    const buttons = pageScope(page).locator('button:visible, [role="button"]:visible')
+    const buttons = root.locator('button:visible, [role="button"]:visible')
     const total = await buttons.count().catch(() => 0)
     if (index >= total) {
       break
@@ -458,6 +469,18 @@ async function clickAllVisibleButtons(page: Page, route: RouteSpec, actions: Act
         label,
         status: 'skipped',
         detail: '按本轮测试要求跳过数字孪生界面',
+      })
+      continue
+    }
+
+    if (destructiveActionText.test(label)) {
+      actions.push({
+        route: route.path,
+        title: route.title,
+        type: '按钮',
+        label,
+        status: 'skipped',
+        detail: '跳过可能没有二次确认的破坏性操作',
       })
       continue
     }
@@ -502,6 +525,7 @@ async function clickSafely(
     if (options.closeAfterClick !== false) {
       await closeTransientUi(page, beforeUrl, actions, route)
     }
+    return true
   } catch (error) {
     actions.push({
       route: route.path,
@@ -512,15 +536,23 @@ async function clickSafely(
       detail: error instanceof Error ? error.message.slice(0, 260) : String(error).slice(0, 260),
     })
     await writeActiveReport()
+    return false
   }
 }
 
-async function editEditableControls(page: Page, route: RouteSpec, actions: ActionRecord[], type: string) {
+async function editEditableControls(
+  page: Page,
+  route: RouteSpec,
+  actions: ActionRecord[],
+  type: string,
+  scope?: Locator,
+) {
   const editableSelector = 'input:not([type="hidden"]):visible, textarea:visible, [contenteditable="true"]:visible'
   const edited = new Set<string>()
+  const root = scope ?? pageScope(page)
 
   for (let index = 0; index < MAX_EDITABLES_PER_PAGE; index += 1) {
-    const editables = pageScope(page).locator(editableSelector)
+    const editables = root.locator(editableSelector)
     const total = await editables.count().catch(() => 0)
     if (index >= total) {
       break
@@ -578,11 +610,13 @@ async function editEditableControls(page: Page, route: RouteSpec, actions: Actio
     }
   }
 
-  await clickToggleControls(page, route, actions)
+  await clickToggleControls(page, route, actions, root)
 }
 
-async function clickToggleControls(page: Page, route: RouteSpec, actions: ActionRecord[]) {
-  const toggles = pageScope(page).locator('.el-switch:visible, .el-checkbox:visible, [role="switch"]:visible, input[type="checkbox"]:visible')
+async function clickToggleControls(page: Page, route: RouteSpec, actions: ActionRecord[], scope?: Locator) {
+  const toggles = (scope ?? pageScope(page)).locator(
+    '.el-switch:visible, .el-checkbox:visible, [role="switch"]:visible, input[type="checkbox"]:visible',
+  )
   const total = await toggles.count().catch(() => 0)
   const seen = new Set<string>()
 
@@ -595,7 +629,14 @@ async function clickToggleControls(page: Page, route: RouteSpec, actions: Action
       continue
     }
     seen.add(key)
-    await clickSafely(page, toggle, route, actions, '开关/复选', label, { exerciseAfterClick: false })
+    const toggled = await clickSafely(page, toggle, route, actions, '开关/复选', label, {
+      exerciseAfterClick: false,
+    })
+    if (toggled) {
+      await clickSafely(page, toggle, route, actions, '开关/复选恢复', `${label}（恢复原状态）`, {
+        exerciseAfterClick: false,
+      })
+    }
   }
 
   if (total > MAX_TOGGLES_PER_PAGE) {

@@ -1,7 +1,7 @@
 """容量趋势预测 API 测试 — Story 7-6"""
 
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 import pytest
 from httpx import AsyncClient, ASGITransport
@@ -16,6 +16,7 @@ from app.models.capacity import (
 )
 from app.models.user import User, UserSession
 from app.api.deps import get_db, require_viewer
+from app.api.v1.capacity import _to_utc_naive
 from tests.conftest import _create_test_token, auth_headers
 
 
@@ -140,6 +141,25 @@ async def _insert_history(session, cap_type, days_ago, usage_rate, total=1000.0,
 
 
 class TestCapacityTrend:
+    def test_aware_query_time_is_normalized_for_naive_database_column(self):
+        value = datetime(2026, 8, 21, 12, 0, tzinfo=timezone(timedelta(hours=8)))
+
+        assert _to_utc_naive(value) == datetime(2026, 8, 21, 4, 0)
+        assert _to_utc_naive(value).tzinfo is None
+
+    async def test_trend_accepts_utc_browser_timestamps(self, client: AsyncClient):
+        resp = await client.get(
+            "/api/v1/capacity/trend",
+            params={
+                "type": "space",
+                "start_time": "2026-07-22T04:57:03.284Z",
+                "end_time": "2026-08-21T04:57:03.284Z",
+                "interval": "day",
+            },
+        )
+
+        assert resp.status_code == 200
+
     async def test_trend_empty_data(self, client: AsyncClient):
         """无数据时返回空数组"""
         resp = await client.get("/api/v1/capacity/trend", params={"type": "space"})
