@@ -37,6 +37,7 @@ from ...schemas.capacity import (
     WeightCapacityUpdate,
     WeightCapacityResponse,
     CapacityPlanCreate,
+    CapacityPlanUpdate,
     CapacityPlanResponse,
     CapacityConstraintRequest,
     CapacityConstraintResponse,
@@ -764,6 +765,59 @@ async def get_capacity_plans(
     return [CapacityPlanResponse.model_validate(plan) for plan in plans]
 
 
+async def _evaluate_capacity_plan(plan: CapacityPlan, db: AsyncSession) -> None:
+    notes = []
+    is_feasible = True
+
+    if plan.required_u:
+        result = await db.execute(select(SpaceCapacity))
+        capacities = result.scalars().all()
+        available = sum((item.total_u_positions or 0) - (item.used_u_positions or 0) for item in capacities)
+        if available >= plan.required_u:
+            notes.append(f"空间容量检查通过: 可用U位 {available}U >= 所需 {plan.required_u}U")
+        else:
+            notes.append(f"空间容量不足: 可用U位 {available}U < 所需 {plan.required_u}U")
+            is_feasible = False
+
+    if plan.required_power_kw:
+        result = await db.execute(select(PowerCapacity))
+        capacities = result.scalars().all()
+        available = sum((item.total_capacity_kw or 0) - (item.used_capacity_kw or 0) for item in capacities)
+        if available >= plan.required_power_kw:
+            notes.append(f"电力容量检查通过: 可用电力 {available:.2f}kW >= 所需 {plan.required_power_kw:.2f}kW")
+        else:
+            notes.append(f"电力容量不足: 可用电力 {available:.2f}kW < 所需 {plan.required_power_kw:.2f}kW")
+            is_feasible = False
+
+    if plan.required_cooling_kw:
+        result = await db.execute(select(CoolingCapacity))
+        capacities = result.scalars().all()
+        available = sum((item.total_cooling_kw or 0) - (item.used_cooling_kw or 0) for item in capacities)
+        if available >= plan.required_cooling_kw:
+            notes.append(
+                f"制冷容量检查通过: 可用制冷 {available:.2f}kW >= 所需 {plan.required_cooling_kw:.2f}kW"
+            )
+        else:
+            notes.append(f"制冷容量不足: 可用制冷 {available:.2f}kW < 所需 {plan.required_cooling_kw:.2f}kW")
+            is_feasible = False
+
+    if plan.required_weight_kg:
+        result = await db.execute(select(WeightCapacity))
+        capacities = result.scalars().all()
+        available = sum((item.total_weight_kg or 0) - (item.used_weight_kg or 0) for item in capacities)
+        if available >= plan.required_weight_kg:
+            notes.append(f"承重容量检查通过: 可用承重 {available:.2f}kg >= 所需 {plan.required_weight_kg:.2f}kg")
+        else:
+            notes.append(f"承重容量不足: 可用承重 {available:.2f}kg < 所需 {plan.required_weight_kg:.2f}kg")
+            is_feasible = False
+
+    if not notes:
+        notes.append("无容量需求，规划可行")
+
+    plan.is_feasible = is_feasible
+    plan.feasibility_notes = "\n".join(notes)
+
+
 @router.post("/plans", response_model=CapacityPlanResponse, summary="创建容量规划")
 async def create_capacity_plan(
     data: CapacityPlanCreate, db: AsyncSession = Depends(get_db), _: User = Depends(require_operator)
@@ -774,72 +828,7 @@ async def create_capacity_plan(
     plan = CapacityPlan(**data.model_dump())
     db.add(plan)
     await db.flush()  # 获取ID但不提交
-
-    # 评估可行性
-    notes = []
-    is_feasible = True
-
-    # 检查空间容量（U位）
-    if plan.required_u:
-        space_result = await db.execute(select(SpaceCapacity))
-        space_capacities = space_result.scalars().all()
-        total_available_u = sum((sc.total_u_positions or 0) - (sc.used_u_positions or 0) for sc in space_capacities)
-        if total_available_u >= plan.required_u:
-            notes.append(f"空间容量检查通过: 可用U位 {total_available_u}U >= 所需 {plan.required_u}U")
-        else:
-            notes.append(f"空间容量不足: 可用U位 {total_available_u}U < 所需 {plan.required_u}U")
-            is_feasible = False
-
-    # 检查电力容量
-    if plan.required_power_kw:
-        power_result = await db.execute(select(PowerCapacity))
-        power_capacities = power_result.scalars().all()
-        total_available_power = sum((pc.total_capacity_kw or 0) - (pc.used_capacity_kw or 0) for pc in power_capacities)
-        if total_available_power >= plan.required_power_kw:
-            notes.append(
-                f"电力容量检查通过: 可用电力 {total_available_power:.2f}kW >= 所需 {plan.required_power_kw:.2f}kW"
-            )
-        else:
-            notes.append(f"电力容量不足: 可用电力 {total_available_power:.2f}kW < 所需 {plan.required_power_kw:.2f}kW")
-            is_feasible = False
-
-    # 检查制冷容量
-    if plan.required_cooling_kw:
-        cooling_result = await db.execute(select(CoolingCapacity))
-        cooling_capacities = cooling_result.scalars().all()
-        total_available_cooling = sum(
-            (cc.total_cooling_kw or 0) - (cc.used_cooling_kw or 0) for cc in cooling_capacities
-        )
-        if total_available_cooling >= plan.required_cooling_kw:
-            notes.append(
-                f"制冷容量检查通过: 可用制冷 {total_available_cooling:.2f}kW >= 所需 {plan.required_cooling_kw:.2f}kW"
-            )
-        else:
-            notes.append(
-                f"制冷容量不足: 可用制冷 {total_available_cooling:.2f}kW < 所需 {plan.required_cooling_kw:.2f}kW"
-            )
-            is_feasible = False
-
-    # 检查承重容量
-    if plan.required_weight_kg:
-        weight_result = await db.execute(select(WeightCapacity))
-        weight_capacities = weight_result.scalars().all()
-        total_available_weight = sum((wc.total_weight_kg or 0) - (wc.used_weight_kg or 0) for wc in weight_capacities)
-        if total_available_weight >= plan.required_weight_kg:
-            notes.append(
-                f"承重容量检查通过: 可用承重 {total_available_weight:.2f}kg >= 所需 {plan.required_weight_kg:.2f}kg"
-            )
-        else:
-            notes.append(
-                f"承重容量不足: 可用承重 {total_available_weight:.2f}kg < 所需 {plan.required_weight_kg:.2f}kg"
-            )
-            is_feasible = False
-
-    if not notes:
-        notes.append("无容量需求，规划可行")
-
-    plan.is_feasible = is_feasible
-    plan.feasibility_notes = "\n".join(notes)
+    await _evaluate_capacity_plan(plan, db)
 
     await db.commit()
     await db.refresh(plan)
@@ -858,6 +847,30 @@ async def get_capacity_plan(id: int, db: AsyncSession = Depends(get_db), _: User
     if not plan:
         raise HTTPException(status_code=404, detail="容量规划不存在")
 
+    return CapacityPlanResponse.model_validate(plan)
+
+
+@router.put("/plans/{id}", response_model=CapacityPlanResponse, summary="更新容量规划")
+async def update_capacity_plan(
+    id: int,
+    data: CapacityPlanUpdate,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_operator),
+):
+    result = await db.execute(select(CapacityPlan).where(CapacityPlan.id == id))
+    plan = result.scalar_one_or_none()
+    if not plan:
+        raise HTTPException(status_code=404, detail="容量规划不存在")
+
+    updates = data.model_dump(exclude_unset=True)
+    if updates.get("name", plan.name) is None:
+        raise HTTPException(status_code=422, detail="规划名称不能为空")
+    for field, value in updates.items():
+        setattr(plan, field, value)
+
+    await _evaluate_capacity_plan(plan, db)
+    await db.commit()
+    await db.refresh(plan)
     return CapacityPlanResponse.model_validate(plan)
 
 

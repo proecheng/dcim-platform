@@ -407,3 +407,38 @@ class TestOverrideCabinet:
             },
         )
         assert resp.status_code == 404
+
+
+class TestUpdateCapacityPlan:
+    @pytest.fixture
+    async def seed_plan(self, db_session):
+        plan = CapacityPlan(
+            id=1,
+            name="原规划",
+            description="原描述",
+            required_u=0,
+            is_feasible=False,
+            feasibility_notes="旧结论",
+        )
+        db_session.add(plan)
+        await db_session.commit()
+        return plan
+
+    async def test_update_plan_recalculates_feasibility(self, client: AsyncClient, seed_plan):
+        resp = await client.put(
+            "/api/v1/capacity/plans/1",
+            json={"name": "更新规划", "description": "更新描述"},
+        )
+
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["name"] == "更新规划"
+        assert body["description"] == "更新描述"
+        assert body["required_u"] == 0
+        assert body["is_feasible"] is True
+        assert body["feasibility_notes"] == "无容量需求，规划可行"
+
+    async def test_update_plan_not_found(self, client: AsyncClient):
+        resp = await client.put("/api/v1/capacity/plans/9999", json={"name": "不存在"})
+
+        assert resp.status_code == 404

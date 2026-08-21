@@ -219,6 +219,19 @@ class CapacityPlanCreate(CapacityPlanBase):
     created_by: Optional[str] = Field(None, description="创建人")
 
 
+class CapacityPlanUpdate(BaseModel):
+    """更新容量规划"""
+
+    name: Optional[str] = Field(None, description="规划名称")
+    description: Optional[str] = Field(None, description="规划描述")
+    device_count: Optional[int] = Field(None, description="设备数量")
+    required_u: Optional[int] = Field(None, description="所需U位")
+    required_power_kw: Optional[float] = Field(None, description="所需电力(kW)")
+    required_cooling_kw: Optional[float] = Field(None, description="所需制冷量(kW)")
+    required_weight_kg: Optional[float] = Field(None, description="所需承重(kg)")
+    target_cabinet_id: Optional[int] = Field(None, description="目标机柜ID")
+
+
 class CapacityPlanResponse(CapacityPlanBase):
     """容量规划响应"""
 

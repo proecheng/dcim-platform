@@ -10644,6 +10644,19 @@ http:
   active_session: true
   tests:
   - AUTHZ-INVENTORY-HTTP-01
+- key: PUT /api/v1/capacity/plans/{id}::update_capacity_plan
+  method: PUT
+  path: /api/v1/capacity/plans/{id}
+  operation: update_capacity_plan
+  access: GLOBAL
+  roles:
+  - admin
+  action: update
+  resource: capacity
+  resolver: null
+  active_session: true
+  tests:
+  - AUTHZ-INVENTORY-HTTP-01
 - key: PUT /api/v1/capacity/power/{id}::update_power_capacity
   method: PUT
   path: /api/v1/capacity/power/{id}
