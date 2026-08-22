@@ -16,10 +16,21 @@ from ...models.user import User, UserLoginHistory, UserSite
 from ...models.spatial import Site
 from ...schemas.user import UserCreate, UserUpdate, UserInfo, UserLoginHistoryResponse, UserSiteUpdate, UserSiteInfo
 from ...schemas.common import PageResponse
+from ...services.operation_audit import add_operation_audit
 from ...services.websocket import ws_manager
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
+
+
+def _user_audit_values(user: User) -> dict:
+    return {
+        "username": user.username,
+        "real_name": user.real_name,
+        "role": user.role,
+        "department": user.department,
+        "is_active": user.is_active,
+    }
 
 
 async def _invalidate_user_after_commit(user_id: int) -> None:
@@ -111,7 +122,11 @@ async def get_user(user_id: int, db: AsyncSession = Depends(get_db), _: User = D
 
 
 @router.post("", response_model=UserInfo, summary="创建用户")
-async def create_user(data: UserCreate, db: AsyncSession = Depends(get_db), _: User = Depends(require_admin)):
+async def create_user(
+    data: UserCreate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_admin),
+):
     """
     创建新用户
     """
@@ -136,6 +151,18 @@ async def create_user(data: UserCreate, db: AsyncSession = Depends(get_db), _: U
         department=data.department,
     )
     db.add(user)
+    await db.flush()
+    add_operation_audit(
+        db,
+        current_user,
+        module="user",
+        action="create",
+        target_type="user",
+        target_id=user.id,
+        target_name=user.username,
+        new_value=_user_audit_values(user),
+        remark="创建用户",
+    )
     await db.commit()
     await db.refresh(user)
 
@@ -144,7 +171,10 @@ async def create_user(data: UserCreate, db: AsyncSession = Depends(get_db), _: U
 
 @router.put("/{user_id}", response_model=UserInfo, summary="更新用户")
 async def update_user(
-    user_id: int, data: UserUpdate, db: AsyncSession = Depends(get_db), _: User = Depends(require_admin)
+    user_id: int,
+    data: UserUpdate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_admin),
 ):
     """
     更新用户信息
@@ -154,11 +184,30 @@ async def update_user(
     if not user:
         raise HTTPException(status_code=404, detail="用户不存在")
 
+    old_value = _user_audit_values(user)
+
     # 更新字段
     update_data = data.model_dump(exclude_unset=True)
     update_data["updated_at"] = datetime.now()
 
+    new_value = old_value.copy()
+    for key, value in update_data.items():
+        if key in new_value:
+            new_value[key] = value
+
     await db.execute(update(User).where(User.id == user_id).values(**update_data))
+    add_operation_audit(
+        db,
+        current_user,
+        module="user",
+        action="update",
+        target_type="user",
+        target_id=user_id,
+        target_name=user.username,
+        old_value=old_value,
+        new_value=new_value,
+        remark="更新用户信息",
+    )
     await db.commit()
     await _invalidate_user_after_commit(user_id)
 
@@ -185,6 +234,17 @@ async def delete_user(user_id: int, db: AsyncSession = Depends(get_db), current_
     await _ensure_user_history_allows_delete(db, [user_id])
     try:
         await db.execute(delete(User).where(User.id == user_id))
+        add_operation_audit(
+            db,
+            current_user,
+            module="user",
+            action="delete",
+            target_type="user",
+            target_id=user_id,
+            target_name=user.username,
+            old_value=_user_audit_values(user),
+            remark="删除用户",
+        )
         await db.commit()
     except IntegrityError as exc:
         await db.rollback()
@@ -207,14 +267,26 @@ async def batch_delete_users(
     if current_user.id in user_ids:
         raise HTTPException(status_code=400, detail="不能删除自己")
 
-    result = await db.execute(select(func.count(User.id)).where(User.id.in_(user_ids)))
-    found = result.scalar()
+    result = await db.execute(select(User).where(User.id.in_(user_ids)))
+    users = list(result.scalars().all())
+    found = len(users)
     if found == 0:
         raise HTTPException(status_code=404, detail="未找到要删除的用户")
 
     await _ensure_user_history_allows_delete(db, user_ids)
     try:
         await db.execute(delete(User).where(User.id.in_(user_ids)))
+        add_operation_audit(
+            db,
+            current_user,
+            module="user",
+            action="delete",
+            target_type="user",
+            target_id=None,
+            target_name=", ".join(user.username for user in users),
+            old_value={"user_ids": user_ids},
+            remark=f"批量删除 {found} 个用户",
+        )
         await db.commit()
     except IntegrityError as exc:
         await db.rollback()
@@ -243,7 +315,21 @@ async def toggle_user_status(
     if not user:
         raise HTTPException(status_code=404, detail="用户不存在")
 
+    old_value = _user_audit_values(user)
+    new_value = {**old_value, "is_active": is_active}
     await db.execute(update(User).where(User.id == user_id).values(is_active=is_active, updated_at=datetime.now()))
+    add_operation_audit(
+        db,
+        current_user,
+        module="user",
+        action="update",
+        target_type="user",
+        target_id=user_id,
+        target_name=user.username,
+        old_value=old_value,
+        new_value=new_value,
+        remark="启用用户" if is_active else "禁用用户",
+    )
     await db.commit()
     await _invalidate_user_after_commit(user_id)
 
@@ -255,7 +341,7 @@ async def reset_password(
     user_id: int,
     new_password: str = Query(..., min_length=8, description="新密码（必填，至少8位）"),
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_admin),
+    current_user: User = Depends(require_admin),
 ):
     """
     重置用户密码（必须提供新密码）
@@ -269,6 +355,16 @@ async def reset_password(
         update(User)
         .where(User.id == user_id)
         .values(password_hash=get_password_hash(new_password), updated_at=datetime.now())
+    )
+    add_operation_audit(
+        db,
+        current_user,
+        module="user",
+        action="update",
+        target_type="user",
+        target_id=user_id,
+        target_name=user.username,
+        remark="重置用户密码",
     )
     await db.commit()
     await _invalidate_user_after_commit(user_id)
@@ -332,13 +428,17 @@ async def get_user_sites(user_id: int, db: AsyncSession = Depends(get_db), _: Us
 
 @router.put("/{user_id}/sites", summary="设置用户站点权限")
 async def update_user_sites(
-    user_id: int, data: UserSiteUpdate, db: AsyncSession = Depends(get_db), _: User = Depends(require_admin)
+    user_id: int,
+    data: UserSiteUpdate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_admin),
 ):
     """
     设置用户的站点权限（全量替换）
     """
     result = await db.execute(select(User).where(User.id == user_id))
-    if not result.scalar_one_or_none():
+    user = result.scalar_one_or_none()
+    if not user:
         raise HTTPException(status_code=404, detail="用户不存在")
 
     # 验证站点存在
@@ -347,6 +447,9 @@ async def update_user_sites(
         if site_count.scalar() != len(data.site_ids):
             raise HTTPException(status_code=400, detail="部分站点不存在")
 
+    old_site_result = await db.execute(select(UserSite.site_id).where(UserSite.user_id == user_id))
+    old_site_ids = list(old_site_result.scalars().all())
+
     # 删除旧关联
     await db.execute(delete(UserSite).where(UserSite.user_id == user_id))
 
@@ -354,6 +457,18 @@ async def update_user_sites(
     for site_id in data.site_ids:
         db.add(UserSite(user_id=user_id, site_id=site_id))
 
+    add_operation_audit(
+        db,
+        current_user,
+        module="user",
+        action="update",
+        target_type="user_site_permissions",
+        target_id=user_id,
+        target_name=user.username,
+        old_value={"site_ids": old_site_ids},
+        new_value={"site_ids": data.site_ids},
+        remark="更新用户站点权限",
+    )
     await db.commit()
     await _invalidate_user_after_commit(user_id)
     return {"message": f"已为用户分配 {len(data.site_ids)} 个站点"}

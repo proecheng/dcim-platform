@@ -86,17 +86,19 @@ class ImAdapter(NotificationAdapter):
 
         try:
             async with async_session() as session:
-                for key in (
-                    "notification.im.dingtalk.webhook_url",
-                    "notification.im.dingtalk.secret",
-                ):
-                    result = await session.execute(select(SystemConfig).where(SystemConfig.key == key))
+                for key in ("webhook_url", "secret"):
+                    result = await session.execute(
+                        select(SystemConfig).where(
+                            SystemConfig.config_group == "notification.im.dingtalk",
+                            SystemConfig.config_key == key,
+                        )
+                    )
                     cfg = result.scalar_one_or_none()
-                    if cfg and cfg.value:
+                    if cfg and cfg.config_value:
                         if "webhook_url" in key:
-                            self._webhook_url = cfg.value
+                            self._webhook_url = cfg.config_value
                         else:
-                            self._secret = cfg.value
+                            self._secret = cfg.config_value
         except Exception as e:
             logger.warning("加载钉钉配置失败: %s", e)
 

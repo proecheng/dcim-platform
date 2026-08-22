@@ -356,9 +356,12 @@ async function loadSitesAndUsers() {
   try {
     const [sitesRes, usersRes] = await Promise.all([
       getSites(),
-      getUserList({ page: 1, page_size: 500 }),
+      getUserList({ page: 1, page_size: 100 }),
     ])
-    siteList.value = ((sitesRes as any).data || sitesRes || []).map((s: any) => ({ id: s.id, name: s.name }))
+    siteList.value = ((sitesRes as any).data || sitesRes || []).map((s: any) => ({
+      id: s.id,
+      name: s.site_name || s.name,
+    }))
     const usersData = (usersRes as any).items || (usersRes as any).data?.items || []
     userOptions.value = usersData.map((u: any) => ({ id: u.id, username: u.username, real_name: u.real_name || '' }))
   } catch (e) {

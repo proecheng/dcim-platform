@@ -162,10 +162,23 @@
           </el-radio-group>
         </el-form-item>
         <el-form-item v-if="!form.immediate" label="开始时间" prop="startTime">
-          <el-date-picker v-model="form.startTime" type="datetime" placeholder="选择开始时间" style="width: 100%" />
+          <el-date-picker
+            v-model="form.startTime"
+            type="datetime"
+            placeholder="选择开始时间"
+            :disabled-date="disablePastDate"
+            style="width: 100%"
+            @change="validateEndTime"
+          />
         </el-form-item>
         <el-form-item label="结束时间" prop="endTime">
-          <el-date-picker v-model="form.endTime" type="datetime" placeholder="选择结束时间" style="width: 100%" />
+          <el-date-picker
+            v-model="form.endTime"
+            type="datetime"
+            placeholder="选择结束时间"
+            :disabled-date="disablePastDate"
+            style="width: 100%"
+          />
         </el-form-item>
         <el-divider content-position="left">屏蔽告警级别</el-divider>
         <el-form-item label="告警级别" prop="levels">
@@ -526,7 +539,30 @@ const form = reactive<ShieldForm>({
 const formRules = {
   name: [{ required: true, message: '请输入策略名称', trigger: 'blur' }],
   scope: [{ required: true, message: '请选择屏蔽范围', trigger: 'change' }],
-  endTime: [{ required: true, message: '请选择结束时间', trigger: 'change' }]
+  endTime: [
+    { required: true, message: '请选择结束时间', trigger: 'change' },
+    {
+      validator: (_rule: unknown, value: Date | null, callback: (error?: Error) => void) => {
+        const start = form.immediate ? new Date() : form.startTime
+        if (value && start && value.getTime() <= start.getTime()) {
+          callback(new Error('结束时间必须晚于开始时间'))
+          return
+        }
+        callback()
+      },
+      trigger: 'change'
+    }
+  ]
+}
+
+function disablePastDate(date: Date) {
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  return date.getTime() < today.getTime()
+}
+
+function validateEndTime() {
+  if (form.endTime) formRef.value?.validateField('endTime').catch(() => false)
 }
 
 function handleScopeChange() {

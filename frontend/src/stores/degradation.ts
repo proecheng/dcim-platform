@@ -3,7 +3,7 @@
  * 管理 Redis / WebSocket / MQTT 降级状态，供 DegradationBanner 消费
  */
 import { defineStore } from 'pinia'
-import { reactive } from 'vue'
+import { computed, reactive } from 'vue'
 
 /** 独立响应式标志，可在 Pinia 初始化前安全写入（如 axios 拦截器） */
 export const degradationFlags = reactive({
@@ -13,37 +13,40 @@ export const degradationFlags = reactive({
   degradedMessage: '',
 })
 
-export const useDegradationStore = defineStore('degradation', {
-  state: () => ({
-    redisDown: false,
-    websocketDown: false,
-    mqttDown: false,
-    degradedMessage: '',
-  }),
-  getters: {
-    hasDegradation: (state) => state.redisDown || state.websocketDown || state.mqttDown,
-  },
-  actions: {
-    setRedisDown(down: boolean, message?: string) {
-      this.redisDown = down
-      degradationFlags.redisDown = down
-      this.degradedMessage = message || ''
-      degradationFlags.degradedMessage = message || ''
-    },
-    setWebsocketDown(down: boolean) {
-      this.websocketDown = down
-      degradationFlags.websocketDown = down
-    },
-    setMqttDown(down: boolean) {
-      this.mqttDown = down
-      degradationFlags.mqttDown = down
-    },
-    /** 从 degradationFlags 同步状态（供组件 onMounted 调用） */
-    syncFromFlags() {
-      this.redisDown = degradationFlags.redisDown
-      this.websocketDown = degradationFlags.websocketDown
-      this.mqttDown = degradationFlags.mqttDown
-      this.degradedMessage = degradationFlags.degradedMessage
-    },
-  },
+export const useDegradationStore = defineStore('degradation', () => {
+  const redisDown = computed(() => degradationFlags.redisDown)
+  const websocketDown = computed(() => degradationFlags.websocketDown)
+  const mqttDown = computed(() => degradationFlags.mqttDown)
+  const degradedMessage = computed(() => degradationFlags.degradedMessage)
+  const hasDegradation = computed(
+    () => degradationFlags.redisDown || degradationFlags.websocketDown || degradationFlags.mqttDown,
+  )
+
+  function setRedisDown(down: boolean, message?: string) {
+    degradationFlags.redisDown = down
+    degradationFlags.degradedMessage = message || ''
+  }
+
+  function setWebsocketDown(down: boolean) {
+    degradationFlags.websocketDown = down
+  }
+
+  function setMqttDown(down: boolean) {
+    degradationFlags.mqttDown = down
+  }
+
+  // 状态直接引用 degradationFlags，保留该方法兼容现有调用方。
+  function syncFromFlags() {}
+
+  return {
+    redisDown,
+    websocketDown,
+    mqttDown,
+    degradedMessage,
+    hasDegradation,
+    setRedisDown,
+    setWebsocketDown,
+    setMqttDown,
+    syncFromFlags,
+  }
 })

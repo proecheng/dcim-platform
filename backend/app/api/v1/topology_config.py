@@ -36,10 +36,12 @@ from ...models.topology_config import (
     CoolingZone,
     CoolingZoneCabinet,
     CoolingZoneUnit,
+    CabinetTemperatureSensor,
+    CabinetITLoad,
 )
 from ...models.energy import DistributionPanel, DistributionCircuit, PowerDevice
 from ...models.alarm import Alarm
-from ...models.point import Point
+from ...models.point import Point, PointRealtime
 from ...schemas.topology_config import (
     PowerPhaseMappingCreate,
     PowerPhaseMappingUpdate,
@@ -812,13 +814,88 @@ async def smart_site_selection(
     cz_result = await db.execute(zone_statement)
     zone_map = {z.id: z for z in cz_result.scalars().all()}
 
-    cab_power_map = {c.id: (c.max_power if c.max_power is not None else 0) for c in cabinets}
+    # 机柜当前 IT 负载：实时点位优先，其次使用设计/额定负载估算。
+    load_stmt = (
+        select(
+            CabinetITLoad.cabinet_id,
+            CabinetITLoad.design_load_kw,
+            CabinetITLoad.rated_power_kw,
+            PointRealtime.value,
+            PointRealtime.quality,
+        )
+        .outerjoin(PointRealtime, PointRealtime.point_id == CabinetITLoad.power_point_id)
+        .where(CabinetITLoad.cabinet_id.in_(cabinet_ids))
+    )
+    load_result = await db.execute(load_stmt)
+    cab_load_map: dict[int, float] = {}
+    cab_load_is_realtime: dict[int, bool] = {}
+    cab_load_source: dict[int, str] = {}
+    for cabinet_id, design_load, rated_power, realtime_value, quality in load_result.all():
+        if realtime_value is not None and quality != 2 and realtime_value >= 0:
+            cab_load_map[cabinet_id] = float(realtime_value)
+            cab_load_is_realtime[cabinet_id] = True
+            cab_load_source[cabinet_id] = "实时负载"
+        elif design_load is not None and design_load >= 0:
+            cab_load_map[cabinet_id] = float(design_load)
+            cab_load_is_realtime[cabinet_id] = False
+            cab_load_source[cabinet_id] = "设计负载估算"
+        elif rated_power is not None and rated_power >= 0:
+            cab_load_map[cabinet_id] = float(rated_power)
+            cab_load_is_realtime[cabinet_id] = False
+            cab_load_source[cabinet_id] = "额定负载估算"
+
+    for cabinet_id in cabinet_ids:
+        cab_load_map.setdefault(cabinet_id, 0.0)
+        cab_load_is_realtime.setdefault(cabinet_id, False)
+        cab_load_source.setdefault(cabinet_id, "负载未知，按0kW估算")
+
+    # 机柜温度：优先进风口，其次环境、出风口；仅使用质量不为坏值的实时点位。
+    temperature_stmt = (
+        select(
+            CabinetTemperatureSensor.cabinet_id,
+            CabinetTemperatureSensor.sensor_location,
+            CabinetTemperatureSensor.temp_warning_threshold,
+            CabinetTemperatureSensor.temp_critical_threshold,
+            PointRealtime.value,
+            PointRealtime.quality,
+        )
+        .outerjoin(PointRealtime, PointRealtime.point_id == CabinetTemperatureSensor.point_id)
+        .where(CabinetTemperatureSensor.cabinet_id.in_(cabinet_ids))
+    )
+    temperature_result = await db.execute(temperature_stmt)
+    location_priority = {"inlet": 0, "ambient": 1, "outlet": 2}
+    cab_temperature_map: dict[int, tuple[float, float, float, str]] = {}
+    cab_temperature_priority: dict[int, int] = {}
+    for cabinet_id, location, warning, critical, value, quality in temperature_result.all():
+        if value is None or quality == 2:
+            continue
+        priority = location_priority.get(location, 3)
+        if priority >= cab_temperature_priority.get(cabinet_id, 99):
+            continue
+        cab_temperature_priority[cabinet_id] = priority
+        cab_temperature_map[cabinet_id] = (
+            float(value),
+            float(warning if warning is not None else 27.0),
+            float(critical if critical is not None else 32.0),
+            location or "unknown",
+        )
 
     # Row + Room 预加载
     row_result = await db.execute(select(Row))
     row_map = {r.id: r for r in row_result.scalars().all()}
     room_result = await db.execute(select(Room))
     room_map = {r.id: r for r in room_result.scalars().all()}
+
+    def temperature_score(value: float, warning: float, critical: float) -> float:
+        if value <= 24:
+            return 100.0
+        if warning > 24 and value <= warning:
+            return max(70.0, 100.0 - (value - 24) / (warning - 24) * 30)
+        if critical <= warning:
+            critical = warning + 5
+        if value < critical:
+            return max(0.0, 70.0 - (value - warning) / (critical - warning) * 70)
+        return 0.0
 
     # 2. 评分函数
     def score_cabinet(cab):
@@ -827,15 +904,19 @@ async def smart_site_selection(
         if available_u < data.required_u:
             return None
         # 承重硬性筛选
-        if data.required_weight_kg is not None:
+        if data.required_weight_kg is not None and data.required_weight_kg > 0:
             if cab.max_weight is None or cab.max_weight < data.required_weight_kg:
                 return None
         if data.required_power_kw is not None and data.required_power_kw > 0:
-            if cab.max_power is None or cab.max_power < data.required_power_kw:
+            current_load = cab_load_map[cab.id]
+            if cab.max_power is None or cab.max_power - current_load < data.required_power_kw:
                 return None
 
         dimensions = []
         req_power = data.required_power_kw
+        current_load = cab_load_map[cab.id]
+        load_is_realtime = cab_load_is_realtime[cab.id]
+        load_source = cab_load_source[cab.id]
 
         # 空间评分
         space_score = min(100, (available_u / data.required_u) * 50)
@@ -858,8 +939,13 @@ async def smart_site_selection(
         elif cab.max_power is None:
             p_score, p_avail, p_detail = 50.0, False, "机柜未配置最大功率"
         else:
-            p_score = min(100, (cab.max_power / req_power) * 50)
-            p_avail, p_detail = True, f"最大{cab.max_power}kW，需要{req_power}kW"
+            remaining_power = max(0.0, cab.max_power - current_load)
+            p_score = min(100, (remaining_power / req_power) * 50)
+            p_avail = load_is_realtime
+            p_detail = (
+                f"可用{remaining_power:.1f}kW(容量{cab.max_power} - 当前{current_load:.1f})，"
+                f"需要{req_power}kW；{load_source}"
+            )
         dimensions.append(
             DimensionScore(
                 dimension="电力容量",
@@ -880,16 +966,20 @@ async def smart_site_selection(
             pdu_ppms = pdu_ppm_map.get(primary_ppm.pdu_device_id, [])
             phase_power = {"A": 0.0, "B": 0.0, "C": 0.0}
             for p in pdu_ppms:
-                phase_power[p.phase] = phase_power.get(p.phase, 0) + cab_power_map.get(p.cabinet_id, 0)
+                phase_power[p.phase] = phase_power.get(p.phase, 0) + cab_load_map.get(p.cabinet_id, 0)
             phase_power[primary_ppm.phase] += req_power or 0
+            phase_realtime = all(cab_load_is_realtime.get(p.cabinet_id, False) for p in pdu_ppms)
             a, b, c = phase_power["A"], phase_power["B"], phase_power["C"]
             avg = (a + b + c) / 3
             if avg == 0:
-                ph_score, ph_avail, ph_detail = 80.0, True, "PDU空载"
+                ph_score, ph_avail = 80.0, phase_realtime
+                ph_detail = "PDU空载" if phase_realtime else "负载数据不完整，按0kW模拟空载"
             else:
                 imbalance = (max(a, b, c) - min(a, b, c)) / avg * 100
                 ph_score = max(0, 100 - imbalance * 3)
-                ph_avail, ph_detail = True, f"模拟不平衡度{imbalance:.1f}%"
+                ph_avail = phase_realtime
+                source_note = "实时负载" if phase_realtime else "含估算负载"
+                ph_detail = f"{source_note}模拟不平衡度{imbalance:.1f}%"
         dimensions.append(
             DimensionScore(
                 dimension="三相平衡度",
@@ -903,18 +993,17 @@ async def smart_site_selection(
 
         # 温度环境评分
         zone_ids = cab_zone_map.get(cab.id, [])
-        if not zone_ids:
-            t_score, t_avail, t_detail = 50.0, False, "未关联制冷区域"
+        temperature = cab_temperature_map.get(cab.id)
+        if temperature is None:
+            t_score, t_avail, t_detail = 50.0, False, "未配置有效的机柜温度实时点位"
         else:
-            zone = zone_map.get(zone_ids[0])
-            if not zone or not zone.design_capacity_kw or zone.design_capacity_kw <= 0:
-                t_score, t_avail, t_detail = 50.0, False, "制冷区域未配置设计容量"
-            else:
-                zone_cabs = zone_cab_map.get(zone.id, [])
-                total_power = sum(cab_power_map.get(cid, 0) for cid in zone_cabs)
-                utilization = total_power / zone.design_capacity_kw * 100
-                t_score = max(0, 100 - utilization)
-                t_avail, t_detail = True, f"制冷利用率{utilization:.1f}%"
+            temp_value, warning, critical, location = temperature
+            t_score = temperature_score(temp_value, warning, critical)
+            t_avail = True
+            location_label = {"inlet": "进风", "ambient": "环境", "outlet": "出风"}.get(location, location)
+            t_detail = (
+                f"{location_label}温度{temp_value:.1f}℃，告警{warning:.1f}℃，严重{critical:.1f}℃"
+            )
         dimensions.append(
             DimensionScore(
                 dimension="温度环境",
@@ -938,14 +1027,17 @@ async def smart_site_selection(
                 cl_score, cl_avail, cl_detail = 50.0, False, "制冷区域未配置设计容量"
             else:
                 zone_cabs = zone_cab_map.get(zone.id, [])
-                total_power = sum(cab_power_map.get(cid, 0) for cid in zone_cabs)
+                total_power = sum(cab_load_map.get(cid, 0) for cid in zone_cabs)
+                load_realtime = all(cab_load_is_realtime.get(cid, False) for cid in zone_cabs)
                 remaining = zone.design_capacity_kw - total_power - req_power
                 if remaining <= 0:
                     cl_score, cl_detail = 0.0, f"制冷不足(剩余{remaining:.1f}kW)"
                 else:
                     cl_score = min(100, (remaining / req_power) * 50)
                     cl_detail = f"剩余制冷{remaining:.1f}kW"
-                cl_avail = True
+                if not load_realtime:
+                    cl_detail += "；区域负载含估算值"
+                cl_avail = load_realtime
         dimensions.append(
             DimensionScore(
                 dimension="制冷余量",

@@ -59,8 +59,13 @@ export class WebSocketClient {
    * 连接 WebSocket
    */
   connect(): void {
-    if (this.ws?.readyState === WebSocket.OPEN) {
+    if (this.ws?.readyState === WebSocket.OPEN || this.ws?.readyState === WebSocket.CONNECTING) {
       return
+    }
+
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer)
+      this.reconnectTimer = null
     }
 
     this.isManualClose = false
@@ -202,6 +207,7 @@ export class WebSocketClient {
     if (import.meta.env.DEV) console.log(`WebSocket 将在 ${delay}ms 后重连 (${this.reconnectAttempts}/${this.maxReconnectAttempts})`)
 
     this.reconnectTimer = window.setTimeout(() => {
+      this.reconnectTimer = null
       this.connect()
     }, delay)
   }

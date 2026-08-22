@@ -4,10 +4,10 @@ Story 34.2 — 通知渠道适配器框架测试
 
 import asyncio
 from datetime import datetime
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from tests.conftest import auth_headers
 
 from app.schemas.notification import (
     AlarmNotificationContext,
@@ -25,6 +25,7 @@ from app.services.notification.adapters import (
     VoiceCallAdapter,
     NotificationResult,
     ADAPTER_REGISTRY,
+    init_adapters,
 )
 
 
@@ -128,7 +129,7 @@ class TestEmailAdapter:
     async def test_send_timeout(self, sample_context):
         mock_svc = MagicMock()
         mock_svc.is_available = True
-        mock_svc.send_html_email = AsyncMock(side_effect=asyncio.TimeoutError())
+        mock_svc.send_html_email = MagicMock(return_value=None)
         adapter = EmailNotificationAdapter(mock_svc)
 
         # patch asyncio.wait_for to raise TimeoutError immediately
@@ -154,6 +155,32 @@ class TestEmailAdapter:
 
 
 class TestImAdapter:
+
+    async def test_load_config_uses_system_config_schema(self):
+        adapter = ImAdapter()
+        session = AsyncMock()
+        session.execute = AsyncMock(
+            side_effect=[
+                MagicMock(
+                    scalar_one_or_none=MagicMock(
+                        return_value=SimpleNamespace(config_value="https://example.com/hook")
+                    )
+                ),
+                MagicMock(
+                    scalar_one_or_none=MagicMock(return_value=SimpleNamespace(config_value="secret"))
+                ),
+            ]
+        )
+        session_context = AsyncMock()
+        session_context.__aenter__.return_value = session
+        session_context.__aexit__.return_value = False
+
+        with patch("app.core.database.async_session", return_value=session_context):
+            await adapter.load_config()
+
+        assert adapter._webhook_url == "https://example.com/hook"
+        assert adapter._secret == "secret"
+        assert session.execute.await_count == 2
 
     async def test_send_success(self, sample_context):
         adapter = ImAdapter()
@@ -307,6 +334,17 @@ class TestNotificationAPI:
 # ==================== 适配器注册表测试 ====================
 
 class TestAdapterRegistry:
+
+    async def test_init_registers_every_supported_channel(self):
+        original = dict(ADAPTER_REGISTRY)
+        ADAPTER_REGISTRY.clear()
+        try:
+            with patch.object(ImAdapter, "load_config", new=AsyncMock()):
+                await init_adapters()
+            assert set(ADAPTER_REGISTRY) == {"email", "im", "sms", "voice"}
+        finally:
+            ADAPTER_REGISTRY.clear()
+            ADAPTER_REGISTRY.update(original)
 
     async def test_disabled_adapter_not_used(self):
         """禁用的适配器 is_enabled 返回 False"""

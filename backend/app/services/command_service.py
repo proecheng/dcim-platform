@@ -427,6 +427,7 @@ async def get_risk_configs(db: AsyncSession) -> list[dict]:
         config_map[key] = {
             "command_type": key,
             "risk_level": default["risk_level"],
+            "minimum_risk": COMMAND_DEFINITIONS[key].minimum_risk,
             "description": default["description"],
         }
 

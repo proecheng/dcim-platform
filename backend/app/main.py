@@ -19,6 +19,7 @@ from .api.deps import authenticate_access_token, build_site_access_context, enfo
 from .services.websocket import ConnectionContext, WebSocketAuthorizationContext, ws_manager
 from .demo.lifecycle import startup as demo_startup, shutdown as demo_shutdown
 from .core.redis import redis_service
+from .mqtt import mqtt_service
 from .services.observability import run_observability_monitor
 from .engines.alarm_engine import alarm_engine
 from .engines.linkage_engine import linkage_engine
@@ -381,6 +382,14 @@ async def lifespan(app: FastAPI):
     # 连接 Redis 缓存
     if settings.redis_enabled:
         await redis_service.connect(settings.effective_redis_url)
+
+    # MQTT ingestion and command delivery are part of the runtime data path.
+    await mqtt_service.start()
+
+    # 注册通知渠道，确保渠道状态和告警分发链路在启动后即可用。
+    from app.services.notification import init_adapters
+
+    await init_adapters()
 
     # 加载告警引擎阈值缓存
     await alarm_engine.load_thresholds()
@@ -1277,6 +1286,7 @@ async def lifespan(app: FastAPI):
         calibration_check_task.cancel()
 
     ws_manager.stop_heartbeat()
+    await mqtt_service.stop()
     # 关闭 Redis 连接
     await redis_service.close()
     print("应用关闭")

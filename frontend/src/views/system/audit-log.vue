@@ -31,6 +31,7 @@
                 <el-option label="报表" value="report" />
                 <el-option label="能源管理" value="energy" />
                 <el-option label="数据源" value="datasource" />
+                <el-option label="认证" value="auth" />
               </el-select>
               <el-select v-model="opFilter.action" placeholder="全部操作" clearable style="width: 130px;">
                 <el-option label="全部" value="" />
@@ -39,6 +40,7 @@
                 <el-option label="删除" value="delete" />
                 <el-option label="查询" value="query" />
                 <el-option label="导出" value="export" />
+                <el-option label="安全事件" value="jwt_tamper_detected" />
               </el-select>
               <el-input
                 v-model="opFilter.keyword"
@@ -166,10 +168,12 @@
                 value-format="YYYY-MM-DD"
                 style="width: 260px;"
               />
-              <el-input
+              <el-input-number
                 v-model="commFilter.device_id"
-                placeholder="设备ID"
-                clearable
+                :min="1"
+                :precision="0"
+                placeholder="正整数设备ID"
+                controls-position="right"
                 style="width: 130px;"
                 @keyup.enter="handleSearch"
               />
@@ -313,7 +317,7 @@ const commPageSize = ref(20)
 const commTotal = ref(0)
 const commFilter = reactive({
   timeRange: null as [string, string] | null,
-  device_id: '',
+  device_id: null as number | null,
   status: '',
 })
 
@@ -325,7 +329,7 @@ async function loadCommunicationLogs() {
       page_size: commPageSize.value,
       start_time: commFilter.timeRange?.[0] || undefined,
       end_time: commFilter.timeRange?.[1] || undefined,
-      device_id: commFilter.device_id ? Number(commFilter.device_id) : undefined,
+      device_id: commFilter.device_id || undefined,
       status: commFilter.status || undefined,
     })
     commList.value = res.items || []
@@ -372,7 +376,7 @@ function handleReset() {
     sysPage.value = 1
   } else {
     commFilter.timeRange = null
-    commFilter.device_id = ''
+    commFilter.device_id = null
     commFilter.status = ''
     commPage.value = 1
   }

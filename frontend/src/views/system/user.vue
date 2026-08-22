@@ -352,19 +352,9 @@ import {
 } from '@/api/modules/notification'
 import type { ContactItem, ContactForm } from '@/api/modules/notification'
 import { isValidOptionalEmail, isValidOptionalPhone } from '@/utils/userValidation'
+import { getApiErrorMessage } from '@/utils/apiErrorMessage'
 
 type FormInstance = InstanceType<typeof import('element-plus')['ElForm']>
-
-function getApiErrorMessage(error: unknown, fallback: string): string {
-  const data = (error as any)?.response?.data
-  return (
-    (typeof data?.detail === 'string' && data.detail) ||
-    (typeof data?.error?.message === 'string' && data.error.message) ||
-    (typeof data?.error === 'string' && data.error) ||
-    (typeof data?.message === 'string' && data.message) ||
-    fallback
-  )
-}
 
 function showApiError(error: unknown, fallback: string, logLabel = fallback) {
   const status = (error as any)?.response?.status

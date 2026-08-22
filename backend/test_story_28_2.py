@@ -5,6 +5,9 @@
 2. Seed + Demo
 3. Seed + Demo + Simulation
 """
+
+__test__ = False
+
 import asyncio
 import os
 import sys

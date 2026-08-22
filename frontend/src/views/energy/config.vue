@@ -565,14 +565,14 @@
 
     <!-- 配电回路对话框 -->
     <el-dialog append-to-body v-model="dialogs.circuit" :title="circuitForm.id ? '编辑回路' : '新增回路'" width="500px">
-      <el-form :model="circuitForm" label-width="100px">
-        <el-form-item label="编码" required>
+      <el-form ref="circuitFormRef" :model="circuitForm" :rules="circuitRules" label-width="100px">
+        <el-form-item label="编码" prop="circuit_code">
           <el-input v-model="circuitForm.circuit_code" :disabled="!!circuitForm.id" />
         </el-form-item>
-        <el-form-item label="名称" required>
+        <el-form-item label="名称" prop="circuit_name">
           <el-input v-model="circuitForm.circuit_name" />
         </el-form-item>
-        <el-form-item label="所属配电柜" required>
+        <el-form-item label="所属配电柜" prop="panel_id">
           <el-select v-model="circuitForm.panel_id" style="width: 100%">
             <el-option v-for="p in panels" :key="p.id" :label="p.panel_name" :value="p.id" />
           </el-select>
@@ -861,8 +861,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted, computed } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ref, reactive, onMounted, computed, nextTick } from 'vue'
+import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus'
 import { Plus, Upload, Check, Refresh, Setting } from '@element-plus/icons-vue'
 import DeviceShiftDetailDrawer from '@/components/energy/DeviceShiftDetailDrawer.vue'
 import PricingSchemeManager from '@/components/energy/PricingSchemeManager.vue'
@@ -915,6 +915,12 @@ const transformerForm = ref<any>({})
 const meterForm = ref<any>({})
 const panelForm = ref<any>({})
 const circuitForm = ref<any>({})
+const circuitFormRef = ref<FormInstance>()
+const circuitRules: FormRules = {
+  circuit_code: [{ required: true, message: '请输入回路编码', trigger: 'blur' }],
+  circuit_name: [{ required: true, message: '请输入回路名称', trigger: 'blur' }],
+  panel_id: [{ required: true, message: '请选择所属配电柜', trigger: 'change' }]
+}
 const pricingForm = ref<any>({})
 const demandForm = ref<any>({})
 const meterDemandForm = ref<any>({})
@@ -1124,6 +1130,7 @@ const showPanelDialog = (row?: DistributionPanel) => {
 const showCircuitDialog = (row?: DistributionCircuit) => {
   circuitForm.value = row ? { ...row } : { is_shiftable: false }
   dialogs.circuit = true
+  nextTick(() => circuitFormRef.value?.clearValidate())
 }
 
 const showPricingDialog = (row?: ElectricityPricing) => {
@@ -1192,6 +1199,9 @@ const handleSavePanel = async () => {
 }
 
 const handleSaveCircuit = async () => {
+  const valid = await circuitFormRef.value?.validate().catch(() => false)
+  if (!valid) return
+
   saving.value = true
   try {
     if (circuitForm.value.id) {

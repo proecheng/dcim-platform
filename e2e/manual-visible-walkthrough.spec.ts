@@ -134,7 +134,7 @@ const routeSlice = routes.slice(ROUTE_START - 1, ROUTE_END > 0 ? ROUTE_END : rou
 
 const sessionEndingButtonText = /退出登录|登出|注销|返回登录/
 const excludedWalkthroughButtonText = /打开数字孪生大屏/
-const destructiveActionText = /删除|清空|移除|注销/
+const destructiveActionText = /删除|清空|移除|注销|终止/
 const confirmButtonText = /确定|确认|确认删除|删除|保存|提交|应用|完成|启用|禁用|下发|执行|开始分析|触发分析|继续|生成|评估/
 const closeButtonText = /取消|关闭|返回/
 const expectedBusinessHttpConsoleText = /Failed to load resource: the server responded with a status of (400|409) /
@@ -210,10 +210,15 @@ test('manual headed walkthrough of every routed page and safe functions', async 
         url: response.url(),
       })
     }
-    if (status === 404 && ['xhr', 'fetch', 'document'].includes(request.resourceType())) {
+    if (
+      status >= 400 &&
+      status < 500 &&
+      ![400, 409].includes(status) &&
+      ['xhr', 'fetch', 'document'].includes(request.resourceType())
+    ) {
       issues.push({
         route: currentRoute,
-        type: 'http.404',
+        type: `http.${status}`,
         detail: response.statusText(),
         status,
         url: response.url(),
@@ -404,11 +409,26 @@ async function clickSelectLikeControls(page: Page, route: RouteSpec, actions: Ac
       closeAfterClick: false,
       exerciseAfterClick: false,
     })
-    const option = page
+    const label = normalize(
+      (await control
+        .evaluate((element) => element.closest('.el-form-item')?.querySelector('.el-form-item__label')?.textContent ?? '')
+        .catch(() => '')) as string,
+    )
+    const futureDate = page.locator('.el-picker-panel:visible td.available:not(.disabled):visible').last()
+    const sourceLevel = page
+      .locator('.el-select-dropdown:visible .el-select-dropdown__item:not(.is-disabled):visible')
+      .filter({ hasText: '次要' })
+      .first()
+    const defaultOption = page
       .locator(
-        '.el-select-dropdown:visible .el-select-dropdown__item:not(.is-disabled):visible, .el-dropdown-menu:visible .el-dropdown-menu__item:not(.is-disabled):visible, .el-picker-panel:visible td.available:visible',
+        '.el-select-dropdown:visible .el-select-dropdown__item:not(.is-disabled):visible, .el-dropdown-menu:visible .el-dropdown-menu__item:not(.is-disabled):visible',
       )
       .first()
+    const option = (await futureDate.isVisible().catch(() => false))
+      ? futureDate
+      : /源告警级别/.test(label) && (await sourceLevel.isVisible().catch(() => false))
+        ? sourceLevel
+        : defaultOption
     if (await option.isVisible().catch(() => false)) {
       await clickSafely(page, option, route, actions, '下拉/日期选项', `控件${index + 1}选项`, {
         closeAfterClick: false,
@@ -611,6 +631,7 @@ async function editEditableControls(
   }
 
   await clickToggleControls(page, route, actions, root)
+  await clickRadioControls(page, route, actions, root)
 }
 
 async function clickToggleControls(page: Page, route: RouteSpec, actions: ActionRecord[], scope?: Locator) {
@@ -630,10 +651,12 @@ async function clickToggleControls(page: Page, route: RouteSpec, actions: Action
     }
     seen.add(key)
     const toggled = await clickSafely(page, toggle, route, actions, '开关/复选', label, {
+      closeAfterClick: false,
       exerciseAfterClick: false,
     })
     if (toggled) {
       await clickSafely(page, toggle, route, actions, '开关/复选恢复', `${label}（恢复原状态）`, {
+        closeAfterClick: false,
         exerciseAfterClick: false,
       })
     }
@@ -648,6 +671,49 @@ async function clickToggleControls(page: Page, route: RouteSpec, actions: Action
       status: 'skipped',
       detail: '超过单页动态开关巡检上限，避免重复控件导致巡检无法收尾',
     })
+  }
+}
+
+async function clickRadioControls(page: Page, route: RouteSpec, actions: ActionRecord[], scope?: Locator) {
+  const root = scope ?? pageScope(page)
+  const groups = root.locator('.el-radio-group:visible, [role="radiogroup"]:visible')
+  const groupCount = await groups.count().catch(() => 0)
+
+  for (let groupIndex = 0; groupIndex < groupCount; groupIndex += 1) {
+    const radios = groups.nth(groupIndex).locator('.el-radio:visible, [role="radio"]:visible')
+    const total = Math.min(await radios.count().catch(() => 0), MAX_TOGGLES_PER_PAGE)
+    let originalIndex = -1
+
+    for (let index = 0; index < total; index += 1) {
+      const radio = radios.nth(index)
+      const checked =
+        (await radio.getAttribute('aria-checked').catch(() => null)) === 'true' ||
+        (await radio.evaluate((element) => element.classList.contains('is-checked')).catch(() => false)) ||
+        (await radio.locator('input[type="radio"]').isChecked().catch(() => false))
+      if (checked) originalIndex = index
+      await clickSafely(
+        page,
+        radio,
+        route,
+        actions,
+        '单选项',
+        (await buttonLabel(radio)) || `单选组${groupIndex + 1}选项${index + 1}`,
+        { closeAfterClick: false, exerciseAfterClick: false },
+      )
+    }
+
+    if (originalIndex >= 0 && total > 1) {
+      const original = radios.nth(originalIndex)
+      await clickSafely(
+        page,
+        original,
+        route,
+        actions,
+        '单选项恢复',
+        `${(await buttonLabel(original)) || `单选组${groupIndex + 1}选项${originalIndex + 1}`}（恢复原状态）`,
+        { closeAfterClick: false, exerciseAfterClick: false },
+      )
+    }
   }
 }
 
@@ -698,6 +764,9 @@ async function exerciseTransientUi(page: Page, route: RouteSpec, actions: Action
   const dialog = page.locator('.el-dialog:visible, .el-drawer:visible').last()
   if (await dialog.isVisible().catch(() => false)) {
     await editDialogFields(dialog, page, route, actions)
+    await clickToggleControls(page, route, actions, dialog)
+    await clickRadioControls(page, route, actions, dialog)
+    await clickSelectLikeControls(page, route, actions, dialog)
     const dialogText = await dialog.innerText().catch(() => '')
     if (destructiveActionText.test(dialogText)) {
       const cancel = dialog.getByRole('button', { name: closeButtonText }).first()

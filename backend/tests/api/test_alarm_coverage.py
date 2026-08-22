@@ -616,6 +616,37 @@ class TestAlarmShields:
         assert data["id"] is not None
         assert data["status"] == "active"
 
+    async def test_create_shield_accepts_utc_aware_timestamps(self, client, operator_user, async_db):
+        _, token = operator_user
+        point, _, _ = await _seed_points_and_alarms(async_db)
+        now = datetime.now()
+        resp = await client.post(
+            "/api/v1/alarms/shields",
+            json={
+                "point_id": point.id,
+                "alarm_level": "major",
+                "start_time": now.isoformat() + "Z",
+                "end_time": (now + timedelta(hours=1)).isoformat() + "Z",
+                "reason": "UTC browser payload",
+            },
+            headers=auth_headers(token),
+        )
+        assert resp.status_code == 200
+        assert resp.json()["status"] == "active"
+
+    async def test_create_shield_rejects_reversed_time_range(self, client, operator_user, async_db):
+        _, token = operator_user
+        now = datetime.now()
+        resp = await client.post(
+            "/api/v1/alarms/shields",
+            json={
+                "start_time": now.isoformat() + "Z",
+                "end_time": (now - timedelta(hours=1)).isoformat() + "Z",
+            },
+            headers=auth_headers(token),
+        )
+        assert resp.status_code == 422
+
     async def test_get_shields_list(self, client, admin_user, async_db):
         """GET /alarms/shields — 屏蔽列表"""
         _, token = admin_user

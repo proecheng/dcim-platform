@@ -63,7 +63,8 @@ export interface CommandAuditLog {
 /** 风险配置项 */
 export interface RiskConfigItem {
   command_type: string
-  risk_level: string
+  risk_level: 'normal' | 'critical'
+  minimum_risk: 'normal' | 'critical'
   description?: string
 }
 

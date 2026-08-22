@@ -165,6 +165,17 @@ def test_production_validation_precedes_database_and_background_side_effects():
     assert all(validation_position < position for position in side_effect_positions)
 
 
+def test_mqtt_service_is_wired_into_application_lifecycle():
+    main_source = (ROOT / "backend" / "app" / "main.py").read_text(encoding="utf-8")
+    lifespan_source = main_source[main_source.index("async def lifespan(") :]
+
+    start_position = lifespan_source.index("await mqtt_service.start()")
+    yield_position = lifespan_source.index("yield")
+    stop_position = lifespan_source.index("await mqtt_service.stop()")
+
+    assert start_position < yield_position < stop_position
+
+
 def test_production_compose_requires_secrets_and_disables_seed_modes():
     compose = (ROOT / "docker-compose.yml").read_text(encoding="utf-8")
 

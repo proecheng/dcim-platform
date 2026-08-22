@@ -545,6 +545,9 @@ async def test_get_risk_configs(client):
     types = {item["command_type"] for item in data}
     assert "power_off" in types
     assert "ac_temp_set" in types
+    config_map = {item["command_type"]: item for item in data}
+    assert config_map["power_off"]["minimum_risk"] == "critical"
+    assert config_map["ac_temp_set"]["minimum_risk"] == "normal"
 
 
 @pytest.mark.anyio

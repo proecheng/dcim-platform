@@ -49,6 +49,21 @@ export interface LicenseActivateParams {
   hardware_id?: string
 }
 
+export interface SystemHealthInfo {
+  application: {
+    name: string
+    version: string
+    uptime_seconds: number
+  }
+  database: {
+    status: string
+    engine: string
+  }
+  websocket: {
+    active_connections: number
+  }
+}
+
 /**
  * 获取系统配置
  */
@@ -93,6 +108,11 @@ export function getDictionaryOptions(dictType: string): Promise<Dictionary[]> {
  */
 export function getLicenseInfo(): Promise<LicenseInfo> {
   return request.get('/v1/configs/license')
+}
+
+/** 获取当前进程、数据库与连接状态 */
+export function getSystemHealth(): Promise<SystemHealthInfo> {
+  return request.get('/v1/system/health')
 }
 
 /**

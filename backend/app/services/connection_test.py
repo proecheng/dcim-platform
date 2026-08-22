@@ -1,5 +1,8 @@
 """连接测试服务"""
 
+# 文件名是业务领域术语，不是 pytest 测试模块。
+__test__ = False
+
 import asyncio
 import logging
 from dataclasses import asdict

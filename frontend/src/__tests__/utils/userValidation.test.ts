@@ -7,6 +7,8 @@ describe('user form validation', () => {
     expect(isValidOptionalEmail('  admin@example.com  ')).toBe(true)
     expect(isValidOptionalEmail('invalid-email')).toBe(false)
     expect(isValidOptionalEmail('admin@example')).toBe(false)
+    expect(isValidOptionalEmail('admin@example.invalid')).toBe(false)
+    expect(isValidOptionalEmail('admin@example.test')).toBe(false)
   })
 
   it('accepts common phone formats and rejects incomplete values', () => {

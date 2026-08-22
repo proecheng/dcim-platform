@@ -22,7 +22,11 @@ class TestSystemHealth:
         resp = await client.get("/api/v1/system/health", headers=auth_headers(token))
         assert resp.status_code == 200
         data = resp.json()
-        assert "database" in data or "db_status" in data or "status" in str(data).lower()
+        assert data["database"]["status"] in {"connected", "disconnected"}
+        assert data["database"]["engine"] in {"SQLite", "PostgreSQL", "MySQL", "MariaDB"}
+        assert data["application"]["name"]
+        assert data["application"]["version"]
+        assert data["application"]["uptime_seconds"] >= 0
 
     async def test_backup_config_requires_auth(self, client):
         """未认证访问备份配置应返回 401"""

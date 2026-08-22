@@ -316,6 +316,21 @@ class TestHistoryAPI:
         )
         assert resp.status_code == 200
 
+    async def test_get_trend_accepts_utc_aware_window(self, client, admin_user, async_db):
+        _, token = admin_user
+        pt = await _seed_point(async_db)
+        await _seed_history(async_db, pt.id)
+        now = datetime.now()
+        resp = await client.get(
+            f"/api/v1/history/{pt.id}/trend",
+            params={
+                "start_time": (now - timedelta(days=1)).isoformat() + "Z",
+                "end_time": now.isoformat() + "Z",
+            },
+            headers=auth_headers(token),
+        )
+        assert resp.status_code == 200
+
     async def test_get_statistics(self, client, admin_user, async_db):
         _, token = admin_user
         pt = await _seed_point(async_db)

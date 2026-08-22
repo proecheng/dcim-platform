@@ -183,20 +183,10 @@ import {
 } from '@/api/modules/spatial'
 import type { Site, SiteForm, SiteSummaryResponse } from '@/api/modules/spatial'
 import { useSiteStore } from '@/stores/site'
+import { getApiErrorMessage } from '@/utils/apiErrorMessage'
 
 type FormInstance = InstanceType<typeof import('element-plus')['ElForm']>
 type TagType = 'info' | 'warning' | 'success' | 'danger' | 'primary'
-
-function getApiErrorMessage(error: unknown, fallback: string): string {
-  const data = (error as any)?.response?.data
-  return (
-    (typeof data?.detail === 'string' && data.detail) ||
-    (typeof data?.error?.message === 'string' && data.error.message) ||
-    (typeof data?.error === 'string' && data.error) ||
-    (typeof data?.message === 'string' && data.message) ||
-    fallback
-  )
-}
 
 function showApiError(error: unknown, fallback: string, logLabel = fallback) {
   const status = (error as any)?.response?.status

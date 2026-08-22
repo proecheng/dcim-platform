@@ -715,7 +715,10 @@ async def create_alarm_shield(
     """
 
     await _authorize_shield_point(db, data.point_id, site_context)
-    shield = AlarmShield(**data.model_dump(), created_by=current_user.id)
+    shield_data = data.model_dump()
+    shield_data["start_time"] = _db_datetime(data.start_time)
+    shield_data["end_time"] = _db_datetime(data.end_time)
+    shield = AlarmShield(**shield_data, created_by=current_user.id)
     db.add(shield)
     await db.commit()
     await db.refresh(shield)

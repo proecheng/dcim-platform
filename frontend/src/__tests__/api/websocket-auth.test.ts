@@ -77,6 +77,16 @@ describe('WebSocket first-frame authentication', () => {
     expect(client.isConnected).toBe(false)
   })
 
+  it('does not create duplicate sockets while a connection is pending', () => {
+    const client = new WebSocketClient({ url: '/ws/realtime' })
+
+    client.connect()
+    client.connect()
+
+    expect(MockWebSocket.instances).toHaveLength(1)
+    client.close()
+  })
+
   it('restores queued subscriptions only after authentication succeeds', () => {
     const onOpen = vi.fn()
     const client = new WebSocketClient({ url: '/ws/alarms', onOpen })
@@ -272,6 +282,30 @@ describe('WebSocket manager site-scoped subscriptions', () => {
     expect(handler).toHaveBeenCalledTimes(2)
 
     manager.disconnect('realtime')
+    siteEvents.clear()
+  })
+
+  it('retries an existing disconnected channel when connect is called again', async () => {
+    vi.useFakeTimers()
+    vi.resetModules()
+    const { siteEvents } = await import('@/utils/siteEvents')
+    siteEvents.clear()
+    const { useWebSocketManager } = await import('@/composables/useWebSocketManager')
+    const manager = useWebSocketManager()
+
+    manager.connect('system')
+    const firstSocket = MockWebSocket.instances[0]
+    firstSocket.open()
+    firstSocket.receive({ type: 'authenticated' })
+    firstSocket.serverClose(1006)
+
+    manager.connect('system')
+
+    expect(MockWebSocket.instances).toHaveLength(2)
+    vi.advanceTimersByTime(1000)
+    expect(MockWebSocket.instances).toHaveLength(2)
+
+    manager.disconnect('system')
     siteEvents.clear()
   })
 })

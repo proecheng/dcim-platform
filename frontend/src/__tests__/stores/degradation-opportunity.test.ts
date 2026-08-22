@@ -3,6 +3,7 @@
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { setActivePinia, createPinia } from 'pinia'
+import { degradationFlags } from '@/stores/degradation'
 
 // Mock opportunities API
 vi.mock('@/api/modules/opportunities', () => ({
@@ -85,6 +86,10 @@ vi.mock('@/api/modules/opportunities', () => ({
 describe('useDegradationStore', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
+    degradationFlags.redisDown = false
+    degradationFlags.websocketDown = false
+    degradationFlags.mqttDown = false
+    degradationFlags.degradedMessage = ''
   })
 
   it('初始状态 — 所有降级标志为 false', async () => {

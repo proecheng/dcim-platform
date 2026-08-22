@@ -104,6 +104,7 @@
                 <el-option label="删除" value="delete" />
                 <el-option label="查询" value="query" />
                 <el-option label="导出" value="export" />
+                <el-option label="安全事件" value="jwt_tamper_detected" />
               </el-select>
             </el-form-item>
             <el-form-item label="模块">
@@ -114,6 +115,7 @@
                 <el-option label="告警" value="alarm" />
                 <el-option label="配置" value="config" />
                 <el-option label="报表" value="report" />
+                <el-option label="认证" value="auth" />
               </el-select>
             </el-form-item>
             <el-form-item label="关键词">
@@ -262,7 +264,7 @@
           <el-descriptions title="系统信息" :column="2" border>
             <el-descriptions-item label="系统名称">{{ systemInfo.app_name }}</el-descriptions-item>
             <el-descriptions-item label="系统版本">{{ systemInfo.app_version }}</el-descriptions-item>
-            <el-descriptions-item label="数据库">SQLite</el-descriptions-item>
+            <el-descriptions-item label="数据库">{{ systemInfo.database }}</el-descriptions-item>
             <el-descriptions-item label="运行时间">{{ systemInfo.uptime }}</el-descriptions-item>
           </el-descriptions>
         </el-tab-pane>
@@ -430,7 +432,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted, watch } from 'vue'
+import { ref, reactive, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus } from '@element-plus/icons-vue'
 import { getPointList, type PointInfo } from '@/api/modules/point'
@@ -542,24 +544,28 @@ const alarmLevelType: Record<string, TagType> = {
   info: 'info'
 }
 
-const deviceTypeOptions = [
-  { label: '温湿度传感器', value: 'TH' },
-  { label: 'UPS', value: 'UPS' },
-  { label: 'PDU', value: 'PDU' },
-  { label: '精密空调', value: 'AC' },
-  { label: '门禁', value: 'DOOR' },
-  { label: '烟感', value: 'SMOKE' },
-  { label: '漏水', value: 'WATER' },
-  { label: '红外', value: 'IR' },
-  { label: '风机', value: 'FAN' },
-  { label: '照明', value: 'LIGHT' },
-]
-
-const deviceTypeText: Record<string, string> = {
+const knownDeviceTypeText: Record<string, string> = {
   TH: '温湿度', UPS: 'UPS', PDU: 'PDU', AC: '精密空调',
   DOOR: '门禁', SMOKE: '烟感', WATER: '漏水', IR: '红外',
-  FAN: '风机', LIGHT: '照明'
+  FAN: '风机', LIGHT: '照明', power: '电力'
 }
+
+const deviceTypeOptions = computed(() => {
+  const values = new Set<string>()
+  pointList.value.forEach(point => {
+    if (point.device_type) values.add(point.device_type)
+  })
+  thresholds.value.forEach(threshold => {
+    if (threshold.device_type) values.add(threshold.device_type)
+  })
+  return [...values]
+    .sort((a, b) => a.localeCompare(b))
+    .map(value => ({ label: knownDeviceTypeText[value] || value, value }))
+})
+
+const deviceTypeText = computed<Record<string, string>>(() =>
+  Object.fromEntries(deviceTypeOptions.value.map(option => [option.value, option.label]))
+)
 
 // ===== 操作日志 =====
 const operationLogs = ref<OperationLog[]>([])
@@ -601,7 +607,8 @@ const moduleText: Record<string, string> = {
   device: '设备',
   alarm: '告警',
   config: '配置',
-  report: '报表'
+  report: '报表',
+  auth: '认证'
 }
 
 // ===== 系统日志 =====
@@ -639,15 +646,27 @@ const excessPoints = computed(() => Math.max(0, licenseInfo.used_points - licens
 
 const systemInfo = reactive({
   app_name: '算力中心智能监控系统',
-  app_version: '2.0.0',
+  app_version: '-',
+  database: '-',
   uptime: '-'
 })
+const uptimeSeconds = ref<number | null>(null)
+let uptimeTimer: ReturnType<typeof setInterval> | undefined
 
 // ===== 生命周期 =====
 onMounted(async () => {
   await loadPoints()
   loadThresholds()
   loadSystemInfo()
+  uptimeTimer = setInterval(() => {
+    if (uptimeSeconds.value === null) return
+    uptimeSeconds.value += 1
+    systemInfo.uptime = formatUptime(uptimeSeconds.value)
+  }, 1000)
+})
+
+onBeforeUnmount(() => {
+  if (uptimeTimer !== undefined) clearInterval(uptimeTimer)
 })
 
 watch(activeTab, (val) => {
@@ -669,19 +688,48 @@ async function loadPoints() {
 }
 
 async function loadSystemInfo() {
-  try {
-    // 从统计API获取点位总数
-    const { getSystemOverview } = await import('@/api/modules/statistics')
-    const overview = await getSystemOverview()
-    licenseInfo.used_points = overview.points?.total || 0
+  const { getSystemOverview } = await import('@/api/modules/statistics')
+  const { getLicenseInfo: getLicense, getSystemHealth } = await import('@/api/modules/config')
+  const [overviewResult, licenseResult, healthResult] = await Promise.allSettled([
+    getSystemOverview(),
+    getLicense(),
+    getSystemHealth(),
+  ])
 
-    // 从配置API获取授权信息
-    const { getLicenseInfo: getLicense } = await import('@/api/modules/config')
-    const license = await getLicense()
-    licenseInfo.max_points = license.max_points || 100
-  } catch (e) {
-    console.error('加载系统信息失败', e)
+  if (overviewResult.status === 'fulfilled') {
+    const overview = overviewResult.value
+    licenseInfo.used_points = overview.points?.total || 0
+  } else {
+    console.error('加载点位统计失败', overviewResult.reason)
   }
+
+  if (licenseResult.status === 'fulfilled') {
+    const license = licenseResult.value
+    licenseInfo.max_points = license.max_points || 100
+  } else {
+    console.error('加载授权信息失败', licenseResult.reason)
+  }
+
+  if (healthResult.status === 'fulfilled') {
+    const health = healthResult.value
+    systemInfo.app_name = health.application.name
+    systemInfo.app_version = health.application.version
+    systemInfo.database = health.database.engine
+    uptimeSeconds.value = health.application.uptime_seconds
+    systemInfo.uptime = formatUptime(uptimeSeconds.value)
+  } else {
+    console.error('加载运行状态失败', healthResult.reason)
+  }
+}
+
+function formatUptime(totalSeconds: number): string {
+  const seconds = Math.max(0, Math.floor(totalSeconds))
+  const days = Math.floor(seconds / 86400)
+  const hours = Math.floor((seconds % 86400) / 3600)
+  const minutes = Math.floor((seconds % 3600) / 60)
+  if (days > 0) return `${days}天 ${hours}小时`
+  if (hours > 0) return `${hours}小时 ${minutes}分钟`
+  return `${minutes}分钟`
 }
 
 // ===== 阈值方法 =====
@@ -858,7 +906,7 @@ async function submitBatchByDeviceType() {
 
   try {
     await ElMessageBox.confirm(
-      `确定为设备类型「${deviceTypeText[batchDeviceTypeForm.device_type] || batchDeviceTypeForm.device_type}」下的 ${batchDeviceTypePointCount.value} 个 AI 点位批量设置阈值？`,
+      `确定为设备类型「${deviceTypeText.value[batchDeviceTypeForm.device_type] || batchDeviceTypeForm.device_type}」下的 ${batchDeviceTypePointCount.value} 个 AI 点位批量设置阈值？`,
       '批量配置确认',
       { type: 'warning' }
     )

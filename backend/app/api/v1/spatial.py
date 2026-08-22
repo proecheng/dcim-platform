@@ -58,8 +58,18 @@ from ...schemas.spatial import (
     TemplateApplyRequest,
     TemplateApplyResponse,
 )
+from ...services.operation_audit import add_operation_audit
 
 router = APIRouter(prefix="/spatial", tags=["空间拓扑"])
+
+
+def _site_audit_values(site: Site) -> dict:
+    return {
+        "site_code": site.site_code,
+        "site_name": site.site_name,
+        "address": site.address,
+        "status": site.status,
+    }
 
 
 def _floor_scope(query, context: SiteAccessContext):
@@ -318,7 +328,7 @@ async def get_sites_summary(
 async def create_site(
     data: SiteCreate,
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_operator),
+    current_user: User = Depends(require_operator),
 ):
     """创建站点（自动生成 EMQX ACL 规则）"""
     site = Site(**data.model_dump())
@@ -329,6 +339,18 @@ async def create_site(
     from ...services.emqx_acl import emqx_acl_service
 
     await emqx_acl_service.on_site_created(site.id, site.site_code, db)
+
+    add_operation_audit(
+        db,
+        current_user,
+        module="config",
+        action="create",
+        target_type="site",
+        target_id=site.id,
+        target_name=site.site_name,
+        new_value=_site_audit_values(site),
+        remark="创建站点",
+    )
 
     await db.commit()
     await db.refresh(site)
@@ -344,16 +366,29 @@ async def update_site(
     data: SiteUpdate,
     site_id: int = Depends(require_site_access),
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_operator),
+    current_user: User = Depends(require_operator),
 ):
     """更新站点"""
     result = await db.execute(select(Site).where(Site.id == site_id))
     site = result.scalar_one_or_none()
     if not site:
         raise HTTPException(status_code=404, detail="站点不存在")
+    old_value = _site_audit_values(site)
     for k, v in data.model_dump(exclude_unset=True).items():
         setattr(site, k, v)
     site.updated_at = datetime.now()
+    add_operation_audit(
+        db,
+        current_user,
+        module="config",
+        action="update",
+        target_type="site",
+        target_id=site_id,
+        target_name=site.site_name,
+        old_value=old_value,
+        new_value=_site_audit_values(site),
+        remark="更新站点",
+    )
     await db.commit()
     await db.refresh(site)
 
@@ -370,7 +405,7 @@ async def update_site(
 async def delete_site(
     site_id: int = Depends(require_site_access),
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_operator),
+    current_user: User = Depends(require_operator),
 ):
     """删除站点（检查所有关联数据）"""
     result = await db.execute(select(Site).where(Site.id == site_id))
@@ -415,6 +450,17 @@ async def delete_site(
 
     # 清理 ACL 规则
     await db.execute(delete(MqttAclRule).where(MqttAclRule.site_id == site_id))
+    add_operation_audit(
+        db,
+        current_user,
+        module="config",
+        action="delete",
+        target_type="site",
+        target_id=site_id,
+        target_name=site.site_name,
+        old_value=_site_audit_values(site),
+        remark="删除站点",
+    )
     await db.delete(site)
     await db.commit()
     return {"detail": "删除成功"}
@@ -428,7 +474,7 @@ async def update_site_status(
     site_id: int = Depends(require_site_access),
     status: str = Query(..., description="目标状态: active/inactive/maintenance"),
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_operator),
+    current_user: User = Depends(require_operator),
 ):
     """更新站点状态"""
     if status not in VALID_SITE_STATUSES:
@@ -440,6 +486,18 @@ async def update_site_status(
     old_status = site.status
     site.status = status
     site.updated_at = datetime.now()
+    add_operation_audit(
+        db,
+        current_user,
+        module="config",
+        action="update",
+        target_type="site",
+        target_id=site_id,
+        target_name=site.site_name,
+        old_value={"status": old_status},
+        new_value={"status": status},
+        remark="更新站点状态",
+    )
     await db.commit()
     return {"detail": f"站点状态已从 {old_status} 更新为 {status}"}
 

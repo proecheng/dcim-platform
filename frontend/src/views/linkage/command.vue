@@ -170,7 +170,7 @@
             <el-table-column prop="risk_level" label="风险等级" width="180" align="center">
               <template #default="{ row }">
                 <el-select v-model="row.risk_level" style="width: 130px">
-                  <el-option label="普通" value="normal" />
+                  <el-option label="普通" value="normal" :disabled="!canSelectRiskLevel(row, 'normal')" />
                   <el-option label="高危" value="critical" />
                 </el-select>
               </template>
@@ -198,6 +198,7 @@ import {
   updateRiskConfigs,
 } from '@/api/modules/command'
 import type { CommandApproval, CommandAuditLog, RiskConfigItem } from '@/api/modules/command'
+import { canSelectRiskLevel } from '@/utils/commandRisk'
 
 // ==================== Tab 切换 ====================
 const activeTab = ref('approvals')
@@ -322,6 +323,12 @@ async function loadRiskConfigs() {
 }
 
 async function handleSaveRiskConfigs() {
+  const invalidConfig = riskConfigs.value.find((config) => !canSelectRiskLevel(config, config.risk_level))
+  if (invalidConfig) {
+    ElMessage.error(`命令 ${invalidConfig.command_type} 不能低于系统最低风险等级`)
+    return
+  }
+
   savingRisk.value = true
   try {
     const res = await updateRiskConfigs(riskConfigs.value)

@@ -93,6 +93,7 @@ class RiskConfigItem(BaseModel):
 
     command_type: str
     risk_level: str  # normal / critical
+    minimum_risk: Optional[str] = None
     description: Optional[str] = None
 
 

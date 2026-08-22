@@ -2,7 +2,7 @@
 历史数据 API - v1
 """
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
@@ -29,6 +29,13 @@ from ...schemas.history import HistoryStatistics
 router = APIRouter()
 
 
+def _db_datetime(value: Optional[datetime]) -> Optional[datetime]:
+    """Normalize API timestamps to UTC-naive values used by history columns."""
+    if value is None or value.tzinfo is None:
+        return value
+    return value.astimezone(timezone.utc).replace(tzinfo=None)
+
+
 @router.get("/{point_id}", summary="获取点位历史数据")
 async def get_point_history(
     point_id: int,
@@ -53,6 +60,8 @@ async def get_point_history(
         start_time = datetime.now() - timedelta(hours=24)
     if not end_time:
         end_time = datetime.now()
+    start_time = _db_datetime(start_time)
+    end_time = _db_datetime(end_time)
 
     if granularity == "raw":
         # 原始数据
@@ -152,6 +161,8 @@ async def get_trend_data(
             start_time = datetime.now() - timedelta(hours=24)
         if not end_time:
             end_time = datetime.now()
+    start_time = _db_datetime(start_time)
+    end_time = _db_datetime(end_time)
 
     result = await db.execute(
         select(PointHistory)
@@ -194,6 +205,8 @@ async def get_history_statistics(
         start_time = datetime.now() - timedelta(hours=24)
     if not end_time:
         end_time = datetime.now()
+    start_time = _db_datetime(start_time)
+    end_time = _db_datetime(end_time)
 
     result = await db.execute(
         select(
@@ -320,6 +333,8 @@ async def compare_points(
         start_time = datetime.now() - timedelta(hours=24)
     if not end_time:
         end_time = datetime.now()
+    start_time = _db_datetime(start_time)
+    end_time = _db_datetime(end_time)
 
     result_data = {}
     for point_id in ids:
@@ -370,6 +385,8 @@ async def get_change_log(
         start_time = datetime.now() - timedelta(days=7)
     if not end_time:
         end_time = datetime.now()
+    start_time = _db_datetime(start_time)
+    end_time = _db_datetime(end_time)
 
     query = (
         select(PointChangeLog)
@@ -426,6 +443,8 @@ async def export_history(
         start_time = datetime.now() - timedelta(hours=24)
     if not end_time:
         end_time = datetime.now()
+    start_time = _db_datetime(start_time)
+    end_time = _db_datetime(end_time)
 
     result = await db.execute(
         select(PointHistory)

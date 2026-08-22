@@ -11,7 +11,14 @@ from sqlalchemy import delete
 from app.core.database import Base
 from app.models.asset import Cabinet, Asset
 from app.models.device import Device
-from app.models.topology_config import PowerPhaseMapping, CoolingZone, CoolingZoneCabinet
+from app.models.point import Point, PointRealtime
+from app.models.topology_config import (
+    PowerPhaseMapping,
+    CoolingZone,
+    CoolingZoneCabinet,
+    CabinetTemperatureSensor,
+    CabinetITLoad,
+)
 from app.models.user import User, UserSession
 from app.api.deps import get_db, require_viewer
 from tests.conftest import _create_test_token, auth_headers
@@ -62,10 +69,14 @@ async def admin_token(session_factory):
 @pytest.fixture
 async def db_session(session_factory):
     async with session_factory() as session:
+        await session.execute(delete(PointRealtime))
+        await session.execute(delete(CabinetTemperatureSensor))
+        await session.execute(delete(CabinetITLoad))
         await session.execute(delete(CoolingZoneCabinet))
         await session.execute(delete(CoolingZone))
         await session.execute(delete(PowerPhaseMapping))
         await session.execute(delete(Asset))
+        await session.execute(delete(Point))
         await session.execute(delete(Cabinet))
         await session.execute(delete(Device))
         await session.commit()
@@ -196,6 +207,46 @@ async def seed_cooling_zone(db_session, seed_cabinets):
     return zone
 
 
+@pytest.fixture
+async def seed_it_loads(db_session, seed_cabinets):
+    points = [
+        Point(id=1001, point_code="CAB-1-POWER", point_name="机柜1实时功率", point_type="AI", unit="kW"),
+        Point(id=1002, point_code="CAB-2-POWER", point_name="机柜2实时功率", point_type="AI", unit="kW"),
+        Point(id=1003, point_code="CAB-3-POWER", point_name="机柜3功率", point_type="AI", unit="kW"),
+    ]
+    db_session.add_all(points)
+    await db_session.flush()
+    db_session.add_all(
+        [
+            CabinetITLoad(cabinet_id=1, power_point_id=1001, design_load_kw=4.0, rated_power_kw=8.0),
+            CabinetITLoad(cabinet_id=2, power_point_id=1002, design_load_kw=2.0, rated_power_kw=4.0),
+            CabinetITLoad(cabinet_id=3, power_point_id=1003, design_load_kw=4.0, rated_power_kw=10.0),
+            PointRealtime(point_id=1001, value=3.0, quality=0),
+            PointRealtime(point_id=1002, value=1.0, quality=0),
+        ]
+    )
+    await db_session.commit()
+
+
+@pytest.fixture
+async def seed_temperatures(db_session, seed_cabinets):
+    points = [
+        Point(id=1101, point_code="CAB-1-TEMP", point_name="机柜1进风温度", point_type="AI", unit="℃"),
+        Point(id=1102, point_code="CAB-2-TEMP", point_name="机柜2进风温度", point_type="AI", unit="℃"),
+    ]
+    db_session.add_all(points)
+    await db_session.flush()
+    db_session.add_all(
+        [
+            CabinetTemperatureSensor(cabinet_id=1, point_id=1101, sensor_location="inlet"),
+            CabinetTemperatureSensor(cabinet_id=2, point_id=1102, sensor_location="inlet"),
+            PointRealtime(point_id=1101, value=25.0, quality=0),
+            PointRealtime(point_id=1102, value=33.0, quality=0),
+        ]
+    )
+    await db_session.commit()
+
+
 # ============================================================
 # Tests
 # ============================================================
@@ -235,8 +286,21 @@ async def test_smart_site_power_scoring(client, seed_cabinets):
     for c in data["candidates"]:
         power_dim = next(d for d in c["dimensions"] if d["dimension"] == "电力容量")
         if c["cabinet_id"] == 3:
-            assert power_dim["data_available"] is True
+            assert power_dim["data_available"] is False
             assert power_dim["score"] == 100.0
+            assert "按0kW估算" in power_dim["detail"]
+
+
+@pytest.mark.anyio
+async def test_smart_site_power_requirement_deducts_existing_load(client, seed_cabinets, seed_it_loads):
+    resp = await client.post(URL, json={"required_u": 1, "required_power_kw": 8.0})
+    assert resp.status_code == 200
+    data = resp.json()
+    assert {candidate["cabinet_id"] for candidate in data["candidates"]} == {3}
+    power_dim = next(d for d in data["candidates"][0]["dimensions"] if d["dimension"] == "电力容量")
+    assert power_dim["data_available"] is False
+    assert "容量20.0 - 当前4.0" in power_dim["detail"]
+    assert "设计负载估算" in power_dim["detail"]
 
 
 @pytest.mark.anyio
@@ -249,7 +313,7 @@ async def test_smart_site_power_requirement_excludes_unknown_and_insufficient_ca
 
 
 @pytest.mark.anyio
-async def test_smart_site_phase_balance(client, seed_cabinets, seed_pdu_device, seed_phase_mapping):
+async def test_smart_site_phase_balance(client, seed_cabinets, seed_pdu_device, seed_phase_mapping, seed_it_loads):
     resp = await client.post(URL, json={"required_u": 1, "required_power_kw": 5.0})
     data = resp.json()
     for c in data["candidates"]:
@@ -262,19 +326,22 @@ async def test_smart_site_phase_balance(client, seed_cabinets, seed_pdu_device, 
 
 
 @pytest.mark.anyio
-async def test_smart_site_temperature(client, seed_cabinets, seed_cooling_zone):
+async def test_smart_site_temperature(client, seed_cabinets, seed_cooling_zone, seed_temperatures):
     resp = await client.post(URL, json={"required_u": 1})
     data = resp.json()
     for c in data["candidates"]:
         temp_dim = next(d for d in c["dimensions"] if d["dimension"] == "温度环境")
         if c["cabinet_id"] in (1, 2):
             assert temp_dim["data_available"] is True
+            assert "进风温度" in temp_dim["detail"]
+            if c["cabinet_id"] == 2:
+                assert temp_dim["score"] == 0.0
         else:
             assert temp_dim["data_available"] is False
 
 
 @pytest.mark.anyio
-async def test_smart_site_cooling_remaining(client, seed_cabinets, seed_cooling_zone):
+async def test_smart_site_cooling_remaining(client, seed_cabinets, seed_cooling_zone, seed_it_loads):
     resp = await client.post(URL, json={"required_u": 1, "required_power_kw": 5.0})
     data = resp.json()
     for c in data["candidates"]:
@@ -286,7 +353,15 @@ async def test_smart_site_cooling_remaining(client, seed_cabinets, seed_cooling_
 
 
 @pytest.mark.anyio
-async def test_smart_site_confidence(client, seed_cabinets, seed_pdu_device, seed_phase_mapping, seed_cooling_zone):
+async def test_smart_site_confidence(
+    client,
+    seed_cabinets,
+    seed_pdu_device,
+    seed_phase_mapping,
+    seed_cooling_zone,
+    seed_it_loads,
+    seed_temperatures,
+):
     resp = await client.post(URL, json={"required_u": 1, "required_power_kw": 5.0})
     data = resp.json()
     for c in data["candidates"]:
@@ -306,6 +381,8 @@ async def test_smart_site_custom_weights(client, seed_cabinets):
         },
     )
     assert resp.status_code == 200
+    for candidate in resp.json()["candidates"]:
+        assert sum(dimension["weight"] for dimension in candidate["dimensions"]) == pytest.approx(100)
 
 
 @pytest.mark.anyio
@@ -322,6 +399,14 @@ async def test_smart_site_weight_requirement_excludes_unknown_capacity(client, s
     assert resp.status_code == 200
     data = resp.json()
     assert {candidate["cabinet_id"] for candidate in data["candidates"]} == {1, 3}
+
+
+@pytest.mark.anyio
+async def test_smart_site_zero_weight_does_not_require_configured_capacity(client, seed_cabinets):
+    resp = await client.post(URL, json={"required_u": 1, "required_weight_kg": 0})
+    assert resp.status_code == 200
+    data = resp.json()
+    assert {candidate["cabinet_id"] for candidate in data["candidates"]} == {1, 2, 3, 4}
 
 
 @pytest.mark.anyio

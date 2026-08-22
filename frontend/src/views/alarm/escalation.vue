@@ -140,7 +140,7 @@
           </el-col>
           <el-col :span="8">
             <el-form-item label="源告警级别" prop="sourceLevel">
-              <el-select v-model="form.sourceLevel" style="width: 100%">
+              <el-select v-model="form.sourceLevel" style="width: 100%" @change="validateTargetLevel">
                 <el-option label="紧急" value="critical" />
                 <el-option label="重要" value="major" />
                 <el-option label="次要" value="minor" />
@@ -481,7 +481,24 @@ const form = reactive<EscalationForm>({
 const formRules = {
   ruleName: [{ required: true, message: '请输入规则名称', trigger: 'blur' }],
   sourceLevel: [{ required: true, message: '请选择源告警级别', trigger: 'change' }],
-  targetLevel: [{ required: true, message: '请选择目标升级级别', trigger: 'change' }]
+  targetLevel: [
+    { required: true, message: '请选择目标升级级别', trigger: 'change' },
+    {
+      validator: (_rule: unknown, value: string, callback: (error?: Error) => void) => {
+        const order: Record<string, number> = { info: 0, minor: 1, major: 2, critical: 3 }
+        if (order[value] <= order[form.sourceLevel]) {
+          callback(new Error('目标级别必须高于源告警级别'))
+          return
+        }
+        callback()
+      },
+      trigger: 'change'
+    }
+  ]
+}
+
+function validateTargetLevel() {
+  formRef.value?.validateField('targetLevel').catch(() => false)
 }
 
 function createEmptyNode(): EscalationNode {

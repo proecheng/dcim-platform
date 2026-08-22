@@ -5,8 +5,9 @@
 import logging
 import os
 import shutil
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
+from urllib.parse import urlparse
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import text, select
@@ -22,6 +23,18 @@ from ...mqtt import mqtt_service
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
+PROCESS_STARTED_AT = datetime.now(timezone.utc)
+
+
+def _database_engine_name(database_url: str) -> str:
+    scheme = urlparse(database_url).scheme.split("+", 1)[0].lower()
+    return {
+        "postgres": "PostgreSQL",
+        "postgresql": "PostgreSQL",
+        "sqlite": "SQLite",
+        "mysql": "MySQL",
+        "mariadb": "MariaDB",
+    }.get(scheme, scheme or "Unknown")
 
 
 @router.get("/observability", summary="SLO 可观测性快照")
@@ -83,8 +96,16 @@ async def get_system_health(
         pass  # 磁盘信息获取失败不影响健康检查
 
     return {
+        "application": {
+            "name": settings.app_name,
+            "version": settings.app_version,
+            "uptime_seconds": int((datetime.now(timezone.utc) - PROCESS_STARTED_AT).total_seconds()),
+        },
         "redis": {"status": redis_status},
-        "database": {"status": db_status},
+        "database": {
+            "status": db_status,
+            "engine": _database_engine_name(settings.database_url),
+        },
         "websocket": {"active_connections": ws_connections},
         "mqtt": {"status": mqtt_status},
         "storage": storage_info,

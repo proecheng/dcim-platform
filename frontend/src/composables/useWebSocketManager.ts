@@ -110,7 +110,8 @@ const manager = {
    * 连接指定通道（如果已连接则复用）
    */
   connect(channel: WebSocketChannel): void {
-    ensureClient(channel)
+    const client = ensureClient(channel)
+    if (!client.isConnected) client.connect()
   },
 
   /**

@@ -4,7 +4,7 @@
 
 import json
 from typing import Optional, Dict, List
-from datetime import datetime
+from datetime import datetime, timezone
 from pydantic import BaseModel, ConfigDict, field_validator, model_validator
 
 
@@ -238,6 +238,18 @@ class AlarmShieldBase(BaseModel):
     start_time: datetime
     end_time: datetime
     reason: Optional[str] = None
+
+    @model_validator(mode="after")
+    def validate_time_range(self):
+        start = self.start_time
+        end = self.end_time
+        if start.tzinfo is not None:
+            start = start.astimezone(timezone.utc).replace(tzinfo=None)
+        if end.tzinfo is not None:
+            end = end.astimezone(timezone.utc).replace(tzinfo=None)
+        if end <= start:
+            raise ValueError("结束时间必须晚于开始时间")
+        return self
 
 
 class AlarmShieldCreate(AlarmShieldBase):
