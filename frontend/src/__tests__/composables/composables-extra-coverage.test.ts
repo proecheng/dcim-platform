@@ -6,13 +6,17 @@ import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest'
 import { setActivePinia, createPinia } from 'pinia'
 import { defineComponent, nextTick } from 'vue'
 import { mount } from '@vue/test-utils'
+import { useDataQuality } from '@/composables/useDataQuality'
 
 // ==================== Mock 依赖 ====================
 
 // Mock WebSocket (systemWs)
-const mockWsConnect = vi.fn()
-const mockWsOn = vi.fn()
-const mockWsOff = vi.fn()
+const { mockWsConnect, mockWsOn, mockWsOff, mockNotification } = vi.hoisted(() => ({
+  mockWsConnect: vi.fn(),
+  mockWsOn: vi.fn(),
+  mockWsOff: vi.fn(),
+  mockNotification: vi.fn(),
+}))
 vi.mock('@/api/websocket', () => ({
   systemWs: { connect: mockWsConnect, on: mockWsOn, off: mockWsOff },
 }))
@@ -41,7 +45,6 @@ vi.mock('@/composables/useWebSocket', () => ({
 }))
 
 // Mock ElNotification
-const mockNotification = vi.fn()
 vi.mock('element-plus', async () => {
   const actual = await vi.importActual<Record<string, unknown>>('element-plus')
   return { ...actual, ElNotification: mockNotification }
@@ -231,7 +234,6 @@ describe('useDataQuality', () => {
   it('onMounted 连接 WebSocket 并注册监听', async () => {
     const pinia = createPinia()
     setActivePinia(pinia)
-    const { useDataQuality } = await import('@/composables/useDataQuality')
     mountComposable(() => useDataQuality(), pinia)
     expect(mockWsConnect).toHaveBeenCalled()
     expect(mockWsOn).toHaveBeenCalledWith('system', expect.any(Function))
@@ -240,7 +242,6 @@ describe('useDataQuality', () => {
   it('onUnmounted 取消监听', async () => {
     const pinia = createPinia()
     setActivePinia(pinia)
-    const { useDataQuality } = await import('@/composables/useDataQuality')
     const { wrapper } = mountComposable(() => useDataQuality(), pinia)
     wrapper.unmount()
     expect(mockWsOff).toHaveBeenCalledWith('system', expect.any(Function))
@@ -249,7 +250,6 @@ describe('useDataQuality', () => {
   it('收到 quality=2 消息时弹出 warning 通知', async () => {
     const pinia = createPinia()
     setActivePinia(pinia)
-    const { useDataQuality } = await import('@/composables/useDataQuality')
     mountComposable(() => useDataQuality(), pinia)
     const handler = mockWsOn.mock.calls.find((c: unknown[]) => c[0] === 'system')?.[1] as (msg: unknown) => void
     handler({ data: { type: 'data_quality_changed', quality: 2, affected_count: 5 } })
@@ -259,7 +259,6 @@ describe('useDataQuality', () => {
   it('收到 quality=0 消息时弹出 success 通知', async () => {
     const pinia = createPinia()
     setActivePinia(pinia)
-    const { useDataQuality } = await import('@/composables/useDataQuality')
     mountComposable(() => useDataQuality(), pinia)
     const handler = mockWsOn.mock.calls.find((c: unknown[]) => c[0] === 'system')?.[1] as (msg: unknown) => void
     handler({ data: { type: 'data_quality_changed', quality: 0, affected_count: 5 } })
@@ -269,7 +268,6 @@ describe('useDataQuality', () => {
   it('非 data_quality_changed 消息不触发通知', async () => {
     const pinia = createPinia()
     setActivePinia(pinia)
-    const { useDataQuality } = await import('@/composables/useDataQuality')
     mountComposable(() => useDataQuality(), pinia)
     const handler = mockWsOn.mock.calls.find((c: unknown[]) => c[0] === 'system')?.[1] as (msg: unknown) => void
     handler({ data: { type: 'other_event' } })
