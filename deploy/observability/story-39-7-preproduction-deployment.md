@@ -223,6 +223,51 @@ samples with gaps no greater than five minutes.
 
 ## 7. Run the 72-hour evidence window
 
+The repository includes a fail-closed collector and absolute-time scheduler.
+Run it only after the fixed candidate has passed lifecycle `upgrade` or
+`verify`, and after `scripts/story_39_7_prepare.py --skip-build` has bound the
+current immutable image manifests to the evidence baseline:
+
+```bash
+python -m scripts.story_39_7_burnin probe \
+  --inventory deploy/observability/story-39-7-targets.yaml \
+  --target workstation
+
+python -m scripts.story_39_7_burnin run \
+  --inventory deploy/observability/story-39-7-targets.yaml \
+  --target workstation
+```
+
+On Windows, start the `run` command with `Start-Process -WindowStyle Hidden`
+and redirect stdout/stderr to protected files outside the evidence artifacts.
+The collector calls the Windows execution-state API while it is alive so the
+host does not enter automatic sleep. Keep the interactive user session logged
+in because the scheduled Microsoft Edge tests are headed.
+
+Inspect progress without reading secrets:
+
+```bash
+python -m scripts.story_39_7_burnin status \
+  --inventory deploy/observability/story-39-7-targets.yaml \
+  --target workstation
+```
+
+Request a controlled stop when the candidate must change:
+
+```bash
+python -m scripts.story_39_7_burnin stop \
+  --inventory deploy/observability/story-39-7-targets.yaml \
+  --target workstation
+```
+
+The runner samples health, readiness, database, Redis, EMQX, WebSocket, image
+identity, container identity, restart counts, and Compose configuration every
+minute. It runs the headed zero-retry critical Edge suite on the absolute
+schedule below, performs the approved Redis recovery drill at `T+25h`, and
+runs the independent validator after `T+72h`. A missed five-minute boundary,
+candidate drift, process restart, first-attempt E2E failure, failed incident
+recovery, or operator stop leaves the manifest and release gate `BLOCKED`.
+
 Use one absolute UTC schedule. The contract's valid 12-run schedule is:
 
 ```text

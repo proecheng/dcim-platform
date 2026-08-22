@@ -6,10 +6,10 @@ owner: proecheng
 decision_id: D39-03
 annual_slo_proven: false
 provenance:
-  git_sha: ba1177448958c90e7ab979a3666f8719208c2f8f
-  backend_image: dcim-backend@sha256:2024d5d0e953153674a769307dbfccb840cbe47596e3277a8efbb09b17b626fc
-  frontend_image: dcim-frontend@sha256:28f85db1baf1f039614c2e1ea4b4a4a1fc610bfda3c30ce239f7b018f6ee0032
-  environment_fingerprint: 1e112779666dad5dab8cd69e2298bda847f556eda34ec01c7baedc844e5ab0db
+  git_sha: 204a3fa7161217d551c9b43c9bca9f94a2b2cbaf
+  backend_image: localhost/dcim-platform/backend@sha256:14176c3701168bdac88cb4409e890e6d1e71299015da5857feb5c09cdd172672
+  frontend_image: localhost/dcim-platform/frontend@sha256:f0a5db08dd9f9306529c41ae4688eea0ab8b148a1274fb28d57b1f859e057aab
+  environment_fingerprint: d9a54d50624c40dfdf93abdb8a6840ef5778ff4c0258dd8eb8c0ef8cee04a27e
 window:
   started_at_utc: null
   ended_at_utc: null
@@ -34,22 +34,22 @@ artifacts:
     sha256: 4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945
   source_hashes:
     path: source_hashes.json
-    sha256: 2adb346ac8955084f8c8723cd0a1cd1751a3a2145715c83d8914c518217f216a
+    sha256: 623f8c747a4a4e3a38f45b2be701f376869ea9614b2d2b874c449d8bbe6cb03f
   backend_image_manifest:
     path: backend_image_manifest.json
-    sha256: 2024d5d0e953153674a769307dbfccb840cbe47596e3277a8efbb09b17b626fc
+    sha256: 14176c3701168bdac88cb4409e890e6d1e71299015da5857feb5c09cdd172672
   frontend_image_manifest:
     path: frontend_image_manifest.json
-    sha256: 28f85db1baf1f039614c2e1ea4b4a4a1fc610bfda3c30ce239f7b018f6ee0032
+    sha256: f0a5db08dd9f9306529c41ae4688eea0ab8b148a1274fb28d57b1f859e057aab
   environment:
     path: environment.json
-    sha256: 1e112779666dad5dab8cd69e2298bda847f556eda34ec01c7baedc844e5ab0db
+    sha256: d9a54d50624c40dfdf93abdb8a6840ef5778ff4c0258dd8eb8c0ef8cee04a27e
 commands:
-- docker buildx build --provenance=false --platform linux/amd64 --annotation manifest:org.opencontainers.image.revision=ba1177448958c90e7ab979a3666f8719208c2f8f
-  --build-arg VCS_REF=ba1177448958c90e7ab979a3666f8719208c2f8f --tag dcim-backend:story-39-7-ba11774
+- docker buildx build --provenance=false --platform linux/amd64 --annotation manifest:org.opencontainers.image.revision=204a3fa7161217d551c9b43c9bca9f94a2b2cbaf
+  --build-arg VCS_REF=204a3fa7161217d551c9b43c9bca9f94a2b2cbaf --tag localhost/dcim-platform/backend:story-39-7-204a3fa-fixed
   --load backend
-- docker buildx build --provenance=false --platform linux/amd64 --annotation manifest:org.opencontainers.image.revision=ba1177448958c90e7ab979a3666f8719208c2f8f
-  --build-arg VCS_REF=ba1177448958c90e7ab979a3666f8719208c2f8f --tag dcim-frontend:story-39-7-ba11774
+- docker buildx build --provenance=false --platform linux/amd64 --annotation manifest:org.opencontainers.image.revision=204a3fa7161217d551c9b43c9bca9f94a2b2cbaf
+  --build-arg VCS_REF=204a3fa7161217d551c9b43c9bca9f94a2b2cbaf --tag localhost/dcim-platform/frontend:story-39-7-204a3fa-evidence
   --load frontend
 - 'PENDING: deploy the fixed images and start the 72-hour collector plus critical
   E2E schedule'

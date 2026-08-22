@@ -270,6 +270,8 @@ GPT-5
 - `scripts/story_39_7_evidence.py`
 - `scripts/story_39_7_prepare.py`
 - `scripts/story_39_7_deploy.py`
+- `scripts/story_39_7_burnin.py`
+- `backend/tests/test_story_39_7_burnin.py`
 - `_bmad-output/test-artifacts/epic-39/39.7/manifest.yaml`
 - `_bmad-output/test-artifacts/epic-39/39.7/manifest.schema.json`
 - `_bmad-output/test-artifacts/epic-39/39.7/local-validation.json`
@@ -294,3 +296,4 @@ GPT-5
 - 2026-08-19: Prepared the Node 22 fixed-image candidate and trusted local `BLOCKED` baseline, fixed Windows BuildKit output decoding, and recorded immutable SHA/digest/environment provenance; the genuine 72-hour gate remains open.
 - 2026-08-19: Published the fixed application images to GHCR and added the no-build pre-production deployment package; Story remains in progress until a real target, collector, scheduled E2E runs, and incident drill complete the external gate.
 - 2026-08-19: Added inventory-driven cross-platform fleet deployment, runtime verification, SSH-tunneled headed Edge E2E execution, failure-isolated parallel reports, and configurable critical-test users/browser channels; the Story remains blocked pending the genuine 72-hour window.
+- 2026-08-22: Added the fail-closed one-minute burn-in collector, absolute headed Edge schedule, controlled Redis incident/recovery drill, Windows sleep prevention, runtime drift detection, status/stop controls, and 9 focused tests; Task 5.4 remains open until the real 72-hour evidence validates.

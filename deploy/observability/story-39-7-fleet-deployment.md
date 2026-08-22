@@ -365,6 +365,32 @@ These reports support deployment diagnosis. They do not replace the raw
 availability, provenance, alert, incident, and 12-run evidence required by
 the independent Story 39.7 validator.
 
+## Automated 72-hour qualification
+
+After `plan -> preflight -> upgrade` has frozen one target, use the burn-in
+runner rather than manually scheduling twelve commands:
+
+```bash
+python -m scripts.story_39_7_burnin probe \
+  --inventory deploy/observability/story-39-7-targets.yaml \
+  --target workstation
+
+python -m scripts.story_39_7_burnin run \
+  --inventory deploy/observability/story-39-7-targets.yaml \
+  --target workstation
+```
+
+`status` reads `_bmad-output/test-artifacts/epic-39/39.7/burnin-state.json`;
+`stop` writes a controlled stop request and leaves the gate blocked. The
+runner uses the inventory's headed Edge channel and zero-retry critical suite,
+collects one-minute raw records, detects candidate/configuration/process drift,
+performs the required Redis alert and recovery drill, and invokes the
+independent evidence validator at the end. Run only one qualification target
+per evidence directory; the collector holds an OS-level single-instance lock.
+The current collector requires `e2e.mode: local`; SSH-tunnel fleet targets use
+the deployment controller for diagnosis but need a host-local collector before
+starting their formal evidence window.
+
 ## Recommended expansion
 
 For regular deployment beyond ten environments, keep this script as the
