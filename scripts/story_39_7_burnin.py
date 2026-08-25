@@ -36,7 +36,7 @@ from scripts.story_39_7_evidence import validate_evidence
 
 
 UTC = timezone.utc
-COLLECTOR_VERSION = "1"
+COLLECTOR_VERSION = "2"
 DEFAULT_EVIDENCE_DIR = ROOT / "_bmad-output" / "test-artifacts" / "epic-39" / "39.7"
 DEFAULT_CONTRACT = ROOT / "deploy" / "observability" / "story-39-7-contract.yaml"
 DEFAULT_INVENTORY = ROOT / "deploy" / "observability" / "story-39-7-targets.yaml"
@@ -864,6 +864,28 @@ class BurnInRunner:
             time.sleep(5)
         raise BurnInError(f"readiness did not become {expected}")
 
+    def _wait_for_service_health(self, service_name: str, timeout_seconds: int) -> None:
+        deadline = time.monotonic() + timeout_seconds
+        last_state = "missing"
+        while time.monotonic() < deadline:
+            compose = _run(
+                _compose_command(
+                    self.target, "ps", "--all", "--format", "json", service_name
+                ),
+                timeout=30,
+            )
+            services = _parse_json_lines(compose.stdout)
+            if len(services) == 1:
+                state = services[0].get("State")
+                health = services[0].get("Health")
+                last_state = f"{state}/{health}"
+                if state == "running" and health == "healthy":
+                    return
+            time.sleep(5)
+        raise BurnInError(
+            f"service {service_name} did not become running/healthy: {last_state}"
+        )
+
     def _incident_drill(self) -> None:
         incident_id = f"INC-REDIS-{uuid.uuid4().hex[:12]}"
         actions: list[dict[str, Any]] = []
@@ -879,11 +901,11 @@ class BurnInRunner:
             _run(_compose_command(self.target, "start", "redis"), timeout=2 * 60)
             redis_stopped = False
             actions.append({"action": "start_redis", "timestamp_utc": _utc_text()})
-            self._wait_for_readiness(True, 3 * 60)
-            self.incident_active.clear()
+            self._wait_for_service_health("redis", 3 * 60)
             recovery_checks: list[dict[str, Any]] = []
             previous_monotonic = fired_monotonic
             for index in range(3):
+                self._wait_for_readiness(True, 3 * 60)
                 with self.e2e_lock:
                     _artifact, summary, _started, _finished = self._fleet_test()
                 now_monotonic = time.monotonic()
